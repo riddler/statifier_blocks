@@ -1,6 +1,6 @@
 # ADR-0005: The editor is a pure command algebra and view model with a thin LiveView shell
 
-Status: proposed (2026-08-26)
+Status: accepted (2026-08-26)
 
 ## Context
 

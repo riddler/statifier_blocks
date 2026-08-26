@@ -1,6 +1,6 @@
 # ADR-0003: Assignability is opaque-string identity plus a host-supplied widening relation
 
-Status: proposed (2026-08-26)
+Status: accepted (2026-08-26)
 
 ## Context
 
