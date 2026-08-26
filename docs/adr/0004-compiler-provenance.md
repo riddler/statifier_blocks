@@ -1,6 +1,6 @@
 # ADR-0004: One block, one state - a deterministic compile carrying a provenance map
 
-Status: proposed (2026-08-26)
+Status: accepted (2026-08-26)
 
 ## Context
 

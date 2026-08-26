@@ -1,6 +1,6 @@
 # ADR-0002: A block type is a behaviour module resolved through a caller-supplied palette
 
-Status: proposed (2026-08-26)
+Status: accepted (2026-08-26)
 
 ## Context
 
@@ -255,6 +255,12 @@ sb-iwz's.
 not on its own children. It is a validation rule the core types carry, and
 the general question - which block types may appear in which slots - is
 assignability's, which is sb-7rx's record, not this one.
+
+*Amended at acceptance (2026-08-26):* ADR-0003 answered that question by
+subsuming this special case - the placement rule is carried by `io/1` kind
+tags, in both directions, and the core types carry no separate validation
+rule. Read this table's `core.on_event` row and the paragraph above as
+"carried by `io/1`" per ADR-0003.
 
 **11. What this record does not decide.** Named so that the next four
 records do not have to re-derive the boundary:

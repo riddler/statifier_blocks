@@ -1,6 +1,6 @@
 # ADR-0001: The block document is a tree of typed blocks with named slots
 
-Status: proposed (2026-08-26)
+Status: accepted (2026-08-26)
 
 ## Context
 
