@@ -3,6 +3,7 @@
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-block-document-schema.md) | The block document is a tree of typed blocks with named slots | proposed |
+| [0002](0002-block-type-behaviour.md) | A block type is a behaviour module resolved through a caller-supplied palette | proposed |
 
 New ADRs: next number, same three-section format (Context, Decision,
 Consequences). Pick the number against a freshly fetched remote.
