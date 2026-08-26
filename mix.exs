@@ -16,7 +16,14 @@ defmodule StatifierBlocks.MixProject do
       description:
         "Block document model, one-way SCXML compiler, and LiveView editor components for composing Statifier statecharts",
       source_url: @source_url,
-      package: package()
+      package: package(),
+      test_coverage: [tool: ExCoveralls],
+      dialyzer: [plt_add_apps: [:ex_unit]],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.html": :test
+      ]
     ]
   end
 
@@ -40,13 +47,18 @@ defmodule StatifierBlocks.MixProject do
     ]
   end
 
-  # Scaffold-only dependency set. The quality tooling (ex_quality, credo,
-  # dialyxir, excoveralls), the docs tooling (ex_doc), and the LiveView
-  # dependencies the editor components need are added by the beads that
-  # follow this one in the bootstrap stack.
+  # The docs tooling (ex_doc) and the LiveView dependencies the editor
+  # components need are added by the beads that follow this one in the
+  # bootstrap stack.
   defp deps do
     [
-      statifier_dep()
+      statifier_dep(),
+
+      # Dev / test
+      {:ex_quality, "~> 0.14", only: :dev, runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18", only: :test}
     ]
   end
 
