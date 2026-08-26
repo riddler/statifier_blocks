@@ -49,4 +49,5 @@ Not yet published to Hex.
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
+MIT - see
+[LICENSE](https://github.com/riddler/statifier_blocks/blob/main/LICENSE).

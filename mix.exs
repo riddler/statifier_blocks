@@ -16,6 +16,7 @@ defmodule StatifierBlocks.MixProject do
       description:
         "Block document model, one-way SCXML compiler, and LiveView editor components for composing Statifier statecharts",
       source_url: @source_url,
+      docs: docs(),
       package: package(),
       test_coverage: [tool: ExCoveralls],
       dialyzer: [plt_add_apps: [:ex_unit]],
@@ -36,20 +37,39 @@ defmodule StatifierBlocks.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
+  # Hexdocs configuration. These paths are read off the publisher's disk at
+  # `mix docs` time and need no entry in package()'s files: list - the docs
+  # tarball hexdocs hosts is built separately from the package tarball
+  # `mix deps.get` fetches.
+  defp docs do
+    [
+      name: "StatifierBlocks",
+      source_ref: "v#{@version}",
+      canonical: "https://hexdocs.pm/statifier_blocks",
+      source_url: @source_url,
+      main: "readme",
+      extras: [
+        "README.md",
+        "CHANGELOG.md"
+      ],
+      skip_undefined_reference_warnings_on: ["CHANGELOG.md"]
+    ]
+  end
+
   defp package do
     [
       name: "statifier_blocks",
       licenses: ["MIT"],
-      files: ~w(lib mix.exs README.md LICENSE),
+      files: ~w(lib mix.exs README.md LICENSE CHANGELOG.md),
       links: %{
-        "GitHub" => @source_url
+        "GitHub" => @source_url,
+        "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
       }
     ]
   end
 
-  # The docs tooling (ex_doc) and the LiveView dependencies the editor
-  # components need are added by the beads that follow this one in the
-  # bootstrap stack.
+  # The LiveView dependencies the editor components need are added by the
+  # beads that follow this one in the bootstrap stack.
   defp deps do
     [
       statifier_dep(),
@@ -58,7 +78,8 @@ defmodule StatifierBlocks.MixProject do
       {:ex_quality, "~> 0.14", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:excoveralls, "~> 0.18", only: :test}
+      {:excoveralls, "~> 0.18", only: :test},
+      {:ex_doc, "~> 0.40", only: :dev, runtime: false}
     ]
   end
 
