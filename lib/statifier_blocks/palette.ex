@@ -61,4 +61,69 @@ defmodule StatifierBlocks.Palette do
       :error -> {:error, {:unknown_block_type, type_name}}
     end
   end
+
+  @doc """
+  Resolves `block` through `palette` and, if needed, migrates its config in
+  memory (ADR-0002 decision 8).
+
+  Four distinguishable outcomes, checked in this order:
+
+    * the block's `type` has no entry in `palette` ->
+      `{:error, {:unknown_block_type, type}}`
+    * `block.type_version == module.current_version()` -> `{:ok, module,
+      block}`, `block` returned exactly as given
+    * `block.type_version > module.current_version()` -> `{:error,
+      {:block_type_too_new, block.id, block.type_version}}`. Hard error,
+      never a best-effort read: the code is older than the data, and
+      guessing is how a rollback corrupts documents
+    * `block.type_version < module.current_version()` -> `module.migrate_config/2`
+      is called once, straight from the stored version to current (never a
+      version-by-version ladder). A successful migration rewrites only
+      `block.config` on the returned struct; a failing one, or a module that
+      does not export `migrate_config/2` at all, becomes `{:error,
+      {:migration_failed, block.id, reason}}`
+
+  The migrated config is applied to the returned struct only - `resolve/2`
+  never calls `Document.to_json/1`, `from_json/1`, or anything else that
+  could persist. Persisting a migration is the caller's decision. The
+  returned block's `type_version` is left **as stored**, never bumped to
+  `current_version()`, so the result can never be mistaken for a block that
+  was migrated on disk.
+
+  `resolve/2` takes one block, not a document - it never walks a document;
+  the caller owns the walk and what to do with a per-block failure.
+  """
+  @spec resolve(t(), Block.t()) ::
+          {:ok, module(), Block.t()}
+          | {:error, {:unknown_block_type, Block.type_name()}}
+          | {:error, {:block_type_too_new, Block.id(), pos_integer()}}
+          | {:error, {:migration_failed, Block.id(), term()}}
+  def resolve(%__MODULE__{} = palette, %Block{} = block) do
+    with {:ok, module} <- fetch(palette, block.type) do
+      migrate(module, block, module.current_version())
+    end
+  end
+
+  @spec migrate(module(), Block.t(), pos_integer()) ::
+          {:ok, module(), Block.t()}
+          | {:error, {:block_type_too_new, Block.id(), pos_integer()}}
+          | {:error, {:migration_failed, Block.id(), term()}}
+  defp migrate(module, %Block{type_version: current} = block, current) do
+    {:ok, module, block}
+  end
+
+  defp migrate(_module, %Block{type_version: stored} = block, current) when stored > current do
+    {:error, {:block_type_too_new, block.id, stored}}
+  end
+
+  defp migrate(module, %Block{type_version: stored} = block, current) when stored < current do
+    if Code.ensure_loaded?(module) and function_exported?(module, :migrate_config, 2) do
+      case module.migrate_config(stored, block.config) do
+        {:ok, config} -> {:ok, module, %{block | config: config}}
+        {:error, reason} -> {:error, {:migration_failed, block.id, reason}}
+      end
+    else
+      {:error, {:migration_failed, block.id, :no_migration_available}}
+    end
+  end
 end

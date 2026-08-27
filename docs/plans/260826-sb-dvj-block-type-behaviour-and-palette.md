@@ -750,35 +750,35 @@ behaviour a host has to know.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Full gate green: `mix quality`
-- [ ] A block at `type_version: 2` against `Toy` (`current_version/0 == 2`)
+- [x] Full gate green: `mix quality`
+- [x] A block at `type_version: 2` against `Toy` (`current_version/0 == 2`)
       resolves to `{:ok, Toy, block}` with `block` **identical** to the input
       (`assert resolved == block`)
-- [ ] **The migration path**: a block at `type_version: 1` carrying
+- [x] **The migration path**: a block at `type_version: 1` carrying
       `%{"field" => "lead_score"}` resolves to `{:ok, Toy, migrated}` where
       `migrated.config["assign_to"] == "lead_score"` and
       `Map.has_key?(migrated.config, "field") == false`
-- [ ] **Never written back**: the migration test holds a `%Document{}`
+- [x] **Never written back**: the migration test holds a `%Document{}`
       containing that block, calls `resolve/2` on the block, and asserts the
       document is byte-identical afterwards -
       `Document.content_hash(doc)` unchanged and `doc == doc_before`
-- [ ] **The hard error**: a block at `type_version: 99` against `Toy`
+- [x] **The hard error**: a block at `type_version: 99` against `Toy`
       returns `{:error, {:block_type_too_new, block.id, 99}}`, with the block
       id and the offending version both named
-- [ ] `resolve/2` on a block whose `type` no entry carries returns
+- [x] `resolve/2` on a block whose `type` no entry carries returns
       `{:error, {:unknown_block_type, type}}` and never reaches
       `current_version/0`
-- [ ] A migration returning `{:error, reason}` (the Toy's catch-all clause,
+- [x] A migration returning `{:error, reason}` (the Toy's catch-all clause,
       reached by a block at `type_version: 1` against a type whose
       `current_version/0` is `3`) surfaces as
       `{:error, {:migration_failed, id, {:no_migration_from, 1}}}`
-- [ ] A type with `current_version/0 == 2` and **no** `migrate_config/2`
+- [x] A type with `current_version/0 == 2` and **no** `migrate_config/2`
       (add a third fixture module) returns
       `{:error, {:migration_failed, id, :no_migration_available}}`
-- [ ] `resolve/2` returns a value and raises for none over the same hostile
+- [x] `resolve/2` returns a value and raises for none over the same hostile
       table phase 2 used, plus a block whose `type_version` is `1` against
       every fixture module
-- [ ] Coverage stays at or above the 90% floor with every `resolve/2` clause
+- [x] Coverage stays at or above the 90% floor with every `resolve/2` clause
       reached - full `mix quality` decides this, and it is called out because
       the headroom is 4.2 points
 
@@ -1023,5 +1023,23 @@ advancement and the Manual items defer to `/wurk:verify`.
 - [ ] No rescue-to-default anywhere in the module (`CLAUDE.md` convention)
 
 **Implementation Note**: as phase 1.
+
+---
+
+### Phase 3
+
+- [ ] Every new test carries its sabotage mutation note, verified by hand
+- [ ] The check order is defensible as "one arm per distinguishable cause"
+      against decision 8 - read the ordered list beside the ADR
+- [ ] Migration is applied exactly once per `resolve/2` call, not iterated -
+      confirm by reading, since a ladder and a single call are
+      indistinguishable for a 1 -> 2 migration
+- [ ] Nothing in `palette.ex` calls `Document.to_json/1`, `from_json/1`, or
+      anything that could persist - the "never written back" rule read rather
+      than only tested
+
+**Implementation Note**: as phase 1. This is the last phase; run
+`/wurk:verify --unattended` after it to work the deferred manual items and
+the open questions below.
 
 ---
