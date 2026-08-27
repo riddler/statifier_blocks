@@ -391,15 +391,15 @@ and no nested bullets.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Full gate green: `mix quality`
-- [ ] A test reaches each of: `{:unsupported_schema_version, 2}`,
+- [x] Full gate green: `mix quality`
+- [x] A test reaches each of: `{:unsupported_schema_version, 2}`,
       `{:malformed_envelope, _}` for each envelope key, `{:malformed_block,
       _, _}` for each block field, and `{:duplicate_block_id, id}` for a
       duplicate deep in the tree
-- [ ] Float rejection is tested at three depths: a top-level `config` value,
+- [x] Float rejection is tested at three depths: a top-level `config` value,
       a value inside a nested list, and a value inside `metadata`
-- [ ] A valid document built by `Block.new/2`/`Document.new/2` returns `:ok`
-- [ ] `validate/1` returns a value in every case and raises in none, over a
+- [x] A valid document built by `Block.new/2`/`Document.new/2` returns `:ok`
+- [x] `validate/1` returns a value in every case and raises in none, over a
       table of hostile inputs (tuple, pid-free struct, atom, non-UTF-8 binary)
 
 #### Manual Verification:
@@ -793,5 +793,17 @@ before considering the plan fully landed.
 full `mix quality` as the phase gate. In interactive execution pause here for
 the human; in `--loop` execution the Automated Verification block gates
 advancement and the Manual items defer to `/wurk:verify`.
+
+---
+
+### Phase 2
+
+- [ ] Every new test carries its sabotage mutation note, verified by hand
+- [ ] The check order matches ADR-0001 decision 9's "ordered check, one error
+      arm per distinguishable cause" and no two distinguishable causes
+      collapse into one arm
+- [ ] No rescue-to-default anywhere in the module (`CLAUDE.md` convention)
+
+**Implementation Note**: as phase 1.
 
 ---

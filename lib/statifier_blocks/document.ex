@@ -8,7 +8,7 @@ defmodule StatifierBlocks.Document do
   later phases of the same bead.
   """
 
-  alias StatifierBlocks.Block
+  alias StatifierBlocks.{Block, Validation}
 
   @typedoc ~S(`"bdoc_" <> uxid`.)
   @type id :: String.t()
@@ -102,4 +102,13 @@ defmodule StatifierBlocks.Document do
       :error -> find_in_slot(parent_id, slot_name, rest, id, index + 1)
     end
   end
+
+  @doc """
+  Checks `document` against ADR-0001's structural rules: schema version,
+  envelope shape, per-block shape (id, type, type_version, config, slots),
+  and document-wide id uniqueness. Never consults a block-type registry -
+  `config` is opaque here and `type` is never resolved against anything.
+  """
+  @spec validate(t()) :: :ok | {:error, Validation.error()}
+  def validate(%__MODULE__{} = document), do: Validation.validate(document)
 end
