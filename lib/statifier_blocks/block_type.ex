@@ -140,10 +140,11 @@ defmodule StatifierBlocks.BlockType do
   @callback emit(Block.t(), context :: term()) :: {:ok, term()} | {:error, term()}
 
   @doc """
-  Type expressions for assignability. The return shape is ADR-0003's.
-  Absent means assignability treats the block as unconstrained.
+  Type expressions for assignability. The return shape is
+  `StatifierBlocks.Assignability.io/0` (ADR-0003). Absent means
+  assignability treats the block as unconstrained.
   """
-  @callback io(Block.config()) :: term()
+  @callback io(Block.config()) :: StatifierBlocks.Assignability.io()
 
   @doc """
   In-memory upgrade from an older stored `type_version`; never written back

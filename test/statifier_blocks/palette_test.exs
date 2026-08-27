@@ -24,6 +24,26 @@ defmodule StatifierBlocks.PaletteTest do
       given = %{"toy.score" => Toy}
       assert Palette.new(given) == %Palette{types: given}
     end
+
+    # sabotage: change the defstruct default for :assignability from `nil`
+    # to any other value -> this assertion goes red
+    test "a bare %Palette{} carries no assignability relation" do
+      assert %Palette{}.assignability == nil
+    end
+
+    # sabotage: change new/2's default for the :assignability option from
+    # `Keyword.get(opts, :assignability)` to a hard-coded module -> this
+    # assertion goes red
+    test "new/1 (no opts) leaves assignability nil" do
+      assert Palette.new(%{"toy.score" => Toy}).assignability == nil
+    end
+
+    # sabotage: change new/2 to ignore the :assignability key entirely ->
+    # this assertion goes red
+    test "new/2 carries the :assignability module given in opts" do
+      palette = Palette.new(%{"toy.score" => Toy}, assignability: MyWideningModule)
+      assert palette.assignability == MyWideningModule
+    end
   end
 
   describe "fetch/2" do
