@@ -500,9 +500,9 @@ is unchanged and contributes no inverse. On failure, print the seed index.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] full `mix quality` green, coverage at or above 90%
-- [ ] `grep -rn "Phoenix" lib/ test/` returns nothing
-- [ ] the suite is deterministic: `mix test --seed 0` run twice produces
+- [x] full `mix quality` green, coverage at or above 90%
+- [x] `grep -rn "Phoenix" lib/ test/` returns nothing
+- [x] the suite is deterministic: `mix test --seed 0` run twice produces
       identical summary lines (`diff <(mix test --seed 0 | tail -3) <(mix test
       --seed 0 | tail -3)` is empty)
 
@@ -874,5 +874,17 @@ before considering the plan fully landed.
 **Implementation Note**: Use `mix quality --profile loop` between edits; the
 full `mix quality` is the phase gate. In looped execution the Automated
 criteria gate advancement and the Manual ones are deferred.
+
+---
+
+### Phase 2
+
+- [ ] A sabotage note sits above every new test asserting `lib/` behaviour, and
+      each named mutation was actually run and actually went red
+- [ ] The property folds over generated sequences rather than a fixed example
+      list, read in the test file
+- [ ] The generated commands genuinely exercise all four command tags and both
+      the same-slot and cross-slot move cases (inspect a printed sample)
+- [ ] The seed is printed on failure and re-running with it reproduces
 
 ---
