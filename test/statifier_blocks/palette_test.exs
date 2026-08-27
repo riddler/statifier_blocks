@@ -96,9 +96,13 @@ defmodule StatifierBlocks.PaletteTest do
       refute Map.has_key?(migrated.config, "field")
     end
 
-    # sabotage: have resolve/2 call Document.to_json/1 (or otherwise touch
-    # the document) as a side effect -> content_hash/1 and the struct
-    # equality below go red
+    # sabotage: n/a - no mutation of palette.ex can red this test.
+    # `resolve/2` is never handed the document, and terms are immutable, so
+    # `doc` cannot change under it whatever the function does. It is a
+    # regression guard against a future `resolve/2` that takes a document,
+    # not a mutation-sensitive assertion. The "never written back" rule is
+    # carried by the source scan in the hygiene describe below, which does
+    # have a mutation that reds it.
     test "migration is applied in memory only; the source document is untouched" do
       doc = DocumentFixtures.worked_example()
       block = Block.new("toy.score", type_version: 1, config: %{"field" => "lead_score"})
@@ -111,9 +115,11 @@ defmodule StatifierBlocks.PaletteTest do
       assert Document.content_hash(doc) == hash_before
     end
 
-    # sabotage: drop the `stored > current` guard so the too-new clause
-    # never matches -> this assertion goes red (falls through to the
-    # migration clause instead)
+    # sabotage: report `current` instead of `stored` in the too-new arm
+    # (`{:error, {:block_type_too_new, block.id, current}}`) -> the pinned
+    # 99 goes red. Dropping the `stored > current` guard instead does NOT
+    # red this test - the clause still matches a too-new block and returns
+    # the same tuple; it reds the migration tests instead
     test "a block newer than the type's current version hard-errors" do
       block = Block.new("toy.score", type_version: 99, config: %{})
 
@@ -190,6 +196,17 @@ defmodule StatifierBlocks.PaletteTest do
     test "palette.ex names no global-state mechanism" do
       forbidden =
         ~r/Application\.get_env|:ets\.|Process\.whereis|GenServer|Agent|:persistent_term/
+
+      refute read_file(@lib_file) =~ forbidden
+    end
+
+    # sabotage: add a `Document.to_json(block)` call anywhere in
+    # palette.ex -> this test goes red. The regex is call-shaped (an open
+    # paren) on purpose: the `resolve/2` @doc names `Document.to_json/1`
+    # in arity spelling to say it is never called, and prose saying so
+    # must not trip the scan that enforces it.
+    test "palette.ex never persists: no to_json/1, from_json/1, or file write" do
+      forbidden = ~r/to_json\(|from_json\(|File\.write|File\.open|:file\./
 
       refute read_file(@lib_file) =~ forbidden
     end
