@@ -572,10 +572,10 @@ and leaves both stacks untouched.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] full `mix quality` green, coverage at or above 90%
-- [ ] a test asserts the document is unchanged **and** both stacks are
+- [x] full `mix quality` green, coverage at or above 90%
+- [x] a test asserts the document is unchanged **and** both stacks are
       unchanged after a refused `:update_config`
-- [ ] `grep -rn "Phoenix" lib/ test/` returns nothing
+- [x] `grep -rn "Phoenix" lib/ test/` returns nothing
 
 #### Manual Verification:
 - [ ] A sabotage note sits above every new test asserting `lib/` behaviour, and
@@ -886,5 +886,14 @@ criteria gate advancement and the Manual ones are deferred.
 - [ ] The generated commands genuinely exercise all four command tags and both
       the same-slot and cross-slot move cases (inspect a printed sample)
 - [ ] The seed is printed on failure and re-running with it reproduces
+
+---
+
+### Phase 3
+
+- [ ] A sabotage note sits above every new test asserting `lib/` behaviour, and
+      each named mutation was actually run and actually went red
+- [ ] Running the gate on undo/redo is stated in the moduledoc together with
+      the single-session justification
 
 ---
