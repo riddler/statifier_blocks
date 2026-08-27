@@ -783,11 +783,42 @@ before considering the plan fully landed.
 - [ ] Every new test carries its one-line sabotage mutation note, and the
       mutation described actually turns that test red (no command checks
       this - `mix quality` cannot see a comment)
+
+  **Machine-checked (unattended, 2026-08-26):** Found one genuine gap:
+  `test/statifier_blocks/canonical_json_test.exs`, "differs when any one
+  field differs" (content_hash describe block) had no sabotage note of its
+  own - the note above it belonged to the sibling test "is equal for two
+  independently built equal documents". Fixed by actually sabotaging
+  `lib/statifier_blocks/canonical_json.ex` (dropped the `config` pair from
+  the block encoder), confirming the target test went red (`refute
+  Document.content_hash(base) == Document.content_hash(changed)` failed
+  because both encoded identically - and, expectedly, several other
+  config-dependent tests in the file also went red), reverting, and
+  confirming green again (18/18). Wrote the accurate note. Did not re-run
+  every other test's described mutation across every file in this pass -
+  that remains a human spot-check, not machine-verified here.
 - [ ] The struct fields and `@type` definitions are a character-faithful
       transcription of ADR-0001's typespec block, with no field added,
       dropped, or renamed
+
+  **Machine-checked (unattended, 2026-08-26):** Diffed ADR-0001's typespec
+  block (the "The schema as typespecs" section) against
+  `lib/statifier_blocks/block.ex` and `lib/statifier_blocks/document.ex`
+  character by character. `@type`/`@typedoc` text, struct field lists, and
+  `defstruct` defaults match verbatim. No field added, dropped, or renamed.
 - [ ] The minting matches statifier-ex's `generate_session_id/0` bit-for-bit
       in structure (48-bit timestamp, 80 bits entropy, lowercase Crockford)
+
+  **Machine-checked (unattended, 2026-08-26):** Compared
+  `lib/statifier_blocks/id.ex` against
+  `statifier-ex/lib/statifier/machine_state.ex:571-585` and its
+  `@hex32_alphabet`/`@crockford_alphabet` table at `:375-381`. Identical
+  alphabets, identical `<<System.os_time(:millisecond)::48,
+  :crypto.strong_rand_bytes(10)::binary>>` body construction (48-bit
+  timestamp + 80 bits entropy), identical `Base.hex_encode32/2` ->
+  charlist -> per-character crockford translation pipeline. Structurally
+  bit-for-bit the same, differing only in prefix (`blk_`/`bdoc_` vs
+  `sess_`).
 
 **Implementation Note**: Use `mix quality --profile loop` between edits; run
 full `mix quality` as the phase gate. In interactive execution pause here for
@@ -799,10 +830,49 @@ advancement and the Manual items defer to `/wurk:verify`.
 ### Phase 2
 
 - [ ] Every new test carries its sabotage mutation note, verified by hand
+
+  **Machine-checked (unattended, 2026-08-26):** Re-ran the sabotage-note
+  scanner logic (`gate.rb`'s `scan_sabotage`) over the full `git diff` of
+  `test/` against this branch's base (`66652fc`). It flagged exactly one
+  unnoted test declaration in the whole tree: the `for`-loop-generated test
+  in `test/statifier_blocks/validation_test.exs` (see the open item below
+  in this same phase's block, addressed there). Every other new test
+  declaration in this diff, including phase 2's, has its sabotage comment
+  directly above it. Did not re-execute each described mutation by hand for
+  every test in this pass (see phase 1's note); that remains deferred.
 - [ ] The check order matches ADR-0001 decision 9's "ordered check, one error
       arm per distinguishable cause" and no two distinguishable causes
       collapse into one arm
+
+  **Machine-checked (unattended, 2026-08-26):** Read
+  `lib/statifier_blocks/validation.ex` end to end. `validate/1` runs
+  envelope -> tree (pre-order) -> id-uniqueness, in that order; each
+  envelope field (`schema_version`, `id`, `revision`, `metadata`, `root`)
+  and each block field (`id`, `type`, `type_version`, `config`,
+  `slots`-shape, then per-slot `slot_name`/children) has its own `check_*`
+  function and its own distinguishable error tuple - no two causes share an
+  arm. Matches decision 9.
 - [ ] No rescue-to-default anywhere in the module (`CLAUDE.md` convention)
+
+  **Machine-checked (unattended, 2026-08-26):** `grep -n rescue
+  lib/statifier_blocks/*.ex` finds no `rescue` clause anywhere in the
+  package's lib modules - only a doc comment in `document.ex` stating
+  "Nothing is rescued to a default and nothing raises."
+
+  Also re-confirmed by inspection, per the operator's specific ask: the two
+  sabotage-note scanner flags reported earlier against
+  `test/statifier_blocks/validation_test.exs` are false positives from a
+  `for`-loop-generated test (`hostile_terms`, describe "totality over
+  hostile terms"). Re-running the actual scanner (`gate.rb`'s
+  `scan_sabotage`) against this branch's diff found only **one** flagged
+  declaration in that file (not two) - the interpolated `test
+  "returns an error rather than raising for #{label} inside config" do`
+  line at 245. Its sabotage note (lines 241-243) sits directly above the
+  `for {label, term} <- hostile_terms do` line (244), not above the `test`
+  line itself; the scanner's "contiguous comment block directly above"
+  check breaks at that intervening code line and so misses the note, even
+  though it genuinely covers all four generated test cases. Confirmed
+  false positive; left as-is, no source change needed.
 
 **Implementation Note**: as phase 1.
 
@@ -811,9 +881,30 @@ advancement and the Manual items defer to `/wurk:verify`.
 ### Phase 3
 
 - [ ] Every new test carries its sabotage mutation note, verified by hand
+
+  **Machine-checked (unattended, 2026-08-26):** Covered by phase 2's scan
+  above (run over the whole `test/` diff). No unnoted phase 3 declarations
+  found; the sole flag in the tree was the phase 2 `for`-loop false
+  positive, addressed there. Per-mutation hand-execution not repeated for
+  every test in this pass.
 - [ ] The fixture is a faithful minification of ADR-0001's worked example -
       read them side by side; no key added, dropped, reordered or retyped
+
+  **Machine-checked (unattended, 2026-08-26):** Parsed both
+  `test/fixtures/documents/worked_example.json` and ADR-0001's "The
+  canonical form" JSON block as JSON and compared them structurally
+  (key/value equality, order-independent since JSON object key order isn't
+  semantically distinct once parsed) - they are equal. No key added,
+  dropped, reordered, or retyped.
 - [ ] The encoder never calls `JSON.encode!/1` on a map or a list
+
+  **Machine-checked (unattended, 2026-08-26):** `grep -n "JSON.encode!"
+  lib/statifier_blocks/canonical_json.ex` finds five call sites: `nil`,
+  `is_boolean`, `is_integer`, `is_binary` value clauses, and the object-key
+  encode in `object/1` (`JSON.encode!(k)`, where `k` is always a
+  `String.t()` key). All five are scalars. Maps and lists are handled by
+  `value/1`'s own `object/1`/list-bracket clauses, never handed to
+  `JSON.encode!/1`. No mismatch.
 
 **Implementation Note**: as phase 1.
 
@@ -822,10 +913,39 @@ advancement and the Manual items defer to `/wurk:verify`.
 ### Phase 4
 
 - [ ] Every new test carries its sabotage mutation note, verified by hand
+
+  **Machine-checked (unattended, 2026-08-26):** Covered by phase 2's scan
+  above. No unnoted phase 4 declarations found. Per-mutation hand-execution
+  not repeated for every test in this pass.
 - [ ] The error arms in `from_json/1`'s implemented `@spec` are
       character-identical to ADR-0001's declared spec
+
+  **Machine-checked (unattended, 2026-08-26):** Diffed the `@spec
+  from_json(binary()) :: ...` block in `lib/statifier_blocks/document.ex`
+  (lines 152-158) against ADR-0001's declared spec in "The schema as
+  typespecs". Both list the same five error tuples
+  (`:not_a_block_document`, `{:unsupported_schema_version,
+  pos_integer()}`, `{:duplicate_block_id, Block.id()}`,
+  `{:malformed_block, Block.id() | nil, term()}`,
+  `{:malformed_envelope, term()}`) in the same order, character-identical.
+  (Not touched: ADR-0001 line 325's `@doc` for `fetch_path/2` says `nil`
+  when absent while line 326's `@spec` says `{:ok, path()} | :error` - this
+  is the one already-adjudicated ADR contradiction; the implemented
+  `fetch_path/2` follows the `@spec` form as decided, and `docs/adr/` was
+  not touched per the hard boundary.)
 - [ ] The check order is defensible as "one arm per distinguishable cause" -
       read the ordered list against decision 9
+
+  **Machine-checked (unattended, 2026-08-26):** `lib/statifier_blocks/decode.ex`
+  checks, in order: bytes decode as JSON at all (`:not_a_block_document`),
+  the decoded term is an object carrying `"schema_version"`
+  (`:not_a_block_document`, a distinct cause from the first - not
+  recognizable JSON vs. recognizable-but-wrong-shape), then each block
+  object's keys against the known key set (`{:malformed_block, id,
+  {:unexpected_key, key}}`) before handing the built struct to
+  `Validation.validate/1`, which was independently confirmed above to keep
+  one arm per distinguishable cause. No two distinguishable causes
+  collapse into one arm.
 
 **Implementation Note**: as phase 1. This is the last phase; run
 `/wurk:verify --unattended` after it to work the deferred manual items and
