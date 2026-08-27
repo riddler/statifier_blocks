@@ -486,4 +486,86 @@ defmodule StatifierBlocks.Assignability do
       before_block -> {produces(palette, document, before_block, ctx), before_block.id}
     end
   end
+
+  @doc """
+  Every position in `document` where `candidate` may be dropped, per
+  ADR-0003's `valid_targets/4`: for every block in `Document.blocks/1`, for
+  every slot that block's module **declares** (`module.slots(config)`, not
+  the slot keys the stored document happens to carry), for every index from
+  `0` to that slot's current child count inclusive, the position is kept
+  when `check/5` returns `:ok` for it.
+
+  Deterministic: `Document.blocks/1` is already pre-order, `slots/1` is
+  visited in the order it declares slots, and indices ascend within each
+  slot - so the same call always returns the same list, in the same order.
+
+  A block whose type fails `Palette.resolve/2` contributes no positions:
+  there is no module to ask for a declared slot set, so this is an absence
+  of positions rather than a refusal. Offering a target inside a slot that
+  is not even declared would be offering a position the document walk that
+  owns undeclared-slot findings (ADR-0002 decision 6) then rejects.
+  """
+  @spec valid_targets(Palette.t(), Document.t(), Block.t(), context()) :: [target()]
+  def valid_targets(%Palette{} = palette, %Document{} = document, %Block{} = candidate, ctx) do
+    for block <- Document.blocks(document),
+        {module, config} = resolve_module_config(palette, block),
+        module != nil,
+        {slot, _arity, _label} <- module.slots(config),
+        index <- 0..length(Map.get(block.slots, slot, [])),
+        check(palette, document, {block.id, slot, index}, candidate, ctx) == :ok do
+      {block.id, slot, index}
+    end
+  end
+
+  @doc """
+  Every finding in `document`, per ADR-0003's `validate/3`: every seam
+  already present in the document, checked with the same rules `check/5`
+  checks a seam with - the whole-document counterpart to `check/5`'s
+  single-position query.
+
+  A document's seams are exactly its blocks' own upstream seams: the slot's
+  own inbound (or the previous sibling's resolved `produces`, when there is
+  one) against the block's `consumes`, plus the same kind-admission check
+  `check/5` runs for a candidate at a target. Walking every block in
+  `Document.blocks/1` other than the root (which occupies no slot and has
+  no seam of its own) and checking each one this way visits every seam in
+  the document exactly once - a block never shares its upstream seam with
+  any other block, and nothing in a slot has a seam after its last child
+  that some other block's own upstream check does not already cover.
+
+  This is deliberately **not** `check/5` called with a block already
+  sitting at its own current position as the candidate: `check/5`'s
+  downstream and vacated seams are defined relative to a `target` the
+  candidate is being placed at or removed from, and a block that already
+  occupies `target` makes both of those seams check the block against
+  itself, or against neighbors as though the block were not there at all -
+  neither is a seam that exists in `document` as given. `validate/3`
+  reaches the same two checks `check/5` runs for kind admission and the
+  upstream seam - `kind_admission_finding/5` and `upstream_seam_finding/5`
+  - directly, so the decision stays the one `check/5` is built from without
+  running its candidate-already-there degenerate case.
+
+  `:ok` when the document has no findings; otherwise `{:error, findings}`
+  with every block's findings concatenated, in `Document.blocks/1`'s
+  pre-order.
+  """
+  @spec validate(Palette.t(), Document.t(), context()) :: :ok | {:error, [finding()]}
+  def validate(%Palette{} = palette, %Document{} = document, ctx) do
+    findings =
+      for block <- Document.blocks(document),
+          {:ok, [_ | _] = path} <- [Document.fetch_path(document, block.id)],
+          {parent_id, slot, index} = List.last(path),
+          finding <- [
+            kind_admission_finding(palette, document, parent_id, slot, block),
+            upstream_seam_finding(palette, document, {parent_id, slot, index}, block, ctx)
+          ],
+          finding != nil do
+        finding
+      end
+
+    case findings do
+      [] -> :ok
+      findings -> {:error, findings}
+    end
+  end
 end
