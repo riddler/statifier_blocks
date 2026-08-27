@@ -2,26 +2,21 @@ defmodule StatifierBlocks.CoreFixtures do
   @moduledoc """
   Test-only support for the `core.*` vocabulary (ADR-0002 decision 10).
 
-  Three things live here, and none of them belongs in `lib/`:
+  Two things live here, and neither belongs in `lib/`:
 
     * the `myapp.*` block types the ADR-0001 worked example names, so that
       example can be checked against **real** core types with only its host
       types stubbed;
-    * `admits?/4`, ADR-0003 decision 3's kind-intersection rule spelled out
-      once for the tests to share. The shipped implementation of that rule
-      is `sb-b3t`'s `Assignability`, which does not exist yet - this is the
-      declarations being checked against the record, not a second
-      implementation racing the first;
     * `check/2`, a palette-aware walk of a document reporting resolution,
       config, arity, undeclared-slot and kind findings. The shipped version
       of that walk is `sb-da9`'s.
 
-  Both helpers are deliberately blunt and deliberately test-only. When
-  `sb-b3t` and `sb-da9` land, the tests move over to them and this module
-  loses everything but the `myapp.*` types.
+  `check/2` is deliberately blunt and deliberately test-only. When `sb-da9`
+  lands, the tests move over to it and this module loses everything but the
+  `myapp.*` types.
   """
 
-  alias StatifierBlocks.{Block, Core, Document, Palette}
+  alias StatifierBlocks.{Assignability, Block, Core, Document, Palette}
 
   defmodule Enrich do
     @moduledoc """
@@ -167,33 +162,6 @@ defmodule StatifierBlocks.CoreFixtures do
   def valid_config(_module), do: %{}
 
   @doc """
-  ADR-0003 decision 3's verdict for placing `child` in `slot` of `parent`:
-  `:any` admits everything, otherwise the parent slot's accepted kinds and
-  the child's own kinds must intersect.
-  """
-  @spec admits?({module(), Block.config()}, Block.slot_name(), {module(), Block.config()}) ::
-          boolean()
-  def admits?({parent, parent_config}, slot, {child, child_config}) do
-    case slot_accepts(parent, parent_config, slot) do
-      :any -> true
-      accepted -> Enum.any?(kinds(child, child_config), &(&1 in accepted))
-    end
-  end
-
-  @doc "The child's `kinds`, defaulting to `[:step]` (ADR-0003 decision 5)."
-  @spec kinds(module(), Block.config()) :: [atom()]
-  def kinds(module, config), do: Map.get(io(module, config), :kinds, [:step])
-
-  @doc "The parent slot's accepted kinds, defaulting to `:any`."
-  @spec slot_accepts(module(), Block.config(), Block.slot_name()) :: [atom()] | :any
-  def slot_accepts(module, config, slot) do
-    module
-    |> io(config)
-    |> Map.get(:slot_accepts, %{})
-    |> Map.get(slot, :any)
-  end
-
-  @doc """
   `validate_config/1` through a variable, so a test may pattern-match both
   arms of it. Called on a literal module, the compiler narrows the return
   of a type that only ever answers `:ok` and flags the `{:error, _}` arm as
@@ -210,14 +178,6 @@ defmodule StatifierBlocks.CoreFixtures do
     if Code.ensure_loaded?(module) and function_exported?(module, :fixtures, 0),
       do: {:ok, module.fixtures()},
       else: :none
-  end
-
-  @doc "`io/1`'s map, or the empty map when the callback is absent."
-  @spec io(module(), Block.config()) :: map()
-  def io(module, config) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :io, 1),
-      do: module.io(config),
-      else: %{}
   end
 
   @doc """
@@ -285,7 +245,7 @@ defmodule StatifierBlocks.CoreFixtures do
     for {name, _arity, _label} <- declared,
         child <- Map.get(block.slots, name, []),
         {:ok, child_module} <- [Palette.fetch(palette, child.type)],
-        not admits?({module, block.config}, name, {child_module, child.config}),
+        not Assignability.admits?({module, block.config}, name, {child_module, child.config}),
         do: {:kind_not_admitted, child.id, block.id, name}
   end
 

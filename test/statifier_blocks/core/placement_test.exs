@@ -24,6 +24,7 @@ defmodule StatifierBlocks.Core.PlacementTest do
 
   use ExUnit.Case, async: true
 
+  alias StatifierBlocks.Assignability
   alias StatifierBlocks.Core
   alias StatifierBlocks.CoreFixtures
 
@@ -46,7 +47,7 @@ defmodule StatifierBlocks.Core.PlacementTest do
   test "placement is exactly 'interrupt handlers in interrupts slots', in both directions" do
     for {parent, parent_config, slot} <- core_slots(),
         {child, child_config} <- core_children() do
-      admitted = CoreFixtures.admits?({parent, parent_config}, slot, {child, child_config})
+      admitted = Assignability.admits?({parent, parent_config}, slot, {child, child_config})
       expected = slot == "interrupts" == (child == Core.OnEvent)
 
       assert admitted == expected, """
@@ -66,8 +67,8 @@ defmodule StatifierBlocks.Core.PlacementTest do
       Enum.split_with(core_slots(), fn {_module, _config, slot} -> slot == "interrupts" end)
 
     assert interrupts != []
-    assert Enum.all?(interrupts, fn {m, c, s} -> CoreFixtures.admits?({m, c}, s, handler) end)
-    refute Enum.any?(others, fn {m, c, s} -> CoreFixtures.admits?({m, c}, s, handler) end)
+    assert Enum.all?(interrupts, fn {m, c, s} -> Assignability.admits?({m, c}, s, handler) end)
+    refute Enum.any?(others, fn {m, c, s} -> Assignability.admits?({m, c}, s, handler) end)
   end
 
   # Sabotage: changed `Core.Group.io/1`'s "body" to `:any` - red here, on
@@ -77,12 +78,12 @@ defmodule StatifierBlocks.Core.PlacementTest do
           Enum.filter(core_slots(), fn {_m, _c, slot} -> slot == "interrupts" end),
         {child, child_config} <- core_children(),
         child != Core.OnEvent do
-      refute CoreFixtures.admits?({parent, parent_config}, "interrupts", {child, child_config}),
+      refute Assignability.admits?({parent, parent_config}, "interrupts", {child, child_config}),
              "#{inspect(parent)} admitted #{inspect(child)} into interrupts"
     end
   end
 
-  # Sabotage: made `CoreFixtures.kinds/2` default to `[]` instead of
+  # Sabotage: made `Assignability.kinds/2` default to `[]` instead of
   # `[:step]` - red here, which is the ADR-0003 decision 5 default the whole
   # property rests on.
   test "a host handler is admitted without either side naming the other" do
@@ -90,9 +91,9 @@ defmodule StatifierBlocks.Core.PlacementTest do
     host_handler = {CoreFixtures.OnEvent, %{}}
     host_step = {CoreFixtures.Notify, %{}}
 
-    assert CoreFixtures.admits?(group, "interrupts", host_handler)
-    refute CoreFixtures.admits?(group, "interrupts", host_step)
-    refute CoreFixtures.admits?(group, "body", host_handler)
-    assert CoreFixtures.admits?(group, "body", host_step)
+    assert Assignability.admits?(group, "interrupts", host_handler)
+    refute Assignability.admits?(group, "interrupts", host_step)
+    refute Assignability.admits?(group, "body", host_handler)
+    assert Assignability.admits?(group, "body", host_step)
   end
 end
