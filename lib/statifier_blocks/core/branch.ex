@@ -76,6 +76,15 @@ defmodule StatifierBlocks.Core.Branch do
     arm_slots ++ [{"otherwise", :any, "Otherwise"}]
   end
 
+  @doc """
+  One `:expression` condition field per arm, keyed by the arm's slot name
+  and reading through `value_path: ["arms", index, "cond"]`.
+
+  `index` is the arm's position in the **stored** list rather than among
+  the well-formed ones, so an arm below a malformed one still addresses
+  its own condition while an author is mid-edit. See the moduledoc for why
+  the key and the path answer two different questions.
+  """
   @impl true
   def config_schema(config) do
     Enum.map(indexed_arms(config), fn {%{"slot" => slot}, index} ->
