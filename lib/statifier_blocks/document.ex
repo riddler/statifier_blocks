@@ -8,7 +8,7 @@ defmodule StatifierBlocks.Document do
   later phases of the same bead.
   """
 
-  alias StatifierBlocks.{Block, CanonicalJson, Validation}
+  alias StatifierBlocks.{Block, CanonicalJson, Decode, Validation}
 
   @typedoc ~S(`"bdoc_" <> uxid`.)
   @type id :: String.t()
@@ -139,4 +139,22 @@ defmodule StatifierBlocks.Document do
   def content_hash(%__MODULE__{} = document) do
     "sha256:" <> Base.encode16(:crypto.hash(:sha256, to_json(document)), case: :lower)
   end
+
+  @doc """
+  Structural decode. Never consults the block-type registry (ADR-0001
+  decision 9); unknown `type` names decode successfully.
+
+  Decoding is total and ordered: bytes that are not a JSON object carrying
+  a `"schema_version"` key are `:not_a_block_document`; a recognizable
+  document that is wrong in a specific way gets an envelope-, block-, or
+  id-level arm instead. Nothing is rescued to a default and nothing raises.
+  """
+  @spec from_json(binary()) ::
+          {:ok, t()}
+          | {:error, :not_a_block_document}
+          | {:error, {:unsupported_schema_version, pos_integer()}}
+          | {:error, {:duplicate_block_id, Block.id()}}
+          | {:error, {:malformed_block, Block.id() | nil, term()}}
+          | {:error, {:malformed_envelope, term()}}
+  def from_json(binary) when is_binary(binary), do: Decode.decode(binary)
 end

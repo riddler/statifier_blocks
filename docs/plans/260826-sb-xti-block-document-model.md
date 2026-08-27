@@ -595,29 +595,29 @@ and that unknown types load.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Full gate green: `mix quality`
-- [ ] **Worked example, byte-stable**:
+- [x] Full gate green: `mix quality`
+- [x] **Worked example, byte-stable**:
       `from_json(worked_example_json())` returns `{:ok, doc}`, `doc ==
       DocumentFixtures.worked_example()`, and `to_json(doc) ==
       worked_example_json()`
-- [ ] **Round-trip property**: over a generated corpus of at least 200 valid
+- [x] **Round-trip property**: over a generated corpus of at least 200 valid
       documents (varying depth, slot counts, empty and non-empty
       config/metadata/slots, unicode and escape-bearing strings, negative and
       large integers), `decode(encode(d)) == d` and
       `encode(decode(encode(d))) == encode(d)`. Generation is deterministic
       from a fixed seed printed on failure - no `:rand` seeding from the
       clock, so a red run is reproducible
-- [ ] **Identity stability**: `content_hash(d) ==
+- [x] **Identity stability**: `content_hash(d) ==
       content_hash(elem(from_json(to_json(d)), 1))` across that corpus
-- [ ] Each error arm reached by at least one test: `:not_a_block_document`
+- [x] Each error arm reached by at least one test: `:not_a_block_document`
       (garbage bytes; a JSON array; a JSON object with no `schema_version`),
       `{:unsupported_schema_version, 2}`, `{:duplicate_block_id, _}` (the
       same id on two blocks in different subtrees),
       `{:malformed_block, _, _}`, `{:malformed_envelope, _}`
-- [ ] A float anywhere in decoded `config` or `metadata` is refused, and the
+- [x] A float anywhere in decoded `config` or `metadata` is refused, and the
       reason names the float
-- [ ] A document whose `type` is `"nobody.knows.this"` decodes to `{:ok, _}`
-- [ ] Decoding does not create atoms: assert `:erlang.system_info(:atom_count)`
+- [x] A document whose `type` is `"nobody.knows.this"` decodes to `{:ok, _}`
+- [x] Decoding does not create atoms: assert `:erlang.system_info(:atom_count)`
       is unchanged across decoding a document whose keys and values are novel
       random strings. **This test module runs `async: false`**:
       `:erlang.system_info(:atom_count)` is a VM-global counter, and another
@@ -816,5 +816,19 @@ advancement and the Manual items defer to `/wurk:verify`.
 - [ ] The encoder never calls `JSON.encode!/1` on a map or a list
 
 **Implementation Note**: as phase 1.
+
+---
+
+### Phase 4
+
+- [ ] Every new test carries its sabotage mutation note, verified by hand
+- [ ] The error arms in `from_json/1`'s implemented `@spec` are
+      character-identical to ADR-0001's declared spec
+- [ ] The check order is defensible as "one arm per distinguishable cause" -
+      read the ordered list against decision 9
+
+**Implementation Note**: as phase 1. This is the last phase; run
+`/wurk:verify --unattended` after it to work the deferred manual items and
+the open questions below.
 
 ---
