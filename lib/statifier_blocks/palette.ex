@@ -33,7 +33,7 @@ defmodule StatifierBlocks.Palette do
   raises, so there is nothing to rescue.
   """
 
-  alias StatifierBlocks.Block
+  alias StatifierBlocks.{Block, Core}
 
   @type t :: %__MODULE__{types: %{optional(Block.type_name()) => module()}}
 
@@ -45,6 +45,45 @@ defmodule StatifierBlocks.Palette do
   """
   @spec new(%{optional(Block.type_name()) => module()}) :: t()
   def new(types \\ %{}) when is_map(types), do: %__MODULE__{types: types}
+
+  @doc """
+  The `core.*` structural vocabulary as a palette (ADR-0002 decision 10).
+
+  Seven entries, described in `StatifierBlocks.Core`. They are ordinary
+  palette entries with no privileged path anywhere in this package - a
+  palette without them is as valid as a palette with them, and a host that
+  wants only some of them builds a map with only those.
+
+      Palette.core()
+      #=> %StatifierBlocks.Palette{types: %{"core.sequence" => ..., ...}}
+
+  """
+  @spec core() :: t()
+  def core, do: new(core_types())
+
+  @doc """
+  The `type_name => module` map behind `core/0`, for a host merging the
+  core vocabulary with its own entries:
+
+      Palette.new(Map.merge(Palette.core_types(), %{"myapp.enrich" => MyApp.Blocks.Enrich}))
+
+  A host entry sharing a name with a core one wins, because that is what
+  `Map.merge/2` does and a palette is just a value: nothing in this package
+  reserves the `core.` prefix, and a host deliberately swapping in its own
+  `core.wait` is doing something this design allows on purpose.
+  """
+  @spec core_types() :: %{optional(Block.type_name()) => module()}
+  def core_types do
+    %{
+      "core.sequence" => Core.Sequence,
+      "core.group" => Core.Group,
+      "core.branch" => Core.Branch,
+      "core.parallel" => Core.Parallel,
+      "core.wait" => Core.Wait,
+      "core.resumable_group" => Core.ResumableGroup,
+      "core.on_event" => Core.OnEvent
+    }
+  end
 
   @doc """
   Resolves a `type_name` to its module. Total; never raises (ADR-0002
