@@ -89,7 +89,7 @@ defmodule StatifierBlocks.Compiler.StateId do
   @doc ~S"""
   Whether `role` is a role this module will mint an id for.
 
-      iex> StatifierBlocks.Compiler.StateId.role?("lane_crm")
+      iex> StatifierBlocks.Compiler.StateId.role?("lane_capture")
       true
 
       iex> StatifierBlocks.Compiler.StateId.role?("Done")

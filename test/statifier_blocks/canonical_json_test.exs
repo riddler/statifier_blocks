@@ -20,10 +20,38 @@ defmodule StatifierBlocks.CanonicalJsonTest do
       refute String.contains?(json, "\n")
 
       # Strip JSON string literals (handling `\"` inside them) before
-      # checking for stray spaces, so a space inside e.g. "score > 80"
+      # checking for stray spaces, so a space inside e.g. "budget_remaining > amount"
       # doesn't false-positive.
       without_strings = Regex.replace(~r/"(?:[^"\\]|\\.)*"/, json, "")
       refute String.contains?(without_strings, " ")
+    end
+  end
+
+  describe "the signup wizard (the second worked example)" do
+    # sabotage: in `object/1`, drop the `Enum.sort_by/2` call -> the
+    # wizard's `arm_variant_b`/`otherwise` and `body`/`interrupts` slots
+    # encode in insertion order instead of UTF-8 key order -> red
+    test "to_json/1 of the hand-built wizard equals the fixture bytes exactly" do
+      assert Document.to_json(DocumentFixtures.signup_wizard()) ==
+               DocumentFixtures.signup_wizard_json()
+    end
+
+    # sabotage: change the fixture read helper to skip
+    # `String.trim_trailing/1` while a trailing newline is present in the
+    # fixture file -> red (this asserts the fixture itself carries none)
+    test "the wizard's fixture bytes contain no newline, and no space outside a string" do
+      json = DocumentFixtures.signup_wizard_json()
+      refute String.contains?(json, "\n")
+
+      without_strings = Regex.replace(~r/"(?:[^"\\]|\\.)*"/, json, "")
+      refute String.contains?(without_strings, " ")
+    end
+
+    # sabotage: make `Document.from_json/1` drop `metadata` -> red, because
+    # the decoded document stops equalling the one built in memory.
+    test "from_json/1 of the fixture bytes equals the hand-built wizard" do
+      assert Document.from_json(DocumentFixtures.signup_wizard_json()) ==
+               {:ok, DocumentFixtures.signup_wizard()}
     end
   end
 

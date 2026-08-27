@@ -51,16 +51,18 @@ defmodule StatifierBlocks.Core.EmitTest do
     # unconditional `otherwise` one -> the unconditional transition always
     # wins and this goes red (verified)
     test "takes the first arm whose condition holds" do
-      {machine_state, _effects} = run(branch(), datamodel: %{"score" => 92})
+      {machine_state, _effects} =
+        run(branch(), datamodel: %{"budget_remaining" => 500, "amount" => 120})
+
       scxml = compiled_branch()
 
       assert done?(machine_state, "s_blk_BR__done")
-      assert scxml =~ ~s(cond="score &gt; 80" target="s_blk_HIT")
+      assert scxml =~ ~s(cond="budget_remaining &gt; amount" target="s_blk_HIT")
 
       # Order is the whole of the semantics here: an unconditional
       # `otherwise` transition emitted first would be selected before any
       # arm's condition was ever evaluated.
-      assert index(scxml, ~s(cond="score &gt; 80")) <
+      assert index(scxml, ~s(cond="budget_remaining &gt; amount")) <
                index(scxml, ~s(<transition target="s_blk_MISS"/>))
     end
 
@@ -313,7 +315,7 @@ defmodule StatifierBlocks.Core.EmitTest do
   defp branch do
     Block.new("core.branch",
       id: "blk_BR",
-      config: %{"arms" => [%{"slot" => "arm_hit", "cond" => "score > 80"}]},
+      config: %{"arms" => [%{"slot" => "arm_hit", "cond" => "budget_remaining > amount"}]},
       slots: %{
         "arm_hit" => [container("blk_HIT")],
         "otherwise" => [container("blk_MISS")]

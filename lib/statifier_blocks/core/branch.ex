@@ -8,16 +8,16 @@ defmodule StatifierBlocks.Core.Branch do
   expression}` pair, and `slots/1` returns one slot per arm in that order
   followed by `otherwise`:
 
-      config = %{"arms" => [%{"slot" => "arm_qualified", "cond" => "score > 80"}]}
+      config = %{"arms" => [%{"slot" => "arm_approved", "cond" => "budget_remaining > amount"}]}
 
       slots(config)
-      #=> [{"arm_qualified", :at_least_one, ~s(When "qualified")},
+      #=> [{"arm_approved", :at_least_one, ~s(When "approved")},
       #=>  {"otherwise", :any, "Otherwise"}]
 
   Three details worth naming, because each is a place a reader would
   reasonably guess the other way:
 
-    * **An arm stores its whole slot name**, `"arm_qualified"`, not the
+    * **An arm stores its whole slot name**, `"arm_approved"`, not the
       suffix. ADR-0002 decision 10's table says "slot suffix"; the ADR-0001
       worked example stores the full name, and the stored bytes are what
       this type has to read.
@@ -98,7 +98,7 @@ defmodule StatifierBlocks.Core.Branch do
   defp check_arm(%{"slot" => slot, "cond" => condition} = _arm, {findings, seen}) do
     cond do
       not Config.arm_slot?(slot) ->
-        {[{"arms", ~s(an arm's slot must look like "arm_qualified")} | findings], seen}
+        {[{"arms", ~s(an arm's slot must look like "arm_approved")} | findings], seen}
 
       MapSet.member?(seen, slot) ->
         {[{slot, "two arms cannot share one slot"} | findings], seen}
@@ -158,13 +158,13 @@ defmodule StatifierBlocks.Core.Branch do
   def fixtures do
     %{
       datasets: %{
-        "qualified" => %{"score" => 92},
-        "unqualified" => %{"score" => 12}
+        "approved" => %{"budget_remaining" => 500, "amount" => 120},
+        "declined" => %{"budget_remaining" => 100, "amount" => 340}
       },
       expressions: %{
-        "qualifies" => %{
-          "source" => "score > 80",
-          "expect" => %{"qualified" => true, "unqualified" => false}
+        "approves" => %{
+          "source" => "budget_remaining > amount",
+          "expect" => %{"approved" => true, "declined" => false}
         }
       }
     }
@@ -177,7 +177,7 @@ defmodule StatifierBlocks.Core.Branch do
 
       <state id="s_BR" initial="s_BR__pick">
         <state id="s_BR__pick">
-          <transition cond="score &gt; 80" target="s_blk_A"/>
+          <transition cond="budget_remaining &gt; amount" target="s_blk_A"/>
           <transition target="s_blk_B"/>
         </state>
         <transition event="done.state.s_blk_A" target="s_BR__done"/>
@@ -254,7 +254,7 @@ defmodule StatifierBlocks.Core.Branch do
     |> Enum.uniq_by(fn %{"slot" => slot} -> slot end)
   end
 
-  # `"arm_qualified"` reads as `When "qualified"` - the suffix is the name
+  # `"arm_approved"` reads as `When "approved"` - the suffix is the name
   # the author gave the arm.
   defp arm_label("arm_" <> suffix), do: ~s(When "#{suffix}")
 end

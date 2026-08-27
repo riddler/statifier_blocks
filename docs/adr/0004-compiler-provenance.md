@@ -510,7 +510,7 @@ annotations on the tree with no fallback presentation.
   record is a cache key, not a source of truth - but it cannot answer "which
   document is this running session from" without a walk.
 - Two registries remain two registries. This record does not unify them, and a
-  host wiring `myapp.enrich` still does two things. What changed is that
+  host wiring `myapp.authorize` still does two things. What changed is that
   forgetting the second is now detectable from data the compiler publishes, at the
   moment the host actually knows the answer.
 
@@ -667,7 +667,7 @@ end
 
 ## Worked example: a validator finding on generated SCXML routed back to a block
 
-Take ADR-0001's worked example - the inbound-qualification workflow in a
+Take ADR-0001's worked example - the card-authorization workflow in a
 multi-tenant host embedding the engine - and compile it. The relevant fragment,
 re-indented for reading; the serializer emits it in one canonical form, because
 st-ADR-0052 hashes these bytes. Every id is `state_id` over a block id from that
@@ -676,21 +676,21 @@ document, and the sequence's wiring is entirely `done.state` transitions
 
 ```xml
 <scxml datamodel="predicator" initial="s_blk_ROOT" name="bdoc_01JDOC" version="1.0">
-  <state id="s_blk_ROOT" initial="s_blk_ENR">
+  <state id="s_blk_ROOT" initial="s_blk_AUTH">
 
-    <state id="s_blk_ENR" initial="s_blk_ENR__running">
-      <state id="s_blk_ENR__running">
-        <invoke type="myapp:enrich"/>
-        <transition event="done.invoke" target="s_blk_ENR__done"/>
+    <state id="s_blk_AUTH" initial="s_blk_AUTH__running">
+      <state id="s_blk_AUTH__running">
+        <invoke type="myapp:authorize"/>
+        <transition event="done.invoke" target="s_blk_AUTH__done"/>
       </state>
-      <final id="s_blk_ENR__done"/>
+      <final id="s_blk_AUTH__done"/>
     </state>
-    <transition event="done.state.s_blk_ENR" target="s_blk_GRP"/>
+    <transition event="done.state.s_blk_AUTH" target="s_blk_GRP"/>
 
     <state id="s_blk_GRP" initial="s_blk_BR">
       <state id="s_blk_BR" initial="s_blk_BR__choose">
         <state id="s_blk_BR__choose">
-          <transition cond="score &gt; 80" target="s_blk_PAR"/>
+          <transition cond="budget_remaining &gt; amount" target="s_blk_PAR"/>
           <transition target="s_blk_NO2"/>
         </state>
       </state>
@@ -711,22 +711,22 @@ The provenance map, abbreviated to its `by_state_id` half:
 | state id | owner |
 |---|---|
 | `s_blk_ROOT` | `blk_ROOT`, role `nil` |
-| `s_blk_ENR` | `blk_ENR`, role `nil` |
-| `s_blk_ENR__running` | `blk_ENR`, role `running` |
-| `s_blk_ENR__done` | `blk_ENR`, role `done` |
+| `s_blk_AUTH` | `blk_AUTH`, role `nil` |
+| `s_blk_AUTH__running` | `blk_AUTH`, role `running` |
+| `s_blk_AUTH__done` | `blk_AUTH`, role `done` |
 | `s_blk_BR__choose` | `blk_BR`, role `choose` |
 
 and a few of the spans, which are what findings actually route through:
 
 | span (bytes) | owner |
 |---|---|
-| the `<transition event="done.state.s_blk_ENR">` element | `blk_ENR`, role `nil`, key `nil` |
-| the `cond="score &gt; 80"` attribute value | `blk_BR`, role `choose`, key `arms` |
+| the `<transition event="done.state.s_blk_AUTH">` element | `blk_AUTH`, role `nil`, key `nil` |
+| the `cond="budget_remaining &gt; amount"` attribute value | `blk_BR`, role `choose`, key `arms` |
 | the `<transition event="myapp.cancelled">` element | `blk_INT`, role `nil`, key `nil` |
 
 Two rows carry the record's weight. The transition wiring the sequence is
-attributed to **`blk_ENR`, the child it leaves**, not to the sequence that
-emitted it, because "what happens after the enrich step" is the fact an author
+attributed to **`blk_AUTH`, the child it leaves**, not to the sequence that
+emitted it, because "what happens after the authorize step" is the fact an author
 would recognise. And the interrupt transition on the group's state is attributed
 to **`blk_INT`**, the handler block in the `interrupts` slot, even though it was
 emitted while compiling `blk_GRP`. That is precisely why ADR-0001 decision 10
@@ -736,8 +736,8 @@ an element, so they can own one.
 **A structural finding.** Suppose the host's `myapp.on_event` block type has a
 bug and targets a state that does not exist - note `s_blk_ROOT__abandoned` above
 is targeted but never emitted. `Statifier.compile/2` returns
-`%Statifier.Validator.Error{reason: {:unresolved_target, "s_blk_ROOT__abandoned"}, location: %Location{start_offset: 612, ...}}`.
-The compiler routes offset 612 to the innermost owning span:
+`%Statifier.Validator.Error{reason: {:unresolved_target, "s_blk_ROOT__abandoned"}, location: %Location{start_offset: 637, ...}}`.
+The compiler routes offset 637 to the innermost owning span:
 
 ```elixir
 {:error, [
@@ -759,8 +759,8 @@ interrupt rule inside the resumable group, and tells the author they cannot fix
 it - the bug is in the block type, and no edit to the document will help.
 
 **A content finding.** Now the author's own typo: the branch's arm condition is
-`score > > 80`. That reaches upstream as
-`%Statifier.Compiler.Error{reason: {:expression_compile_error, owner_ref, "score > > 80", %Predicator.Errors.ParseError{}}}`,
+`budget_remaining > > amount`. That reaches upstream as
+`%Statifier.Compiler.Error{reason: {:expression_compile_error, owner_ref, "budget_remaining > > amount", %Predicator.Errors.ParseError{}}}`,
 whose location resolves into the `cond` attribute's span. That span's owner
 carries `config_key: "arms"`, so:
 
@@ -787,7 +787,7 @@ typed into.
 ```elixir
 {:ok, compiled} = Compiler.compile(document, palette)
 compiled.invoke_types
-#=> ["myapp:crm_push", "myapp:enrich", "myapp:notify"]
+#=> ["myapp:authorize", "myapp:capture", "myapp:notify"]
 ```
 
 At deploy time the host - which by then knows its st-ADR-0051 registration -
@@ -796,16 +796,16 @@ compares. Or it asks the compiler to, by handing over the set it believes in:
 ```elixir
 {:ok, compiled} =
   Compiler.compile(document, palette,
-    known_invoke_types: MapSet.new(["myapp:enrich", "myapp:notify"])
+    known_invoke_types: MapSet.new(["myapp:authorize", "myapp:notify"])
   )
 
 compiled.warnings
-#=> [%{block_id: "blk_CRM", stage: :chart, severity: :warning, fault: :author,
+#=> [%{block_id: "blk_CAP", stage: :chart, severity: :warning, fault: :author,
 #      code: :no_registered_invoke_handler,
-#      message: ~s(no handler registered for invoke type "myapp:crm_push")}]
+#      message: ~s(no handler registered for invoke type "myapp:capture")}]
 ```
 
-The compile **succeeds**. `blk_CRM` would raise `error.execution` at runtime
+The compile **succeeds**. `blk_CAP` would raise `error.execution` at runtime
 (st-ADR-0051 decision 1), and saying so at authoring time is worth a warning -
 but the set handed in is one deployment's belief, and decision 8 is the argument
 for why that is not enough to refuse a publish.
@@ -826,7 +826,7 @@ compiled.record.chart_identity
 #   }
 
 # A metadata-only edit moves one hash and not the other.
-{:ok, renamed} = Compiler.compile(Document.rename(document, "Q3 inbound"), palette)
+{:ok, renamed} = Compiler.compile(Document.rename(document, "Q3 authorization"), palette)
 renamed.record.document_hash == compiled.record.document_hash   #=> false
 renamed.scxml == compiled.scxml                                 #=> true
 Statifier.Machine.Identity.matches?(
@@ -844,9 +844,9 @@ And the determinism property, the acceptance test for decisions 3 and 6:
 {:ok, b} = Compiler.compile(document, palette)
 a.scxml == b.scxml and a.provenance == b.provenance   #=> true
 
-# An unrelated insertion far from blk_CRM leaves its state id alone.
+# An unrelated insertion far from blk_CAP leaves its state id alone.
 {:ok, c} = Compiler.compile(Document.insert(document, "blk_ROOT", "body", 0, new), palette)
-Map.has_key?(c.provenance.by_state_id, Compiler.state_id("blk_CRM"))   #=> true
+Map.has_key?(c.provenance.by_state_id, Compiler.state_id("blk_CAP"))   #=> true
 ```
 
 What this example is chosen to demonstrate:

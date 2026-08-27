@@ -4,9 +4,11 @@ defmodule StatifierBlocks.CoreFixtures do
 
   Two things live here, and neither belongs in `lib/`:
 
-    * the `myapp.*` block types the ADR-0001 worked example names, so that
-      example can be checked against **real** core types with only its host
-      types stubbed;
+    * the `myapp.*` block types the family's two worked examples name - the
+      ADR-0001 credit-card authorization flow and the signup wizard with
+      A/B testing (the umbrella's `docs/terminology-firewall.md`, "Example
+      domains") - so each example can be checked against **real** core
+      types with only its host types stubbed;
     * `check/2`, a palette-aware walk of a document reporting resolution,
       config, arity, undeclared-slot and kind findings. The shipped version
       of that walk is `sb-da9`'s.
@@ -20,10 +22,16 @@ defmodule StatifierBlocks.CoreFixtures do
   alias StatifierBlocks.Compiler.Context
   alias StatifierBlocks.Core.Emit
 
-  defmodule Enrich do
+  defmodule Authorize do
     @moduledoc """
-    `myapp.enrich`: the worked example's first step, at `type_version: 2`,
-    so the document's stored version resolves without a migration.
+    `myapp.authorize`: the worked example's first step, at
+    `type_version: 2`, so the document's stored version resolves without a
+    migration.
+
+    `StatifierBlocks.AssignabilityFixtures` carries a second, thinner stub
+    under the same type name for ADR-0003's worked example. The two never
+    share a palette, and this one sits at version 2 on purpose - that is
+    the property the ADR-0001 example is here to demonstrate.
     """
 
     @behaviour StatifierBlocks.BlockType
@@ -45,7 +53,7 @@ defmodule StatifierBlocks.CoreFixtures do
     def validate_config(_config), do: :ok
 
     @impl true
-    def io(_config), do: %{kinds: [:step], produces: "record"}
+    def io(_config), do: %{kinds: [:step], produces: "myapp.credit_card_txn"}
 
     @impl true
     def emit(%Block{} = block, context),
@@ -75,8 +83,8 @@ defmodule StatifierBlocks.CoreFixtures do
       do: StatifierBlocks.CoreFixtures.invoke_leaf(block, context)
   end
 
-  defmodule CrmPush do
-    @moduledoc "`myapp.crm_push`: a leaf step consuming what `Enrich` produces."
+  defmodule Capture do
+    @moduledoc "`myapp.capture`: a leaf step consuming what `Authorize` produces."
 
     @behaviour StatifierBlocks.BlockType
 
@@ -94,7 +102,7 @@ defmodule StatifierBlocks.CoreFixtures do
     def validate_config(_config), do: :ok
 
     @impl true
-    def io(_config), do: %{kinds: [:step], consumes: "record"}
+    def io(_config), do: %{kinds: [:step], consumes: "myapp.credit_card_txn"}
 
     @impl true
     def emit(%Block{} = block, context),
@@ -132,6 +140,93 @@ defmodule StatifierBlocks.CoreFixtures do
     @impl true
     def emit(%Block{} = block, context),
       do: StatifierBlocks.CoreFixtures.handler_leaf(block, context)
+  end
+
+  defmodule AssignVariant do
+    @moduledoc """
+    `myapp.assign_variant`: the signup wizard's first step, which puts the
+    visitor in an A/B bucket and hands the bucket downstream.
+    """
+
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+
+    @impl true
+    def slots(_config), do: []
+
+    @impl true
+    def config_schema(_config),
+      do: [%{key: "invoke_type", type: :string, label: "Invoke", required?: true, default: ""}]
+
+    @impl true
+    def validate_config(_config), do: :ok
+
+    @impl true
+    def io(_config), do: %{kinds: [:step], produces: "myapp.variant"}
+
+    @impl true
+    def emit(%Block{} = block, context),
+      do: StatifierBlocks.CoreFixtures.invoke_leaf(block, context)
+  end
+
+  defmodule SignupStep do
+    @moduledoc "`myapp.signup_step`: one screen of the wizard, in one variant."
+
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+
+    @impl true
+    def slots(_config), do: []
+
+    @impl true
+    def config_schema(_config),
+      do: [
+        %{key: "invoke_type", type: :string, label: "Invoke", required?: true, default: ""},
+        %{key: "step", type: :string, label: "Step", required?: true, default: ""}
+      ]
+
+    @impl true
+    def validate_config(_config), do: :ok
+
+    @impl true
+    def io(_config), do: %{kinds: [:step]}
+
+    @impl true
+    def emit(%Block{} = block, context),
+      do: StatifierBlocks.CoreFixtures.invoke_leaf(block, context)
+  end
+
+  defmodule Conversion do
+    @moduledoc "`myapp.conversion`: records the conversion event against the bucket."
+
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+
+    @impl true
+    def slots(_config), do: []
+
+    @impl true
+    def config_schema(_config),
+      do: [
+        %{key: "invoke_type", type: :string, label: "Invoke", required?: true, default: ""},
+        %{key: "event", type: :string, label: "Event", required?: true, default: ""}
+      ]
+
+    @impl true
+    def validate_config(_config), do: :ok
+
+    @impl true
+    def io(_config), do: %{kinds: [:step], consumes: "myapp.variant"}
+
+    @impl true
+    def emit(%Block{} = block, context),
+      do: StatifierBlocks.CoreFixtures.invoke_leaf(block, context)
   end
 
   @doc """
@@ -197,18 +292,21 @@ defmodule StatifierBlocks.CoreFixtures do
     {:ok, Emit.state(context.state_id, armed, [watcher, Emit.final(done)])}
   end
 
-  @doc "The `myapp.*` types the ADR-0001 worked example names."
+  @doc "The `myapp.*` types the two worked examples name."
   @spec host_types() :: %{Block.type_name() => module()}
   def host_types do
     %{
-      "myapp.enrich" => Enrich,
+      "myapp.authorize" => Authorize,
       "myapp.notify" => Notify,
-      "myapp.crm_push" => CrmPush,
-      "myapp.on_event" => OnEvent
+      "myapp.capture" => Capture,
+      "myapp.on_event" => OnEvent,
+      "myapp.assign_variant" => AssignVariant,
+      "myapp.signup_step" => SignupStep,
+      "myapp.conversion" => Conversion
     }
   end
 
-  @doc "The real core vocabulary plus the worked example's host types."
+  @doc "The real core vocabulary plus both worked examples' host types."
   @spec palette() :: Palette.t()
   def palette, do: Palette.new(Map.merge(Palette.core_types(), host_types()))
 
@@ -222,9 +320,9 @@ defmodule StatifierBlocks.CoreFixtures do
   """
   @spec valid_config(module()) :: Block.config()
   def valid_config(Core.Branch),
-    do: %{"arms" => [%{"slot" => "arm_qualified", "cond" => "score > 80"}]}
+    do: %{"arms" => [%{"slot" => "arm_approved", "cond" => "budget_remaining > amount"}]}
 
-  def valid_config(Core.Parallel), do: %{"lanes" => ["crm", "nurture"]}
+  def valid_config(Core.Parallel), do: %{"lanes" => ["capture", "receipt"]}
   def valid_config(Core.Wait), do: %{"duration" => "PT48H"}
   def valid_config(Core.ResumableGroup), do: %{"history" => "deep"}
   def valid_config(Core.OnEvent), do: %{"event" => "order.cancelled", "outcome" => "abandon"}

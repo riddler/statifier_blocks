@@ -65,11 +65,11 @@ defmodule StatifierBlocks.DocumentTest do
       arm_block = Block.new("myapp.notify", id: "blk_arm")
       otherwise_block = Block.new("myapp.notify", id: "blk_otherwise")
 
-      # Inserted in reverse-sorted order: "otherwise" before "arm_qualified".
+      # Inserted in reverse-sorted order: "otherwise" before "arm_approved".
       root =
         Block.new("core.branch",
           id: "blk_root",
-          slots: %{"otherwise" => [otherwise_block], "arm_qualified" => [arm_block]}
+          slots: %{"otherwise" => [otherwise_block], "arm_approved" => [arm_block]}
         )
 
       document = Document.new(root)

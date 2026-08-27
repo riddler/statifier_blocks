@@ -29,8 +29,8 @@ author has already committed to it.
 a structure - a record shape, a union, a parameterized container - this
 package owns a subtyping algorithm, a normal form, an inference rule for
 containers, and a decade of edge cases, none of which are what it is for. But
-hosts genuinely do have widening: a host whose `myapp.contact` and
-`myapp.lead` both satisfy the shape a generic notify step wants has a real
+hosts genuinely do have widening: a host whose `myapp.credit_card_txn` and
+`myapp.debit_card_txn` both satisfy the shape a generic ledger step wants has a real
 relation between them, and it is a relation only that host can know. The way
 out is the one the family already uses for every other extension point: keep
 the core rule trivial and total, and let the host supply the part only it can
@@ -56,7 +56,7 @@ host's contribution is registered, which both consumers are already passed.
 ## Decision
 
 **1. A type expression is an opaque string, and the default relation is
-string identity.** `"record"`, `"score"`, `"myapp.contact"`. This package
+string identity.** `"record"`, `"decision"`, `"myapp.card_txn"`. This package
 parses type expressions, compares their parts, normalizes them, and infers
 them: never. `assignable?(produced, consumed)` is `produced == consumed`,
 which is decidable in constant time, obviously reflexive, obviously
@@ -426,18 +426,18 @@ The `io/1` callback ADR-0002 declared as returning `term()` is thereby pinned:
 
 ## Worked example
 
-A multi-tenant host embedding the engine, whose records widen: `myapp.lead`
-and `myapp.contact` both satisfy anything that wants a bare `myapp.person`.
-The host declares that once.
+A multi-tenant host embedding the engine, whose card transactions widen:
+`myapp.credit_card_txn` and `myapp.debit_card_txn` both satisfy anything
+that wants a bare `myapp.card_txn`. The host declares that once.
 
 ```elixir
 defmodule MyApp.Blocks.Types do
   @behaviour StatifierBlocks.Assignability.Relation
 
   @widens %{
-    "myapp.lead" => ["myapp.person"],
-    "myapp.contact" => ["myapp.person"],
-    "myapp.scored_lead" => ["myapp.lead", "myapp.person"]
+    "myapp.credit_card_txn" => ["myapp.card_txn"],
+    "myapp.debit_card_txn" => ["myapp.card_txn"],
+    "myapp.settled_txn" => ["myapp.credit_card_txn", "myapp.card_txn"]
   }
 
   @impl true
@@ -447,10 +447,10 @@ end
 
 palette = %StatifierBlocks.Palette{
   types: Map.merge(StatifierBlocks.Palette.core(), %{
-    "myapp.enrich" => MyApp.Blocks.Enrich,
-    "myapp.score" => MyApp.Blocks.Score,
-    "myapp.notify" => MyApp.Blocks.Notify,
-    "myapp.on_cancel" => MyApp.Blocks.OnCancel
+    "myapp.authorize" => MyApp.Blocks.Authorize,
+    "myapp.settle" => MyApp.Blocks.Settle,
+    "myapp.post_to_ledger" => MyApp.Blocks.PostToLedger,
+    "myapp.on_chargeback" => MyApp.Blocks.OnChargeback
   }),
   assignability: MyApp.Blocks.Types
 }
@@ -459,17 +459,19 @@ palette = %StatifierBlocks.Palette{
 Its palette entries declare what they are and what they move:
 
 ```elixir
-# Takes a raw record, hands back a lead.
-def io(_config), do: %{consumes: "myapp.record", produces: "myapp.lead"}      # enrich
+# Takes a transaction, hands back a card authorization.
+def io(_config),
+  do: %{consumes: "myapp.transaction", produces: "myapp.credit_card_txn"}   # authorize
 
-# Takes a lead, hands back a scored lead.
-def io(_config), do: %{consumes: "myapp.lead", produces: "myapp.scored_lead"} # score
+# Takes a card authorization, hands back a settled transaction.
+def io(_config),
+  do: %{consumes: "myapp.credit_card_txn", produces: "myapp.settled_txn"}   # settle
 
-# Takes anyone with contact details; produces nothing anyone downstream wants.
-def io(_config), do: %{consumes: "myapp.person", produces: :unknown}          # notify
+# Takes any card transaction; produces nothing anyone downstream wants.
+def io(_config), do: %{consumes: "myapp.card_txn", produces: :unknown}      # post_to_ledger
 
 # Not a step at all.
-def io(_config), do: %{kinds: [:interrupt_handler]}                           # on_cancel
+def io(_config), do: %{kinds: [:interrupt_handler]}                         # on_chargeback
 ```
 
 And the two core types that carry structure:
@@ -487,24 +489,24 @@ def io(_config),
   }
 ```
 
-Now the document from ADR-0001's worked example, with a `myapp.score` step
-(`blk_SCR`) added after the enrich, and entry type `"myapp.record"` supplied by
-the host in the context. Walking the `body` of the root sequence:
+Now the document from ADR-0001's worked example, with a `myapp.settle` step
+(`blk_STL`) added after the authorize, and entry type `"myapp.transaction"`
+supplied by the host in the context. Walking the `body` of the root sequence:
 
 | Position | Inbound | Candidate consumes | Verdict |
 |---|---|---|---|
-| before `blk_ENR` | `"myapp.record"` (entry type) | enrich wants `"myapp.record"` | identity, step 2 |
-| after `blk_ENR` | `"myapp.lead"` | score wants `"myapp.lead"` | identity, step 2 |
-| after `blk_SCR` | `"myapp.scored_lead"` | notify wants `"myapp.person"` | **host widens**, step 4 |
-| after `blk_SCR` | `"myapp.scored_lead"` | enrich wants `"myapp.record"` | no - `:type_mismatch` |
-| inside `interrupts` | - | notify is `[:step]` | no - `:kind_not_admitted` |
-| inside `interrupts` | - | on_cancel is `[:interrupt_handler]` | admitted |
-| inside `body` | - | on_cancel is `[:interrupt_handler]` | no - `:kind_not_admitted` |
+| before `blk_AUTH` | `"myapp.transaction"` (entry type) | authorize wants `"myapp.transaction"` | identity, step 2 |
+| after `blk_AUTH` | `"myapp.credit_card_txn"` | settle wants `"myapp.credit_card_txn"` | identity, step 2 |
+| after `blk_STL` | `"myapp.settled_txn"` | post_to_ledger wants `"myapp.card_txn"` | **host widens**, step 4 |
+| after `blk_STL` | `"myapp.settled_txn"` | authorize wants `"myapp.transaction"` | no - `:type_mismatch` |
+| inside `interrupts` | - | post_to_ledger is `[:step]` | no - `:kind_not_admitted` |
+| inside `interrupts` | - | on_chargeback is `[:interrupt_handler]` | admitted |
+| inside `body` | - | on_chargeback is `[:interrupt_handler]` | no - `:kind_not_admitted` |
 
 Reading the interesting rows:
 
-- **The host relation widening, and only widening.** `"myapp.scored_lead"` ->
-  `"myapp.person"` is not identity, so step 4 asks the host, which says yes.
+- **The host relation widening, and only widening.** `"myapp.settled_txn"` ->
+  `"myapp.card_txn"` is not identity, so step 4 asks the host, which says yes.
   Delete `assignability: MyApp.Blocks.Types` from the palette and that one row
   flips to a mismatch while every other row is unchanged - the identity rows
   never reached the callback (decision 6).
@@ -514,8 +516,8 @@ Reading the interesting rows:
 - **`:passthrough` earning its keep.** `blk_GRP` is a `core.resumable_group`
   whose `body` ends in the branch, and the branch declares `produces:
   :unknown`, so everything after the group is unconstrained. Had the group's
-  body ended in a scored lead instead, `{:passthrough, "body"}` would have
-  carried `"myapp.scored_lead"` out past the group with no lattice and no
+  body ended in a settled transaction instead, `{:passthrough, "body"}` would
+  have carried `"myapp.settled_txn"` out past the group with no lattice and no
   inference (decision 4).
 - **Permissive `:unknown` (decision 5).** `core.branch` and `core.parallel`
   declare no types, so every position downstream of the branch accepts
@@ -531,7 +533,7 @@ StatifierBlocks.Assignability.valid_targets(palette, document, dragged, ctx)
 
 # Compiler, before emitting - the authority over every seam.
 StatifierBlocks.Assignability.validate(palette, document, ctx)
-#=> {:error, [{:type_mismatch, "blk_EN2", "blk_SCR", "myapp.scored_lead", "myapp.record"}]}
+#=> {:error, [{:type_mismatch, "blk_AU2", "blk_STL", "myapp.settled_txn", "myapp.transaction"}]}
 ```
 
 The acceptance property for this record: those two calls consult one

@@ -17,7 +17,7 @@ defmodule StatifierBlocks.DecodeTest do
 
   describe "worked example (headline round trip)" do
     # sabotage: in `Decode.build_block/1`, hardcode `type_version: 1` instead
-    # of reading `Map.get(map, "type_version")` -> `blk_ENR`'s `type_version:
+    # of reading `Map.get(map, "type_version")` -> `blk_AUTH`'s `type_version:
     # 2` decodes as `1` -> the equality assertion below goes red
     test "from_json/1 of the fixture bytes equals the hand-built document, and re-encodes to the same bytes" do
       json = DocumentFixtures.worked_example_json()

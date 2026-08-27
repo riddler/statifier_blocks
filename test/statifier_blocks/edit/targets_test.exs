@@ -125,10 +125,10 @@ defmodule StatifierBlocks.Edit.TargetsTest do
                MapSet.new([
                  {"blk_ROOT", "body"},
                  {"blk_GRP", "body"},
-                 {"blk_BR", "arm_qualified"},
+                 {"blk_BR", "arm_approved"},
                  {"blk_BR", "otherwise"},
-                 {"blk_PAR", "lane_crm"},
-                 {"blk_PAR", "lane_nurture"}
+                 {"blk_PAR", "lane_capture"},
+                 {"blk_PAR", "lane_receipt"}
                ])
 
       refute {"blk_GRP", "interrupts"} in result

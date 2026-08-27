@@ -15,7 +15,7 @@ defmodule StatifierBlocks.Core.Config do
   @identifier ~r/\A[a-z][a-z0-9_]*\z/
 
   # An arm's stored slot name. ADR-0002 decision 10 calls it a suffix; the
-  # ADR-0001 worked example stores the whole slot name (`"arm_qualified"`),
+  # ADR-0001 worked example stores the whole slot name (`"arm_approved"`),
   # and the stored bytes win.
   @arm_slot ~r/\Aarm_[a-z][a-z0-9_]*\z/
 

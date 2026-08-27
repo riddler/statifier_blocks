@@ -21,7 +21,7 @@ defmodule StatifierBlocks.Block do
   @typedoc ~S(Document-unique, stable, never reused. `"blk_" <> uxid`.)
   @type id :: String.t()
 
-  @typedoc ~S(Namespaced block-type name, e.g. `"core.branch"`, `"myapp.enrich"`.)
+  @typedoc ~S(Namespaced block-type name, e.g. `"core.branch"`, `"myapp.authorize"`.)
   @type type_name :: String.t()
 
   @type slot_name :: String.t()

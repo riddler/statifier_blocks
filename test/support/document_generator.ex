@@ -47,7 +47,7 @@ defmodule StatifierBlocks.DocumentGenerator do
     123_456_789_012_345
   ]
   @type_names ~w(core.sequence core.branch core.parallel core.wait
-                 core.resumable_group myapp.enrich myapp.crm_push
+                 core.resumable_group myapp.authorize myapp.capture
                  myapp.notify myapp.on_event nobody.knows.this)
 
   @doc "Generates document `index`, deterministically from `base_seed`."

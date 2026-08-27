@@ -710,7 +710,7 @@ never markup (ADR-0005 decision 10).
 
 The document is ADR-0001's worked example. The author drags `blk_NOT` (a
 notify step, currently the second block in the parallel block's
-`lane_nurture`) out of that lane and into the branch's `otherwise` slot,
+`lane_receipt`) out of that lane and into the branch's `otherwise` slot,
 dropping it above the notify that is already there.
 
 **At `dragstart`,** the shell pushes one event and the server evaluates:
@@ -721,10 +721,10 @@ Edit.Targets.droppable_slots(document, palette, "blk_NOT")
 #     {"blk_ROOT", "body"},
 #     {"blk_GRP", "body"},
 #     {"blk_GRP", "interrupts"},
-#     {"blk_BR", "arm_qualified"},
+#     {"blk_BR", "arm_approved"},
 #     {"blk_BR", "otherwise"},
-#     {"blk_PAR", "lane_crm"},
-#     {"blk_PAR", "lane_nurture"}
+#     {"blk_PAR", "lane_capture"},
+#     {"blk_PAR", "lane_receipt"}
 #   ]
 ```
 
@@ -743,10 +743,10 @@ the server builds and applies one command:
   Edit.apply(document, {:move, "blk_NOT", {"blk_BR", "otherwise", 0}})
 
 inverse
-#=> {:move, "blk_NOT", {"blk_PAR", "lane_nurture", 1}}
+#=> {:move, "blk_NOT", {"blk_PAR", "lane_receipt", 1}}
 ```
 
-`lane_nurture` now holds only `blk_WAI`; `otherwise` holds `blk_NOT` then
+`lane_receipt` now holds only `blk_WAI`; `otherwise` holds `blk_NOT` then
 `blk_NO2`. No id changed - ADR-0001 decision 3 - so the provenance map sb-iwz
 will build still keys correctly for every block that did not move.
 
@@ -759,7 +759,7 @@ What this example is chosen to demonstrate:
 - **Pre-hover validity as a pure function.** The seven-element list is the
   entire interaction model of a drag, and it is computed by a function that
   takes a document, a palette, and an id, with no browser anywhere near it.
-- **Slot granularity (decision 5).** `lane_nurture` appears once, not three
+- **Slot granularity (decision 5).** `lane_receipt` appears once, not three
   times for its three gaps, and the source slot is a legitimate target
   because dropping back where you started is not an error.
 - **The command is smaller than the gesture.** A drag across the tree is four

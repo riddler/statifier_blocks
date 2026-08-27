@@ -93,7 +93,7 @@ An id is meaningful only inside its document. Anything that names a block
 from outside carries the document id alongside it.
 
 **4. A block type is referenced by a namespaced string name, not a
-module.** `"core.sequence"`, `"core.branch"`, `"myapp.enrich"`. The
+module.** `"core.sequence"`, `"core.branch"`, `"myapp.authorize"`. The
 document must survive a host renaming or moving the module that implements
 a palette entry, and an encoded Elixir module name in stored bytes makes a
 refactor a data migration. The `core.*` namespace is reserved for the block
@@ -264,7 +264,7 @@ defmodule StatifierBlocks.Block do
   @typedoc ~S(Document-unique, stable, never reused. `"blk_" <> uxid`.)
   @type id :: String.t()
 
-  @typedoc ~S(Namespaced block-type name, e.g. `"core.branch"`, `"myapp.enrich"`.)
+  @typedoc ~S(Namespaced block-type name, e.g. `"core.branch"`, `"myapp.authorize"`.)
   @type type_name :: String.t()
 
   @type slot_name :: String.t()
@@ -330,30 +330,31 @@ end
 ## Worked example
 
 A published workflow in a multi-tenant host embedding the engine. It
-enriches an inbound record, branches on the enrichment result, and on the
-qualified arm runs two lanes concurrently - a CRM push, and a wait followed
-by a notification. The branch sits inside a resumable group carrying one
-interrupt rule, so a cancellation event tears the whole group down and the
-group resumes where it left off when re-entered.
+authorizes a card transaction, branches on whether the account's remaining
+budget covers the amount, and on the approved arm runs two lanes
+concurrently - a capture, and a wait followed by a receipt notification.
+The branch sits inside a resumable group carrying one interrupt rule, so a
+cancellation event tears the whole group down and the group resumes where
+it left off when re-entered.
 
 ```
-core.sequence  blk_01J...ROOT
+core.sequence                           blk_01J...ROOT
 └─ body
-   ├─ myapp.enrich              blk_01J...ENR   (invoke myapp:enrich)
-   └─ core.resumable_group      blk_01J...GRP   (history: deep)
+   ├─ myapp.authorize                   blk_01J...AUTH  (invoke myapp:authorize)
+   └─ core.resumable_group              blk_01J...GRP   (history: deep)
       ├─ body
-      │  └─ core.branch         blk_01J...BR    (arms: ["qualified"])
-      │     ├─ arm_qualified
-      │     │  └─ core.parallel blk_01J...PAR   (lanes: ["crm", "nurture"])
-      │     │     ├─ lane_crm
-      │     │     │  └─ myapp.crm_push          blk_01J...CRM
-      │     │     └─ lane_nurture
-      │     │        ├─ core.wait               blk_01J...WAI  (PT48H)
-      │     │        └─ myapp.notify            blk_01J...NOT
+      │  └─ core.branch                 blk_01J...BR    (arms: ["approved"])
+      │     ├─ arm_approved
+      │     │  └─ core.parallel         blk_01J...PAR   (lanes: ["capture", "receipt"])
+      │     │     ├─ lane_capture
+      │     │     │  └─ myapp.capture   blk_01J...CAP
+      │     │     └─ lane_receipt
+      │     │        ├─ core.wait       blk_01J...WAI   (PT48H)
+      │     │        └─ myapp.notify    blk_01J...NOT
       │     └─ otherwise
-      │        └─ myapp.notify                  blk_01J...NO2
+      │        └─ myapp.notify          blk_01J...NO2
       └─ interrupts
-         └─ myapp.on_event                      blk_01J...INT  (myapp.cancelled)
+         └─ myapp.on_event              blk_01J...INT   (myapp.cancelled)
 ```
 
 The canonical form, re-indented here for reading - the encoder emits it
@@ -362,16 +363,16 @@ with sorted keys and no whitespace, and the ids are abbreviated:
 ```json
 {
   "id": "bdoc_01JDOC",
-  "metadata": {"name": "Inbound qualification"},
+  "metadata": {"name": "Card authorization"},
   "revision": 17,
   "root": {
     "id": "blk_ROOT",
     "slots": {
       "body": [
         {
-          "config": {"invoke_type": "myapp:enrich", "timeout": "PT30S"},
-          "id": "blk_ENR",
-          "type": "myapp.enrich",
+          "config": {"invoke_type": "myapp:authorize", "timeout": "PT30S"},
+          "id": "blk_AUTH",
+          "type": "myapp.authorize",
           "type_version": 2
         },
         {
@@ -380,23 +381,23 @@ with sorted keys and no whitespace, and the ids are abbreviated:
           "slots": {
             "body": [
               {
-                "config": {"arms": [{"cond": "score > 80", "slot": "arm_qualified"}]},
+                "config": {"arms": [{"cond": "budget_remaining > amount", "slot": "arm_approved"}]},
                 "id": "blk_BR",
                 "slots": {
-                  "arm_qualified": [
+                  "arm_approved": [
                     {
-                      "config": {"lanes": ["crm", "nurture"]},
+                      "config": {"lanes": ["capture", "receipt"]},
                       "id": "blk_PAR",
                       "slots": {
-                        "lane_crm": [
+                        "lane_capture": [
                           {
-                            "config": {"invoke_type": "myapp:crm_push"},
-                            "id": "blk_CRM",
-                            "type": "myapp.crm_push",
+                            "config": {"invoke_type": "myapp:capture"},
+                            "id": "blk_CAP",
+                            "type": "myapp.capture",
                             "type_version": 1
                           }
                         ],
-                        "lane_nurture": [
+                        "lane_receipt": [
                           {
                             "config": {"duration": "PT48H"},
                             "id": "blk_WAI",
@@ -454,10 +455,10 @@ What this example is chosen to demonstrate:
 - **Nested groups.** `core.resumable_group` contains a `core.branch` which
   contains a `core.parallel` which contains a `core.sequence`-shaped lane.
   Depth arrives with no schema change; `blk_WAI` and `blk_NOT` sit adjacent
-  in `lane_nurture` and are therefore sequential, with no wiring recorded.
+  in `lane_receipt` and are therefore sequential, with no wiring recorded.
 - **Config-parameterized slots (decision 5).** `blk_BR` has slots
-  `arm_qualified` and `otherwise` because its config declares one arm;
-  `blk_PAR` has `lane_crm` and `lane_nurture` because its config declares
+  `arm_approved` and `otherwise` because its config declares one arm;
+  `blk_PAR` has `lane_capture` and `lane_receipt` because its config declares
   two lanes. Neither slot set is knowable from the type name alone.
 - **Named slots earning their keep (decision 5).** `blk_GRP` carries `body`
   and `interrupts`. Both are lists of blocks under the same parent; they
@@ -465,7 +466,7 @@ What this example is chosen to demonstrate:
 - **Omission in canonical form (decision 8).** Leaf blocks carry no `slots`
   key at all rather than `"slots": {}`; the branch's arm slots that a
   second arm would add are simply absent.
-- **Opacity of config (decision 6).** `"cond": "score > 80"` is a predicator
+- **Opacity of config (decision 6).** `"cond": "budget_remaining > amount"` is a predicator
   expression and `"duration": "PT48H"` is an ISO-8601 duration. This layer
   sees two strings. Note also that the 48 hours is *not* `48.0` - decision
   6's no-floats rule is why durations are strings here rather than numbers.

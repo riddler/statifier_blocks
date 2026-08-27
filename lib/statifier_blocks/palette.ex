@@ -75,7 +75,7 @@ defmodule StatifierBlocks.Palette do
   The `type_name => module` map behind `core/0`, for a host merging the
   core vocabulary with its own entries:
 
-      Palette.new(Map.merge(Palette.core_types(), %{"myapp.enrich" => MyApp.Blocks.Enrich}))
+      Palette.new(Map.merge(Palette.core_types(), %{"myapp.authorize" => MyApp.Blocks.Authorize}))
 
   A host entry sharing a name with a core one wins, because that is what
   `Map.merge/2` does and a palette is just a value: nothing in this package

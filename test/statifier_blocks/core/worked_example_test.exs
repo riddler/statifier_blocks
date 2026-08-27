@@ -59,17 +59,17 @@ defmodule StatifierBlocks.Core.WorkedExampleTest do
     parallel = block(ctx.document, "blk_PAR")
 
     assert Core.Branch.slots(branch.config) == [
-             {"arm_qualified", :at_least_one, ~s(When "qualified")},
+             {"arm_approved", :at_least_one, ~s(When "approved")},
              {"otherwise", :any, "Otherwise"}
            ]
 
     assert Core.Parallel.slots(parallel.config) == [
-             {"lane_crm", :any, "crm"},
-             {"lane_nurture", :any, "nurture"}
+             {"lane_capture", :any, "capture"},
+             {"lane_receipt", :any, "receipt"}
            ]
 
-    assert Map.keys(branch.slots) |> Enum.sort() == ["arm_qualified", "otherwise"]
-    assert Map.keys(parallel.slots) |> Enum.sort() == ["lane_crm", "lane_nurture"]
+    assert Map.keys(branch.slots) |> Enum.sort() == ["arm_approved", "otherwise"]
+    assert Map.keys(parallel.slots) |> Enum.sort() == ["lane_capture", "lane_receipt"]
   end
 
   # Sabotage: changed `Core.Wait`'s duration regex to reject `PT48H` - red
