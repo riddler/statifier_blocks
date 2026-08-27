@@ -763,6 +763,314 @@ defmodule StatifierBlocks.AssignabilityTest do
     end
   end
 
+  # A small, deliberately mixed document: a two-level tree covering an
+  # empty slot, a populated slot, and a resumable_group with both of its
+  # slots present, so `valid_targets/4` and `validate/3`'s tests below
+  # exercise more than a flat root-only sequence.
+  defp phase5_document do
+    enrich = Block.new("myapp.enrich", id: "blk_ENR")
+    score = Block.new("myapp.score", id: "blk_SCR")
+
+    group =
+      Block.new("core.resumable_group", id: "blk_GRP", slots: %{"body" => [], "interrupts" => []})
+
+    root = Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [enrich, score, group]})
+    Document.new(root, id: "bdoc_phase5")
+  end
+
+  defp phase5_context, do: %{entry_type: "myapp.record"}
+
+  # Every position `check/5` can be asked about for `candidate` over
+  # `document`: `{parent_id, slot, index}` for every block, every slot the
+  # resolved module declares, and every index from 0 through the slot's
+  # current length inclusive - the same space `valid_targets/4` enumerates,
+  # rebuilt independently here so the property tests below do not assume
+  # `valid_targets/4` is correct while testing it.
+  defp enumerate_positions(palette, document) do
+    for block <- Document.blocks(document),
+        {:ok, module, resolved} <- [Palette.resolve(palette, block)],
+        {slot, _arity, _label} <- module.slots(resolved.config),
+        index <- 0..length(Map.get(block.slots, slot, [])) do
+      {block.id, slot, index}
+    end
+  end
+
+  describe "valid_targets/4 - widening can only grow the accepted set" do
+    # sabotage: change `valid_targets/4`'s final filter from
+    # `check(...) == :ok` to always `true` -> both palettes below return the
+    # full position set and the "grows the set for at least one position"
+    # assertion at the end goes red (there is no longer a position present
+    # with the module and absent without it, since both sets are already
+    # everything)
+    test "the with-module result is a superset of the without-module result, over the enumerated space" do
+      document = phase5_document()
+      candidate = Block.new("myapp.notify", id: "blk_notify_candidate")
+      ctx = phase5_context()
+
+      without = AssignabilityFixtures.palette(nil)
+      with_widens = AssignabilityFixtures.palette(Widens)
+
+      targets_without = Assignability.valid_targets(without, document, candidate, ctx)
+      targets_with = Assignability.valid_targets(with_widens, document, candidate, ctx)
+
+      assert MapSet.subset?(MapSet.new(targets_without), MapSet.new(targets_with))
+
+      # Not a vacuous inclusion: the widened relation accepts a position the
+      # unwidened one refuses (the seam after blk_SCR, "myapp.scored_lead"
+      # widening to myapp.notify's "myapp.person").
+      assert {"blk_ROOT", "body", 2} in targets_with
+      refute {"blk_ROOT", "body", 2} in targets_without
+    end
+
+    # sabotage: change `Deny.assignable?/2` from `false` to `true` -> this
+    # assertion goes red (the floor case would then also widen)
+    test "a deny-everything module makes the superset an equality - the floor property" do
+      document = phase5_document()
+      candidate = Block.new("myapp.notify", id: "blk_notify_candidate")
+      ctx = phase5_context()
+
+      without = AssignabilityFixtures.palette(nil)
+      with_deny = AssignabilityFixtures.palette(Deny)
+
+      assert Assignability.valid_targets(without, document, candidate, ctx) ==
+               Assignability.valid_targets(with_deny, document, candidate, ctx)
+    end
+  end
+
+  describe "check/5 - both core.on_event misplacement directions, restated at the decision function" do
+    # sabotage: change `Core.OnEvent`'s (or the fixture standing in for it
+    # here) `:kinds` from `[:interrupt_handler]` to `[:step]` -> the second
+    # assertion below (refusal inside "body") goes red, since a `:step`
+    # would then be admitted where only an interrupt handler is
+    test "an interrupt handler is refused inside a body slot, from kind tags alone" do
+      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => []})
+      document = Document.new(root, id: "bdoc_onevent_a")
+      candidate = Block.new("core.on_event", id: "blk_cand")
+      palette = Palette.core()
+
+      assert {:error,
+              [
+                {:kind_not_admitted, "blk_cand", "blk_root", "body", [:interrupt_handler],
+                 [:step]}
+              ]} =
+               Assignability.check(palette, document, {"blk_root", "body", 0}, candidate, %{})
+    end
+
+    # sabotage: change `Core.Sequence`'s (or the fixture standing in) `:kinds`
+    # from `[:step]` to `[:interrupt_handler]` -> the first assertion below
+    # goes red, since a `:step` would then be wrongly admitted into
+    # "interrupts"
+    test "a step is refused inside an interrupts slot, from kind tags alone" do
+      group =
+        Block.new("core.group", id: "blk_grp", slots: %{"body" => [], "interrupts" => []})
+
+      document = Document.new(group, id: "bdoc_onevent_b")
+      candidate = Block.new("core.sequence", id: "blk_cand", slots: %{"body" => []})
+      palette = Palette.core()
+
+      assert {:error,
+              [
+                {:kind_not_admitted, "blk_cand", "blk_grp", "interrupts", [:step],
+                 [:interrupt_handler]}
+              ]} =
+               Assignability.check(
+                 palette,
+                 document,
+                 {"blk_grp", "interrupts", 0},
+                 candidate,
+                 %{}
+               )
+    end
+  end
+
+  describe "an :unknown-everywhere palette accepts everything" do
+    defmodule Unconstrained do
+      @moduledoc "Declares no `io/1` at all - every default applies."
+
+      @behaviour StatifierBlocks.BlockType
+
+      @impl true
+      def current_version, do: 1
+      @impl true
+      def slots(_config), do: [{"body", :any, "Body"}]
+      @impl true
+      def config_schema(_config), do: []
+      @impl true
+      def validate_config(_config), do: :ok
+      @impl true
+      def emit(_block, _context), do: {:error, :not_implemented}
+    end
+
+    defp unconstrained_document do
+      leaf = Block.new("leaf", id: "blk_leaf")
+      inner = Block.new("leaf", id: "blk_inner", slots: %{"body" => [leaf]})
+      root = Block.new("leaf", id: "blk_root", slots: %{"body" => [inner]})
+      Document.new(root, id: "bdoc_unconstrained")
+    end
+
+    defp unconstrained_palette, do: Palette.new(%{"leaf" => Unconstrained})
+
+    # sabotage: change `kinds/2`'s default from `[:step]` to `[:other]` for
+    # both the candidate and every slot's accepted set consistently there
+    # would be no observable difference (both default the same way), so the
+    # true sabotage is on `slot_accepts/3`'s default: change it from `:any`
+    # to `[]` -> this assertion goes red, since a block declaring no
+    # `slot_accepts` would then admit nothing
+    test "valid_targets/4 equals the full enumerated position set" do
+      document = unconstrained_document()
+      candidate = Block.new("leaf", id: "blk_candidate")
+      palette = unconstrained_palette()
+
+      expected = enumerate_positions(palette, document)
+      actual = Assignability.valid_targets(palette, document, candidate, %{})
+
+      assert MapSet.new(actual) == MapSet.new(expected)
+      assert length(actual) == length(expected)
+    end
+
+    # sabotage: change `assignable?/3`'s `%Palette{assignability: nil}`
+    # clause from `do: false` to `do: true` unconditionally would not red
+    # this (every seam here is already `:unknown`, permissive by step 1
+    # regardless); the sabotage that reds it is changing
+    # `assignable?(_palette, :unknown, _consumed)`'s `do: true` to `do:
+    # false` -> validate/3 then reports a :type_mismatch on every seam,
+    # since :unknown is no longer permissive on the produced side
+    test "validate/3 returns :ok on any document built from an :unknown-everywhere palette" do
+      document = unconstrained_document()
+      palette = unconstrained_palette()
+
+      assert Assignability.validate(palette, document, %{}) == :ok
+    end
+  end
+
+  describe "the decision function is the single call site both consumers use" do
+    # sabotage: change `valid_targets/4`'s guard from `check(...) == :ok` to
+    # `check(...) != :ok` (inverted) -> this assertion goes red for every
+    # position where the two disagree
+    test "valid_targets/4 contains a position exactly when check/5 returns :ok for it" do
+      document = phase5_document()
+      candidate = Block.new("myapp.notify", id: "blk_notify_candidate")
+      ctx = phase5_context()
+      palette = AssignabilityFixtures.palette()
+
+      targets = MapSet.new(Assignability.valid_targets(palette, document, candidate, ctx))
+
+      for target <- enumerate_positions(palette, document) do
+        expected_ok? = Assignability.check(palette, document, target, candidate, ctx) == :ok
+
+        assert MapSet.member?(targets, target) == expected_ok?,
+               "#{inspect(target)}: valid_targets/4 disagreed with check/5"
+      end
+    end
+
+    # Builds `document` with `block` removed from its own slot - the
+    # document `check/5` would see if `block` were being inserted fresh at
+    # the position it currently occupies. Lets this test ask check/5,
+    # honestly as an insert rather than the degenerate "already there" move,
+    # whether it would refuse `block` at its own position.
+    defp without_block(document, block_id) do
+      {:ok, [_ | _] = path} = Document.fetch_path(document, block_id)
+      %{document | root: remove_along_path(document.root, path)}
+    end
+
+    defp remove_along_path(block, [{_parent_id, slot, index}]) do
+      children = Map.get(block.slots, slot, [])
+      %{block | slots: Map.put(block.slots, slot, List.delete_at(children, index))}
+    end
+
+    defp remove_along_path(block, [{_parent_id, slot, index} | rest]) do
+      children = Map.get(block.slots, slot, [])
+      child = Enum.at(children, index)
+      updated_children = List.replace_at(children, index, remove_along_path(child, rest))
+      %{block | slots: Map.put(block.slots, slot, updated_children)}
+    end
+
+    # sabotage: change `validate/3`'s `finding != nil` filter to always keep
+    # every element (including `nil`) -> this assertion goes red, since
+    # `{:error, findings}` would then carry stray `nil`s that no `check/5`
+    # call ever produces
+    test "validate/3 reports a finding for a seam exactly when check/5 refuses the block sitting on it" do
+      broken_group =
+        Block.new("core.group", id: "blk_broken_grp", slots: %{"body" => [], "interrupts" => []})
+
+      bad_handler = Block.new("myapp.on_cancel", id: "blk_bad_handler")
+
+      root =
+        Block.new("core.sequence",
+          id: "blk_root",
+          slots: %{"body" => [broken_group, bad_handler]}
+        )
+
+      document = Document.new(root, id: "bdoc_validate_check")
+      palette = AssignabilityFixtures.palette()
+      ctx = phase5_context()
+
+      {:error, findings} = Assignability.validate(palette, document, ctx)
+      refuted_block_ids = findings |> Enum.map(&elem(&1, 1)) |> MapSet.new()
+
+      for block <- Document.blocks(document), block.id != root.id do
+        {:ok, [_ | _] = path} = Document.fetch_path(document, block.id)
+        {parent_id, slot, index} = List.last(path)
+        reduced = without_block(document, block.id)
+
+        check_result =
+          Assignability.check(palette, reduced, {parent_id, slot, index}, block, ctx)
+
+        # Only the findings check/5 attributes to `block` itself bear on
+        # its own seam - a downstream finding from this insert-check
+        # belongs to whichever block now sits after it, not to `block`.
+        block_refused? =
+          case check_result do
+            :ok ->
+              false
+
+            {:error, block_findings} ->
+              Enum.any?(block_findings, &(elem(&1, 1) == block.id))
+          end
+
+        assert MapSet.member?(refuted_block_ids, block.id) == block_refused?,
+               "#{block.id}: validate/3 disagreed with check/5 on its own seam"
+      end
+    end
+  end
+
+  describe "valid_targets/4 - determinism" do
+    # sabotage: change `Document.blocks/1`'s slot traversal order (swap
+    # `Enum.sort_by/2` for no sort) indirectly reds this through
+    # non-determinism - the direct sabotage here is changing this function's
+    # `for` comprehension's index generator from `0..length(...)` (ascending)
+    # to a reversed range -> the returned list's ordering changes on the
+    # same call while its contents (as a set) stay the same, so an
+    # order-sensitive equality here goes red
+    test "the same call returns the same list, in pre-order" do
+      document = phase5_document()
+      candidate = Block.new("myapp.notify", id: "blk_notify_candidate")
+      ctx = phase5_context()
+      palette = AssignabilityFixtures.palette()
+
+      first = Assignability.valid_targets(palette, document, candidate, ctx)
+      second = Assignability.valid_targets(palette, document, candidate, ctx)
+
+      assert first == second
+
+      block_order = Enum.map(Document.blocks(document), & &1.id)
+
+      parent_positions =
+        first
+        |> Enum.map(fn {parent_id, _slot, _index} -> parent_id end)
+        |> Enum.uniq()
+
+      assert parent_positions ==
+               Enum.filter(block_order, &(&1 in parent_positions))
+
+      for {{parent_id, slot}, entries} <-
+            Enum.group_by(first, fn {p, s, _i} -> {p, s} end) do
+        indices = Enum.map(entries, fn {^parent_id, ^slot, index} -> index end)
+        assert indices == Enum.sort(indices)
+      end
+    end
+  end
+
   defp add_type(%Palette{types: types} = palette, type_name, module) do
     %{palette | types: Map.put(types, type_name, module)}
   end
