@@ -52,15 +52,19 @@ What is already in place, and what each phase can lean on:
 
 What is **not** in place and has to be written: nothing in `test/` today
 implements `Assignability.Relation`, and `CoreFixtures`' existing `myapp.*`
-types declare only the bare `"record"` type expression - none of ADR-0003's
-`myapp.lead` / `myapp.scored_lead` / `myapp.person` widening vocabulary. Phases
+types declare only the bare `"record"` type expression - none of the
+`myapp.credit_card_txn` / `myapp.settled_txn` / `myapp.card_txn` widening
+vocabulary this bead's fixtures need. Phases
 3 through 5 all need both. They go in a **new** `test/support/assignability_fixtures.ex`
 (`StatifierBlocks.AssignabilityFixtures`), not in `core_fixtures.ex` - Phase 2
 is slimming that module, and the two support files then have one subject each:
 `CoreFixtures` is the core vocabulary and `sb-da9`'s stand-in walk,
 `AssignabilityFixtures` is ADR-0003's worked example. It carries the
-worked-example toy types (`myapp.enrich`, `myapp.score`, `myapp.notify`,
-`myapp.on_cancel` with the record's own `consumes`/`produces` declarations), a
+worked-example toy types (`myapp.authorize`, `myapp.settle`,
+`myapp.post_to_ledger`, `myapp.on_chargeback` - ADR-0003's worked example
+re-expressed in the family's canonical credit-card example domain per the
+umbrella's `docs/terminology-firewall.md`, structurally isomorphic to the
+record's own table), a
 `Widens` module implementing `Assignability.Relation` over the record's
 `@widens` map, a `Deny` module answering `false` to everything (the floor case
 Phase 3 and Phase 5 both need), `palette/1` building the palette with or
