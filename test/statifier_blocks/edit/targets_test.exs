@@ -364,5 +364,21 @@ defmodule StatifierBlocks.Edit.TargetsTest do
       assert MapSet.new(by_id) == MapSet.new(by_fresh)
       assert by_id != []
     end
+
+    # sabotage: restore the single `{:ok, path}` clause of
+    # `Assignability.vacated_seam_finding/4` - red, the call raises a
+    # MatchError instead of returning `[]`. The root occupies no slot, so
+    # it vacates no seam; rule 4 then excludes its own whole subtree, which
+    # is every block, leaving the empty set `Edit.apply/2`'s
+    # `check_not_root/2` agrees with.
+    test "the document root is answerable and offers no slot" do
+      palette = core_palette()
+
+      leaf = signup_step("core.wait", "blk_LEAF", config: %{"duration" => "PT1S"})
+      root = Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [leaf]})
+      document = Document.new(root, id: "bdoc_ROOT_DRAG")
+
+      assert Targets.droppable_slots(document, palette, "blk_ROOT") == []
+    end
   end
 end

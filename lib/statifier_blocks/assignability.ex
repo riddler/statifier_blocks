@@ -448,13 +448,18 @@ defmodule StatifierBlocks.Assignability do
   end
 
   # The seam a move vacates: nil when `candidate` is not already in
-  # `document` (an insert has nothing to vacate), and nil when the slot has
-  # no block after `candidate`'s current position (nothing becomes adjacent
-  # to nothing).
+  # `document` (an insert has nothing to vacate), nil when `candidate` is
+  # the document root (`fetch_path/2` answers `{:ok, []}` for it - the root
+  # occupies no slot, so it leaves no seam behind), and nil when the slot
+  # has no block after `candidate`'s current position (nothing becomes
+  # adjacent to nothing).
   @spec vacated_seam_finding(Palette.t(), Document.t(), Block.t(), context()) :: finding() | nil
   defp vacated_seam_finding(palette, document, candidate, ctx) do
     case Document.fetch_path(document, candidate.id) do
       :error ->
+        nil
+
+      {:ok, []} ->
         nil
 
       {:ok, path} ->
