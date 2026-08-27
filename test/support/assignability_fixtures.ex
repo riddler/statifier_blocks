@@ -1,30 +1,39 @@
 defmodule StatifierBlocks.AssignabilityFixtures do
   @moduledoc """
-  Test-only support for ADR-0003's worked example. `CoreFixtures` carries
-  the `myapp.*` types the ADR-0001 worked example names, plus `sb-da9`'s
-  stand-in walk; this module carries ADR-0003's own worked example instead
-  - `myapp.enrich` / `myapp.score` / `myapp.notify` / `myapp.on_cancel`,
-  declared with the `consumes`/`produces` the record's worked example
-  gives them, plus the widening vocabulary (`myapp.lead` /
-  `myapp.scored_lead` / `myapp.person`) that vocabulary needs a host
-  relation to interpret.
+  Test-only support for ADR-0003's worked example, re-expressed in the
+  family's canonical credit-card example domain (the umbrella's
+  `docs/terminology-firewall.md`, "Example domains"). `CoreFixtures`
+  carries the `myapp.*` types the ADR-0001 worked example names, plus
+  `sb-da9`'s stand-in walk; this module carries ADR-0003's own worked
+  example instead - `myapp.authorize` / `myapp.settle` /
+  `myapp.post_to_ledger` / `myapp.on_chargeback`, plus the widening
+  vocabulary (`myapp.credit_card_txn` / `myapp.settled_txn` /
+  `myapp.card_txn`) that needs a host relation to interpret.
+
+  The re-skin is **structurally isomorphic** to the table in ADR-0003, not
+  a change to it: every row still exercises the same step of decision 6's
+  ordered relation. Authorize into settle is identity (step 2); settle into
+  post-to-ledger is not identity and reaches the host relation (step 4);
+  settle back into authorize is a `:type_mismatch` even with the relation;
+  and the handler gives both directions of the kind gate. The record itself
+  is unchanged and still spells its example in its own vocabulary - reading
+  the two side by side means mapping the names, not the structure.
 
   Two `StatifierBlocks.Assignability.Relation` implementations: `Widens`,
-  the record's own `MyApp.Blocks.Types` verbatim, and `Deny`, which answers
-  `false` to everything - the floor case a widen-only relation can never
-  fall below, and the fixture Phase 3 and Phase 5 both need to state that.
+  the record's `MyApp.Blocks.Types` re-skinned the same way, and `Deny`,
+  which answers `false` to everything - the floor case a widen-only
+  relation can never fall below.
 
-  Phase 3 needs only these types, the two relation modules, and `palette/1`
-  to point a palette at one of them. Phases 4 and 5 extend this file with
-  the worked-example document itself, rather than starting a second
-  support file - `test/support/` carries one subject per file, and this
-  one's subject is ADR-0003's worked example end to end.
+  `test/support/` carries one subject per file, and this one's subject is
+  ADR-0003's worked example end to end: the types, the two relation
+  modules, `palette/1` to point a palette at one of them, and the
+  worked-example document itself.
   """
 
   alias StatifierBlocks.{Assignability, Block, Document, Palette}
 
-  defmodule Enrich do
-    @moduledoc "`myapp.enrich`: takes a raw record, hands back a lead."
+  defmodule Authorize do
+    @moduledoc "`myapp.authorize`: takes a transaction, hands back a card authorization."
 
     @behaviour StatifierBlocks.BlockType
 
@@ -37,13 +46,13 @@ defmodule StatifierBlocks.AssignabilityFixtures do
     @impl true
     def validate_config(_config), do: :ok
     @impl true
-    def io(_config), do: %{consumes: "myapp.record", produces: "myapp.lead"}
+    def io(_config), do: %{consumes: "myapp.transaction", produces: "myapp.credit_card_txn"}
     @impl true
     def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
   end
 
-  defmodule Score do
-    @moduledoc "`myapp.score`: takes a lead, hands back a scored lead."
+  defmodule Settle do
+    @moduledoc "`myapp.settle`: takes a card authorization, hands back a settled transaction."
 
     @behaviour StatifierBlocks.BlockType
 
@@ -56,14 +65,14 @@ defmodule StatifierBlocks.AssignabilityFixtures do
     @impl true
     def validate_config(_config), do: :ok
     @impl true
-    def io(_config), do: %{consumes: "myapp.lead", produces: "myapp.scored_lead"}
+    def io(_config), do: %{consumes: "myapp.credit_card_txn", produces: "myapp.settled_txn"}
     @impl true
     def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
   end
 
-  defmodule Notify do
+  defmodule PostToLedger do
     @moduledoc """
-    `myapp.notify`: takes anyone with contact details; produces nothing
+    `myapp.post_to_ledger`: takes any card transaction; produces nothing
     anyone downstream wants.
     """
 
@@ -78,13 +87,13 @@ defmodule StatifierBlocks.AssignabilityFixtures do
     @impl true
     def validate_config(_config), do: :ok
     @impl true
-    def io(_config), do: %{consumes: "myapp.person", produces: :unknown}
+    def io(_config), do: %{consumes: "myapp.card_txn", produces: :unknown}
     @impl true
     def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
   end
 
-  defmodule OnCancel do
-    @moduledoc "`myapp.on_cancel`: not a step at all - an interrupt handler."
+  defmodule OnChargeback do
+    @moduledoc "`myapp.on_chargeback`: not a step at all - an interrupt handler."
 
     @behaviour StatifierBlocks.BlockType
 
@@ -104,17 +113,20 @@ defmodule StatifierBlocks.AssignabilityFixtures do
 
   defmodule Widens do
     @moduledoc """
-    ADR-0003's own worked-example relation, verbatim: `myapp.lead` and
-    `myapp.contact` both widen to `myapp.person`, and `myapp.scored_lead`
-    widens to either.
+    ADR-0003's worked-example relation, re-skinned onto the canonical
+    credit-card domain: `myapp.credit_card_txn` and `myapp.debit_card_txn`
+    both widen to `myapp.card_txn`, and `myapp.settled_txn` widens to
+    either. Same three-deep shape as the record's own `MyApp.Blocks.Types`,
+    so the "widening only ever grows the accepted set" property still has
+    something to grow.
     """
 
     @behaviour StatifierBlocks.Assignability.Relation
 
     @widens %{
-      "myapp.lead" => ["myapp.person"],
-      "myapp.contact" => ["myapp.person"],
-      "myapp.scored_lead" => ["myapp.lead", "myapp.person"]
+      "myapp.credit_card_txn" => ["myapp.card_txn"],
+      "myapp.debit_card_txn" => ["myapp.card_txn"],
+      "myapp.settled_txn" => ["myapp.credit_card_txn", "myapp.card_txn"]
     }
 
     @impl true
@@ -138,10 +150,10 @@ defmodule StatifierBlocks.AssignabilityFixtures do
   @spec host_types() :: %{Block.type_name() => module()}
   def host_types do
     %{
-      "myapp.enrich" => Enrich,
-      "myapp.score" => Score,
-      "myapp.notify" => Notify,
-      "myapp.on_cancel" => OnCancel
+      "myapp.authorize" => Authorize,
+      "myapp.settle" => Settle,
+      "myapp.post_to_ledger" => PostToLedger,
+      "myapp.on_chargeback" => OnChargeback
     }
   end
 
@@ -157,16 +169,16 @@ defmodule StatifierBlocks.AssignabilityFixtures do
 
   @doc """
   ADR-0003's own worked-example document: the ADR-0001 worked example's
-  root sequence, a `myapp.score` step (`blk_SCR`) added after the enrich,
+  root sequence, a `myapp.settle` step (`blk_STL`) added after the authorize,
   and the resumable group (`blk_GRP`) left with empty `body`/`interrupts`
   slots - Phase 4's `check/5` table only ever asks about kind admission
   once inside them, and an empty slot is the total, permissive answer for
   everything downstream of that. Fixed ids, so a caller can name any
   position directly:
 
-    * `"blk_ROOT"` - `core.sequence`, `body: [blk_ENR, blk_SCR, blk_GRP]`
-    * `"blk_ENR"` - `myapp.enrich`
-    * `"blk_SCR"` - `myapp.score`
+    * `"blk_ROOT"` - `core.sequence`, `body: [blk_AUTH, blk_STL, blk_GRP]`
+    * `"blk_AUTH"` - `myapp.authorize`
+    * `"blk_STL"` - `myapp.settle`
     * `"blk_GRP"` - `core.resumable_group`, empty `body` and `interrupts`
 
   Pair with `worked_example_context/0` for the entry type ADR-0003's own
@@ -174,19 +186,19 @@ defmodule StatifierBlocks.AssignabilityFixtures do
   """
   @spec worked_example_document() :: Document.t()
   def worked_example_document do
-    enrich = Block.new("myapp.enrich", id: "blk_ENR")
-    score = Block.new("myapp.score", id: "blk_SCR")
+    authorize = Block.new("myapp.authorize", id: "blk_AUTH")
+    settle = Block.new("myapp.settle", id: "blk_STL")
 
     group =
       Block.new("core.resumable_group", id: "blk_GRP", slots: %{"body" => [], "interrupts" => []})
 
     root =
-      Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [enrich, score, group]})
+      Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [authorize, settle, group]})
 
     Document.new(root, id: "bdoc_worked_example")
   end
 
-  @doc "The entry type ADR-0003's worked example supplies: `\"myapp.record\"`."
+  @doc "The entry type ADR-0003's worked example supplies: `\"myapp.transaction\"`."
   @spec worked_example_context() :: Assignability.context()
-  def worked_example_context, do: %{entry_type: "myapp.record"}
+  def worked_example_context, do: %{entry_type: "myapp.transaction"}
 end

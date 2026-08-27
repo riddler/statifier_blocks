@@ -35,13 +35,13 @@ defmodule StatifierBlocks.PaletteTest do
     # `Keyword.get(opts, :assignability)` to a hard-coded module -> this
     # assertion goes red
     test "new/1 (no opts) leaves assignability nil" do
-      assert Palette.new(%{"toy.score" => Toy}).assignability == nil
+      assert Palette.new(%{"toy.authorize" => Toy}).assignability == nil
     end
 
     # sabotage: change new/2 to ignore the :assignability key entirely ->
     # this assertion goes red
     test "new/2 carries the :assignability module given in opts" do
-      palette = Palette.new(%{"toy.score" => Toy}, assignability: MyWideningModule)
+      palette = Palette.new(%{"toy.authorize" => Toy}, assignability: MyWideningModule)
       assert palette.assignability == MyWideningModule
     end
   end

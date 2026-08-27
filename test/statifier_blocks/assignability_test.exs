@@ -177,13 +177,13 @@ defmodule StatifierBlocks.AssignabilityTest do
     # sabotage: delete the `assignable?(_palette, :unknown, _consumed)` head
     # -> this assertion goes red
     test ":unknown produced is assignable to anything" do
-      assert Assignability.assignable?(Palette.new(%{}), :unknown, "myapp.person")
+      assert Assignability.assignable?(Palette.new(%{}), :unknown, "myapp.card_txn")
     end
 
     # sabotage: delete the `assignable?(_palette, _produced, :unknown)` head
     # -> this assertion goes red
     test "anything is assignable to :unknown consumed" do
-      assert Assignability.assignable?(Palette.new(%{}), "myapp.person", :unknown)
+      assert Assignability.assignable?(Palette.new(%{}), "myapp.card_txn", :unknown)
     end
   end
 
@@ -191,14 +191,14 @@ defmodule StatifierBlocks.AssignabilityTest do
     # sabotage: delete the `assignable?(_palette, same, same)` head -> this
     # assertion goes red (no module on the palette, so step 4 would refuse)
     test "identical type expressions are assignable with no module on the palette" do
-      assert Assignability.assignable?(Palette.new(%{}), "myapp.person", "myapp.person")
+      assert Assignability.assignable?(Palette.new(%{}), "myapp.card_txn", "myapp.card_txn")
     end
 
     # sabotage: change the identity clause's `do: true` to `do: false` ->
     # this assertion goes red
     test "host module is consulted only after identity has already failed" do
       palette = Palette.new(%{}, assignability: RaisingRelation)
-      assert Assignability.assignable?(palette, "myapp.person", "myapp.person")
+      assert Assignability.assignable?(palette, "myapp.card_txn", "myapp.card_txn")
     end
   end
 
@@ -206,7 +206,7 @@ defmodule StatifierBlocks.AssignabilityTest do
     # sabotage: change `assignable?(%Palette{assignability: nil}, ...)` to
     # `do: true` -> this assertion goes red
     test "a non-identical pair is refused when the palette carries no relation" do
-      refute Assignability.assignable?(Palette.new(%{}), "myapp.scored_lead", "myapp.person")
+      refute Assignability.assignable?(Palette.new(%{}), "myapp.settled_txn", "myapp.card_txn")
     end
   end
 
@@ -219,7 +219,12 @@ defmodule StatifierBlocks.AssignabilityTest do
             Palette.new(%{}, assignability: Widens),
             Palette.new(%{}, assignability: Deny)
           ],
-          type <- ["myapp.record", "myapp.lead", "myapp.scored_lead", "myapp.person"] do
+          type <- [
+            "myapp.transaction",
+            "myapp.credit_card_txn",
+            "myapp.settled_txn",
+            "myapp.card_txn"
+          ] do
         assert Assignability.assignable?(palette, type, type),
                "#{inspect(palette.assignability)} refused #{type} against itself"
       end
@@ -230,16 +235,22 @@ defmodule StatifierBlocks.AssignabilityTest do
     # the floor case is still reflexive.
     test "a module that denies everything cannot narrow reflexivity" do
       palette = Palette.new(%{}, assignability: Deny)
-      assert Assignability.assignable?(palette, "myapp.person", "myapp.person")
+      assert Assignability.assignable?(palette, "myapp.card_txn", "myapp.card_txn")
     end
   end
 
   describe "assignable?/3 - monotonicity" do
-    @fixed_types [:unknown, "myapp.record", "myapp.lead", "myapp.scored_lead", "myapp.person"]
+    @fixed_types [
+      :unknown,
+      "myapp.transaction",
+      "myapp.credit_card_txn",
+      "myapp.settled_txn",
+      "myapp.card_txn"
+    ]
 
     # sabotage: change the module-consulting clause to `do: false`
     # unconditionally -> this assertion goes red the moment a widened pair
-    # (e.g. "myapp.scored_lead"/"myapp.person") is accepted without the
+    # (e.g. "myapp.settled_txn"/"myapp.card_txn") is accepted without the
     # module but not with it - impossible, so instead sabotage by making
     # `Widens.assignable?/2` return `false` unconditionally, which removes
     # every non-identity pair from the with-module set and breaks the
@@ -268,8 +279,8 @@ defmodule StatifierBlocks.AssignabilityTest do
 
       # And the module genuinely grows the set for at least one pair, so
       # this isn't a vacuous inclusion.
-      assert Assignability.assignable?(with_module, "myapp.scored_lead", "myapp.person")
-      refute Assignability.assignable?(without, "myapp.scored_lead", "myapp.person")
+      assert Assignability.assignable?(with_module, "myapp.settled_txn", "myapp.card_txn")
+      refute Assignability.assignable?(without, "myapp.settled_txn", "myapp.card_txn")
     end
   end
 
@@ -280,14 +291,14 @@ defmodule StatifierBlocks.AssignabilityTest do
     # `-1` and `Enum.at/2` returns nil for it - confirming the guard, not
     # just the arithmetic, is load-bearing
     test "the inbound type is the resolved produces of the previous sibling" do
-      enrich = Block.new("myapp.enrich", id: "blk_enr")
-      score = Block.new("myapp.score", id: "blk_scr")
-      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [enrich, score]})
+      authorize = Block.new("myapp.authorize", id: "blk_auth")
+      settle = Block.new("myapp.settle", id: "blk_scr")
+      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [authorize, settle]})
       document = Document.new(root, id: "bdoc_a")
       palette = AssignabilityFixtures.palette()
 
       assert Assignability.inbound_type(palette, document, {"blk_root", "body", 1}, %{}) ==
-               "myapp.lead"
+               "myapp.credit_card_txn"
     end
   end
 
@@ -301,10 +312,10 @@ defmodule StatifierBlocks.AssignabilityTest do
       root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [inner]})
       document = Document.new(root, id: "bdoc_b")
       palette = AssignabilityFixtures.palette()
-      ctx = %{entry_type: "myapp.record"}
+      ctx = %{entry_type: "myapp.transaction"}
 
       assert Assignability.inbound_type(palette, document, {"blk_inner", "body", 0}, ctx) ==
-               "myapp.record"
+               "myapp.transaction"
     end
   end
 
@@ -320,11 +331,11 @@ defmodule StatifierBlocks.AssignabilityTest do
                palette,
                document,
                {"blk_root", "body", 0},
-               %{entry_type: "myapp.record"}
-             ) == "myapp.record"
+               %{entry_type: "myapp.transaction"}
+             ) == "myapp.transaction"
     end
 
-    # sabotage: change the default from `:unknown` to `"myapp.record"` ->
+    # sabotage: change the default from `:unknown` to `"myapp.transaction"` ->
     # this assertion goes red
     test "the root with no entry type in ctx is :unknown" do
       root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => []})
@@ -340,35 +351,38 @@ defmodule StatifierBlocks.AssignabilityTest do
     # sabotage: change `resolve_produces({:passthrough, slot}, ...)` to
     # return `:unknown` unconditionally -> this assertion goes red
     test "a passthrough sequence carries a type out past itself" do
-      enrich = Block.new("myapp.enrich", id: "blk_enr")
-      nested = Block.new("core.sequence", id: "blk_nested", slots: %{"body" => [enrich]})
-      notify = Block.new("myapp.notify", id: "blk_not")
+      authorize = Block.new("myapp.authorize", id: "blk_auth")
+      nested = Block.new("core.sequence", id: "blk_nested", slots: %{"body" => [authorize]})
+      post_to_ledger = Block.new("myapp.post_to_ledger", id: "blk_ledger")
 
       root =
-        Block.new("core.sequence", id: "blk_root", slots: %{"body" => [nested, notify]})
+        Block.new("core.sequence", id: "blk_root", slots: %{"body" => [nested, post_to_ledger]})
 
       document = Document.new(root, id: "bdoc_e")
       palette = AssignabilityFixtures.palette()
 
       assert Assignability.inbound_type(palette, document, {"blk_root", "body", 1}, %{}) ==
-               "myapp.lead"
+               "myapp.credit_card_txn"
     end
 
     # sabotage: change the empty-slot branch of `resolve_produces` from
     # `own_inbound_type(...)` to `:unknown` -> this assertion goes red
     test "an empty passthrough sequence falls back to its own inbound type" do
       empty_seq = Block.new("core.sequence", id: "blk_empty", slots: %{"body" => []})
-      notify = Block.new("myapp.notify", id: "blk_not")
+      post_to_ledger = Block.new("myapp.post_to_ledger", id: "blk_ledger")
 
       root =
-        Block.new("core.sequence", id: "blk_root", slots: %{"body" => [empty_seq, notify]})
+        Block.new("core.sequence",
+          id: "blk_root",
+          slots: %{"body" => [empty_seq, post_to_ledger]}
+        )
 
       document = Document.new(root, id: "bdoc_f")
       palette = AssignabilityFixtures.palette()
-      ctx = %{entry_type: "myapp.record"}
+      ctx = %{entry_type: "myapp.transaction"}
 
       assert Assignability.inbound_type(palette, document, {"blk_root", "body", 1}, ctx) ==
-               "myapp.record"
+               "myapp.transaction"
     end
 
     # sabotage: n/a directly (a wrong-answer sabotage is already covered
@@ -380,15 +394,18 @@ defmodule StatifierBlocks.AssignabilityTest do
     # same arguments) and observing the test hang past its timeout.
     test "a passthrough chain deep enough that a non-terminating implementation would hang completes" do
       depth = 2_000
-      enrich = Block.new("myapp.enrich", id: "blk_leaf")
+      authorize = Block.new("myapp.authorize", id: "blk_leaf")
 
       chain =
-        Enum.reduce(1..depth, enrich, fn i, acc ->
+        Enum.reduce(1..depth, authorize, fn i, acc ->
           Block.new("core.sequence", id: "blk_seq#{i}", slots: %{"body" => [acc]})
         end)
 
-      notify = Block.new("myapp.notify", id: "blk_not")
-      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [chain, notify]})
+      post_to_ledger = Block.new("myapp.post_to_ledger", id: "blk_ledger")
+
+      root =
+        Block.new("core.sequence", id: "blk_root", slots: %{"body" => [chain, post_to_ledger]})
+
       document = Document.new(root, id: "bdoc_g")
       palette = AssignabilityFixtures.palette()
 
@@ -397,7 +414,7 @@ defmodule StatifierBlocks.AssignabilityTest do
           Assignability.inbound_type(palette, document, {"blk_root", "body", 1}, %{})
         end)
 
-      assert Task.await(task, 5_000) == "myapp.lead"
+      assert Task.await(task, 5_000) == "myapp.credit_card_txn"
     end
   end
 
@@ -416,8 +433,8 @@ defmodule StatifierBlocks.AssignabilityTest do
     # sabotage: same else arm - an index past the end of a real slot's
     # children must also degrade rather than raise
     test "an index past the end of the slot resolves to :unknown" do
-      enrich = Block.new("myapp.enrich", id: "blk_enr")
-      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [enrich]})
+      authorize = Block.new("myapp.authorize", id: "blk_auth")
+      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [authorize]})
       document = Document.new(root, id: "bdoc_i")
       palette = AssignabilityFixtures.palette()
 
@@ -480,7 +497,7 @@ defmodule StatifierBlocks.AssignabilityTest do
     test "an accepted insert is :ok" do
       root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => []})
       document = Document.new(root, id: "bdoc_ins_ok")
-      candidate = Block.new("myapp.enrich", id: "blk_cand")
+      candidate = Block.new("myapp.authorize", id: "blk_cand")
       palette = AssignabilityFixtures.palette()
 
       assert Assignability.check(
@@ -488,35 +505,39 @@ defmodule StatifierBlocks.AssignabilityTest do
                document,
                {"blk_root", "body", 0},
                candidate,
-               %{entry_type: "myapp.record"}
+               %{entry_type: "myapp.transaction"}
              ) == :ok
     end
 
     # sabotage: change `upstream_seam_finding/5` to always return `nil` ->
     # this assertion goes red
     test "a :type_mismatch on the upstream seam names the upstream block id" do
-      score = Block.new("myapp.score", id: "blk_scr")
-      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [score]})
+      settle = Block.new("myapp.settle", id: "blk_scr")
+      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [settle]})
       document = Document.new(root, id: "bdoc_ins_upstream")
-      candidate = Block.new("myapp.enrich", id: "blk_cand")
+      candidate = Block.new("myapp.authorize", id: "blk_cand")
       palette = AssignabilityFixtures.palette()
 
       assert Assignability.check(palette, document, {"blk_root", "body", 1}, candidate, %{}) ==
                {:error,
-                [{:type_mismatch, "blk_cand", "blk_scr", "myapp.scored_lead", "myapp.record"}]}
+                [
+                  {:type_mismatch, "blk_cand", "blk_scr", "myapp.settled_txn",
+                   "myapp.transaction"}
+                ]}
     end
 
     # sabotage: change `downstream_seam_finding/4` to always return `nil` ->
     # this assertion goes red
     test "a :type_mismatch on the downstream seam" do
-      score = Block.new("myapp.score", id: "blk_scr")
-      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [score]})
+      settle = Block.new("myapp.settle", id: "blk_scr")
+      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [settle]})
       document = Document.new(root, id: "bdoc_ins_downstream")
       candidate = Block.new("weird", id: "blk_cand")
       palette = AssignabilityFixtures.palette() |> add_type("weird", Weird)
 
       assert Assignability.check(palette, document, {"blk_root", "body", 0}, candidate, %{}) ==
-               {:error, [{:type_mismatch, "blk_scr", "blk_cand", "myapp.other", "myapp.lead"}]}
+               {:error,
+                [{:type_mismatch, "blk_scr", "blk_cand", "myapp.other", "myapp.credit_card_txn"}]}
     end
 
     # sabotage: change `upstream_ref/2`'s `index == 0` clause to look up a
@@ -524,7 +545,7 @@ defmodule StatifierBlocks.AssignabilityTest do
     test "a :type_mismatch at index 0 names :slot_entry" do
       root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => []})
       document = Document.new(root, id: "bdoc_ins_slot_entry")
-      candidate = Block.new("myapp.score", id: "blk_cand")
+      candidate = Block.new("myapp.settle", id: "blk_cand")
       palette = AssignabilityFixtures.palette()
 
       assert Assignability.check(
@@ -532,9 +553,13 @@ defmodule StatifierBlocks.AssignabilityTest do
                document,
                {"blk_root", "body", 0},
                candidate,
-               %{entry_type: "myapp.record"}
+               %{entry_type: "myapp.transaction"}
              ) ==
-               {:error, [{:type_mismatch, "blk_cand", :slot_entry, "myapp.record", "myapp.lead"}]}
+               {:error,
+                [
+                  {:type_mismatch, "blk_cand", :slot_entry, "myapp.transaction",
+                   "myapp.credit_card_txn"}
+                ]}
     end
 
     # sabotage: change `kind_admission_finding/5`'s finding branch to
@@ -561,32 +586,36 @@ defmodule StatifierBlocks.AssignabilityTest do
     # line to `vacated_finding = nil` -> this assertion goes red (the error
     # list comes back empty and the result is `:ok`)
     test "a move clean at the insertion point is refused at the vacated seam" do
-      a = Block.new("myapp.enrich", id: "blk_a")
-      b = Block.new("myapp.score", id: "blk_b")
-      c = Block.new("myapp.enrich", id: "blk_c")
+      a = Block.new("myapp.authorize", id: "blk_a")
+      b = Block.new("myapp.settle", id: "blk_b")
+      c = Block.new("myapp.authorize", id: "blk_c")
       root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [a, b, c]})
       document = Document.new(root, id: "bdoc_mv_vacated")
       palette = AssignabilityFixtures.palette()
 
       assert Assignability.check(palette, document, {"blk_root", "body", 3}, b, %{}) ==
-               {:error, [{:type_mismatch, "blk_c", "blk_a", "myapp.lead", "myapp.record"}]}
+               {:error,
+                [{:type_mismatch, "blk_c", "blk_a", "myapp.credit_card_txn", "myapp.transaction"}]}
     end
 
     # sabotage: remove the `nil -> nil` clause from `vacated_seam_finding/6`'s
     # `Enum.at(children, index + 1)` case -> raises instead of finding
     # nothing to check
     test "a move whose vacated slot has no block after the candidate has nothing to check there" do
-      enrich = Block.new("myapp.enrich", id: "blk_enr")
+      authorize = Block.new("myapp.authorize", id: "blk_auth")
 
       group =
-        Block.new("core.group", id: "blk_grp", slots: %{"body" => [enrich], "interrupts" => []})
+        Block.new("core.group",
+          id: "blk_grp",
+          slots: %{"body" => [authorize], "interrupts" => []}
+        )
 
-      score = Block.new("myapp.score", id: "blk_scr")
-      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [group, score]})
+      settle = Block.new("myapp.settle", id: "blk_scr")
+      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [group, settle]})
       document = Document.new(root, id: "bdoc_mv_no_after")
       palette = AssignabilityFixtures.palette()
 
-      assert Assignability.check(palette, document, {"blk_grp", "body", 1}, score, %{}) == :ok
+      assert Assignability.check(palette, document, {"blk_grp", "body", 1}, settle, %{}) == :ok
     end
   end
 
@@ -605,7 +634,7 @@ defmodule StatifierBlocks.AssignabilityTest do
   end
 
   describe "check/5 - the ADR-0003 worked-example table" do
-    # Rows for "before blk_ENR" and "after blk_ENR" isolate exactly the
+    # Rows for "before blk_AUTH" and "after blk_AUTH" isolate exactly the
     # upstream seam the ADR's own table names, the same way the two
     # dedicated seam tests above do - an empty slot with nothing downstream,
     # rather than the shared worked-example document, because inserting a
@@ -616,10 +645,10 @@ defmodule StatifierBlocks.AssignabilityTest do
     # sabotage: n/a directly - identical code path to "an accepted insert
     # is :ok" above; recorded here to pin the table's own row rather than
     # duplicate the mutation.
-    test "before blk_ENR: entry type identity admits enrich" do
+    test "before blk_AUTH: entry type identity admits authorize" do
       root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => []})
       document = Document.new(root, id: "bdoc_row1")
-      candidate = Block.new("myapp.enrich", id: "blk_enr_candidate")
+      candidate = Block.new("myapp.authorize", id: "blk_auth_candidate")
       palette = AssignabilityFixtures.palette()
 
       assert Assignability.check(
@@ -627,17 +656,17 @@ defmodule StatifierBlocks.AssignabilityTest do
                document,
                {"blk_root", "body", 0},
                candidate,
-               %{entry_type: "myapp.record"}
+               %{entry_type: "myapp.transaction"}
              ) == :ok
     end
 
     # sabotage: n/a directly - identical code path to the two tests above;
     # pins the table's second row.
-    test "after blk_ENR: enrich's produces identity admits score" do
-      enrich = Block.new("myapp.enrich", id: "blk_enr")
-      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [enrich]})
+    test "after blk_AUTH: authorize's produces identity admits settle" do
+      authorize = Block.new("myapp.authorize", id: "blk_auth")
+      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [authorize]})
       document = Document.new(root, id: "bdoc_row2")
-      candidate = Block.new("myapp.score", id: "blk_scr_candidate")
+      candidate = Block.new("myapp.settle", id: "blk_scr_candidate")
       palette = AssignabilityFixtures.palette()
 
       assert Assignability.check(palette, document, {"blk_root", "body", 1}, candidate, %{}) ==
@@ -647,9 +676,9 @@ defmodule StatifierBlocks.AssignabilityTest do
     # sabotage: n/a directly - covered by "assignable?/3 - monotonicity"
     # above; this row pins the same widening at the `check/5` level, against
     # the shared worked-example document.
-    test "after blk_SCR: the host relation widens scored_lead to notify's person" do
+    test "after blk_STL: the host relation widens settled_txn to post_to_ledger's card_txn" do
       document = AssignabilityFixtures.worked_example_document()
-      candidate = Block.new("myapp.notify", id: "blk_not_candidate")
+      candidate = Block.new("myapp.post_to_ledger", id: "blk_ledger_candidate")
       palette = AssignabilityFixtures.palette()
 
       assert Assignability.check(
@@ -664,9 +693,9 @@ defmodule StatifierBlocks.AssignabilityTest do
     # sabotage: n/a directly - covered by "a :type_mismatch on the upstream
     # seam names the upstream block id" above; this row pins the same
     # mismatch against the shared worked-example document.
-    test "after blk_SCR: scored_lead does not widen to enrich's record" do
+    test "after blk_STL: settled_txn does not widen to authorize's transaction" do
       document = AssignabilityFixtures.worked_example_document()
-      candidate = Block.new("myapp.enrich", id: "blk_enr_candidate")
+      candidate = Block.new("myapp.authorize", id: "blk_auth_candidate")
       palette = AssignabilityFixtures.palette()
 
       assert Assignability.check(
@@ -678,16 +707,16 @@ defmodule StatifierBlocks.AssignabilityTest do
              ) ==
                {:error,
                 [
-                  {:type_mismatch, "blk_enr_candidate", "blk_SCR", "myapp.scored_lead",
-                   "myapp.record"}
+                  {:type_mismatch, "blk_auth_candidate", "blk_STL", "myapp.settled_txn",
+                   "myapp.transaction"}
                 ]}
     end
 
     # sabotage: n/a directly - covered by "a :kind_not_admitted finding
     # carries the candidate's kinds and the slot's accepted list" above.
-    test "inside interrupts: notify is [:step], not admitted" do
+    test "inside interrupts: post_to_ledger is [:step], not admitted" do
       document = AssignabilityFixtures.worked_example_document()
-      candidate = Block.new("myapp.notify", id: "blk_not_candidate")
+      candidate = Block.new("myapp.post_to_ledger", id: "blk_ledger_candidate")
       palette = AssignabilityFixtures.palette()
 
       assert Assignability.check(
@@ -699,15 +728,15 @@ defmodule StatifierBlocks.AssignabilityTest do
              ) ==
                {:error,
                 [
-                  {:kind_not_admitted, "blk_not_candidate", "blk_GRP", "interrupts", [:step],
+                  {:kind_not_admitted, "blk_ledger_candidate", "blk_GRP", "interrupts", [:step],
                    [:interrupt_handler]}
                 ]}
     end
 
     # sabotage: n/a directly - covered by "an accepted insert is :ok" above.
-    test "inside interrupts: on_cancel is [:interrupt_handler], admitted" do
+    test "inside interrupts: on_chargeback is [:interrupt_handler], admitted" do
       document = AssignabilityFixtures.worked_example_document()
-      candidate = Block.new("myapp.on_cancel", id: "blk_cancel_candidate")
+      candidate = Block.new("myapp.on_chargeback", id: "blk_chargeback_candidate")
       palette = AssignabilityFixtures.palette()
 
       assert Assignability.check(
@@ -721,9 +750,9 @@ defmodule StatifierBlocks.AssignabilityTest do
 
     # sabotage: n/a directly - covered by "a :kind_not_admitted finding
     # carries the candidate's kinds and the slot's accepted list" above.
-    test "inside body: on_cancel is [:interrupt_handler], not admitted" do
+    test "inside body: on_chargeback is [:interrupt_handler], not admitted" do
       document = AssignabilityFixtures.worked_example_document()
-      candidate = Block.new("myapp.on_cancel", id: "blk_cancel_candidate")
+      candidate = Block.new("myapp.on_chargeback", id: "blk_chargeback_candidate")
       palette = AssignabilityFixtures.palette()
 
       assert Assignability.check(
@@ -735,7 +764,7 @@ defmodule StatifierBlocks.AssignabilityTest do
              ) ==
                {:error,
                 [
-                  {:kind_not_admitted, "blk_cancel_candidate", "blk_GRP", "body",
+                  {:kind_not_admitted, "blk_chargeback_candidate", "blk_GRP", "body",
                    [:interrupt_handler], [:step]}
                 ]}
     end
@@ -745,7 +774,7 @@ defmodule StatifierBlocks.AssignabilityTest do
     # because the row would then stay :ok with the module dropped
     test "dropping assignability from the palette flips the widened row to :type_mismatch" do
       document = AssignabilityFixtures.worked_example_document()
-      candidate = Block.new("myapp.notify", id: "blk_not_candidate")
+      candidate = Block.new("myapp.post_to_ledger", id: "blk_ledger_candidate")
       palette = AssignabilityFixtures.palette(nil)
 
       assert Assignability.check(
@@ -757,8 +786,8 @@ defmodule StatifierBlocks.AssignabilityTest do
              ) ==
                {:error,
                 [
-                  {:type_mismatch, "blk_not_candidate", "blk_SCR", "myapp.scored_lead",
-                   "myapp.person"}
+                  {:type_mismatch, "blk_ledger_candidate", "blk_STL", "myapp.settled_txn",
+                   "myapp.card_txn"}
                 ]}
     end
   end
@@ -768,17 +797,19 @@ defmodule StatifierBlocks.AssignabilityTest do
   # slots present, so `valid_targets/4` and `validate/3`'s tests below
   # exercise more than a flat root-only sequence.
   defp phase5_document do
-    enrich = Block.new("myapp.enrich", id: "blk_ENR")
-    score = Block.new("myapp.score", id: "blk_SCR")
+    authorize = Block.new("myapp.authorize", id: "blk_AUTH")
+    settle = Block.new("myapp.settle", id: "blk_STL")
 
     group =
       Block.new("core.resumable_group", id: "blk_GRP", slots: %{"body" => [], "interrupts" => []})
 
-    root = Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [enrich, score, group]})
+    root =
+      Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [authorize, settle, group]})
+
     Document.new(root, id: "bdoc_phase5")
   end
 
-  defp phase5_context, do: %{entry_type: "myapp.record"}
+  defp phase5_context, do: %{entry_type: "myapp.transaction"}
 
   # Every position `check/5` can be asked about for `candidate` over
   # `document`: `{parent_id, slot, index}` for every block, every slot the
@@ -804,7 +835,7 @@ defmodule StatifierBlocks.AssignabilityTest do
     # everything)
     test "the with-module result is a superset of the without-module result, over the enumerated space" do
       document = phase5_document()
-      candidate = Block.new("myapp.notify", id: "blk_notify_candidate")
+      candidate = Block.new("myapp.post_to_ledger", id: "blk_ledger_candidate")
       ctx = phase5_context()
 
       without = AssignabilityFixtures.palette(nil)
@@ -816,8 +847,8 @@ defmodule StatifierBlocks.AssignabilityTest do
       assert MapSet.subset?(MapSet.new(targets_without), MapSet.new(targets_with))
 
       # Not a vacuous inclusion: the widened relation accepts a position the
-      # unwidened one refuses (the seam after blk_SCR, "myapp.scored_lead"
-      # widening to myapp.notify's "myapp.person").
+      # unwidened one refuses (the seam after blk_STL, "myapp.settled_txn"
+      # widening to myapp.post_to_ledger's "myapp.card_txn").
       assert {"blk_ROOT", "body", 2} in targets_with
       refute {"blk_ROOT", "body", 2} in targets_without
     end
@@ -826,7 +857,7 @@ defmodule StatifierBlocks.AssignabilityTest do
     # assertion goes red (the floor case would then also widen)
     test "a deny-everything module makes the superset an equality - the floor property" do
       document = phase5_document()
-      candidate = Block.new("myapp.notify", id: "blk_notify_candidate")
+      candidate = Block.new("myapp.post_to_ledger", id: "blk_ledger_candidate")
       ctx = phase5_context()
 
       without = AssignabilityFixtures.palette(nil)
@@ -949,7 +980,7 @@ defmodule StatifierBlocks.AssignabilityTest do
     # position where the two disagree
     test "valid_targets/4 contains a position exactly when check/5 returns :ok for it" do
       document = phase5_document()
-      candidate = Block.new("myapp.notify", id: "blk_notify_candidate")
+      candidate = Block.new("myapp.post_to_ledger", id: "blk_ledger_candidate")
       ctx = phase5_context()
       palette = AssignabilityFixtures.palette()
 
@@ -993,7 +1024,7 @@ defmodule StatifierBlocks.AssignabilityTest do
       broken_group =
         Block.new("core.group", id: "blk_broken_grp", slots: %{"body" => [], "interrupts" => []})
 
-      bad_handler = Block.new("myapp.on_cancel", id: "blk_bad_handler")
+      bad_handler = Block.new("myapp.on_chargeback", id: "blk_bad_handler")
 
       root =
         Block.new("core.sequence",
@@ -1044,7 +1075,7 @@ defmodule StatifierBlocks.AssignabilityTest do
     # order-sensitive equality here goes red
     test "the same call returns the same list, in pre-order" do
       document = phase5_document()
-      candidate = Block.new("myapp.notify", id: "blk_notify_candidate")
+      candidate = Block.new("myapp.post_to_ledger", id: "blk_ledger_candidate")
       ctx = phase5_context()
       palette = AssignabilityFixtures.palette()
 
