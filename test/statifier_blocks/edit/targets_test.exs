@@ -334,6 +334,9 @@ defmodule StatifierBlocks.Edit.TargetsTest do
   # ---------------------------------------------------------------------
 
   describe "droppable_slots/3" do
+    # Sabotage: in `droppable_slots/3`'s `nil` branch, returned a non-empty
+    # placeholder (`[{"blk_ROOT", "body"}]`) instead of `[]` - red, the
+    # comparison against `[]` failed.
     test "an id not in the document returns []" do
       palette = core_palette()
       root = Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => []})

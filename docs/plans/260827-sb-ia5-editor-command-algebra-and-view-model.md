@@ -827,6 +827,12 @@ one a reviewer should look at hardest.
    sentence corrected to say "nothing in *rules 1, 3 and 4*, and nothing in
    rule 2's kind gate, depends on the index", that is a one-line clarifying
    amendment and this implementation already matches it.
+
+   **Machine-checked (unattended, 2026-08-27):** This is a decision (an ADR
+   amendment), not a check - left for the operator per the item's own text.
+   No ADR file was touched. Confirmed the implementation's own reasoning
+   (`Edit.Targets`'s moduledoc, "## The stated reduction" section) states
+   the same three-part soundness argument this note summarizes.
 2. **`{:no_such_slot, block_id, slot_name}` has no natural trigger** in a
    palette-free `apply/2`, because refusing to create an absent-but-declared
    slot key would break the commonest drop there is. This plan gives it the
@@ -834,6 +840,12 @@ one a reviewer should look at hardest.
    from a replayed command log. If the record intended it to mean "not
    declared by the parent's type", that requires a palette in `apply/2`'s
    signature, which contradicts d3's spec.
+
+   **Machine-checked (unattended, 2026-08-27):** Confirmed
+   `check_slot_name/2` (`edit.ex:186-191`) implements exactly this: `:ok` for
+   a non-empty binary, `{:error, {:no_such_slot, parent_id, slot_name}}`
+   otherwise. This is a settled design choice recorded as an open question
+   for the record's benefit, not a pending check; no code change needed.
 3. **No compiler-finding-to-presentation-finding adapter is built.** The bead
    specifies `{document, palette, findings}`, which reads as caller-supplied,
    and the instruction was not to invent one. But `Compiler.Finding` carries
@@ -842,14 +854,33 @@ one a reviewer should look at hardest.
    branch is a live producer of exactly the `:lint` source d11 reserves. A ten
    line adapter is the obvious next step; recommended home is `sb-7f2` (where
    a compile result is actually in hand) or a small follow-up bead.
+
+   **Machine-checked (unattended, 2026-08-27):** Confirmed no adapter exists
+   in this bead's files (grep for `Compiler.Finding` outside
+   `compiler/finding.ex` and its own test turns up nothing in the new
+   modules) - matches "What We're NOT Doing." This is a roadmap
+   recommendation, not a defect; not filing a new bead for it here since it
+   is already recorded as a recommended follow-up and this pass's scope is
+   verification, not planning.
 4. **The d9 gate runs on undo and redo too.** One code path, strict d9. The
    theoretical cost is that a host swapping the palette mid-session could see
    an undo refused. ADR-0005 d15 makes the editor single-session, so this is
    out of scope; if `sb-7f2` finds it in practice, the fix is a documented
    exemption for inverses, not a change here.
+
+   **Machine-checked (unattended, 2026-08-27):** Same finding as Phase 3's
+   note above - `Edit.History`'s moduledoc states this reasoning in full,
+   including the single-session justification. No action needed here beyond
+   what Phase 3 already confirmed.
 5. **`:arity` findings have no producer.** `sb-da9` is open. The view model
    has the anchor and the slot-level slot to render them into; nothing
    generates one yet, so that route is tested with a hand-built finding.
+
+   **Machine-checked (unattended, 2026-08-27):** Confirmed:
+   `Finding.source/0` includes `:arity`, `view_model_test.exs` constructs
+   `:arity`-sourced findings by hand (lines 201, 218, 292) rather than via
+   any producer, and no `lib/` code in this bead emits one. Matches `sb-da9`
+   being open; no action needed here.
 6. **`ViewModel.build/3`'s third argument.** ADR-0005 d13's table says the
    view model derives from `{document, palette}`; the bead says
    `{document, palette, findings}`. This plan follows the bead, and reads d13
@@ -857,6 +888,15 @@ one a reviewer should look at hardest.
    view model is where validation happens, which is where the derived findings
    come from, and the third argument is the seam for the sources that live
    outside this package's pure layer.
+
+   **Machine-checked (unattended, 2026-08-27):** This is an interpretive
+   call about how to read d13 against the bead text, not a mechanical check,
+   and the plan's own argument (d13's paragraph already puts validation
+   inside `ViewModel`) is sound on its face. Confirmed `ViewModel.build/3`'s
+   actual signature is `build(Document.t(), Palette.t(), [Finding.t()])`
+   (`view_model.ex`), matching the bead rather than d13's table literally.
+   No ADR file touched; this stays recorded rather than resolved, as the
+   item says.
 
 ## References
 
@@ -896,6 +936,18 @@ before considering the plan fully landed.
 full `mix quality` is the phase gate. In looped execution the Automated
 criteria gate advancement and the Manual ones are deferred.
 
+**Machine-checked (unattended, 2026-08-27):** All 28 tests in
+`edit_test.exs` carry a sabotage note. Ran the property-test-file's own
+insert-inverse sabotage (`{:remove, block.id}` -> `{:remove, parent_id}` in
+`edit.ex`'s `:insert` clause) live: `mix test test/statifier_blocks/edit_property_test.exs`
+went red (`MatchError`, matching the note's "usually raising"), reverted,
+gate re-confirmed green. Read `edit.ex`'s four structural rules against
+`apply/2`, `detach/2`/`remove_at_path/2` (rule 3's slot-key pruning),
+`check_index/4` (rule 1), and `insert_child/4` (rule 2) side by side - all
+four match. The widening section names `{:duplicate_block_id, ...}` and
+`{:cannot_remove_root, ...}` and states the record-coverage gap for each
+(document-wide id uniqueness invariant; the root occupying no slot).
+
 ---
 
 ### Phase 2
@@ -908,6 +960,21 @@ criteria gate advancement and the Manual ones are deferred.
       the same-slot and cross-slot move cases (inspect a printed sample)
 - [ ] The seed is printed on failure and re-running with it reproduces
 
+**Machine-checked (unattended, 2026-08-27):** The one test in
+`edit_property_test.exs` folds `Enum.reduce/3` over
+`DocumentGenerator.commands/3`'s generated sequence, not a fixed list -
+confirmed by reading the file (no hand-written example list exists in it).
+Sampled 60 generated sequences (`@seed`/`@sample_size`/`@commands_per_document`
+values, 12 commands each, 720 commands total) via a scratch script: all four
+tags appear (`insert: 155, remove: 186, update_config: 194, move: 185`).
+`gen_move_target/3`'s own comment and code (`document_generator.ex:215-231`)
+confirm the 50/50 same-slot/cross-slot split by construction (`Enum.random(1..2)`
+choosing between the occupied slot and a freshly drawn one) rather than by
+sampling luck. The seed and index are literal string-interpolated into every
+`assert` failure message, and `@seed` is a fixed module attribute (`909_090`,
+never clock-seeded), so re-running reproduces by construction, not merely by
+chance.
+
 ---
 
 ### Phase 3
@@ -916,6 +983,15 @@ criteria gate advancement and the Manual ones are deferred.
       each named mutation was actually run and actually went red
 - [ ] Running the gate on undo/redo is stated in the moduledoc together with
       the single-session justification
+
+**Machine-checked (unattended, 2026-08-27):** All 14 tests in
+`history_test.exs` carry a sabotage note (two `apply_gated/3`-funnel tests
+share one note, since one note names both call sites explicitly). Read
+`history.ex`'s "## The gate runs on undo and redo too" moduledoc section:
+it states the one-funnel design (`apply_gated/3` runs `Edit.check_config/3`
+before `Edit.apply/2` for `commit/4`, `undo/3`, and `redo/3` alike) and the
+single-session justification (ADR-0005 decision 15) in the same section,
+side by side with the code, which matches.
 
 ---
 
@@ -927,6 +1003,36 @@ criteria gate advancement and the Manual ones are deferred.
       residue, not only the conclusion
 - [ ] The seven-slot worked-example assertion matches the ADR's list exactly
 
+**Machine-checked (unattended, 2026-08-27):** Found one gap and fixed it:
+`targets_test.exs`'s "an id not in the document returns []" test
+(`droppable_slots/3`'s `nil` branch) had no sabotage note. Mutated the branch
+to `nil -> [{"blk_ROOT", "body"}]`, confirmed
+`mix test test/statifier_blocks/edit/targets_test.exs:337` went red, reverted,
+and added the note - see commit below. All other targets tests already carried
+a note; spot-ran the property-flavoured "existential reduction" and the
+funnel-swap worked-example sabotage by reading the mutated line against the
+current code, both plausible and consistent with the described failure mode.
+`Edit.Targets`'s moduledoc "## The stated reduction..." section names both
+`Assignability.valid_targets/4` and `droppable_slots/3` as the two functions
+it bridges, states all three soundness arguments, and states the residue
+("per-slot highlighting is a superset of per-position validity") rather than
+only the conclusion.
+
+**On the seven-vs-six-slot item specifically** (flagged for careful review):
+confirmed the code's six-slot result is correct. `CoreFixtures.Notify`
+(`test/support/core_fixtures.ex:55-76`) declares no `io/1` callback,
+so `Assignability.io/2` returns `%{}` for it and `Assignability.kinds/2`
+(`assignability.ex:119`) defaults absent `:kinds` to `[:step]`.
+`Core.ResumableGroup`'s `interrupts` slot declares
+`slot_accepts: %{"interrupts" => [:interrupt_handler]}}`
+(`core/resumable_group.ex:74`), and `[:step]` does not intersect
+`[:interrupt_handler]`, so the slot is correctly dark - matching the test's
+own inline comment, which already states this reasoning next to the
+assertion. This is not an ADR-0005 contradiction: the ADR's own worked
+example is explicitly conditional ("had sb-7rx's relation said otherwise,
+it would be dark"). No ADR file was touched; the test's six-slot assertion
+stands as the ADR's own hedge already predicted.
+
 ---
 
 ### Phase 5
@@ -937,6 +1043,26 @@ criteria gate advancement and the Manual ones are deferred.
       checked against ADR-0005 d13's component table row by row
 - [ ] The `Finding` moduledoc makes the two-Finding situation unmistakable
 
+**Machine-checked (unattended, 2026-08-27):** All 16 tests in
+`view_model_test.exs` carry a sabotage note; spot-verified the conservation
+test's note by locating `findings: block_findings` at
+`view_model.ex:390`/`:447`, which is exactly the line the note names as the
+hard-code target. Walked ADR-0005 d13's component table
+(`docs/adr/0005-liveview-editor.md:480-524`) row by row against
+`%ViewModel{}`/`%Node{}`/`%Slot{}`/`%Form{}`/`%Field{}`/`%PaletteGroup{}`:
+`Canvas` (root), `BlockNode` (block chrome and slot dispatch), `Slot`
+(header/children/findings), `ConfigForm` (`Form`), `Field` (`Field`),
+`PaletteBrowser` (`palette_groups` with `entry.keywords`/`label`/`description`
+for search, filtering-by-droppability composed separately from
+`Edit.Targets` per decision 8, not the view model's job), and `Findings`
+(`findings`/`orphan_findings`) are all satisfied; `Editor` itself is the
+stateful shell and owns document/history/selection/drag state outside the
+view model by design. `Finding`'s moduledoc "## Two Finding modules, on
+purpose" section states plainly that neither wraps the other and ends with
+an explicit disambiguation ("if you are about to import this module and get
+`stage`, `fault`, `code`, or `reason` back, you have the wrong one") -
+unmistakable.
+
 ---
 
 ### Phase 6
@@ -944,5 +1070,18 @@ criteria gate advancement and the Manual ones are deferred.
 - [ ] `/wurk:verify --unattended` run and its findings folded back
 - [ ] Every new example is a signup wizard or a card-processing example; no new
       enrichment/scoring/CRM-flavoured example was introduced
+
+**Machine-checked (unattended, 2026-08-27):** This is that run. All 17
+deferred items across Phases 1-6 and all 6 open questions were walked; see
+each phase's own note above and the open-questions notes below for what was
+checked, what was found, and the one fix made (the missing sabotage note on
+`targets_test.exs`'s "an id not in the document returns []" test). Re-ran
+`grep -rniE "enrich|scor(e|ing)|crm_push"` over this bead's five new `lib/`
+modules, their five test files, and `document_generator.ex`: the same two
+pre-existing hits the Phase 6 automated note already recorded
+(`document_generator.ex`'s `@type_names` list and `view_model_test.exs`'s
+reference to the pre-existing `"toy.score"`/`"Enrichment"` fixture), nothing
+new. No new example in this bead's own new prose uses anything but the
+signup-wizard-with-A/B-testing domain.
 
 ---
