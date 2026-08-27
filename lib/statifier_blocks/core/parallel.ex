@@ -7,10 +7,10 @@ defmodule StatifierBlocks.Core.Parallel do
   `"lanes"` list of bare lane names, and each lane `name` becomes the slot
   `"lane_" <> name`:
 
-      config = %{"lanes" => ["crm", "nurture"]}
+      config = %{"lanes" => ["capture", "receipt"]}
 
       slots(config)
-      #=> [{"lane_crm", :any, "crm"}, {"lane_nurture", :any, "nurture"}]
+      #=> [{"lane_capture", :any, "capture"}, {"lane_receipt", :any, "receipt"}]
 
   A lane stores its **bare name** and the slot prefixes it, where
   `StatifierBlocks.Core.Branch`'s arms store the whole slot name. The
@@ -81,8 +81,10 @@ defmodule StatifierBlocks.Core.Parallel do
   defp check_lane(lane, {findings, seen}) do
     cond do
       not Config.identifier?(lane) ->
-        {[{"lanes", ~s(a lane name must be a bare lowercase identifier, like "crm")} | findings],
-         seen}
+        {[
+           {"lanes", ~s(a lane name must be a bare lowercase identifier, like "capture")}
+           | findings
+         ], seen}
 
       MapSet.member?(seen, lane) ->
         {[{"lanes", ~s(two lanes cannot share the name "#{lane}")} | findings], seen}
@@ -122,8 +124,8 @@ defmodule StatifierBlocks.Core.Parallel do
       <state id="s_PAR" initial="s_PAR__run">
         <transition event="done.state.s_PAR__run" target="s_PAR__done"/>
         <parallel id="s_PAR__run">
-          <state id="s_PAR__lane_crm" initial="...">...<final id="s_PAR__done_lane_crm"/></state>
-          <state id="s_PAR__lane_nurture" ...>
+          <state id="s_PAR__lane_capture" initial="...">...<final id="s_PAR__done_lane_capture"/></state>
+          <state id="s_PAR__lane_receipt" ...>
         </parallel>
         <final id="s_PAR__done"/>
       </state>
@@ -134,7 +136,7 @@ defmodule StatifierBlocks.Core.Parallel do
   The two role families are `lane_<name>` and `done_lane_<name>`. They
   cannot collide with each other whatever a lane is called, because they
   differ in their first token rather than their last - a lane named
-  `crm_done` mints `lane_crm_done` and `done_lane_crm_done`, and neither is
+  `capture_done` mints `lane_capture_done` and `done_lane_capture_done`, and neither is
   any other lane's id.
 
   A parallel with no lanes emits no `<parallel>` at all: an empty one is

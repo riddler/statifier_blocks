@@ -15,8 +15,8 @@ schema is (decision 6).
 
 **The block type is the extension seam of this package.** This package ships
 a small `core.*` structural vocabulary and nothing else; every palette entry
-a host actually cares about - an external data-provider step, a scoring
-step, a CRM-push step - is written by a multi-tenant host embedding the
+a host actually cares about - an external data-provider step, a budget-check
+step, a settlement step - is written by a multi-tenant host embedding the
 engine. That is the same shape the engine already settled upstream for
 `<invoke>`: st-ADR-0051 made the invoke-handler set deployment state,
 supplied per session as a caller-declared value, with a behaviour of pure
@@ -101,7 +101,7 @@ the same answer forever. This is what lets validation run on every edit and
 what lets sb-iwz promise a deterministic compile against a document hash.
 
 A block type that genuinely needs external data at authoring time - a list
-of the host's CRM pipelines to populate a select, say - gets it by the host
+of the host's budget policies to populate a select, say - gets it by the host
 resolving it *before* the operation and passing it in the palette entry's
 own options, not by the callback reaching for it. That mechanism is not
 specified here; what is specified is that the callback stays pure.
@@ -250,7 +250,7 @@ defines, and `StatifierUI.Fixtures.Bundle.load/3` is what reads it:
 | `%StatifierUI.Fixtures{}` | the struct |
 | `%{scenarios: ..., events: ..., datasets: ..., expressions: ...}` | **atom** top-level keys |
 | `%{"version" => 1, "datasets" => ...}` | **string** top-level keys |
-| `"palette/score.fixtures.json"` | a binary path |
+| `"palette/budget_check.fixtures.json"` | a binary path |
 
 The atom-versus-string top-level key is the whole discriminator: atom keys
 are the Elixir spelling a host writes by hand in a module, string keys are
@@ -361,7 +361,7 @@ records do not have to re-derive the boundary:
   are related only by string type names appearing in a block's config and in
   the emitted SCXML. Keeping them separate is deliberate - an authoring
   server that never runs a chart needs only the first - but a host wiring
-  `myapp.enrich` must remember to do both, and a block type whose emitted
+  `myapp.authorize` must remember to do both, and a block type whose emitted
   invoke type has no registered handler fails at runtime with
   `error.execution` (st-ADR-0051 decision 1), not at authoring time. Naming
   that gap is sb-iwz's and sb-w50's to act on if either wants a lint.
@@ -469,14 +469,15 @@ end
 
 ## Worked example: one block type exercising every callback
 
-A scoring step in a multi-tenant host embedding the engine. It scores an
-inbound record through the host's model, writes the result to the datamodel,
-and offers an optional review slot whose contents run when the score is
-below a configured floor. It is deliberately the smallest type that needs
-config-parameterized slots, a migration, and a non-trivial cross-field rule.
+A budget-check step in a multi-tenant host embedding the engine. It checks
+a card transaction against the account's budget policy, writes the decision
+to the datamodel, and offers an optional review slot whose contents run when
+the amount is above a configured ceiling. It is deliberately the smallest
+type that needs config-parameterized slots, a migration, and a non-trivial
+cross-field rule.
 
 ```elixir
-defmodule MyApp.Blocks.Score do
+defmodule MyApp.Blocks.BudgetCheck do
   @behaviour StatifierBlocks.BlockType
 
   @impl true
@@ -486,46 +487,46 @@ defmodule MyApp.Blocks.Score do
   # for one. Turning the flag off in the editor removes a slot, which is a
   # document edit (sb-w50), not a silent drop.
   @impl true
-  def slots(%{"review_below" => floor}) when is_integer(floor),
-    do: [{"review", :at_least_one, "If the score is below the floor"}]
+  def slots(%{"review_above" => ceiling}) when is_integer(ceiling),
+    do: [{"review", :at_least_one, "If the amount is above the ceiling"}]
 
   def slots(_config), do: []
 
   @impl true
   def config_schema(config) do
     [
-      %{key: "model", type: {:select, [{"lead_v3", "Lead score v3"},
-                                       {"account_v1", "Account score v1"}]},
-        label: "Model", required?: true, default: "lead_v3"},
-      %{key: "assign_to", type: :string, label: "Write score to",
-        required?: true, default: "score"},
+      %{key: "policy", type: {:select, [{"standard_v3", "Standard policy v3"},
+                                        {"corporate_v1", "Corporate policy v1"}]},
+        label: "Policy", required?: true, default: "standard_v3"},
+      %{key: "assign_to", type: :string, label: "Write decision to",
+        required?: true, default: "decision"},
       %{key: "timeout", type: :duration, label: "Timeout",
         required?: false, default: "PT30S"}
     ] ++ review_fields(config)
   end
 
-  defp review_fields(%{"review_below" => _}),
-    do: [%{key: "review_below", type: :integer, label: "Review below",
+  defp review_fields(%{"review_above" => _}),
+    do: [%{key: "review_above", type: :integer, label: "Review above",
            required?: true, default: 50}]
 
   defp review_fields(_), do: []
 
-  # The authority (decision 7). The schema above cannot express "the floor
+  # The authority (decision 7). The schema above cannot express "the ceiling
   # must be in 0..100" or "assign_to must be a bare identifier", and
   # deliberately does not try.
   @impl true
   def validate_config(config) do
     findings =
       []
-      |> check_model(config)
+      |> check_policy(config)
       |> check_assign_to(config)
-      |> check_floor(config)
+      |> check_ceiling(config)
 
     if findings == [], do: :ok, else: {:error, Enum.reverse(findings)}
   end
 
-  defp check_model(f, %{"model" => m}) when m in ["lead_v3", "account_v1"], do: f
-  defp check_model(f, _), do: [{"model", "pick a model"} | f]
+  defp check_policy(f, %{"policy" => p}) when p in ["standard_v3", "corporate_v1"], do: f
+  defp check_policy(f, _), do: [{"policy", "pick a policy"} | f]
 
   defp check_assign_to(f, %{"assign_to" => a}) when is_binary(a) do
     if Regex.match?(~r/\A[a-z][a-z0-9_]*\z/, a),
@@ -535,29 +536,29 @@ defmodule MyApp.Blocks.Score do
 
   defp check_assign_to(f, _), do: [{"assign_to", "required"} | f]
 
-  defp check_floor(f, %{"review_below" => n}) when is_integer(n) and n in 0..100, do: f
-  defp check_floor(f, %{"review_below" => _}),
-    do: [{"review_below", "must be an integer from 0 to 100"} | f]
+  defp check_ceiling(f, %{"review_above" => n}) when is_integer(n) and n in 0..100, do: f
+  defp check_ceiling(f, %{"review_above" => _}),
+    do: [{"review_above", "must be an integer from 0 to 100"} | f]
 
-  defp check_floor(f, _), do: f
+  defp check_ceiling(f, _), do: f
 
   # sb-7rx owns what these terms mean; this module only declares them.
   @impl true
-  def io(_config), do: %{consumes: ["record"], produces: ["score"]}
+  def io(_config), do: %{consumes: ["myapp.transaction"], produces: ["decision"]}
 
   # sb-iwz owns the context and the subtree representation. What the type
-  # promises here is that the emitted subtree invokes `myapp:score` - the
+  # promises here is that the emitted subtree invokes `myapp:budget_check` - the
   # runtime handler for which the host registers separately, per
   # st-ADR-0051.
   @impl true
   def emit(%StatifierBlocks.Block{config: config} = block, context) do
-    MyApp.Blocks.ScoreEmitter.emit(block, config, context)
+    MyApp.Blocks.BudgetCheckEmitter.emit(block, config, context)
   end
 
   # v1 spelled the target key `field`; v2 spells it `assign_to`.
   @impl true
   def migrate_config(1, config) do
-    {value, rest} = Map.pop(config, "field", "score")
+    {value, rest} = Map.pop(config, "field", "decision")
     {:ok, Map.put(rest, "assign_to", value)}
   end
 
@@ -568,13 +569,13 @@ defmodule MyApp.Blocks.Score do
   def fixtures do
     %{
       datasets: %{
-        "hot-lead" => %{"record" => %{"pages_viewed" => 14, "domain" => "acme.example"}},
-        "cold-lead" => %{"record" => %{"pages_viewed" => 1, "domain" => "mail.example"}}
+        "within-budget" => %{"transaction" => %{"amount" => 120, "currency" => "USD"}},
+        "over-budget" => %{"transaction" => %{"amount" => 940, "currency" => "USD"}}
       },
       expressions: %{
         "needs_review" => %{
-          "source" => "score < 50",
-          "expect" => %{"hot-lead" => false, "cold-lead" => true}
+          "source" => "amount > 500",
+          "expect" => %{"within-budget" => false, "over-budget" => true}
         }
       }
     }
@@ -582,7 +583,8 @@ defmodule MyApp.Blocks.Score do
 
   @impl true
   def palette_entry,
-    do: %{label: "Score record", group: "Enrichment", description: "Scores an inbound record."}
+    do: %{label: "Budget check", group: "Authorization",
+          description: "Checks a transaction against the account's budget."}
 end
 ```
 
@@ -590,20 +592,24 @@ Registered, and used:
 
 ```elixir
 palette = %StatifierBlocks.Palette{
-  types: Map.merge(StatifierBlocks.Palette.core(), %{"myapp.score" => MyApp.Blocks.Score})
+  types:
+    Map.merge(StatifierBlocks.Palette.core(), %{
+      "myapp.budget_check" => MyApp.Blocks.BudgetCheck
+    })
 }
 
 # A block stored at type_version 1 resolves and migrates in memory only.
-{:ok, MyApp.Blocks.Score, block} = StatifierBlocks.Palette.resolve(palette, stored_block)
+{:ok, MyApp.Blocks.BudgetCheck, block} = StatifierBlocks.Palette.resolve(palette, stored_block)
 block.config["assign_to"]
-#=> "score"
+#=> "decision"
 
 # The slot set follows the config, per ADR-0001 decision 5.
-MyApp.Blocks.Score.slots(%{"model" => "lead_v3", "assign_to" => "score"})
+MyApp.Blocks.BudgetCheck.slots(%{"policy" => "standard_v3", "assign_to" => "decision"})
 #=> []
 
-MyApp.Blocks.Score.slots(%{"model" => "lead_v3", "assign_to" => "score", "review_below" => 50})
-#=> [{"review", :at_least_one, "If the score is below the floor"}]
+MyApp.Blocks.BudgetCheck.slots(%{"policy" => "standard_v3", "assign_to" => "decision",
+                                 "review_above" => 50})
+#=> [{"review", :at_least_one, "If the amount is above the ceiling"}]
 
 # A palette entry the host removed still resolves to a value, not an exception.
 StatifierBlocks.Palette.fetch(palette, "myapp.retired")
@@ -624,5 +630,5 @@ What this example is chosen to demonstrate:
 - **In-memory migration (decision 8).** `migrate_config/2` renames a config
   key on resolve, and nothing writes the document back.
 - **The two-registry seam.** `emit/2` produces a subtree naming
-  `myapp:score`; a handler for that invoke type is registered with the
+  `myapp:budget_check`; a handler for that invoke type is registered with the
   engine at runtime under st-ADR-0051, by the same host, separately.

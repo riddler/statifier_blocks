@@ -16,8 +16,8 @@ defmodule StatifierBlocks.Compiler.Attribution do
     * **Role.** An element whose `id` is a state id this block minted
       (`StatifierBlocks.Compiler.StateId.unstate_id/1`) takes that role,
       and everything inside it inherits the role until another state
-      changes it. That is what puts `s_blk_ENR__running`'s `<invoke>` on
-      `blk_ENR` role `running` rather than on the block as a whole.
+      changes it. That is what puts `s_blk_AUTH__running`'s `<invoke>` on
+      `blk_AUTH` role `running` rather than on the block as a whole.
     * **Override.** `StatifierBlocks.Emission.attributed_to/2` moves an
       element and its subtree to another block and clears the role, which
       is the case decision 5 names: "attribution is a judgment, not a

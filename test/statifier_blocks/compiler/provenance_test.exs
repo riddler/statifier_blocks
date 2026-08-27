@@ -103,14 +103,14 @@ defmodule StatifierBlocks.Compiler.ProvenanceTest do
   test "an auxiliary state carries the role its block minted it under", ctx do
     provenance = ctx.compiled.provenance
 
-    assert {:ok, %{block_id: "blk_ENR", role: nil}} =
-             Provenance.owner_of_state(provenance, "s_blk_ENR")
+    assert {:ok, %{block_id: "blk_AUTH", role: nil}} =
+             Provenance.owner_of_state(provenance, "s_blk_AUTH")
 
-    assert {:ok, %{block_id: "blk_ENR", role: "running"}} =
-             Provenance.owner_of_state(provenance, "s_blk_ENR__running")
+    assert {:ok, %{block_id: "blk_AUTH", role: "running"}} =
+             Provenance.owner_of_state(provenance, "s_blk_AUTH__running")
 
-    assert {:ok, %{block_id: "blk_ENR", role: "done"}} =
-             Provenance.owner_of_state(provenance, "s_blk_ENR__done")
+    assert {:ok, %{block_id: "blk_AUTH", role: "done"}} =
+             Provenance.owner_of_state(provenance, "s_blk_AUTH__done")
   end
 
   # Sabotage: removed the `Emission.attributed_to/2` call from
@@ -119,9 +119,9 @@ defmodule StatifierBlocks.Compiler.ProvenanceTest do
   test "a sequencing transition belongs to the child it leaves, not the container", ctx do
     %{scxml: scxml, provenance: provenance} = ctx.compiled
 
-    {offset, _length} = :binary.match(scxml, ~s(<transition event="done.state.s_blk_ENR"))
+    {offset, _length} = :binary.match(scxml, ~s(<transition event="done.state.s_blk_AUTH"))
 
-    assert {:ok, %{block_id: "blk_ENR", role: nil, config_key: nil}} =
+    assert {:ok, %{block_id: "blk_AUTH", role: nil, config_key: nil}} =
              Provenance.owner_at(provenance, offset)
   end
 
@@ -131,13 +131,13 @@ defmodule StatifierBlocks.Compiler.ProvenanceTest do
   test "an arm's cond value carries the config key the author typed it into", ctx do
     %{scxml: scxml, provenance: provenance} = ctx.compiled
 
-    {element, _length} = :binary.match(scxml, ~s(<transition cond="score))
-    {value, _length} = :binary.match(scxml, "score &gt; 80")
+    {element, _length} = :binary.match(scxml, ~s(<transition cond="budget_remaining))
+    {value, _length} = :binary.match(scxml, "budget_remaining &gt; amount")
 
     assert {:ok, %{block_id: "blk_BR", role: "pick", config_key: nil}} =
              Provenance.owner_at(provenance, element)
 
-    assert {:ok, %{block_id: "blk_BR", role: "pick", config_key: "arm_qualified"}} =
+    assert {:ok, %{block_id: "blk_BR", role: "pick", config_key: "arm_approved"}} =
              Provenance.owner_at(provenance, value)
   end
 
@@ -199,6 +199,6 @@ defmodule StatifierBlocks.Compiler.ProvenanceTest do
       |> then(&Provenance.owners_of_states(ctx.compiled.provenance, &1))
       |> Enum.map(& &1.block_id)
 
-    assert "blk_ENR" in blocks
+    assert "blk_AUTH" in blocks
   end
 end

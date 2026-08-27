@@ -18,7 +18,7 @@ defmodule StatifierBlocks.BlockTest do
   # with `StatifierBlocks.Id.block()` (ignores the :id option) -> red
   test "new/2 accepts an explicit :id and overrides every default" do
     block =
-      Block.new("myapp.enrich",
+      Block.new("myapp.authorize",
         id: "blk_explicit",
         type_version: 2,
         config: %{"a" => 1},

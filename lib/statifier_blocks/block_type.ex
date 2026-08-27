@@ -195,7 +195,7 @@ defmodule StatifierBlocks.BlockType do
       **atom** top-level keys, the Elixir spelling written by hand
     * `%{"version" => 1, "datasets" => ...}` - **string** top-level keys,
       the JSON spelling that survives a file
-    * `"palette/score.fixtures.json"` - a binary path
+    * `"palette/budget_check.fixtures.json"` - a binary path
 
   The bundle is addressed by the `type_name` the palette resolves it
   under, and discovery is per entry: one malformed bundle is reported

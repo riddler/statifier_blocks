@@ -30,7 +30,7 @@ defmodule StatifierBlocks.Core.ConformanceTest do
     %{"arms" => "not a list"},
     %{"arms" => [%{"slot" => "nope"}, "wat", nil]},
     %{"lanes" => 5},
-    %{"lanes" => ["Bad Name", "crm", "crm"]},
+    %{"lanes" => ["Bad Name", "capture", "capture"]},
     %{"duration" => 30},
     %{"history" => "sideways"},
     %{"event" => "", "outcome" => "explode"}

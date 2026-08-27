@@ -21,7 +21,7 @@ defmodule StatifierBlocks.PaletteTest do
     # sabotage: change new/1's body to ignore the argument and always use
     # %{} -> this assertion goes red
     test "new/1 produces a palette carrying the given map" do
-      given = %{"toy.score" => Toy}
+      given = %{"toy.budget_check" => Toy}
       assert Palette.new(given) == %Palette{types: given}
     end
 
@@ -50,7 +50,7 @@ defmodule StatifierBlocks.PaletteTest do
     # sabotage: change fetch/2's success clause to return `:ok` instead of
     # `{:ok, module}` -> this assertion goes red
     test "returns {:ok, module} for a name the palette carries" do
-      assert Palette.fetch(BlockTypeFixtures.palette(), "toy.score") == {:ok, Toy}
+      assert Palette.fetch(BlockTypeFixtures.palette(), "toy.budget_check") == {:ok, Toy}
     end
 
     # sabotage: change the :error branch to `{:error, :unknown_block_type}`
@@ -87,11 +87,11 @@ defmodule StatifierBlocks.PaletteTest do
     # start returning the first palette's module too, and this test's second
     # assertion goes red
     test "two palettes with different modules under the same name resolve independently" do
-      palette_a = Palette.new(%{"toy.score" => Toy})
-      palette_b = Palette.new(%{"toy.score" => Minimal})
+      palette_a = Palette.new(%{"toy.budget_check" => Toy})
+      palette_b = Palette.new(%{"toy.budget_check" => Minimal})
 
-      assert Palette.fetch(palette_a, "toy.score") == {:ok, Toy}
-      assert Palette.fetch(palette_b, "toy.score") == {:ok, Minimal}
+      assert Palette.fetch(palette_a, "toy.budget_check") == {:ok, Toy}
+      assert Palette.fetch(palette_b, "toy.budget_check") == {:ok, Minimal}
     end
   end
 
@@ -99,7 +99,7 @@ defmodule StatifierBlocks.PaletteTest do
     # sabotage: change the current-version clause to always rewrite
     # `config` to `%{}` -> `resolved == block` goes red
     test "a block at the current version resolves unchanged" do
-      block = Block.new("toy.score", type_version: 2, config: %{"assign_to" => "score"})
+      block = Block.new("toy.budget_check", type_version: 2, config: %{"assign_to" => "decision"})
 
       assert {:ok, Toy, resolved} = Palette.resolve(BlockTypeFixtures.palette(), block)
       assert resolved == block
@@ -109,10 +109,11 @@ defmodule StatifierBlocks.PaletteTest do
     # block}` (the unmigrated block) instead of the migrated struct ->
     # `migrated.config["assign_to"]` goes red
     test "a block below the current version migrates its config in memory" do
-      block = Block.new("toy.score", type_version: 1, config: %{"field" => "lead_score"})
+      block =
+        Block.new("toy.budget_check", type_version: 1, config: %{"field" => "risk_decision"})
 
       assert {:ok, Toy, migrated} = Palette.resolve(BlockTypeFixtures.palette(), block)
-      assert migrated.config["assign_to"] == "lead_score"
+      assert migrated.config["assign_to"] == "risk_decision"
       refute Map.has_key?(migrated.config, "field")
     end
 
@@ -125,7 +126,10 @@ defmodule StatifierBlocks.PaletteTest do
     # have a mutation that reds it.
     test "migration is applied in memory only; the source document is untouched" do
       doc = DocumentFixtures.worked_example()
-      block = Block.new("toy.score", type_version: 1, config: %{"field" => "lead_score"})
+
+      block =
+        Block.new("toy.budget_check", type_version: 1, config: %{"field" => "risk_decision"})
+
       doc_before = doc
       hash_before = Document.content_hash(doc)
 
@@ -141,7 +145,7 @@ defmodule StatifierBlocks.PaletteTest do
     # red this test - the clause still matches a too-new block and returns
     # the same tuple; it reds the migration tests instead
     test "a block newer than the type's current version hard-errors" do
-      block = Block.new("toy.score", type_version: 99, config: %{})
+      block = Block.new("toy.budget_check", type_version: 99, config: %{})
 
       assert Palette.resolve(BlockTypeFixtures.palette(), block) ==
                {:error, {:block_type_too_new, block.id, 99}}

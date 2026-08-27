@@ -123,14 +123,14 @@ defmodule StatifierBlocks.Edit.HistoryTest do
       document = signup_wizard()
       history = History.new()
 
-      # A "cond" is present, but the slot name doesn't look like "arm_qualified".
+      # A "cond" is present, but the slot name doesn't look like "arm_approved".
       bad_config = %{"arms" => [%{"slot" => "not-an-arm-name", "cond" => "true"}]}
       command = {:update_config, "blk_VARIANT", bad_config}
 
       assert History.commit(history, palette(), document, command) ==
                {:error,
                 {:invalid_config, "blk_VARIANT",
-                 [{"arms", ~s(an arm's slot must look like "arm_qualified")}]}}
+                 [{"arms", ~s(an arm's slot must look like "arm_approved")}]}}
 
       assert document == signup_wizard()
       assert history == History.new()

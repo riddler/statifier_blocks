@@ -138,13 +138,13 @@ defmodule StatifierBlocks.CompilerTest do
       root =
         Block.new("core.parallel",
           id: "blk_PAR",
-          config: %{"lanes" => ["nurture", "crm"]},
-          slots: %{"lane_nurture" => [leaf("blk_N")], "lane_crm" => [leaf("blk_C")]}
+          config: %{"lanes" => ["receipt", "capture"]},
+          slots: %{"lane_receipt" => [leaf("blk_N")], "lane_capture" => [leaf("blk_C")]}
         )
 
       scxml = compile!(Document.new(root), toy_palette()).scxml
 
-      assert index(scxml, "s_blk_PAR__lane_nurture") < index(scxml, "s_blk_PAR__lane_crm")
+      assert index(scxml, "s_blk_PAR__lane_receipt") < index(scxml, "s_blk_PAR__lane_capture")
     end
 
     # sabotage: compile the `metadata` map into the emission -> the two
@@ -205,7 +205,7 @@ defmodule StatifierBlocks.CompilerTest do
       document = Document.new(leaf("blk_ONLY"), id: "bdoc_PH", revision: 0)
 
       one = compile!(document, Palette.new(%{"toy.leaf" => CoreFixtures.Notify}))
-      two = compile!(document, Palette.new(%{"toy.leaf" => CoreFixtures.CrmPush}))
+      two = compile!(document, Palette.new(%{"toy.leaf" => CoreFixtures.Capture}))
 
       refute one.record.palette_hash == two.record.palette_hash
     end

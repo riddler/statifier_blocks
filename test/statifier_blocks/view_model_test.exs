@@ -368,18 +368,18 @@ defmodule StatifierBlocks.ViewModelTest do
     test "groups by entry.group and sorts group name -> order -> label" do
       vm = build(document_with(Block.new("core.sequence", id: "blk_SEQ")))
 
-      # `BlockTypeFixtures.raw_palette/0` contributes "toy.score" (its own
-      # `palette_entry/0` puts it in "Enrichment") and three types with no
+      # `BlockTypeFixtures.raw_palette/0` contributes "toy.budget_check" (its own
+      # `palette_entry/0` puts it in "Authorization") and three types with no
       # `palette_entry/0` at all, which default to "Other" - alongside the
       # seven real `core.*` types, all "Structure". Three groups, sorted by
-      # name: "Enrichment" < "Other" < "Structure".
+      # name: "Authorization" < "Other" < "Structure".
       assert [
-               %PaletteGroup{name: "Enrichment"} = enrichment,
+               %PaletteGroup{name: "Authorization"} = authorization,
                %PaletteGroup{name: "Other"} = other,
                %PaletteGroup{name: "Structure"} = structure
              ] = vm.palette_groups
 
-      assert Enum.map(enrichment.entries, & &1.type_name) == ["toy.score"]
+      assert Enum.map(authorization.entries, & &1.type_name) == ["toy.budget_check"]
 
       assert Enum.map(other.entries, & &1.type_name) == [
                "toy.erroring_migration",

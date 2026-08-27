@@ -45,7 +45,7 @@ defmodule StatifierBlocks.Compiler.SerializerTest do
       {:ok, document} = Document.from_json(File.read!(worked_example()))
       {:ok, compiled} = Compiler.compile(document, CoreFixtures.palette())
 
-      assert compiled.scxml =~ ~s(cond="score &gt; 80")
+      assert compiled.scxml =~ ~s(cond="budget_remaining &gt; amount")
       assert {:ok, _machine} = Statifier.compile(compiled.scxml)
     end
 

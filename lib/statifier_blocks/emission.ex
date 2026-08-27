@@ -43,7 +43,7 @@ defmodule StatifierBlocks.Emission do
       block emits belongs to that block, which is right almost everywhere.
       ADR-0004 decision 5 names the exceptions: the `done.state` transition
       a sequence emits belongs to *the child it leaves*, because "what
-      happens after the enrich step" is the fact an author would recognise.
+      happens after the authorize step" is the fact an author would recognise.
       `attributed_to/2` records that. `from_config/2` records the other
       half - an element written out of one config field, so a finding
       against it is the author's rather than a bug.

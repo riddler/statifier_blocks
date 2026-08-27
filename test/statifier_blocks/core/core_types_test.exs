@@ -154,8 +154,8 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
   describe "core.branch" do
     @arms %{
       "arms" => [
-        %{"slot" => "arm_qualified", "cond" => "score > 80"},
-        %{"slot" => "arm_warm", "cond" => "score > 40"}
+        %{"slot" => "arm_approved", "cond" => "budget_remaining > amount"},
+        %{"slot" => "arm_review", "cond" => "amount > 200"}
       ]
     }
 
@@ -163,8 +163,8 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
     # which is the order the editor renders arms in.
     test "derives one at-least-one slot per arm, in config order, then otherwise" do
       assert Core.Branch.slots(@arms) == [
-               {"arm_qualified", :at_least_one, ~s(When "qualified")},
-               {"arm_warm", :at_least_one, ~s(When "warm")},
+               {"arm_approved", :at_least_one, ~s(When "approved")},
+               {"arm_review", :at_least_one, ~s(When "review")},
                {"otherwise", :any, "Otherwise"}
              ]
 
@@ -175,12 +175,12 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
     # would no longer route to the field it is about.
     test "derives one expression field per arm, keyed on the arm's slot" do
       assert [
-               %{key: "arm_qualified", type: :expression, required?: true},
-               %{key: "arm_warm", type: :expression, required?: true}
+               %{key: "arm_approved", type: :expression, required?: true},
+               %{key: "arm_review", type: :expression, required?: true}
              ] = Core.Branch.config_schema(@arms)
     end
 
-    # Sabotage: accepted a bare suffix as an arm slot - red on `"qualified"`.
+    # Sabotage: accepted a bare suffix as an arm slot - red on `"approved"`.
     test "reports malformed, duplicated and conditionless arms" do
       assert Core.Branch.validate_config(@arms) == :ok
       assert Core.Branch.validate_config(%{}) == :ok
@@ -188,7 +188,7 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
       assert {:error, [{"arms", _}]} = Core.Branch.validate_config(%{"arms" => "nope"})
 
       assert {:error, [{"arms", _}]} =
-               Core.Branch.validate_config(%{"arms" => [%{"slot" => "qualified", "cond" => "x"}]})
+               Core.Branch.validate_config(%{"arms" => [%{"slot" => "approved", "cond" => "x"}]})
 
       assert {:error, [{"arms", _}]} =
                Core.Branch.validate_config(%{"arms" => [%{"slot" => "arm_a"}]})
@@ -211,32 +211,34 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
       assert %{kinds: [:step], produces: :unknown, slot_accepts: accepts} = Core.Branch.io(@arms)
 
       assert accepts == %{
-               "arm_qualified" => [:step],
-               "arm_warm" => [:step],
+               "arm_approved" => [:step],
+               "arm_review" => [:step],
                "otherwise" => [:step]
              }
     end
 
-    # Sabotage: swapped the two datasets' scores - red on the expectation.
+    # Sabotage: swapped the two datasets' budgets - red on the expectation.
     # PROVISIONAL: bundle shape is ADR-0002 decision 9's amendment (PR #13).
     test "ships a condition evaluated against two datasets (PROVISIONAL)" do
       assert %{datasets: datasets, expressions: expressions} = Core.Branch.fixtures()
-      assert Map.keys(datasets) |> Enum.sort() == ["qualified", "unqualified"]
+      assert Map.keys(datasets) |> Enum.sort() == ["approved", "declined"]
 
-      assert %{"qualifies" => %{"source" => "score > 80", "expect" => expect}} = expressions
-      assert expect == %{"qualified" => true, "unqualified" => false}
+      assert %{"approves" => %{"source" => "budget_remaining > amount", "expect" => expect}} =
+               expressions
+
+      assert expect == %{"approved" => true, "declined" => false}
     end
   end
 
   describe "core.parallel" do
-    @lanes %{"lanes" => ["crm", "nurture"]}
+    @lanes %{"lanes" => ["capture", "receipt"]}
 
     # Sabotage: labelled a lane with its slot name rather than its bare name
     # - red on the label, which is what an author reads.
     test "derives one any-arity slot per lane, prefixed lane_" do
       assert Core.Parallel.slots(@lanes) == [
-               {"lane_crm", :any, "crm"},
-               {"lane_nurture", :any, "nurture"}
+               {"lane_capture", :any, "capture"},
+               {"lane_receipt", :any, "receipt"}
              ]
 
       assert Core.Parallel.slots(%{}) == []
@@ -253,9 +255,9 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
       assert {:error, [{"lanes", _}]} = Core.Parallel.validate_config(%{"lanes" => [1]})
 
       assert {:error, [{"lanes", message}]} =
-               Core.Parallel.validate_config(%{"lanes" => ["crm", "crm"]})
+               Core.Parallel.validate_config(%{"lanes" => ["capture", "capture"]})
 
-      assert message =~ "crm"
+      assert message =~ "capture"
     end
 
     # Sabotage: changed `layout` to `:stack` - red, and the lanes would
@@ -263,7 +265,7 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
     test "renders as columns and produces nothing knowable" do
       assert Core.Parallel.palette_entry().layout == :columns
       assert %{produces: :unknown, slot_accepts: accepts} = Core.Parallel.io(@lanes)
-      assert accepts == %{"lane_crm" => [:step], "lane_nurture" => [:step]}
+      assert accepts == %{"lane_capture" => [:step], "lane_receipt" => [:step]}
     end
   end
 end

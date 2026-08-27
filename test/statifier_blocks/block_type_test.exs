@@ -44,43 +44,43 @@ defmodule StatifierBlocks.BlockTypeTest do
   describe "Toy exercises every one of the nine callbacks" do
     # sabotage: change Toy's fallback `slots/1` clause to return the review
     # slot too -> the `Toy.slots(%{}) == []` assertion goes red
-    test "slots/1 returns the review slot only when review_below is present" do
-      assert Toy.slots(%{"review_below" => 50}) == [
-               {"review", :at_least_one, "If the score is below the floor"}
+    test "slots/1 returns the review slot only when review_above is present" do
+      assert Toy.slots(%{"review_above" => 50}) == [
+               {"review", :at_least_one, "If the amount is above the ceiling"}
              ]
 
       assert Toy.slots(%{}) == []
     end
 
     # sabotage: change Toy's `review_fields(_)` fallback to return the
-    # review_below field unconditionally -> the base_keys assertion goes red
-    test "config_schema/1 adds the review_below field only when configured" do
+    # review_above field unconditionally -> the base_keys assertion goes red
+    test "config_schema/1 adds the review_above field only when configured" do
       base_keys = Toy.config_schema(%{}) |> Enum.map(& &1.key)
-      assert base_keys == ["model", "assign_to"]
+      assert base_keys == ["policy", "assign_to"]
 
-      with_review_keys = Toy.config_schema(%{"review_below" => 50}) |> Enum.map(& &1.key)
-      assert with_review_keys == ["model", "assign_to", "review_below"]
+      with_review_keys = Toy.config_schema(%{"review_above" => 50}) |> Enum.map(& &1.key)
+      assert with_review_keys == ["policy", "assign_to", "review_above"]
     end
 
-    # sabotage: drop "lead_v3" from Toy's `check_model/2` accepted list ->
-    # the valid config gains a "model" finding and :ok goes red
+    # sabotage: drop "standard_v3" from Toy's `check_policy/2` accepted list ->
+    # the valid config gains a "policy" finding and :ok goes red
     test "validate_config/1 returns :ok for a valid config" do
-      assert Toy.validate_config(%{"model" => "lead_v3", "assign_to" => "score"}) == :ok
+      assert Toy.validate_config(%{"policy" => "standard_v3", "assign_to" => "decision"}) == :ok
     end
 
-    # sabotage: widen Toy's `check_floor/2` bound guard from `n in 0..100`
-    # to any integer -> the "review_below" finding disappears -> red
+    # sabotage: widen Toy's `check_ceiling/2` bound guard from `n in 0..100`
+    # to any integer -> the "review_above" finding disappears -> red
     test "validate_config/1 returns findings for an invalid config" do
       assert {:error, findings} =
                Toy.validate_config(%{
-                 "model" => "not_a_model",
+                 "policy" => "not_a_policy",
                  "assign_to" => "Not Valid",
-                 "review_below" => 500
+                 "review_above" => 500
                })
 
-      assert {"model", _} = List.keyfind(findings, "model", 0)
+      assert {"policy", _} = List.keyfind(findings, "policy", 0)
       assert {"assign_to", _} = List.keyfind(findings, "assign_to", 0)
-      assert {"review_below", _} = List.keyfind(findings, "review_below", 0)
+      assert {"review_above", _} = List.keyfind(findings, "review_above", 0)
     end
 
     # sabotage: change Toy's `current_version/0` to 3 -> red
@@ -91,21 +91,21 @@ defmodule StatifierBlocks.BlockTypeTest do
     # sabotage: drop `context` from Toy's emit/2 marker tuple, leaving
     # `{:ok, {:emitted, id}}` -> red
     test "emit/2 returns a marker tuple carrying the block id and context" do
-      block = %StatifierBlocks.Block{id: "blk_1", type: "toy.score"}
+      block = %StatifierBlocks.Block{id: "blk_1", type: "toy.budget_check"}
       assert Toy.emit(block, :some_context) == {:ok, {:emitted, "blk_1", :some_context}}
     end
 
     # sabotage: change Toy's `io/1` to return empty consumes/produces
     # lists -> red
     test "io/1 declares consumed and produced terms" do
-      assert Toy.io(%{}) == %{consumes: ["record"], produces: ["score"]}
+      assert Toy.io(%{}) == %{consumes: ["myapp.transaction"], produces: ["decision"]}
     end
 
     # sabotage: have Toy's `migrate_config(1, _)` put the value back under
     # "field" instead of "assign_to" -> red
     test "migrate_config/2 renames field to assign_to from version 1" do
-      assert Toy.migrate_config(1, %{"field" => "lead_score"}) ==
-               {:ok, %{"assign_to" => "lead_score"}}
+      assert Toy.migrate_config(1, %{"field" => "risk_decision"}) ==
+               {:ok, %{"assign_to" => "risk_decision"}}
     end
 
     # sabotage: drop the source version from Toy's catch-all migrate_config
@@ -125,7 +125,7 @@ defmodule StatifierBlocks.BlockTypeTest do
     # sabotage: change Toy's `palette_entry/0` label to any other string
     # -> red
     test "palette_entry/0 returns presentation metadata" do
-      assert Toy.palette_entry() == %{label: "Score record", group: "Enrichment"}
+      assert Toy.palette_entry() == %{label: "Budget check", group: "Authorization"}
     end
   end
 
@@ -159,7 +159,7 @@ defmodule StatifierBlocks.BlockTypeTest do
     # sabotage: change Toy's review slot arity from `:at_least_one` to an
     # invented `:one_or_more` -> red
     test "every slot_decl arity Toy returns is drawn from the closed set" do
-      for config <- [%{}, %{"review_below" => 50}] do
+      for config <- [%{}, %{"review_above" => 50}] do
         for {_name, arity, _label} <- Toy.slots(config) do
           assert arity in @closed_slot_arities
         end
@@ -172,10 +172,10 @@ defmodule StatifierBlocks.BlockTypeTest do
     defp closed_field_type?({:list, inner}), do: closed_field_type?(inner)
     defp closed_field_type?(_type), do: false
 
-    # sabotage: change the review_below field's `type: :integer` to an
+    # sabotage: change the review_above field's `type: :integer` to an
     # invented `type: :money` -> red
     test "every field_decl type Toy returns is drawn from the closed set" do
-      for config <- [%{}, %{"review_below" => 50}] do
+      for config <- [%{}, %{"review_above" => 50}] do
         for field <- Toy.config_schema(config) do
           assert closed_field_type?(field.type)
         end
@@ -195,8 +195,8 @@ defmodule StatifierBlocks.BlockTypeTest do
     # returning [] -> the accepted-but-not-review-configured case goes red
     test "for every config validate_config/1 accepts, slots/1 returns without raising" do
       accepted_configs = [
-        %{"model" => "lead_v3", "assign_to" => "score"},
-        %{"model" => "account_v1", "assign_to" => "lead_score", "review_below" => 40}
+        %{"policy" => "standard_v3", "assign_to" => "decision"},
+        %{"policy" => "corporate_v1", "assign_to" => "risk_decision", "review_above" => 40}
       ]
 
       for config <- accepted_configs do

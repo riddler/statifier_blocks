@@ -24,7 +24,7 @@ defmodule StatifierBlocks.BlockTypeFixtures do
   defmodule Toy do
     @moduledoc """
     Implements all nine `StatifierBlocks.BlockType` callbacks, modelled on
-    ADR-0002's `MyApp.Blocks.Score` worked example: a config-parameterized
+    ADR-0002's `MyApp.Blocks.BudgetCheck` worked example: a config-parameterized
     review slot, a cross-field validation rule that lives only in
     `validate_config/1`, and a v1 -> v2 config-key rename.
     """
@@ -37,8 +37,8 @@ defmodule StatifierBlocks.BlockTypeFixtures do
     # Config-parameterized (ADR-0001 decision 5): the review slot exists
     # only when the author asked for one.
     @impl true
-    def slots(%{"review_below" => floor}) when is_integer(floor),
-      do: [{"review", :at_least_one, "If the score is below the floor"}]
+    def slots(%{"review_above" => ceiling}) when is_integer(ceiling),
+      do: [{"review", :at_least_one, "If the amount is above the ceiling"}]
 
     def slots(_config), do: []
 
@@ -46,28 +46,30 @@ defmodule StatifierBlocks.BlockTypeFixtures do
     def config_schema(config) do
       [
         %{
-          key: "model",
-          type: {:select, [{"lead_v3", "Lead score v3"}, {"account_v1", "Account score v1"}]},
-          label: "Model",
+          key: "policy",
+          type:
+            {:select,
+             [{"standard_v3", "Standard policy v3"}, {"corporate_v1", "Corporate policy v1"}]},
+          label: "Policy",
           required?: true,
-          default: "lead_v3"
+          default: "standard_v3"
         },
         %{
           key: "assign_to",
           type: :string,
-          label: "Write score to",
+          label: "Write decision to",
           required?: true,
-          default: "score"
+          default: "decision"
         }
       ] ++ review_fields(config)
     end
 
-    defp review_fields(%{"review_below" => _}),
+    defp review_fields(%{"review_above" => _}),
       do: [
         %{
-          key: "review_below",
+          key: "review_above",
           type: :integer,
-          label: "Review below",
+          label: "Review above",
           required?: true,
           default: 50
         }
@@ -81,15 +83,15 @@ defmodule StatifierBlocks.BlockTypeFixtures do
     def validate_config(config) do
       findings =
         []
-        |> check_model(config)
+        |> check_policy(config)
         |> check_assign_to(config)
-        |> check_floor(config)
+        |> check_ceiling(config)
 
       if findings == [], do: :ok, else: {:error, Enum.reverse(findings)}
     end
 
-    defp check_model(f, %{"model" => m}) when m in ["lead_v3", "account_v1"], do: f
-    defp check_model(f, _), do: [{"model", "pick a model"} | f]
+    defp check_policy(f, %{"policy" => p}) when p in ["standard_v3", "corporate_v1"], do: f
+    defp check_policy(f, _), do: [{"policy", "pick a policy"} | f]
 
     defp check_assign_to(f, %{"assign_to" => a}) when is_binary(a) do
       if Regex.match?(~r/\A[a-z][a-z0-9_]*\z/, a),
@@ -99,15 +101,15 @@ defmodule StatifierBlocks.BlockTypeFixtures do
 
     defp check_assign_to(f, _), do: [{"assign_to", "required"} | f]
 
-    defp check_floor(f, %{"review_below" => n}) when is_integer(n) and n in 0..100, do: f
+    defp check_ceiling(f, %{"review_above" => n}) when is_integer(n) and n in 0..100, do: f
 
-    defp check_floor(f, %{"review_below" => _}),
-      do: [{"review_below", "must be an integer from 0 to 100"} | f]
+    defp check_ceiling(f, %{"review_above" => _}),
+      do: [{"review_above", "must be an integer from 0 to 100"} | f]
 
-    defp check_floor(f, _), do: f
+    defp check_ceiling(f, _), do: f
 
     @impl true
-    def io(_config), do: %{consumes: ["record"], produces: ["score"]}
+    def io(_config), do: %{consumes: ["myapp.transaction"], produces: ["decision"]}
 
     # ADR-0004 owns the real shape; a marker tuple exercises the callback
     # without asserting a contract this bead does not own.
@@ -117,7 +119,7 @@ defmodule StatifierBlocks.BlockTypeFixtures do
     # v1 spelled the target key `field`; v2 spells it `assign_to`.
     @impl true
     def migrate_config(1, config) do
-      {value, rest} = Map.pop(config, "field", "score")
+      {value, rest} = Map.pop(config, "field", "decision")
       {:ok, Map.put(rest, "assign_to", value)}
     end
 
@@ -128,20 +130,20 @@ defmodule StatifierBlocks.BlockTypeFixtures do
     def fixtures do
       %{
         datasets: %{
-          "hot-lead" => %{"record" => %{"pages_viewed" => 14}},
-          "cold-lead" => %{"record" => %{"pages_viewed" => 1}}
+          "within-budget" => %{"transaction" => %{"amount" => 120}},
+          "over-budget" => %{"transaction" => %{"amount" => 940}}
         },
         expressions: %{
           "needs_review" => %{
-            "source" => "score < 50",
-            "expect" => %{"hot-lead" => false, "cold-lead" => true}
+            "source" => "amount > 500",
+            "expect" => %{"within-budget" => false, "over-budget" => true}
           }
         }
       }
     end
 
     @impl true
-    def palette_entry, do: %{label: "Score record", group: "Enrichment"}
+    def palette_entry, do: %{label: "Budget check", group: "Authorization"}
   end
 
   defmodule Minimal do
@@ -260,7 +262,7 @@ defmodule StatifierBlocks.BlockTypeFixtures do
   @spec raw_palette() :: %{Block.type_name() => module()}
   def raw_palette do
     %{
-      "toy.score" => Toy,
+      "toy.budget_check" => Toy,
       "toy.minimal" => Minimal,
       "toy.erroring_migration" => ErroringMigration,
       "toy.no_migration" => NoMigration

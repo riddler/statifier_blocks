@@ -19,7 +19,7 @@ defmodule StatifierBlocks.ValidationTest do
       root =
         Block.new("core.branch",
           id: "blk_root",
-          slots: %{"arm_qualified" => [child], "otherwise" => []}
+          slots: %{"arm_approved" => [child], "otherwise" => []}
         )
 
       document = Document.new(root, id: "bdoc_root", metadata: %{"name" => "Example"})
@@ -181,7 +181,7 @@ defmodule StatifierBlocks.ValidationTest do
         Block.new("core.branch",
           id: "blk_root",
           slots: %{
-            "arm_qualified" => [grandchild_holder],
+            "arm_approved" => [grandchild_holder],
             "otherwise" => [leaf_b]
           }
         )
@@ -223,10 +223,10 @@ defmodule StatifierBlocks.ValidationTest do
     # sabotage: in `check_metadata/1`, swap `canonical_json_object(metadata)`
     # for a call that always returns :ok -> red
     test "rejects a float inside document metadata" do
-      document = Document.new(Block.new("core.sequence"), metadata: %{"score" => 1.5})
+      document = Document.new(Block.new("core.sequence"), metadata: %{"amount" => 1.5})
 
       assert Document.validate(document) ==
-               {:error, {:malformed_envelope, {:metadata, {:float, ["score"]}}}}
+               {:error, {:malformed_envelope, {:metadata, {:float, ["amount"]}}}}
     end
   end
 

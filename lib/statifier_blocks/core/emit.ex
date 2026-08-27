@@ -136,8 +136,8 @@ defmodule StatifierBlocks.Core.Emit do
 
   Each transition is attributed to **the child it leaves**, not to the
   container that emitted it (ADR-0004 decision 5). "What happens after the
-  enrich step" is the fact an author would recognise, so a finding against
-  that transition belongs on the enrich block rather than on the sequence
+  authorize step" is the fact an author would recognise, so a finding
+  against that transition belongs on the authorize block than on the sequence
   around it. Attribution carries no bytes, so this changes nothing about
   the generated chart.
   """
