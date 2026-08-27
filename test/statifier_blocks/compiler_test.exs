@@ -197,6 +197,20 @@ defmodule StatifierBlocks.CompilerTest do
              )
     end
 
+    # The stability ratchet sb-dtr asks for. ADR-0004 decision 6 makes the
+    # serializer identity-bearing code; serializer_test.exs enforces only
+    # *sensitivity* (a reformat moves the identity), so nothing would notice
+    # a change that silently moves the worked example's bytes. Updating this
+    # hash is a deliberate compiler-version bump (decision 6's third
+    # determinism input), never a routine fix - a failing pin is the signal
+    # the ADR asks for, not noise to be re-pinned past.
+    # sabotage: append one byte to the serialized SCXML before hashing ->
+    # the pinned identity moves and this goes red (verified)
+    test "the worked example's chart identity is pinned" do
+      assert compile_worked_example().record.chart_identity.content_hash ==
+               "sha256:3c0f170cd91d8ec21fd43b455a4014d4ed3f06d67b77c1bd21176e4b0c206cb2"
+    end
+
     # sabotage: drop `module` from the palette_hash triples -> swapping one
     # entry for another module under the same name stops moving the hash,
     # which is exactly the surprising recompile the field exists to make
