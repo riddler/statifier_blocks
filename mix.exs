@@ -65,6 +65,33 @@ defmodule StatifierBlocks.MixProject do
         "README.md",
         "CHANGELOG.md"
       ],
+      # Without this the first hexdocs is one flat list of ~50 modules, which
+      # tells a reader nothing about which of them they are meant to call. The
+      # groups follow the package's own seams - the document is the source of
+      # truth, block types are the extension seam, the compiler is one way, and
+      # the editor is the optional LiveView half - so the sidebar reads as the
+      # architecture rather than as the alphabet. Order matters: ex_doc assigns
+      # each module to the first group whose pattern matches.
+      groups_for_modules: [
+        "Document model": [
+          ~r/^StatifierBlocks\.(Document|Block|Id|CanonicalJson|Decode|Validation)($|\.)/
+        ],
+        "Block types and assignability": [
+          ~r/^StatifierBlocks\.(BlockType|Palette|Assignability)($|\.)/
+        ],
+        "Core block vocabulary": [
+          ~r/^StatifierBlocks\.Core($|\.)/
+        ],
+        Compiler: [
+          ~r/^StatifierBlocks\.(Compiler|Compiled|CompilationRecord|Emission|Provenance)($|\.)/
+        ],
+        "Edit algebra and view model": [
+          ~r/^StatifierBlocks\.(Edit|Finding|ViewModel)($|\.)/
+        ],
+        "LiveView editor": [
+          ~r/^StatifierBlocks\.Editor($|\.)/
+        ]
+      ],
       skip_undefined_reference_warnings_on: ["CHANGELOG.md"]
     ]
   end
