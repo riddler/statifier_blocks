@@ -1,6 +1,6 @@
 # ADR-0004: One block, one state - a deterministic compile carrying a provenance map
 
-Status: accepted (2026-08-26)
+Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings)
 
 ## Context
 
@@ -648,8 +648,16 @@ defmodule StatifierBlocks.Compiler do
   @typedoc """
   `:known_invoke_types` enables the optional two-registry lint (decision 8);
   a host passes `Map.keys(invoke_handlers)` from its session options.
+
+  `:entry_type` (amended 2026-08-27) is ADR-0003 decision 4's caller-supplied
+  context - the type flowing into the document's root. That record made the
+  context caller-supplied without this record providing an arrival channel;
+  this option is the arrival, not a second decision about what assignability
+  means. Absent, assignability reads `:unknown` (permissive, ADR-0003 d5).
   """
-  @type option :: {:known_invoke_types, MapSet.t(String.t())}
+  @type option ::
+          {:known_invoke_types, MapSet.t(String.t())}
+          | {:entry_type, Assignability.type_expr() | :unknown}
 
   @doc """
   Total. Errors from the first failing stage only (decision 10); warnings ride
@@ -688,8 +696,8 @@ document, and the sequence's wiring is entirely `done.state` transitions
     <transition event="done.state.s_blk_AUTH" target="s_blk_GRP"/>
 
     <state id="s_blk_GRP" initial="s_blk_BR">
-      <state id="s_blk_BR" initial="s_blk_BR__choose">
-        <state id="s_blk_BR__choose">
+      <state id="s_blk_BR" initial="s_blk_BR__pick">
+        <state id="s_blk_BR__pick">
           <transition cond="budget_remaining &gt; amount" target="s_blk_PAR"/>
           <transition target="s_blk_NO2"/>
         </state>
@@ -714,14 +722,14 @@ The provenance map, abbreviated to its `by_state_id` half:
 | `s_blk_AUTH` | `blk_AUTH`, role `nil` |
 | `s_blk_AUTH__running` | `blk_AUTH`, role `running` |
 | `s_blk_AUTH__done` | `blk_AUTH`, role `done` |
-| `s_blk_BR__choose` | `blk_BR`, role `choose` |
+| `s_blk_BR__pick` | `blk_BR`, role `pick` (amended 2026-08-27: this illustration said `choose`; the shipped role is `pick`) |
 
 and a few of the spans, which are what findings actually route through:
 
 | span (bytes) | owner |
 |---|---|
 | the `<transition event="done.state.s_blk_AUTH">` element | `blk_AUTH`, role `nil`, key `nil` |
-| the `cond="budget_remaining &gt; amount"` attribute value | `blk_BR`, role `choose`, key `arms` |
+| the `cond="budget_remaining &gt; amount"` attribute value | `blk_BR`, role `pick`, key `arm_approved` (amended 2026-08-27: the key is the arm's own slot name, what `config_schema/1` keys the field by, not the `arms` list) |
 | the `<transition event="myapp.cancelled">` element | `blk_INT`, role `nil`, key `nil` |
 
 Two rows carry the record's weight. The transition wiring the sequence is
@@ -762,13 +770,14 @@ it - the bug is in the block type, and no edit to the document will help.
 `budget_remaining > > amount`. That reaches upstream as
 `%Statifier.Compiler.Error{reason: {:expression_compile_error, owner_ref, "budget_remaining > > amount", %Predicator.Errors.ParseError{}}}`,
 whose location resolves into the `cond` attribute's span. That span's owner
-carries `config_key: "arms"`, so:
+carries `config_key: "arm_approved"` - the arm's own slot name, the key an
+editor anchors the finding to (amended 2026-08-27) - so:
 
 ```elixir
 %{
   block_id: "blk_BR",
   path: [{"blk_ROOT", "body", 1}, {"blk_GRP", "body", 0}],
-  config_key: "arms",
+  config_key: "arm_approved",
   stage: :chart,
   severity: :error,
   fault: :author,

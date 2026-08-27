@@ -1,6 +1,6 @@
 # ADR-0005: The editor is a pure command algebra and view model with a thin LiveView shell
 
-Status: accepted (2026-08-26)
+Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings)
 
 ## Context
 
@@ -229,8 +229,16 @@ A slot accepts the dragged block when all four hold:
    become its own descendant, and ADR-0001 decision 1's tree invariant is not
    negotiable.
 
-Nothing in that list depends on the index within the slot, which is why
-validity is per-slot. That is not a simplification for its own sake: it means
+Rules 1, 3 and 4 do not depend on the index within the slot; rule 2's
+kind-admission half is index-free too, while its seam half reads the
+neighbours at the index and therefore does move with it (amended
+2026-08-27 - the original sentence claimed index-independence outright).
+Per-slot validity is a deliberate over-approximation on exactly that half:
+highlighting a slot when at least one of its gaps admits the block can
+offer a gap that later yields a `:type_mismatch` finding, and can never
+hide a gap that would have been clean - which is the right direction for a
+mechanism the editor does not block on. That is not a simplification for
+its own sake: it means
 the enumeration is O(slots) rather than O(gaps), and it means the editor
 highlights a whole slot as a target region rather than lighting up n+1
 individual seams, which is also the clearer thing to look at.
@@ -720,7 +728,6 @@ Edit.Targets.droppable_slots(document, palette, "blk_NOT")
 #=> [
 #     {"blk_ROOT", "body"},
 #     {"blk_GRP", "body"},
-#     {"blk_GRP", "interrupts"},
 #     {"blk_BR", "arm_approved"},
 #     {"blk_BR", "otherwise"},
 #     {"blk_PAR", "lane_capture"},
@@ -728,12 +735,16 @@ Edit.Targets.droppable_slots(document, palette, "blk_NOT")
 #   ]
 ```
 
-Seven slots highlight at once, before the pointer has moved. Note what is
-absent and why: nothing inside `blk_NOT` itself (rule 4 - it has no children
-here, but the rule is what makes dragging a group safe), and `blk_GRP`'s
-`interrupts` slot is present only because a `myapp.notify` is assignable
-there; had sb-7rx's relation said otherwise, it would be dark. Every one of
-those seven is a pure-function assertion in a test file.
+Six slots highlight at once, before the pointer has moved (amended
+2026-08-27: this example originally listed seven, including
+`{"blk_GRP", "interrupts"}` - machine-checking found the relation says
+otherwise, exactly as the conditional below predicted). Note what is absent
+and why: nothing inside `blk_NOT` itself (rule 4 - it has no children here,
+but the rule is what makes dragging a group safe), and `blk_GRP`'s
+`interrupts` slot is dark because the notify step's kinds do not include
+`:interrupt_handler`, which is the only kind that slot accepts; had
+sb-7rx's relation said otherwise, it would light. Every one of those six is
+a pure-function assertion in a test file.
 
 **At `drop`,** the client pushes `{"blk_NOT", "blk_BR", "otherwise", 0}` and
 the server builds and applies one command:
@@ -756,7 +767,7 @@ law, which is a property test.
 
 What this example is chosen to demonstrate:
 
-- **Pre-hover validity as a pure function.** The seven-element list is the
+- **Pre-hover validity as a pure function.** The six-element list is the
   entire interaction model of a drag, and it is computed by a function that
   takes a document, a palette, and an id, with no browser anywhere near it.
 - **Slot granularity (decision 5).** `lane_receipt` appears once, not three

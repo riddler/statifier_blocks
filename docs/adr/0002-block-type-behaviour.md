@@ -1,6 +1,6 @@
 # ADR-0002: A block type is a behaviour module resolved through a caller-supplied palette
 
-Status: accepted (2026-08-26); decision 9 amended (2026-08-26)
+Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings)
 
 ## Context
 
@@ -190,6 +190,19 @@ gains a condition field per arm as arms are added, and a select's choices
 can depend on an earlier field's value. The editor re-derives the form after
 every config change rather than caching it.
 
+*(Amended 2026-08-27, operator ruling on sb-9cp.)* A field declaration's
+`key` addresses `config[key]` by default - that relation was implied rather
+than stated, and the editor reads and writes exactly there. A field whose
+value lives elsewhere in the config declares it explicitly: the field
+declaration gains an optional `value_path`, a list of keys and indexes from
+the config root to the value (e.g. `["arms", 2, "cond"]`), and when present
+the editor reads and writes through it instead of `config[key]`. The `key`
+remains the field's identity - what findings anchor to (ADR-0005
+decision 11) and what the form keys the control by - so `Core.Branch`'s
+per-arm condition fields keep their slot-name keys and become editable
+without the editor ever branching on a block type's internals. A
+declaration without `value_path` behaves exactly as before.
+
 The schema drives the editor's form and nothing else. It deliberately
 expresses no cross-field rules, no conditional requirement, no numeric
 bounds, and no regex - because a schema rich enough to express those becomes
@@ -219,6 +232,20 @@ every read a write in a multi-tenant host. A block whose `type_version` is
 *above* the module's current version is a typed resolution error
 (`:block_type_too_new`), not a best-effort read: it means the code is older
 than the data, and guessing there is how a rollback corrupts documents.
+
+*(Amended 2026-08-27, operator ruling.)* Three semantics the original text
+left open, fixed as shipped:
+
+- A `migrate_config/2` call that returns `{:error, reason}`, and a module
+  whose `type_version` is behind but does not export `migrate_config/2` at
+  all, are a fourth typed resolution error,
+  `{:error, {:migration_failed, block_id, reason}}` (the no-callback case
+  carries `:no_migration_available`).
+- Migration is a single hop, straight from the stored version to
+  `current_version/0` - never a version-by-version ladder.
+- The returned block's `type_version` is left as stored, never bumped, so
+  an in-memory-migrated block can never be mistaken for one migrated on
+  disk.
 
 **9. Fixture bundles are optional, and this section is provisional.** The
 brief asks that a palette entry be able to carry its own executable examples
@@ -300,11 +327,30 @@ sb-iwz's.
 | Block type | `slots(config)` | Config schema | Notes |
 |---|---|---|---|
 | `core.sequence` | `[{"body", :any, "Steps"}]` | empty | the conventional document root |
-| `core.branch` | one `arm_*` per declared arm, then `{"otherwise", :any, ...}` | `arms`: a list of `{slot suffix, condition expression}` | conditions are `:expression` fields |
+| `core.branch` | one `arm_*` per declared arm, then `{"otherwise", :any, ...}` | `arms`: a list of `{slot name, condition expression}` (amended 2026-08-27: the full slot name, e.g. `arm_approved`, not a suffix - matching ADR-0001's worked-example bytes) | conditions are `:expression` fields |
 | `core.parallel` | one `lane_*` per declared lane | `lanes`: a list of lane names | lane slots are `:any`; no ordering between them |
 | `core.wait` | `[]` | `duration`: `:duration` | a leaf whose whole meaning is config |
 | `core.resumable_group` | `[{"body", :any, ...}, {"interrupts", :any, ...}]` | `history`: `:select` of `shallow`/`deep` | the two-named-slots case |
-| `core.on_event` | `[]` | `event`: `:string`; `outcome`: `:select` | an interrupt handler, valid only inside an `interrupts` slot |
+| `core.on_event` | `[]` | `event`: `:string`; `outcome`: `:select` of `abandon`/`resume` (ratified 2026-08-27) | an interrupt handler, valid only inside an `interrupts` slot |
+| `core.group` | `[{"body", :any, ...}, {"interrupts", :any, ...}]` | empty | ratified 2026-08-27: `core.resumable_group` minus the history mode - same slots, no config; a `resume` re-enters and the body restarts |
+
+*(Ratified 2026-08-27, operator ruling.)* Three shipped facts this table
+now records rather than leaves to moduledocs:
+
+- The vocabulary is **seven** types - `core.group` above is the seventh,
+  drawn so the `core.resumable_group` row is untouched.
+- `core.on_event`'s `outcome` values are `"abandon"` (leave the group, do
+  not come back) and `"resume"` (handle the event, re-enter the group).
+  A third value is a `config_schema/1` change plus a `current_version/0`
+  bump, not a document schema change.
+- **The `statifier_blocks.` event-name prefix is reserved.** The interrupt
+  protocol between a handler and its enclosing group is two package-owned
+  events, `statifier_blocks.interrupt.abandon` and
+  `statifier_blocks.interrupt.resume`, named in code by
+  `StatifierBlocks.Core.Emit.interrupt_events/0`. A host block type joins
+  the protocol by raising them; a host must not name its own events under
+  the prefix. (ADR-0004's emitted-event vocabulary - `done.state.*` - is
+  unchanged; these are raised events inside the emitted chart.)
 
 `core.on_event`'s placement constraint is the one rule in this table that
 `slots/1` cannot express, because it is a constraint on a block's *parent*,
@@ -447,9 +493,14 @@ defmodule StatifierBlocks.Palette do
 
   alias StatifierBlocks.Block
 
-  @type t :: %__MODULE__{types: %{optional(Block.type_name()) => module()}}
+  # assignability added 2026-08-27: ADR-0003 decision 6 puts the host's
+  # widening relation on the palette; this appendix predated that record.
+  @type t :: %__MODULE__{
+          types: %{optional(Block.type_name()) => module()},
+          assignability: module() | nil
+        }
 
-  defstruct types: %{}
+  defstruct types: %{}, assignability: nil
 
   @doc "Total; never raises (ADR-0002 decision 3)."
   @spec fetch(t(), Block.type_name()) ::
@@ -458,12 +509,15 @@ defmodule StatifierBlocks.Palette do
 
   @doc """
   Resolves and, if needed, migrates in memory. `:block_type_too_new` when the
-  block's `type_version` exceeds the module's `current_version/0`.
+  block's `type_version` exceeds the module's `current_version/0`;
+  `:migration_failed` when `migrate_config/2` fails or is not exported
+  (amended 2026-08-27, per decision 8's amendment).
   """
   @spec resolve(t(), Block.t()) ::
           {:ok, module(), Block.t()}
           | {:error, {:unknown_block_type, Block.type_name()}}
           | {:error, {:block_type_too_new, Block.id(), pos_integer()}}
+          | {:error, {:migration_failed, Block.id(), term()}}
 end
 ```
 
