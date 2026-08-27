@@ -8,12 +8,14 @@ defmodule StatifierBlocks.BlockTypeFixtures do
   exist only to cover two of the four `fixtures/0` spellings amendment 9a
   names that `Toy`'s atom-keyed map cannot demonstrate on its own.
 
-  `palette/0` returns the plain `%{type_name => module}` map phase 1 needs.
-  `StatifierBlocks.Palette` does not exist yet in this phase; phase 2 adds
-  a `Palette`-returning helper beside this one.
+  `raw_palette/0` returns the plain `%{type_name => module}` map phase 1
+  needed, kept for anything that wants the bare map. `palette/0` (phase 2)
+  wraps the same map in a `StatifierBlocks.Palette`, which is what every
+  phase-2-and-later test should reach for.
   """
 
   alias StatifierBlocks.Block
+  alias StatifierBlocks.Palette
 
   defmodule Toy do
     @moduledoc """
@@ -192,15 +194,20 @@ defmodule StatifierBlocks.BlockTypeFixtures do
   end
 
   @doc """
-  The plain `%{type_name => module}` map phase 1 needs. `Palette` does not
-  exist yet in this phase; phase 2 adds a `Palette`-returning helper
-  beside this one.
+  The plain `%{type_name => module}` map underlying `palette/0`.
   """
-  @spec palette() :: %{Block.type_name() => module()}
-  def palette do
+  @spec raw_palette() :: %{Block.type_name() => module()}
+  def raw_palette do
     %{
       "toy.score" => Toy,
       "toy.minimal" => Minimal
     }
   end
+
+  @doc """
+  A `StatifierBlocks.Palette` built from `raw_palette/0`, for tests that
+  exercise `Palette.fetch/2` and beyond.
+  """
+  @spec palette() :: Palette.t()
+  def palette, do: Palette.new(raw_palette())
 end
