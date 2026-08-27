@@ -65,7 +65,7 @@ defmodule StatifierBlocks.Edit do
   this is a real arm, not a dead one.
   """
 
-  alias StatifierBlocks.{Block, Document}
+  alias StatifierBlocks.{Block, BlockType, Document, Palette}
 
   @typedoc "A position, not a block. ADR-0001 decision 5's path element."
   @type target :: {Block.id(), Block.slot_name(), non_neg_integer()}
@@ -135,6 +135,51 @@ defmodule StatifierBlocks.Edit do
     with {:ok, block} <- find_block(document, id) do
       new_document = replace_at_id(document, id, %{block | config: config})
       {:ok, new_document, {:update_config, id, block.config}}
+    end
+  end
+
+  @doc """
+  ADR-0005 decision 9's config gate. `apply/2` above is purely structural
+  and cannot ask a block type whether a config is valid; this is where that
+  question actually gets asked, one layer up from the structural rewrite
+  and one layer below `Edit.History`, which is the only caller (see its
+  moduledoc).
+
+  `:ok` for the three commands that are not `:update_config` - they never
+  touch a block's config, so there is nothing for a block type to validate.
+  For an `:update_config`, resolves the named block's current type through
+  `palette` and runs its `validate_config/1` against the **candidate**
+  config the command carries (not the block's current config - that one
+  already validated, or the block would not exist in a valid document).
+
+  Also `:ok` when the block does not resolve through `palette` at all -
+  unknown type, too-new version, or a failed migration. There is no
+  authority to consult in that case, and ADR-0005 decision 12 already
+  forbids the editor from offering a config form for an unresolvable
+  block's config in the first place; refusing here would be this function
+  inventing a rule that belongs to the editor, not restating one. The same
+  `:ok` covers a block id `apply/2` will itself refuse as
+  `{:no_such_block, id}` - there is no config to check, and this function
+  is not the one that reports that error.
+  """
+  @spec check_config(Palette.t(), Document.t(), t()) ::
+          :ok | {:error, {:invalid_config, Block.id(), [BlockType.finding()]}}
+  def check_config(%Palette{}, %Document{}, {tag, _, _})
+      when tag in [:insert, :move] do
+    :ok
+  end
+
+  def check_config(%Palette{}, %Document{}, {:remove, _id}), do: :ok
+
+  def check_config(%Palette{} = palette, %Document{} = document, {:update_config, id, config}) do
+    with {:ok, block} <- find_block(document, id),
+         {:ok, module, _resolved_block} <- Palette.resolve(palette, block) do
+      case module.validate_config(config) do
+        :ok -> :ok
+        {:error, findings} -> {:error, {:invalid_config, id, findings}}
+      end
+    else
+      _error -> :ok
     end
   end
 
