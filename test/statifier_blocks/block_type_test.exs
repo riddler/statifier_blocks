@@ -42,6 +42,8 @@ defmodule StatifierBlocks.BlockTypeTest do
   end
 
   describe "Toy exercises every one of the nine callbacks" do
+    # sabotage: change Toy's fallback `slots/1` clause to return the review
+    # slot too -> the `Toy.slots(%{}) == []` assertion goes red
     test "slots/1 returns the review slot only when review_below is present" do
       assert Toy.slots(%{"review_below" => 50}) == [
                {"review", :at_least_one, "If the score is below the floor"}
@@ -50,6 +52,8 @@ defmodule StatifierBlocks.BlockTypeTest do
       assert Toy.slots(%{}) == []
     end
 
+    # sabotage: change Toy's `review_fields(_)` fallback to return the
+    # review_below field unconditionally -> the base_keys assertion goes red
     test "config_schema/1 adds the review_below field only when configured" do
       base_keys = Toy.config_schema(%{}) |> Enum.map(& &1.key)
       assert base_keys == ["model", "assign_to"]
@@ -58,10 +62,14 @@ defmodule StatifierBlocks.BlockTypeTest do
       assert with_review_keys == ["model", "assign_to", "review_below"]
     end
 
+    # sabotage: drop "lead_v3" from Toy's `check_model/2` accepted list ->
+    # the valid config gains a "model" finding and :ok goes red
     test "validate_config/1 returns :ok for a valid config" do
       assert Toy.validate_config(%{"model" => "lead_v3", "assign_to" => "score"}) == :ok
     end
 
+    # sabotage: widen Toy's `check_floor/2` bound guard from `n in 0..100`
+    # to any integer -> the "review_below" finding disappears -> red
     test "validate_config/1 returns findings for an invalid config" do
       assert {:error, findings} =
                Toy.validate_config(%{
@@ -75,34 +83,47 @@ defmodule StatifierBlocks.BlockTypeTest do
       assert {"review_below", _} = List.keyfind(findings, "review_below", 0)
     end
 
+    # sabotage: change Toy's `current_version/0` to 3 -> red
     test "current_version/0 is 2" do
       assert Toy.current_version() == 2
     end
 
+    # sabotage: drop `context` from Toy's emit/2 marker tuple, leaving
+    # `{:ok, {:emitted, id}}` -> red
     test "emit/2 returns a marker tuple carrying the block id and context" do
       block = %StatifierBlocks.Block{id: "blk_1", type: "toy.score"}
       assert Toy.emit(block, :some_context) == {:ok, {:emitted, "blk_1", :some_context}}
     end
 
+    # sabotage: change Toy's `io/1` to return empty consumes/produces
+    # lists -> red
     test "io/1 declares consumed and produced terms" do
       assert Toy.io(%{}) == %{consumes: ["record"], produces: ["score"]}
     end
 
+    # sabotage: have Toy's `migrate_config(1, _)` put the value back under
+    # "field" instead of "assign_to" -> red
     test "migrate_config/2 renames field to assign_to from version 1" do
       assert Toy.migrate_config(1, %{"field" => "lead_score"}) ==
                {:ok, %{"assign_to" => "lead_score"}}
     end
 
+    # sabotage: drop the source version from Toy's catch-all migrate_config
+    # error, leaving a bare `{:error, :no_migration_from}` -> red
     test "migrate_config/2 errors for an unknown source version" do
       assert Toy.migrate_config(3, %{}) == {:error, {:no_migration_from, 3}}
     end
 
+    # sabotage: spell Toy's `datasets:` bundle key as `"datasets" =>` ->
+    # `Map.has_key?(bundle, :datasets)` goes red
     test "fixtures/0 returns an atom-keyed bundle" do
       bundle = Toy.fixtures()
       assert Map.has_key?(bundle, :datasets)
       assert Map.has_key?(bundle, :expressions)
     end
 
+    # sabotage: change Toy's `palette_entry/0` label to any other string
+    # -> red
     test "palette_entry/0 returns presentation metadata" do
       assert Toy.palette_entry() == %{label: "Score record", group: "Enrichment"}
     end
@@ -114,6 +135,9 @@ defmodule StatifierBlocks.BlockTypeTest do
       :ok
     end
 
+    # sabotage: delete Minimal's `emit/2` clause -> the module stops
+    # exporting it and this test goes red (the missing @impl also trips
+    # warnings-as-errors, which is red by another road)
     test "the five required callbacks are exported" do
       assert function_exported?(Minimal, :slots, 1)
       assert function_exported?(Minimal, :config_schema, 1)
@@ -122,6 +146,7 @@ defmodule StatifierBlocks.BlockTypeTest do
       assert function_exported?(Minimal, :emit, 2)
     end
 
+    # sabotage: give Minimal an `io/1` clause -> the first refute goes red
     test "the four optional callbacks are absent" do
       refute function_exported?(Minimal, :io, 1)
       refute function_exported?(Minimal, :migrate_config, 2)
@@ -131,6 +156,8 @@ defmodule StatifierBlocks.BlockTypeTest do
   end
 
   describe "closed sets" do
+    # sabotage: change Toy's review slot arity from `:at_least_one` to an
+    # invented `:one_or_more` -> red
     test "every slot_decl arity Toy returns is drawn from the closed set" do
       for config <- [%{}, %{"review_below" => 50}] do
         for {_name, arity, _label} <- Toy.slots(config) do
@@ -145,6 +172,8 @@ defmodule StatifierBlocks.BlockTypeTest do
     defp closed_field_type?({:list, inner}), do: closed_field_type?(inner)
     defp closed_field_type?(_type), do: false
 
+    # sabotage: change the review_below field's `type: :integer` to an
+    # invented `type: :money` -> red
     test "every field_decl type Toy returns is drawn from the closed set" do
       for config <- [%{}, %{"review_below" => 50}] do
         for field <- Toy.config_schema(config) do
@@ -153,6 +182,8 @@ defmodule StatifierBlocks.BlockTypeTest do
       end
     end
 
+    # sabotage: change `closed_field_type?/1`'s catch-all clause to return
+    # true -> both refutes go red
     test "a non-closed field type is correctly rejected by the recursive check" do
       refute closed_field_type?({:list, {:map, %{}}})
       refute closed_field_type?(:money)
@@ -176,22 +207,31 @@ defmodule StatifierBlocks.BlockTypeTest do
   end
 
   describe "fixtures/0 spellings" do
+    # sabotage: spell Toy's `datasets:` bundle key as `"datasets" =>` ->
+    # the bundle mixes key kinds and the all-atoms assertion goes red
     test "Toy's fixtures/0 is atom-keyed only" do
       bundle = Toy.fixtures()
       assert Enum.all?(Map.keys(bundle), &is_atom/1)
       refute Enum.any?(Map.keys(bundle), &is_binary/1)
     end
 
+    # sabotage: spell StringKeyedFixtures' bundle `%{"version" => 1,
+    # datasets: %{}}` (one atom key, shorthand last so it still parses) ->
+    # the all-strings assertion goes red
     test "StringKeyedFixtures.fixtures/0 is string-keyed only" do
       bundle = StringKeyedFixtures.fixtures()
       assert Enum.all?(Map.keys(bundle), &is_binary/1)
       refute Enum.any?(Map.keys(bundle), &is_atom/1)
     end
 
+    # sabotage: have PathFixtures.fixtures/0 return a map instead of the
+    # path binary -> red
     test "PathFixtures.fixtures/0 is a binary path" do
       assert is_binary(PathFixtures.fixtures())
     end
 
+    # sabotage: spell Toy's `datasets:` bundle key as `"datasets" =>` ->
+    # that bundle is neither all-atom nor all-string and this goes red
     test "no constructible bundle mixes atom and string top-level keys" do
       for bundle <- [Toy.fixtures(), StringKeyedFixtures.fixtures()] do
         keys = Map.keys(bundle)
@@ -212,10 +252,14 @@ defmodule StatifierBlocks.BlockTypeTest do
       end)
     end
 
+    # sabotage: spell the `statifier-ui` mention in block_type.ex's
+    # fixtures/0 @doc with an underscore -> red
     test "block_type.ex never mentions statifier_ui" do
       refute read_files(@lib_files) =~ "statifier_ui"
     end
 
+    # sabotage: add an `Application.get_env(:statifier_blocks, :x)` mention
+    # anywhere in block_type.ex -> red
     test "no purity-violating calls appear in the new lib/test-support files" do
       forbidden = ~r/
         Application\.(get|fetch)_env |
@@ -237,6 +281,8 @@ defmodule StatifierBlocks.BlockTypeTest do
       refute read_files(@lib_and_support_files) =~ forbidden
     end
 
+    # sabotage: put a bead id back into a block_type.ex @doc, as ADR-0002's
+    # own sketch spells it -> red
     test "lib/ carries no bead ids or pull-request numbers" do
       forbidden = ~r/\bs(b|t|ui|p|ob)-[a-z0-9]{3,4}\b|PR #[0-9]/
 
