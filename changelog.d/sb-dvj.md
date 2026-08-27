@@ -1,5 +1,0 @@
-### Added
-
-- `StatifierBlocks.BlockType` behaviour: the nine-callback authoring-time extension seam (ADR-0002), five required (`slots/1`, `config_schema/1`, `validate_config/1`, `current_version/0`, `emit/2`) and four optional (`io/1`, `migrate_config/2`, `fixtures/0`, `palette_entry/0`).
-- `StatifierBlocks.Palette`: a caller-supplied `type_name => module` value (ADR-0002 decision 2), with `new/1` to build one and a total `fetch/2` that returns `{:ok, module}` or `{:error, {:unknown_block_type, type_name}}` and never raises (ADR-0002 decision 3).
-- `StatifierBlocks.Palette.resolve/2`: resolves a block through the palette and migrates its config in memory when the stored `type_version` is below the type's `current_version/0` (ADR-0002 decision 8). Migration is applied to the returned struct only and never written back to a document; a stored version above `current_version/0` hard-errors as `{:error, {:block_type_too_new, id, version}}` rather than reading best-effort, and a failing or missing `migrate_config/2` surfaces as `{:error, {:migration_failed, id, reason}}`.
