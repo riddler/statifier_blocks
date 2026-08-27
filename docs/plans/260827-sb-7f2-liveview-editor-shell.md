@@ -142,6 +142,42 @@ gate rather than a review.
 - **Re-skinning existing examples.** `sb-xln` owns that sweep. New examples in
   this bead use a signup wizard with A/B testing, or card processing.
 
+## Open questions
+
+Three things this bead found and did not fix, recorded here so they are
+enumerable rather than living only in a PR body. None of them is this bead's
+to decide, and each names the record or module that owns it.
+
+- **`Assignability.valid_targets/4` raises on the document root.**
+  `Document.fetch_path/2` answers `{:ok, []}` for the root, and
+  `vacated_seam_finding/4` calls `List.last/1` on that path without handling
+  the empty case - so `Edit.Targets.droppable_slots/3` raises a `MatchError`
+  for the root id. `StatifierBlocks.Editor` guards around it (the root is
+  neither draggable nor deletable, and the enumeration is skipped for it,
+  which is the right behaviour even once this is fixed), but the pure
+  function is still unsafe for any other caller. Owned by the bead behind
+  ADR-0003, not by this one.
+
+- **A `field_decl`'s `key` does not always address the value it edits.**
+  ADR-0002 decision 7 and ADR-0005 decision 9 relate the two as
+  `config[key]`, and every field this package ships obeys that except
+  `Core.Branch`'s per-arm `:expression` fields, which are keyed by the arm's
+  slot name while the condition lives at `config["arms"][i]["cond"]`. Branch
+  conditions therefore render empty and cannot be edited. Inferring "a key
+  shaped like `arm_*` means reach into the `arms` list" would be the editor
+  branching on a block type's internals - the operator pre-decision ADR-0005
+  exists to hold - so the gap is recorded in
+  `StatifierBlocks.Editor.ConfigForm`'s moduledoc and left to the record that
+  owns the callback. `decode/3` starts from the block's current config, so
+  nothing is lost meanwhile.
+
+- **Where the `Compiler.Finding` -> `StatifierBlocks.Finding` adapter goes.**
+  `sb-ia5` suggested this bead. It is not this bead: decisions 6-8 and 10-14
+  never wire a compile result into the editor, and decision 15 defers the
+  SCXML/preview pane that would be its natural caller. `ViewModel.build/3`
+  already takes caller-supplied findings, so the adapter stays purely
+  additive whenever its own bead is filed.
+
 ## Phases
 
 1. Dependency shape and the headless proof: `mix.exs`, `.gitignore`, the CI
