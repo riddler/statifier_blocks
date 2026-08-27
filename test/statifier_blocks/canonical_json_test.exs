@@ -170,6 +170,10 @@ defmodule StatifierBlocks.CanonicalJsonTest do
       assert Document.content_hash(build.()) == Document.content_hash(build.())
     end
 
+    # sabotage: drop `maybe_put(pairs, "config", block.config)` in
+    # `value/1`'s block clause so `config` is never encoded -> the two
+    # documents below differ only in `config` and would encode to
+    # identical bytes -> red
     test "differs when any one field differs" do
       base =
         Document.new(Block.new("core.wait", id: "blk_leaf", config: %{"a" => 1}),
