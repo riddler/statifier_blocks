@@ -30,6 +30,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
+    alias StatifierBlocks.BlockType
     alias StatifierBlocks.Editor.Field
     alias StatifierBlocks.ViewModel
 
@@ -82,24 +83,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       * **A field whose control did not post keeps the value it had.** A
         partially rendered form does not blank out the fields it did not show.
 
-    ## Known gap: a field whose key does not address its value
+    ## Where a decoded value is written
 
-    This function writes `config[field.key]`, and `StatifierBlocks.ViewModel`
-    reads the same place to fill the control. That is the whole of the
-    relationship ADR-0002 decision 7 and ADR-0005 decision 9 describe between
-    a `field_decl`'s `key` and the value it edits, and it holds for every
-    field type this package ships **except one**: `Core.Branch.config_schema/1`
-    declares one `:expression` field per arm, keyed by the arm's own slot
-    name, while the condition it edits lives at `config["arms"][i]["cond"]`.
-    So a branch's condition fields render empty and are not editable here.
-
-    That is a gap in the block type's own contract rather than something this
-    component may paper over - inferring "a key of the form `arm_*` means
-    reach into the `arms` list" would be the editor branching on a block
-    type's internals, which is exactly the operator pre-decision ADR-0005
-    exists to hold. It is reported against the records that own it. What this
-    function guarantees in the meantime is the part that matters: the `arms`
-    key survives every edit, so nothing is lost while the contract is settled.
+    A field's `key` names its control; where the value goes is the field's
+    `value_path` (ADR-0002 decision 7, amended 2026-08-27), which is `[key]`
+    unless the block type said otherwise. `Core.Branch` is the one core type
+    that says otherwise: its per-arm condition fields keep their slot-name
+    keys and declare `["arms", i, "cond"]`, so a branch's conditions are
+    editable here without this component ever inferring anything from the
+    shape of a key. Writing through the path is also what stops a top-level
+    `config["arm_approved"]` from accumulating beside the arm the author
+    actually edited.
     """
     @spec decode([ViewModel.Field.t()], map(), StatifierBlocks.Block.config()) ::
             StatifierBlocks.Block.config()
@@ -107,10 +101,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       posted = Map.get(params, "config", %{})
 
       Enum.reduce(fields, base, fn %ViewModel.Field{} = field, config ->
-        case Map.fetch(posted, field.key) do
-          {:ok, raw} -> Map.put(config, field.key, Field.decode(field.type, raw))
-          :error -> Map.put(config, field.key, field.value)
-        end
+        value =
+          case Map.fetch(posted, field.key) do
+            {:ok, raw} -> Field.decode(field.type, raw)
+            :error -> field.value
+          end
+
+        BlockType.put_value(config, ViewModel.Field.value_path(field), value)
       end)
     end
 

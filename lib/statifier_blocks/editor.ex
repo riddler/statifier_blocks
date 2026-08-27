@@ -72,7 +72,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.LiveComponent
 
-    alias StatifierBlocks.{Block, Document, Edit, Finding, Palette, ViewModel}
+    alias StatifierBlocks.{Block, BlockType, Document, Edit, Finding, Palette, ViewModel}
     alias StatifierBlocks.Edit.{History, Targets}
     alias StatifierBlocks.Editor.{Canvas, ConfigForm, Findings, PaletteBrowser}
 
@@ -376,17 +376,29 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # `key` arrives from the row's `phx-value-key`, which is the field's
+    # identity rather than its address - so the rows are read and written
+    # through the field's own `value_path` (ADR-0002 decision 7, amended
+    # 2026-08-27), the same place the form's other writes go. A key naming
+    # no field in the selected block's schema edits nothing, which is the
+    # same crafted-payload guard `ConfigForm.decode/3` applies.
     @spec update_list(Phoenix.LiveView.Socket.t(), String.t(), ([term()] -> [term()])) ::
             Phoenix.LiveView.Socket.t()
     defp update_list(socket, key, fun) do
-      case socket.assigns.selected_id do
-        nil ->
-          socket
+      with id when not is_nil(id) <- socket.assigns.selected_id,
+           %ViewModel.Field{} = field <- Enum.find(fields_for(socket, id), &(&1.key == key)) do
+        config = effective_config(socket, id)
+        path = ViewModel.Field.value_path(field)
 
-        id ->
-          config = effective_config(socket, id)
-          rows = config |> Map.get(key, []) |> List.wrap()
-          change_config(socket, id, Map.put(config, key, fun.(rows)))
+        rows =
+          case BlockType.fetch_value(config, path) do
+            {:ok, value} -> List.wrap(value)
+            :error -> []
+          end
+
+        change_config(socket, id, BlockType.put_value(config, path, fun.(rows)))
+      else
+        _none -> socket
       end
     end
 

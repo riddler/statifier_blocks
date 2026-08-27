@@ -174,6 +174,42 @@ defmodule StatifierBlocks.ViewModelTest do
       assert length(before_node.form.fields) == 1
       assert length(after_node.form.fields) == 2
     end
+
+    # sabotage: in `build_fields/3`, read `Map.get(config, key, default)`
+    # rather than `value_at/3` - a branch arm's condition comes back as the
+    # empty default, which is the "renders empty" half of the defect
+    # ADR-0002 decision 7's `value_path` amendment fixes.
+    test "a field with a value_path carries the value at that path" do
+      branch =
+        Block.new("core.branch",
+          id: "blk_BR",
+          config: %{
+            "arms" => [
+              %{"slot" => "arm_a", "cond" => "budget > 0"},
+              %{"slot" => "arm_b"}
+            ]
+          }
+        )
+
+      node = branch |> document_with() |> build() |> find_node("blk_BR")
+
+      assert [
+               %Field{key: "arm_a", value: "budget > 0", value_path: ["arms", 0, "cond"]},
+               %Field{key: "arm_b", value: "", value_path: ["arms", 1, "cond"]}
+             ] = node.form.fields
+    end
+
+    # sabotage: have `Field.value_path/1` return the struct field unchanged -
+    # an ordinary field answers `nil` and every caller has to branch on it.
+    test "a field without one addresses its own key" do
+      group = Block.new("core.resumable_group", id: "blk_RG", config: %{"history" => "deep"})
+
+      [field] =
+        group |> document_with() |> build() |> find_node("blk_RG") |> then(& &1.form.fields)
+
+      assert field.value_path == nil
+      assert Field.value_path(field) == ["history"]
+    end
   end
 
   describe "d11 routing" do
