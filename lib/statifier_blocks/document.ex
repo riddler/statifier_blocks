@@ -8,7 +8,7 @@ defmodule StatifierBlocks.Document do
   later phases of the same bead.
   """
 
-  alias StatifierBlocks.{Block, Validation}
+  alias StatifierBlocks.{Block, CanonicalJson, Validation}
 
   @typedoc ~S(`"bdoc_" <> uxid`.)
   @type id :: String.t()
@@ -111,4 +111,32 @@ defmodule StatifierBlocks.Document do
   """
   @spec validate(t()) :: :ok | {:error, Validation.error()}
   def validate(%__MODULE__{} = document), do: Validation.validate(document)
+
+  @doc """
+  Canonical JSON per ADR-0001 decision 8. Deterministic: sorted object keys,
+  no insignificant whitespace, empty `slots`/`config`/`metadata` omitted, no
+  floats.
+
+  Runs `validate/1` first and raises `ArgumentError` carrying the validation
+  reason when it fails, so an invalid document can never produce bytes that
+  claim to be canonical.
+  """
+  @spec to_json(t()) :: binary()
+  def to_json(%__MODULE__{} = document) do
+    case validate(document) do
+      :ok ->
+        document
+        |> CanonicalJson.encode()
+        |> IO.iodata_to_binary()
+
+      {:error, reason} ->
+        raise ArgumentError, "cannot encode an invalid document: #{inspect(reason)}"
+    end
+  end
+
+  @doc "SHA-256 over `to_json/1`. Stable document identity."
+  @spec content_hash(t()) :: binary()
+  def content_hash(%__MODULE__{} = document) do
+    "sha256:" <> Base.encode16(:crypto.hash(:sha256, to_json(document)), case: :lower)
+  end
 end

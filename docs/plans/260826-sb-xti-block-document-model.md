@@ -507,24 +507,24 @@ fail if the encoder ever leaned on map iteration order instead of sorting.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Full gate green: `mix quality`
-- [ ] `to_json(DocumentFixtures.worked_example()) ==
+- [x] Full gate green: `mix quality`
+- [x] `to_json(DocumentFixtures.worked_example()) ==
       DocumentFixtures.worked_example_json()` - byte equality, the headline
       acceptance test
-- [ ] The fixture bytes contain no `\n`, and no `" "` outside a JSON string
-- [ ] Key-sort tests: a document whose `metadata`, `config` and `slots` maps
+- [x] The fixture bytes contain no `\n`, and no `" "` outside a JSON string
+- [x] Key-sort tests: a document whose `metadata`, `config` and `slots` maps
       are built in reverse-sorted insertion order encodes with sorted keys
-- [ ] Omission tests: a leaf block emits no `"slots"` key; an empty `config`
+- [x] Omission tests: a leaf block emits no `"slots"` key; an empty `config`
       emits no `"config"` key; empty `metadata` emits no `"metadata"` key; a
       block with one empty and one non-empty slot emits only the non-empty one
-- [ ] Escaping tests: quote, backslash, newline, tab, a control character
+- [x] Escaping tests: quote, backslash, newline, tab, a control character
       (U+0001), and a multi-byte UTF-8 string round-trip through
       `JSON.decode/1` back to the input value
-- [ ] Sort-order test with non-ASCII keys, asserting UTF-8 **byte** order
+- [x] Sort-order test with non-ASCII keys, asserting UTF-8 **byte** order
       rather than codepoint-collation order
-- [ ] `content_hash/1` is equal for two independently built equal documents
+- [x] `content_hash/1` is equal for two independently built equal documents
       and differs when any one field differs
-- [ ] `to_json/1` raises `ArgumentError` (not `FunctionClauseError`) for a
+- [x] `to_json/1` raises `ArgumentError` (not `FunctionClauseError`) for a
       document carrying a float
 
 #### Manual Verification:
@@ -803,6 +803,17 @@ advancement and the Manual items defer to `/wurk:verify`.
       arm per distinguishable cause" and no two distinguishable causes
       collapse into one arm
 - [ ] No rescue-to-default anywhere in the module (`CLAUDE.md` convention)
+
+**Implementation Note**: as phase 1.
+
+---
+
+### Phase 3
+
+- [ ] Every new test carries its sabotage mutation note, verified by hand
+- [ ] The fixture is a faithful minification of ADR-0001's worked example -
+      read them side by side; no key added, dropped, reordered or retyped
+- [ ] The encoder never calls `JSON.encode!/1` on a map or a list
 
 **Implementation Note**: as phase 1.
 
