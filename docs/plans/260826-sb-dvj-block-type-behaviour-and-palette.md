@@ -635,19 +635,19 @@ name.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Full gate green: `mix quality`
-- [ ] `fetch/2` returns `{:ok, Toy}` for a name the palette carries
-- [ ] `fetch/2` returns `{:error, {:unknown_block_type, "myapp.retired"}}`
+- [x] Full gate green: `mix quality`
+- [x] `fetch/2` returns `{:ok, Toy}` for a name the palette carries
+- [x] `fetch/2` returns `{:error, {:unknown_block_type, "myapp.retired"}}`
       for a name it does not, with the offending name carried in the tuple
-- [ ] `fetch/2` returns a value and raises for none over a table of hostile
+- [x] `fetch/2` returns a value and raises for none over a table of hostile
       type names (the empty string, a binary that is not valid UTF-8, a very
       long binary), and over an empty palette
-- [ ] `new/0` and `new/1` produce `%Palette{types: %{}}` and
+- [x] `new/0` and `new/1` produce `%Palette{types: %{}}` and
       `%Palette{types: given}` respectively
-- [ ] `grep -rn "Application.get_env\|:ets\.\|Process.whereis\|GenServer\|Agent\|:persistent_term"
+- [x] `grep -rn "Application.get_env\|:ets\.\|Process.whereis\|GenServer\|Agent\|:persistent_term"
       lib/statifier_blocks/palette.ex` returns nothing - decision 2's
       no-global-state rule, machine-checked
-- [ ] Two palettes built in the same test with different modules under the
+- [x] Two palettes built in the same test with different modules under the
       same type name both resolve to their own module - the multi-tenant
       property decision 2 names, which a global registry would break
 
@@ -1010,5 +1010,18 @@ before considering the plan fully landed.
 full `mix quality` as the phase gate. In interactive execution pause here for
 the human; in `--loop` execution the Automated Verification block gates
 advancement and the Manual items defer to `/wurk:verify`.
+
+---
+
+### Phase 2
+
+- [ ] Every new test carries its sabotage mutation note, verified by hand
+- [ ] The struct and `t/0` are a character-faithful transcription of
+      ADR-0002 lines 392-394
+- [ ] The moduledoc states all four of decision 2's prohibitions explicitly,
+      not a summary of them
+- [ ] No rescue-to-default anywhere in the module (`CLAUDE.md` convention)
+
+**Implementation Note**: as phase 1.
 
 ---
