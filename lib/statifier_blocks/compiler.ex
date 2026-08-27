@@ -23,20 +23,49 @@ defmodule StatifierBlocks.Compiler do
      `StatifierBlocks.Palette.resolve/2`, which also applies an in-memory
      config migration (ADR-0002 decision 8). Nothing is written back.
   3. **Config** - every block's `validate_config/1`.
-  4. **Emit** - bottom-up. Each block's `emit/2` is called with its
-     children already compiled and summarized, and its child placeholders
+  4. **Structure** - `StatifierBlocks.Assignability.validate/3`: may this
+     block land in this slot, by kind tag and by data-flow type
+     (ADR-0003)?
+  5. **Emit** - bottom-up. Each block's `emit/2` is called with its
+     children already compiled and summarized, its emission is attributed
+     (`StatifierBlocks.Compiler.Attribution`), and its child placeholders
      are spliced with those children's own emissions.
-  5. **Serialize** - once, at the end, through
-     `StatifierBlocks.Compiler.Serializer`, then
-     `Statifier.Machine.Identity.of_source/2` over the bytes just written.
+  6. **Chart** - serialize once through
+     `StatifierBlocks.Compiler.Serializer`, which writes the bytes and the
+     provenance map together, then run those bytes through
+     `Statifier.compile/2` and map every finding back through provenance
+     (`StatifierBlocks.Compiler.Chart`).
 
-  The `Structure` stage decision 10 names - slot arity, `:undeclared_slot`,
-  assignability - is **not** in this list. `sb-da9` owns the first two and
-  `sb-b3t` shipped `StatifierBlocks.Assignability.validate/3` for the
-  third; wiring them in as a stage between Config and Emit is sb-qz0's,
-  alongside the rest of decision 10. Until then this pipeline simply never
-  visits a slot `slots/1` did not declare, so an undeclared slot's blocks
-  are absent from the emission rather than misplaced in it.
+  Findings from every stage are reported in document order over blocks -
+  `StatifierBlocks.Document.blocks/1`'s pre-order - which is how upstream's
+  own document-order sort survives the trip.
+
+  ### The Structure stage is not yet whole
+
+  Decision 10's table names three things in this stage: slot **arity**,
+  `:undeclared_slot`, and assignability. Only the third runs here.
+  Palette-aware arity and undeclared-slot validation is **`sb-da9`'s**,
+  filed and unworked; this module draws the seam and leaves it empty
+  rather than growing a second implementation of ADR-0002 decision 6's
+  rules beside the one that bead will ship. Until it lands the pipeline
+  simply never visits a slot `slots/1` did not declare, so an undeclared
+  slot's blocks are absent from the emission rather than misplaced in it -
+  which is a silent drop, and exactly what `sb-da9` exists to make loud.
+
+  ## Options
+
+    * `:known_invoke_types` - decision 8's opt-in lint. A set (or list) of
+      invoke types the caller believes will be registered; every emitted
+      type absent from it becomes a **warning**, never an error. See
+      `StatifierBlocks.Compiler.InvokeTypes`.
+    * `:entry_type` - ADR-0003 decision 4's caller-supplied context: the
+      type flowing into the document's root. Defaults to absent, which
+      `StatifierBlocks.Assignability` reads as `:unknown`. ADR-0004's own
+      typespec lists only the first option, because it delegated
+      assignability wholesale to ADR-0003 (decision 11) without noticing
+      that ADR-0003's context is caller-supplied and therefore has to
+      arrive through this function. This is that arrival, not a second
+      decision about what assignability means.
 
   ## Determinism (decision 6)
 
@@ -61,15 +90,25 @@ defmodule StatifierBlocks.Compiler do
   alias Statifier.Machine.Identity
 
   alias StatifierBlocks.{
+    Assignability,
     Block,
     CompilationRecord,
     Compiled,
     Document,
     Emission,
-    Palette
+    Palette,
+    Provenance
   }
 
-  alias StatifierBlocks.Compiler.{Context, Finding, Serializer, StateId}
+  alias StatifierBlocks.Compiler.{
+    Attribution,
+    Chart,
+    Context,
+    Finding,
+    InvokeTypes,
+    Serializer,
+    StateId
+  }
 
   @scxml_ns "http://www.w3.org/2005/07/scxml"
 
@@ -96,22 +135,34 @@ defmodule StatifierBlocks.Compiler do
     defstruct [:block, :module, :slots]
   end
 
+  @typedoc """
+  `:known_invoke_types` enables decision 8's optional two-registry lint;
+  `:entry_type` is ADR-0003 decision 4's caller-supplied context. See the
+  moduledoc.
+  """
+  @type option ::
+          {:known_invoke_types, Enumerable.t()}
+          | {:entry_type, Assignability.type_expr() | :unknown}
+
   @doc """
   Compiles `document` against `palette`.
 
-  `opts` is accepted and currently unread. Decision 8's
-  `:known_invoke_types` lint lands with sb-qz0; taking the option now keeps
-  that a behaviour change rather than an arity change at every call site.
+  Total: `{:ok, %StatifierBlocks.Compiled{}}` or
+  `{:error, [%StatifierBlocks.Compiler.Finding{}]}`, never a raise and
+  never a partial success. Errors come from the first failing stage only
+  (decision 10); warnings ride on the artifact when the compile succeeds.
   """
-  @spec compile(Document.t(), Palette.t(), keyword()) ::
+  @spec compile(Document.t(), Palette.t(), [option()]) ::
           {:ok, Compiled.t()} | {:error, [Finding.t()]}
   def compile(%Document{} = document, %Palette{} = palette, opts \\ []) when is_list(opts) do
     with :ok <- document_stage(document),
          {:ok, node} <- resolve_stage(document, palette),
          :ok <- config_stage(node),
+         :ok <- structure_stage(document, palette, opts),
          {:ok, emission} <- emit_stage(node, document.id) do
-      {:ok, artifact(document, node, emission)}
+      chart_stage(document, node, emission, opts)
     end
+    |> in_document_order(document)
   end
 
   @doc "Decision 6's third determinism input: this package's version."
@@ -257,7 +308,51 @@ defmodule StatifierBlocks.Compiler do
       Enum.flat_map(slots, fn {_name, children} -> Enum.flat_map(children, &config_findings/1) end)
   end
 
-  # -- Stage 4: emit ---------------------------------------------------------
+  # -- Stage 4: structure ----------------------------------------------------
+
+  # Assignability only. Slot arity and `:undeclared_slot` are `sb-da9`'s -
+  # see the moduledoc's seam note. This stage runs over the *document*
+  # rather than the resolved tree because `Assignability.validate/3` is
+  # the one implementation both the editor and the compiler consult
+  # (ADR-0003 decision 6), and the editor has no resolved tree.
+  @spec structure_stage(Document.t(), Palette.t(), keyword()) :: :ok | {:error, [Finding.t()]}
+  defp structure_stage(document, palette, opts) do
+    case Assignability.validate(palette, document, assignability_context(opts)) do
+      :ok -> :ok
+      {:error, findings} -> {:error, Enum.map(findings, &structure_finding/1)}
+    end
+  end
+
+  @spec assignability_context(keyword()) :: Assignability.context()
+  defp assignability_context(opts) do
+    case Keyword.fetch(opts, :entry_type) do
+      {:ok, entry_type} -> %{entry_type: entry_type}
+      :error -> %{}
+    end
+  end
+
+  @spec structure_finding(Assignability.finding()) :: Finding.t()
+  defp structure_finding({:kind_not_admitted, id, parent_id, slot, kinds, accepts} = reason) do
+    Finding.new(
+      :structure,
+      reason,
+      ~s(a #{inspect(kinds)} block cannot go in #{parent_id}'s "#{slot}" slot, ) <>
+        "which admits #{inspect(accepts)}",
+      block_id: id
+    )
+  end
+
+  defp structure_finding({:type_mismatch, id, source, produced, consumed} = reason) do
+    Finding.new(
+      :structure,
+      reason,
+      "this block consumes #{inspect(consumed)} but #{inspect(source)} produces " <>
+        "#{inspect(produced)}",
+      block_id: id
+    )
+  end
+
+  # -- Stage 5: emit ---------------------------------------------------------
 
   @spec emit_stage(Resolved.t(), Document.id()) :: {:ok, Emission.t()} | {:error, [Finding.t()]}
   defp emit_stage(node, document_id) do
@@ -272,9 +367,36 @@ defmodule StatifierBlocks.Compiler do
       context = Context.new(block.id, document_id, summaries(compiled_slots))
 
       case module.emit(block, context) do
-        {:ok, %Emission{} = emission} -> splice(emission, compiled_slots, block)
+        {:ok, %Emission{} = emission} -> attribute(emission, block, compiled_slots)
         {:error, reason} -> {:error, emit_findings(block, reason)}
       end
+    end
+  end
+
+  # Attribution runs on the block's own emission, before its children are
+  # spliced in: each block stamps only what it wrote, and a child's
+  # subtree arrives already stamped from its own pass. That is what makes
+  # the provenance map total by construction (ADR-0004 decision 5) rather
+  # than by a later sweep that would have to guess who emitted what.
+  @spec attribute(Emission.t(), Block.t(), [{Block.slot_name(), [{Block.id(), Emission.t()}]}]) ::
+          {:ok, Emission.t()} | {:error, [Finding.t()]}
+  defp attribute(emission, block, compiled_slots) do
+    known = MapSet.new([block.id | Enum.map(children(compiled_slots), &elem(&1, 0))])
+
+    case Attribution.stamp(emission, block.id, known) do
+      {:ok, stamped} ->
+        splice(stamped, compiled_slots, block)
+
+      {:error, {:unknown_attribution, other} = reason} ->
+        {:error,
+         [
+           Finding.new(
+             :emit,
+             reason,
+             "attributed an element to #{other}, which is not this block or one of its children",
+             block_id: block.id
+           )
+         ]}
     end
   end
 
@@ -323,8 +445,7 @@ defmodule StatifierBlocks.Compiler do
   @spec splice(Emission.t(), [{Block.slot_name(), [{Block.id(), Emission.t()}]}], Block.t()) ::
           {:ok, Emission.t()} | {:error, [Finding.t()]}
   defp splice(emission, compiled_slots, block) do
-    available =
-      Map.new(Enum.flat_map(compiled_slots, fn {_name, children} -> children end))
+    available = Map.new(children(compiled_slots))
 
     case substitute(emission, available) do
       {:ok, spliced} ->
@@ -341,6 +462,12 @@ defmodule StatifierBlocks.Compiler do
            )
          ]}
     end
+  end
+
+  @spec children([{Block.slot_name(), [{Block.id(), Emission.t()}]}]) ::
+          [{Block.id(), Emission.t()}]
+  defp children(compiled_slots) do
+    Enum.flat_map(compiled_slots, fn {_name, children} -> children end)
   end
 
   @spec substitute(Emission.node_t(), %{optional(Block.id()) => Emission.t()}) ::
@@ -392,27 +519,59 @@ defmodule StatifierBlocks.Compiler do
     [Finding.new(:emit, {:emit_refused, reason}, inspect(reason), block_id: id)]
   end
 
-  # -- Stage 5: serialize and record ----------------------------------------
-
+  # The `<scxml>` element belongs to no particular block, so ADR-0004
+  # decision 5 attributes it to the **root block**, which ADR-0001 decision
+  # 1 guarantees exists. That is what makes the provenance map total over
+  # the bytes: the root element's span covers all of them, so no offset in
+  # the generated chart is unowned.
   @spec scxml_element(Resolved.t(), Document.id(), Emission.t()) :: Emission.t()
   defp scxml_element(%Resolved{block: %Block{id: root_id}}, document_id, root_emission) do
-    Emission.element(
-      "scxml",
-      [
-        {"initial", StateId.state_id(root_id)},
-        {"name", document_id},
-        {"version", "1.0"},
-        {"xmlns", @scxml_ns}
-      ],
-      [root_emission]
-    )
+    element =
+      Emission.element(
+        "scxml",
+        [
+          {"initial", StateId.state_id(root_id)},
+          {"name", document_id},
+          {"version", "1.0"},
+          {"xmlns", @scxml_ns}
+        ],
+        [root_emission]
+      )
+
+    %{element | owner: Provenance.owner(root_id)}
   end
 
-  @spec artifact(Document.t(), Resolved.t(), Emission.t()) :: Compiled.t()
-  defp artifact(%Document{} = document, node, emission) do
-    scxml = Serializer.to_binary(emission)
+  # -- Stage 6: chart --------------------------------------------------------
 
-    record = %CompilationRecord{
+  @spec chart_stage(Document.t(), Resolved.t(), Emission.t(), keyword()) ::
+          {:ok, Compiled.t()} | {:error, [Finding.t()]}
+  defp chart_stage(%Document{} = document, node, emission, opts) do
+    {scxml, provenance} = Serializer.serialize(emission)
+    emitted = InvokeTypes.collect(emission)
+
+    with {:ok, warnings} <- Chart.validate(scxml, provenance, document) do
+      {:ok,
+       %Compiled{
+         scxml: scxml,
+         provenance: provenance,
+         record: record(document, node, scxml),
+         invoke_types: InvokeTypes.types(emitted),
+         warnings: warnings ++ lint(emitted, opts)
+       }}
+    end
+  end
+
+  @spec lint([InvokeTypes.emitted()], keyword()) :: [Finding.t()]
+  defp lint(emitted, opts) do
+    case Keyword.fetch(opts, :known_invoke_types) do
+      {:ok, known} -> InvokeTypes.lint(emitted, known)
+      :error -> []
+    end
+  end
+
+  @spec record(Document.t(), Resolved.t(), binary()) :: CompilationRecord.t()
+  defp record(%Document{} = document, node, scxml) do
+    %CompilationRecord{
       document_id: document.id,
       revision: document.revision,
       document_hash: Document.content_hash(document),
@@ -420,8 +579,48 @@ defmodule StatifierBlocks.Compiler do
       compiler_version: @compiler_version,
       chart_identity: Identity.of_source(scxml, chart_name: document.id, chart_version: nil)
     }
+  end
 
-    %Compiled{scxml: scxml, record: record}
+  # -- Findings: paths, and document order ----------------------------------
+
+  # Decision 10 requires every finding to name a block; ADR-0001 decision 5
+  # gives the editor the path to reveal it in the tree without walking the
+  # document. Both are filled in once, here, so no stage has to remember
+  # to - and every stage's findings come out in the same order, which is
+  # `Document.blocks/1`'s pre-order and is how upstream's own
+  # document-order sort survives the trip.
+  @spec in_document_order({:ok, Compiled.t()} | {:error, [Finding.t()]}, Document.t()) ::
+          {:ok, Compiled.t()} | {:error, [Finding.t()]}
+  defp in_document_order({:ok, %Compiled{} = compiled}, document) do
+    {:ok, %{compiled | warnings: order(compiled.warnings, document)}}
+  end
+
+  defp in_document_order({:error, findings}, document) do
+    {:error, order(findings, document)}
+  end
+
+  @spec order([Finding.t()], Document.t()) :: [Finding.t()]
+  defp order(findings, document) do
+    ranks =
+      document
+      |> Document.blocks()
+      |> Enum.with_index()
+      |> Map.new(fn {block, index} -> {block.id, index} end)
+
+    findings
+    |> Enum.map(&locate(&1, document))
+    |> Enum.sort_by(&Map.get(ranks, &1.block_id, -1))
+  end
+
+  @spec locate(Finding.t(), Document.t()) :: Finding.t()
+  defp locate(%Finding{block_id: nil} = finding, _document), do: finding
+  defp locate(%Finding{path: path} = finding, _document) when is_list(path), do: finding
+
+  defp locate(%Finding{block_id: block_id} = finding, document) do
+    case Document.fetch_path(document, block_id) do
+      {:ok, path} -> %{finding | path: path}
+      :error -> finding
+    end
   end
 
   # A digest over the sorted `{type_name, module, current_version}` triples
