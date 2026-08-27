@@ -21,7 +21,7 @@ defmodule StatifierBlocks.AssignabilityFixtures do
   one's subject is ADR-0003's worked example end to end.
   """
 
-  alias StatifierBlocks.{Block, Palette}
+  alias StatifierBlocks.{Assignability, Block, Document, Palette}
 
   defmodule Enrich do
     @moduledoc "`myapp.enrich`: takes a raw record, hands back a lead."
@@ -154,4 +154,39 @@ defmodule StatifierBlocks.AssignabilityFixtures do
   def palette(assignability \\ Widens) do
     Palette.new(Map.merge(Palette.core_types(), host_types()), assignability: assignability)
   end
+
+  @doc """
+  ADR-0003's own worked-example document: the ADR-0001 worked example's
+  root sequence, a `myapp.score` step (`blk_SCR`) added after the enrich,
+  and the resumable group (`blk_GRP`) left with empty `body`/`interrupts`
+  slots - Phase 4's `check/5` table only ever asks about kind admission
+  once inside them, and an empty slot is the total, permissive answer for
+  everything downstream of that. Fixed ids, so a caller can name any
+  position directly:
+
+    * `"blk_ROOT"` - `core.sequence`, `body: [blk_ENR, blk_SCR, blk_GRP]`
+    * `"blk_ENR"` - `myapp.enrich`
+    * `"blk_SCR"` - `myapp.score`
+    * `"blk_GRP"` - `core.resumable_group`, empty `body` and `interrupts`
+
+  Pair with `worked_example_context/0` for the entry type ADR-0003's own
+  table reads from.
+  """
+  @spec worked_example_document() :: Document.t()
+  def worked_example_document do
+    enrich = Block.new("myapp.enrich", id: "blk_ENR")
+    score = Block.new("myapp.score", id: "blk_SCR")
+
+    group =
+      Block.new("core.resumable_group", id: "blk_GRP", slots: %{"body" => [], "interrupts" => []})
+
+    root =
+      Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [enrich, score, group]})
+
+    Document.new(root, id: "bdoc_worked_example")
+  end
+
+  @doc "The entry type ADR-0003's worked example supplies: `\"myapp.record\"`."
+  @spec worked_example_context() :: Assignability.context()
+  def worked_example_context, do: %{entry_type: "myapp.record"}
 end

@@ -244,4 +244,246 @@ defmodule StatifierBlocks.Assignability do
   # single pass.
   @spec find_block(Document.t(), Block.id()) :: Block.t() | nil
   defp find_block(document, id), do: Enum.find(Document.blocks(document), &(&1.id == id))
+
+  @doc """
+  ADR-0003 decision 7's one decision function: kind admission for
+  `candidate` at `target`, plus the seams whose verdict a placement at
+  `target` can change.
+
+  `candidate` not yet in `document` (`Document.fetch_path/2` returns
+  `:error`) is an **insert**: two seams, `inbound_type(target)` against
+  `candidate`'s `consumes`, and `candidate`'s resolved `produces` against
+  the `consumes` of whatever block currently sits at `target`'s index
+  (nothing to check when the slot ends there).
+
+  `candidate` already in `document` is a **move**: the same two seams, plus
+  the seam it vacates - at its current position `{p, s, i}`, removing it
+  makes `i - 1` and `i + 1` adjacent, so the resolved `produces` of the
+  block at `i - 1` (or the slot's own inbound type when `i == 0`) is
+  checked against the `consumes` of the block at `i + 1` (nothing to check
+  when the slot has no `i + 1`).
+
+  Findings are decision 8's vocabulary verbatim, in this order when more
+  than one applies: kind admission first, then the insertion seams, then
+  the vacated seam. `:ok` when the list is empty.
+
+  Degradation, per decision 5: a block that fails `Palette.resolve/2` - the
+  candidate, the parent, or any block on a seam - contributes the
+  permissive default rather than a finding, the same way `io/2` already
+  degrades a module that is not loadable.
+  """
+  @spec check(Palette.t(), Document.t(), target(), Block.t(), context()) ::
+          :ok | {:error, [finding()]}
+  def check(
+        %Palette{} = palette,
+        %Document{} = document,
+        {parent_id, slot, _index} = target,
+        %Block{} = candidate,
+        ctx
+      ) do
+    kind_finding = kind_admission_finding(palette, document, parent_id, slot, candidate)
+    upstream_finding = upstream_seam_finding(palette, document, target, candidate, ctx)
+    downstream_finding = downstream_seam_finding(palette, document, target, candidate, ctx)
+    vacated_finding = vacated_seam_finding(palette, document, candidate, ctx)
+
+    case Enum.reject(
+           [kind_finding, upstream_finding, downstream_finding, vacated_finding],
+           &is_nil/1
+         ) do
+      [] -> :ok
+      findings -> {:error, findings}
+    end
+  end
+
+  # `{module, config}` for `block` through `palette`, or `{nil, %{}}` when
+  # `Palette.resolve/2` fails - the same permissive shape `io/2` already
+  # gives a module that is not loadable, so every primitive below degrades
+  # through the one path.
+  @spec resolve_module_config(Palette.t(), Block.t()) :: {module() | nil, Block.config()}
+  defp resolve_module_config(palette, block) do
+    case Palette.resolve(palette, block) do
+      {:ok, module, resolved} -> {module, resolved.config}
+      {:error, _reason} -> {nil, %{}}
+    end
+  end
+
+  # `parent_id`'s `{module, config}`, or `{nil, %{}}` when no block in
+  # `document` carries it (a permissive default: `admits?/3` then sees
+  # `:any`, which is the total, never-raising reading decision 5 already
+  # establishes for every other absent declaration).
+  @spec resolve_parent(Palette.t(), Document.t(), Block.id()) :: {module() | nil, Block.config()}
+  defp resolve_parent(palette, document, parent_id) do
+    case find_block(document, parent_id) do
+      nil -> {nil, %{}}
+      parent -> resolve_module_config(palette, parent)
+    end
+  end
+
+  # `block`'s declared `consumes`, defaulting to `:unknown` (decision 5)
+  # through the same degradation `resolve_module_config/2` gives.
+  @spec consumes_of(Palette.t(), Block.t()) :: type_expr() | :unknown
+  defp consumes_of(palette, block) do
+    {module, config} = resolve_module_config(palette, block)
+    module |> io(config) |> Map.get(:consumes, :unknown)
+  end
+
+  @spec kind_admission_finding(
+          Palette.t(),
+          Document.t(),
+          Block.id(),
+          Block.slot_name(),
+          Block.t()
+        ) ::
+          finding() | nil
+  defp kind_admission_finding(palette, document, parent_id, slot, candidate) do
+    parent_mc = resolve_parent(palette, document, parent_id)
+    candidate_mc = resolve_module_config(palette, candidate)
+
+    if admits?(parent_mc, slot, candidate_mc) do
+      nil
+    else
+      {parent_module, parent_config} = parent_mc
+      {candidate_module, candidate_config} = candidate_mc
+      accepts = slot_accepts(parent_module, parent_config, slot)
+      candidate_kinds = kinds(candidate_module, candidate_config)
+      {:kind_not_admitted, candidate.id, parent_id, slot, candidate_kinds, accepts}
+    end
+  end
+
+  # The block, or `:slot_entry` when there is none, at the seam upstream of
+  # `target` - the sibling at `index - 1`, or the slot's own inbound
+  # (nothing produced by a specific block) at `index == 0`.
+  @spec upstream_ref(Document.t(), target()) :: Block.id() | :slot_entry
+  defp upstream_ref(_document, {_parent_id, _slot, 0}), do: :slot_entry
+
+  defp upstream_ref(document, {parent_id, slot, index}) do
+    case find_block(document, parent_id) do
+      nil ->
+        :slot_entry
+
+      parent ->
+        case Enum.at(Map.get(parent.slots, slot, []), index - 1) do
+          nil -> :slot_entry
+          sibling -> sibling.id
+        end
+    end
+  end
+
+  @spec upstream_seam_finding(Palette.t(), Document.t(), target(), Block.t(), context()) ::
+          finding() | nil
+  defp upstream_seam_finding(palette, document, target, candidate, ctx) do
+    inbound = inbound_type(palette, document, target, ctx)
+    candidate_consumes = consumes_of(palette, candidate)
+
+    if assignable?(palette, inbound, candidate_consumes) do
+      nil
+    else
+      {:type_mismatch, candidate.id, upstream_ref(document, target), inbound, candidate_consumes}
+    end
+  end
+
+  @spec downstream_seam_finding(Palette.t(), Document.t(), target(), Block.t(), context()) ::
+          finding() | nil
+  defp downstream_seam_finding(palette, document, {parent_id, slot, index}, candidate, ctx) do
+    with parent when not is_nil(parent) <- find_block(document, parent_id),
+         downstream when not is_nil(downstream) <-
+           Enum.at(Map.get(parent.slots, slot, []), index) do
+      candidate_produces = produces(palette, document, candidate, ctx)
+      downstream_consumes = consumes_of(palette, downstream)
+
+      if assignable?(palette, candidate_produces, downstream_consumes) do
+        nil
+      else
+        {:type_mismatch, downstream.id, candidate.id, candidate_produces, downstream_consumes}
+      end
+    else
+      nil -> nil
+    end
+  end
+
+  # The seam a move vacates: nil when `candidate` is not already in
+  # `document` (an insert has nothing to vacate), and nil when the slot has
+  # no block after `candidate`'s current position (nothing becomes adjacent
+  # to nothing).
+  @spec vacated_seam_finding(Palette.t(), Document.t(), Block.t(), context()) :: finding() | nil
+  defp vacated_seam_finding(palette, document, candidate, ctx) do
+    case Document.fetch_path(document, candidate.id) do
+      :error ->
+        nil
+
+      {:ok, path} ->
+        {parent_id, slot, index} = List.last(path)
+
+        case find_block(document, parent_id) do
+          nil -> nil
+          parent -> vacated_seam_finding(palette, document, parent, slot, index, ctx)
+        end
+    end
+  end
+
+  @spec vacated_seam_finding(
+          Palette.t(),
+          Document.t(),
+          Block.t(),
+          Block.slot_name(),
+          non_neg_integer(),
+          context()
+        ) :: finding() | nil
+  defp vacated_seam_finding(palette, document, parent, slot, index, ctx) do
+    children = Map.get(parent.slots, slot, [])
+
+    case Enum.at(children, index + 1) do
+      nil ->
+        nil
+
+      after_block ->
+        vacated_seam_finding(palette, document, parent, slot, index, children, after_block, ctx)
+    end
+  end
+
+  @spec vacated_seam_finding(
+          Palette.t(),
+          Document.t(),
+          Block.t(),
+          Block.slot_name(),
+          non_neg_integer(),
+          [Block.t()],
+          Block.t(),
+          context()
+        ) :: finding() | nil
+  defp vacated_seam_finding(palette, document, parent, slot, index, children, after_block, ctx) do
+    {before_produces, before_ref} =
+      seam_before(palette, document, parent, slot, index, children, ctx)
+
+    after_consumes = consumes_of(palette, after_block)
+
+    if assignable?(palette, before_produces, after_consumes) do
+      nil
+    else
+      {:type_mismatch, after_block.id, before_ref, before_produces, after_consumes}
+    end
+  end
+
+  # The producing side of a vacated seam: the slot's own inbound type at
+  # `index == 0` (there is no block before it to name), or the resolved
+  # `produces` of the sibling at `index - 1` otherwise.
+  @spec seam_before(
+          Palette.t(),
+          Document.t(),
+          Block.t(),
+          Block.slot_name(),
+          non_neg_integer(),
+          [Block.t()],
+          context()
+        ) :: {type_expr() | :unknown, Block.id() | :slot_entry}
+  defp seam_before(palette, document, parent, slot, 0, _children, ctx) do
+    {inbound_type(palette, document, {parent.id, slot, 0}, ctx), :slot_entry}
+  end
+
+  defp seam_before(palette, document, _parent, _slot, index, children, ctx) do
+    case Enum.at(children, index - 1) do
+      nil -> {:unknown, :slot_entry}
+      before_block -> {produces(palette, document, before_block, ctx), before_block.id}
+    end
+  end
 end
