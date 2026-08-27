@@ -211,11 +211,26 @@ defmodule StatifierBlocks.BlockType do
   """
   @callback fixtures() :: term()
 
+  @typedoc """
+  All keys optional. `icon` is a name resolved by a host-supplied
+  component, never markup (ADR-0005 decision 10).
+  """
+  @type palette_entry :: %{
+          optional(:label) => String.t(),
+          optional(:group) => String.t(),
+          optional(:description) => String.t(),
+          optional(:icon) => String.t(),
+          optional(:keywords) => [String.t()],
+          optional(:order) => integer(),
+          optional(:layout) => :stack | :columns,
+          optional(:slot_style) => %{optional(String.t()) => :primary | :secondary}
+        }
+
   @doc """
   Palette presentation metadata. Contents are ADR-0005's. Absent means the
   editor falls back to the type name.
   """
-  @callback palette_entry() :: map()
+  @callback palette_entry() :: palette_entry()
 
   @optional_callbacks io: 1, migrate_config: 2, fixtures: 0, palette_entry: 0
 end
