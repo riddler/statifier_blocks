@@ -4,12 +4,25 @@ defmodule StatifierBlocks.MixProject do
   @version "0.1.0"
   @source_url "https://github.com/riddler/statifier_blocks"
 
+  # ADR-0005 decision 1's acceptance property: the package must compile clean
+  # and its non-LiveView suite must pass with `phoenix_live_view` absent from
+  # the dependency tree. `STATIFIER_BLOCKS_HEADLESS=1` is how that tree is
+  # produced. It drops the optional dependency *and* redirects the deps,
+  # build and lock paths to headless-only siblings, so resolving a
+  # Phoenix-free tree can never disturb the ordinary one - in particular it
+  # can never rewrite `mix.lock`, which a plain `mix deps.get` with the
+  # dependency removed absolutely would.
+  @headless System.get_env("STATIFIER_BLOCKS_HEADLESS") in ["1", "true"]
+
   def project do
     [
       app: :statifier_blocks,
       version: @version,
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
+      deps_path: if(@headless, do: "deps_headless", else: "deps"),
+      build_path: if(@headless, do: "_build_headless", else: "_build"),
+      lockfile: if(@headless, do: "mix.headless.lock", else: "mix.lock"),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       name: "StatifierBlocks",
@@ -60,7 +73,11 @@ defmodule StatifierBlocks.MixProject do
     [
       name: "statifier_blocks",
       licenses: ["MIT"],
-      files: ~w(lib mix.exs README.md LICENSE CHANGELOG.md),
+      # `assets` is in the list because the hook and the stylesheet ship as
+      # source (ADR-0005 decisions 7 and 14, sui-ADR-0009's delivery model),
+      # and source that is not in the tarball is not public API however
+      # carefully it is versioned. The record calls this out by name.
+      files: ~w(lib assets mix.exs README.md LICENSE CHANGELOG.md),
       links: %{
         "GitHub" => @source_url,
         "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
@@ -68,19 +85,42 @@ defmodule StatifierBlocks.MixProject do
     ]
   end
 
-  # The LiveView dependencies the editor components need are added by the
-  # beads that follow this one in the bootstrap stack.
   defp deps do
-    [
-      statifier_dep(),
+    [statifier_dep()] ++
+      live_view_dep() ++
+      [
+        # Dev / test
+        {:ex_quality, "~> 0.14", only: :dev, runtime: false},
+        {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+        {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+        {:excoveralls, "~> 0.18", only: :test},
+        {:ex_doc, "~> 0.40", only: :dev, runtime: false}
+      ]
+  end
 
-      # Dev / test
-      {:ex_quality, "~> 0.14", only: :dev, runtime: false},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:excoveralls, "~> 0.18", only: :test},
-      {:ex_doc, "~> 0.40", only: :dev, runtime: false}
-    ]
+  # ADR-0005 decision 1. The requirement and the flag are copied deliberately
+  # from statifier-ui's `mix.exs`: two packages in one family disagreeing
+  # about the LiveView floor is a problem a host discovers at dependency
+  # resolution, and there is no reason to create it. No `phoenix_html`,
+  # `esbuild` or `tailwind` - the first arrives transitively, the other two
+  # belong to the host (sui-ADR-0009).
+  #
+  # The empty list is the headless tree, and it is the only place in this
+  # file that decides whether the guard around `StatifierBlocks.Editor.*`
+  # has anything to guard.
+  # `lazy_html` rides along because `Phoenix.LiveViewTest` refuses to run
+  # without it. It is `only: :test` and never reaches a host, and it belongs in
+  # this list rather than beside the other test dependencies precisely because
+  # it is useless in the headless tree - nothing there drives a LiveView.
+  defp live_view_dep do
+    if @headless do
+      []
+    else
+      [
+        {:phoenix_live_view, "~> 1.0", optional: true},
+        {:lazy_html, ">= 0.1.0", only: :test}
+      ]
+    end
   end
 
   # Export STATIFIER_PATH to point at a local checkout while co-developing a

@@ -7,6 +7,14 @@
 # The directory Mix downloads your dependencies sources to.
 /deps/
 
+# The Phoenix-free tree STATIFIER_BLOCKS_HEADLESS=1 resolves into, proving
+# ADR-0005 decision 1's optional dependency really is optional. Kept separate
+# from deps/, _build/ and mix.lock precisely so the proof cannot disturb the
+# ordinary build; resolved fresh on every run, so none of it is tracked.
+/deps_headless/
+/_build_headless/
+/mix.headless.lock
+
 # Where third-party dependencies like ExDoc output generated docs.
 /doc/
 
