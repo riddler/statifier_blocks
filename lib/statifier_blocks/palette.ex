@@ -35,16 +35,26 @@ defmodule StatifierBlocks.Palette do
 
   alias StatifierBlocks.{Block, Core}
 
-  @type t :: %__MODULE__{types: %{optional(Block.type_name()) => module()}}
+  @type t :: %__MODULE__{
+          types: %{optional(Block.type_name()) => module()},
+          assignability: module() | nil
+        }
 
-  defstruct types: %{}
+  defstruct types: %{}, assignability: nil
 
   @doc """
   Builds a palette from a `type_name => module` map. Defaults to an empty
   palette.
+
+  Options: `:assignability`, a module implementing
+  `StatifierBlocks.Assignability.Relation` (ADR-0003 decision 6). Defaults
+  to `nil`, meaning the palette declares no widening relation - `new(types)`
+  and `new(types, assignability: nil)` are the same palette.
   """
-  @spec new(%{optional(Block.type_name()) => module()}) :: t()
-  def new(types \\ %{}) when is_map(types), do: %__MODULE__{types: types}
+  @spec new(%{optional(Block.type_name()) => module()}, keyword()) :: t()
+  def new(types \\ %{}, opts \\ []) when is_map(types) do
+    %__MODULE__{types: types, assignability: Keyword.get(opts, :assignability)}
+  end
 
   @doc """
   The `core.*` structural vocabulary as a palette (ADR-0002 decision 10).
