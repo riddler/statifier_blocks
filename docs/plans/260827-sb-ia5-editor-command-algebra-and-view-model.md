@@ -743,12 +743,33 @@ and `Edit.Targets` both carry their widening sections, and that
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] full `mix quality` green from a clean `_build`, coverage at or above 90%
-- [ ] `mix deps.tree` contains no `phoenix` entry and the full suite passes
-- [ ] `grep -rn "Phoenix" lib/ test/` returns nothing
-- [ ] the terminology scan in the umbrella's `docs/terminology-firewall.md` is
+- [x] full `mix quality` green from a clean `_build`, coverage at or above 90%
+- [x] `mix deps.tree` contains no `phoenix` entry and the full suite passes
+- [x] `grep -rn "Phoenix" lib/ test/` returns nothing
+- [x] the terminology scan in the umbrella's `docs/terminology-firewall.md` is
       clean over the branch's full outbound content
-- [ ] `changelog.d/sb-ia5.md` exists and uses only standard headings
+- [x] `changelog.d/sb-ia5.md` exists and uses only standard headings
+
+**Machine-checked (unattended, 2026-08-27):** `rm -rf _build && mix deps.get
+&& mix quality` from a genuinely clean `_build` - format, compile
+(warnings-as-errors), credo, deps, dialyzer (PLT built this run), 430 of 430
+tests, **95.6%** coverage against the 90% floor. `mix deps.tree | grep -i
+phoenix` and `grep -rn "Phoenix" lib/ test/` both empty. The umbrella's
+terminology-firewall pre-push scan
+(the pattern is recorded in the umbrella's
+`docs/terminology-firewall.md`, and is deliberately not reproduced here -
+the pattern enumerates the very terms the firewall exists to keep out of a
+public repo, so quoting it inline is itself a leak)
+returns nothing over the whole tree. `changelog.d/sb-ia5.md` exists with only
+`### Added` / `### Changed` headings, phrased the way `sb-b3t.md` phrases the
+`io/1` pin. The example-domain scan (`enrich|scor(e|ing)|crm_push`) over the
+five new `lib/` modules, their five test files, and this bead's addition to
+`test/support/document_generator.ex` turned up two hits, both pre-existing
+and out of scope: `document_generator.ex`'s `@type_names` list (predates this
+bead's `commands/2` addition) and `view_model_test.exs`'s reference to
+`test/support/block_type_fixtures.ex`'s pre-existing `"toy.score"` /
+`"Enrichment"` toy fixture. Neither is new prose or a new example this bead
+introduced.
 
 #### Manual Verification:
 - [ ] `/wurk:verify --unattended` run and its findings folded back
@@ -915,5 +936,13 @@ criteria gate advancement and the Manual ones are deferred.
 - [ ] The view model carries everything `sb-7f2`'s eight components would need,
       checked against ADR-0005 d13's component table row by row
 - [ ] The `Finding` moduledoc makes the two-Finding situation unmistakable
+
+---
+
+### Phase 6
+
+- [ ] `/wurk:verify --unattended` run and its findings folded back
+- [ ] Every new example is a signup wizard or a card-processing example; no new
+      enrichment/scoring/CRM-flavoured example was introduced
 
 ---
