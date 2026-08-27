@@ -868,6 +868,47 @@ defmodule StatifierBlocks.AssignabilityTest do
     end
   end
 
+  describe "the document root as candidate - it vacates no seam" do
+    # sabotage: restore the single `{:ok, path}` clause of
+    # `vacated_seam_finding/4` (dropping the `{:ok, []}` clause) -> red,
+    # `List.last([])` returns nil and the match raises the MatchError this
+    # test exists to pin.
+    test "check/5 answers for a position rather than raising, with the root as candidate" do
+      root =
+        Block.new("core.sequence",
+          id: "blk_ROOT",
+          slots: %{
+            "body" => [Block.new("core.sequence", id: "blk_INNER", slots: %{"body" => []})]
+          }
+        )
+
+      document = Document.new(root, id: "bdoc_root_candidate")
+
+      assert Assignability.check(Palette.core(), document, {"blk_INNER", "body", 0}, root, %{}) ==
+               :ok
+    end
+
+    # sabotage: change the new `{:ok, []}` clause to return a finding (e.g.
+    # `{:type_mismatch, "x", "y", :unknown, []}`) instead of `nil` -> red,
+    # the root occupies no slot, so there is no vacated seam to report and
+    # `valid_targets/4` would come back empty.
+    test "valid_targets/4 enumerates positions for the root instead of raising" do
+      root =
+        Block.new("core.sequence",
+          id: "blk_ROOT",
+          slots: %{
+            "body" => [Block.new("core.sequence", id: "blk_INNER", slots: %{"body" => []})]
+          }
+        )
+
+      document = Document.new(root, id: "bdoc_root_targets")
+
+      targets = Assignability.valid_targets(Palette.core(), document, root, %{})
+
+      assert {"blk_INNER", "body", 0} in targets
+    end
+  end
+
   describe "check/5 - both core.on_event misplacement directions, restated at the decision function" do
     # sabotage: change `Core.OnEvent`'s (or the fixture standing in for it
     # here) `:kinds` from `[:interrupt_handler]` to `[:step]` -> the second

@@ -190,15 +190,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     #
     # The root is excluded before the enumeration rather than after it. It has
     # no valid target in any case - `Edit.apply/2`'s `check_not_root/2`
-    # refuses a `:move` of the root, so the correct answer is the empty set -
-    # but asking is not currently safe: `Assignability.valid_targets/4` raises
-    # a `MatchError` on the root, because `Document.fetch_path/2` answers
-    # `{:ok, []}` for it and `vacated_seam_finding/4` calls `List.last/1` on
-    # that path without handling the empty case. That is a defect in the
-    # assignability module rather than here, and it is reported against the
-    # bead that owns ADR-0003 rather than patched from this one - so this
-    # guard is written to be the right thing even once it is fixed, not to be
-    # a workaround that becomes wrong.
+    # refuses a `:move` of the root, so the correct answer is the empty set,
+    # and `Targets.droppable_slots/3` now independently arrives at the same
+    # empty set (rule 4 excludes the root's own subtree, which is every
+    # block). The guard stays because it says why the answer is empty at the
+    # place that asks, and it short-circuits an enumeration whose result is
+    # known; it is not a workaround for the `MatchError`
+    # `Assignability.valid_targets/4` used to raise here (sb-rzr).
     def handle_event("dragstart", %{"block-id" => id}, socket) do
       {:noreply, assign(socket, :drag, %{block_id: id, droppable: droppable_for(socket, id)})}
     end
