@@ -19,13 +19,8 @@ defmodule StatifierBlocks.Validation do
 
   alias StatifierBlocks.{Block, Document}
 
-  @typedoc "ADR-0001's typespec block, defined once and reused by from_json/1."
-  @type error ::
-          :not_a_block_document
-          | {:unsupported_schema_version, pos_integer()}
-          | {:duplicate_block_id, Block.id()}
-          | {:malformed_block, Block.id() | nil, term()}
-          | {:malformed_envelope, term()}
+  @typedoc "ADR-0001's typespec block. The union lives on the public side as `t:StatifierBlocks.Document.validation_error/0`; this is its internal name."
+  @type error :: Document.validation_error()
 
   @typedoc "Decision 6's value-grammar rejection: a float, or an unrecognized term."
   @type json_problem :: {:float, [term()]} | {:not_json, term()}
