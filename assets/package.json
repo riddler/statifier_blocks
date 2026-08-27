@@ -1,0 +1,16 @@
+{
+  "name": "statifier_blocks",
+  "version": "0.1.0",
+  "description": "The statifier_blocks editor's single LiveView hook, shipped as source (ADR-0005 decisions 7 and 14).",
+  "license": "MIT",
+  "type": "module",
+  "main": "js/statifier_blocks.js",
+  "exports": {
+    ".": "./js/statifier_blocks.js",
+    "./css": "./css/statifier_blocks.css"
+  },
+  "files": [
+    "js/statifier_blocks.js",
+    "css/statifier_blocks.css"
+  ]
+}

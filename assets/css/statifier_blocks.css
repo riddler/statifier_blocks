@@ -1,0 +1,331 @@
+/*
+ * Structural CSS for the statifier_blocks editor. ADR-0005 decision 14.
+ *
+ * "Moderate" is the operative word and it cuts both ways: enough that a host
+ * can make the editor look like its own product without forking it, and not
+ * so much that this package acquires a theming DSL to maintain.
+ *
+ * Three rules hold everything here together:
+ *
+ *   1. Every class this package emits is prefixed `sb-`. No CSS framework is
+ *      depended on and no framework's class names are emitted, so the editor
+ *      drops into a host with any styling approach.
+ *   2. Every color, space, radius and drag treatment is a `--sb-*` custom
+ *      property with a default, declared on the canvas root. A host overrides
+ *      by setting those properties - on the canvas root via the `theme`
+ *      assign, or anywhere above it in its own stylesheet.
+ *   3. What is here is what the editor is broken without: the column layout,
+ *      the drag affordances, the finding treatments. Everything else is a
+ *      visual opinion and is not this package's to have.
+ *
+ * A host wanting more than this restyles against the `sb-` prefix, which is a
+ * stable surface the record commits to.
+ */
+
+.sb-editor {
+  /* Palette */
+  --sb-bg: #ffffff;
+  --sb-bg-muted: #f6f7f9;
+  --sb-fg: #16181d;
+  --sb-fg-muted: #5b6270;
+  --sb-border: #d7dbe2;
+  --sb-accent: #2f6feb;
+
+  /* Drag affordances */
+  --sb-drop-ok-border: #2f9e5f;
+  --sb-drop-ok-bg: rgba(47, 158, 95, 0.08);
+  --sb-drop-no-opacity: 0.45;
+  --sb-gap-height: 0.5rem;
+  --sb-gap-hover-bg: var(--sb-accent);
+
+  /* Findings */
+  --sb-error: #c0362c;
+  --sb-warning: #a2680a;
+
+  /* Metrics */
+  --sb-radius: 6px;
+  --sb-space: 0.5rem;
+  --sb-border-width: 1px;
+  --sb-font: inherit;
+  --sb-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr) minmax(14rem, 1fr);
+  gap: calc(var(--sb-space) * 2);
+  color: var(--sb-fg);
+  background: var(--sb-bg);
+  font: var(--sb-font);
+}
+
+/* ---------------------------------------------------------------- canvas */
+
+.sb-canvas {
+  min-width: 0;
+}
+
+.sb-node {
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius);
+  padding: var(--sb-space);
+  background: var(--sb-bg);
+}
+
+.sb-node--selected {
+  outline: 2px solid var(--sb-accent);
+}
+
+.sb-node--unresolvable {
+  border-style: dashed;
+  background: var(--sb-bg-muted);
+}
+
+.sb-node__chrome {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space);
+}
+
+.sb-node__label {
+  font-weight: 600;
+}
+
+.sb-node__type {
+  color: var(--sb-fg-muted);
+  font-family: var(--sb-font-mono);
+  font-size: 0.85em;
+}
+
+.sb-node__raw-config {
+  font-family: var(--sb-font-mono);
+  font-size: 0.85em;
+  white-space: pre-wrap;
+  background: var(--sb-bg-muted);
+  border-radius: var(--sb-radius);
+  padding: var(--sb-space);
+}
+
+/* d10: the two layouts, and the only thing that distinguishes a group from a
+ * set of lanes. There is no Group component and no Parallel component. */
+.sb-node__slots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space);
+}
+
+.sb-node__slots--columns {
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.sb-node__slots--columns > .sb-slot {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* ----------------------------------------------------------------- slots */
+
+.sb-slot {
+  border-left: var(--sb-border-width) solid var(--sb-border);
+  padding-left: var(--sb-space);
+}
+
+.sb-slot--secondary {
+  border-left-style: dashed;
+  color: var(--sb-fg-muted);
+}
+
+.sb-slot--undeclared {
+  border-left-color: var(--sb-warning);
+}
+
+.sb-slot__header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+  font-size: 0.9em;
+  color: var(--sb-fg-muted);
+}
+
+/* d6: validity reaches the client as markup, and hover highlighting is CSS on
+ * these attributes. It costs nothing and it cannot disagree with the server. */
+.sb-slot[data-drop="ok"] {
+  border-left-color: var(--sb-drop-ok-border);
+  background: var(--sb-drop-ok-bg);
+}
+
+.sb-slot[data-drop="no"] {
+  opacity: var(--sb-drop-no-opacity);
+}
+
+.sb-gap {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space);
+  min-height: var(--sb-gap-height);
+}
+
+.sb-slot[data-drop="ok"] .sb-gap:hover {
+  box-shadow: inset 0 0 0 1px var(--sb-gap-hover-bg);
+}
+
+/* d8: every drop target is reachable without dragging. The "+" is not only
+ * the accessible path - it is what makes the insertion path exercisable in
+ * LiveViewTest without simulating a drag. */
+.sb-gap__add {
+  font: inherit;
+  color: var(--sb-accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 var(--sb-space);
+}
+
+/* ------------------------------------------------------------------ form */
+
+.sb-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space);
+  min-width: 0;
+}
+
+.sb-field {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--sb-space) / 2);
+}
+
+.sb-field__label {
+  font-size: 0.9em;
+  color: var(--sb-fg-muted);
+}
+
+.sb-field__required {
+  color: var(--sb-error);
+}
+
+.sb-field__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space);
+}
+
+.sb-field__input {
+  font: inherit;
+  min-width: 0;
+}
+
+.sb-field__input--expression {
+  font-family: var(--sb-font-mono);
+}
+
+/* -------------------------------------------------------------- findings */
+
+.sb-finding {
+  font-size: 0.9em;
+}
+
+.sb-finding--error {
+  color: var(--sb-error);
+}
+
+.sb-finding--warning {
+  color: var(--sb-warning);
+}
+
+/* d11's last sentence: a finding can never hide inside something folded shut. */
+.sb-badge {
+  border-radius: var(--sb-radius);
+  background: var(--sb-error);
+  color: var(--sb-bg);
+  font-size: 0.75em;
+  padding: 0 calc(var(--sb-space) / 2);
+}
+
+.sb-findings {
+  min-width: 0;
+}
+
+.sb-findings__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--sb-space) / 2);
+}
+
+.sb-findings__reveal {
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+/* --------------------------------------------------------------- palette */
+
+.sb-palette {
+  min-width: 0;
+}
+
+.sb-palette__search {
+  font: inherit;
+  width: 100%;
+}
+
+.sb-palette__group {
+  margin-top: var(--sb-space);
+}
+
+.sb-palette__group-name {
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sb-fg-muted);
+}
+
+.sb-palette__entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sb-palette__pick {
+  font: inherit;
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--sb-radius);
+  padding: calc(var(--sb-space) / 2);
+  color: inherit;
+}
+
+.sb-palette__pick:hover {
+  background: var(--sb-bg-muted);
+}
+
+.sb-palette__description {
+  display: block;
+  color: var(--sb-fg-muted);
+  font-size: 0.85em;
+}
+
+.sb-toolbar {
+  display: flex;
+  gap: var(--sb-space);
+}
+
+.sb-toolbar__button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.sb-toolbar__button[disabled] {
+  cursor: default;
+  opacity: var(--sb-drop-no-opacity);
+}

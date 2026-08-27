@@ -90,3 +90,75 @@ jobs:
           test "${#cmd[@]}" -gt 0 || { echo "gate.full is empty" >&2; exit 1; }
           echo "gate command (.claude/wurk.json gate.full): ${cmd[*]}"
           "${cmd[@]}"
+
+  # ADR-0005 decision 1 requires this job by name: "the package compiles
+  # clean, and the full headless test suite passes, with phoenix_live_view
+  # absent from the dependency tree", and "the CI job that proves this is not
+  # optional; decision 1's guard is untrustworthy without it."
+  #
+  # A guard that is never exercised without the dependency present is a guard
+  # that is already broken. Every module under StatifierBlocks.Editor.* is
+  # wrapped in `if Code.ensure_loaded?(Phoenix.LiveView)`, and nothing but a
+  # Phoenix-free resolution can tell whether those wrappers are correct.
+  #
+  # STATIFIER_BLOCKS_HEADLESS=1 drops the optional dependency from mix.exs and
+  # redirects deps_path, build_path and lockfile to headless-only siblings, so
+  # the proof cannot disturb the ordinary build - in particular it cannot
+  # rewrite mix.lock, which a plain deps.get with the dependency removed
+  # absolutely would. Nothing here is cached for the same reason: this job is
+  # worth nothing if it resolves anything but a genuinely fresh tree.
+  headless:
+    name: Headless (phoenix_live_view absent)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      STATIFIER_BLOCKS_HEADLESS: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the toolchain out of mise.toml
+        id: toolchain
+        run: |
+          set -euo pipefail
+          erlang="$(sed -n 's/^erlang *= *"\(.*\)".*$/\1/p' mise.toml | head -1)"
+          elixir="$(sed -n 's/^elixir *= *"\(.*\)".*$/\1/p' mise.toml | head -1)"
+          test -n "$erlang" || { echo "no erlang version in mise.toml" >&2; exit 1; }
+          test -n "$elixir" || { echo "no elixir version in mise.toml" >&2; exit 1; }
+          echo "erlang=$erlang" >> "$GITHUB_OUTPUT"
+          echo "elixir=$elixir" >> "$GITHUB_OUTPUT"
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ steps.toolchain.outputs.erlang }}
+          elixir-version: ${{ steps.toolchain.outputs.elixir }}
+
+      - name: Resolve a Phoenix-free tree
+        run: mix deps.get
+
+      # The negative assertion, made before anything else can accidentally
+      # satisfy it: if phoenix_live_view is in this tree, the job is proving
+      # nothing and should fail loudly rather than pass quietly.
+      - name: Prove phoenix_live_view really is absent
+        run: |
+          set -euo pipefail
+          if [ -d deps_headless/phoenix_live_view ]; then
+            echo "phoenix_live_view resolved into the headless tree" >&2
+            exit 1
+          fi
+          echo "deps_headless holds: $(ls deps_headless | tr '\n' ' ')"
+
+      - name: Compile with warnings as errors
+        run: mix compile --warnings-as-errors
+
+      # Not `mix quality`: the full gate measures coverage, and the headless
+      # tree deliberately does not compile the editor, so its coverage is a
+      # different number against a different denominator. What decision 1 asks
+      # for is that the non-LiveView suite passes, and that is exactly this.
+      # The :liveview exclusion is applied by test_helper.exs, derived from the
+      # dependency rather than from this env var - so a misconfigured job that
+      # still had LiveView on the path would run the LiveView tests here
+      # instead of silently skipping them.
+      - name: Non-LiveView suite
+        run: mix test
