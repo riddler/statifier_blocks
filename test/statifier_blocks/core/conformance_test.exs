@@ -16,7 +16,7 @@ defmodule StatifierBlocks.Core.ConformanceTest do
 
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{Block, CoreFixtures}
+  alias StatifierBlocks.{Assignability, Block, CoreFixtures}
 
   @arities [:any, :at_least_one, :exactly_one, :zero_or_one]
   @io_keys [:kinds, :consumes, :produces, :slot_accepts]
@@ -90,7 +90,7 @@ defmodule StatifierBlocks.Core.ConformanceTest do
         for config <- @junk do
           assert is_list(@module.slots(config))
           assert is_list(@module.config_schema(config))
-          assert is_map(CoreFixtures.io(@module, config))
+          assert is_map(Assignability.io(@module, config))
 
           case CoreFixtures.validate(@module, config) do
             :ok ->
@@ -109,7 +109,7 @@ defmodule StatifierBlocks.Core.ConformanceTest do
       # Sabotage: added `consumes: :record` (an atom, not a type expression)
       # to a core `io/1` - red on the produces/consumes shape assert.
       test "io/1 returns only ADR-0003 decision 2's keys, over declared slots" do
-        io = CoreFixtures.io(@module, @valid)
+        io = Assignability.io(@module, @valid)
         declared = MapSet.new(@module.slots(@valid), fn {name, _a, _l} -> name end)
 
         assert Enum.all?(Map.keys(io), &(&1 in @io_keys))
@@ -166,7 +166,7 @@ defmodule StatifierBlocks.Core.ConformanceTest do
         assert @module.slots(@valid) == @module.slots(@valid)
         assert @module.config_schema(@valid) == @module.config_schema(@valid)
         assert @module.validate_config(@valid) == @module.validate_config(@valid)
-        assert CoreFixtures.io(@module, @valid) == CoreFixtures.io(@module, @valid)
+        assert Assignability.io(@module, @valid) == Assignability.io(@module, @valid)
         assert @module.palette_entry() == @module.palette_entry()
       end
 
