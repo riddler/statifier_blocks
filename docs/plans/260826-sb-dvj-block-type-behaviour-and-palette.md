@@ -989,6 +989,18 @@ before considering the plan fully landed.
 - [ ] Every new test carries its one-line sabotage mutation note, and the
       mutation described actually turns that test red (no command checks
       this - `mix quality` cannot see a comment)
+
+
+      **Machine-checked (unattended, 2026-08-26):** FIXED. 23 of the 26 tests in `block_type_test.exs` carried no
+      `# sabotage:` note - the gate's own scanner listed every one under
+      `data.sabotage.missing`. Notes were written for all 23, and each
+      described mutation was then applied to `lib/` or `test/support/`,
+      the file re-run, and the named test confirmed red before the
+      mutation was reverted. All 23 go red. `data.sabotage.missing` is
+      now empty for this file. One entry remains repo-wide, in
+      `validation_test.exs` (`sb-xti`'s file): its note is present but
+      sits above the enclosing `for`, not above the `test` the scanner
+      keys on. Left alone, filed as `sb-3d0`.
 - [ ] The `@type` and `@callback` definitions are a character-faithful
       transcription of ADR-0002 lines 318-385, with no callback added,
       dropped, renamed, or re-arity'd, and no type widened or narrowed. Two
@@ -997,14 +1009,66 @@ before considering the plan fully landed.
       7), and the moduledoc's `core.*` sentence is reworded to future tense
       because decision 10 has not landed (Open Question 8). There should be
       no third departure
+
+
+      **Machine-checked (unattended, 2026-08-26):** definitions clean; two prose departures left for the operator.
+      Every `@type`, `@typedoc`, `@callback` and the
+      `@optional_callbacks` line was extracted from both ADR lines
+      318-385 and `block_type.ex` and compared whitespace-normalized:
+      all 15 declarations are identical, set for set. No callback
+      added, dropped, renamed or re-arity'd; no type widened or
+      narrowed. **Two departures beyond the two this item declares,
+      both prose, both plausibly deliberate, neither changed here.**
+      (a) Callback *order* differs: the ADR runs slots, config_schema,
+      validate_config, emit, io, current_version, migrate_config, ...
+      while the code runs slots, config_schema, validate_config,
+      current_version, emit, io, migrate_config, ... - the five
+      required first, then the four optional in `@optional_callbacks`
+      order, which matches the moduledoc's own required/optional
+      table, so it reads as deliberate structure rather than a slip.
+      (b) The per-callback `@doc` prose is expanded well past
+      ADR-number substitution: `slots/1`'s one-line sketch doc is 15
+      lines in the code, and `config_schema/1`, `validate_config/1`,
+      `current_version/0`, `migrate_config/2` and `fixtures/0` are
+      likewise expanded. Whether either is a "third departure" or
+      ordinary documentation is a judgment call, and reversing (b)
+      would mean deleting docs written on purpose. Operator's call.
 - [ ] The `fixtures/0` provisional marker reads as the family's own idiom:
       ADR-0002 decision 9's `PROVISIONAL - <pointer>` spelling inside
       predicator-ex's admonition shape, sentence-case title, blank `>` line
+
+
+      **Machine-checked (unattended, 2026-08-26):** clean on shape, one point for the operator. The marker reads
+      `> #### Provisional: the accepted spellings are not settled
+      {: .warning}`, then a bare `>` line, then a body opening
+      `PROVISIONAL - see ADR-0002 decision 9.` That is
+      predicator-ex's shape exactly (`#### Sentence-case title
+      {: .class}`, blank `>`, body - as in `predicator.ex:1234`,
+      `context_location.ex:175`, `evaluator.ex:1396`), a sentence-case
+      title, and ADR decision 9's own `PROVISIONAL - <pointer>`
+      spelling with an ADR number substituted for the bead id per
+      Open Question 7. **One divergence:** all three predicator-ex
+      admonitions use `{: .info}`; this one uses `{: .warning}`. The
+      family has no `.warning` precedent, though `.warning` is a
+      valid ExDoc class and defensible for a provisional contract.
+      Not changed - a house-idiom call.
 - [ ] The per-callback `@doc`s name the correct owning **record** for each of
       the four shapes this record does not own: ADR-0003 for `io/1`,
       ADR-0004 for `emit/2`, ADR-0005 for `palette_entry/0`, and ADR-0002
       decision 9 plus statifier-ui's `docs/fixture-bundles.md` for
       `fixtures/0`
+
+
+      **Machine-checked (unattended, 2026-08-26):** VERIFIED CLEAN. Checked each `@doc` against the ADR filenames on
+      disk (`0003-assignability.md`, `0004-compiler-provenance.md`,
+      `0005-liveview-editor.md`) and against ADR-0002 decision 11's
+      own ownership list. `io/1` cites ADR-0003 (assignability),
+      `emit/2` cites ADR-0004 (compiler provenance), `palette_entry/0`
+      cites ADR-0005 (LiveView editor), and `fixtures/0` cites
+      ADR-0002 decision 9 plus statifier-ui's
+      `docs/fixture-bundles.md`. All four correct, and the
+      moduledoc's "Who owns what" table repeats the same three
+      mappings consistently.
 
 **Implementation Note**: Use `mix quality --profile loop` between edits; run
 full `mix quality` as the phase gate. In interactive execution pause here for
@@ -1016,11 +1080,66 @@ advancement and the Manual items defer to `/wurk:verify`.
 ### Phase 2
 
 - [ ] Every new test carries its sabotage mutation note, verified by hand
+
+
+      **Machine-checked (unattended, 2026-08-26):** VERIFIED CLEAN, then strengthened. All 16 tests in
+      `palette_test.exs` already carried notes - the gate's scanner
+      reports none missing for this file. Going further than the
+      scanner can, each described mutation was applied to
+      `palette.ex`, the file re-run, and the named test checked:
+      14 of 16 went red exactly as written. **Two did not, and were
+      corrected.** The too-new note claimed dropping the
+      `stored > current` guard would red it; it does not - the clause
+      still matches a too-new block and returns the same tuple (it
+      reds the migration tests instead), so the note now names the
+      value swap (`current` for `stored` in the arm) that does red
+      it, verified. The memory-only note claimed a
+      `Document.to_json/1` side effect inside `resolve/2`; **no
+      mutation of `palette.ex` can red that test** - `resolve/2` is
+      never handed the document and terms are immutable - so it is
+      now a stated `# sabotage: n/a` exemption naming why, and the
+      rule it stood in for moved to a new source-scan test that does
+      have a reddening mutation (see phase 3's last item).
 - [ ] The struct and `t/0` are a character-faithful transcription of
       ADR-0002 lines 392-394
+
+
+      **Machine-checked (unattended, 2026-08-26):** VERIFIED CLEAN. ADR line 392 `@type t :: %__MODULE__{types:
+      %{optional(Block.type_name()) => module()}}` and line 394
+      `defstruct types: %{}` appear in `palette.ex` character for
+      character. The `fetch/2` `@spec` is identical to the ADR's too.
+      `resolve/2`'s `@spec` carries one extra arm,
+      `{:error, {:migration_failed, Block.id(), term()}}`, which is
+      outside lines 392-394 and is Open Question 1's subject, not a
+      transcription defect.
 - [ ] The moduledoc states all four of decision 2's prohibitions explicitly,
       not a summary of them
+
+
+      **Machine-checked (unattended, 2026-08-26):** VERIFIED CLEAN, with one interaction worth naming. Decision 2
+      reads "There is no `Application` env lookup, no named ETS table,
+      no process registry, and no 'register at boot' side effect."
+      The moduledoc carries all four as four separate bullets, not a
+      summary: an application-configuration lookup keyed by block
+      type; a table of shared entries reachable by name from anywhere
+      in the process tree; a lookup registered under a well-known
+      process name; anything wired up automatically when this package
+      or a host application starts. The mechanism *names* are
+      paraphrased rather than spelled, and that is forced: the
+      hygiene test in `palette_test.exs` greps `palette.ex` for
+      `Application.get_env`, `:ets.`, `Process.whereis`, `GenServer`,
+      `Agent` and `:persistent_term`, so naming ETS or a GenServer in
+      the prose would red the test that enforces their absence.
+      Defensible, but the operator may want the tension recorded in
+      the test rather than discovered here.
 - [ ] No rescue-to-default anywhere in the module (`CLAUDE.md` convention)
+
+
+      **Machine-checked (unattended, 2026-08-26):** VERIFIED CLEAN. `grep` for `rescue`, `catch` and `try do` over
+      `palette.ex` and `block_type.ex` returns exactly one hit, the
+      word "rescue" inside the moduledoc sentence "`fetch/2` never
+      raises, so there is nothing to rescue." No `try`, no `rescue`
+      clause, no defaulting on failure anywhere in either module.
 
 **Implementation Note**: as phase 1.
 
@@ -1029,14 +1148,58 @@ advancement and the Manual items defer to `/wurk:verify`.
 ### Phase 3
 
 - [ ] Every new test carries its sabotage mutation note, verified by hand
+
+
+      **Machine-checked (unattended, 2026-08-26):** VERIFIED CLEAN - same pass as phase 2's item, which covered
+      `palette_test.exs` end to end (the phase 2 and phase 3 tests
+      live in that one file). See that item for the two notes
+      corrected and the one `n/a` exemption recorded.
 - [ ] The check order is defensible as "one arm per distinguishable cause"
       against decision 8 - read the ordered list beside the ADR
+
+
+      **Machine-checked (unattended, 2026-08-26):** defensible as read; one arm is still an open question. The
+      order is: unknown type -> `{:unknown_block_type, type}`; equal
+      version -> `{:ok, module, block}` unchanged; stored > current ->
+      `{:block_type_too_new, id, stored}`; stored < current ->
+      migrate. Read beside decision 8 ("called when a resolved
+      block's `type_version` is below the module's
+      `current_version/0`" and "a block whose `type_version` is
+      *above* ... is a typed resolution error, not a best-effort
+      read") and decision 3 ("an ordered check, one error arm per
+      distinguishable cause, nothing rescued to a default"), each arm
+      corresponds to exactly one distinguishable cause and nothing is
+      collapsed or defaulted. **The fourth arm,
+      `{:migration_failed, id, reason}`, is not in the ADR at all** -
+      that is Open Question 1, an ADR gap needing an operator ruling
+      and probably an amendment. Nothing about it was decided here.
 - [ ] Migration is applied exactly once per `resolve/2` call, not iterated -
       confirm by reading, since a ladder and a single call are
       indistinguishable for a 1 -> 2 migration
+
+
+      **Machine-checked (unattended, 2026-08-26):** VERIFIED CLEAN by reading. `resolve/2` calls `migrate/3` once.
+      `migrate/3`'s third clause calls `module.migrate_config(stored,
+      block.config)` exactly once, passing the stored version
+      straight through to current. There is no recursion, no `Enum`
+      or `Stream` walk over a version range, and no self-call
+      anywhere in the module - a single hop, not a ladder.
 - [ ] Nothing in `palette.ex` calls `Document.to_json/1`, `from_json/1`, or
       anything that could persist - the "never written back" rule read rather
       than only tested
+
+
+      **Machine-checked (unattended, 2026-08-26):** VERIFIED CLEAN by reading, and now covered by a mutation-tested
+      scan. `palette.ex` contains no call to `Document.to_json/1`,
+      `Document.from_json/1`, `File.*`, or `:file.*`; the only
+      occurrence of those names is the `resolve/2` `@doc` sentence
+      saying it never calls them. `Document` is not even aliased in
+      the module. A new hygiene test, "palette.ex never persists: no
+      to_json/1, from_json/1, or file write", now enforces this with
+      a call-shaped regex (an open paren, so the arity-spelled prose
+      that documents the rule does not trip the scan that enforces
+      it). Its sabotage - adding a `Document.to_json(block)` call to
+      `palette.ex` - was applied and confirmed to red it.
 
 **Implementation Note**: as phase 1. This is the last phase; run
 `/wurk:verify --unattended` after it to work the deferred manual items and
