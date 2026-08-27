@@ -8,14 +8,60 @@ defmodule StatifierBlocks.Assignability do
   compiler (`sb-iwz`), because both are passed the same palette (ADR-0003
   decision 6).
 
-  This module currently carries ADR-0003's seven types and four
-  primitives: `io/2`, `kinds/2`, `slot_accepts/3` and `admits?/3`. These
-  four are a deliberate widening of the record's own listed surface, not a
-  second path around it - `check/5`, `valid_targets/4` and `validate/3`
-  (later phases) are built out of them, not alongside them. They are public
-  because the kind gate has to be testable in isolation, and because
-  `StatifierBlocks.CoreFixtures`'s stand-in walk has to delegate to the
-  shipped rule rather than keep a copy of it.
+  ## The contract
+
+  ADR-0003's "The relation as typespecs" section is this module's contract,
+  taken verbatim - the seven types above (`type_expr/0`, `kind/0`,
+  `produces/0`, `io/0`, `context/0`, `target/0`, `finding/0`) and five
+  functions:
+
+      @spec check(Palette.t(), Document.t(), target(), Block.t(), context()) ::
+              :ok | {:error, [finding()]}
+
+      @spec valid_targets(Palette.t(), Document.t(), Block.t(), context()) :: [target()]
+
+      @spec validate(Palette.t(), Document.t(), context()) :: :ok | {:error, [finding()]}
+
+      @spec inbound_type(Palette.t(), Document.t(), target(), context()) ::
+              type_expr() | :unknown
+
+      @spec assignable?(Palette.t(), type_expr() | :unknown, type_expr() | :unknown) ::
+              boolean()
+
+  Everything else this module exports is built out of that contract, not
+  alongside it.
+
+  ## The deliberate widening
+
+  This module ships five more public functions than the record lists:
+  `io/2`, `kinds/2`, `slot_accepts/3`, and `admits?/3` (the structural
+  kind-admission gate), plus `produces/4` (data-flow resolution, including
+  `{:passthrough, slot}`). None of these is a second implementation of the
+  relation - they are the one implementation `check/5`, `valid_targets/4`
+  and `validate/3` are built out of, exposed because the record's own
+  acceptance criteria need them independently testable: the kind gate has
+  to be assertable in isolation to state the both-directions placement
+  property over the core vocabulary, `produces/4` has to be assertable on
+  its own to state the termination property below, and
+  `StatifierBlocks.CoreFixtures`'s stand-in document walk has to delegate
+  to the shipped rule rather than keep a private copy of it. A host that
+  calls only `check/5`, `valid_targets/4`, `validate/3`, `inbound_type/4`
+  and `assignable?/3` sees exactly ADR-0003's contract; the five extra
+  functions widen what is callable, never what is decided.
+
+  ## Why `produces/4` terminates
+
+  `{:passthrough, slot}` resolves recursively - to the last block in
+  `slot`, or, when `slot` is empty, to the resolving block's own inbound
+  type. Every such step moves to a strictly earlier position in the
+  document's pre-order than the position that asked: descending into a
+  slot still lands before the position that asked (everything under a
+  block is ordered before that block's own next sibling), and falling back
+  to a block's own inbound type moves to its previous sibling or its
+  parent, both earlier than the block itself. Pre-order rank over a finite
+  tree has no infinite descending chain, so resolution cannot cycle even
+  over a document built entirely of empty passthrough sequences. See
+  `produces/4` for the full argument.
 
   Defaults, per ADR-0003 decision 5: an absent `io/1` callback, or a module
   that is not loadable, is `%{}`; an absent `:kinds` key is `[:step]`; an
