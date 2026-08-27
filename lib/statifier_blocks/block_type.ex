@@ -132,12 +132,35 @@ defmodule StatifierBlocks.BlockType do
   """
   @callback current_version() :: pos_integer()
 
-  @doc """
-  Emits this block's SCXML subtree. `context` and the return term's real
-  shape are ADR-0004's; this record fixes only that the callback lives
-  here and is pure.
+  @typedoc """
+  What `emit/2` can refuse with (ADR-0004 decisions 4 and 10).
+
+  A list of `finding/0` pairs is the ordinary case: a type that can
+  validate its config but still cannot compile some combination of it
+  reports findings against its own block id rather than raising.
+  `{:invalid_role, block_id, role}` is what
+  `StatifierBlocks.Compiler.Context.role_id/2` hands back for a role the
+  compiler could not invert, propagated as-is by a type that mints a role
+  from config.
   """
-  @callback emit(Block.t(), context :: term()) :: {:ok, term()} | {:error, term()}
+  @type emit_error :: [finding()] | {:invalid_role, Block.id(), String.t()}
+
+  @doc """
+  Emits this block's SCXML subtree (ADR-0004 decision 4).
+
+  `context` is a `StatifierBlocks.Compiler.Context` carrying the block's own
+  id and state id, the document id, the ordered summaries of its already
+  compiled children, and decision 3's role-minting function. It carries no
+  palette and no child's emitted SCXML, so an emission is a function of
+  this block's config and its children's *ids* - which is what makes
+  decision 6's per-block byte stability hold.
+
+  The return is structural, never a string: see
+  `StatifierBlocks.Emission`, and `StatifierBlocks.Core.Emit` for the shapes
+  the shipped vocabulary uses.
+  """
+  @callback emit(Block.t(), StatifierBlocks.Compiler.Context.t()) ::
+              {:ok, StatifierBlocks.Emission.t()} | {:error, emit_error()}
 
   @doc """
   Type expressions for assignability. The return shape is

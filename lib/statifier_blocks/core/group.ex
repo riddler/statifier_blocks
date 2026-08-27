@@ -28,7 +28,7 @@ defmodule StatifierBlocks.Core.Group do
 
   @behaviour StatifierBlocks.BlockType
 
-  alias StatifierBlocks.Core.Config
+  alias StatifierBlocks.Core.Emit
 
   @impl true
   def current_version, do: 1
@@ -72,6 +72,18 @@ defmodule StatifierBlocks.Core.Group do
       slot_style: %{"body" => :primary, "interrupts" => :secondary}
     }
 
+  @doc """
+  A compound state whose `body` runs in order, guarded by whatever sits in
+  `interrupts` (`StatifierBlocks.Core.Emit`). With no interrupt handlers it
+  is exactly a sequence; with them, the body and the handlers run as
+  regions of a `<parallel>` and the two-event interrupt protocol is wired
+  on the group's own state.
+
+  A group has nothing to remember, so a `"resume"` handler re-enters the
+  `<parallel>` and the body restarts from its first step. Resuming where it
+  left off is `StatifierBlocks.Core.ResumableGroup`, and that difference is
+  the whole of what separates the two types.
+  """
   @impl true
-  def emit(block, _context), do: Config.emit_deferred(block)
+  def emit(_block, context), do: Emit.interruptible(context, nil)
 end

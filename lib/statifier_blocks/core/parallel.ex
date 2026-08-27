@@ -31,7 +31,10 @@ defmodule StatifierBlocks.Core.Parallel do
 
   @behaviour StatifierBlocks.BlockType
 
-  alias StatifierBlocks.Core.Config
+  alias StatifierBlocks.Block
+  alias StatifierBlocks.Compiler.Context
+  alias StatifierBlocks.Core.{Config, Emit}
+  alias StatifierBlocks.Emission
 
   @impl true
   def current_version, do: 1
@@ -111,8 +114,77 @@ defmodule StatifierBlocks.Core.Parallel do
       layout: :columns
     }
 
+  @doc """
+  A compound state wrapping one `<parallel>` whose regions are the lanes
+  (ADR-0004 decision 2), each region sequencing its own steps and finishing
+  at its own `<final>`.
+
+      <state id="s_PAR" initial="s_PAR__run">
+        <transition event="done.state.s_PAR__run" target="s_PAR__done"/>
+        <parallel id="s_PAR__run">
+          <state id="s_PAR__lane_crm" initial="...">...<final id="s_PAR__done_lane_crm"/></state>
+          <state id="s_PAR__lane_nurture" ...>
+        </parallel>
+        <final id="s_PAR__done"/>
+      </state>
+
+  A `<parallel>` is done when every region is, so the outer state needs one
+  transition and no join logic of its own.
+
+  The two role families are `lane_<name>` and `done_lane_<name>`. They
+  cannot collide with each other whatever a lane is called, because they
+  differ in their first token rather than their last - a lane named
+  `crm_done` mints `lane_crm_done` and `done_lane_crm_done`, and neither is
+  any other lane's id.
+
+  A parallel with no lanes emits no `<parallel>` at all: an empty one is
+  not valid SCXML, and "run nothing concurrently" is done the moment it
+  starts, so the block compiles to a state whose `initial` is its `<final>`.
+  """
   @impl true
-  def emit(block, _context), do: Config.emit_deferred(block)
+  def emit(%Block{config: config}, context) do
+    done = Context.done_id(context)
+
+    case lanes(config) do
+      [] ->
+        {:ok, Emit.state(context.state_id, done, [Emit.final(done)])}
+
+      lanes ->
+        with {:ok, run} <- Context.role_id(context, "run"),
+             {:ok, regions} <- regions(context, lanes) do
+          children = [
+            Emit.transition(event: "done.state." <> run, target: done, internal: true),
+            Emission.element("parallel", [{"id", run}], regions),
+            Emit.final(done)
+          ]
+
+          {:ok, Emit.state(context.state_id, run, children)}
+        end
+    end
+  end
+
+  defp regions(context, lanes) do
+    Enum.reduce_while(lanes, {:ok, []}, fn lane, {:ok, acc} ->
+      case region(context, lane) do
+        {:ok, region} -> {:cont, {:ok, [region | acc]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, acc} -> {:ok, Enum.reverse(acc)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp region(context, lane) do
+    with {:ok, region_id} <- Context.role_id(context, "lane_" <> lane),
+         {:ok, region_done} <- Context.role_id(context, "done_lane_" <> lane) do
+      {initial, transitions, refs} =
+        Emit.chain(Context.children(context, "lane_" <> lane), region_done)
+
+      {:ok, Emit.state(region_id, initial, transitions ++ refs ++ [Emit.final(region_done)])}
+    end
+  end
 
   # The well-formed lane names of `config`, in stored order.
   defp lanes(config) do
