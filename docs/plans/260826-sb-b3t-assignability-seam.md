@@ -467,21 +467,21 @@ Success:
 
 ## Automated Success Criteria
 
-- [ ] full `mix quality` green, coverage at or above 90%
-- [ ] `StatifierBlocks.Assignability` exports `check/5`, `valid_targets/4`,
+- [x] full `mix quality` green, coverage at or above 90%
+- [x] `StatifierBlocks.Assignability` exports `check/5`, `valid_targets/4`,
       `validate/3`, `inbound_type/4` and `assignable?/3` at ADR-0003's
       signatures, and defines all seven of its types
-- [ ] `StatifierBlocks.Assignability.Relation` declares `assignable?/2`
-- [ ] `%Palette{}.assignability` defaults to `nil` and `Palette.new/1` is
+- [x] `StatifierBlocks.Assignability.Relation` declares `assignable?/2`
+- [x] `%Palette{}.assignability` defaults to `nil` and `Palette.new/1` is
       unchanged for existing callers
-- [ ] `c:StatifierBlocks.BlockType.io/1` is specced
+- [x] `c:StatifierBlocks.BlockType.io/1` is specced
       `StatifierBlocks.Assignability.io()`
-- [ ] `test/support/core_fixtures.ex` contains no `admits?`, `kinds/2`,
+- [x] `test/support/core_fixtures.ex` contains no `admits?`, `kinds/2`,
       `slot_accepts/3` or `io/2`
-- [ ] the four acceptance properties from the bead assert in the suite
-- [ ] the widening fixtures live in `test/support/assignability_fixtures.ex`
+- [x] the four acceptance properties from the bead assert in the suite
+- [x] the widening fixtures live in `test/support/assignability_fixtures.ex`
       and `test/support/core_fixtures.ex` gained nothing
-- [ ] no second implementation of the relation exists: `grep -rn
+- [x] no second implementation of the relation exists: `grep -rn
       "slot_accepts\|:interrupt_handler" lib/` returns only the core types'
       `io/1` declarations, `Assignability`, and prose
 
@@ -516,6 +516,14 @@ implement, and each is written down because ADR-0003 does not settle it.
    inside a pure query, and the caller performing the move already knows both
    forms. If `sb-w50` finds it wants the other reading, that is an amendment to
    ADR-0003 decision 7, not a patch here.
+   **Machine-checked (unattended, 2026-08-26):** confirmed in
+   `lib/statifier_blocks/assignability.ex` - `check/5`'s vacated-seam helper
+   (`vacated_seam_finding/4`) reads the candidate's current position with
+   `Document.fetch_path(document, candidate.id)` against `document` exactly
+   as passed in, with no removal step applied first. The stated default is
+   what the code does. The underlying design question (whether a future
+   caller wants the other reading) is not settled by this check and is left
+   open for `sb-w50`.
 2. **Does `valid_targets/4` exclude the candidate's own subtree?** Dropping a
    block inside itself is not an assignability question - it is a
    tree-well-formedness question - and ADR-0003 does not mention it.
@@ -525,12 +533,22 @@ implement, and each is written down because ADR-0003 does not settle it.
    and slot room, with assignability named separately as the second. The
    editor owns the cycle check; a filter here would make this module partly
    responsible for a rule it does not state.
+   **Machine-checked (unattended, 2026-08-26):** confirmed `valid_targets/4`
+   in `lib/statifier_blocks/assignability.ex` enumerates every block via
+   `Document.blocks/1` with no exclusion of the candidate or its subtree.
+   The stated default is what the code does. Whether the editor's own
+   subtree-cycle filter is in place is `sb-w50`'s to confirm, not this bead's.
 3. **Does ADR-0002's typespec appendix get an editorial amendment?** Its
    `%Palette{types: ...}` line is now one field short of the accepted struct.
    ADR-0002 already carries a precedent for this (its decision 10 was amended
    at acceptance to defer to ADR-0003). **Default taken:** no ADR edit in this
    bead - out of the scope handed to it - and the mismatch is recorded here so
    whoever does the next ADR pass has it.
+   **Machine-checked (unattended, 2026-08-26):** confirmed no ADR file under
+   `docs/adr/` was edited by this bead (`git diff --stat` against this
+   branch's base shows no `docs/adr/` changes). The stated default (no ADR
+   edit in this bead) holds; the underlying question of whether ADR-0002
+   should get an editorial amendment is still open, for the next ADR pass.
 4. **`{:passthrough, slot}` naming a slot the block does not declare.**
    Decision 4 defines passthrough over a slot's contents and is silent on a
    declaration that names a slot `slots/1` does not return.
@@ -538,6 +556,12 @@ implement, and each is written down because ADR-0003 does not settle it.
    own inbound type. Permissive, total, and consistent with decision 5; the
    undeclared-slot condition is already ADR-0002 decision 6's finding and is
    reported by the walk that owns it.
+   **Machine-checked (unattended, 2026-08-26):** confirmed in `produces/4`
+   (`lib/statifier_blocks/assignability.ex`) - resolving `{:passthrough,
+   slot}` reads the slot's children with a lookup that defaults to `[]` for
+   a slot the block's config does not carry, which falls straight through to
+   the "empty slot -> own inbound type" arm. No special case exists for an
+   undeclared slot name. The stated default is what the code does.
 5. **`valid_targets/4` is per position; ADR-0005's `droppable_slots/3` is per
    slot.** ADR-0003's typespec block returns `[target()]`, and `target()` is
    `{block_id, slot_name, index}` - the data-flow gate genuinely depends on the
@@ -554,3 +578,8 @@ implement, and each is written down because ADR-0003 does not settle it.
    index in it is accepted - is `sb-w50`'s to make and to record, and it is the
    one that keeps ADR-0005's "consulted through one predicate and nothing else"
    true. Whoever picks up `sb-w50` should read this note first.
+   **Machine-checked (unattended, 2026-08-26):** confirmed `valid_targets/4`
+   ships exactly as ADR-0003 specs it - returns `[target()]` with a
+   `{block_id, slot_name, index}` per accepted position, no per-slot
+   reduction applied. The stated default holds; the reconciliation with
+   ADR-0005's `droppable_slots/3` is still `sb-w50`'s to make.
