@@ -99,19 +99,31 @@ defmodule StatifierBlocks.Core.Emit do
   it - which for a `<parallel>`'s region means tearing down the other
   regions mid-flight. That is not a subtlety a block-type author should
   have to rediscover, so the builders below set it and this note says why.
+
+  `cond_key` names the config field the `cond` came from verbatim, which
+  is what makes an upstream expression error the author's typo rather than
+  a bug in the block type (ADR-0004 decision 9). Pass it whenever the
+  condition is an author's `:expression` field rather than something the
+  type composed.
   """
   @spec transition(keyword(), [Emission.node_t()]) :: Emission.t()
   def transition(opts, children \\ []) do
-    Emission.element(
-      "transition",
-      [
-        {"cond", Keyword.get(opts, :cond)},
-        {"event", Keyword.get(opts, :event)},
-        {"target", Keyword.get(opts, :target)},
-        {"type", if(Keyword.get(opts, :internal, false), do: "internal")}
-      ],
-      children
-    )
+    element =
+      Emission.element(
+        "transition",
+        [
+          {"cond", Keyword.get(opts, :cond)},
+          {"event", Keyword.get(opts, :event)},
+          {"target", Keyword.get(opts, :target)},
+          {"type", if(Keyword.get(opts, :internal, false), do: "internal")}
+        ],
+        children
+      )
+
+    case Keyword.get(opts, :cond_key) do
+      nil -> element
+      key -> Emission.attribute_from_config(element, "cond", key)
+    end
   end
 
   @doc """
@@ -121,6 +133,13 @@ defmodule StatifierBlocks.Core.Emit do
   (the first child, or `exit_target` for an empty run), one transition per
   adjacent pair plus one from the last child to `exit_target`, and a
   placeholder per child for the compiler to splice.
+
+  Each transition is attributed to **the child it leaves**, not to the
+  container that emitted it (ADR-0004 decision 5). "What happens after the
+  enrich step" is the fact an author would recognise, so a finding against
+  that transition belongs on the enrich block rather than on the sequence
+  around it. Attribution carries no bytes, so this changes nothing about
+  the generated chart.
   """
   @spec chain([Context.child_summary()], String.t()) ::
           {String.t(), [Emission.t()], [Emission.node_t()]}
@@ -131,7 +150,9 @@ defmodule StatifierBlocks.Core.Emit do
       summaries
       |> Enum.zip(tl(targets))
       |> Enum.map(fn {summary, target} ->
-        transition(event: summary.done_event, target: target, internal: true)
+        [event: summary.done_event, target: target, internal: true]
+        |> transition()
+        |> Emission.attributed_to(summary.block_id)
       end)
 
     {hd(targets), transitions, Enum.map(summaries, &Emission.child_ref(&1.block_id))}

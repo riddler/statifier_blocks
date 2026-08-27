@@ -35,6 +35,13 @@ defmodule StatifierBlocks.CanonicalJson do
     object(pairs)
   end
 
+  # The same rules over a plain term rather than a document: sorted object
+  # keys, no insignificant whitespace, no floats, nothing omitted. Used by
+  # `StatifierBlocks.Provenance.to_json/1`, which ADR-0004 decision 5 binds
+  # to decision 8's canonical rules without making it part of the document.
+  @spec encode_term(term()) :: iodata()
+  def encode_term(term), do: value(term)
+
   @spec value(term()) :: iodata()
   defp value(%Block{} = block) do
     pairs = [

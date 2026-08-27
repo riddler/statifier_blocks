@@ -200,14 +200,15 @@ defmodule StatifierBlocks.Core.Branch do
     done = Context.done_id(context)
 
     with {:ok, pick} <- Context.role_id(context, "pick") do
-      branches = arm_branches(config, context) ++ [{nil, Context.children(context, "otherwise")}]
+      branches =
+        arm_branches(config, context) ++ [{nil, nil, Context.children(context, "otherwise")}]
 
       picks =
-        Enum.map(branches, fn {condition, children} ->
-          Emit.transition(cond: condition, target: entry(children, done))
+        Enum.map(branches, fn {condition, key, children} ->
+          Emit.transition(cond: condition, cond_key: key, target: entry(children, done))
         end)
 
-      chained = Enum.map(branches, fn {_cond, children} -> Emit.chain(children, done) end)
+      chained = Enum.map(branches, fn {_cond, _key, children} -> Emit.chain(children, done) end)
       transitions = Enum.flat_map(chained, fn {_initial, transitions, _refs} -> transitions end)
       refs = Enum.flat_map(chained, fn {_initial, _transitions, refs} -> refs end)
 
@@ -218,13 +219,20 @@ defmodule StatifierBlocks.Core.Branch do
     end
   end
 
-  # `{cond, children}` per well-formed arm, in config order. `arms/1` has
-  # already dropped anything that could not name a slot, and `slots/1`
-  # declared the same list, so every slot named here is one the compiler
-  # walked.
+  # `{cond, config key, children}` per well-formed arm, in config order.
+  # `arms/1` has already dropped anything that could not name a slot, and
+  # `slots/1` declared the same list, so every slot named here is one the
+  # compiler walked.
+  #
+  # The config key is the **arm's slot name**, because that is what
+  # `config_schema/1` keys the arm's `:expression` field by and therefore
+  # what an editor anchors a finding to (ADR-0005 decision 11). ADR-0004's
+  # worked example writes `key: "arms"` in its illustration, which predates
+  # this type's per-arm schema; the key that routes a finding to the field
+  # the author typed into is the one that matters, and it is this one.
   defp arm_branches(config, context) do
     Enum.map(arms(config), fn %{"slot" => slot} = arm ->
-      {Map.get(arm, "cond"), Context.children(context, slot)}
+      {Map.get(arm, "cond"), slot, Context.children(context, slot)}
     end)
   end
 
