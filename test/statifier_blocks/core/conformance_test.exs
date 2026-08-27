@@ -16,7 +16,8 @@ defmodule StatifierBlocks.Core.ConformanceTest do
 
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{Assignability, Block, CoreFixtures}
+  alias StatifierBlocks.{Assignability, Block, CoreFixtures, Emission}
+  alias StatifierBlocks.Compiler.Context
 
   @arities [:any, :at_least_one, :exactly_one, :zero_or_one]
   @io_keys [:kinds, :consumes, :produces, :slot_accepts]
@@ -170,12 +171,30 @@ defmodule StatifierBlocks.Core.ConformanceTest do
         assert @module.palette_entry() == @module.palette_entry()
       end
 
-      # Sabotage: made `emit_deferred/1` raise instead of returning - red
-      # here, which is the difference between a deferral and a landmine.
-      test "emit/2 defers with a typed error rather than raising" do
+      # Sabotage: made Core.Emit.ordered/2 return a bare Emission rather
+      # than {:ok, emission} - red here for every container type, which is
+      # what "answers in the contract's shape" is worth checking (verified).
+      test "emit/2 answers in ADR-0004 decision 4's shape for a config this type accepts" do
         block = Block.new("core.example", id: "blk_EMIT", config: @valid)
+        context = Context.new("blk_EMIT", "bdoc_CONF")
 
-        assert {:error, {:not_implemented, "blk_EMIT"}} = @module.emit(block, %{})
+        assert {:ok, %Emission{name: name}} = @module.emit(block, context)
+        assert name in ["state", "parallel"]
+      end
+
+      # `emit/2` is a pure total function of its arguments, so it has to
+      # answer for a config `validate_config/1` would reject rather than
+      # raising on it - the compiler's Config stage makes that arm
+      # unreachable in practice, never impossible.
+      #
+      # Sabotage: made Core.OnEvent.emit/2 read `outcome` unchecked - red
+      # here, since a raise is not an answer (verified).
+      test "emit/2 answers rather than raising for a config this type rejects" do
+        block = Block.new("core.example", id: "blk_EMIT", config: %{"nonsense" => true})
+        context = Context.new("blk_EMIT", "bdoc_CONF")
+
+        assert match?({:ok, %Emission{}}, @module.emit(block, context)) or
+                 match?({:error, _reason}, @module.emit(block, context))
       end
     end
   end

@@ -26,7 +26,8 @@ defmodule StatifierBlocks.Core.ResumableGroup do
 
   @behaviour StatifierBlocks.BlockType
 
-  alias StatifierBlocks.Core.Config
+  alias StatifierBlocks.Block
+  alias StatifierBlocks.Core.{Config, Emit}
 
   @history ["shallow", "deep"]
 
@@ -86,6 +87,24 @@ defmodule StatifierBlocks.Core.ResumableGroup do
       slot_style: %{"body" => :primary, "interrupts" => :secondary}
     }
 
+  @doc """
+  `StatifierBlocks.Core.Group`'s shape plus a `<history>` inside the body
+  region, of the type `history` names. A `"resume"` handler targets that
+  history rather than the `<parallel>`, so the body re-enters where it left
+  off instead of restarting - which is the whole of what this config buys,
+  and why ADR-0002 decision 10 could leave it as one `:select` field.
+
+  A config carrying neither `"shallow"` nor `"deep"` is refused here as
+  well as in `validate_config/1`. The compiler runs the Config stage first,
+  so that arm is unreachable through `StatifierBlocks.Compiler`; it exists
+  because `emit/2` is a total function of its arguments and has to answer
+  for the config it was handed rather than for the one it assumed.
+  """
   @impl true
-  def emit(block, _context), do: Config.emit_deferred(block)
+  def emit(%Block{config: config}, context) do
+    case Map.get(config, "history") do
+      history when history in @history -> Emit.interruptible(context, history)
+      _other -> {:error, [{"history", ~s(pick "shallow" or "deep")}]}
+    end
+  end
 end

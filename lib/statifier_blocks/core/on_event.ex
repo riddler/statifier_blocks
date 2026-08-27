@@ -48,7 +48,10 @@ defmodule StatifierBlocks.Core.OnEvent do
 
   @behaviour StatifierBlocks.BlockType
 
-  alias StatifierBlocks.Core.Config
+  alias StatifierBlocks.Block
+  alias StatifierBlocks.Compiler.Context
+  alias StatifierBlocks.Core.{Config, Emit}
+  alias StatifierBlocks.Emission
 
   @outcomes ["abandon", "resume"]
 
@@ -143,6 +146,58 @@ defmodule StatifierBlocks.Core.OnEvent do
     }
   end
 
+  @doc """
+  A compound state that waits for `event` and, when it arrives, raises the
+  interrupt-protocol event its `outcome` names before going final.
+
+      <state id="s_INT" initial="s_INT__armed">
+        <state id="s_INT__armed">
+          <transition event="order.cancelled" target="s_INT__done">
+            <raise event="statifier_blocks.interrupt.abandon"/>
+          </transition>
+        </state>
+        <final id="s_INT__done"/>
+      </state>
+
+  The group this handler sits in runs it as a region of a `<parallel>`
+  alongside the body, which is what keeps it live while the body works, and
+  transitions on **both** protocol events unconditionally - see
+  `StatifierBlocks.Core.Emit`. The raise is how the outcome crosses that
+  seam: ADR-0004 decision 4 keeps a child's config out of its parent's
+  context on purpose, so the group cannot read `outcome` and must not try.
+
+  A raised event is internal, so it is processed before any external event
+  the queue is holding, and a nested group's handler is selected over an
+  outer group's because SCXML prefers the transition whose source is the
+  deepest active state.
+  """
   @impl true
-  def emit(block, _context), do: Config.emit_deferred(block)
+  def emit(%Block{config: config}, context) do
+    done = Context.done_id(context)
+
+    with {:ok, armed} <- Context.role_id(context, "armed"),
+         {:ok, outcome} <- outcome_event(Map.get(config, "outcome")),
+         {:ok, event} <- event_name(Map.get(config, "event")) do
+      watcher =
+        Emit.state(armed, nil, [
+          Emit.transition([event: event, target: done], [
+            Emission.element("raise", [{"event", outcome}])
+          ])
+        ])
+
+      {:ok, Emit.state(context.state_id, armed, [watcher, Emit.final(done)])}
+    end
+  end
+
+  defp outcome_event("abandon"), do: {:ok, Emit.interrupt_events().abandon}
+  defp outcome_event("resume"), do: {:ok, Emit.interrupt_events().resume}
+  defp outcome_event(_other), do: {:error, [{"outcome", ~s(pick "abandon" or "resume")}]}
+
+  defp event_name(event) do
+    if Config.event_name?(event) do
+      {:ok, event}
+    else
+      {:error, [{"event", "must be an event name, like order.cancelled"}]}
+    end
+  end
 end

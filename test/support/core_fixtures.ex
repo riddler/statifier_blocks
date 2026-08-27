@@ -16,7 +16,9 @@ defmodule StatifierBlocks.CoreFixtures do
   `myapp.*` types.
   """
 
-  alias StatifierBlocks.{Assignability, Block, Core, Document, Palette}
+  alias StatifierBlocks.{Assignability, Block, Core, Document, Emission, Palette}
+  alias StatifierBlocks.Compiler.Context
+  alias StatifierBlocks.Core.Emit
 
   defmodule Enrich do
     @moduledoc """
@@ -46,7 +48,8 @@ defmodule StatifierBlocks.CoreFixtures do
     def io(_config), do: %{kinds: [:step], produces: "record"}
 
     @impl true
-    def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+    def emit(%Block{} = block, context),
+      do: StatifierBlocks.CoreFixtures.invoke_leaf(block, context)
   end
 
   defmodule Notify do
@@ -68,7 +71,8 @@ defmodule StatifierBlocks.CoreFixtures do
     def validate_config(_config), do: :ok
 
     @impl true
-    def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+    def emit(%Block{} = block, context),
+      do: StatifierBlocks.CoreFixtures.invoke_leaf(block, context)
   end
 
   defmodule CrmPush do
@@ -93,7 +97,8 @@ defmodule StatifierBlocks.CoreFixtures do
     def io(_config), do: %{kinds: [:step], consumes: "record"}
 
     @impl true
-    def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+    def emit(%Block{} = block, context),
+      do: StatifierBlocks.CoreFixtures.invoke_leaf(block, context)
   end
 
   defmodule OnEvent do
@@ -125,7 +130,71 @@ defmodule StatifierBlocks.CoreFixtures do
     def io(_config), do: %{kinds: [:interrupt_handler]}
 
     @impl true
-    def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+    def emit(%Block{} = block, context),
+      do: StatifierBlocks.CoreFixtures.handler_leaf(block, context)
+  end
+
+  @doc """
+  The emission a host's invoking leaf produces: one compound state that
+  starts an `<invoke>` on entry and finishes when the invocation reports
+  back, either way.
+
+  It is here rather than in `lib/` because the invoking leaf is exactly the
+  block type a host writes and this package does not ship - `core.*` is
+  structure, never domain (ADR-0002 decision 10). What it demonstrates is
+  the convention `StatifierBlocks.Core.Emit` documents: one compound state,
+  one `<final>`, completion signalled by `done.state`.
+  """
+  @spec invoke_leaf(Block.t(), Context.t()) :: {:ok, Emission.t()}
+  def invoke_leaf(%Block{config: config}, %Context{} = context) do
+    done = Context.done_id(context)
+    {:ok, running} = Context.role_id(context, "running")
+    {:ok, invocation} = Context.role_id(context, "invocation")
+
+    invoke =
+      Emission.element("invoke", [
+        {"id", invocation},
+        {"type", Map.get(config, "invoke_type", "")}
+      ])
+
+    state =
+      Emit.state(running, nil, [
+        invoke,
+        Emit.transition(event: "done.invoke." <> invocation, target: done),
+        Emit.transition(event: "error.execution", target: done)
+      ])
+
+    {:ok, Emit.state(context.state_id, running, [state, Emit.final(done)])}
+  end
+
+  @doc """
+  The emission a host's interrupt handler produces: the same shape
+  `StatifierBlocks.Core.OnEvent` uses, raising one of the two protocol
+  events `StatifierBlocks.Core.Emit.interrupt_events/0` names.
+
+  Its presence is the point of the `myapp.on_event` fixture: a host handler
+  joins the protocol by raising the same events, and the group admits it
+  through kind tags without either type naming the other.
+  """
+  @spec handler_leaf(Block.t(), Context.t()) :: {:ok, Emission.t()}
+  def handler_leaf(%Block{config: config}, %Context{} = context) do
+    done = Context.done_id(context)
+    {:ok, armed} = Context.role_id(context, "armed")
+
+    outcome =
+      case Map.get(config, "outcome") do
+        "resume" -> Emit.interrupt_events().resume
+        _abandon -> Emit.interrupt_events().abandon
+      end
+
+    watcher =
+      Emit.state(armed, nil, [
+        Emit.transition([event: Map.get(config, "event", "myapp.interrupt"), target: done], [
+          Emission.element("raise", [{"event", outcome}])
+        ])
+      ])
+
+    {:ok, Emit.state(context.state_id, armed, [watcher, Emit.final(done)])}
   end
 
   @doc "The `myapp.*` types the ADR-0001 worked example names."

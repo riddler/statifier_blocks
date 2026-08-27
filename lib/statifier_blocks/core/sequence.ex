@@ -20,7 +20,8 @@ defmodule StatifierBlocks.Core.Sequence do
 
   @behaviour StatifierBlocks.BlockType
 
-  alias StatifierBlocks.Core.Config
+  alias StatifierBlocks.Compiler.Context
+  alias StatifierBlocks.Core.Emit
 
   @impl true
   def current_version, do: 1
@@ -60,6 +61,13 @@ defmodule StatifierBlocks.Core.Sequence do
       layout: :stack
     }
 
+  @doc """
+  A compound state running `body` in order and finishing at its own
+  `<final>` - `StatifierBlocks.Core.Emit`'s plain ordered shape, with
+  nothing added. A sequence with an empty `body` enters its `<final>`
+  directly and is done, which is the honest compilation of "these, in this
+  order" over no steps.
+  """
   @impl true
-  def emit(block, _context), do: Config.emit_deferred(block)
+  def emit(_block, context), do: Emit.ordered(context, Context.children(context, "body"))
 end

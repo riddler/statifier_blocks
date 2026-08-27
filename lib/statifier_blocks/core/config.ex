@@ -8,7 +8,7 @@ defmodule StatifierBlocks.Core.Config do
   # them seven times. Every function is pure and total - decision 4 applies
   # to anything a callback calls, not only to the callback itself.
 
-  alias StatifierBlocks.{Block, BlockType}
+  alias StatifierBlocks.BlockType
 
   # A bare lowercase identifier: what a lane name has to be for
   # `"lane_" <> name` to be a usable slot name.
@@ -52,13 +52,6 @@ defmodule StatifierBlocks.Core.Config do
   @spec verdict([BlockType.finding()]) :: :ok | {:error, [BlockType.finding()]}
   def verdict([]), do: :ok
   def verdict(findings), do: {:error, Enum.reverse(findings)}
-
-  @doc """
-  The `{:error, term()}` every core `emit/2` returns until the compiler
-  bead supplies a body. See `StatifierBlocks.Core`.
-  """
-  @spec emit_deferred(Block.t()) :: {:error, {:not_implemented, Block.id()}}
-  def emit_deferred(%Block{id: id}), do: {:error, {:not_implemented, id}}
 
   @doc """
   A `:select` field's value check: present, and one of the declared option

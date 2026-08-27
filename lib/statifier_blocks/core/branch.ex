@@ -45,7 +45,9 @@ defmodule StatifierBlocks.Core.Branch do
 
   @behaviour StatifierBlocks.BlockType
 
-  alias StatifierBlocks.Core.Config
+  alias StatifierBlocks.Block
+  alias StatifierBlocks.Compiler.Context
+  alias StatifierBlocks.Core.{Config, Emit}
 
   @impl true
   def current_version, do: 1
@@ -168,8 +170,66 @@ defmodule StatifierBlocks.Core.Branch do
     }
   end
 
+  @doc """
+  A compound state whose `initial` is a transient `pick` state carrying one
+  conditional transition per arm, in config order, then an unconditional
+  one for `otherwise` (ADR-0004 decision 2 names this shape).
+
+      <state id="s_BR" initial="s_BR__pick">
+        <state id="s_BR__pick">
+          <transition cond="score &gt; 80" target="s_blk_A"/>
+          <transition target="s_blk_B"/>
+        </state>
+        <transition event="done.state.s_blk_A" target="s_BR__done"/>
+        ...
+        <final id="s_BR__done"/>
+      </state>
+
+  An arm's `cond` is the author's `:expression` config passed through
+  verbatim into predicator's datamodel - the compiler ships no expression
+  checking of its own (ADR-0004 decision 9), so a typo there surfaces as an
+  upstream compile error routed back through provenance by sb-qz0.
+
+  Each arm's steps are sequenced the same way a `core.sequence`'s are, and
+  every arm's last step transitions to the block's own `<final>`, so a
+  branch is done when whichever arm it took is done. An empty `otherwise`
+  transitions there directly.
+  """
   @impl true
-  def emit(block, _context), do: Config.emit_deferred(block)
+  def emit(%Block{config: config}, context) do
+    done = Context.done_id(context)
+
+    with {:ok, pick} <- Context.role_id(context, "pick") do
+      branches = arm_branches(config, context) ++ [{nil, Context.children(context, "otherwise")}]
+
+      picks =
+        Enum.map(branches, fn {condition, children} ->
+          Emit.transition(cond: condition, target: entry(children, done))
+        end)
+
+      chained = Enum.map(branches, fn {_cond, children} -> Emit.chain(children, done) end)
+      transitions = Enum.flat_map(chained, fn {_initial, transitions, _refs} -> transitions end)
+      refs = Enum.flat_map(chained, fn {_initial, _transitions, refs} -> refs end)
+
+      children =
+        [Emit.state(pick, nil, picks)] ++ transitions ++ refs ++ [Emit.final(done)]
+
+      {:ok, Emit.state(context.state_id, pick, children)}
+    end
+  end
+
+  # `{cond, children}` per well-formed arm, in config order. `arms/1` has
+  # already dropped anything that could not name a slot, and `slots/1`
+  # declared the same list, so every slot named here is one the compiler
+  # walked.
+  defp arm_branches(config, context) do
+    Enum.map(arms(config), fn %{"slot" => slot} = arm ->
+      {Map.get(arm, "cond"), Context.children(context, slot)}
+    end)
+  end
+
+  defp entry([], done), do: done
+  defp entry([first | _rest], _done), do: first.state_id
 
   # The well-formed arms of `config`, in stored order. Anything that is not
   # a map carrying a usable slot name is dropped: `slots/1` and

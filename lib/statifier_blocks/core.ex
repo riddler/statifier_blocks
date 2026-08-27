@@ -53,13 +53,14 @@ defmodule StatifierBlocks.Core do
   constraint by declaring the same thing, and `core.on_event` never has to
   enumerate the groups it is allowed inside.
 
-  ## `emit/2` is deferred
+  ## What they compile to
 
-  ADR-0004 decision 4 fixes `emit/2` as
-  `{:ok, Emission.t()} | {:error, [finding()]}`, and neither type exists
-  yet - both belong to the compiler bead. Every core type therefore answers
-  `emit/2` with `{:error, {:not_implemented, block_id}}`: total, pure, an
-  ordinary error arm rather than a raise, and within the behaviour's
-  current `{:error, term()}` spec. The bodies land with the compiler.
+  All seven emit through `#{inspect(__MODULE__)}.Emit`, which is where the
+  SCXML shapes and the one convention they share are written down: a block
+  is one compound state carrying a `<final>`, and completion is
+  `done.state.<state id>` (ADR-0004 decision 2). Read that module before
+  writing a host block type - a type that follows the same convention
+  composes with these without either side knowing about the other, and a
+  type that does not is a type no container can sequence after.
   """
 end
