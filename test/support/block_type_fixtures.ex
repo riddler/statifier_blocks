@@ -7,6 +7,10 @@ defmodule StatifierBlocks.BlockTypeFixtures do
   than being silently required. `StringKeyedFixtures` and `PathFixtures`
   exist only to cover two of the four `fixtures/0` spellings amendment 9a
   names that `Toy`'s atom-keyed map cannot demonstrate on its own.
+  `ErroringMigration` and `NoMigration` (phase 3) cover
+  `Palette.resolve/2`'s two `:migration_failed` causes: a `migrate_config/2`
+  that itself errors, and a type whose config shape has changed with no
+  `migrate_config/2` at all.
 
   `raw_palette/0` returns the plain `%{type_name => module}` map phase 1
   needed, kept for anything that wants the bare map. `palette/0` (phase 2)
@@ -168,6 +172,63 @@ defmodule StatifierBlocks.BlockTypeFixtures do
     def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
   end
 
+  defmodule ErroringMigration do
+    @moduledoc """
+    Phase 3 fixture: `current_version/0 == 3`, and a `migrate_config/2` that
+    only understands `from: 2` - a block at `type_version: 1` reaches its
+    catch-all error clause, exercising `Palette.resolve/2`'s
+    `:migration_failed` arm for a migration that itself fails (as opposed
+    to `NoMigration`'s absent-callback case below).
+    """
+
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 3
+
+    @impl true
+    def slots(_config), do: []
+
+    @impl true
+    def config_schema(_config), do: []
+
+    @impl true
+    def validate_config(_config), do: :ok
+
+    @impl true
+    def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+
+    @impl true
+    def migrate_config(2, config), do: {:ok, config}
+    def migrate_config(from, _config), do: {:error, {:no_migration_from, from}}
+  end
+
+  defmodule NoMigration do
+    @moduledoc """
+    Phase 3 fixture: `current_version/0 == 2` with **no** `migrate_config/2`
+    at all, so `Palette.resolve/2` reaches the absent-callback branch of
+    `:migration_failed` rather than a callback that itself returns an
+    error.
+    """
+
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 2
+
+    @impl true
+    def slots(_config), do: []
+
+    @impl true
+    def config_schema(_config), do: []
+
+    @impl true
+    def validate_config(_config), do: :ok
+
+    @impl true
+    def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+  end
+
   defmodule StringKeyedFixtures do
     @moduledoc """
     A one-line `fixtures/0` spelling: a map with string top-level keys,
@@ -200,7 +261,9 @@ defmodule StatifierBlocks.BlockTypeFixtures do
   def raw_palette do
     %{
       "toy.score" => Toy,
-      "toy.minimal" => Minimal
+      "toy.minimal" => Minimal,
+      "toy.erroring_migration" => ErroringMigration,
+      "toy.no_migration" => NoMigration
     }
   end
 
