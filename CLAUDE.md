@@ -117,19 +117,23 @@ author by hand. This package is the authoring layer above both:
   domain needs; the compiler and the editor work off that registry rather than
   a closed built-in vocabulary.
 
-**Nothing is implemented yet.** The repository holds the scaffold only, so
-almost every convention below is inherited rather than demonstrated.
+The document model, the `core.*` vocabulary, the compiler and its provenance
+map, the edit algebra and view model, and the LiveView editor shell are all
+built. The README's worked example runs the whole path and is executed by
+`test/statifier_blocks/readme_test.exs` on every build - a README snippet that
+stops compiling against the real API fails the gate rather than the reader.
 
 Always refer to state machines as **state charts**, as statifier-ex does.
 
 ### Read before writing any code here
 
-The five P0 ADR beads (`sb-png` document schema, `sb-5n0` block-type
-behaviour, `sb-7rx` host-pluggable assignability, `sb-iwz` compiler and
-provenance map, `sb-w50` LiveView editor architecture) decide the contracts
-this package is built out of. Until an ADR is accepted, its contract is open:
-do not encode a guess about it in code, and stop and report if a bead needs an
-answer that no accepted ADR gives.
+The five founding ADRs (0001 document schema, 0002 block-type behaviour, 0003
+host-pluggable assignability, 0004 compiler and provenance map, 0005 LiveView
+editor architecture) are accepted, and they are the contracts this package is
+built out of. Read the record before changing the code that implements it:
+when the two disagree the record is the contract and the code is the bug. A
+bead that needs an answer no accepted ADR gives is a stop-and-report, not a
+guess encoded in code.
 
 The contracts this package consumes live in the siblings, not here:
 
@@ -153,8 +157,10 @@ Full `mix quality` must be green before any commit. The format stage runs in
 check mode (`format: [check: true]` in `.quality.exs`): drift fails the gate
 and nothing is rewritten, so run `mix format` yourself before committing. The
 gate is deliberately smaller than statifier-ex's; `.quality.exs` records why,
-including the `coveralls.json` deviation that keeps the fleet's 90% floor
-meaningful while the package is still a moduledoc-only scaffold.
+including the `coveralls.json` deviation that kept the fleet's 90% floor
+meaningful while the package had no executable code. That premise has lapsed
+now that it does; whether to drop the flag for strict parity is the fleet's
+call, and `.quality.exs` says so.
 
 To co-develop a change that spans this package and the engine, export
 `STATIFIER_PATH` at a local statifier-ex checkout. `mix.exs` reads it so the

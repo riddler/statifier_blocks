@@ -186,7 +186,7 @@ defmodule StatifierBlocks.BlockType do
 
   @doc """
   Type expressions for assignability. The return shape is
-  `StatifierBlocks.Assignability.io/0` (ADR-0003). Absent means
+  `t:StatifierBlocks.Assignability.io/0` (ADR-0003). Absent means
   assignability treats the block as unconstrained.
   """
   @callback io(Block.config()) :: StatifierBlocks.Assignability.io()
