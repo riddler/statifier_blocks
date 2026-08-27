@@ -623,13 +623,13 @@ the `%{}` context note, and the widening note for `droppable_slots_for/3`.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] full `mix quality` green, coverage at or above 90%
-- [ ] all four d5 rules have a named test, and rule 4's test drags a group with
+- [x] full `mix quality` green, coverage at or above 90%
+- [x] all four d5 rules have a named test, and rule 4's test drags a group with
       descendants
-- [ ] a test compares `droppable_slots/3`'s output against the projection of
+- [x] a test compares `droppable_slots/3`'s output against the projection of
       `Assignability.valid_targets/4`, so the reduction is asserted rather than
       assumed
-- [ ] `grep -rn "Phoenix" lib/ test/` returns nothing
+- [x] `grep -rn "Phoenix" lib/ test/` returns nothing
 
 #### Manual Verification:
 - [ ] A sabotage note sits above every new test asserting `lib/` behaviour, and
@@ -895,5 +895,15 @@ criteria gate advancement and the Manual ones are deferred.
       each named mutation was actually run and actually went red
 - [ ] Running the gate on undo/redo is stated in the moduledoc together with
       the single-session justification
+
+---
+
+### Phase 4
+
+- [ ] A sabotage note sits above every new test asserting `lib/` behaviour, and
+      each named mutation was actually run and actually went red
+- [ ] The moduledoc's reduction paragraph names both functions and states the
+      residue, not only the conclusion
+- [ ] The seven-slot worked-example assertion matches the ADR's list exactly
 
 ---
