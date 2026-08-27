@@ -1,6 +1,6 @@
 # ADR-0001: The block document is a tree of typed blocks with named slots
 
-Status: accepted (2026-08-26)
+Status: accepted (2026-08-26); fetch_path/2 doc line amended (2026-08-27)
 
 ## Context
 
@@ -322,7 +322,10 @@ defmodule StatifierBlocks.Document do
           | {:error, {:malformed_block, Block.id() | nil, term()}}
           | {:error, {:malformed_envelope, term()}}
 
-  @doc "Walks the tree; `nil` when the id is absent."
+  @doc "Walks the tree; `:error` when the id is absent (amended 2026-08-27:
+  the prose previously said `nil`, contradicting this spec; the spec was
+  always the normative content of this section and the shipped function
+  follows it - the root answers `{:ok, []}`)."
   @spec fetch_path(t(), Block.id()) :: {:ok, path()} | :error
 end
 ```
