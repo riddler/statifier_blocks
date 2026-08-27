@@ -1,6 +1,6 @@
 # ADR-0002: A block type is a behaviour module resolved through a caller-supplied palette
 
-Status: accepted (2026-08-26)
+Status: accepted (2026-08-26); decision 9 amended (2026-08-26)
 
 ## Context
 
@@ -236,6 +236,62 @@ When sui-13q lands, this section is amended to cite it, and the return type
 of `fixtures/0` is pinned to whatever it settles. Until then a host wiring
 `fixtures/0` should expect the return shape to change.
 
+*Amended (2026-08-26), and this decision is no longer provisional:* sui-13q
+landed. The convention is statifier-ui's `docs/fixture-bundles.md`, and this
+record adopts it whole rather than restating it - that page is the authority
+on the bundle shape, and a disagreement between it and the summary below is
+resolved in its favour. The three things this record now pins:
+
+**9a. `fixtures/0` returns one of four spellings**, exactly the set that page
+defines, and `StatifierUI.Fixtures.Bundle.load/3` is what reads it:
+
+| Spelling | Recognized by |
+|---|---|
+| `%StatifierUI.Fixtures{}` | the struct |
+| `%{scenarios: ..., events: ..., datasets: ..., expressions: ...}` | **atom** top-level keys |
+| `%{"version" => 1, "datasets" => ...}` | **string** top-level keys |
+| `"palette/score.fixtures.json"` | a binary path |
+
+The atom-versus-string top-level key is the whole discriminator: atom keys
+are the Elixir spelling a host writes by hand in a module, string keys are
+the JSON spelling that survives a file, and a map mixing the two is rejected
+as `{:mixed_bundle_keys, name}` rather than guessed at. Unknown top-level
+keys are ignored on the JSON spelling (the sidecar's forward-compatibility
+discipline, sui-ADR-0006) and rejected on the Elixir spelling as
+`{:unknown_bundle_key, name, key}`, because an unknown atom key is a typo in
+code the author is looking at. A block type that implements no `fixtures/0`
+at all is an absence, never an error.
+
+**9b. The bundle is addressed by block type name.** A bundle carries the
+fragment name it was loaded under, and for this package that name is the
+`type_name` the palette resolves (decision 1) - the same string the document
+stores. That is what lets a host discover the whole palette's examples at
+once with `StatifierUI.Fixtures.Bundle.discover/2` over its palette map, and
+what makes a failing expectation name the block type that drifted.
+
+**9c. Discovery is per-entry, never all-or-nothing.** One palette entry's
+malformed bundle is reported against that entry's name and every other entry
+still loads; a `fixtures/0` that raises is caught the same way. This is the
+same discipline decision 3 applies to resolution, arriving from the other
+package for the same reason: one bad palette entry must not hide every good
+one.
+
+Read the callback table's `fixtures/0` row as owned by sui-13q rather than
+"provisional", and the two PROVISIONAL comments in the worked example as
+settled - the example's atom-keyed map was already one of the four
+spellings, so nothing in it changes. The typespec block below keeps
+`@callback fixtures() :: term()`, and that is not laziness: statifier-ui
+names no single type for the union of the four spellings, and inventing one
+here would be this package asserting a type it does not own. The authority is
+what `StatifierUI.Fixtures.Bundle.load/3` accepts.
+
+What this amendment does **not** do: it does not make `statifier_ui` a
+required dependency of this package. Nothing here calls the loader. A host
+that wants palette-entry test panels depends on `statifier_ui` itself, and a
+host that does not can leave `fixtures/0` unimplemented and lose nothing.
+Whether this package ever grows an optional dependency to validate bundles at
+palette-construction time is sb-w50's question, not this record's.
+
 **10. The core vocabulary, as answers to these callbacks.** ADR-0001
 decision 10 listed the structural block types as the load its schema had to
 carry. Here they are as block-type contracts. Their SCXML emission remains
@@ -311,6 +367,8 @@ records do not have to re-derive the boundary:
   that gap is sb-iwz's and sb-w50's to act on if either wants a lint.
 - Pinning `fixtures/0` provisionally means one known future amendment to
   this record. It is scoped to decision 9 and touches no other decision.
+  *Amended (2026-08-26): discharged. That amendment is decision 9's 9a-9c
+  above, and it touched no other decision, as predicted.*
 
 ## The contract as typespecs
 
