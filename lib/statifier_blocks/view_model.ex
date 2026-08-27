@@ -99,7 +99,16 @@ defmodule StatifierBlocks.ViewModel do
   alias StatifierBlocks.{Block, BlockType, CanonicalJson, Document, Finding, Palette}
 
   defmodule Field do
-    @moduledoc "One config field, its schema and its current value (ADR-0005 decision 9)."
+    @moduledoc """
+    One config field, its schema and its current value (ADR-0005 decision 9).
+
+    `key` is the field's identity - the DOM id, the form param name, and
+    what a `{:config, id, key}` finding anchors to. `value_path` is where
+    the bytes live, and the two are the same place unless the block type
+    said otherwise (ADR-0002 decision 7, amended 2026-08-27). `nil` means
+    it did not; read it through `value_path/1` rather than the struct
+    field, and the two cases collapse into one path.
+    """
 
     @type t :: %__MODULE__{
             key: String.t(),
@@ -108,11 +117,17 @@ defmodule StatifierBlocks.ViewModel do
             required?: boolean(),
             default: Block.json(),
             value: Block.json(),
+            value_path: BlockType.value_path() | nil,
             findings: [Finding.t()]
           }
 
     @enforce_keys [:key, :type, :label, :required?, :default, :value]
-    defstruct [:key, :type, :label, :required?, :default, :value, findings: []]
+    defstruct [:key, :type, :label, :required?, :default, :value, :value_path, findings: []]
+
+    @doc "Where this field's value lives, defaulting to `[key]`."
+    @spec value_path(t()) :: BlockType.value_path()
+    def value_path(%__MODULE__{value_path: [_first | _rest] = path}), do: path
+    def value_path(%__MODULE__{key: key}), do: [key]
   end
 
   defmodule Form do
@@ -485,17 +500,32 @@ defmodule StatifierBlocks.ViewModel do
                           label: label,
                           required?: required?,
                           default: default
-                        } ->
+                        } = decl ->
+      path = BlockType.value_path(decl)
+
       %Field{
         key: key,
         type: type,
         label: label,
         required?: required?,
         default: default,
-        value: Map.get(config, key, default),
+        value_path: Map.get(decl, :value_path),
+        value: value_at(config, path, default),
         findings: Map.get(config_findings, key, [])
       }
     end)
+  end
+
+  # A declared `value_path` is read exactly as `config[key]` always was:
+  # the value if it is there, the field's default if it is not. Both cases
+  # go through `BlockType.fetch_value/2` so the un-pathed field and the
+  # pathed one cannot drift apart.
+  @spec value_at(Block.config(), BlockType.value_path(), Block.json()) :: Block.json()
+  defp value_at(config, path, default) do
+    case BlockType.fetch_value(config, path) do
+      {:ok, value} -> value
+      :error -> default
+    end
   end
 
   # Places one block's own findings into four buckets, by anchor:

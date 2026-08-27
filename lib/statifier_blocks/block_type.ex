@@ -75,12 +75,19 @@ defmodule StatifierBlocks.BlockType do
           | :duration
           | {:list, field_type()}
 
+  @typedoc """
+  Keys and list indexes from the config root down to one value, as
+  `value_path` carries them (ADR-0002 decision 7, amended 2026-08-27).
+  """
+  @type value_path :: [String.t() | non_neg_integer()]
+
   @type field_decl :: %{
-          key: String.t(),
-          type: field_type(),
-          label: String.t(),
-          required?: boolean(),
-          default: Block.json()
+          required(:key) => String.t(),
+          required(:type) => field_type(),
+          required(:label) => String.t(),
+          required(:required?) => boolean(),
+          required(:default) => Block.json(),
+          optional(:value_path) => value_path()
         }
 
   @typedoc "Names the offending config key; message is author-facing."
@@ -114,6 +121,21 @@ defmodule StatifierBlocks.BlockType do
   The seven closed `field_type/0` values are `:string`, `:integer`,
   `:boolean`, `{:select, options}`, `:expression`, `:duration`, and
   `{:list, field_type()}`.
+
+  ## Where a field's value lives
+
+  A declaration's `key` addresses `config[key]`, and the editor reads and
+  writes exactly there. A field whose value lives elsewhere in the config
+  says so explicitly with the optional `value_path` - a list of keys and
+  list indexes from the config root down to the value, as
+  `StatifierBlocks.Core.Branch.config_schema/1` uses for a per-arm
+  condition stored at `config["arms"][i]["cond"]`.
+
+  The `key` stays the field's identity either way: it is what
+  `validate_config/1` anchors a finding to (ADR-0005 decision 11) and what
+  the form keys its control by. `value_path` says only where the bytes
+  are. Use `value_path/1`, `fetch_value/2` and `put_value/3` rather than
+  reading the map key directly - they collapse both cases into one path.
   """
   @callback config_schema(Block.config()) :: [field_decl()]
 
@@ -233,4 +255,88 @@ defmodule StatifierBlocks.BlockType do
   @callback palette_entry() :: palette_entry()
 
   @optional_callbacks io: 1, migrate_config: 2, fixtures: 0, palette_entry: 0
+
+  @doc """
+  Where a field declaration's value lives, as a path from the config root.
+
+  The declared `value_path` when there is one, and `[key]` - the default
+  ADR-0002 decision 7 states - when there is not. Callers get a path
+  either way and never branch on which case they are in.
+
+  An explicitly empty `value_path` is read as no path at all rather than
+  as "the config root": a field editing the whole config is not something
+  decision 7 describes, and silently letting one through would let a form
+  control overwrite every key the block carries.
+  """
+  @spec value_path(field_decl()) :: value_path()
+  def value_path(%{value_path: [_first | _rest] = path}), do: path
+  def value_path(%{key: key}), do: [key]
+
+  @doc """
+  The config value at `path`, or `:error` when the path does not resolve.
+
+  `:error` is a real answer, not a failure: an arm that carries no `cond`
+  yet has no value at `["arms", 0, "cond"]`, and the form renders that
+  field at its default. Total over any config and any path.
+  """
+  @spec fetch_value(Block.json(), value_path()) :: {:ok, Block.json()} | :error
+  def fetch_value(value, []), do: {:ok, value}
+
+  def fetch_value(map, [key | rest]) when is_map(map) and is_binary(key) do
+    case Map.fetch(map, key) do
+      {:ok, inner} -> fetch_value(inner, rest)
+      :error -> :error
+    end
+  end
+
+  def fetch_value(list, [index | rest]) when is_list(list) and is_integer(index) and index >= 0 do
+    case Enum.fetch(list, index) do
+      {:ok, inner} -> fetch_value(inner, rest)
+      :error -> :error
+    end
+  end
+
+  def fetch_value(_value, _path), do: :error
+
+  @doc """
+  `config` with `path`'s value replaced, or `config` unchanged when the
+  path does not lead anywhere the value could go.
+
+  The **last** segment is written whether or not something was already
+  there - an arm missing its `"cond"` is exactly the arm an author is
+  about to type a condition into, and refusing that write would make the
+  field permanently uneditable. Every segment before it must already
+  exist: a path is a way to reach a value the block type stores, not a
+  licence for a form control to invent a shape the type never wrote. A
+  list index out of range writes nothing, since a list has no gap to fill.
+
+  Only the map case needs a last-segment clause of its own. A list's does
+  the same thing either way - replacing element `i` with the result of
+  writing the empty path into it, which is that value - so the recursive
+  clause covers a path ending at a list index too, and the empty path it
+  bottoms out on addresses the config root. That is why `value_path/1`
+  never returns an empty path.
+  """
+  @spec put_value(Block.json(), value_path(), Block.json()) :: Block.json()
+  def put_value(_target, [], value), do: value
+
+  def put_value(map, [key], value) when is_map(map) and is_binary(key),
+    do: Map.put(map, key, value)
+
+  def put_value(map, [key | rest], value) when is_map(map) and is_binary(key) do
+    case Map.fetch(map, key) do
+      {:ok, inner} -> Map.put(map, key, put_value(inner, rest, value))
+      :error -> map
+    end
+  end
+
+  def put_value(list, [index | rest], value)
+      when is_list(list) and is_integer(index) and index >= 0 do
+    case Enum.fetch(list, index) do
+      {:ok, inner} -> List.replace_at(list, index, put_value(inner, rest, value))
+      :error -> list
+    end
+  end
+
+  def put_value(target, _path, _value), do: target
 end

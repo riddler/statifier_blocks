@@ -38,6 +38,15 @@ defmodule StatifierBlocks.Core.Branch do
   field it is about (ADR-0005 decision 11's `{:config, block_id, key}`
   anchor).
 
+  The condition itself is not stored under that key, though: it lives at
+  `config["arms"][i]["cond"]`, so each field also declares the `value_path`
+  ADR-0002 decision 7 was amended to carry (2026-08-27) -
+  `["arms", i, "cond"]`, with `i` the arm's index in the **stored** list.
+  Key and value path are two different questions about one field, and this
+  is the core type that has to answer them differently: the editor reads
+  and writes the condition through the path while findings and the form
+  control keep addressing the arm by name.
+
   The `"arms"` list itself is deliberately not a field. Adding and removing
   an arm changes the block's slot set, which makes it an editor command
   over the document rather than a value typed into a form.
@@ -69,13 +78,14 @@ defmodule StatifierBlocks.Core.Branch do
 
   @impl true
   def config_schema(config) do
-    Enum.map(arms(config), fn %{"slot" => slot} ->
+    Enum.map(indexed_arms(config), fn {%{"slot" => slot}, index} ->
       %{
         key: slot,
         type: :expression,
         label: arm_label(slot),
         required?: true,
-        default: ""
+        default: "",
+        value_path: ["arms", index, "cond"]
       }
     end)
   end
@@ -244,14 +254,25 @@ defmodule StatifierBlocks.Core.Branch do
   # `config_schema/1` both have to answer for config `validate_config/1`
   # rejects, and neither may raise doing it.
   defp arms(config) do
+    config |> indexed_arms() |> Enum.map(&elem(&1, 0))
+  end
+
+  # The same arms, each paired with **its index in the stored list** rather
+  # than its index among the well-formed ones. That distinction is the
+  # whole point of pairing them: the two numbers differ the moment an
+  # author leaves a malformed arm above a good one mid-edit, and a
+  # `value_path` built from the filtered position would then address a
+  # different arm's condition.
+  defp indexed_arms(config) do
     config
     |> Map.get("arms", [])
     |> List.wrap()
+    |> Enum.with_index()
     |> Enum.filter(fn
-      %{"slot" => slot} -> Config.arm_slot?(slot)
+      {%{"slot" => slot}, _index} -> Config.arm_slot?(slot)
       _other -> false
     end)
-    |> Enum.uniq_by(fn %{"slot" => slot} -> slot end)
+    |> Enum.uniq_by(fn {%{"slot" => slot}, _index} -> slot end)
   end
 
   # `"arm_approved"` reads as `When "approved"` - the suffix is the name

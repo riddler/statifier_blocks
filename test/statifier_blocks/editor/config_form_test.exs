@@ -149,7 +149,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       # Sabotage: `ConfigForm.decode/3` starting from `%{}` instead of `base` -
       # the branch's "arms" key is deleted by the very first form change, which
-      # is silent data loss and the reason this test exists.
+      # is silent data loss and the reason this test exists. The arm's `"slot"`
+      # is the witness: it sits beside the one value the form does edit, and
+      # nothing in the schema names it.
       test "a config key the schema does not name survives an edit", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn)
         view = select(view, "blk_variant")
@@ -158,8 +160,70 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> form(~s(#sb-form-blk_variant), %{"config" => %{"arm_variant_b" => "variant == 'c'"}})
         |> render_change()
 
-        assert %{"arms" => [%{"slot" => "arm_variant_b", "cond" => "variant == 'b'"}]} =
-                 config(latest_document(), "blk_variant")
+        assert config(latest_document(), "blk_variant") == %{
+                 "arms" => [%{"slot" => "arm_variant_b", "cond" => "variant == 'c'"}]
+               }
+      end
+    end
+
+    describe "a field whose value lives elsewhere (ADR-0002 d7's value_path)" do
+      # sabotage: `ViewModel.build_fields/3` reading `Map.get(config, key, default)`
+      # rather than the declared path - the condition input renders empty.
+      test "a branch arm's condition renders its stored value", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+        view = select(view, "blk_variant")
+
+        assert has_element?(
+                 view,
+                 ~s(input[name="config[arm_variant_b]"][value="variant == 'b'"])
+               )
+      end
+
+      # sabotage: `ConfigForm.decode/3` writing `Map.put(config, field.key, value)`
+      # - the arm keeps its old condition and a junk top-level key appears.
+      test "editing it writes into the arm and creates no top-level key", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+        view = select(view, "blk_variant")
+
+        view
+        |> form(~s(#sb-form-blk_variant), %{"config" => %{"arm_variant_b" => "variant == 'c'"}})
+        |> render_change()
+
+        config = config(latest_document(), "blk_variant")
+
+        assert config == %{"arms" => [%{"slot" => "arm_variant_b", "cond" => "variant == 'c'"}]}
+        refute Map.has_key?(config, "arm_variant_b")
+      end
+
+      # sabotage: `Core.Branch.config_schema/1` numbering arms by their position
+      # among the well-formed ones - the second arm renders the first's junk.
+      # The config here is one `validate_config/1` rejects, which is exactly
+      # when the two numberings diverge and exactly what an author is looking
+      # at mid-edit.
+      test "the path names the arm's stored index, not its filtered one", %{conn: conn} do
+        document =
+          Document.new(
+            Block.new("core.branch",
+              id: "blk_skewed",
+              config: %{
+                "arms" => [
+                  %{"slot" => "not_an_arm", "cond" => "junk"},
+                  %{"slot" => "arm_second", "cond" => "x == 1"}
+                ]
+              },
+              slots: %{
+                "arm_second" => [EditorFixtures.wait("blk_second_step", "PT5M")],
+                "otherwise" => []
+              }
+            ),
+            id: "doc_skewed"
+          )
+
+        {:ok, view, _html} = mount_editor(conn, document: document)
+        view = select(view, "blk_skewed")
+
+        assert has_element?(view, ~s(input[name="config[arm_second]"][value="x == 1"]))
+        refute has_element?(view, ~s(input[name="config[arm_second]"][value="junk"]))
       end
     end
 
@@ -264,6 +328,35 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert ConfigForm.decode(fields, %{"config" => %{"weights" => ["50", "50"]}}, %{}) ==
                  %{"weights" => [50, 50]}
       end
+
+      # sabotage: `decode/3` writing `Map.put(config, field.key, value)` - the
+      # arm keeps "x" and a top-level "arm_b" appears beside it.
+      test "a field with a value_path writes through the path, not the key" do
+        fields = [field("arm_b", :expression, "x", ["arms", 0, "cond"])]
+        base = %{"arms" => [%{"slot" => "arm_b", "cond" => "x"}]}
+
+        assert ConfigForm.decode(fields, %{"config" => %{"arm_b" => "y"}}, base) ==
+                 %{"arms" => [%{"slot" => "arm_b", "cond" => "y"}]}
+      end
+
+      # sabotage: `BlockType.put_value/3` requiring the last segment to exist -
+      # an arm that has no condition yet could never be given one.
+      test "a value_path writes a value the config did not have yet" do
+        fields = [field("arm_b", :expression, "", ["arms", 0, "cond"])]
+        base = %{"arms" => [%{"slot" => "arm_b"}]}
+
+        assert ConfigForm.decode(fields, %{"config" => %{"arm_b" => "y"}}, base) ==
+                 %{"arms" => [%{"slot" => "arm_b", "cond" => "y"}]}
+      end
+
+      # sabotage: `put_value/3` creating the intermediate structure it did not
+      # find - a form control would invent a shape the block type never wrote.
+      test "a value_path that leads nowhere leaves the config alone" do
+        fields = [field("arm_b", :expression, "", ["arms", 3, "cond"])]
+
+        assert ConfigForm.decode(fields, %{"config" => %{"arm_b" => "y"}}, %{"other" => 1}) ==
+                 %{"other" => 1}
+      end
     end
 
     describe "Field.parse_duration/1 and format_duration/2" do
@@ -294,14 +387,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    defp field(key, type, value) do
+    defp field(key, type, value, value_path \\ nil) do
       %ViewModel.Field{
         key: key,
         type: type,
         label: key,
         required?: false,
         default: value,
-        value: value
+        value: value,
+        value_path: value_path
       }
     end
   end

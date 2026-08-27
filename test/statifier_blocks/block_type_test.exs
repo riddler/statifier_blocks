@@ -242,6 +242,66 @@ defmodule StatifierBlocks.BlockTypeTest do
     end
   end
 
+  describe "decision 7's value_path" do
+    # sabotage: `value_path/1` matching `%{value_path: path}` rather than a
+    # non-empty list - an empty declared path addresses the whole config, and
+    # a form control would then overwrite every key the block carries.
+    test "a declaration without a usable value_path addresses its own key" do
+      assert BlockType.value_path(%{key: "label"}) == ["label"]
+      assert BlockType.value_path(%{key: "label", value_path: []}) == ["label"]
+
+      assert BlockType.value_path(%{key: "arm_b", value_path: ["arms", 0, "cond"]}) ==
+               ["arms", 0, "cond"]
+    end
+
+    # sabotage: drop `fetch_value/2`'s catch-all clause - a config an author is
+    # halfway through typing raises instead of rendering at its default.
+    test "fetch_value/2 is total, and a path that does not resolve is :error" do
+      config = %{"arms" => [%{"slot" => "arm_b", "cond" => "x"}]}
+
+      assert BlockType.fetch_value(config, ["arms", 0, "cond"]) == {:ok, "x"}
+      assert BlockType.fetch_value(config, []) == {:ok, config}
+
+      for missing <- [
+            ["arms", 0, "absent"],
+            ["arms", 9, "cond"],
+            ["arms", "not_an_index"],
+            ["arms", -1, "cond"],
+            ["absent", 0],
+            ["arms", 0, "cond", "deeper"]
+          ] do
+        assert BlockType.fetch_value(config, missing) == :error
+      end
+    end
+
+    # sabotage: make `put_value/3`'s last-segment map clause require the key to
+    # exist - an arm with no condition yet could never be given one.
+    test "put_value/3 writes the last segment whether or not it was there" do
+      assert BlockType.put_value(%{"arms" => [%{"slot" => "arm_b"}]}, ["arms", 0, "cond"], "y") ==
+               %{"arms" => [%{"slot" => "arm_b", "cond" => "y"}]}
+    end
+
+    # sabotage: have `put_value/3` create the intermediate structure it did not
+    # find - a form control invents a shape the block type never wrote.
+    test "put_value/3 leaves a config a path does not reach alone" do
+      config = %{"arms" => [%{"cond" => "x"}], "other" => 1}
+
+      for unreachable <- [["arms", 5, "cond"], ["absent", "deeper"], ["other", "deeper"]] do
+        assert BlockType.put_value(config, unreachable, "y") == config
+      end
+    end
+
+    # sabotage: change `put_value(_target, [], value)` to return `_target` -
+    # the recursion bottoms out on the old value, so a path ending at a list
+    # index writes the element back unchanged.
+    test "put_value/3 replaces a whole list element when the path ends at one" do
+      config = %{"arms" => [%{"cond" => "x"}, %{"cond" => "y"}]}
+
+      assert BlockType.put_value(config, ["arms", 1], "z") ==
+               %{"arms" => [%{"cond" => "x"}, "z"]}
+    end
+  end
+
   describe "hygiene: no statifier_ui reference, no purity violations, no bead/PR ids" do
     @lib_files ["lib/statifier_blocks/block_type.ex"]
     @lib_and_support_files @lib_files ++ ["test/support/block_type_fixtures.ex"]

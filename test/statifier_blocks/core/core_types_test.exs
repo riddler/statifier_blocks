@@ -180,6 +180,34 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
              ] = Core.Branch.config_schema(@arms)
     end
 
+    # sabotage: drop the `value_path` from `config_schema/1` - the key is read
+    # as the address again, so a condition renders empty and edits nowhere.
+    test "each arm's field declares where its condition actually lives" do
+      assert [
+               %{key: "arm_approved", value_path: ["arms", 0, "cond"]},
+               %{key: "arm_review", value_path: ["arms", 1, "cond"]}
+             ] = Core.Branch.config_schema(@arms)
+    end
+
+    # sabotage: build the path from `Enum.with_index` over the *filtered* arms
+    # - the good arm below a malformed one addresses the malformed one's
+    # condition, which is a live case since that config is mid-edit.
+    test "the path indexes the stored arms, not the well-formed ones" do
+      config = %{
+        "arms" => [
+          %{"slot" => "not_an_arm", "cond" => "junk"},
+          %{"slot" => "arm_second", "cond" => "x == 1"},
+          %{"slot" => "arm_second", "cond" => "shadowed"},
+          %{"slot" => "arm_third", "cond" => "x == 2"}
+        ]
+      }
+
+      assert [
+               %{key: "arm_second", value_path: ["arms", 1, "cond"]},
+               %{key: "arm_third", value_path: ["arms", 3, "cond"]}
+             ] = Core.Branch.config_schema(config)
+    end
+
     # Sabotage: accepted a bare suffix as an arm slot - red on `"approved"`.
     test "reports malformed, duplicated and conditionless arms" do
       assert Core.Branch.validate_config(@arms) == :ok
