@@ -1,8 +1,11 @@
 defmodule StatifierBlocks.DecodeTest do
-  # async: false - the atom-count test below reads
-  # `:erlang.system_info(:atom_count)`, a VM-global counter. Any other
-  # `async: true` module interning an atom mid-assertion would make that
-  # test flake unreproducibly, so this whole module runs serially.
+  # async: false - the batch atom-count test below reads
+  # `:erlang.system_info(:atom_count)`, a VM-global counter that every other
+  # process in the VM can move. Running this module serially removes the
+  # `async: true` modules from that set; it does not remove the ExUnit runner,
+  # Logger, IO or lazy module loading, which is why that test measures a batch
+  # against a tolerance rather than a single decode against exact zero, and
+  # why the deterministic import-table test beside it is the primary check.
   use ExUnit.Case, async: false
 
   alias StatifierBlocks.{Block, Document, DocumentFixtures, DocumentGenerator}
@@ -12,6 +15,46 @@ defmodule StatifierBlocks.DecodeTest do
   # regenerates that exact document from `{@seed, index}` alone.
   @seed 424_242
   @corpus_size 200
+
+  # Every module that touches a value decoded from untrusted bytes. ADR-0001
+  # decision 6 says none of them may intern an atom from that input.
+  @decode_path_modules [
+    StatifierBlocks.Decode,
+    StatifierBlocks.Validation,
+    StatifierBlocks.Document
+  ]
+
+  # The atom table only grows through these. The `String.*`/`List.*` forms are
+  # listed for readability - the Elixir compiler rewrites them to their
+  # `:erlang.*` equivalents, which is what actually lands in an import table -
+  # and `binary_to_term/1,2` is here because a term it decodes may carry atoms.
+  @atom_interning_mfas MapSet.new([
+                         {:erlang, :binary_to_atom, 1},
+                         {:erlang, :binary_to_atom, 2},
+                         {:erlang, :binary_to_existing_atom, 1},
+                         {:erlang, :binary_to_existing_atom, 2},
+                         {:erlang, :list_to_atom, 1},
+                         {:erlang, :list_to_existing_atom, 1},
+                         {:erlang, :binary_to_term, 1},
+                         {:erlang, :binary_to_term, 2},
+                         {Module, :concat, 1},
+                         {Module, :concat, 2},
+                         {String, :to_atom, 1},
+                         {String, :to_existing_atom, 1},
+                         {List, :to_atom, 1},
+                         {List, :to_existing_atom, 1}
+                       ])
+
+  # Each document below carries this many strings that have never been seen
+  # before, so a decoder that interns every one of them mints that many atoms
+  # per decode - and the narrowest sabotage that interns only `type` still
+  # mints 2. The batch is sized so that even the narrowest one clears the
+  # tolerance by an order of magnitude, and the tolerance sits about as far
+  # above the worst ambient drift observed on this counter (+9 over a whole
+  # suite run) in the other direction.
+  @novel_strings_per_document 7
+  @atom_batch_size 500
+  @atom_noise_tolerance 50
 
   defp corpus, do: for(i <- 1..@corpus_size, do: {i, DocumentGenerator.generate(@seed, i)})
 
@@ -229,28 +272,96 @@ defmodule StatifierBlocks.DecodeTest do
   end
 
   describe "decoding does not create atoms" do
+    # The end-to-end half of the property: whatever the decoder is compiled
+    # from, running it over novel bytes must not grow the atom table. It is a
+    # batch against a tolerance rather than one decode against exact zero
+    # because `:atom_count` is VM-global and `async: false` does not stop the
+    # runner, Logger or IO from interning during the window (sb-b5l: 2 red
+    # runs in ~72, delta +9). See `@atom_batch_size` for how batch and
+    # tolerance are sized against noise on one side and signal on the other.
+    #
     # sabotage: in `Decode.build_block/1`, replace `Map.get(map, "type")`
     # with `String.to_atom(Map.get(map, "type"))` -> every novel type string
-    # below mints a brand-new atom on decode -> the atom-count assertion
-    # goes red
-    test "decoding a document with novel random strings leaves the atom count unchanged" do
-      novel = fn -> "novel_" <> Base.encode16(:crypto.strong_rand_bytes(12), case: :lower) end
+    # mints a brand-new atom on decode -> the delta assertion goes red
+    test "decoding a batch of documents of novel random strings interns no atoms" do
+      json = novel_document_json()
 
-      json =
-        ~s({"id":"bdoc_x","revision":0,"schema_version":1,) <>
-          ~s("metadata":{"#{novel.()}":"#{novel.()}"},) <>
-          ~s("root":{"id":"blk_root","type":"#{novel.()}","type_version":1,) <>
-          ~s("config":{"#{novel.()}":"#{novel.()}"},) <>
-          ~s("slots":{"#{novel.()}":[{"id":"blk_child","type":"#{novel.()}",) <>
-          ~s("type_version":1}]}}})
+      # Warm the whole decode path once before measuring. Lazy module loading
+      # interns atoms of its own, and doing it inside the measured window is
+      # what made the original single-document form of this test flake.
+      assert {:ok, _warmup} = Document.from_json(json)
 
       before_count = :erlang.system_info(:atom_count)
-      assert {:ok, _document} = Document.from_json(json)
-      assert :erlang.system_info(:atom_count) == before_count
+
+      for _ <- 1..@atom_batch_size do
+        assert {:ok, _document} = Document.from_json(novel_document_json())
+      end
+
+      delta = :erlang.system_info(:atom_count) - before_count
+
+      assert delta <= @atom_noise_tolerance,
+             "decoding #{@atom_batch_size} documents of novel strings grew the " <>
+               "atom table by #{delta} (tolerance #{@atom_noise_tolerance}); a " <>
+               "decoder that interns mints #{@novel_strings_per_document} atoms " <>
+               "per document, an honest one mints none"
+    end
+
+    # sabotage: in `Decode.build_block/1`, replace `Map.get(map, "type")` with
+    # `String.to_atom(Map.get(map, "type"))` -> `:erlang.binary_to_atom/1`
+    # (what `String.to_atom/1` compiles to) appears in `Decode`'s import
+    # table -> the assertion below goes red
+    test "no module on the decode path calls an atom-interning function" do
+      for module <- @decode_path_modules do
+        {:ok, {^module, [imports: imports]}} =
+          :beam_lib.chunks(beam_path(module), [:imports])
+
+        assert Enum.filter(imports, &MapSet.member?(@atom_interning_mfas, &1)) == [],
+               "#{inspect(module)} calls an atom-interning function, so decoding " <>
+                 "untrusted input can grow the VM's atom table (ADR-0001 decision 6)"
+      end
     end
   end
 
   # --- Helpers --------------------------------------------------------------
+
+  # Where a module's compiled `.beam` actually is on disk. Under the coverage
+  # stage of the full gate the modules are cover-compiled, and `:code.which/1`
+  # then answers the atom `:cover_compiled` instead of a path - so fall back to
+  # the application's `ebin`, which still holds the real beam. Reading that one
+  # is also what this test wants: cover-compiled bytecode carries the coverage
+  # instrumentation's own calls, not just the module's.
+  @spec beam_path(module()) :: charlist()
+  defp beam_path(module) do
+    case :code.which(module) do
+      path when is_list(path) ->
+        path
+
+      _cover_compiled_or_missing ->
+        ebin = :code.lib_dir(:statifier_blocks, :ebin)
+        refute match?({:error, _reason}, ebin), "statifier_blocks has no ebin directory"
+
+        ebin
+        |> List.to_string()
+        |> Path.join("#{module}.beam")
+        |> String.to_charlist()
+    end
+  end
+
+  # Canonical bytes for a valid document whose every free-form string - the
+  # metadata key and value, both types, the config key and value, the slot
+  # name - has never existed in this VM before. Keep the count in step with
+  # `@novel_strings_per_document`.
+  @spec novel_document_json() :: binary()
+  defp novel_document_json do
+    novel = fn -> "novel_" <> Base.encode16(:crypto.strong_rand_bytes(12), case: :lower) end
+
+    ~s({"id":"bdoc_x","revision":0,"schema_version":1,) <>
+      ~s("metadata":{"#{novel.()}":"#{novel.()}"},) <>
+      ~s("root":{"id":"blk_root","type":"#{novel.()}","type_version":1,) <>
+      ~s("config":{"#{novel.()}":"#{novel.()}"},) <>
+      ~s("slots":{"#{novel.()}":[{"id":"blk_child","type":"#{novel.()}",) <>
+      ~s("type_version":1}]}}})
+  end
 
   # Builds canonical bytes for a document whose `root` id is duplicated
   # across two subtrees, bypassing `Document.to_json/1`'s own `validate/1`
