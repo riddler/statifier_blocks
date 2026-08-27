@@ -26,6 +26,17 @@ defmodule StatifierBlocks.Document do
   @typedoc "Derived, never stored. Identifies a position, not a block."
   @type path :: [{Block.id(), Block.slot_name(), non_neg_integer()}]
 
+  @typedoc """
+  ADR-0001's typespec block: everything `validate/1` and `from_json/1` can
+  reject, defined once.
+  """
+  @type validation_error ::
+          :not_a_block_document
+          | {:unsupported_schema_version, pos_integer()}
+          | {:duplicate_block_id, Block.id()}
+          | {:malformed_block, Block.id() | nil, term()}
+          | {:malformed_envelope, term()}
+
   @doc """
   Wraps `root` in a document envelope.
 
@@ -109,7 +120,7 @@ defmodule StatifierBlocks.Document do
   and document-wide id uniqueness. Never consults a block-type registry -
   `config` is opaque here and `type` is never resolved against anything.
   """
-  @spec validate(t()) :: :ok | {:error, Validation.error()}
+  @spec validate(t()) :: :ok | {:error, validation_error()}
   def validate(%__MODULE__{} = document), do: Validation.validate(document)
 
   @doc """
@@ -149,12 +160,6 @@ defmodule StatifierBlocks.Document do
   document that is wrong in a specific way gets an envelope-, block-, or
   id-level arm instead. Nothing is rescued to a default and nothing raises.
   """
-  @spec from_json(binary()) ::
-          {:ok, t()}
-          | {:error, :not_a_block_document}
-          | {:error, {:unsupported_schema_version, pos_integer()}}
-          | {:error, {:duplicate_block_id, Block.id()}}
-          | {:error, {:malformed_block, Block.id() | nil, term()}}
-          | {:error, {:malformed_envelope, term()}}
+  @spec from_json(binary()) :: {:ok, t()} | {:error, validation_error()}
   def from_json(binary) when is_binary(binary), do: Decode.decode(binary)
 end
