@@ -697,12 +697,12 @@ caller-supplied ones; routes all of them; counts per subtree.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] full `mix quality` green, coverage at or above 90%
-- [ ] the conservation test passes: no finding is dropped by routing
-- [ ] a test asserts an `"arms"`-keyed `:config` finding lands in
+- [x] full `mix quality` green, coverage at or above 90%
+- [x] the conservation test passes: no finding is dropped by routing
+- [x] a test asserts an `"arms"`-keyed `:config` finding lands in
       `form.unrouted`
-- [ ] a test asserts an unresolvable block renders its children
-- [ ] `grep -rn "Phoenix" lib/ test/` returns nothing, and no file exists under
+- [x] a test asserts an unresolvable block renders its children
+- [x] `grep -rn "Phoenix" lib/ test/` returns nothing, and no file exists under
       `lib/statifier_blocks/editor/`
 
 #### Manual Verification:
@@ -905,5 +905,15 @@ criteria gate advancement and the Manual ones are deferred.
 - [ ] The moduledoc's reduction paragraph names both functions and states the
       residue, not only the conclusion
 - [ ] The seven-slot worked-example assertion matches the ADR's list exactly
+
+---
+
+### Phase 5
+
+- [ ] A sabotage note sits above every new test asserting `lib/` behaviour, and
+      each named mutation was actually run and actually went red
+- [ ] The view model carries everything `sb-7f2`'s eight components would need,
+      checked against ADR-0005 d13's component table row by row
+- [ ] The `Finding` moduledoc makes the two-Finding situation unmistakable
 
 ---
