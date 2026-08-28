@@ -297,7 +297,7 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
     );
 
     if (card) {
-      card.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+      centerOn([card]);
       flash(card);
     }
 
@@ -353,9 +353,47 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
     if (cards.length > 0) {
       centerOn(cards);
       for (const card of cards) flash(card);
+      announceSpread(cards);
     }
 
     return true;
+  }
+
+  /*
+   * The one case centring the union cannot rescue (sb-9z3's note, item 10).
+   *
+   * Two lanes of a wide parallel region can sit further apart than the canvas
+   * is wide, and then no scroll position shows both: centring the union puts
+   * the middle of the gap on screen and both cards off the edges, which is the
+   * worst of the three available answers except that the other two are worse
+   * still. Zooming out is the answer a canvas with a zoom control gives, and
+   * this one deliberately does not have one - see the wrap note on sb-vhu.
+   *
+   * What is cheap, and what the runner was missing, is SAYING so. A step that
+   * lights three blocks and shows one looks like a step that lit one block,
+   * and an author reading it that way misreads the run rather than merely
+   * missing a card. The live region already exists for exactly this kind of
+   * statement, and a sentence costs nothing to render and nothing to maintain.
+   *
+   * Silence when they all fit, on purpose: a message on every step of a replay
+   * is a message nobody reads by step four.
+   */
+  function announceSpread(cards) {
+    if (cards.length < 2) return;
+
+    const view = canvas.getBoundingClientRect();
+    const box = unionOf(cards);
+    if (box.width <= view.width && box.height <= view.height) return;
+
+    const offScreen = cards.filter((card) => {
+      const rect = card.getBoundingClientRect();
+      return rect.right <= view.left || rect.left >= view.right || rect.bottom <= view.top || rect.top >= view.bottom;
+    }).length;
+
+    announce(
+      `${cards.length} blocks are active and they do not fit on screen together` +
+        (offScreen > 0 ? ` - ${offScreen} ${offScreen === 1 ? "is" : "are"} off the edge.` : ".")
+    );
   }
 
   /*
@@ -371,7 +409,7 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
    */
   function centerOn(cards) {
     if (cards.length === 1) {
-      cards[0].scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+      centerSmoothly(cards[0]);
       return;
     }
 
@@ -391,8 +429,11 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
      * second re-reads the rectangles from there and centres the union exactly.
      */
     cards[0].scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
+    centerUnion(cards);
+  }
 
-    const view = canvas.getBoundingClientRect();
+  /** The union rectangle of a set of cards, in viewport coordinates. */
+  function unionOf(cards) {
     let left = Infinity;
     let right = -Infinity;
     let top = Infinity;
@@ -406,11 +447,77 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
       bottom = Math.max(bottom, box.bottom);
     }
 
+    return { left, right, top, bottom, width: right - left, height: bottom - top };
+  }
+
+  /** Puts the centre of that union on the centre of the canvas, at once. */
+  function centerUnion(cards) {
+    const view = canvas.getBoundingClientRect();
+    const box = unionOf(cards);
+
     canvas.scrollTo({
-      left: canvas.scrollLeft + (left + right) / 2 - (view.left + view.width / 2),
-      top: canvas.scrollTop + (top + bottom) / 2 - (view.top + view.height / 2),
+      left: canvas.scrollLeft + (box.left + box.right) / 2 - (view.left + view.width / 2),
+      top: canvas.scrollTop + (box.top + box.bottom) / 2 - (view.top + view.height / 2),
       behavior: "instant",
     });
+  }
+
+  /*
+   * A smooth scroll that checks where it landed, and corrects it if it landed
+   * somewhere else.
+   *
+   * `scrollIntoView({ behavior: "smooth" })` is a request, not a guarantee.
+   * Anything that scrolls the canvas while the animation is running cancels
+   * it - a wheel tick, a trackpad flick, a second reveal, the focus ring
+   * moving - and the browser simply stops where it is. The reported symptom
+   * (sb-84k) is a revealed card sitting at the very bottom edge of the canvas
+   * instead of in the middle of it, which is the animation being interrupted a
+   * few frames in, and it is worse than not scrolling at all: the flash draws
+   * the eye to a card that is half cut off by the pane edge.
+   *
+   * So the smooth scroll keeps a receipt. `scrollend` fires once the canvas
+   * has actually stopped moving, however it stopped, and the card's distance
+   * from the centre is then a fact rather than an intention. Off by more than
+   * a tolerance means the animation did not finish, and an INSTANT correction
+   * puts the card where the reveal promised - instant because a second
+   * animation would be interruptible in exactly the same way, and because by
+   * this point the author has already waited for one.
+   *
+   * `scrollend` is not universal, so a timeout is the fallback path and the
+   * two are made idempotent by a `settled` flag rather than by trusting either
+   * to be the one that runs. The token is what stops an old reveal correcting
+   * the viewport out from under a newer one: reveals are clicked in quick
+   * succession down a findings list, and a stale correction firing after the
+   * next reveal has landed is the same defect in a new place.
+   */
+  const SETTLE_TOLERANCE_PX = 24;
+  const SETTLE_TIMEOUT_MS = 700;
+  let settleToken = 0;
+
+  function centerSmoothly(card) {
+    const token = ++settleToken;
+    card.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+
+    let settled = false;
+
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      canvas.removeEventListener("scrollend", settle);
+      if (token !== settleToken) return;
+
+      const view = canvas.getBoundingClientRect();
+      const box = card.getBoundingClientRect();
+      const offBy = Math.max(
+        Math.abs((box.top + box.bottom) / 2 - (view.top + view.height / 2)),
+        Math.abs((box.left + box.right) / 2 - (view.left + view.width / 2))
+      );
+
+      if (offBy > SETTLE_TOLERANCE_PX) centerUnion([card]);
+    };
+
+    canvas.addEventListener("scrollend", settle);
+    window.setTimeout(settle, SETTLE_TIMEOUT_MS);
   }
 
   /*

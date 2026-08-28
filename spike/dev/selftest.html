@@ -2881,6 +2881,23 @@
           `line was ${positioned.line}`
         );
 
+        // The message with no position in it, placed at the end of the text
+        // rather than reported as nowhere (sb-vhu). Two lines and a half of a
+        // third, so the answer is line 3 and not "the last line of the file".
+        const truncated = parseFixtures('{\n  "documents": {\n    "doc_a"');
+        check("refuses a truncated file", truncated.ok === false);
+        equal("placing the end of the input on its last line", truncated.line, 3);
+        equal("and one column past its last character", truncated.column, 12);
+
+        // ...and does NOT invent one for a message it cannot place.
+        const unplaceable = parseFixtures("nope");
+        check("refuses a file that is not JSON at all", unplaceable.ok === false);
+        check(
+          "without inventing a line for a message that names no place",
+          /position \d+|line \d+|end of/i.test(unplaceable.message) || unplaceable.line === null,
+          `line was ${unplaceable.line} for "${unplaceable.message}"`
+        );
+
         const array = parseFixtures("[1, 2]");
         check("refuses a top-level array", array.ok === false);
         equal("saying what it wanted", array.message, "The fixture file must be a JSON object.");

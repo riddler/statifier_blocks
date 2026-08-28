@@ -397,11 +397,30 @@ function positionOf(message, text) {
   if (lineColumn) return { line: Number(lineColumn[1]), column: Number(lineColumn[2]) };
 
   const offset = /position (\d+)/.exec(message);
-  if (!offset) return { line: null, column: null };
+  if (offset) return at(text, Number(offset[1]));
 
-  const upTo = text.slice(0, Number(offset[1]));
-  const lines = upTo.split("\n");
+  /*
+   * The one family of message that carries no position at all, and it is the
+   * one an editing author hits most (sb-9z3's note, item 11): delete a closing
+   * brace, or stop typing mid-object, and every engine says some version of
+   * "unexpected end of JSON input" with nothing to point at. Nothing to point
+   * at is not the same as nowhere to point: the parser ran out of input, so
+   * the place it ran out is the END of the text, and that is where the author's
+   * missing bracket goes.
+   *
+   * Matched on "end of" rather than on any one engine's wording, and NOT
+   * generalised to every position-less message - a message we cannot place is
+   * still reported without a place, because a confident wrong line number
+   * costs an author more than an honest missing one.
+   */
+  if (/end of (the )?(JSON )?(input|data|file|document)/i.test(message)) return at(text, text.length);
 
+  return { line: null, column: null };
+}
+
+/** A character offset into the edited text, as a 1-based line and column. */
+function at(text, offset) {
+  const lines = text.slice(0, offset).split("\n");
   return { line: lines.length, column: lines[lines.length - 1].length + 1 };
 }
 
