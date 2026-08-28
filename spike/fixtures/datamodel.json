@@ -477,6 +477,15 @@
               "type": "duration",
               "label": "Trial length",
               "example": "P14D"
+            },
+            {
+              "name": "invitees",
+              "path": "signup.invitees",
+              "type": "list",
+              "item_type": "string",
+              "label": "Invitees",
+              "note": "Added for sb-9nn: the list the proposed core.foreach in signup-invitations.json iterates. An item is an email address and nothing more - the datamodel type set has no way to say a list holds objects, so 'list of string' is the honest declaration and it is also why a foreach's bound name cannot yet be offered with FIELDS under it in the condition editor. That gap is named in js/proposed-core.js's core.foreach note.",
+              "example": ["dana@example.com", "rowan@example.com"]
             }
           ]
         }

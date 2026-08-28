@@ -74,7 +74,32 @@
     "would be claiming machinery the D4 ruling refuses. How a child chart's",
     "several final states would map onto a parent's slots is open upstream, and",
     "js/proposed-core.js's sketch says so; these runs use the two outcomes an",
-    "invoke has because that is all the vocabulary decides today."
+    "invoke has because that is all the vocabulary decides today.",
+    "",
+    "PROPOSED STEP FIELD - `foreach` (sb-9nn, 2026-08-28). The sb-ig4 pattern",
+    "again, for the proposed core.foreach container, and flagged the same way:",
+    "this is the spike's proposal for how a replay says a step is INSIDE AN",
+    "ITERATION, not a shape any accepted record defines.",
+    "  foreach: {",
+    "    block:  the id of the core.foreach block the step is inside. The pane",
+    "            names that card, so a reader can see which container the pass",
+    "            belongs to when two are nested",
+    "    index:  the ordinal of the pass, 0-based. TYPED IN, never counted",
+    "    item?:  display-only source text for the item this pass is about, the",
+    "            same string rule the deltas hold to. Nothing reads it back",
+    "  }",
+    "The honest-replayer rule is under MORE pressure here than anywhere else in",
+    "this file, which is why it is restated: a run over a list is the case a",
+    "replayer is most likely to be mistaken for a loop. Nothing iterates. The",
+    "runner does not read the list `items` names, does not know its length, and",
+    "does not check `index` against it - two steps may both say 0, and a fixture",
+    "that skips from 0 to 2 renders 1 and 3 without complaint. A run over two",
+    "invitees is two passes an author wrote out by hand, and the pane says so",
+    "under the step. See run_si_each_invitee below.",
+    "The field is OPTIONAL and its absence says nothing: run_si_invited and",
+    "run_si_invite_abandoned were written before the foreach existed (sb-7s2)",
+    "and still replay unchanged, because a step that does not say which pass it",
+    "is has not made a claim about one."
   ],
   "version": 1,
   "documents": {
@@ -1127,6 +1152,110 @@
                 "label": "the team is not confirmed on this path",
                 "result": "pass",
                 "detail": "blk_si_confirm is never activated by this run. That is the fixture's claim and nothing more - it is not evidence about what the compiler would emit."
+              }
+            }
+          ]
+        },
+        {
+          "id": "run_si_each_invitee",
+          "name": "Two invitees, one at a time",
+          "description": "The proposed core.foreach, replayed. Two invitees are on the list and the signup wizard runs for each of them in turn. Every pass is AUTHORED: the ordinals and the items below are values in this file, not a list the runner walked. Nothing here iterates.",
+          "expected": "pass",
+          "steps": [
+            {
+              "label": "Email the invitations",
+              "active": ["blk_si_send_invites"],
+              "invoke": {
+                "block": "blk_si_send_invites",
+                "outcome": "done",
+                "payload": { "invited": "2", "template": "\"workspace_invitation\"" }
+              },
+              "deltas": [
+                { "path": "signup.invitees", "value": "[\"dana@example.com\", \"rowan@example.com\"]" },
+                { "path": "signup.seats", "value": "3" }
+              ],
+              "note": "The list the foreach below iterates is established here, as a string of source text like every other delta in this file. The runner does not parse it - the two passes that follow name their own items."
+            },
+            {
+              "label": "First invitee: the child chart is running",
+              "active": ["blk_si_each_invitee", "blk_si_invitee_signup"],
+              "foreach": {
+                "block": "blk_si_each_invitee",
+                "index": 0,
+                "item": "\"dana@example.com\""
+              },
+              "deltas": [{ "path": "signup.email", "value": "\"dana@example.com\"" }],
+              "note": "Both cards light: the container and the step inside it. The delta is what the bound name `invitee` would carry if the condition editor could offer it - it cannot yet, and js/proposed-core.js's core.foreach note says why, so the fixture writes the ordinary datamodel path instead of inventing a scope."
+            },
+            {
+              "label": "First invitee: the child chart comes back done",
+              "active": ["blk_si_each_invitee", "blk_si_invitee_signup"],
+              "foreach": {
+                "block": "blk_si_each_invitee",
+                "index": 0,
+                "item": "\"dana@example.com\""
+              },
+              "invoke": {
+                "block": "blk_si_invitee_signup",
+                "outcome": "done",
+                "payload": {
+                  "chart": "\"bdoc_signup_demo\"",
+                  "outcome": "\"completed\"",
+                  "plan": "\"business\""
+                }
+              },
+              "deltas": [
+                { "path": "signup.email_verified", "value": "true" },
+                { "path": "signup.plan", "value": "\"business\"" }
+              ]
+            },
+            {
+              "label": "Second invitee: the child chart is running",
+              "active": ["blk_si_each_invitee", "blk_si_invitee_signup"],
+              "foreach": {
+                "block": "blk_si_each_invitee",
+                "index": 1,
+                "item": "\"rowan@example.com\""
+              },
+              "deltas": [{ "path": "signup.email", "value": "\"rowan@example.com\"" }],
+              "note": "The same two cards, the same step ids, a different pass. That repetition IS the foreach: one authored subtree standing for as many passes as the list has, rather than a copy of the subtree per invitee."
+            },
+            {
+              "label": "Second invitee: the child chart comes back done",
+              "active": ["blk_si_each_invitee", "blk_si_invitee_signup"],
+              "foreach": {
+                "block": "blk_si_each_invitee",
+                "index": 1,
+                "item": "\"rowan@example.com\""
+              },
+              "invoke": {
+                "block": "blk_si_invitee_signup",
+                "outcome": "done",
+                "payload": {
+                  "chart": "\"bdoc_signup_demo\"",
+                  "outcome": "\"completed\"",
+                  "plan": "\"business\""
+                }
+              },
+              "check": {
+                "label": "the second pass reuses the first pass's blocks",
+                "result": "pass",
+                "detail": "Both passes light blk_si_invitee_signup, because there is one such block in the document and the container is what runs it twice. A compiler would have to make that true of the emitted chart as well, and how it does - a sequential loop-shaped subgraph, or one child session per item - is sketched in js/proposed-core.js and built by nothing."
+              }
+            },
+            {
+              "label": "Give the rest of the team a day",
+              "active": ["blk_si_settle"],
+              "note": "Outside the foreach: the wait runs once, after every pass has finished. That ordering is the fixture's claim about what a sequential foreach means, and it is the assumption the compile sketch names rather than a fact the spike can demonstrate."
+            },
+            {
+              "label": "Confirm the team is set up",
+              "active": ["blk_si_confirm"],
+              "deltas": [{ "path": "signup.company", "value": "\"Northwind Trading\"" }],
+              "check": {
+                "label": "the datamodel carries the LAST pass, not both",
+                "result": "pass",
+                "detail": "signup.email ends on rowan@example.com because the accumulator is last-write-wins and each pass wrote the same path. That is a real finding about the proposal rather than a bug in the fixture: a foreach whose body writes to fixed datamodel paths loses every pass but the last, and where a per-item result should accumulate is not something core.foreach decides today. Phase-B, on sb-9nn."
               }
             }
           ]

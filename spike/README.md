@@ -505,6 +505,13 @@ living there would cost it that property however loudly it were headed.
 `coreRegistry()` and `spikeRegistry()` keep answering "what does the package
 actually ship", and the proposals sit beside them.
 
+There are seven, and the sections below take them in this order: `core.invoke`
+and `core.raise` (the first two), then `core.timeout`, `core.subchart`,
+`core.assign`, `core.send` and `core.foreach`. Every one of them carries a
+compile **sketch** rather than a compiler - what the block would emit, which
+upstream record owns the part this repo does not, and what is still open.
+Nothing in the spike compiles anything.
+
 ### `core.invoke`, and the `on_error` slot
 
 The first one. A step that calls a host handler and waits for it to answer,
@@ -595,6 +602,196 @@ should be able to carry a payload (the datamodel fixture already declares
 `core.invoke` claims one because its work happens outside the chart; a raise
 is the most inside-the-chart step there is, so it takes the editor's own
 accent like every other core step.
+
+### `core.timeout`, the rail rule that fires on the clock
+
+`core.on_event` catches an event; nothing caught the clock. "Interrupt this
+group after fifteen minutes, whatever it is doing" is a different shape from
+`core.wait`, which is a step inside a body that the chart sits at, and no
+shipped `core.*` type expressed it - so the demo documents grew a
+`myapp.timeout_rule` crutch to say it. That crutch is retired (D12) and this
+descriptor is what replaced it, key for key.
+
+`after` is a `duration`, spelled `after` rather than `duration` because a
+wait's duration is how long the step **takes** and a rule's `after` is when it
+**fires**; `outcome` is `abandon` or `resume`, spelled exactly as
+`core.on_event` spells it, because two rules on one rail whose "Then" menus
+disagreed would be the drift this vocabulary repeats itself to avoid; `cond`
+is the same optional `expression` guard. It declares
+`kinds: ["interrupt_handler"]` and nothing else, and that single tag is the
+whole placement rule in both directions - there is no placement check
+anywhere and there is not supposed to be one. Whether the vocabulary should
+insist on one spelling of "duration" across a step and a rule is a Phase-B
+naming question, flagged and not decided.
+
+### `core.subchart`, and a reference rather than an embedding
+
+A step that runs another chart and waits for it, with `core.invoke`'s
+`on_error` slot declared character for character - the same slot, because a
+child chart that fails and a host call that fails are the same shape of thing
+to the author who has to say what happens next.
+
+The child is **named, not embedded**. A body slot holding the child's blocks
+inline would be a second copy of a document that already exists with its own
+id, its own revision and its own runs, and a document is a tree whose chart is
+a build product of it. So the type declares no body slot at all, and D11
+settles the spike's half of the reference: the picker offers only the spike's
+own fixture documents, derived from `js/fixture-documents.js` rather than
+typed into the descriptor, so a reference cannot name a chart the shell could
+not open. What it stores is the child document's id - which is the only chart
+identity a spike with no compiler has, where a compiler would emit the
+identity statifier-ex ADR-0052/0057 defines.
+
+`fixtures/documents/signup-invitations.json` is the fixture built for it, and
+`run_si_invited` / `run_si_invite_abandoned` replay the two outcomes. The
+child's own steps are **not** replayed: the spike opens one document at a
+time, and a run that walked the child's blocks under the parent's name would
+be claiming machinery the D4 ruling refuses.
+
+Two open questions the type raises and does not answer. A child chart has more
+than two outcomes in general - it can finish in any of its final states, and
+"done / error" flattens that to the two an invoke has; how "which final state"
+maps to "which slot" is not something ADR-0051's invoke contract or ADR-0004's
+single-final emission decides today, so the type has an invoke's two outcomes
+and says so. And nothing refuses a reference to the document the block sits in:
+`validate_config/1` is handed a config, not a document, so a self-reference and
+a cycle through two documents are document-level findings, filed with sb-c2o.
+
+### `core.assign`, the first block that writes
+
+The vocabulary could read the datamodel from the day `core.branch` grew a
+`cond` and could never write it. Every value in the demo documents arrives
+from a host call or an event payload, so a chart that wanted to record a fact
+of its own - a flag it set, a decision it made - had nowhere to put it.
+`core.assign` is a leaf with `path` and `value`.
+
+`value` is **source text**: `false`, `42350`, `"manual_review"`, quotes
+included for a string. That is the same rule `fixtures/runs.json` already
+holds every delta to, and holding both to it is what makes the replay claim
+checkable - a run's delta on an assign step and the block's own config are the
+same two strings, so the fixture can be compared to the document character for
+character rather than by interpretation. `dev/selftest.html` does exactly that.
+
+Two things are deliberately absent. Expressions: `capture_attempts + 1` is the
+obvious next `value` and three things would have to be decided first - which
+language, how it is stored, and what the spike would then have to refuse to do,
+since D4 means an expression-valued assign would replay exactly as a literal
+one and the screen would look identical while claiming more. And the
+declaration check: nothing asks whether `path` is declared in
+`fixtures/datamodel.json`, because that finding wants to be a **warning** and
+`layout.js` stamps `severity: "error"` on everything `validateConfig` returns.
+Both belong to sb-c2o, which is now the third type to say so.
+
+The replay half is the strongest thing that can be said for a mechanism that
+was already there: `core.assign` proposes **no** fixture field at all. The
+run's existing `deltas` carry `{ path, value }` and `bindingsAt` already
+accumulates them last-write-wins, so an assign step's delta simply is the
+step's own work rather than a side effect of a call.
+
+### `core.send`, and the two things it declines to declare
+
+`core.raise` names an event and hands control on, now. `core.send` names an
+event and says **when** - `event`, plus an optional `delay` duration. They are
+two types rather than one type with an optional key, because a raise is
+internal and synchronous while a delayed send outlives the step that armed it,
+has to survive a restart, and compiles through infrastructure outside the
+interpreter (the `sob-` durable-timers lane; statifier-ex
+`docs/durable-timers.md`, ADR-0054/0059). A `delay` key that quietly turned a
+raise into a durable timer would make `core.raise`'s whole note false half the
+time.
+
+`delay` is the vocabulary's first **optional** duration, which is a state
+sb-d9's open control question has never had to express: "no delay" is not
+`PT0S` and it is not an unfinished field either. The signup document arms a
+`PT2H` deadline, so that question now has a case that ships.
+
+Two omissions, both argued rather than accidental. No `target`: what a target
+may name is not this repo's decision - session identity is statifier-ex's
+(ADR-0052) and reaching the host is the invoke seam ADR-0051 defines, which
+the vocabulary already spells `core.invoke` - and a config key that validates
+nothing is a proposal made by accident. No `core.cancel`: a cancel names the
+send it cancels, which makes it a cross-subtree reference to another block,
+the exact shape D13 refused. The alternative that keeps the tree invariant is
+scope-shaped rather than reference-shaped - a delayed send is cancelled when
+the region that armed it is left - and that is a compiler rule rather than a
+block type, which is a strong hint the vocabulary may need no cancel at all.
+Either way it is an upstream question no accepted ADR answers.
+
+The badge is a static `sends` rather than `timer` when a delay is set. `timer`
+is already `core.wait`'s badge, where it means the chart stays **live** for the
+duration - which a delayed send does not say about the block it sits on - and
+a badge that changes as a field is typed is a chip a reader cannot learn.
+(Whether `badge` should be allowed to be a callback the way `joinLabel` is, is
+a Phase-B finding this type is the first real evidence for.)
+
+### `core.foreach`, the container that binds a name
+
+Every container the package ships is about **when** a run of steps happens -
+`core.sequence` one after another, `core.parallel` at once, `core.group`
+inside a boundary rules fire against. None of them is about **how many times**.
+A chart that has to do the same work for each of three invitees could only be
+authored by copying the subtree once per item, which is transcription rather
+than authoring and goes wrong the moment the list has a length nobody knew at
+authoring time.
+
+`core.foreach` declares one `body` slot and three config fields: `items`, a
+datamodel path naming a list; `item_as`, the name the item is bound to inside
+the body, defaulted to `item`; and an optional `index_as` for the ordinal. The
+two names must differ - the only cross-field check in the file, and it earns
+its place, because `item_as: "row"` with `index_as: "row"` reads fine and
+means nothing.
+
+`item_as` is the genuinely new idea. Every other block reads the datamodel
+through paths that exist before the chart runs; this one introduces a name that
+exists only inside its own subtree. The demo appearance is in
+`signup-invitations.json`, where the subchart that was already there is now
+**wrapped** rather than copied - one authored subtree standing for as many
+passes as the list has - and `signup.invitees` was added to
+`fixtures/datamodel.json` for it.
+
+The bound name is **not** offered in the condition editor, and that is a
+deferral with a scope note rather than a gap. The condition surface resolves
+paths against one index, built once in `shell.js` as `indexPaths(datamodelDoc)`
+and handed to the inspector; it is a fact about the datamodel and knows nothing
+about which block is selected. A scoped offering would need an ancestor walk
+per selection, a layered index that can distinguish a bound name from a
+declared path (rendering them identically would claim the datamodel declares
+something it does not), and a new value threaded from `shell.js` through
+`inspector.js`. It also needs an answer this bead has no standing to give:
+`invitee.email` is only offerable if something knows the item type of the list,
+and the datamodel proposal today says `"list of string"` rather than a shape.
+So the editor reports a bound name as an unknown path, which is advisory and
+never an error - a true answer rather than a flattering one. Phase-B, and it
+wants the datamodel-document proposal decided first.
+
+The replay is `foreach: { block, index, item }` on a step - the sb-ig4 pattern
+again, and under more pressure than anywhere else in the fixture file, because
+a run over a list is the case a replayer is most likely to be mistaken for a
+loop. Nothing iterates. The runner does not read the list, does not know its
+length, and does not check `index` against it; two steps may both say `0`, and
+a malformed index renders as "an iteration" rather than collapsing onto `0`,
+because `0` is a legitimate ordinal and coercing to it would put a claim on
+screen the fixture never made. `run_si_each_invitee` is two authored passes
+over two invitees, and the pane says "recorded, not counted" under the step.
+
+That run also records a real finding about the proposal rather than hiding it:
+both passes write `signup.email`, so the accumulator ends on the last one.
+Where a per-item result should accumulate is not something `core.foreach`
+decides today.
+
+The compile is **sketched and not built**, in two shapes the vocabulary has no
+key to choose between. Sequential is a loop-shaped subgraph: the body compiles
+once into a state entered with the item bound, its completion transitioning
+back to the head with the cursor advanced. That is the open part - SCXML's
+`<foreach>` iterates executable content and a body of blocks is states, so the
+emission is a state machine rather than an executable-content element, and what
+binds the item and where the cursor lives are statifier-ex's calls. Parallel
+fan-out is `core.subchart`'s sketch applied N times, one child session per
+item, which inherits that sketch's open question and adds a second: what the
+parent does when three of five children fail. No `mode` field chooses between
+them, deliberately - it would be a key whose two values name two compilers that
+do not exist, which is the same argument `core.send` makes for declining a
+`target`.
 
 ## Serving it
 

@@ -126,6 +126,8 @@ const stepsOf = (run) => (Array.isArray(run?.steps) ? run.steps : []);
  *       activeIds,    the blocks the CURRENT step lights up - [] when not on one
  *       invoke,       the CURRENT step's host call, or null - the canvas badge
  *                     mark reads this the way the highlight reads activeIds
+ *       foreach,      the CURRENT step's iteration, or null - which container
+ *                     it belongs to, and which authored pass it is
  *       steps: [StepView],
  *       current,      the current StepView, or null
  *       verdict,      "not-run" | "running" | "failing" | "pass" | "fail"
@@ -172,6 +174,10 @@ export function runView(run, cursor) {
     // left lit after the transport ran out would go on claiming a call is in
     // flight.
     invoke: current ? current.invoke : null,
+    // Null off the current step for `invoke`'s reason, and the reason bites
+    // harder here: an iteration marker left lit after the transport ran out
+    // would go on saying "pass 2 of the list" over a chart that has finished.
+    foreach: current ? current.foreach : null,
     steps: views,
     current,
     verdict,
@@ -200,6 +206,7 @@ function stepView(step, index, cursor) {
     deltas: Array.isArray(step.deltas) ? step.deltas : [],
     check: step.check ?? null,
     invoke: invokeView(step.invoke),
+    foreach: foreachView(step.foreach),
     consumed,
     state: cursor === index ? "current" : consumed ? "past" : "future",
   };
@@ -244,6 +251,52 @@ export function invokeView(invoke) {
     block: invoke.block,
     outcome: invoke.outcome === "error" ? "error" : "done",
     payload,
+  };
+}
+
+/**
+ * A step's PROPOSED `foreach` field (sb-9nn), normalized for the pane.
+ *
+ *     { block, index: integer | null, item: string | null }
+ *
+ * or `null` for a step that is not inside an iteration.
+ *
+ * ## Every one of those three values is TYPED IN, and that is the whole point
+ *
+ * A run over a list is the case a replayer is most likely to be mistaken for a
+ * loop, so nothing here counts anything. `index` is the ordinal the fixture's
+ * author wrote down, not a counter this module keeps: two steps in a row may
+ * both say `0`, an author may skip from `0` to `2`, and the pane reports what
+ * is there. `item` is display-only source text under the same string rule the
+ * deltas hold to, and nothing reads it back. The runner does not iterate, does
+ * not know how long the list is, and does not check `index` against it - which
+ * is D4's honest-replayer rule applied to the field most likely to look like
+ * machinery, exactly as `invokeView` above applies it to `outcome`.
+ *
+ * Three normalizations, the first two `invokeView`'s and the third this
+ * field's own:
+ *
+ *   - a missing `block` drops the whole field, for `invokeView`'s reason: the
+ *     pane's job with it is to name a card, and a foreach naming no card is a
+ *     fixture typo that would otherwise render as a silent no-op;
+ *   - anything unusable lands on the quiet side rather than being invented;
+ *   - a non-integer or negative `index` becomes `null` rather than `0`. `0` is
+ *     a legitimate ordinal - it is the FIRST pass - so coercing a malformed
+ *     value to it would put a wrong iteration number on screen, which is worse
+ *     than putting none there. `null` renders as "an iteration, position not
+ *     recorded"; `0` would render as a claim.
+ */
+export function foreachView(foreach) {
+  if (foreach === null || typeof foreach !== "object" || Array.isArray(foreach)) return null;
+  if (typeof foreach.block !== "string" || foreach.block === "") return null;
+
+  return {
+    block: foreach.block,
+    index: Number.isInteger(foreach.index) && foreach.index >= 0 ? foreach.index : null,
+    item:
+      foreach.item === undefined || foreach.item === null || foreach.item === ""
+        ? null
+        : String(foreach.item),
   };
 }
 

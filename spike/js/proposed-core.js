@@ -26,6 +26,34 @@
  *
  * ## What is proposed here, and what would have to be decided
  *
+ * Seven descriptors now, grouped by the shape they take rather than by the
+ * order they appear in below:
+ *
+ *   - LEAVES, no slots at all: `core.raise` names one internal event and hands
+ *     control on; `core.assign` writes one literal to one datamodel path;
+ *     `core.send` names an event and says WHEN - now, or after a delay.
+ *   - STEPS WITH A FAILURE PATH: `core.invoke` calls the host and waits;
+ *     `core.subchart` runs another chart and waits. Both declare the same
+ *     `on_error` slot, character for character, because a host call that fails
+ *     and a child chart that fails are the same shape of thing to an author.
+ *   - A CONTAINER: `core.foreach` runs its one `body` slot once per item of a
+ *     datamodel list.
+ *   - A RAIL RULE: `core.timeout` fires on the clock rather than on an event,
+ *     which is the half of `core.on_event`'s pair the vocabulary was missing.
+ *
+ * File order is NOT that order, and four of the descriptors say so where they
+ * sit: `core.timeout`, `core.assign`, `core.send` and `core.foreach` each
+ * carry an APPENDED BY note, because each landed while a sibling bead was
+ * writing into this same file, and a pure append at the end of the file and of
+ * the map is the only edit two writers can make to one file without meeting in
+ * the middle. Placement is a merge courtesy; if this file is ever tidied, the
+ * grouping above is the reading order it wants.
+ *
+ * Every one of them carries a COMPILE SKETCH rather than a compiler: what the
+ * block would emit, which upstream record owns the part this repo does not,
+ * and what is still open. Nothing in this file compiles anything, and the
+ * sketches are written so that the gap is visible instead of assumed.
+ *
  * Whether any of this earns an ADR-0002/0004 amendment is a Phase-B finding.
  * The specific open questions each type raises are flagged at that type.
  *
@@ -1078,6 +1106,257 @@ const coreSend = {
   },
 };
 
+/* ---------------------------------------------------------- core.foreach
+ *
+ * APPENDED BY sb-9nn at the END of this file and of the map below, for the
+ * reason `core.timeout` says above. Placement is a merge courtesy; in reading
+ * order this is the file's one CONTAINER and belongs beside nothing else here.
+ *
+ * A container that runs its `body` once for each item of a datamodel list.
+ *
+ * ## Why the vocabulary needed it
+ *
+ * Every container the package ships is about WHEN a run of steps happens -
+ * `core.sequence` one after another, `core.parallel` at the same time,
+ * `core.group` inside a boundary rules can fire against. None of them is about
+ * HOW MANY TIMES. A chart that has to do the same work for each of three
+ * invitees, or each transaction in a statement batch, could only be authored by
+ * copying the subtree once per item - which is not authoring, it is
+ * transcription, and it goes wrong the moment the list has a length nobody
+ * knew at authoring time.
+ *
+ * ## Its config, and the one key that is a genuinely new idea
+ *
+ *   - `items` is a datamodel path, checked the way `core.assign`'s `path` is
+ *     checked and for the same stated reason: this file does not own the
+ *     datamodel path grammar. What it does NOT check is that the path is
+ *     declared, or that the thing it names is a LIST rather than a string -
+ *     both are document-level checks against the datamodel index, which
+ *     `validate_config/1` is not handed, and both belong to sb-c2o with the
+ *     `assign_to` and `path` findings that are already filed there. Named
+ *     rather than silently missing, and this is the third type to say it;
+ *   - `item_as` BINDS A NAME. That is the new idea, and it is the reason this
+ *     type is more than a container: every other block in the vocabulary reads
+ *     the datamodel through paths that exist before the chart runs, and this
+ *     one introduces a name that exists only inside its own body. A bare
+ *     identifier, defaulted to `item`, because a foreach with nothing to call
+ *     its item is an unfinished block and an empty default would read as one
+ *     the author had abandoned;
+ *   - `index_as` is optional and binds the ordinal the same way. Optional
+ *     because most bodies never name it, and a required key an author has to
+ *     fill in to say "I do not need this" is a key that teaches them to ignore
+ *     the form.
+ *
+ * The two bound names must differ. That is the only cross-field check here,
+ * and it is worth making: `item_as: "row"` with `index_as: "row"` is a config
+ * that reads fine and means nothing, and the author who typed it will look for
+ * the mistake everywhere except at the block.
+ *
+ * ## The declared body slot renders EMPTY, and that is sb-mu2's landing
+ *
+ * `slots()` declares one `body`, so `layout.js` calls this block a container
+ * whether or not anything is in it (`shapeOf`: the test is over DECLARED
+ * slots), and the renderer draws a labeled drop target for the empty slot. A
+ * freshly inserted foreach is therefore fillable, which is not something this
+ * descriptor had to build - sb-mu2 made the container test a statement about
+ * the TYPE rather than about a document's contents, and every later container
+ * gets it for free. Asserted in `dev/selftest.html` rather than assumed,
+ * because "for free" is the kind of claim that stops being true quietly.
+ *
+ * ## The bound name is NOT offered in the condition editor yet - DEFERRED
+ *
+ * The bead asks whether `item_as`'s name becomes offerable to a condition
+ * written INSIDE the body, so an author can write `invitee.email` where they
+ * can today only write `signup.email`. It does not, and this is a deliberate
+ * deferral with a scope note rather than a gap:
+ *
+ *   - the condition surface resolves paths against ONE index, built once in
+ *     `shell.js` as `indexPaths(datamodelDoc)` and handed to the inspector.
+ *     It is a fact about the DOCUMENT-independent datamodel, and it knows
+ *     nothing about which block is selected;
+ *   - a scoped offering is a different object: the index a block sees would
+ *     have to be the datamodel index PLUS the names bound by every
+ *     `core.foreach` on the path from the root to that block. That needs an
+ *     ancestor walk per selection, a layered index that can say which of its
+ *     entries are bound rather than declared (they are not the same thing to a
+ *     reader, and rendering them identically would claim the datamodel
+ *     declares something it does not), and a new value threaded from `shell.js`
+ *     through `inspector.js` to `annotateCondition`;
+ *   - it also raises a question this bead has no standing to answer: what an
+ *     item's own FIELDS are. `invitee.email` is only offerable if something
+ *     knows the item type of the list `items` names - which is the datamodel
+ *     document's `item_type`, today a string like `"string"` and not a shape.
+ *     Offering a bare `invitee` and nothing under it is honest; offering
+ *     `invitee.email` needs the datamodel proposal to grow, and that is a
+ *     proposal, not an implementation detail.
+ *
+ * So: the descriptor binds the name, the document stores it, the selftest
+ * asserts it is stored, and the condition editor reports a bound name as an
+ * UNKNOWN path exactly as it reports any path the datamodel does not declare -
+ * which is advisory, never an error (see `datamodel.js`'s header on why that
+ * asymmetry exists). A reader gets a true answer rather than a flattering one.
+ * Filed as a Phase-B finding on sb-9nn, and it wants the datamodel-document
+ * proposal decided first.
+ *
+ * ## Replay: an AUTHORED `foreach` step field (D4)
+ *
+ * A run over a list is the case a replayer is most likely to be mistaken for a
+ * loop, so the fixture field is shaped to make the mistake impossible to make
+ * quietly. `fixtures/runs.json` grows `foreach: { block, index, item }` on a
+ * step - the sb-ig4 pattern, the same way `invoke` was added - and every one of
+ * those three values is TYPED IN by the fixture's author:
+ *
+ *   - `block` is the foreach block the step is inside, so the pane can say
+ *     which container the iteration belongs to;
+ *   - `index` is the ordinal the author wrote, not a counter the pane keeps;
+ *   - `item` is display-only source text, the same string rule the deltas hold
+ *     to, and nothing reads it back.
+ *
+ * Nothing in the runner iterates. A run over two invitees is two authored
+ * passes of authored steps, and if an author writes indices 0 and 2 the pane
+ * shows 0 and 2. That is D4 applied to the one field most likely to be
+ * mistaken for machinery, which is exactly what sb-ig4's note says about
+ * `invoke` and is repeated here because the temptation is stronger.
+ *
+ * ## What this would compile to (SKETCH ONLY - nothing here compiles anything)
+ *
+ * Two shapes, and the vocabulary does not yet say which one a `core.foreach`
+ * means, because it has no key to say it with:
+ *
+ *   - SEQUENTIAL, which is what this descriptor assumes and what the demo
+ *     replays: a loop-shaped subgraph. The body compiles once, into a state
+ *     entered with the item bound, and its completion transitions back to the
+ *     head with the cursor advanced - the datamodel carrying the cursor and the
+ *     bound name, since SCXML has no loop construct and a `<foreach>` in
+ *     executable content is not a place a whole subtree can live. That is the
+ *     part that is genuinely open: `<foreach>` iterates EXECUTABLE CONTENT, and
+ *     a body of blocks is states, so the emission is a state machine and not an
+ *     executable-content element. What binds the item, where the cursor lives,
+ *     and whether either is visible in the datamodel a host can read are
+ *     statifier-ex's calls, not this repo's;
+ *   - PARALLEL FAN-OUT: one child session per item, which is
+ *     `core.subchart`'s compile sketch applied N times - an `<invoke>` per item
+ *     through the per-session registry statifier-ex ADR-0051 defines, with the
+ *     item passed as a param. That sketch already names its own open question
+ *     (how a child chart's several final states reach a parent's slots), and a
+ *     fan-out inherits it and adds a second: what the parent does when three
+ *     of five children fail. Cited rather than restated.
+ *
+ * Neither is built and no config key chooses between them. A `mode` field was
+ * the obvious thing to declare and it is left out on purpose: it would be a
+ * key whose two values name two compilers that do not exist, which is a
+ * proposal made by accident - the same argument `core.send` makes for
+ * declining a `target`. When the emission is decided the key follows it.
+ */
+
+const coreForeach = {
+  name: "core.foreach",
+  currentVersion: 1,
+  /* One primary slot, so `layout.js` arranges it as a stack rather than a fan
+   * (`arrangementOf`: more than one primary slot is what fans). `core.group`'s
+   * `body` declaration with a label that says what makes this container
+   * different - the steps inside run more than once. */
+  slots: () => [{ name: "body", arity: "any", label: "For each item" }],
+  configSchema: () => [
+    {
+      key: "items",
+      type: "string",
+      label: "For each item in",
+      required: true,
+      default: "",
+    },
+    {
+      key: "item_as",
+      type: "string",
+      label: "Call the item",
+      required: true,
+      default: "item",
+    },
+    {
+      key: "index_as",
+      type: "string",
+      label: "Call the position (optional)",
+      required: false,
+      default: "",
+    },
+  ],
+  validateConfig: (config) => {
+    const findings = [];
+
+    if (!isDatamodelPath(config.items)) {
+      findings.push({
+        key: "items",
+        message: "must be a datamodel path naming a list, like signup.invitees",
+      });
+    }
+    if (!isIdentifier(config.item_as)) {
+      findings.push({ key: "item_as", message: "must be a bare lowercase identifier" });
+    }
+    /* `assignToFindings`' idiom for an optional field, not `core.timeout`'s
+     * `cond` idiom, and for `core.send`'s stated reason: "" is this field's own
+     * DEFAULT, which the config form writes into every block of this type, so
+     * absent and empty are both silent. */
+    if (nonEmptyString(config.index_as) && !isIdentifier(config.index_as)) {
+      findings.push({ key: "index_as", message: "must be a bare lowercase identifier" });
+    }
+    /* The only cross-field check in this file, and the note above says why it
+     * earns its place: two names that collide read fine and mean nothing. */
+    if (
+      isIdentifier(config.item_as) &&
+      nonEmptyString(config.index_as) &&
+      config.item_as === config.index_as
+    ) {
+      findings.push({
+        key: "index_as",
+        message: "the item and its position cannot share one name",
+      });
+    }
+
+    return verdict(findings);
+  },
+  /*
+   * `core.group`'s io: a step containing steps. `produces` is absent rather
+   * than `"unknown"` - a foreach has one outcome, so there is no join to
+   * refuse, which is the distinction `core.invoke` and `core.branch` are
+   * `"unknown"` for. `consumes` is absent too, and it is the one place a reader
+   * might expect otherwise: a foreach does read the datamodel, through `items`,
+   * but that is a config path rather than a value arriving through the type
+   * flow, which is exactly the reason `core.invoke` declares no `consumes`
+   * either while reading its inputs through `params`.
+   */
+  io: () => ({
+    kinds: ["step"],
+    slotAccepts: { body: ["step"] },
+  }),
+  paletteEntry: {
+    label: "For each",
+    group: "Proposed core",
+    description: "Runs its body once for each item in a datamodel list.",
+    /* `core.resumable_group`'s glyph - a circling arrow - and the collision is
+     * argued the way `core.subchart` argues its reuse of `rectangle-group`:
+     * both blocks are about coming back to the same place, and the drawing is
+     * the right picture twice. Minting a new glyph would mean editing
+     * `render.js`'s icon set for a proposal, which is the cost `core.raise`,
+     * `core.assign` and `core.subchart` all declined. */
+    icon: "arrow-path",
+    keywords: ["foreach", "each", "loop", "iterate", "list", "batch", "repeat"],
+    order: 4,
+    layout: "stack",
+    /* The one slot is the body, so it takes the primary style `core.group`'s
+     * body takes. Declared rather than left to `layout.js`'s fallback (which
+     * would reach the same answer) because a container whose slot style is
+     * implicit is the one place a later rail would land silently. */
+    slotStyle: { body: "primary" },
+    /* What a card titled "For each invitee" cannot say on its own: the steps
+     * below it run more than once. Well under `badgeFor`'s 24-character cap. */
+    badge: "for each",
+    /* No `accentToken`, for `core.raise`'s reason: the teal is for work that
+     * happens outside this chart, and a foreach is pure control flow inside
+     * it. The steps in its body claim their own accents where they earn them,
+     * which is what keeps the container from out-shouting its contents. */
+  },
+};
+
 /* -------------------------------------------------------------- the value */
 
 /**
@@ -1099,4 +1378,6 @@ export const proposedCoreTypes = {
   "core.assign": coreAssign,
   /* APPENDED by sb-ajr - see the placement note at the descriptor. */
   "core.send": coreSend,
+  /* APPENDED by sb-9nn - see the placement note at the descriptor. */
+  "core.foreach": coreForeach,
 };
