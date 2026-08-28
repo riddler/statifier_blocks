@@ -143,7 +143,33 @@
         updateConfig,
       } from "../js/edit.js";
 
-      import { droppableSlots, droppableSlotsFor } from "../js/targets.js";
+      import { droppableSlots, droppableSlotsFor, slotKey } from "../js/targets.js";
+
+      import {
+        beginDrag,
+        blockForType,
+        canRedoSession,
+        canUndoSession,
+        createSession,
+        descendantCount,
+        deselect,
+        dropAt,
+        dropStateFor,
+        droppableCount,
+        endDrag,
+        insertTypeAt,
+        isCollapsed,
+        isDropAllowed,
+        moveIndexFor,
+        positionOf,
+        redoSession,
+        removeBlock,
+        select,
+        selectionSummary,
+        toggleCollapsed,
+        typesForSlot,
+        undoSession,
+      } from "../js/session.js";
 
       import {
         fanPath,
@@ -1311,6 +1337,447 @@
             endsWith(flowPath({ x: 0, y: 0 }, { x: 3, y: 2 }), "V 2"),
           flowPath({ x: 0, y: 0 }, { x: 3, y: 2 })
         );
+      });
+
+      /* ==================================================================
+       * sb-ad2: the editor session.
+       *
+       * Everything a gesture MEANS, asserted with no browser gesture
+       * anywhere - which is the point of `session.js` being a separate file
+       * from `interact.js`. What is deliberately NOT here: whether a card
+       * looks selected, whether a ghost follows the pointer, whether a seam
+       * arms on approach. Those are pixels, they are verified in Chrome, and
+       * a test that claimed to check them from here would be lying.
+       * ================================================================== */
+
+      suite("session: selection is a value, and it reports a position", () => {
+        const start = createSession(cardDocument(), registry);
+
+        equal("a fresh session has nothing selected", start.selectedId, null);
+        equal("and no summary to show", selectionSummary(start), null);
+
+        const chosen = select(start, "blk_CAP");
+
+        equal("selecting names the block", chosen.selectedId, "blk_CAP");
+        equal("the summary carries the three fields the inspector shows", selectionSummary(chosen), {
+          id: "blk_CAP",
+          type: "myapp.capture",
+          slot: "lane_capture",
+          parentId: "blk_PAR",
+          index: 0,
+          unresolved: false,
+        });
+
+        // The root is IN no slot. Reporting an empty string there would put a
+        // blank in the inspector that an author has to interpret; the word
+        // says what is true.
+        equal("the root reports slot \"root\"", selectionSummary(select(start, "blk_ROOT")).slot, "root");
+
+        equal("deselecting clears it", deselect(chosen).selectedId, null);
+
+        // A stale id is not an error state to render, it is nothing selected.
+        equal("selecting an absent block selects nothing", select(start, "blk_NOPE").selectedId, null);
+
+        check(
+          "selection never touches the document",
+          chosen.document === start.document,
+          "select() rebuilt the document"
+        );
+      });
+
+      suite("session: collapse is keyed by id, so it survives a re-render", () => {
+        const start = createSession(cardDocument(), registry);
+        const folded = toggleCollapsed(start, "blk_GRP");
+
+        check("toggling folds the block", isCollapsed(folded, "blk_GRP"), "not folded");
+        check("and only that block", !isCollapsed(folded, "blk_BR"), "folded a sibling too");
+        check("toggling again opens it", !isCollapsed(toggleCollapsed(folded, "blk_GRP"), "blk_GRP"), "still folded");
+
+        // The re-render contract, stated as the thing it actually depends on:
+        // a fold is an ID in a Set, so laying the document out again - which
+        // is what every command does - reproduces it exactly.
+        const tree = layoutDocument(folded.document, registry, { collapsed: folded.collapsed });
+        const group = tree.root.slots
+          .flatMap((slot) => slot.children)
+          .find((child) => child.id === "blk_GRP");
+
+        check("a fresh layout renders the fold", group.collapsed === true, "layout lost the fold");
+        equal("and the badge counts what it hides", group.descendantCount, 7);
+        equal("which is what the document says too", descendantCount(folded.document, "blk_GRP"), 7);
+
+        // d11: a finding must never hide inside something folded shut, so the
+        // count the badge draws from has to include the whole subtree.
+        const retired = createSession(retiredDocument(), registry);
+        const retiredTree = layoutDocument(retired.document, registry, {
+          collapsed: new Set(["blk_R1"]),
+        });
+
+        check(
+          "a folded card knows about findings below it",
+          retiredTree.root.descendantFindings > 0,
+          `descendantFindings was ${retiredTree.root.descendantFindings}`
+        );
+      });
+
+      suite("session: a drag lights every valid slot at once (d5)", () => {
+        const start = createSession(cardDocument(), registry);
+
+        equal("nothing is dragging to begin with", start.drag, null);
+        equal("so no slot carries a drop state", dropStateFor(start, "blk_ROOT", "body"), null);
+
+        const dragging = beginDrag(start, { kind: "move", id: "blk_WAI" });
+
+        // The set is computed ONCE, at drag start, from the same function the
+        // shipped editor calls on the server. Every assertion below reads that
+        // one set rather than asking per hover.
+        equal(
+          "the set is exactly droppable_slots for the block",
+          droppableCount(dragging),
+          droppableSlots(dragging.document, registry, "blk_WAI").length
+        );
+
+        equal("an accepting slot reads ok", dropStateFor(dragging, "blk_ROOT", "body"), "ok");
+        equal(
+          "a slot that takes only interrupt handlers reads no",
+          dropStateFor(dragging, "blk_GRP", "interrupts"),
+          "no"
+        );
+        check("and ok means allowed", isDropAllowed(dragging, "blk_ROOT", "body"), "not allowed");
+
+        equal("ending the drag clears the whole session", endDrag(dragging).drag, null);
+        equal("and the states go back to null", dropStateFor(endDrag(dragging), "blk_ROOT", "body"), null);
+
+        // Rule 4, the one an author is most likely to try: dragging a
+        // container onto its own descendant.
+        const group = beginDrag(start, { kind: "move", id: "blk_GRP" });
+
+        equal("a block's own subtree is never a target", dropStateFor(group, "blk_BR", "otherwise"), "no");
+        equal("nor is the block itself", dropStateFor(group, "blk_GRP", "body"), "no");
+        equal("but the slot it sits in still is", dropStateFor(group, "blk_ROOT", "body"), "ok");
+
+        // An interrupt handler is the mirror case, and it is what makes the
+        // rail light up while the body does not.
+        const handler = beginDrag(start, { kind: "move", id: "blk_INT" });
+
+        equal("an interrupt rule may go on a rail", dropStateFor(handler, "blk_GRP", "interrupts"), "ok");
+        equal("and nowhere a step goes", dropStateFor(handler, "blk_ROOT", "body"), "no");
+      });
+
+      suite("session: a drop is a command, and it refuses off-target", () => {
+        const start = beginDrag(createSession(cardDocument(), registry), {
+          kind: "move",
+          id: "blk_WAI",
+        });
+
+        const refused = dropAt(start, { parentId: "blk_GRP", slot: "interrupts", index: 0 });
+
+        check("a drop outside the set is refused", !refused.ok, JSON.stringify(refused));
+        equal("and says why", refused.error.tag, "not_droppable");
+
+        const dropped = dropAt(start, { parentId: "blk_ROOT", slot: "body", index: 0 });
+
+        check("a drop inside it applies", dropped.ok, JSON.stringify(dropped.error));
+        equal("the block moved", positionOf(dropped.value.document, "blk_WAI"), {
+          parentId: "blk_ROOT",
+          slot: "body",
+          index: 0,
+        });
+        equal("the drag session is over", dropped.value.drag, null);
+        equal("the moved block is selected", dropped.value.selectedId, "blk_WAI");
+        equal("the revision advanced", dropped.value.document.revision, 18);
+        check("and it is undoable", canUndoSession(dropped.value), "empty undo stack");
+
+        equal(
+          "dropping with no drag running refuses",
+          dropAt(createSession(cardDocument(), registry), {
+            parentId: "blk_ROOT",
+            slot: "body",
+            index: 0,
+          }).error.tag,
+          "no_drag"
+        );
+      });
+
+      suite("session: canvas gap indices become command indices (d4)", () => {
+        // The four-child slot the arithmetic is about. Reordering inside one
+        // slot is the case where the canvas and the command disagree, and the
+        // disagreement is exactly one.
+        const doc = createDocument(
+          block({
+            id: "blk_S",
+            type: "core.sequence",
+            slots: { body: [step("blk_A"), step("blk_B"), step("blk_C"), step("blk_D")] },
+          })
+        );
+
+        equal(
+          "moving later in the same slot loses one index",
+          moveIndexFor(doc, "blk_A", { parentId: "blk_S", slot: "body", index: 3 }),
+          2
+        );
+        equal(
+          "moving earlier in the same slot keeps its index",
+          moveIndexFor(doc, "blk_D", { parentId: "blk_S", slot: "body", index: 1 }),
+          1
+        );
+        equal(
+          "a move into a different slot keeps its index",
+          moveIndexFor(doc, "blk_A", { parentId: "blk_S", slot: "other", index: 3 }),
+          3
+        );
+
+        // The property the correction exists for: the canvas gap an author
+        // released on is the position the block ends up in.
+        const dragged = beginDrag(createSession(doc, registry), { kind: "move", id: "blk_A" });
+        const moved = dropAt(dragged, { parentId: "blk_S", slot: "body", index: 3 });
+
+        check("the drop applies", moved.ok, JSON.stringify(moved.error));
+        equal(
+          "and the block sits where the gap was",
+          moved.value.document.root.slots.body.map((child) => child.id),
+          ["blk_B", "blk_C", "blk_A", "blk_D"]
+        );
+      });
+
+      suite("session: the \"+\" path produces the same command a drop does (d8)", () => {
+        const start = createSession(cardDocument(), registry);
+        const offered = typesForSlot(start, "blk_GRP", "interrupts");
+
+        equal(
+          "an interrupts rail offers only interrupt handlers",
+          offered.map((entry) => entry.type),
+          ["core.on_event"]
+        );
+
+        check(
+          "a body offers steps and containers",
+          typesForSlot(start, "blk_ROOT", "body").some((entry) => entry.type === "core.sequence") &&
+            !typesForSlot(start, "blk_ROOT", "body").some((entry) => entry.type === "core.on_event"),
+          typesForSlot(start, "blk_ROOT", "body").map((entry) => entry.type).join(",")
+        );
+
+        // Decision 8's actual claim: the picker's filter IS decision 5's
+        // predicate. Asserted as an identity between the two lists rather
+        // than as two lists that happen to look similar.
+        for (const entry of typesForSlot(start, "blk_ROOT", "body")) {
+          const candidate = blockForType(registry, entry.type);
+          const slots = new Set(
+            droppableSlotsFor(start.document, registry, candidate).map(slotKey)
+          );
+
+          check(
+            `${entry.type} is offered because the drop rules admit it`,
+            slots.has(slotKey({ parentId: "blk_ROOT", slot: "body" })),
+            "offered a type a drag would have refused"
+          );
+        }
+
+        const inserted = insertTypeAt(start, "core.wait", {
+          parentId: "blk_ROOT",
+          slot: "body",
+          index: 1,
+        });
+
+        check("inserting applies", inserted.ok, JSON.stringify(inserted.error));
+        equal(
+          "the new block lands at the gap's index",
+          inserted.value.document.root.slots.body.length,
+          3
+        );
+        equal(
+          "its config is seeded from the declared defaults",
+          findBlock(inserted.value.document, inserted.value.selectedId).config,
+          { duration: "PT1H" }
+        );
+        equal(
+          "and it carries the type's current version",
+          findBlock(inserted.value.document, inserted.value.selectedId).typeVersion,
+          1
+        );
+
+        equal(
+          "a type the registry does not have is refused",
+          insertTypeAt(start, "myapp.nope", { parentId: "blk_ROOT", slot: "body", index: 0 }).error
+            .tag,
+          "unknown_block_type"
+        );
+
+        // A full `exactly_one`/`zero_or_one` slot offers nothing rather than
+        // offering a drop that would silently replace a child (rule 3).
+        check(
+          "a slot no type fits offers an empty list, not a throw",
+          Array.isArray(typesForSlot(start, "blk_ROOT", "no_such_slot")),
+          "typesForSlot did not return a list"
+        );
+      });
+
+      suite("session: delete, and what it selects afterwards", () => {
+        const start = select(createSession(cardDocument(), registry), "blk_WAI");
+        const removed = removeBlock(start, "blk_WAI");
+
+        check("a selected block can be removed", removed.ok, JSON.stringify(removed.error));
+        equal("it is gone", findBlock(removed.value.document, "blk_WAI"), null);
+        equal("and its parent takes the selection", removed.value.selectedId, "blk_PAR");
+        check("the removal is undoable", canUndoSession(removed.value), "empty undo stack");
+
+        const restored = undoSession(removed.value);
+
+        check("undo puts it back", restored.ok, JSON.stringify(restored.error));
+        check(
+          "with its subtree and its position",
+          findBlock(restored.value.document, "blk_WAI") !== null,
+          "block did not come back"
+        );
+
+        equal(
+          "the root refuses to be deleted",
+          removeBlock(start, "blk_ROOT").error.tag,
+          "cannot_remove_root"
+        );
+        equal(
+          "and deleting nothing says so",
+          removeBlock(createSession(cardDocument(), registry), null).error.tag,
+          "nothing_selected"
+        );
+      });
+
+      suite("session: undo and redo, and what the buttons read off them", () => {
+        const start = createSession(cardDocument(), registry);
+
+        check("nothing to undo at rest", !canUndoSession(start), "undo enabled on a fresh session");
+        check("nothing to redo either", !canRedoSession(start), "redo enabled on a fresh session");
+        equal("and undo refuses rather than throwing", undoSession(start).error.tag, "nothing_to_undo");
+        equal("as does redo", redoSession(start).error.tag, "nothing_to_redo");
+
+        const one = insertTypeAt(start, "core.wait", {
+          parentId: "blk_ROOT",
+          slot: "body",
+          index: 0,
+        }).value;
+        const two = removeBlock(one, "blk_AUTH").value;
+
+        check("two commands leave undo available", canUndoSession(two), "undo unavailable");
+        check("and redo still empty", !canRedoSession(two), "redo unexpectedly available");
+        equal("the revision counted both", two.document.revision, 19);
+
+        const back = undoSession(two).value;
+
+        check("undo restores the removed block", findBlock(back.document, "blk_AUTH") !== null, "gone");
+        check("and offers a redo", canRedoSession(back), "redo unavailable after undo");
+        equal("undo counts as an applied command", back.document.revision, 20);
+
+        const forward = redoSession(back).value;
+
+        equal("redo removes it again", findBlock(forward.document, "blk_AUTH"), null);
+        check("and redo is spent", !canRedoSession(forward), "redo still available");
+
+        // The stack property that makes undo trustworthy: winding all the way
+        // back reproduces the ORIGINAL document, structurally.
+        let wound = forward;
+        while (canUndoSession(wound)) wound = undoSession(wound).value;
+
+        equal("winding the stack out restores the original bytes", toJson(wound.document), toJson(
+          { ...cardDocument(), revision: wound.document.revision }
+        ));
+
+        // A fresh command after an undo invalidates the redo branch - the one
+        // rule every author relies on without ever being told it.
+        const branched = insertTypeAt(back, "core.wait", {
+          parentId: "blk_ROOT",
+          slot: "body",
+          index: 0,
+        }).value;
+
+        check("a new command clears the redo stack", !canRedoSession(branched), "redo survived a new command");
+      });
+
+      suite("session: an unresolvable block stays a first-class citizen (d12)", () => {
+        const start = createSession(retiredDocument(), registry);
+
+        // Selectable, and the inspector says what it is rather than nothing.
+        const chosen = select(start, "blk_GONE");
+
+        equal("it can be selected", chosen.selectedId, "blk_GONE");
+        equal("the inspector shows its stored type", selectionSummary(chosen).type, "myapp.retired");
+        check("and flags it as unresolvable", selectionSummary(chosen).unresolved, "not flagged");
+
+        // Movable: ADR-0003 decision 5's permissive default is what keeps a
+        // block whose type is gone from becoming stuck in place.
+        const dragging = beginDrag(chosen, { kind: "move", id: "blk_GONE" });
+
+        check("it can be picked up", dragging.drag !== null, "no drag session");
+        check("and it has somewhere to go", droppableCount(dragging) > 0, "no targets at all");
+        equal("its own body is not a target", dropStateFor(dragging, "blk_GONE", "body"), "no");
+
+        // ...and its slots are not targets for anything else either, because
+        // decision 5's first rule needs `slots/1` and there is none. NOTE:
+        // decision 12's prose also permits REORDERING within a slot it
+        // already has, which `droppable_slots/3` cannot express at slot
+        // granularity - the shipped enumeration excludes an unresolvable
+        // parent outright, and `targets.js` mirrors that. The spike follows
+        // the code, and the gap is recorded on the bead rather than papered
+        // over here.
+        const other = beginDrag(start, { kind: "move", id: "blk_KEPT" });
+
+        equal(
+          "an unresolvable parent offers no slots to a foreign block",
+          dropStateFor(other, "blk_GONE", "body"),
+          "no"
+        );
+
+        // Deletable, and its children come back with it.
+        const removed = removeBlock(chosen, "blk_GONE");
+
+        check("it can be deleted", removed.ok, JSON.stringify(removed.error));
+        equal("its children go with it", findBlock(removed.value.document, "blk_KEPT"), null);
+
+        // The acceptance property decision 12 names: preservation. Edit an
+        // unrelated part of the tree, undo nothing, and the unresolvable
+        // block's bytes are byte-for-byte what they were.
+        const edited = insertTypeAt(start, "core.wait", {
+          parentId: "blk_R1",
+          slot: "body",
+          index: 0,
+        });
+
+        check("an unrelated edit applies", edited.ok, JSON.stringify(edited.error));
+        equal(
+          "and the unresolvable block's bytes are untouched",
+          JSON.stringify(findBlock(edited.value.document, "blk_GONE")),
+          JSON.stringify(findBlock(start.document, "blk_GONE"))
+        );
+      });
+
+      suite("session: the layout hooks the canvas stamps its state through", () => {
+        const dragging = beginDrag(createSession(cardDocument(), registry), {
+          kind: "move",
+          id: "blk_WAI",
+        });
+
+        const tree = layoutDocument(dragging.document, registry, {
+          collapsed: dragging.collapsed,
+          dropState: (parentId, slot) => dropStateFor(dragging, parentId, slot),
+        });
+
+        const rootBody = tree.root.slots.find((slot) => slot.name === "body");
+
+        equal("an accepting slot's view carries data-drop=ok", rootBody.dropState, "ok");
+
+        const group = rootBody.children.find((child) => child.id === "blk_GRP");
+        const interrupts = group.slots.find((slot) => slot.name === "interrupts");
+
+        equal("a refusing slot's view carries data-drop=no", interrupts.dropState, "no");
+
+        // And with no session at all the canvas is inert, which is what the
+        // previous wave's two-argument call has to keep producing.
+        const inert = layoutDocument(dragging.document, registry);
+
+        equal(
+          "a session-free layout stamps nothing",
+          inert.root.slots.find((slot) => slot.name === "body").dropState,
+          null
+        );
+        equal("and folds nothing", inert.root.collapsed, false);
       });
 
       /* ------------------------------------------------------- reporting */
