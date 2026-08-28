@@ -158,9 +158,37 @@ export function parentOf(document, id) {
   return findBlock(document, path[path.length - 1].parentId);
 }
 
-/** A slot's children, where an absent slot key reads back as `[]`. */
+/**
+ * A slot's children, where an absent slot key reads back as `[]`.
+ *
+ * `Object.hasOwn` rather than a bare read, and it is load-bearing rather than
+ * defensive: Elixir's `Map.get(slots, name, [])` cannot see an inherited key,
+ * and a plain `slots[name]` can. A slot name is a string that arrives from
+ * decoded bytes or from a replayed command, so `"toString"` or `"constructor"`
+ * are reachable values - and without the guard they resolve to a function off
+ * `Object.prototype`, which would turn `applyCommand`'s documented refusal
+ * into a thrown `TypeError`.
+ */
 export function slotChildren(node, slot) {
-  return node.slots[slot] ?? [];
+  return Object.hasOwn(node.slots, slot) ? node.slots[slot] : [];
+}
+
+/**
+ * Writes one slot key. The mirror of the read guard above: a plain
+ * `slots[name] = children` with `name === "__proto__"` sets the prototype
+ * instead of creating an own key, so the slot silently disappears from
+ * `Object.keys` and from every walk built on it. A computed key in an object
+ * literal (`{ ...slots, [name]: children }`) already defines rather than
+ * assigns, so only the two statement-position writes need this.
+ */
+function setSlot(slots, name, children) {
+  Object.defineProperty(slots, name, {
+    value: children,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+  return slots;
 }
 
 /** Every id in `node`'s own subtree, `node` included (ADR-0005 rule 4). */
@@ -190,11 +218,38 @@ export function validate(document) {
   const envelope = validateEnvelope(document);
   if (envelope) return envelope;
 
+  // The two passes are ordered, not merged: `Validation.validate/1` runs the
+  // whole tree walk to completion and only THEN checks id uniqueness, so a
+  // structurally malformed block anywhere outranks a duplicate id no matter
+  // which comes first in pre-order. Checking `seen` inside the walk would
+  // silently reverse that precedence.
+  const walked = [];
+  const structural = validateTree(document.root, walked);
+  if (structural) return structural;
+
+  return validateUniqueIds(walked);
+}
+
+function validateUniqueIds(walked) {
   const seen = new Set();
-  return validateTree(document.root, seen);
+
+  for (const id of walked) {
+    if (seen.has(id)) return { tag: "duplicate_block_id", id };
+    seen.add(id);
+  }
+
+  return null;
 }
 
 function validateEnvelope(document) {
+  // Two distinguishable causes, not one: a positive integer that is not this
+  // envelope's version is a document from a schema this code does not speak,
+  // while anything else is a malformed envelope field. Collapsing them would
+  // tell an author their document is from the future when it actually has
+  // `"schema_version": null`.
+  if (!Number.isInteger(document.schemaVersion) || document.schemaVersion < 1) {
+    return { tag: "malformed_envelope", field: "schema_version" };
+  }
   if (document.schemaVersion !== SCHEMA_VERSION) {
     return { tag: "unsupported_schema_version", version: document.schemaVersion };
   }
@@ -219,7 +274,7 @@ function validateEnvelope(document) {
   return null;
 }
 
-function validateTree(node, seen) {
+function validateTree(node, walked) {
   const reportedId = nonEmptyString(node.id) ? node.id : null;
 
   if (!nonEmptyString(node.id)) {
@@ -244,8 +299,7 @@ function validateTree(node, seen) {
     return { tag: "malformed_block", id: reportedId, field: "slots" };
   }
 
-  if (seen.has(node.id)) return { tag: "duplicate_block_id", id: node.id };
-  seen.add(node.id);
+  walked.push(node.id);
 
   for (const slot of sortedSlotNames(node.slots)) {
     const children = node.slots[slot];
@@ -258,7 +312,7 @@ function validateTree(node, seen) {
       if (!isJsonObject(child)) {
         return { tag: "malformed_block", id: reportedId, field: "slots", slot };
       }
-      const problem = validateTree(child, seen);
+      const problem = validateTree(child, walked);
       if (problem) return problem;
     }
   }
@@ -344,7 +398,7 @@ function blockToJsonValue(node) {
   const slots = {};
   for (const slot of sortedSlotNames(node.slots)) {
     const children = node.slots[slot];
-    if (children.length > 0) slots[slot] = children.map(blockToJsonValue);
+    if (children.length > 0) setSlot(slots, slot, children.map(blockToJsonValue));
   }
   if (Object.keys(slots).length > 0) value.slots = slots;
 
@@ -429,10 +483,25 @@ export function fromJson(input) {
     return err({ tag: "not_a_block_document" });
   }
 
+  // Before anything is built: a block object carrying a key the encoder would
+  // never have written is refused. This is the one check only DECODING can
+  // make - it is about bytes that were never asked for rather than about the
+  // shape of a value that made it into the model - and it is what keeps
+  // ADR-0001 decision 2's `encode(decode(bytes)) == bytes` honest. A key
+  // silently dropped here would break that law with no error to say so.
+  const unexpected = unexpectedKeyProblem(raw.root);
+  if (unexpected) return err(unexpected);
+
   const decoded = {
     schemaVersion: raw.schema_version,
     id: raw.id,
-    revision: raw.revision ?? 0,
+    // No defaults for `revision` or `type_version`. Only `config`, `metadata`
+    // and `slots` are optional keys ADR-0001 lets canonical form omit; a
+    // document missing `revision`, or a block missing `type_version`, is
+    // refused by the validator below rather than quietly guessed at. Guessing
+    // `type_version: 1` would additionally change which descriptor version
+    // the block then resolves against.
+    revision: raw.revision,
     root: isJsonObject(raw.root) ? blockFromJsonValue(raw.root) : raw.root,
     metadata: raw.metadata ?? {},
   };
@@ -441,22 +510,64 @@ export function fromJson(input) {
   return problem ? err(problem) : ok(decoded);
 }
 
+/** The only keys a block object may carry - what the encoder writes, exactly. */
+const BLOCK_KEYS = ["id", "type", "type_version", "config", "slots"];
+
+/*
+ * Walks a raw block object and its slot children looking for a key outside
+ * `BLOCK_KEYS`, parent before children. A term that is not an object in block
+ * position, or a slot value that is not an array, is passed over rather than
+ * refused here - `validate` already has a typed arm for each, so an
+ * unrecognizable shape still produces a refusal rather than a crash.
+ */
+function unexpectedKeyProblem(raw) {
+  if (!isJsonObject(raw)) return null;
+
+  const key = Object.keys(raw).find((candidate) => !BLOCK_KEYS.includes(candidate));
+  if (key !== undefined) {
+    return { tag: "malformed_block", id: reportedId(raw), field: "unexpected_key", key };
+  }
+
+  if (!isJsonObject(raw.slots)) return null;
+
+  for (const slot of Object.keys(raw.slots)) {
+    const children = raw.slots[slot];
+    if (!Array.isArray(children)) continue;
+
+    for (const child of children) {
+      const problem = unexpectedKeyProblem(child);
+      if (problem) return problem;
+    }
+  }
+
+  return null;
+}
+
+/* `null` when the id itself is untrustworthy - there is nothing to name. */
+function reportedId(raw) {
+  return nonEmptyString(raw.id) ? raw.id : null;
+}
+
 function blockFromJsonValue(raw) {
   const slots = {};
 
   if (isJsonObject(raw.slots)) {
     for (const slot of Object.keys(raw.slots)) {
       const children = raw.slots[slot];
-      slots[slot] = Array.isArray(children)
-        ? children.map((child) => (isJsonObject(child) ? blockFromJsonValue(child) : child))
-        : children;
+      setSlot(
+        slots,
+        slot,
+        Array.isArray(children)
+          ? children.map((child) => (isJsonObject(child) ? blockFromJsonValue(child) : child))
+          : children
+      );
     }
   }
 
   return {
     id: raw.id,
     type: raw.type,
-    typeVersion: raw.type_version ?? 1,
+    typeVersion: raw.type_version,
     config: raw.config ?? {},
     slots,
   };
@@ -506,7 +617,7 @@ export function removeAtPath(node, path) {
     if (remaining.length === 0) {
       delete slots[slot];
     } else {
-      slots[slot] = remaining;
+      setSlot(slots, slot, remaining);
     }
 
     return {

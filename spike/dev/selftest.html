@@ -377,6 +377,137 @@
         );
       });
 
+      /*
+       * Decoding is where the spike is most tempted to be lenient, and every
+       * lenience is a silent divergence from Decode: a default the package
+       * does not have accepts bytes it would refuse, and a dropped key breaks
+       * decision 2's `encode(decode(bytes)) == bytes` with no error to say so.
+       */
+      suite("document: decode refuses what Decode refuses", () => {
+        const bytes = toJson(cardDocument());
+
+        const withStray = JSON.parse(bytes);
+        withStray.root.slots.body[0].collapsed = true;
+        const stray = fromJson(JSON.stringify(withStray));
+        check("a block key the encoder never writes is refused", !stray.ok);
+        equal("...as a malformed block", stray.error.tag, "malformed_block");
+        equal("...naming the key", stray.error.key, "collapsed");
+        equal("...and the block it is on", stray.error.id, "blk_AUTH");
+
+        const noRevision = JSON.parse(bytes);
+        delete noRevision.revision;
+        equal(
+          "a document missing revision is refused, not defaulted to 0",
+          fromJson(JSON.stringify(noRevision)).error,
+          { tag: "malformed_envelope", field: "revision" }
+        );
+
+        const noTypeVersion = JSON.parse(bytes);
+        delete noTypeVersion.root.type_version;
+        const missing = fromJson(JSON.stringify(noTypeVersion));
+        equal(
+          "a block missing type_version is refused, not defaulted to 1",
+          missing.error.tag,
+          "malformed_block"
+        );
+        equal("...naming the field", missing.error.field, "type_version");
+
+        const noConfig = JSON.parse(bytes);
+        delete noConfig.metadata;
+        check(
+          "metadata IS optional and reads back as empty",
+          fromJson(JSON.stringify(noConfig)).ok
+        );
+
+        for (const [label, version] of [
+          ["a string", "1"],
+          ["zero", 0],
+          ["null", null],
+          ["a float", 1.5],
+        ]) {
+          const bad = JSON.parse(bytes);
+          bad.schema_version = version;
+          equal(
+            `schema_version as ${label} is a malformed envelope, not a future version`,
+            fromJson(JSON.stringify(bad)).error,
+            { tag: "malformed_envelope", field: "schema_version" }
+          );
+        }
+
+        const future = JSON.parse(bytes);
+        future.schema_version = 2;
+        equal(
+          "a positive integer that is not 1 IS a future version",
+          fromJson(JSON.stringify(future)).error,
+          { tag: "unsupported_schema_version", version: 2 }
+        );
+
+        // Precedence: the tree walk runs to completion before uniqueness, so a
+        // malformed block outranks a duplicate id however pre-order orders them.
+        const both = cardDocument();
+        both.root.slots.body[0].id = "blk_ROOT";
+        both.root.slots.body[1].slots.interrupts[0].typeVersion = 0;
+        equal(
+          "a malformed block outranks a duplicate id",
+          validate(both).tag,
+          "malformed_block"
+        );
+      });
+
+      /*
+       * JavaScript hazards with no Elixir counterpart. `Map.get/3` cannot see
+       * an inherited key and `Map.put/3` cannot reach a prototype; a plain JS
+       * object read and write can do both, and slot names arrive from decoded
+       * bytes and from replayed commands.
+       */
+      suite("document: slot names are data, not property lookups", () => {
+        const doc = cardDocument();
+
+        // "toString" resolves off Object.prototype without the read guard, and
+        // a function's `.length` of 0 would admit index 0 and then throw.
+        const inherited = applyCommand(
+          doc,
+          insert(target("blk_ROOT", "toString", 0), step("blk_TS"))
+        );
+        check(
+          "a slot named toString creates an own key, as Map.put would",
+          inherited.ok,
+          JSON.stringify(inherited.error)
+        );
+        equal(
+          "...holding just that block",
+          inherited.value.document.root.slots["toString"].map((b) => b.id),
+          ["blk_TS"]
+        );
+        equal(
+          "...and index 1 is out of range, so no inherited length was read",
+          applyCommand(doc, insert(target("blk_ROOT", "toString", 1), step("blk_TS2"))).error.tag,
+          "index_out_of_range"
+        );
+        check(
+          "applyCommand stays total rather than throwing",
+          applyCommand(doc, remove("blk_ROOT")).ok === false
+        );
+
+        // "__proto__" assigns the prototype instead of defining an own key,
+        // unless the write defines rather than assigns.
+        const proto = applyCommand(
+          doc,
+          insert(target("blk_ROOT", "__proto__", 0), step("blk_PT"))
+        );
+        check("a slot named __proto__ applies", proto.ok, JSON.stringify(proto.error));
+        check(
+          "...as an own, enumerable key",
+          Object.keys(proto.value.document.root.slots).includes("__proto__"),
+          JSON.stringify(Object.keys(proto.value.document.root.slots))
+        );
+        equal(
+          "...and survives a decode round-trip",
+          fromJson(toJson(proto.value.document)).value.root.slots["__proto__"].map((b) => b.id),
+          ["blk_PT"]
+        );
+      });
+
       suite("document: traversal", () => {
         const doc = cardDocument();
 
@@ -487,13 +618,34 @@
           ["interrupt_handler"]
         );
 
-        const groupsView = paletteGroups(registry);
+        // A stored null is a config value ADR-0001 decision 6 admits, so it
+        // has to reach the "must be a list" arm rather than be coalesced into
+        // a valid empty list - `Map.get/3` defaults on an ABSENT key only.
+        equal(
+          "a null arms list is refused, not read as empty",
+          coreTypes["core.branch"].validateConfig({ arms: null }),
+          [{ key: "arms", message: "must be a list of arms" }]
+        );
+        equal(
+          "a null lanes list is refused, not read as empty",
+          coreTypes["core.parallel"].validateConfig({ lanes: null }),
+          [{ key: "lanes", message: "must be a list of lane names" }]
+        );
         check(
-          "the palette browser groups the demo types separately",
-          groupsView.some((g) => g.name === "Card processing") &&
-            groupsView.some((g) => g.name === "Signup wizard") &&
-            groupsView.some((g) => g.name === "Structure"),
-          JSON.stringify(groupsView.map((g) => g.name))
+          "an absent arms key IS the empty case",
+          coreTypes["core.branch"].validateConfig({}) === null
+        );
+
+        const groupsView = paletteGroups(registry);
+        equal(
+          "the palette browser sorts groups by name, then order, then label",
+          groupsView.map((g) => g.name),
+          ["Card processing", "Signup wizard", "Structure"]
+        );
+        equal(
+          "...and orders a group's entries by declared order",
+          groupsView.find((g) => g.name === "Structure").entries.map((e) => e.entry.label),
+          ["Sequence", "Group", "Resumable group", "Branch", "Parallel", "Wait", "On event"]
         );
       });
 
