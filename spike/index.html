@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>statifier_blocks editor spike</title>
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/themes/host-brand.css" />
+    <link rel="stylesheet" href="css/reset.css" />
+    <link rel="stylesheet" href="css/editor.css" />
+    <style>
+      /* Page chrome around the editor, deliberately NOT `sb-` prefixed and
+         deliberately not token-driven: this stands in for the host page, and
+         the point of the scoped reset is that nothing here reaches inside
+         `.sb-spike` and nothing inside it reaches out. */
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        line-height: 2;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- The scoping container. Everything the editor styles lives under it;
+         `data-sb-theme` selects light (absent), dark, or host-brand. -->
+    <div class="sb-spike" id="sb-spike">
+      <div class="sb-editor">
+        <header class="sb-topbar">
+          <div class="sb-topbar__identity">
+            <span class="sb-topbar__title">Untitled document</span>
+            <span class="sb-topbar__subtitle">shell frame &middot; no document loaded</span>
+          </div>
+
+          <div class="sb-topbar__spacer"></div>
+
+          <div class="sb-topbar__group">
+            <button class="sb-button sb-button--quiet" type="button" disabled>Undo</button>
+            <button class="sb-button sb-button--quiet" type="button" disabled>Redo</button>
+          </div>
+
+          <div class="sb-topbar__group">
+            <label class="sb-topbar__label" for="sb-theme">Theme</label>
+            <select class="sb-select" id="sb-theme">
+              <option value="">Light</option>
+              <option value="dark">Dark</option>
+              <option value="host-brand">Host brand</option>
+            </select>
+          </div>
+
+          <div class="sb-topbar__group">
+            <button class="sb-button sb-button--primary" type="button" disabled>Compile</button>
+          </div>
+        </header>
+
+        <div class="sb-editor__body">
+          <!-- ------------------------------------------------- palette -->
+          <section class="sb-pane sb-pane--palette" aria-label="Block palette">
+            <div class="sb-pane__header">
+              <h2 class="sb-pane__title">Palette</h2>
+            </div>
+            <div class="sb-pane__body">
+              <input
+                class="sb-input sb-palette__search"
+                type="search"
+                placeholder="Search blocks"
+                aria-label="Search blocks"
+              />
+
+              <div class="sb-palette__group">
+                <h3 class="sb-palette__group-name">Structure</h3>
+                <ul class="sb-palette__entries">
+                  <li>
+                    <button class="sb-palette__pick" type="button">
+                      <span class="sb-palette__name">Sequence</span>
+                      <span class="sb-palette__description">Runs its steps one after another.</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button class="sb-palette__pick" type="button">
+                      <span class="sb-palette__name">Group</span>
+                      <span class="sb-palette__description">
+                        Groups steps so interrupt rules can fire against them.
+                      </span>
+                    </button>
+                  </li>
+                  <li>
+                    <button class="sb-palette__pick" type="button">
+                      <span class="sb-palette__name">Resumable group</span>
+                      <span class="sb-palette__description">
+                        A group that remembers where it was when it resumes.
+                      </span>
+                    </button>
+                  </li>
+                  <li>
+                    <button class="sb-palette__pick" type="button">
+                      <span class="sb-palette__name">Branch</span>
+                      <span class="sb-palette__description">
+                        Takes the first arm whose condition holds, or otherwise.
+                      </span>
+                    </button>
+                  </li>
+                  <li>
+                    <button class="sb-palette__pick" type="button">
+                      <span class="sb-palette__name">Parallel</span>
+                      <span class="sb-palette__description">
+                        Runs its lanes at the same time, in no particular order.
+                      </span>
+                    </button>
+                  </li>
+                  <li>
+                    <button class="sb-palette__pick" type="button">
+                      <span class="sb-palette__name">Wait</span>
+                      <span class="sb-palette__description">
+                        Pauses for a fixed duration before continuing.
+                      </span>
+                    </button>
+                  </li>
+                  <li>
+                    <button class="sb-palette__pick" type="button">
+                      <span class="sb-palette__name">On event</span>
+                      <span class="sb-palette__description">
+                        Interrupts the group it sits in when an event arrives.
+                      </span>
+                    </button>
+                  </li>
+                </ul>
+              </div>
+
+              <div class="sb-palette__group">
+                <h3 class="sb-palette__group-name">Demo host types</h3>
+                <ul class="sb-palette__entries">
+                  <li>
+                    <button class="sb-palette__pick" type="button">
+                      <span class="sb-palette__name">Authorize</span>
+                      <span class="sb-palette__description">
+                        <code>myapp:authorize</code> &middot; example host block type.
+                      </span>
+                    </button>
+                  </li>
+                  <li>
+                    <button class="sb-palette__pick" type="button">
+                      <span class="sb-palette__name">Capture</span>
+                      <span class="sb-palette__description">
+                        <code>myapp:capture</code> &middot; example host block type.
+                      </span>
+                    </button>
+                  </li>
+                  <li>
+                    <button class="sb-palette__pick" type="button">
+                      <span class="sb-palette__name">Signup</span>
+                      <span class="sb-palette__description">
+                        <code>myapp:signup</code> &middot; example host block type.
+                      </span>
+                    </button>
+                  </li>
+                </ul>
+              </div>
+
+              <p class="sb-placeholder">
+                Grouped, searchable, drag-source palette.
+                <span class="sb-placeholder__wave">Composition is W3 subject matter.</span>
+              </p>
+            </div>
+          </section>
+
+          <!-- -------------------------------------------------- canvas -->
+          <section class="sb-pane sb-pane--canvas" aria-label="Canvas">
+            <div class="sb-pane__header">
+              <h2 class="sb-pane__title">Canvas</h2>
+              <span class="sb-chip">nested tree</span>
+              <div class="sb-topbar__spacer"></div>
+              <span class="sb-chip">0 blocks</span>
+            </div>
+            <div class="sb-pane__body sb-pane__body--flush sb-canvas">
+              <div class="sb-canvas__viewport">
+                <div class="sb-canvas__placeholder">
+                  <p class="sb-canvas__placeholder-title">No document loaded</p>
+                  <p class="sb-canvas__placeholder-body">
+                    The auto-laid-out nested tree renders here, with SVG connector
+                    lines drawn over it. Adjacency and nesting stay the only source
+                    of truth: connectors are rendered, never authored.
+                  </p>
+                  <p class="sb-canvas__placeholder-body">
+                    Demo documents and the layout engine arrive in W1 and W2.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ----------------------------------------------- inspector -->
+          <section class="sb-pane sb-pane--inspector" aria-label="Inspector">
+            <div class="sb-pane__header">
+              <h2 class="sb-pane__title">Inspector</h2>
+              <div class="sb-topbar__spacer"></div>
+              <span class="sb-chip">no selection</span>
+            </div>
+
+            <div class="sb-tabs" role="tablist" aria-label="Inspector panes">
+              <button
+                class="sb-tabs__tab"
+                type="button"
+                role="tab"
+                id="sb-tab-config"
+                aria-controls="sb-panel-config"
+                aria-selected="true"
+              >
+                Config
+              </button>
+              <button
+                class="sb-tabs__tab"
+                type="button"
+                role="tab"
+                id="sb-tab-findings"
+                aria-controls="sb-panel-findings"
+                aria-selected="false"
+              >
+                Findings
+              </button>
+              <button
+                class="sb-tabs__tab"
+                type="button"
+                role="tab"
+                id="sb-tab-datamodel"
+                aria-controls="sb-panel-datamodel"
+                aria-selected="false"
+              >
+                Datamodel
+              </button>
+              <button
+                class="sb-tabs__tab"
+                type="button"
+                role="tab"
+                id="sb-tab-condition"
+                aria-controls="sb-panel-condition"
+                aria-selected="false"
+              >
+                Condition
+              </button>
+              <button
+                class="sb-tabs__tab"
+                type="button"
+                role="tab"
+                id="sb-tab-fixtures"
+                aria-controls="sb-panel-fixtures"
+                aria-selected="false"
+              >
+                Fixtures
+              </button>
+            </div>
+
+            <div class="sb-pane__body">
+              <!-- config -->
+              <div
+                class="sb-tabpanel"
+                id="sb-panel-config"
+                role="tabpanel"
+                aria-labelledby="sb-tab-config"
+              >
+                <div class="sb-inspector__section">
+                  <h3 class="sb-inspector__section-title">Block</h3>
+                  <dl class="sb-kv">
+                    <dt class="sb-kv__key">Type</dt>
+                    <dd class="sb-kv__value sb-kv__value--mono">&mdash;</dd>
+                    <dt class="sb-kv__key">Id</dt>
+                    <dd class="sb-kv__value sb-kv__value--mono">&mdash;</dd>
+                    <dt class="sb-kv__key">Slot</dt>
+                    <dd class="sb-kv__value">&mdash;</dd>
+                  </dl>
+                </div>
+
+                <div class="sb-inspector__section">
+                  <h3 class="sb-inspector__section-title">Configuration</h3>
+                  <p class="sb-placeholder">
+                    Schema-driven form over the block type's declared fields.
+                    <span class="sb-placeholder__wave">W3 subject matter.</span>
+                  </p>
+                </div>
+              </div>
+
+              <!-- findings -->
+              <div
+                class="sb-tabpanel"
+                id="sb-panel-findings"
+                role="tabpanel"
+                aria-labelledby="sb-tab-findings"
+                hidden
+              >
+                <div class="sb-inspector__section">
+                  <h3 class="sb-inspector__section-title">Document findings</h3>
+                  <ul class="sb-findings__list">
+                    <li class="sb-finding sb-finding--error">
+                      <span class="sb-badge">1</span>
+                      <span class="sb-finding__body">
+                        <span class="sb-finding__message">
+                          Example error finding, anchored to a block and field.
+                        </span>
+                        <span class="sb-finding__anchor">blk_0 &rsaquo; config.condition</span>
+                      </span>
+                    </li>
+                    <li class="sb-finding sb-finding--warning">
+                      <span class="sb-badge sb-badge--muted">2</span>
+                      <span class="sb-finding__body">
+                        <span class="sb-finding__message">
+                          Example warning finding, anchored to a slot.
+                        </span>
+                        <span class="sb-finding__anchor">blk_0 &rsaquo; slot:body</span>
+                      </span>
+                    </li>
+                    <li class="sb-finding sb-finding--info">
+                      <span class="sb-badge sb-badge--muted">3</span>
+                      <span class="sb-finding__body">
+                        <span class="sb-finding__message">
+                          Example informational finding, anchored to the document.
+                        </span>
+                        <span class="sb-finding__anchor">document</span>
+                      </span>
+                    </li>
+                  </ul>
+                  <p class="sb-hint">
+                    Severity chrome only. Anchored navigation (click a finding,
+                    select and reveal its block) is W3.
+                  </p>
+                </div>
+              </div>
+
+              <!-- datamodel -->
+              <div
+                class="sb-tabpanel"
+                id="sb-panel-datamodel"
+                role="tabpanel"
+                aria-labelledby="sb-tab-datamodel"
+                hidden
+              >
+                <div class="sb-inspector__section">
+                  <h3 class="sb-inspector__section-title">Scopes</h3>
+                  <div class="sb-tree">
+                    <div class="sb-tree__scope">
+                      <div class="sb-tree__row">
+                        <span class="sb-tree__name">global</span>
+                        <span class="sb-tree__type">scope</span>
+                      </div>
+                      <div class="sb-tree__row sb-tree__row--nested">
+                        <span class="sb-tree__name">&mdash;</span>
+                        <span class="sb-tree__type">empty</span>
+                      </div>
+                    </div>
+                    <div class="sb-tree__scope">
+                      <div class="sb-tree__row">
+                        <span class="sb-tree__name">local</span>
+                        <span class="sb-tree__type">scope</span>
+                      </div>
+                    </div>
+                    <div class="sb-tree__scope">
+                      <div class="sb-tree__row">
+                        <span class="sb-tree__name">event</span>
+                        <span class="sb-tree__type">scope</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p class="sb-placeholder">
+                    Typed datamodel tree with scope sections.
+                    <span class="sb-placeholder__wave">
+                      New design territory; W3 subject matter.
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <!-- condition -->
+              <div
+                class="sb-tabpanel"
+                id="sb-panel-condition"
+                role="tabpanel"
+                aria-labelledby="sb-tab-condition"
+                hidden
+              >
+                <div class="sb-inspector__section">
+                  <h3 class="sb-inspector__section-title">Condition</h3>
+                  <code class="sb-code">amount &gt; 0 and country = "US"</code>
+                  <p class="sb-hint">
+                    Plain editor pane. No completion: the predicator-grammar
+                    completion is a follow-up, not spike scope.
+                  </p>
+                </div>
+              </div>
+
+              <!-- fixtures -->
+              <div
+                class="sb-tabpanel"
+                id="sb-panel-fixtures"
+                role="tabpanel"
+                aria-labelledby="sb-tab-fixtures"
+                hidden
+              >
+                <div class="sb-inspector__section">
+                  <h3 class="sb-inspector__section-title">Fixtures</h3>
+                  <div class="sb-fixtures__list">
+                    <div class="sb-fixtures__row">
+                      <span class="sb-fixtures__name">Example run fixture</span>
+                      <span class="sb-status sb-status--pass">passed</span>
+                    </div>
+                    <div class="sb-fixtures__row">
+                      <span class="sb-fixtures__name">Example condition table</span>
+                      <span class="sb-status sb-status--fail">failed</span>
+                    </div>
+                    <div class="sb-fixtures__row">
+                      <span class="sb-fixtures__name">Example interrupt fixture</span>
+                      <span class="sb-status sb-status--pending">not run</span>
+                    </div>
+                  </div>
+                  <p class="sb-placeholder">
+                    Fixture editor and runner over mocked step sequences and
+                    precomputed condition truth tables.
+                    <span class="sb-placeholder__wave">W3 subject matter.</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="sb-pane__footer">Shell frame &middot; campaign 012 W0</div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="js/shell.js"></script>
+  </body>
+</html>

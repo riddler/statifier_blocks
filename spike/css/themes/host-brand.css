@@ -1,0 +1,70 @@
+/*
+ * spike/css/themes/host-brand.css - the third theme, and the proof.
+ *
+ * This file is what a host embedding the editor writes. The rule it exists
+ * to demonstrate, and to hold the spike to, is a hard one:
+ *
+ *   A theme may set `--sb-*` properties. It may not write a structural rule,
+ *   it may not name an `sb-` class, and it may not touch layout.
+ *
+ * If a restyle turns out to need something this file is not allowed to do,
+ * that is a finding about the token surface in tokens.css, and the fix goes
+ * there rather than here. W4 is where the theme reaches parity and where
+ * those findings get written down; this is the starter set that proves the
+ * mechanism carries colour, shape and type, not colour alone.
+ *
+ * The brand below is invented for the spike and is not any real product's.
+ */
+
+.sb-spike[data-sb-theme="host-brand"],
+[data-sb-theme="host-brand"] .sb-spike {
+  /* Warmer paper than the default's cool grey. */
+  --sb-bg-canvas: #f5f1ea;
+  --sb-bg: #fffdf9;
+  --sb-bg-muted: #f2ece1;
+  --sb-bg-sunken: #ebe4d7;
+  --sb-bg-raised: #fffdf9;
+
+  --sb-fg: #2a2118;
+  --sb-fg-muted: #6d6154;
+  --sb-fg-subtle: #9a8e7e;
+  --sb-fg-on-accent: #fffdf9;
+
+  --sb-border: #ded4c4;
+  --sb-border-strong: #c4b8a4;
+
+  /* Brand accent: deep teal rather than the default blue. */
+  --sb-accent: #1f6f68;
+  --sb-accent-hover: #175853;
+  --sb-accent-muted: rgba(31, 111, 104, 0.12);
+
+  --sb-error: #a83223;
+  --sb-error-bg: rgba(168, 50, 35, 0.1);
+  --sb-warning: #9a6510;
+  --sb-warning-bg: rgba(154, 101, 16, 0.12);
+  --sb-info: #1f6f68;
+  --sb-info-bg: rgba(31, 111, 104, 0.1);
+  --sb-success: #3f7d3a;
+  --sb-success-bg: rgba(63, 125, 58, 0.12);
+
+  --sb-drop-ok-border: #3f7d3a;
+  --sb-drop-ok-bg: rgba(63, 125, 58, 0.09);
+
+  --sb-connector: #c4b8a4;
+
+  /* Shape: softer than the default. */
+  --sb-radius: 10px;
+  --sb-radius-sm: 6px;
+  --sb-radius-lg: 16px;
+
+  /* Type: the brand's own stack, and a slightly roomier rhythm. The
+   * fallbacks matter - a host font that fails to load must not leave the
+   * editor unreadable. */
+  --sb-font: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sb-space: 0.5625rem;
+  --sb-leading: 1.55;
+  --sb-tracking-caps: 0.09em;
+
+  --sb-shadow-sm: 0 1px 2px rgba(42, 33, 24, 0.07);
+  --sb-shadow-md: 0 6px 16px rgba(42, 33, 24, 0.12);
+}

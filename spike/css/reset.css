@@ -1,0 +1,145 @@
+/*
+ * spike/css/reset.css - the host-agnostic baseline.
+ *
+ * Every rule here is scoped under `.sb-spike`, on purpose. The editor drops
+ * into a host page that already has its own stylesheet, and a global reset
+ * would be the editor reaching outside its own box to rewrite that page. So
+ * the reset neutralises the host's inherited styling *inside* the editor's
+ * subtree and touches nothing outside it.
+ *
+ * This is a spike answer to a real question ADR-0005 d14 leaves open: the
+ * shipped stylesheet is structural only and inherits whatever the host's
+ * `p`, `ul`, `button` and `input` styles happen to be. Whether a scoped
+ * reset layer belongs in the package is one of the things this spike exists
+ * to find out.
+ */
+
+.sb-spike,
+.sb-spike *,
+.sb-spike *::before,
+.sb-spike *::after {
+  box-sizing: border-box;
+}
+
+.sb-spike {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: var(--sb-font);
+  font-size: var(--sb-text-md);
+  line-height: var(--sb-leading);
+  color: var(--sb-fg);
+  background: var(--sb-bg-canvas);
+  text-align: left;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Block-level elements: no inherited margins, no inherited list chrome. */
+.sb-spike h1,
+.sb-spike h2,
+.sb-spike h3,
+.sb-spike h4,
+.sb-spike h5,
+.sb-spike h6,
+.sb-spike p,
+.sb-spike figure,
+.sb-spike blockquote,
+.sb-spike dl,
+.sb-spike dd,
+.sb-spike ol,
+.sb-spike ul,
+.sb-spike pre {
+  margin: 0;
+  padding: 0;
+}
+
+.sb-spike h1,
+.sb-spike h2,
+.sb-spike h3,
+.sb-spike h4,
+.sb-spike h5,
+.sb-spike h6 {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.sb-spike ol,
+.sb-spike ul {
+  list-style: none;
+}
+
+.sb-spike pre,
+.sb-spike code,
+.sb-spike kbd,
+.sb-spike samp {
+  font-family: var(--sb-font-mono);
+  font-size: 1em;
+}
+
+/* Form controls do not inherit font by default in any browser. */
+.sb-spike button,
+.sb-spike input,
+.sb-spike select,
+.sb-spike textarea {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border-radius: 0;
+  appearance: none;
+}
+
+.sb-spike button {
+  cursor: pointer;
+  text-align: inherit;
+}
+
+.sb-spike button:disabled {
+  cursor: default;
+}
+
+.sb-spike textarea {
+  resize: vertical;
+}
+
+.sb-spike a {
+  color: var(--sb-accent);
+  text-decoration: none;
+}
+
+.sb-spike img,
+.sb-spike svg,
+.sb-spike video,
+.sb-spike canvas {
+  display: block;
+  max-width: 100%;
+}
+
+.sb-spike table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.sb-spike hr {
+  border: 0;
+  border-top: var(--sb-border-width) solid var(--sb-border);
+  margin: 0;
+}
+
+/* One visible focus treatment for the whole subtree, token-driven, so no
+ * surface has to remember to style focus and none can quietly drop it. */
+.sb-spike :focus-visible {
+  outline: var(--sb-focus-width) solid var(--sb-focus-ring);
+  outline-offset: var(--sb-focus-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-spike *,
+  .sb-spike *::before,
+  .sb-spike *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
