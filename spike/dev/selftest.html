@@ -5654,6 +5654,275 @@
         equal("and the run still replays to a pass", finished.verdict, "pass");
       });
 
+      /* ------------------------------------------- sb-ajr: core.send
+       *
+       * APPENDED, like the descriptor it covers, and for the same reason: a
+       * sibling bead was appending its own suites to this file at the same
+       * time. Reading order would put these beside core.raise's suites, which
+       * are the ones they most want to be read against.
+       *
+       * `shipped` (fetched further up for the fixture-file suites) is reused
+       * rather than re-fetched: the last suite here is about the block that
+       * ships in signup-wizard.json, and one fetch of that file is enough.
+       */
+
+      const sendType = proposedCoreTypes["core.send"];
+
+      suite("proposed core: core.send is a leaf that names an event and a time", () => {
+        check("the type is registered", sendType !== undefined);
+        if (sendType === undefined) return;
+
+        equal("it names itself", sendType.name, "core.send");
+        check("it is not in the shipped core vocabulary", !("core.send" in coreTypes));
+
+        equal("no slots at all - a send has no subtree", sendType.slots({}), []);
+        equal("it is a step", sendType.io({}).kinds, ["step"]);
+        // core.raise's argument, and it holds with a delay in the config: the
+        // block finishes when the send is ARMED, so there is still one
+        // outcome and still no join to refuse.
+        check("produces is absent, not 'unknown'", sendType.io({}).produces === undefined);
+        check("and it consumes nothing", sendType.io({}).consumes === undefined);
+        check(
+          "so it drops into a group's body",
+          admits(coreTypes["core.group"], {}, "body", sendType, {})
+        );
+        check(
+          "...and not onto the interrupt rail, which takes handlers",
+          !admits(coreTypes["core.group"], {}, "interrupts", sendType, {})
+        );
+
+        equal(
+          "two config fields, the event first",
+          sendType.configSchema({}).map((field) => [field.key, field.type, field.required]),
+          [
+            ["event", "string", true],
+            ["delay", "duration", false],
+          ]
+        );
+        // The default is "" and not a duration: a send with no delay is the
+        // ordinary case, and core.wait's PT1H default would author a timer
+        // nobody asked for.
+        equal("the delay defaults to no delay", sendType.configSchema({})[1].default, "");
+      });
+
+      suite("proposed core: core.send speaks core.raise's event grammar", () => {
+        const onEvent = coreTypes["core.on_event"];
+        const raise = proposedCoreTypes["core.raise"];
+
+        // core.raise's suite makes this check against core.on_event; the third
+        // type joins the same assertion rather than adding a second one,
+        // because the property is three-way now: a name any one of them
+        // refuses is a rail that cannot catch what a step sends.
+        const sendTakes = (event) =>
+          (sendType.validateConfig({ event }) ?? []).every((finding) => finding.key !== "event");
+        const raiseTakes = (event) => raise.validateConfig({ event }) === null;
+        const railTakes = (event) =>
+          (onEvent.validateConfig({ event, outcome: "abandon" }) ?? []).every(
+            (finding) => finding.key !== "event"
+          );
+
+        const names = [
+          "signup.abandoned",
+          "signup.email_verified",
+          "error.communication.invoke.blk_x",
+          "done.state.blk_y",
+          "Cancelled",
+          "_internal",
+          "a-b.c_d.9",
+          "",
+          "  ",
+          ".leading",
+          "9starts_with_a_digit",
+          "has space",
+          "has/slash",
+        ];
+
+        equal(
+          "every name lands the same way on send, raise and rail",
+          names.filter(
+            (event) => sendTakes(event) !== raiseTakes(event) || sendTakes(event) !== railTakes(event)
+          ),
+          []
+        );
+
+        equal(
+          "a missing event is core.raise's finding, word for word",
+          sendType.validateConfig({}),
+          [{ key: "event", message: "must be an event name, like signup.abandoned" }]
+        );
+      });
+
+      suite("proposed core: core.send's delay is optional and otherwise a duration", () => {
+        const delayFinding = {
+          key: "delay",
+          message: "must be an ISO-8601 duration, like PT2H, or empty to send now",
+        };
+        const withDelay = (delay) => sendType.validateConfig({ event: "signup.abandoned", delay });
+
+        equal("an absent delay is silent", sendType.validateConfig({ event: "signup.abandoned" }), null);
+        // "" is the field's own DEFAULT, which the config form writes into
+        // every block of this type, so it cannot be a finding.
+        equal("and so is the empty default", withDelay(""), null);
+        equal("a real duration passes", withDelay("PT2H"), null);
+        equal("as does one with a date part", withDelay("P1DT6H"), null);
+
+        equal("an hours-and-minutes shorthand is refused", withDelay("2h"), [delayFinding]);
+        equal("so is a bare number", withDelay("7200"), [delayFinding]);
+        equal("so is a lone P", withDelay("P"), [delayFinding]);
+        // ADR-0001 decision 6: a STORED null reaches the refusal arm rather
+        // than being read as an absent key.
+        equal("a stored null is refused, not defaulted", withDelay(null), [delayFinding]);
+        equal("and so is a number", withDelay(90), [delayFinding]);
+
+        // core.wait refuses what this refuses: one control, one grammar. The
+        // asymmetry is deliberate and is the whole of the optional case - a
+        // wait with no duration is unfinished, a send with no delay is a send.
+        const wait = coreTypes["core.wait"];
+        const durations = ["PT2H", "P1DT6H", "2h", "7200", "P", "PT", ""];
+        equal(
+          "every duration string a wait refuses, a delayed send refuses too",
+          durations.filter(
+            (value) =>
+              value !== "" &&
+              (wait.validateConfig({ duration: value }) === null) !== (withDelay(value) === null)
+          ),
+          []
+        );
+
+        equal(
+          "a bad event and a bad delay are both reported, event first",
+          sendType.validateConfig({ event: "has space", delay: "soon" }).map((finding) => finding.key),
+          ["event", "delay"]
+        );
+      });
+
+      suite("proposed core: core.send's badge is static, by decision", () => {
+        const entry = paletteEntryFor(sendType);
+
+        equal("it declares a badge", entry.badge, "sends");
+        equal("...which survives the normalizer", badgeFor(entry), "sends");
+        equal("it sits with the other proposals", entry.group, "Proposed core");
+
+        // The mechanical half of the decision recorded at the descriptor: a
+        // config-dependent badge is not expressible today. `badgeFor` takes an
+        // ENTRY and nothing else, where `joinLabelFor` takes a config as well,
+        // which is the precedent that made the question worth asking. If this
+        // ever changes, this check is the one that says so.
+        const parallelEntry = paletteEntryFor(coreTypes["core.parallel"]);
+        check(
+          "a joinLabel is a callback, so config moves it",
+          joinLabelFor(parallelEntry, { complete: "first" }) !==
+            joinLabelFor(parallelEntry, { complete: "all" })
+        );
+        equal("a badge is inert data - badgeFor takes the entry alone", badgeFor.length, 1);
+        check(
+          "...and a callback in its place degrades to no badge at all",
+          badgeFor({ badge: () => "timer" }) === null
+        );
+
+        // The other half: `timer` is taken, and it means something else.
+        equal("core.wait's badge is timer", badgeFor(paletteEntryFor(coreTypes["core.wait"])), "timer");
+        check("core.send does not reuse it", badgeFor(entry) !== "timer");
+
+        // With no target a send goes to this chart's own session, so it is
+        // inside-the-chart work and takes the editor's accent - core.raise's
+        // argument, and the thing that keeps the shared glyph off core.invoke.
+        check("it claims no accent token", accentTokenFor(entry) === null);
+        equal("it shares core.invoke's glyph", entry.icon, paletteEntryFor(proposedCoreTypes["core.invoke"]).icon);
+        check(
+          "...but not core.invoke's accent, which is what tells them apart",
+          accentTokenFor(paletteEntryFor(proposedCoreTypes["core.invoke"])) !== null
+        );
+      });
+
+      suite("proposed core: what core.send deliberately does not declare", () => {
+        // `target` is SKETCHED in the descriptor's note and not built: what a
+        // target may name is statifier-ex's (ADR-0052 identity, ADR-0051's
+        // invoke seam), and a field that validates nothing is a proposal made
+        // by accident.
+        equal(
+          "no target field",
+          sendType.configSchema({}).filter((field) => field.key === "target"),
+          []
+        );
+        equal(
+          "and validation has nothing to say about one",
+          sendType.validateConfig({ event: "signup.abandoned", target: "#_internal" }),
+          null
+        );
+
+        // `<cancel>` is sketched at the descriptor and NOT built: a cancel
+        // naming the send it cancels is a cross-subtree reference, which is
+        // the shape D13 refused.
+        check("no core.cancel is proposed", !("core.cancel" in proposedCoreTypes));
+        check("...and none is shipped either", !("core.cancel" in coreTypes));
+      });
+
+      suite("proposed core: core.send in the shipped signup document", () => {
+        const raw = shipped["bdoc_signup_demo"];
+        check("signup-wizard.json loads", raw !== null);
+        if (raw === null) return;
+
+        const found = [];
+        const walk = (node) => {
+          if (!node || typeof node !== "object") return;
+          if (node.type === "core.send") found.push(node);
+          for (const children of Object.values(node.slots ?? {})) children.forEach(walk);
+        };
+        walk(raw.root);
+
+        equal("the document uses the proposed type once", found.length, 1);
+        if (found.length !== 1) return;
+
+        const [sendBlock] = found;
+        equal("it is the onboarding deadline", sendBlock.id, "blk_su_onboarding_deadline");
+        equal("its stored config validates", sendType.validateConfig(sendBlock.config), null);
+        equal("it is the delayed case, which is sb-d9's live test", sendBlock.config.delay, "PT2H");
+
+        // The point of the demo appearance: a sent event and a raised one
+        // reach the SAME rule, and neither is joined to it by an edge.
+        const rules = [];
+        const rails = (node) => {
+          if (!node || typeof node !== "object") return;
+          for (const [slot, children] of Object.entries(node.slots ?? {})) {
+            if (slot === "interrupts") rules.push(...children);
+            children.forEach(rails);
+          }
+        };
+        rails(raw.root);
+
+        check(
+          "a rule on some rail catches what it sends",
+          rules.some((rule) => rule.config?.event === sendBlock.config.event)
+        );
+
+        const raised = [];
+        const raises = (node) => {
+          if (!node || typeof node !== "object") return;
+          if (node.type === "core.raise") raised.push(node.config?.event);
+          for (const children of Object.values(node.slots ?? {})) children.forEach(raises);
+        };
+        raises(raw.root);
+        check("and the same name is raised elsewhere in the document", raised.includes(sendBlock.config.event));
+
+        // The run: authored steps only (D4), and the one that matters is the
+        // step lighting the send's own card.
+        const fixtures = fixturesFor(shipped.runs, "bdoc_signup_demo");
+        const run = fixtures.runs.find((candidate) => candidate.id === "run_su_deadline");
+        check("the deadline run is present", run !== undefined);
+        if (run === undefined) return;
+
+        check(
+          "it lights the send's card",
+          run.steps.some((step) => (step.active ?? []).includes(sendBlock.id))
+        );
+        check(
+          "and a later step carries the event's arrival",
+          run.steps.some((step) => step.event === sendBlock.config.event)
+        );
+        equal("and it replays to its declared verdict", runView(run, run.steps.length).verdict, run.expected);
+      });
+
       /* ------------------------------------------------------- reporting */
 
       const results = document.getElementById("results");

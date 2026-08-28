@@ -850,6 +850,234 @@ const coreAssign = {
   },
 };
 
+/* ------------------------------------------------------------- core.send
+ *
+ * APPENDED BY sb-ajr, at the END of this file and of the map below, for the
+ * reason `core.timeout` says above: a sibling bead was appending its own
+ * descriptor at the same time, and a pure append is the only edit two writers
+ * can make to one file without meeting in the middle. Placement is a merge
+ * courtesy; in reading order `core.send` belongs beside `core.raise`, which is
+ * the type it is one config field away from.
+ *
+ * A leaf step that sends one event, immediately or after a delay.
+ *
+ * ## What it adds to `core.raise`, and why it is a second type
+ *
+ * `core.raise` names an event and hands control on, now. `core.send` names an
+ * event and says WHEN - and the delay is not a detail of the same block, it is
+ * a different thing to compile and a different thing to reason about. A raise
+ * is internal and synchronous: the enclosing group's rail sees it during the
+ * same macrostep. A delayed send outlives the step that armed it, has to
+ * survive a restart, and is the one form in this file whose compiled shape
+ * needs infrastructure outside the interpreter (see the compile note below).
+ *
+ * Folding the two into one type with an optional `delay` was the alternative
+ * and it is worse: `core.raise`'s whole descriptor argues that a raise is the
+ * most inside-the-chart step there is, and a key that quietly turns it into a
+ * durable timer would make that note false half the time. Two types, one
+ * grammar for the event name, is the same shape `core.wait` and `core.timeout`
+ * already have - the same clock, said from a body and said from a rail.
+ *
+ * ## The badge is `sends`, and NOT `timer` when a delay is set
+ *
+ * The bead left this to the drafter. Decided: a single static `sends`.
+ *
+ * The dynamic reading - `timer` when `delay` is set, `sends` when it is not -
+ * was checked against the metadata layer before being turned down, because it
+ * is expressible: `paletteEntry.joinLabel` is a CALLBACK of config (sb-dxs),
+ * so d10 already has a precedent for a config-dependent presentation value.
+ * `badge` is not one. `badgeFor(entry)` in `palette.js` takes the entry and
+ * nothing else, and `layout.js` calls it that way; making the badge dynamic
+ * means widening that signature and its call site - an in-place change to two
+ * shared files, proposing a d10 metadata amendment, made in passing by a leaf
+ * descriptor whose bead is about neither. That is the tail wagging the dog.
+ *
+ * Two reasons besides the mechanical one, and they are the ones that would
+ * still hold if `badgeFor` took a config tomorrow:
+ *
+ *   - `timer` is already `core.wait`'s badge (sb-p0k), where it means the
+ *     thing a reader cannot otherwise see: the chart stays LIVE for the whole
+ *     duration. A delayed send does not say that about the block it sits on -
+ *     the send finishes immediately and the delay is the event's, not the
+ *     step's. The same chip meaning two different things on two cards is worse
+ *     than no chip;
+ *   - a badge that changes as a config field is typed is a chip a reader
+ *     cannot learn. `sends` is true of every `core.send` in every
+ *     configuration, which is what makes it worth putting on the card at all.
+ *
+ * Whether `badge` should be allowed to be a callback the way `joinLabel` is -
+ * and this type is the first real evidence for the question - is a Phase-B
+ * finding, recorded on the bead.
+ *
+ * ## `target` is SKETCHED, not built
+ *
+ * An SCXML `<send>` carries a target: the same session, another session, or an
+ * external I/O processor. This descriptor declares NO `target` field, and the
+ * omission is deliberate rather than an oversight:
+ *
+ *   - what a target may NAME is not this repo's decision. Session identity is
+ *     statifier-ex's (ADR-0052), and reaching the host is the invoke seam
+ *     ADR-0051 defines, which the vocabulary already spells `core.invoke`. A
+ *     `target` string field here would be a third way to leave the chart,
+ *     invented in a spike file, with no record behind it;
+ *   - a config key that validates nothing is a proposal made by accident. The
+ *     field would have to accept any string, because this file does not own
+ *     the grammar - and then the first author to type one would have authored
+ *     a document the compiler cannot honour.
+ *
+ * So the sketch is this paragraph. If a target lands, the shape it would take
+ * is a `{ select: [...] }` over targets a HOST declares - the same move
+ * `core.subchart`'s chart picker makes (D11) - and never a free string. Every
+ * `core.send` in a document without one means the internal target: this
+ * session, which is what makes a delayed send catchable by a rail in the same
+ * chart, which is what the demo does.
+ *
+ * ## `<cancel>` is SKETCHED HERE and NOT BUILT - deliberately
+ *
+ * A `<send>` with a delay and an id can be cancelled by a `<cancel>` before it
+ * fires, and every real use of a durable timer wants that: the deadline that
+ * stops mattering once the customer finishes. This file proposes NO
+ * `core.cancel`, and will not, because the missing piece is not a descriptor:
+ *
+ *   - a cancel names the SEND it cancels, so it needs an identity for a send.
+ *     `sendid` in SCXML is a compile-time artifact; a block document's handle
+ *     would have to be the sending block's id, which makes the cancel a
+ *     cross-subtree REFERENCE to another block - the exact shape D13 refused
+ *     for `core.invoke`'s failure path and `core.raise`'s catch (operator,
+ *     2026-08-28, umbrella `docs/decisions.md`). Every edge in a document is a
+ *     parent/slot/child relationship, and a cancel pointing at a send would be
+ *     the first hand-drawn one;
+ *   - the alternative that keeps the tree invariant is scope-shaped rather
+ *     than reference-shaped: a delayed send is cancelled when the region that
+ *     armed it is left. That is a COMPILER rule, not a block type, and it is
+ *     also what `core.timeout` already means on a rail - which is the strong
+ *     hint that the vocabulary may need no `core.cancel` at all;
+ *   - either way it is an upstream question (what a delayed send's lifetime is
+ *     bound to) that no accepted ADR answers, and CLAUDE.md is explicit that a
+ *     bead needing an answer no accepted ADR gives is a stop-and-report rather
+ *     than a guess encoded in code.
+ *
+ * Sketched, named, and left unbuilt. A Phase-B finding, on the bead.
+ *
+ * ## What this would compile to (Phase B; nothing here compiles anything)
+ *
+ *   - `<send event="..." />` in the onentry of the state this block compiles
+ *     into. With no `delay`, that is a zero-delay send to this session, which
+ *     is the same delivery `core.raise` gets and the reason `core.raise`'s
+ *     note leaves "`<raise>` or a zero-delay `<send>`" open - whichever way
+ *     that is settled, it should be settled ONCE for both types;
+ *   - with a `delay`, `<send delay="...">`, and that is the clause with an
+ *     owner outside this repo: a delayed send that survives a restart is the
+ *     statifier_oban lane (`sob-`, durable timers; statifier-ex
+ *     `docs/durable-timers.md`, ADR-0054/0059). This descriptor names that
+ *     lane and proposes nothing about it. `core.wait`'s badge already says the
+ *     neighbouring fact - a wait compiles to a delayed send rather than a
+ *     sleep - which means the two types would compile through the SAME
+ *     machinery, one saying "pause here until" and one saying "wake me later";
+ *   - an event nothing catches is not an error, exactly as for `core.raise`:
+ *     it is delivered, no transition is enabled, the chart carries on. A
+ *     document-level finding ("nothing catches signup.onboarding_expired") is
+ *     an editor affordance worth having and is not this descriptor's job.
+ *
+ * ## The duration CONTROL question (sb-d9) gets its live test case here
+ *
+ * `delay` is ADR-0002 decision 7's existing `duration` field type, so it draws
+ * the same ISO-8601 control `core.wait`'s duration and `core.timeout`'s
+ * `after` draw. sb-d9's open item is whether that control is the right one to
+ * author with; this is the first duration in the vocabulary that is OPTIONAL,
+ * which is a state the control has never had to express - "no delay" is not
+ * `PT0S` and it is not an unfinished field either. The demo below arms a
+ * `PT2H` deadline, so the question now has a case that ships rather than a
+ * hypothetical. Flagged, not answered: this descriptor takes the control as it
+ * is and proposes nothing about it.
+ */
+const coreSend = {
+  name: "core.send",
+  currentVersion: 1,
+  /* `core.raise`'s declaration: a send has no subtree and no outcome path. */
+  slots: () => [],
+  configSchema: () => [
+    {
+      key: "event",
+      type: "string",
+      label: "Send this event",
+      required: true,
+      default: "",
+    },
+    {
+      /* Optional, and the default is "" rather than a duration: a send with no
+       * delay is the ordinary case, and defaulting to `PT1H` the way
+       * `core.wait` does would author a timer nobody asked for. */
+      key: "delay",
+      type: "duration",
+      label: "After (leave empty to send now)",
+      required: false,
+      default: "",
+    },
+  ],
+  validateConfig: (config) => {
+    const findings = [];
+
+    /* `core.raise`'s check and `core.raise`'s message, word for word, through
+     * the same `EVENT_NAME` this file already shares with `core.on_event`. A
+     * name one type accepts and another refuses is a rail that catches
+     * nothing, and the selftest asserts the three agree rather than asserting
+     * one regex three times. */
+    if (!isEventName(config.event)) {
+      findings.push({ key: "event", message: "must be an event name, like signup.abandoned" });
+    }
+
+    /* `assignToFindings`' idiom for an optional field, not `core.timeout`'s
+     * `cond` idiom, and the difference is deliberate. A `cond` that is present
+     * and empty is an author who started writing a guard and stopped; a
+     * `delay` that is present and empty is the field's own DEFAULT, which the
+     * config form writes into every block of this type. So absent and "" are
+     * both silent, and anything else present has to be a real duration - a
+     * stored `null` included, which reaches this arm and is refused, as
+     * ADR-0001 decision 6 requires. */
+    if ("delay" in config && config.delay !== "" && !isDuration(config.delay)) {
+      findings.push({
+        key: "delay",
+        message: "must be an ISO-8601 duration, like PT2H, or empty to send now",
+      });
+    }
+
+    return verdict(findings);
+  },
+  /*
+   * `core.raise`'s io exactly, for `core.raise`'s reason: one outcome, so
+   * `produces` is absent rather than `"unknown"` - there is no join to refuse.
+   * A delayed send is still one outcome; the block finishes when the send is
+   * armed, not when it arrives.
+   */
+  io: () => ({ kinds: ["step"] }),
+  paletteEntry: {
+    label: "Send",
+    group: "Proposed core",
+    description: "Sends an event, now or after a delay.",
+    /* `core.invoke`'s glyph - an arrow leaving the box - and the collision is
+     * argued rather than accidental, the way `core.subchart` argues its reuse
+     * of `rectangle-group`. A send DISPATCHES: the event leaves this block and
+     * is delivered on its own, possibly long after the step has finished.
+     * `megaphone` would have been the other candidate and it is worse: that is
+     * `core.raise`'s glyph, and raise and send are the two types in this file
+     * a reader is most likely to confuse, so they are the two that must not
+     * look alike. The teal accent is what tells this card apart from an
+     * invoke's, and this type declines it - see below. */
+    icon: "arrow-up-right",
+    keywords: ["send", "event", "delay", "later", "timer", "deadline", "notify"],
+    order: 3,
+    /* The decision argued at length above: static, and `sends` rather than
+     * `timer`. Under `badgeFor`'s 24-character cap with room to spare. */
+    badge: "sends",
+    /* No `accentToken`, for `core.raise`'s reason: with no target, a send goes
+     * to this chart's own session, so it is inside-the-chart work and takes
+     * the editor's own accent. `tokens.css` says the teal is for the step
+     * whose work happens outside, and this is not that step - which is also
+     * what keeps the shared glyph from reading as an invoke. */
+  },
+};
+
 /* -------------------------------------------------------------- the value */
 
 /**
@@ -869,4 +1097,6 @@ export const proposedCoreTypes = {
   "core.subchart": coreSubchart,
   /* APPENDED by sb-y4a - see the placement note at the descriptor. */
   "core.assign": coreAssign,
+  /* APPENDED by sb-ajr - see the placement note at the descriptor. */
+  "core.send": coreSend,
 };

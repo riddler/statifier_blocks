@@ -873,6 +873,67 @@
               }
             }
           ]
+        },
+        {
+          "id": "run_su_deadline",
+          "name": "Onboarding runs out of time",
+          "description": "The third way into the same rail, and the one with a clock in it (sb-ajr). The proposed core.send at the top of the onboarding group arms signup.abandoned for PT2H; the account verifies and the business arm is taken, the company details are never filled in, and two hours later the armed event arrives and the group's rule abandons. Same rule run_su_declined's raise reaches, sent later instead of raised now.",
+          "expected": "pass",
+          "steps": [
+            {
+              "label": "Collect email and password",
+              "active": ["blk_su_account"],
+              "deltas": [{ "path": "signup.email", "value": "\"sam@example.com\"" }]
+            },
+            {
+              "label": "The customer verifies",
+              "active": ["blk_su_verified"],
+              "event": "signup.email_verified",
+              "deltas": [{ "path": "signup.email_verified", "value": "true" }]
+            },
+            {
+              "label": "Arm the onboarding deadline",
+              "active": ["blk_su_onboarding_deadline"],
+              "note": "The proposed core.send. The step finishes immediately - what waits is the EVENT, not the block, which is the whole difference between this card and the core.wait further up. Nothing here counts the two hours: the delay is authored on the block and this run is a script, per the D4 ruling at the top of this file.",
+              "check": {
+                "label": "the step completes at once and the event is owed",
+                "result": "pass",
+                "detail": "A delayed send outlives the step that armed it. Whether it also outlives a restart is the statifier_oban lane's question (durable timers), which js/proposed-core.js names and does not answer."
+              }
+            },
+            {
+              "label": "Plan branch takes arm_business",
+              "active": ["blk_su_plan"],
+              "deltas": [
+                { "path": "signup.plan", "value": "\"business\"" },
+                { "path": "signup.seats", "value": "12" }
+              ]
+            },
+            {
+              "label": "The company details are never filled in",
+              "active": ["blk_su_company"],
+              "note": "The customer stops here. Nothing is wrong with the chart; the deadline is what the document has to say about a step nobody finishes."
+            },
+            {
+              "label": "Two hours later, the armed event arrives",
+              "active": ["blk_su_onboarding_abandoned"],
+              "event": "signup.abandoned",
+              "check": {
+                "label": "the rail catches a sent event exactly as it catches a raised one",
+                "result": "pass",
+                "detail": "One rule, two senders: blk_su_raise_abandoned raises this name in run_su_declined and blk_su_onboarding_deadline sends it here. Neither is joined to the rail by an edge - all three name the same string, which is the D13 shape."
+              }
+            },
+            {
+              "label": "The onboarding group abandons",
+              "active": ["blk_su_onboarding"],
+              "check": {
+                "label": "provisioning never runs",
+                "result": "pass",
+                "detail": "The same ending run_su_declined reaches, from the other sender. A deadline that fires after the workspace exists would be a cancel, and no core.cancel is proposed - js/proposed-core.js sketches why and leaves it unbuilt."
+              }
+            }
+          ]
         }
       ],
       "tables": [
