@@ -287,8 +287,8 @@
                   ],
                   "interrupts": [
                     {
-                      "_comment": "Demo type #1. core.on_event carries only event + outcome; it has no condition. A conditioned interrupt rule is what the spike needs to render a guard on an exit edge, so the demo palette adds myapp.guarded_on_event = core.on_event plus a 'cond'. If the spike proves the affordance is worth it, that is an ADR-0002 amendment to propose, not something this fixture decides.",
-                      "type": "myapp.guarded_on_event",
+                      "_comment": "The guarded interrupt rule, authored on the CORE form since 2026-08-28 (sb-0o4, umbrella D12). It used to be myapp.guarded_on_event - a demo type that existed only because core.on_event carried no condition - and the spike proved the affordance was worth it, so core.on_event grew an optional 'cond' (PROPOSED, flagged at the descriptor in spike/js/palette.js) and the crutch was retired. The stored config did not move: event, cond and outcome are spelled exactly as they were, and only the type name changed. Whether the key earns an ADR-0002 amendment is still a Phase-B finding, not something this fixture decides.",
+                      "type": "core.on_event",
                       "id": "blk_cp_cancelled",
                       "type_version": 1,
                       "config": {
@@ -298,8 +298,8 @@
                       }
                     },
                     {
-                      "_comment": "Demo type #2. The PT15M authorization timeout. No core type expresses 'interrupt this group after a duration'; core.wait is a step inside a body, not a rule on an interrupt rail. myapp.timeout_rule = an 'after' duration plus an optional guard.",
-                      "type": "myapp.timeout_rule",
+                      "_comment": "The PT15M authorization timeout, authored on the PROPOSED core type core.timeout (spike/js/proposed-core.js) since 2026-08-28 (sb-0o4, umbrella D12) - not a shipped core type. It used to be myapp.timeout_rule, a demo type that existed because no core type expressed 'interrupt this group after a duration': core.wait is a step inside a body, not a rule on an interrupt rail. The stored config did not move - after, cond and outcome are spelled exactly as they were - which is the argument for the proposal: the core form covers what the host form was standing in for, key for key.",
+                      "type": "core.timeout",
                       "id": "blk_cp_authz_timeout",
                       "type_version": 1,
                       "config": {
@@ -494,7 +494,7 @@
                   ],
                   "interrupts": [
                     {
-                      "type": "myapp.guarded_on_event",
+                      "type": "core.on_event",
                       "id": "blk_cp_manual_resolved",
                       "type_version": 1,
                       "config": {

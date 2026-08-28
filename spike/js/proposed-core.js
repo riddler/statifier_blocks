@@ -551,6 +551,133 @@ const coreSubchart = {
   },
 };
 
+/* ---------------------------------------------------------- core.timeout
+ *
+ * APPENDED BY sb-0o4, deliberately at the END of this file and of the map
+ * below, because a sibling bead was editing the two descriptors above at the
+ * same time. Placement is a merge courtesy and nothing more; if this file is
+ * ever tidied, `core.timeout` belongs beside `core.raise` in reading order.
+ *
+ * An interrupt rule that fires once a duration has elapsed. The other half of
+ * the pair `core.on_event` opens: that one catches an event, this one catches
+ * the clock, and both sit on a group's `interrupts` rail and declare
+ * `kinds: ["interrupt_handler"]` and nothing else. That single tag is the
+ * whole placement rule in both directions, exactly as it is for
+ * `core.on_event`; there is no placement check here and there is not supposed
+ * to be one.
+ *
+ * ## Why the vocabulary needed it
+ *
+ * `core.wait` is a STEP inside a body: the chart sits at it and moves on when
+ * the duration is up. "Interrupt this group after fifteen minutes, whatever it
+ * is doing" is a different shape and no shipped `core.*` type expressed it, so
+ * the demo documents grew `myapp.timeout_rule` to say it. That crutch is
+ * retired (2026-08-28, umbrella D12) and this descriptor is what replaced it -
+ * which is the whole argument for the type: the core form covers what the host
+ * form was standing in for, key for key.
+ *
+ * ## Its config, and the one question it leaves open
+ *
+ *   - `after` is a `duration`, ADR-0002 decision 7's existing field type, so
+ *     it gets the same ISO-8601 control `core.wait`'s duration does. The key
+ *     is spelled `after` rather than `duration` because the two mean different
+ *     things at the same block: a wait's duration is how long the step TAKES,
+ *     a rule's `after` is when it FIRES. Whether the vocabulary should insist
+ *     on one spelling across both is a Phase-B naming question, flagged and
+ *     not decided;
+ *   - the duration CONTROL question sb-d9's item raised stays open. This
+ *     descriptor takes the control as it is and proposes nothing about it;
+ *   - `cond` is the same optional guard `core.on_event` grew in sb-0o4, with
+ *     the same `expression` type, the same "absent is silent, present must be
+ *     an expression" rule, and for the same reason - so the condition pane
+ *     picks it up without learning a type name;
+ *   - `outcome` is `abandon` or `resume`, spelled exactly as `core.on_event`
+ *     spells it. Two interrupt rules on one rail whose "Then" menus disagreed
+ *     would be the drift this repeats itself to avoid.
+ *
+ * ## What this would compile to (Phase B; nothing here compiles anything)
+ *
+ * A delayed send on entry to the group plus a transition on its arrival -
+ * which is what `core.wait`'s badge already says about the neighbouring
+ * vocabulary, a wait being a delayed send rather than a sleep. Whether that
+ * earns an ADR-0002/0004 amendment is a Phase-B finding, and so is what the
+ * timer does when a `resume` outcome re-enters the group it just left.
+ */
+
+/* Verbatim `palette.js`'s spelling, for the reason `EVENT_NAME` above is
+ * verbatim: a duration this file accepts and `core.wait` refuses would be two
+ * controls disagreeing about the same ISO-8601 string. */
+const DURATION = /^P(?!$)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?!$)(\d+H)?(\d+M)?(\d+S)?)?$/;
+const isDuration = (value) => nonEmptyString(value) && DURATION.test(value);
+
+const TIMEOUT_OUTCOMES = ["abandon", "resume"];
+
+const coreTimeout = {
+  name: "core.timeout",
+  currentVersion: 1,
+  slots: () => [],
+  configSchema: () => [
+    {
+      key: "after",
+      type: "duration",
+      label: "After",
+      required: true,
+      default: "PT15M",
+    },
+    {
+      key: "outcome",
+      type: {
+        select: [
+          { value: "abandon", label: "Abandon - leave the group" },
+          { value: "resume", label: "Resume - re-enter the group" },
+        ],
+      },
+      label: "Then",
+      required: true,
+      default: "abandon",
+    },
+    {
+      key: "cond",
+      type: "expression",
+      label: "Only when",
+      required: false,
+      default: "",
+    },
+  ],
+  validateConfig: (config) => {
+    const findings = [];
+
+    if (!isDuration(config.after)) {
+      findings.push({ key: "after", message: "must be an ISO-8601 duration, like PT15M" });
+    }
+    if (!TIMEOUT_OUTCOMES.includes(config.outcome)) {
+      findings.push({ key: "outcome", message: 'pick "abandon" or "resume"' });
+    }
+    /* Absent is silent; present has to carry an expression. The same rule
+     * `core.on_event`'s `cond` states, in the same words, on purpose. */
+    if ("cond" in config && !nonEmptyString(config.cond)) {
+      findings.push({ key: "cond", message: "a guard, if present, needs an expression" });
+    }
+
+    return verdict(findings);
+  },
+  io: () => ({ kinds: ["interrupt_handler"] }),
+  paletteEntry: {
+    label: "Timeout",
+    group: "Proposed core",
+    description: "Interrupts the group it sits in once a duration has elapsed.",
+    /* One of `render.js`'s existing glyph names, the one the retired
+     * `myapp.timeout_rule` used, so the rail looks the same to an author who
+     * knew the demo before the crutch went away. */
+    icon: "clock-alert",
+    keywords: ["interrupt", "timeout", "deadline", "expire", "after"],
+    order: 2,
+    /* No `accentToken`, for `core.raise`'s reason: a timeout is an
+     * inside-the-chart rule, not work that leaves it, so it takes the
+     * editor's own accent like every other core type. */
+  },
+};
+
 /* -------------------------------------------------------------- the value */
 
 /**
@@ -565,5 +692,7 @@ const coreSubchart = {
 export const proposedCoreTypes = {
   "core.invoke": coreInvoke,
   "core.raise": coreRaise,
+  /* APPENDED by sb-0o4 - see the placement note at the descriptor. */
+  "core.timeout": coreTimeout,
   "core.subchart": coreSubchart,
 };
