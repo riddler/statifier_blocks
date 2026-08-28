@@ -1149,3 +1149,47 @@ are not one unit.
   groups, branch arms, parallel lanes, interrupt rails, resumable history, and
   an unresolvable block at depth 7 - which is the strongest available evidence
   that decision 13's uniformity holds under load.
+
+---
+
+## Note (2026-08-28): decision 14, config chips carry no accent
+
+A dated note rather than a proposed decision, because it ratifies a deletion
+rather than asking for anything. It belongs to the 14d lane above - the
+per-block-type accent seam - and records the one place that accent
+deliberately does not reach.
+
+**The rule was dead CSS for four beads.** `.sb-chip--config` carried a rule
+declaring an accent tint and a medium weight, and it never painted: `.sb-chip`
+is declared further down the stylesheet at equal specificity and won every one
+of those properties, and the rule's `padding` was the base's value restated.
+sb-p0k found the ordering while placing the card badge and reported it rather
+than reviving it from inside another bead; sb-pt1's polish pass then decided
+against reviving it, and the class kept its rule-free comment. What shipped
+throughout, and what shipped after, is a plain muted chip.
+
+**Every visual judgment in the spike was made against the chip that actually
+rendered.** That is the whole argument, and it is why this is worth a record
+rather than a code comment. Four beads of canvas work - card density, the meta
+row's layout, depth-7 narrowing - were tuned looking at plain chips. sb-p0k's
+badge is the sharpest case: it is a ring rather than a fill, an inset shadow
+carrying no new token, and the ring was chosen **precisely so a badge would not
+read like a filled config chip**. Restoring a tint would falsify the premise of
+a design decision already taken, and would do it invisibly.
+
+**The card already carries its one identity, and it is the stripe.** 14d gives a
+block type an accent and spends it in two places: an icon tile and a card
+stripe. A third accent-bearing element inside the same card is a second claim
+on the same signal, and it lands hardest where it fits worst - the config chips
+are on the interrupt rules ("Abandon", "Resume", "Deep"), whose cards already
+carry the rail's warning identity, so a tinted pill inside a warning-tan card
+argues with the card around it.
+
+The class itself stays written on the card. It names what the chip *is*, and
+the finding machinery and any later rule need the hook; the class having no
+rule is the decision, not an oversight to be tidied away.
+
+Recorded so the shipped editor does not re-litigate this from the stylesheet.
+Restoring a tint nobody has ever seen is a new design, not a bug fix, and if
+the shipped editor wants config chips to carry an accent it should decide that
+looking at them.
