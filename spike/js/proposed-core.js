@@ -678,6 +678,178 @@ const coreTimeout = {
   },
 };
 
+/* ----------------------------------------------------------- core.assign
+ *
+ * APPENDED BY sb-y4a at the END of this file and of the map below, for the
+ * reason `core.timeout` says above: a sibling bead was appending its own
+ * descriptor at the same time, and a pure append is what makes two of those
+ * compose. Placement is a merge courtesy; in reading order this belongs beside
+ * `core.raise`, with the other leaves.
+ *
+ * A leaf step that writes one literal to one datamodel path. The vocabulary
+ * could read the datamodel from the day `core.branch` grew a `cond` and could
+ * never write it: every value in either demo document arrives from a host call
+ * (`assign_to`) or from an event payload, so a chart that wanted to record a
+ * fact of its own - a flag it set, a counter it moved, a decision it made - had
+ * nowhere to put it and no way to say it had.
+ *
+ * ## `value` is SOURCE TEXT, and that is the whole design
+ *
+ * `value` stores the literal as an author would type it: `false`, `42350`,
+ * `"manual_review"` - quotes included for a string. That is not a shortcut
+ * around ADR-0002 decision 7's closed field-type set, it is the same rule
+ * `fixtures/runs.json` already holds every delta to ("every value is a STRING
+ * of source text, never a live value"), and holding both to it is what makes
+ * the replay claim below checkable: a run's delta on an assign step and the
+ * block's own config are the same two strings, so the fixture can be compared
+ * to the document character for character rather than by interpretation.
+ *
+ * A typed value - `{ literal: "boolean" }`, or a control that knows the
+ * declared type of `path` - is the honest alternative and it is a Phase-B
+ * question, not something this descriptor decides. It would need the field-type
+ * set to grow, which is the same wall `params` hit.
+ *
+ * ## EXPRESSION support: a sketch, deliberately not built
+ *
+ * The obvious next `value` is an expression - `capture_attempts + 1`,
+ * `amount_cents * merchant.settlement_fx_rate` - and the spike does not have
+ * one. Not a gap left open by accident; three things would have to be decided
+ * first, and none of them is this bead's:
+ *
+ *   - WHICH language. predicator is the family's expression language and it is
+ *     deliberately non-evaluative on the condition surface; whether the same
+ *     grammar is the right one for a value that is COMPUTED, and whether a
+ *     block document may carry an expression that must be evaluated to compile,
+ *     is predicator-ex's and statifier-ex's call jointly, not this repo's;
+ *   - HOW it is stored. A second field (`value` xor `expression`), or one field
+ *     with a mode, or the `expression` field type `core.on_event`'s `cond`
+ *     already uses. The third is cheapest and is probably right, and "probably
+ *     right" is not a reason to author it into a fixture;
+ *   - what the SPIKE would then have to refuse to do. D4's honest-replayer
+ *     ruling means the runner may not evaluate anything, so an expression-valued
+ *     assign would replay exactly as a literal one does - the delta the author
+ *     wrote - and the screen would look identical while claiming more. That is
+ *     the shape of thing this spike exists to avoid shipping.
+ *
+ * So: literals only, said out loud here rather than discovered by a reader.
+ *
+ * ## Replay: the delta IS the step
+ *
+ * `core.invoke` needed a PROPOSED `invoke` step field (sb-ig4) because "this
+ * step left the chart" is a fact no other part of a run records. An assign
+ * needs nothing: the run's `deltas` mechanism already carries `{ path, value }`
+ * writes, `bindingsAt` already accumulates them last-write-wins, and an assign
+ * step's delta is simply the step's own work rather than a side effect of a
+ * call. This descriptor therefore proposes no fixture field at all, which is
+ * the strongest thing that can be said for the mechanism that is already there.
+ *
+ * ## The DECLARATION check is not here, and this is the third type to say so
+ *
+ * Nothing below asks whether `path` is DECLARED in `fixtures/datamodel.json`.
+ * It is the same check `assign_to` defers (see `assignToFindings`) and the same
+ * owner: sb-c2o, whose scope widens to cover this key. Two reasons it cannot
+ * live here, and the second is the one worth recording:
+ *
+ *   - `validate_config/1` is handed a config, not a document, so the datamodel
+ *     index it would need is not in reach - `assign_to`'s note, unchanged;
+ *   - the finding wants to be a WARNING, and a finding this function returns
+ *     cannot be one. `layout.js` stamps `severity: "error"` on every problem
+ *     `validateConfig` returns, so a warning-shaped return would render as an
+ *     error on the card and in the findings panel. Carrying `problem.severity`
+ *     through `layout.js` is a one-line change and it is exactly the "new
+ *     machinery" this bead was told not to build; it is filed for sb-c2o with
+ *     the index question, because the two land together or not at all.
+ *
+ * ## What this would compile to (Phase B; nothing here compiles anything)
+ *
+ * An `<assign location="..." expr="...">` in the onentry of the state the block
+ * compiles into - the SCXML the engine already executes, which is why this is
+ * the shortest compile sketch in the file. What it does NOT settle is where the
+ * write is ordered against the state's other onentry content, and whether an
+ * assign to an undeclared location is an error at compile time or a datamodel
+ * that grows a key. Both are statifier-ex's, both are open.
+ */
+
+/* Non-empty and no whitespace, and NOT a dotted-identifier grammar, which is
+ * the deliberate part. `PARAM_LINE` above takes exactly this stance and says
+ * why: this file does not own the datamodel path grammar, and a regex here that
+ * accepted `review.parked` and refused something `fixtures/datamodel.json`
+ * legitimately declares would be a second, quieter proposal riding along with
+ * this one. Whether the two paths a `params` line and an assign name are the
+ * same grammar is a real question and it has one answer, not two spellings. */
+const isDatamodelPath = (value) => nonEmptyString(value) && !/\s/.test(value);
+
+const coreAssign = {
+  name: "core.assign",
+  currentVersion: 1,
+  slots: () => [],
+  configSchema: () => [
+    {
+      key: "path",
+      type: "string",
+      label: "Write to",
+      required: true,
+      default: "",
+    },
+    {
+      key: "value",
+      /* `string` because the stored form is source text (see the note above),
+       * so the control an author gets is the one that shows them the quotes
+       * they typed. An `expression` type would be the wrong promise. */
+      type: "string",
+      label: "This literal",
+      required: true,
+      default: "",
+    },
+  ],
+  validateConfig: (config) => {
+    const findings = [];
+
+    if (!isDatamodelPath(config.path)) {
+      findings.push({ key: "path", message: "must be a datamodel path, like review.parked" });
+    }
+    /* An empty `value` is refused, and the source-text rule is why it can be:
+     * writing an empty string is spelled `""`, two characters, so nothing
+     * legitimate is spelled with nothing at all. Under a typed value this
+     * check would have to change with it. */
+    if (!nonEmptyString(config.value)) {
+      findings.push({
+        key: "value",
+        message: 'must be a literal, written as source text - false, 42350, "manual_review"',
+      });
+    }
+
+    return verdict(findings);
+  },
+  /*
+   * `core.raise`'s io exactly, for `core.raise`'s reason: one outcome, so there
+   * is no join to refuse and `produces` is absent rather than `"unknown"`. An
+   * assign reads nothing through the type flow either - its input is a literal
+   * it carries - so there is no `consumes`.
+   */
+  io: () => ({ kinds: ["step"] }),
+  paletteEntry: {
+    label: "Assign",
+    group: "Proposed core",
+    description: "Writes a literal to a datamodel path.",
+    /* `render.js`'s existing glyph for something landing in a container, which
+     * is what a write to the datamodel is. It collides with `myapp.intake`, and
+     * the collision is the same kind `core.raise` accepted for `megaphone`:
+     * cheaper than editing the renderer's icon set for a proposal. */
+    icon: "inbox",
+    keywords: ["assign", "set", "write", "datamodel", "variable", "flag"],
+    order: 3,
+    /* The bead's badge. What a card titled "Clear the parked flag" cannot say:
+     * this step changes the datamodel, so a reader tracing where a value came
+     * from has somewhere to look that is not a host call. Well under
+     * `badgeFor`'s 24-character cap. */
+    badge: "writes",
+    /* No `accentToken`, for the reason `core.raise` gives: the teal is for work
+     * that happens outside this chart, and a write to the chart's own datamodel
+     * is as inside as a step gets. */
+  },
+};
+
 /* -------------------------------------------------------------- the value */
 
 /**
@@ -695,4 +867,6 @@ export const proposedCoreTypes = {
   /* APPENDED by sb-0o4 - see the placement note at the descriptor. */
   "core.timeout": coreTimeout,
   "core.subchart": coreSubchart,
+  /* APPENDED by sb-y4a - see the placement note at the descriptor. */
+  "core.assign": coreAssign,
 };
