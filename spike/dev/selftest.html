@@ -136,6 +136,12 @@
       import { parseParams, proposedCoreTypes } from "../js/proposed-core.js";
 
       import {
+        fixtureDocumentIds,
+        fixtureDocumentOptions,
+        fixtureDocuments,
+      } from "../js/fixture-documents.js";
+
+      import {
         applyCommand,
         canRedo,
         canUndo,
@@ -4860,6 +4866,305 @@
         const gone = configFormFor(registry, findBlock(retiredDocument(), "blk_GONE"));
         equal("an unresolvable block still offers no fields", gone.fields, []);
         equal("...and is still read-only", gone.readOnly, true);
+      });
+
+      /* ========================================== core.subchart (sb-7s2) */
+
+      /*
+       * The proposed `core.subchart`, in four suites: what the descriptor
+       * declares, where its chart picker's options come from, that its failure
+       * path lands on the same rail `core.invoke`'s does, and that the shipped
+       * runs for the new fixture document replay the two outcomes honestly.
+       *
+       * Self-contained on purpose - the fixture document is fetched here
+       * rather than added to `shipped` above, so these suites can be read (and
+       * moved) without unpicking the ones that came before.
+       */
+
+      const subchartType = proposedCoreTypes["core.subchart"];
+
+      const shippedFixtureDocs = await Promise.all(
+        fixtureDocuments.map((doc) =>
+          fetch(`../fixtures/documents/${doc.file}.json`)
+            .then((response) => (response.ok ? response.json() : null))
+            .then((value) => [doc.file, value])
+            .catch(() => [doc.file, null])
+        )
+      ).then((pairs) => Object.fromEntries(pairs));
+
+      suite("proposed core: core.subchart declares a leaf with a failure slot", () => {
+        check("the type is registered", subchartType !== undefined);
+        if (subchartType === undefined) return;
+
+        equal("it names itself", subchartType.name, "core.subchart");
+
+        // The child chart is a REFERENCE, so there is no body slot to put it
+        // in - the only slot is the failure path.
+        equal(
+          "its only slot is on_error",
+          subchartType.slots().map((slot) => [slot.name, slot.arity, slot.label]),
+          [["on_error", "zero_or_one", "If it fails"]]
+        );
+
+        // Character for character `core.invoke`'s, which is the claim the
+        // descriptor's comment makes. Asserted rather than trusted: the two
+        // drifting apart is exactly the failure a reader could not see.
+        equal(
+          "the slot is core.invoke's, unchanged",
+          subchartType.slots(),
+          proposedCoreTypes["core.invoke"].slots()
+        );
+
+        equal(
+          "a subchart is a step with two outcomes",
+          subchartType.io(),
+          { kinds: ["step"], produces: "unknown", slotAccepts: { on_error: ["step"] } }
+        );
+
+        equal("the failure slot keeps sb-68b's style", subchartType.paletteEntry.slotStyle, {
+          on_error: "failure",
+        });
+        equal("the badge is the one word a card cannot say", badgeFor(subchartType.paletteEntry), "subchart");
+        equal("it sits with the other proposals", subchartType.paletteEntry.group, "Proposed core");
+      });
+
+      suite("proposed core: core.subchart's chart picker is the shell's list (D11)", () => {
+        const schema = subchartType.configSchema();
+
+        equal(
+          "three fields, the reference first",
+          schema.map((field) => field.key),
+          ["chart", "assign_to", "params"]
+        );
+        equal("the chart is required", schema[0].required, true);
+        equal("and defaults to nothing chosen", schema[0].default, "");
+
+        // The D11 assertion: the options ARE the fixture-document list, not a
+        // copy of it that happens to agree today.
+        equal("the chart field is a select", Array.isArray(schema[0].type?.select), true);
+        equal(
+          "over exactly the spike's fixture documents",
+          schema[0].type.select,
+          fixtureDocumentOptions()
+        );
+        equal(
+          "which are the ids the shell can open",
+          schema[0].type.select.map((option) => option.value),
+          fixtureDocumentIds()
+        );
+
+        // And the list has to be true about the files on disk, in both
+        // directions: every entry loads, and the envelope id inside the file
+        // is the id the picker stores.
+        const wrong = [];
+        for (const doc of fixtureDocuments) {
+          const raw = shippedFixtureDocs[doc.file];
+          if (raw === null) wrong.push(`${doc.file}.json did not load`);
+          else if (raw.id !== doc.id) wrong.push(`${doc.file}.json is ${raw.id}, listed as ${doc.id}`);
+        }
+        equal("every listed document exists and matches its id", wrong, []);
+
+        // The validator's job is the other half of the same rule.
+        equal("an unchosen chart is a finding", subchartType.validateConfig({ chart: "" }), [
+          { key: "chart", message: "pick one of the spike's fixture documents" },
+        ]);
+        equal(
+          "so is a chart the shell has no file for",
+          subchartType.validateConfig({ chart: "bdoc_not_a_fixture" }),
+          [{ key: "chart", message: "pick one of the spike's fixture documents" }]
+        );
+        equal(
+          "a chosen one with no other config is fine",
+          subchartType.validateConfig({ chart: "bdoc_signup_demo" }),
+          null
+        );
+
+        // The params and assign_to rules are core.invoke's, shared in one
+        // place - so the interesting check is that they answer identically.
+        const config = {
+          chart: "bdoc_signup_demo",
+          assign_to: "Onboarding",
+          params: "email=signup.email\nnot a pair\nemail=signup.plan",
+        };
+        const fromInvoke = proposedCoreTypes["core.invoke"]
+          .validateConfig({ ...config, invoke_type: "myapp:signup" })
+          .filter((finding) => finding.key !== "invoke_type");
+
+        equal("the shared checks answer the same on both types", subchartType.validateConfig(config), fromInvoke);
+        equal(
+          "and they are the findings the fields deserve",
+          subchartType.validateConfig(config).map((finding) => finding.key),
+          ["assign_to", "params", "params"]
+        );
+      });
+
+      suite("layout + render: a subchart's failure path is on the rail (sb-7s2)", () => {
+        const proposing = proposingRegistry();
+
+        const doc = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_SUB",
+                  type: "core.subchart",
+                  config: { chart: "bdoc_signup_demo", label: "Run the wizard" },
+                  slots: {
+                    on_error: [
+                      block({ id: "blk_TELL", type: "core.raise", config: { event: "signup.abandoned" } }),
+                    ],
+                  },
+                }),
+                block({
+                  id: "blk_SUB_EMPTY",
+                  type: "core.subchart",
+                  config: { chart: "bdoc_cp_demo" },
+                }),
+              ],
+            },
+          }),
+          { id: "bdoc_SUBRAILS" }
+        );
+
+        const tree = layoutDocument(doc, proposing);
+        const body = tree.root.slots.find((one) => one.name === "body");
+        const at = (id) => body.children.find((child) => child.id === id);
+
+        equal(
+          "the failure path declares the failure style",
+          at("blk_SUB").slots.map((one) => [one.name, one.style]),
+          [["on_error", "failure"]]
+        );
+        equal("it is on the rail", at("blk_SUB").secondary.map((one) => one.name), ["on_error"]);
+        equal("...and is not a primary slot", at("blk_SUB").primary.length, 0);
+        equal("the subtree is under it", at("blk_SUB").secondary[0].children.map((c) => c.id), ["blk_TELL"]);
+
+        // The badge is what tells a reader the card is a whole other chart, so
+        // it has to survive layout rather than only exist in the descriptor.
+        equal("the card carries the badge", at("blk_SUB").badge, "subchart");
+
+        // An empty failure slot is still a declared slot: the rail is drawn
+        // with nothing in it, exactly as an invoke's is.
+        equal(
+          "an unused failure slot is still on the rail",
+          at("blk_SUB_EMPTY").secondary.map((one) => [one.name, one.children.length]),
+          [["on_error", 0]]
+        );
+
+        // The document is valid, so nothing here is leaning on a finding.
+        equal("the fixture document validates", tree.findings, []);
+      });
+
+      suite("fixtures / the shipped subchart runs (sb-7s2)", () => {
+        const raw = shippedFixtureDocs["signup-invitations"];
+
+        check("fixtures/runs.json loads", shipped.runs !== null);
+        check("signup-invitations.json loads", raw !== null);
+        if (shipped.runs === null || raw === null) return;
+
+        const byId = new Map();
+        const walk = (node) => {
+          if (!node || typeof node !== "object") return;
+          if (typeof node.id === "string" && typeof node.type === "string") byId.set(node.id, node);
+          for (const children of Object.values(node.slots ?? {})) for (const child of children) walk(child);
+        };
+        walk(raw.root);
+
+        const fixtures = fixturesFor(shipped.runs, "bdoc_su_invites_demo");
+        check("the document has runs", fixtures.runs.length > 0, "no runs written");
+
+        const ids = fixtures.runs.map((run) => run.id);
+        equal("run ids are unique", ids.length, new Set(ids).size);
+
+        const strays = [];
+        for (const run of fixtures.runs) {
+          for (const step of run.steps ?? []) {
+            for (const id of step.active ?? []) {
+              if (!byId.has(id)) strays.push(`${run.id}: ${id}`);
+            }
+          }
+        }
+        equal("every active id is a block in the document", strays, []);
+
+        const steps = fixtures.runs.flatMap((run) => (run.steps ?? []).map((step) => ({ run, step })));
+        const calls = steps.filter(({ step }) => invokeView(step.invoke) !== null);
+        const subchartCalls = calls.filter(({ step }) => byId.get(step.invoke.block)?.type === "core.subchart");
+
+        check("the runs record subchart calls", subchartCalls.length > 0, "no step carries a subchart call");
+
+        // The `invoke` field is shared between the two types that leave the
+        // chart, and nothing else may claim it: a fixture marking an ordinary
+        // step would light a card with no badge on it.
+        const wrong = calls
+          .filter(({ step }) => !["core.invoke", "core.subchart"].includes(byId.get(step.invoke.block)?.type))
+          .map(({ run, step }) => `${run.id}: ${step.invoke.block}`);
+        equal("every call names a block that leaves the chart", wrong, []);
+
+        const adrift = calls
+          .filter(({ step }) => !(step.active ?? []).includes(step.invoke.block))
+          .map(({ run, step }) => `${run.id}: ${step.invoke.block}`);
+        equal("and the step activates it", adrift, []);
+
+        equal(
+          "both subchart outcomes are exercised",
+          [...new Set(subchartCalls.map(({ step }) => step.invoke.outcome))].sort(),
+          ["done", "error"]
+        );
+
+        // The authored-walk assertion, the same one the card-processing invoke
+        // runs get: after an error outcome the next step's ids are inside that
+        // block's own on_error subtree, because a human wrote them there.
+        const subtree = (blockId) => {
+          const inside = new Set();
+          const collect = (node) => {
+            if (!node) return;
+            if (typeof node.id === "string") inside.add(node.id);
+            for (const children of Object.values(node.slots ?? {})) for (const child of children) collect(child);
+          };
+          for (const child of byId.get(blockId)?.slots?.on_error ?? []) collect(child);
+          return inside;
+        };
+
+        const misplaced = [];
+        for (const run of fixtures.runs) {
+          const list = run.steps ?? [];
+          list.forEach((step, index) => {
+            if (invokeView(step.invoke)?.outcome !== "error") return;
+
+            const next = list[index + 1];
+            const inside = subtree(step.invoke.block);
+
+            if (!next) {
+              misplaced.push(`${run.id}: the error step is last, so nothing shows the failure path`);
+              return;
+            }
+
+            for (const id of next.active ?? []) {
+              if (!inside.has(id)) misplaced.push(`${run.id}: ${id} is not under ${step.invoke.block}'s on_error`);
+            }
+          });
+        }
+        equal("an error step is followed by its on_error subtree", misplaced, []);
+
+        // And the pane's own reading of the error run: the mark is on the step
+        // the cursor is on, the step after it is just the next step - it
+        // carries a call of its OWN, to the invoke inside the failure subtree,
+        // which is the honest-replayer rule seen from the awkward side - and
+        // the run reaches a pass.
+        const errorRun = fixtures.runs.find((run) => run.id === "run_si_invite_abandoned");
+        check("the error run is present", errorRun !== undefined);
+        if (errorRun === undefined) return;
+
+        const at = errorRun.steps.findIndex((step) => invokeView(step.invoke)?.outcome === "error");
+        equal("the failing step marks its own card", runView(errorRun, at).invoke.block, "blk_si_invitee_signup");
+        equal(
+          "the next step's call is its own, not the subchart's",
+          runView(errorRun, at + 1).invoke.block,
+          "blk_si_notify_owner"
+        );
+        equal("and the run replays to a pass", runView(errorRun, errorRun.steps.length).verdict, "pass");
       });
 
       /* ------------------------------------------------------- reporting */

@@ -42,10 +42,15 @@
 
           <div class="sb-topbar__group">
             <label class="sb-topbar__label" for="sb-document">Document</label>
+            <!--
+              Only the empty option is markup. The fixture documents are
+              appended by shell.js from `js/fixture-documents.js`, which is
+              also where core.subchart's chart picker gets its options: two
+              hand-kept copies of the same list is how a chart reference ends
+              up naming a document the shell cannot open (D11).
+            -->
             <select class="sb-select" id="sb-document">
               <option value="">None</option>
-              <option value="card-processing">Card processing</option>
-              <option value="signup-wizard">Signup wizard</option>
             </select>
           </div>
 
