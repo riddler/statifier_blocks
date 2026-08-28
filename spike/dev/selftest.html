@@ -5415,6 +5415,245 @@
         equal("and the run replays to a pass", runView(errorRun, errorRun.steps.length).verdict, "pass");
       });
 
+      /* ============================================= core.assign (sb-y4a) */
+
+      /*
+       * The proposed `core.assign`, in four suites: what the descriptor
+       * declares, what its validator refuses, that it lays out as a badged
+       * leaf, and - the one worth the fetch - that the shipped appearance in
+       * `card-processing.json` and the step in `runs.json` are the SAME two
+       * strings. That last one is the whole replay claim: an assign proposes no
+       * fixture field, because the delta mechanism already carries the write,
+       * and the way to check a claim like that is to compare the fixture with
+       * the document rather than to read both and agree.
+       *
+       * Appended at the end for the same merge reason `core.subchart`'s suites
+       * were: a sibling bead is appending its own suites to this file.
+       */
+
+      const assignType = proposedCoreTypes["core.assign"];
+
+      suite("proposed core: core.assign declares a leaf that writes (sb-y4a)", () => {
+        check("the type is registered", assignType !== undefined);
+        if (assignType === undefined) return;
+
+        equal("it names itself", assignType.name, "core.assign");
+        equal("a write has no subtree", assignType.slots(), []);
+
+        equal(
+          "two fields, the destination first",
+          assignType.configSchema().map((field) => [field.key, field.type, field.required]),
+          [
+            ["path", "string", true],
+            ["value", "string", true],
+          ]
+        );
+        equal(
+          "and neither defaults to a write nobody authored",
+          assignType.configSchema().map((field) => field.default),
+          ["", ""]
+        );
+
+        // `core.raise`'s io, not `core.invoke`'s: one outcome, so there is no
+        // join to refuse and `produces` is absent rather than "unknown".
+        equal("an assign is a plain step", assignType.io(), { kinds: ["step"] });
+        equal("its io is core.raise's, unchanged", assignType.io(), proposedCoreTypes["core.raise"].io());
+
+        equal("the badge is the one word a card cannot say", badgeFor(assignType.paletteEntry), "writes");
+        equal("it sits with the other proposals", assignType.paletteEntry.group, "Proposed core");
+        // The teal is for work that leaves the chart; a datamodel write does
+        // not, so the type deliberately claims no accent of its own.
+        equal("it takes the editor's own accent", accentTokenFor(assignType.paletteEntry), null);
+
+        equal("the shipped registry does not know it", registry.types["core.assign"], undefined);
+        check("the proposing one does", proposingRegistry().types["core.assign"] !== undefined);
+      });
+
+      suite("proposed core: core.assign refuses what it cannot store (sb-y4a)", () => {
+        const pathFinding = {
+          key: "path",
+          message: "must be a datamodel path, like review.parked",
+        };
+        const valueFinding = {
+          key: "value",
+          message: 'must be a literal, written as source text - false, 42350, "manual_review"',
+        };
+
+        equal("an empty block is two findings", assignType.validateConfig({}), [
+          pathFinding,
+          valueFinding,
+        ]);
+        equal(
+          "a path with whitespace in it is not a path",
+          assignType.validateConfig({ path: "review parked", value: "false" }),
+          [pathFinding]
+        );
+        equal(
+          "and neither is a blank one",
+          assignType.validateConfig({ path: "   ", value: "false" }),
+          [pathFinding]
+        );
+
+        // The source-text rule is what makes an empty `value` refusable: the
+        // empty STRING is spelled with two quote characters, so nothing an
+        // author legitimately wants is spelled with nothing at all.
+        equal(
+          "an empty value is a finding",
+          assignType.validateConfig({ path: "review.parked", value: "" }),
+          [valueFinding]
+        );
+        equal(
+          "the empty string, written as source text, is not",
+          assignType.validateConfig({ path: "review.resolution", value: '""' }),
+          null
+        );
+
+        // The grammar this file deliberately does NOT own: a dotted path and a
+        // bare one are both accepted, exactly as a `params` line's path is,
+        // because a stricter regex here would be a second proposal riding
+        // along with this one.
+        equal(
+          "a dotted path is fine",
+          assignType.validateConfig({ path: "review.parked", value: "false" }),
+          null
+        );
+        equal(
+          "so is a bare one",
+          assignType.validateConfig({ path: "capture_attempts", value: "1" }),
+          null
+        );
+
+        // The DECLARATION check is sb-c2o's, and this is what "not here" looks
+        // like from the outside: a path no datamodel declares validates
+        // clean, because `validate_config/1` is handed a config and not a
+        // document. Asserted so the gap is pinned rather than assumed.
+        equal(
+          "an undeclared path is not this function's finding",
+          assignType.validateConfig({ path: "not.a.declared.path", value: "true" }),
+          null
+        );
+      });
+
+      suite("layout + render: an assign is a badged leaf (sb-y4a)", () => {
+        const doc = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_SET",
+                  type: "core.assign",
+                  config: { path: "review.parked", value: "false", label: "Clear the flag" },
+                }),
+                block({
+                  id: "blk_SET_BAD",
+                  type: "core.assign",
+                  config: { path: "", value: "" },
+                }),
+              ],
+            },
+          }),
+          { id: "bdoc_ASSIGN" }
+        );
+
+        const tree = layoutDocument(doc, proposingRegistry());
+        const body = tree.root.slots.find((one) => one.name === "body");
+        const at = (id) => body.children.find((child) => child.id === id);
+
+        equal("a write draws no rails", at("blk_SET").secondary.length, 0);
+        equal("and no primary slots either", at("blk_SET").primary.length, 0);
+        equal("the card carries the badge", at("blk_SET").badge, "writes");
+
+        // The unfinished block's findings, and the severity they arrive with.
+        // `layout.js` stamps `severity: "error"` on everything `validateConfig`
+        // returns, which is precisely why the undeclared-path finding cannot
+        // live in `validateConfig` and is filed for sb-c2o instead.
+        equal(
+          "an unfinished write is two config findings",
+          tree.findings
+            .filter((finding) => finding.anchor?.blockId === "blk_SET_BAD")
+            .map((finding) => [finding.severity, finding.anchor.key]),
+          [
+            ["error", "path"],
+            ["error", "value"],
+          ]
+        );
+        equal(
+          "and the finished one is clean",
+          tree.findings.filter((finding) => finding.anchor?.blockId === "blk_SET"),
+          []
+        );
+
+        // The form the inspector would draw, including the injected label
+        // field - the assign declares two fields and the editor makes it three.
+        equal(
+          "the config form is the two fields plus the injected label",
+          configFormFor(proposingRegistry(), findBlock(doc, "blk_SET")).fields.map((f) => f.key),
+          [LABEL_FIELD.key, "path", "value"]
+        );
+      });
+
+      suite("fixtures / the shipped assign replays as its own delta (sb-y4a)", () => {
+        check("fixtures/runs.json loads", shipped.runs !== null);
+        check("card-processing.json loads", shipped.bdoc_cp_demo !== null);
+        check("datamodel.json loads", shipped.datamodel !== null);
+        if (shipped.runs === null || shipped.bdoc_cp_demo === null || shipped.datamodel === null) return;
+
+        const assigns = [];
+        const walk = (node) => {
+          if (!node || typeof node !== "object") return;
+          if (node.type === "core.assign") assigns.push(node);
+          for (const children of Object.values(node.slots ?? {})) for (const child of children) walk(child);
+        };
+        walk(shipped.bdoc_cp_demo.root);
+
+        equal("the document has one assign", assigns.map((one) => one.id), ["blk_cp_review_cleared"]);
+        if (assigns.length === 0) return;
+
+        const authored = assigns[0];
+        equal("its stored version is the descriptor's", authored.type_version, assignType.currentVersion);
+        equal("and its config validates", assignType.validateConfig(authored.config), null);
+
+        // The check `validateConfig` cannot make, made here at document level
+        // instead - which is the shape sb-c2o will build for every block.
+        const index = indexPaths(shipped.datamodel);
+        check(
+          `the path it writes is declared (${authored.config.path})`,
+          index.has(authored.config.path),
+          `${authored.config.path} is not in fixtures/datamodel.json`
+        );
+
+        const fixtures = fixturesFor(shipped.runs, "bdoc_cp_demo");
+        const run = runById(fixtures, "run_cp_manual_review");
+        check("the manual-review run is present", run !== null);
+        if (run === null) return;
+
+        const on = run.steps.filter((step) => (step.active ?? []).includes(authored.id));
+        equal("exactly one step sits on the assign", on.length, 1);
+        if (on.length !== 1) return;
+
+        // THE claim: no new fixture field, because the delta the step already
+        // carries IS the block's work. Compared as strings, both sides being
+        // source text, so the fixture and the document are checked against
+        // each other rather than each against a reading of the other.
+        equal(
+          "the step's delta is the block's own config, character for character",
+          on[0].deltas,
+          [{ path: authored.config.path, value: authored.config.value }]
+        );
+        equal("and the step does not claim to leave the chart", invokeView(on[0].invoke), null);
+
+        // The accumulator doing the whole job unaided: the park step wrote the
+        // flag true, the assign writes it false, last write wins.
+        const finished = runView(run, endCursor(run));
+        const binding = finished.bindings.find((one) => one.path === authored.config.path);
+        check("the run binds the path it writes", binding !== undefined);
+        equal("with the assign's value, not the park's", binding?.value, authored.config.value);
+        equal("charged to the assign's step", binding?.step, run.steps.length - 1);
+        equal("and the run still replays to a pass", finished.verdict, "pass");
+      });
+
       /* ------------------------------------------------------- reporting */
 
       const results = document.getElementById("results");

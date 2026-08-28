@@ -261,7 +261,19 @@
             },
             {
               "label": "Apply the reviewer's decision",
-              "active": ["blk_cp_resolve"]
+              "active": ["blk_cp_resolve"],
+              "deltas": [{ "path": "review.resolution", "value": "\"approve\"" }]
+            },
+            {
+              "label": "Clear the parked flag",
+              "active": ["blk_cp_review_cleared"],
+              "note": "The step for the PROPOSED core.assign (sb-y4a). There is no new fixture field here and that is the point: an assign's replay IS its delta. The pair below is blk_cp_review_cleared's own config, character for character, because both the block and this file store a literal as source text - so the run can be checked against the document by comparison rather than by interpretation. Watch the bindings list: review.parked was written true by the park step and is written false here, last write winning, which is the accumulator doing the whole job unaided.",
+              "deltas": [{ "path": "review.parked", "value": "false" }],
+              "check": {
+                "label": "the assign's write is the run's final binding for review.parked",
+                "result": "pass",
+                "detail": "The park step established review.parked = true; this step writes false, and bindingsAt keeps the last write, so the run ends with the flag cleared."
+              }
             }
           ]
         },

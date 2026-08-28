@@ -13,10 +13,13 @@
     "     follow decision 8.",
     "  4. No floats anywhere (decision 6): money is integer minor units, durations",
     "     are ISO-8601 strings.",
-    "Block types: the seven core.* types are real (StatifierBlocks.Core). The",
-    "eighth, core.invoke, is NOT - it is the proposed descriptor in",
-    "spike/js/proposed-core.js, registered beside the real ones so the spike can",
-    "show what a core type with an outcome slot would look like. Every",
+    "Block types: the seven core.* types this document uses from",
+    "StatifierBlocks.Core are real. Three more core.* types here are NOT - they",
+    "are proposed descriptors in spike/js/proposed-core.js, registered beside the",
+    "real ones so the spike can show what the vocabulary would look like if it",
+    "grew them: core.invoke (an outcome slot, blk_cp_authorize and blk_cp_capture),",
+    "core.timeout (an interrupt rule on the clock, blk_cp_authz_timeout) and",
+    "core.assign (a datamodel write, blk_cp_review_cleared). Every",
     "myapp.* type is a demo palette entry the spike registers; three of them exist",
     "because the core set has no equivalent - see the '_comment' on each first use.",
     "The single deliberately-unresolvable type is myapp.legacy_check (blk_cp_legacy).",
@@ -24,7 +27,7 @@
     "the comparison: idiom A is core.invoke's on_error SLOT (blk_cp_authorize with",
     "a park-and-notify sequence, blk_cp_capture with a lone park), and idiom B is",
     "the predicate branch (blk_cp_capture_retry), which is left exactly as it was.",
-    "Shape: 45 blocks, maximum nesting depth 7 (root = depth 1).",
+    "Shape: 46 blocks, maximum nesting depth 7 (root = depth 1).",
     "Every datamodel path named in a 'cond' resolves in ../datamodel.json."
   ],
   "schema_version": 1,
@@ -489,6 +492,17 @@
                       "config": {
                         "invoke_type": "myapp:resolve_review",
                         "label": "Apply the reviewer's decision"
+                      }
+                    },
+                    {
+                      "_comment": "The PROPOSED type core.assign (spike/js/proposed-core.js), added 2026-08-28 (sb-y4a) - not a shipped core type. It is here rather than anywhere else because this is the one place in the document where the chart itself knows a fact the host does not: the reviewer has answered, so the work is no longer parked, and until now nothing in the vocabulary could write that down. Read it against blk_cp_manual_resolved on this group's interrupt rail, whose guard tests 'review.parked' - the flag that rule reads is a flag a block can now set, which is the argument for the type in one line. 'value' is SOURCE TEXT ('false', not a boolean), the same rule every delta in ../runs.json holds to, and run_cp_manual_review's last step carries that exact pair as its delta.",
+                      "type": "core.assign",
+                      "id": "blk_cp_review_cleared",
+                      "type_version": 1,
+                      "config": {
+                        "path": "review.parked",
+                        "value": "false",
+                        "label": "Clear the parked flag"
                       }
                     }
                   ],
