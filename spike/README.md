@@ -58,6 +58,7 @@ spike/
     document.js    the block document model, mirrored (ADR-0001)
     palette.js     the block-type registry + the core.* vocabulary (ADR-0002)
     demo-types.js  the host vocabulary the demo documents are written against
+    proposed-core.js  core.* types the package does NOT ship (see below)
     edit.js        the command algebra and undo stacks (ADR-0005 d2-d4)
     targets.js     drop-target enumeration (ADR-0005 d5)
     layout.js      the layout model, and connector geometry as pure functions
@@ -344,6 +345,54 @@ Two things were deliberately NOT built, and the reasoning is the finding:
   the kind of helpfulness that reads as a bug the second time it happens, and
   the anchor is already visible on the finding row. Held for an operator's
   eye rather than changed on a worker's judgment.
+
+## The proposed vocabulary
+
+`js/proposed-core.js` holds `core.*` block types the package **does not
+ship**. They are descriptors written to find out what such a type would have
+to declare, registered by `shell.js` through the same caller-supplied registry
+value a host uses for its own types (ADR-0002 decision 2). Nothing about them
+is decided; whether any of it earns an ADR-0002/0004 amendment is a Phase-B
+finding, and each type's own open questions are flagged at the type.
+
+They are a separate file rather than a second map inside `palette.js` on
+purpose. `palette.js` is a hand transcription of the shipped core vocabulary,
+and that is the only thing it is worth reading it FOR; a map of invented types
+living there would cost it that property however loudly it were headed.
+`demo-types.js` was split out for the same reason. `coreTypes`,
+`coreRegistry()` and `spikeRegistry()` keep answering "what does the package
+actually ship", and the proposals sit beside them.
+
+### `core.invoke`, and the `on_error` slot
+
+The first one. A step that calls a host handler and waits for it to answer,
+with an optional subtree for the failure case:
+
+- `invoke_type` (required) names the handler, validated against a **generic**
+  `namespace:name` - a core type may not know any particular host's namespace,
+  so the demo documents' `myapp:*` is a demo fact rather than a rule in the
+  descriptor. `assign_to` (optional) is where the result lands. `params` is
+  text, one `name=path` pair per line.
+- `on_error` is a **slot**, arity `zero_or_one`, styled `secondary` - the
+  same declaration `core.group`'s `interrupts` rail already makes, and the
+  renderer needs nothing new to draw it.
+
+That last point is the load-bearing one. An outcome path is a slot and never a
+port (ruled 2026-08-28; the umbrella's `docs/decisions.md` D13). The whole
+editor rests on connectors being rendered rather than authored, which holds
+only while every edge in a document is a parent/slot/child relationship; a
+port-shaped failure edge would have been the one edge an author draws by hand.
+
+`params` being a plain string is the file's one visible compromise: ADR-0002
+decision 7's field types are a closed set and none of them is a list of pairs.
+Flattening the pairs into text proves the block type's shape without also
+proposing an editor feature. A structured param editor is a Phase-B question;
+`parseParams` in that file is the shape it would carry.
+
+The new `badge` palette-entry key is declared here and rendered elsewhere: a
+short chip a type may put on its card header, a string under the same
+discipline as `accentToken` and `icon`. The editor renders whatever is there
+and still never learns a type name.
 
 ## Serving it
 

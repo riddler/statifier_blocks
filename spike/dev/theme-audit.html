@@ -201,6 +201,7 @@
         "--sb-syntax-number",
         "--sb-accent-myapp",
         "--sb-accent-myapp-capture",
+        "--sb-accent-invoke",
       ];
 
       /* Every colour a theme MUST restate. A surface or a foreground that a
@@ -254,8 +255,13 @@
         structuralCss: `${editorCss}\n${resetCss}`,
         /* The demo host's accents are read from an inline `var()` reference
          * the renderer writes from the registry, which is by design the one
-         * consumer no stylesheet can see. */
-        ignoreUnused: ["--sb-accent-myapp", "--sb-accent-myapp-capture"],
+         * consumer no stylesheet can see. `--sb-accent-invoke` is read the
+         * same way, from the proposed `core.invoke` in js/proposed-core.js. */
+        ignoreUnused: [
+          "--sb-accent-myapp",
+          "--sb-accent-myapp-capture",
+          "--sb-accent-invoke",
+        ],
       });
 
       check(

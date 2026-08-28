@@ -1,0 +1,241 @@
+/*
+ * spike/js/proposed-core.js - core block types that DO NOT EXIST YET.
+ *
+ * PROPOSED VOCABULARY. Nothing in this file is transcribed from
+ * `lib/statifier_blocks/core/*.ex`, because nothing in this file has a module
+ * there. These are descriptors written to find out what a `core.*` type would
+ * have to declare if the package grew one, and the spike registers them the
+ * same way a host registers its own - through the caller-supplied registry
+ * value ADR-0002 decision 2 already provides.
+ *
+ * ## Why this is a separate file and not a `proposedCoreTypes` map in palette.js
+ *
+ * `palette.js` opens by saying what it IS: a hand transcription of the
+ * shipped core vocabulary, "so the spike's palette browser and config forms
+ * are looking at the real vocabulary rather than at an invented one". A map
+ * of invented types living in that file - however loudly headed - costs it
+ * exactly the property that makes it worth reading. `demo-types.js` was
+ * split out of `palette.js` for the same reason one campaign earlier, and
+ * this file follows that precedent rather than inventing a second one. The
+ * mirror stays a mirror; the proposals sit beside it.
+ *
+ * The cost is duplicated shared predicates (`IDENTIFIER` and friends below).
+ * `demo-types.js` pays the same cost and it is the cheaper of the two
+ * mistakes: exporting palette.js's private predicates would make the mirror
+ * a utility module as well as a mirror.
+ *
+ * ## What is proposed here, and what would have to be decided
+ *
+ * Whether any of this earns an ADR-0002/0004 amendment is a Phase-B finding.
+ * The specific open questions each type raises are flagged at that type.
+ */
+
+/* ------------------------------------------------------- shared checks
+ *
+ * The same predicates `palette.js` and `demo-types.js` each keep privately.
+ * `INVOKE_TYPE` is deliberately GENERIC - `namespace:name`, any namespace -
+ * where `demo-types.js` hard-codes `^myapp:`. A core type may not know the
+ * demo host's namespace; only the demo documents use `myapp:*`.
+ */
+const IDENTIFIER = /^[a-z][a-z0-9_]*$/;
+const INVOKE_TYPE = /^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/;
+
+/* One `name=path` pair, with whitespace around either side tolerated. The
+ * name is an identifier; the path is any non-empty run of non-whitespace,
+ * because this file does not own the datamodel path grammar and guessing at
+ * it here would be a second, quieter proposal. */
+const PARAM_LINE = /^\s*([a-z][a-z0-9_]*)\s*=\s*(\S+)\s*$/;
+
+const nonEmptyString = (value) => typeof value === "string" && value !== "";
+const isIdentifier = (value) => nonEmptyString(value) && IDENTIFIER.test(value);
+const isInvokeType = (value) => nonEmptyString(value) && INVOKE_TYPE.test(value);
+const verdict = (findings) => (findings.length === 0 ? null : findings);
+
+/**
+ * The non-blank lines of a `params` block, in order. Blank lines are ignored
+ * rather than refused: an author who leaves a trailing newline in a textarea
+ * has not made an error, and a validator that says otherwise trains people to
+ * stop reading it.
+ */
+export function paramLines(value) {
+  if (typeof value !== "string") return [];
+  return value.split("\n").filter((line) => line.trim() !== "");
+}
+
+/**
+ * `params` parsed into `{ name, path }` pairs, or the ordered list of the
+ * lines that did not parse. Exported because `dev/selftest.html` checks the
+ * parse directly - the string field is a spike compromise (see below) and the
+ * shape it stands in for is the part worth pinning down.
+ */
+export function parseParams(value) {
+  const ok = [];
+  const bad = [];
+
+  for (const line of paramLines(value)) {
+    const match = PARAM_LINE.exec(line);
+    if (match) ok.push({ name: match[1], path: match[2] });
+    else bad.push(line.trim());
+  }
+
+  return { params: ok, malformed: bad };
+}
+
+/* ----------------------------------------------------------- core.invoke
+ *
+ * A step that calls the host and waits for it to answer, with an optional
+ * subtree for the failure case.
+ *
+ * ## The on_error SLOT, and why it is not a port
+ *
+ * RULED 2026-08-28 (operator; umbrella `docs/decisions.md` D13): an outcome
+ * path is a SLOT, never a port. This is decided, not recommended. The tree
+ * invariant the whole editor rests on - connectors are RENDERED, never
+ * authored - survives only if every edge in a document is a parent/slot/child
+ * relationship, and a port-shaped alternative would have made the failure
+ * edge the one thing an author draws by hand.
+ *
+ * The slot declaration itself needs no new machinery: `zero_or_one` arity and
+ * a `secondary` slot style are exactly what `core.group`'s `interrupts` rail
+ * already declares, and the renderer reads both off ADR-0005 decision 10's
+ * metadata without learning a type name.
+ *
+ * ## What this would compile to (Phase B; nothing here compiles anything)
+ *
+ *   - the block emits an `<invoke>` whose `type` is `invoke_type`, resolved
+ *     through the per-session registry statifier-ex ADR-0051 defines. A block
+ *     type NAMES an invoke type; it never runs one (ADR-0002's two-registry
+ *     seam);
+ *   - `assign_to`, when set, is where the invoke's result lands in the
+ *     datamodel;
+ *   - the `on_error` subtree is the target of the transition on statifier-ex
+ *     ADR-0068's `error.communication.invoke.<id>` event, with `<id>` the
+ *     invoke's own id. An absent `on_error` means no such transition is
+ *     emitted and the error propagates as it does today.
+ *
+ * None of that is settled. Whether it earns an ADR-0002/0004 amendment - and
+ * how a two-outcome block reconciles with ADR-0004's single-final emission -
+ * is a Phase-B finding.
+ *
+ * ## The params field is a spike compromise
+ *
+ * `params` is a plain `string`, one `name=path` pair per line, because
+ * ADR-0002 decision 7's field types are a CLOSED set and none of them is "a
+ * list of pairs". The honest options were to propose a new field type or to
+ * flatten the pairs into text; the second one proves the block type's shape
+ * without also proposing an editor feature. A structured param editor - a
+ * `{ list: { record: ... } }` field type, or a dedicated control - is a
+ * Phase-B question, and the shape it would carry is `parseParams` above.
+ */
+const coreInvoke = {
+  name: "core.invoke",
+  currentVersion: 1,
+  slots: () => [{ name: "on_error", arity: "zero_or_one", label: "If it fails" }],
+  configSchema: () => [
+    {
+      key: "invoke_type",
+      type: "string",
+      label: "Invoke type",
+      required: true,
+      default: "",
+    },
+    {
+      key: "assign_to",
+      type: "string",
+      label: "Write the result to",
+      required: false,
+      default: "",
+    },
+    {
+      key: "params",
+      type: "string",
+      label: "Params (one name=path per line)",
+      required: false,
+      default: "",
+    },
+  ],
+  validateConfig: (config) => {
+    const findings = [];
+
+    if (!isInvokeType(config.invoke_type)) {
+      findings.push({
+        key: "invoke_type",
+        message: 'must look like "namespace:name", such as "myapp:authorize"',
+      });
+    }
+
+    /* Optional, so an absent key and an empty string are both fine; anything
+     * present and non-empty has to be a bare identifier, because it names a
+     * datamodel key the result is written to. */
+    if (nonEmptyString(config.assign_to) && !isIdentifier(config.assign_to)) {
+      findings.push({ key: "assign_to", message: "must be a bare lowercase identifier" });
+    }
+
+    if ("params" in config && typeof config.params !== "string") {
+      findings.push({ key: "params", message: "must be text, one name=path pair per line" });
+    } else {
+      const { params, malformed } = parseParams(config.params);
+
+      for (const line of malformed) {
+        findings.push({ key: "params", message: `"${line}" is not a name=path pair` });
+      }
+
+      const seen = new Set();
+      for (const { name } of params) {
+        if (seen.has(name)) {
+          findings.push({ key: "params", message: `two params cannot share the name "${name}"` });
+        }
+        seen.add(name);
+      }
+    }
+
+    return verdict(findings);
+  },
+  /*
+   * `produces: "unknown"` for the reason `core.branch` does (ADR-0003
+   * decision 4 refuses to build a type lattice): a block with two outcomes
+   * would otherwise have to join the type its own body produces with the type
+   * its `on_error` subtree produces. `consumes` is absent - an invoke reads
+   * its inputs through `params`, not through the type flow.
+   */
+  io: () => ({
+    kinds: ["step"],
+    produces: "unknown",
+    slotAccepts: { on_error: ["step"] },
+  }),
+  paletteEntry: {
+    label: "Invoke",
+    group: "Proposed core",
+    description: "Calls a host handler and waits for it to answer.",
+    icon: "arrow-up-right",
+    keywords: ["invoke", "call", "host", "service", "error"],
+    order: 0,
+    layout: "stack",
+    /* The `interrupts` precedent: the failure path is a rail beside the
+     * step, not a second body. */
+    slotStyle: { on_error: "secondary" },
+    accentToken: "--sb-accent-invoke",
+    /* PROPOSED metadata key (sb-p0k builds the renderer). A short chip on the
+     * card header saying what a reader could not otherwise see: this step
+     * leaves the chart. A string a block type declares, exactly as
+     * `accentToken` is a token name it declares - the editor renders whatever
+     * is there and never learns a type name. Whether it belongs in ADR-0005
+     * decision 10's metadata is a Phase-B finding. */
+    badge: "calls the host",
+  },
+};
+
+/* -------------------------------------------------------------- the value */
+
+/**
+ * The proposed `core.*` entries, keyed by type name.
+ *
+ * Deliberately NOT merged into `palette.js`'s `coreTypes`, and deliberately
+ * not reachable from `coreRegistry()` or `spikeRegistry()`: those two answer
+ * "what does the package actually ship", and a proposal that quietly joined
+ * them would make that question unanswerable. `shell.js` spreads this map
+ * into the registry it builds, beside the other three.
+ */
+export const proposedCoreTypes = {
+  "core.invoke": coreInvoke,
+};
