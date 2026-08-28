@@ -107,6 +107,24 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
   let activeMarks = new Set();
 
   /*
+   * The block a fixture run's current step is calling out to, and how that call
+   * came back: `{ block, outcome }`, or `null` for no call (sb-foh).
+   *
+   * Here for the same reason `activeMarks` is here, arrived at the expensive
+   * way. The Fixtures pane used to paint this class onto the cards itself,
+   * because the seam had `markActive` and nothing for the invoke mark; the
+   * price was a canvas rebuild with no `draw` after it - an author editing the
+   * document mid-replay - silently dropping the mark until the next transport
+   * press. State the editor holds and re-applies in `render` cannot be dropped
+   * that way, because the rebuild IS the thing that re-applies it.
+   *
+   * Single-valued, unlike `activeMarks`: a step calls out to one host at a
+   * time. If that ever stops being true, this becomes a Map of block to
+   * outcome and `paintInvokeMark` below grows a lookup; nothing else moves.
+   */
+  let invokeMark = null;
+
+  /*
    * A pane that renders something about the SELECTED block needs to know when
    * it changes, and the inspector's own panes learn that by being refreshed.
    * The Fixtures pane is mounted by the shell rather than by `createInspector`
@@ -208,6 +226,7 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
 
     applySelection();
     applyActiveMarks();
+    applyInvokeMark();
     syncChrome(tree);
 
     return tree;
@@ -218,6 +237,10 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
       if (activeMarks.has(card.dataset.blockId)) card.dataset.runActive = "true";
       else delete card.dataset.runActive;
     }
+  }
+
+  function applyInvokeMark() {
+    paintInvokeMark(canvas.querySelectorAll(".sb-card"), invokeMark);
   }
 
   /*
@@ -1078,6 +1101,7 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
       session = null;
       findings = [];
       activeMarks = new Set();
+      invokeMark = null;
       if (rendered) rendered.destroy();
       rendered = null;
       canvas.replaceChildren();
@@ -1096,6 +1120,22 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
     markActive(ids) {
       activeMarks = new Set(ids ?? []);
       if (session) applyActiveMarks();
+    },
+
+    /**
+     * Marks the block a replayed step is calling out to, and how the call came
+     * back - `"done"` or `"error"`, the values the stylesheet keys off, or null
+     * for a call with no answer yet. A null block clears the mark.
+     *
+     * Beside `markActive` rather than folded into it: the two marks answer
+     * different questions - "where is the run now" and "who is it waiting on" -
+     * they are set from different parts of a step view, and a step can have
+     * either without the other. One call that took both would make every caller
+     * that has one of them pass a placeholder for the other.
+     */
+    markInvoking(block, outcome = null) {
+      invokeMark = block == null ? null : { block, outcome };
+      if (session) applyInvokeMark();
     },
 
     /** Unfolds, scrolls to and flashes a set of blocks. Selection untouched. */
@@ -1136,6 +1176,38 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
 }
 
 /* ================================================================= helpers */
+
+/** The class and the data attribute the invoke mark writes onto a card. */
+export const INVOKE_MARK_CLASS = "sb-card--invoking";
+
+/**
+ * Paints the invoke mark over a list of cards: `mark` is `{ block, outcome }`
+ * or `null`, and every card that is not the marked one is cleared.
+ *
+ * Exported and pure over what it is handed, which is what makes the contract
+ * testable without a mounted editor - a suite can hand it three plain elements
+ * and read the result. It takes an iterable of cards rather than reaching for
+ * `document` for the same reason.
+ *
+ * Cards are walked and compared rather than selected by id: a block id is
+ * author-controlled text, and building a selector out of it needs escaping that
+ * is one forgotten call away from a silent no-op. One pass over the cards costs
+ * nothing at spike sizes and cannot be got wrong that way.
+ */
+export function paintInvokeMark(cards, mark) {
+  const target = mark == null ? null : mark.block;
+
+  for (const card of cards) {
+    if (target !== null && card.dataset.blockId === target) {
+      card.classList.add(INVOKE_MARK_CLASS);
+      if (mark.outcome == null) delete card.dataset.invokeOutcome;
+      else card.dataset.invokeOutcome = mark.outcome;
+    } else if (card.classList.contains(INVOKE_MARK_CLASS)) {
+      card.classList.remove(INVOKE_MARK_CLASS);
+      delete card.dataset.invokeOutcome;
+    }
+  }
+}
 
 function setText(element, value) {
   if (element) element.textContent = value;

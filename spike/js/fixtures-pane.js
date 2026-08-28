@@ -38,23 +38,13 @@
  * auto-scrolling the canvas on every "step forward" fights an author who has
  * parked the viewport somewhere on purpose.
  *
- * ## The one exception to that rule, and its price (sb-ig4)
- *
  * The invoke mark - the badge highlight on the card a step is calling out to -
- * IS written from here, by `paintInvoke` below. There is no `markInvoking` on
- * the host seam to route it through, and adding one reaches into files another
- * bead owns this week, so the pane paints the class itself.
- *
- * The price is exactly the one the paragraph above names: a canvas rebuild
- * drops the mark, because it is not part of the editor's own re-render. That
- * is survivable here and would not be for the active highlight, for one
- * reason - the mark is repainted on EVERY `draw`, and every gesture that moves
- * the replay goes through `draw`. What it cannot survive is a rebuild that no
- * `draw` follows, which is an author editing the document mid-replay. The mark
- * comes back on their next transport press.
- *
- * Promoting this to a host member alongside `markActive` is the right shape
- * and is a Phase-B note, not something to do from inside this file.
+ * goes the same way, through `markInvoking` (sb-foh). It used to be this
+ * file's one exception, painted from here because the seam had no member for
+ * it, and the exception cost exactly what the rule predicts: a rebuild with no
+ * `draw` after it - an author editing the document mid-replay - dropped the
+ * mark until the next transport press. Both marks are now editor state, so
+ * both survive a rebuild by being re-applied by it.
  */
 
 import {
@@ -77,39 +67,6 @@ import { el } from "./render.js";
 /** How long the "Play" transport waits between steps. */
 const PLAY_INTERVAL_MS = 900;
 
-/** The class the invoke mark writes onto a card. See the header comment. */
-const INVOKE_MARK = "sb-card--invoking";
-
-/*
- * The invoke mark, painted onto the canvas card the current step is calling
- * out to and cleared everywhere else. `null` clears it entirely.
- *
- * Cards are walked and compared rather than selected by id: a block id is
- * author-controlled text, and building a selector out of it needs escaping
- * that is one forgotten call away from a silent no-op. One pass over the cards
- * costs nothing at spike sizes and cannot be got wrong that way.
- *
- * A page with no canvas mounted is not a special case: `querySelectorAll`
- * finds no cards, the loop does nothing, and the pane renders its runner
- * exactly as it does with one. The `document` guard is for a non-browser
- * caller reaching the module at all.
- */
-function paintInvoke(invoke) {
-  if (typeof document === "undefined") return;
-
-  const target = invoke === null ? null : invoke.block;
-
-  for (const card of document.querySelectorAll(".sb-card")) {
-    if (target !== null && card.dataset.blockId === target) {
-      card.classList.add(INVOKE_MARK);
-      card.dataset.invokeOutcome = invoke.outcome;
-    } else if (card.classList.contains(INVOKE_MARK)) {
-      card.classList.remove(INVOKE_MARK);
-      delete card.dataset.invokeOutcome;
-    }
-  }
-}
-
 const VERDICT_LABELS = {
   "not-run": "not run",
   running: "replaying",
@@ -123,7 +80,8 @@ const VERDICT_LABELS = {
  *
  *     mount   the element to render into
  *     data    the parsed fixture file, or null when it could not be fetched
- *     host    { documentId(), selectedId(), markActive(ids), revealBlocks(ids),
+ *     host    { documentId(), selectedId(), markActive(ids),
+ *               markInvoking(block, outcome), revealBlocks(ids),
  *               revealBlock(id), labelFor(id) }
  *
  * Every `host` member is optional in the sense that the pane degrades rather
@@ -185,12 +143,23 @@ export function createFixturesPane({ mount, data, host = {} }) {
 
   /* ------------------------------------------------------------- drawing */
 
+  /** Clears the invoke mark alone - the active marks are the caller's call. */
+  function clearInvoke() {
+    host.markInvoking?.(null);
+  }
+
+  /** Clears both marks: no step is current, so neither mark has a subject. */
+  function clearMarks() {
+    host.markActive?.([]);
+    clearInvoke();
+  }
+
   function draw() {
     // Cleared up front and re-painted by `runnerElement` if the draw lands on
     // a step that carries a call. Every path out of `draw` therefore leaves
     // the mark correct, including the two early returns below and every
     // sub-view that is not the runner.
-    paintInvoke(null);
+    clearInvoke();
 
     for (const button of buttons) {
       button.setAttribute("aria-pressed", String(button.dataset.view === view));
@@ -333,14 +302,14 @@ export function createFixturesPane({ mount, data, host = {} }) {
     openRunId = id;
     cursor = NOT_STARTED;
     stopPlaying();
-    host.markActive?.([]);
+    clearMarks();
     draw();
   }
 
   function closeRun() {
     openRunId = null;
     stopPlaying();
-    host.markActive?.([]);
+    clearMarks();
     draw();
   }
 
@@ -350,12 +319,10 @@ export function createFixturesPane({ mount, data, host = {} }) {
     const state = runView(run, cursor);
 
     host.markActive?.(state.activeIds);
-    // After `markActive` rather than before. The two marks are independent -
-    // the editor's sets `data-run-active`, this one sets a class and
-    // `data-invoke-outcome` - but the editor is the one allowed to rebuild the
-    // canvas, so the pane's paint goes last and reads whatever cards exist
-    // when it runs.
-    paintInvoke(state.invoke);
+    // The two marks are independent - one sets `data-run-active`, the other a
+    // class and `data-invoke-outcome` - and a step can have either without the
+    // other, so they are two calls and the order between them does not matter.
+    host.markInvoking?.(state.invoke?.block ?? null, state.invoke?.outcome ?? null);
 
     const back = el("button", {
       class: "sb-button sb-button--quiet sb-fixtures__back",
@@ -1103,7 +1070,7 @@ export function createFixturesPane({ mount, data, host = {} }) {
       openRunId = null;
       cursor = NOT_STARTED;
       stopPlaying();
-      host.markActive?.([]);
+      clearMarks();
       notice = "Applied. These fixtures live in memory only - the file on disk is unchanged.";
       draw();
     });
@@ -1115,7 +1082,7 @@ export function createFixturesPane({ mount, data, host = {} }) {
       openRunId = null;
       cursor = NOT_STARTED;
       stopPlaying();
-      host.markActive?.([]);
+      clearMarks();
       notice = "Reverted to the fixtures as fetched.";
       draw();
     });
@@ -1179,7 +1146,7 @@ export function createFixturesPane({ mount, data, host = {} }) {
       stopPlaying();
       // The canvas outlives this pane, so a mark left behind would sit on a
       // card claiming a call is in flight with nothing left to clear it.
-      paintInvoke(null);
+      clearInvoke();
     },
   };
 }

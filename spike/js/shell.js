@@ -255,6 +255,7 @@ const fixturesPane = fixturesMount
         documentId: () => editor?.session?.document.id ?? null,
         selectedId: () => editor?.selectedId ?? null,
         markActive: (ids) => editor?.markActive(ids),
+        markInvoking: (block, outcome) => editor?.markInvoking(block, outcome),
         revealBlocks: (ids) => editor?.revealBlocks(ids) ?? false,
         revealBlock: (id) => editor?.revealBlock(id) ?? false,
         labelFor: (id) => blockLabel(id),
