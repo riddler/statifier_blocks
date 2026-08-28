@@ -62,6 +62,11 @@ spike/
     targets.js     drop-target enumeration (ADR-0005 d5)
     layout.js      the layout model, and connector geometry as pure functions
     render.js      the layout model as DOM, and the connectors as SVG
+    interact.js    pointer and key events, translated into commands
+    session.js     selection, collapse, drag and edits, with no DOM
+    panes.js       the palette / config-form / findings view models (d9-d11)
+    palette-pane.js the left pane, rendered from the registry
+    inspector.js   the Config and Findings panes, rendered
     shell.js       the shell's own behaviour: tabs, theme, document loader
   fixtures/
     documents/     the two demo documents
@@ -95,11 +100,36 @@ ADR-0005 decision 10's presentation metadata rather than a type name:
 | an arm's condition pill | an `:expression` config field keyed by the slot name |
 | a compact chip instead of a card | a leaf whose whole schema is one `:duration` |
 
-Later waves add `js/` modules proper (document model, palette registry, edit
-algebra, drop targets, layout and connector routing, rendering, panels) and a
-`fixtures/` directory of demo documents. They are not scaffolded here: an
-empty directory is not committable, and a placeholder file that does nothing
-is worse than its absence.
+## The panes
+
+`panes.js` is to the three panes what `layout.js` is to the canvas: the pure
+half. Which palette entries match a query and where they were matched, which
+controls a block's `config_schema/1` derives into, what a finding's anchor
+resolves to - all answerable without a browser, so `dev/selftest.html`
+answers them there rather than probing a rendered page.
+
+| Pane | Contract | Notes |
+|---|---|---|
+| Palette | ADR-0005 d10 | Rendered from the registry, so registering a block type is all a host does. Search matches label, type name, description and declared `keywords`, and says which when the match is one the reader cannot see. |
+| Config | ADR-0005 d9 | Schema-driven over ADR-0002 d7's closed field-type set. Edits commit on `change`, as one `update_config`; d9's gate refuses invalid config, and the refusal is shown under the field without discarding what the author typed. |
+| Findings | ADR-0005 d11 | Anchored: clicking a row selects and reveals its target, unfolding every collapsed ancestor over it. Count badge on the tab, and the collapsed-card badges count the same set. |
+
+Two things there are worth naming because they are proposals rather than
+readings of the record, and both are noted on `sb-8cm`:
+
+- **A third severity.** d11 spells severity as `:error | :warning`. The pane
+  renders `info` as well, for advisory lints that read wrong in warning
+  chrome. Every `info` is `origin: "demo"`; no validation path produces one.
+- **A static demo finding set.** Alongside the real findings `layout.js`
+  computes, `panes.js` carries a small per-document set covering the shapes
+  validation cannot currently produce - a `:slot` anchor and the `:lint`
+  source. Rows say which half they came from, so a screenshot is not
+  ambiguous.
+
+There is no decimal control, on purpose: ADR-0001 d6 forbids floats in
+config, so a decimal is a `:string` holding `"12.50"` and the text control
+stores and round-trips it unchanged. Adding a `:decimal` field type would
+widen a closed set to describe something the set already covers.
 
 ## The three themes
 

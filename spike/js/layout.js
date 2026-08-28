@@ -69,9 +69,15 @@ export function layoutDocument(document, registry, session = {}) {
   // blocks are folded shut, and what `data-drop` each slot carries during a
   // drag. Both default to "no session", so a call with two arguments still
   // produces the inert canvas the previous wave rendered.
+  // `extra` is sb-8cm's addition: findings the caller computed that validation
+  // cannot produce - a `:slot` anchor, the `:lint` source - folded in HERE
+  // rather than beside the tree, so a folded card's count badge and the
+  // findings panel's list are two readings of one set. Two sources that each
+  // counted their own half is exactly how a badge starts lying.
   const view = {
     collapsed: session.collapsed ?? new Set(),
     dropState: session.dropState ?? (() => null),
+    extra: groupByBlock(session.extraFindings ?? []),
   };
 
   const root = layoutBlock(document.root, registry, findings, {
@@ -82,6 +88,20 @@ export function layoutDocument(document, registry, session = {}) {
   });
 
   return { root, blockCount: countNodes(root), findings, maxDepth: depthOf(root) };
+}
+
+/** Caller-supplied findings, bucketed by the block their anchor names. */
+function groupByBlock(findings) {
+  const buckets = new Map();
+
+  for (const finding of findings) {
+    const id = finding.anchor?.blockId;
+    if (id === undefined || id === null) continue;
+    if (!buckets.has(id)) buckets.set(id, []);
+    buckets.get(id).push(finding);
+  }
+
+  return buckets;
 }
 
 function countNodes(node) {
@@ -127,6 +147,7 @@ function layoutBlock(node, registry, findings, { depth, slot, parentId, view }) 
     own.push({
       severity: "error",
       source: "resolution",
+      origin: "validation",
       anchor: { kind: "block", blockId: node.id },
       message: entry.description,
     });
@@ -135,11 +156,17 @@ function layoutBlock(node, registry, findings, { depth, slot, parentId, view }) 
       own.push({
         severity: "error",
         source: "config",
+        origin: "validation",
         anchor: { kind: "config", blockId: node.id, key: problem.key },
         message: problem.message,
       });
     }
   }
+
+  // The caller's own findings, appended after validation's so that a block
+  // carrying both reads real-first. `origin` is already stamped on these by
+  // whoever supplied them, and this file neither invents nor rewrites one.
+  own.push(...(view.extra.get(node.id) ?? []));
 
   const schema = safeSchema(descriptor, config);
   const slots = slotViews(node, descriptor, entry, config, schema, view);

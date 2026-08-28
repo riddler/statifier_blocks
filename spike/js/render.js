@@ -80,7 +80,7 @@ const ICONS = {
 /* The neutral glyph a name with no drawing gets - never nothing. */
 const NEUTRAL_ICON = "M8 12h8";
 
-function iconElement(name) {
+export function iconElement(name) {
   const svg = svgEl("svg", {
     class: "sb-icon",
     viewBox: "0 0 24 24",
@@ -95,7 +95,7 @@ function iconElement(name) {
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-function el(tag, attrs = {}, children = []) {
+export function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(attrs)) {
     if (value === null || value === undefined) continue;
@@ -247,7 +247,17 @@ function renderCard(node) {
       "sb-card",
       `sb-card--${node.shape}`,
       node.unresolved ? "sb-card--unresolved" : null,
-      node.findings.length > 0 && !node.unresolved ? "sb-card--flagged" : null,
+      // Flagged is for ERRORS. A card carrying only an advisory finding gets
+      // the quieter treatment, because a canvas where an informational note
+      // and a broken config look identical teaches an author to ignore both.
+      !node.unresolved && node.findings.some((one) => one.severity === "error")
+        ? "sb-card--flagged"
+        : null,
+      !node.unresolved &&
+      node.findings.length > 0 &&
+      !node.findings.some((one) => one.severity === "error")
+        ? "sb-card--noted"
+        : null,
     ]
       .filter(Boolean)
       .join(" "),
