@@ -63,12 +63,22 @@ import { describe, paletteEntryFor } from "./palette.js";
  * layout node (below). Total: an unresolvable block type produces a node with
  * `unresolved: true` rather than an absent one or a throw.
  */
-export function layoutDocument(document, registry) {
+export function layoutDocument(document, registry, session = {}) {
   const findings = [];
+  // The two hooks this file left for sb-ad2, now supplied by the caller: which
+  // blocks are folded shut, and what `data-drop` each slot carries during a
+  // drag. Both default to "no session", so a call with two arguments still
+  // produces the inert canvas the previous wave rendered.
+  const view = {
+    collapsed: session.collapsed ?? new Set(),
+    dropState: session.dropState ?? (() => null),
+  };
+
   const root = layoutBlock(document.root, registry, findings, {
     depth: 1,
     slot: null,
     parentId: null,
+    view,
   });
 
   return { root, blockCount: countNodes(root), findings, maxDepth: depthOf(root) };
@@ -105,7 +115,7 @@ function depthOf(node) {
  *       findings      the block's own, also appended to the document list
  *     }
  */
-function layoutBlock(node, registry, findings, { depth, slot, parentId }) {
+function layoutBlock(node, registry, findings, { depth, slot, parentId, view }) {
   const described = describe(registry, node);
   const { descriptor, block, unresolved } = described;
   const entry = paletteEntryFor(descriptor);
@@ -132,7 +142,7 @@ function layoutBlock(node, registry, findings, { depth, slot, parentId }) {
   }
 
   const schema = safeSchema(descriptor, config);
-  const slots = slotViews(node, descriptor, entry, config, schema);
+  const slots = slotViews(node, descriptor, entry, config, schema, view);
 
   const layoutNode = {
     id: node.id,
@@ -151,36 +161,42 @@ function layoutBlock(node, registry, findings, { depth, slot, parentId }) {
     summary: summaryOf(schema, config),
     chips: chipsOf(schema, config),
     rawConfig: unresolved ? canonicalConfig(config) : null,
-    collapsed: false,
+    collapsed: view.collapsed.has(node.id),
     findings: own,
     slots: [],
   };
 
-  layoutNode.slots = slots.map(({ rawChildren, ...view }) => ({
-    ...view,
+  layoutNode.slots = slots.map(({ rawChildren, ...slotView }) => ({
+    ...slotView,
     children: rawChildren.map((child) =>
       layoutBlock(child, registry, findings, {
         depth: depth + 1,
-        slot: view.name,
+        slot: slotView.name,
         parentId: node.id,
+        view,
       })
     ),
   }));
 
-  layoutNode.primary = layoutNode.slots.filter((view) => view.style === "primary");
-  layoutNode.secondary = layoutNode.slots.filter((view) => view.style === "secondary");
+  layoutNode.primary = layoutNode.slots.filter((one) => one.style === "primary");
+  layoutNode.secondary = layoutNode.slots.filter((one) => one.style === "secondary");
   layoutNode.shape = shapeOf(layoutNode, schema);
   layoutNode.arrangement = arrangementOf(layoutNode, entry);
   layoutNode.descendantFindings = 0;
 
   findings.push(...own);
 
-  for (const view of layoutNode.slots) {
-    for (const child of view.children) {
+  for (const one of layoutNode.slots) {
+    for (const child of one.children) {
       layoutNode.descendantFindings +=
         child.findings.length + child.descendantFindings;
     }
   }
+
+  // What a folded card reports it is hiding. Counted from the layout tree
+  // rather than re-walked from the document, so the number on the badge and
+  // the subtree the fold actually hides are the same walk by construction.
+  layoutNode.descendantCount = countNodes(layoutNode) - 1;
 
   return layoutNode;
 }
@@ -220,7 +236,7 @@ function safeSlots(descriptor, config) {
  * strand a slot the same way - so it is derived from the document rather than
  * from `unresolved`.
  */
-function slotViews(node, descriptor, entry, config, schema) {
+function slotViews(node, descriptor, entry, config, schema, view) {
   const declared = safeSlots(descriptor, config);
   const declaredNames = new Set(declared.map((slot) => slot.name));
 
@@ -236,8 +252,10 @@ function slotViews(node, descriptor, entry, config, schema) {
     style: entry.slotStyle?.[slot.name] === "secondary" ? "secondary" : "primary",
     guard: guardFor(schema, config, slot.name),
     rawChildren: slotChildren(node, slot.name),
-    // sb-ad2 stamps drop validity here; the canvas already renders the gaps.
-    dropState: null,
+    // Drop validity, asked of the session rather than derived here: this file
+    // stays a pure function of {document, registry, view} and `targets.js`
+    // keeps sole ownership of decision 5's four rules.
+    dropState: view.dropState(node.id, slot.name),
   }));
 }
 
