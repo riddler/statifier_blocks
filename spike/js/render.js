@@ -726,10 +726,16 @@ function renderColumn(node, slot, reserveGuardLine = false) {
 }
 
 /**
- * A secondary slot as an attached rail (ADR-0005 decision 10's
- * `slot_style: :secondary`). It sits beside the group's body rather than
- * under it, which is what makes "these rules watch that body" legible without
- * an arrow having to say so - and the exit edges then say where the rules go.
+ * A rail slot as an attached rail (ADR-0005 decision 10's `slot_style`). It
+ * sits beside the group's body rather than under it, which is what makes
+ * "these rules watch that body" legible without an arrow having to say so -
+ * and the exit edges then say where the rules go.
+ *
+ * Two vocabularies share the placement (sb-68b): a `secondary` rail of
+ * interrupt rules, and a `failure` rail holding what runs when the step it
+ * hangs off goes badly. The difference is the slot's declared style, carried
+ * onto the DOM and painted by the stylesheet; nothing here knows which is
+ * which beyond passing the word along.
  */
 function renderRail(node) {
   const rail = el("aside", { class: "sb-rail" });
@@ -739,6 +745,12 @@ function renderRail(node) {
       class: "sb-rail__slot",
       "data-block-id": node.id,
       "data-slot": slot.name,
+      // sb-68b: WHICH rail vocabulary this slot is painted in. The value is
+      // the style the type declared, written through unread - the stylesheet
+      // decides what `failure` looks like, this file only says which one it
+      // is. A rail can hold either kind, so the attribute is on the slot and
+      // not on the rail that contains it.
+      "data-slot-style": slot.style,
       "data-drop": slot.dropState,
     });
 
