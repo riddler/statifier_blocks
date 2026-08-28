@@ -120,6 +120,18 @@
   --sb-topbar-height: 3rem;
   --sb-palette-width: 15rem;
   --sb-inspector-width: 21rem;
+
+  /* Canvas metrics (W2). The sizes the tree is laid out from, here rather
+   * than in editor.css so a host can make the canvas denser or roomier
+   * without touching structural CSS - the same bargain d14 strikes for
+   * colour. Whether these belong in the SHIPPED token surface is a W6
+   * finding; what the spike establishes is that the canvas needs no literal
+   * dimension of its own. */
+  --sb-card-width: 15rem;
+  --sb-column-min-width: 15rem;
+  --sb-column-empty-min-width: 10rem;
+  --sb-rail-width: 13rem;
+  --sb-config-preview-max-height: 8rem;
 }
 
 /* -------------------------------------------------------------------- dark */

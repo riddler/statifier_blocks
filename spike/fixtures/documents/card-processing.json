@@ -237,6 +237,7 @@
                       "type_version": 2,
                       "config": {
                         "invoke_type": "myapp:authorize",
+                        "assign_to": "authorization",
                         "timeout": "PT30S",
                         "label": "Authorize the card"
                       }
@@ -317,6 +318,7 @@
                       "type_version": 1,
                       "config": {
                         "invoke_type": "myapp:capture",
+                        "amount_key": "amount_cents",
                         "label": "Capture the funds"
                       }
                     },
@@ -355,6 +357,8 @@
                                   "type_version": 1,
                                   "config": {
                                     "invoke_type": "myapp:capture",
+                                    "amount_key": "amount_cents",
+                                    "retries": 3,
                                     "label": "Try the capture again"
                                   }
                                 }

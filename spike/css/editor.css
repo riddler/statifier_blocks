@@ -274,6 +274,8 @@
 
 .sb-canvas {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   background: var(--sb-bg-sunken);
@@ -282,7 +284,8 @@
 /* The dotted ground the tree will sit on. Kept here rather than in the
  * placeholder so W2's real canvas inherits it unchanged. */
 .sb-canvas__viewport {
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   background-image: radial-gradient(
     var(--sb-border) var(--sb-border-width),
@@ -294,13 +297,18 @@
 
 .sb-canvas__placeholder {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--sb-space);
-  min-height: 100%;
+  min-height: 0;
   padding: var(--sb-space-4);
   text-align: center;
+}
+
+.sb-canvas__placeholder[hidden] {
+  display: none;
 }
 
 .sb-canvas__placeholder-title {
@@ -313,6 +321,566 @@
   max-width: 34rem;
   font-size: var(--sb-text-sm);
   color: var(--sb-fg-subtle);
+}
+
+/* ------------------------------------------------------- canvas: the tree */
+
+/*
+ * The stage is what the connectors are measured against and what scrolls. It
+ * is `inline-block` so it grows to the width of the widest fan rather than
+ * being clipped to the viewport, and `min-width: 100%` so a small document
+ * still fills the pane instead of huddling in a corner.
+ */
+.sb-stage {
+  position: relative;
+  display: inline-block;
+  min-width: 100%;
+  padding: var(--sb-space-4) var(--sb-space-4) var(--sb-space-4);
+}
+
+/*
+ * The SVG covers the stage, sits ABOVE the tree, and never takes a pointer
+ * event. Above rather than below because every card and every group body is
+ * opaque, and a connector layer underneath them is a connector layer nobody
+ * can see. It is safe to put it on top because the routing only ever runs
+ * through the gaps between cards - a connector that crossed a card would be
+ * a routing bug, and having it visible is how that bug gets found.
+ */
+.sb-connectors {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.sb-edge {
+  fill: none;
+  stroke: var(--sb-connector);
+  stroke-width: var(--sb-connector-width);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* A branch arm is a choice, so its edges are the same weight as flow but
+ * lighter in colour; a parallel lane is not a choice, so it keeps full
+ * weight. The difference is small on purpose - these are the same kind of
+ * line, and over-decorating them is what makes a canvas noisy. */
+.sb-edge--fan {
+  stroke: var(--sb-connector);
+  opacity: 0.85;
+}
+
+.sb-edge--lane {
+  stroke: var(--sb-connector);
+}
+
+/* Interrupt exits are the one genuinely different edge: they leave the group
+ * rather than continuing it, so they are dashed and carry the warning hue. */
+.sb-edge--interrupt {
+  stroke: var(--sb-warning);
+  stroke-dasharray: 4 4;
+  opacity: 0.9;
+}
+
+.sb-arrow--flow path {
+  fill: var(--sb-connector);
+}
+
+.sb-arrow--interrupt path {
+  fill: var(--sb-warning);
+}
+
+.sb-tree-root {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  justify-content: center;
+}
+
+/* --------------------------------------------------------- canvas: nodes */
+
+/*
+ * `center`, not `stretch`. A node stretched to its slot's width takes the
+ * width of the widest thing anywhere beside it, so a two-card group sitting
+ * next to a three-armed branch would draw its boundary box across the whole
+ * branch and claim to contain it. Centring at natural width makes every box
+ * mean exactly what it encloses.
+ */
+.sb-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.sb-node__outlet {
+  height: 0;
+  overflow: hidden;
+}
+
+.sb-node__body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--sb-space-2);
+  margin-top: var(--sb-space-2);
+}
+
+/*
+ * Only a container that declares a SECONDARY slot draws a box around its
+ * body. That is not an aesthetic choice dressed up as a rule: a secondary
+ * slot is a rail of interrupt rules, and a rule can only fire against a
+ * region with an edge, so declaring one is exactly what makes a container a
+ * BOUNDARY rather than merely a container. `core.group` and
+ * `core.resumable_group` declare one and get the box; `core.sequence`,
+ * `core.branch` and `core.parallel` do not and stay unboxed, which is what
+ * keeps a deep tree from turning into nested rectangles that mean nothing.
+ * The derivation is ADR-0005 decision 10's `slot_style`, so a host type that
+ * declares a rail is drawn as a boundary too.
+ */
+.sb-node[data-boundary="true"] > .sb-node__body {
+  padding: var(--sb-space-2);
+  border: var(--sb-border-width) solid var(--sb-border-strong);
+  border-radius: var(--sb-radius);
+  background: var(--sb-bg-muted);
+}
+
+/* Natural width, never shrunk: the stage grows and the pane scrolls, because
+ * a squeezed card whose title wraps mid-word is worse than a scrollbar. */
+.sb-node__children {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.sb-node__children[data-collapsed="true"] {
+  display: none;
+}
+
+/* --------------------------------------------------------- canvas: cards */
+
+.sb-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sb-space);
+  align-self: center;
+  width: var(--sb-card-width);
+  padding: var(--sb-space) var(--sb-space-2);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius);
+  background: var(--sb-bg-raised);
+  box-shadow: var(--sb-shadow-sm);
+  text-align: left;
+}
+
+/* A container's header is the thing its body hangs from, so it reads a step
+ * heavier than a leaf - but it keeps a leaf's width. Stretching it to the
+ * width of everything below would make the root sequence's header as wide as
+ * the whole diagram, which says nothing and costs the entire viewport. */
+.sb-node--container > .sb-card {
+  background: var(--sb-bg);
+  border-color: var(--sb-border-strong);
+}
+
+/* A wait is a chip: one duration, no room needed for anything else. Making
+ * it small is what keeps a deep tree readable - a full card per timer is
+ * most of the height of a nested branch and none of its meaning. */
+.sb-node--chip > .sb-card {
+  width: auto;
+  align-self: center;
+  padding: var(--sb-space-half) var(--sb-space);
+  border-radius: var(--sb-radius-lg);
+  background: var(--sb-bg-muted);
+  box-shadow: none;
+}
+
+.sb-node--chip .sb-card__text {
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--sb-space);
+}
+
+.sb-node--chip .sb-card__summary {
+  font-family: var(--sb-font-mono);
+}
+
+.sb-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--sb-space-3);
+  height: var(--sb-space-3);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-accent-muted);
+  color: var(--sb-accent);
+}
+
+.sb-icon {
+  width: var(--sb-space-2);
+  height: var(--sb-space-2);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sb-card__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 0;
+}
+
+.sb-card__title {
+  font-size: var(--sb-text-md);
+  font-weight: var(--sb-weight-medium);
+  line-height: var(--sb-leading);
+  overflow-wrap: anywhere;
+}
+
+/* Caption and config chips share one row under the title. */
+.sb-card__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sb-space-half);
+  min-width: 0;
+}
+
+.sb-card__caption {
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-subtle);
+}
+
+.sb-card__summary {
+  margin-top: var(--sb-space-half);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb-chip--config {
+  background: var(--sb-accent-muted);
+  color: var(--sb-accent);
+  padding: 0 var(--sb-space-half);
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-card--flagged {
+  border-color: var(--sb-error);
+}
+
+/* --------------------------------------------------------- canvas: slots */
+
+.sb-slot {
+  min-width: 0;
+}
+
+.sb-slot + .sb-slot {
+  margin-top: var(--sb-space-2);
+}
+
+.sb-slot__header,
+.sb-column__header,
+.sb-rail__header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+  margin-bottom: var(--sb-space-half);
+}
+
+.sb-slot__label,
+.sb-column__label,
+.sb-rail__label {
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+  color: var(--sb-fg-subtle);
+  white-space: nowrap;
+}
+
+.sb-slot__tag {
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-warning-bg);
+  color: var(--sb-warning);
+  font-size: var(--sb-text-xs);
+}
+
+.sb-slot__children {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.sb-slot__empty {
+  align-self: center;
+  padding: var(--sb-space-half) var(--sb-space);
+  border: var(--sb-border-width) dashed var(--sb-border-strong);
+  border-radius: var(--sb-radius-lg);
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+}
+
+/* The gap IS the connector's run: it is sized to the vertical distance a flow
+ * edge needs to read as an edge rather than as a join, and it is where the
+ * "+" and the drop seam will live (sb-ad2). */
+.sb-gap {
+  height: var(--sb-space-2);
+  flex: 0 0 auto;
+}
+
+/* ---------------------------------------------------- canvas: fan / lanes */
+
+.sb-fan {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+/* The markers are what a fan turns on: every arm's elbow lands on the hub's
+ * line, so the whole distribution reads as one gesture. They are also the
+ * only place the exclusive/concurrent distinction is stated in words. */
+.sb-fan__marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: var(--sb-space) 0 var(--sb-space-2);
+  padding: 0 var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border-strong);
+  border-radius: var(--sb-radius-lg);
+  background: var(--sb-bg);
+}
+
+.sb-fan--lanes > .sb-fan__marker {
+  border-color: var(--sb-accent);
+  background: var(--sb-accent-muted);
+}
+
+.sb-fan__label {
+  font-size: var(--sb-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+  color: var(--sb-fg-muted);
+}
+
+.sb-fan--lanes .sb-fan__label {
+  color: var(--sb-accent);
+}
+
+/*
+ * `flex-start`, not `stretch`. Stretching every column to the height of the
+ * tallest one is the obvious default and it is wrong here: one lane of the
+ * demo document's parallel holds a whole nested group and the other two hold
+ * two cards each, so stretching leaves two enormous empty panels whose only
+ * message is "there is nothing here". At natural height the rejoin edges
+ * leave each column where its work actually ends, and the difference in
+ * length is itself information about how much each arm does.
+ */
+.sb-fan__columns {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sb-space-2);
+}
+
+.sb-column {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-width: var(--sb-column-min-width);
+  padding: var(--sb-space) var(--sb-space) var(--sb-space-2);
+  border-radius: var(--sb-radius);
+  background: var(--sb-bg);
+}
+
+/*
+ * The header is CENTRED and card-width, not stretched to the column.
+ *
+ * A branch arm can be one notify card wide or a thousand pixels wide - the
+ * arm holding the authorization group in the demo document is the latter -
+ * and an arm label pinned to the far-left edge of that arm is a label nobody
+ * will ever connect to the flow it belongs to. Centring it puts the condition
+ * directly above the first card the condition governs, which is where a
+ * reader looks for it and where the fan edge arrives.
+ */
+.sb-column__header {
+  flex-direction: column;
+  align-self: center;
+  align-items: stretch;
+  width: var(--sb-column-min-width);
+  max-width: 100%;
+  gap: var(--sb-space-half);
+  padding-top: var(--sb-space);
+  border-top: var(--sb-space-half) solid var(--sb-border-strong);
+}
+
+/* A guarded arm's rule takes the accent; an unguarded one - `otherwise` -
+ * stays neutral, so "this is the fallback" is visible without reading. */
+.sb-column:not(.sb-column--unguarded) > .sb-column__header,
+.sb-fan--lanes .sb-column__header {
+  border-top-color: var(--sb-accent);
+}
+
+.sb-guard {
+  display: block;
+  max-width: 100%;
+  padding: var(--sb-space-half) var(--sb-space);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-sunken);
+  color: var(--sb-fg-muted);
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* An empty arm is a real arm and has to be visible, but it does not need the
+ * width of a full one - nothing is going to be read inside it. */
+/* The reserved line an unguarded arm keeps so its siblings' cards and its own
+ * start on the same row. Invisible, never announced, purely rhythm. */
+.sb-guard--none {
+  visibility: hidden;
+}
+
+.sb-column--empty {
+  min-width: var(--sb-column-empty-min-width);
+  opacity: 0.8;
+}
+
+/* ---------------------------------------------------------- canvas: rail */
+
+/*
+ * ADR-0005 decision 10's `slot_style: :secondary`, rendered. The rail sits
+ * beside the body it watches rather than under it - "these rules apply to
+ * that" is a containment fact, and putting the rail inline would make it read
+ * as a step that runs after.
+ */
+.sb-rail {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  gap: var(--sb-space-2);
+  width: var(--sb-rail-width);
+  padding-left: var(--sb-space-2);
+  border-left: var(--sb-border-width) dashed var(--sb-warning);
+}
+
+.sb-rail .sb-card {
+  width: 100%;
+  border-style: dashed;
+  border-color: var(--sb-warning);
+  background: var(--sb-warning-bg);
+  box-shadow: none;
+}
+
+.sb-rail .sb-card__icon {
+  background: transparent;
+  color: var(--sb-warning);
+}
+
+.sb-rail .sb-gap {
+  height: var(--sb-space);
+}
+
+.sb-rail .sb-slot__empty {
+  align-self: stretch;
+  text-align: center;
+}
+
+/* ------------------------------------------------- canvas: unresolvable */
+
+/*
+ * ADR-0005 decision 12. The chrome has to say three things at a glance -
+ * this type is unavailable, it is not editable, and nothing has been lost -
+ * and the hatched border is what separates "the editor cannot render this"
+ * from "this block is invalid", which are different problems with different
+ * fixes.
+ */
+.sb-card--unresolved {
+  flex-wrap: wrap;
+  border-style: dashed;
+  border-color: var(--sb-error);
+  background: var(--sb-error-bg);
+}
+
+.sb-card--unresolved .sb-card__icon {
+  background: transparent;
+  color: var(--sb-error);
+}
+
+.sb-card--unresolved .sb-card__title {
+  color: var(--sb-error);
+}
+
+.sb-unresolved {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+  flex: 1 1 100%;
+  /* Without this a flex item refuses to shrink below its content, so the
+   * read-only config escapes the card instead of scrolling inside it. */
+  min-width: 0;
+  margin-top: var(--sb-space);
+  padding-top: var(--sb-space);
+  border-top: var(--sb-border-width) dashed var(--sb-error);
+}
+
+.sb-unresolved__badge {
+  align-self: flex-start;
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-error);
+  color: var(--sb-fg-on-accent);
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+}
+
+/* An unresolvable block's title IS its type name, so it is set in mono - the
+ * one card on the canvas whose heading is an identifier rather than prose. */
+.sb-card--unresolved .sb-card__title {
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-unresolved__message {
+  font-size: var(--sb-text-xs);
+  color: var(--sb-error);
+}
+
+.sb-unresolved__note {
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-muted);
+}
+
+/* Wraps rather than scrolling sideways: the whole point of showing the config
+ * is that the author can read what would be lost, and a horizontal scrollbar
+ * inside a card at depth 7 is not reading. */
+.sb-unresolved__config {
+  min-width: 0;
+  max-height: var(--sb-config-preview-max-height);
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: var(--sb-space);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-sunken);
+  color: var(--sb-fg-muted);
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
 }
 
 /* --------------------------------------------------------------------- tabs */

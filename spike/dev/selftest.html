@@ -145,6 +145,16 @@
 
       import { droppableSlots, droppableSlotsFor } from "../js/targets.js";
 
+      import {
+        fanPath,
+        flowPath,
+        humanizeDuration,
+        interruptPath,
+        joinPath,
+        layoutDocument,
+        readValuePath,
+      } from "../js/layout.js";
+
       /* ------------------------------------------------ the assert harness */
 
       const groups = [];
@@ -1106,6 +1116,200 @@
           "kind admission defaults to permissive for an undeclared slot",
           admits(coreTypes["core.wait"], {}, "anything", coreTypes["core.wait"], {}),
           "an absent slot_accepts entry should read as any"
+        );
+      });
+
+      suite("layout: the view model derives arrangement from d10 metadata", () => {
+        const doc = cardDocument();
+        const tree = layoutDocument(doc, registry);
+
+        const find = (id) => {
+          const walk = (node) =>
+            node.id === id
+              ? node
+              : node.slots
+                  .flatMap((slot) => slot.children)
+                  .map(walk)
+                  .find(Boolean) ?? null;
+          return walk(tree.root);
+        };
+
+        equal("every block is laid out", tree.blockCount, blocks(doc).length);
+        check("depth is reported", tree.maxDepth >= 4, `got ${tree.maxDepth}`);
+
+        // The three derivations layout.js's header comment commits to. Each
+        // is asserted against a DIFFERENT core type reaching the same rule by
+        // a different route, which is the property that matters: no branch on
+        // a type name anywhere.
+        equal("one primary slot stacks", find("blk_ROOT").arrangement, "stack");
+        equal(
+          "a secondary slot does not make a block fan",
+          find("blk_GRP").arrangement,
+          "stack"
+        );
+        equal(
+          "more than one primary slot fans (branch: arm + otherwise)",
+          find("blk_BR").arrangement,
+          "fan"
+        );
+        equal(
+          'layout "columns" makes lanes, not a fan',
+          find("blk_PAR").arrangement,
+          "lanes"
+        );
+
+        equal(
+          "slot_style routes the interrupts slot to the rail",
+          find("blk_GRP").slots.map((slot) => [slot.name, slot.style]),
+          [
+            ["body", "primary"],
+            ["interrupts", "secondary"],
+          ]
+        );
+
+        // The guard is the expression field KEYED BY the slot name, read
+        // through its valuePath into the stored arms list.
+        const branch = find("blk_BR");
+        equal(
+          "an arm's guard comes off the config schema, via valuePath",
+          branch.slots.find((slot) => slot.name === "arm_approved").guard,
+          "budget_remaining > amount"
+        );
+        equal(
+          "otherwise has no guard",
+          branch.slots.find((slot) => slot.name === "otherwise").guard,
+          null
+        );
+
+        // A leaf whose whole schema is one duration is a chip; a leaf with
+        // anything else to say is a card.
+        equal("a lone duration is a chip", find("blk_WAI").shape, "chip");
+        equal("a duration summary is humanized", find("blk_WAI").summary, [
+          { key: "duration", label: "Wait for", value: "48h" },
+        ]);
+        equal("a step with fields is a card", find("blk_CAP").shape, "card");
+        equal("a block with children is a container", find("blk_PAR").shape, "container");
+
+        // A select field becomes a chip, not a summary item - the
+        // resumable group's history, which ADR-0005 d10 leaves entirely to
+        // ordinary config machinery.
+        equal("a select renders as a chip", find("blk_GRP").chips, [
+          { key: "history", label: "Resume at", value: "Deep" },
+        ]);
+      });
+
+      suite("layout: an unresolvable type renders, with its bytes (d12)", () => {
+        const doc = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_OLD",
+                  type: "myapp.legacy_check",
+                  typeVersion: 3,
+                  config: { window: "PT24H", ruleset: "velocity-v2" },
+                }),
+              ],
+            },
+          }),
+          { id: "bdoc_unresolved" }
+        );
+
+        const before = toJson(doc);
+        const tree = layoutDocument(doc, registry);
+        const node = tree.root.slots[0].children[0];
+
+        check("it is laid out rather than dropped", node !== undefined);
+        equal("it is marked unresolvable", node.unresolved, true);
+        equal("its caption is the raw type name", node.caption, "myapp.legacy_check");
+        equal("it produces one block-anchored finding", tree.findings.length, 1);
+        equal("the finding is an error", tree.findings[0].severity, "error");
+        equal("the finding is anchored to the block", tree.findings[0].anchor, {
+          kind: "block",
+          blockId: "blk_OLD",
+        });
+
+        // Config is shown read-only, key-sorted - and nothing here rewrites
+        // the document, which is the preservation property d12 is about.
+        equal(
+          "its config is shown read-only, keys sorted",
+          node.rawConfig,
+          '{\n  "ruleset": "velocity-v2",\n  "window": "PT24H"\n}'
+        );
+        equal("laying it out did not rewrite the document", toJson(doc), before);
+        equal("it declares no slots to drop into", node.primary, []);
+      });
+
+      suite("layout: durations and value paths", () => {
+        equal("PT1H30M reads as 1h 30m", humanizeDuration("PT1H30M"), "1h 30m");
+        equal("P2D reads as 2d", humanizeDuration("P2D"), "2d");
+        equal("PT30S reads as 30s", humanizeDuration("PT30S"), "30s");
+        // An author mid-edit has invalid config almost continuously; a
+        // summary line is not the place to tell them so.
+        equal("a non-duration is returned unchanged", humanizeDuration("soon"), "soon");
+
+        equal(
+          "a valuePath walks objects and array indexes",
+          readValuePath({ arms: [{ cond: "a" }, { cond: "b" }] }, ["arms", 1, "cond"]),
+          "b"
+        );
+        equal(
+          "an absent step reads as undefined, never a throw",
+          readValuePath({ arms: [] }, ["arms", 3, "cond"]),
+          undefined
+        );
+        equal(
+          "an inherited key is not a value",
+          readValuePath({}, ["toString"]),
+          undefined
+        );
+      });
+
+      suite("layout: connector geometry is pure", () => {
+        // Vertically aligned is the common case inside a sequence, and it
+        // must not acquire corners it does not need.
+        equal(
+          "an aligned flow edge is one straight line",
+          flowPath({ x: 10, y: 20 }, { x: 10, y: 60 }),
+          "M 10 20 L 10 60"
+        );
+        equal(
+          "an offset flow edge turns on the halfway line",
+          flowPath({ x: 10, y: 20 }, { x: 50, y: 60 }),
+          "M 10 20 V 30 Q 10 40 20 40 H 40 Q 50 40 50 50 V 60"
+        );
+
+        // A fan's elbow sits close to the HUB so every arm turns on one
+        // line and the result reads as a distribution bar.
+        equal(
+          "a fan edge elbows just below its hub",
+          fanPath({ x: 100, y: 10 }, { x: 40, y: 100 }),
+          "M 100 10 V 16 Q 100 26 90 26 H 50 Q 40 26 40 36 V 100"
+        );
+        equal(
+          "a rejoin edge elbows just above its hub",
+          joinPath({ x: 40, y: 100 }, { x: 100, y: 200 }),
+          "M 40 100 V 174 Q 40 184 50 184 H 90 Q 100 184 100 194 V 200"
+        );
+
+        // The interrupt channel is OUTSIDE the group's box, which is the
+        // rule that keeps an exit edge from crossing the group at any depth.
+        equal(
+          "an interrupt edge leaves right, runs the channel, and comes back",
+          interruptPath({ x: 100, y: 50 }, { x: 20, y: 200 }, 140),
+          "M 100 50 H 130 Q 140 50 140 60 V 190 Q 140 200 130 200 H 20"
+        );
+
+        // Every path starts where it was told to and ends where it was told
+        // to, whatever the corners did in between.
+        const endsWith = (d, suffix) => d.endsWith(suffix);
+        check(
+          "a short edge cannot turn its corners inside out",
+          flowPath({ x: 0, y: 0 }, { x: 3, y: 2 }).startsWith("M 0 0") &&
+            endsWith(flowPath({ x: 0, y: 0 }, { x: 3, y: 2 }), "V 2"),
+          flowPath({ x: 0, y: 0 }, { x: 3, y: 2 })
         );
       });
 
