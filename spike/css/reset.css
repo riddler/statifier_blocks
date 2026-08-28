@@ -40,44 +40,60 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* Block-level elements: no inherited margins, no inherited list chrome. */
-.sb-spike h1,
-.sb-spike h2,
-.sb-spike h3,
-.sb-spike h4,
-.sb-spike h5,
-.sb-spike h6,
-.sb-spike p,
-.sb-spike figure,
-.sb-spike blockquote,
-.sb-spike dl,
-.sb-spike dd,
-.sb-spike ol,
-.sb-spike ul,
-.sb-spike pre {
+/* Block-level elements: no inherited margins, no inherited list chrome.
+ *
+ * `:where(.sb-spike)` for the same reason the control block below already used
+ * it, and the same defect: `.sb-spike p` and `.sb-spike pre` score one class
+ * plus one element, which beats a single-class component rule, so `.sb-hint`'s
+ * `margin-top` and `.sb-code`'s `padding` were both being stripped by the
+ * reset that exists to make room for them. The symptom is quiet - a hint flush
+ * against the paragraph above it, a code surface with text against its border -
+ * which is why it survived four beads and had to be found by measuring rather
+ * than by reading. Two surfaces had already worked around it locally
+ * (`p.sb-condition__where`, `p.sb-datamodel__note`); those qualifications come
+ * off with this change rather than staying as cargo.
+ *
+ * Zero specificity on the `.sb-spike` half leaves each of these at one
+ * element, which ties with a host page's own `p { margin: 1em }`. Source order
+ * decides a tie, and the editor's stylesheet is loaded after the host's, so
+ * the reset still wins the thing it exists to win. */
+:where(.sb-spike) h1,
+:where(.sb-spike) h2,
+:where(.sb-spike) h3,
+:where(.sb-spike) h4,
+:where(.sb-spike) h5,
+:where(.sb-spike) h6,
+:where(.sb-spike) p,
+:where(.sb-spike) figure,
+:where(.sb-spike) blockquote,
+:where(.sb-spike) dl,
+:where(.sb-spike) dd,
+:where(.sb-spike) ol,
+:where(.sb-spike) ul,
+:where(.sb-spike) pre {
   margin: 0;
   padding: 0;
 }
 
-.sb-spike h1,
-.sb-spike h2,
-.sb-spike h3,
-.sb-spike h4,
-.sb-spike h5,
-.sb-spike h6 {
+:where(.sb-spike) h1,
+:where(.sb-spike) h2,
+:where(.sb-spike) h3,
+:where(.sb-spike) h4,
+:where(.sb-spike) h5,
+:where(.sb-spike) h6 {
   font-size: inherit;
   font-weight: inherit;
 }
 
-.sb-spike ol,
-.sb-spike ul {
+:where(.sb-spike) ol,
+:where(.sb-spike) ul {
   list-style: none;
 }
 
-.sb-spike pre,
-.sb-spike code,
-.sb-spike kbd,
-.sb-spike samp {
+:where(.sb-spike) pre,
+:where(.sb-spike) code,
+:where(.sb-spike) kbd,
+:where(.sb-spike) samp {
   font-family: var(--sb-font-mono);
   font-size: 1em;
 }

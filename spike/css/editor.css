@@ -234,15 +234,38 @@
 
 /* ----------------------------------------------------------------- palette */
 
-/* The search box sticks: filtering a long palette and losing the box you are
- * typing into is the one thing a search box must never do. */
-.sb-palette__search-row {
+/*
+ * The one sticky-header idiom, shared by every pane that has one, rather than
+ * a copy per surface.
+ *
+ * A search box sticks because filtering a long list and losing the box you are
+ * typing into is the one thing a search box must never do. What makes it hard
+ * is that `.sb-pane__body` is both the scrollport and a padded box: content
+ * scrolls up THROUGH the top padding rather than being clipped at it, so a
+ * header stuck at `top: 0` - the scrollport's padding box - has a
+ * `--sb-space-2` band of moving rows above it. The three declarations are one
+ * mechanism: the negative offset sticks to the border box instead, the equal
+ * negative margin puts the unstuck position back where it was, and the top
+ * padding gives the header a painted box tall enough to cover the band. Take
+ * any one away and it breaks in a different direction.
+ *
+ * Extending it to a new pane is adding a selector here, not re-deriving the
+ * arithmetic; the background is deliberately the pane header's `--sb-bg`
+ * rather than the body's raised surface, so a stuck header reads as chrome.
+ */
+.sb-sticky-head,
+.sb-palette__search-row,
+.sb-datamodel__head {
   position: sticky;
   top: calc(var(--sb-space-2) * -1);
   z-index: 1;
-  padding: var(--sb-space-2) 0 var(--sb-space);
   margin-top: calc(var(--sb-space-2) * -1);
+  padding-top: var(--sb-space-2);
   background: var(--sb-bg);
+}
+
+.sb-palette__search-row {
+  padding-bottom: var(--sb-space);
 }
 
 .sb-palette__count {
@@ -1357,17 +1380,15 @@
  * into is the one thing a search box must never do. The offsets mirror
  * `.sb-palette__search-row`'s, because both sit directly inside a
  * `.sb-pane__body` and are cancelling the same padding. */
-/* Deliberately NOT sticky, unlike the palette's search row.
- *
- * Two attempts at sticking it - at the palette's negative offset and at zero -
- * both left a band at the top of the tab panel that scrolled rows showed
- * through, because the inspector's scroller is not the pane the palette's
- * offsets were tuned against. A header that paints a row of the list above
- * itself looks broken in a way that a header which simply scrolls does not,
- * and the thing stickiness buys - keeping the box you are typing into on
- * screen - is already bought here by scrolling back to the top on every
- * keystroke. Whether the palette's idiom can be made to transplant is a
- * question for the polish pass with the whole shell in view. */
+/* It sticks after all (sb-vhu). The two earlier attempts each got half of the
+ * idiom: `top: 0` sticks to the scrollport's PADDING box, which leaves a
+ * `--sb-space-2` band of scrolling rows visible above the header, and the
+ * negative offset alone moves the stuck position without giving the header a
+ * painted box tall enough to cover that band. All three declarations are one
+ * mechanism and none of them works alone - the offset chooses the border box,
+ * the negative margin keeps the unstuck position where it was, and the top
+ * padding is what actually paints over the band. `.sb-sticky-head` below
+ * carries the three so neither surface owns it privately. */
 .sb-datamodel__head {
   padding-bottom: var(--sb-space-half);
   background: var(--sb-bg);
@@ -1440,14 +1461,14 @@
   font-variant-numeric: tabular-nums;
 }
 
-p.sb-datamodel__scope-note {
+.sb-datamodel__scope-note {
   margin: var(--sb-space-half) 0 var(--sb-space);
   color: var(--sb-fg-subtle);
   font-size: var(--sb-text-xs);
   line-height: var(--sb-leading);
 }
 
-p.sb-datamodel__none {
+.sb-datamodel__none {
   margin: 0 0 var(--sb-space);
   color: var(--sb-fg-subtle);
   font-size: var(--sb-text-xs);
@@ -1462,11 +1483,11 @@ p.sb-datamodel__none {
 /* The nested indent is a rule, not padding: at depth two the eye needs a line
  * to run back up, and a subtree that is only offset reads as a second list.
  *
- * Qualified by element on purpose. `reset.css` zeroes `margin`/`padding` on
- * `.sb-spike ul`, which is a class-plus-element selector and therefore beats a
- * bare component class - the reset says so about buttons and the same trap is
- * here for lists. `ul.` matches its specificity and wins on order. */
-ul.sb-datamodel__list--nested {
+ * It was `ul.sb-datamodel__list--nested` until sb-vhu, matching the specificity
+ * of a reset that scored class-plus-element. The reset scores one element now,
+ * so the class carries the rule on its own - the same de-qualification the
+ * other five element-prefixed rules in this file took. */
+.sb-datamodel__list--nested {
   margin-left: calc(var(--sb-space) + var(--sb-space-half));
   padding-left: var(--sb-space);
   border-left: var(--sb-border-width) solid var(--sb-border);
@@ -1599,7 +1620,7 @@ ul.sb-datamodel__list--nested {
   font-size: var(--sb-text-xs);
 }
 
-p.sb-datamodel__note {
+.sb-datamodel__note {
   margin: 0 0 var(--sb-space-half) calc(1rem + var(--sb-space-half));
   color: var(--sb-fg-subtle);
   font-size: var(--sb-text-xs);
@@ -1608,12 +1629,10 @@ p.sb-datamodel__note {
 
 /* ------------------------------------------------------- the condition pane */
 
-/* `.sb-hint`'s own `margin-top` is a bare class against `reset.css`'s
- * `.sb-spike p`, which is class-plus-element and wins - so the hint under the
- * empty state sits flush against it. Qualified here for this one use rather
- * than reaching into a shared rule another bead's panes depend on; that the
- * shared rule is dead at all is a finding for the polish pass. */
-p.sb-condition__where {
+/* Was `p.sb-condition__where`, a local escape from `reset.css` out-specifying
+ * `.sb-hint`. The reset takes zero specificity on its container half now
+ * (sb-vhu), so the qualification has nothing left to escape from. */
+.sb-condition__where {
   margin-top: var(--sb-space);
 }
 
@@ -1652,7 +1671,7 @@ p.sb-condition__where {
   font-size: var(--sb-text-xs);
 }
 
-pre.sb-condition__code {
+.sb-condition__code {
   padding: var(--sb-space);
   line-height: 1.7;
 }
@@ -1729,7 +1748,7 @@ pre.sb-condition__code {
   margin-top: var(--sb-space);
 }
 
-p.sb-condition__paths-title {
+.sb-condition__paths-title {
   margin: 0 0 var(--sb-space-half);
   color: var(--sb-fg-subtle);
   font-size: var(--sb-text-xs);
@@ -1785,7 +1804,7 @@ p.sb-condition__paths-title {
 /* Advisory, and shaped like one. It borrows the warning colour but not the
  * findings chrome, because everything in the findings panel is a claim that
  * something is wrong and this is a question. */
-p.sb-condition__advisory {
+.sb-condition__advisory {
   margin: var(--sb-space) 0 0;
   padding: var(--sb-space);
   border-left: var(--sb-focus-width) solid var(--sb-path-unknown);
@@ -2058,6 +2077,25 @@ p.sb-condition__advisory {
   color: var(--sb-fg-subtle);
 }
 
+/*
+ * The raw config preview clips at `--sb-config-preview-max-height`, and until
+ * sb-vhu it clipped SILENTLY: a nine-key config and a four-key config both
+ * ended at the same flat border, so the only way to learn there was more was
+ * to try scrolling a box that gave no reason to try. The overlay scrollbar
+ * this platform draws does not count as the affordance, because it is not
+ * painted until the pointer is already inside and moving.
+ *
+ * The mark is the classic four-layer background rather than a JS scroll
+ * listener: two opaque covers attached `local` so they ride with the content
+ * and sit flush at the ends, and two shadows attached `scroll` so they stay
+ * pinned to the box. At the top of the scroll the cover hides the shadow
+ * exactly; scroll down and the cover moves away and the shadow appears. No
+ * script, no scroll event, and it is correct on the first paint - which a
+ * listener is not, because nothing has scrolled yet.
+ *
+ * `background-color` comes AFTER the shorthand on purpose: the shorthand
+ * resets it to transparent, so declaring the surface first paints nothing.
+ */
 .sb-form__raw {
   margin: var(--sb-space) 0 0;
   max-height: var(--sb-config-preview-max-height);
@@ -2065,8 +2103,22 @@ p.sb-condition__advisory {
   padding: var(--sb-space);
   border: var(--sb-border-width) solid var(--sb-border);
   border-radius: var(--sb-radius-sm);
-  background: var(--sb-bg-sunken);
   font-size: var(--sb-text-xs);
+}
+
+/* The two vertical ones, and they are the same surface twice: the inspector's
+ * read-only preview and the card's own. `--sb-bg-sunken` is hard-coded into
+ * the gradient because a cover has to be the surface it is covering and a
+ * gradient cannot read the element's own `background-color`; both surfaces are
+ * sunken, so the pairing holds. */
+.sb-form__raw,
+.sb-unresolved__config {
+  background:
+    linear-gradient(var(--sb-bg-sunken) 30%, transparent) 0 0 / 100% var(--sb-space-3) no-repeat local,
+    linear-gradient(transparent, var(--sb-bg-sunken) 70%) 0 100% / 100% var(--sb-space-3) no-repeat local,
+    radial-gradient(farthest-side at 50% 0, var(--sb-scroll-shadow), transparent) 0 0 / 100% var(--sb-scroll-shadow-size) no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, var(--sb-scroll-shadow), transparent) 0 100% / 100% var(--sb-scroll-shadow-size) no-repeat scroll;
+  background-color: var(--sb-bg-sunken);
 }
 
 /* ------------------------------------------------------------ the reveal */
@@ -2729,10 +2781,34 @@ p.sb-condition__advisory {
  * squeezing it produces a table nobody can read. Whether a truth table wants a
  * wider home than the inspector is the open question this pane found.
  */
+/* The same four-layer mark as `.sb-form__raw`, turned on its side. It does not
+ * settle the open question above - whether a truth table wants a wider home
+ * than a 21rem inspector is a panel-design decision, not a CSS one - but it
+ * does stop the pane lying about it in the meantime. A grid clipped at the
+ * pane edge with no mark reads as a grid that ends there, and a reader who
+ * believes the last visible column is the last column reads the table wrong
+ * rather than incompletely.
+ *
+ * It is weaker here than on the vertical surfaces and the reason is worth
+ * writing down, because it is the limit of the whole technique: a background
+ * paints BELOW content, and the verdict cells carry opaque chips, so wherever
+ * a chip lands on the clipped edge it hides the shadow behind it. The mark is
+ * reliable on the left edge, where the case-name column is plain text, and
+ * intermittent on the right. Making it reliable on both sides means an
+ * overlay rather than a background - a sticky pseudo-element, or a wrapper -
+ * and that is a change to the pane's markup, which belongs with the decision
+ * about where the table lives rather than ahead of it. The sentence under the
+ * table says the same thing in words in the meantime. */
 .sb-fixtures__table-scroll {
   overflow-x: auto;
   border: var(--sb-border-width) solid var(--sb-border);
   border-radius: var(--sb-radius-sm);
+  background:
+    linear-gradient(to right, var(--sb-bg-raised) 30%, transparent) 0 0 / var(--sb-space-3) 100% no-repeat local,
+    linear-gradient(to left, var(--sb-bg-raised) 30%, transparent) 100% 0 / var(--sb-space-3) 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--sb-scroll-shadow), transparent) 0 0 / var(--sb-scroll-shadow-size) 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--sb-scroll-shadow), transparent) 100% 0 / var(--sb-scroll-shadow-size) 100% no-repeat scroll;
+  background-color: var(--sb-bg-raised);
 }
 
 .sb-fixtures__grid {
@@ -3385,14 +3461,36 @@ p.sb-condition__advisory {
   pointer-events: none;
 }
 
+/*
+ * The live region, and it floats over the canvas because it has to: it is
+ * announcing something about the canvas and a line in the chrome underneath
+ * would be read as chrome. Floating is the whole difficulty, though. Bare
+ * text at `bottom: var(--sb-space)` centred on the canvas landed ON a card
+ * about a third of the time on the deep document - two greys of similar
+ * weight overlapping, which is unreadable in both directions at once - and
+ * the rest of the time it landed on the horizontal scrollbar.
+ *
+ * So: a chip rather than a line. An opaque raised surface with a border and
+ * `--sb-shadow-md` separates it from whatever it is over instead of blending
+ * into it, and lifting it clear of `--sb-space-3` puts it above the
+ * scrollbar's track rather than in it. It keeps `pointer-events: none` -
+ * a status message that eats a click on the card behind it is worse than one
+ * that overlaps it - and it keeps `:empty { display: none }`, so an empty
+ * live region is not a chip with nothing in it.
+ */
 .sb-status {
   position: absolute;
-  bottom: var(--sb-space);
+  bottom: var(--sb-space-3);
   left: 50%;
   transform: translateX(-50%);
   z-index: 2;
+  max-width: calc(100% - var(--sb-space-4));
   margin: 0;
-  padding: 0 var(--sb-space);
+  padding: var(--sb-space-half) var(--sb-space-2);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-lg);
+  background: var(--sb-bg-raised);
+  box-shadow: var(--sb-shadow-md);
   color: var(--sb-fg-muted);
   font-size: var(--sb-text-xs);
   pointer-events: none;
