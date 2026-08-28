@@ -12,11 +12,12 @@
  * no dependency, ever.
  */
 
-import { fromJson } from "./document.js";
-import { coreTypes, createRegistry, demoTypes } from "./palette.js";
+import { findBlock, fromJson } from "./document.js";
+import { coreTypes, createRegistry, demoTypes, describe } from "./palette.js";
 import { fixtureTypes } from "./demo-types.js";
 import { createEditor } from "./interact.js";
 import { createDatamodelPane } from "./datamodel-pane.js";
+import { createFixturesPane } from "./fixtures-pane.js";
 import { indexPaths } from "./datamodel.js";
 import { createPalettePane } from "./palette-pane.js";
 
@@ -187,6 +188,74 @@ const editor = canvas
     })
   : null;
 
+/* ------------------------------------------------------------- fixtures */
+
+
+/*
+ * The run/table fixtures (sb-9z3), fetched the same way and with the same
+ * degradation as the datamodel document: a failed fetch leaves the pane saying
+ * so rather than throwing, because a spike whose whole Fixtures tab is a stack
+ * trace when one static file 404s teaches nothing.
+ *
+ * A SIBLING file rather than a section inside each document fixture. The
+ * reasons are in the file's own header comment; the short one is that a
+ * document fixture is an ADR-0001 envelope and the decoder refuses keys the
+ * encoder would never have written, so a `runs` key would be a second thing to
+ * strip on every load - and the strict check is what keeps the round trip
+ * honest.
+ */
+const runsDoc = await fetch("fixtures/runs.json")
+  .then((response) => (response.ok ? response.json() : null))
+  .catch(() => null);
+
+const fixturesMount = document.getElementById("sb-fixtures-panel");
+
+/*
+ * The pane reads the editor rather than the other way round. It needs three
+ * things the editor owns - which document is open, what is selected, and the
+ * canvas - and it gets them as functions rather than as values, for the reason
+ * every other seam in this shell takes a function: the session is replaced by
+ * every command, so anything holding one holds a stale value.
+ */
+const fixturesPane = fixturesMount
+  ? createFixturesPane({
+      mount: fixturesMount,
+      data: runsDoc,
+      host: {
+        documentId: () => editor?.session?.document.id ?? null,
+        selectedId: () => editor?.selectedId ?? null,
+        markActive: (ids) => editor?.markActive(ids),
+        revealBlocks: (ids) => editor?.revealBlocks(ids) ?? false,
+        revealBlock: (id) => editor?.revealBlock(id) ?? false,
+        labelFor: (id) => blockLabel(id),
+      },
+    })
+  : null;
+
+if (editor && fixturesPane) {
+  editor.onSelectionChange = () => fixturesPane.selectionChanged();
+}
+
+/*
+ * A block's own title, the way the canvas card reads it: the `label` an author
+ * typed, falling back to the block type's palette label and then to the raw id.
+ * A chip reading `blk_cp_three_ds_wait` is an id; a chip reading "Wait" beside
+ * that id in the tooltip is a block.
+ */
+function blockLabel(id) {
+  const session = editor?.session;
+  if (!session) return id;
+
+  const node = findBlock(session.document, id);
+  if (!node) return id;
+
+  const label = node.config?.label;
+  if (typeof label === "string" && label !== "") return label;
+
+  const { descriptor, unresolved } = describe(session.registry, node);
+  return unresolved ? node.type : (descriptor.paletteEntry?.label ?? descriptor.name ?? node.type);
+}
+
 /*
  * The fixtures carry `_comment` keys - their own documentation, additive and
  * explicitly not part of the ADR-0001 node shape. `Decode` refuses a block
@@ -223,6 +292,7 @@ async function loadDocument(name) {
     depthChip.hidden = true;
     docTitle.textContent = "No document";
     docSubtitle.textContent = "pick a demo document to load";
+    fixturesPane?.documentChanged();
     return;
   }
 
@@ -248,6 +318,10 @@ async function loadDocument(name) {
   // only the one thing the editor has no opinion about: the document's name.
   docTitle.textContent = doc.metadata.name ?? doc.id;
   editor.open(doc);
+
+  // After `open`, not before: a run left open from the previous document would
+  // otherwise mark blocks that are no longer on the canvas.
+  fixturesPane?.documentChanged();
 }
 
 if (documentSelect && canvas && emptyState) {

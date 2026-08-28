@@ -2053,51 +2053,896 @@ p.sb-condition__advisory {
 
 /* ---------------------------------------------------------------- fixtures */
 
-.sb-fixtures__list {
+/*
+ * sb-9z3's pane: the run list, the replay transport, the truth tables and the
+ * raw-JSON editor. Three whole sub-views rather than three stacked sections,
+ * because the inspector is `--sb-inspector-width` wide and a step list plus a
+ * grid plus a textarea stacked is a scroll with no map.
+ *
+ * The placeholder rules this replaces also carried a second `.sb-status`
+ * definition, which shadowed nothing only because the canvas's live-region rule
+ * happens to come later in this file. That is gone with them.
+ */
+
+.sb-fixtures {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-2);
+}
+
+/* --- the sub-view switch --- */
+
+.sb-fixtures__nav {
+  display: flex;
+  gap: 0;
+  padding: 2px;
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius);
+  background: var(--sb-bg-sunken);
+}
+
+.sb-fixtures__nav-button {
+  flex: 1 1 0;
+  padding: var(--sb-space-half) var(--sb-space);
+  border: 0;
+  border-radius: var(--sb-radius-sm);
+  background: transparent;
+  color: var(--sb-fg-muted);
+  font: inherit;
+  font-size: var(--sb-text-sm);
+  font-weight: var(--sb-weight-medium);
+  cursor: pointer;
+}
+
+.sb-fixtures__nav-button:hover {
+  color: var(--sb-fg);
+}
+
+.sb-fixtures__nav-button[aria-pressed="true"] {
+  background: var(--sb-bg-raised);
+  color: var(--sb-fg);
+  box-shadow: var(--sb-shadow-sm);
+}
+
+/* The count rides on the label rather than in a badge: three counts in three
+ * badges across a 21rem strip is more chrome than information. */
+.sb-fixtures__nav-button[data-count]:not([data-count=""])::after {
+  content: " " attr(data-count);
+  color: var(--sb-fg-subtle);
+  font-weight: 400;
+}
+
+.sb-fixtures__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-2);
+}
+
+.sb-fixtures__section {
   display: flex;
   flex-direction: column;
   gap: var(--sb-space);
 }
 
-.sb-fixtures__row {
-  display: flex;
-  align-items: center;
-  gap: var(--sb-space);
-  padding: var(--sb-space);
-  border: var(--sb-border-width) solid var(--sb-border);
-  border-radius: var(--sb-radius-sm);
-  background: var(--sb-bg);
-  font-size: var(--sb-text-sm);
+.sb-fixtures__subhead {
+  margin: 0;
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  letter-spacing: var(--sb-tracking-caps);
+  text-transform: uppercase;
 }
 
-.sb-fixtures__name {
+.sb-fixtures__notice {
+  margin: 0;
+  padding: var(--sb-space-half) var(--sb-space);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-accent-muted);
+  color: var(--sb-fg);
+  font-size: var(--sb-text-xs);
+}
+
+/* --- the run list --- */
+
+.sb-fixtures__runs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sb-fixtures__run {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+  width: 100%;
+  padding: var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius);
+  background: var(--sb-bg);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sb-fixtures__run:hover {
+  border-color: var(--sb-accent);
+  background: var(--sb-bg-muted);
+}
+
+.sb-fixtures__run-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+}
+
+.sb-fixtures__run-name {
   flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: var(--sb-text-sm);
+  font-weight: var(--sb-weight-strong);
+}
+
+.sb-fixtures__expect {
   white-space: nowrap;
 }
 
-.sb-status {
-  padding: 0 var(--sb-space-half);
-  border-radius: var(--sb-radius-sm);
-  font-size: var(--sb-text-xs);
+.sb-fixtures__expect[data-expected="fail"] {
+  color: var(--sb-warning);
   font-weight: var(--sb-weight-medium);
 }
 
-.sb-status--pass {
+.sb-fixtures__run-description {
+  margin: 0;
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+}
+
+.sb-fixtures__run-meta {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+}
+
+/* --- the runner --- */
+
+.sb-fixtures__runner-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+}
+
+.sb-fixtures__back {
+  align-self: flex-start;
+  padding-left: 0;
+}
+
+.sb-fixtures__runner-name {
+  margin: 0;
+  font-size: var(--sb-text-md);
+  font-weight: var(--sb-weight-strong);
+}
+
+.sb-fixtures__verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sb-space);
+  padding: var(--sb-space);
+  border-radius: var(--sb-radius);
+  background: var(--sb-bg-muted);
+}
+
+.sb-fixtures__verdict-chip {
+  padding: 0 var(--sb-space);
+  border-radius: 999px;
+  background: var(--sb-bg-sunken);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  letter-spacing: var(--sb-tracking-caps);
+  text-transform: uppercase;
+}
+
+.sb-fixtures__verdict-chip[data-verdict="pass"] {
   background: var(--sb-success-bg);
   color: var(--sb-success);
 }
 
-.sb-status--fail {
+.sb-fixtures__verdict-chip[data-verdict="fail"],
+.sb-fixtures__verdict-chip[data-verdict="failing"] {
   background: var(--sb-error-bg);
   color: var(--sb-error);
 }
 
-.sb-status--pending {
-  background: var(--sb-bg-muted);
+.sb-fixtures__verdict-chip[data-verdict="running"] {
+  background: var(--sb-info-bg);
+  color: var(--sb-info);
+}
+
+.sb-fixtures__progress {
   color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-fixtures__agree,
+.sb-fixtures__disagree {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+}
+
+.sb-fixtures__agree {
+  color: var(--sb-fg-muted);
+}
+
+/* The interesting case gets the loud treatment: a fixture whose recorded steps
+ * disagree with its own declared expectation has caught something. */
+.sb-fixtures__disagree {
+  color: var(--sb-warning);
+  font-weight: var(--sb-weight-medium);
+}
+
+/* --- the transport --- */
+
+.sb-fixtures__transport {
+  display: flex;
+  gap: var(--sb-space-half);
+}
+
+.sb-fixtures__transport-button {
+  flex: 0 0 auto;
+  min-width: 2.25rem;
+  padding: var(--sb-space-half) var(--sb-space);
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-fixtures__transport-button[data-transport="forward"],
+.sb-fixtures__transport-button[data-transport="back"] {
+  font-size: var(--sb-text-md);
+  line-height: 1;
+}
+
+/* Play does not stretch. It did, and a button four times the width of the ones
+ * beside it read as the primary action of the whole pane rather than as one
+ * transport control among five. */
+.sb-fixtures__transport-button[data-transport="end"] {
+  margin-left: auto;
+}
+
+/* --- the current step --- */
+
+.sb-fixtures__current {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space);
+  padding: var(--sb-space-2);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-left: 3px solid var(--sb-accent);
+  border-radius: var(--sb-radius);
+  background: var(--sb-bg);
+}
+
+.sb-fixtures__current-idle {
+  margin: 0;
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-fixtures__current-label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+  margin: 0;
+  font-size: var(--sb-text-sm);
+  font-weight: var(--sb-weight-strong);
+  line-height: var(--sb-leading);
+}
+
+.sb-fixtures__current-ordinal {
+  flex: 0 0 auto;
+  min-width: 1.25rem;
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-accent);
+  color: var(--sb-fg-on-accent);
+  font-size: var(--sb-text-xs);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-fixtures__event {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space);
+  margin: 0;
+}
+
+.sb-fixtures__event-label {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+  letter-spacing: var(--sb-tracking-caps);
+  text-transform: uppercase;
+}
+
+.sb-fixtures__event-name {
+  padding: 0 var(--sb-space-half);
+  font-size: var(--sb-text-xs);
+}
+
+.sb-fixtures__note {
+  margin: 0;
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+}
+
+/* --- the active blocks --- */
+
+.sb-fixtures__active {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+}
+
+.sb-fixtures__active-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sb-space-half);
+}
+
+.sb-fixtures__active-chip {
+  padding: 1px var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-accent);
+  border-radius: 999px;
+  background: var(--sb-accent-muted);
+  color: var(--sb-fg);
+  font: inherit;
+  font-size: var(--sb-text-xs);
+  cursor: pointer;
+}
+
+.sb-fixtures__active-chip:hover {
+  background: var(--sb-accent);
+  color: var(--sb-fg-on-accent);
+}
+
+.sb-fixtures__reveal-all {
+  align-self: flex-start;
+}
+
+/* --- the recorded check --- */
+
+.sb-fixtures__check {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+  padding: var(--sb-space);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-muted);
+}
+
+.sb-fixtures__check[data-result="pass"] {
+  background: var(--sb-success-bg);
+}
+
+.sb-fixtures__check[data-result="fail"] {
+  background: var(--sb-error-bg);
+}
+
+.sb-fixtures__check-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+  margin: 0;
+}
+
+.sb-fixtures__check-chip {
+  flex: 0 0 auto;
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  letter-spacing: var(--sb-tracking-caps);
+  text-transform: uppercase;
+}
+
+.sb-fixtures__check-chip[data-result="pass"] {
+  color: var(--sb-success);
+}
+
+.sb-fixtures__check-chip[data-result="fail"] {
+  color: var(--sb-error);
+}
+
+.sb-fixtures__check-label {
+  font-size: var(--sb-text-sm);
+}
+
+.sb-fixtures__check-detail {
+  margin: 0;
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+}
+
+/* --- the writes --- */
+
+.sb-fixtures__deltas {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sb-fixtures__delta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+  padding: 1px 0;
+  font-size: var(--sb-text-xs);
+}
+
+.sb-fixtures__delta-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--sb-fg);
+  font-family: var(--sb-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb-fixtures__delta-value {
+  flex: 0 0 auto;
+  color: var(--sb-syntax-string);
+  font-family: var(--sb-font-mono);
+}
+
+.sb-fixtures__deltas--accumulated .sb-fixtures__delta {
+  border-bottom: var(--sb-border-width) solid var(--sb-border);
+}
+
+/* --- the step list --- */
+
+.sb-fixtures__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.sb-fixtures__step {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+  width: 100%;
+  padding: var(--sb-space-half) var(--sb-space);
+  border: var(--sb-border-width) solid transparent;
+  border-radius: var(--sb-radius-sm);
+  background: transparent;
+  color: var(--sb-fg-muted);
+  font: inherit;
+  font-size: var(--sb-text-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sb-fixtures__step:hover {
+  background: var(--sb-bg-muted);
+}
+
+.sb-fixtures__step[data-state="past"] {
+  color: var(--sb-fg);
+}
+
+/* The current row is the one the eye has to find without looking for it: the
+ * accent border and the raised surface, matching the current-step panel above
+ * so the two read as one thing seen twice. */
+.sb-fixtures__step[data-state="current"] {
+  border-color: var(--sb-accent);
+  background: var(--sb-accent-muted);
+  color: var(--sb-fg);
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-fixtures__step[data-state="future"] {
+  color: var(--sb-fg-subtle);
+}
+
+.sb-fixtures__step-ordinal {
+  flex: 0 0 1.25rem;
+  color: var(--sb-fg-subtle);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.sb-fixtures__step-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: var(--sb-leading);
+}
+
+/* The parallel marker. A step that lights two lanes is the thing this fixture
+ * set exists to show, and it should be visible in the list without opening
+ * the step. */
+.sb-fixtures__step-lanes {
+  flex: 0 0 auto;
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-sunken);
+  color: var(--sb-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-fixtures__step-check {
+  flex: 0 0 auto;
+  font-weight: var(--sb-weight-strong);
+}
+
+.sb-fixtures__step-check[data-result="pass"] {
+  color: var(--sb-success);
+}
+
+.sb-fixtures__step-check[data-result="fail"] {
+  color: var(--sb-error);
+}
+
+/* An unreached check keeps its slot and gives nothing away. */
+.sb-fixtures__step-check[data-result="pending"] {
+  color: var(--sb-fg-subtle);
+}
+
+/* --- the truth tables --- */
+
+.sb-fixtures__table {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space);
+  padding: var(--sb-space-2) 0;
+  border-top: var(--sb-border-width) solid var(--sb-border);
+}
+
+.sb-fixtures__table:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.sb-fixtures__table-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+}
+
+.sb-fixtures__table-name {
+  margin: 0;
+  font-size: var(--sb-text-md);
+  font-weight: var(--sb-weight-strong);
+}
+
+.sb-fixtures__table-description {
+  margin: 0;
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+}
+
+.sb-fixtures__exprs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sb-fixtures__expr {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-muted);
+}
+
+.sb-fixtures__expr-label {
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+}
+
+.sb-fixtures__expr-source {
+  padding: 0;
+  background: transparent;
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  overflow-wrap: anywhere;
+}
+
+.sb-fixtures__expr-count {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * The grid is wider than the pane and is allowed to be. A bindings column per
+ * referenced path plus one per arm does not fit in `--sb-inspector-width`, and
+ * squeezing it produces a table nobody can read. Whether a truth table wants a
+ * wider home than the inspector is the open question this pane found.
+ */
+.sb-fixtures__table-scroll {
+  overflow-x: auto;
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+}
+
+.sb-fixtures__grid {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: var(--sb-text-xs);
+}
+
+.sb-fixtures__grid th,
+.sb-fixtures__grid td {
+  padding: var(--sb-space-half) var(--sb-space);
+  border-bottom: var(--sb-border-width) solid var(--sb-border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.sb-fixtures__grid thead th {
+  position: sticky;
+  top: 0;
+  background: var(--sb-bg-sunken);
+  color: var(--sb-fg-muted);
+  font-weight: var(--sb-weight-strong);
+}
+
+/* Specificity matched to `.sb-fixtures__grid thead th` rather than raised with
+ * `!important`: this file is one other beads will copy from, and an
+ * `!important` in it is a habit that outlives the rule it fixed. */
+.sb-fixtures__grid thead th.sb-fixtures__grid-path {
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+  font-weight: 400;
+}
+
+/* The arm columns are the answer and the binding columns are the question, so
+ * the two halves get a rule between them rather than being one flat strip. */
+.sb-fixtures__grid thead th.sb-fixtures__grid-arm {
+  color: var(--sb-fg);
+}
+
+.sb-fixtures__grid-arm,
+.sb-fixtures__grid-cell {
+  border-left: var(--sb-border-width) solid var(--sb-border);
+}
+
+/* The seam between the question columns and the answer columns. Marked in the
+ * markup rather than with `:first-of-type`, which counts among siblings of the
+ * same element name and would land on the first BINDING cell - the two column
+ * families are both `td`. */
+.sb-fixtures__grid [data-column="first-arm"] {
+  border-left: var(--sb-border-width) solid var(--sb-border-strong);
+}
+
+.sb-fixtures__grid-row:hover td,
+.sb-fixtures__grid-row:hover th {
+  background: var(--sb-bg-muted);
+}
+
+/* The case name pins to the left edge, so a reader who scrolls out to the
+ * bindings can still tell which row they are on. Both halves of the sticky
+ * column need an opaque background or the scrolled cells show through. */
+.sb-fixtures__grid-name,
+.sb-fixtures__grid thead th.sb-fixtures__grid-corner {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  font-weight: var(--sb-weight-medium);
+  white-space: nowrap;
+}
+
+.sb-fixtures__grid-name {
+  background: var(--sb-bg);
+}
+
+.sb-fixtures__grid thead th.sb-fixtures__grid-corner {
+  z-index: 2;
+  background: var(--sb-bg-sunken);
+}
+
+.sb-fixtures__grid-row:hover .sb-fixtures__grid-name {
+  background: var(--sb-bg-muted);
+}
+
+.sb-fixtures__grid-note-mark {
+  margin-left: 2px;
+  color: var(--sb-accent);
+}
+
+.sb-fixtures__grid-binding code {
+  color: var(--sb-fg-muted);
+  font-family: var(--sb-font-mono);
+}
+
+.sb-fixtures__grid-cell {
+  text-align: center;
+}
+
+.sb-fixtures__bool {
+  display: inline-block;
+  min-width: 2.75rem;
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  font-weight: var(--sb-weight-medium);
+  text-align: center;
+}
+
+.sb-fixtures__bool[data-value="true"] {
+  background: var(--sb-success-bg);
+  color: var(--sb-success);
+}
+
+.sb-fixtures__bool[data-value="false"] {
+  background: var(--sb-bg-sunken);
+  color: var(--sb-fg-subtle);
+}
+
+.sb-fixtures__bool[data-value="unset"] {
+  color: var(--sb-warning);
+}
+
+.sb-fixtures__table-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sb-fixtures__table-note {
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+}
+
+.sb-fixtures__table-note-name {
+  margin-right: var(--sb-space-half);
+  color: var(--sb-fg);
+  font-weight: var(--sb-weight-medium);
+}
+
+/* --- the "which blocks have tables" empty state --- */
+
+.sb-fixtures__table-jumps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sb-fixtures__table-jump {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+  width: 100%;
+  padding: var(--sb-space-half) var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg);
+  color: inherit;
+  font: inherit;
+  font-size: var(--sb-text-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sb-fixtures__table-jump:hover {
+  border-color: var(--sb-accent);
+  background: var(--sb-bg-muted);
+}
+
+.sb-fixtures__table-jump-name {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-fixtures__table-jump-block {
+  color: var(--sb-fg-subtle);
+  font-weight: 400;
+}
+
+.sb-fixtures__table-jump-count {
+  flex: 0 0 auto;
+  color: var(--sb-fg-subtle);
+}
+
+/* --- the JSON editor --- */
+
+.sb-fixtures__editor {
+  width: 100%;
+  min-height: 18rem;
+  resize: vertical;
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.sb-fixtures__editor-actions {
+  display: flex;
+  gap: var(--sb-space);
+}
+
+.sb-fixtures__parse-error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+  padding: var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-error);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-error-bg);
+}
+
+.sb-fixtures__parse-error-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+  margin: 0;
+}
+
+.sb-fixtures__parse-error-chip {
+  color: var(--sb-error);
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  letter-spacing: var(--sb-tracking-caps);
+  text-transform: uppercase;
+}
+
+.sb-fixtures__parse-error-where {
+  color: var(--sb-fg);
+  font-size: var(--sb-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-fixtures__parse-error-message {
+  margin: 0;
+  color: var(--sb-fg-muted);
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+  overflow-wrap: anywhere;
+}
+
+/* --- the canvas mark --- */
+
+/*
+ * The block a replayed step activates. Deliberately NOT the selection chrome:
+ * a step can light three lanes at once, selection is single-valued, and an
+ * author's own selection must survive a replay. Outline rather than border, so
+ * a card that is also selected or flagged keeps its own edge and the two
+ * treatments stack instead of fighting.
+ */
+.sb-card[data-run-active="true"] {
+  outline: 2px solid var(--sb-accent);
+  outline-offset: 2px;
+  box-shadow: var(--sb-shadow-md);
 }
 
 /* ------------------------------------------------------------ placeholders */

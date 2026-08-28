@@ -94,6 +94,29 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
   let findings = [];
 
   /*
+   * The blocks a fixture run's current step lights up (sb-9z3). Held here
+   * rather than written onto the DOM by the pane, because every command
+   * rebuilds the canvas from scratch - a class the pane painted itself would
+   * survive exactly until the next undo. The editor owns the canvas, so the
+   * editor owns the mark, and re-applying it is one line inside `render`.
+   *
+   * Deliberately NOT the selection. A step activating three lanes cannot be
+   * expressed as a selection, which is single-valued and is also the author's
+   * own cursor - hijacking it to show a replay would lose their place.
+   */
+  let activeMarks = new Set();
+
+  /*
+   * A pane that renders something about the SELECTED block needs to know when
+   * it changes, and the inspector's own panes learn that by being refreshed.
+   * The Fixtures pane is mounted by the shell rather than by `createInspector`
+   * - it reads a fixture file the editor knows nothing about - so it gets a
+   * callback instead of a refresh. One handler, set by the shell; the editor
+   * does not accumulate subscribers it would then have to unsubscribe.
+   */
+  let onSelectionChange = null;
+
+  /*
    * The two inspector panes this bead builds. They are given a `state()` rather
    * than the session itself for the reason every other seam here is: the
    * session is replaced by every command, so anything holding one holds a
@@ -184,9 +207,17 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
     }
 
     applySelection();
+    applyActiveMarks();
     syncChrome(tree);
 
     return tree;
+  }
+
+  function applyActiveMarks() {
+    for (const card of canvas.querySelectorAll(".sb-card")) {
+      if (activeMarks.has(card.dataset.blockId)) card.dataset.runActive = "true";
+      else delete card.dataset.runActive;
+    }
   }
 
   /*
@@ -218,6 +249,7 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
     // can distinguish `unknown_block_type` from `block_type_too_new` - and one
     // accurate sentence beats two, one of them vague.
     inspector.refresh();
+    if (onSelectionChange) onSelectionChange(session?.selectedId ?? null);
   }
 
   /* ------------------------------------------------------- finding reveal */
@@ -281,6 +313,104 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
         ? `Revealed ${anchor.blockId}.`
         : `Revealed ${anchor.blockId}, unfolding ${unfolded} block${unfolded === 1 ? "" : "s"}.`
     );
+  }
+
+  /*
+   * The same reveal, for a SET of blocks (sb-9z3's runner: a step in a parallel
+   * region activates two or three lanes at once).
+   *
+   * Three differences from the single-anchor case, each one a decision the
+   * finding reveal did not have to make. Every id's ancestors unfold, so a step
+   * whose blocks sit in different collapsed subtrees shows all of them. Only the
+   * FIRST is scrolled to - scrolling to each in turn would leave the viewport on
+   * the last one and animate past the rest - and every one flashes, which is
+   * what says "these three, together" rather than "this one". And the selection
+   * is left alone: a replay is not the author's cursor, and moving their
+   * selection to follow a step would lose the block they were editing.
+   */
+  function revealBlocks(ids) {
+    const wanted = ids.filter((id) => resolveAnchor(session.document, { blockId: id }).ok);
+    if (wanted.length === 0) return false;
+
+    const collapsed = new Set(session.collapsed);
+    let unfolded = 0;
+
+    for (const id of wanted) {
+      for (const ancestor of resolveAnchor(session.document, { blockId: id }).ancestorIds) {
+        if (collapsed.delete(ancestor)) unfolded += 1;
+      }
+    }
+
+    if (unfolded > 0) {
+      session = { ...session, collapsed };
+      render();
+    }
+
+    const cards = wanted
+      .map((id) => canvas.querySelector(`.sb-card[data-block-id="${cssEscape(id)}"]`))
+      .filter(Boolean);
+
+    if (cards.length > 0) {
+      centerOn(cards);
+      for (const card of cards) flash(card);
+    }
+
+    return true;
+  }
+
+  /*
+   * Scrolls so the BOUNDING BOX of a set of cards is centred, rather than
+   * scrolling to the first one.
+   *
+   * Centring the first is what a single-anchor reveal does and it is wrong for
+   * a set: a step that lights two parallel lanes centres the left-hand lane and
+   * pushes the right-hand one off the far edge, so the author sees one
+   * highlighted card and no reason to believe there is another. Centring the
+   * union puts both on screen whenever both can fit, and when they cannot it at
+   * least splits the difference instead of picking a side.
+   */
+  function centerOn(cards) {
+    if (cards.length === 1) {
+      cards[0].scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+      return;
+    }
+
+    /*
+     * Two passes, both INSTANT.
+     *
+     * Instant because a rectangle read while a previous smooth scroll is still
+     * animating is a rectangle from halfway through it, and this gesture is
+     * pressed repeatedly - once per step of a replay. The first version
+     * animated, and stepping twice in a second computed the second target from
+     * the first animation's midpoint and landed nowhere near either.
+     *
+     * Two passes because a card far outside the viewport still reports a real
+     * rectangle, but rounding and the stage's own transforms make one pass land
+     * short on a forty-block canvas. The first pass gets into the neighbourhood
+     * through `scrollIntoView`, which knows about nesting and clamping; the
+     * second re-reads the rectangles from there and centres the union exactly.
+     */
+    cards[0].scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
+
+    const view = canvas.getBoundingClientRect();
+    let left = Infinity;
+    let right = -Infinity;
+    let top = Infinity;
+    let bottom = -Infinity;
+
+    for (const card of cards) {
+      const box = card.getBoundingClientRect();
+      left = Math.min(left, box.left);
+      right = Math.max(right, box.right);
+      top = Math.min(top, box.top);
+      bottom = Math.max(bottom, box.bottom);
+    }
+
+    canvas.scrollTo({
+      left: canvas.scrollLeft + (left + right) / 2 - (view.left + view.width / 2),
+      top: canvas.scrollTop + (top + bottom) / 2 - (view.top + view.height / 2),
+      behavior: "instant",
+    });
   }
 
   /*
@@ -840,6 +970,7 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
       closePicker();
       session = null;
       findings = [];
+      activeMarks = new Set();
       if (rendered) rendered.destroy();
       rendered = null;
       canvas.replaceChildren();
@@ -850,6 +981,36 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
     /** The live session - the read handle a test or a console poke needs. */
     get session() {
       return session;
+    },
+
+    /* --------------------------------------------- the fixture-runner seam */
+
+    /** Lights up the blocks one replayed step activates. `[]` clears it. */
+    markActive(ids) {
+      activeMarks = new Set(ids ?? []);
+      if (session) applyActiveMarks();
+    },
+
+    /** Unfolds, scrolls to and flashes a set of blocks. Selection untouched. */
+    revealBlocks(ids) {
+      return session ? revealBlocks(ids ?? []) : false;
+    },
+
+    /** Selects and reveals one block, the way a findings row does. */
+    revealBlock(id) {
+      if (!session) return false;
+      revealFinding({ anchor: { kind: "block", blockId: id } });
+      return true;
+    },
+
+    /** The selected block id, or null - what the truth tables key off. */
+    get selectedId() {
+      return session?.selectedId ?? null;
+    },
+
+    /** Called after every selection change, so a pane can follow it. */
+    set onSelectionChange(handler) {
+      onSelectionChange = handler;
     },
 
     destroy() {
