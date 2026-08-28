@@ -1,0 +1,167 @@
+/*
+ * spike/css/tokens.css - the `--sb-*` custom-property surface.
+ *
+ * ADR-0005 decision 14 is the contract this file builds on and stress-tests:
+ * every class the editor emits is prefixed `sb-`, and every colour, space,
+ * radius and drag treatment is a `--sb-*` custom property with a default,
+ * declared on the editor root. A host restyles by overriding properties, not
+ * by forking structural CSS.
+ *
+ * The shipped package declares its defaults on `.sb-editor`
+ * (assets/css/statifier_blocks.css). The spike declares them one level out,
+ * on the scoping container `.sb-spike`, because the spike styles editor
+ * chrome the package does not ship yet (top bar, panes, tab strip) and those
+ * need the same tokens. Every name the package already ships appears here
+ * unchanged; names the spike adds are candidates for the d14 amendment, and
+ * which ones earned their place is a W6 finding, not a decision taken here.
+ *
+ * Three themes, one mechanism:
+ *
+ *   light        the default, declared on `.sb-spike` itself
+ *   dark         `data-sb-theme="dark"` on the container or any ancestor
+ *   host-brand   themes/host-brand.css, a pure token override file
+ *
+ * The house rule the spike holds itself to: no structural stylesheet may
+ * name a literal colour, space or font size. If a theme cannot be expressed
+ * by overriding properties in this file, that is a finding about the token
+ * surface, and the fix goes here.
+ */
+
+/* ------------------------------------------------------------ light (default) */
+
+.sb-spike {
+  /* Surfaces, back to front. */
+  --sb-bg-canvas: #f4f5f7;
+  --sb-bg: #ffffff;
+  --sb-bg-muted: #f6f7f9;
+  --sb-bg-sunken: #eceef2;
+  --sb-bg-raised: #ffffff;
+
+  /* Text. */
+  --sb-fg: #16181d;
+  --sb-fg-muted: #5b6270;
+  --sb-fg-subtle: #878e9c;
+  --sb-fg-on-accent: #ffffff;
+
+  /* Lines. `--sb-border-strong` sits near 1.9:1 against `--sb-bg` in all
+   * three themes, below the 3:1 a meaningful UI boundary wants. Raising it
+   * makes every divider heavier, which is a visual judgment rather than a
+   * mechanical fix, so it is left for the W5 contrast pass to settle with
+   * the whole shell in view. */
+  --sb-border: #d7dbe2;
+  --sb-border-strong: #b6bcc7;
+  --sb-border-width: 1px;
+
+  /* Accent. */
+  --sb-accent: #2f6feb;
+  --sb-accent-hover: #245bc7;
+  --sb-accent-muted: rgba(47, 111, 235, 0.12);
+
+  /* Findings and status. */
+  --sb-error: #c0362c;
+  --sb-error-bg: rgba(192, 54, 44, 0.1);
+  --sb-warning: #a2680a;
+  --sb-warning-bg: rgba(162, 104, 10, 0.12);
+  --sb-info: #2f6feb;
+  --sb-info-bg: rgba(47, 111, 235, 0.1);
+  /* Darker than the drag affordance's green below, on purpose: this one is
+   * used as TEXT (the passing fixture status) and #2f9e5f only reaches 3.4:1
+   * on white. The drag border is a border and keeps the shipped value. */
+  --sb-success: #1f7a48;
+  --sb-success-bg: rgba(31, 122, 72, 0.12);
+
+  /* Drag affordances (d6, d8). */
+  --sb-drop-ok-border: #2f9e5f;
+  --sb-drop-ok-bg: rgba(47, 158, 95, 0.08);
+  --sb-drop-no-opacity: 0.45;
+  --sb-gap-height: 0.5rem;
+  --sb-gap-hover-bg: var(--sb-accent);
+
+  /* Connectors (W2 draws these; the tokens exist now so nothing hard-codes). */
+  --sb-connector: #b6bcc7;
+  --sb-connector-active: var(--sb-accent);
+  --sb-connector-width: 1.5px;
+
+  /* Space. One base step, everything else derived from it, so a host that
+   * wants a denser editor sets one property. */
+  --sb-space: 0.5rem;
+  --sb-space-half: calc(var(--sb-space) / 2);
+  --sb-space-2: calc(var(--sb-space) * 2);
+  --sb-space-3: calc(var(--sb-space) * 3);
+  --sb-space-4: calc(var(--sb-space) * 4);
+
+  /* Shape. */
+  --sb-radius: 6px;
+  --sb-radius-sm: 4px;
+  --sb-radius-lg: 10px;
+
+  /* Type. */
+  --sb-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sb-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sb-text-xs: 0.6875rem;
+  --sb-text-sm: 0.8125rem;
+  --sb-text-md: 0.875rem;
+  --sb-text-lg: 1rem;
+  --sb-leading: 1.5;
+  --sb-weight-medium: 500;
+  --sb-weight-strong: 600;
+  --sb-tracking-caps: 0.06em;
+
+  /* Elevation. */
+  --sb-shadow-sm: 0 1px 2px rgba(16, 18, 23, 0.06);
+  --sb-shadow-md: 0 4px 12px rgba(16, 18, 23, 0.1);
+
+  /* Focus, one treatment for the whole subtree (see reset.css). */
+  --sb-focus-ring: var(--sb-accent);
+  --sb-focus-width: 2px;
+  --sb-focus-offset: 2px;
+
+  /* Editor chrome metrics. */
+  --sb-topbar-height: 3rem;
+  --sb-palette-width: 15rem;
+  --sb-inspector-width: 21rem;
+}
+
+/* -------------------------------------------------------------------- dark */
+
+/* Explicit opt-in, not `prefers-color-scheme`: the editor is a component
+ * inside a host page, and the host decides which theme its page is in. The
+ * attribute is read from the container or from any ancestor, so a host can
+ * flip its whole page. */
+.sb-spike[data-sb-theme="dark"],
+[data-sb-theme="dark"] .sb-spike {
+  --sb-bg-canvas: #14161a;
+  --sb-bg: #1c1f25;
+  --sb-bg-muted: #23272f;
+  --sb-bg-sunken: #101216;
+  --sb-bg-raised: #262b33;
+
+  --sb-fg: #e8eaee;
+  --sb-fg-muted: #a2aab8;
+  --sb-fg-subtle: #737c8b;
+  --sb-fg-on-accent: #0f1115;
+
+  --sb-border: #333944;
+  --sb-border-strong: #4a5261;
+
+  --sb-accent: #6f9dfb;
+  --sb-accent-hover: #8db3ff;
+  --sb-accent-muted: rgba(111, 157, 251, 0.18);
+
+  --sb-error: #f08a80;
+  --sb-error-bg: rgba(240, 138, 128, 0.14);
+  --sb-warning: #e0b25c;
+  --sb-warning-bg: rgba(224, 178, 92, 0.14);
+  --sb-info: #6f9dfb;
+  --sb-info-bg: rgba(111, 157, 251, 0.14);
+  --sb-success: #6cc48d;
+  --sb-success-bg: rgba(108, 196, 141, 0.14);
+
+  --sb-drop-ok-border: #6cc48d;
+  --sb-drop-ok-bg: rgba(108, 196, 141, 0.12);
+
+  --sb-connector: #4a5261;
+
+  --sb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sb-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+}

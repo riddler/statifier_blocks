@@ -1,0 +1,613 @@
+/*
+ * spike/css/editor.css - structure and the default visual treatment.
+ *
+ * Two rules hold this file together, and they are the ones the spike is
+ * testing:
+ *
+ *   1. Every class is prefixed `sb-` (ADR-0005 d14).
+ *   2. No literal colour, space, radius or font size appears below this
+ *      comment. Every such decision reads a `--sb-*` token from tokens.css,
+ *      which is what makes themes/host-brand.css possible as a pure
+ *      override file. The exceptions are structural constants that are not
+ *      a visual opinion (0, 1fr, 100%, and the like).
+ *
+ * Naming follows the shipped stylesheet: `sb-block` for a component,
+ * `sb-block__element` for a part of it, `sb-block--modifier` for a variant.
+ * State that the DOM already carries - `aria-selected`, `disabled`,
+ * `data-drop` - is styled from the attribute rather than mirrored into a
+ * class, so the markup cannot drift out of agreement with the styling.
+ *
+ * Divergence worth journaling: the shipped `.sb-editor` is the three-column
+ * grid itself. Here `.sb-editor` is the whole shell (top bar plus body) and
+ * the three columns are `.sb-editor__body`. The spike needs chrome the
+ * package does not ship yet; whether that chrome belongs in the package is
+ * a W6 question, not one this file answers.
+ */
+
+/* --------------------------------------------------------------- container */
+
+.sb-spike {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+.sb-editor {
+  display: grid;
+  grid-template-rows: var(--sb-topbar-height) minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  background: var(--sb-bg-canvas);
+  color: var(--sb-fg);
+}
+
+.sb-editor__body {
+  display: grid;
+  grid-template-columns:
+    var(--sb-palette-width)
+    minmax(0, 1fr)
+    var(--sb-inspector-width);
+  gap: var(--sb-space);
+  padding: var(--sb-space);
+  min-height: 0;
+}
+
+/* ----------------------------------------------------------------- top bar */
+
+.sb-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space-2);
+  padding: 0 var(--sb-space-2);
+  background: var(--sb-bg);
+  border-bottom: var(--sb-border-width) solid var(--sb-border);
+}
+
+.sb-topbar__identity {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+  min-width: 0;
+}
+
+.sb-topbar__title {
+  font-size: var(--sb-text-lg);
+  font-weight: var(--sb-weight-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sb-topbar__subtitle {
+  font-size: var(--sb-text-sm);
+  color: var(--sb-fg-muted);
+  white-space: nowrap;
+}
+
+.sb-topbar__spacer {
+  flex: 1 1 auto;
+}
+
+.sb-topbar__group {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space-half);
+}
+
+.sb-topbar__label {
+  font-size: var(--sb-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+  color: var(--sb-fg-subtle);
+}
+
+/* ----------------------------------------------------------------- buttons */
+
+.sb-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sb-space-half);
+  padding: var(--sb-space-half) var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg);
+  color: var(--sb-fg);
+  font-size: var(--sb-text-sm);
+  line-height: var(--sb-leading);
+}
+
+.sb-button:hover:not(:disabled) {
+  background: var(--sb-bg-muted);
+  border-color: var(--sb-border-strong);
+}
+
+.sb-button:disabled {
+  opacity: var(--sb-drop-no-opacity);
+}
+
+.sb-button--primary {
+  background: var(--sb-accent);
+  border-color: var(--sb-accent);
+  color: var(--sb-fg-on-accent);
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-button--primary:hover:not(:disabled) {
+  background: var(--sb-accent-hover);
+  border-color: var(--sb-accent-hover);
+}
+
+.sb-button--quiet {
+  border-color: transparent;
+  background: none;
+  color: var(--sb-fg-muted);
+}
+
+.sb-button--quiet:hover:not(:disabled) {
+  background: var(--sb-bg-muted);
+  color: var(--sb-fg);
+}
+
+.sb-select {
+  padding: var(--sb-space-half) var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg);
+  color: var(--sb-fg);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-input {
+  width: 100%;
+  padding: var(--sb-space-half) var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg);
+  color: var(--sb-fg);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-input::placeholder {
+  color: var(--sb-fg-subtle);
+}
+
+/* ------------------------------------------------------------------- panes */
+
+.sb-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--sb-bg-raised);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius);
+  box-shadow: var(--sb-shadow-sm);
+  overflow: hidden;
+}
+
+.sb-pane__header {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space);
+  padding: var(--sb-space) var(--sb-space-2);
+  border-bottom: var(--sb-border-width) solid var(--sb-border);
+  background: var(--sb-bg);
+}
+
+.sb-pane__title {
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+  color: var(--sb-fg-muted);
+}
+
+.sb-pane__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--sb-space-2);
+}
+
+.sb-pane__body--flush {
+  padding: 0;
+}
+
+.sb-pane__footer {
+  padding: var(--sb-space) var(--sb-space-2);
+  border-top: var(--sb-border-width) solid var(--sb-border);
+  background: var(--sb-bg);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-subtle);
+}
+
+/* ----------------------------------------------------------------- palette */
+
+.sb-palette__search {
+  margin-bottom: var(--sb-space-2);
+}
+
+.sb-palette__group + .sb-palette__group {
+  margin-top: var(--sb-space-3);
+}
+
+.sb-palette__group-name {
+  font-size: var(--sb-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+  color: var(--sb-fg-subtle);
+  margin-bottom: var(--sb-space-half);
+}
+
+.sb-palette__entries {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+}
+
+.sb-palette__pick {
+  display: block;
+  width: 100%;
+  padding: var(--sb-space-half) var(--sb-space);
+  border: var(--sb-border-width) solid transparent;
+  border-radius: var(--sb-radius-sm);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-palette__pick:hover {
+  background: var(--sb-bg-muted);
+  border-color: var(--sb-border);
+}
+
+.sb-palette__name {
+  display: block;
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-palette__description {
+  display: block;
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+}
+
+/* ------------------------------------------------------------------ canvas */
+
+.sb-canvas {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: var(--sb-bg-sunken);
+}
+
+/* The dotted ground the tree will sit on. Kept here rather than in the
+ * placeholder so W2's real canvas inherits it unchanged. */
+.sb-canvas__viewport {
+  height: 100%;
+  overflow: auto;
+  background-image: radial-gradient(
+    var(--sb-border) var(--sb-border-width),
+    transparent 0
+  );
+  background-size: var(--sb-space-3) var(--sb-space-3);
+  background-position: calc(var(--sb-space) * -1) calc(var(--sb-space) * -1);
+}
+
+.sb-canvas__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sb-space);
+  min-height: 100%;
+  padding: var(--sb-space-4);
+  text-align: center;
+}
+
+.sb-canvas__placeholder-title {
+  font-size: var(--sb-text-lg);
+  font-weight: var(--sb-weight-strong);
+  color: var(--sb-fg-muted);
+}
+
+.sb-canvas__placeholder-body {
+  max-width: 34rem;
+  font-size: var(--sb-text-sm);
+  color: var(--sb-fg-subtle);
+}
+
+/* --------------------------------------------------------------------- tabs */
+
+.sb-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 var(--sb-space);
+  border-bottom: var(--sb-border-width) solid var(--sb-border);
+  background: var(--sb-bg);
+  overflow-x: auto;
+}
+
+.sb-tabs__tab {
+  padding: var(--sb-space) var(--sb-space);
+  border-bottom: var(--sb-focus-width) solid transparent;
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-sm);
+  white-space: nowrap;
+}
+
+.sb-tabs__tab:hover {
+  color: var(--sb-fg);
+}
+
+.sb-tabs__tab[aria-selected="true"] {
+  color: var(--sb-accent);
+  border-bottom-color: var(--sb-accent);
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-tabpanel[hidden] {
+  display: none;
+}
+
+/* --------------------------------------------------------------- inspector */
+
+.sb-inspector__section + .sb-inspector__section {
+  margin-top: var(--sb-space-3);
+}
+
+.sb-inspector__section-title {
+  font-size: var(--sb-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+  color: var(--sb-fg-subtle);
+  margin-bottom: var(--sb-space);
+}
+
+/* Read-only key/value rows: the placeholder shape of the config form until
+ * W3 replaces it with the schema-driven one (d9's closed field-type set). */
+.sb-kv {
+  display: grid;
+  grid-template-columns: minmax(0, 7rem) minmax(0, 1fr);
+  gap: var(--sb-space-half) var(--sb-space);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-kv__key {
+  color: var(--sb-fg-muted);
+}
+
+.sb-kv__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sb-kv__value--mono {
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+}
+
+/* --------------------------------------------------- findings and severity */
+
+.sb-findings__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space);
+}
+
+.sb-finding {
+  display: flex;
+  gap: var(--sb-space);
+  padding: var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-left-width: var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-finding--error {
+  border-left-color: var(--sb-error);
+  background: var(--sb-error-bg);
+}
+
+.sb-finding--warning {
+  border-left-color: var(--sb-warning);
+  background: var(--sb-warning-bg);
+}
+
+.sb-finding--info {
+  border-left-color: var(--sb-info);
+  background: var(--sb-info-bg);
+}
+
+.sb-finding__body {
+  min-width: 0;
+}
+
+.sb-finding__message {
+  display: block;
+}
+
+.sb-finding__anchor {
+  display: block;
+  margin-top: var(--sb-space-half);
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-muted);
+}
+
+.sb-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--sb-space-3);
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-lg);
+  background: var(--sb-error);
+  color: var(--sb-fg-on-accent);
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+}
+
+.sb-badge--muted {
+  background: var(--sb-bg-sunken);
+  color: var(--sb-fg-muted);
+}
+
+.sb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sb-space-half);
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-muted);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+}
+
+/* ---------------------------------------------------------- datamodel tree */
+
+.sb-tree {
+  font-size: var(--sb-text-sm);
+}
+
+.sb-tree__scope + .sb-tree__scope {
+  margin-top: var(--sb-space-2);
+}
+
+.sb-tree__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+  padding: var(--sb-space-half) 0;
+}
+
+.sb-tree__row--nested {
+  padding-left: var(--sb-space-2);
+}
+
+.sb-tree__name {
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+}
+
+.sb-tree__type {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+}
+
+/* ---------------------------------------------------------- code surfaces */
+
+.sb-code {
+  display: block;
+  width: 100%;
+  min-height: var(--sb-space-4);
+  padding: var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-sunken);
+  color: var(--sb-fg);
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-sm);
+  line-height: var(--sb-leading);
+  white-space: pre-wrap;
+}
+
+.sb-hint {
+  margin-top: var(--sb-space);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-subtle);
+}
+
+/* ---------------------------------------------------------------- fixtures */
+
+.sb-fixtures__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space);
+}
+
+.sb-fixtures__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space);
+  padding: var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-fixtures__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb-status {
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-status--pass {
+  background: var(--sb-success-bg);
+  color: var(--sb-success);
+}
+
+.sb-status--fail {
+  background: var(--sb-error-bg);
+  color: var(--sb-error);
+}
+
+.sb-status--pending {
+  background: var(--sb-bg-muted);
+  color: var(--sb-fg-muted);
+}
+
+/* ------------------------------------------------------------ placeholders */
+
+/* Every pane whose composition is still spike subject matter says so, in the
+ * same voice, rather than filling itself with plausible-looking noise. */
+.sb-placeholder {
+  padding: var(--sb-space-2);
+  border: var(--sb-border-width) dashed var(--sb-border-strong);
+  border-radius: var(--sb-radius-sm);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-placeholder__wave {
+  display: block;
+  margin-top: var(--sb-space-half);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-subtle);
+}
+
+/* ------------------------------------------------------------------ narrow */
+
+/* One breakpoint, so the shell survives a narrow viewport rather than
+ * pretending the editor is desktop-only. W5 does the real pass. */
+@media (max-width: 68rem) {
+  .sb-editor__body {
+    grid-template-columns: minmax(0, 1fr) var(--sb-inspector-width);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 14rem);
+  }
+
+  .sb-editor__body > .sb-pane--palette {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .sb-editor__body > .sb-pane--canvas {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .sb-editor__body > .sb-pane--inspector {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
