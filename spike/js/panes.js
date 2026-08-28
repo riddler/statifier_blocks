@@ -355,7 +355,7 @@ function dedupe(findings) {
   const seen = new Set();
 
   return findings.filter((finding) => {
-    const token = `${finding.key} ${finding.message}`;
+    const token = `${finding.key}\u0000${finding.message}`;
     if (seen.has(token)) return false;
     seen.add(token);
     return true;
