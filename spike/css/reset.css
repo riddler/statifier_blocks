@@ -82,11 +82,25 @@
   font-size: 1em;
 }
 
-/* Form controls do not inherit font by default in any browser. */
-.sb-spike button,
-.sb-spike input,
-.sb-spike select,
-.sb-spike textarea {
+/* Form controls do not inherit font by default in any browser.
+ *
+ * `:where()` is load-bearing and was the bug. `.sb-spike button` scores one
+ * class plus one element, which BEATS a single-class component rule like
+ * `.sb-button` or `.sb-tabs__tab` - so this block was silently stripping the
+ * padding, border and background off every button, input and select in
+ * `editor.css`. It is what made the inspector's five tab labels render as
+ * "ConfigFindingsDatamodelConditionFixtures" (the defect recorded on sb-8cm),
+ * and the same cause left the top bar's buttons and the palette's search box
+ * with no chrome at all.
+ *
+ * `:where()` contributes zero specificity, which is exactly what a reset
+ * wants: it still lands on every control, and every component class still
+ * wins. A reset that out-specifies the stylesheet it is resetting FOR is not
+ * a reset, it is a fight. */
+:where(.sb-spike) button,
+:where(.sb-spike) input,
+:where(.sb-spike) select,
+:where(.sb-spike) textarea {
   margin: 0;
   padding: 0;
   border: 0;
@@ -97,12 +111,12 @@
   appearance: none;
 }
 
-.sb-spike button {
+:where(.sb-spike) button {
   cursor: pointer;
   text-align: inherit;
 }
 
-.sb-spike button:disabled {
+:where(.sb-spike) button:disabled {
   cursor: default;
 }
 

@@ -16,6 +16,7 @@ import { fromJson } from "./document.js";
 import { coreTypes, createRegistry, demoTypes } from "./palette.js";
 import { fixtureTypes } from "./demo-types.js";
 import { createEditor } from "./interact.js";
+import { createPalettePane } from "./palette-pane.js";
 
 const root = document.getElementById("sb-spike");
 
@@ -95,6 +96,18 @@ const docSubtitle = document.getElementById("sb-doc-subtitle");
 const documentSelect = document.getElementById("sb-document");
 
 /*
+ * The palette renders itself from the registry, so a host that registers a
+ * block type gets a palette entry with no markup anywhere - which is what
+ * ADR-0002 decision 5 promises and what hand-written markup here could never
+ * actually deliver.
+ */
+const paletteMount = document.getElementById("sb-palette");
+
+if (paletteMount) {
+  createPalettePane({ mount: paletteMount, registry });
+}
+
+/*
  * The editor owns the canvas, the selection, the history and the drag; the
  * shell owns the frame around it and the fixture fetch. `chrome` is the list
  * of elements the editor is allowed to write to, named here rather than
@@ -113,11 +126,13 @@ const editor = canvas
         blockType: document.getElementById("sb-block-type"),
         blockId: document.getElementById("sb-block-id"),
         blockSlot: document.getElementById("sb-block-slot"),
-        blockNote: document.getElementById("sb-block-readonly"),
         selectionChip: document.getElementById("sb-selection-chip"),
         dragBar: document.getElementById("sb-dragbar"),
         status: document.getElementById("sb-status"),
         palette: document.querySelector(".sb-pane--palette"),
+        configForm: document.getElementById("sb-config-form"),
+        findingsPanel: document.getElementById("sb-findings-panel"),
+        findingsBadge: document.getElementById("sb-findings-count"),
       },
     })
   : null;
@@ -151,7 +166,7 @@ function stripComments(raw) {
 
 async function loadDocument(name) {
   if (!name) {
-    canvas.replaceChildren();
+    editor.clear();
     canvas.hidden = true;
     emptyState.hidden = false;
     countChip.textContent = "0 blocks";

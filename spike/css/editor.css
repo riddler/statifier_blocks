@@ -148,7 +148,11 @@
   color: var(--sb-fg);
 }
 
+/* `appearance: auto` for the same reason the checkbox needs it: without the
+ * native control the disclosure arrow disappears and a select reads as a text
+ * box that ignores typing. */
 .sb-select {
+  appearance: auto;
   padding: var(--sb-space-half) var(--sb-space);
   border: var(--sb-border-width) solid var(--sb-border);
   border-radius: var(--sb-radius-sm);
@@ -223,8 +227,25 @@
 
 /* ----------------------------------------------------------------- palette */
 
-.sb-palette__search {
-  margin-bottom: var(--sb-space-2);
+/* The search box sticks: filtering a long palette and losing the box you are
+ * typing into is the one thing a search box must never do. */
+.sb-palette__search-row {
+  position: sticky;
+  top: calc(var(--sb-space-2) * -1);
+  z-index: 1;
+  padding: var(--sb-space-2) 0 var(--sb-space);
+  margin-top: calc(var(--sb-space-2) * -1);
+  background: var(--sb-bg);
+}
+
+.sb-palette__count {
+  margin: 0 0 var(--sb-space-2);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-subtle);
+}
+
+.sb-palette__count[data-filtering="true"] {
+  color: var(--sb-fg-muted);
 }
 
 .sb-palette__group + .sb-palette__group {
@@ -232,11 +253,21 @@
 }
 
 .sb-palette__group-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sb-space);
   font-size: var(--sb-text-xs);
   text-transform: uppercase;
   letter-spacing: var(--sb-tracking-caps);
   color: var(--sb-fg-subtle);
   margin-bottom: var(--sb-space-half);
+}
+
+.sb-palette__group-count {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: normal;
+  color: var(--sb-fg-subtle);
 }
 
 .sb-palette__entries {
@@ -245,13 +276,20 @@
   gap: var(--sb-space-half);
 }
 
+/* An entry is a drag source, so it gets a grab cursor and the icon slot d10
+ * asks for - a slot, not an icon: a type declaring none still lines up with
+ * the ones that do, which is what keeps the list readable as a column. */
 .sb-palette__pick {
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sb-space);
   width: 100%;
-  padding: var(--sb-space-half) var(--sb-space);
+  padding: var(--sb-space) var(--sb-space);
   border: var(--sb-border-width) solid transparent;
   border-radius: var(--sb-radius-sm);
   font-size: var(--sb-text-sm);
+  text-align: left;
+  cursor: grab;
 }
 
 .sb-palette__pick:hover {
@@ -259,15 +297,85 @@
   border-color: var(--sb-border);
 }
 
+.sb-palette__pick:active {
+  cursor: grabbing;
+}
+
+.sb-palette__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--sb-space-3);
+  height: var(--sb-space-3);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-sunken);
+  color: var(--sb-fg-muted);
+}
+
+.sb-palette__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
 .sb-palette__name {
   display: block;
   font-weight: var(--sb-weight-medium);
+  color: var(--sb-fg);
+}
+
+.sb-palette__match {
+  padding: 0 0.1em;
+  border-radius: 2px;
+  background: var(--sb-accent-muted);
+  color: inherit;
+  font-weight: var(--sb-weight-strong);
 }
 
 .sb-palette__description {
   display: block;
   color: var(--sb-fg-muted);
   font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+}
+
+/* Why an entry the author cannot see a reason for is in the list. "Wait"
+ * surfacing for "sleep" is correct and inexplicable without this line. */
+.sb-palette__matched {
+  display: block;
+  margin-top: var(--sb-space-half);
+  font-size: var(--sb-text-xs);
+  font-style: italic;
+  color: var(--sb-fg-subtle);
+}
+
+.sb-palette__empty {
+  padding: var(--sb-space-2);
+  border: var(--sb-border-width) dashed var(--sb-border-strong);
+  border-radius: var(--sb-radius-sm);
+  text-align: center;
+}
+
+.sb-palette__empty-title {
+  margin: 0 0 var(--sb-space-half);
+  font-size: var(--sb-text-sm);
+  color: var(--sb-fg);
+}
+
+.sb-palette__empty-body {
+  margin: 0 0 var(--sb-space);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-muted);
+  line-height: var(--sb-leading);
+}
+
+.sb-palette__hint {
+  margin: var(--sb-space-3) 0 0;
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-subtle);
+  line-height: var(--sb-leading);
 }
 
 /* ------------------------------------------------------------------ canvas */
@@ -885,25 +993,74 @@
 
 /* --------------------------------------------------------------------- tabs */
 
+/* The recorded defect this bead fixes: the five labels rendered as
+ * "ConfigFindingsDatamodelConditionFixtures".
+ *
+ * The cause was not the missing `gap` it looked like. `padding: var(--sb-space)
+ * var(--sb-space)` is 0.5rem of horizontal padding on a 0.8125rem label, so the
+ * five tabs overflowed a 21rem pane, `overflow-x: auto` shrank them to fit, and
+ * the labels butted up against each other with no visible seam between them.
+ * Adding a gap alone would have moved the collision rather than fixed it.
+ *
+ * So: real horizontal padding, a gap, and WRAPPING rather than scrolling.
+ * Five labels plus a count badge do not fit one 21rem row at a readable size,
+ * and the two alternatives both hide something - compressing hides the seams
+ * between labels, scrolling hides Fixtures off the right edge. Two rows hides
+ * nothing, which is the only property a tab strip has to have. */
 .sb-tabs {
   display: flex;
-  gap: 0;
+  flex-wrap: wrap;
+  gap: 0 var(--sb-space-half);
   padding: 0 var(--sb-space);
   border-bottom: var(--sb-border-width) solid var(--sb-border);
   background: var(--sb-bg);
-  overflow-x: auto;
 }
 
 .sb-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sb-space-half);
+  /* `flex: 0 0 auto` is the load-bearing half: without it the flex container
+   * shrinks every tab below its content width rather than wrapping. */
+  flex: 0 0 auto;
   padding: var(--sb-space) var(--sb-space);
   border-bottom: var(--sb-focus-width) solid transparent;
   color: var(--sb-fg-muted);
   font-size: var(--sb-text-sm);
+  line-height: var(--sb-leading);
   white-space: nowrap;
 }
 
 .sb-tabs__tab:hover {
   color: var(--sb-fg);
+  background: var(--sb-bg-muted);
+}
+
+/* The count badge on the Findings tab (d11). Loud for errors, quiet for
+ * everything else, so the number answers "is anything broken" rather than
+ * only "is anything here". */
+.sb-tabs__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  padding: 0 0.25rem;
+  border-radius: var(--sb-radius-lg);
+  background: var(--sb-bg-sunken);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15rem;
+}
+
+.sb-tabs__badge[data-severity="error"] {
+  background: var(--sb-error);
+  color: var(--sb-fg-on-accent);
+}
+
+.sb-tabs__badge[hidden] {
+  display: none;
 }
 
 .sb-tabs__tab[aria-selected="true"] {
@@ -955,21 +1112,127 @@
 
 /* --------------------------------------------------- findings and severity */
 
+.sb-findings__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sb-space-half);
+  margin-bottom: var(--sb-space-2);
+}
+
+.sb-severity-chip {
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-severity-chip[data-severity="error"] {
+  background: var(--sb-error-bg);
+  color: var(--sb-error);
+}
+
+.sb-severity-chip[data-severity="warning"] {
+  background: var(--sb-warning-bg);
+  color: var(--sb-warning);
+}
+
+.sb-severity-chip[data-severity="info"] {
+  background: var(--sb-info-bg);
+  color: var(--sb-info);
+}
+
 .sb-findings__list {
   display: flex;
   flex-direction: column;
   gap: var(--sb-space);
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
+/* A finding is a button, because clicking one navigates. Full width and
+ * left-aligned so it does not read as a form control. */
 .sb-finding {
   display: flex;
   gap: var(--sb-space);
+  width: 100%;
   padding: var(--sb-space);
   border: var(--sb-border-width) solid var(--sb-border);
   border-left-width: var(--sb-space-half);
   border-radius: var(--sb-radius-sm);
   background: var(--sb-bg);
   font-size: var(--sb-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sb-finding:hover {
+  border-color: var(--sb-border-strong);
+}
+
+.sb-finding__severity {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+}
+
+.sb-finding__severity[data-severity="error"] {
+  background: var(--sb-error);
+  color: var(--sb-fg-on-accent);
+}
+
+.sb-finding__severity[data-severity="warning"] {
+  background: var(--sb-warning);
+  color: var(--sb-fg-on-accent);
+}
+
+.sb-finding__severity[data-severity="info"] {
+  background: var(--sb-bg-sunken);
+  color: var(--sb-fg-muted);
+}
+
+.sb-finding__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+}
+
+.sb-finding__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sb-space-half) var(--sb-space);
+}
+
+.sb-finding__anchor {
+  display: block;
+  margin: 0;
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-muted);
+  overflow-wrap: anywhere;
+}
+
+.sb-finding__source {
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-subtle);
+}
+
+/* Which half of the set a row came from. The demo set exists because
+ * validation cannot currently produce a `:slot` anchor or a `:lint` source,
+ * and a reader of a screenshot should not have to guess which is which. */
+.sb-finding__origin {
+  padding: 0 var(--sb-space-half);
+  border: var(--sb-border-width) dashed var(--sb-border-strong);
+  border-radius: var(--sb-radius-sm);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-subtle);
 }
 
 .sb-finding--error {
@@ -993,14 +1256,8 @@
 
 .sb-finding__message {
   display: block;
-}
-
-.sb-finding__anchor {
-  display: block;
-  margin-top: var(--sb-space-half);
-  font-family: var(--sb-font-mono);
-  font-size: var(--sb-text-xs);
-  color: var(--sb-fg-muted);
+  color: var(--sb-fg);
+  line-height: var(--sb-leading);
 }
 
 .sb-badge {
@@ -1084,6 +1341,290 @@
   margin-top: var(--sb-space);
   font-size: var(--sb-text-xs);
   color: var(--sb-fg-subtle);
+}
+
+/* ------------------------------------------------------- the config form */
+
+/* A generic "nothing to show here yet" line, shared by both panes. Distinct
+ * from `.sb-placeholder`: that one says a pane is unbuilt, this one says a
+ * built pane has nothing to render, and conflating them would tell an author
+ * their editor is unfinished every time they deselect. */
+.sb-empty {
+  margin: 0;
+  padding: var(--sb-space-2);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-muted);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-sm);
+  line-height: var(--sb-leading);
+}
+
+.sb-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-2);
+}
+
+.sb-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+}
+
+.sb-field__label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sb-space);
+  font-size: var(--sb-text-sm);
+  color: var(--sb-fg);
+}
+
+.sb-field__required {
+  font-size: var(--sb-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+  color: var(--sb-fg-subtle);
+}
+
+.sb-field__control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+  min-width: 0;
+}
+
+.sb-field__control--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sb-space);
+}
+
+.sb-field__check-label {
+  font-size: var(--sb-text-sm);
+  color: var(--sb-fg-muted);
+}
+
+/* `appearance: auto` puts back what the reset takes away. A checkbox is the
+ * one control whose entire affordance IS its native appearance, so a reset
+ * that strips it leaves an invisible box. */
+.sb-checkbox {
+  appearance: auto;
+  width: var(--sb-space-2);
+  height: var(--sb-space-2);
+  accent-color: var(--sb-accent);
+}
+
+.sb-select--block {
+  width: 100%;
+}
+
+.sb-input--mono {
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+}
+
+/* d11: "a `:config` finding renders inline beneath its field". */
+.sb-field__finding {
+  margin: 0;
+  padding: var(--sb-space-half) var(--sb-space);
+  border-left: var(--sb-space-half) solid var(--sb-error);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-error-bg);
+  color: var(--sb-error);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+}
+
+.sb-field__finding[data-severity="warning"] {
+  border-left-color: var(--sb-warning);
+  background: var(--sb-warning-bg);
+  color: var(--sb-warning);
+}
+
+.sb-field__finding[data-severity="info"] {
+  border-left-color: var(--sb-info);
+  background: var(--sb-info-bg);
+  color: var(--sb-info);
+}
+
+/* d9's gate turning an edit down. The field is marked and the author's text is
+ * left alone - snapping the input back to the last valid value is what makes a
+ * form feel like it is fighting you. */
+.sb-field[data-refused="true"] .sb-input,
+.sb-field[data-refused="true"] .sb-select {
+  border-color: var(--sb-error);
+}
+
+/* ---------------------------------------------------- the duration control */
+
+.sb-duration {
+  display: flex;
+  gap: var(--sb-space-half);
+}
+
+.sb-duration__amount {
+  flex: 0 1 6rem;
+}
+
+.sb-duration__unit {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sb-duration__readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sb-space-half);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-muted);
+}
+
+.sb-duration__human {
+  font-weight: var(--sb-weight-medium);
+  color: var(--sb-fg);
+}
+
+.sb-duration__iso {
+  font-family: var(--sb-font-mono);
+  color: var(--sb-fg-subtle);
+}
+
+.sb-duration__note {
+  flex: 1 0 100%;
+  font-style: italic;
+  color: var(--sb-fg-subtle);
+}
+
+.sb-duration__escape {
+  align-self: flex-start;
+  padding-left: 0;
+  font-size: var(--sb-text-xs);
+}
+
+/* --------------------------------------------------------- the list rows */
+
+.sb-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+}
+
+.sb-rows__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space-half);
+}
+
+.sb-rows__ordinal {
+  flex: 0 0 auto;
+  width: 1.25rem;
+  font-size: var(--sb-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--sb-fg-subtle);
+  text-align: right;
+}
+
+.sb-rows__input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sb-rows__action {
+  flex: 0 0 auto;
+  width: var(--sb-space-3);
+  height: var(--sb-space-3);
+  border: var(--sb-border-width) solid transparent;
+  border-radius: var(--sb-radius-sm);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-sm);
+  line-height: 1;
+}
+
+.sb-rows__action:hover:not(:disabled) {
+  background: var(--sb-bg-muted);
+  border-color: var(--sb-border);
+  color: var(--sb-fg);
+}
+
+.sb-rows__action:disabled {
+  opacity: var(--sb-drop-no-opacity);
+}
+
+.sb-rows__empty {
+  margin: 0;
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-subtle);
+}
+
+.sb-rows__add {
+  align-self: flex-start;
+}
+
+/* ------------------------------------------- the read-only config (d12) */
+
+.sb-form__readonly-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space);
+  margin-top: var(--sb-space-2);
+}
+
+.sb-chip--readonly {
+  background: var(--sb-warning-bg);
+  color: var(--sb-warning);
+  font-family: inherit;
+}
+
+.sb-form__readonly-label {
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-subtle);
+}
+
+.sb-form__raw {
+  margin: var(--sb-space) 0 0;
+  max-height: var(--sb-config-preview-max-height);
+  overflow: auto;
+  padding: var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-sunken);
+  font-size: var(--sb-text-xs);
+}
+
+/* ------------------------------------------------------------ the reveal */
+
+/* A finding's click lands somewhere; the flash is what makes the eye land
+ * there too. Removed on `animationend`, and reduced to a still highlight for
+ * anyone who has asked for less motion. */
+.sb-flash {
+  animation: sb-flash 900ms ease-out 1;
+}
+
+@keyframes sb-flash {
+  0% {
+    box-shadow: 0 0 0 var(--sb-focus-width) var(--sb-accent);
+    background: var(--sb-accent-muted);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-flash {
+    animation: none;
+    box-shadow: 0 0 0 var(--sb-focus-width) var(--sb-accent);
+  }
+}
+
+/* A card carrying only advisory findings. Quieter than `--flagged`, because a
+ * canvas where a note and a broken config look identical teaches an author to
+ * ignore both. */
+.sb-card--noted {
+  border-color: var(--sb-border-strong);
+  border-style: dashed;
 }
 
 /* ---------------------------------------------------------------- fixtures */

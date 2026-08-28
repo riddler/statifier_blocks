@@ -181,6 +181,26 @@
         readValuePath,
       } from "../js/layout.js";
 
+      import {
+        addRow,
+        anchorLabel,
+        collectFindings,
+        configFormFor,
+        controlFor,
+        demoFindings,
+        durationFrom,
+        durationParts,
+        findingsUnder,
+        highlight,
+        moveRow,
+        paletteView,
+        removeRow,
+        resolveAnchor,
+        seedRow,
+        severityCounts,
+        writeAtPath,
+      } from "../js/panes.js";
+
       /* ------------------------------------------------ the assert harness */
 
       const groups = [];
@@ -1778,6 +1798,381 @@
           null
         );
         equal("and folds nothing", inert.root.collapsed, false);
+      });
+
+      /* ================================================ sb-8cm: the panes */
+
+      suite("panes: the palette filters, and says why an entry matched", () => {
+        const all = paletteView(registry, "");
+
+        equal("an empty query keeps every type", all.matched, all.total);
+        equal("and the registry's size is what it counts", all.total, 10);
+        equal("nothing is highlighted at rest", all.groups[0].entries[0].matchedOn, []);
+
+        // Grouping is `paletteGroups`'s rule, unchanged: group NAME, then
+        // order, then label. Filtering must not reorder a palette an author
+        // has learned the shape of.
+        equal(
+          "groups stay sorted by name",
+          all.groups.map((group) => group.name),
+          [...all.groups.map((group) => group.name)].sort()
+        );
+
+        const wait = paletteView(registry, "wait");
+        equal("a label match filters", wait.matched, 1);
+        equal("and it is the right one", wait.groups[0].entries[0].type, "core.wait");
+        equal("the label is split into runs", wait.groups[0].entries[0].segments, [
+          { text: "Wait", match: true },
+        ]);
+
+        // ADR-0005 d10 gives `keywords` as "additional palette search terms",
+        // which means an entry can match on something the author cannot see.
+        // Surfacing WHICH is what stops that reading as a false positive.
+        const sleep = paletteView(registry, "sleep");
+        equal("a keyword match filters too", sleep.matched, 1);
+        equal("and it says so", sleep.groups[0].entries[0].matchedOn, ["keywords"]);
+
+        // Case-insensitive, and matching the type name as well as the label.
+        equal("the query is case-insensitive", paletteView(registry, "WAIT").matched, 1);
+        equal(
+          "a type name is searchable",
+          paletteView(registry, "core.on_event").matched,
+          1
+        );
+
+        const none = paletteView(registry, "zzz");
+        equal("no match is an empty state, not an empty list", none.empty, true);
+        equal("and it carries the query it failed on", none.query, "zzz");
+        equal("a query that matches keeps `empty` false", wait.empty, false);
+
+        // Every occurrence, or none. Lighting only the first reads as a bug.
+        equal("highlight splits every occurrence", highlight("banana", "an"), [
+          { text: "b", match: false },
+          { text: "an", match: true },
+          { text: "an", match: true },
+          { text: "a", match: false },
+        ]);
+        equal("an unmatched string is one run", highlight("Wait", "zz"), [
+          { text: "Wait", match: false },
+        ]);
+        equal("an empty needle highlights nothing", highlight("Wait", ""), [
+          { text: "Wait", match: false },
+        ]);
+      });
+
+      suite("panes: the config form is derived from config_schema (d9)", () => {
+        const doc = cardDocument();
+
+        // ADR-0002 d7's set is CLOSED so that this mapping can be total.
+        equal("string is a text control", controlFor("string"), "text");
+        equal("integer is a number control", controlFor("integer"), "integer");
+        equal("boolean is a checkbox", controlFor("boolean"), "boolean");
+        equal("expression is its own control", controlFor("expression"), "expression");
+        equal("duration is its own control", controlFor("duration"), "duration");
+        equal("a select is a select", controlFor({ select: [] }), "select");
+        equal("a list is rows", controlFor({ list: "string" }), "list");
+        // Not a member of the set, and deliberately not given one: a decimal
+        // is a string, because ADR-0001 d6 forbids the float.
+        equal("an unknown type degrades to text", controlFor("decimal"), "text");
+
+        const wait = configFormFor(registry, findBlock(doc, "blk_WAI"));
+        equal("a wait declares one duration field", wait.fields.length, 1);
+        equal("with the duration control", wait.fields[0].control, "duration");
+        equal("reading the stored value", wait.fields[0].value, "PT48H");
+        equal("and a humanized readout", wait.fields[0].duration.human, "48h");
+
+        // The branch is the type that keys a field by one thing and reads it
+        // through another, and the form has to honor both at once.
+        const branch = configFormFor(registry, findBlock(doc, "blk_BR"));
+        equal("a branch publishes one field per arm", branch.fields.length, 1);
+        equal("keyed by the arm's slot name", branch.fields[0].key, "arm_approved");
+        equal("read through its valuePath", branch.fields[0].path, ["arms", 0, "cond"]);
+        equal(
+          "and carrying the stored condition",
+          branch.fields[0].value,
+          "budget_remaining > amount"
+        );
+
+        const parallel = configFormFor(registry, findBlock(doc, "blk_PAR"));
+        equal("a parallel's lanes are list rows", parallel.fields[0].control, "list");
+        equal(
+          "one row per stored lane",
+          parallel.fields[0].rows.map((row) => row.value),
+          ["capture", "receipt"]
+        );
+        equal("each row addresses its own index", parallel.fields[0].rows[1].path, [
+          "lanes",
+          1,
+        ]);
+
+        const signup = configFormFor(registry, findBlock(doc, "blk_SIG"));
+        equal(
+          "a select carries its choices in declared order",
+          signup.fields[0].choices.map((choice) => choice.value),
+          ["email", "profile", "confirm"]
+        );
+        equal("a boolean field renders as one", signup.fields[1].control, "boolean");
+
+        // A config error routes to the field it is about, by KEY - which is
+        // the reason the branch keys arms by slot name (d11's config anchor).
+        const broken = configFormFor(
+          registry,
+          block({ id: "blk_X", type: "core.wait", config: { duration: "soon" } })
+        );
+        equal("an invalid value produces one inline finding", broken.fields[0].findings, [
+          {
+            key: "duration",
+            message: "must be an ISO-8601 duration, like PT30S or P1D",
+            severity: "error",
+            origin: "validation",
+          },
+        ]);
+        equal("a valid one produces none", wait.fields[0].findings, []);
+
+        // d12: no form at all, the bytes instead.
+        const gone = configFormFor(registry, findBlock(retiredDocument(), "blk_GONE"));
+        equal("an unresolvable block's config is read-only", gone.readOnly, true);
+        equal("it offers no fields to edit", gone.fields, []);
+        equal(
+          "and shows its stored bytes",
+          gone.rawConfig,
+          '{\n  "note": "a step whose block type the host removed"\n}'
+        );
+      });
+
+      suite("panes: an edit writes through a valuePath without mutating", () => {
+        const config = { arms: [{ slot: "arm_a", cond: "x" }, { slot: "arm_b", cond: "y" }] };
+        const before = JSON.stringify(config);
+
+        const next = writeAtPath(config, ["arms", 1, "cond"], "z");
+
+        equal("the new value is written", next.arms[1].cond, "z");
+        equal("its sibling is untouched", next.arms[0].cond, "x");
+        // The previous config is the inverse command's payload (d3). Mutating
+        // it in place would quietly corrupt the undo stack.
+        equal("the original is not mutated", JSON.stringify(config), before);
+        check("and it is a different value", next !== config);
+
+        equal(
+          "a missing container is created",
+          writeAtPath({}, ["a", "b"], 1),
+          { a: { b: 1 } }
+        );
+        // A path is data off a document's bytes; a `__proto__` segment must
+        // create an own key rather than move a prototype.
+        const hostile = writeAtPath({}, ["__proto__"], "moved");
+        equal("a __proto__ segment stays an own key", Object.hasOwn(hostile, "__proto__"), true);
+        equal("and reaches no prototype", {}.moved, undefined);
+
+        equal("add appends", addRow(["a"], "b"), ["a", "b"]);
+        equal("remove drops one", removeRow(["a", "b", "c"], 1), ["a", "c"]);
+        equal("move down swaps", moveRow(["a", "b", "c"], 0, 1), ["b", "a", "c"]);
+        equal("move up swaps back", moveRow(["b", "a", "c"], 1, -1), ["a", "b", "c"]);
+        // Clamped rather than refused, so the renderer can disable the end
+        // buttons for looks rather than for correctness.
+        equal("move off the top is a no-op", moveRow(["a", "b"], 0, -1), ["a", "b"]);
+        equal("move off the bottom is a no-op", moveRow(["a", "b"], 1, 1), ["a", "b"]);
+
+        equal("a string row seeds empty", seedRow("string"), "");
+        equal("an integer row seeds zero", seedRow("integer"), 0);
+        equal("a boolean row seeds false", seedRow("boolean"), false);
+      });
+
+      suite("panes: the duration control round-trips ISO-8601 (d9)", () => {
+        equal("a single component is structured", durationParts("PT30S"), {
+          simple: true,
+          amount: 30,
+          unit: "S",
+          designator: "T",
+          iso: "PT30S",
+          human: "30s",
+        });
+        equal("days too", durationParts("P2D").unit, "D");
+
+        // `P1M` is months and `PT1M` is minutes, and this is the one place in
+        // ISO-8601 where that ambiguity can bite.
+        equal("PT1M is minutes", durationParts("PT1M").designator, "T");
+        equal("P1M is months, and not a unit the control offers", durationParts("P1M").simple, false);
+
+        // Two components cannot round-trip through a number and a unit, so
+        // the control falls back rather than rewriting the author's value.
+        equal("PT1H30M is not structured", durationParts("PT1H30M").simple, false);
+        equal("but it still reads", durationParts("PT1H30M").human, "1h 30m");
+        equal("garbage does not throw", durationParts("soon").simple, false);
+        equal("nor does an absent value", durationParts(undefined).iso, "");
+
+        equal("30 seconds composes", durationFrom(30, "S"), "PT30S");
+        equal("2 hours composes", durationFrom(2, "H"), "PT2H");
+        equal("1 day composes without the T", durationFrom(1, "D"), "P1D");
+        equal("a negative is clamped to zero", durationFrom(-5, "M"), "PT0M");
+        equal("a fraction truncates, because d6 forbids the float", durationFrom(1.5, "H"), "PT1H");
+
+        // The property the whole control exists for.
+        for (const iso of ["PT30S", "PT15M", "PT2H", "P3D", "P1W"]) {
+          const parts = durationParts(iso);
+          equal(`${iso} survives a round trip`, durationFrom(parts.amount, parts.unit), iso);
+        }
+      });
+
+      suite("panes: findings are anchored, counted, and resolvable (d11)", () => {
+        const doc = cardDocument();
+        const extras = [
+          {
+            severity: "warning",
+            source: "lint",
+            origin: "demo",
+            anchor: { kind: "block", blockId: "blk_AUTH" },
+            message: "no handler registered",
+          },
+          {
+            severity: "info",
+            source: "lint",
+            origin: "demo",
+            anchor: { kind: "slot", blockId: "blk_GRP", slot: "interrupts" },
+            message: "nothing abandons this group",
+          },
+          {
+            // Four levels below blk_GRP, so the fold-badge check below has to
+            // walk descendants rather than count one block's own findings.
+            severity: "warning",
+            source: "lint",
+            origin: "demo",
+            anchor: { kind: "config", blockId: "blk_CAP", key: "retries" },
+            message: "retrying a capture without idempotency can double-charge",
+          },
+        ];
+
+        // The stale one goes in through `collectFindings`'s own argument
+        // rather than through the layout: `layoutDocument` never reaches a
+        // block it does not hold, so routing it that way would have the
+        // layout drop it and leave `collectFindings`'s guard untested.
+        const stale = {
+          severity: "error",
+          source: "lint",
+          origin: "demo",
+          anchor: { kind: "block", blockId: "blk_VANISHED" },
+          message: "about a block that is not here",
+        };
+
+        const tree = layoutDocument(doc, registry, { extraFindings: extras });
+        const findings = collectFindings(tree, doc, [stale]);
+
+        // An anchor naming a block the document does not hold is dropped
+        // rather than listed: a row that cannot be clicked teaches an author
+        // to stop clicking rows.
+        equal("a stale anchor is dropped", findings.length, 3);
+        equal(
+          "the layout drops one it cannot reach, too",
+          layoutDocument(doc, registry, { extraFindings: [stale] }).findings.length,
+          0
+        );
+        // Severity first, then document order - so the panel reads
+        // top-to-bottom the way the canvas does within each band.
+        equal(
+          "errors sort before warnings before notes",
+          findings.map((one) => one.severity),
+          ["warning", "warning", "info"]
+        );
+        equal(
+          "and within a severity, document order decides",
+          findings.map((one) => one.anchor.blockId),
+          ["blk_AUTH", "blk_CAP", "blk_GRP"]
+        );
+        equal(
+          "the origin says which half a row came from",
+          findings.map((one) => one.origin),
+          ["demo", "demo", "demo"]
+        );
+
+        equal("the tab badge counts by severity", severityCounts(findings), {
+          error: 0,
+          warning: 2,
+          info: 1,
+          total: 3,
+        });
+
+        // d11's last sentence: "a collapsed subtree carries a count badge so a
+        // finding can never hide inside something folded shut". The badge and
+        // the panel must be two readings of ONE set, which is why the extras
+        // are folded into the layout rather than counted beside it.
+        const grp = tree.root.slots[0].children[1];
+        equal("the fold badge sees the caller's findings too", grp.id, "blk_GRP");
+        equal(
+          "and its count matches the panel's",
+          grp.findings.length + grp.descendantFindings,
+          findingsUnder(doc, findings, "blk_GRP")
+        );
+
+        // A validation finding still arrives, and still says it is real.
+        const bad = createDocument(
+          block({
+            id: "blk_B1",
+            type: "core.sequence",
+            slots: { body: [block({ id: "blk_B2", type: "core.wait", config: { duration: "soon" } })] },
+          }),
+          { id: "bdoc_BAD" }
+        );
+        const badTree = layoutDocument(bad, registry);
+        const badFindings = collectFindings(badTree, bad);
+        equal("validation produces its own findings", badFindings.length, 1);
+        equal("marked as real", badFindings[0].origin, "validation");
+        equal("anchored to the field", badFindings[0].anchor, {
+          kind: "config",
+          blockId: "blk_B2",
+          key: "duration",
+        });
+
+        // The routing mechanism: an anchor becomes a block plus the ancestors
+        // a reveal has to unfold.
+        const anchor = resolveAnchor(doc, { kind: "config", blockId: "blk_CAP", key: "retries" });
+        equal("an anchor resolves", anchor.ok, true);
+        equal("to its block", anchor.blockId, "blk_CAP");
+        equal("with the field it is about", anchor.key, "retries");
+        equal("and every ancestor between it and the root", anchor.ancestorIds, [
+          "blk_ROOT",
+          "blk_GRP",
+          "blk_BR",
+          "blk_PAR",
+        ]);
+
+        const slotAnchor = resolveAnchor(doc, {
+          kind: "slot",
+          blockId: "blk_GRP",
+          slot: "interrupts",
+        });
+        equal("a slot anchor keeps its slot", slotAnchor.slot, "interrupts");
+        equal("a root anchor has no ancestors", resolveAnchor(doc, {
+          kind: "block",
+          blockId: "blk_ROOT",
+        }).ancestorIds, []);
+        equal("an absent block refuses as a value", resolveAnchor(doc, {
+          kind: "block",
+          blockId: "blk_NOPE",
+        }).ok, false);
+
+        equal("a config anchor reads as its field", anchorLabel({
+          kind: "config",
+          blockId: "blk_CAP",
+          key: "retries",
+        }), "blk_CAP › config.retries");
+        equal("a slot anchor reads as its slot", anchorLabel(slotAnchor === null ? null : {
+          kind: "slot",
+          blockId: "blk_GRP",
+          slot: "interrupts",
+        }), "blk_GRP › slot:interrupts");
+
+        // The demo set is keyed by document, because an anchor that resolves
+        // to nothing is worse than an absent finding.
+        equal("the demo set is per document", demoFindings("bdoc_nothing"), []);
+        check(
+          "and the shipped fixtures have one",
+          demoFindings("bdoc_cp_demo").length > 0,
+          "card-processing should carry a demo set"
+        );
+        check(
+          "every demo finding is marked as such",
+          demoFindings("bdoc_cp_demo").every((one) => one.origin === "demo")
+        );
       });
 
       /* ------------------------------------------------------- reporting */

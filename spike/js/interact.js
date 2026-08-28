@@ -36,7 +36,9 @@
  * are here rather than in a commit message.
  */
 
+import { createInspector } from "./inspector.js";
 import { layoutDocument } from "./layout.js";
+import { collectFindings, demoFindings, resolveAnchor } from "./panes.js";
 import { renderCanvas } from "./render.js";
 import {
   beginDrag,
@@ -57,6 +59,7 @@ import {
   toggleCollapsed,
   typesForSlot,
   undoSession,
+  updateBlockConfig,
   blockForType,
 } from "./session.js";
 
@@ -88,6 +91,33 @@ export function createEditor({ canvas, registry, chrome = {} }) {
   let ghost = null;
   let armed = null;
   let picker = null;
+  let findings = [];
+
+  /*
+   * The two inspector panes this bead builds. They are given a `state()` rather
+   * than the session itself for the reason every other seam here is: the
+   * session is replaced by every command, so anything holding one holds a
+   * stale value the moment an author does something.
+   */
+  const inspector = createInspector({
+    mounts: {
+      config: chrome.configForm ?? null,
+      findings: chrome.findingsPanel ?? null,
+      findingsBadge: chrome.findingsBadge ?? null,
+    },
+    host: {
+      state: () => (session ? { session, findings } : null),
+      // `null` when the edit landed, the refusal otherwise - the form needs
+      // the reason, not just the verdict, so it can say WHY under the field
+      // the author is standing in rather than only in the canvas's status
+      // line, which is three panes away from where they are looking.
+      updateConfig: (id, config) => {
+        const result = updateBlockConfig(session, id, config);
+        return apply(result) ? null : result.error;
+      },
+      reveal: (finding) => revealFinding(finding),
+    },
+  });
 
   /* ------------------------------------------------------------- rendering */
 
@@ -100,7 +130,14 @@ export function createEditor({ canvas, registry, chrome = {} }) {
     const tree = layoutDocument(session.document, session.registry, {
       collapsed: session.collapsed,
       dropState: (parentId, slot) => dropStateFor(session, parentId, slot),
+      // The demo half of the findings set, folded into the layout rather than
+      // added beside it, so a folded card's count badge and the findings
+      // panel's list are two readings of ONE set (ADR-0005 d11's last
+      // sentence, which a second source would quietly falsify).
+      extraFindings: demoFindings(session.document.id),
     });
+
+    findings = collectFindings(tree, session.document);
 
     rendered = renderCanvas(canvas, tree, { center });
 
@@ -153,11 +190,90 @@ export function createEditor({ canvas, registry, chrome = {} }) {
     setText(chrome.blockSlot, summary ? summary.slot : dash);
     setText(chrome.selectionChip, summary ? summary.type : "no selection");
 
-    // The read-only note decision 12 promises, surfaced where an author looks
-    // for the config form rather than only on the card.
-    if (chrome.blockNote) {
-      chrome.blockNote.hidden = !(summary && summary.unresolved);
+    // Decision 12's read-only note used to be a static element flipped here.
+    // The config pane now renders it from the actual resolution failure, so it
+    // can distinguish `unknown_block_type` from `block_type_too_new` - and one
+    // accurate sentence beats two, one of them vague.
+    inspector.refresh();
+  }
+
+  /* ------------------------------------------------------- finding reveal */
+
+  /*
+   * ADR-0005 decision 11: "a document-level panel lists all findings;
+   * selecting one selects and reveals its anchor."
+   *
+   * Reveal is four things, and skipping any one of them makes the panel feel
+   * broken rather than merely terse: unfold every collapsed ancestor (a
+   * finding that navigates to something still hidden is worse than no
+   * navigation), select the block, scroll it into view, and flash it so the
+   * eye lands where the click sent it. The unfold is the half the count badge
+   * on a folded card exists to promise, and this is where the promise is kept.
+   */
+  function revealFinding(finding) {
+    const anchor = resolveAnchor(session.document, finding.anchor);
+
+    if (!anchor.ok) {
+      announce("That finding's block is no longer in the document.");
+      return;
     }
+
+    const collapsed = new Set(session.collapsed);
+    let unfolded = 0;
+
+    for (const id of anchor.ancestorIds) {
+      if (collapsed.delete(id)) unfolded += 1;
+    }
+
+    // A slot or field anchor is INSIDE the block, so the block itself has to
+    // open too; a `:block` anchor is about the card, which a fold does not
+    // hide.
+    if (anchor.slot !== null || anchor.key !== null) {
+      if (collapsed.delete(anchor.blockId)) unfolded += 1;
+    }
+
+    session = select({ ...session, collapsed }, anchor.blockId);
+
+    if (unfolded > 0) render();
+    else applySelection();
+
+    const card = canvas.querySelector(
+      `.sb-card[data-block-id="${cssEscape(anchor.blockId)}"]`
+    );
+
+    if (card) {
+      card.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+      flash(card);
+    }
+
+    if (anchor.slot !== null) {
+      const slot = canvas.querySelector(
+        `[data-block-id="${cssEscape(anchor.blockId)}"][data-slot="${cssEscape(anchor.slot)}"]`
+      );
+      if (slot) flash(slot);
+    }
+
+    announce(
+      unfolded === 0
+        ? `Revealed ${anchor.blockId}.`
+        : `Revealed ${anchor.blockId}, unfolding ${unfolded} block${unfolded === 1 ? "" : "s"}.`
+    );
+  }
+
+  /*
+   * The flash is a class the element wears for one animation. Removed on
+   * `animationend` rather than on a timer, so a reduced-motion user - whose
+   * animation the stylesheet shortens to nothing - is not left wearing it.
+   */
+  function flash(element) {
+    element.classList.remove("sb-flash");
+    // Reading `offsetWidth` restarts the animation when the same element is
+    // revealed twice in a row; without it the second click does nothing.
+    void element.offsetWidth;
+    element.classList.add("sb-flash");
+    element.addEventListener("animationend", () => element.classList.remove("sb-flash"), {
+      once: true,
+    });
   }
 
   function syncChrome(tree) {
@@ -216,6 +332,9 @@ export function createEditor({ canvas, registry, chrome = {} }) {
     }
 
     session = result.value;
+    // A refusal that stays on screen after the next gesture succeeds is a
+    // refusal the author will read as being about the gesture that worked.
+    announce("");
     closePicker();
     render();
     return true;
@@ -686,6 +805,23 @@ export function createEditor({ canvas, registry, chrome = {} }) {
       session = createSession(doc, registry);
       announce("");
       return render({ center: true });
+    },
+
+    /**
+     * Drops the open document. The shell calls it for the "None" option, so
+     * the inspector empties with the canvas rather than going on describing a
+     * block nothing is showing.
+     */
+    clear() {
+      cancelDrag();
+      closePicker();
+      session = null;
+      findings = [];
+      if (rendered) rendered.destroy();
+      rendered = null;
+      canvas.replaceChildren();
+      announce("");
+      inspector.refresh();
     },
 
     /** The live session - the read handle a test or a console poke needs. */
