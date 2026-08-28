@@ -49,6 +49,17 @@
  * The residue is real and worth naming rather than hiding: per-slot
  * highlighting is a superset of per-position validity, and per-slot
  * highlighting WITHOUT the seams is a superset of that again.
+ *
+ * ## Unresolvable parents (ADR-0005 decision 12)
+ *
+ * Rule 1 excludes an unresolvable parent outright, so such a block offers no
+ * slots at all - not even a reorder among the children it already has. That
+ * was once a divergence from decision 12's prose, which said the reorder was
+ * permitted; the operator ruled on 2026-08-28 (sb-cvo) that d12's sentence
+ * was the error and this enumeration is correct as written. The prose now
+ * says the reorder is not offered, and keeps order-asks-the-parent's-type-
+ * nothing as the reason a future enumeration that expresses it would be an
+ * additive extension rather than a reversal.
  */
 
 import { blocks, findBlock, slotChildren, subtreeIds } from "./document.js";

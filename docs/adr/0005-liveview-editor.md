@@ -1,6 +1,6 @@
 # ADR-0005: The editor is a pure command algebra and view model with a thin LiveView shell
 
-Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings)
+Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling)
 
 ## Context
 
@@ -476,8 +476,16 @@ renders with:
 It may be selected, moved, and deleted. Its config may not be edited. It is
 never a drop target for a new or foreign block, because decision 5's first
 rule needs `slots/1` and there is none. Reordering blocks *within* one of its
-existing slots is permitted, since order is a document-level property that
-asks the parent's type nothing.
+existing slots is **not offered either**, for the same reason: decision 5's
+enumeration works from `slots/1`, so an unresolvable parent contributes no
+targets at all, and `droppable_slots/3`'s return type - a list of
+`{block_id, slot_name}` - cannot express "this slot, but only for blocks
+already in it". Nothing here forbids the reorder in principle: order is a
+document-level property that asks the parent's type nothing, so an enumeration
+that later expresses it is a purely additive extension of decision 5 rather
+than a reversal of this one (amended 2026-08-28, operator ruling - the
+original sentence said the reorder is permitted; decision 5's enumeration is
+correct as written and this sentence was the error).
 
 The acceptance property is preservation: **open a document containing a block
 type the host does not have, edit an unrelated part of the tree, save, and the
@@ -1082,23 +1090,27 @@ depends on whether any second consumer for it exists. **Operator's call.**
 
 ### Smaller items folded in here
 
-**The d12-versus-assignability seam. QUEUED for the operator; this record does
-not pick.** Decision 12 says reordering blocks *within* an unresolvable block's
-existing slots is permitted, since order asks the parent's type nothing. The
-shipped `droppable_slots/3` (decision 5, rule 1) excludes an unresolvable
-parent outright - it needs `slots/1`, and there is none - and its return type,
-a list of `{block_id, slot_name}`, cannot express "this slot, but only for
-blocks already in it". The spike mirrors the shipped code and therefore does
-not offer the reorder. Two options, both coherent:
+**The d12-versus-assignability seam. RULED 2026-08-28: d12's prose was the
+error.** Decision 12 originally said reordering blocks *within* an unresolvable
+block's existing slots is permitted, since order asks the parent's type
+nothing. The shipped `droppable_slots/3` (decision 5, rule 1) excludes an
+unresolvable parent outright - it needs `slots/1`, and there is none - and its
+return type, a list of `{block_id, slot_name}`, cannot express "this slot, but
+only for blocks already in it". The spike mirrors the shipped code and
+therefore does not offer the reorder. Two options were put, both coherent:
+amend d12's prose to say the reorder is not offered, making the enumeration
+correct as written; or extend the enumeration so a slot may be returned with a
+restriction, widening `droppable_slots/3`'s return type - and therefore its
+callers and its tests - to carry a case that exists for exactly one situation.
 
-- **Amend d12's prose** to say the reorder is not offered, making the
-  enumeration correct as written and d12's sentence the error.
-- **Extend the enumeration** so a slot may be returned with a restriction -
-  which widens `droppable_slots/3`'s return type, and therefore its callers and
-  its tests, to carry a case that exists for exactly one situation.
-
-The trade is a smaller contract against a stated capability the author cannot
-actually reach. Recorded at `sb-ad2` next to the spike's own d12 test suite.
+The operator took the first: the trade is a smaller contract against a stated
+capability the author cannot actually reach, and the capability loses.
+Decision 12's sentence is amended above to say the reorder is not offered,
+while keeping order-asks-the-parent's-type-nothing as the reason the door
+stays open - the principle forbids nothing, so an enumeration that later
+expresses the reorder is an additive extension of decision 5 rather than a
+reversal. Filed and applied at `sb-cvo`; the divergence note next to the
+spike's own d12 test suite (`sb-ad2`) now cites this ruling.
 
 **Decision 11's severity set: `:info` proposed, open.** The spike's findings
 pane renders a third severity for advisory rows that read wrong in warning
