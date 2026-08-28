@@ -100,6 +100,13 @@
    * stylesheet does not know either token exists. */
   --sb-accent-myapp: #8a4a1f;
   --sb-accent-myapp-capture: #a3341f;
+
+  /* The proposed `core.invoke` accent (sb-nt3). Light and dark give it a
+   * teal, which would be invisible as an identity here: this brand's own
+   * accent IS teal. A plum instead, and the reason is worth keeping - a type
+   * declares a token NAME, so the one theme where the default choice would
+   * have collided fixes it in one line and nothing else moves. */
+  --sb-accent-invoke: #6a3d8f;
   /* A louder brand wants a louder tile and a heavier edge. */
   --sb-block-accent-mix: 18%;
   --sb-block-edge: 4px;

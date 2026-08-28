@@ -287,6 +287,27 @@
   --sb-accent-myapp-capture: var(--sb-accent-myapp);
 }
 
+/* --------------------------------------------- proposed core block accents
+ *
+ * sb-nt3. Also NOT part of the shipped token surface, and for a second
+ * reason on top of the one above: the block type that reads this token does
+ * not exist either. `js/proposed-core.js` describes a PROPOSED `core.invoke`
+ * and points its palette entry here.
+ *
+ * A core type reaching for its own accent is a slightly different claim from
+ * a host type doing so - a host is declaring an identity, and a core type
+ * would be declaring that one of the editor's own steps deserves to look
+ * unlike the others. `core.invoke` is the case for it: it is the only step
+ * in the vocabulary whose work happens outside the chart. Whether that earns
+ * a token in the shipped surface is a Phase-B finding. */
+
+.sb-spike {
+  /* Teal, so it reads as neither the editor's blue accent nor the demo
+   * host's purple: an invoke belongs to the vocabulary but points away from
+   * it. 5.2:1 against the worst surface in this theme. */
+  --sb-accent-invoke: #0f6d78;
+}
+
 /* -------------------------------------------------------------------- dark */
 
 /* Explicit opt-in, not `prefers-color-scheme`: the editor is a component
@@ -355,6 +376,8 @@
    * colour in this block is. `myapp.capture` still shares the family's. */
   --sb-accent-myapp: #bfa0f0;
   --sb-accent-myapp-capture: var(--sb-accent-myapp);
+  /* The proposed invoke accent, lightened onto the dark ground the same way. */
+  --sb-accent-invoke: #7fd0dd;
   /* A tint that is 14% of a pale accent over a near-black surface is not a
    * tint, it is the surface. Dark needs more of the colour to show the same
    * amount of it - which is exactly the kind of adjustment the mix being a

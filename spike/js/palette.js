@@ -829,6 +829,18 @@ const PALETTE_ENTRY_DEFAULTS = {
    * type deciding what it looks like in a theme it has never seen. Whether
    * this belongs in ADR-0005 decision 10's metadata is a W6 finding. */
   accentToken: null,
+  /* sb-nt3. A short chip a block type may declare for its card header - the
+   * one-line "what is this, really" a label has no room for. A STRING the
+   * type declares, under the same discipline as `accentToken` and `icon`:
+   * the editor renders whatever is here and never learns a type name. No
+   * shipped `core.*` type declares one; `js/proposed-core.js` does, and
+   * sb-p0k builds the renderer. PROPOSED - whether it belongs in ADR-0005
+   * decision 10's metadata is a Phase-B finding.
+   *
+   * The default lives here rather than in the proposal file so that
+   * `paletteEntryFor(descriptor).badge` is total for every descriptor, the
+   * way every other key in this map is. */
+  badge: null,
 };
 
 /**

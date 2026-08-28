@@ -76,6 +76,9 @@ const ICONS = {
   receipt: "M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5zM9 8h6M9 12h6",
   megaphone: "M4 10v4h3l7 4V6l-7 4zM18 9a4 4 0 0 1 0 6",
   sparkles: "M12 4l1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6zM18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z",
+  /* An arrow leaving the box: the proposed `core.invoke`, which is the one
+   * step in the vocabulary whose work happens somewhere else. */
+  "arrow-up-right": "M6 18 18 6M9 6h9v9",
 };
 
 /* The neutral glyph a name with no drawing gets - never nothing. */

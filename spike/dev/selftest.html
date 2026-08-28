@@ -127,6 +127,8 @@
         spikeRegistry,
       } from "../js/palette.js";
 
+      import { parseParams, proposedCoreTypes } from "../js/proposed-core.js";
+
       import {
         applyCommand,
         canRedo,
@@ -843,6 +845,172 @@
           !targets.some((t) => t.parentId === "blk_GONE"),
           JSON.stringify(targets)
         );
+      });
+
+      /*
+       * The PROPOSED vocabulary (sb-nt3). Nothing below is transcribed from
+       * lib/ - these are checks on a descriptor written to find out what a
+       * `core.*` type would have to declare. See js/proposed-core.js.
+       */
+      suite("proposed core: core.invoke declares an on_error SLOT (D13)", () => {
+        const invoke = proposedCoreTypes["core.invoke"];
+
+        check("it is not in the shipped core vocabulary", !("core.invoke" in coreTypes));
+
+        equal(
+          "one on_error slot, zero_or_one, and nothing else",
+          invoke.slots({}),
+          [{ name: "on_error", arity: "zero_or_one", label: "If it fails" }]
+        );
+        equal(
+          "the failure path is a secondary rail, the group.interrupts precedent",
+          paletteEntryFor(invoke).slotStyle.on_error,
+          "secondary"
+        );
+        equal("the slot accepts steps", invoke.io({}).slotAccepts.on_error, ["step"]);
+        check(
+          "...so an interrupt handler cannot be dropped into it",
+          !admits(invoke, {}, "on_error", coreTypes["core.on_event"], {})
+        );
+        check(
+          "...and an ordinary step can",
+          admits(invoke, {}, "on_error", coreTypes["core.wait"], {})
+        );
+
+        equal("it is a step", invoke.io({}).kinds, ["step"]);
+        equal(
+          "it produces unknown - two outcomes are not a type lattice (ADR-0003 d4)",
+          invoke.io({}).produces,
+          "unknown"
+        );
+        check("and consumes nothing", invoke.io({}).consumes === undefined);
+      });
+
+      suite("proposed core: core.invoke's config", () => {
+        const invoke = proposedCoreTypes["core.invoke"];
+
+        equal(
+          "three fields, in this order",
+          invoke.configSchema({}).map((field) => [field.key, field.type, field.required]),
+          [
+            ["invoke_type", "string", true],
+            ["assign_to", "string", false],
+            ["params", "string", false],
+          ]
+        );
+
+        /*
+         * The regex is GENERIC, which is the whole point of it living in a
+         * core type rather than in demo-types.js. Sabotage: replacing
+         * INVOKE_TYPE with demo-types.js's `^myapp:` spelling turns the
+         * "another namespace" check red and leaves everything else green.
+         */
+        check(
+          "a myapp invoke type is accepted",
+          invoke.validateConfig({ invoke_type: "myapp:authorize" }) === null
+        );
+        check(
+          "...and so is another host's namespace entirely",
+          invoke.validateConfig({ invoke_type: "billing:refund" }) === null
+        );
+        for (const bad of ["authorize", "myapp:", ":authorize", "MyApp:authorize", "myapp:Auth", ""]) {
+          equal(
+            `refuses ${JSON.stringify(bad)}`,
+            invoke.validateConfig({ invoke_type: bad }),
+            [
+              {
+                key: "invoke_type",
+                message: 'must look like "namespace:name", such as "myapp:authorize"',
+              },
+            ]
+          );
+        }
+        equal(
+          "a missing invoke type is the same finding",
+          invoke.validateConfig({}),
+          [
+            {
+              key: "invoke_type",
+              message: 'must look like "namespace:name", such as "myapp:authorize"',
+            },
+          ]
+        );
+
+        check(
+          "assign_to is optional",
+          invoke.validateConfig({ invoke_type: "myapp:authorize" }) === null
+        );
+        check(
+          "...and an empty one still is",
+          invoke.validateConfig({ invoke_type: "myapp:authorize", assign_to: "" }) === null
+        );
+        equal(
+          "...but a present one must be a bare identifier",
+          invoke.validateConfig({ invoke_type: "myapp:authorize", assign_to: "Auth Result" }),
+          [{ key: "assign_to", message: "must be a bare lowercase identifier" }]
+        );
+      });
+
+      suite("proposed core: the params field is text standing in for pairs", () => {
+        const invoke = proposedCoreTypes["core.invoke"];
+        const ok = (params) => invoke.validateConfig({ invoke_type: "myapp:authorize", params });
+
+        equal(
+          "one name=path pair per line, whitespace tolerated",
+          parseParams("amount = order.total\n  card=order.card_token  "),
+          {
+            params: [
+              { name: "amount", path: "order.total" },
+              { name: "card", path: "order.card_token" },
+            ],
+            malformed: [],
+          }
+        );
+
+        // A trailing newline in a textarea is not an authoring error.
+        equal(
+          "blank lines are ignored, not refused",
+          parseParams("amount=order.total\n\n\n"),
+          { params: [{ name: "amount", path: "order.total" }], malformed: [] }
+        );
+        equal("an absent params key parses as nothing", parseParams(undefined), {
+          params: [],
+          malformed: [],
+        });
+
+        check("a well-formed block validates", ok("amount=order.total") === null);
+        equal(
+          "a line with no = is named in the finding",
+          ok("amount order.total"),
+          [{ key: "params", message: '"amount order.total" is not a name=path pair' }]
+        );
+        equal(
+          "two params cannot share a name",
+          ok("amount=order.total\namount=order.other"),
+          [{ key: "params", message: 'two params cannot share the name "amount"' }]
+        );
+        equal(
+          "params that is not text at all",
+          invoke.validateConfig({ invoke_type: "myapp:authorize", params: ["amount=x"] }),
+          [{ key: "params", message: "must be text, one name=path pair per line" }]
+        );
+      });
+
+      suite("proposed core: the badge is metadata, like the accent token", () => {
+        const invoke = proposedCoreTypes["core.invoke"];
+
+        equal("core.invoke declares one", paletteEntryFor(invoke).badge, "calls the host");
+        equal(
+          "every shipped core type declares none, and reads null rather than undefined",
+          Object.values(coreTypes).map((one) => paletteEntryFor(one).badge),
+          Object.values(coreTypes).map(() => null)
+        );
+        equal(
+          "the accent is a token NAME the theme resolves",
+          paletteEntryFor(invoke).accentToken,
+          "--sb-accent-invoke"
+        );
+        check("...and it is a well-formed one", isAccentToken(paletteEntryFor(invoke).accentToken));
       });
 
       suite("edit: insert and its inverse", () => {

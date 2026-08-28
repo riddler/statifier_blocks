@@ -15,6 +15,7 @@
 import { findBlock, fromJson } from "./document.js";
 import { coreTypes, createRegistry, demoTypes, describe } from "./palette.js";
 import { fixtureTypes } from "./demo-types.js";
+import { proposedCoreTypes } from "./proposed-core.js";
 import { createEditor } from "./interact.js";
 import { createDatamodelPane } from "./datamodel-pane.js";
 import { createFixturesPane } from "./fixtures-pane.js";
@@ -105,8 +106,19 @@ if (root && themeSelect) {
  *
  * `myapp.legacy_check` is deliberately absent - it is the ADR-0005 decision
  * 12 case the deep end of card-processing.json exists to exercise.
+ *
+ * `proposedCoreTypes` is the fourth map and the odd one out: `core.*` types
+ * the package does NOT ship, registered here so the spike can show what one
+ * would look like. It is spread here rather than merged into `coreTypes`
+ * precisely so that `coreRegistry()` and `spikeRegistry()` keep answering
+ * "what ships" honestly - see the header of `proposed-core.js`.
  */
-const registry = createRegistry({ ...coreTypes, ...demoTypes, ...fixtureTypes });
+const registry = createRegistry({
+  ...coreTypes,
+  ...proposedCoreTypes,
+  ...demoTypes,
+  ...fixtureTypes,
+});
 
 const canvas = document.getElementById("sb-canvas");
 const emptyState = document.getElementById("sb-canvas-empty");
