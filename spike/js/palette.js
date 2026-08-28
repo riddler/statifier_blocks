@@ -37,6 +37,11 @@
  * Arity is ADR-0002 decision 6's closed set, spelled as strings:
  * `"any"`, `"at_least_one"`, `"exactly_one"`, `"zero_or_one"`.
  *
+ * One field NO descriptor below declares, and none should: `label`. The
+ * editor injects it into every descriptor it resolves (`withEditorFields`),
+ * because every card titles itself from it and a type declaring it was
+ * writing the editor's boilerplate.
+ *
  * A field type is ADR-0002 decision 7's closed set: the string `"string"`,
  * `"integer"`, `"boolean"`, `"expression"` or `"duration"`, or the object
  * `{ select: [{ value, label }] }` or `{ list: <field type> }`. Closed on
@@ -871,6 +876,89 @@ function unresolvedMessage(reason) {
   }
 }
 
+/* --------------------------------------- the editor's own config field */
+
+/*
+ * sb-jvz. `label` is the author's own words for one block, and EVERY card
+ * titles itself from it. It is therefore the editor's field, not a block
+ * type's: a type that declared one was writing boilerplate, and a type that
+ * forgot lost its author's words silently - `core.invoke` stored a label the
+ * canvas titled from and the config form could not edit, because no type had
+ * declared it.
+ *
+ * So the editor injects it, once, into every descriptor it resolves. A block
+ * type declares what its own work needs and nothing more; the editor owns the
+ * one field that is about authoring rather than about behaviour. A host type
+ * that still declares `label` is not an error - its declaration is dropped in
+ * favour of this one, so the field cannot be redefined out from under the
+ * canvas, which reads it by schema (a `string` field keyed `label`) and never
+ * by type name.
+ *
+ * Deliberately NO `default`. It is optional, and a default would seed
+ * `{"label": ""}` into the config of every block ever inserted - bytes in
+ * every document to say nothing at all.
+ */
+export const LABEL_FIELD = Object.freeze({
+  key: "label",
+  type: "string",
+  label: "Step name",
+  required: false,
+});
+
+/*
+ * The injected field's own check, which moves here for the same reason the
+ * field does: the editor owns the field, so the editor owns what makes it
+ * valid. An absent key is fine - the field is optional - and `null` is not,
+ * because ADR-0001 decision 6 admits `null` as a stored config value and the
+ * canvas would have to render it as a title.
+ */
+function checkLabel(config) {
+  if (!config || !Object.hasOwn(config, "label")) return [];
+  if (typeof config.label === "string") return [];
+
+  return [{ key: "label", message: "must be text" }];
+}
+
+/*
+ * One wrapper per descriptor, cached on the descriptor itself: `describe` is
+ * called for every block on every layout pass, and a fresh object each time
+ * would make descriptor identity meaningless to anything holding one.
+ */
+const injected = new WeakMap();
+
+/**
+ * A resolved descriptor as the EDITOR sees it: the type's own declarations,
+ * plus `LABEL_FIELD` at the head of `configSchema/1` and its check at the
+ * head of `validateConfig/1`.
+ *
+ * Error semantics are the type's, unchanged: a `configSchema/1` that raises
+ * for config `validate_config/1` would refuse (ADR-0002 decision 6 permits
+ * exactly that) still raises through this wrapper, so the callers that
+ * already have a degradation policy for it keep owning that policy. This
+ * wrapper adds a field; it does not add a rescue.
+ */
+export function withEditorFields(descriptor) {
+  if (!descriptor || descriptor.unresolved === true) return descriptor;
+
+  const cached = injected.get(descriptor);
+  if (cached) return cached;
+
+  const wrapped = {
+    ...descriptor,
+    configSchema: (config) => [
+      { ...LABEL_FIELD },
+      ...(descriptor.configSchema(config) ?? []).filter((field) => field?.key !== "label"),
+    ],
+    validateConfig: (config) => {
+      const findings = [...checkLabel(config), ...(descriptor.validateConfig(config) ?? [])];
+      return verdict(findings);
+    },
+  };
+
+  injected.set(descriptor, wrapped);
+  return wrapped;
+}
+
 /**
  * The descriptor to render `node` with: the resolved one, or decision 12's
  * placeholder. Total - it is the call the canvas makes for every block, and
@@ -879,12 +967,29 @@ function unresolvedMessage(reason) {
  * Returns `{ descriptor, block, unresolved }`, where `block` carries the
  * in-memory-migrated config when a migration ran and is `node` untouched
  * otherwise. The document's own bytes are never rewritten by this call.
+ *
+ * A resolved descriptor arrives carrying the editor's injected `label`
+ * field (`withEditorFields`); the placeholder does not. That asymmetry IS
+ * decision 12: an unresolvable block has no form at all, so injecting an
+ * editable field into it would be offering to edit the config of a block
+ * whose type nothing can validate.
+ *
+ * This is the one injection seam. Every surface that reads a schema or runs
+ * a check - the canvas, the config form, the command gate - reaches its
+ * descriptor through here, so none of them has to know the field exists.
+ * `fetchType` is deliberately NOT wrapped: it answers "what did the host
+ * register", which is a question about the registry rather than about how a
+ * block is edited.
  */
 export function describe(registry, node) {
   const resolved = resolveBlock(registry, node);
 
   if (resolved.ok) {
-    return { ...resolved.value, unresolved: false };
+    return {
+      ...resolved.value,
+      descriptor: withEditorFields(resolved.value.descriptor),
+      unresolved: false,
+    };
   }
 
   return {

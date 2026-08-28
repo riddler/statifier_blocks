@@ -228,8 +228,19 @@ export function controlFor(type) {
  *       readOnly,   true exactly when the block does not resolve (d12)
  *       rawConfig,  the read-only canonical JSON, or null
  *       fields: [Field],
- *       empty       true when a resolvable type declares no fields at all
+ *       empty       true when a resolvable block has no fields at all
  *     }
+ *
+ * `empty` is structurally false for a resolvable block since sb-jvz: the
+ * editor injects a `label` field into every descriptor `describe` resolves,
+ * so the schema this form is derived from is never the empty list. It is
+ * kept in the shape rather than dropped because it states the invariant -
+ * a caller reading `empty` gets a true answer, and one asserting it can
+ * still catch the day the injection stops happening.
+ *
+ * That injection is also why nothing here mentions `label`. The form does
+ * not know the field exists: it derives from the schema `describe` hands
+ * back, and the schema already carries it.
  *
  * `readOnly` is decision 12 stated as a boolean: "its config shown read-only as
  * canonical JSON, because there is no `config_schema/1` to drive a form and

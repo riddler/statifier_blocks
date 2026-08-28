@@ -118,15 +118,19 @@
       } from "../js/document.js";
 
       import {
+        LABEL_FIELD,
         admits,
         badgeFor,
         coreTypes,
+        demoTypes,
         describe,
         joinLabelFor,
         paletteEntryFor,
         paletteGroups,
+        placeholderDescriptor,
         resolveBlock,
         spikeRegistry,
+        withEditorFields,
       } from "../js/palette.js";
 
       import { parseParams, proposedCoreTypes } from "../js/proposed-core.js";
@@ -1390,10 +1394,13 @@
       suite("panes: an absent optional keeps its default readable, not resolved", () => {
         const lanes = { lanes: ["capture", "receipt"] };
 
+        // Read by KEY, not by index: sb-jvz injects the editor's `label`
+        // field at the head of every schema, and a positional read of a
+        // declared field would be asserting where the injection landed.
         const absent = configFormFor(
           registry,
           block({ id: "blk_PD", type: "core.parallel", config: lanes })
-        ).fields[1];
+        ).fields.find((field) => field.key === "complete");
 
         equal("the field is the select", absent.control, "select");
         check("an absent key reads as undefined, not as the default", absent.value === undefined);
@@ -1409,7 +1416,7 @@
         const authored = configFormFor(
           registry,
           block({ id: "blk_PA", type: "core.parallel", config: { ...lanes, complete: "first" } })
-        ).fields[1];
+        ).fields.find((field) => field.key === "complete");
 
         equal("an authored value reads back as itself", authored.value, "first");
         equal("with the default still declared beside it", authored.default, "all");
@@ -2855,43 +2862,53 @@
         // is a string, because ADR-0001 d6 forbids the float.
         equal("an unknown type degrades to text", controlFor("decimal"), "text");
 
+        /*
+         * The fields the TYPE declared. sb-jvz injects the editor's own
+         * `label` field at the head of every schema, so a form's `fields`
+         * is the injected one followed by the declared ones; this suite is
+         * about the declared half, and the suite below it is about the
+         * injected one. Filtering rather than re-indexing keeps each
+         * assertion about the thing it names.
+         */
+        const declared = (form) => form.fields.filter((field) => field.key !== "label");
+
         const wait = configFormFor(registry, findBlock(doc, "blk_WAI"));
-        equal("a wait declares one duration field", wait.fields.length, 1);
-        equal("with the duration control", wait.fields[0].control, "duration");
-        equal("reading the stored value", wait.fields[0].value, "PT48H");
-        equal("and a humanized readout", wait.fields[0].duration.human, "48h");
+        equal("a wait declares one duration field", declared(wait).length, 1);
+        equal("with the duration control", declared(wait)[0].control, "duration");
+        equal("reading the stored value", declared(wait)[0].value, "PT48H");
+        equal("and a humanized readout", declared(wait)[0].duration.human, "48h");
 
         // The branch is the type that keys a field by one thing and reads it
         // through another, and the form has to honor both at once.
         const branch = configFormFor(registry, findBlock(doc, "blk_BR"));
-        equal("a branch publishes one field per arm", branch.fields.length, 1);
-        equal("keyed by the arm's slot name", branch.fields[0].key, "arm_approved");
-        equal("read through its valuePath", branch.fields[0].path, ["arms", 0, "cond"]);
+        equal("a branch publishes one field per arm", declared(branch).length, 1);
+        equal("keyed by the arm's slot name", declared(branch)[0].key, "arm_approved");
+        equal("read through its valuePath", declared(branch)[0].path, ["arms", 0, "cond"]);
         equal(
           "and carrying the stored condition",
-          branch.fields[0].value,
+          declared(branch)[0].value,
           "budget_remaining > amount"
         );
 
-        const parallel = configFormFor(registry, findBlock(doc, "blk_PAR"));
-        equal("a parallel's lanes are list rows", parallel.fields[0].control, "list");
+        const parallel = declared(configFormFor(registry, findBlock(doc, "blk_PAR")));
+        equal("a parallel's lanes are list rows", parallel[0].control, "list");
         equal(
           "one row per stored lane",
-          parallel.fields[0].rows.map((row) => row.value),
+          parallel[0].rows.map((row) => row.value),
           ["capture", "receipt"]
         );
-        equal("each row addresses its own index", parallel.fields[0].rows[1].path, [
+        equal("each row addresses its own index", parallel[0].rows[1].path, [
           "lanes",
           1,
         ]);
 
-        const signup = configFormFor(registry, findBlock(doc, "blk_SIG"));
+        const signup = declared(configFormFor(registry, findBlock(doc, "blk_SIG")));
         equal(
           "a select carries its choices in declared order",
-          signup.fields[0].choices.map((choice) => choice.value),
+          signup[0].choices.map((choice) => choice.value),
           ["email", "profile", "confirm"]
         );
-        equal("a boolean field renders as one", signup.fields[1].control, "boolean");
+        equal("a boolean field renders as one", signup[1].control, "boolean");
 
         // A config error routes to the field it is about, by KEY - which is
         // the reason the branch keys arms by slot name (d11's config anchor).
@@ -2899,7 +2916,7 @@
           registry,
           block({ id: "blk_X", type: "core.wait", config: { duration: "soon" } })
         );
-        equal("an invalid value produces one inline finding", broken.fields[0].findings, [
+        equal("an invalid value produces one inline finding", declared(broken)[0].findings, [
           {
             key: "duration",
             message: "must be an ISO-8601 duration, like PT30S or P1D",
@@ -2907,7 +2924,7 @@
             origin: "validation",
           },
         ]);
-        equal("a valid one produces none", wait.fields[0].findings, []);
+        equal("a valid one produces none", declared(wait)[0].findings, []);
 
         // d12: no form at all, the bytes instead.
         const gone = configFormFor(registry, findBlock(retiredDocument(), "blk_GONE"));
@@ -4584,6 +4601,265 @@
         );
 
         mount.remove();
+      });
+
+      /* ----------------------------------- sb-jvz: the injected label field
+       *
+       * `label` is the editor's field, not a block type's. Every card titles
+       * itself from it, so a type that had to declare one was writing the
+       * editor's boilerplate - and a type that forgot lost its author's
+       * words silently, which is exactly what happened to `core.invoke`:
+       * `card-processing.json` stores "Authorize the card", the canvas titled
+       * the card from it, and the config form could not edit it.
+       *
+       * The injection seam is `describe/2` and nothing else. These suites
+       * assert that from both ends: every registered type comes back with the
+       * field whether or not it asked, and no type declares one.
+       *
+       * Sabotage: dropping the `.filter` in `withEditorFields` leaves a
+       * rogue host declaration duplicated in the schema, which the third
+       * suite catches; returning the shared `LABEL_FIELD` rather than a copy
+       * leaves the mutation check red.
+       */
+
+      const everyType = {
+        types: { ...coreTypes, ...demoTypes, ...proposedCoreTypes },
+      };
+
+      suite("palette: the editor injects label into every type it resolves", () => {
+        const names = Object.keys(everyType.types);
+
+        check("the registry under test is not empty", names.length > 0, `${names.length} types`);
+
+        for (const name of names) {
+          const descriptor = everyType.types[name];
+          const node = block({
+            id: "blk_L",
+            type: name,
+            typeVersion: descriptor.currentVersion,
+          });
+          const schema = describe(everyType, node).descriptor.configSchema(node.config);
+
+          equal(`${name} leads its schema with label`, schema[0].key, "label");
+          equal(`...as an optional string`, [schema[0].type, schema[0].required], [
+            "string",
+            false,
+          ]);
+          check(
+            `...seeding nothing into ${name}'s config`,
+            !("default" in schema[0]),
+            "the injected field declares a default"
+          );
+          equal(
+            `...exactly once`,
+            schema.filter((field) => field.key === "label").length,
+            1
+          );
+          check(
+            `...and NOT declared by the type itself`,
+            (descriptor.configSchema({}) ?? []).every((field) => field.key !== "label"),
+            "the type still declares its own label"
+          );
+        }
+      });
+
+      suite("palette: the injected label seeds nothing and titles everything", () => {
+        /*
+         * No `default`, deliberately: a default would write `{"label": ""}`
+         * into the config of every block ever inserted - bytes in every
+         * document to say nothing at all.
+         *
+         * The declaration is what carries this, and it is asserted above
+         * per type as well. `blockForType` below is the belt to that
+         * braces: it seeds from the RAW descriptor rather than through
+         * `describe`, so it would not seed a label today even if the field
+         * declared one - and the day someone routes seeding through the
+         * injection seam, this is the check that has to stay green.
+         */
+        check("the injected field declares no default", !("default" in LABEL_FIELD));
+
+        for (const name of Object.keys(everyType.types)) {
+          const made = blockForType(everyType, name);
+          check(
+            `a new ${name} seeds no label`,
+            !Object.hasOwn(made.config, "label"),
+            JSON.stringify(made.config)
+          );
+        }
+
+        // The canvas reads the field by SCHEMA - a string field keyed
+        // `label` - so injecting it is all it takes for a stored label to
+        // become a title. `core.invoke` is the type the bead was filed for.
+        const doc = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_INV",
+                  type: "core.invoke",
+                  config: { invoke_type: "myapp:authorize", label: "Authorize the card" },
+                }),
+                block({ id: "blk_SEQ", type: "core.sequence" }),
+              ],
+            },
+          })
+        );
+
+        const cards = layoutDocument(doc, everyType).root.slots[0].children;
+
+        equal("a stored label titles the card", cards[0].title, "Authorize the card");
+        equal("the palette label becomes the caption", cards[0].caption, "Invoke");
+        equal(
+          "and a block with no stored label still reads its type",
+          cards[1].title,
+          "Sequence"
+        );
+      });
+
+      suite("palette: the injected field is the editor's, in both directions", () => {
+        // A host type that declares `label` anyway is not an error - its
+        // declaration is dropped, so the field the canvas titles from cannot
+        // be redefined into an integer out from under it.
+        const rogue = {
+          name: "myapp.rogue",
+          currentVersion: 1,
+          slots: () => [],
+          configSchema: () => [
+            { key: "label", type: "integer", label: "Rogue", required: true, default: 7 },
+            { key: "other", type: "string", label: "Other", required: false },
+          ],
+          validateConfig: () => null,
+          io: () => ({ kinds: ["step"] }),
+          paletteEntry: { label: "Rogue" },
+        };
+
+        equal(
+          "a declared label is replaced, not duplicated",
+          withEditorFields(rogue).configSchema({}).map((field) => [field.key, field.type]),
+          [
+            ["label", "string"],
+            ["other", "string"],
+          ]
+        );
+
+        // Each call hands back a COPY, so a caller that edits a field view in
+        // place cannot poison every other type's form.
+        const schema = withEditorFields(coreTypes["core.wait"]).configSchema({});
+        schema[0].label = "clobbered";
+        equal(
+          "the injected field is copied per call",
+          withEditorFields(coreTypes["core.wait"]).configSchema({})[0].label,
+          "Step name"
+        );
+
+        // One wrapper per descriptor: `describe` runs for every block on
+        // every layout pass, and a fresh object each time would make
+        // descriptor identity meaningless to anything holding one.
+        const node = block({ id: "blk_W", type: "core.wait" });
+        check(
+          "and the wrapper is stable across calls",
+          describe(registry, node).descriptor === describe(registry, node).descriptor
+        );
+
+        /*
+         * ADR-0005 d12: an unresolvable block has no form at all, so there is
+         * nothing to inject a field INTO. Injecting one would be offering to
+         * edit the config of a block whose type nothing can validate.
+         *
+         * Two layers hold that, and both are asserted: `describe` never
+         * routes its placeholder through the wrapper, AND the wrapper
+         * refuses an unresolved descriptor if something else ever hands it
+         * one. Asserting only the first would leave the guard untested and a
+         * later caller free to inject by going around `describe`.
+         */
+        const gone = describe(registry, findBlock(retiredDocument(), "blk_GONE"));
+        check("an unresolvable descriptor is left alone", gone.unresolved);
+        equal("...declaring no fields, injected or otherwise", gone.descriptor.configSchema({}), []);
+        equal(
+          "and the wrapper itself refuses a placeholder",
+          withEditorFields(placeholderDescriptor("myapp.retired", { tag: "unknown_block_type" }))
+            .configSchema({}),
+          []
+        );
+      });
+
+      suite("palette: the injected field's check is the editor's too", () => {
+        // It moved off `demo-types.js`, where only the myapp.* steps had it,
+        // and onto the injection seam, where every type does.
+        for (const name of ["core.wait", "core.invoke", "myapp.capture"]) {
+          const descriptor = withEditorFields(everyType.types[name]);
+
+          equal(
+            `${name} refuses a non-string label`,
+            (descriptor.validateConfig({ label: 7 }) ?? [])[0],
+            { key: "label", message: "must be text" }
+          );
+          // ADR-0001 d6 admits `null` as a stored config value, so "absent"
+          // and "stored null" are different questions and only the first is
+          // fine - the canvas would otherwise have to title a card `null`.
+          equal(
+            `${name} refuses a null label`,
+            (descriptor.validateConfig({ label: null }) ?? [])[0],
+            { key: "label", message: "must be text" }
+          );
+        }
+
+        const wait = withEditorFields(coreTypes["core.wait"]);
+
+        check("an absent label is fine", wait.validateConfig({ duration: "PT1S" }) === null);
+        check(
+          "an empty string is fine - optional means optional",
+          wait.validateConfig({ duration: "PT1S", label: "" }) === null
+        );
+        equal(
+          "and the type's own findings survive beside the injected one",
+          (wait.validateConfig({ duration: "soon", label: 7 }) ?? []).map((one) => one.key),
+          ["label", "duration"]
+        );
+      });
+
+      suite("panes: the config form edits label on every type", () => {
+        for (const name of Object.keys(everyType.types)) {
+          const descriptor = everyType.types[name];
+          const form = configFormFor(
+            everyType,
+            block({ id: "blk_F", type: name, typeVersion: descriptor.currentVersion })
+          );
+
+          equal(`${name} offers label first`, form.fields[0].key, "label");
+          equal(`...as a text control`, form.fields[0].control, "text");
+          equal(`...writing to config.label`, form.fields[0].path, ["label"]);
+        }
+
+        // The gap the bead names, at the surface it was reported from.
+        const authored = configFormFor(
+          everyType,
+          block({
+            id: "blk_INV",
+            type: "core.invoke",
+            config: { invoke_type: "myapp:authorize", label: "Authorize the card" },
+          })
+        );
+
+        equal(
+          "an invoke's stored label reads back into the form",
+          authored.fields[0].value,
+          "Authorize the card"
+        );
+
+        // The types that used to land on "this block type declares no
+        // configuration of its own" - the arm `inspector.js` dropped.
+        const sequence = configFormFor(everyType, block({ id: "blk_S", type: "core.sequence" }));
+
+        equal("a sequence's form is no longer empty", sequence.empty, false);
+        equal("it is exactly the injected field", sequence.fields.map((f) => f.key), ["label"]);
+
+        // d12 is unchanged: the bytes, not a form.
+        const gone = configFormFor(registry, findBlock(retiredDocument(), "blk_GONE"));
+        equal("an unresolvable block still offers no fields", gone.fields, []);
+        equal("...and is still read-only", gone.readOnly, true);
       });
 
       /* ------------------------------------------------------- reporting */

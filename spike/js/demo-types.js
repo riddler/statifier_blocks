@@ -54,24 +54,20 @@ const isEventName = (value) => nonEmptyString(value) && EVENT_NAME.test(value);
 const verdict = (findings) => (findings.length === 0 ? null : findings);
 
 /*
- * Two config fields every demo step carries, and the reason each is declared
+ * The one config field every demo step carries, and the reason it is declared
  * rather than left as undeclared stored data:
  *
- *   `label`   the author's own words for this step. The canvas reads it as
- *             the card's title, falling back to the palette label - which is
- *             a general rule over the SCHEMA (a declared string field keyed
- *             `label`), not a branch on any type name.
  *   `invoke_type`  the host handler this step names. ADR-0002's two-registry
  *             seam: a block type NAMES an invoke type, it never runs one.
+ *
+ * `label` used to be declared beside it, and no longer is (sb-jvz). The
+ * canvas titles EVERY card from `label`, so declaring it here was writing the
+ * editor's own field: a type that forgot lost its author's words, which is
+ * exactly what happened to the proposed `core.invoke`. The editor now injects
+ * it into every descriptor it resolves (`withEditorFields` in palette.js), so
+ * these types get it - and its check - without asking, and so does every type
+ * a host writes next.
  */
-const labelField = {
-  key: "label",
-  type: "string",
-  label: "Step name",
-  required: false,
-  default: "",
-};
-
 const invokeTypeField = {
   key: "invoke_type",
   type: "string",
@@ -86,9 +82,9 @@ function checkCommon(config) {
   if (!nonEmptyString(config.invoke_type) || !INVOKE_TYPE.test(config.invoke_type)) {
     findings.push({ key: "invoke_type", message: 'must look like "myapp:capture"' });
   }
-  if ("label" in config && typeof config.label !== "string") {
-    findings.push({ key: "label", message: "must be text" });
-  }
+
+  /* No `label` check here: the editor injects the field, so the editor checks
+   * it, for every type rather than only for these. */
 
   return findings;
 }
@@ -115,7 +111,7 @@ function step({
     name,
     currentVersion,
     slots: () => [],
-    configSchema: () => [labelField, invokeTypeField, ...fields],
+    configSchema: () => [invokeTypeField, ...fields],
     validateConfig: (config) => verdict([...checkCommon(config), ...check(config)]),
     io: () => io,
     paletteEntry: { label, group, description, icon, keywords, order, accentToken: HOST_ACCENT },

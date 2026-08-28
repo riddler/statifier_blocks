@@ -28,6 +28,16 @@
  *
  * Whether any of this earns an ADR-0002/0004 amendment is a Phase-B finding.
  * The specific open questions each type raises are flagged at that type.
+ *
+ * ## Neither type declares `label`, and that is now correct
+ *
+ * It used to be a gap: `card-processing.json` stores a label on both of its
+ * `core.invoke` blocks, the canvas titled the cards from it, and the config
+ * form could not edit it, because a schema field keyed `label` was something
+ * each type had to remember to declare. The editor injects that field now
+ * (`withEditorFields` in palette.js), so these two proposals declare only
+ * what their own work needs - which is what made the gap visible in the
+ * first place and is the argument sb-jvz was decided on.
  */
 
 /* ------------------------------------------------------- shared checks
