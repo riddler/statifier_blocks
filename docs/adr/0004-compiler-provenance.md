@@ -1014,10 +1014,12 @@ child - targets the block's **error-outcome final**. Entering that final raises
 does not resume anything, does not re-enter its own body, and has no opinion
 about what comes next.
 
-What comes next is the enclosing parent's wiring and only that. In the fixture,
-the enclosing sequence transitions on the prefix descriptor, so it carries on to
-`blk_cp_outcome` whichever way the authorization finished - which is precisely
-the behaviour the run assumed and flagged as an assumption. A different parent
+What comes next is the enclosing parent's wiring and only that. In the fixture
+the invoke is the last body child of a group, and the group transitions on the
+prefix descriptor, so it finishes whichever way the authorization finished and
+the run carries on to `blk_cp_outcome` by the ordinary completion chain above
+it - which is precisely the behaviour the run assumed and flagged as an
+assumption. A different parent
 could route the error outcome somewhere else, or nowhere, and both are ordinary
 wiring rather than special cases. Recovery flows shared across many outcome
 paths are D13's designated escape hatch (a subchart/fragment-reference block),
@@ -1079,10 +1081,13 @@ child's emitted SCXML is still not in the context.
 
 ### Worked example: the failed authorization, compiled
 
-The fixture's failing step, in the shape this amendment proposes. The invoke's
-own id is minted by the engine, so the failure transition matches statifier-ex
-ADR-0068's `error.communication.invoke` by prefix rather than naming it - the
-same reason the accepted example's `done.invoke` transition does:
+The fixture's failing step, in the shape this amendment proposes. In that
+document `blk_cp_authorize` is a `core.invoke` whose `on_error` slot holds the
+sequence `blk_cp_authz_error`, and it is the last body child of the group
+`blk_cp_authz`. The invoke's own id is minted by the engine, so the failure
+transition matches statifier-ex ADR-0068's `error.communication.invoke` by
+prefix rather than naming it - the same reason the accepted example's
+`done.invoke` transition does:
 
 ```xml
 <state id="s_blk_cp_authorize" initial="s_blk_cp_authorize__running">
@@ -1090,14 +1095,14 @@ same reason the accepted example's `done.invoke` transition does:
   <state id="s_blk_cp_authorize__running">
     <invoke type="myapp:authorize"/>
     <transition event="done.invoke" target="s_blk_cp_authorize__o_done"/>
-    <transition event="error.communication.invoke" target="s_blk_cp_authz_seq"/>
+    <transition event="error.communication.invoke" target="s_blk_cp_authz_error"/>
   </state>
 
   <!-- the on_error slot's child, compiled as any slot child is -->
-  <state id="s_blk_cp_authz_seq" initial="s_blk_cp_authz_park">
+  <state id="s_blk_cp_authz_error" initial="s_blk_cp_authz_park">
     <!-- park, then notify ops -->
   </state>
-  <transition event="done.state.s_blk_cp_authz_seq"
+  <transition event="done.state.s_blk_cp_authz_error"
               target="s_blk_cp_authorize__o_error"/>
 
   <final id="s_blk_cp_authorize__o_done">
@@ -1108,15 +1113,23 @@ same reason the accepted example's `done.invoke` transition does:
   </final>
 
 </state>
-<transition event="done.outcome.s_blk_cp_authorize" target="s_blk_cp_outcome"/>
+
+<!-- emitted by the enclosing group, on the child it leaves -->
+<transition event="done.outcome.s_blk_cp_authorize" target="s_blk_cp_authz__o_done"/>
 ```
 
-The last line is the whole of decision 2d in one element: the enclosing sequence
-carries on to the outcome branch whichever way the authorization finished, and
-it says so in its own wiring rather than the invoke block deciding for it. The
-provenance rows are what decision 5 already prescribes - `s_blk_cp_authorize__o_error`
-owned by `blk_cp_authorize` with role `o_error`, and the final transition
-attributed to the child it leaves, as the accepted example's sequence wiring is.
+The last line is the whole of decision 2d in one element. The invoke's emission
+ends at its error final; the enclosing group is what carries on, and it does so
+whichever way the authorization finished because it wires the prefix descriptor
+and never learns an outcome name. From there nothing is new: the group is a
+single-outcome block, so its own completion travels as `done.state` up through
+the branch arm to the root sequence, which moves the run to `blk_cp_outcome` -
+the step the fixture takes next, now by an emission rather than by assumption.
+
+The provenance rows are what decision 5 already prescribes:
+`s_blk_cp_authorize__o_error` and the `<raise>` inside it are owned by
+`blk_cp_authorize` with role `o_error`, and the group's transition is attributed
+to the child it leaves, as the accepted example's sequence wiring is.
 
 ### Deferred question: is there an author-facing outcome leaf?
 
