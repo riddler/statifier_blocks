@@ -874,3 +874,295 @@ What this example is chosen to demonstrate:
 - **Identity is a relation, not an equation (decision 7).** A rename moves the
   document hash, leaves the SCXML byte-identical, and leaves every running session
   resumable.
+
+## Proposed amendment (2026-08-28): decision 2, outcome-tagged finals
+
+**Status: proposed.** Nothing in this section is accepted. It amends decision
+2's single-final emission and nothing else; every other decision in the record
+stands as written, and no accepted text above has been edited.
+
+### What forces the amendment
+
+The operator's 2026-08-28 ruling (umbrella `docs/decisions.md` D13) settled the
+authoring model above this record: **outcome paths are slots, never ports; a
+block has one inlet and one outlet; and each outcome compiles to a distinct
+completion event.** Ports - several typed outputs with author-drawn edges - were
+rejected because they break the tree invariant the editor rests on (connectors
+are rendered, never authored), so a block with more than one way to finish
+declares a *slot* per alternative path and the compiler is left owing an
+emission for it.
+
+Decision 2 as accepted does not supply one. It says a block signals completion
+by its state reaching done, and `done.state.<state id>` names the state that
+finished and nothing about *how* it finished. A `core.invoke` with an `on_error`
+slot has two ways to finish, and under the accepted text both produce the same
+event, so a parent cannot tell them apart and the question of what runs after a
+failure path completes has no answer at all.
+
+That gap is not hypothetical, and the spike recorded it rather than papering
+over it. The fixture run `run_cp_invoke_error` in `spike/fixtures/runs.json`
+walks the card-authorization document through a failed `myapp:authorize` call:
+the `on_error` subtree parks the transaction and tells ops, and the run then
+carries on to the next step in the enclosing sequence. The step that does so
+carries this note in the fixture, verbatim:
+
+> What happens once the on_error subtree finishes - whether the enclosing group
+> carries on to the next step as it does here, and how that reconciles with
+> ADR-0004's single-final emission - is undecided. This run assumes it does
+> carry on, and says so rather than letting the assumption ride as a rendered
+> fact.
+
+This amendment is the answer that note is waiting for.
+
+### 2a. A block type may declare outcomes; the default is exactly one
+
+A block type declares an ordered list of outcome names. A type that declares
+none has one outcome, named `done`, which is the case the accepted record
+already describes: one final, one completion event, nothing to choose between.
+Every existing `core.*` type is in that case and none of them changes meaning.
+
+Outcome names match `~r/\A[a-z][a-z0-9_]*\z/`, the same shape as a role
+(decision 3), and are declared in a fixed order so decision 6's byte
+determinism survives. **Where the declaration surface lives is not this
+record's call**: the `outcomes/1` callback, and how an outcome relates to the
+slot that feeds it, belong to ADR-0002's own amendment (sb-0b0). This record
+owns only what the compiler emits once the declaration exists.
+
+### 2b. One `<final>` per declared outcome, minted through the context
+
+Each declared outcome the block actually reaches compiles to its own `<final>`
+child of the block's own state, with the id
+
+```
+outcome_id(block_id, outcome) = state_id(block_id, "o_" <> outcome)
+                              = "s_" <> block_id <> "__o_" <> outcome
+```
+
+minted through `Context.outcome_id/2` rather than by string concatenation
+inside the block type, for decision 3's reason. Outcome finals therefore live
+in the role namespace decision 3 already established: they are auxiliary states
+inside the block's own state, they inherit its uniqueness and invertibility
+properties unchanged, and `unstate_id/1` still inverts them.
+
+To keep the two kinds of auxiliary state distinguishable, **the compiler
+reserves the role prefix `o_`**: `Context.role_id/2` refuses a role beginning
+with `o_` with a `:reserved_role` finding, and `Context.outcome_id/2` is the
+only way to mint one. Without the reservation an outcome final and a
+hand-minted role could produce the same id and provenance could not say which
+it was.
+
+"One block, one state" is untouched. A block with four outcomes still compiles
+to one state; what grew is the number of `<final>` children *inside* it, which
+decision 2's own escape - auxiliary states inside the block's own state - always
+permitted.
+
+### 2c. The outcome rides on an event, not on the final's identity
+
+`done.state.<state id>` is generated whichever final is entered, so the final's
+identity is not observable to a parent. The tag has to travel as its own event:
+
+```xml
+<final id="s_blk_AUTH__o_error">
+  <onentry><raise event="done.outcome.s_blk_AUTH.error"/></onentry>
+</final>
+```
+
+The completion event of an outcome is `done.outcome.<state id>.<outcome>`, and
+it is computable from the child's block id and the outcome name alone - which is
+the composability property decision 2 exists to protect, extended rather than
+weakened. A parent still reads none of its child's emission.
+
+Three consequences worth stating, because each is a place to get it wrong:
+
+- **A parent that does not care which outcome wires the prefix.** SCXML event
+  descriptors match at token boundaries, so a transition on
+  `done.outcome.s_blk_AUTH` matches every outcome of that block and no other
+  block's. `core.sequence` uses exactly that and never learns an outcome name;
+  a parent that *does* discriminate names the full event. This is the same
+  prefix-descriptor idiom the accepted record already relies on for
+  `done.invoke`.
+- **A parent must not wire both `done.outcome.*` and `done.state.*` for one
+  child.** Both are internal events and Appendix D queues the final's `onentry`
+  content before the `done.state` it then generates, so in practice the outcome
+  transition is offered first - but resting a semantic distinction on
+  internal-queue ordering is a contract nobody should have to read the
+  interpreter to understand. `done.state.<state id>` remains what it was: the
+  "finished, do not care how" signal for a single-outcome child.
+- **An outcome a block never reaches costs a parent nothing.** Because the
+  wiring is an event and not a target, a parent may transition on an outcome
+  whose final was never emitted; the transition simply never fires, and no
+  `{:unresolved_target, _}` finding results. That is what lets `core.invoke`
+  omit the error path entirely when its `on_error` slot is empty, exactly as the
+  spike's `core.invoke` sketch describes, without the parent's wiring changing.
+
+Two alternatives were considered and rejected. Carrying the outcome in
+`<donedata>` and having the parent discriminate with a `cond` on `_event.data`
+makes every structural parent's wiring depend on the datamodel language and
+turns a routing decision into an expression evaluation. Emitting one final and
+having the parent read the block's internal configuration reintroduces the
+dependency decision 2 was written to forbid.
+
+### 2d. The parent decides continuation; the block does not
+
+This is the part `run_cp_invoke_error` was waiting on, and it follows from 2c
+rather than being a separate choice.
+
+The `on_error` subtree is compiled, like any slot child, as a state inside the
+invoke block's own state. Its completion - an ordinary `done.state` on that
+child - targets the block's **error-outcome final**. Entering that final raises
+`done.outcome.<state id>.error`, and there the block's emission ends. The block
+does not resume anything, does not re-enter its own body, and has no opinion
+about what comes next.
+
+What comes next is the enclosing parent's wiring and only that. In the fixture,
+the enclosing sequence transitions on the prefix descriptor, so it carries on to
+`blk_cp_outcome` whichever way the authorization finished - which is precisely
+the behaviour the run assumed and flagged as an assumption. A different parent
+could route the error outcome somewhere else, or nowhere, and both are ordinary
+wiring rather than special cases. Recovery flows shared across many outcome
+paths are D13's designated escape hatch (a subchart/fragment-reference block),
+not a reason to give a block continuation authority.
+
+### 2e. What the context carries
+
+Decision 4's child summary grows one field, and nothing else in the context
+changes:
+
+```elixir
+@type outcome :: %{
+        name: String.t(),
+        state_id: String.t(),
+        done_event: String.t()
+      }
+
+@type child :: %{
+        block_id: Block.id(),
+        state_id: String.t(),
+        done_event: String.t(),
+        outcomes: [outcome()]
+      }
+```
+
+`done_event` keeps its accepted meaning - `done.state.<state id>` - so every
+structural parent written against the accepted record still compiles and still
+behaves identically for single-outcome children. `outcomes` is in declaration
+order, always non-empty, and holds one entry for a type that declared none. A
+child's emitted SCXML is still not in the context.
+
+```elixir
+@doc "Mints the final's id for one declared outcome. Injective; `unstate_id/1` inverts it."
+@spec outcome_id(t(), outcome :: String.t()) :: String.t()
+
+@doc "The completion event a parent wires on: `done.outcome.<state id>.<outcome>`."
+@spec outcome_event(t(), outcome :: String.t()) :: String.t()
+```
+
+### 2f. Provenance, determinism, and findings
+
+- **Provenance (decision 5) is unchanged and stays total.** An outcome final is
+  owned by its block with `role: "o_" <> outcome` and `config_key: nil`; so is
+  the `<raise>` inside it. Nothing new is unowned.
+- **Determinism (decision 6) is unchanged in kind and moved in fact.** Outcomes
+  serialize in declaration order, never from map iteration. But the default
+  outcome's final id moves from the ad-hoc role a type used before - the
+  accepted worked example's `s_blk_AUTH__done` - to `s_blk_AUTH__o_done`, so
+  adopting this amendment moves bytes for every document and is a
+  compiler-version bump under decision 6's third axis. That is the record's own
+  release-discipline obligation coming due, not an exception to it.
+- **Findings (decision 10) gain two Emit-stage codes**, both `fault: :package`
+  and both named against the block whose type misbehaved: `:invalid_outcome`
+  for an outcome name failing the role shape or declared twice, and
+  `:reserved_role` for a `role_id/2` call in the `o_` namespace.
+- **Decision 9 is untouched.** Chart-semantic validation stays delegated; an
+  unreachable outcome final, if upstream ever warns about one, arrives here as
+  an ordinary mapped warning.
+
+### Worked example: the failed authorization, compiled
+
+The fixture's failing step, in the shape this amendment proposes. The invoke's
+own id is minted by the engine, so the failure transition matches statifier-ex
+ADR-0068's `error.communication.invoke` by prefix rather than naming it - the
+same reason the accepted example's `done.invoke` transition does:
+
+```xml
+<state id="s_blk_cp_authorize" initial="s_blk_cp_authorize__running">
+
+  <state id="s_blk_cp_authorize__running">
+    <invoke type="myapp:authorize"/>
+    <transition event="done.invoke" target="s_blk_cp_authorize__o_done"/>
+    <transition event="error.communication.invoke" target="s_blk_cp_authz_seq"/>
+  </state>
+
+  <!-- the on_error slot's child, compiled as any slot child is -->
+  <state id="s_blk_cp_authz_seq" initial="s_blk_cp_authz_park">
+    <!-- park, then notify ops -->
+  </state>
+  <transition event="done.state.s_blk_cp_authz_seq"
+              target="s_blk_cp_authorize__o_error"/>
+
+  <final id="s_blk_cp_authorize__o_done">
+    <onentry><raise event="done.outcome.s_blk_cp_authorize.done"/></onentry>
+  </final>
+  <final id="s_blk_cp_authorize__o_error">
+    <onentry><raise event="done.outcome.s_blk_cp_authorize.error"/></onentry>
+  </final>
+
+</state>
+<transition event="done.outcome.s_blk_cp_authorize" target="s_blk_cp_outcome"/>
+```
+
+The last line is the whole of decision 2d in one element: the enclosing sequence
+carries on to the outcome branch whichever way the authorization finished, and
+it says so in its own wiring rather than the invoke block deciding for it. The
+provenance rows are what decision 5 already prescribes - `s_blk_cp_authorize__o_error`
+owned by `blk_cp_authorize` with role `o_error`, and the final transition
+attributed to the child it leaves, as the accepted example's sequence wiring is.
+
+### Deferred question: is there an author-facing outcome leaf?
+
+**Not decided here, and deliberately so.** Under this amendment every outcome
+final and every transition into one is *emitter-generated*: a block type decides
+which of its declared outcomes a given internal path reaches, and an author
+never names an outcome except by putting content in the slot that feeds it.
+
+The open alternative is a **leaf block type meaning "finish with outcome X"** -
+an author drops it at the end of a subtree and chooses the outcome the enclosing
+block completes with, the way a `return` ends a function body. It is the natural
+authoring surface for a type with three or more outcomes whose paths are not in
+one-to-one correspondence with its slots.
+
+What the question does *not* touch, which is why the amendment above can stand
+without it: both answers produce the same emission. The outcome final exists,
+its id is `outcome_id/2`, entering it raises `done.outcome.<state id>.<outcome>`,
+and the parent decides continuation. The question is only **who writes the edge
+into the final** - the block type, or an author placing a leaf.
+
+What it would have to settle if taken up:
+
+- whether the leaf is a `core.*` type or a per-host concern, and whether it can
+  name an outcome the enclosing block type did not declare (the compiler can
+  check this, since it mints the ids);
+- what it means in a subtree with no enclosing multi-outcome block, and what
+  finding that produces;
+- how it interacts with assignability (ADR-0003): a leaf that ends a path
+  declares no `produces`, as `core.raise` already does, but an outcome-selecting
+  leaf makes the enclosing block's `produces` a join over the paths that reach
+  each outcome - the join ADR-0003 decision 4 declined to build a lattice for,
+  and the reason the spike's `core.invoke` declares `produces: "unknown"`;
+- whether it is authored at all, or whether it is the presentation of something
+  the block type declares, which is ADR-0005's kind of question rather than this
+  record's.
+
+Until it is ruled, block types wire their own outcome finals and no such leaf
+exists in the vocabulary.
+
+### What this amendment does not change
+
+- Decision 2's "one block, one state" and the ban on sibling states.
+- Decision 3's derivation, its three properties, or `unstate_id/1`.
+- Decision 5's provenance keys and its totality.
+- Decision 6's determinism guarantee, whose compiler-version axis this
+  amendment exercises rather than amends.
+- Decisions 7 through 10 in any respect.
+- ADR-0002's declaration surface, which is sb-0b0's to amend, and ADR-0001's
+  document schema, which nothing here touches.
