@@ -1,0 +1,636 @@
+{
+  "_comment": [
+    "The typed datamodel the spike's datamodel panel and condition editor read.",
+    "Not an ADR-0001 artifact: no accepted record defines a datamodel document",
+    "yet, so this shape is the spike's proposal and journalling it is part of W3.",
+    "Shape: three scopes - 'global' (host-owned, same for every run), 'local'",
+    "(chart-local, one per run), 'event' (the payload of the event currently being",
+    "handled; its entries are addressed with the 'event.' prefix in conditions).",
+    "Type set: string, integer, decimal, boolean, datetime, duration, object, list.",
+    "Per ADR-0001 decision 6 there are no floats anywhere - money is integer minor",
+    "units and a decimal is carried as a string.",
+    "Invariant this fixture is held to: every datamodel path named in a 'cond' in",
+    "documents/*.json resolves to an entry here. Both directions were walked by",
+    "hand when the fixtures were written (sb-ajk)."
+  ],
+  "version": 1,
+  "scopes": [
+    {
+      "scope": "global",
+      "label": "Global",
+      "description": "Host-owned configuration. The same for every run of every chart.",
+      "entries": [
+        {
+          "name": "merchant",
+          "path": "merchant",
+          "type": "object",
+          "label": "Merchant",
+          "fields": [
+            {
+              "name": "id",
+              "path": "merchant.id",
+              "type": "string",
+              "label": "Merchant id",
+              "example": "mer_9f2c"
+            },
+            {
+              "name": "country",
+              "path": "merchant.country",
+              "type": "string",
+              "label": "Country",
+              "example": "US"
+            },
+            {
+              "name": "currency",
+              "path": "merchant.currency",
+              "type": "string",
+              "label": "Settlement currency",
+              "example": "USD"
+            },
+            {
+              "name": "risk_tier",
+              "path": "merchant.risk_tier",
+              "type": "string",
+              "label": "Risk tier",
+              "example": "standard"
+            },
+            {
+              "name": "settlement_fx_rate",
+              "path": "merchant.settlement_fx_rate",
+              "type": "decimal",
+              "label": "Settlement FX rate",
+              "example": "1.0000",
+              "note": "Decimal carried as a string - ADR-0001 decision 6 forbids floats."
+            }
+          ]
+        },
+        {
+          "name": "limits",
+          "path": "limits",
+          "type": "object",
+          "label": "Limits",
+          "fields": [
+            {
+              "name": "daily_capture_cap_cents",
+              "path": "limits.daily_capture_cap_cents",
+              "type": "integer",
+              "label": "Daily capture cap (minor units)",
+              "example": 5000000
+            },
+            {
+              "name": "manual_review_backlog",
+              "path": "limits.manual_review_backlog",
+              "type": "integer",
+              "label": "Manual review backlog",
+              "example": 12
+            },
+            {
+              "name": "authorization_window",
+              "path": "limits.authorization_window",
+              "type": "duration",
+              "label": "Authorization window",
+              "example": "PT15M"
+            }
+          ]
+        },
+        {
+          "name": "feature_flags",
+          "path": "feature_flags",
+          "type": "object",
+          "label": "Feature flags",
+          "fields": [
+            {
+              "name": "three_ds_required",
+              "path": "feature_flags.three_ds_required",
+              "type": "boolean",
+              "label": "3DS required",
+              "example": true
+            },
+            {
+              "name": "legacy_check_enabled",
+              "path": "feature_flags.legacy_check_enabled",
+              "type": "boolean",
+              "label": "Legacy check enabled",
+              "example": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scope": "local",
+      "label": "Chart-local",
+      "description": "One per run. Written by the steps of the chart as it goes.",
+      "entries": [
+        {
+          "name": "started_at",
+          "path": "started_at",
+          "type": "datetime",
+          "label": "Started at",
+          "example": "2026-08-28T09:14:03Z"
+        },
+        {
+          "name": "amount_cents",
+          "path": "amount_cents",
+          "type": "integer",
+          "label": "Amount (minor units)",
+          "example": 42350
+        },
+        {
+          "name": "amount",
+          "path": "amount",
+          "type": "decimal",
+          "label": "Amount (display)",
+          "example": "423.50"
+        },
+        {
+          "name": "currency",
+          "path": "currency",
+          "type": "string",
+          "label": "Currency",
+          "example": "USD"
+        },
+        {
+          "name": "capture_attempts",
+          "path": "capture_attempts",
+          "type": "integer",
+          "label": "Capture attempts",
+          "example": 1
+        },
+        {
+          "name": "risk_rating",
+          "path": "risk_rating",
+          "type": "integer",
+          "label": "Risk rating",
+          "example": 34
+        },
+        {
+          "name": "risk_reasons",
+          "path": "risk_reasons",
+          "type": "list",
+          "item_type": "string",
+          "label": "Risk reasons",
+          "example": ["velocity", "new_device"]
+        },
+        {
+          "name": "card",
+          "path": "card",
+          "type": "object",
+          "label": "Card",
+          "fields": [
+            {
+              "name": "brand",
+              "path": "card.brand",
+              "type": "string",
+              "label": "Brand",
+              "example": "visa"
+            },
+            {
+              "name": "last4",
+              "path": "card.last4",
+              "type": "string",
+              "label": "Last four",
+              "example": "4242"
+            },
+            {
+              "name": "active",
+              "path": "card.active",
+              "type": "boolean",
+              "label": "Active",
+              "example": true
+            },
+            {
+              "name": "expires_at",
+              "path": "card.expires_at",
+              "type": "datetime",
+              "label": "Expires at",
+              "example": "2029-01-31T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "name": "customer",
+          "path": "customer",
+          "type": "object",
+          "label": "Customer",
+          "fields": [
+            {
+              "name": "id",
+              "path": "customer.id",
+              "type": "string",
+              "label": "Customer id",
+              "example": "cus_31b8"
+            },
+            {
+              "name": "email",
+              "path": "customer.email",
+              "type": "string",
+              "label": "Email",
+              "example": "avery@example.com"
+            },
+            {
+              "name": "tenure_days",
+              "path": "customer.tenure_days",
+              "type": "integer",
+              "label": "Tenure (days)",
+              "example": 512
+            },
+            {
+              "name": "verified",
+              "path": "customer.verified",
+              "type": "boolean",
+              "label": "Verified",
+              "example": true
+            }
+          ]
+        },
+        {
+          "name": "validation",
+          "path": "validation",
+          "type": "object",
+          "label": "Validation",
+          "fields": [
+            {
+              "name": "passed",
+              "path": "validation.passed",
+              "type": "boolean",
+              "label": "Passed",
+              "example": true
+            },
+            {
+              "name": "errors",
+              "path": "validation.errors",
+              "type": "list",
+              "item_type": "string",
+              "label": "Errors",
+              "example": []
+            }
+          ]
+        },
+        {
+          "name": "fraud",
+          "path": "fraud",
+          "type": "object",
+          "label": "Fraud",
+          "fields": [
+            {
+              "name": "verdict",
+              "path": "fraud.verdict",
+              "type": "string",
+              "label": "Verdict",
+              "example": "clear",
+              "one_of": ["clear", "review", "decline"]
+            },
+            {
+              "name": "cleared",
+              "path": "fraud.cleared",
+              "type": "boolean",
+              "label": "Cleared",
+              "example": true
+            },
+            {
+              "name": "rated_at",
+              "path": "fraud.rated_at",
+              "type": "datetime",
+              "label": "Rated at",
+              "example": "2026-08-28T09:14:11Z"
+            }
+          ]
+        },
+        {
+          "name": "balance",
+          "path": "balance",
+          "type": "object",
+          "label": "Balance",
+          "fields": [
+            {
+              "name": "available_cents",
+              "path": "balance.available_cents",
+              "type": "integer",
+              "label": "Available (minor units)",
+              "example": 91200
+            },
+            {
+              "name": "checked",
+              "path": "balance.checked",
+              "type": "boolean",
+              "label": "Checked",
+              "example": true
+            }
+          ]
+        },
+        {
+          "name": "three_ds",
+          "path": "three_ds",
+          "type": "object",
+          "label": "3DS",
+          "fields": [
+            {
+              "name": "required",
+              "path": "three_ds.required",
+              "type": "boolean",
+              "label": "Required",
+              "example": true
+            },
+            {
+              "name": "completed",
+              "path": "three_ds.completed",
+              "type": "boolean",
+              "label": "Completed",
+              "example": false
+            },
+            {
+              "name": "status",
+              "path": "three_ds.status",
+              "type": "string",
+              "label": "Status",
+              "example": "challenge_sent"
+            }
+          ]
+        },
+        {
+          "name": "auth",
+          "path": "auth",
+          "type": "object",
+          "label": "Authorization",
+          "fields": [
+            {
+              "name": "approved",
+              "path": "auth.approved",
+              "type": "boolean",
+              "label": "Approved",
+              "example": true
+            },
+            {
+              "name": "captured",
+              "path": "auth.captured",
+              "type": "boolean",
+              "label": "Captured",
+              "example": false
+            },
+            {
+              "name": "code",
+              "path": "auth.code",
+              "type": "string",
+              "label": "Authorization code",
+              "example": "A71C09"
+            },
+            {
+              "name": "network_ref",
+              "path": "auth.network_ref",
+              "type": "string",
+              "label": "Network reference",
+              "example": "nref_5512aa"
+            },
+            {
+              "name": "expires_in",
+              "path": "auth.expires_in",
+              "type": "duration",
+              "label": "Authorization holds for",
+              "example": "P7D"
+            }
+          ]
+        },
+        {
+          "name": "review",
+          "path": "review",
+          "type": "object",
+          "label": "Manual review",
+          "fields": [
+            {
+              "name": "parked",
+              "path": "review.parked",
+              "type": "boolean",
+              "label": "Parked",
+              "example": false
+            },
+            {
+              "name": "queue",
+              "path": "review.queue",
+              "type": "string",
+              "label": "Queue",
+              "example": "manual_review"
+            },
+            {
+              "name": "resolution",
+              "path": "review.resolution",
+              "type": "string",
+              "label": "Resolution",
+              "example": "",
+              "one_of": ["", "approve", "decline"]
+            },
+            {
+              "name": "parked_at",
+              "path": "review.parked_at",
+              "type": "datetime",
+              "label": "Parked at",
+              "example": "2026-08-28T09:20:44Z"
+            }
+          ]
+        },
+        {
+          "name": "signup",
+          "path": "signup",
+          "type": "object",
+          "label": "Signup",
+          "note": "Chart-local for the signup-wizard document.",
+          "fields": [
+            {
+              "name": "email",
+              "path": "signup.email",
+              "type": "string",
+              "label": "Email",
+              "example": "avery@example.com"
+            },
+            {
+              "name": "email_verified",
+              "path": "signup.email_verified",
+              "type": "boolean",
+              "label": "Email verified",
+              "example": false
+            },
+            {
+              "name": "plan",
+              "path": "signup.plan",
+              "type": "string",
+              "label": "Plan",
+              "example": "personal",
+              "one_of": ["personal", "business"]
+            },
+            {
+              "name": "seats",
+              "path": "signup.seats",
+              "type": "integer",
+              "label": "Seats",
+              "example": 1
+            },
+            {
+              "name": "company",
+              "path": "signup.company",
+              "type": "string",
+              "label": "Company",
+              "example": ""
+            },
+            {
+              "name": "trial_length",
+              "path": "signup.trial_length",
+              "type": "duration",
+              "label": "Trial length",
+              "example": "P14D"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "scope": "event",
+      "label": "Event payload",
+      "description": "The payload of the event being handled. Addressed with the 'event.' prefix in conditions; only the entry matching the event currently in flight is populated.",
+      "entries": [
+        {
+          "name": "name",
+          "path": "event.name",
+          "type": "string",
+          "label": "Event name",
+          "example": "customer.cancelled"
+        },
+        {
+          "name": "received_at",
+          "path": "event.received_at",
+          "type": "datetime",
+          "label": "Received at",
+          "example": "2026-08-28T09:22:01Z"
+        },
+        {
+          "name": "customer_cancelled",
+          "path": "event.customer_cancelled",
+          "type": "object",
+          "label": "customer.cancelled",
+          "fields": [
+            {
+              "name": "reason",
+              "path": "event.customer_cancelled.reason",
+              "type": "string",
+              "label": "Reason",
+              "example": "customer_request",
+              "one_of": ["customer_request", "duplicate", "timeout"]
+            },
+            {
+              "name": "at",
+              "path": "event.customer_cancelled.at",
+              "type": "datetime",
+              "label": "Cancelled at",
+              "example": "2026-08-28T09:21:58Z"
+            }
+          ]
+        },
+        {
+          "name": "review_resolved",
+          "path": "event.review_resolved",
+          "type": "object",
+          "label": "review.resolved",
+          "fields": [
+            {
+              "name": "decision",
+              "path": "event.review_resolved.decision",
+              "type": "string",
+              "label": "Decision",
+              "example": "approve",
+              "one_of": ["approve", "decline"]
+            },
+            {
+              "name": "reviewer_id",
+              "path": "event.review_resolved.reviewer_id",
+              "type": "string",
+              "label": "Reviewer id",
+              "example": "usr_7d1e"
+            },
+            {
+              "name": "notes",
+              "path": "event.review_resolved.notes",
+              "type": "string",
+              "label": "Notes",
+              "example": ""
+            }
+          ]
+        },
+        {
+          "name": "three_ds_completed",
+          "path": "event.three_ds_completed",
+          "type": "object",
+          "label": "card.three_ds_completed",
+          "fields": [
+            {
+              "name": "status",
+              "path": "event.three_ds_completed.status",
+              "type": "string",
+              "label": "Status",
+              "example": "authenticated",
+              "one_of": ["authenticated", "failed", "unavailable"]
+            }
+          ]
+        },
+        {
+          "name": "fraud_aborted",
+          "path": "event.fraud_aborted",
+          "type": "object",
+          "label": "fraud.aborted",
+          "fields": [
+            {
+              "name": "reason",
+              "path": "event.fraud_aborted.reason",
+              "type": "string",
+              "label": "Reason",
+              "example": "provider_unavailable"
+            }
+          ]
+        },
+        {
+          "name": "capture_reversed",
+          "path": "event.capture_reversed",
+          "type": "object",
+          "label": "capture.reversed",
+          "fields": [
+            {
+              "name": "amount_cents",
+              "path": "event.capture_reversed.amount_cents",
+              "type": "integer",
+              "label": "Reversed amount (minor units)",
+              "example": 42350
+            }
+          ]
+        },
+        {
+          "name": "signup_email_verified",
+          "path": "event.signup_email_verified",
+          "type": "object",
+          "label": "signup.email_verified",
+          "fields": [
+            {
+              "name": "verified_at",
+              "path": "event.signup_email_verified.verified_at",
+              "type": "datetime",
+              "label": "Verified at",
+              "example": "2026-08-28T10:02:17Z"
+            }
+          ]
+        },
+        {
+          "name": "signup_abandoned",
+          "path": "event.signup_abandoned",
+          "type": "object",
+          "label": "signup.abandoned",
+          "fields": [
+            {
+              "name": "last_step",
+              "path": "event.signup_abandoned.last_step",
+              "type": "string",
+              "label": "Last step",
+              "example": "send_verification"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
