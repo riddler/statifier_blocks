@@ -25,7 +25,13 @@
   margin: 0;
   padding: 0;
   border: 0;
-  font: var(--sb-font);
+  /* `font-family`, NOT the `font` shorthand. `font: <family-list>` is invalid
+   * CSS - the shorthand requires a size and a family together - so the whole
+   * declaration was being dropped and the host page's serif was inheriting
+   * straight through the reset that exists to stop exactly that. Found in
+   * sb-ad2; the symptom was every card, every label and every chip in the
+   * editor rendering in the demo page's Georgia. */
+  font-family: var(--sb-font);
   font-size: var(--sb-text-md);
   line-height: var(--sb-leading);
   color: var(--sb-fg);
