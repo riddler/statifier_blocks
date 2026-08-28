@@ -399,11 +399,15 @@ export function conditionPaths(source, index) {
  *
  * That derivation is the decision worth naming: a condition is any field whose
  * declared type is `expression` (ADR-0002 decision 7's field-type set), so a
- * branch's per-arm `cond`, `myapp.guarded_on_event`'s guard and
- * `myapp.timeout_rule`'s guard all arrive here without this file knowing any of
+ * branch's per-arm `cond`, `core.on_event`'s optional guard and
+ * `core.timeout`'s guard all arrive here without this file knowing any of
  * those type names, and a host that declares an `expression` field gets the
  * pane for free. A hard-coded list of types would have been shorter and would
  * have been wrong for the first host block type nobody thought of.
+ *
+ * That claim was paid for on 2026-08-28 (sb-0o4): the first two of those three
+ * used to be `myapp.guarded_on_event` and `myapp.timeout_rule`, the guards
+ * moved onto core types, and this function did not change.
  *
  * An unresolvable block (d12) yields nothing at all: its config is read-only
  * bytes with no schema to say which of them is an expression, and guessing

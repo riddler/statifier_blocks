@@ -44,13 +44,9 @@ const HOST_ACCENT = "--sb-accent-myapp";
 
 const IDENTIFIER = /^[a-z][a-z0-9_]*$/;
 const INVOKE_TYPE = /^myapp:[a-z][a-z0-9_]*$/;
-const DURATION = /^P(?!$)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?!$)(\d+H)?(\d+M)?(\d+S)?)?$/;
-const EVENT_NAME = /^[A-Za-z_][A-Za-z0-9_.\-]*$/;
 
 const nonEmptyString = (value) => typeof value === "string" && value !== "";
 const isIdentifier = (value) => nonEmptyString(value) && IDENTIFIER.test(value);
-const isDuration = (value) => nonEmptyString(value) && DURATION.test(value);
-const isEventName = (value) => nonEmptyString(value) && EVENT_NAME.test(value);
 const verdict = (findings) => (findings.length === 0 ? null : findings);
 
 /*
@@ -122,46 +118,43 @@ function step({
   return descriptor;
 }
 
-/**
- * An interrupt rule: `kinds: ["interrupt_handler"]` and nothing else, which
- * is the whole placement rule in both directions (see `core.on_event`'s note
- * in palette.js). These two exist because `core.on_event` carries no guard
- * and no duration, and the fixture needs both to have something to draw an
- * exit edge FOR. Whether they earn an ADR-0002 amendment is a W6 finding.
+/* ------------------------------- RETIRED 2026-08-28: the interrupt rules
+ *
+ * `myapp.guarded_on_event` and `myapp.timeout_rule` used to live here, and
+ * they are gone (sb-0o4; operator ruling D12 in the umbrella's
+ * `docs/decisions.md`, 2026-08-28). Both were CRUTCHES, and the note they
+ * carried said so: they existed because the core vocabulary could not express
+ * a guarded interrupt rule or a timeout rule, and the demo documents needed
+ * both to have something to draw an exit edge FOR.
+ *
+ * The spike answered the question they were asked to hold open, so they were
+ * removed rather than left standing:
+ *
+ *   - `myapp.guarded_on_event` was `core.on_event` plus a `cond`. `core.on_event`
+ *     now declares that optional `cond` itself - a PROPOSED key on a SHIPPED
+ *     type, flagged as a mirror divergence at the descriptor in `palette.js`,
+ *     the way `core.parallel`'s `complete` is;
+ *   - `myapp.timeout_rule` was an `after` duration plus the same guard.
+ *     `core.timeout` in `proposed-core.js` is that type, proposed as core
+ *     because nothing about "interrupt this group after a duration" is
+ *     host-specific.
+ *
+ * `fixtures/documents/card-processing.json` was re-authored onto the two core
+ * forms in the same change. Every block id held and every config key kept its
+ * spelling, so `fixtures/runs.json` needed no edit at all - which is the
+ * cleanest evidence available that the core forms cover what these two were
+ * standing in for.
+ *
+ * What this file lost with them: it no longer declares an interrupt rule of
+ * any kind, and no demo type here declares an `expression` field. That is not
+ * a gap. The seam these two were meant to demonstrate - a host registering a
+ * block type through the caller-supplied registry (ADR-0002 decision 2) - is
+ * demonstrated by the eleven steps below and by `palette.js`'s three, and a
+ * crutch kept for symmetry is still a crutch.
+ *
+ * Nothing else was removed from this file. Anything else that looks like
+ * fixture furniture stays until the operator says otherwise.
  */
-const OUTCOMES = [
-  { value: "abandon", label: "Abandon - leave the group" },
-  { value: "resume", label: "Resume - re-enter the group" },
-];
-
-const outcomeField = {
-  key: "outcome",
-  type: { select: OUTCOMES },
-  label: "Then",
-  required: true,
-  default: "abandon",
-};
-
-const guardField = {
-  key: "cond",
-  type: "expression",
-  label: "Only when",
-  required: false,
-  default: "",
-};
-
-function checkOutcome(config) {
-  return OUTCOMES.some((option) => option.value === config.outcome)
-    ? []
-    : [{ key: "outcome", message: 'pick "abandon" or "resume"' }];
-}
-
-function checkGuard(config) {
-  if (!("cond" in config)) return [];
-  return nonEmptyString(config.cond)
-    ? []
-    : [{ key: "cond", message: "a guard, if present, needs an expression" }];
-}
 
 /* --------------------------------------------------- card processing */
 
@@ -326,78 +319,6 @@ const myappProvision = step({
   order: 1,
 });
 
-/* ---------------------------------------------------- interrupt rules */
-
-const myappGuardedOnEvent = {
-  name: "myapp.guarded_on_event",
-  currentVersion: 1,
-  slots: () => [],
-  configSchema: () => [
-    {
-      key: "event",
-      type: "string",
-      label: "When this event arrives",
-      required: true,
-      default: "",
-    },
-    guardField,
-    outcomeField,
-  ],
-  validateConfig: (config) =>
-    verdict([
-      ...(isEventName(config.event)
-        ? []
-        : [{ key: "event", message: "must be an event name, like review.resolved" }]),
-      ...checkGuard(config),
-      ...checkOutcome(config),
-    ]),
-  io: () => ({ kinds: ["interrupt_handler"] }),
-  paletteEntry: {
-    label: "On event, when",
-    group: "Interrupt rules",
-    description: "Interrupts the group when an event arrives and a guard holds.",
-    icon: "bolt",
-    keywords: ["interrupt", "guard", "condition", "event"],
-    order: 0,
-    accentToken: HOST_ACCENT,
-  },
-};
-
-const myappTimeoutRule = {
-  name: "myapp.timeout_rule",
-  currentVersion: 1,
-  slots: () => [],
-  configSchema: () => [
-    {
-      key: "after",
-      type: "duration",
-      label: "After",
-      required: true,
-      default: "PT15M",
-    },
-    guardField,
-    outcomeField,
-  ],
-  validateConfig: (config) =>
-    verdict([
-      ...(isDuration(config.after)
-        ? []
-        : [{ key: "after", message: "must be an ISO-8601 duration, like PT15M" }]),
-      ...checkGuard(config),
-      ...checkOutcome(config),
-    ]),
-  io: () => ({ kinds: ["interrupt_handler"] }),
-  paletteEntry: {
-    label: "Timeout",
-    group: "Interrupt rules",
-    description: "Interrupts the group once a duration has elapsed.",
-    icon: "clock-alert",
-    keywords: ["interrupt", "timeout", "deadline", "expire"],
-    order: 1,
-    accentToken: HOST_ACCENT,
-  },
-};
-
 /* ---------------------------------------------------------- the value */
 
 /** Every host type the demo documents name, except the unresolvable one. */
@@ -413,6 +334,4 @@ export const fixtureTypes = {
   "myapp.notify": myappNotify,
   "myapp.signup_step": myappSignupStep,
   "myapp.provision": myappProvision,
-  "myapp.guarded_on_event": myappGuardedOnEvent,
-  "myapp.timeout_rule": myappTimeoutRule,
 };

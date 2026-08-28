@@ -3582,10 +3582,21 @@
 
         // A step has config and no condition, which is the pane's empty state.
         equal("a wait carries none", conditionFields(configFormFor(registry, findBlock(doc, "blk_WAI"))), []);
-        equal(
-          "nor does a plain interrupt rule",
-          conditionFields(configFormFor(registry, findBlock(doc, "blk_INT"))),
-          []
+
+        /* CHANGED 2026-08-28 (sb-0o4). This used to read "nor does a plain
+         * interrupt rule", and `core.on_event` used to carry no condition at
+         * all. It declares an optional `cond` now (PROPOSED, flagged at the
+         * descriptor in palette.js), so the rule offers exactly one - and the
+         * point the suite is making survives intact, because it is offered on
+         * the strength of the DECLARED type and not of the stored value:
+         * `blk_INT`'s config has no `cond` key. */
+        const rule = conditionFields(configFormFor(registry, findBlock(doc, "blk_INT")));
+        equal("an interrupt rule offers its guard", rule.length, 1);
+        equal("...under the words the type gave it", rule[0].label, "Only when");
+        check("...unauthored, because this one stored none", rule[0].value === undefined);
+        check(
+          "the block really has no stored cond",
+          !("cond" in findBlock(doc, "blk_INT").config)
         );
 
         // d12: no schema, so nothing can say which stored value is a
@@ -4866,6 +4877,243 @@
         const gone = configFormFor(registry, findBlock(retiredDocument(), "blk_GONE"));
         equal("an unresolvable block still offers no fields", gone.fields, []);
         equal("...and is still read-only", gone.readOnly, true);
+      });
+
+      /* ======================================== cond + core.timeout (sb-0o4) */
+
+      /*
+       * The mirror divergence, checked as a divergence.
+       *
+       * `core.on_event` is a SHIPPED type carrying a PROPOSED key, which is
+       * the `core.parallel`/`complete` situation exactly (sb-dxs). The whole
+       * risk of that shape is a stored document that used to decode and
+       * validate and now does not, so that is what this suite is about: the
+       * key is additive, absence is silent, and the shipped keys did not move.
+       *
+       * Sabotage: dropping the `"cond" in config` test from the descriptor's
+       * validateConfig - so an absent key falls through to the non-empty
+       * check - turns "an absent guard is silent" and both back-compat
+       * assertions red. Reverted.
+       */
+      suite("palette: core.on_event's proposed cond is additive (sb-0o4)", () => {
+        const onEvent = coreTypes["core.on_event"];
+        const schema = onEvent.configSchema({});
+
+        equal(
+          "the shipped keys keep their indices, and cond is appended",
+          schema.map((field) => field.key),
+          ["event", "outcome", "cond"]
+        );
+
+        const cond = schema.find((field) => field.key === "cond");
+        equal("declared as an expression, like a branch arm's", cond.type, "expression");
+        check("and optional", cond.required === false);
+
+        // Back-compat, the load-bearing property. Every stored `core.on_event`
+        // in the demo documents predates this key.
+        const before = { event: "order.cancelled", outcome: "abandon" };
+        check("an absent guard is silent", onEvent.validateConfig(before) === null);
+        check(
+          "and so is the whole block, through the registry",
+          checkConfig(
+            registry,
+            createDocument(block({ id: "blk_R", type: "core.on_event", config: before })),
+            updateConfig("blk_R", before)
+          ) === null
+        );
+
+        // Present-but-empty is NOT "no guard": it is a guard an author began
+        // and did not finish, and ADR-0001 d6's absent-versus-null reading is
+        // what makes those two different cases here.
+        equal(
+          "an empty guard is a finding on its own key",
+          onEvent.validateConfig({ ...before, cond: "" }),
+          [{ key: "cond", message: "a guard, if present, needs an expression" }]
+        );
+        equal(
+          "a stored null lands on the same refusal",
+          onEvent.validateConfig({ ...before, cond: null }),
+          [{ key: "cond", message: "a guard, if present, needs an expression" }]
+        );
+        check(
+          "an authored guard passes",
+          onEvent.validateConfig({ ...before, cond: "auth.captured == false" }) === null
+        );
+
+        // The guard does not buy the rule a placement it did not have: the
+        // single `interrupt_handler` tag is still the whole placement rule.
+        equal("it is still an interrupt handler and nothing else", onEvent.io({}).kinds, [
+          "interrupt_handler",
+        ]);
+      });
+
+      /*
+       * `core.timeout`, the proposed interrupt rule that replaced the demo's
+       * `myapp.timeout_rule` crutch.
+       *
+       * The claim the suite is really checking is the one the retirement rests
+       * on: the core form covers what the host form was standing in for, key
+       * for key, so a document could be re-typed without its stored config
+       * moving. That is asserted against the SHIPPED fixture's own bytes.
+       *
+       * Sabotage: spelling the duration key `duration` instead of `after`
+       * turns "the shipped fixture's stored config is clean" red, which is the
+       * point - the fixture was re-typed and not re-written. Reverted.
+       */
+      suite("proposed core: core.timeout is the interrupt rule's core form (sb-0o4)", () => {
+        const timeout = proposedCoreTypes["core.timeout"];
+
+        check("it exists", Boolean(timeout));
+        equal("as an interrupt handler and nothing else", timeout.io({}).kinds, [
+          "interrupt_handler",
+        ]);
+        equal("with no slots", timeout.slots({}), []);
+        equal(
+          "and the three keys the crutch carried",
+          timeout.configSchema({}).map((field) => field.key),
+          ["after", "outcome", "cond"]
+        );
+        equal(
+          "`after` takes the EXISTING duration field type - nothing new is proposed for it",
+          timeout.configSchema({}).find((field) => field.key === "after").type,
+          "duration"
+        );
+
+        // The exact bytes `fixtures/documents/card-processing.json` stores at
+        // `blk_cp_authz_timeout`, which used to be a `myapp.timeout_rule` and
+        // was re-typed rather than re-written.
+        const stored = {
+          after: "PT15M",
+          cond: "three_ds.completed == false OR fraud.cleared == false",
+          outcome: "abandon",
+        };
+        check("the shipped fixture's stored config is clean", timeout.validateConfig(stored) === null);
+
+        equal(
+          "a plain-English duration is refused",
+          timeout.validateConfig({ ...stored, after: "15 minutes" }),
+          [{ key: "after", message: "must be an ISO-8601 duration, like PT15M" }]
+        );
+        equal(
+          "a missing duration is the same finding, not a throw",
+          (timeout.validateConfig({ outcome: "abandon" }) ?? []).map((f) => f.key),
+          ["after"]
+        );
+        equal(
+          "an outcome outside the pair is refused",
+          timeout.validateConfig({ ...stored, outcome: "retry" }),
+          [{ key: "outcome", message: 'pick "abandon" or "resume"' }]
+        );
+
+        // Its guard is the SAME rule `core.on_event`'s is. Two interrupt
+        // rules on one rail whose optional guards disagreed about what an
+        // empty string means is the drift this checks for.
+        const onEvent = coreTypes["core.on_event"];
+        const railTakes = (descriptor, base, cond) =>
+          JSON.stringify(
+            (descriptor.validateConfig({ ...base, ...cond }) ?? []).filter((f) => f.key === "cond")
+          );
+
+        equal(
+          "every guard value lands the same way on both rules",
+          [{}, { cond: "" }, { cond: null }, { cond: "a == 1" }, { cond: 7 }].filter(
+            (c) =>
+              railTakes(timeout, stored, c) !==
+              railTakes(onEvent, { event: "a.b", outcome: "abandon" }, c)
+          ),
+          []
+        );
+
+        // It is a PROPOSAL: `coreRegistry()` and `spikeRegistry()` answer
+        // "what does the package actually ship", and a proposal that quietly
+        // joined them would make that question unanswerable.
+        check("the shipped registry does not know it", registry.types["core.timeout"] === undefined);
+        check("the proposing one does", proposingRegistry().types["core.timeout"] !== undefined);
+        equal(
+          "and it sits in the proposed group, beside core.invoke and core.raise",
+          paletteEntryFor(timeout).group,
+          "Proposed core"
+        );
+      /*
+       * The retirement itself (D12, 2026-08-28).
+       *
+       * `demo-types.js` is not imported by this page - `spikeRegistry()` is
+       * `palette.js`'s own maps - so this suite checks the property that
+       * actually matters and that the page CAN see: the editor needed no
+       * special case for either crutch, so removing them from the demo
+       * vocabulary is a registry edit and nothing more. The re-authored
+       * document is checked against the core descriptors directly.
+       */
+      suite("the retired crutches leave nothing behind (sb-0o4, D12)", () => {
+        const proposing = proposingRegistry();
+
+        // The three re-typed blocks, rebuilt here from the fixture's stored
+        // bytes. A document written against the host crutches becomes a
+        // document written against the core forms by changing `type` alone.
+        const retyped = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.group",
+            slots: {
+              body: [block({ id: "blk_BODY", type: "core.wait", config: { duration: "PT1H" } })],
+              interrupts: [
+                block({
+                  id: "blk_cp_cancelled",
+                  type: "core.on_event",
+                  config: {
+                    event: "customer.cancelled",
+                    cond: "event.customer_cancelled.reason == 'customer_request' AND auth.captured == false",
+                    outcome: "abandon",
+                  },
+                }),
+                block({
+                  id: "blk_cp_authz_timeout",
+                  type: "core.timeout",
+                  config: {
+                    after: "PT15M",
+                    cond: "three_ds.completed == false OR fraud.cleared == false",
+                    outcome: "abandon",
+                  },
+                }),
+                block({
+                  id: "blk_cp_manual_resolved",
+                  type: "core.on_event",
+                  config: {
+                    event: "review.resolved",
+                    cond: "event.review_resolved.decision == 'approve' AND review.parked",
+                    outcome: "resume",
+                  },
+                }),
+              ],
+            },
+          }),
+          { id: "bdoc_RETYPED", revision: 1 }
+        );
+
+        equal("the re-authored rail validates clean", validate(retyped, proposing), null);
+
+        // Both crutch names are gone from the vocabulary this page knows, and
+        // a block still naming one would be the d12 unresolvable case rather
+        // than a silent resolution to something else.
+        for (const gone of ["myapp.guarded_on_event", "myapp.timeout_rule"]) {
+          check(`${gone} resolves to nothing`, proposing.types[gone] === undefined);
+          check(
+            `...and a block naming it is unresolvable, not silently retyped`,
+            describe(proposing, block({ id: "blk_X", type: gone, config: {} })).unresolved === true
+          );
+        }
+
+        // The condition pane picks both guards up off the DECLARED type, with
+        // no list of type names anywhere - which is the property that made the
+        // retirement free (`conditionFields` did not change).
+        for (const id of ["blk_cp_cancelled", "blk_cp_authz_timeout", "blk_cp_manual_resolved"]) {
+          const fields = conditionFields(configFormFor(proposing, findBlock(retyped, id)));
+          equal(`${id} offers exactly its one guard`, fields.length, 1);
+          equal(`...keyed the way it is stored`, fields[0].key, "cond");
+          equal(`...carrying the stored source`, fields[0].value, findBlock(retyped, id).config.cond);
+        }
+      });
+
       });
 
       /* ========================================== core.subchart (sb-7s2) */

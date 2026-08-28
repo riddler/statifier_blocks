@@ -508,6 +508,47 @@ const coreWait = {
  * step dropped into `interrupts` fails because `interrupts` declares
  * `["interrupt_handler"]`. There is no placement check in this descriptor and
  * there is not supposed to be one.
+ *
+ * ## sb-0o4: `cond`, and a MIRROR DIVERGENCE flagged in the open
+ *
+ * The `cond` field below is PROPOSED. `core.on_event` is a SHIPPED `core.*`
+ * type and `lib/statifier_blocks/core/on_event.ex` declares no such key, so
+ * this descriptor is no longer a verbatim transcription: it is the shipped
+ * type plus one proposed config field. Same standing as `core.parallel`'s
+ * `complete` (sb-dxs), `core.wait`'s badge (sb-p0k) and `core.invoke`
+ * (sb-nt3), and flagged the same way - in the open, at the point of
+ * divergence, so nobody reads this mirror as evidence of what the package
+ * ships.
+ *
+ * What it means: an interrupt rule that fires only when a predicate holds.
+ * `core.on_event` could previously only ask "did this event arrive"; a rule
+ * that also asks "and is the money still unmoved" had to be a host type, and
+ * the demo documents grew `myapp.guarded_on_event` to say it. That crutch is
+ * retired (2026-08-28, umbrella D12) and this key is what replaced it.
+ *
+ * The field is `expression`, which is the SAME declared type a branch arm's
+ * condition uses - so it gets the same one-line mono control in the config
+ * form, and `datamodel.js`'s condition pane picks it up without learning a
+ * type name (`conditionFields` filters on the declared type, never on a list
+ * of types).
+ *
+ * What is still open, for Phase B rather than for this descriptor:
+ *
+ *   - the compiled form. A guard on an interrupt rule is a `cond` on the
+ *     transition the rail emits, which is the obvious reading, but ADR-0004
+ *     has not said so and nothing here compiles anything;
+ *   - whether an interrupt rule with a guard that never holds deserves a
+ *     document-level finding. `run_cp_three_ds_timeout` in `fixtures/runs.json`
+ *     is exactly that case written down, and it is recorded as a fixture
+ *     rather than as an editor affordance on purpose.
+ *
+ * Backward compatibility is load-bearing and asserted in the selftest: every
+ * stored `core.on_event` that predates this key must decode and validate
+ * exactly as it did before, so an ABSENT `cond` is silent and only a PRESENT
+ * one is checked. `event` and `outcome` keep their indices - a proposed key
+ * does not renumber a shipped one (the `core.parallel` precedent above), which
+ * is why `cond` is appended rather than slotted between them where it would
+ * read better.
  */
 const ON_EVENT_OUTCOMES = ["abandon", "resume"];
 
@@ -535,6 +576,17 @@ const coreOnEvent = {
       required: true,
       default: "abandon",
     },
+    {
+      // PROPOSED (sb-0o4) - see the divergence note above this descriptor.
+      // Appended, not inserted: `event` is fields[0] and `outcome` is
+      // fields[1] in the shipped type, and a proposed key does not renumber
+      // a shipped one.
+      key: "cond",
+      type: "expression",
+      label: "Only when",
+      required: false,
+      default: "",
+    },
   ],
   validateConfig: (config) => {
     const findings = [];
@@ -544,6 +596,14 @@ const coreOnEvent = {
     }
     if (!oneOf(config.outcome, ON_EVENT_OUTCOMES)) {
       findings.push({ key: "outcome", message: 'pick "abandon" or "resume"' });
+    }
+    // An ABSENT `cond` is silent, so a document stored before this key
+    // existed validates exactly as it did before. A key that IS present has
+    // to carry an expression: a stored `null` or `""` is not "no guard", it
+    // is a guard an author started and did not finish (ADR-0001 d6's reading
+    // of absent-versus-null, applied to the one optional key here).
+    if ("cond" in config && !nonEmptyString(config.cond)) {
+      findings.push({ key: "cond", message: "a guard, if present, needs an expression" });
     }
 
     return verdict(findings);
