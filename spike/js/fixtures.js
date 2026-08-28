@@ -124,6 +124,8 @@ const stepsOf = (run) => (Array.isArray(run?.steps) ? run.steps : []);
  *       cursor, started, finished, stepCount,
  *       progress,     "not run" | "step 3 of 9" | "finished"
  *       activeIds,    the blocks the CURRENT step lights up - [] when not on one
+ *       invoke,       the CURRENT step's host call, or null - the canvas badge
+ *                     mark reads this the way the highlight reads activeIds
  *       steps: [StepView],
  *       current,      the current StepView, or null
  *       verdict,      "not-run" | "running" | "failing" | "pass" | "fail"
@@ -165,6 +167,11 @@ export function runView(run, cursor) {
         ? `step ${at + 1} of ${steps.length}`
         : `${steps.length} step${steps.length === 1 ? "" : "s"}`,
     activeIds: current ? current.active : [],
+    // Null on a finished or not-started run for the same reason `activeIds` is
+    // empty there: the mark belongs to the step the cursor is ON, and a badge
+    // left lit after the transport ran out would go on claiming a call is in
+    // flight.
+    invoke: current ? current.invoke : null,
     steps: views,
     current,
     verdict,
@@ -192,8 +199,51 @@ function stepView(step, index, cursor) {
     active: Array.isArray(step.active) ? step.active : [],
     deltas: Array.isArray(step.deltas) ? step.deltas : [],
     check: step.check ?? null,
+    invoke: invokeView(step.invoke),
     consumed,
     state: cursor === index ? "current" : consumed ? "past" : "future",
+  };
+}
+
+/**
+ * A step's PROPOSED `invoke` field (sb-ig4), normalized for the pane.
+ *
+ *     { block, outcome: "done" | "error", payload: [{ name, value }] }
+ *
+ * or `null` for a step that is not a host call.
+ *
+ * ## What this does NOT do, and it is the whole point
+ *
+ * `outcome: "error"` does not make anything walk the block's `on_error`
+ * subtree. The step after an error carries its own authored `active`, the same
+ * as every other step, and the runner replays it - the honest-replayer rule
+ * this file opens with, applied to the one field most likely to be mistaken
+ * for machinery. `deltas` are accumulated on an error step exactly as on a
+ * successful one; nothing here suppresses or synthesizes a write.
+ *
+ * Two normalizations, both deliberate:
+ *
+ *   - a missing `block` drops the whole field. The pane's only job with an
+ *     invoke is to mark a card, and an invoke naming no card is a fixture
+ *     typo that would otherwise render as a silent no-op;
+ *   - anything other than the string "error" reads as "done", the same way
+ *     `runView` reads `expected`. A misspelt outcome landing on the safe side
+ *     is a rendering that under-claims rather than one that paints a red
+ *     failure the author never wrote.
+ */
+export function invokeView(invoke) {
+  if (invoke === null || typeof invoke !== "object" || Array.isArray(invoke)) return null;
+  if (typeof invoke.block !== "string" || invoke.block === "") return null;
+
+  const payload =
+    invoke.payload !== null && typeof invoke.payload === "object" && !Array.isArray(invoke.payload)
+      ? Object.keys(invoke.payload).map((name) => ({ name, value: String(invoke.payload[name]) }))
+      : [];
+
+  return {
+    block: invoke.block,
+    outcome: invoke.outcome === "error" ? "error" : "done",
+    payload,
   };
 }
 
@@ -242,6 +292,11 @@ export function runSummary(run) {
     expected: run.expected === "fail" ? "fail" : "pass",
     stepCount: steps.length,
     checkCount: steps.filter((step) => step.check).length,
+    // Counted through `invokeView` rather than off the raw key, so a malformed
+    // `invoke` counts the same in the list as it renders in the runner: not at
+    // all. A row promising "2 host calls" over a run that shows one is the
+    // sort of drift a summary computed a second way always eventually has.
+    invokeCount: steps.filter((step) => invokeView(step.invoke) !== null).length,
   };
 }
 

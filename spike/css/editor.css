@@ -3100,6 +3100,39 @@
   box-shadow: var(--sb-shadow-md);
 }
 
+/*
+ * sb-ig4's invoke mark: the badge of the block a replayed step is calling out
+ * to. It lands on the BADGE rather than on the card because the card is
+ * already carrying the active outline above, and a second treatment on the
+ * same box would read as one louder highlight rather than as two facts. The
+ * badge is the right target anyway - "calls the host" is the thing that has
+ * just become true of this step, so the annotation saying it is what lights.
+ *
+ * Filled, where the resting badge is a ring on transparent: a marked badge has
+ * to win against a card that is simultaneously outlined, and losing the ring
+ * for a fill is a change of state rather than a change of degree.
+ *
+ * No new tokens. `--sb-success` / `--sb-error` and their backgrounds are the
+ * pair the recorded-check chip already uses in all three themes, and reusing
+ * them keeps one vocabulary for "the fixture recorded a good outcome" across
+ * the pane and the canvas.
+ */
+.sb-card--invoking .sb-chip--badge {
+  font-weight: var(--sb-weight-strong);
+}
+
+.sb-card--invoking[data-invoke-outcome="done"] .sb-chip--badge {
+  background: var(--sb-success-bg);
+  box-shadow: inset 0 0 0 1px var(--sb-success);
+  color: var(--sb-success);
+}
+
+.sb-card--invoking[data-invoke-outcome="error"] .sb-chip--badge {
+  background: var(--sb-error-bg);
+  box-shadow: inset 0 0 0 1px var(--sb-error);
+  color: var(--sb-error);
+}
+
 /* ------------------------------------------------------------ placeholders */
 
 /* Every pane whose composition is still spike subject matter says so, in the

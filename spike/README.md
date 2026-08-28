@@ -420,6 +420,26 @@ Flattening the pairs into text proves the block type's shape without also
 proposing an editor feature. A structured param editor is a Phase-B question;
 `parseParams` in that file is the shape it would carry.
 
+Both outcomes are replayed in `fixtures/runs.json`. A step may carry a
+proposed `invoke: { block, outcome, payload? }`, and the Fixtures pane lights
+that block's badge for the length of the step - the one fact about the step a
+reader could not otherwise see, which is that it left the chart.
+`run_cp_invoke_done` has the host answer the authorization and then the
+capture; `run_cp_invoke_error` has the authorization fail, parks it through the
+`on_error` subtree, and carries on to the manual-review group until a reviewer
+resolves it.
+
+What that run does NOT do is the point. On an `error` outcome nothing walks the
+failure subtree: the next step's `active` ids are ids a human wrote after
+reading the document, and the pane says so under the step rather than only in
+the fixture file's comment. A runner that looked like it routed the failure
+itself would be claiming the one thing this spike has no machinery for. Two
+Phase-B findings fell out of writing them: `assign_to` on the authorize block
+names `authorization`, which `fixtures/datamodel.json` does not declare, and
+what happens once an `on_error` subtree finishes - whether the enclosing group
+carries on, and how that squares with ADR-0004's single-final emission - is
+undecided, so the run states its assumption instead of rendering it as fact.
+
 The new `badge` palette-entry key is declared here and rendered elsewhere: a
 short chip a type may put on its card header, a string under the same
 discipline as `accentToken` and `icon`. The editor renders whatever is there

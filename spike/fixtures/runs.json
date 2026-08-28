@@ -21,7 +21,48 @@
     "misleading thing this spike could ship.",
     "",
     "Every block id referenced here exists in the matching document, and every",
-    "datamodel path in a binding or a delta resolves in ../datamodel.json."
+    "datamodel path in a binding or a delta resolves in ../datamodel.json.",
+    "",
+    "THE STEP SCHEMA every run in this file shares (card-processing and",
+    "signup-wizard alike):",
+    "  {",
+    "    label:   what the step is, in an author's words",
+    "    active:  block ids the step lights on the canvas - a SET, because a",
+    "             parallel region lights more than one at a time",
+    "    event?:  the event name that arrived, when the step is one an event",
+    "             drives (run_su_declined's raise-and-catch pair uses it twice)",
+    "    note?:   prose shown under the step, for what the ids cannot say",
+    "    deltas?: [{ path, value }] the datamodel writes the step establishes;",
+    "             every path is declared in ../datamodel.json and every value is",
+    "             a STRING of source text, never a live value",
+    "    check?:  { label, result: \"pass\" | \"fail\", detail? } - the",
+    "             author's recorded verdict, typed in, never computed",
+    "    invoke?: PROPOSED (sb-ig4), see below",
+    "  }",
+    "",
+    "PROPOSED STEP FIELD - `invoke` (sb-ig4, 2026-08-28). Flagged the way the",
+    "spike flags core.invoke and core.raise themselves: this is the spike's",
+    "proposal for how a replay says a step CALLED THE HOST, not a shape any",
+    "accepted record defines.",
+    "  invoke: {",
+    "    block:    the id of the core.invoke block the call belongs to. The pane",
+    "              highlights that card's badge for the length of the step, which",
+    "              is the one thing a reader could not otherwise see: the step",
+    "              left the chart",
+    "    outcome:  \"done\" | \"error\" - what the host answered",
+    "    payload?: { name: value } display-only lines, the same string-of-source",
+    "              -text rule the deltas hold to. Nothing reads them back",
+    "  }",
+    "The honest-replayer rule applies to `invoke` exactly as it does to",
+    "everything else here, and it is worth stating because this is the field",
+    "most likely to be mistaken for machinery: on `\"outcome\": \"error\"` the",
+    "runner does NOT walk the block's on_error subtree. The NEXT step's `active`",
+    "is authored - a human wrote those ids after reading the document - and the",
+    "pane replays it. `deltas` are applied by the pane's ordinary accumulator on",
+    "an error step as on any other; an error step simply tends to write less.",
+    "See run_cp_invoke_error below, whose steps 7-8 are authored to sit inside",
+    "blk_cp_authorize's on_error subtree and would be just as authored if they",
+    "sat anywhere else."
   ],
   "version": 1,
   "documents": {
@@ -298,6 +339,213 @@
               "label": "The group is still open",
               "active": ["blk_cp_authz"],
               "note": "The run stops here: with nothing on the rail able to fire, the authorization group has no way out."
+            }
+          ]
+        },
+        {
+          "id": "run_cp_invoke_done",
+          "name": "Both host calls answer",
+          "description": "The two core.invoke steps in their ordinary case: the host answers the authorization, the outcome branch approves, the host answers the capture, and the receipt goes out. Neither on_error subtree is entered, which is the baseline the failure run below is read against.",
+          "expected": "pass",
+          "steps": [
+            {
+              "label": "Take the payment request",
+              "active": ["blk_cp_intake"],
+              "event": "payment.requested",
+              "deltas": [
+                { "path": "amount_cents", "value": "42350" },
+                { "path": "currency", "value": "\"USD\"" },
+                { "path": "card.active", "value": "true" }
+              ]
+            },
+            {
+              "label": "Validation passes",
+              "active": ["blk_cp_validation"],
+              "deltas": [{ "path": "validation.passed", "value": "true" }]
+            },
+            {
+              "label": "The fraud and balance lanes clear",
+              "active": ["blk_cp_risk_rating", "blk_cp_balance"],
+              "deltas": [
+                { "path": "risk_rating", "value": "22" },
+                { "path": "fraud.verdict", "value": "\"clear\"" },
+                { "path": "fraud.cleared", "value": "true" },
+                { "path": "balance.available_cents", "value": "180000" }
+              ]
+            },
+            {
+              "label": "Authorize the card",
+              "note": "The card's badge lights while this step is current: the work is happening at the acquirer, not in the chart. Its result is declared to land in `authorization` (core.invoke's assign_to), and ../datamodel.json declares no such entry - so the run writes only the paths the datamodel does declare and leaves the gap visible rather than inventing one. A Phase-B finding, not something a fixture gets to decide.",
+              "active": ["blk_cp_authorize"],
+              "invoke": {
+                "block": "blk_cp_authorize",
+                "outcome": "done",
+                "payload": {
+                  "approved": "true",
+                  "code": "\"A31842\"",
+                  "network_ref": "\"vs-88f21\""
+                }
+              },
+              "deltas": [
+                { "path": "auth.approved", "value": "true" },
+                { "path": "auth.code", "value": "\"A31842\"" },
+                { "path": "auth.network_ref", "value": "\"vs-88f21\"" }
+              ],
+              "check": {
+                "label": "the on_error subtree never armed",
+                "result": "pass",
+                "detail": "The call answered, so blk_cp_authz_error and the two steps under it are not part of this run at all. Recorded by the author; nothing here evaluated the call."
+              }
+            },
+            {
+              "label": "Outcome branch takes arm_approved",
+              "active": ["blk_cp_outcome"],
+              "check": {
+                "label": "arm_approved was taken",
+                "result": "pass",
+                "detail": "auth.approved AND fraud.cleared AND balance.available_cents >= amount_cents - and the first of those three is the fact the authorization call established."
+              }
+            },
+            {
+              "label": "Capture the funds",
+              "note": "The second core.invoke, whose on_error slot holds a single park step rather than a sequence. Same badge, same highlight, a smaller failure path.",
+              "active": ["blk_cp_capture"],
+              "invoke": {
+                "block": "blk_cp_capture",
+                "outcome": "done",
+                "payload": {
+                  "captured": "true",
+                  "captured_cents": "42350"
+                }
+              },
+              "deltas": [
+                { "path": "auth.captured", "value": "true" },
+                { "path": "capture_attempts", "value": "1" }
+              ],
+              "check": {
+                "label": "neither failure idiom fired",
+                "result": "pass",
+                "detail": "The on_error slot is unused because the call answered, and blk_cp_capture_retry's arm is unarmed because auth.captured == false no longer holds. The two idioms are independent, which is the comparison the document exists to make."
+              }
+            },
+            {
+              "label": "Build and send the receipt",
+              "active": ["blk_cp_receipt", "blk_cp_final_notify"],
+              "note": "The tail runs to completion."
+            }
+          ]
+        },
+        {
+          "id": "run_cp_invoke_error",
+          "name": "The authorization call fails",
+          "description": "The other outcome. The fraud lane has already flagged the transaction when the host fails to answer the authorization; the on_error subtree parks it and tells ops, the outcome branch then routes it to the manual-review group, and a reviewer resolves it two days later. Every step after the failure is AUTHORED - the runner replays the ids a human wrote, it does not walk the on_error subtree itself.",
+          "expected": "pass",
+          "steps": [
+            {
+              "label": "Take the payment request",
+              "active": ["blk_cp_intake"],
+              "event": "payment.requested",
+              "deltas": [
+                { "path": "amount_cents", "value": "980000" },
+                { "path": "currency", "value": "\"USD\"" }
+              ]
+            },
+            {
+              "label": "Validation passes",
+              "active": ["blk_cp_validation"],
+              "deltas": [{ "path": "validation.passed", "value": "true" }]
+            },
+            {
+              "label": "The fraud and balance lanes run together",
+              "active": ["blk_cp_risk_rating", "blk_cp_balance"],
+              "deltas": [
+                { "path": "risk_rating", "value": "91" },
+                { "path": "balance.available_cents", "value": "1200000" }
+              ]
+            },
+            {
+              "label": "Risk branch takes the high-risk arm",
+              "active": ["blk_cp_risk_branch"],
+              "deltas": [{ "path": "fraud.verdict", "value": "\"review\"" }],
+              "check": {
+                "label": "arm_high_risk was taken",
+                "result": "pass",
+                "detail": "risk_rating 91 >= 70, so the first arm matched before the low-risk arm was tried."
+              }
+            },
+            {
+              "label": "Flag it for a human",
+              "active": ["blk_cp_manual_flag"],
+              "deltas": [{ "path": "fraud.cleared", "value": "false" }]
+            },
+            {
+              "label": "The authorization call fails",
+              "note": "The badge lights on the same card as in the run above, and the outcome is the difference. What the failure would compile to is proposed-core.js's account: a transition on statifier-ex ADR-0068's error.communication.invoke.blk_cp_authorize into the on_error subtree. Nothing here compiles or fires anything - the next two steps are ids an author wrote down.",
+              "active": ["blk_cp_authorize"],
+              "invoke": {
+                "block": "blk_cp_authorize",
+                "outcome": "error",
+                "payload": {
+                  "error": "\"error.communication.invoke.blk_cp_authorize\"",
+                  "reason": "\"acquirer_timeout\"",
+                  "retryable": "true"
+                }
+              },
+              "check": {
+                "label": "the failure edge is the on_error slot, not a predicate",
+                "result": "pass",
+                "detail": "This is failure idiom A: the acquirer never answered, so there is nothing in the datamodel a guard could have read. Idiom B further down the document (blk_cp_capture_retry) could not have caught this one at all."
+              }
+            },
+            {
+              "label": "Queue it for review",
+              "note": "First step inside blk_cp_authorize's on_error subtree, under the core.sequence the zero_or_one slot needs to hold two steps. Authored, not walked.",
+              "active": ["blk_cp_authz_park"],
+              "deltas": [
+                { "path": "review.parked", "value": "true" },
+                { "path": "review.queue", "value": "\"authorization_review\"" }
+              ]
+            },
+            {
+              "label": "Tell ops the authorization failed",
+              "active": ["blk_cp_authz_error_notify"]
+            },
+            {
+              "label": "Outcome branch takes arm_manual_review",
+              "note": "What happens once the on_error subtree finishes - whether the enclosing group carries on to the next step as it does here, and how that reconciles with ADR-0004's single-final emission - is undecided. This run assumes it does carry on, and says so rather than letting the assumption ride as a rendered fact.",
+              "active": ["blk_cp_outcome"],
+              "check": {
+                "label": "arm_manual_review was taken, not arm_approved",
+                "result": "pass",
+                "detail": "fraud.verdict == 'review' and the backlog was under 50. arm_approved wanted auth.approved, which the call that failed never set - an unset boolean, which is the same question run_cp_three_ds_timeout parks for the expression language."
+              }
+            },
+            {
+              "label": "Park it for a reviewer",
+              "note": "The second park of the run, and a different block: blk_cp_authz_park queued the acquirer failure, and this one is the manual-review group's own park inside the resumable group.",
+              "active": ["blk_cp_park"],
+              "deltas": [{ "path": "review.queue", "value": "\"manual_review\"" }]
+            },
+            {
+              "label": "Two days pass",
+              "active": ["blk_cp_manual_wait"],
+              "note": "The resumable group holds deep history, so a resume lands back here rather than at the top of the arm."
+            },
+            {
+              "label": "A reviewer approves it",
+              "active": ["blk_cp_manual_resolved"],
+              "event": "review.resolved",
+              "deltas": [{ "path": "event.review_resolved.decision", "value": "\"approve\"" }],
+              "check": {
+                "label": "the guarded interrupt rule fired",
+                "result": "pass",
+                "detail": "decision == 'approve' AND review.parked both held - and review.parked was written by the on_error park, five steps back."
+              }
+            },
+            {
+              "label": "Apply the reviewer's decision",
+              "active": ["blk_cp_resolve"],
+              "deltas": [{ "path": "review.resolution", "value": "\"approved\"" }]
             }
           ]
         }
