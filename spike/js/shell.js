@@ -215,9 +215,70 @@ const editor = canvas
         findingsPanel: document.getElementById("sb-findings-panel"),
         findingsBadge: document.getElementById("sb-findings-count"),
         conditionPanel: document.getElementById("sb-condition-panel"),
+        // The canvas zoom cluster (sb-bl1). Named here like every other
+        // element the editor writes to, so the shell's markup stays the
+        // shell's business and `interact.js` never queries the document.
+        zoomOut: document.getElementById("sb-zoom-out"),
+        zoomIn: document.getElementById("sb-zoom-in"),
+        zoomLabel: document.getElementById("sb-zoom-level"),
+        zoomFit: document.getElementById("sb-zoom-fit"),
+        zoomFitActive: document.getElementById("sb-zoom-fit-active"),
       },
     })
   : null;
+
+/* --------------------------------------------------------- pane collapse */
+
+/*
+ * Folding a side pane to a rail, which is the narrow-embed answer that does
+ * not depend on a breakpoint (sb-bl1).
+ *
+ * The state is written in TWO places because two different things need it,
+ * and it is written by one function so they cannot disagree: the pane carries
+ * `data-collapsed` for what happens inside it, and the grid carries
+ * `data-palette` / `data-inspector` because a column TRACK is the grid's and
+ * no rule on a child can change one. The button's `aria-expanded` is the same
+ * fact a third time, for a reader who cannot see either.
+ *
+ * The shell's, not the editor's. `interact.js` owns the canvas and the session;
+ * which panes are folded is frame furniture, and the editor has no opinion
+ * about it - the same division the tab strip and the theme selector are on.
+ */
+const shellBody = document.querySelector(".sb-editor__body");
+
+function wireCollapse(button, pane, key, noun) {
+  if (!button || !pane || !shellBody) return;
+
+  const set = (collapsed) => {
+    pane.dataset.collapsed = String(collapsed);
+    shellBody.dataset[key] = collapsed ? "collapsed" : "open";
+    button.setAttribute("aria-expanded", String(!collapsed));
+
+    // The label names what the NEXT press will do, not what the pane is now.
+    // A control that describes its effect survives an author who arrived at
+    // the pane already folded; one that describes its state does not.
+    const label = `${collapsed ? "Expand" : "Collapse"} the ${noun}`;
+    button.setAttribute("aria-label", label);
+    button.title = label;
+  };
+
+  set(false);
+  button.addEventListener("click", () => set(pane.dataset.collapsed !== "true"));
+}
+
+wireCollapse(
+  document.getElementById("sb-collapse-palette"),
+  document.querySelector(".sb-pane--palette"),
+  "palette",
+  "palette"
+);
+
+wireCollapse(
+  document.getElementById("sb-collapse-inspector"),
+  document.querySelector(".sb-pane--inspector"),
+  "inspector",
+  "inspector"
+);
 
 /* ------------------------------------------------------------- fixtures */
 

@@ -66,6 +66,8 @@ spike/
     interact.js    pointer and key events, translated into commands
     session.js     selection, collapse, drag and edits, with no DOM
     theme.js       the per-block-type accent hook, and the audit arithmetic
+    zoom.js        the canvas scale: the ladder, the fits, and the one
+                   coordinate conversion a transform costs
     panes.js       the palette / config-form / findings view models (d9-d11)
     palette-pane.js the left pane, rendered from the registry
     inspector.js   the Config and Findings panes, rendered
@@ -76,6 +78,8 @@ spike/
   dev/
     selftest.html    browser-run assertions over every pure module above
     theme-audit.html the same arithmetic pointed at the real stylesheets
+    narrow.html      the editor in a host box of a chosen width, which is the
+                     only way to exercise the shell's container queries
 ```
 
 Open `index.html?doc=signup-wizard` to load a named fixture directly; the
@@ -792,6 +796,119 @@ parent does when three of five children fail. No `mode` field chooses between
 them, deliberately - it would be a key whose two values name two compilers that
 do not exist, which is the same argument `core.send` makes for declining a
 `target`.
+## Zoom, fit, and a narrow embed (sb-bl1)
+
+Three controls the canvas did not have, and one of them is a direct answer to
+something W5 wrote down as not worth building. The reasoning W5 gave was
+right; its premise was wrong, and that is the finding.
+
+**The zoom sb-vhu costed was costed against a hit-test this editor does not
+have.** The note said a canvas-wide zoom "is a transform whose scale every
+pointer coordinate in `interact.js` would have to be divided by". There are no
+such coordinates. The drag hit-test is `document.elementFromPoint(clientX,
+clientY)`, and its nearest-gap fallback compares that same client point
+against `getBoundingClientRect()` boxes. Both of those are defined on RENDERED
+geometry, so both sides of every comparison are already in viewport space, and
+two viewport quantities need no scale factor between them. The reveal
+arithmetic is safe for the same reason one step further out: `centerUnion` adds
+a viewport-space *delta* to `scrollLeft`, and a delta between two viewport
+points does not change with scale.
+
+So the real cost of a transform-based zoom here is **one division, in one
+helper**: `routeConnectors` is the only place in the spike that crosses
+coordinate spaces, because it subtracts a post-transform origin from
+post-transform boxes and writes the result into an `<svg>` that lives inside
+the stage and is drawn in the stage's untransformed space. `zoom.js`'s
+`scaleOf` and `unscaleRect` are that division, extracted so the self-test
+covers it. The two conditions that make the rest correct by construction are
+worth stating because a shipped editor has to keep them: the overlays
+(`.sb-ghost`, `.sb-picker`) must stay OUTSIDE the transform - they hang off
+`.sb-spike`, an ancestor, so the stage's transform never becomes their
+containing block - and the scale must be read off the DOM rather than
+remembered, so a transform a host applied further up is corrected too.
+
+The generalizable rule for the shipped editor: **an editor that hit-tests
+through the browser can be zoomed cheaply, and an editor that hit-tests
+through its own arithmetic cannot.** That is a reason to keep
+`elementFromPoint` in ADR-0005's drag hook, not merely a convenience.
+
+Verified in the browser rather than argued: a real pointer drag from the
+palette onto a chosen gap at 67% landed in exactly the gap aimed at
+(`blk_cp_lanes / lane_balance_check / 0`), and the same at 150%
+(`blk_cp_validation / arm_valid / 0`).
+
+**A fit that reports success it did not have is worse than no fit.** The first
+version announced "Fitted to width at 40%" for the deep demo document, which
+wants 38% in a 902px pane and gets the ladder's floor - a third of the tree
+still off the edge, and an author told the control had worked. Distinguishing
+the three cases needs the UNCLAMPED ratio, because `fitZoom` returning the
+floor is ambiguous between "the floor is what fits" and "the floor is as close
+as I can get". The same honesty is why the ladder stops at 0.4: below that the
+labels stop being readable, and a canvas of unreadable rectangles is a
+minimap, which is a different feature with a different design.
+
+**Fit-to-active is the composition, not a new mechanism.** sb-9z3 built the
+union-centring and sb-vhu could only announce when the union did not fit.
+Zoom-to-fit-the-union plus that same centring is the gesture; when the union
+already fits it centres and does not rescale, and when even the floor cannot
+contain it `announceSpread`'s sentence still says so. Two defects fell out of
+building it, both about time rather than geometry. A reveal's `scrollend`
+receipt stays live for 700ms, which is longer than it takes to press a fixture
+step and then Fit active, so a stale correction was throwing the fit away -
+`setZoom` bumps `settleToken` now, which is exactly what that token is for.
+And the centring needs two frames, not one, for the reason `renderCanvas`
+already takes two.
+
+**The narrow-embed finding was in the top bar, and no grid change could have
+reached it.** The shell would not shrink below about 958px however the pane
+tracks were tuned: `.sb-topbar` was a nowrap flex row, so the sum of its five
+controls was a min-content floor under the entire editor, and a host box
+narrower than that got an editor hanging out of it with the theme selector cut
+off at the edge. `flex-wrap: wrap` on that one row - with the shell's first
+grid track relaxed to `minmax(topbar-height, auto)` so nothing moves until it
+actually wraps - is the whole fix. Chosen over hiding controls at a breakpoint
+because which of the five an embed can live without is a product decision.
+
+**A component asks how wide its box is, not how wide the window is.** The
+shell's breakpoints are `@container` queries now. An editor in a 900px column
+inside a 1900px window is the narrow case that matters, and a media query
+cannot see it. Two gotchas, both paid for:
+
+- **A container cannot match its own query.** `container-type` was on
+  `.sb-editor__body` first, so rules whose subject was a PANE applied - their
+  nearest ancestor container was `__body` - and rules whose subject was
+  `__body` itself silently did not. The panes moved to their narrow positions
+  inside a grid still using its wide track list, and the inspector was laid
+  over the canvas. The container is on `.sb-editor` now, one level out.
+- **It cannot go on `.sb-spike`.** That would be the tidier place, and it is
+  the one place it must not be: `container-type` applies layout containment,
+  which would make `.sb-spike` the containing block for the `position: fixed`
+  ghost and picker that hang off it - so the drag chip would be positioned
+  against the editor's box instead of the viewport. Correct on the demo page,
+  wrong in every real embed, and invisible until one. Exactly the class of
+  quiet wrongness this bead's zoom was supposed to avoid.
+
+The breakpoints are chosen by arithmetic against `--sb-canvas-min-width`
+rather than by eye, and that floor is a real `min-width` so a future
+breakpoint that stops satisfying it overflows visibly instead of silently
+squeezing the canvas back to where this bead found it. Measured across the
+harness's five widths, the canvas is wider than the inspector at every one and
+the shell fits its host at every one - which is the finding the bead was filed
+on, closed.
+
+The collapse controls are the other half, and the half that works at any
+width: either side pane folds to a rail and the canvas takes the width back.
+With both folded, the deep document that could not be fitted at all fits at
+59%.
+
+**One thing the transform costs and this bead did not fix.** Scrollable
+overflow never shrinks below in-flow layout size, so at scales below 1 the
+scroller still reports the unscaled width and there is empty ground to the
+right of a fitted document. Zooming IN is fine - the transformed box does
+extend the scroll region, and nothing is unreachable at 150%. The fix is a
+compensating negative margin reapplied on every render, which is more
+machinery than the symptom justifies in a spike; the shipped editor should
+decide with a real embed in front of it.
 
 ## Serving it
 

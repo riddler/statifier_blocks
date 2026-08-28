@@ -82,6 +82,21 @@
           <section class="sb-pane sb-pane--palette" aria-label="Block palette">
             <div class="sb-pane__header">
               <h2 class="sb-pane__title">Palette</h2>
+              <div class="sb-topbar__spacer"></div>
+              <!-- The narrow-embed answer that works at any width (sb-bl1):
+                   either side pane folds to a rail and the canvas takes the
+                   width back. `aria-expanded` is the state; the pane and the
+                   grid both carry it as a data attribute, written by one
+                   function in shell.js so the two cannot drift. -->
+              <button
+                class="sb-pane__toggle"
+                id="sb-collapse-palette"
+                type="button"
+                aria-expanded="true"
+                aria-controls="sb-palette"
+                aria-label="Collapse the palette"
+                title="Collapse the palette"
+              ></button>
             </div>
             <!-- Rendered from the registry by `palette-pane.js`. It used to be
                  hand-written markup here, which had already drifted from the
@@ -95,6 +110,51 @@
             <div class="sb-pane__header">
               <h2 class="sb-pane__title">Canvas</h2>
               <span class="sb-chip">nested tree</span>
+
+              <!-- Zoom, fit-width and fit-to-active (sb-bl1). The stepper is
+                   one control in three parts: the readout between its two
+                   buttons IS the reset, so 100% is one click away from
+                   anywhere without a fourth button claiming header width. -->
+              <div class="sb-zoom" role="group" aria-label="Canvas zoom">
+                <div class="sb-zoom__stepper">
+                  <button
+                    class="sb-zoom__step"
+                    id="sb-zoom-out"
+                    type="button"
+                    aria-label="Zoom out"
+                  >
+                    &minus;
+                  </button>
+                  <button
+                    class="sb-zoom__level"
+                    id="sb-zoom-level"
+                    type="button"
+                    aria-label="Canvas zoom level. Activate to reset to 100 percent."
+                    title="Reset to 100%"
+                  >
+                    100%
+                  </button>
+                  <button class="sb-zoom__step" id="sb-zoom-in" type="button" aria-label="Zoom in">
+                    +
+                  </button>
+                </div>
+                <button class="sb-button sb-button--quiet" id="sb-zoom-fit" type="button">
+                  Fit width
+                </button>
+                <!-- Disabled until a replayed step lights something: a control
+                     that is enabled when it can do nothing teaches an author to
+                     distrust the toolbar. `interact.js` flips it from
+                     `markActive`. -->
+                <button
+                  class="sb-button sb-button--quiet"
+                  id="sb-zoom-fit-active"
+                  type="button"
+                  disabled
+                >
+                  Fit active
+                </button>
+              </div>
+
               <div class="sb-topbar__spacer"></div>
               <span class="sb-chip" id="sb-canvas-depth" hidden>depth 0</span>
               <span class="sb-chip" id="sb-canvas-count">0 blocks</span>
@@ -128,6 +188,15 @@
           <!-- ----------------------------------------------- inspector -->
           <section class="sb-pane sb-pane--inspector" aria-label="Inspector">
             <div class="sb-pane__header">
+              <button
+                class="sb-pane__toggle"
+                id="sb-collapse-inspector"
+                type="button"
+                aria-expanded="true"
+                aria-controls="sb-panel-config"
+                aria-label="Collapse the inspector"
+                title="Collapse the inspector"
+              ></button>
               <h2 class="sb-pane__title">Inspector</h2>
               <div class="sb-topbar__spacer"></div>
               <span class="sb-chip" id="sb-selection-chip">no selection</span>

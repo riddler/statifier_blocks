@@ -275,6 +275,21 @@
        */
       import { INVOKE_MARK_CLASS, createEditor, paintInvokeMark } from "../js/interact.js";
 
+      import {
+        ZOOM_MAX,
+        ZOOM_MIN,
+        ZOOM_STEPS,
+        clampZoom,
+        fitBoxZoom,
+        fitZoom,
+        formatZoom,
+        rescaleScroll,
+        sameZoom,
+        scaleOf,
+        stepZoom,
+        unscaleRect,
+      } from "../js/zoom.js";
+
       /* ------------------------------------------------ the assert harness */
 
       const groups = [];
@@ -6784,6 +6799,211 @@
         // renders, which is the whole reason this is not a validation error.
         equal("the document itself is valid", validate(decoded.value), null);
         check("and its cards are laid out", tree.blockCount > 1);
+      });
+
+      /* ============================================ zoom (sb-bl1) ======== */
+
+      suite("zoom: the ladder is reversible, which is why it is a ladder", () => {
+        // The property a multiply-by-1.2 zoom does not have, and the reason
+        // the steps are enumerated: a press and its opposite must land back
+        // exactly where they started, or repeated stepping drifts.
+        for (const rung of ZOOM_STEPS.slice(1, -1)) {
+          equal(`${rung}: up then down returns`, stepZoom(stepZoom(rung, +1), -1), rung);
+          equal(`${rung}: down then up returns`, stepZoom(stepZoom(rung, -1), +1), rung);
+        }
+
+        equal("the bottom rung cannot step down past itself", stepZoom(ZOOM_MIN, -1), ZOOM_MIN);
+        equal("the top rung cannot step up past itself", stepZoom(ZOOM_MAX, +1), ZOOM_MAX);
+        equal("a zero direction is a no-op", stepZoom(0.8, 0), 0.8);
+
+        // A fit lands BETWEEN rungs, and "fit, then press +" has to do
+        // something visible rather than snapping back to where it already is.
+        check("a between-rungs scale steps up past itself", stepZoom(0.72, +1) > 0.72);
+        check("a between-rungs scale steps down past itself", stepZoom(0.72, -1) < 0.72);
+        equal("and it steps to the next rung, not to the nearest", stepZoom(0.72, +1), 0.8);
+      });
+
+      suite("zoom: clamping refuses to make the canvas disappear", () => {
+        equal("above the top clamps to the top", clampZoom(9), ZOOM_MAX);
+        equal("below the bottom clamps to the bottom", clampZoom(0.01), ZOOM_MIN);
+        equal("zero clamps to the bottom rather than vanishing", clampZoom(0), ZOOM_MIN);
+
+        // These reach a `transform`. A canvas that disappears because a caller
+        // passed a bad value is a worse failure than one that ignores it.
+        equal("undefined is 1, not NaN", clampZoom(undefined), 1);
+        equal("null is 1", clampZoom(null), 1);
+        equal("a non-number string is 1", clampZoom("wide"), 1);
+        equal("Infinity is 1", clampZoom(Infinity), 1);
+      });
+
+      suite("zoom: a fit never magnifies", () => {
+        // The one thing a "fit" must not do to an author who pressed it to
+        // stop hunting: move a document that was already fully visible.
+        equal(
+          "a document narrower than the pane is left alone",
+          fitZoom({ content: 400, viewport: 1000 }),
+          1
+        );
+        equal(
+          "a document exactly the pane's width is left alone",
+          fitZoom({ content: 1000, viewport: 1000 }),
+          1
+        );
+        equal(
+          "a document twice the pane's width halves",
+          fitZoom({ content: 2000, viewport: 1000 }),
+          0.5
+        );
+        equal(
+          "padding comes off both sides before the division",
+          fitZoom({ content: 1000, viewport: 600, padding: 50 }),
+          0.5
+        );
+        equal(
+          "a document too wide even for the bottom rung gets the bottom rung",
+          fitZoom({ content: 100000, viewport: 1000 }),
+          ZOOM_MIN
+        );
+
+        // A hidden canvas measures zero, and it happens for real.
+        equal("nothing into nothing changes nothing", fitZoom({ content: 0, viewport: 0 }), 1);
+        equal("a zero viewport changes nothing", fitZoom({ content: 900, viewport: 0 }), 1);
+        equal(
+          "a missing measurement changes nothing",
+          fitZoom({ content: undefined, viewport: 1000 }),
+          1
+        );
+      });
+
+      suite("zoom: fitting a box takes the tighter axis", () => {
+        equal(
+          "width is tighter",
+          fitBoxZoom({ content: { width: 2000, height: 500 }, viewport: { width: 1000, height: 1000 } }),
+          0.5
+        );
+        equal(
+          "height is tighter",
+          fitBoxZoom({ content: { width: 500, height: 2000 }, viewport: { width: 1000, height: 1000 } }),
+          0.5
+        );
+        // Both axes still go through the ladder's floor. A step whose active
+        // blocks are four screens tall cannot be fitted, and the honest answer
+        // is the closest scale there is plus `announceSpread`'s sentence - not
+        // a scale at which the cards are unreadable rectangles.
+        equal(
+          "a box too tall even for the bottom rung gets the bottom rung",
+          fitBoxZoom({ content: { width: 500, height: 4000 }, viewport: { width: 1000, height: 1000 } }),
+          ZOOM_MIN
+        );
+        equal(
+          "a box that already fits on both axes is left alone",
+          fitBoxZoom({ content: { width: 200, height: 200 }, viewport: { width: 1000, height: 1000 } }),
+          1
+        );
+      });
+
+      suite("zoom: the applied scale is read off the DOM, not remembered", () => {
+        // `render.js` does not own the zoom state and must not be told about
+        // it; asking the element what the browser is doing cannot drift from
+        // what the browser is doing, and is also right for a transform a HOST
+        // applied to an ancestor.
+        equal("rendered over layout is the scale", scaleOf(500, 1000), 0.5);
+        equal("a magnified element reports its magnification", scaleOf(1500, 1000), 1.5);
+        equal("the unscaled case is exactly 1", scaleOf(1000, 1000), 1);
+
+        // Snapping matters: sub-pixel rounding in a rect must not turn the
+        // unzoomed case into a division by 0.9999 in every connector.
+        equal("a sub-epsilon difference snaps to exactly 1", scaleOf(1000.0004, 1000), 1);
+
+        equal("a zero layout width is 1, not Infinity", scaleOf(500, 0), 1);
+        equal("a negative layout width is 1", scaleOf(500, -10), 1);
+        equal("an unmeasurable element is 1", scaleOf(undefined, undefined), 1);
+      });
+
+      suite("zoom: the connector correction, which is the whole cost", () => {
+        // The single place in the spike that crosses coordinate spaces. The
+        // `<svg>` lives inside the stage and is drawn in the stage's
+        // UNTRANSFORMED space; the boxes are measured in rendered space.
+        const origin = { left: 100, top: 50 };
+
+        equal(
+          "at scale 1 it is a plain translation",
+          unscaleRect({ left: 300, top: 250, width: 240, height: 80 }, origin, 1),
+          { x: 200, y: 200, width: 240, height: 80 }
+        );
+
+        // The load-bearing case: at half scale a card 240 layout-pixels wide
+        // MEASURES 120, and writing 120 into the stage's own space would draw
+        // a connector to the wrong end of it.
+        equal(
+          "at half scale both the offset and the size come back",
+          unscaleRect({ left: 200, top: 150, width: 120, height: 40 }, origin, 0.5),
+          { x: 200, y: 200, width: 240, height: 80 }
+        );
+
+        equal(
+          "and at 1.5 the other way",
+          unscaleRect({ left: 400, top: 350, width: 360, height: 120 }, origin, 1.5),
+          { x: 200, y: 200, width: 240, height: 80 }
+        );
+
+        equal(
+          "a zero scale does not produce Infinity coordinates",
+          unscaleRect({ left: 300, top: 250, width: 240, height: 80 }, origin, 0),
+          { x: 200, y: 200, width: 240, height: 80 }
+        );
+      });
+
+      suite("zoom: the scroll correction holds the viewport centre", () => {
+        // Without this a zoom is a teleport: `transform-origin` is the stage's
+        // top left, so halving the scale halves every content coordinate and
+        // whatever the author was reading moves toward the corner.
+        equal(
+          "zooming out halves the centre's distance from the origin",
+          rescaleScroll({ scroll: 1000, viewport: 800, from: 1, to: 0.5 }),
+          300
+        );
+
+        // (1000 + 400) * 0.5 - 400 = 300, and the point that was at content
+        // x=1400 is at 700 after the scale, which is 300 + half the viewport.
+
+        equal(
+          "zooming back in is its exact inverse",
+          rescaleScroll({ scroll: 300, viewport: 800, from: 0.5, to: 1 }),
+          1000
+        );
+
+        equal(
+          "no change of scale is no change of scroll",
+          rescaleScroll({ scroll: 640, viewport: 800, from: 0.8, to: 0.8 }),
+          640
+        );
+
+        // A scroller cannot go negative, and zooming out near the left edge
+        // computes a negative target. The upper clamp is deliberately NOT
+        // here: the scroller knows its own post-transform `scrollWidth` and
+        // guessing it would be a second, staler answer.
+        equal(
+          "a negative target clamps at the left edge",
+          rescaleScroll({ scroll: 0, viewport: 800, from: 1, to: 0.5 }),
+          0
+        );
+
+        equal(
+          "a nonsense scale leaves the scroll where it was",
+          rescaleScroll({ scroll: 640, viewport: 800, from: 0, to: 0.5 }),
+          640
+        );
+      });
+
+      suite("zoom: the readout, and sameZoom", () => {
+        equal("100%", formatZoom(1), "100%");
+        equal("a rung with a repeating decimal reads whole", formatZoom(0.67), "67%");
+        equal("it rounds rather than truncating", formatZoom(0.666), "67%");
+        equal("an out-of-range value is reported clamped", formatZoom(99), formatZoom(ZOOM_MAX));
+
+        check("sameZoom is true within the epsilon", sameZoom(1, 1.0004));
+        check("sameZoom is false outside it", !sameZoom(1, 1.01));
       });
 
       /* ------------------------------------------------------- reporting */

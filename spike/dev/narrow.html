@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>statifier_blocks spike - narrow embed harness</title>
+
+    <!--
+      What this page is for (sb-bl1).
+
+      The editor is a COMPONENT a host drops into a page, so the width that
+      decides its layout is the width of the box the host gave it - not the
+      width of the browser window. Those two are the same number only on the
+      demo page, and the narrow case this harness exists for is precisely the
+      one where they are not: an editor in an 800px column inside a 1900px
+      window.
+
+      That is also why the shell's breakpoints are `@container` rather than
+      `@media`, and why they cannot be exercised by resizing a window. This
+      page gives the editor a real, measurable box of a chosen width and lets
+      it lay itself out inside it.
+
+      An `<iframe>` rather than a wrapper `<div>` on purpose. A wrapper would
+      test the container queries but would leave the editor's own `@media`
+      assumptions - and the browser's idea of the viewport - reading the outer
+      window, so a layout that only LOOKS right because the window is wide
+      would pass. The frame gets its own viewport, so what is measured here is
+      what a 900px-wide host page actually gets.
+
+      It is a DEV page: it loads no spike CSS and styles itself inline, the
+      same bargain selftest.html and theme-audit.html strike.
+
+      Open it at http://localhost:8642/dev/narrow.html.
+    -->
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        margin: 0;
+        padding: 1.25rem;
+        font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      h1 {
+        font-size: 1.2rem;
+        margin: 0 0 0.2rem;
+      }
+      p.lede {
+        margin: 0 0 1rem;
+        opacity: 0.75;
+        max-width: 60rem;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.4rem;
+        margin-bottom: 0.75rem;
+      }
+      button {
+        font: inherit;
+        font-size: 0.85rem;
+        padding: 0.3rem 0.6rem;
+        border: 1px solid rgba(127, 127, 127, 0.5);
+        border-radius: 0.3rem;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+      }
+      button[aria-pressed="true"] {
+        border-color: currentColor;
+        background: rgba(127, 127, 127, 0.18);
+        font-weight: 600;
+      }
+      label {
+        font-size: 0.85rem;
+        opacity: 0.8;
+      }
+      .frame {
+        border: 1px solid rgba(127, 127, 127, 0.5);
+        border-radius: 0.4rem;
+        overflow: hidden;
+        /* The height is the harness's, not the editor's: the panes are all
+           `minmax(0, ...)` tracks and a short frame is a legitimate embed. */
+        height: 78vh;
+        min-height: 30rem;
+        resize: horizontal;
+        max-width: 100%;
+      }
+      iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+      code {
+        font: 0.85em ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .readout {
+        font: 0.85rem ui-monospace, SFMono-Regular, Menlo, monospace;
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Narrow embed harness</h1>
+    <p class="lede">
+      The editor inside a host box of a chosen width. The shell's breakpoints are
+      <code>@container</code> queries on <code>.sb-editor</code>, so what they
+      read is this frame's width and not the browser window's - which is the
+      whole point, and the reason resizing the window proves nothing. The frame
+      is also drag-resizable from its bottom-right corner.
+    </p>
+
+    <div class="controls" id="controls">
+      <label>Host width:</label>
+      <!-- The three that matter, named for what they show rather than for the
+           number: a breakpoint is only interesting either side of itself. -->
+      <button type="button" data-width="1280">1280 - three panes</button>
+      <button type="button" data-width="1024">1024 - palette stacks</button>
+      <button type="button" data-width="900">900 - palette stacks</button>
+      <button type="button" data-width="780">780 - inspector stacks too</button>
+      <button type="button" data-width="640">640 - narrowest</button>
+      <span class="readout" id="readout"></span>
+    </div>
+
+    <div class="frame" id="frame">
+      <iframe id="editor" src="../index.html?doc=card-processing" title="Editor"></iframe>
+    </div>
+
+    <script type="module">
+      const frame = document.getElementById("frame");
+      const readout = document.getElementById("readout");
+      const buttons = [...document.querySelectorAll("#controls button")];
+
+      function apply(width) {
+        frame.style.width = `${width}px`;
+        for (const button of buttons) {
+          button.setAttribute("aria-pressed", String(Number(button.dataset.width) === width));
+        }
+        report();
+      }
+
+      /*
+       * The measured width, not the requested one. A frame clamped by
+       * `max-width: 100%` on a narrow screen is showing something other than
+       * what the button asked for, and a harness that reported the request
+       * would be the exact kind of "it looked right on my machine" this page
+       * exists to replace.
+       */
+      function report() {
+        const actual = Math.round(frame.getBoundingClientRect().width);
+        readout.textContent = `measured: ${actual}px`;
+      }
+
+      for (const button of buttons) {
+        button.addEventListener("click", () => apply(Number(button.dataset.width)));
+      }
+
+      new ResizeObserver(report).observe(frame);
+
+      apply(1024);
+    </script>
+  </body>
+</html>

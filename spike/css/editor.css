@@ -40,31 +40,112 @@
 }
 
 .sb-editor {
+  /*
+   * The query container for the whole shell (sb-bl1), and it is HERE rather
+   * than on `.sb-editor__body` for a reason that cost a browser pass to find:
+   * a container query is evaluated against an element's nearest ANCESTOR
+   * container, so an element can never match a query on a container it is
+   * itself. With `container-type` on `__body`, the rules whose subject was a
+   * PANE applied - their nearest ancestor container was `__body` - and the
+   * rules whose subject was `__body` itself silently did not. The result was
+   * the worst kind of half-working: the panes moved to their narrow positions
+   * inside a grid still using its wide track list, so the inspector was laid
+   * over the canvas.
+   *
+   * `.sb-editor` is one level out and has a definite inline size from the
+   * block flow, so the query reads the same width plus `__body`'s padding -
+   * which is why the breakpoints below are stated a whole `--sb-space` pair
+   * wider than the widths they are reasoning about.
+   */
+  container-type: inline-size;
+  container-name: sb-shell;
   display: grid;
-  grid-template-rows: var(--sb-topbar-height) minmax(0, 1fr);
+  /*
+   * `minmax(topbar-height, auto)` rather than a fixed height, because the top
+   * bar is allowed to wrap now - see `.sb-topbar`. At every width where it
+   * does not wrap this resolves to exactly the token, so nothing moves.
+   */
+  grid-template-rows: minmax(var(--sb-topbar-height), auto) minmax(0, 1fr);
   height: 100%;
   min-height: 0;
+  /*
+   * The shell may be narrower than its contents' natural minimum. Without
+   * this the whole editor simply refuses to shrink past the widest row's
+   * min-content and overflows its host, which is the failure the narrow
+   * harness found at 780px and which no amount of grid-track tuning inside
+   * `__body` could have fixed: the floor was in the TOP BAR.
+   */
+  min-width: 0;
   background: var(--sb-bg-canvas);
   color: var(--sb-fg);
 }
 
+/*
+ * The three-pane grid, and the one place in the spike that asks how wide the
+ * EMBED is rather than how wide the window is (sb-bl1).
+ *
+ * `container-type: inline-size` plus `@container` further down, rather than
+ * `@media`. The editor is a component a host drops into a page, and the
+ * question its layout has to answer is "how much width did the host give me",
+ * which a media query cannot ask: an editor in a 900px column inside a 1900px
+ * window gets the desktop layout and overflows. That is exactly the narrow
+ * case this bead was filed about, and it is not reproducible by resizing a
+ * window - which is also why `dev/narrow.html` exists.
+ *
+ * The two column widths are read from properties rather than written here, so
+ * that collapsing a pane is a width change on this one grid rather than a rule
+ * per pane, and so that the breakpoints below can restate a track without
+ * restating a pane's identity.
+ */
 .sb-editor__body {
   display: grid;
   grid-template-columns:
-    var(--sb-palette-width)
+    var(--sb-pane-left-width)
     minmax(0, 1fr)
-    var(--sb-inspector-width);
+    var(--sb-pane-right-width);
   gap: var(--sb-space);
   padding: var(--sb-space);
   min-height: 0;
 }
 
+/* Collapse, as an attribute on the grid rather than on the pane, because the
+ * thing that changes is a TRACK and only the grid owns its tracks. The pane
+ * carries `data-collapsed` too, for what happens inside it; these two are one
+ * state written in the two places that need it, and `shell.js` writes both in
+ * one function so they cannot drift. */
+.sb-editor__body[data-palette="collapsed"] {
+  --sb-pane-left-width: var(--sb-pane-collapsed-width);
+}
+
+.sb-editor__body[data-inspector="collapsed"] {
+  --sb-pane-right-width: var(--sb-pane-collapsed-width);
+}
+
 /* ----------------------------------------------------------------- top bar */
 
+/*
+ * `flex-wrap: wrap` is the load-bearing declaration here, and it is about
+ * WIDTH rather than about wrapping (sb-bl1).
+ *
+ * A nowrap flex row's min-content width is the sum of its items, so this one
+ * bar - document picker, undo, redo, theme, Compile - was quietly setting a
+ * ~958px floor under the entire editor. Every pane below could shrink; the
+ * shell could not, so a host box narrower than that got an editor hanging out
+ * of it with the theme selector and half the inspector cut off at the edge.
+ * Allowing the row to wrap drops its min-content to its widest single control,
+ * and the grid row above is `minmax(..., auto)` so the bar gets the second
+ * line only when it actually needs one.
+ *
+ * Chosen over hiding controls at a breakpoint on purpose: which of these five
+ * an embed can live without is a product decision, and a shell that silently
+ * drops the theme selector at 780px is a worse answer than one two rows tall.
+ */
 .sb-topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--sb-space-2);
+  min-width: 0;
   padding: 0 var(--sb-space-2);
   background: var(--sb-bg);
   border-bottom: var(--sb-border-width) solid var(--sb-border);
@@ -481,6 +562,24 @@
   display: inline-block;
   min-width: 100%;
   padding: var(--sb-space-4) var(--sb-space-4) var(--sb-space-4);
+  /*
+   * The zoom (sb-bl1). One property, read from the scroller above so it
+   * survives the stage being destroyed and rebuilt by every command.
+   *
+   * `transform-origin: 0 0` is not decoration: the scroll position is
+   * corrected on every zoom change by `rescaleScroll`, whose arithmetic
+   * assumes the content scales about the scroller's origin. A centred origin
+   * would put content at negative coordinates a scroller cannot reach, and
+   * half the document would become unscrollable at any scale below 1.
+   *
+   * The transform is what makes the stage's rendered geometry differ from its
+   * layout geometry, which costs exactly one correction, in `routeConnectors`.
+   * It costs the drag hit-test nothing, because that hit-test compares two
+   * viewport-space quantities and never converts between spaces - the whole
+   * argument is in the header of `js/zoom.js`.
+   */
+  transform: scale(var(--sb-zoom, 1));
+  transform-origin: 0 0;
 }
 
 /*
@@ -3293,11 +3392,48 @@
 
 /* ------------------------------------------------------------------ narrow */
 
-/* One breakpoint, so the shell survives a narrow viewport rather than
- * pretending the editor is desktop-only. W5 does the real pass. */
-@media (max-width: 68rem) {
+/*
+ * The narrow answer (sb-bl1), and the arithmetic it is chosen by.
+ *
+ * The finding this replaces was that the canvas ends up NARROWER THAN THE
+ * INSPECTOR beside it on a narrow embed - the editor's whole subject squeezed
+ * so that a details pane can keep its full width. The fix is a floor the
+ * canvas is never allowed below, plus breakpoints picked so the floor is
+ * arithmetically satisfied rather than eyeballed. The widths below are the
+ * SHELL's (`.sb-editor`, the container), which is `__body`'s content width
+ * plus its 1rem of padding:
+ *
+ *   >= 69rem   palette 15 + canvas + inspector 21 + gaps 2  ->  canvas >= 30rem
+ *   >= 53rem   canvas + inspector 21 + gaps 1.5, palette stacked
+ *                                                    ->  canvas >= 29.5rem
+ *    < 53rem   canvas alone on row 1, both panes stacked below
+ *                                                    ->  canvas = full width
+ *
+ * Every arm clears `--sb-canvas-min-width` (24rem) with room to spare. The
+ * floor is written as a real `min-width` below rather than as a `minmax()`
+ * track precisely so that it is a TRIPWIRE: a future breakpoint that stops
+ * satisfying it overflows the shell visibly, which someone fixes, instead of
+ * silently squeezing the canvas back to where this bead found it.
+ *
+ * `@container`, not `@media`: see `.sb-editor__body`. `dev/narrow.html` is
+ * what exercises these, because a browser window is not the only thing that
+ * can be narrow and, for a component, is not the interesting thing.
+ */
+
+.sb-pane--canvas {
+  min-width: var(--sb-canvas-min-width);
+}
+
+/* A collapsed pane has no width to give the canvas a floor against, and it is
+ * the author asking for exactly that, so the floor stands down for it. */
+.sb-editor__body[data-palette="collapsed"] > .sb-pane--palette,
+.sb-editor__body[data-inspector="collapsed"] > .sb-pane--inspector {
+  min-width: 0;
+}
+
+@container sb-shell (max-width: 69rem) {
   .sb-editor__body {
-    grid-template-columns: minmax(0, 1fr) var(--sb-inspector-width);
+    grid-template-columns: minmax(0, 1fr) var(--sb-pane-right-width);
     grid-template-rows: minmax(0, 1fr) minmax(0, 14rem);
   }
 
@@ -3315,6 +3451,188 @@
     grid-column: 2;
     grid-row: 1;
   }
+}
+
+/*
+ * The second breakpoint, which the shell did not have. Below it the inspector
+ * cannot keep a column and leave the canvas its floor, so it joins the palette
+ * on the stacked row instead of taking width the canvas needs. Two stacked
+ * panes side by side rather than three rows: a 14rem row each would leave the
+ * canvas a band, and the panes below are reference surfaces the author dips
+ * into, while the canvas is the one they work in.
+ */
+@container sb-shell (max-width: 53rem) {
+  .sb-editor__body {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .sb-editor__body > .sb-pane--canvas {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .sb-editor__body > .sb-pane--palette {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .sb-editor__body > .sb-pane--inspector {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+
+/* -------------------------------------------------------- pane collapse */
+
+/*
+ * The other half of the narrow answer, and the half that works at ANY width:
+ * either side pane folds to a rail, and the canvas takes the width back.
+ *
+ * Everything below the header is hidden with `display: none` rather than with
+ * `visibility` or a zero width, so a collapsed pane's contents are out of the
+ * tab order and out of the accessibility tree - a folded pane an author can
+ * still Tab into is a pane that reads as broken to everyone who does not use a
+ * mouse. The toggle itself stays, because it is the way back.
+ */
+.sb-pane[data-collapsed="true"] > .sb-pane__body,
+.sb-pane[data-collapsed="true"] > .sb-pane__footer,
+.sb-pane[data-collapsed="true"] > .sb-tabs {
+  display: none;
+}
+
+.sb-pane[data-collapsed="true"] > .sb-pane__header {
+  /* The header becomes the whole pane: a column, so the toggle sits at the top
+   * of the rail rather than being centred in a tall empty box, and with no
+   * bottom rule, because there is nothing below it to divide from. */
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  padding: var(--sb-space) var(--sb-space-half);
+  border-bottom: 0;
+}
+
+/* The title and every chip go with the body. What remains is the toggle and
+ * the rotated label, which is the pane's identity in the only orientation a
+ * 2.25rem rail has room for. */
+.sb-pane[data-collapsed="true"] > .sb-pane__header > *:not(.sb-pane__toggle):not(.sb-pane__title) {
+  display: none;
+}
+
+.sb-pane[data-collapsed="true"] > .sb-pane__header > .sb-pane__title {
+  writing-mode: vertical-rl;
+  margin-top: var(--sb-space);
+  white-space: nowrap;
+}
+
+.sb-pane__toggle {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: var(--sb-border-width) solid transparent;
+  border-radius: var(--sb-radius-sm);
+  background: transparent;
+  color: var(--sb-fg-muted);
+  cursor: pointer;
+}
+
+.sb-pane__toggle:hover {
+  border-color: var(--sb-border);
+  background: var(--sb-bg-muted);
+  color: var(--sb-fg);
+}
+
+/* The glyph is a chevron that points the way the press will MOVE the pane, so
+ * the control describes its effect rather than its current state - the reading
+ * that survives an author who arrived at the pane already collapsed. It is a
+ * character rather than an icon because it is the only glyph in the shell that
+ * has to flip, and a rotated SVG here would be a sprite for one arrow. */
+.sb-pane__toggle::before {
+  content: "\2039";
+  font-size: var(--sb-text-lg);
+  line-height: 1;
+}
+
+.sb-pane--inspector .sb-pane__toggle::before,
+.sb-pane--palette[data-collapsed="true"] .sb-pane__toggle::before {
+  content: "\203a";
+}
+
+.sb-pane--inspector[data-collapsed="true"] .sb-pane__toggle::before {
+  content: "\2039";
+}
+
+/* ------------------------------------------------------------------- zoom */
+
+/*
+ * The zoom cluster in the canvas header. A segmented feel - one border around
+ * the stepper, the readout between its two buttons - because the three are one
+ * control, and three separate buttons would read as three unrelated ones.
+ */
+.sb-zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space-half);
+}
+
+.sb-zoom__stepper {
+  display: flex;
+  align-items: stretch;
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg);
+  overflow: hidden;
+}
+
+.sb-zoom__step,
+.sb-zoom__level {
+  border: 0;
+  background: transparent;
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.sb-zoom__step {
+  width: 1.5rem;
+  padding: 0;
+  font-size: var(--sb-text-md);
+  line-height: 1;
+}
+
+/* The readout is also the reset, so it is a button and has to look like one on
+ * hover - but at rest it is a value the eye reads, not a control the eye is
+ * offered, which is why it carries no border of its own. Tabular numerals so
+ * stepping through the ladder does not make the cluster twitch. */
+.sb-zoom__level {
+  min-width: 3.25rem;
+  padding: var(--sb-space-half) var(--sb-space-half);
+  border-inline: var(--sb-border-width) solid var(--sb-border);
+  color: var(--sb-fg);
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-zoom__step:hover:not(:disabled),
+.sb-zoom__level:hover {
+  background: var(--sb-bg-muted);
+  color: var(--sb-fg);
+}
+
+.sb-zoom__step:disabled {
+  color: var(--sb-fg-subtle);
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* A canvas that is not at 100% says so louder than the readout alone does: an
+ * author who has forgotten they zoomed will otherwise read a small canvas as a
+ * small document. */
+.sb-canvas__viewport[data-zoomed="true"] {
+  box-shadow: inset 0 0 0 var(--sb-run-mark-width) var(--sb-accent-muted);
 }
 
 /* =========================================================== interactions
