@@ -249,6 +249,37 @@ host-brand gives it a hotter red, so the block type that moves money stands
 out from its own family. Same document, same DOM, same JavaScript, one line
 in a theme file.
 
+### A badge is metadata too
+
+The same seam, one key further along. A block type may declare
+
+```js
+// in the block type's paletteEntry
+badge: "calls the host"
+```
+
+and the card grows a small outlined chip in its meta row, between the type
+caption and the config chips. Two types declare one: the proposed
+`core.invoke`, and `core.wait`, whose badge says "timer" because the one
+thing a reader cannot get from "Wait for 2m" is that the compiled form is a
+delayed send rather than a sleep.
+
+It earns its place for the same three reasons the accent hook does. The
+editor never learns a type name - `render.js` draws whatever string
+`layout.js` hands it, and no rule in `editor.css` mentions a type. The value
+is normalized in one place (`badgeFor` in `js/palette.js`), which refuses a
+non-string, an empty string, a newline, and anything past 24 characters, so a
+host that declares a sentence gets the ordinary card rather than one with its
+title squeezed out - the same degrade-to-default rule a malformed accent
+token is under. And it needs no CSS from the host, because it is deliberately
+uncoloured: a config chip is a value the author set and is filled in the
+accent, while a badge is an annotation the type carries and is outlined in
+`--sb-border-strong`. The card already has one identity, in its accent
+stripe; a second one would argue with it.
+
+Whether this belongs in ADR-0005 decision 10's metadata is a Phase-B finding,
+exactly as `accentToken` is.
+
 ### What W4 found the d14 surface was missing
 
 Four holes, all closed by widening `tokens.css` rather than by letting a theme
@@ -392,7 +423,7 @@ proposing an editor feature. A structured param editor is a Phase-B question;
 The new `badge` palette-entry key is declared here and rendered elsewhere: a
 short chip a type may put on its card header, a string under the same
 discipline as `accentToken` and `icon`. The editor renders whatever is there
-and still never learns a type name.
+and still never learns a type name. See "A badge is metadata too" below.
 
 ## Serving it
 

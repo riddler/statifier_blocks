@@ -1364,6 +1364,33 @@
   font-size: var(--sb-text-xs);
 }
 
+/* sb-p0k's badge, which shares the card's meta row with the config chips and
+ * deliberately does not look like one. A config chip reports a VALUE the
+ * author set and can change; a badge is an annotation the block TYPE carries
+ * and nobody can. Two chips of the same weight in one row would make an
+ * author read the badge as something editable, so the badge drops the fill
+ * and takes a ring instead.
+ *
+ * The ring is an inset shadow rather than a border so the chip keeps the
+ * exact box height its filled neighbours have; a 1px border here shifts the
+ * whole meta row by 2px on any card carrying both.
+ *
+ * Placed AFTER `.sb-chip` on purpose. The two rules are the same specificity,
+ * so the later one wins, and a `--badge` rule written beside `--config` up in
+ * the card section would silently lose its `background` to the base. (That is
+ * not hypothetical: `.sb-chip--config` IS written up there and its fill and
+ * weight are dead for exactly this reason - a finding for the polish bead,
+ * not something to fix from here.)
+ *
+ * No new token: the text is the base chip's `--sb-fg-muted` and the ring is
+ * `--sb-border-strong`, both already audited in all three themes. A badge is
+ * not an identity - the card already has one, in its accent stripe - so a
+ * colour of its own would be a second identity arguing with the first. */
+.sb-chip--badge {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--sb-border-strong);
+}
+
 /* ---------------------------------------------------------- datamodel tree */
 
 /* The pane reuses the palette's search row and its count line verbatim - the

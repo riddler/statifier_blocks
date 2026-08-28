@@ -119,6 +119,7 @@
 
       import {
         admits,
+        badgeFor,
         coreTypes,
         describe,
         paletteEntryFor,
@@ -799,6 +800,11 @@
           // sb-957: no accent means the editor's own, which is what every
           // core type gets and what a bare descriptor must keep getting.
           accentToken: null,
+          // sb-nt3 added the key and sb-p0k the renderer; this assertion is
+          // the reason both belong in PALETTE_ENTRY_DEFAULTS rather than in
+          // the proposal file. A bare descriptor reads `null`, never
+          // `undefined`, so the renderer's `!== null` test is total.
+          badge: null,
         });
       });
 
@@ -1001,9 +1007,18 @@
 
         equal("core.invoke declares one", paletteEntryFor(invoke).badge, "calls the host");
         equal(
-          "every shipped core type declares none, and reads null rather than undefined",
-          Object.values(coreTypes).map((one) => paletteEntryFor(one).badge),
-          Object.values(coreTypes).map(() => null)
+          "core.wait declares one too - its compiled form is a delayed send",
+          paletteEntryFor(coreTypes["core.wait"]).badge,
+          "timer"
+        );
+        equal(
+          "and every other core type reads null rather than undefined",
+          Object.entries(coreTypes)
+            .filter(([name]) => name !== "core.wait")
+            .map(([, one]) => paletteEntryFor(one).badge),
+          Object.keys(coreTypes)
+            .filter((name) => name !== "core.wait")
+            .map(() => null)
         );
         equal(
           "the accent is a token NAME the theme resolves",
@@ -1011,6 +1026,103 @@
           "--sb-accent-invoke"
         );
         check("...and it is a well-formed one", isAccentToken(paletteEntryFor(invoke).accentToken));
+      });
+
+      /*
+       * sb-p0k. `badgeFor` is the renderer's whole view of the key, so the
+       * refusals are the part worth pinning: a badge is interpolated onto a
+       * card that is already narrow, and a host that declares a sentence must
+       * get the ordinary card rather than one with its title squeezed out.
+       *
+       * Sabotage: dropping the length arm from `badgeFor` turns the "a
+       * sentence" assertion red and leaves the rest green; dropping the
+       * newline arm turns exactly the newline one red. Both arms carry their
+       * own weight.
+       */
+      suite("proposed core: badgeFor normalizes, and refuses rather than truncates", () => {
+        equal("a plain badge comes back as itself", badgeFor({ badge: "timer" }), "timer");
+        equal("surrounding space is trimmed", badgeFor({ badge: "  timer  " }), "timer");
+
+        equal("a type that declares nothing has none", badgeFor({}), null);
+        equal("and neither does a null", badgeFor({ badge: null }), null);
+        equal("nor a non-object", badgeFor(null), null);
+        equal("nor a non-string", badgeFor({ badge: 3 }), null);
+        equal("nor an all-whitespace string", badgeFor({ badge: "   " }), null);
+        equal(
+          "a sentence is refused, not ellipsized - 25 characters is one too many",
+          badgeFor({ badge: "x".repeat(25) }),
+          null
+        );
+        equal("24 is the last one that fits", badgeFor({ badge: "x".repeat(24) }), "x".repeat(24));
+        equal(
+          "a newline means something a chip cannot say, so it is refused",
+          badgeFor({ badge: "calls\nthe host" }),
+          null
+        );
+
+        // The two real declarations survive the normalizer, which is the
+        // assertion that would catch a cap set too low by one.
+        equal(
+          "core.invoke's survives",
+          badgeFor(paletteEntryFor(proposedCoreTypes["core.invoke"])),
+          "calls the host"
+        );
+        equal(
+          "core.wait's survives",
+          badgeFor(paletteEntryFor(coreTypes["core.wait"])),
+          "timer"
+        );
+      });
+
+      suite("layout: the badge rides the view model like the accent does", () => {
+        // `spikeRegistry()` deliberately does not know the proposals, so the
+        // one document in this suite builds its own registry - the same way a
+        // host registering its own types would.
+        const proposing = {
+          ...registry,
+          types: { ...registry.types, ...proposedCoreTypes },
+        };
+
+        const doc = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_INV",
+                  type: "core.invoke",
+                  config: { invoke_type: "myapp:authorize", assign_to: "authorization" },
+                  slots: {
+                    on_error: [
+                      block({ id: "blk_PARK", type: "core.wait", config: { duration: "PT1H" } }),
+                    ],
+                  },
+                }),
+                block({ id: "blk_SEQ", type: "core.sequence" }),
+              ],
+            },
+          })
+        );
+
+        const tree = layoutDocument(doc, proposing).root;
+        const body = tree.slots.find((one) => one.name === "body");
+        const invokeNode = body.children[0];
+        const plainNode = body.children[1];
+        const errorSlot = invokeNode.slots.find((one) => one.name === "on_error");
+
+        equal("the invoke carries its badge", invokeNode.badge, "calls the host");
+        equal("a type that declares none carries null", plainNode.badge, null);
+        equal("and so does the wait inside on_error", errorSlot.children[0].badge, "timer");
+
+        // The rail treatment the badge shares a card with. `secondary` is
+        // what `core.group`'s interrupts slot already declares, so the
+        // failure path needed no new renderer machinery - that claim is
+        // exactly this assertion.
+        equal("on_error is a secondary slot, like an interrupts rail", errorSlot.style, "secondary");
+        equal("it is the node's only slot", invokeNode.slots.length, 1);
+        equal("and it is not a primary one", invokeNode.primary.length, 0);
+        equal("it is a secondary one", invokeNode.secondary.length, 1);
       });
 
       suite("edit: insert and its inverse", () => {

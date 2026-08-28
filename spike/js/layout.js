@@ -51,7 +51,7 @@
  */
 
 import { compareUtf8, slotChildren, sortedSlotNames } from "./document.js";
-import { describe, paletteEntryFor } from "./palette.js";
+import { badgeFor, describe, paletteEntryFor } from "./palette.js";
 
 /* ============================================================ layout tree */
 
@@ -188,6 +188,13 @@ function layoutBlock(node, registry, findings, { depth, slot, parentId, view }) 
     // sb-957: the accent token the type declares, carried through the view
     // model like `icon` is - a name the renderer binds, never a colour.
     accentToken: entry.accentToken ?? null,
+    // sb-p0k: the badge the type declares, normalized once here rather than
+    // at the point of render, so the count/legibility rules live with the
+    // rest of the view model and the renderer only draws what it is handed.
+    // An unresolved block gets none: its card is already given over to
+    // saying it cannot be resolved, and a chip from a descriptor that is
+    // missing is a chip from nowhere.
+    badge: unresolved ? null : badgeFor(entry),
     summary: summaryOf(schema, config),
     chips: chipsOf(schema, config),
     rawConfig: unresolved ? canonicalConfig(config) : null,
