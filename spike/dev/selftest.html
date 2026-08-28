@@ -1002,6 +1002,115 @@
         );
       });
 
+      /*
+       * sb-cy5. `core.raise` is the send half of the send -> interrupt wiring
+       * `core.on_event` could previously only catch.
+       *
+       * Sabotage: spelling the descriptor's EVENT_NAME as IDENTIFIER turns the
+       * "same grammar as the rail" assertions red - the dotted names every
+       * document actually uses stop validating - and leaves the leaf-ness and
+       * badge assertions green, which is the split this suite is for.
+       */
+      suite("proposed core: core.raise is a leaf that names an event", () => {
+        const raise = proposedCoreTypes["core.raise"];
+
+        check("it is not in the shipped core vocabulary", !("core.raise" in coreTypes));
+
+        equal("no slots at all - a raise has no subtree", raise.slots({}), []);
+        equal("it is a step", raise.io({}).kinds, ["step"]);
+        check(
+          "produces is absent, not 'unknown' - one outcome is no join to refuse",
+          raise.io({}).produces === undefined
+        );
+        check("and it consumes nothing", raise.io({}).consumes === undefined);
+        check(
+          "so it drops into a group's body",
+          admits(coreTypes["core.group"], {}, "body", raise, {})
+        );
+        check(
+          "...and not onto the interrupt rail, which takes handlers",
+          !admits(coreTypes["core.group"], {}, "interrupts", raise, {})
+        );
+
+        equal(
+          "one config field",
+          raise.configSchema({}).map((field) => [field.key, field.type, field.required]),
+          [["event", "string", true]]
+        );
+      });
+
+      suite("proposed core: core.raise and core.on_event share one grammar", () => {
+        const raise = proposedCoreTypes["core.raise"];
+        const onEvent = coreTypes["core.on_event"];
+
+        // The load-bearing property: a name one of them accepts and the other
+        // refuses is a rail that can never catch what a step raises. Checked
+        // as agreement rather than by asserting a regex twice, because two
+        // spellings of the same regex is exactly the drift this guards.
+        const raiseTakes = (event) => raise.validateConfig({ event }) === null;
+        const railTakes = (event) =>
+          (onEvent.validateConfig({ event, outcome: "abandon" }) ?? []).every(
+            (finding) => finding.key !== "event"
+          );
+
+        const names = [
+          "signup.abandoned",
+          "signup.email_verified",
+          "error.communication.invoke.blk_x",
+          "done.state.blk_y",
+          "Cancelled",
+          "_internal",
+          "a-b.c_d.9",
+          "",
+          "  ",
+          ".leading",
+          "9starts_with_a_digit",
+          "has space",
+          "has/slash",
+        ];
+
+        equal(
+          "every name lands the same way on both",
+          names.filter((event) => raiseTakes(event) !== railTakes(event)),
+          []
+        );
+
+        check("the document's own event validates", raiseTakes("signup.abandoned"));
+        equal(
+          "a missing event is the field's finding",
+          raise.validateConfig({}),
+          [{ key: "event", message: "must be an event name, like signup.abandoned" }]
+        );
+        equal(
+          "and so is one that is not a string",
+          raise.validateConfig({ event: 3 }),
+          [{ key: "event", message: "must be an event name, like signup.abandoned" }]
+        );
+      });
+
+      suite("proposed core: core.raise's badge, and the accent it does not claim", () => {
+        const raise = proposedCoreTypes["core.raise"];
+        const entry = paletteEntryFor(raise);
+
+        equal("it declares a badge", entry.badge, "raises");
+        equal("...which survives the normalizer", badgeFor(entry), "raises");
+        equal("it sits in the proposed group, beside core.invoke", entry.group, "Proposed core");
+        equal(
+          "...which is the group core.invoke is in",
+          paletteEntryFor(proposedCoreTypes["core.invoke"]).group,
+          entry.group
+        );
+
+        // The omission is the argument: an invoke's work happens outside the
+        // chart and claims a token for it; a raise is the most inside-the-
+        // chart step there is and takes the editor's own accent.
+        check("it claims no accent token", accentTokenFor(entry) === null);
+        check(
+          "...where core.invoke does",
+          accentTokenFor(paletteEntryFor(proposedCoreTypes["core.invoke"])) !== null
+        );
+      });
+
       suite("proposed core: the badge is metadata, like the accent token", () => {
         const invoke = proposedCoreTypes["core.invoke"];
 

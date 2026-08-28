@@ -259,10 +259,10 @@ badge: "calls the host"
 ```
 
 and the card grows a small outlined chip in its meta row, between the type
-caption and the config chips. Two types declare one: the proposed
-`core.invoke`, and `core.wait`, whose badge says "timer" because the one
-thing a reader cannot get from "Wait for 2m" is that the compiled form is a
-delayed send rather than a sleep.
+caption and the config chips. Three types declare one: the proposed
+`core.invoke` and `core.raise`, and `core.wait`, whose badge says "timer"
+because the one thing a reader cannot get from "Wait for 2m" is that the
+compiled form is a delayed send rather than a sleep.
 
 It earns its place for the same three reasons the accent hook does. The
 editor never learns a type name - `render.js` draws whatever string
@@ -424,6 +424,46 @@ The new `badge` palette-entry key is declared here and rendered elsewhere: a
 short chip a type may put on its card header, a string under the same
 discipline as `accentToken` and `icon`. The editor renders whatever is there
 and still never learns a type name. See "A badge is metadata too" below.
+
+### `core.raise`, and the edge that is deliberately not drawn
+
+The second one, and the other half of a wiring the vocabulary could previously
+only express half of. `core.on_event` has always been able to catch an event;
+nothing in a document could send one. `core.raise` is a leaf with one config
+field, `event`, validated against the same event-name grammar `core.on_event`
+uses - a name one accepts and the other refuses is a rail that can never catch
+what a step raises, so `dev/selftest.html` asserts the two agree rather than
+asserting a regex twice.
+
+The signup-wizard fixture uses it end to end. The plan branch now sits inside
+a group whose interrupt rail carries `signup.abandoned`, and the branch's
+`otherwise` arm nudges the customer and then raises `signup.abandoned`. The
+group catches it and abandons, so the provisioning step inside that group
+never runs. `run_su_declined` in `fixtures/runs.json` replays it a step at a
+time.
+
+The load-bearing part is what that raise is NOT: there is no edge from the
+raise to the handler it wakes. The two blocks name the same string in two
+places, and the innermost enclosing group is what hears it. That is the same
+answer `core.invoke`'s `on_error` gets (D13) reached from the other side -
+there an outcome path is a slot rather than a port, here a send is a name
+rather than a port - and both protect the same invariant: every edge in a
+document is a parent/slot/child relationship, so connectors are rendered and
+never authored. A raise with a port pointing at its handler would have been
+the first hand-drawn edge in the editor, and a cross-subtree one at that.
+
+What a reader loses is real. `signup.abandoned` on two cards is a weaker cue
+than a line, and buying it back is a **rendering** question - highlight the
+rails that catch the event of the selected raise - rather than a
+document-shape one. Whether the canvas should do that, whether an event no
+enclosing rail catches deserves a document-level finding, and whether a raise
+should be able to carry a payload (the datamodel fixture already declares
+`event.signup_abandoned.last_step`) are all Phase-B findings.
+
+`core.raise` declares no accent token, and the omission is the argument.
+`core.invoke` claims one because its work happens outside the chart; a raise
+is the most inside-the-chart step there is, so it takes the editor's own
+accent like every other core step.
 
 ## Serving it
 

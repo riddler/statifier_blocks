@@ -3,15 +3,22 @@
     "Spike fixture, the small case. Same adaptations as card-processing.json:",
     "'_comment' keys are additive and not part of the ADR-0001 node shape or",
     "envelope, and the file is pretty-printed rather than canonical.",
-    "Shape: 12 blocks, maximum nesting depth 3 (root = depth 1). Every block type",
+    "Shape: 15 blocks, maximum nesting depth 4 (root = depth 1). Every block type",
     "here except myapp.signup_step / myapp.notify / myapp.provision is core.*, and",
     "every datamodel path in a 'cond' resolves in ../datamodel.json.",
     "This document is the 'does the canvas still look right when there is almost",
-    "nothing on it' fixture."
+    "nothing on it' fixture.",
+    "One block type here is PROPOSED and not shipped: core.raise, in js/proposed-",
+    "core.js. It is the send half of the send -> interrupt wiring (sb-cy5) - the",
+    "otherwise arm of the plan branch raises signup.abandoned, and the rail of the",
+    "group the branch sits in catches it. The two are not joined by an edge; they",
+    "name the same event, and the innermost enclosing group is what catches it.",
+    "The verify group further up names the same event on its own rail, which is a",
+    "second scope rather than a second catcher for this raise."
   ],
   "schema_version": 1,
   "id": "bdoc_signup_demo",
-  "revision": 6,
+  "revision": 7,
   "metadata": {
     "name": "Signup wizard",
     "description": "Collect an account, verify the email, branch on the chosen plan, and provision.",
@@ -81,67 +88,95 @@
           }
         },
         {
-          "type": "core.branch",
-          "id": "blk_su_plan",
+          "type": "core.group",
+          "id": "blk_su_onboarding",
           "type_version": 1,
-          "config": {
-            "arms": [
+          "slots": {
+            "body": [
               {
-                "slot": "arm_business",
-                "cond": "signup.plan == 'business' AND signup.seats > 1"
+                "type": "core.branch",
+                "id": "blk_su_plan",
+                "type_version": 1,
+                "config": {
+                  "arms": [
+                    {
+                      "slot": "arm_business",
+                      "cond": "signup.plan == 'business' AND signup.seats > 1"
+                    },
+                    {
+                      "slot": "arm_personal",
+                      "cond": "signup.plan == 'personal' AND signup.email_verified"
+                    }
+                  ]
+                },
+                "slots": {
+                  "arm_business": [
+                    {
+                      "type": "myapp.signup_step",
+                      "id": "blk_su_company",
+                      "type_version": 1,
+                      "config": {
+                        "invoke_type": "myapp:signup",
+                        "step": "company_details",
+                        "label": "Collect the company details"
+                      }
+                    }
+                  ],
+                  "arm_personal": [
+                    {
+                      "type": "myapp.signup_step",
+                      "id": "blk_su_preferences",
+                      "type_version": 1,
+                      "config": {
+                        "invoke_type": "myapp:signup",
+                        "step": "preferences",
+                        "label": "Ask about preferences"
+                      }
+                    }
+                  ],
+                  "otherwise": [
+                    {
+                      "type": "myapp.notify",
+                      "id": "blk_su_plan_help",
+                      "type_version": 1,
+                      "config": {
+                        "invoke_type": "myapp:notify",
+                        "template": "choose_a_plan",
+                        "label": "Nudge them to pick a plan"
+                      }
+                    },
+                    {
+                      "type": "core.raise",
+                      "id": "blk_su_raise_abandoned",
+                      "type_version": 1,
+                      "config": {
+                        "event": "signup.abandoned"
+                      }
+                    }
+                  ]
+                }
               },
               {
-                "slot": "arm_personal",
-                "cond": "signup.plan == 'personal' AND signup.email_verified"
-              }
-            ]
-          },
-          "slots": {
-            "arm_business": [
-              {
-                "type": "myapp.signup_step",
-                "id": "blk_su_company",
+                "type": "myapp.provision",
+                "id": "blk_su_provision",
                 "type_version": 1,
                 "config": {
-                  "invoke_type": "myapp:signup",
-                  "step": "company_details",
-                  "label": "Collect the company details"
+                  "invoke_type": "myapp:provision",
+                  "label": "Create the workspace"
                 }
               }
             ],
-            "arm_personal": [
+            "interrupts": [
               {
-                "type": "myapp.signup_step",
-                "id": "blk_su_preferences",
+                "type": "core.on_event",
+                "id": "blk_su_onboarding_abandoned",
                 "type_version": 1,
                 "config": {
-                  "invoke_type": "myapp:signup",
-                  "step": "preferences",
-                  "label": "Ask about preferences"
-                }
-              }
-            ],
-            "otherwise": [
-              {
-                "type": "myapp.notify",
-                "id": "blk_su_plan_help",
-                "type_version": 1,
-                "config": {
-                  "invoke_type": "myapp:notify",
-                  "template": "choose_a_plan",
-                  "label": "Nudge them to pick a plan"
+                  "event": "signup.abandoned",
+                  "outcome": "abandon"
                 }
               }
             ]
-          }
-        },
-        {
-          "type": "myapp.provision",
-          "id": "blk_su_provision",
-          "type_version": 1,
-          "config": {
-            "invoke_type": "myapp:provision",
-            "label": "Create the workspace"
           }
         }
       ]

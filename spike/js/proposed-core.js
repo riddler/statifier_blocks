@@ -39,6 +39,11 @@
  */
 const IDENTIFIER = /^[a-z][a-z0-9_]*$/;
 const INVOKE_TYPE = /^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/;
+/* Verbatim `StatifierBlocks.Core.Config`'s spelling, the same one `palette.js`
+ * keeps for `core.on_event`. A raised event and a caught one have to be the
+ * same grammar or the rail catches nothing, and two regexes are two chances
+ * for them to drift. */
+const EVENT_NAME = /^[A-Za-z_][A-Za-z0-9_.\-]*$/;
 
 /* One `name=path` pair, with whitespace around either side tolerated. The
  * name is an identifier; the path is any non-empty run of non-whitespace,
@@ -49,6 +54,7 @@ const PARAM_LINE = /^\s*([a-z][a-z0-9_]*)\s*=\s*(\S+)\s*$/;
 const nonEmptyString = (value) => typeof value === "string" && value !== "";
 const isIdentifier = (value) => nonEmptyString(value) && IDENTIFIER.test(value);
 const isInvokeType = (value) => nonEmptyString(value) && INVOKE_TYPE.test(value);
+const isEventName = (value) => nonEmptyString(value) && EVENT_NAME.test(value);
 const verdict = (findings) => (findings.length === 0 ? null : findings);
 
 /**
@@ -225,6 +231,106 @@ const coreInvoke = {
   },
 };
 
+/* ------------------------------------------------------------ core.raise
+ *
+ * A leaf step that raises one event, for an enclosing group's interrupt rail
+ * to catch. The other half of a wiring the vocabulary could previously only
+ * express half of: `core.on_event` has always been able to catch an event,
+ * and nothing in a document could send one.
+ *
+ * ## Why this is a leaf, and why the edge is still not drawn
+ *
+ * A raise has no subtree and no outcome path: it names an event and hands
+ * control on. It therefore declares no slots at all, exactly as `core.wait`
+ * and `core.on_event` do - and the send -> catch relationship, the one edge a
+ * reader most wants to see, is deliberately NOT an edge in the document. It
+ * is two blocks naming the same string in two places, and the enclosing
+ * group's rail is where the catch lives.
+ *
+ * That is the same D13 answer `core.invoke`'s `on_error` gets (operator,
+ * 2026-08-28; umbrella `docs/decisions.md`), arrived at from the other side.
+ * There an outcome path is a SLOT rather than a port; here a send is a NAME
+ * rather than a port. Both refusals protect the one invariant the editor
+ * rests on: every edge in a document is a parent/slot/child relationship, so
+ * connectors are rendered and never authored. A `core.raise` with a port
+ * pointing at the handler it wakes would have been the first hand-drawn edge,
+ * and it would have been a cross-subtree one at that.
+ *
+ * What a reader loses is real - `signup.abandoned` in two cards is a weaker
+ * cue than a line - and buying it back is a RENDERING question (highlight the
+ * rail when a raise of its event is selected), not a document-shape one.
+ * Whether the spike's canvas should do that is a Phase-B finding.
+ *
+ * ## What this would compile to (Phase B; nothing here compiles anything)
+ *
+ *   - the block emits a `<raise event="...">` in the onentry of the state it
+ *     compiles into: an INTERNAL event, delivered to the same session, which
+ *     is what makes an enclosing group's transition the thing that sees it.
+ *     `core.wait`'s badge already says the neighbouring fact about that
+ *     vocabulary - a wait is a delayed send rather than a sleep;
+ *   - an event no enclosing rail catches is not an error. It is raised, no
+ *     transition is enabled by it, and the chart carries on. A document-level
+ *     finding ("nothing catches signup.abandoned") is an editor affordance
+ *     worth having and is not this descriptor's job.
+ *
+ * Whether `<raise>` or a zero-delay `<send>` is the right emission, and
+ * whether a raise should be able to carry a payload the handler reads through
+ * `event.*`, are both open. The datamodel fixture already declares payload
+ * fields for `signup.abandoned`, so the second question has a shape; a
+ * `payload` config field would need ADR-0002 decision 7's closed field-type
+ * set to grow, or the same flattening compromise `params` makes above. Left
+ * out on purpose rather than guessed at.
+ */
+const coreRaise = {
+  name: "core.raise",
+  currentVersion: 1,
+  slots: () => [],
+  configSchema: () => [
+    {
+      key: "event",
+      type: "string",
+      label: "Raise this event",
+      required: true,
+      default: "",
+    },
+  ],
+  validateConfig: (config) =>
+    isEventName(config.event)
+      ? null
+      : [{ key: "event", message: "must be an event name, like signup.abandoned" }],
+  /*
+   * A step, and nothing more. `produces` is absent rather than `"unknown"`:
+   * a raise has one outcome, so there is no join to refuse (the reason
+   * `core.invoke` and `core.branch` both say `"unknown"`), and `core.wait` -
+   * the other single-outcome leaf - declares its io exactly this way.
+   */
+  io: () => ({ kinds: ["step"] }),
+  paletteEntry: {
+    label: "Raise",
+    group: "Proposed core",
+    description: "Raises an event for an enclosing group's interrupt rules.",
+    /* One of `render.js`'s existing glyph names. `myapp.notify` uses it too,
+     * which is a legible collision - both announce something - and minting a
+     * new one would mean editing the renderer's icon set for a proposal. */
+    icon: "megaphone",
+    keywords: ["raise", "event", "send", "signal", "interrupt", "abandon"],
+    order: 1,
+    /* PROPOSED, like the key itself. The one thing a reader cannot get from
+     * "Raise signup.abandoned": that the event goes to this chart's own
+     * handlers rather than out to the host. Under `badgeFor`'s 24-character
+     * cap with room to spare. */
+    badge: "raises",
+    /* No `accentToken`, deliberately, and the omission is the argument.
+     * `core.invoke` claims one because its work happens OUTSIDE the chart -
+     * that is what `tokens.css` says the teal is for. A raise is the
+     * opposite: it is the most inside-the-chart step there is, so it takes
+     * the editor's own accent like every other core step. Declaring a second
+     * proposed token here would also have meant a theme change in three
+     * files for a type whose whole point is that it is ordinary.
+     */
+  },
+};
+
 /* -------------------------------------------------------------- the value */
 
 /**
@@ -238,4 +344,5 @@ const coreInvoke = {
  */
 export const proposedCoreTypes = {
   "core.invoke": coreInvoke,
+  "core.raise": coreRaise,
 };
