@@ -536,6 +536,71 @@
               }
             }
           ]
+        },
+        {
+          "id": "run_su_declined",
+          "name": "No plan is chosen",
+          "description": "The other half of the interrupt story: a step RAISES the event a rail is waiting for. A one-seat business plan matches neither arm, so the branch takes otherwise, the nudge goes out, and the proposed core.raise raises signup.abandoned - which the group the branch sits in catches, so the workspace is never provisioned.",
+          "expected": "pass",
+          "steps": [
+            {
+              "label": "Collect email and password",
+              "active": ["blk_su_account"],
+              "deltas": [{ "path": "signup.email", "value": "\"rowan@example.com\"" }]
+            },
+            {
+              "label": "The customer verifies",
+              "active": ["blk_su_verified"],
+              "event": "signup.email_verified",
+              "deltas": [{ "path": "signup.email_verified", "value": "true" }]
+            },
+            {
+              "label": "Plan branch falls through to otherwise",
+              "active": ["blk_su_plan"],
+              "deltas": [
+                { "path": "signup.plan", "value": "\"business\"" },
+                { "path": "signup.seats", "value": "1" }
+              ],
+              "check": {
+                "label": "neither arm holds, so otherwise is taken",
+                "result": "pass",
+                "detail": "arm_business needs seats > 1 and arm_personal needs plan == 'personal'. This is the truth table's 'Business, single seat' row, and it is the row whose note calls the outcome probably wrong."
+              }
+            },
+            {
+              "label": "Nudge them to pick a plan",
+              "active": ["blk_su_plan_help"]
+            },
+            {
+              "label": "Raise signup.abandoned",
+              "active": ["blk_su_raise_abandoned"],
+              "note": "The proposed core.raise. Nothing joins this card to the rail that catches it - they name the same event, and the innermost enclosing group is the one that hears it.",
+              "check": {
+                "label": "the raised name matches a rule on the enclosing group's rail",
+                "result": "pass",
+                "detail": "Walked by hand when the fixture was written, which is exactly the check an editor-side finding should be making instead."
+              }
+            },
+            {
+              "label": "The onboarding group's rail catches it",
+              "active": ["blk_su_onboarding_abandoned"],
+              "event": "signup.abandoned",
+              "check": {
+                "label": "the onboarding rail catches it, not the verify group's identical rule",
+                "result": "pass",
+                "detail": "The verify group names signup.abandoned too, but it finished several steps ago; a rail only catches while its own group is live."
+              }
+            },
+            {
+              "label": "The onboarding group abandons",
+              "active": ["blk_su_onboarding"],
+              "check": {
+                "label": "provisioning never runs",
+                "result": "pass",
+                "detail": "blk_su_provision sits inside the abandoned group, which is why the group wraps the branch and the provisioning step together rather than the branch alone."
+              }
+            }
+          ]
         }
       ],
       "tables": [
