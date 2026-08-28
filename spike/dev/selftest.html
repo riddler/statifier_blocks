@@ -213,6 +213,23 @@
         typeLabel,
       } from "../js/datamodel.js";
 
+      import {
+        NOT_STARTED,
+        bindingsAt,
+        endCursor,
+        fixturesFor,
+        fixturesText,
+        moveCursor,
+        parseFixtures,
+        resetCursor,
+        runById,
+        runSummary,
+        runView,
+        tableBlockIds,
+        tableView,
+        tablesForBlock,
+      } from "../js/fixtures.js";
+
       /* ------------------------------------------------ the assert harness */
 
       const groups = [];
@@ -2612,6 +2629,399 @@
         const next = writeAtPath(config, branch[0].path, "risk_rating < 40");
         equal("an edit writes through the same path", next.arms[0].cond, "risk_rating < 40");
         equal("without mutating what undo holds", config.arms[0].cond, "budget_remaining > amount");
+      });
+
+      /* ================================================ fixtures (sb-9z3) */
+
+      /*
+       * A small fixture set of the same SHAPE as `fixtures/runs.json`, written
+       * here rather than fetched so these suites stay synchronous and so a
+       * change to the shipped file cannot silently rewrite what they assert.
+       * The shipped file gets its own suite at the bottom, which is about the
+       * file rather than about the module.
+       *
+       * Everything here is mocked, exactly as D4 requires of the real thing:
+       * `result` is a value someone wrote down and nothing evaluates `expr`.
+       */
+      const FIX = {
+        version: 1,
+        documents: {
+          doc_a: {
+            runs: [
+              {
+                id: "run_one",
+                name: "One",
+                description: "three steps, one of them parallel",
+                expected: "pass",
+                steps: [
+                  { label: "start", active: ["blk_1"], deltas: [{ path: "a", value: "1" }] },
+                  {
+                    label: "two lanes",
+                    active: ["blk_2", "blk_3"],
+                    event: "e.arrived",
+                    deltas: [{ path: "b", value: "2" }],
+                    check: { label: "both lanes armed", result: "pass" },
+                  },
+                  {
+                    label: "done",
+                    active: ["blk_4"],
+                    deltas: [{ path: "a", value: "9" }],
+                  },
+                ],
+              },
+              {
+                id: "run_two",
+                name: "Two",
+                expected: "pass",
+                steps: [
+                  { label: "ok", active: ["blk_1"], check: { label: "fine", result: "pass" } },
+                  { label: "broken", active: ["blk_2"], check: { label: "nope", result: "fail" } },
+                ],
+              },
+            ],
+            tables: [
+              {
+                id: "tbl_one",
+                blockId: "blk_9",
+                name: "A branch",
+                columns: [
+                  { key: "arm_x", label: "X", expr: "a > 1" },
+                  { key: "arm_y", label: "Y", expr: "b" },
+                ],
+                paths: ["a", "b"],
+                rows: [
+                  { name: "both", bindings: { a: "2", b: "true" }, expected: { arm_x: true, arm_y: true } },
+                  { name: "neither", bindings: { a: "0", b: "false" }, expected: { arm_x: false, arm_y: false } },
+                  { name: "half said", bindings: { a: "5" }, expected: { arm_x: true } },
+                ],
+              },
+            ],
+          },
+          doc_empty: { runs: [], tables: [] },
+        },
+      };
+
+      const runOne = FIX.documents.doc_a.runs[0];
+      const runTwo = FIX.documents.doc_a.runs[1];
+
+      suite("fixtures / the document section", () => {
+        const a = fixturesFor(FIX, "doc_a");
+        equal("finds a document's runs", a.runs.length, 2);
+        equal("and its tables", a.tables.length, 1);
+        check("a section that exists is known", a.known === true);
+
+        const empty = fixturesFor(FIX, "doc_empty");
+        check("an empty section is still known", empty.known === true);
+        equal("with no runs in it", empty.runs.length, 0);
+
+        // The distinction the pane says two different sentences for: nobody has
+        // written fixtures for this document, versus someone wrote the section
+        // and left it empty.
+        const missing = fixturesFor(FIX, "doc_nope");
+        check("a document with no section is not known", missing.known === false);
+        equal("and reads as empty rather than throwing", missing.runs, []);
+        equal("a null fixture file degrades the same way", fixturesFor(null, "doc_a").runs, []);
+
+        equal("block ids owning a table", tableBlockIds(a), ["blk_9"]);
+        equal("tables for a block", tablesForBlock(a, "blk_9").length, 1);
+        equal("tables for a block with none", tablesForBlock(a, "blk_1"), []);
+        equal("tables for no selection", tablesForBlock(a, null), []);
+        equal("a run by id", runById(a, "run_two").name, "Two");
+        equal("an unknown run id is null, not a throw", runById(a, "nope"), null);
+      });
+
+      suite("fixtures / the replay cursor", () => {
+        equal("a fresh cursor is 'not started'", resetCursor(), NOT_STARTED);
+        equal("the end cursor is one past the last step", endCursor(runOne), 3);
+
+        equal("forward from not-started lands on step 0", moveCursor(runOne, NOT_STARTED, 1), 0);
+        equal("forward again", moveCursor(runOne, 0, 1), 1);
+
+        // Clamped rather than refused, at BOTH ends: the transport disables the
+        // buttons for looks, and the model is what makes that safe.
+        equal("back from not-started stays put", moveCursor(runOne, NOT_STARTED, -1), NOT_STARTED);
+        equal("forward from the end stays put", moveCursor(runOne, 3, 1), 3);
+        equal("back from the end returns to the last step", moveCursor(runOne, 3, -1), 2);
+        equal("a nonsense cursor reads as not-started", moveCursor(runOne, "x", 1), 0);
+        equal("a run with no steps cannot move forward", moveCursor({ steps: [] }, NOT_STARTED, 1), NOT_STARTED);
+      });
+
+      suite("fixtures / a run at a cursor", () => {
+        const fresh = runView(runOne, NOT_STARTED);
+        equal("a fresh run has not started", fresh.started, false);
+        // The chip beside it already says "not run"; the progress line's job
+        // before the replay starts is to say how long the run is.
+        equal("its progress reads the step count", fresh.progress, "3 steps");
+        equal("nothing is active", fresh.activeIds, []);
+        equal("and its verdict is 'not-run'", fresh.verdict, "not-run");
+        equal("no bindings yet", fresh.bindings, []);
+        equal("every step is in the future", fresh.steps.map((s) => s.state), [
+          "future",
+          "future",
+          "future",
+        ]);
+
+        const mid = runView(runOne, 1);
+        equal("the cursor's step is current", mid.steps[1].state, "current");
+        equal("the one behind it is past", mid.steps[0].state, "past");
+        equal("the one ahead is future", mid.steps[2].state, "future");
+        equal("progress counts from one", mid.progress, "step 2 of 3");
+        // The whole reason the runner exists: a parallel step lights more than
+        // one block, and the highlight is a SET.
+        equal("a parallel step activates two blocks", mid.activeIds, ["blk_2", "blk_3"]);
+        equal("the current step carries its event", mid.current.event, "e.arrived");
+        equal("mid-run with no failure reads 'replaying'", mid.verdict, "running");
+        equal("bindings accumulate up to the cursor", mid.bindings, [
+          { path: "a", value: "1", step: 0 },
+          { path: "b", value: "2", step: 1 },
+        ]);
+
+        const done = runView(runOne, 3);
+        equal("a finished run has no current step", done.current, null);
+        equal("nothing is highlighted once it finishes", done.activeIds, []);
+        equal("its progress reads 'finished'", done.progress, "finished");
+        equal("with no failed check it passes", done.verdict, "pass");
+        equal("and agrees with its declared expectation", done.agrees, true);
+        // Last write wins, insertion order kept - `a` was written twice.
+        equal("a later write replaces an earlier one in place", done.bindings, [
+          { path: "a", value: "9", step: 2 },
+          { path: "b", value: "2", step: 1 },
+        ]);
+
+        // A check only counts once the cursor has REACHED it. Anything else
+        // would let a step list spoil its own ending.
+        const before = runView(runTwo, 0);
+        equal("an unconsumed failing check does not count", before.verdict, "running");
+        equal("and reports no failures yet", before.failures.length, 0);
+
+        const after = runView(runTwo, 1);
+        equal("consuming it turns the verdict to 'failing'", after.verdict, "failing");
+        equal("which is not yet the final verdict", after.finished, false);
+        equal("the failure names its step", after.failures[0].step, 1);
+
+        const finished = runView(runTwo, 2);
+        equal("finishing after a failed check fails", finished.verdict, "fail");
+        equal("and disagrees with 'expects pass'", finished.agrees, false);
+        equal("agreement is unknown before the end", runView(runTwo, 0).agrees, null);
+
+        const summary = runSummary(runOne);
+        equal("a summary counts steps", summary.stepCount, 3);
+        equal("and counts only the steps carrying a check", summary.checkCount, 1);
+
+        equal("bindingsAt before any step is empty", bindingsAt(runOne.steps, NOT_STARTED), []);
+      });
+
+      suite("fixtures / the truth table", () => {
+        const table = tableView(FIX.documents.doc_a.tables[0]);
+
+        equal("columns keep their declared order", table.columns.map((c) => c.key), [
+          "arm_x",
+          "arm_y",
+        ]);
+        equal("the expression is carried, not evaluated", table.columns[0].expr, "a > 1");
+        equal("declared paths are the column order", table.paths, ["a", "b"]);
+        equal("every row binds every path", table.rows[0].bindings.length, 2);
+        equal("a row that binds nothing for a path shows a dash", table.rows[2].bindings[1].value, "—");
+
+        equal("a true cell", table.rows[0].cells[0].expected, true);
+        equal("a false cell", table.rows[1].cells[0].expected, false);
+        // Tri-state on purpose: an unfilled cell must read as "nobody said",
+        // never as false - the one wrong answer a truth table can give.
+        equal("an unstated cell is null, not false", table.rows[2].cells[1].expected, null);
+
+        equal("true counts are per column", table.trueCounts, [2, 1]);
+
+        // Declared beats derived; derived is the fallback and keeps first-seen
+        // order rather than sorting, because sorting would reorder the columns
+        // every time a row changed.
+        const derived = tableView({
+          id: "t",
+          columns: [{ key: "k" }],
+          rows: [{ bindings: { z: "1", a: "2" } }, { bindings: { a: "3", m: "4" } }],
+        });
+        equal("paths derive in first-seen order", derived.paths, ["z", "a", "m"]);
+        equal("a column with no label falls back to its key", derived.columns[0].label, "k");
+      });
+
+      suite("fixtures / the JSON editor", () => {
+        const good = parseFixtures(fixturesText(FIX));
+        check("round-trips the fixture file", good.ok === true);
+        equal("and keeps its documents", Object.keys(good.value.documents).sort(), [
+          "doc_a",
+          "doc_empty",
+        ]);
+
+        // A refusal is a value, never an exception - the pane has to render the
+        // reason under the textarea, and a throw reaches it as nothing at all.
+        const broken = parseFixtures('{"documents": {,}}');
+        check("refuses invalid JSON", broken.ok === false);
+        check("with the engine's message", typeof broken.message === "string" && broken.message !== "");
+
+        const positioned = parseFixtures('{\n  "documents": {}\n  "extra": 1\n}');
+        check("refuses a missing comma", positioned.ok === false);
+        check(
+          "and recovers a line where the engine reports one",
+          positioned.line === null || positioned.line >= 2,
+          `line was ${positioned.line}`
+        );
+
+        const array = parseFixtures("[1, 2]");
+        check("refuses a top-level array", array.ok === false);
+        equal("saying what it wanted", array.message, "The fixture file must be a JSON object.");
+
+        const noDocs = parseFixtures('{"version": 1}');
+        check("refuses a file with no documents key", noDocs.ok === false);
+
+        const badDocs = parseFixtures('{"documents": []}');
+        check("refuses a documents key that is not an object", badDocs.ok === false);
+
+        const empty = parseFixtures('{"documents": {}}');
+        check("accepts an empty but well-formed file", empty.ok === true);
+      });
+
+      /* --------------------------------- the shipped fixture file itself */
+
+      /*
+       * The suites above are about the module. This one is about
+       * `fixtures/runs.json`: every block id it names has to exist in the
+       * document it is filed under, or the runner reveals nothing and the
+       * truth tables hang off blocks nobody can select. Fetched rather than
+       * inlined, because the whole point is to check the file that ships.
+       *
+       * A failed fetch is reported as a failure rather than skipped: a fixture
+       * file that 404s is exactly the bug this suite is for.
+       */
+      const shipped = await Promise.all(
+        [
+          ["runs", "../fixtures/runs.json"],
+          ["bdoc_cp_demo", "../fixtures/documents/card-processing.json"],
+          ["bdoc_signup_demo", "../fixtures/documents/signup-wizard.json"],
+          ["datamodel", "../fixtures/datamodel.json"],
+        ].map(([key, path]) =>
+          fetch(path)
+            .then((response) => (response.ok ? response.json() : null))
+            .then((value) => [key, value])
+            .catch(() => [key, null])
+        )
+      ).then((pairs) => Object.fromEntries(pairs));
+
+      suite("fixtures / the shipped fixture file", () => {
+        check("fixtures/runs.json loads", shipped.runs !== null);
+        if (shipped.runs === null) return;
+
+        const idsIn = (raw) => {
+          const seen = new Set();
+          const walk = (node) => {
+            if (!node || typeof node !== "object") return;
+            if (typeof node.id === "string" && typeof node.type === "string") seen.add(node.id);
+            for (const children of Object.values(node.slots ?? {})) {
+              for (const child of children) walk(child);
+            }
+          };
+          walk(raw.root);
+          return seen;
+        };
+
+        for (const documentId of ["bdoc_cp_demo", "bdoc_signup_demo"]) {
+          const raw = shipped[documentId];
+          check(`${documentId} loads`, raw !== null);
+          if (raw === null) continue;
+
+          const blocks = idsIn(raw);
+          const fixtures = fixturesFor(shipped.runs, documentId);
+
+          check(`${documentId} has runs`, fixtures.runs.length > 0, "no runs written");
+          check(`${documentId} has tables`, fixtures.tables.length > 0, "no tables written");
+
+          const ids = fixtures.runs.map((run) => run.id);
+          equal(`${documentId} run ids are unique`, ids.length, new Set(ids).size);
+
+          const strays = [];
+          for (const run of fixtures.runs) {
+            for (const step of run.steps ?? []) {
+              for (const id of step.active ?? []) {
+                if (!blocks.has(id)) strays.push(`${run.id}: ${id}`);
+              }
+            }
+          }
+          equal(`${documentId} every active block exists`, strays, []);
+
+          const tableStrays = fixtures.tables
+            .filter((table) => !blocks.has(table.blockId))
+            .map((table) => `${table.id}: ${table.blockId}`);
+          equal(`${documentId} every table's block exists`, tableStrays, []);
+
+          // A row that binds nothing for a declared path renders a dash, which
+          // is right for a table someone is still filling in and wrong for one
+          // that ships as evidence.
+          const holes = [];
+          for (const table of fixtures.tables) {
+            const view = tableView(table);
+            for (const row of view.rows) {
+              for (const binding of row.bindings) {
+                if (binding.value === "—") holes.push(`${table.id}/${row.name}: ${binding.path}`);
+              }
+              for (const cell of row.cells) {
+                if (cell.expected === null) holes.push(`${table.id}/${row.name}: ${cell.key}`);
+              }
+            }
+          }
+          equal(`${documentId} no table row is half filled in`, holes, []);
+
+        }
+
+        // At least one step somewhere must light two blocks at once - the
+        // parallel case is the thing the runner exists to prove, and a fixture
+        // set that quietly lost it would still look fine. Asserted against
+        // card-processing specifically rather than against every document,
+        // because signup-wizard has no parallel region and a two-block step in
+        // it would be a fixture stating something the document does not do.
+        const parallel = fixturesFor(shipped.runs, "bdoc_cp_demo").runs.some((run) =>
+          (run.steps ?? []).some((step) => (step.active ?? []).length > 1)
+        );
+        check("card-processing has a step with two blocks active", parallel);
+
+        // One run somewhere must disagree with its own declared expectation, so
+        // the pane's "one of the two is out of date" state is reachable.
+        const disagreeing = Object.keys(shipped.runs.documents).flatMap((documentId) =>
+          fixturesFor(shipped.runs, documentId)
+            .runs.map((run) => runView(run, endCursor(run)))
+            .filter((state) => state.agrees === false)
+        );
+        check("at least one run's steps disagree with its expectation", disagreeing.length > 0);
+
+        /*
+         * Every datamodel path a run writes or a table binds has to be one the
+         * datamodel document declares. A fixture naming `fraud.verdicts` reads
+         * exactly as convincingly as one naming `fraud.verdict` and is wrong,
+         * and nothing else in the spike would catch it: the runner does not
+         * look these up, it prints them.
+         */
+        check("fixtures/datamodel.json loads", shipped.datamodel !== null);
+        if (shipped.datamodel === null) return;
+
+        const declared = indexPaths(shipped.datamodel);
+        const undeclared = [];
+
+        for (const documentId of Object.keys(shipped.runs.documents)) {
+          const fixtures = fixturesFor(shipped.runs, documentId);
+
+          for (const run of fixtures.runs) {
+            for (const step of run.steps ?? []) {
+              for (const delta of step.deltas ?? []) {
+                if (!declared.has(delta.path)) undeclared.push(`${run.id}: ${delta.path}`);
+              }
+            }
+          }
+
+          for (const table of fixtures.tables) {
+            for (const path of tableView(table).paths) {
+              if (!declared.has(path)) undeclared.push(`${table.id}: ${path}`);
+            }
+          }
+        }
+
+        equal("every fixture path is declared in the datamodel", undeclared, []);
       });
 
       /* ------------------------------------------------------- reporting */

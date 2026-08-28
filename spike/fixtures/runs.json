@@ -1,0 +1,579 @@
+{
+  "_comment": [
+    "Spike fixture for the Fixtures pane (sb-9z3). SIBLING FILE, not a section",
+    "inside the document fixtures - the shape decision, and why:",
+    "  A document fixture is an ADR-0001 envelope, and the spike's fromJson/1",
+    "  mirrors the real decoder's strictness: it refuses a key the encoder would",
+    "  never have written. The existing '_comment' keys already have to be",
+    "  stripped before decoding for exactly that reason. Adding a 'runs' key to",
+    "  the envelope would mean either a second thing to strip on every load or a",
+    "  laxer decoder, and the strict check is what keeps encode(decode(b)) == b",
+    "  honest. A run is also not part of the document: it is a fixture ABOUT one,",
+    "  it has its own lifetime, and a host that ships documents from a database",
+    "  will keep its fixtures somewhere else entirely. So: one file, keyed by",
+    "  document id, fetched beside the document.",
+    "",
+    "EVERYTHING HERE IS MOCKED, per the campaign's D4 ruling: a run is a scripted",
+    "sequence an author wrote, and a truth table's expected values are typed in.",
+    "Nothing in the spike interprets a chart or evaluates a predicate. The runner",
+    "REPLAYS; it does not compute. The pane says so on screen, because a fixture",
+    "UI that looks like it is running the chart would be the single most",
+    "misleading thing this spike could ship.",
+    "",
+    "Every block id referenced here exists in the matching document, and every",
+    "datamodel path in a binding or a delta resolves in ../datamodel.json."
+  ],
+  "version": 1,
+  "documents": {
+    "bdoc_cp_demo": {
+      "runs": [
+        {
+          "id": "run_cp_approved",
+          "name": "Approved and captured",
+          "description": "The happy path: validation passes, all three lanes clear, the outcome branch takes the approved arm, and the capture succeeds first try.",
+          "expected": "pass",
+          "steps": [
+            {
+              "label": "Take the payment request",
+              "active": ["blk_cp_intake"],
+              "event": "payment.requested",
+              "deltas": [
+                { "path": "amount_cents", "value": "42350" },
+                { "path": "currency", "value": "\"USD\"" },
+                { "path": "card.active", "value": "true" }
+              ]
+            },
+            {
+              "label": "Validation branch takes arm_valid",
+              "active": ["blk_cp_validation"],
+              "deltas": [{ "path": "validation.passed", "value": "true" }],
+              "check": {
+                "label": "arm_valid was taken",
+                "result": "pass",
+                "detail": "validation.passed AND amount_cents > 0 AND card.active all held."
+              }
+            },
+            {
+              "label": "Two lanes run side by side",
+              "note": "The parallel block is live: the fraud lane is rating the transaction while the balance lane checks funds. Both cards are highlighted on the canvas.",
+              "active": ["blk_cp_risk_rating", "blk_cp_balance"],
+              "deltas": [
+                { "path": "risk_rating", "value": "34" },
+                { "path": "balance.available_cents", "value": "180000" }
+              ]
+            },
+            {
+              "label": "The 3DS lane joins",
+              "note": "Three lanes active at once - the widest the parallel gets in this run.",
+              "active": ["blk_cp_fraud_wait", "blk_cp_balance_wait", "blk_cp_three_ds"],
+              "deltas": [{ "path": "three_ds.required", "value": "true" }]
+            },
+            {
+              "label": "The cardholder completes the challenge",
+              "active": ["blk_cp_three_ds_done"],
+              "event": "card.three_ds_completed",
+              "deltas": [
+                { "path": "three_ds.completed", "value": "true" },
+                { "path": "three_ds.status", "value": "\"authenticated\"" }
+              ],
+              "check": {
+                "label": "the 3DS group resumed rather than timing out",
+                "result": "pass",
+                "detail": "The completion event reached the interrupt rail before the PT10M wait ran out."
+              }
+            },
+            {
+              "label": "Risk branch takes the low-risk arm",
+              "active": ["blk_cp_risk_branch"],
+              "deltas": [
+                { "path": "fraud.verdict", "value": "\"clear\"" },
+                { "path": "fraud.cleared", "value": "true" },
+                { "path": "customer.verified", "value": "true" }
+              ],
+              "check": {
+                "label": "arm_low_risk was taken, not arm_high_risk",
+                "result": "pass",
+                "detail": "risk_rating 34 < 40 and customer.verified held, so the high-risk arm never armed."
+              }
+            },
+            {
+              "label": "Authorize the card",
+              "active": ["blk_cp_authorize"],
+              "deltas": [
+                { "path": "auth.approved", "value": "true" },
+                { "path": "auth.code", "value": "\"A31842\"" }
+              ]
+            },
+            {
+              "label": "Outcome branch takes arm_approved",
+              "active": ["blk_cp_outcome"],
+              "check": {
+                "label": "arm_approved was taken",
+                "result": "pass",
+                "detail": "auth.approved AND fraud.cleared AND balance.available_cents >= amount_cents."
+              }
+            },
+            {
+              "label": "Capture the funds",
+              "active": ["blk_cp_capture"],
+              "deltas": [
+                { "path": "auth.captured", "value": "true" },
+                { "path": "capture_attempts", "value": "1" }
+              ],
+              "check": {
+                "label": "the retry arm was not taken",
+                "result": "pass",
+                "detail": "auth.captured == false no longer held, so the one-armed retry branch fell through."
+              }
+            },
+            {
+              "label": "Build and send the receipt",
+              "active": ["blk_cp_receipt", "blk_cp_final_notify"],
+              "note": "The tail runs to completion."
+            }
+          ]
+        },
+        {
+          "id": "run_cp_manual_review",
+          "name": "Fraud flags it for manual review",
+          "description": "The rating comes back high, the high-risk arm flags a human, and the outcome branch parks the work in the resumable group until a reviewer resolves it two days later.",
+          "expected": "pass",
+          "steps": [
+            {
+              "label": "Take the payment request",
+              "active": ["blk_cp_intake"],
+              "event": "payment.requested",
+              "deltas": [{ "path": "amount_cents", "value": "980000" }]
+            },
+            {
+              "label": "Validation passes",
+              "active": ["blk_cp_validation"],
+              "deltas": [{ "path": "validation.passed", "value": "true" }]
+            },
+            {
+              "label": "The fraud and balance lanes run together",
+              "active": ["blk_cp_risk_rating", "blk_cp_balance"],
+              "deltas": [
+                { "path": "risk_rating", "value": "88" },
+                { "path": "balance.available_cents", "value": "1200000" }
+              ]
+            },
+            {
+              "label": "Risk branch takes the high-risk arm",
+              "active": ["blk_cp_risk_branch"],
+              "deltas": [{ "path": "fraud.verdict", "value": "\"review\"" }],
+              "check": {
+                "label": "arm_high_risk was taken",
+                "result": "pass",
+                "detail": "risk_rating 88 >= 70, so the first arm matched before the low-risk arm was tried."
+              }
+            },
+            {
+              "label": "Flag it for a human",
+              "active": ["blk_cp_manual_flag"],
+              "deltas": [{ "path": "fraud.cleared", "value": "false" }]
+            },
+            {
+              "label": "Outcome branch takes arm_manual_review",
+              "active": ["blk_cp_outcome"],
+              "check": {
+                "label": "arm_manual_review was taken, not arm_declined",
+                "result": "pass",
+                "detail": "fraud.verdict == 'review' and the backlog was under 50, and arm_declined's guard wanted verdict 'decline'."
+              }
+            },
+            {
+              "label": "Park it for a reviewer",
+              "active": ["blk_cp_park"],
+              "deltas": [
+                { "path": "review.parked", "value": "true" },
+                { "path": "review.queue", "value": "\"manual_review\"" }
+              ]
+            },
+            {
+              "label": "Two days pass",
+              "active": ["blk_cp_manual_wait"],
+              "note": "The resumable group holds deep history, so a resume lands back here rather than at the top of the arm."
+            },
+            {
+              "label": "A reviewer approves it",
+              "active": ["blk_cp_manual_resolved"],
+              "event": "review.resolved",
+              "deltas": [{ "path": "event.review_resolved.decision", "value": "\"approve\"" }],
+              "check": {
+                "label": "the guarded interrupt rule fired",
+                "result": "pass",
+                "detail": "decision == 'approve' AND review.parked both held."
+              }
+            },
+            {
+              "label": "Apply the reviewer's decision",
+              "active": ["blk_cp_resolve"]
+            }
+          ]
+        },
+        {
+          "id": "run_cp_cancelled",
+          "name": "Customer cancels mid-authorization",
+          "description": "The customer cancels while the three lanes are still running. The authorization group's guarded interrupt rule abandons the work before anything is captured.",
+          "expected": "pass",
+          "steps": [
+            {
+              "label": "Take the payment request",
+              "active": ["blk_cp_intake"],
+              "event": "payment.requested"
+            },
+            {
+              "label": "Validation passes",
+              "active": ["blk_cp_validation"],
+              "deltas": [{ "path": "validation.passed", "value": "true" }]
+            },
+            {
+              "label": "The fraud and 3DS lanes are both waiting",
+              "note": "Two lanes held open at once - this is the step the interrupt lands on.",
+              "active": ["blk_cp_fraud_wait", "blk_cp_three_ds_wait"],
+              "deltas": [{ "path": "auth.captured", "value": "false" }]
+            },
+            {
+              "label": "The customer cancels",
+              "active": ["blk_cp_cancelled"],
+              "event": "customer.cancelled",
+              "deltas": [
+                { "path": "event.customer_cancelled.reason", "value": "\"customer_request\"" }
+              ],
+              "check": {
+                "label": "the guarded rule fired and the group abandoned",
+                "result": "pass",
+                "detail": "reason == 'customer_request' AND auth.captured == false both held, so the rule took its abandon outcome."
+              }
+            },
+            {
+              "label": "Tell ops no outcome arm matched",
+              "active": ["blk_cp_outcome_fallback"],
+              "note": "The abandon skips the outcome arms, so the otherwise arm carries the notification."
+            }
+          ]
+        },
+        {
+          "id": "run_cp_three_ds_timeout",
+          "name": "3DS never completes",
+          "description": "The cardholder never answers the challenge. This fixture expects the PT15M authorization timeout to abandon the group - and the scripted run shows it does not, because the timeout rule's guard reads fraud.cleared, which the fraud lane never set either way.",
+          "expected": "pass",
+          "steps": [
+            {
+              "label": "Take the payment request",
+              "active": ["blk_cp_intake"],
+              "event": "payment.requested"
+            },
+            {
+              "label": "Validation passes",
+              "active": ["blk_cp_validation"],
+              "deltas": [{ "path": "validation.passed", "value": "true" }]
+            },
+            {
+              "label": "The challenge is sent",
+              "active": ["blk_cp_three_ds"],
+              "deltas": [{ "path": "three_ds.completed", "value": "false" }]
+            },
+            {
+              "label": "The 3DS wait runs out",
+              "active": ["blk_cp_three_ds_wait"],
+              "note": "PT10M elapses with no completion event on the rail.",
+              "check": {
+                "label": "the 3DS group did not resume",
+                "result": "pass",
+                "detail": "No card.three_ds_completed event arrived, so the wait ran to its end."
+              }
+            },
+            {
+              "label": "The PT15M authorization timeout should fire",
+              "active": ["blk_cp_authz_timeout"],
+              "check": {
+                "label": "the timeout rule abandons the authorization group",
+                "result": "fail",
+                "detail": "The rule's guard is three_ds.completed == false OR fraud.cleared == false. The fraud lane never ran, so fraud.cleared is unset rather than false - and this fixture records that the rule did not fire. Whether an unset boolean should read as false is a question for the expression language, not for this pane."
+              }
+            },
+            {
+              "label": "The group is still open",
+              "active": ["blk_cp_authz"],
+              "note": "The run stops here: with nothing on the rail able to fire, the authorization group has no way out."
+            }
+          ]
+        }
+      ],
+      "tables": [
+        {
+          "id": "tbl_cp_risk",
+          "blockId": "blk_cp_risk_branch",
+          "name": "Risk rating branch",
+          "description": "Which arm the fraud lane's branch takes. The arms are tried in order, so a row that satisfies both takes the first.",
+          "columns": [
+            { "key": "arm_high_risk", "label": "High risk", "expr": "risk_rating >= 70 OR fraud.verdict == 'review'" },
+            { "key": "arm_low_risk", "label": "Low risk", "expr": "risk_rating < 40 AND customer.verified" },
+            { "key": "otherwise", "label": "Otherwise", "expr": "no arm matched" }
+          ],
+          "paths": ["risk_rating", "fraud.verdict", "customer.verified"],
+          "rows": [
+            {
+              "name": "Clear and low",
+              "bindings": { "risk_rating": "34", "fraud.verdict": "'clear'", "customer.verified": "true" },
+              "expected": { "arm_high_risk": false, "arm_low_risk": true, "otherwise": false }
+            },
+            {
+              "name": "Rated high",
+              "bindings": { "risk_rating": "88", "fraud.verdict": "'clear'", "customer.verified": "true" },
+              "expected": { "arm_high_risk": true, "arm_low_risk": false, "otherwise": false }
+            },
+            {
+              "name": "Flagged for review",
+              "bindings": { "risk_rating": "12", "fraud.verdict": "'review'", "customer.verified": "true" },
+              "expected": { "arm_high_risk": true, "arm_low_risk": false, "otherwise": false },
+              "note": "Both arms' expressions hold. The high-risk arm is declared first, so it wins - which is the reason arm order is part of the config and not an implementation detail."
+            },
+            {
+              "name": "Middling, unverified",
+              "bindings": { "risk_rating": "55", "fraud.verdict": "'clear'", "customer.verified": "false" },
+              "expected": { "arm_high_risk": false, "arm_low_risk": false, "otherwise": true },
+              "note": "The gap between 40 and 70 is what the otherwise arm exists for."
+            },
+            {
+              "name": "Low but unverified",
+              "bindings": { "risk_rating": "12", "fraud.verdict": "'clear'", "customer.verified": "false" },
+              "expected": { "arm_high_risk": false, "arm_low_risk": false, "otherwise": true },
+              "note": "The AND is the whole difference: a low rating alone does not clear the arm."
+            },
+            {
+              "name": "Declined outright",
+              "bindings": { "risk_rating": "95", "fraud.verdict": "'decline'", "customer.verified": "true" },
+              "expected": { "arm_high_risk": true, "arm_low_risk": false, "otherwise": false }
+            }
+          ]
+        },
+        {
+          "id": "tbl_cp_cancelled",
+          "blockId": "blk_cp_cancelled",
+          "name": "Customer-cancelled interrupt rule",
+          "description": "Whether the authorization group's cancellation rule fires. It guards on the event payload and on whether the money has already moved.",
+          "columns": [
+            { "key": "cond", "label": "Rule fires", "expr": "event.customer_cancelled.reason == 'customer_request' AND auth.captured == false" }
+          ],
+          "paths": ["event.customer_cancelled.reason", "auth.captured"],
+          "rows": [
+            {
+              "name": "Customer asked, nothing captured",
+              "bindings": { "event.customer_cancelled.reason": "'customer_request'", "auth.captured": "false" },
+              "expected": { "cond": true }
+            },
+            {
+              "name": "Customer asked, already captured",
+              "bindings": { "event.customer_cancelled.reason": "'customer_request'", "auth.captured": "true" },
+              "expected": { "cond": false },
+              "note": "The guard's whole job: once the funds have moved, cancelling is a refund and not an abandon."
+            },
+            {
+              "name": "Duplicate request",
+              "bindings": { "event.customer_cancelled.reason": "'duplicate'", "auth.captured": "false" },
+              "expected": { "cond": false }
+            },
+            {
+              "name": "Cancelled by timeout",
+              "bindings": { "event.customer_cancelled.reason": "'timeout'", "auth.captured": "false" },
+              "expected": { "cond": false },
+              "note": "A timeout cancellation is the other rule's business - this one only answers a deliberate customer request."
+            }
+          ]
+        },
+        {
+          "id": "tbl_cp_outcome",
+          "blockId": "blk_cp_outcome",
+          "name": "Outcome branch",
+          "description": "Three arms over the authorization result, tried in declaration order.",
+          "columns": [
+            { "key": "arm_approved", "label": "Approved", "expr": "auth.approved AND fraud.cleared AND balance.available_cents >= amount_cents" },
+            { "key": "arm_declined", "label": "Declined", "expr": "fraud.verdict == 'decline' OR balance.available_cents < amount_cents" },
+            { "key": "arm_manual_review", "label": "Manual review", "expr": "fraud.verdict == 'review' AND limits.manual_review_backlog < 50" }
+          ],
+          "paths": [
+            "auth.approved",
+            "fraud.cleared",
+            "fraud.verdict",
+            "balance.available_cents",
+            "amount_cents",
+            "limits.manual_review_backlog"
+          ],
+          "rows": [
+            {
+              "name": "Clean approval",
+              "bindings": {
+                "auth.approved": "true",
+                "fraud.cleared": "true",
+                "fraud.verdict": "'clear'",
+                "balance.available_cents": "180000",
+                "amount_cents": "42350",
+                "limits.manual_review_backlog": "12"
+              },
+              "expected": { "arm_approved": true, "arm_declined": false, "arm_manual_review": false }
+            },
+            {
+              "name": "Insufficient funds",
+              "bindings": {
+                "auth.approved": "true",
+                "fraud.cleared": "true",
+                "fraud.verdict": "'clear'",
+                "balance.available_cents": "1000",
+                "amount_cents": "42350",
+                "limits.manual_review_backlog": "12"
+              },
+              "expected": { "arm_approved": false, "arm_declined": true, "arm_manual_review": false }
+            },
+            {
+              "name": "Held for a reviewer",
+              "bindings": {
+                "auth.approved": "true",
+                "fraud.cleared": "false",
+                "fraud.verdict": "'review'",
+                "balance.available_cents": "1200000",
+                "amount_cents": "980000",
+                "limits.manual_review_backlog": "12"
+              },
+              "expected": { "arm_approved": false, "arm_declined": false, "arm_manual_review": true }
+            },
+            {
+              "name": "Review queue is full",
+              "bindings": {
+                "auth.approved": "true",
+                "fraud.cleared": "false",
+                "fraud.verdict": "'review'",
+                "balance.available_cents": "1200000",
+                "amount_cents": "980000",
+                "limits.manual_review_backlog": "64"
+              },
+              "expected": { "arm_approved": false, "arm_declined": false, "arm_manual_review": false },
+              "note": "No arm holds, so the otherwise arm notifies ops. A backlog cap that silently changes which arm is taken is exactly the kind of thing a truth table is for."
+            }
+          ]
+        }
+      ]
+    },
+    "bdoc_signup_demo": {
+      "runs": [
+        {
+          "id": "run_su_business",
+          "name": "Business plan signup",
+          "description": "The account is collected, the email verifies inside the day, and the plan branch routes to the company-details step.",
+          "expected": "pass",
+          "steps": [
+            {
+              "label": "Collect email and password",
+              "active": ["blk_su_account"],
+              "deltas": [{ "path": "signup.email", "value": "\"dana@example.com\"" }]
+            },
+            {
+              "label": "Send the verification email",
+              "active": ["blk_su_send_verification"]
+            },
+            {
+              "label": "The customer verifies",
+              "active": ["blk_su_verified"],
+              "event": "signup.email_verified",
+              "deltas": [{ "path": "signup.email_verified", "value": "true" }],
+              "check": {
+                "label": "the group resumed rather than waiting out PT24H",
+                "result": "pass"
+              }
+            },
+            {
+              "label": "Plan branch takes arm_business",
+              "active": ["blk_su_plan"],
+              "deltas": [
+                { "path": "signup.plan", "value": "\"business\"" },
+                { "path": "signup.seats", "value": "8" }
+              ],
+              "check": {
+                "label": "arm_business was taken",
+                "result": "pass",
+                "detail": "plan == 'business' AND seats > 1."
+              }
+            },
+            {
+              "label": "Collect the company details",
+              "active": ["blk_su_company"]
+            },
+            {
+              "label": "Create the workspace",
+              "active": ["blk_su_provision"]
+            }
+          ]
+        },
+        {
+          "id": "run_su_abandoned",
+          "name": "Verification never arrives",
+          "description": "The customer never opens the email. This fixture expects the wizard to abandon; the scripted run records the PT24H wait falling through with no rule taking it, which is the gap the findings pane already warns about.",
+          "expected": "pass",
+          "steps": [
+            {
+              "label": "Collect email and password",
+              "active": ["blk_su_account"]
+            },
+            {
+              "label": "Send the verification email",
+              "active": ["blk_su_send_verification"],
+              "deltas": [{ "path": "signup.email_verified", "value": "false" }]
+            },
+            {
+              "label": "The wait runs out",
+              "active": ["blk_su_verify_wait"],
+              "note": "PT24H with neither signup.email_verified nor signup.abandoned on the rail."
+            },
+            {
+              "label": "Nothing abandons the wizard",
+              "active": ["blk_su_verify"],
+              "check": {
+                "label": "the verify group ends without a resolution",
+                "result": "fail",
+                "detail": "Both interrupt rules wait for an event that never comes, and the group's body has run out. The document needs a timeout rule here - which is what the info-level finding on this group already says."
+              }
+            }
+          ]
+        }
+      ],
+      "tables": [
+        {
+          "id": "tbl_su_plan",
+          "blockId": "blk_su_plan",
+          "name": "Plan branch",
+          "description": "Which onboarding step a new account is routed to.",
+          "columns": [
+            { "key": "arm_business", "label": "Business", "expr": "signup.plan == 'business' AND signup.seats > 1" },
+            { "key": "arm_personal", "label": "Personal", "expr": "signup.plan == 'personal' AND signup.email_verified" }
+          ],
+          "paths": ["signup.plan", "signup.seats", "signup.email_verified"],
+          "rows": [
+            {
+              "name": "Team of eight",
+              "bindings": { "signup.plan": "'business'", "signup.seats": "8", "signup.email_verified": "true" },
+              "expected": { "arm_business": true, "arm_personal": false }
+            },
+            {
+              "name": "Business, single seat",
+              "bindings": { "signup.plan": "'business'", "signup.seats": "1", "signup.email_verified": "true" },
+              "expected": { "arm_business": false, "arm_personal": false },
+              "note": "A one-seat business plan falls to the otherwise arm, which nudges them to pick a plan again. Probably wrong, and only visible as a row."
+            },
+            {
+              "name": "Personal, verified",
+              "bindings": { "signup.plan": "'personal'", "signup.seats": "1", "signup.email_verified": "true" },
+              "expected": { "arm_business": false, "arm_personal": true }
+            },
+            {
+              "name": "Personal, unverified",
+              "bindings": { "signup.plan": "'personal'", "signup.seats": "1", "signup.email_verified": "false" },
+              "expected": { "arm_business": false, "arm_personal": false }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -285,32 +285,20 @@
                 hidden
               >
                 <div class="sb-inspector__section">
-                  <h3 class="sb-inspector__section-title">Fixtures</h3>
-                  <div class="sb-fixtures__list">
-                    <div class="sb-fixtures__row">
-                      <span class="sb-fixtures__name">Example run fixture</span>
-                      <span class="sb-status sb-status--pass">passed</span>
-                    </div>
-                    <div class="sb-fixtures__row">
-                      <span class="sb-fixtures__name">Example condition table</span>
-                      <span class="sb-status sb-status--fail">failed</span>
-                    </div>
-                    <div class="sb-fixtures__row">
-                      <span class="sb-fixtures__name">Example interrupt fixture</span>
-                      <span class="sb-status sb-status--pending">not run</span>
-                    </div>
-                  </div>
-                  <p class="sb-placeholder">
-                    Fixture editor and runner over mocked step sequences and
-                    precomputed condition truth tables.
-                    <span class="sb-placeholder__wave">W3 subject matter.</span>
-                  </p>
+                  <!-- The runner, the truth tables and the raw-JSON editor,
+                       rendered from `fixtures/runs.json` by
+                       `fixtures-pane.js`. Everything it shows is MOCKED per the
+                       campaign's D4 ruling: a run is a scripted step sequence
+                       and a truth table's cells are precomputed. Nothing here
+                       interprets a chart or evaluates a predicate, and the pane
+                       says so on screen. -->
+                  <div id="sb-fixtures-panel" class="sb-fixtures"></div>
                 </div>
               </div>
             </div>
 
             <div class="sb-pane__footer">
-              Fixtures is still a placeholder &middot; campaign 012 W3
+              Fixture runs and truth tables are mocked &middot; campaign 012 D4
             </div>
           </section>
         </div>
