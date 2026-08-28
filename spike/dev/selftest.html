@@ -146,6 +146,19 @@
       import { droppableSlots, droppableSlotsFor, slotKey } from "../js/targets.js";
 
       import {
+        accentTokenFor,
+        blockAccentStyle,
+        contrastRatio,
+        coverage,
+        declarationBlocks,
+        declaredTokens,
+        isAccentToken,
+        structuralDeclarations,
+        themeGaps,
+        usedTokens,
+      } from "../js/theme.js";
+
+      import {
         beginDrag,
         blockForType,
         canRedoSession,
@@ -781,6 +794,9 @@
           order: 0,
           layout: "stack",
           slotStyle: {},
+          // sb-957: no accent means the editor's own, which is what every
+          // core type gets and what a bare descriptor must keep getting.
+          accentToken: null,
         });
       });
 
@@ -3022,6 +3038,165 @@
         }
 
         equal("every fixture path is declared in the datamodel", undeclared, []);
+      });
+
+      /* ================================================== theme (sb-957) */
+
+      /*
+       * The pure half of theming. The audit that points this arithmetic at the
+       * real stylesheets is `dev/theme-audit.html`; what is checked here is the
+       * arithmetic itself, against fixtures, so a green audit means the files
+       * are right rather than that the checker is broken.
+       */
+
+      suite("theme: a block type's accent is a token NAME, never a colour", () => {
+        equal(
+          "a declared token becomes a var() reference with a fallback",
+          blockAccentStyle({ accentToken: "--sb-accent-myapp" }),
+          "--sb-block-accent: var(--sb-accent-myapp, var(--sb-accent));"
+        );
+
+        equal(
+          "a type that declares nothing gets no inline style at all",
+          blockAccentStyle({}),
+          null
+        );
+        equal("and neither does a null", blockAccentStyle({ accentToken: null }), null);
+        equal("nor a non-object", blockAccentStyle(null), null);
+
+        /*
+         * The value is interpolated into a `style` attribute, so a name that
+         * is not obviously a custom property is refused rather than escaped.
+         * Sabotage: dropping the `^`/`$` anchors from ACCENT_TOKEN in
+         * theme.js turns all five of these green and the suite red.
+         */
+        for (const bad of [
+          "--sb-accent; background: red",
+          "--other-prefix",
+          "--sb-Accent",
+          "red",
+          "var(--sb-accent)",
+        ]) {
+          check(`refuses ${JSON.stringify(bad)}`, blockAccentStyle({ accentToken: bad }) === null);
+        }
+
+        check("accepts a plain --sb- name", isAccentToken("--sb-accent-myapp-capture"));
+        equal(
+          "accentTokenFor is what the renderer stamps as the attribute",
+          accentTokenFor({ accentToken: "--sb-accent-myapp" }),
+          "--sb-accent-myapp"
+        );
+      });
+
+      suite("theme: WCAG contrast", () => {
+        // The two anchors every implementation agrees on.
+        equal("black on white is 21:1", contrastRatio("#000000", "#ffffff"), 21);
+        equal("a colour against itself is 1:1", contrastRatio("#2f6feb", "#2f6feb"), 1);
+
+        equal(
+          "the ratio does not care which way round it is asked",
+          contrastRatio("#16181d", "#ffffff"),
+          contrastRatio("#ffffff", "#16181d")
+        );
+
+        equal("shorthand hex expands", contrastRatio("#fff", "#000"), 21);
+
+        // The number the light theme's subtle text was moved FOR: #878e9c on
+        // the sunken surface was 2.83:1, and #646c7a is over 4.5.
+        check("the old --sb-fg-subtle really did fail on the sunken surface",
+          contrastRatio("#878e9c", "#eceef2") < 4.5);
+        check("and the new one passes", contrastRatio("#646c7a", "#eceef2") >= 4.5);
+
+        let threw = false;
+        try {
+          contrastRatio("not-a-colour", "#ffffff");
+        } catch {
+          threw = true;
+        }
+        check("garbage throws rather than returning a plausible number", threw);
+      });
+
+      suite("theme: reading a token surface out of CSS", () => {
+        const css = `
+          /* --sb-commented-out: #fff; a token NAME in prose is not a declaration */
+          .sb-spike {
+            --sb-bg: #ffffff;
+            --sb-fg: #000000;
+            color-scheme: light;
+          }
+          .sb-spike[data-sb-theme="dark"] {
+            --sb-bg: #101010;
+          }
+        `;
+
+        equal(
+          "declared names, comments stripped",
+          [...declaredTokens(css)].sort(),
+          ["--sb-bg", "--sb-fg"]
+        );
+
+        const blocks = declarationBlocks(css);
+        equal("one entry per rule block that declares a token", blocks.length, 2);
+        equal("the theme block keeps its selector", blocks[1].selector, '.sb-spike[data-sb-theme="dark"]');
+
+        equal(
+          "used names come from var() and nowhere else",
+          [...usedTokens(".a { color: var(--sb-fg); border: 1px solid var( --sb-border ); }")].sort(),
+          ["--sb-border", "--sb-fg"]
+        );
+
+        equal(
+          "a theme's gaps are the base tokens it does not restate",
+          themeGaps({ baseCss: css, themeCss: '.t[data-sb-theme="dark"] { --sb-bg: #101010; }' }),
+          ["--sb-fg"]
+        );
+      });
+
+      suite("theme: coverage, both directions", () => {
+        const tokensCss = ".sb-spike { --sb-used: #fff; --sb-orphan: #000; }";
+        const structuralCss = ".sb-card { color: var(--sb-used); background: var(--sb-missing); }";
+
+        const report = coverage({ tokensCss, structuralCss });
+
+        equal("a token a rule reads and nothing declares", report.undeclared, ["--sb-missing"]);
+        equal("a token declared and nothing reads", report.unused, ["--sb-orphan"]);
+
+        equal(
+          "and a name the caller exempts is not reported unused",
+          coverage({ tokensCss, structuralCss, ignoreUnused: ["--sb-orphan"] }).unused,
+          []
+        );
+
+        // A token read only by another token's value still counts as used:
+        // `--sb-info: var(--sb-accent)` is a consumer.
+        equal(
+          "a token read from inside another token's value counts",
+          coverage({
+            tokensCss: ".s { --sb-accent: #fff; --sb-info: var(--sb-accent); }",
+            structuralCss: ".c { color: var(--sb-info); }",
+          }).unused,
+          []
+        );
+      });
+
+      suite("theme: a theme file is a PURE token override", () => {
+        equal(
+          "a file of nothing but custom properties has no structural declaration",
+          structuralDeclarations('.t[data-sb-theme="x"] { --sb-bg: #fff; --sb-fg: #000; }'),
+          []
+        );
+
+        equal(
+          "one ordinary property is one finding, with its selector",
+          structuralDeclarations('.t { --sb-bg: #fff; } .t .sb-card { border-radius: 0; }'),
+          [{ selector: ".t .sb-card", property: "border-radius" }]
+        );
+
+        equal(
+          "a property named inside a comment is not a declaration",
+          structuralDeclarations('.t { /* padding: 0; */ --sb-bg: #fff; }'),
+          []
+        );
       });
 
       /* ------------------------------------------------------- reporting */

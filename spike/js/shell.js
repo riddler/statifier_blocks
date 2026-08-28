@@ -68,6 +68,24 @@ for (const [index, tab] of tabs.entries()) {
 const themeSelect = document.getElementById("sb-theme");
 
 if (root && themeSelect) {
+  /*
+   * The select was write-only: it pushed a theme onto the container and never
+   * read one back, so it opened claiming "Light" whatever `data-sb-theme` the
+   * markup already carried, and a host that shipped the editor pre-set to
+   * dark got a control that disagreed with the screen behind it.
+   *
+   * Reading the attribute back also decides what an UNKNOWN theme does. The
+   * container keeps it - the attribute is the host's, and a theme this select
+   * has never heard of is a theme the host may well have a stylesheet for -
+   * and the select shows nothing selected rather than silently claiming the
+   * theme is Light. That is the one honest reading of "the control does not
+   * know what is on screen".
+   */
+  const current = root.getAttribute("data-sb-theme") ?? "";
+  const known = [...themeSelect.options].some((option) => option.value === current);
+  themeSelect.value = known ? current : "";
+  if (!known) themeSelect.selectedIndex = -1;
+
   themeSelect.addEventListener("change", () => {
     if (themeSelect.value === "") {
       root.removeAttribute("data-sb-theme");

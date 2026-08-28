@@ -64,6 +64,7 @@ spike/
     render.js      the layout model as DOM, and the connectors as SVG
     interact.js    pointer and key events, translated into commands
     session.js     selection, collapse, drag and edits, with no DOM
+    theme.js       the per-block-type accent hook, and the audit arithmetic
     panes.js       the palette / config-form / findings view models (d9-d11)
     palette-pane.js the left pane, rendered from the registry
     inspector.js   the Config and Findings panes, rendered
@@ -72,7 +73,8 @@ spike/
     documents/     the two demo documents
     datamodel.json typed, scoped datamodel for the panel and the conditions
   dev/
-    selftest.html  browser-run assertions over every pure module above
+    selftest.html    browser-run assertions over every pure module above
+    theme-audit.html the same arithmetic pointed at the real stylesheets
 ```
 
 Open `index.html?doc=signup-wizard` to load a named fixture directly; the
@@ -147,7 +149,132 @@ no `sb-` class, no layout. If a restyle turns out to need something that file
 is not allowed to do, that is a finding about the token surface and the fix
 goes in `tokens.css`.
 
-The theme selector in the top bar switches between all three at runtime.
+The theme selector in the top bar switches between all three at runtime, and
+it reads the container's current `data-sb-theme` on load rather than assuming
+light - a control that disagrees with the screen behind it is worse than no
+control.
+
+`dev/theme-audit.html` checks all of that rather than asserting it in a
+comment: contrast ratios, token coverage in both directions, whether each
+theme restates every colour it has to, and whether `host-brand.css` is still
+pure. Open it beside the editor.
+
+## Theming: what a host overrides, and how
+
+Everything below is what the spike learned by taking the dark theme to parity
+and making host-brand carry the whole surface (`sb-957`). The mechanism is
+ADR-0005 decision 14's; what W4 established is what the surface has to
+CONTAIN for that mechanism to be enough.
+
+### The three tiers
+
+A host reaches for exactly one of these, and which one says how much it is
+taking on.
+
+**Tier 1 - the palette.** Eleven or so colour tokens and the shape and type
+scale. Set these and the whole editor moves: `--sb-bg*`, `--sb-fg*`,
+`--sb-border*`, `--sb-accent*`, the status colours, `--sb-radius*`,
+`--sb-font`, `--sb-space`. This is what most hosts want and it is a couple of
+dozen lines.
+
+**Tier 2 - the treatments.** Named marks that a host may reasonably disagree
+with, each with its own token so that disagreeing with one does not mean
+overriding a rule:
+
+| Token family | The mark |
+|---|---|
+| `--sb-drop-ok-*`, `--sb-gap-*` | the drag affordance: which slots accept, how tall the seam grows, what the armed bar is painted in |
+| `--sb-run-mark*` | the ring a replayed fixture step puts on a card - its own colour, width and offset, so it stays tellable apart from selection |
+| `--sb-ghost-*` | the chip that follows the pointer. Inverted by default; dark reverses the inversion, which is the reason it is three tokens and not `var(--sb-fg)` in a rule |
+| `--sb-connector*` | the rendered edges |
+| `--sb-syntax-*`, `--sb-path-*` | the condition editor's five roles and its known/unknown path underlines |
+| `--sb-focus-*` | one focus treatment for the whole subtree |
+
+**Tier 3 - `--sb-color-scheme`.** The one property that is not a colour and
+cannot be replaced by one. It tells the BROWSER which scheme to paint its own
+chrome in: a `<select>`'s drop-down, both pane scrollbars, the text caret, the
+selection highlight. Nothing in `tokens.css` can reach those, and a dark
+theme that omits this has a top bar whose controls open a white menu over a
+dark editor. `editor.css` reads it as `color-scheme: var(--sb-color-scheme)`
+on `.sb-spike` - scoped to the container, never on `:root`, because telling
+the host page which scheme it is in is the editor reaching outside its box.
+
+### Per-block-type identity
+
+A host that registers its own block types usually wants them to LOOK like its
+own. The hook is one field and no CSS:
+
+```js
+// in the block type's paletteEntry
+accentToken: "--sb-accent-myapp"
+```
+
+and one declaration in the host's theme file:
+
+```css
+.sb-spike[data-sb-theme="host-brand"] {
+  --sb-accent-myapp: #8a4a1f;
+}
+```
+
+The renderer stamps `data-sb-block-accent="<the name>"` on the card and the
+palette row and rebinds `--sb-block-accent` on that element to
+`var(<the name>, var(--sb-accent))`. Three consequences, and they are the
+point:
+
+- **The editor never learns a type name.** No rule in `editor.css` and no
+  branch in any module mentions `myapp.capture`. `js/theme.js` validates the
+  name against `/^--sb-[a-z0-9-]+(-[a-z0-9-]+)*$/` and falls back to the
+  editor's accent for anything else, so a typo in a host's registry degrades
+  to the default rather than to a broken card.
+- **The value is decided by the theme, not by the block type.** A descriptor
+  carries a token NAME, never a colour - the same discipline `icon` is under,
+  and for the same reason: a block type that named a hex value would be
+  deciding what it looks like in themes it has never seen.
+- **Adding a type with its own identity adds no CSS.** Two rules read
+  `--sb-block-accent` (the icon tile, and a `::before` stripe on the card),
+  and they are the only two.
+
+Two more tokens shape the treatment rather than colour it:
+`--sb-block-accent-mix` is how much of the accent the icon tile is tinted
+with (dark raises it, because 14% of a pale colour over near-black is not a
+tint), and `--sb-block-edge` is the stripe's width - set it to `0` to keep
+the colour and drop the stripe.
+
+The spike demonstrates the layering with `myapp.capture`, which points at
+`--sb-accent-myapp-capture` instead of the family's token. Light and dark
+resolve that to the family colour and the whole `myapp.*` group reads as one;
+host-brand gives it a hotter red, so the block type that moves money stands
+out from its own family. Same document, same DOM, same JavaScript, one line
+in a theme file.
+
+### What W4 found the d14 surface was missing
+
+Four holes, all closed by widening `tokens.css` rather than by letting a theme
+write a rule. They are the spike's input to a d14 amendment, not a decision
+taken here:
+
+1. **No `color-scheme`.** The largest of the four. A colour-token surface
+   cannot reach the parts of a component the browser paints, so "every colour
+   is a token" was not sufficient for a dark theme, and the failure was
+   invisible until someone opened a `<select>`.
+2. **Marks with no name.** The replayed-step ring hard-coded its width and
+   offset and borrowed `--sb-accent`; the drag ghost hard-coded a foreground
+   /background inversion that produces a white chip in a dark theme. A
+   treatment a theme must be able to reverse needs tokens of its own.
+3. **Declared-and-never-read tokens.** `--sb-gap-height` and
+   `--sb-gap-hover-bg` were declared in W0 and consumed by nothing. That is
+   worse than a missing token: a host sets it and nothing moves. The audit
+   now fails on either direction, and one reserved token
+   (`--sb-connector-active`) was retired rather than left as a promise.
+4. **No per-block-type seam.** d14 gives a host the editor and gives it
+   nothing below the editor. The `accentToken` hook above is the proposal.
+
+A fifth is a judgment rather than a hole: `--sb-border-strong` sat near
+1.9:1 in all three themes and now clears 3:1. `--sb-border` deliberately does
+not - it is the divider between two panes of the same surface, decoration
+rather than a boundary carrying information, and holding it to a ratio turns
+every pane edge into a rule.
 
 ## Serving it
 

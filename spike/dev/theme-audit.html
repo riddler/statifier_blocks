@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>statifier_blocks spike - theme audit</title>
+
+    <!--
+      What this page is for.
+
+      Themes are the one part of the spike where "it looks right on my screen"
+      is normally the only test anyone runs, and it is a test that passes for
+      whoever last looked at it and fails silently for everyone else. This page
+      fetches the REAL stylesheets over the same static server the editor is
+      served by and checks the four things about them that are arithmetic
+      rather than taste:
+
+        1. contrast    every foreground token against every surface token in
+                       its own theme, at 4.5:1, and `--sb-border-strong` at 3:1
+        2. coverage    no structural rule reads a token nothing declares, and
+                       no declared token goes unread
+        3. parity      the dark and host-brand blocks override every colour
+                       the light block declares
+        4. purity      themes/host-brand.css declares nothing but `--sb-*`
+                       properties - the rule that file lives under, checked
+                       rather than asserted in a comment
+
+      The arithmetic itself is `js/theme.js` and is covered by
+      `dev/selftest.html` against fixtures. This page is what points it at the
+      files. Open it at http://localhost:8642/dev/theme-audit.html.
+
+      It is a DEV page: it loads no spike CSS and styles itself inline, the
+      same bargain selftest.html strikes.
+    -->
+    <style>
+      :root {
+        color-scheme: light dark;
+        --pass: #1a7f37;
+        --fail: #b3261e;
+      }
+      body {
+        margin: 0;
+        padding: 2rem;
+        font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        max-width: 68rem;
+      }
+      h1 {
+        font-size: 1.35rem;
+        margin: 0 0 0.25rem;
+      }
+      p.lede {
+        margin: 0 0 1.5rem;
+        opacity: 0.75;
+      }
+      #summary {
+        font-weight: 600;
+        padding: 0.7rem 1rem;
+        border-radius: 0.4rem;
+        border: 1px solid currentColor;
+        display: inline-block;
+        margin-bottom: 1.5rem;
+      }
+      #summary[data-state="pass"] {
+        color: var(--pass);
+      }
+      #summary[data-state="fail"] {
+        color: var(--fail);
+      }
+      section {
+        margin-bottom: 1.6rem;
+      }
+      h2 {
+        font-size: 1rem;
+        margin: 0 0 0.4rem;
+      }
+      ul {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+      li[data-state="pass"]::marker {
+        content: "\2713  ";
+        color: var(--pass);
+      }
+      li[data-state="fail"]::marker {
+        content: "\2717  ";
+        color: var(--fail);
+      }
+      li[data-state="fail"] {
+        color: var(--fail);
+      }
+      pre {
+        margin: 0.3rem 0 0.6rem;
+        padding: 0.6rem 0.8rem;
+        overflow-x: auto;
+        border-radius: 0.3rem;
+        background: rgba(127, 127, 127, 0.12);
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Theme audit</h1>
+    <p class="lede">
+      spike/css: contrast, token coverage, theme parity, and whether
+      <code>themes/host-brand.css</code> is still a pure token override.
+      Results also go to the console with a <code>[theme-audit]</code> prefix.
+    </p>
+
+    <div id="summary" data-state="running">running...</div>
+    <div id="results"></div>
+
+    <script type="module">
+      import {
+        contrastRatio,
+        coverage,
+        declarationBlocks,
+        declaredTokens,
+        structuralDeclarations,
+        themeGaps,
+      } from "../js/theme.js";
+
+      const groups = [];
+      let group = null;
+
+      function suite(name) {
+        group = { name, checks: [] };
+        groups.push(group);
+      }
+
+      function check(label, ok, detail = null) {
+        group.checks.push({ label, state: ok ? "pass" : "fail", detail: ok ? null : detail });
+      }
+
+      const text = (path) => fetch(path).then((response) => response.text());
+
+      const [tokensCss, editorCss, resetCss, brandCss] = await Promise.all([
+        text("../css/tokens.css"),
+        text("../css/editor.css"),
+        text("../css/reset.css"),
+        text("../css/themes/host-brand.css"),
+      ]);
+
+      /* ------------------------------------------------- the theme blocks */
+
+      /*
+       * The audit reads the themes out of the files rather than being told
+       * what they are, so a fourth theme is audited the day it is added.
+       * A block "is" a theme when its selector names `data-sb-theme`; the
+       * bare `.sb-spike` blocks are the defaults every theme starts from.
+       */
+      const allBlocks = [...declarationBlocks(tokensCss), ...declarationBlocks(brandCss)];
+
+      const base = new Map();
+      for (const block of allBlocks) {
+        if (block.selector.includes("data-sb-theme")) continue;
+        for (const [name, value] of block.tokens) base.set(name, value);
+      }
+
+      const themes = new Map([["light", new Map(base)]]);
+
+      for (const block of allBlocks) {
+        const named = block.selector.match(/data-sb-theme="([a-z-]+)"/);
+        if (!named) continue;
+        const name = named[1];
+        if (!themes.has(name)) themes.set(name, new Map(base));
+        for (const [token, value] of block.tokens) themes.get(name).set(token, value);
+      }
+
+      /*
+       * A token's value can be a `var()` on another token, so resolving one
+       * means following the chain. Only literal hex colours are audited for
+       * contrast; `rgba()` tints and non-colour tokens are skipped, because a
+       * ratio against a translucent fill is a number about a guess.
+       */
+      function resolve(map, name, seen = new Set()) {
+        if (seen.has(name)) return null;
+        seen.add(name);
+        const value = map.get(name);
+        if (value === undefined) return null;
+        const reference = value.match(/^var\(\s*(--sb-[a-z0-9-]+)/);
+        if (reference) return resolve(map, reference[1], seen);
+        return /^#[0-9a-fA-F]{3,8}$/.test(value.trim()) ? value.trim() : null;
+      }
+
+      const SURFACES = ["--sb-bg", "--sb-bg-muted", "--sb-bg-sunken", "--sb-bg-raised", "--sb-bg-canvas"];
+
+      const TEXT = [
+        "--sb-fg",
+        "--sb-fg-muted",
+        "--sb-fg-subtle",
+        "--sb-accent",
+        "--sb-accent-hover",
+        "--sb-error",
+        "--sb-warning",
+        "--sb-info",
+        "--sb-success",
+        "--sb-syntax-keyword",
+        "--sb-syntax-string",
+        "--sb-syntax-number",
+        "--sb-accent-myapp",
+        "--sb-accent-myapp-capture",
+      ];
+
+      /* Every colour a theme MUST restate. A surface or a foreground that a
+       * theme leaves at the light default is the dark-theme failure mode in
+       * its purest form: one token, and half the editor stays light. */
+      const MUST_COVER = [...SURFACES, "--sb-fg", "--sb-fg-muted", "--sb-fg-subtle", "--sb-border", "--sb-border-strong", "--sb-connector", "--sb-color-scheme"];
+
+      /* ------------------------------------------------------ 1. contrast */
+
+      for (const [name, map] of themes) {
+        suite(`contrast: ${name}`);
+
+        for (const token of TEXT) {
+          const colour = resolve(map, token);
+          if (colour === null) continue;
+
+          const worst = SURFACES.map((surface) => ({
+            surface,
+            on: resolve(map, surface),
+          }))
+            .filter((pair) => pair.on !== null)
+            .map((pair) => ({ ...pair, ratio: contrastRatio(colour, pair.on) }))
+            .sort((a, b) => a.ratio - b.ratio)[0];
+
+          check(
+            `${token} (${colour}) is at least 4.5:1 on every surface`,
+            worst.ratio >= 4.5,
+            `worst: ${worst.ratio}:1 on ${worst.surface} (${worst.on})`
+          );
+        }
+
+        const strong = resolve(map, "--sb-border-strong");
+        const worstStrong = SURFACES.map((surface) => resolve(map, surface))
+          .filter(Boolean)
+          .map((on) => ({ on, ratio: contrastRatio(strong, on) }))
+          .sort((a, b) => a.ratio - b.ratio)[0];
+
+        check(
+          `--sb-border-strong (${strong}) is at least 3:1 on every surface`,
+          worstStrong.ratio >= 3,
+          `worst: ${worstStrong.ratio}:1 on ${worstStrong.on}`
+        );
+      }
+
+      /* ------------------------------------------------------ 2. coverage */
+
+      suite("coverage: every token declared is read, every token read is declared");
+
+      const report = coverage({
+        tokensCss,
+        structuralCss: `${editorCss}\n${resetCss}`,
+        /* The demo host's accents are read from an inline `var()` reference
+         * the renderer writes from the registry, which is by design the one
+         * consumer no stylesheet can see. */
+        ignoreUnused: ["--sb-accent-myapp", "--sb-accent-myapp-capture"],
+      });
+
+      check(
+        "no structural rule reads an undeclared token",
+        report.undeclared.length === 0,
+        report.undeclared.join("\n")
+      );
+
+      check(
+        "no declared token goes unread",
+        report.unused.length === 0,
+        report.unused.join("\n")
+      );
+
+      /* -------------------------------------------------------- 3. parity */
+
+      for (const name of [...themes.keys()].filter((key) => key !== "light")) {
+        suite(`parity: ${name}`);
+
+        const declaredHere = new Set();
+        for (const block of allBlocks) {
+          if (!block.selector.includes(`data-sb-theme="${name}"`)) continue;
+          for (const token of block.tokens.keys()) declaredHere.add(token);
+        }
+
+        const missing = MUST_COVER.filter((token) => !declaredHere.has(token));
+
+        check(
+          `restates every surface, foreground, line and scheme token`,
+          missing.length === 0,
+          `left at the light default:\n${missing.join("\n")}`
+        );
+      }
+
+      /* -------------------------------------------------------- 4. purity */
+
+      suite("purity: themes/host-brand.css");
+
+      const structural = structuralDeclarations(brandCss);
+
+      check(
+        "declares nothing but --sb-* custom properties",
+        structural.length === 0,
+        structural.map((one) => `${one.selector} { ${one.property}: ... }`).join("\n")
+      );
+
+      const brandTokens = declaredTokens(brandCss);
+      const stray = [...brandTokens].filter((token) => !token.startsWith("--sb-"));
+
+      check("every property it sets is in the --sb- namespace", stray.length === 0, stray.join("\n"));
+
+      const brandGaps = themeGaps({ baseCss: tokensCss, themeCss: brandCss, only: MUST_COVER });
+      check(
+        "covers every token a theme must restate",
+        brandGaps.length === 0,
+        brandGaps.join("\n")
+      );
+
+      /* --------------------------------------------------------- render */
+
+      const summary = document.getElementById("summary");
+      const results = document.getElementById("results");
+      let passed = 0;
+      let failed = 0;
+
+      for (const item of groups) {
+        const section = document.createElement("section");
+        const heading = document.createElement("h2");
+        heading.textContent = item.name;
+        section.append(heading);
+
+        const list = document.createElement("ul");
+
+        for (const one of item.checks) {
+          if (one.state === "pass") passed += 1;
+          else failed += 1;
+
+          const li = document.createElement("li");
+          li.dataset.state = one.state;
+          li.textContent = one.label;
+
+          if (one.detail) {
+            const pre = document.createElement("pre");
+            pre.textContent = one.detail;
+            li.append(pre);
+          }
+
+          list.append(li);
+          console.log(
+            `[theme-audit] ${one.state === "pass" ? "PASS" : "FAIL"} ${item.name} / ${one.label}` +
+              (one.detail ? `\n[theme-audit]   ${one.detail.replace(/\n/g, "\n[theme-audit]   ")}` : "")
+          );
+        }
+
+        section.append(list);
+        results.append(section);
+      }
+
+      summary.dataset.state = failed === 0 ? "pass" : "fail";
+      summary.textContent =
+        failed === 0
+          ? `all ${passed} checks passed`
+          : `${failed} of ${passed + failed} checks FAILED`;
+
+      console.log(`[theme-audit] ${summary.textContent}`);
+    </script>
+  </body>
+</html>

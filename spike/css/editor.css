@@ -30,6 +30,13 @@
   display: block;
   height: 100%;
   min-height: 0;
+  /* The one property that decides what the BROWSER paints inside the editor:
+   * a `<select>`'s drop-down, both pane scrollbars, the text caret, the
+   * selection highlight. It is scoped to the container rather than set on
+   * `:root`, because the editor is a component and telling the host page
+   * which scheme it is in would be the editor reaching outside its own box -
+   * the same argument reset.css makes about the reset. */
+  color-scheme: var(--sb-color-scheme);
 }
 
 .sb-editor {
@@ -311,6 +318,13 @@
   border-radius: var(--sb-radius-sm);
   background: var(--sb-bg-sunken);
   color: var(--sb-fg-muted);
+}
+
+/* A palette row for a type that declared an accent wears it too, so the
+ * identity an author sees on the canvas is the one they picked it up by. */
+.sb-palette__pick[data-sb-block-accent] .sb-palette__icon {
+  background: var(--sb-block-accent-tint);
+  color: var(--sb-block-accent);
 }
 
 .sb-palette__text {
@@ -621,8 +635,46 @@
   width: var(--sb-space-3);
   height: var(--sb-space-3);
   border-radius: var(--sb-radius-sm);
-  background: var(--sb-accent-muted);
-  color: var(--sb-accent);
+  background: var(--sb-block-accent-tint);
+  color: var(--sb-block-accent);
+}
+
+/* ------------------------------------------- the per-block-type accent hook
+ *
+ * `--sb-block-accent` defaults to the editor's accent for every block type,
+ * and the two rules below are the ONLY place the value is read. A block type
+ * that declares an accent token in its palette entry gets it rebound on its
+ * own elements by an inline `var()` reference the renderer writes (see
+ * `js/theme.js`); nothing here and nothing in the theme files names a block
+ * type, and adding a type with its own identity adds no CSS at all.
+ *
+ * The tile above reads `--sb-block-accent-tint`, which tokens.css derives
+ * from the accent rather than declaring per theme, so a host that sets one
+ * colour gets the tile, the glyph and the edge from it.
+ */
+
+/* The accented edge, on cards whose type declared a token and on no others:
+ * a core block keeps the plain card it has always had, and the treatment
+ * reads as "this one is the host's" rather than as decoration everything
+ * carries. A pseudo-element rather than a border or an inset shadow, because
+ * both of those are already spoken for on a card - the border is selection's
+ * and the shadow is elevation's - and an edge that vanished the moment a
+ * card was selected would be worse than no edge. */
+.sb-card[data-sb-block-accent]::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--sb-block-edge);
+  border-radius: var(--sb-radius) 0 0 var(--sb-radius);
+  background: var(--sb-block-accent);
+}
+
+/* The rail's interrupt rules and an unresolvable card both take the whole
+ * card over for a status colour, and a second identity stripe underneath
+ * that is noise arguing with a warning. */
+.sb-rail .sb-card[data-sb-block-accent]::before,
+.sb-card--unresolved[data-sb-block-accent]::before {
+  display: none;
 }
 
 .sb-icon {
@@ -742,7 +794,7 @@
  * edge needs to read as an edge rather than as a join, and it is where the
  * "+" and the drop seam will live (sb-ad2). */
 .sb-gap {
-  height: var(--sb-space-2);
+  height: var(--sb-gap-height);
   flex: 0 0 auto;
 }
 
@@ -2940,8 +2992,8 @@ p.sb-condition__advisory {
  * treatments stack instead of fighting.
  */
 .sb-card[data-run-active="true"] {
-  outline: 2px solid var(--sb-accent);
-  outline-offset: 2px;
+  outline: var(--sb-run-mark-width) solid var(--sb-run-mark);
+  outline-offset: var(--sb-run-mark-offset);
   box-shadow: var(--sb-shadow-md);
 }
 
@@ -3247,7 +3299,7 @@ p.sb-condition__advisory {
  * mouse precision. This is the visual half of the nearest-gap arming in
  * interact.js. */
 .sb-canvas__viewport[data-dragging="true"] [data-drop="ok"] .sb-gap {
-  min-height: var(--sb-space-3);
+  min-height: var(--sb-gap-drag-height);
 }
 
 .sb-canvas__viewport[data-dragging="true"] .sb-gap__add {
@@ -3266,7 +3318,7 @@ p.sb-condition__advisory {
   max-width: 100%;
   height: var(--sb-focus-width);
   border-radius: var(--sb-radius-sm);
-  background: var(--sb-drop-ok-border);
+  background: var(--sb-gap-armed-bg);
 }
 
 .sb-canvas__viewport[data-dragging="true"] .sb-card {
@@ -3298,8 +3350,15 @@ p.sb-condition__advisory {
   z-index: 1000;
   padding: var(--sb-space-half) var(--sb-space);
   border-radius: var(--sb-radius);
-  background: var(--sb-fg);
-  color: var(--sb-bg);
+  /* Its own tokens rather than the fg/bg inversion it used to hard-code. The
+   * inversion is still the light default and it is right there - a dark chip
+   * over pale paper is the most legible thing the pointer can carry - but in
+   * a dark theme the same rule produces a WHITE chip, which is the one thing
+   * on screen that reads as the light theme leaking through. A treatment a
+   * theme has to be able to reverse needs a name of its own. */
+  border: var(--sb-border-width) solid var(--sb-ghost-border);
+  background: var(--sb-ghost-bg);
+  color: var(--sb-ghost-fg);
   font-family: var(--sb-font);
   font-size: var(--sb-text-sm);
   line-height: var(--sb-leading);

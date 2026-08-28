@@ -18,6 +18,7 @@
 
 import { paletteView } from "./panes.js";
 import { el, iconElement } from "./render.js";
+import { accentTokenFor, blockAccentStyle } from "./theme.js";
 
 /**
  * Mounts the palette into `mount` and returns a handle.
@@ -163,12 +164,18 @@ function entryElement(entry) {
     );
   }
 
+  /* The accent hook, written from the registry and from nothing else. The
+   * attribute is the CSS's selector and the inline property is the binding;
+   * a type that declares no token gets neither, which is what keeps a core
+   * block's row exactly the row it was. */
   return el(
     "button",
     {
       class: "sb-palette__pick",
       type: "button",
       "data-block-type": entry.type,
+      "data-sb-block-accent": accentTokenFor(entry),
+      style: blockAccentStyle(entry),
       title: entry.type,
     },
     [el("span", { class: "sb-palette__icon" }, [iconElement(entry.icon)]), text]
