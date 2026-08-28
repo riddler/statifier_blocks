@@ -280,6 +280,56 @@ stripe; a second one would argue with it.
 Whether this belongs in ADR-0005 decision 10's metadata is a Phase-B finding,
 exactly as `accentToken` is.
 
+### A join marker that reads the config (sb-dxs)
+
+One key further still, and the first one that is a **function** rather than a
+value. Every block whose slots are arranged side by side draws a marker under
+the columns, and until now that marker said `continue` for all of them. Once a
+block type can carry a completion rule in its config that string is a
+half-truth, so a type may now declare
+
+```js
+// in the block type's paletteEntry
+joinLabel: (config) => (config.complete === "first" ? "continue at first" : "continue when all")
+```
+
+and the marker reads whatever comes back. `layout.js` resolves it onto the
+view model beside the badge and the accent token; `render.js` draws a string
+and still never learns a type name, which is the entire reason it is a
+callback and not a case in the renderer. A host type that fans into lanes with
+its own completion rule declares its own words and gets them.
+
+`joinLabelFor` in `js/palette.js` is the one normalizer, under `badgeFor`'s
+rules - a non-string, an empty string, a newline or anything past 24
+characters degrades to the old constant - plus one this key needs and the
+badge does not: the callback is host code running during layout, so it is
+called inside a `try` and a throw degrades too. A bug in a host's `joinLabel`
+costs that block its words, not the canvas.
+
+The declaration that motivates it is a **proposed config key on a shipped core
+type**, which is a sharper divergence than the proposals in
+`js/proposed-core.js` and is flagged in the open at the descriptor.
+`core.parallel` gains `complete: all | first`, defaulting to `all`:
+
+- **`all`** is the statifier-native reading. The lanes are a `<parallel>`, the
+  region is done when every lane is final, and that compiles to a
+  `done.state` transition on all-final. Nothing downstream is new.
+- **`first`** is an open Phase-B semantics question, not a decision taken
+  here. First-lane-wins is not a `<parallel>` completion rule; expressing it
+  means cancelling the losing lanes, and what cancelling does to a lane
+  mid-invoke is a contract question this spike is not entitled to answer. It
+  renders, it validates, it labels its marker, and it compiles to nothing.
+
+The default is a **read-time** default, which is what makes it safe: every
+`core.parallel` in the demo documents predates the key, none of them was
+edited, and `dev/selftest.html` pins that an absent `complete` decodes,
+validates and lays out exactly as it did before - down to a stored `null`
+still reaching the refusal rather than being coalesced into the default, which
+is ADR-0001 decision 6's distinction.
+
+Whether a callback belongs in decision 10's metadata at all - every other key
+there is inert data - is the Phase-B finding this one adds.
+
 ### What W4 found the d14 surface was missing
 
 Four holes, all closed by widening `tokens.css` rather than by letting a theme

@@ -601,6 +601,11 @@ function renderGap(node, slot, index) {
  * `fan` and `lanes` differ here only in what the two markers say and in the
  * class the edges carry. Both derive from ADR-0005 decision 10's `layout`
  * metadata (see layout.js) and neither knows what block type it is drawing.
+ *
+ * The hub's word is derived from the arrangement, which is derived from the
+ * metadata; the join's word is `node.joinLabel`, which layout.js resolved
+ * through the type's own callback (sb-dxs). Two different derivations, and
+ * neither of them a type name.
  */
 function renderColumns(node) {
   const exclusive = node.arrangement === "fan";
@@ -633,7 +638,12 @@ function renderColumns(node) {
   wrapper.append(columns);
   wrapper.append(
     el("div", { class: "sb-fan__marker sb-fan__marker--join" }, [
-      el("span", { class: "sb-fan__label", text: "continue" }),
+      // sb-dxs. The words come off the view model, which got them from the
+      // type's `joinLabel(config)` callback and normalized them there. This
+      // file does not know what "continue when all" means, which type said
+      // it, or that a completion rule exists - it draws a string, and that
+      // is the whole reason the mechanism is a callback rather than a case.
+      el("span", { class: "sb-fan__label", text: node.joinLabel }),
     ])
   );
 

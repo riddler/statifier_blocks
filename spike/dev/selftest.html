@@ -122,6 +122,7 @@
         badgeFor,
         coreTypes,
         describe,
+        joinLabelFor,
         paletteEntryFor,
         paletteGroups,
         resolveBlock,
@@ -697,6 +698,15 @@
           paletteEntryFor(coreTypes["core.parallel"]).layout,
           "columns"
         );
+        // sb-dxs. This descriptor is no longer a verbatim transcription:
+        // `complete` is PROPOSED and the shipped type declares no such key.
+        // Asserted here, in the suite that claims the transcription, so the
+        // divergence cannot be read off the mirror as something that ships.
+        equal(
+          "core.parallel's schema is the shipped field plus one proposed one",
+          coreTypes["core.parallel"].configSchema({}).map((field) => field.key),
+          ["lanes", "complete"]
+        );
         equal(
           "a group's interrupts render as a secondary rail (d10)",
           paletteEntryFor(coreTypes["core.group"]).slotStyle.interrupts,
@@ -805,6 +815,10 @@
           // the proposal file. A bare descriptor reads `null`, never
           // `undefined`, so the renderer's `!== null` test is total.
           badge: null,
+          // sb-dxs, for the same reason: `joinLabelFor` tests for a FUNCTION,
+          // and a bare descriptor has to reach that test with a value rather
+          // than with a missing key.
+          joinLabel: null,
         });
       });
 
@@ -1232,6 +1246,234 @@
         equal("it is the node's only slot", invokeNode.slots.length, 1);
         equal("and it is not a primary one", invokeNode.primary.length, 0);
         equal("it is a secondary one", invokeNode.secondary.length, 1);
+      });
+
+      /*
+       * sb-dxs. The proposed `complete` key, and the property the whole item
+       * turns on: every `core.parallel` stored before this key existed has to
+       * decode and validate EXACTLY as it did before, because no fixture was
+       * edited to add one. The default therefore has to be a read-time
+       * default and not a write-time one.
+       *
+       * Sabotage: spelling the read as `config.complete ?? "all"` leaves the
+       * absent case green and turns the stored-null one red, which is the
+       * ADR-0001 d6 distinction `configGet` exists to keep.
+       */
+      suite("palette: core.parallel's proposed complete, and its read-time default", () => {
+        const parallel = coreTypes["core.parallel"];
+
+        equal(
+          "lanes stays fields[0] - a proposed key does not renumber a shipped one",
+          parallel.configSchema({})[0].key,
+          "lanes"
+        );
+
+        const complete = parallel.configSchema({})[1];
+        equal("complete is a select", complete.type.select.map((c) => c.value), ["all", "first"]);
+        equal("defaulting to all", complete.default, "all");
+        equal("and it is not required", complete.required, false);
+
+        check(
+          "an absent complete validates - every shipped document is this case",
+          parallel.validateConfig({ lanes: ["capture"] }) === null
+        );
+        check("all validates", parallel.validateConfig({ lanes: ["a"], complete: "all" }) === null);
+        check(
+          "first validates",
+          parallel.validateConfig({ lanes: ["a"], complete: "first" }) === null
+        );
+        equal(
+          "anything else is refused",
+          parallel.validateConfig({ lanes: ["a"], complete: "any" }),
+          [{ key: "complete", message: 'pick "all" or "first"' }]
+        );
+        equal(
+          "a stored null is NOT absent, and reaches the refusal (d6)",
+          parallel.validateConfig({ lanes: ["a"], complete: null }),
+          [{ key: "complete", message: 'pick "all" or "first"' }]
+        );
+
+        // The lanes arms are unchanged, which is the regression this pairs
+        // with: a new check ahead of them must not swallow or reorder them.
+        equal(
+          "a null lanes list still reads exactly as before",
+          parallel.validateConfig({ lanes: null }),
+          [{ key: "lanes", message: "must be a list of lane names" }]
+        );
+        equal(
+          "and a malformed lane name still does too",
+          parallel.validateConfig({ lanes: ["Capture"] }),
+          [
+            {
+              key: "lanes",
+              message: 'a lane name must be a bare lowercase identifier, like "capture"',
+            },
+          ]
+        );
+      });
+
+      /*
+       * sb-dxs. `joinLabelFor` is the renderer's whole view of the key, and
+       * the discipline is `badgeFor`'s plus one: the callback is HOST code
+       * running during layout, so a throw degrades to the constant the
+       * marker carried before rather than taking the canvas down.
+       *
+       * Every refusal returns the FALLBACK rather than null, because a join
+       * marker is drawn either way - there is no "no marker" state for a
+       * malformed declaration to fall into.
+       */
+      suite("palette: joinLabelFor is a callback, normalized like a badge", () => {
+        const parallel = paletteEntryFor(coreTypes["core.parallel"]);
+
+        equal("the default config reads all", joinLabelFor(parallel, {}), "continue when all");
+        equal(
+          "an explicit all reads the same",
+          joinLabelFor(parallel, { complete: "all" }),
+          "continue when all"
+        );
+        equal(
+          "first reads at-first",
+          joinLabelFor(parallel, { complete: "first" }),
+          "continue at first"
+        );
+        equal(
+          "and config the type would refuse still labels rather than throwing",
+          joinLabelFor(parallel, { complete: "nonsense" }),
+          "continue when all"
+        );
+
+        equal("a type declaring nothing keeps the old constant", joinLabelFor({}), "continue");
+        equal("nor does a non-object declare one", joinLabelFor(null), "continue");
+        equal(
+          "a STRING is not a callback, and is refused rather than used",
+          joinLabelFor({ joinLabel: "continue when all" }),
+          "continue"
+        );
+        equal(
+          "a host callback that throws does not take the canvas down",
+          joinLabelFor({
+            joinLabel: () => {
+              throw new Error("host bug");
+            },
+          }),
+          "continue"
+        );
+        equal("a non-string return is refused", joinLabelFor({ joinLabel: () => 3 }), "continue");
+        equal("so is an empty one", joinLabelFor({ joinLabel: () => "   " }), "continue");
+        equal("surrounding space is trimmed", joinLabelFor({ joinLabel: () => " join " }), "join");
+        equal(
+          "a newline means something a marker cannot say",
+          joinLabelFor({ joinLabel: () => "a\nb" }),
+          "continue"
+        );
+        equal(
+          "24 characters is the last one that fits",
+          joinLabelFor({ joinLabel: () => "x".repeat(24) }),
+          "x".repeat(24)
+        );
+        equal(
+          "25 is refused, not ellipsized",
+          joinLabelFor({ joinLabel: () => "x".repeat(25) }),
+          "continue"
+        );
+        equal(
+          "the callback is handed the block's config",
+          joinLabelFor({ joinLabel: (config) => config.word }, { word: "rejoin" }),
+          "rejoin"
+        );
+
+        equal(
+          "core.parallel is the ONLY core type that declares one",
+          Object.entries(coreTypes)
+            .filter(([, one]) => typeof paletteEntryFor(one).joinLabel === "function")
+            .map(([name]) => name),
+          ["core.parallel"]
+        );
+        equal(
+          "...so every other one still reads the constant",
+          [
+            ...new Set(
+              Object.values(coreTypes).map((one) => joinLabelFor(paletteEntryFor(one), {}))
+            ),
+          ].sort(),
+          ["continue", "continue when all"]
+        );
+      });
+
+      /*
+       * sb-dxs, the seam that matters: the words reach `render.js` through
+       * the VIEW MODEL, the same way the badge and the accent token do. If
+       * this suite passes and the renderer still says "continue", the string
+       * was hard-coded; if the renderer branched on a type name instead, the
+       * unresolvable case below is what would catch it.
+       */
+      suite("layout: the join marker's words ride the view model", () => {
+        const doc = cardDocument();
+        const find = (id) => {
+          const walk = (node) =>
+            node.id === id
+              ? node
+              : node.slots
+                  .flatMap((slot) => slot.children)
+                  .map(walk)
+                  .find(Boolean) ?? null;
+          return walk(layoutDocument(doc, registry).root);
+        };
+
+        // `blk_PAR` stores no `complete` - it is the shipped-document case.
+        equal(
+          "a parallel stored before the key existed still lays out",
+          find("blk_PAR").arrangement,
+          "lanes"
+        );
+        equal("...and its marker reads the default", find("blk_PAR").joinLabel, "continue when all");
+        equal(
+          "...and it grows no chip for a key it does not store",
+          find("blk_PAR").chips,
+          []
+        );
+
+        const first = applyCommand(
+          doc,
+          updateConfig("blk_PAR", { lanes: ["capture", "receipt"], complete: "first" })
+        );
+        check("switching the mode is an ordinary config edit", first.ok, JSON.stringify(first.error));
+        const switched = (() => {
+          const walk = (node) =>
+            node.id === "blk_PAR"
+              ? node
+              : node.slots
+                  .flatMap((slot) => slot.children)
+                  .map(walk)
+                  .find(Boolean) ?? null;
+          return walk(layoutDocument(first.value.document, registry).root);
+        })();
+        equal("...and the marker follows it", switched.joinLabel, "continue at first");
+        equal("...and the mode shows as an ordinary select chip", switched.chips, [
+          { key: "complete", label: "Continue", value: "First" },
+        ]);
+
+        // Every node carries the field, marker or no marker: `arrangement`
+        // already says whether one is drawn, and a sometimes-present field is
+        // one a caller has to remember to guard.
+        equal("a branch keeps the old constant", find("blk_BR").joinLabel, "continue");
+        equal("so does a leaf that never draws a marker", find("blk_WAI").joinLabel, "continue");
+
+        // An unresolvable block asks a placeholder descriptor, so it gets the
+        // fallback rather than a callback from a type that is not there.
+        const orphan = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [block({ id: "blk_OLD", type: "myapp.legacy_check", config: {} })],
+            },
+          })
+        );
+        const tree = layoutDocument(orphan, registry).root;
+        const missing = tree.slots.find((one) => one.name === "body").children[0];
+        check("the orphan is unresolved", missing.unresolved);
+        equal("...and it still carries a label", missing.joinLabel, "continue");
       });
 
       suite("edit: insert and its inverse", () => {
