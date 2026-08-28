@@ -517,6 +517,11 @@ export function createFixturesPane({ mount, data, host = {} }) {
       );
     }
 
+    // Before the host call rather than after it: the iteration is the CONTEXT
+    // the step happens in, and a reader who meets "the host answered" first has
+    // to re-read the panel to find out which invitee it answered about.
+    if (step.foreach) panel.append(...foreachElements(step.foreach));
+
     if (step.invoke) panel.append(...invokeElements(step.invoke));
 
     if (step.note) panel.append(el("p", { class: "sb-fixtures__note", text: step.note }));
@@ -597,6 +602,55 @@ export function createFixturesPane({ mount, data, host = {} }) {
           invoke.outcome === "error"
             ? "Recorded, not routed: the steps after this one are block ids the fixture's author wrote after reading the document. Nothing here walked the failure path."
             : "Recorded, not called: the badge on the canvas marks the block this step calls out to, and the answer above is a value in the fixture file.",
+      })
+    );
+
+    return out;
+  }
+
+  /*
+   * The step's ITERATION (sb-9nn), rendered out of the same two classes the
+   * event line and the host call already use, for the reason `invokeElements`
+   * gives: an iteration is the same kind of fact the pane already shows - a
+   * name that arrived, a line a script wrote - and a treatment of its own would
+   * say it is a third kind.
+   *
+   * The sentence at the bottom is this half's load-bearing part, and it is a
+   * stronger claim than the invoke one has to make. A reader watching "pass 1",
+   * then "pass 2", then the run move on will conclude the runner walked the
+   * list. It did not: there is no list here, only steps an author wrote, and
+   * the ordinal is one of the things they wrote. Written where they are
+   * looking, not only in the fixture file's comment.
+   */
+  function foreachElements(iteration) {
+    const label = host.labelFor?.(iteration.block) ?? iteration.block;
+    const pass = iteration.index === null ? "an iteration" : `pass ${iteration.index + 1}`;
+
+    const out = [
+      el("p", { class: "sb-fixtures__event" }, [
+        el("span", { class: "sb-fixtures__event-label", text: "for each" }),
+        el("code", {
+          class: "sb-code sb-fixtures__event-name",
+          text: `${label} · ${pass}`,
+        }),
+      ]),
+    ];
+
+    if (iteration.item !== null) {
+      out.push(
+        el("p", { class: "sb-fixtures__subhead", text: "this item" }),
+        el("ul", { class: "sb-fixtures__deltas" }, [
+          el("li", { class: "sb-fixtures__delta" }, [
+            el("code", { class: "sb-fixtures__delta-value", text: iteration.item }),
+          ]),
+        ])
+      );
+    }
+
+    out.push(
+      el("p", {
+        class: "sb-hint",
+        text: "Recorded, not counted: the position and the item are values in the fixture file. Nothing here walked a list, and a run over three items is three passes an author wrote out.",
       })
     );
 

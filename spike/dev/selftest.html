@@ -254,6 +254,7 @@
         endCursor,
         fixturesFor,
         fixturesText,
+        foreachView,
         invokeView,
         moveCursor,
         parseFixtures,
@@ -5921,6 +5922,440 @@
           run.steps.some((step) => step.event === sendBlock.config.event)
         );
         equal("and it replays to its declared verdict", runView(run, run.steps.length).verdict, run.expected);
+      });
+
+      /* ---------------------------------------- sb-9nn: core.foreach
+       *
+       * APPENDED, like the descriptor it covers, and for the reason the
+       * suites above it were: the file has had more than one writer per round
+       * and an append is the only edit two of them can make without meeting.
+       *
+       * `shipped` and `shippedFixtureDocs` (both fetched further up) are
+       * reused rather than re-fetched - the demo appearance is in
+       * signup-invitations.json, which `shippedFixtureDocs` already holds.
+       */
+
+      const foreachType = proposedCoreTypes["core.foreach"];
+
+      suite("proposed core: core.foreach is a container over a list (sb-9nn)", () => {
+        check("the type is registered", foreachType !== undefined);
+        if (foreachType === undefined) return;
+
+        equal("it names itself", foreachType.name, "core.foreach");
+        check("it is not in the shipped core vocabulary", !("core.foreach" in coreTypes));
+        check("nor in the demo vocabulary", !("core.foreach" in demoTypes));
+
+        // The one slot, and its arity. `any` rather than `at_least_one`: a
+        // foreach with an empty body is an unfinished block, not an invalid
+        // one, and refusing it would mean an author cannot insert the
+        // container before the steps that go in it.
+        equal(
+          "one body slot, arity any",
+          foreachType.slots({}).map((slot) => [slot.name, slot.arity, slot.label]),
+          [["body", "any", "For each item"]]
+        );
+
+        equal(
+          "it is a step whose body takes steps",
+          foreachType.io({}),
+          { kinds: ["step"], slotAccepts: { body: ["step"] } }
+        );
+        // core.group's reading, and the reason it is not "unknown": one
+        // outcome, so there is no join to refuse.
+        check("produces is absent, not 'unknown'", foreachType.io({}).produces === undefined);
+        check(
+          "and consumes is absent too - `items` is a config path, not type flow",
+          foreachType.io({}).consumes === undefined
+        );
+
+        check(
+          "it drops into a group's body",
+          admits(coreTypes["core.group"], {}, "body", foreachType, {})
+        );
+        check(
+          "...and not onto the interrupt rail",
+          !admits(coreTypes["core.group"], {}, "interrupts", foreachType, {})
+        );
+        check(
+          "a subchart drops into ITS body, which is what the demo authors",
+          admits(foreachType, {}, "body", proposedCoreTypes["core.subchart"], {})
+        );
+        check(
+          "...and an interrupt rule does not",
+          !admits(foreachType, {}, "body", proposedCoreTypes["core.timeout"], {})
+        );
+
+        equal(
+          "three config fields, the list first",
+          foreachType.configSchema({}).map((field) => [field.key, field.type, field.required]),
+          [
+            ["items", "string", true],
+            ["item_as", "string", true],
+            ["index_as", "string", false],
+          ]
+        );
+        // The default an unfinished block opens on: `items` empty, because
+        // nobody has chosen a list, and `item_as` NOT empty, because "item" is
+        // a working name and an empty one would read as abandoned.
+        equal(
+          "the item's name has a working default",
+          foreachType.configSchema({}).find((field) => field.key === "item_as").default,
+          "item"
+        );
+        equal(
+          "the list does not",
+          foreachType.configSchema({}).find((field) => field.key === "items").default,
+          ""
+        );
+
+        equal("it sits with the other proposals", foreachType.paletteEntry.group, "Proposed core");
+        equal("the badge says what a title cannot", badgeFor(foreachType.paletteEntry), "for each");
+        equal("its body is a primary slot", foreachType.paletteEntry.slotStyle, { body: "primary" });
+        // No accent token, for core.raise's reason: the teal is for work that
+        // leaves the chart, and a foreach is pure inside-the-chart control flow.
+        check(
+          "and it claims no accent token",
+          foreachType.paletteEntry.accentToken === undefined
+        );
+
+        // No `mode` key, deliberately: the descriptor's compile sketch has two
+        // shapes and the vocabulary has not chosen between them, so a key
+        // naming two compilers that do not exist is left unwritten. Same
+        // argument core.send makes for declining a `target`.
+        equal(
+          "no mode field chooses a compile shape",
+          foreachType.configSchema({}).filter((field) => field.key === "mode"),
+          []
+        );
+      });
+
+      suite("proposed core: core.foreach's two bound names (sb-9nn)", () => {
+        const ok = { items: "signup.invitees", item_as: "invitee" };
+
+        equal("a list and a name validate", foreachType.validateConfig(ok), null);
+        equal(
+          "an index name may join them",
+          foreachType.validateConfig({ ...ok, index_as: "position" }),
+          null
+        );
+        // The optional field's own default reaches this function on every
+        // block the config form writes, so "" has to be silent - core.send's
+        // `delay` idiom, not core.on_event's `cond` idiom.
+        equal(
+          "an empty index name is the field's default, not a mistake",
+          foreachType.validateConfig({ ...ok, index_as: "" }),
+          null
+        );
+
+        equal(
+          "an empty list path is a finding",
+          foreachType.validateConfig({ ...ok, items: "" }),
+          [{ key: "items", message: "must be a datamodel path naming a list, like signup.invitees" }]
+        );
+        equal(
+          "so is one with whitespace in it",
+          foreachType.validateConfig({ ...ok, items: "signup invitees" }).map((one) => one.key),
+          ["items"]
+        );
+        // The grammar this file does not own, exactly as core.assign's `path`
+        // does not own it: dotted and bare are both accepted.
+        equal("a bare path is fine", foreachType.validateConfig({ ...ok, items: "invitees" }), null);
+
+        equal(
+          "a bound name has to be an identifier",
+          foreachType.validateConfig({ ...ok, item_as: "Invitee" }).map((one) => one.key),
+          ["item_as"]
+        );
+        equal(
+          "...and so does the index's",
+          foreachType.validateConfig({ ...ok, index_as: "the position" }).map((one) => one.key),
+          ["index_as"]
+        );
+
+        // The one cross-field check in proposed-core.js, and the reason it
+        // earns its place: two names that collide read fine and mean nothing.
+        equal(
+          "the two names cannot be the same",
+          foreachType.validateConfig({ ...ok, index_as: "invitee" }),
+          [{ key: "index_as", message: "the item and its position cannot share one name" }]
+        );
+
+        // The DECLARATION checks that are sb-c2o's rather than this
+        // function's, pinned from the outside: neither "is this path
+        // declared" nor "is what it names a LIST" is answerable from a config.
+        equal(
+          "an undeclared list is not this function's finding",
+          foreachType.validateConfig({ items: "not.declared.anywhere", item_as: "row" }),
+          null
+        );
+        equal(
+          "nor is a path that names a string rather than a list",
+          foreachType.validateConfig({ items: "signup.email", item_as: "row" }),
+          null
+        );
+      });
+
+      suite("layout: a foreach's declared body is a container, empty or not (sb-9nn)", () => {
+        const doc = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_EACH_EMPTY",
+                  type: "core.foreach",
+                  config: { items: "signup.invitees", item_as: "invitee" },
+                }),
+                block({
+                  id: "blk_EACH",
+                  type: "core.foreach",
+                  config: {
+                    items: "signup.invitees",
+                    item_as: "invitee",
+                    label: "For each invitee",
+                  },
+                  slots: {
+                    body: [step("blk_EACH_STEP")],
+                  },
+                }),
+                block({
+                  id: "blk_EACH_BAD",
+                  type: "core.foreach",
+                  config: { items: "", item_as: "row", index_as: "row" },
+                }),
+              ],
+            },
+          }),
+          { id: "bdoc_FOREACH" }
+        );
+
+        const tree = layoutDocument(doc, proposingRegistry());
+        const body = tree.root.slots.find((one) => one.name === "body");
+        const at = (id) => body.children.find((child) => child.id === id);
+
+        // sb-mu2's landing, claimed by the descriptor and asserted here
+        // rather than assumed: the container test is over DECLARED slots, so
+        // a freshly inserted foreach is fillable without this bead building
+        // anything.
+        equal("an empty foreach is still a container", at("blk_EACH_EMPTY").shape, "container");
+        equal(
+          "...with its one body slot listed",
+          at("blk_EACH_EMPTY").primary.map((one) => [one.name, one.children.length]),
+          [["body", 0]]
+        );
+        equal("and it draws no rails", at("blk_EACH_EMPTY").secondary.length, 0);
+
+        // One primary slot, so a stack rather than a fan - the arrangement
+        // rule reads the slot count, never the type name.
+        equal("one primary slot arranges as a stack", at("blk_EACH").arrangement, "stack");
+        equal("a filled body carries its child", at("blk_EACH").primary[0].children.length, 1);
+        equal("the card wears the badge", at("blk_EACH").badge, "for each");
+
+        equal(
+          "an unfinished foreach is two config findings",
+          tree.findings
+            .filter((finding) => finding.anchor?.blockId === "blk_EACH_BAD")
+            .map((finding) => [finding.severity, finding.anchor.key]),
+          [
+            ["error", "items"],
+            ["error", "index_as"],
+          ]
+        );
+        equal(
+          "and the finished ones are clean",
+          tree.findings.filter((finding) => finding.anchor?.blockId === "blk_EACH"),
+          []
+        );
+
+        equal(
+          "the config form is the three fields plus the injected label",
+          configFormFor(proposingRegistry(), findBlock(doc, "blk_EACH")).fields.map((f) => f.key),
+          [LABEL_FIELD.key, "items", "item_as", "index_as"]
+        );
+        // The bound name is NOT an expression field, so the condition pane
+        // offers nothing for it - which is the deferral the descriptor
+        // records, checked from the surface that would have shown it.
+        equal(
+          "a foreach carries no condition field",
+          conditionFields(configFormFor(proposingRegistry(), findBlock(doc, "blk_EACH"))),
+          []
+        );
+      });
+
+      suite("fixtures / a foreach step is authored, never counted (sb-9nn)", () => {
+        equal(
+          "a well-formed field normalizes whole",
+          foreachView({ block: "blk_EACH", index: 0, item: '"dana@example.com"' }),
+          { block: "blk_EACH", index: 0, item: '"dana@example.com"' }
+        );
+
+        // invokeView's rule, for invokeView's reason: a field naming no card
+        // would render as a silent no-op.
+        equal("a field with no block drops", foreachView({ index: 0 }), null);
+        equal("...and so does an empty block id", foreachView({ block: "", index: 0 }), null);
+        equal("a non-object is not a field", foreachView("blk_EACH"), null);
+        equal("nor is an array", foreachView([{ block: "blk_EACH" }]), null);
+        equal("nor is null", foreachView(null), null);
+
+        // The normalization that is this field's own. `0` is a legitimate
+        // ordinal - it is the FIRST pass - so a malformed index must not
+        // collapse onto it and render as a claim the fixture never made.
+        equal(
+          "a malformed index is null, never 0",
+          foreachView({ block: "blk_EACH", index: "first" }).index,
+          null
+        );
+        equal(
+          "a negative index is null too",
+          foreachView({ block: "blk_EACH", index: -1 }).index,
+          null
+        );
+        equal(
+          "a fractional one likewise",
+          foreachView({ block: "blk_EACH", index: 1.5 }).index,
+          null
+        );
+        equal("but zero survives, because it is a pass", foreachView({ block: "blk_EACH", index: 0 }).index, 0);
+
+        equal("a missing item is null", foreachView({ block: "blk_EACH", index: 0 }).item, null);
+        equal(
+          "and an item is carried as the source text it is",
+          foreachView({ block: "blk_EACH", index: 0, item: 42 }).item,
+          "42"
+        );
+
+        // Nothing counts. Two steps may both claim pass 0 and the module
+        // reports both, because D4 says the ordinals are the author's.
+        const run = {
+          id: "run_F",
+          name: "F",
+          expected: "pass",
+          steps: [
+            { label: "one", active: [], foreach: { block: "blk_EACH", index: 0 } },
+            { label: "two", active: [], foreach: { block: "blk_EACH", index: 0 } },
+            { label: "three", active: [] },
+          ],
+        };
+        equal(
+          "the runner repeats an ordinal rather than fixing it",
+          runView(run, 3).steps.map((one) => one.foreach?.index ?? null),
+          [0, 0, null]
+        );
+        equal("the current step exposes its iteration", runView(run, 1).foreach.index, 0);
+        equal("a step outside one exposes null", runView(run, 2).foreach, null);
+        equal("...as does a finished run", runView(run, 3).foreach, null);
+        equal("...and one that has not started", runView(run, NOT_STARTED).foreach, null);
+      });
+
+      suite("fixtures / the shipped foreach replays two authored passes (sb-9nn)", () => {
+        const raw = shippedFixtureDocs["signup-invitations"];
+
+        check("fixtures/runs.json loads", shipped.runs !== null);
+        check("signup-invitations.json loads", raw !== null);
+        check("datamodel.json loads", shipped.datamodel !== null);
+        if (shipped.runs === null || raw === null || shipped.datamodel === null) return;
+
+        const byId = new Map();
+        const walk = (node) => {
+          if (!node || typeof node !== "object") return;
+          if (typeof node.id === "string" && typeof node.type === "string") byId.set(node.id, node);
+          for (const children of Object.values(node.slots ?? {})) for (const child of children) walk(child);
+        };
+        walk(raw.root);
+
+        const each = [...byId.values()].filter((node) => node.type === "core.foreach");
+        equal("the document uses the proposed type once", each.map((one) => one.id), [
+          "blk_si_each_invitee",
+        ]);
+        if (each.length !== 1) return;
+
+        const [container] = each;
+        equal("its stored version is the descriptor's", container.type_version, foreachType.currentVersion);
+        equal("its stored config validates", foreachType.validateConfig(container.config), null);
+        equal("it binds the name the demo reads as", container.config.item_as, "invitee");
+        check("and it does not name a position it never uses", !("index_as" in container.config));
+
+        // The document-level check `validateConfig` cannot make, made here
+        // instead - the shape sb-c2o will build for every block.
+        const index = indexPaths(shipped.datamodel);
+        check(
+          `the list it iterates is declared (${container.config.items})`,
+          index.has(container.config.items),
+          `${container.config.items} is not in fixtures/datamodel.json`
+        );
+        equal("...and it is declared as a list", index.get(container.config.items)?.type, "list");
+
+        // The bound name is NOT declared, and that is the deferral rather
+        // than a bug: the condition surface would report it unknown, which is
+        // advisory and never an error. Pinned so the gap stays visible.
+        check(
+          "the bound name is not a datamodel path, and nothing pretends it is",
+          !index.has(container.config.item_as)
+        );
+
+        // The subchart the container wraps is still the same block, moved
+        // rather than copied - which is the whole argument for the type.
+        const bodyIds = (container.slots?.body ?? []).map((child) => child.id);
+        equal("it wraps the subchart that was already there", bodyIds, ["blk_si_invitee_signup"]);
+
+        const fixtures = fixturesFor(shipped.runs, "bdoc_su_invites_demo");
+        const run = runById(fixtures, "run_si_each_invitee");
+        check("the foreach run is present", run !== null);
+        if (run === null) return;
+
+        const view = runView(run, endCursor(run));
+        equal("it replays to its declared verdict", view.verdict, run.expected);
+        equal("...and the fixture agrees with itself", view.agrees, true);
+
+        const passes = view.steps.filter((one) => one.foreach !== null);
+        equal("four of its steps sit inside an iteration", passes.length, 4);
+        equal(
+          "every one of them names the container",
+          [...new Set(passes.map((one) => one.foreach.block))],
+          ["blk_si_each_invitee"]
+        );
+        equal(
+          "two passes, each spanning two steps",
+          passes.map((one) => one.foreach.index),
+          [0, 0, 1, 1]
+        );
+        equal(
+          "and each pass names its own item",
+          [...new Set(passes.map((one) => one.foreach.item))],
+          ['"dana@example.com"', '"rowan@example.com"']
+        );
+
+        // THE claim the run exists to make: the two passes light the SAME
+        // block ids. One authored subtree, run more than once - not a copy
+        // per item, which is the authoring this type replaces.
+        const [first, second] = [passes.slice(0, 2), passes.slice(2)];
+        equal(
+          "both passes light the same cards",
+          first.map((one) => one.active),
+          second.map((one) => one.active)
+        );
+
+        const strays = [];
+        for (const step of run.steps) {
+          for (const id of step.active ?? []) if (!byId.has(id)) strays.push(id);
+          if (step.foreach && !byId.has(step.foreach.block)) strays.push(step.foreach.block);
+        }
+        equal("every id the run names is a block in the document", strays, []);
+
+        for (const step of run.steps) {
+          for (const delta of step.deltas ?? []) {
+            check(`the run writes a declared path (${delta.path})`, index.has(delta.path));
+          }
+        }
+
+        // The finding the run's last check records, asserted rather than
+        // taken on trust: each pass wrote the same path, so the accumulator
+        // ends on the LAST one. That is a real Phase-B question about the
+        // proposal - where a per-item result should accumulate - and the
+        // fixture states it instead of hiding it.
+        const email = view.bindings.find((one) => one.path === "signup.email");
+        equal("the datamodel ends on the last pass's item", email?.value, '"rowan@example.com"');
       });
 
       /* ------------------------------------------------------- reporting */
