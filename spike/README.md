@@ -102,6 +102,16 @@ ADR-0005 decision 10's presentation metadata rather than a type name:
 | a boundary box around a body | the same - a rule needs a region with an edge |
 | an arm's condition pill | an `:expression` config field keyed by the slot name |
 | a compact chip instead of a card | a leaf whose whole schema is one `:duration` |
+| a container with a body to fill | the block type DECLARING a slot (sb-mu2) |
+
+That last row is a rule about types, not about documents, and it is the one
+the spike got wrong first: `shapeOf` used to call a block a container only
+once a slot HELD something, so a freshly inserted `core.invoke` or
+`core.group` drew as a leaf, emitted no body, and therefore offered neither a
+"+" gap nor a drop target for the slot it declares. The authoring path the
+vocabulary invites could not start. A declared slot is now drawn whether or
+not it is occupied, and the empty ones carry a placeholder that names the
+slot where no header above it already does.
 
 ## The panes
 
@@ -472,7 +482,11 @@ finding:
   one-line rule that fixes it (a block that DECLARES slots is a container)
   moves the shape derivation that drives arrangement, boundary boxes and
   connector routing for every block, which is a model change and not a polish
-  one.
+  one. **Fixed in sb-mu2**, as its own item with its own re-verification pass:
+  both demo documents measure byte-identical afterwards - every node's shape,
+  arrangement, boundary flag and rectangle, and all 69 connector paths in
+  card-processing - because they fill every slot they declare, which is
+  exactly why no machine check in the campaign had ever seen the gap.
 
 ## The proposed vocabulary
 
