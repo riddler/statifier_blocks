@@ -357,7 +357,11 @@ function describeValidation(descriptor, config) {
   return (descriptor.validateConfig(config) ?? []).map((problem) => ({
     key: problem.key,
     message: problem.message,
-    severity: "error",
+    // sb-c2o: the problem's own severity, defaulted - `layout.js` reads it the
+    // same way now, and the form and the canvas have to agree about a finding
+    // or the panel and the field under the author's cursor say different
+    // things about one problem.
+    severity: problem.severity ?? "error",
     origin: "validation",
   }));
 }

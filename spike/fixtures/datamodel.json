@@ -353,6 +353,7 @@
           "path": "auth",
           "type": "object",
           "label": "Authorization",
+          "note": "Where the myapp:authorize call's result lands: blk_cp_authorize's assign_to names this path, and the run's deltas write these fields. The worked example for sb-c2o's declaration check - an invoke whose result the datamodel declares, so the condition editor can offer auth.approved to the outcome branch downstream.",
           "fields": [
             {
               "name": "approved",

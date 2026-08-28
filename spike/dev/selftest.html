@@ -5567,9 +5567,10 @@
         equal("the card carries the badge", at("blk_SET").badge, "writes");
 
         // The unfinished block's findings, and the severity they arrive with.
-        // `layout.js` stamps `severity: "error"` on everything `validateConfig`
-        // returns, which is precisely why the undeclared-path finding cannot
-        // live in `validateConfig` and is filed for sb-c2o instead.
+        // `layout.js` DEFAULTS a problem's severity to `"error"` since sb-c2o
+        // (it used to stamp it), so these two still read exactly as they did -
+        // which is the point of the default, and is asserted here as well as in
+        // sb-c2o's own suites.
         equal(
           "an unfinished write is two config findings",
           tree.findings
@@ -6356,6 +6357,433 @@
         // fixture states it instead of hiding it.
         const email = view.bindings.find((one) => one.path === "signup.email");
         equal("the datamodel ends on the last pass's item", email?.value, '"rowan@example.com"');
+      });
+
+      /* ------------------------------------- sb-c2o: declared paths
+       *
+       * APPENDED at the end of the file, like the suites before them and for
+       * the same reason: a sibling bead is appending to this file at the same
+       * time. In reading order these belong beside the per-type suites for
+       * `core.invoke`, `core.assign` and `core.foreach`, each of which recorded
+       * this check as a deferral.
+       *
+       * Two halves, and they land together on purpose. The severity
+       * pass-through is what makes a WARNING expressible at all; the
+       * declaration check is the first finding that needs one.
+       */
+
+      /* The shipped fixture documents carry `_comment` keys - their own
+       * documentation, and explicitly not part of the ADR-0001 node shape, so
+       * `fromJson` refuses them exactly as `Decode` would. `shell.js` strips
+       * them before decoding for that reason; this is the same walk, written
+       * here rather than exported, because the strict decoder is the thing
+       * being relied on and a shared laxer path would be the wrong fix. */
+      function stripFixtureComments(raw) {
+        if (Array.isArray(raw)) return raw.map(stripFixtureComments);
+        if (raw === null || typeof raw !== "object") return raw;
+
+        const out = {};
+        for (const [key, value] of Object.entries(raw)) {
+          if (key === "_comment") continue;
+          out[key] = key === "config" || key === "metadata" ? value : stripFixtureComments(value);
+        }
+        return out;
+      }
+
+      const declaredDatamodel = {
+        version: 1,
+        scopes: [
+          {
+            scope: "local",
+            label: "Chart-local",
+            description: "For this suite only.",
+            entries: [
+              { name: "review", path: "review", type: "object", label: "Review", fields: [
+                { name: "parked", path: "review.parked", type: "boolean", label: "Parked" },
+              ] },
+              { name: "invitees", path: "invitees", type: "list", label: "Invitees" },
+              { name: "auth", path: "auth", type: "object", label: "Authorization" },
+            ],
+          },
+        ],
+      };
+
+      /* A HOST type, registered the way a host registers its own: it declares
+       * `datamodelPath` on a field of its own naming, and nothing in
+       * `layout.js` knows it exists. If the check ever grows a `core.*` name
+       * this suite is what goes red. */
+      const hostWriter = {
+        name: "acme.record",
+        currentVersion: 1,
+        slots: () => [],
+        configSchema: () => [
+          { key: "target", type: "string", label: "Record it at", required: true, default: "", datamodelPath: "writes" },
+        ],
+        validateConfig: () => null,
+        io: () => ({ kinds: ["step"] }),
+        paletteEntry: { label: "Record", group: "Acme", description: "Writes a fact.", icon: "pencil" },
+      };
+
+      /* A type that returns a WARNING from `validate_config/1` - the door the
+       * severity default opens. No shipped or proposed type walks through it
+       * yet, so the pass-through is asserted against one written here. */
+      const advisoryType = {
+        name: "acme.advisory",
+        currentVersion: 1,
+        slots: () => [],
+        configSchema: () => [{ key: "note", type: "string", label: "Note", required: false, default: "" }],
+        validateConfig: (config) => [
+          { key: "note", message: "an unsigned note is fine, but nobody will know who wrote it", severity: "warning" },
+          ...(config.note === "boom" ? [{ key: "note", message: "that is not a note" }] : []),
+        ],
+        io: () => ({ kinds: ["step"] }),
+        paletteEntry: { label: "Advisory", group: "Acme", description: "Carries a note.", icon: "pencil" },
+      };
+
+      function declaringRegistry() {
+        const base = proposingRegistry();
+        return {
+          ...base,
+          types: { ...base.types, "acme.record": hostWriter, "acme.advisory": advisoryType },
+        };
+      }
+
+      function pathDocument() {
+        return createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_DECLARED",
+                  type: "core.invoke",
+                  config: { invoke_type: "myapp:authorize", assign_to: "auth" },
+                }),
+                block({
+                  id: "blk_UNDECLARED",
+                  type: "core.invoke",
+                  config: { invoke_type: "myapp:authorize", assign_to: "authorization" },
+                }),
+                block({
+                  id: "blk_WRITE",
+                  type: "core.assign",
+                  config: { path: "review.unparked", value: "true" },
+                }),
+                block({
+                  id: "blk_EMPTY",
+                  type: "core.assign",
+                  config: { path: "", value: "" },
+                }),
+                block({
+                  id: "blk_LOOP",
+                  type: "core.foreach",
+                  config: { items: "signup.invitees", item_as: "invitee" },
+                  slots: { body: [] },
+                }),
+                block({
+                  id: "blk_HOST",
+                  type: "acme.record",
+                  config: { target: "somewhere.else" },
+                }),
+                block({
+                  id: "blk_GONE",
+                  type: "acme.retired",
+                  config: { target: "somewhere.else" },
+                }),
+              ],
+            },
+          }),
+          { id: "bdoc_PATHS" }
+        );
+      }
+
+      const declarationsOf = (tree, id) =>
+        tree.findings.filter(
+          (finding) => finding.anchor?.blockId === id && finding.source === "datamodel"
+        );
+
+      suite("layout: an undeclared datamodel path is a warning (sb-c2o)", () => {
+        const doc = pathDocument();
+        const registry = declaringRegistry();
+        const index = indexPaths(declaredDatamodel);
+        const tree = layoutDocument(doc, registry, { datamodelIndex: index });
+
+        // The check reaches every field that DECLARES itself a datamodel path,
+        // across four proposed types and one host type, and no others.
+        equal(
+          "every undeclared path in the document is found, once each",
+          tree.findings
+            .filter((finding) => finding.source === "datamodel")
+            .map((finding) => [finding.anchor.blockId, finding.anchor.key]),
+          [
+            ["blk_UNDECLARED", "assign_to"],
+            ["blk_WRITE", "path"],
+            ["blk_LOOP", "items"],
+            ["blk_HOST", "target"],
+          ]
+        );
+
+        equal(
+          "a declared path says nothing at all",
+          declarationsOf(tree, "blk_DECLARED"),
+          []
+        );
+        equal("...and neither does the block that names none", declarationsOf(tree, "blk_ROOT"), []);
+
+        const [undeclared] = declarationsOf(tree, "blk_UNDECLARED");
+        equal("it is a WARNING, not a refusal", undeclared.severity, "warning");
+        equal("it is anchored at the field the author typed in", undeclared.anchor, {
+          kind: "config",
+          blockId: "blk_UNDECLARED",
+          key: "assign_to",
+        });
+        equal("with the datamodel as its source", undeclared.source, "datamodel");
+        check(
+          "the text names the key",
+          undeclared.message.includes('"authorization"'),
+          undeclared.message
+        );
+        check(
+          "and the fix",
+          undeclared.message.includes("Declare") && undeclared.message.includes("datamodel document"),
+          undeclared.message
+        );
+        equal(
+          "the whole sentence",
+          undeclared.message,
+          'The datamodel does not declare "authorization". Declare "authorization" in the datamodel document, or write to a path it already declares.'
+        );
+
+        // `reads` and `writes` differ in one clause, because "write it
+        // somewhere else" is not advice about a list a block only reads.
+        const [loop] = declarationsOf(tree, "blk_LOOP");
+        equal(
+          "a path a block only READS says so",
+          loop.message,
+          'The datamodel does not declare "signup.invitees". Declare "signup.invitees" in the datamodel document, or read a path it already declares.'
+        );
+
+        // Silence where the author is mid-word, or where the type's own error
+        // already says the field is unfinished.
+        equal("an empty path is validation's business, not this check's", declarationsOf(tree, "blk_EMPTY"), []);
+        equal(
+          "...and the type's own finding is the only one under it",
+          tree.findings
+            .filter((finding) => finding.anchor?.blockId === "blk_EMPTY")
+            .map((finding) => [finding.severity, finding.anchor.key]),
+          [
+            ["error", "path"],
+            ["error", "value"],
+          ]
+        );
+
+        // An unresolvable block's card is already given over to saying it
+        // cannot be resolved; a second finding about a schema nobody has is
+        // a finding from nowhere (`badge`'s argument, applied).
+        equal("an unresolved block is not path-checked", declarationsOf(tree, "blk_GONE"), []);
+
+        const midWord = layoutDocument(
+          createDocument(
+            block({
+              id: "blk_ROOT",
+              type: "core.sequence",
+              slots: {
+                body: [
+                  block({ id: "blk_TYPING", type: "core.assign", config: { path: "review ", value: "true" } }),
+                ],
+              },
+            }),
+            { id: "bdoc_TYPING" }
+          ),
+          registry,
+          { datamodelIndex: index }
+        );
+        equal(
+          "a path with whitespace in it is the grammar's problem, not the index's",
+          midWord.findings.filter((finding) => finding.source === "datamodel"),
+          []
+        );
+      });
+
+      suite("layout: with no datamodel in reach the check is silent (sb-c2o)", () => {
+        const doc = pathDocument();
+        const registry = declaringRegistry();
+
+        // The inert default, which is the state a host that ships no datamodel
+        // document is in - and the state every existing caller of
+        // `layoutDocument` is in until it passes an index.
+        equal(
+          "two arguments produce no declaration findings",
+          layoutDocument(doc, registry).findings.filter((one) => one.source === "datamodel"),
+          []
+        );
+        equal(
+          "and neither does an explicit null",
+          layoutDocument(doc, registry, { datamodelIndex: null }).findings.filter(
+            (one) => one.source === "datamodel"
+          ),
+          []
+        );
+        equal(
+          "a session that carries other things still gets none",
+          layoutDocument(doc, registry, { collapsed: new Set(["blk_ROOT"]) }).findings.filter(
+            (one) => one.source === "datamodel"
+          ),
+          []
+        );
+
+        // Nothing else about the layout moves when an index arrives: the same
+        // blocks, the same shapes, the same config findings.
+        const without = layoutDocument(doc, registry);
+        const with_ = layoutDocument(doc, registry, { datamodelIndex: indexPaths(declaredDatamodel) });
+        equal("the tree is the same size either way", with_.blockCount, without.blockCount);
+        equal(
+          "and the validation findings are untouched",
+          with_.findings.filter((one) => one.source !== "datamodel").length,
+          without.findings.length
+        );
+      });
+
+      suite("layout + panes: a problem's own severity survives (sb-c2o)", () => {
+        const doc = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({ id: "blk_NOTE", type: "acme.advisory", config: { note: "fine" } }),
+                block({ id: "blk_BOOM", type: "acme.advisory", config: { note: "boom" } }),
+              ],
+            },
+          }),
+          { id: "bdoc_SEVERITY" }
+        );
+        const registry = declaringRegistry();
+        const tree = layoutDocument(doc, registry);
+
+        equal(
+          "a warning-shaped problem arrives as a warning",
+          tree.findings
+            .filter((finding) => finding.anchor?.blockId === "blk_NOTE")
+            .map((finding) => finding.severity),
+          ["warning"]
+        );
+        equal(
+          "and a problem with no severity is still an error",
+          tree.findings
+            .filter((finding) => finding.anchor?.blockId === "blk_BOOM")
+            .map((finding) => finding.severity),
+          ["warning", "error"]
+        );
+
+        // The form under the author's cursor and the panel beside it have to
+        // agree about one finding, so `panes.js` defaults the same way.
+        equal(
+          "the config form reads the same severities",
+          configFormFor(registry, findBlock(doc, "blk_BOOM")).fields
+            .find((field) => field.key === "note")
+            .findings.map((finding) => finding.severity),
+          ["warning", "error"]
+        );
+
+        // The count badge and the tab's chip, which are the two readings of
+        // the set an author actually sees.
+        const counts = severityCounts(collectFindings(tree, doc));
+        equal("the panel counts one error", counts.error, 1);
+        equal("...and two warnings", counts.warning, 2);
+      });
+
+      suite("fixtures / the demo declares its invoke result (sb-c2o)", () => {
+        check("card-processing.json loads", shipped.bdoc_cp_demo !== null);
+        check("datamodel.json loads", shipped.datamodel !== null);
+        check("runs.json loads", shipped.runs !== null);
+        if (shipped.bdoc_cp_demo === null || shipped.datamodel === null || shipped.runs === null) return;
+
+        const index = indexPaths(shipped.datamodel);
+        const decoded = fromJson(JSON.stringify(stripFixtureComments(shipped.bdoc_cp_demo)));
+        check("the demo document decodes", decoded.ok);
+        if (!decoded.ok) return;
+
+        const authorize = findBlock(decoded.value, "blk_cp_authorize");
+        check("the authorize call is still there", authorize !== null);
+        if (authorize === null) return;
+
+        // THE worked example: the invoke's result lands where the datamodel
+        // says a result can land, which is what lets the condition editor offer
+        // `auth.approved` to the outcome branch downstream.
+        equal("its result lands in a declared path", authorize.config.assign_to, "auth");
+        check(
+          "which fixtures/datamodel.json declares",
+          index.has(authorize.config.assign_to),
+          `${authorize.config.assign_to} is not in fixtures/datamodel.json`
+        );
+
+        // The run and the block now name one path rather than two: sb-ig4's
+        // finding was that the deltas wrote `auth.*` while the block said
+        // `authorization`, and nothing could see the disagreement.
+        const fixtures = fixturesFor(shipped.runs, "bdoc_cp_demo");
+        const run = runById(fixtures, "run_cp_invoke_done");
+        check("the ordinary invoke run is present", run !== null);
+        if (run !== null) {
+          const on = run.steps.filter((step) => (step.active ?? []).includes("blk_cp_authorize"));
+          equal("one step sits on the authorize call", on.length, 1);
+          equal(
+            "and every path it writes is under the block's assign_to",
+            (on[0]?.deltas ?? []).map((delta) => delta.path.split(".")[0]),
+            ["auth", "auth", "auth"]
+          );
+        }
+
+        const tree = layoutDocument(decoded.value, proposingRegistry(), { datamodelIndex: index });
+        equal(
+          "so the whole demo document raises no declaration warning",
+          tree.findings.filter((finding) => finding.source === "datamodel"),
+          []
+        );
+      });
+
+      suite("fixtures / one undeclared case is left standing (sb-c2o)", () => {
+        const raw = shippedFixtureDocs["signup-invitations"];
+        check("signup-invitations.json loads", raw !== null);
+        check("datamodel.json loads", shipped.datamodel !== null);
+        if (raw === null || shipped.datamodel === null) return;
+
+        const index = indexPaths(shipped.datamodel);
+        const decoded = fromJson(JSON.stringify(stripFixtureComments(raw)));
+        check("the document decodes", decoded.ok);
+        if (!decoded.ok) return;
+
+        // sb-7s2 left this one deliberately, and sb-c2o keeps it rather than
+        // fixing it away: a demo where nothing is ever undeclared teaches that
+        // the check does not fire. The subchart writes its outcome to
+        // `onboarding`, which the datamodel document does not describe.
+        const tree = layoutDocument(decoded.value, proposingRegistry(), { datamodelIndex: index });
+        const declarations = tree.findings.filter((finding) => finding.source === "datamodel");
+
+        equal(
+          "the demo surfaces exactly one declaration warning",
+          declarations.map((finding) => [finding.severity, finding.anchor.blockId, finding.anchor.key]),
+          [["warning", "blk_si_invitee_signup", "assign_to"]]
+        );
+        check(
+          "naming the path and the fix",
+          declarations[0]?.message ===
+            'The datamodel does not declare "onboarding". Declare "onboarding" in the datamodel document, or write to a path it already declares.',
+          declarations[0]?.message
+        );
+        check("and the path really is undeclared", !index.has("onboarding"));
+
+        // The list the same document iterates IS declared, so the two halves
+        // of the check are both exercised by one shipped fixture.
+        const loop = findBlock(decoded.value, "blk_si_each_invitee");
+        check("the foreach is still there", loop !== null);
+        check("and the list it reads is declared", index.has(loop?.config?.items));
+
+        // A warning, never a refusal: the document is still valid and still
+        // renders, which is the whole reason this is not a validation error.
+        equal("the document itself is valid", validate(decoded.value), null);
+        check("and its cards are laid out", tree.blockCount > 1);
       });
 
       /* ------------------------------------------------------- reporting */

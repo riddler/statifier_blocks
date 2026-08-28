@@ -82,10 +82,26 @@ export function layoutDocument(document, registry, session = {}) {
   // rather than beside the tree, so a folded card's count badge and the
   // findings panel's list are two readings of one set. Two sources that each
   // counted their own half is exactly how a badge starts lying.
+  // sb-c2o's addition: the datamodel index (`indexPaths(datamodelDoc)`, built
+  // once in `shell.js` and already handed to the editor for the condition
+  // surface). Defaulted to `null`, which means "no datamodel document is in
+  // reach" and produces no declaration findings at all - the same inert
+  // default `extraFindings` takes, and the honest state for a host that ships
+  // no datamodel. A Map is all that is read of it: `has`.
+  //
+  // NOT YET PASSED BY THE LIVE EDITOR. `interact.js` already receives the
+  // datamodel seam from the shell (`datamodel.index`) and calls
+  // `layoutDocument` once, in `render()`; adding `datamodelIndex:
+  // datamodel?.index` to that call is the whole of the wiring, and it is left
+  // undone here only because a sibling bead owns that file in this wave. Until
+  // it lands the check is exercised by `dev/selftest.html` and by any caller
+  // that passes an index - which is the honest state to leave, rather than a
+  // second place the index could be built.
   const view = {
     collapsed: session.collapsed ?? new Set(),
     dropState: session.dropState ?? (() => null),
     extra: groupByBlock(session.extraFindings ?? []),
+    datamodelIndex: session.datamodelIndex ?? null,
   };
 
   const root = layoutBlock(document.root, registry, findings, {
@@ -164,7 +180,15 @@ function layoutBlock(node, registry, findings, { depth, slot, parentId, view }) 
   } else {
     for (const problem of descriptor.validateConfig(config) ?? []) {
       own.push({
-        severity: "error",
+        // sb-c2o: the problem's OWN severity, defaulted rather than stamped.
+        // It used to read `severity: "error"` unconditionally, which made a
+        // warning-shaped return from `validate_config/1` render as an error on
+        // the card and in the findings panel - so no type could return one, and
+        // three of them (`core.invoke`, `core.assign`, `core.foreach`) recorded
+        // that as a deferral rather than a design. The default keeps every
+        // existing type's findings exactly as they were: an error is what a
+        // problem is unless it says otherwise.
+        severity: problem.severity ?? "error",
         source: "config",
         origin: "validation",
         anchor: { kind: "config", blockId: node.id, key: problem.key },
@@ -173,12 +197,19 @@ function layoutBlock(node, registry, findings, { depth, slot, parentId, view }) 
     }
   }
 
+  const schema = safeSchema(descriptor, config);
+
+  // sb-c2o: the declaration check `validate_config/1` cannot make, because it
+  // is handed a config and this needs the datamodel index. Appended after
+  // validation's findings so a block carrying both reads real-first, and
+  // before the caller's, which is where the reading order already put them.
+  if (!unresolved) own.push(...declarationFindings(node.id, schema, config, view.datamodelIndex));
+
   // The caller's own findings, appended after validation's so that a block
   // carrying both reads real-first. `origin` is already stamped on these by
   // whoever supplied them, and this file neither invents nor rewrites one.
   own.push(...(view.extra.get(node.id) ?? []));
 
-  const schema = safeSchema(descriptor, config);
   const slots = slotViews(node, descriptor, entry, config, schema, view);
 
   const layoutNode = {
@@ -276,6 +307,83 @@ function safeSchema(descriptor, config) {
   } catch {
     return [];
   }
+}
+
+/*
+ * sb-c2o: every config field that names a datamodel path the datamodel
+ * document does not declare, as WARNING findings.
+ *
+ * ## Read off the schema, never off a type name
+ *
+ * A field says of itself that its value is a datamodel path, by carrying
+ * `datamodelPath: "writes" | "reads"` beside its `type`. That is the same move
+ * ADR-0005 decision 10's presentation metadata makes and the same one
+ * `joinLabel` makes: the type declares the fact, this file reads the
+ * declaration, and no `core.*` name appears anywhere in the check. A host type
+ * whose config names a datamodel path gets the finding by declaring the
+ * annotation, without this file learning it exists.
+ *
+ * It is deliberately NOT a new ADR-0002 decision-7 FIELD TYPE. The type set is
+ * closed and `params` already recorded what it costs to reopen it; an
+ * annotation beside `type: "string"` says the one thing needed here - what the
+ * string names - without proposing a new control, a new storage form, or a new
+ * validation rule for every reader of the schema.
+ *
+ * ## Why a warning
+ *
+ * A refusal would make authoring order matter: an author who names the path
+ * before declaring it would be stopped mid-thought, and the fluidity is the
+ * whole reason the spike's canvas is worth having. The finding says the thing
+ * that is true - the datamodel does not declare this - and names the fix, which
+ * is what makes the later "declare it" affordance a button over an existing
+ * finding rather than new machinery.
+ *
+ * ## What it stays silent about
+ *
+ * An empty value, and a value with whitespace in it. Both are already the
+ * subject of the type's own `validate_config/1` error ("must be a datamodel
+ * path, like review.parked"), and a second finding under the same field saying
+ * the datamodel does not declare `""` is noise that arrives exactly when the
+ * author is mid-word.
+ */
+function declarationFindings(blockId, schema, config, index) {
+  if (!index || typeof index.has !== "function") return [];
+
+  const findings = [];
+
+  for (const field of Array.isArray(schema) ? schema : []) {
+    const mode = field?.datamodelPath;
+    if (mode !== "writes" && mode !== "reads") continue;
+
+    const raw = config?.[field.key];
+    if (typeof raw !== "string") continue;
+
+    const path = raw.trim();
+    if (path === "" || /\s/.test(path) || index.has(path)) continue;
+
+    findings.push({
+      severity: "warning",
+      source: "datamodel",
+      origin: "validation",
+      anchor: { kind: "config", blockId, key: field.key },
+      message: declarationMessage(path, mode),
+    });
+  }
+
+  return findings;
+}
+
+/* The path, then the fix, in that order: the author is looking at a field they
+ * just typed into, so the first thing the sentence has to do is name the string
+ * it is talking about. Two endings rather than one, because "write the result
+ * somewhere else" is not advice you give about a list a block only reads. */
+function declarationMessage(path, mode) {
+  const fix =
+    mode === "writes"
+      ? `Declare "${path}" in the datamodel document, or write to a path it already declares.`
+      : `Declare "${path}" in the datamodel document, or read a path it already declares.`;
+
+  return `The datamodel does not declare "${path}". ${fix}`;
 }
 
 function safeSlots(descriptor, config) {

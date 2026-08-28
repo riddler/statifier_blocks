@@ -424,7 +424,7 @@
             },
             {
               "label": "Authorize the card",
-              "note": "The card's badge lights while this step is current: the work is happening at the acquirer, not in the chart. Its result is declared to land in `authorization` (core.invoke's assign_to), and ../datamodel.json declares no such entry - so the run writes only the paths the datamodel does declare and leaves the gap visible rather than inventing one. A Phase-B finding, not something a fixture gets to decide.",
+              "note": "The card's badge lights while this step is current: the work is happening at the acquirer, not in the chart. Its result is declared to land in `auth` (core.invoke's assign_to), and the deltas below write the fields of exactly that path. Until sb-c2o the block said `authorization`, which ../datamodel.json never declared, and the run wrote auth.* anyway - the gap sb-ig4 found. Both halves say `auth` now, so the deltas can be read against the block rather than around it.",
               "active": ["blk_cp_authorize"],
               "invoke": {
                 "block": "blk_cp_authorize",
