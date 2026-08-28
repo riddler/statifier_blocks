@@ -211,6 +211,13 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
       // panel's list are two readings of ONE set (ADR-0005 d11's last
       // sentence, which a second source would quietly falsify).
       extraFindings: demoFindings(session.document.id),
+      // sb-c2o's declaration check, wired to the live canvas (sb-e2x). The
+      // index is the one `shell.js` already built and already handed this
+      // editor for the condition surface - passed through rather than rebuilt,
+      // so the canvas's warnings and the datamodel pane's answers cannot
+      // disagree about what the document declares. `null` when no datamodel
+      // document is in reach, which produces no declaration findings at all.
+      datamodelIndex: datamodel?.index ?? null,
     });
 
     findings = collectFindings(tree, session.document);

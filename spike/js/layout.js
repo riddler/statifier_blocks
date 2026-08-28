@@ -89,14 +89,12 @@ export function layoutDocument(document, registry, session = {}) {
   // default `extraFindings` takes, and the honest state for a host that ships
   // no datamodel. A Map is all that is read of it: `has`.
   //
-  // NOT YET PASSED BY THE LIVE EDITOR. `interact.js` already receives the
-  // datamodel seam from the shell (`datamodel.index`) and calls
-  // `layoutDocument` once, in `render()`; adding `datamodelIndex:
-  // datamodel?.index` to that call is the whole of the wiring, and it is left
-  // undone here only because a sibling bead owns that file in this wave. Until
-  // it lands the check is exercised by `dev/selftest.html` and by any caller
-  // that passes an index - which is the honest state to leave, rather than a
-  // second place the index could be built.
+  // PASSED BY THE LIVE EDITOR since sb-e2x: `interact.js` hands the seam it
+  // already receives from the shell (`datamodel?.index`) to the one
+  // `layoutDocument` call in `render()`. The index is built once, in
+  // `shell.js`, and is the same one the datamodel pane answers from - so the
+  // canvas's warnings and that pane cannot disagree about what a document
+  // declares.
   const view = {
     collapsed: session.collapsed ?? new Set(),
     dropState: session.dropState ?? (() => null),
@@ -355,22 +353,59 @@ function declarationFindings(blockId, schema, config, index) {
     const mode = field?.datamodelPath;
     if (mode !== "writes" && mode !== "reads") continue;
 
-    const raw = config?.[field.key];
-    if (typeof raw !== "string") continue;
+    for (const [row, raw] of declaredValues(field, config?.[field.key])) {
+      if (typeof raw !== "string") continue;
 
-    const path = raw.trim();
-    if (path === "" || /\s/.test(path) || index.has(path)) continue;
+      const path = raw.trim();
+      if (path === "" || /\s/.test(path) || index.has(path)) continue;
 
-    findings.push({
-      severity: "warning",
-      source: "datamodel",
-      origin: "validation",
-      anchor: { kind: "config", blockId, key: field.key },
-      message: declarationMessage(path, mode),
-    });
+      findings.push({
+        severity: "warning",
+        source: "datamodel",
+        origin: "validation",
+        // sb-e2x: `row` beside the anchor's key, for a map field, naming which
+        // row of it the finding is about. Absent for a plain string field, and
+        // ignorable by any reader that does not route rows - the message names
+        // the path either way, which is what the "declare it" affordance reads.
+        anchor:
+          row === null
+            ? { kind: "config", blockId, key: field.key }
+            : { kind: "config", blockId, key: field.key, row },
+        message: declarationMessage(path, mode),
+      });
+    }
   }
 
   return findings;
+}
+
+/*
+ * The values one annotated field offers the check, as `[row, value]` pairs.
+ *
+ * A `string` field offers its own value under `row: null`, which is what this
+ * pass has always done. sb-e2x's `{ map: T }` field offers each of its VALUES
+ * under that value's key: a `params` map binds names to datamodel paths, and
+ * the paths are the part the datamodel either declares or does not. The keys
+ * are names the host handler receives and are nobody's datamodel path, so they
+ * are deliberately not checked here.
+ *
+ * Driven by the field's declared TYPE and its `datamodelPath` annotation, both
+ * of which the type states about itself. Still no `core.*` name anywhere in
+ * this file, which is the property the selftest's host-type case exists to
+ * keep - a host declaring `{ map: "string" }` with the annotation gets these
+ * findings without this file learning it exists.
+ */
+function declaredValues(field, raw) {
+  const type = field?.type;
+
+  if (type !== null && typeof type === "object" && type.map !== undefined) {
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return [];
+    return Object.keys(raw)
+      .sort()
+      .map((key) => [key, raw[key]]);
+  }
+
+  return [[null, raw]];
 }
 
 /* The path, then the fix, in that order: the author is looking at a field they
@@ -570,7 +605,18 @@ function formatValue(type, value) {
   if (type === "duration") return humanizeDuration(String(value));
   if (typeof value === "boolean") return value ? "yes" : "no";
   if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "object") return null;
+
+  /* sb-e2x: a `{ map: T }` field summarises as its KEYS, in key order. The
+   * names are what a reader of a card wants ("Params: amount, currency") -
+   * where the values come FROM is the inspector's question, and a card that
+   * printed both would be a config dump rather than a summary line. Keyed off
+   * the declared type, so a host map field reads the same way. */
+  if (typeof value === "object") {
+    if (type === null || typeof type !== "object" || type.map === undefined) return null;
+    const keys = Object.keys(value).sort();
+    return keys.length === 0 ? null : keys.join(", ");
+  }
+
   return String(value);
 }
 

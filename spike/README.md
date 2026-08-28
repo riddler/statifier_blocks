@@ -524,8 +524,8 @@ with an optional subtree for the failure case:
 - `invoke_type` (required) names the handler, validated against a **generic**
   `namespace:name` - a core type may not know any particular host's namespace,
   so the demo documents' `myapp:*` is a demo fact rather than a rule in the
-  descriptor. `assign_to` (optional) is where the result lands. `params` is
-  text, one `name=path` pair per line.
+  descriptor. `assign_to` (optional) is where the result lands. `params`
+  (optional) is a map of name to datamodel path.
 - `on_error` is a **slot**, arity `zero_or_one`, styled `secondary` - the
   same declaration `core.group`'s `interrupts` rail already makes, and the
   renderer needs nothing new to draw it.
@@ -536,11 +536,26 @@ editor rests on connectors being rendered rather than authored, which holds
 only while every edge in a document is a parent/slot/child relationship; a
 port-shaped failure edge would have been the one edge an author draws by hand.
 
-`params` being a plain string is the file's one visible compromise: ADR-0002
-decision 7's field types are a closed set and none of them is a list of pairs.
-Flattening the pairs into text proves the block type's shape without also
-proposing an editor feature. A structured param editor is a Phase-B question;
-`parseParams` in that file is the shape it would carry.
+`params` used to be a plain string - one `name=path` pair per line - and the
+file called that a compromise in so many words: ADR-0002 decision 7's field
+types are a closed set and none of them is a list of pairs. sb-e2x answered it
+by widening the set rather than by flattening the data. `params` is stored as a
+**map** and edited as key/path rows, both `core.invoke` and `core.subchart`
+declare the same field, and the control is driven by the declared type
+(`{ map: "string" }`, a PROPOSED member of the closed set) rather than by
+either type's name - a host type that declares it gets the same rows.
+
+The storage shape is the part worth arguing about, and `proposed-core.js`
+carries the argument: a param binding is two facts, and in the text form
+neither had a home that was not a re-parse; a structured control over a
+flattened field would have shown an author rows while storing prose. The map
+also makes duplicate names structurally impossible and stops a document's
+identity depending on the order the lines were typed in (ADR-0001 decision 8
+sorts keys). It cost a document migration - five `params` values across the two
+shipped fixture documents - which is the honest price of not leaving the
+compromise in the bytes. Whether decision 7's set actually gains `{ map: T }`
+is an operator's call on a Phase-B finding; the spike is the evidence, not the
+decision.
 
 Both outcomes are replayed in `fixtures/runs.json`. A step may carry a
 proposed `invoke: { block, outcome, payload? }`, and the Fixtures pane lights

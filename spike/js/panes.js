@@ -198,6 +198,14 @@ export function controlFor(type) {
   if (type !== null && typeof type === "object") {
     if (Array.isArray(type.select)) return "select";
     if (type.list !== undefined) return "list";
+    /* sb-e2x: the PROPOSED `{ map: T }` field type - rows of a string key and a
+     * `T` value. Read exactly as `{ list: T }` is read, one line below it,
+     * because it is the same kind of thing: a container parameterised by a
+     * member of the closed set. This mapping is the whole reason the set is
+     * closed, so a proposed member has to earn its arm here or it is not a
+     * field type at all. `proposed-core.js` carries the divergence flag and the
+     * argument; nothing in this file knows which type declared it. */
+    if (type.map !== undefined) return "map";
     return "text";
   }
 
@@ -267,6 +275,10 @@ export function configFormFor(registry, node, documentFindings = []) {
       .filter((finding) => finding.anchor?.kind === "config" && finding.anchor.blockId === node.id)
       .map((finding) => ({
         key: finding.anchor.key,
+        // sb-e2x: a map field's anchor may name a row as well as a key. Carried
+        // through so the row control can put the message on that row, and
+        // ABSENT rather than `undefined` when the anchor names none.
+        ...(finding.anchor.row === undefined ? {} : { row: finding.anchor.row }),
         message: finding.message,
         severity: finding.severity ?? "error",
         origin: finding.origin ?? "validation",
@@ -331,6 +343,40 @@ function fieldView(field, config, findings) {
   if (control === "select") view.choices = field.type.select;
   if (control === "duration") view.duration = durationParts(value);
 
+  /*
+   * sb-e2x's row control, derived the same way the list control's rows are:
+   * pure data the renderer only has to draw.
+   *
+   * Rows come back in KEY order rather than insertion order, because a map has
+   * no row order and pretending otherwise is what the text field did. That
+   * also matches ADR-0001 decision 8's canonical key sort, so the order an
+   * author sees is the order the stored bytes are in.
+   *
+   * Findings are routed by `row`: a finding naming a map key sits on that row,
+   * and one without a `row` stays under the field as every other control's
+   * does. `field.findings` keeps the whole set either way - a caller that
+   * ignores `rows` still renders every message - which is what makes the row
+   * routing a presentation refinement rather than a second finding source.
+   */
+  if (control === "map") {
+    const entries = mapEntries(value);
+
+    view.valueType = field.type.map;
+    view.valueControl = controlFor(field.type.map);
+    view.keyLabel = field.keyLabel ?? "Key";
+    view.valueLabel = field.valueLabel ?? "Value";
+    view.rows = entries.map(([key, item]) => ({
+      key,
+      path: [...path, key],
+      value: item,
+      control: controlFor(field.type.map),
+      findings: view.findings.filter((finding) => finding.row === key),
+    }));
+    view.fieldFindings = view.findings.filter(
+      (finding) => finding.row === undefined || !entries.some(([key]) => key === finding.row)
+    );
+  }
+
   if (control === "list") {
     view.itemType = field.type.list;
     view.itemControl = controlFor(field.type.list);
@@ -356,6 +402,11 @@ function safeSchema(descriptor, config) {
 function describeValidation(descriptor, config) {
   return (descriptor.validateConfig(config) ?? []).map((problem) => ({
     key: problem.key,
+    // sb-e2x: the map row a row-level problem is about, when the type reports
+    // one. Spread rather than set to `undefined`, so a finding that names no
+    // row has no `row` key at all - which is what keeps it deep-equal to the
+    // finding this line produced before the map field existed.
+    ...(problem.row === undefined ? {} : { row: problem.row }),
     message: problem.message,
     // sb-c2o: the problem's own severity, defaulted - `layout.js` reads it the
     // same way now, and the form and the canvas have to agree about a finding
@@ -370,7 +421,10 @@ function dedupe(findings) {
   const seen = new Set();
 
   return findings.filter((finding) => {
-    const token = `${finding.key}\u0000${finding.message}`;
+    // The row joins the token (sb-e2x): two rows of one map field can carry the
+    // same message about different rows, and collapsing those would silently
+    // drop one of them.
+    const token = `${finding.key}\u0000${finding.row ?? ""}\u0000${finding.message}`;
     if (seen.has(token)) return false;
     seen.add(token);
     return true;
@@ -472,6 +526,86 @@ export function moveRow(rows, index, step) {
   const out = rows.slice();
   const [held] = out.splice(index, 1);
   out.splice(to, 0, held);
+
+  return out;
+}
+
+/* ------------------------------------------------------- the map controls
+ *
+ * sb-e2x. The list controls above transform an array; these transform an
+ * object, and the difference in the gestures they offer is not an omission.
+ * There is no `moveMapRow`, because a map has no row order to move a row
+ * within - the storage shape decides the interaction, which is the honest
+ * consequence of storing the pairs as pairs rather than as text.
+ *
+ * All four are pure and total: they take a map and return a NEW map, for the
+ * reason `writeAtPath` gives (the previous config is the inverse command's
+ * payload, ADR-0005 decision 3, and mutating it corrupts the undo stack). They
+ * are exported so `dev/selftest.html` can check the transforms without a DOM,
+ * which is where every claim about them is machine-checked.
+ */
+
+/** A map's entries in key order - the order the canonical bytes are in. */
+export function mapEntries(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return [];
+  return Object.keys(value)
+    .sort()
+    .map((key) => [key, value[key]]);
+}
+
+/**
+ * The map with one new unnamed row. Idempotent BY CONSTRUCTION, and that is
+ * the point: a map cannot hold two unnamed rows, so "add" while one is
+ * unfinished can only mean the row already there. The control disables its add
+ * button while that is true rather than letting a click silently do nothing,
+ * but the transform is honest on its own so a caller that does not check gets
+ * the same map back rather than a lost row.
+ */
+export function addMapRow(map, seed = "") {
+  return mapFrom([...mapEntries(map).filter(([key]) => key !== ""), ["", seed]]);
+}
+
+export function removeMapRow(map, key) {
+  return mapFrom(mapEntries(map).filter(([at]) => at !== key));
+}
+
+export function setMapValue(map, key, value) {
+  return mapFrom([...mapEntries(map).filter(([at]) => at !== key), [key, value]]);
+}
+
+/**
+ * The map with one row renamed, or `null` when the rename would collide.
+ *
+ * `null` rather than a silent overwrite, and rather than a second row: writing
+ * `b` over an existing `b` is the one gesture a map makes destructive and a
+ * text field did not, so it is refused where the author can see it. The caller
+ * marks the row and puts the old key back; nothing is stored. Renaming a key to
+ * itself is a no-op that succeeds, so a blur with no edit is not a refusal.
+ */
+export function renameMapRow(map, from, to) {
+  if (from === to) return mapFrom(mapEntries(map));
+
+  const entries = mapEntries(map);
+  if (entries.some(([key]) => key === to)) return null;
+
+  return mapFrom(entries.map(([key, value]) => (key === from ? [to, value] : [key, value])));
+}
+
+/* Own keys only, defined rather than assigned, for `writeAtPath`'s reason: a
+ * key is data, and a `"__proto__"` row must create an own key rather than move
+ * a prototype. Rebuilt in key order so the object a form hands back is already
+ * in the order the canonical encoder will put it in. */
+function mapFrom(entries) {
+  const out = {};
+
+  for (const [key, value] of [...entries].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+    Object.defineProperty(out, key, {
+      value,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
 
   return out;
 }

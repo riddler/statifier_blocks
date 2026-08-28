@@ -133,7 +133,7 @@
         withEditorFields,
       } from "../js/palette.js";
 
-      import { parseParams, proposedCoreTypes } from "../js/proposed-core.js";
+      import { paramRows, proposedCoreTypes } from "../js/proposed-core.js";
 
       import {
         fixtureDocumentIds,
@@ -204,6 +204,7 @@
         toggleCollapsed,
         typesForSlot,
         undoSession,
+        updateBlockConfig,
       } from "../js/session.js";
 
       import {
@@ -217,6 +218,7 @@
       } from "../js/layout.js";
 
       import {
+        addMapRow,
         addRow,
         anchorLabel,
         collectFindings,
@@ -227,11 +229,15 @@
         durationParts,
         findingsUnder,
         highlight,
+        mapEntries,
         moveRow,
         paletteView,
+        removeMapRow,
         removeRow,
+        renameMapRow,
         resolveAnchor,
         seedRow,
+        setMapValue,
         severityCounts,
         writeAtPath,
       } from "../js/panes.js";
@@ -1001,7 +1007,9 @@
           [
             ["invoke_type", "string", true],
             ["assign_to", "string", false],
-            ["params", "string", false],
+            // sb-e2x: the params field carries the PROPOSED `{ map: T }` field
+            // type, and both types that declare params declare this exact one.
+            ["params", { map: "string" }, false],
           ]
         );
 
@@ -1057,49 +1065,149 @@
         );
       });
 
-      suite("proposed core: the params field is text standing in for pairs", () => {
+      /*
+       * sb-e2x. The text-field compromise is gone from the STORED BYTES:
+       * `params` is a map of name to datamodel path, and this suite is the old
+       * "text standing in for pairs" suite rewritten against it.
+       *
+       * Sabotage: making `paramRows` return insertion order rather than key
+       * order turns the row-order check red and leaves the rest green; dropping
+       * `row` from a finding turns the routing checks in the row-control suite
+       * red and leaves these green, which is the split the two suites are for.
+       */
+      suite("proposed core: params is a map of name to datamodel path", () => {
         const invoke = proposedCoreTypes["core.invoke"];
         const ok = (params) => invoke.validateConfig({ invoke_type: "myapp:authorize", params });
 
         equal(
-          "one name=path pair per line, whitespace tolerated",
-          parseParams("amount = order.total\n  card=order.card_token  "),
-          {
-            params: [
-              { name: "amount", path: "order.total" },
-              { name: "card", path: "order.card_token" },
-            ],
-            malformed: [],
-          }
+          "rows come back in KEY order, which is the canonical key order",
+          paramRows({ card: "order.card_token", amount: "order.total" }),
+          [
+            { name: "amount", path: "order.total" },
+            { name: "card", path: "order.card_token" },
+          ]
+        );
+        equal("an absent params key has no rows", paramRows(undefined), []);
+        equal("neither does a non-map", paramRows("amount=order.total"), []);
+
+        check("a well-formed block validates", ok({ amount: "order.total" }) === null);
+        check("...and so does an empty map", ok({}) === null);
+        check("...and an absent params key", ok(undefined) === null);
+
+        equal(
+          "a name that is not an identifier is named, and its row is carried",
+          ok({ "Amount Due": "order.total" }),
+          [
+            {
+              key: "params",
+              row: "Amount Due",
+              message:
+                '"Amount Due" is not a name: use lowercase letters, digits and underscores, starting with a letter',
+            },
+          ]
+        );
+        equal(
+          "a path with a space in it is not a path",
+          ok({ amount: "order total" }),
+          [
+            {
+              key: "params",
+              row: "amount",
+              message: '"amount" needs a datamodel path, like signup.email',
+            },
+          ]
+        );
+        equal(
+          "an unnamed row with a bad path is still named as the unnamed row",
+          ok({ "": "order total" }),
+          [
+            {
+              key: "params",
+              row: "",
+              message: "the unnamed row needs a datamodel path, like signup.email",
+            },
+          ]
         );
 
-        // A trailing newline in a textarea is not an authoring error.
-        equal(
-          "blank lines are ignored, not refused",
-          parseParams("amount=order.total\n\n\n"),
-          { params: [{ name: "amount", path: "order.total" }], malformed: [] }
-        );
-        equal("an absent params key parses as nothing", parseParams(undefined), {
-          params: [],
-          malformed: [],
-        });
+        /*
+         * THE HALF-WRITTEN ROW IS SILENT, and the suite below proves why that
+         * is load-bearing rather than lenient: ADR-0005 decision 9's gate makes
+         * a finding about a row a refusal of the whole edit, so a validator
+         * that spoke while a row was in progress would make the control unable
+         * to create a row at all.
+         */
+        check("a row with no name yet is silent", ok({ "": "" }) === null);
+        check("...and a named row with no path yet is too", ok({ amount: "" }) === null);
 
-        check("a well-formed block validates", ok("amount=order.total") === null);
         equal(
-          "a line with no = is named in the finding",
-          ok("amount order.total"),
-          [{ key: "params", message: '"amount order.total" is not a name=path pair' }]
-        );
-        equal(
-          "two params cannot share a name",
-          ok("amount=order.total\namount=order.other"),
-          [{ key: "params", message: 'two params cannot share the name "amount"' }]
-        );
-        equal(
-          "params that is not text at all",
+          "params that is not a map at all",
           invoke.validateConfig({ invoke_type: "myapp:authorize", params: ["amount=x"] }),
-          [{ key: "params", message: "must be text, one name=path pair per line" }]
+          [{ key: "params", message: "must be a map of names to datamodel paths" }]
         );
+
+        // The finding the SHAPE now makes impossible. A map cannot hold two
+        // rows with one name, so there is nothing left for a validator to say.
+        check(
+          "no duplicate-name finding survives, because a duplicate cannot be stored",
+          JSON.stringify(ok({ amount: "order.total" })) === "null"
+        );
+      });
+
+      /*
+       * sb-e2x. The three gestures against the CONFIG GATE, not just against
+       * the transforms: decision 9 lets an `update_config` through only when
+       * `validate_config/1` returns ok, so "can an author add a row" is a
+       * question about the gate and not about the control.
+       *
+       * This suite is the one that caught the first cut of this bead, where an
+       * unnamed row was a finding and "Add row" was therefore refused forever.
+       * Sabotage: making `paramFindings` speak about an empty name turns the
+       * first three checks red.
+       */
+      suite("edit: the config gate lets a params row be built (sb-e2x)", () => {
+        const doc = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_INV",
+                  type: "core.invoke",
+                  config: { invoke_type: "myapp:authorize", params: {} },
+                }),
+              ],
+            },
+          })
+        );
+
+        let session = createSession(doc, proposingRegistry());
+        const params = () => findBlock(session.document, "blk_INV").config.params;
+
+        const commit = (next) => {
+          const result = updateBlockConfig(session, "blk_INV", {
+            ...findBlock(session.document, "blk_INV").config,
+            params: next,
+          });
+          if (result.ok) session = result.value;
+          return result.ok;
+        };
+
+        check("adding a row lands", commit(addMapRow(params())));
+        equal("...as an unnamed row in the document", params(), { "": "" });
+
+        check("naming it lands", commit(renameMapRow(params(), "", "amount")));
+        equal("...and the row keeps its place", params(), { amount: "" });
+
+        check("giving it a path lands", commit(setMapValue(params(), "amount", "amount_cents")));
+        equal("...leaving a finished binding", params(), { amount: "amount_cents" });
+
+        // And the gate still refuses what is WRONG rather than unfinished.
+        check("a path with a space in it is refused", !commit({ amount: "amount cents" }));
+        equal("...so the document keeps the last good value", params(), { amount: "amount_cents" });
+
+        check("removing the row lands", commit(removeMapRow(params(), "amount")));
+        equal("...leaving no bindings", params(), {});
       });
 
       /*
@@ -5248,7 +5356,10 @@
         const config = {
           chart: "bdoc_signup_demo",
           assign_to: "Onboarding",
-          params: "email=signup.email\nnot a pair\nemail=signup.plan",
+          // sb-e2x: one row with a bad name, one with a bad path. Both types
+          // now declare `paramsField()` itself, so this is the check that they
+          // really are one declaration and not two that agree today.
+          params: { "Email Address": "signup.email", plan: "not a path" },
         };
         const fromInvoke = proposedCoreTypes["core.invoke"]
           .validateConfig({ ...config, invoke_type: "myapp:signup" })
@@ -5259,6 +5370,17 @@
           "and they are the findings the fields deserve",
           subchartType.validateConfig(config).map((finding) => finding.key),
           ["assign_to", "params", "params"]
+        );
+
+        // sb-e2x: and the DECLARATIONS match too, not just the checks. This is
+        // what "reusable beyond invoke" means concretely - one field, declared
+        // by two types, with no type name anywhere in the control that draws it.
+        const paramsOf = (type) =>
+          proposedCoreTypes[type].configSchema({}).find((field) => field.key === "params");
+        equal(
+          "both types declare one and the same params field",
+          paramsOf("core.subchart"),
+          paramsOf("core.invoke")
         );
       });
 
@@ -5525,7 +5647,7 @@
         );
 
         // The grammar this file deliberately does NOT own: a dotted path and a
-        // bare one are both accepted, exactly as a `params` line's path is,
+        // bare one are both accepted, exactly as a `params` row's path is,
         // because a stricter regex here would be a second proposal riding
         // along with this one.
         equal(
@@ -7004,6 +7126,342 @@
 
         check("sameZoom is true within the epsilon", sameZoom(1, 1.0004));
         check("sameZoom is false outside it", !sameZoom(1, 1.01));
+      });
+
+      /*
+       * sb-e2x. The key/path row control, end to end and without a DOM: the
+       * control the schema derives, the rows it publishes, the transforms the
+       * three gestures are, and the routing that puts a row's finding on that
+       * row.
+       *
+       * GENERICITY is the property under test, not a side note. Every check
+       * below that could name `core.invoke` is written against a HOST type this
+       * page invents instead, so a control that ever grew a `core.*` branch
+       * goes red here rather than in a browser six weeks later.
+       *
+       * Sabotage: making `controlFor` fall through to "text" for a map type
+       * turns "the schema derives a map control" red; dropping `row` from the
+       * finding turns the routing checks red and leaves the derivation green.
+       */
+      suite("panes: the map field derives a key/path row control (sb-e2x)", () => {
+        // A host type. Nothing in `panes.js`, `inspector.js` or `layout.js`
+        // has heard of it, which is the point.
+        const hostType = {
+          name: "acme.publish",
+          currentVersion: 1,
+          slots: () => [],
+          configSchema: () => [
+            {
+              key: "bindings",
+              type: { map: "string" },
+              label: "Bindings",
+              required: false,
+              default: {},
+              keyLabel: "Name",
+              valueLabel: "Datamodel path",
+              datamodelPath: "reads",
+            },
+          ],
+          validateConfig: (config) =>
+            Object.keys(config.bindings ?? {}).some((key) => key === "")
+              ? [{ key: "bindings", row: "", message: "name this row" }]
+              : null,
+          io: () => ({ kinds: ["step"], produces: "unknown" }),
+          paletteEntry: { label: "Publish", group: "Host", order: 0 },
+        };
+
+        const hostRegistry = {
+          ...registry,
+          types: { ...registry.types, "acme.publish": hostType },
+        };
+
+        equal("a map type derives the map control", controlFor({ map: "string" }), "map");
+        equal("...and a list type still derives the list one", controlFor({ list: "string" }), "list");
+
+        const doc = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_PUB",
+                  type: "acme.publish",
+                  config: { bindings: { plan: "signup.plan", email: "signup.email" } },
+                }),
+              ],
+            },
+          })
+        );
+
+        const field = configFormFor(hostRegistry, findBlock(doc, "blk_PUB")).fields.find(
+          (one) => one.key === "bindings"
+        );
+
+        equal("the field publishes the map control", field.control, "map");
+        equal("with the declared column headings", [field.keyLabel, field.valueLabel], [
+          "Name",
+          "Datamodel path",
+        ]);
+        equal(
+          "rows come back in KEY order, not insertion order",
+          field.rows.map((row) => [row.key, row.value]),
+          [
+            ["email", "signup.email"],
+            ["plan", "signup.plan"],
+          ]
+        );
+        equal(
+          "and each row addresses its own key in the config",
+          field.rows[0].path,
+          ["bindings", "email"]
+        );
+        equal("each row's value control comes off the declared value type", field.rows[0].control, "text");
+
+        // A row edit is `writeAtPath` through the row's own path - the same
+        // mechanism a branch arm's condition uses, and no new writing seam.
+        equal(
+          "writing through a row path replaces exactly that binding",
+          writeAtPath({ bindings: { email: "signup.email" } }, ["bindings", "email"], "signup.work_email"),
+          { bindings: { email: "signup.work_email" } }
+        );
+
+        // Findings route to rows. The unnamed row's finding sits on the "" row
+        // and nothing is left over for the field.
+        const unnamed = configFormFor(
+          hostRegistry,
+          findBlock(
+            createDocument(
+              block({
+                id: "blk_ROOT",
+                type: "core.sequence",
+                slots: {
+                  body: [
+                    block({ id: "blk_PUB", type: "acme.publish", config: { bindings: { "": "x" } } }),
+                  ],
+                },
+              })
+            ),
+            "blk_PUB"
+          )
+        ).fields.find((one) => one.key === "bindings");
+
+        equal(
+          "a row finding sits on its row",
+          unnamed.rows.map((row) => [row.key, row.findings.map((finding) => finding.message)]),
+          [["", ["name this row"]]]
+        );
+        equal("and nothing is left under the field", unnamed.fieldFindings, []);
+        equal(
+          "while the whole set is still on the field for any reader that wants it",
+          unnamed.findings.map((finding) => finding.message),
+          ["name this row"]
+        );
+      });
+
+      /*
+       * The four transforms the control's gestures are. Pure, so they are
+       * checked here rather than through a rendered form - and the absent
+       * fifth one is checked too, because "a map has no row order" is a claim
+       * about this module and not just about a comment in it.
+       */
+      suite("panes: the map row transforms (sb-e2x)", () => {
+        const map = { plan: "signup.plan", email: "signup.email" };
+
+        equal("entries come back in key order", mapEntries(map), [
+          ["email", "signup.email"],
+          ["plan", "signup.plan"],
+        ]);
+        equal("a non-map has no entries", mapEntries("email=signup.email"), []);
+        equal("nor does an array", mapEntries([["email", "x"]]), []);
+
+        equal("adding a row adds an unnamed one", addMapRow(map), { ...map, "": "" });
+        equal(
+          "adding twice adds one row, because a map cannot hold two unnamed ones",
+          addMapRow(addMapRow(map)),
+          addMapRow(map)
+        );
+
+        equal("removing takes exactly one row out", removeMapRow(map, "plan"), {
+          email: "signup.email",
+        });
+        equal("removing a key that is not there changes nothing", removeMapRow(map, "nope"), map);
+
+        equal("setting a value replaces just that one", setMapValue(map, "plan", "signup.tier"), {
+          plan: "signup.tier",
+          email: "signup.email",
+        });
+        equal("setting an absent key adds it", setMapValue(map, "seats", "signup.seats"), {
+          ...map,
+          seats: "signup.seats",
+        });
+
+        equal("renaming moves the value with the key", renameMapRow(map, "plan", "tier"), {
+          tier: "signup.plan",
+          email: "signup.email",
+        });
+        check(
+          "renaming onto an existing key is refused rather than clobbering it",
+          renameMapRow(map, "plan", "email") === null
+        );
+        equal("renaming a key to itself is a no-op that succeeds", renameMapRow(map, "plan", "plan"), map);
+
+        // The gesture that does not exist. There is no row order to move a row
+        // within, and the module says so by not exporting one.
+        check("there is no moveMapRow to import", typeof globalThis.moveMapRow === "undefined");
+
+        // A `"__proto__"` row is a key, not a prototype - `writeAtPath`'s rule,
+        // and these transforms build objects the same way.
+        const proto = setMapValue({}, "__proto__", "signup.email");
+        check("a __proto__ row is an own key", Object.hasOwn(proto, "__proto__"));
+        check("...and did not move a prototype", Object.getPrototypeOf(proto) === Object.prototype);
+      });
+
+      /*
+       * sb-e2x, extending sb-c2o: the declaration check reads a map field's
+       * VALUES, each under its own row, and still never learns a type name.
+       */
+      suite("layout: declared-path warnings reach inside a map field (sb-e2x)", () => {
+        const hostType = {
+          name: "acme.publish",
+          currentVersion: 1,
+          slots: () => [],
+          configSchema: () => [
+            {
+              key: "bindings",
+              type: { map: "string" },
+              label: "Bindings",
+              required: false,
+              default: {},
+              datamodelPath: "reads",
+            },
+          ],
+          validateConfig: () => null,
+          io: () => ({ kinds: ["step"], produces: "unknown" }),
+          paletteEntry: { label: "Publish", group: "Host", order: 0 },
+        };
+
+        const hostRegistry = {
+          ...registry,
+          types: { ...registry.types, "acme.publish": hostType },
+        };
+
+        const doc = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_PUB",
+                  type: "acme.publish",
+                  config: { bindings: { email: "signup.email", tier: "signup.tier" } },
+                }),
+              ],
+            },
+          })
+        );
+
+        const index = new Map([["signup.email", {}]]);
+        const declarations = layoutDocument(doc, hostRegistry, { datamodelIndex: index }).findings.filter(
+          (finding) => finding.source === "datamodel"
+        );
+
+        equal(
+          "exactly the undeclared row warns",
+          declarations.map((finding) => [
+            finding.severity,
+            finding.anchor.key,
+            finding.anchor.row,
+            finding.message,
+          ]),
+          [
+            [
+              "warning",
+              "bindings",
+              "tier",
+              'The datamodel does not declare "signup.tier". Declare "signup.tier" in the datamodel document, or read a path it already declares.',
+            ],
+          ]
+        );
+
+        // The params half of the same mechanism, on the proposed core type, so
+        // the two are known to be one check rather than two that agree.
+        const invokeDoc = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_INV",
+                  type: "core.invoke",
+                  config: {
+                    invoke_type: "myapp:signup",
+                    params: { email: "signup.email", tier: "signup.tier" },
+                  },
+                }),
+              ],
+            },
+          })
+        );
+
+        equal(
+          "core.invoke's params get the identical treatment",
+          layoutDocument(invokeDoc, proposingRegistry(), { datamodelIndex: index })
+            .findings.filter((finding) => finding.source === "datamodel")
+            .map((finding) => [finding.anchor.key, finding.anchor.row]),
+          [["params", "tier"]]
+        );
+      });
+
+      /*
+       * sb-e2x, closing sb-c2o's one-liner: the LIVE editor passes the
+       * datamodel index it already holds to its layout pass, so the canvas an
+       * author is looking at carries the declaration warnings that until now
+       * only a direct `layoutDocument` caller saw.
+       *
+       * `open()` returns the tree, which is the seam this asserts through - no
+       * DOM query, so the claim is about the wiring rather than about a
+       * rendered badge. The badge is the polish pass's (sb-ea4).
+       */
+      suite("interact: the live canvas checks declared paths (sb-e2x)", () => {
+        const raw = shippedFixtureDocs["signup-invitations"];
+        check("signup-invitations.json loads", raw !== null);
+        check("datamodel.json loads", shipped.datamodel !== null);
+        if (raw === null || shipped.datamodel === null) return;
+
+        const decoded = fromJson(JSON.stringify(stripFixtureComments(raw)));
+        check("the document decodes", decoded.ok);
+        if (!decoded.ok) return;
+
+        const index = indexPaths(shipped.datamodel);
+        const canvas = el("div", { class: "sb-canvas" });
+
+        const wired = createEditor({
+          canvas,
+          registry: proposingRegistry(),
+          datamodel: { index, reveal: () => true },
+        }).open(decoded.value);
+
+        equal(
+          "the editor's own layout raises the demo's one warning",
+          wired.findings
+            .filter((finding) => finding.source === "datamodel")
+            .map((finding) => [finding.anchor.blockId, finding.anchor.key]),
+          [["blk_si_invitee_signup", "assign_to"]]
+        );
+
+        // The other arm, and the one that would have gone unnoticed: an editor
+        // with no datamodel in reach warns about nothing rather than throwing.
+        const unwired = createEditor({ canvas: el("div", {}), registry: proposingRegistry() }).open(
+          decoded.value
+        );
+        equal(
+          "an editor with no datamodel warns about nothing",
+          unwired.findings.filter((finding) => finding.source === "datamodel"),
+          []
+        );
       });
 
       /* ------------------------------------------------------- reporting */
