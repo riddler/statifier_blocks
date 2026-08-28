@@ -37,6 +37,14 @@
  *      one is taken. That is exactly the distinction `layout` was given to
  *      express, so the fan marker reads it and nothing else.
  *
+ *   2a. **What the join marker says** (sb-dxs). The marker under the columns
+ *      read the constant "continue" until a block type could carry a
+ *      completion rule in its config. Now it reads the string a type's
+ *      `paletteEntry.joinLabel(config)` callback returns, defaulting to that
+ *      same constant - so `core.parallel`'s `complete: first` says "continue
+ *      at first" without the renderer learning a type name, and a host type
+ *      with its own rule declares its own words.
+ *
  *   3. **A slot's guard.** A column shows a condition when the block's
  *      `configSchema` declares an `expression` field keyed by that slot's
  *      name - which is precisely how `core.branch` publishes an arm's
@@ -51,7 +59,7 @@
  */
 
 import { compareUtf8, slotChildren, sortedSlotNames } from "./document.js";
-import { badgeFor, describe, paletteEntryFor } from "./palette.js";
+import { badgeFor, describe, joinLabelFor, paletteEntryFor } from "./palette.js";
 
 /* ============================================================ layout tree */
 
@@ -129,6 +137,7 @@ function depthOf(node) {
  *       chips,        [{ key, label, value }] - select fields, shown as chips
  *       shape,        "chip" | "card" | "container"
  *       arrangement,  "stack" | "fan" | "lanes"
+ *       joinLabel,    what the join marker reads, when one is drawn
  *       slots,        every slot view, declared order then present-but-undeclared
  *       primary/secondary, the same views partitioned by slot_style
  *       collapsed,    always false here; sb-ad2 owns the interaction
@@ -195,6 +204,15 @@ function layoutBlock(node, registry, findings, { depth, slot, parentId, view }) 
     // saying it cannot be resolved, and a chip from a descriptor that is
     // missing is a chip from nowhere.
     badge: unresolved ? null : badgeFor(entry),
+    // sb-dxs: the join marker's words, resolved HERE for the same reason the
+    // badge is - the renderer draws a string and never asks what type it is
+    // drawing. Total for every node, including the ones that never render a
+    // marker: a field that exists only sometimes is a field a caller has to
+    // remember to guard, and `arrangement` already says whether it is used.
+    // No `unresolved` arm, unlike the badge above: an unresolvable block's
+    // entry is the PLACEHOLDER's, which declares no callback, so it reaches
+    // the fallback by the ordinary route rather than by a special case.
+    joinLabel: joinLabelFor(entry, config),
     summary: summaryOf(schema, config),
     chips: chipsOf(schema, config),
     rawConfig: unresolved ? canonicalConfig(config) : null,

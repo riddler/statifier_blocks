@@ -305,7 +305,55 @@ const coreBranch = {
  * where a branch's arm stores the whole slot name. The asymmetry is not this
  * type's choice: it is what ADR-0001's worked example stores, and the stored
  * bytes win over any tidier scheme.
+ *
+ * ## sb-dxs: `complete`, and a MIRROR DIVERGENCE flagged in the open
+ *
+ * The `complete` field below is PROPOSED. `core.parallel` is a SHIPPED
+ * `core.*` type and `lib/statifier_blocks/core/parallel.ex` declares no such
+ * key, so this descriptor is no longer a verbatim transcription: it is the
+ * shipped type plus one proposed config field. Same standing as `core.wait`'s
+ * proposed badge (sb-p0k) and `core.invoke` (sb-nt3), and flagged the same
+ * way - in the open, at the point of divergence, so nobody reads this mirror
+ * as evidence of what the package ships.
+ *
+ * What it means, and what is still open:
+ *
+ *   - `"all"` (the default) is the statifier-native reading: the lanes are a
+ *     `<parallel>` and the region is done when every lane is final, which
+ *     compiles to a `done.state.<id>` transition on all-final. Nothing new is
+ *     needed downstream for it.
+ *   - `"first"` is the OPEN Phase-B semantics question. First-lane-wins is
+ *     not a `<parallel>` completion rule; expressing it means cancelling the
+ *     losing lanes, and what "cancel" does to a lane mid-invoke is a contract
+ *     question this spike is not entitled to answer. It renders, it
+ *     validates, it labels its join marker, and it compiles to nothing.
+ *
+ * Backward compatibility is load-bearing here and asserted in the selftest:
+ * every stored `core.parallel` in the demo documents predates this key, so an
+ * ABSENT `complete` has to decode and validate exactly as it did before. That
+ * is why `validate_config` reads it through `configGet(config, "complete",
+ * "all")` - the default applies to an absent key, and a stored `null` still
+ * reaches the refusal arm the way ADR-0001 decision 6 requires.
  */
+const PARALLEL_COMPLETE = ["all", "first"];
+
+/*
+ * The join marker's words, derived from config (sb-dxs).
+ *
+ * This is a `paletteEntry.joinLabel` callback rather than a renderer branch,
+ * and the distinction is the whole point of the item: `render.js` draws
+ * whatever string the view model hands it and never learns that the type
+ * arranging these columns is called `core.parallel`. A host type that fans
+ * into lanes with its own completion rule declares its own callback and gets
+ * its own words, which is ADR-0005 decision 10's promise applied to the one
+ * piece of chrome that had a hard-coded string left in it.
+ */
+function parallelJoinLabel(config) {
+  return configGet(config, "complete", "all") === "first"
+    ? "continue at first"
+    : "continue when all";
+}
+
 function parallelLanes(config) {
   const seen = new Set();
 
@@ -325,6 +373,8 @@ const coreParallel = {
       arity: "any",
       label: lane,
     })),
+  // `lanes` stays FIRST. The config form addresses a parallel's lane rows as
+  // `fields[0]`, and a proposed key is not allowed to renumber a shipped one.
   configSchema: () => [
     {
       key: "lanes",
@@ -333,14 +383,36 @@ const coreParallel = {
       required: true,
       default: [],
     },
+    {
+      // PROPOSED (sb-dxs) - see the divergence note above this descriptor.
+      key: "complete",
+      type: {
+        select: [
+          { value: "all", label: "All - when every lane is done" },
+          { value: "first", label: "First - when any one lane is done" },
+        ],
+      },
+      label: "Continue",
+      required: false,
+      default: "all",
+    },
   ],
   validateConfig: (config) => {
-    const lanes = configGet(config, "lanes", []);
-    if (!Array.isArray(lanes)) {
-      return [{ key: "lanes", message: "must be a list of lane names" }];
+    const findings = [];
+
+    // Read through the default, so a document stored before `complete`
+    // existed validates exactly as it did before. A stored `null` is NOT
+    // absent and still lands on the refusal (ADR-0001 d6).
+    if (!oneOf(configGet(config, "complete", "all"), PARALLEL_COMPLETE)) {
+      findings.push({ key: "complete", message: 'pick "all" or "first"' });
     }
 
-    const findings = [];
+    const lanes = configGet(config, "lanes", []);
+    if (!Array.isArray(lanes)) {
+      findings.push({ key: "lanes", message: "must be a list of lane names" });
+      return verdict(findings);
+    }
+
     const seen = new Set();
 
     for (const lane of lanes) {
@@ -373,6 +445,11 @@ const coreParallel = {
     keywords: ["lanes", "concurrent", "fork", "at once"],
     order: 4,
     layout: "columns",
+    /* sb-dxs. PROPOSED, like the `complete` key it reads. The join marker
+     * under a fan said "continue" for every block that had one; with a
+     * completion rule in config that string is a half-truth, and the fix is
+     * a callback the type owns rather than a case in the renderer. */
+    joinLabel: parallelJoinLabel,
   },
 };
 
@@ -850,6 +927,22 @@ const PALETTE_ENTRY_DEFAULTS = {
    * sb-p0k: `core.wait` now declares one too, and `badgeFor` below is the
    * normalizer the renderer reads it through. */
   badge: null,
+  /* sb-dxs. What the JOIN MARKER under a side-by-side arrangement says, as a
+   * FUNCTION of config rather than a string - the words depend on how the
+   * block is configured, which is exactly what the other d10 keys do not have
+   * to cope with. `null` means "the editor's own word", which is what every
+   * type that declares nothing keeps.
+   *
+   * A callback and not a config key on the block, because the join marker is
+   * chrome the editor draws and not a slot the author fills; and a callback
+   * and not a renderer case, because the moment `render.js` asks "is this a
+   * parallel" the d10 promise is gone for every host type of the same shape.
+   *
+   * PROPOSED, on the same footing as `badge` and `accentToken`: whether a
+   * CALLBACK belongs in decision 10's metadata at all - every other key there
+   * is inert data - is a Phase-B finding, and `core.parallel`'s declaration
+   * above is the evidence for it. */
+  joinLabel: null,
 };
 
 /*
@@ -883,6 +976,40 @@ export function badgeFor(entry) {
 
   const text = value.trim();
   return text === "" || text.length > BADGE_MAX ? null : text;
+}
+
+/**
+ * The word the join marker under a side-by-side arrangement carries.
+ *
+ * `JOIN_LABEL_FALLBACK` is what the renderer said before sb-dxs and what it
+ * still says for every type that declares no callback, so a block that gained
+ * nothing here renders byte-identically.
+ *
+ * The refusals are `badgeFor`'s, for `badgeFor`'s reason - the marker is a
+ * small pill under a fan and a sentence in it pushes the columns apart - plus
+ * one this key needs and the badge does not: the callback is HOST code called
+ * during layout, so it is called inside a try and a throw degrades to the
+ * fallback. A host type with a bug in its `joinLabel` gets the ordinary
+ * marker; it does not take the canvas down with it.
+ */
+const JOIN_LABEL_FALLBACK = "continue";
+const JOIN_LABEL_MAX = 24;
+
+export function joinLabelFor(entry, config = {}) {
+  const declared = entry && typeof entry === "object" ? entry.joinLabel : null;
+  if (typeof declared !== "function") return JOIN_LABEL_FALLBACK;
+
+  let value;
+  try {
+    value = declared(config);
+  } catch {
+    return JOIN_LABEL_FALLBACK;
+  }
+
+  if (typeof value !== "string" || /[\n\r\t]/.test(value)) return JOIN_LABEL_FALLBACK;
+
+  const text = value.trim();
+  return text === "" || text.length > JOIN_LABEL_MAX ? JOIN_LABEL_FALLBACK : text;
 }
 
 /**
