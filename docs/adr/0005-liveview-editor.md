@@ -781,3 +781,359 @@ What this example is chosen to demonstrate:
   assignability predicate on the dragged type. There is no branch anywhere on
   the string `"myapp.notify"` or `"core.parallel"`, which is the operator
   pre-decision holding under load.
+
+---
+
+## Proposed amendment (2026-08-28): decision 14, what the theming surface has to contain
+
+**Status: PROPOSED, not accepted.** This section is additive; nothing above it
+is changed by it, and decision 14's accepted text stands until the operator
+rules. It is drafted from what the campaign-012 editor spike (`spike/`) found
+by taking a dark theme to parity and making a third, host-brand theme carry the
+whole surface as a pure token override (`sb-957`, `sb-vhu`).
+
+### Context
+
+Decision 14 settles the *mechanism*: an `sb-` class prefix, `--sb-*` custom
+properties on the canvas root each with a default, a `class` attr per
+component, and no framework. The spike did not find that mechanism wanting.
+Every finding below is about what the surface must **contain** for that
+mechanism to be sufficient, which is a different question and one decision 14
+does not currently answer beyond "colors, spacing, radii, and the
+drag-highlight treatment".
+
+The evidence is a working three-theme prototype, not an argument. `host-brand.css`
+holds itself to a hard rule - a theme file may set `--sb-*` properties and may
+do nothing else, no structural declaration and no `sb-` class - and every hole
+below was found by that rule failing: a restyle needed something the theme file
+was not allowed to do. `spike/dev/theme-audit.html` checks the rule and the
+arithmetic against the real stylesheets rather than asserting them in a comment
+(52 checks). Screenshots are in the private campaign journal (campaign 012
+journal, private: `sb-957-13`/`-14` for the browser-chrome pair, `-10`/`-11`
+for the accent layering).
+
+### Proposed decision
+
+**14a. A colour-token surface is not sufficient for a dark theme, and
+`--sb-color-scheme` is part of the contract.** The half of a component the
+browser paints - a `<select>`'s drop-down, the scrollbar troughs, the text
+caret, the selection highlight, a search input's UA clear button - is reachable
+by no colour token at all. A theme that restates every colour and omits this
+still opens a white menu over a dark editor. The package therefore declares
+`--sb-color-scheme` with a default of `light`, every theme states its own, and
+the stylesheet reads it as:
+
+```css
+/* on the editor's own root element, whatever the package emits there */
+.sb-editor { color-scheme: var(--sb-color-scheme); }
+```
+
+**scoped to the editor's own container, never on `:root`.** Telling the host
+page which scheme it is in is the editor reaching outside its box, and decision
+14's whole posture is that it does not.
+
+This was invisible for four beads of spike work. It is proposed as a decision
+rather than a note because it is the one token whose absence produces a defect
+that reads as "the dark theme is half-finished" and cannot be diagnosed from
+the stylesheet.
+
+**14b. The scoped reset ships, and every selector in it is
+zero-specificity on the container half.** The spike found the same bug twice.
+`.sb-spike button` and `.sb-spike p` each weigh one class plus one element,
+which beats any single-class component rule, so the reset silently stripped
+padding, border and background off every button, input and select the
+component stylesheet styled (this is what collided the five inspector tab
+labels into `ConfigFindingsDatamodelCondition...`), and later stripped
+`.sb-hint`'s margin, `.sb-code`'s padding, `.sb-empty`'s padding and
+`.sb-pane__title`'s font size. Both symptoms are quiet, which is why the second
+survived four beads.
+
+The proposed rule, and it is mechanical enough to be a lint:
+
+> A scoped reset may match its container only through `:where(.sb-editor)`.
+> Any reset selector that matches the container as a class is a bug generator,
+> because it forces every component rule above it to defend itself with an
+> element qualifier that the next author will not know to copy.
+
+Six spike rules had escaped locally by qualifying themselves
+(`p.sb-datamodel__none`, `ul.sb-datamodel__list--nested`, four others); all six
+dropped the qualification once the reset was `:where()`-wrapped. That is the
+shape of the win: the reset stops being something component CSS has to fight.
+
+**14c. The surface has three tiers, and a host should be able to tell which
+one it is in.** Not new tokens - a statement about the ones there are, which is
+what makes the surface documentable:
+
+| Tier | What it is | What a host taking it on is doing |
+|---|---|---|
+| 1, the palette | `--sb-bg*`, `--sb-fg*`, `--sb-border*`, `--sb-accent*`, the status colours, `--sb-radius*`, `--sb-font*`, `--sb-space*` | making the editor look like its product; a couple of dozen lines |
+| 2, the treatments | `--sb-drop-ok-*`, `--sb-gap-*`, `--sb-run-mark*`, `--sb-ghost-*`, `--sb-connector*`, `--sb-syntax-*`, `--sb-path-*`, `--sb-focus-*` | disagreeing with a specific mark without overriding a rule |
+| 3, `--sb-color-scheme` | 14a | telling the browser which scheme to paint its own chrome in |
+
+The tiering earns its place on tier 2. A mark a theme must be able to *reverse*
+needs tokens of its own: `--sb-ghost-*` is three tokens rather than
+`background: var(--sb-fg); color: var(--sb-bg)` in a rule precisely because
+that inversion is correct in light and produces a white chip in dark. Likewise
+the replayed-step ring hard-coded `2px` twice and borrowed `--sb-accent`, so a
+host could not make the replay mark tellable apart from selection; it is
+`--sb-run-mark`, `-width` and `-offset` now.
+
+**14d. A palette entry may declare `accentToken`, a token NAME, and that is
+the per-block-type styling seam.** Decision 14 gives a host the editor and
+nothing below it: a host registering its own block types has no way to make
+them look like its own without writing a rule per type, which is the special
+casing decision 10 exists to prevent.
+
+The proposal adds one optional key to `palette_entry/0`:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `accent_token` | `nil` | the *name* of a `--sb-*` custom property supplying this type's accent |
+
+The renderer stamps `data-sb-block-accent` on the block's card and its palette
+row and rebinds, on that element only:
+
+```css
+--sb-block-accent: var(<the declared name>, var(--sb-accent));
+```
+
+Three properties make it worth adding rather than leaving to host CSS:
+
+- **The editor still never learns a type name.** No rule in the stylesheet and
+  no branch in any module mentions a block type; two rules read
+  `--sb-block-accent` (an icon tile and a card stripe) and they are the only
+  two. Adding a type with its own identity adds no CSS.
+- **The value is decided by the theme, never by the block type.** A descriptor
+  carries a name, not a colour - the same discipline decision 10 already
+  applies to `icon`, and for the same reason: a block type naming a hex value
+  is deciding what it looks like in themes it has never seen.
+- **It degrades.** The name is validated against an anchored pattern
+  (`/^--sb-[a-z0-9]+(-[a-z0-9]+)*$/` in the spike's `theme.js`) before it
+  reaches a style attribute, so a typo in a host's registry falls back to the
+  editor's accent rather than injecting or producing a broken card.
+
+Two shaping tokens go with it: `--sb-block-accent-mix` (how much of the accent
+the icon tile is tinted with; the spike's dark theme raises 14% to 22%, because
+14% of a pale colour over near-black is not a tint) and `--sb-block-edge` (the
+stripe's width; `0` keeps the colour and drops the stripe).
+
+The layering is the part worth keeping. The spike's `myapp.capture` points at
+`--sb-accent-myapp-capture`, which light and dark resolve to the family's
+`--sb-accent-myapp` - so the whole `myapp.*` group reads as one - while the
+host-brand theme gives it a hotter red, so the block type that moves money
+stands out from its own family. Same document, same DOM, same JavaScript, one
+line in a theme file.
+
+**14e. Token coverage is checked in both directions, and a reserved name is a
+promise.** A token declared and consumed by nothing is worse than a missing
+one: a host sets it, nothing moves, and there is no way to tell that from a
+bug. `--sb-gap-height` and `--sb-gap-hover-bg` were both declared and dead in
+the spike's first pass. So:
+
+> The package's own check fails on **either** direction: a `var(--sb-*)`
+> reference with no declaration, and a declared token no rule reads.
+
+And the precedent set rather than the exception made: `--sb-connector-active`
+was reserved for a connector state the canvas never drew. It was **retired**,
+not left in place, because a name in a published surface is a commitment to
+keep meaning what it says.
+
+**14f. Candidate additions to the shipped surface, found by the spike.**
+Recorded as candidates because each is a real hole the spike had to fill, and
+because deciding them one at a time later is worse than deciding them together:
+
+| Candidate | Why the spike needed it |
+|---|---|
+| `--sb-card-width`, `--sb-column-min-width`, `--sb-column-empty-min-width`, `--sb-rail-width`, `--sb-config-preview-max-height` | canvas sizing constants that were literals; a host with a larger type scale cannot fix a clipped card without editing a rule |
+| `--sb-syntax-path`, `-keyword`, `-string`, `-number`, `-operator` | the condition editor's five roles; a syntax palette is exactly the kind of thing a host has an existing opinion about |
+| `--sb-path-known`, `--sb-path-unknown` | the known/unknown path underlines - deliberately not the status colours, because "undeclared" is not an error (see the datamodel sketch on `sb-6fa`) |
+| `--sb-ghost-bg`, `-fg`, `-border` | 14c's reversible inversion |
+| `--sb-run-mark`, `-width`, `-offset` | 14c's distinguishable mark |
+| `--sb-gap-height`, `--sb-gap-drag-height`, `--sb-gap-armed-bg` | the drag seam's height and armed fill, previously two dead tokens and a literal |
+| `--sb-scroll-shadow`, `--sb-scroll-shadow-size` | the four-layer background that makes a clipped scroller say so on first paint with no scroll listener |
+
+None of these is proposed for `palette_entry/0` or for any module's API; they
+are additions to the `--sb-*` surface, which is where decision 14 says visual
+opinion is allowed to live.
+
+A judgement call the spike took and flags rather than hides: `--sb-fg-subtle`
+failed 4.5:1 on the sunken surface in all three themes and was moved, and
+`--sb-border-strong` (near 1.9:1) now clears 3:1 - but **`--sb-border` is
+deliberately not held to a contrast ratio.** It divides two panes of one
+surface; it is decoration rather than a boundary carrying information, and
+holding it to 3:1 turns every pane edge into a rule. That is a design ruling,
+not a measurement, and it belongs to the operator.
+
+### Consequences
+
+- A dark theme becomes a checkable claim rather than a visual impression: the
+  theme audit can assert that every theme states `--sb-color-scheme` and every
+  colour it must restate.
+- The reset rule in 14b is a lint, not a convention, which is the only form it
+  survives in - the bug it prevents is silent by construction.
+- `accent_token` widens `palette_entry/0`, which decision 10 says is a change
+  to this record and to that callback's contract. That is the deliberate
+  friction decision 10 asks for, and this is a record amendment asking for it.
+- Token coverage failing in both directions means adding a token ahead of the
+  rule that reads it now fails the build. That is intended; 14e is the reason.
+- Nothing here changes the mechanism, so a host already themed against
+  decision 14 keeps working; every addition is a token with a default.
+
+---
+
+## Proposed amendment (2026-08-28): decisions 10 and 13, rendering the tree and its connectors
+
+**Status: PROPOSED, not accepted.** Additive; decisions 10 and 13 stand as
+accepted until the operator rules.
+
+### Context
+
+Decision 10 gives the renderer `layout` and `slot_style` and decision 13 gives
+it a uniform recursion - `BlockNode` renders slots via `Slot`, `Slot` renders
+children via `BlockNode`, and there is no `Group` component and no `Parallel`
+component. Neither record says how the *edges between blocks* are produced,
+because until something drew them there was nothing to say. The campaign-012
+spike drew them, over a document 41 blocks deep at nesting depth 7 with
+conditioned transitions throughout (`sb-aj5`, `sb-ad2`; canvas evidence in the
+campaign journal, private: `sb-aj5-1` through `-8`).
+
+What follows is the set of rules that made those edges legible at depth, each
+of which is currently a property of one prototype and would otherwise be
+re-derived - probably differently - by whoever builds the shipped canvas.
+
+### Proposed decision
+
+**10a. Connectors are rendered, never authored.** Adjacency and nesting stay
+the sole source of truth for what connects to what. There is no edge in the
+document, no edge in the command algebra, and no gesture that creates or
+deletes one. This is a restatement of ADR-0001's tree invariant at the
+presentation layer, and it is written down because a canvas that draws lines is
+the natural place for someone to propose making them editable, and doing so
+would reintroduce exactly the reverse edge ADR-0001 refused.
+
+**10b. The browser does the layout; geometry is measured, never computed.**
+Two passes, in this order:
+
+1. Emit the layout tree as **nested DOM** - the nesting *is* the layout. A
+   block's card sits inside its parent's slot box, columns are a grid, a lane
+   is a column.
+2. Measure what the browser laid out, and draw the connectors over it as SVG.
+
+Nothing in the renderer computes a coordinate. This is the decision that keeps
+the recursion in decision 13 uniform: a layout engine that positioned cards
+itself would need to know how much room a group takes, which is a per-shape
+question, which is how a `Parallel` component gets born. Measuring instead
+means the two components decision 13 names stay the only two, and it means
+natural CSS behaviour - a column growing to its content - is free rather than
+something the layout engine has to reimplement.
+
+The consequence worth stating: **columns take their natural height**, and
+equalizing them is not attempted. A lane with two steps beside a lane with nine
+is honest about that, and forcing a common height either stretches the short
+lane's connectors into a lie about spacing or introduces a scroll region inside
+a lane.
+
+**10c. A boundary box is drawn for a container with a secondary slot, and for
+nothing else.** Decision 10 gives `slot_style: :secondary` for interrupt rails.
+The spike found the same metadata answers a second question: an interrupt rule
+is *about a region*, so a rule attached to a body needs that body to have a
+visible edge, and drawing a box around every container instead turns a
+depth-7 document into nested rectangles that read as noise.
+
+So `slot_style` with any `:secondary` entry both places the rail and marks the
+container as a boundary. One piece of metadata, two renderings, no type name -
+which is the property decision 10 exists to preserve.
+
+**10d. A fan lands on the column header, not on the first card.** Where one
+block's edge fans out to several - a branch's arms, a parallel's lanes - each
+edge terminates at the top edge of the arm or lane column, not at the first
+card inside it. An empty arm therefore still has a visible edge arriving at it,
+which is the case an author most needs to see, and a column whose first child
+is a nested group does not have its edge disappear into that group's chrome.
+
+**10e. Guard-line reservation is per-arm-row, not per-arm.** An arm's condition
+renders as a pill above the arm's column (derived from an `:expression` config
+field keyed by the slot name, per decision 10's existing metadata). Vertical
+space for that pill is reserved across **all** arms of one branch, whether or
+not each arm has a condition - so the arms' first cards align, and `otherwise`
+does not sit one line higher than its siblings. Without the reservation the row
+of cards under a branch is ragged in a way that reads as a rendering bug.
+
+**10f. Open question, put to the record rather than guessed: an interrupt
+rule's outcome is invisible at the edge level.** `core.on_event` carries an
+`outcome` of `abandon` or `resume` (ADR-0002 decision 10). The spike draws
+every interrupt exit edge uniformly to the container's exit and shows the
+outcome only on the rail card, so abandon and resume look identical on the
+canvas - which is a real loss, because "does this rule end the group or return
+to it" is the question an author reading the picture is asking.
+
+The spike declined to fix it, and the reason is the proposal: routing the two
+differently means the renderer reading `config["outcome"]` and branching on its
+value, which is a presentational heuristic over a config key of one core type -
+a type-name branch wearing a different hat. The clean fix is metadata:
+
+> A block type may declare, per statically-named slot, that its rule blocks
+> carry an **outcome** - a declared key whose value the renderer may route on
+> without knowing which type declared it.
+
+That is a genuine widening of decision 10's metadata table and is deliberately
+left as a question rather than drafted as a table row, because the right shape
+depends on whether any second consumer for it exists. **Operator's call.**
+
+### Smaller items folded in here
+
+**The d12-versus-assignability seam. QUEUED for the operator; this record does
+not pick.** Decision 12 says reordering blocks *within* an unresolvable block's
+existing slots is permitted, since order asks the parent's type nothing. The
+shipped `droppable_slots/3` (decision 5, rule 1) excludes an unresolvable
+parent outright - it needs `slots/1`, and there is none - and its return type,
+a list of `{block_id, slot_name}`, cannot express "this slot, but only for
+blocks already in it". The spike mirrors the shipped code and therefore does
+not offer the reorder. Two options, both coherent:
+
+- **Amend d12's prose** to say the reorder is not offered, making the
+  enumeration correct as written and d12's sentence the error.
+- **Extend the enumeration** so a slot may be returned with a restriction -
+  which widens `droppable_slots/3`'s return type, and therefore its callers and
+  its tests, to carry a case that exists for exactly one situation.
+
+The trade is a smaller contract against a stated capability the author cannot
+actually reach. Recorded at `sb-ad2` next to the spike's own d12 test suite.
+
+**Decision 11's severity set: `:info` proposed, open.** The spike's findings
+pane renders a third severity for advisory rows that read wrong in warning
+chrome. Every one of them is `origin: "demo"` - **no validation path produces
+one** - so this is a proposal about the record, not a reading of it. It has now
+been sighted twice from different directions: the findings pane wanted it, and
+the datamodel pane's undeclared-path advisories were deliberately kept *out* of
+findings for the same reason (a findings entry is a claim that something is
+wrong, and a host may legitimately carry values it has not described). Whether
+the answer is a third severity or a second channel is the question; either way
+it is one decision, not two. **Operator's call.**
+
+**Decision 9's `:duration` control: the escape hatch is evidence, not
+decoration.** Decision 9 says `:duration` emits an ISO-8601 string through a
+structured value/unit control so the author does not have to know that. The
+spike built the control and found the obvious limit: a value/unit pair cannot
+express `PT1H30M`. It shipped an "edit as ISO-8601" escape hatch beside the
+control. The shipped editor needs the same decision made deliberately - a
+compound control, an escape hatch, or a documented refusal of durations that
+are not one unit.
+
+### Consequences
+
+- 10b makes the canvas's correctness a question about *measurement* rather than
+  about a layout algorithm, so the parts worth testing without a browser (the
+  layout model, the connector geometry as pure functions of measured boxes)
+  are separable from the parts that are not, exactly as decision 13 separates
+  the view model from the components.
+- 10c, 10d and 10e are legibility rules that cost nothing to honour and are
+  invisible until violated; writing them down is the only way they survive a
+  reimplementation.
+- 10f, if taken, widens `palette_entry/0` a second time. Taking 10f and 14d
+  together is one contract change to that callback rather than two.
+- Nothing proposed here adds a component. Decision 13's `BlockNode`/`Slot`
+  recursion renders every structural idiom the spike exercised - sequences,
+  groups, branch arms, parallel lanes, interrupt rails, resumable history, and
+  an unresolvable block at depth 7 - which is the strongest available evidence
+  that decision 13's uniformity holds under load.
