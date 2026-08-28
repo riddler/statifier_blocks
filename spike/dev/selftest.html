@@ -2452,12 +2452,13 @@
 
         // ...and its slots are not targets for anything else either, because
         // decision 5's first rule needs `slots/1` and there is none. NOTE:
-        // decision 12's prose also permits REORDERING within a slot it
+        // decision 12's prose USED TO also permit REORDERING within a slot it
         // already has, which `droppable_slots/3` cannot express at slot
         // granularity - the shipped enumeration excludes an unresolvable
-        // parent outright, and `targets.js` mirrors that. The spike follows
-        // the code, and the gap is recorded on the bead rather than papered
-        // over here.
+        // parent outright, and `targets.js` mirrors that. Ruled 2026-08-28
+        // (sb-cvo): d12's sentence was the error, and it now says the reorder
+        // is not offered. This suite and the shipped enumeration agree; the
+        // divergence is closed, not papered over.
         const other = beginDrag(start, { kind: "move", id: "blk_KEPT" });
 
         equal(
