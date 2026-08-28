@@ -168,11 +168,13 @@ function paramFindings(config) {
  *
  * What this deliberately does NOT check is whether that key is DECLARED in the
  * datamodel document. sb-ig4 found `assign_to: "authorization"` writing to a
- * path `fixtures/datamodel.json` never declares, and sb-c2o owns the answer:
- * a warning-level finding rather than a refusal, so authoring stays fluid. It
- * is a document-level check against the datamodel index, which is not
- * something `validate_config/1` is handed - so it belongs where sb-c2o puts
- * it and not here. Named rather than silently missing.
+ * path `fixtures/datamodel.json` never declares, and sb-c2o answered it: a
+ * WARNING finding rather than a refusal, so authoring stays fluid, made at
+ * document level in `layout.js` where the datamodel index is in reach.
+ * `validate_config/1` is still handed a config and still cannot make it - what
+ * changed is that the field now SAYS it holds a datamodel path
+ * (`datamodelPath: "writes"` in the schema below), and the document-level pass
+ * reads that declaration rather than a type name.
  */
 function assignToFindings(config) {
   return nonEmptyString(config.assign_to) && !isIdentifier(config.assign_to)
@@ -245,6 +247,12 @@ const coreInvoke = {
       label: "Write the result to",
       required: false,
       default: "",
+      /* sb-c2o: the field says of itself that its value is a datamodel path,
+       * and the document-level pass in `layout.js` warns when the datamodel
+       * does not declare it. An ANNOTATION beside `type`, not a new decision-7
+       * field type: the type set is closed, and what a reader needs here is one
+       * fact about the string, not a new control. */
+      datamodelPath: "writes",
     },
     {
       key: "params",
@@ -515,6 +523,11 @@ const coreSubchart = {
       label: "Write the outcome to",
       required: false,
       default: "",
+      /* sb-c2o, `core.invoke`'s annotation for `core.invoke`'s reason. The
+       * shipped signup-invitations document writes to `onboarding`, which
+       * `fixtures/datamodel.json` deliberately does not declare (sb-7s2) - so
+       * the demo carries one honest warning rather than a clean board. */
+      datamodelPath: "writes",
     },
     {
       /* The same text compromise `core.invoke` makes, for the same closed
@@ -771,22 +784,20 @@ const coreTimeout = {
  * call. This descriptor therefore proposes no fixture field at all, which is
  * the strongest thing that can be said for the mechanism that is already there.
  *
- * ## The DECLARATION check is not here, and this is the third type to say so
+ * ## The DECLARATION check is not here, and that is still true (sb-c2o)
  *
- * Nothing below asks whether `path` is DECLARED in `fixtures/datamodel.json`.
- * It is the same check `assign_to` defers (see `assignToFindings`) and the same
- * owner: sb-c2o, whose scope widens to cover this key. Two reasons it cannot
- * live here, and the second is the one worth recording:
+ * Nothing below asks whether `path` is DECLARED in `fixtures/datamodel.json`,
+ * and it never will: `validate_config/1` is handed a config, not a document, so
+ * the datamodel index the check needs is not in reach. sb-c2o landed the check
+ * where it is - a document-level pass in `layout.js`, off the
+ * `datamodelPath: "writes"` annotation the schema below now carries.
  *
- *   - `validate_config/1` is handed a config, not a document, so the datamodel
- *     index it would need is not in reach - `assign_to`'s note, unchanged;
- *   - the finding wants to be a WARNING, and a finding this function returns
- *     cannot be one. `layout.js` stamps `severity: "error"` on every problem
- *     `validateConfig` returns, so a warning-shaped return would render as an
- *     error on the card and in the findings panel. Carrying `problem.severity`
- *     through `layout.js` is a one-line change and it is exactly the "new
- *     machinery" this bead was told not to build; it is filed for sb-c2o with
- *     the index question, because the two land together or not at all.
+ * The second half of that bead is why the finding can be a WARNING at all.
+ * `layout.js` used to stamp `severity: "error"` on every problem
+ * `validateConfig` returned, so a warning-shaped return would have rendered as
+ * an error on the card and in the panel; it now carries `problem.severity`
+ * through, defaulting to `"error"`. A type that wants to return a warning of
+ * its own may, which is a door this file does not walk through yet.
  *
  * ## What this would compile to (Phase B; nothing here compiles anything)
  *
@@ -818,6 +829,10 @@ const coreAssign = {
       label: "Write to",
       required: true,
       default: "",
+      /* sb-c2o, as `core.invoke`'s `assign_to`. The grammar stays unowned by
+       * this file (see `isDatamodelPath`); what the annotation adds is not a
+       * second grammar but a lookup in the datamodel document. */
+      datamodelPath: "writes",
     },
     {
       key: "value",
@@ -1129,12 +1144,12 @@ const coreSend = {
  *
  *   - `items` is a datamodel path, checked the way `core.assign`'s `path` is
  *     checked and for the same stated reason: this file does not own the
- *     datamodel path grammar. What it does NOT check is that the path is
- *     declared, or that the thing it names is a LIST rather than a string -
- *     both are document-level checks against the datamodel index, which
- *     `validate_config/1` is not handed, and both belong to sb-c2o with the
- *     `assign_to` and `path` findings that are already filed there. Named
- *     rather than silently missing, and this is the third type to say it;
+ *     datamodel path grammar. Whether the path is DECLARED is a document-level
+ *     question `validate_config/1` cannot answer, and sb-c2o answered it in
+ *     `layout.js` off the `datamodelPath: "reads"` annotation below - a
+ *     warning, never a refusal. What is still unchecked is that the thing the
+ *     path names is a LIST rather than a string, which needs the datamodel
+ *     document's own type vocabulary to be decided first;
  *   - `item_as` BINDS A NAME. That is the new idea, and it is the reason this
  *     type is more than a container: every other block in the vocabulary reads
  *     the datamodel through paths that exist before the chart runs, and this
@@ -1264,6 +1279,14 @@ const coreForeach = {
       label: "For each item in",
       required: true,
       default: "",
+      /* sb-c2o, and the one `reads` of the four: a foreach never writes the
+       * list it walks, so the finding's fix says "read a path it already
+       * declares" rather than "write to one". What is STILL not checked is
+       * that the declared path is a LIST rather than a string - that is a
+       * type-shape question the datamodel-document proposal has to settle
+       * first, and the selftest asserts the shipped list is declared as one
+       * rather than the editor enforcing it. */
+      datamodelPath: "reads",
     },
     {
       key: "item_as",
