@@ -409,6 +409,12 @@ const coreWait = {
     icon: "clock",
     keywords: ["delay", "timer", "pause", "sleep"],
     order: 5,
+    /* sb-p0k. The one thing a reader cannot see from "Wait for 2m": the
+     * compiled form of this block is a DELAYED SEND, not a sleep - the chart
+     * stays live and answers events for the whole duration. PROPOSED, like
+     * the key itself; a shipped `core.*` type carrying presentation metadata
+     * this specific is a Phase-B question. */
+    badge: "timer",
   },
 };
 
@@ -832,16 +838,52 @@ const PALETTE_ENTRY_DEFAULTS = {
   /* sb-nt3. A short chip a block type may declare for its card header - the
    * one-line "what is this, really" a label has no room for. A STRING the
    * type declares, under the same discipline as `accentToken` and `icon`:
-   * the editor renders whatever is here and never learns a type name. No
-   * shipped `core.*` type declares one; `js/proposed-core.js` does, and
-   * sb-p0k builds the renderer. PROPOSED - whether it belongs in ADR-0005
-   * decision 10's metadata is a Phase-B finding.
+   * the editor renders whatever is here and never learns a type name.
+   * PROPOSED - whether it belongs in ADR-0005 decision 10's metadata is a
+   * Phase-B finding, and the two declarations that exist (`core.wait` below
+   * and `core.invoke` in `js/proposed-core.js`) are the evidence for it.
    *
    * The default lives here rather than in the proposal file so that
    * `paletteEntryFor(descriptor).badge` is total for every descriptor, the
-   * way every other key in this map is. */
+   * way every other key in this map is.
+   *
+   * sb-p0k: `core.wait` now declares one too, and `badgeFor` below is the
+   * normalizer the renderer reads it through. */
   badge: null,
 };
+
+/*
+ * How long a badge is allowed to be.
+ *
+ * A chip is a chip: it sits on a card that is already carrying a title, a
+ * caption and up to three config chips, and at depth 7 the card is narrow. A
+ * badge long enough to wrap is a description, and a description already has a
+ * home - `paletteEntry.description`, which the palette browser and the "+"
+ * picker both show. 24 characters fits "calls the host" and "timer" with room
+ * to spare and refuses a sentence.
+ */
+const BADGE_MAX = 24;
+
+/**
+ * The badge a palette entry declares, trimmed, or `null`.
+ *
+ * Under exactly the discipline `accentTokenFor` is under, and for the same
+ * reason: a host that declares something malformed gets the ordinary card,
+ * never a broken one. A non-string, an empty or all-whitespace string, and
+ * anything past `BADGE_MAX` all degrade to no badge rather than to a chip
+ * that eats the title's width.
+ *
+ * Newlines are refused rather than collapsed. A badge with a newline in it is
+ * a host meaning something the chip cannot express, and silently flattening
+ * it would hide that.
+ */
+export function badgeFor(entry) {
+  const value = entry && typeof entry === "object" ? entry.badge : null;
+  if (typeof value !== "string" || /[\n\r\t]/.test(value)) return null;
+
+  const text = value.trim();
+  return text === "" || text.length > BADGE_MAX ? null : text;
+}
 
 /**
  * ADR-0005 decision 10's metadata with every default filled in. Every key is

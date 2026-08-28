@@ -293,11 +293,25 @@ function renderCard(node) {
   // steals width from the title, which is the one thing on the card a reader
   // is actually looking for - "Collect the company details" wrapping to three
   // lines so that a mode chip can sit next to it is the wrong trade.
-  if (node.caption !== node.title || node.chips.length > 0) {
+  if (node.caption !== node.title || node.badge !== null || node.chips.length > 0) {
     const meta = el("span", { class: "sb-card__meta" });
 
     if (node.caption !== node.title) {
       meta.append(el("span", { class: "sb-card__caption", text: node.caption }));
+    }
+
+    // sb-p0k's badge, between the caption and the config chips. It answers a
+    // different question from either neighbour - the caption says what type
+    // this is and the chips say how it is configured, while the badge says
+    // what the type DOES that its label does not admit to ("calls the host",
+    // "timer"). Reading order puts it right after the type name, which is the
+    // clause it modifies.
+    //
+    // Generic, like the accent: `layout.js` hands over a string a descriptor
+    // declared, and nothing here or in `editor.css` names a block type. A
+    // type that declares no badge produces no element, not an empty one.
+    if (node.badge !== null) {
+      meta.append(el("span", { class: "sb-chip sb-chip--badge", text: node.badge }));
     }
 
     for (const chip of node.chips) {
