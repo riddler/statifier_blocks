@@ -1,0 +1,493 @@
+{
+  "_comment": [
+    "Spike fixture, not a canonical ADR-0001 document. Adaptations, all of them",
+    "presentation-only and all of them additive:",
+    "  1. This top-level '_comment' key and the per-block '_comment' keys are NOT",
+    "     part of the ADR-0001 envelope or the {type,id,config,slots} node shape.",
+    "     A strict StatifierBlocks.Document.from_json/1 would need them stripped.",
+    "     They exist so the spike's fixtures document themselves without a README.",
+    "  2. Written pretty-printed with keys in reading order (type, id, type_version,",
+    "     config, slots). ADR-0001 decision 8's canonical form is byte-sorted and",
+    "     whitespace-free; that form is the encoder's output, not what a human edits.",
+    "  3. Empty slots are omitted and leaf blocks carry no 'slots' key, which DOES",
+    "     follow decision 8.",
+    "  4. No floats anywhere (decision 6): money is integer minor units, durations",
+    "     are ISO-8601 strings.",
+    "Block types: the seven core.* types are real (StatifierBlocks.Core). Every",
+    "myapp.* type is a demo palette entry the spike registers; three of them exist",
+    "because the core set has no equivalent - see the '_comment' on each first use.",
+    "The single deliberately-unresolvable type is myapp.legacy_check (blk_cp_legacy).",
+    "Shape: 41 blocks, maximum nesting depth 7 (root = depth 1).",
+    "Every datamodel path named in a 'cond' resolves in ../datamodel.json."
+  ],
+  "schema_version": 1,
+  "id": "bdoc_cp_demo",
+  "revision": 42,
+  "metadata": {
+    "name": "Card processing",
+    "description": "Intake, validation, a three-lane authorization group with interrupts, an outcome branch with capture retry and manual review, and a receipt tail.",
+    "domain": "card-processing"
+  },
+  "root": {
+    "type": "core.sequence",
+    "id": "blk_cp_root",
+    "type_version": 1,
+    "slots": {
+      "body": [
+        {
+          "type": "myapp.intake",
+          "id": "blk_cp_intake",
+          "type_version": 1,
+          "config": {
+            "invoke_type": "myapp:intake",
+            "label": "Take the payment request"
+          }
+        },
+        {
+          "type": "core.branch",
+          "id": "blk_cp_validation",
+          "type_version": 1,
+          "config": {
+            "arms": [
+              {
+                "slot": "arm_valid",
+                "cond": "validation.passed AND amount_cents > 0 AND card.active"
+              }
+            ]
+          },
+          "slots": {
+            "arm_valid": [
+              {
+                "_comment": "Depth 3. The authorization group: body holds the lanes and the authorize call, interrupts hold two guarded rules.",
+                "type": "core.group",
+                "id": "blk_cp_authz",
+                "type_version": 1,
+                "slots": {
+                  "body": [
+                    {
+                      "type": "core.parallel",
+                      "id": "blk_cp_lanes",
+                      "type_version": 1,
+                      "config": {
+                        "lanes": ["fraud_review", "balance_check", "three_ds"]
+                      },
+                      "slots": {
+                        "lane_fraud_review": [
+                          {
+                            "_comment": "Depth 5. A nested group inside a lane: its own body, its own interrupt rail.",
+                            "type": "core.group",
+                            "id": "blk_cp_fraud",
+                            "type_version": 1,
+                            "slots": {
+                              "body": [
+                                {
+                                  "type": "myapp.risk_rating",
+                                  "id": "blk_cp_risk_rating",
+                                  "type_version": 1,
+                                  "config": {
+                                    "invoke_type": "myapp:risk_rating",
+                                    "label": "Rate the transaction"
+                                  }
+                                },
+                                {
+                                  "type": "core.wait",
+                                  "id": "blk_cp_fraud_wait",
+                                  "type_version": 1,
+                                  "config": {
+                                    "duration": "PT2M"
+                                  }
+                                },
+                                {
+                                  "type": "core.branch",
+                                  "id": "blk_cp_risk_branch",
+                                  "type_version": 1,
+                                  "config": {
+                                    "arms": [
+                                      {
+                                        "slot": "arm_high_risk",
+                                        "cond": "risk_rating >= 70 OR fraud.verdict == 'review'"
+                                      },
+                                      {
+                                        "slot": "arm_low_risk",
+                                        "cond": "risk_rating < 40 AND customer.verified"
+                                      }
+                                    ]
+                                  },
+                                  "slots": {
+                                    "arm_high_risk": [
+                                      {
+                                        "type": "myapp.manual_flag",
+                                        "id": "blk_cp_manual_flag",
+                                        "type_version": 1,
+                                        "config": {
+                                          "invoke_type": "myapp:manual_flag",
+                                          "label": "Flag for a human"
+                                        }
+                                      }
+                                    ],
+                                    "arm_low_risk": [
+                                      {
+                                        "_comment": "THE UNRESOLVABLE BLOCK (ADR-0005 decision 12). No palette in the spike registers myapp.legacy_check, so it must render with unavailable chrome, a :block finding, its config read-only as JSON, and its bytes preserved on save. It is deliberately at depth 7 so the case is exercised deep in the tree rather than at the top.",
+                                        "type": "myapp.legacy_check",
+                                        "id": "blk_cp_legacy",
+                                        "type_version": 3,
+                                        "config": {
+                                          "ruleset": "velocity-v2",
+                                          "window": "PT24H",
+                                          "thresholds": {
+                                            "count": 5,
+                                            "amount_cents": 250000
+                                          }
+                                        }
+                                      }
+                                    ],
+                                    "otherwise": [
+                                      {
+                                        "type": "myapp.notify",
+                                        "id": "blk_cp_risk_notify",
+                                        "type_version": 1,
+                                        "config": {
+                                          "invoke_type": "myapp:notify",
+                                          "template": "risk_indeterminate",
+                                          "label": "Tell ops the rating was inconclusive"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              ],
+                              "interrupts": [
+                                {
+                                  "type": "core.on_event",
+                                  "id": "blk_cp_fraud_abort",
+                                  "type_version": 1,
+                                  "config": {
+                                    "event": "fraud.aborted",
+                                    "outcome": "abandon"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ],
+                        "lane_balance_check": [
+                          {
+                            "type": "myapp.balance_check",
+                            "id": "blk_cp_balance",
+                            "type_version": 1,
+                            "config": {
+                              "invoke_type": "myapp:balance_check",
+                              "label": "Check the available balance"
+                            }
+                          },
+                          {
+                            "type": "core.wait",
+                            "id": "blk_cp_balance_wait",
+                            "type_version": 1,
+                            "config": {
+                              "duration": "PT30S"
+                            }
+                          }
+                        ],
+                        "lane_three_ds": [
+                          {
+                            "type": "myapp.three_ds_challenge",
+                            "id": "blk_cp_three_ds",
+                            "type_version": 2,
+                            "config": {
+                              "invoke_type": "myapp:three_ds",
+                              "label": "Send the cardholder a challenge"
+                            }
+                          },
+                          {
+                            "_comment": "The on-event-plus-timeout idiom: a group whose whole body is a wait, with the completion event on its interrupt rail. The wait is the timeout; the event is the happy path.",
+                            "type": "core.group",
+                            "id": "blk_cp_three_ds_group",
+                            "type_version": 1,
+                            "slots": {
+                              "body": [
+                                {
+                                  "type": "core.wait",
+                                  "id": "blk_cp_three_ds_wait",
+                                  "type_version": 1,
+                                  "config": {
+                                    "duration": "PT10M"
+                                  }
+                                }
+                              ],
+                              "interrupts": [
+                                {
+                                  "type": "core.on_event",
+                                  "id": "blk_cp_three_ds_done",
+                                  "type_version": 1,
+                                  "config": {
+                                    "event": "card.three_ds_completed",
+                                    "outcome": "resume"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "type": "myapp.authorize",
+                      "id": "blk_cp_authorize",
+                      "type_version": 2,
+                      "config": {
+                        "invoke_type": "myapp:authorize",
+                        "timeout": "PT30S",
+                        "label": "Authorize the card"
+                      }
+                    }
+                  ],
+                  "interrupts": [
+                    {
+                      "_comment": "Demo type #1. core.on_event carries only event + outcome; it has no condition. A conditioned interrupt rule is what the spike needs to render a guard on an exit edge, so the demo palette adds myapp.guarded_on_event = core.on_event plus a 'cond'. If the spike proves the affordance is worth it, that is an ADR-0002 amendment to propose, not something this fixture decides.",
+                      "type": "myapp.guarded_on_event",
+                      "id": "blk_cp_cancelled",
+                      "type_version": 1,
+                      "config": {
+                        "event": "customer.cancelled",
+                        "cond": "event.customer_cancelled.reason == 'customer_request' AND auth.captured == false",
+                        "outcome": "abandon"
+                      }
+                    },
+                    {
+                      "_comment": "Demo type #2. The PT15M authorization timeout. No core type expresses 'interrupt this group after a duration'; core.wait is a step inside a body, not a rule on an interrupt rail. myapp.timeout_rule = an 'after' duration plus an optional guard.",
+                      "type": "myapp.timeout_rule",
+                      "id": "blk_cp_authz_timeout",
+                      "type_version": 1,
+                      "config": {
+                        "after": "PT15M",
+                        "cond": "three_ds.completed == false OR fraud.cleared == false",
+                        "outcome": "abandon"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "otherwise": [
+              {
+                "type": "myapp.notify",
+                "id": "blk_cp_validation_fail",
+                "type_version": 1,
+                "config": {
+                  "invoke_type": "myapp:notify",
+                  "template": "validation_failed",
+                  "label": "Tell the customer what was wrong"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "core.branch",
+          "id": "blk_cp_outcome",
+          "type_version": 1,
+          "config": {
+            "arms": [
+              {
+                "slot": "arm_approved",
+                "cond": "auth.approved AND fraud.cleared AND balance.available_cents >= amount_cents"
+              },
+              {
+                "slot": "arm_declined",
+                "cond": "fraud.verdict == 'decline' OR balance.available_cents < amount_cents"
+              },
+              {
+                "slot": "arm_manual_review",
+                "cond": "fraud.verdict == 'review' AND limits.manual_review_backlog < 50"
+              }
+            ]
+          },
+          "slots": {
+            "arm_approved": [
+              {
+                "type": "core.group",
+                "id": "blk_cp_capture_group",
+                "type_version": 1,
+                "slots": {
+                  "body": [
+                    {
+                      "type": "myapp.capture",
+                      "id": "blk_cp_capture",
+                      "type_version": 1,
+                      "config": {
+                        "invoke_type": "myapp:capture",
+                        "label": "Capture the funds"
+                      }
+                    },
+                    {
+                      "_comment": "The retry idiom: a one-armed branch whose arm is a wait-then-repeat sequence.",
+                      "type": "core.branch",
+                      "id": "blk_cp_capture_retry",
+                      "type_version": 1,
+                      "config": {
+                        "arms": [
+                          {
+                            "slot": "arm_retry",
+                            "cond": "auth.captured == false AND capture_attempts < 3"
+                          }
+                        ]
+                      },
+                      "slots": {
+                        "arm_retry": [
+                          {
+                            "type": "core.sequence",
+                            "id": "blk_cp_retry_seq",
+                            "type_version": 1,
+                            "slots": {
+                              "body": [
+                                {
+                                  "type": "core.wait",
+                                  "id": "blk_cp_retry_wait",
+                                  "type_version": 1,
+                                  "config": {
+                                    "duration": "PT1M"
+                                  }
+                                },
+                                {
+                                  "type": "myapp.capture",
+                                  "id": "blk_cp_capture_retry_call",
+                                  "type_version": 1,
+                                  "config": {
+                                    "invoke_type": "myapp:capture",
+                                    "label": "Try the capture again"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "interrupts": [
+                    {
+                      "type": "core.on_event",
+                      "id": "blk_cp_capture_cancel",
+                      "type_version": 1,
+                      "config": {
+                        "event": "capture.reversed",
+                        "outcome": "abandon"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "arm_declined": [
+              {
+                "type": "myapp.notify",
+                "id": "blk_cp_decline_notify",
+                "type_version": 1,
+                "config": {
+                  "invoke_type": "myapp:notify",
+                  "template": "payment_declined",
+                  "label": "Tell the customer it was declined"
+                }
+              }
+            ],
+            "arm_manual_review": [
+              {
+                "_comment": "The park / needs-attention idiom inside a resumable group with deep history: the work parks, a human resolves it days later, and re-entry lands back where it stopped.",
+                "type": "core.resumable_group",
+                "id": "blk_cp_manual",
+                "type_version": 1,
+                "config": {
+                  "history": "deep"
+                },
+                "slots": {
+                  "body": [
+                    {
+                      "type": "myapp.park",
+                      "id": "blk_cp_park",
+                      "type_version": 1,
+                      "config": {
+                        "invoke_type": "myapp:park",
+                        "queue": "manual_review",
+                        "label": "Park it for a reviewer"
+                      }
+                    },
+                    {
+                      "type": "core.wait",
+                      "id": "blk_cp_manual_wait",
+                      "type_version": 1,
+                      "config": {
+                        "duration": "P2D"
+                      }
+                    },
+                    {
+                      "type": "myapp.resolve_review",
+                      "id": "blk_cp_resolve",
+                      "type_version": 1,
+                      "config": {
+                        "invoke_type": "myapp:resolve_review",
+                        "label": "Apply the reviewer's decision"
+                      }
+                    }
+                  ],
+                  "interrupts": [
+                    {
+                      "type": "myapp.guarded_on_event",
+                      "id": "blk_cp_manual_resolved",
+                      "type_version": 1,
+                      "config": {
+                        "event": "review.resolved",
+                        "cond": "event.review_resolved.decision == 'approve' AND review.parked",
+                        "outcome": "resume"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "otherwise": [
+              {
+                "type": "myapp.notify",
+                "id": "blk_cp_outcome_fallback",
+                "type_version": 1,
+                "config": {
+                  "invoke_type": "myapp:notify",
+                  "template": "outcome_indeterminate",
+                  "label": "Tell ops no outcome arm matched"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "core.sequence",
+          "id": "blk_cp_tail",
+          "type_version": 1,
+          "slots": {
+            "body": [
+              {
+                "type": "myapp.receipt",
+                "id": "blk_cp_receipt",
+                "type_version": 1,
+                "config": {
+                  "invoke_type": "myapp:receipt",
+                  "label": "Build the receipt"
+                }
+              },
+              {
+                "type": "myapp.notify",
+                "id": "blk_cp_final_notify",
+                "type_version": 1,
+                "config": {
+                  "invoke_type": "myapp:notify",
+                  "template": "receipt_ready",
+                  "label": "Send the receipt"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
