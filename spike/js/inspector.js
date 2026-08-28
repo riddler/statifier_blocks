@@ -309,6 +309,37 @@ function selectControl(field, id, commit) {
     );
   }
 
+  // An ABSENT optional whose type declares a default is not "no answer" - the
+  // block behaves as the default, and every other surface already reads it
+  // that way (the canvas draws `core.parallel`'s join marker from
+  // `configGet(config, "complete", "all")` whether or not the key is stored).
+  // Left alone the control renders EMPTY, because no option matches `""`, and
+  // a blank select next to a filled-in form says "you have not answered this"
+  // about a field that is in fact answered. Found by looking at it: sb-dxs
+  // added the first optional select in the spike and routed the blank here.
+  //
+  // The placeholder is `disabled`, so it can be READ but not chosen. Choosing
+  // it would have to mean "go back to storing nothing", and for this field
+  // that is not the same edit: `complete` reads through its default for an
+  // absent key and refuses a stored `null` (ADR-0001 decision 6), so there is
+  // no value the control could commit to get absence back. Naming the state
+  // is the whole fix; authoring over it is what the real options are for.
+  //
+  // It borrows the declared choice's own label rather than restating the
+  // default in words of its own - the same field should not be described
+  // twice in one menu.
+  if (field.value === undefined && field.default !== undefined) {
+    const declared = field.choices.find((choice) => choice.value === field.default);
+
+    select.prepend(
+      el("option", {
+        value: "",
+        disabled: "",
+        text: `${declared ? (declared.label ?? declared.value) : field.default} (default)`,
+      })
+    );
+  }
+
   select.value = field.value === undefined ? "" : String(field.value);
   select.addEventListener("change", () => commit(select.value));
 

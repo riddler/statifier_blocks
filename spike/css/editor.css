@@ -748,12 +748,29 @@
   white-space: nowrap;
 }
 
-.sb-chip--config {
-  background: var(--sb-accent-muted);
-  color: var(--sb-accent);
-  padding: 0 var(--sb-space-half);
-  font-weight: var(--sb-weight-medium);
-}
+/*
+ * `.sb-chip--config` has no rule, on purpose. The class is still written on
+ * the card - it names what the chip IS, and the finding machinery and any
+ * later rule need the hook - but a config chip is deliberately just a chip.
+ *
+ * There WAS a rule here, declaring an accent tint and a medium weight, and it
+ * never painted: `.sb-chip` is declared further down at equal specificity and
+ * won every one of those properties. Its `padding` was the base's value
+ * restated. sb-p0k found the ordering while placing the badge and routed the
+ * dead rule here rather than reviving it from inside another bead.
+ *
+ * Reviving it is what this pass decided AGAINST, and the reason is worth
+ * keeping. Every visual judgment in the spike was made against the plain chip
+ * - four beads of it, sb-p0k's badge design included, which chose a ring
+ * precisely so a badge would not read like a filled config chip. An accent
+ * fill would also land hardest where it fits worst: the chips are on the
+ * interrupt rules ("Abandon", "Resume", "Deep"), whose cards already carry
+ * the rail's warning identity, and a blue pill inside a warning-tan card
+ * argues with it. Restoring a tint nobody has ever seen is a new design, not
+ * a bug fix - and this pass is not the place to make one. If the shipped
+ * editor wants config chips to carry an accent, it should decide that
+ * looking at them.
+ */
 
 .sb-card--flagged {
   border-color: var(--sb-error);
@@ -959,7 +976,46 @@
   border-left: var(--sb-border-width) dashed var(--sb-warning);
 }
 
-.sb-rail .sb-card {
+/*
+ * A rail sized for LEAF rules, widened only when it is given a subtree.
+ *
+ * Every rail this spike drew before Phase A held leaf cards, so a fixed
+ * `--sb-rail-width` was free. sb-nt3's `on_error` is the first secondary slot
+ * that can hold a container, and the card-processing authorize error path is
+ * the first document that puts one there - at which point the fixed width
+ * stopped clipping and started OVERFLOWING: the nested cards refuse to shrink
+ * below their content and rendered outside the boundary box on both sides,
+ * over the connectors and over the sibling rail. Found by running it; no
+ * measurement in a leaf-only document can show it.
+ *
+ * The `:has()` is doing the thing the fixed width was doing implicitly - a
+ * rail of rules stays a narrow annotation column, and its config chips keep
+ * ellipsizing, which is the intent. Only a rail actually holding a container
+ * pays the width, so no existing rail moves (verified: six of the seven rails
+ * in card-processing measure identically before and after; the seventh is the
+ * one that was overflowing).
+ */
+.sb-rail:has(.sb-rail__slot .sb-node--container) {
+  width: auto;
+}
+
+/*
+ * The rail's warning identity belongs to what the rail HOLDS, not to
+ * everything underneath it.
+ *
+ * `.sb-rail .sb-card` is a descendant selector, so before Phase A it painted
+ * the rail's own cards and nothing else - the rail had no depth. Given a
+ * subtree it paints every card at every depth, and an ordinary sequence of
+ * ordinary steps inside an error path came out reading as five out-of-band
+ * interrupt rules. The dashed-warning vocabulary means "this fires outside
+ * the flow you are reading"; the steps INSIDE an error path are an ordinary
+ * flow, and only their root is out of band.
+ *
+ * Scoping to the rail's direct members is a bug fix, not a ruling: whether an
+ * `on_error` root should look like an interrupt rule AT ALL is sb-p0k's
+ * open Phase-B question, and this change leaves it looking exactly as it did.
+ */
+.sb-rail__slot > .sb-node > .sb-card {
   width: 100%;
   border-style: dashed;
   border-color: var(--sb-warning);
@@ -967,7 +1023,7 @@
   box-shadow: none;
 }
 
-.sb-rail .sb-card__icon {
+.sb-rail__slot > .sb-node > .sb-card .sb-card__icon {
   background: transparent;
   color: var(--sb-warning);
 }
