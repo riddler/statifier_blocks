@@ -1179,3 +1179,468 @@
     grid-row: 1;
   }
 }
+
+/* =========================================================== interactions
+ *
+ * sb-ad2. Selection, drag-and-drop with pre-hover slot validity, the "+"
+ * insertion path, collapse, and the chrome that says a drag is running.
+ *
+ * Every state below is read off an attribute the DOM already carries -
+ * `aria-selected`, `data-drop`, `data-collapsed`, `data-dragging` - rather
+ * than off a class this stylesheet's own JavaScript maintains. That is this
+ * file's opening rule, and it is what makes the interaction layer assertable:
+ * a test can ask the DOM what state it is in without knowing that CSS exists.
+ *
+ * The exception is `.sb-gap--armed`, which is genuinely transient - it marks
+ * the ONE seam a release would drop into, changes many times a second, and
+ * corresponds to no state in the session at all.
+ */
+
+/* ------------------------------------------------------------- selection */
+
+.sb-card {
+  cursor: pointer;
+}
+
+.sb-card[aria-selected="true"] {
+  border-color: var(--sb-accent);
+  box-shadow: var(--sb-shadow-md), inset 0 0 0 var(--sb-border-width) var(--sb-accent);
+}
+
+/* The selected card's icon picks up the accent as a fill rather than as a
+ * tint, so selection is legible at a glance on a canvas where a dozen cards
+ * are visible at once and the border alone is one pixel of difference. */
+.sb-card[aria-selected="true"] .sb-card__icon {
+  background: var(--sb-accent);
+  color: var(--sb-fg-on-accent);
+}
+
+/* -------------------------------------------------------- card actions */
+
+/*
+ * Hidden until the card is hovered, focused, or selected. A fold control and
+ * a delete control on every one of forty cards at rest is visual noise that
+ * competes with the workflow itself; revealed on approach, they are exactly
+ * where an author reaches for them.
+ *
+ * `:focus-within` is in the list on purpose - a keyboard user tabbing to the
+ * delete button must be able to see the thing they are about to press.
+ */
+/*
+ * The actions live IN the card`s existing right padding rather than in space
+ * taken from the title. A leaf card carries one button, which is exactly the
+ * width of that padding, so nothing reflows and nothing overlaps. A container
+ * carries two, so it - and only it - reserves the extra; container titles are
+ * one or two words, which is what makes that trade cheap.
+ *
+ * Reserving on hover instead was the other option and it is worse: the title
+ * would re-wrap the moment a pointer came near the card, and an interface
+ * that moves when you approach it reads as unstable.
+ */
+.sb-node--container > .sb-card {
+  padding-right: var(--sb-space-4);
+}
+
+.sb-card__actions {
+  position: absolute;
+  top: var(--sb-space-half);
+  right: var(--sb-space-half);
+  display: flex;
+  gap: var(--sb-space-half);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.sb-card:hover .sb-card__actions,
+.sb-card:focus-within .sb-card__actions,
+.sb-card[aria-selected="true"] .sb-card__actions {
+  opacity: 1;
+}
+
+.sb-card__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sb-space-2);
+  height: var(--sb-space-2);
+  padding: 0;
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg);
+  color: var(--sb-fg-muted);
+  font-family: var(--sb-font);
+  font-size: var(--sb-text-xs);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sb-card__action:hover {
+  border-color: var(--sb-border-strong);
+  color: var(--sb-fg);
+}
+
+.sb-card__action--delete:hover {
+  border-color: var(--sb-error);
+  background: var(--sb-error-bg);
+  color: var(--sb-error);
+}
+
+/* ------------------------------------------------------------- collapse */
+
+/*
+ * A folded container emits no body at all (see render.js), so there is
+ * nothing here to hide - only the header to mark. The dashed trailing edge is
+ * the "there is more below this" signal, borrowed from the way a torn page
+ * reads, and it costs no height.
+ */
+.sb-node[data-collapsed="true"] > .sb-card {
+  border-bottom-style: dashed;
+  border-bottom-color: var(--sb-border-strong);
+}
+
+/* Wraps rather than clips. A folded container`s two numbers plus the card`s
+ * reserved action width do not fit one line at the narrow end of the card
+ * range, and a finding count that gets cut in half is the one number on the
+ * card that must never be unreadable. */
+.sb-folded {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sb-space-half) var(--sb-space);
+  margin-top: var(--sb-space-half);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-muted);
+}
+
+/*
+ * ADR-0005 decision 11's count badge. It is drawn only when the fold is
+ * actually hiding a finding, and it is loud when it is drawn, because its
+ * whole job is to stop a finding disappearing into something folded shut.
+ */
+.sb-folded__findings {
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-error-bg);
+  color: var(--sb-error);
+  font-weight: var(--sb-weight-medium);
+}
+
+/* --------------------------------------------------- gaps and "+" buttons */
+
+.sb-gap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sb-gap__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sb-space-2);
+  height: var(--sb-space-2);
+  padding: 0;
+  border: var(--sb-border-width) dashed var(--sb-border-strong);
+  border-radius: var(--sb-radius-lg);
+  background: var(--sb-bg);
+  color: var(--sb-fg-subtle);
+  font-family: var(--sb-font);
+  font-size: var(--sb-text-xs);
+  line-height: 1;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 120ms ease-out;
+}
+
+/* Revealed on approach to the SLOT rather than to the gap itself: a gap is
+ * eight pixels tall, and a control that only appears once the pointer is
+ * already inside it is a control nobody finds. */
+.sb-slot:hover > .sb-slot__children > .sb-gap > .sb-gap__add,
+.sb-column:hover > .sb-slot__children > .sb-gap > .sb-gap__add,
+.sb-rail__slot:hover > .sb-gap > .sb-gap__add,
+.sb-gap:hover > .sb-gap__add,
+.sb-gap__add:focus-visible {
+  opacity: 1;
+}
+
+.sb-gap__add:hover {
+  border-style: solid;
+  border-color: var(--sb-accent);
+  color: var(--sb-accent);
+}
+
+/* ------------------------------------------------ drag: pre-hover validity
+ *
+ * The showpiece. At `dragstart` the session computes every accepting slot
+ * once (ADR-0005 decision 5) and the layout stamps `data-drop` on all of
+ * them, so this rule lights the whole valid target set BEFORE the pointer
+ * has been near any of it - no hover, no round trip, no per-seam flicker.
+ */
+
+.sb-canvas__viewport[data-dragging="true"] [data-drop="ok"] {
+  border-radius: var(--sb-radius);
+  outline: var(--sb-focus-width) dashed var(--sb-drop-ok-border);
+  outline-offset: var(--sb-focus-offset);
+}
+
+/*
+ * The FILL goes only on accepting slots that contain no other accepting slot.
+ *
+ * Without the `:has()` guard a translucent tint compounds through every level
+ * of nesting, and on the seven-deep fixture the innermost lanes end up several
+ * times darker than the outer ones - which reads as a heat map of depth, not
+ * of validity. Filling the innermost regions and leaving ancestors to their
+ * dashed outline says the true thing: every one of these will take the block,
+ * and these are the smallest places it can land.
+ */
+.sb-canvas__viewport[data-dragging="true"] [data-drop="ok"]:not(:has([data-drop="ok"])) {
+  background: var(--sb-drop-ok-bg);
+}
+
+/*
+ * Invalid targets go INERT rather than red, and "inert" means UNLIT - not
+ * dimmed.
+ *
+ * Dimming the refusing slots was the first thing tried here and it is wrong
+ * on a nested canvas, badly enough to be worth recording. `opacity` creates a
+ * compositing group, so on the seven-deep fixture a slot inside a refusing
+ * slot inside a refusing arm renders at 0.45 cubed and the document all but
+ * disappears; worse, an ACCEPTING slot nested inside a refusing one - which
+ * is exactly what an interrupt rail inside a rejected branch arm is - gets
+ * faded along with its ancestor, so the one thing the author is looking for
+ * is the thing the fade hides. Every "mute the whole subtree" property
+ * (`opacity`, `filter`) has the same two faults.
+ *
+ * So refusal is marked at the ONE place a slot speaks for itself and nowhere
+ * else: its own header, reached with a child combinator so the rule applies
+ * once per slot and never to a slot inside it. Everything else about an
+ * unaccepting region is simply left alone, and the accepting ones are the
+ * only lit thing on the canvas - which is the whole point, reached by adding
+ * signal rather than by subtracting from everything else.
+ */
+.sb-canvas__viewport[data-dragging="true"] [data-drop="no"] > .sb-slot__header,
+.sb-canvas__viewport[data-dragging="true"] [data-drop="no"] > .sb-column__header,
+.sb-canvas__viewport[data-dragging="true"] [data-drop="no"] > .sb-rail__header {
+  opacity: var(--sb-drop-no-opacity);
+}
+
+.sb-canvas__viewport[data-dragging="true"] [data-drop="no"] {
+  cursor: no-drop;
+}
+
+.sb-canvas__viewport[data-dragging="true"] [data-drop="ok"] {
+  cursor: copy;
+}
+
+/* Wider seams while a drag runs: dropping should be a test of intent, not of
+ * mouse precision. This is the visual half of the nearest-gap arming in
+ * interact.js. */
+.sb-canvas__viewport[data-dragging="true"] [data-drop="ok"] .sb-gap {
+  min-height: var(--sb-space-3);
+}
+
+.sb-canvas__viewport[data-dragging="true"] .sb-gap__add {
+  opacity: 0;
+}
+
+/*
+ * The armed seam: a card-width bar, centred, not a rule across the whole
+ * slot. A slot can be the full width of a fan, and a line that wide stops
+ * pointing at a position and starts looking like a section divider.
+ */
+.sb-gap--armed::before {
+  content: "";
+  position: absolute;
+  width: var(--sb-card-width);
+  max-width: 100%;
+  height: var(--sb-focus-width);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-drop-ok-border);
+}
+
+.sb-canvas__viewport[data-dragging="true"] .sb-card {
+  cursor: grabbing;
+}
+
+/* The block being moved stays in place and dims. Showing where it came from
+ * is what makes a move legible AS a move rather than as a delete followed by
+ * an insert somewhere else - and the child combinator keeps the dimming on
+ * the card, so a container being moved does not take its whole subtree down
+ * with it. */
+.sb-node[data-drag-source="true"] > .sb-card {
+  opacity: var(--sb-drop-no-opacity);
+}
+
+/* --------------------------------------------------------------- the ghost */
+
+/*
+ * Appended to the `.sb-spike` container rather than to the canvas, so it can
+ * follow the pointer over the inspector and out past the canvas overflow -
+ * `position: fixed` escapes the scroll container, and staying inside the
+ * scoping element is what keeps every value below a token rather than a
+ * literal.
+ */
+.sb-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  padding: var(--sb-space-half) var(--sb-space);
+  border-radius: var(--sb-radius);
+  background: var(--sb-fg);
+  color: var(--sb-bg);
+  font-family: var(--sb-font);
+  font-size: var(--sb-text-sm);
+  line-height: var(--sb-leading);
+  box-shadow: var(--sb-shadow-md);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------- the drag banner */
+
+/*
+ * In the canvas pane`s HEADER, not floating over the canvas. An overlay
+ * pinned to the top of the viewport covers the root block - which on this
+ * fixture is the one card an author is most likely to be dragging away from -
+ * and the header is chrome with nothing underneath it to hide.
+ */
+.sb-dragbar {
+  padding: var(--sb-space-half) var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-drop-ok-border);
+  border-radius: var(--sb-radius-lg);
+  background: var(--sb-bg-raised);
+  box-shadow: var(--sb-shadow-md);
+  color: var(--sb-fg);
+  font-size: var(--sb-text-sm);
+  pointer-events: none;
+}
+
+.sb-status {
+  position: absolute;
+  bottom: var(--sb-space);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  margin: 0;
+  padding: 0 var(--sb-space);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  pointer-events: none;
+}
+
+.sb-status:empty {
+  display: none;
+}
+
+/* ----------------------------------------------------------- the picker */
+
+/*
+ * Also on the `.sb-spike` container, for the same reason as the ghost: a menu
+ * opened from the bottom gap of a deep group has to escape the canvas`s
+ * `overflow: auto` or it opens into a scrollbar. Positioned in script,
+ * because only script knows where the button it belongs to landed; styled
+ * here, because that is where every other visual decision lives.
+ */
+.sb-picker {
+  position: fixed;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+  width: var(--sb-palette-width);
+  max-height: var(--sb-picker-max-height);
+  overflow-y: auto;
+  padding: var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border-strong);
+  border-radius: var(--sb-radius);
+  background: var(--sb-bg-raised);
+  box-shadow: var(--sb-shadow-md);
+  font-family: var(--sb-font);
+}
+
+/* The menu`s own heading, and it names the SLOT plus a count. "Insert into
+ * interrupts - 1 type" is a sentence about this position; a bare "Insert" is
+ * a label about the menu, and the position is the thing an author needs
+ * confirmed before they commit to it. */
+.sb-picker__title {
+  position: sticky;
+  top: calc(-1 * var(--sb-space));
+  margin: 0;
+  padding: var(--sb-space-half) var(--sb-space-half) var(--sb-space);
+  border-bottom: var(--sb-border-width) solid var(--sb-border);
+  background: var(--sb-bg-raised);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+}
+
+.sb-picker__group {
+  margin: var(--sb-space-half) 0 0;
+  padding: 0 var(--sb-space-half);
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+}
+
+.sb-picker__group:first-of-type {
+  margin-top: 0;
+}
+
+.sb-picker__empty {
+  margin: 0;
+  padding: 0 var(--sb-space) var(--sb-space);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-sm);
+  line-height: var(--sb-leading);
+}
+
+.sb-picker__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+  padding: var(--sb-space) var(--sb-space-half);
+  border: 0;
+  border-radius: var(--sb-radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* A hairline between entries rather than more air. The list runs to twenty
+ * types on an open slot, and at that length whitespace alone stops separating
+ * one entry`s description from the next one`s name. */
+.sb-picker__item + .sb-picker__item {
+  border-top: var(--sb-border-width) solid var(--sb-border);
+}
+
+.sb-picker__item:hover,
+.sb-picker__item:focus-visible {
+  background: var(--sb-accent-muted);
+}
+
+.sb-picker__label {
+  color: var(--sb-fg);
+  font-size: var(--sb-text-sm);
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-picker__description {
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+}
+
+/* ------------------------------------------------------- inspector note */
+
+.sb-inspector__note {
+  margin: var(--sb-space) 0 0;
+  padding: var(--sb-space);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-warning-bg);
+  color: var(--sb-warning);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+}

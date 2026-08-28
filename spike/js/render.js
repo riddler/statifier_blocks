@@ -125,7 +125,7 @@ function svgEl(tag, attrs = {}) {
  * `mount` is the canvas viewport; the stage it builds inside is what scrolls
  * and what the SVG covers.
  */
-export function renderCanvas(mount, tree) {
+export function renderCanvas(mount, tree, { center = true } = {}) {
   mount.replaceChildren();
 
   const stage = el("div", { class: "sb-stage" });
@@ -154,11 +154,19 @@ export function renderCanvas(mount, tree) {
   // is the classic way connectors end up a few pixels off their cards.
   requestAnimationFrame(() => {
     handle.route();
+
     // The tree is centred in a stage as wide as its widest fan, so on a
     // document with a deep parallel the interesting part starts off-screen.
     // Opening scrolled to the middle is the difference between "here is your
     // workflow" and "here is some empty grid".
-    mount.scrollLeft = Math.max(0, (mount.scrollWidth - mount.clientWidth) / 2);
+    //
+    // Only when OPENING, though. An edit re-renders the whole canvas, and
+    // re-centring on every insert would yank the view away from the block the
+    // author just placed - the one thing they are looking at.
+    if (center) {
+      mount.scrollLeft = Math.max(0, (mount.scrollWidth - mount.clientWidth) / 2);
+    }
+
     requestAnimationFrame(handle.route);
   });
 
@@ -211,11 +219,17 @@ function renderNode(node) {
     // the box off this, so the distinction stays derived from ADR-0005
     // decision 10's `slot_style` rather than from a type name.
     "data-boundary": node.secondary.length > 0 ? "true" : "false",
+    "data-collapsed": node.collapsed ? "true" : "false",
   });
 
   wrapper.append(renderCard(node));
 
-  if (node.shape === "container") {
+  // A folded container emits NO body at all rather than a hidden one. Hiding
+  // it would leave the routing pass measuring elements with zero-sized
+  // rectangles and drawing connectors to the origin; not emitting it means the
+  // fold is simply a smaller tree, and pass two is correct without knowing
+  // that collapse exists.
+  if (node.shape === "container" && !node.collapsed) {
     wrapper.append(renderBody(node));
   }
 
@@ -238,9 +252,16 @@ function renderCard(node) {
       .filter(Boolean)
       .join(" "),
     "data-block-id": node.id,
-    // sb-ad2 turns these into real affordances; they are inert markers here.
+    // Selection is a chrome-only attribute flip that `interact.js` writes
+    // straight onto the DOM: a click that re-laid-out and re-routed the whole
+    // canvas would make the cheapest gesture in the editor the most expensive
+    // one, for no change to a single rectangle.
     "aria-selected": "false",
+    // Reachable by keyboard once selected, and skipped by Tab otherwise -
+    // roving tabindex, which is what a tree of dozens of cards needs.
     tabindex: "-1",
+    role: "treeitem",
+    "aria-expanded": node.shape === "container" ? String(!node.collapsed) : null,
   });
 
   card.append(el("span", { class: "sb-card__icon" }, [iconElement(node.icon)]));
@@ -290,11 +311,103 @@ function renderCard(node) {
     );
   }
 
+  if (node.collapsed) text.append(renderFolded(node));
+
   card.append(text);
 
   if (node.unresolved) card.append(renderUnresolved(node));
 
+  card.append(renderCardActions(node));
+
   return card;
+}
+
+/*
+ * The fold indicator and the delete affordance, in that order, pinned to the
+ * card's trailing edge.
+ *
+ * Both are real `<button>`s carrying a `data-action`, which is the whole
+ * contract `interact.js` reads: one delegated listener on the canvas matches
+ * on the attribute, so adding an affordance never means adding a listener.
+ * Buttons rather than clickable spans because they have to answer Enter and
+ * Space, and because "delete this block" is exactly the kind of thing a
+ * screen-reader user should not have to discover by hovering.
+ */
+function renderCardActions(node) {
+  const actions = el("span", { class: "sb-card__actions" });
+  const container = node.shape === "container";
+
+  if (container) {
+    actions.append(
+      el("button", {
+        class: "sb-card__action sb-card__action--fold",
+        type: "button",
+        "data-action": "toggle-collapsed",
+        "data-block-id": node.id,
+        // The label says what the click DOES, not what the state is: "Collapse"
+        // on an open group and "Expand" on a folded one.
+        "aria-label": `${node.collapsed ? "Expand" : "Collapse"} ${node.title}`,
+        title: node.collapsed ? "Expand" : "Collapse",
+        text: node.collapsed ? "+" : "−",
+      })
+    );
+  }
+
+  // No delete on the root. `Edit.apply/2` refuses `cannot_remove_root`, so
+  // offering the button would be offering a gesture the algebra will always
+  // turn down - and a control that never works is worse than an absent one.
+  if (node.parentId !== null) {
+    actions.append(
+      el("button", {
+        class: "sb-card__action sb-card__action--delete",
+        type: "button",
+        "data-action": "delete-block",
+        "data-block-id": node.id,
+        "aria-label": `Delete ${node.title}`,
+        title: "Delete",
+        text: "×",
+      })
+    );
+  }
+
+  return actions;
+}
+
+/*
+ * ADR-0005 decision 11's last sentence, made visible: "a collapsed subtree
+ * carries a count badge so a finding can never hide inside something folded
+ * shut - which is the failure mode that makes tree editors feel unreliable."
+ *
+ * Two numbers, and they are different questions. The block count says how much
+ * is folded away; the finding count says whether any of it needs attention,
+ * and it is drawn only when it is non-zero, because a "0 findings" badge on
+ * every folded card trains an author to stop reading badges.
+ */
+function renderFolded(node) {
+  const hidden = node.descendantCount;
+  const flagged = node.findings.length + node.descendantFindings;
+
+  const box = el("span", { class: "sb-folded" });
+
+  box.append(
+    el("span", {
+      class: "sb-folded__count",
+      text: `${hidden} block${hidden === 1 ? "" : "s"} hidden`,
+    })
+  );
+
+  if (flagged > 0) {
+    box.append(
+      el("span", {
+        class: "sb-folded__findings",
+        "data-severity": "error",
+        title: `${flagged} finding${flagged === 1 ? "" : "s"} inside this folded block`,
+        text: `${flagged} finding${flagged === 1 ? "" : "s"}`,
+      })
+    );
+  }
+
+  return box;
 }
 
 /*
@@ -410,13 +523,43 @@ function renderChildren(node, slot) {
   return list;
 }
 
+/*
+ * One insertion point: the drop seam, and the "+" that makes it reachable
+ * without a pointer at all (ADR-0005 decision 8).
+ *
+ * The button is always emitted, never conditionally on a drag. Emitting it
+ * only for highlighted slots would be the obvious optimisation and it is the
+ * wrong one: decision 8 is an accessibility guarantee, and a control that
+ * exists only while a drag is running is a control a keyboard user cannot
+ * reach. What the "+" offers is filtered instead - the picker asks the same
+ * predicate the highlight does, so an author never opens it onto an empty list
+ * without being told why.
+ */
 function renderGap(node, slot, index) {
-  return el("div", {
+  const gap = el("div", {
     class: "sb-gap",
     "data-block-id": node.id,
     "data-slot": slot.name,
     "data-index": index,
   });
+
+  gap.append(
+    el("button", {
+      class: "sb-gap__add",
+      type: "button",
+      "data-action": "open-picker",
+      "data-block-id": node.id,
+      "data-slot": slot.name,
+      "data-index": index,
+      "aria-label": `Insert into ${slot.label} at position ${index + 1}`,
+      "aria-haspopup": "menu",
+      "aria-expanded": "false",
+      title: "Insert a block here",
+      text: "+",
+    })
+  );
+
+  return gap;
 }
 
 /**

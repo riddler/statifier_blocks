@@ -50,8 +50,12 @@
           </div>
 
           <div class="sb-topbar__group">
-            <button class="sb-button sb-button--quiet" type="button" disabled>Undo</button>
-            <button class="sb-button sb-button--quiet" type="button" disabled>Redo</button>
+            <button class="sb-button sb-button--quiet" id="sb-undo" type="button" disabled>
+              Undo
+            </button>
+            <button class="sb-button sb-button--quiet" id="sb-redo" type="button" disabled>
+              Redo
+            </button>
           </div>
 
           <div class="sb-topbar__group">
@@ -86,13 +90,21 @@
                 <h3 class="sb-palette__group-name">Structure</h3>
                 <ul class="sb-palette__entries">
                   <li>
-                    <button class="sb-palette__pick" type="button">
+                    <button
+                      class="sb-palette__pick"
+                      type="button"
+                      data-block-type="core.sequence"
+                    >
                       <span class="sb-palette__name">Sequence</span>
                       <span class="sb-palette__description">Runs its steps one after another.</span>
                     </button>
                   </li>
                   <li>
-                    <button class="sb-palette__pick" type="button">
+                    <button
+                      class="sb-palette__pick"
+                      type="button"
+                      data-block-type="core.group"
+                    >
                       <span class="sb-palette__name">Group</span>
                       <span class="sb-palette__description">
                         Groups steps so interrupt rules can fire against them.
@@ -100,7 +112,11 @@
                     </button>
                   </li>
                   <li>
-                    <button class="sb-palette__pick" type="button">
+                    <button
+                      class="sb-palette__pick"
+                      type="button"
+                      data-block-type="core.resumable_group"
+                    >
                       <span class="sb-palette__name">Resumable group</span>
                       <span class="sb-palette__description">
                         A group that remembers where it was when it resumes.
@@ -108,7 +124,11 @@
                     </button>
                   </li>
                   <li>
-                    <button class="sb-palette__pick" type="button">
+                    <button
+                      class="sb-palette__pick"
+                      type="button"
+                      data-block-type="core.branch"
+                    >
                       <span class="sb-palette__name">Branch</span>
                       <span class="sb-palette__description">
                         Takes the first arm whose condition holds, or otherwise.
@@ -116,7 +136,11 @@
                     </button>
                   </li>
                   <li>
-                    <button class="sb-palette__pick" type="button">
+                    <button
+                      class="sb-palette__pick"
+                      type="button"
+                      data-block-type="core.parallel"
+                    >
                       <span class="sb-palette__name">Parallel</span>
                       <span class="sb-palette__description">
                         Runs its lanes at the same time, in no particular order.
@@ -124,7 +148,11 @@
                     </button>
                   </li>
                   <li>
-                    <button class="sb-palette__pick" type="button">
+                    <button
+                      class="sb-palette__pick"
+                      type="button"
+                      data-block-type="core.wait"
+                    >
                       <span class="sb-palette__name">Wait</span>
                       <span class="sb-palette__description">
                         Pauses for a fixed duration before continuing.
@@ -132,7 +160,11 @@
                     </button>
                   </li>
                   <li>
-                    <button class="sb-palette__pick" type="button">
+                    <button
+                      class="sb-palette__pick"
+                      type="button"
+                      data-block-type="core.on_event"
+                    >
                       <span class="sb-palette__name">On event</span>
                       <span class="sb-palette__description">
                         Interrupts the group it sits in when an event arrives.
@@ -146,7 +178,11 @@
                 <h3 class="sb-palette__group-name">Demo host types</h3>
                 <ul class="sb-palette__entries">
                   <li>
-                    <button class="sb-palette__pick" type="button">
+                    <button
+                      class="sb-palette__pick"
+                      type="button"
+                      data-block-type="myapp.authorize"
+                    >
                       <span class="sb-palette__name">Authorize</span>
                       <span class="sb-palette__description">
                         <code>myapp:authorize</code> &middot; example host block type.
@@ -154,7 +190,11 @@
                     </button>
                   </li>
                   <li>
-                    <button class="sb-palette__pick" type="button">
+                    <button
+                      class="sb-palette__pick"
+                      type="button"
+                      data-block-type="myapp.capture"
+                    >
                       <span class="sb-palette__name">Capture</span>
                       <span class="sb-palette__description">
                         <code>myapp:capture</code> &middot; example host block type.
@@ -162,7 +202,11 @@
                     </button>
                   </li>
                   <li>
-                    <button class="sb-palette__pick" type="button">
+                    <button
+                      class="sb-palette__pick"
+                      type="button"
+                      data-block-type="myapp.signup"
+                    >
                       <span class="sb-palette__name">Signup</span>
                       <span class="sb-palette__description">
                         <code>myapp:signup</code> &middot; example host block type.
@@ -187,11 +231,18 @@
               <div class="sb-topbar__spacer"></div>
               <span class="sb-chip" id="sb-canvas-depth" hidden>depth 0</span>
               <span class="sb-chip" id="sb-canvas-count">0 blocks</span>
+              <span class="sb-dragbar" id="sb-dragbar" role="status" hidden></span>
             </div>
             <div class="sb-pane__body sb-pane__body--flush sb-canvas">
               <!-- The layout engine mounts here. It is empty until a document
                    loads, and the empty state beside it is shown instead. -->
               <div class="sb-canvas__viewport" id="sb-canvas" hidden></div>
+
+              <!-- Two overlays that never take a click. The first says a drag
+                   is running and how many slots would take the block, so the
+                   highlighting reads as an answer rather than as a glitch; the
+                   second is the live region every refusal is spoken through. -->
+              <p class="sb-status" id="sb-status" role="status" aria-live="polite"></p>
 
               <div class="sb-canvas__placeholder" id="sb-canvas-empty">
                 <p class="sb-canvas__placeholder-title">No document loaded</p>
@@ -212,7 +263,7 @@
             <div class="sb-pane__header">
               <h2 class="sb-pane__title">Inspector</h2>
               <div class="sb-topbar__spacer"></div>
-              <span class="sb-chip">no selection</span>
+              <span class="sb-chip" id="sb-selection-chip">no selection</span>
             </div>
 
             <div class="sb-tabs" role="tablist" aria-label="Inspector panes">
@@ -280,12 +331,20 @@
                   <h3 class="sb-inspector__section-title">Block</h3>
                   <dl class="sb-kv">
                     <dt class="sb-kv__key">Type</dt>
-                    <dd class="sb-kv__value sb-kv__value--mono">&mdash;</dd>
+                    <dd class="sb-kv__value sb-kv__value--mono" id="sb-block-type">&mdash;</dd>
                     <dt class="sb-kv__key">Id</dt>
-                    <dd class="sb-kv__value sb-kv__value--mono">&mdash;</dd>
+                    <dd class="sb-kv__value sb-kv__value--mono" id="sb-block-id">&mdash;</dd>
                     <dt class="sb-kv__key">Slot</dt>
-                    <dd class="sb-kv__value">&mdash;</dd>
+                    <dd class="sb-kv__value" id="sb-block-slot">&mdash;</dd>
                   </dl>
+
+                  <!-- ADR-0005 decision 12, said where an author goes looking
+                       for the form rather than only on the card. -->
+                  <p class="sb-inspector__note" id="sb-block-readonly" hidden>
+                    This block&rsquo;s type is not registered here. It can be
+                    selected, moved and deleted; its config is read-only and its
+                    stored bytes are preserved.
+                  </p>
                 </div>
 
                 <div class="sb-inspector__section">

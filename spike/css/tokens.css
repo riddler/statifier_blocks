@@ -132,6 +132,11 @@
   --sb-column-empty-min-width: 10rem;
   --sb-rail-width: 13rem;
   --sb-config-preview-max-height: 8rem;
+
+  /* Interaction chrome (sb-ad2). The "+" picker is as wide as the palette on
+   * purpose - it IS the palette, filtered to one slot - so it reads as the
+   * same list rather than as a second vocabulary. */
+  --sb-picker-max-height: 20rem;
 }
 
 /* -------------------------------------------------------------------- dark */
