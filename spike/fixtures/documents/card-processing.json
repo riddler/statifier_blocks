@@ -13,11 +13,18 @@
     "     follow decision 8.",
     "  4. No floats anywhere (decision 6): money is integer minor units, durations",
     "     are ISO-8601 strings.",
-    "Block types: the seven core.* types are real (StatifierBlocks.Core). Every",
+    "Block types: the seven core.* types are real (StatifierBlocks.Core). The",
+    "eighth, core.invoke, is NOT - it is the proposed descriptor in",
+    "spike/js/proposed-core.js, registered beside the real ones so the spike can",
+    "show what a core type with an outcome slot would look like. Every",
     "myapp.* type is a demo palette entry the spike registers; three of them exist",
     "because the core set has no equivalent - see the '_comment' on each first use.",
     "The single deliberately-unresolvable type is myapp.legacy_check (blk_cp_legacy).",
-    "Shape: 41 blocks, maximum nesting depth 7 (root = depth 1).",
+    "Both failure idioms are present on purpose, so one document can be read for",
+    "the comparison: idiom A is core.invoke's on_error SLOT (blk_cp_authorize with",
+    "a park-and-notify sequence, blk_cp_capture with a lone park), and idiom B is",
+    "the predicate branch (blk_cp_capture_retry), which is left exactly as it was.",
+    "Shape: 45 blocks, maximum nesting depth 7 (root = depth 1).",
     "Every datamodel path named in a 'cond' resolves in ../datamodel.json."
   ],
   "schema_version": 1,
@@ -25,7 +32,7 @@
   "revision": 42,
   "metadata": {
     "name": "Card processing",
-    "description": "Intake, validation, a three-lane authorization group with interrupts, an outcome branch with capture retry and manual review, and a receipt tail.",
+    "description": "Intake, validation, a three-lane authorization group with interrupts, an outcome branch with capture retry and manual review, and a receipt tail. The authorize and capture calls carry on_error subtrees, so the slot idiom and the retry-predicate idiom can be read side by side.",
     "domain": "card-processing"
   },
   "root": {
@@ -232,14 +239,49 @@
                       }
                     },
                     {
-                      "type": "myapp.authorize",
+                      "_comment": "FAILURE IDIOM A, and the PROPOSED type core.invoke (spike/js/proposed-core.js) - not a shipped core type. The error path is a SLOT the block type declares (umbrella D13, 2026-08-28), so the failure edge is a parent/slot/child relationship like every other edge and the connector stays rendered rather than authored. Idiom B is blk_cp_capture_retry further down: the same kind of failure handled by a predicate the author writes. Three things the rework gave up, all Phase-B findings and none of them decided here: (1) core.invoke declares no 'label' field, so the 'label' below is stored data the canvas titles the card from while the inspector form cannot edit it - every myapp.* step declares one and the proposed core type does not; (2) myapp.authorize's 'timeout' key has no core.invoke equivalent, so it is dropped rather than carried as undeclared config - the authorization timeout already lives on this group's interrupt rail as blk_cp_authz_timeout, which is where a timeout belongs; (3) type_version drops from 2 to 1, because core.invoke's currentVersion is 1 and a stored version above the descriptor's is a hard block_type_too_new refusal.",
+                      "type": "core.invoke",
                       "id": "blk_cp_authorize",
-                      "type_version": 2,
+                      "type_version": 1,
                       "config": {
                         "invoke_type": "myapp:authorize",
                         "assign_to": "authorization",
-                        "timeout": "PT30S",
+                        "params": "amount=amount_cents\ncurrency=currency\ncustomer=customer.id",
                         "label": "Authorize the card"
+                      },
+                      "slots": {
+                        "on_error": [
+                          {
+                            "_comment": "Depth 5. The on_error slot is zero_or_one, so a failure path of more than one step needs a container - a sequence here, and the two steps sit at depth 6.",
+                            "type": "core.sequence",
+                            "id": "blk_cp_authz_error",
+                            "type_version": 1,
+                            "slots": {
+                              "body": [
+                                {
+                                  "type": "myapp.park",
+                                  "id": "blk_cp_authz_park",
+                                  "type_version": 1,
+                                  "config": {
+                                    "invoke_type": "myapp:park",
+                                    "queue": "authorization_review",
+                                    "label": "Queue it for review"
+                                  }
+                                },
+                                {
+                                  "type": "myapp.notify",
+                                  "id": "blk_cp_authz_error_notify",
+                                  "type_version": 1,
+                                  "config": {
+                                    "invoke_type": "myapp:notify",
+                                    "template": "authorization_failed",
+                                    "label": "Tell ops the authorization failed"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
                       }
                     }
                   ],
@@ -313,17 +355,32 @@
                 "slots": {
                   "body": [
                     {
-                      "type": "myapp.capture",
+                      "_comment": "FAILURE IDIOM A in its minimal shape: the on_error slot holding one leaf step rather than a container. Idiom B sits directly below it, and this pair is the comparison the document exists to make. The predicate branch can only see failures the datamodel records (auth.captured == false, capture_attempts < 3); the on_error slot catches the ones it cannot, including the call never answering at all. Neither idiom subsumes the other, which is why both are kept here rather than one replacing the other. 'amount_key' is gone: params carries the same fact as a name=path pair, which is what core.invoke declares.",
+                      "type": "core.invoke",
                       "id": "blk_cp_capture",
                       "type_version": 1,
                       "config": {
                         "invoke_type": "myapp:capture",
-                        "amount_key": "amount_cents",
+                        "params": "amount=amount_cents\nauth_code=auth.code",
                         "label": "Capture the funds"
+                      },
+                      "slots": {
+                        "on_error": [
+                          {
+                            "type": "myapp.park",
+                            "id": "blk_cp_capture_park",
+                            "type_version": 1,
+                            "config": {
+                              "invoke_type": "myapp:park",
+                              "queue": "capture_reconciliation",
+                              "label": "Park it for reconciliation"
+                            }
+                          }
+                        ]
                       }
                     },
                     {
-                      "_comment": "The retry idiom: a one-armed branch whose arm is a wait-then-repeat sequence.",
+                      "_comment": "FAILURE IDIOM B, unchanged from before the rework and deliberately so: the retry idiom is a one-armed branch whose arm is a wait-then-repeat sequence, and its guard is an ordinary condition the author wrote. Read it beside the on_error slot above - same failure, one edge declared by the block type and one edge derived from the datamodel.",
                       "type": "core.branch",
                       "id": "blk_cp_capture_retry",
                       "type_version": 1,
@@ -352,6 +409,7 @@
                                   }
                                 },
                                 {
+                                  "_comment": "Left on the host type on purpose, where the first capture moved to core.invoke. Two reasons, both about what the document has to keep proving: the retry idiom reads honestly only if the block inside it is the block a host writes today, and myapp.capture is the one type in the palette pointing at its own accent token (--sb-accent-myapp-capture, overridden in css/themes/host-brand.css), so this is the last instance of the accent-layering demo on the canvas. A pass that converted it too would delete both without saying so.",
                                   "type": "myapp.capture",
                                   "id": "blk_cp_capture_retry_call",
                                   "type_version": 1,
