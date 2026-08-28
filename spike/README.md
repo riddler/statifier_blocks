@@ -276,6 +276,75 @@ not - it is the divider between two panes of the same surface, decoration
 rather than a boundary carrying information, and holding it to a ratio turns
 every pane edge into a rule.
 
+## What the polish pass found (sb-vhu)
+
+W5 walked every surface against a written checklist - alignment, spacing
+rhythm, type scale, contrast in all three themes, hover, drag and focus
+states, connector legibility at depth, and viewport widths down to 1024px -
+and worked the queue of defects the earlier beads had noted in passing. Four
+of the findings are about the spike's mechanisms rather than about one pane,
+and those are the ones worth carrying forward.
+
+**A reset that out-specifies is a reset that fights.** `reset.css` said so
+about buttons in W2 and then did the same thing to block elements: `.sb-spike
+p` and `.sb-spike pre` score one class plus one element, which beats any
+single-class component rule, so `.sb-hint`'s `margin-top`, `.sb-code`'s
+`padding`, `.sb-empty`'s padding and `.sb-pane__title`'s font size were all
+being silently stripped by the layer that exists to make room for them. The
+symptom is quiet - a hint flush against the line above it, a pane title one
+step too large - which is why it survived four beads. The whole block is
+`:where(.sb-spike)` now, and the six rules that had escaped locally by
+qualifying themselves with an element name (`p.sb-datamodel__none`,
+`ul.sb-datamodel__list--nested`, and four others) dropped the qualification.
+This is the spike's clearest input to whether a scoped reset belongs in the
+shipped package: it does, and every selector in it has to be zero-specificity
+on the container half or it is a bug generator.
+
+**A padded scrollport needs a sticky idiom, not a sticky rule.**
+`.sb-pane__body` is both the scroller and a padded box, and content scrolls
+THROUGH the top padding rather than being clipped at it - so a header stuck at
+`top: 0` has a band of moving rows above it. The three declarations that fix
+it (negative offset, equal negative margin, matching top padding) are one
+mechanism and none works alone, which is why two earlier attempts at the
+inspector's datamodel header each got half of it and concluded the palette's
+idiom would not transplant. It transplants. The arithmetic lives in one
+`.sb-sticky-head` rule now and a new pane joins by adding a selector.
+
+**A clipped scroller has to say so, and a background can only say it where
+content is transparent.** Three surfaces clipped silently: the inspector's
+read-only config preview, the same preview on the card, and the truth-table
+grid. The four-layer background (two covers attached `local`, two shadows
+attached `scroll`) is the right answer for the two `pre` surfaces - correct on
+first paint, no scroll listener, and it disappears exactly when there is
+nothing more to see. It is only intermittent on the grid, because a background
+paints below content and the verdict cells carry opaque chips. Making that one
+reliable means an overlay, which is a change to the pane's markup and belongs
+with the decision about where a truth table lives, not ahead of it.
+
+**A smooth scroll is a request, and a reveal has to check it was granted.**
+Anything that scrolls the canvas mid-animation cancels it and the browser
+stops where it is, which is how a revealed card ends up pinned to the bottom
+edge instead of centred. The reveal now keeps a receipt: `scrollend` fires
+once the canvas has actually stopped, the distance from the centre is then a
+fact, and an instant correction lands the card where the reveal promised.
+
+Two things were deliberately NOT built, and the reasoning is the finding:
+
+- **No zoom or fit-to-width control.** A canvas-wide zoom is not a stylesheet
+  change - it is a transform whose scale every pointer coordinate in
+  `interact.js` would have to be divided by, and a drag hit-test that is
+  subtly wrong is worse than no zoom at all. What the spike does instead is
+  centre the union of a step's active cards, and, when they cannot all fit,
+  SAY so in the live region rather than leave the author believing the step
+  lit one block. Whether the shipped editor wants a real zoom is a question
+  for the panel-design work, with a cost estimate this pass can supply.
+- **A `:config` finding still does not switch the inspector to the Config
+  tab.** It selects and reveals the block and leaves the tab where the author
+  put it. Moving a reader's tab out from under them to show them a field is
+  the kind of helpfulness that reads as a bug the second time it happens, and
+  the anchor is already visible on the finding row. Held for an operator's
+  eye rather than changed on a worker's judgment.
+
 ## Serving it
 
 The spike is served as static files. Anything that serves this directory over
