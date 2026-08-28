@@ -548,6 +548,7 @@ const myappAuthorize = {
     icon: "credit-card",
     keywords: ["authorize", "card", "payment"],
     order: 0,
+    accentToken: "--sb-accent-myapp",
   },
 };
 
@@ -592,6 +593,9 @@ const myappCapture = {
     icon: "banknotes",
     keywords: ["capture", "settle", "payment"],
     order: 1,
+    /* The layering proof (sb-957): its own token rather than the family's.
+     * Light and dark resolve it to the family colour, host-brand does not. */
+    accentToken: "--sb-accent-myapp-capture",
   },
 };
 
@@ -648,6 +652,7 @@ const myappSignup = {
     icon: "user-plus",
     keywords: ["signup", "wizard", "onboarding"],
     order: 0,
+    accentToken: "--sb-accent-myapp",
   },
 };
 
@@ -817,6 +822,13 @@ const PALETTE_ENTRY_DEFAULTS = {
   order: 0,
   layout: "stack",
   slotStyle: {},
+  /* sb-957. The name of a `--sb-*` custom property this type's cards and
+   * palette rows take their accent from, or `null` for the editor's own.
+   * A NAME, never a colour - the same discipline `icon` is under, and for
+   * the same reason: a descriptor that carried a hex value would be a block
+   * type deciding what it looks like in a theme it has never seen. Whether
+   * this belongs in ADR-0005 decision 10's metadata is a W6 finding. */
+  accentToken: null,
 };
 
 /**

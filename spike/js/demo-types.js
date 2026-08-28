@@ -25,6 +25,21 @@
  * chrome is exercised deep in the tree. Registering it would delete the test.
  */
 
+/* ------------------------------------------------------- the host accent
+ *
+ * sb-957. Every type in this file belongs to one host, so every one of them
+ * points at the host's own accent token. The value is declared in
+ * `css/tokens.css` under "demo host block accents" and overridden by
+ * `css/themes/host-brand.css`; nothing here knows what colour it is, which is
+ * the point - a host declares an identity, a theme decides what it looks
+ * like, and the editor stays out of both conversations.
+ *
+ * The one exception lives in `palette.js`: `myapp.capture` points at
+ * `--sb-accent-myapp-capture` instead, which resolves to this same colour in
+ * light and dark and to a different one under host-brand.
+ */
+const HOST_ACCENT = "--sb-accent-myapp";
+
 /* ------------------------------------------------------- shared checks */
 
 const IDENTIFIER = /^[a-z][a-z0-9_]*$/;
@@ -103,7 +118,7 @@ function step({
     configSchema: () => [labelField, invokeTypeField, ...fields],
     validateConfig: (config) => verdict([...checkCommon(config), ...check(config)]),
     io: () => io,
-    paletteEntry: { label, group, description, icon, keywords, order },
+    paletteEntry: { label, group, description, icon, keywords, order, accentToken: HOST_ACCENT },
   };
 
   if (migrateConfig) descriptor.migrateConfig = migrateConfig;
@@ -348,6 +363,7 @@ const myappGuardedOnEvent = {
     icon: "bolt",
     keywords: ["interrupt", "guard", "condition", "event"],
     order: 0,
+    accentToken: HOST_ACCENT,
   },
 };
 
@@ -382,6 +398,7 @@ const myappTimeoutRule = {
     icon: "clock-alert",
     keywords: ["interrupt", "timeout", "deadline", "expire"],
     order: 1,
+    accentToken: HOST_ACCENT,
   },
 };
 

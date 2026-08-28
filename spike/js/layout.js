@@ -185,6 +185,9 @@ function layoutBlock(node, registry, findings, { depth, slot, parentId, view }) 
     caption: unresolved ? node.type : entry.label,
     icon: entry.icon,
     group: entry.group,
+    // sb-957: the accent token the type declares, carried through the view
+    // model like `icon` is - a name the renderer binds, never a colour.
+    accentToken: entry.accentToken ?? null,
     summary: summaryOf(schema, config),
     chips: chipsOf(schema, config),
     rawConfig: unresolved ? canonicalConfig(config) : null,

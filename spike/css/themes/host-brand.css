@@ -9,15 +9,25 @@
  *
  * If a restyle turns out to need something this file is not allowed to do,
  * that is a finding about the token surface in tokens.css, and the fix goes
- * there rather than here. W4 is where the theme reaches parity and where
- * those findings get written down; this is the starter set that proves the
- * mechanism carries colour, shape and type, not colour alone.
+ * there rather than here.
+ *
+ * W4 (sb-957) took it to full coverage and the rule held: four things this
+ * file wanted and could not say - the browser's own colour scheme, the
+ * replayed-step mark, the drag seam, and one block type's identity - became
+ * four new token families in tokens.css and are set below as properties like
+ * everything else. Not one structural declaration was needed, and
+ * `dev/theme-audit.html` fails the audit if one ever appears here.
  *
  * The brand below is invented for the spike and is not any real product's.
  */
 
 .sb-spike[data-sb-theme="host-brand"],
 [data-sb-theme="host-brand"] .sb-spike {
+  /* A light brand, said out loud rather than inherited: the editor may be
+   * dropped into a page that has already flipped an ancestor to dark, and
+   * this theme is light wherever it lands. */
+  --sb-color-scheme: light;
+
   /* Warmer paper than the default's cool grey. */
   --sb-bg-canvas: #f5f1ea;
   --sb-bg: #fffdf9;
@@ -27,11 +37,14 @@
 
   --sb-fg: #2a2118;
   --sb-fg-muted: #6d6154;
-  --sb-fg-subtle: #9a8e7e;
+  /* Was #9a8e7e, 2.5:1 on the sunken surface. */
+  --sb-fg-subtle: #6f6557;
   --sb-fg-on-accent: #fffdf9;
 
   --sb-border: #ded4c4;
-  --sb-border-strong: #c4b8a4;
+  /* 3:1 against every surface in this theme; the brand's own warm grey taken
+   * down to where a dashed advisory outline is actually a boundary. */
+  --sb-border-strong: #93805f;
 
   /* Brand accent: deep teal rather than the default blue. */
   --sb-accent: #1f6f68;
@@ -40,17 +53,56 @@
 
   --sb-error: #a83223;
   --sb-error-bg: rgba(168, 50, 35, 0.1);
-  --sb-warning: #9a6510;
-  --sb-warning-bg: rgba(154, 101, 16, 0.12);
+  --sb-warning: #8c5c0f;
+  --sb-warning-bg: rgba(140, 92, 15, 0.12);
   --sb-info: #1f6f68;
   --sb-info-bg: rgba(31, 111, 104, 0.1);
-  --sb-success: #3f7d3a;
-  --sb-success-bg: rgba(63, 125, 58, 0.12);
+  --sb-success: #3a7335;
+  --sb-success-bg: rgba(58, 115, 53, 0.12);
 
-  --sb-drop-ok-border: #3f7d3a;
-  --sb-drop-ok-bg: rgba(63, 125, 58, 0.09);
+  /* The drop affordance keeps the shipped green rather than the brand's,
+   * because it is the one colour in the editor that means "this will work"
+   * and a brand is not a reason to relearn it. */
+  --sb-drop-ok-border: #3a7335;
+  --sb-drop-ok-bg: rgba(58, 115, 53, 0.09);
+  /* The armed seam, on the other hand, IS brand chrome: it is a bar the
+   * author is aiming at, not a status. This is the token existing to be
+   * used - before W4 the bar could only be the drop colour. */
+  --sb-gap-armed-bg: var(--sb-accent);
 
   --sb-connector: #c4b8a4;
+
+  /* The replayed-step mark: the brand's own teal, thicker and further off the
+   * card than the default, because on warm paper a two-pixel ring at two
+   * pixels' offset disappears into the card's own border. */
+  --sb-run-mark: var(--sb-accent);
+  --sb-run-mark-width: 3px;
+  --sb-run-mark-offset: 3px;
+
+  /* Condition syntax, brought onto the brand's palette. The path keeps
+   * full-strength text (it inherits `--sb-fg`); the three literal roles are
+   * warm siblings of the accent rather than the default's cool set. */
+  --sb-syntax-keyword: #7a3ea3;
+  --sb-syntax-string: #1d7444;
+  --sb-syntax-number: #8a5a06;
+
+  /* --------------------------------------------- the demo host's own types
+   *
+   * The layering proof. `js/demo-types.js` points its `myapp.*` palette
+   * entries at `--sb-accent-myapp`, and `myapp.capture` alone at
+   * `--sb-accent-myapp-capture`. In light and dark the two resolve to the
+   * same colour and the whole family reads as one. Here the family is the
+   * brand's terracotta and capture is a hotter red, so one block type - the
+   * one that moves money - stands out from its own family.
+   *
+   * Nothing outside this file changed to make that happen: no rule names
+   * `myapp.capture`, no JavaScript branches on it, and the editor's
+   * stylesheet does not know either token exists. */
+  --sb-accent-myapp: #8a4a1f;
+  --sb-accent-myapp-capture: #a3341f;
+  /* A louder brand wants a louder tile and a heavier edge. */
+  --sb-block-accent-mix: 18%;
+  --sb-block-edge: 4px;
 
   /* Shape: softer than the default. */
   --sb-radius: 10px;

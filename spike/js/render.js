@@ -40,6 +40,7 @@
  */
 
 import { fanPath, flowPath, interruptPath, inlet, joinPath, outlet } from "./layout.js";
+import { accentTokenFor, blockAccentStyle } from "./theme.js";
 
 /* ================================================================ icons */
 
@@ -262,6 +263,11 @@ function renderCard(node) {
       .filter(Boolean)
       .join(" "),
     "data-block-id": node.id,
+    // sb-957's per-block-type accent. The renderer knows the token's NAME
+    // and never its value, so which colour this is remains the theme's call
+    // and no block type is named anywhere in the editor's CSS or JS.
+    "data-sb-block-accent": accentTokenFor(node),
+    style: blockAccentStyle(node),
     // Selection is a chrome-only attribute flip that `interact.js` writes
     // straight onto the DOM: a click that re-laid-out and re-routed the whole
     // canvas would make the cheapest gesture in the editor the most expensive

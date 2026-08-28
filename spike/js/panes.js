@@ -137,6 +137,7 @@ function paletteEntry(typeName, entry, needle) {
     icon: entry.icon,
     group: entry.group,
     order: entry.order,
+    accentToken: entry.accentToken,
     keywords,
     matchedOn,
     segments: highlight(entry.label, needle),
