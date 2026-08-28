@@ -686,3 +686,295 @@ What this example is chosen to demonstrate:
 - **The two-registry seam.** `emit/2` produces a subtree naming
   `myapp:budget_check`; a handler for that invoke type is registered with the
   engine at runtime under st-ADR-0051, by the same host, separately.
+
+---
+
+## Proposed amendment (2026-08-28): outcomes, presentation metadata, the invoke row, and who owns a label
+
+**Status: PROPOSED, not accepted.** This section is additive. Nothing above it
+is edited, the record's `Status:` line is untouched, and every accepted
+decision stands as written until the operator rules. It amends decision 5's
+callback table, decision 7's schema ownership, decision 10's vocabulary table
+and decision 11's boundary list, and it does so in one section because the
+four are one seam seen from four sides: what a block type declares about
+itself.
+
+It is drafted from two sources and invents as little as it can get away with.
+The operator's 2026-08-28 ruling (umbrella `docs/decisions.md` D13) settles the
+authoring model; the campaign-012 editor spike (`spike/`) supplies working
+forms for everything D13 left to a record. Where the spike already does
+something, this section records what it does rather than proposing a better
+name for it.
+
+### What forces the amendment
+
+**D13: outcome paths are slots, never ports.** A block has one inlet and one
+outlet; a block with more than one way to finish declares a *slot* per
+alternative path, and each outcome compiles to a distinct completion event.
+Ports - several typed outputs with author-drawn edges - were rejected because
+they break the invariant the editor rests on: every edge in a document is a
+parent/slot/child relationship, so connectors are rendered and never authored.
+
+D13 lands on two records at once, and they have already been separated. The
+**emission** is ADR-0004's, and its own Proposed amendment of the same date
+(`docs/adr/0004-compiler-provenance.md`, "decision 2, outcome-tagged finals")
+holds it: outcome-tagged finals, `Context.outcome_id/2`, the reserved `o_`
+role namespace, and the completion event a parent wires on. That section
+explicitly parks the declaration surface here - "where the declaration surface
+lives is not this record's call" - and this section is the answer. Nothing
+below restates what that amendment decides, and where the two touch, it is the
+authority on emission and this one is the authority on declaration.
+
+The rest is what four beads of spike work found by rendering real cards: a
+block type that can name a token but not a chip, a join marker whose words no
+type could supply, an invoke whose failure path had a slot and no compiled
+target, and every card in the flagship demo titled by a key no `core.*` type
+declares.
+
+### A. `outcomes(config)`, an ordered list, defaulting to one
+
+**A1. The callback.** A block type may declare its outcomes:
+
+| Callback | Required | Owner of its return shape |
+|---|---|---|
+| `outcomes(config)` | no | this section |
+
+It takes `config` for decision 5's reason and no other: a type whose
+alternative paths are config-parameterized - one outcome per declared arm,
+say - is the same shape `slots/1` and `config_schema/1` already have, and a
+callback that took no config would be the one declaration in this record that
+could not follow the config. A type that does not export it has exactly one
+outcome, named `done`. All seven accepted `core.*` types are in that case and
+none of them changes meaning.
+
+An outcome declaration is `{name, label}`: the name is what the compiled event
+carries, and the label is human text on the same footing as a slot
+declaration's. Names match `~r/\A[a-z][a-z0-9_]*\z/` and the order is fixed,
+both because ADR-0004's amendment needs them to be - the first for the role
+shape it mints ids under, the second for its byte determinism.
+
+`outcomes/1` is stable under config `validate_config/1` accepts, and returns
+without raising there, for the reason decision 6 binds `slots/1` the same way:
+the editor renders mid-edit and the compiler runs against config the type has
+already accepted.
+
+**A2. A slot is not an outcome, and this record does not marry them.** D13's
+sentence - outcomes are slots - is about the *authoring surface*, and it is
+honoured by section D below: `core.invoke`'s failure path is an `on_error`
+slot with `zero_or_one` arity and a `secondary` slot style, which is machinery
+`core.group`'s `interrupts` rail already provides and the renderer already
+reads without learning a type name. It is not a claim that the two
+declarations are one list. They answer different questions: `slots/1` says
+where children live, `outcomes/1` says how finishing can differ, and a type
+can have either without the other. `core.branch` has many slots and one
+outcome; a type could declare a second outcome reached from no slot at all.
+
+**Which outcome a given slot's completion reaches is deliberately not a third
+declaration.** It is the block type's own emission - `emit/2`, under ADR-0004's
+amendment - and pushing it into a declaration would mean this record inventing
+a binding language for a relation exactly one shipped-adjacent type currently
+has. The alternative was considered: an outcome declaration carrying the slot
+name it is reached from, which would let a validator check that every declared
+outcome is reachable and let the editor caption a slot with the outcome it
+leads to. Both are real, and neither is worth a guessed shape today. Recorded
+as a deferred question in section F rather than decided.
+
+### B. The presentation metadata trio, and the boundary it sits on
+
+The spike's palette entries carry three keys the accepted record does not
+know about: `accentToken` (a `--sb-*` custom-property *name*), `badge` (a short
+chip for the card header), and `joinLabel` (what the join marker under a
+side-by-side arrangement says, as a **function of config**). In the Elixir
+surface they are `accent_token`, `badge` and `join_label`, following the
+spelling ADR-0005's own 14d amendment already uses for the first of them.
+
+**B1. The contents of `palette_entry/0` are not this record's, and stay not
+this record's.** Decision 5 says so and decision 11 repeats it: what the
+metadata map contains is ADR-0005 decision 10's, and `accent_token` is already
+proposed there (14d). This section does not adopt the trio into decision 10 on
+that record's behalf, and a host reading only this section learns nothing about
+what the editor draws.
+
+**B2. What this record does own is that two of the three are inert data and the
+third is code.** `accent_token` and `badge` are values; `join_label` is a
+callback the editor invokes during layout with the block's config. That makes
+it the first executable thing to hang off a palette entry, and decision 4
+therefore applies to it in full: **`join_label` is a pure function of its
+argument.** No process dictionary, no `Application.get_env/2`, no IO, no clock.
+A host that needs external data to phrase a join marker resolves it before the
+operation, exactly as decision 4 already requires of every other callback.
+
+This is the whole reason the trio needs a sentence in *this* record rather than
+only in ADR-0005. Every other key decision 10 owns is inert, so the purity rule
+had nothing to bite on; one callback changes that.
+
+**B3. Normalizer semantics: refuse, do not truncate; a throw degrades to the
+default.** Every consumer reads these three through a total normalizer, and the
+discipline is decision 3's, arriving at presentation for decision 3's reason: a
+malformed declaration in one host's registry must produce the ordinary card,
+never a broken one and never an exception.
+
+| Declaration | Malformed reads as | Refusals |
+|---|---|---|
+| `accent_token` | `nil`, meaning the editor's own accent | anything not matching an anchored `--sb-` custom-property name |
+| `badge` | `nil`, meaning no chip | a non-string, empty or all-whitespace, a newline or tab, or longer than the cap |
+| `join_label` | the editor's own word | the same set, applied to the callback's **return**; plus a non-function, plus a callback that raises |
+
+Two properties are the point of the table, and both are the spike's behaviour
+rather than a proposal:
+
+- **Refuse, never truncate.** An over-long badge is dropped, not clipped to the
+  cap; a badge containing a newline is dropped, not collapsed to a space. A
+  truncated chip reads as a rendering bug the host will file against the
+  editor, where a missing chip reads as the declaration it is. This is the
+  same posture decision 7 takes toward config the schema cannot express: refuse
+  the input, do not silently repair it.
+- **A callback that raises degrades to the default.** `join_label` is host code
+  called inside the editor's layout pass, so it is called inside a rescue and a
+  raise produces the editor's own word. A host type with a bug in its
+  `join_label` gets an ordinary join marker; it does not take the canvas down.
+  That is a deliberate exception to the "nothing rescued to a default" rule
+  this package otherwise keeps, and it is bounded to exactly this callback:
+  the value being defaulted is one word of chrome, and the alternative is a
+  blank editor. `validate_config/1`, `slots/1`, `emit/2` and every other
+  callback keep the rule unweakened.
+
+The cap itself is a number ADR-0005 decision 10 should carry rather than this
+record; the spike's is 24 characters for both the badge and the join marker,
+chosen so that "calls the host" and "timer" fit and a sentence does not.
+
+### C. Who owns a block's label
+
+Two different things are spelled `label`, and the spike found the confusion the
+hard way: both `core.invoke` cards in the flagship demo render as "Invoke"
+while the fixtures pane says "Authorize the card" about the same card.
+
+- **A palette entry's `label` names the TYPE.** It is what the palette browser
+  and the "+" picker show, it defaults to the type name when a type declares
+  none, and it is ADR-0005 decision 10's.
+- **A block's label names THIS BLOCK.** It is the author's own words for one
+  card, it is per-block data, and it therefore lives in `config`.
+
+**C. The block label is editor-owned and editor-injected, not type-declared.**
+The editor injects an optional `label` field into every block type's config
+schema; a block type declares none, and one that declares one today migrates it
+away. This amends decision 7's implication that `config_schema/1`'s return is
+the complete field list a form renders: it is the complete list of the fields
+the *type* owns, and the editor may prepend fields it owns for every type.
+
+The universal form is the operator's 2026-08-28 ruling, and the reasoning is
+that the per-type alternative guarantees the gap recurs. Every card titles
+itself from its label; a type that forgets to declare the field is a card
+titled by its type name, which is a defect no reviewer catches because the
+card still renders. Making it a per-type declaration is asking every host,
+forever, to remember a field that has the same meaning in every type that has
+ever existed.
+
+The implementation of this - the injection, the inspector control, and
+migrating the demo types that declare their own - is sb-jvz's, and is not this
+record's to describe. What is recorded here is only the contract half: `label`
+in a block's config is the editor's field, and a block type neither declares it
+nor validates it.
+
+### D. Two additions to the core vocabulary, and two held back
+
+Decision 10's table lists seven types. This section proposes two more, both
+built and exercised in the spike as descriptors registered through the
+caller-supplied palette decision 2 already provides:
+
+| Block type | `slots(config)` | Config schema | `outcomes(config)` | Notes |
+|---|---|---|---|---|
+| `core.invoke` | `[{"on_error", :zero_or_one, "If it fails"}]` | `invoke_type`: `:string`; `assign_to`: `:string`; params (see below) | `done` and `error` | names an invoke type, never runs one - decision 2's two-registry seam |
+| `core.raise` | `[]` | `event`: `:string` | default (`done`) | a leaf that raises one event for an enclosing group's interrupt rail |
+
+**D1. `core.invoke`'s failure path is a slot, and its compiled target is
+ADR-0068's.** The `on_error` subtree is the target of a transition on
+statifier-ex ADR-0068's `error.communication.invoke.<invoke_id>` - the accepted
+upstream name, a blessed suffix extension of the `error.communication` that
+st-ADR-0051 decision 1 already assigns to this failure, with `<invoke_id>` the
+emitted invocation's own id. Two properties come free from upstream's choice
+and both matter here: a host chart already listening for `error.communication`
+catches the failure with no edit, by SCXML's descriptor prefix rule, and a
+chart naming the full event parks one invocation alone.
+
+An **absent `on_error`** emits no such transition at all and the error
+propagates as it does today. That is what makes the slot optional in fact and
+not only in arity, and under ADR-0004's amendment it costs a parent nothing: a
+parent may wire an outcome whose final was never emitted and the transition
+simply never fires.
+
+The emission itself - the `<invoke>`, the transition, and how the `on_error`
+subtree's completion reaches the error outcome's final - is ADR-0004's, and its
+amendment of this date works that example through in full. This row states only
+what the type *declares*.
+
+`core.invoke`'s params field is the one place the vocabulary is knowingly
+provisional: decision 7's field types are a closed set and none of them is "a
+list of name/path pairs", so the spike flattens the pairs into a `:string`, one
+`name=path` per line. That is a compromise that proves the type's shape without
+also proposing an editor feature, and whichever way it is resolved - a new
+field type, a dedicated control, or the flattening as shipped - is a decision 7
+change rather than a change to this row.
+
+**D2. `core.raise`'s send is a name, not a port.** A raise names an event and
+hands control on; the send-to-catch relationship is deliberately not an edge in
+the document but two blocks naming the same string, with the enclosing group's
+rail as where the catch lives. That is D13's answer arrived at from the other
+side, and it protects the same invariant: a port pointing at the handler it
+wakes would have been the first hand-drawn edge in a document, and a
+cross-subtree one at that.
+
+Whether the emission is `<raise>` or a zero-delay `<send>`, and whether a raise
+may carry a payload, are both open and both ADR-0004's; the second additionally
+needs decision 7's field-type set to grow, which is why neither is settled
+here.
+
+**D3. Two demo types are deliberately NOT promoted.** The spike also carries
+`myapp.guarded_on_event` and `myapp.timeout_rule`, and an earlier reading of the
+spike would have promoted all four. They are held back because the interrupt
+rail covered their demo use cases: a guarded event handler and a timeout rule
+are `core.on_event` and `core.wait` inside a group's `interrupts` slot, with
+the guard as a condition, and promoting them would put two types into the core
+vocabulary whose whole content is a spelling of an arrangement the vocabulary
+already expresses. They stay host types in `demo-types.js`, which is exactly
+what the extension seam is for, and they remain the best evidence that it
+works.
+
+### E. Consequences
+
+- The callback table grows by one optional row, and every existing block type
+  keeps working unchanged: no `outcomes/1` means one outcome named `done`,
+  which is the accepted behaviour spelled out.
+- The core vocabulary goes from seven types to nine. Both additions are
+  structural in the sense decision 10 uses - neither knows a host's domain -
+  and `core.invoke` is the first `core.*` type that names an invoke type,
+  which makes decision 2's two-registry seam something the shipped vocabulary
+  demonstrates rather than only describes.
+- `join_label` puts host code on the layout path for the first time. The purity
+  rule covers correctness and the rescue covers robustness; what neither covers
+  is cost, and a `join_label` that is expensive is a slow canvas. Naming that
+  is enough for now: the callback is called once per rendered join marker.
+- Adopting this and ADR-0004's amendment together moves compiled bytes for
+  every document, because the default outcome's final id changes. That is
+  ADR-0004's decision 6 obligation and is stated there; it is noted here only
+  so a reader of this record is not surprised by it.
+- The label injection means `config_schema/1`'s return is no longer the whole
+  form. A host reading the callback's return to build its own form - which
+  nothing in this package does, but a host might - gets the type's fields and
+  not the editor's.
+
+### F. Deferred questions, named rather than guessed
+
+- **Does an outcome declaration bind to a slot?** Section A2's rejected
+  alternative. Deciding yes would buy a reachability check and a slot caption;
+  deciding no keeps the binding in `emit/2` where the spike has it. Both
+  produce the same emission, so ADR-0004's amendment stands either way.
+- **Does the trio join ADR-0005 decision 10's metadata, and is a callback
+  allowed there at all?** That record's call, and its 14d amendment already
+  asks the operator half of it for `accent_token`. `join_label` sharpens the
+  question, because every other key decision 10 owns is inert data.
+- **Where does the badge/join-marker length cap live?** A number in this record
+  would be visual opinion in the wrong place; a number in no record is a
+  constant two implementations can disagree about.
+- **`core.invoke`'s params field**, per D1.
+- **`core.raise`'s emission and payload**, per D2.
