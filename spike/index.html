@@ -249,37 +249,12 @@
                 hidden
               >
                 <div class="sb-inspector__section">
-                  <h3 class="sb-inspector__section-title">Scopes</h3>
-                  <div class="sb-tree">
-                    <div class="sb-tree__scope">
-                      <div class="sb-tree__row">
-                        <span class="sb-tree__name">global</span>
-                        <span class="sb-tree__type">scope</span>
-                      </div>
-                      <div class="sb-tree__row sb-tree__row--nested">
-                        <span class="sb-tree__name">&mdash;</span>
-                        <span class="sb-tree__type">empty</span>
-                      </div>
-                    </div>
-                    <div class="sb-tree__scope">
-                      <div class="sb-tree__row">
-                        <span class="sb-tree__name">local</span>
-                        <span class="sb-tree__type">scope</span>
-                      </div>
-                    </div>
-                    <div class="sb-tree__scope">
-                      <div class="sb-tree__row">
-                        <span class="sb-tree__name">event</span>
-                        <span class="sb-tree__type">scope</span>
-                      </div>
-                    </div>
-                  </div>
-                  <p class="sb-placeholder">
-                    Typed datamodel tree with scope sections.
-                    <span class="sb-placeholder__wave">
-                      New design territory; W3 subject matter.
-                    </span>
-                  </p>
+                  <!-- The typed tree, rendered from `fixtures/datamodel.json`
+                       by `datamodel-pane.js`. The fixture's shape is the
+                       SPIKE'S PROPOSAL - no accepted ADR defines a datamodel
+                       document - so the pane's readings of it are design
+                       decisions, written down where they are made. -->
+                  <div id="sb-datamodel-panel" class="sb-datamodel"></div>
                 </div>
               </div>
 
@@ -292,12 +267,12 @@
                 hidden
               >
                 <div class="sb-inspector__section">
-                  <h3 class="sb-inspector__section-title">Condition</h3>
-                  <code class="sb-code">amount &gt; 0 and country = "US"</code>
-                  <p class="sb-hint">
-                    Plain editor pane. No completion: the predicator-grammar
-                    completion is a follow-up, not spike scope.
-                  </p>
+                  <!-- The selected block's condition-bearing fields, rendered
+                       by `inspector.js`. Tokenized for reading and checked
+                       against the datamodel's declared paths by static lookup;
+                       nothing here evaluates anything, and there is no
+                       completion (settled input 3). -->
+                  <div id="sb-condition-panel"></div>
                 </div>
               </div>
 
@@ -335,8 +310,7 @@
             </div>
 
             <div class="sb-pane__footer">
-              Datamodel, Condition and Fixtures are still placeholders
-              &middot; campaign 012 W3
+              Fixtures is still a placeholder &middot; campaign 012 W3
             </div>
           </section>
         </div>

@@ -201,6 +201,18 @@
         writeAtPath,
       } from "../js/panes.js";
 
+      import {
+        annotateCondition,
+        ancestorPaths,
+        conditionFields,
+        conditionPaths,
+        datamodelView,
+        exampleText,
+        indexPaths,
+        tokenizeCondition,
+        typeLabel,
+      } from "../js/datamodel.js";
+
       /* ------------------------------------------------ the assert harness */
 
       const groups = [];
@@ -2173,6 +2185,433 @@
           "every demo finding is marked as such",
           demoFindings("bdoc_cp_demo").every((one) => one.origin === "demo")
         );
+      });
+
+      /* ------------------------------------------- datamodel + condition */
+
+      /*
+       * A miniature of `fixtures/datamodel.json` - the same three scopes, the
+       * same per-entry keys, an object with fields, a list with an item type, a
+       * `one_of`, a note, and an example that is the empty string. Inline for
+       * the same reason every other fixture on this page is: the assertions are
+       * about the readings, and a page that fetched the real document would be
+       * asserting the fixture's contents as well.
+       *
+       * Its shape is the SPIKE'S PROPOSAL, not a record - no accepted ADR
+       * defines a datamodel document - so everything below is a check that the
+       * pane reads the proposal the way the pane's comments say it does.
+       */
+      function datamodelDoc() {
+        return {
+          version: 1,
+          scopes: [
+            {
+              scope: "global",
+              label: "Global",
+              description: "Host-owned. The same for every run.",
+              entries: [
+                {
+                  name: "limits",
+                  path: "limits",
+                  type: "object",
+                  label: "Limits",
+                  fields: [
+                    {
+                      name: "manual_review_backlog",
+                      path: "limits.manual_review_backlog",
+                      type: "integer",
+                      label: "Manual review backlog",
+                      example: 12,
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              scope: "local",
+              label: "Chart-local",
+              description: "One per run.",
+              entries: [
+                {
+                  name: "amount_cents",
+                  path: "amount_cents",
+                  type: "integer",
+                  label: "Amount (minor units)",
+                  example: 42350,
+                },
+                {
+                  name: "risk_reasons",
+                  path: "risk_reasons",
+                  type: "list",
+                  item_type: "string",
+                  label: "Risk reasons",
+                  example: ["velocity", "new_device"],
+                },
+                {
+                  name: "review",
+                  path: "review",
+                  type: "object",
+                  label: "Manual review",
+                  note: "Written by the park step.",
+                  fields: [
+                    {
+                      name: "parked",
+                      path: "review.parked",
+                      type: "boolean",
+                      label: "Parked",
+                      example: false,
+                    },
+                    {
+                      name: "resolution",
+                      path: "review.resolution",
+                      type: "string",
+                      label: "Resolution",
+                      example: "",
+                      one_of: ["", "approve", "decline"],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              scope: "event",
+              label: "Event payload",
+              description: "The payload of the event being handled.",
+              entries: [
+                {
+                  name: "review_resolved",
+                  path: "event.review_resolved",
+                  type: "object",
+                  label: "review.resolved",
+                  fields: [
+                    {
+                      name: "decision",
+                      path: "event.review_resolved.decision",
+                      type: "string",
+                      label: "Decision",
+                      example: "approve",
+                      one_of: ["approve", "decline"],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        };
+      }
+
+      const names = (nodes) => nodes.map((node) => node.path);
+
+      /* Rows the tree would show, which is deliberately NOT the match count. */
+      const countRows = (nodes) =>
+        nodes.reduce((sum, node) => sum + 1 + countRows(node.children), 0);
+
+      suite("datamodel: the typed tree, as the pane reads the spike's proposal", () => {
+        const view = datamodelView(datamodelDoc());
+
+        equal("three scopes, in document order", view.scopes.map((one) => one.scope), [
+          "global",
+          "local",
+          "event",
+        ]);
+
+        // A scope's chrome is its lifetime, which is the fact that decides
+        // which of two identically-named paths an author wants.
+        equal("a scope carries its own description", view.scopes[1].description, "One per run.");
+        // The `event.` prefix is stated once on the scope, not on every row.
+        equal("only the event scope is prefixed", view.scopes.map((one) => one.prefix), [
+          "",
+          "",
+          "event.",
+        ]);
+
+        // Every entry counts, nested fields included - the number under the
+        // search box has to be the number the tree can show.
+        equal("the total counts nested fields too", view.total, 9);
+        equal("and nothing is filtered out with no query", view.matched, 9);
+
+        const local = view.scopes[1];
+        equal("top-level entries keep document order", names(local.nodes), [
+          "amount_cents",
+          "risk_reasons",
+          "review",
+        ]);
+
+        const review = local.nodes[2];
+        check("an object with fields is a container", review.container === true);
+        equal("its children are its fields", names(review.children), [
+          "review.parked",
+          "review.resolution",
+        ]);
+        equal("nesting is carried as a depth", review.children[0].depth, 1);
+        equal("a note rides along", review.note, "Written by the park step.");
+
+        // A leaf is not a container even though the tree can hold one.
+        check("a scalar is not a container", local.nodes[0].container === false);
+        check("nor is a list of scalars", local.nodes[1].container === false);
+      });
+
+      suite("datamodel: how a type and an example read", () => {
+        const view = datamodelView(datamodelDoc());
+        const local = view.scopes[1];
+
+        // `list` alone answers nothing an author writing a condition needs.
+        equal("a list says what it holds", typeLabel(local.nodes[1]), "list of string");
+        equal("a scalar says its own type", typeLabel(local.nodes[0]), "integer");
+        equal("an object says object", typeLabel(local.nodes[2]), "object");
+
+        // Quoted the way it would be written: `"USD"` against `USD` is the
+        // difference between a condition that works and one that does not.
+        equal("an integer example is bare", exampleText(local.nodes[0]), "42350");
+        equal(
+          "a list example joins its items, quoted",
+          exampleText(local.nodes[1]),
+          '"velocity", "new_device"'
+        );
+        equal("an object has no example of its own", exampleText(local.nodes[2]), null);
+        equal("a boolean example reads as one", exampleText(local.nodes[2].children[0]), "false");
+
+        // The case that makes presence-not-truthiness matter: an empty string
+        // IS the value that arm's condition compares against.
+        equal(
+          "an empty-string example survives as one",
+          exampleText(local.nodes[2].children[1]),
+          '""'
+        );
+        equal("and its closed set comes through", local.nodes[2].children[1].oneOf, [
+          "",
+          "approve",
+          "decline",
+        ]);
+      });
+
+      suite("datamodel: the filter keeps a matched parent whole", () => {
+        const doc = datamodelDoc();
+
+        // Matching on the full PATH, because an author with a condition in
+        // front of them searches for `review.parked`, not for "Parked".
+        const byPath = datamodelView(doc, "review.parked");
+        equal("a full path matches its entry", byPath.matched, 1);
+        equal(
+          "and only its own scope keeps anything",
+          byPath.scopes.map((one) => one.matched),
+          [0, 1, 0]
+        );
+
+        // The asymmetry: a matched parent keeps ALL its children, an unmatched
+        // one keeps only the children that matched. `review` with three of its
+        // five fields and no sign that two are missing is the reading everyone
+        // calls a bug.
+        // Two entries carry those words - the `review` object here and
+        // `limits.manual_review_backlog` a scope away - and the count says two.
+        // The object then shows three ROWS, because it brings its fields with
+        // it; counting those as matches would make one hit read as three,
+        // which the author can see is wrong from the highlighting alone.
+        const parent = datamodelView(doc, "manual review");
+        equal("the count is entries that matched", parent.matched, 2);
+        equal("a matched object is shown with all of its children", countRows(parent.scopes[1].nodes), 3);
+        equal(
+          "including ones that do not match themselves",
+          names(parent.scopes[1].nodes[0].children),
+          ["review.parked", "review.resolution"]
+        );
+
+        const child = datamodelView(doc, "resolution");
+        equal("an unmatched parent is kept for its match", child.matched, 1);
+        equal("but is shown, so the match has a home", countRows(child.scopes[1].nodes), 2);
+        equal("with only the matching child", names(child.scopes[1].nodes[0].children), [
+          "review.resolution",
+        ]);
+
+        // Searching by type answers "every datetime in this chart", which is a
+        // real question a typed tree should be able to answer.
+        equal("a type is searchable", datamodelView(doc, "boolean").matched, 1);
+        equal(
+          "and finds the nested one",
+          names(datamodelView(doc, "boolean").scopes[1].nodes[0].children),
+          ["review.parked"]
+        );
+
+        // An empty scope is still listed. A section that vanishes reads as a
+        // broken pane; "nothing here matches" is information.
+        const none = datamodelView(doc, "nothing_at_all");
+        equal("a miss still lists every scope", none.scopes.length, 3);
+        check("and says so", none.empty === true);
+        check("a hit does not", datamodelView(doc, "review").empty === false);
+        check("nor does an empty query", datamodelView(doc, "").empty === false);
+
+        // The label's matched runs are data, never markup - the same rule the
+        // palette's highlighter follows for the same reason.
+        equal("the label is split into runs", child.scopes[1].nodes[0].children[0].labelSegments, [
+          { text: "Resolution", match: true },
+        ]);
+        // Both names are lit, because the row shows both and lighting one
+        // would look like the filter had missed the other.
+        equal("and so is the name", child.scopes[1].nodes[0].children[0].nameSegments, [
+          { text: "resolution", match: true },
+        ]);
+      });
+
+      suite("datamodel: the path index, and what a reveal has to unfold", () => {
+        const index = indexPaths(datamodelDoc());
+
+        equal("every declared path is indexed", index.size, 9);
+        check("a leaf resolves", index.has("review.parked"));
+        // Containers are indexed too: `card` is a path an author can name, and
+        // an index of leaves alone would flag it unknown while its own field
+        // was known.
+        check("a container resolves as well", index.has("review"));
+        check("an event path keeps its prefix", index.has("event.review_resolved.decision"));
+        check("an undeclared path does not", index.has("review.parkd") === false);
+
+        const entry = index.get("event.review_resolved.decision");
+        equal("an entry knows its scope", entry.scope, "event");
+        equal("and its scope's label", entry.scopeLabel, "Event payload");
+        equal("and its type", entry.type, "string");
+        equal("and its closed set", entry.oneOf, ["approve", "decline"]);
+
+        // The reveal contract: every ancestor, outermost first, is what the
+        // pane has to unfold before the target is on screen at all.
+        equal("a nested path names its ancestors", ancestorPaths("event.review_resolved.decision"), [
+          "event",
+          "event.review_resolved",
+        ]);
+        equal("a top-level path has none", ancestorPaths("amount_cents"), []);
+      });
+
+      suite("condition: tokenizing is lossless, and it classifies", () => {
+        const source = "fraud.verdict == 'review' AND limits.manual_review_backlog < 50";
+        const tokens = tokenizeCondition(source);
+
+        // The property the whole coloured rendering rests on: what is on
+        // screen is byte-for-byte the stored condition, never rebuilt.
+        equal("concatenating the tokens is the input", tokens.map((one) => one.text).join(""), source);
+
+        const kinds = tokens.filter((one) => one.kind !== "space").map((one) => one.kind);
+        equal("each part is classified", kinds, [
+          "path",
+          "operator",
+          "string",
+          "keyword",
+          "path",
+          "operator",
+          "number",
+        ]);
+
+        // Both spellings, because predicator takes both and a highlighter that
+        // refused one would be making a language decision that is not its.
+        equal(
+          "= and == are both operators",
+          tokenizeCondition("a = 1 AND b == 2").filter((one) => one.kind === "operator").length,
+          2
+        );
+        equal(
+          "so are the four comparisons",
+          tokenizeCondition("a >= 1 AND b <= 2 AND c != 3 AND d > 4")
+            .filter((one) => one.kind === "operator")
+            .map((one) => one.text),
+          [">=", "<=", "!=", ">"]
+        );
+
+        equal("parens are their own kind", tokenizeCondition("(a)")[0].kind, "paren");
+        equal(
+          "a double-quoted string is one token",
+          tokenizeCondition('a == "two words"').filter((one) => one.kind === "string")[0].text,
+          '"two words"'
+        );
+        equal(
+          "a bare word is a path",
+          tokenizeCondition("auth.approved")[0].path,
+          "auth.approved"
+        );
+        // A condition an author is halfway through typing still has to render.
+        equal("a half-typed condition still tokenizes", tokenizeCondition("amount_cents >").length, 3);
+        equal("and an empty one is empty", tokenizeCondition(""), []);
+        equal("as is a missing one", tokenizeCondition(null), []);
+      });
+
+      suite("condition: paths are looked up, never evaluated", () => {
+        const index = indexPaths(datamodelDoc());
+        const source = "review.parked AND event.review_resolved.decision == 'approve'";
+
+        const annotated = annotateCondition(source, index).filter((one) => one.kind === "path");
+        equal("every path is resolved", annotated.map((one) => one.known), [true, true]);
+        equal("a known path carries its entry", annotated[0].entry.label, "Parked");
+
+        // Unknown means "the datamodel does not declare this", never "this is
+        // wrong" - which is why this is advisory and not a finding.
+        const typo = conditionPaths("review.parkd == true", index);
+        equal("an undeclared path is flagged", typo.map((one) => one.known), [false]);
+        equal("and carries no entry", typo[0].entry, null);
+
+        // `true` typed in lower case must not be reported as an unknown path;
+        // it is the single most confusing thing this pane could say.
+        const literals = annotateCondition("a == true OR b == false", index);
+        equal(
+          "lower-case literals are literals",
+          literals.filter((one) => one.kind === "literal").map((one) => one.text),
+          ["true", "false"]
+        );
+        equal(
+          "and the keywords are keywords",
+          literals.filter((one) => one.kind === "keyword").map((one) => one.text),
+          ["OR"]
+        );
+
+        // First-appearance order, de-duplicated: the footer's count is a claim
+        // a reader of a screenshot can check against the highlighted source.
+        equal(
+          "repeats are counted once, in first-appearance order",
+          conditionPaths("amount_cents > 0 AND amount_cents < 100 AND review.parked", index).map(
+            (one) => one.path
+          ),
+          ["amount_cents", "review.parked"]
+        );
+
+        // With no datamodel document at all the pane still tokenizes; it just
+        // has no basis for the affirmative treatment.
+        equal(
+          "with no index nothing is known",
+          conditionPaths("review.parked", new Map()).map((one) => one.known),
+          [false]
+        );
+      });
+
+      suite("condition: which fields carry one is derived, not listed", () => {
+        const doc = cardDocument();
+
+        // The decision worth naming: a condition is any field whose declared
+        // type is `expression`, so a host type nobody here has heard of gets
+        // the pane for free and this file names no block type at all.
+        const branch = conditionFields(configFormFor(registry, findBlock(doc, "blk_BR")));
+        equal("a branch offers one condition per arm", branch.length, 1);
+        equal("labelled the way the arm reads", branch[0].label, 'When "approved"');
+        equal("and written through the arm's valuePath", branch[0].path, ["arms", 0, "cond"]);
+        equal("carrying the stored source", branch[0].value, "budget_remaining > amount");
+
+        // A step has config and no condition, which is the pane's empty state.
+        equal("a wait carries none", conditionFields(configFormFor(registry, findBlock(doc, "blk_WAI"))), []);
+        equal(
+          "nor does a plain interrupt rule",
+          conditionFields(configFormFor(registry, findBlock(doc, "blk_INT"))),
+          []
+        );
+
+        // d12: no schema, so nothing can say which stored value is a
+        // condition, and guessing would invent the decision d12 refuses to.
+        equal(
+          "an unresolvable block offers none",
+          conditionFields(configFormFor(registry, findBlock(retiredDocument(), "blk_GONE"))),
+          []
+        );
+        equal("and neither does no block at all", conditionFields(null), []);
+
+        // An edit from this pane is the same command the config form issues -
+        // one `:update_config`, one undo step, one stored value.
+        const config = findBlock(doc, "blk_BR").config;
+        const next = writeAtPath(config, branch[0].path, "risk_rating < 40");
+        equal("an edit writes through the same path", next.arms[0].cond, "risk_rating < 40");
+        equal("without mutating what undo holds", config.arms[0].cond, "budget_remaining > amount");
       });
 
       /* ------------------------------------------------------- reporting */
