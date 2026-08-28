@@ -3,22 +3,31 @@
     "Spike fixture, the small case. Same adaptations as card-processing.json:",
     "'_comment' keys are additive and not part of the ADR-0001 node shape or",
     "envelope, and the file is pretty-printed rather than canonical.",
-    "Shape: 15 blocks, maximum nesting depth 4 (root = depth 1). Every block type",
+    "Shape: 16 blocks, maximum nesting depth 4 (root = depth 1). Every block type",
     "here except myapp.signup_step / myapp.notify / myapp.provision is core.*, and",
     "every datamodel path in a 'cond' resolves in ../datamodel.json.",
     "This document is the 'does the canvas still look right when there is almost",
     "nothing on it' fixture.",
-    "One block type here is PROPOSED and not shipped: core.raise, in js/proposed-",
-    "core.js. It is the send half of the send -> interrupt wiring (sb-cy5) - the",
-    "otherwise arm of the plan branch raises signup.abandoned, and the rail of the",
-    "group the branch sits in catches it. The two are not joined by an edge; they",
-    "name the same event, and the innermost enclosing group is what catches it.",
-    "The verify group further up names the same event on its own rail, which is a",
-    "second scope rather than a second catcher for this raise."
+    "Two block types here are PROPOSED and not shipped, both in js/proposed-",
+    "core.js:",
+    "  core.raise - the send half of the send -> interrupt wiring (sb-cy5). The",
+    "  otherwise arm of the plan branch raises signup.abandoned, and the rail of",
+    "  the group the branch sits in catches it. The two are not joined by an edge;",
+    "  they name the same event, and the innermost enclosing group is what catches",
+    "  it. The verify group further up names the same event on its own rail, which",
+    "  is a second scope rather than a second catcher for this raise.",
+    "  core.send (sb-ajr) - the same wiring with a CLOCK in it. The first block in",
+    "  the onboarding group arms signup.abandoned for PT2H, so the group has two",
+    "  senders of one event feeding one rule: the raise, immediately, when no plan",
+    "  matches, and the delayed send, later, when nobody finished. Nothing joins",
+    "  either card to the rail; all three name the same string.",
+    "  Worth reading beside core.timeout: a delayed send caught by a rail is the",
+    "  long-hand of what a timeout rule says in one card. Both forms are in the",
+    "  spike on purpose, and which one the vocabulary should keep is Phase B's."
   ],
   "schema_version": 1,
   "id": "bdoc_signup_demo",
-  "revision": 7,
+  "revision": 8,
   "metadata": {
     "name": "Signup wizard",
     "description": "Collect an account, verify the email, branch on the chosen plan, and provision.",
@@ -93,6 +102,16 @@
           "type_version": 1,
           "slots": {
             "body": [
+              {
+                "type": "core.send",
+                "id": "blk_su_onboarding_deadline",
+                "type_version": 1,
+                "config": {
+                  "event": "signup.abandoned",
+                  "delay": "PT2H",
+                  "label": "Give onboarding two hours"
+                }
+              },
               {
                 "type": "core.branch",
                 "id": "blk_su_plan",
