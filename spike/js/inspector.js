@@ -30,6 +30,7 @@
  */
 
 import {
+  addMapRow,
   addRow,
   anchorLabel,
   canonicalJson,
@@ -38,8 +39,11 @@ import {
   durationParts,
   durationUnits,
   moveRow,
+  removeMapRow,
   removeRow,
+  renameMapRow,
   seedRow,
+  setMapValue,
   severityCounts,
   writeAtPath,
 } from "./panes.js";
@@ -207,7 +211,12 @@ function fieldElement(field, form, host) {
   // ADR-0005 decision 11: "a `:config` finding renders inline beneath its
   // field". Routed by the anchor's key, which is the key `validate_config/1`
   // reports against - the reason `core.branch` keys an arm by its slot name.
-  for (const finding of field.findings) {
+  //
+  // sb-e2x: a map control has already drawn the findings that name one of its
+  // rows, on that row, and hands back `fieldFindings` for what is left. Every
+  // other control has no `fieldFindings` and renders the whole set here, which
+  // is exactly the behaviour this loop had before.
+  for (const finding of field.fieldFindings ?? field.findings) {
     wrapper.append(
       el("p", {
         class: "sb-field__finding",
@@ -232,6 +241,8 @@ function control(field, id, commit, host, form) {
       return durationControl(field, id, commit);
     case "list":
       return listControl(field, id, commit, host, form);
+    case "map":
+      return mapControl(field, id, commit);
     case "expression":
       return textControl(field, id, commit, { mono: true, placeholder: "an expression" });
     default:
@@ -559,6 +570,129 @@ function moveAndFollow(field, rows, index, step, commit) {
       ?.querySelector(`[data-row-index="${to}"]`)
       ?.querySelector(`[data-dir="${step < 0 ? "down" : "up"}"]`)
       ?.focus();
+}
+
+/*
+ * sb-e2x's key/path row control, for the proposed `{ map: T }` field type.
+ *
+ * Two columns and three gestures - rename a key, edit a value, remove a row -
+ * plus "add row". There is deliberately no reorder: a map has no row order, and
+ * a control that offered to change one would be promising the author something
+ * the document cannot store. The list control's ordinals are gone for the same
+ * reason; the key IS the row's name.
+ *
+ * Nothing here knows what field it is drawing. `keyLabel` and `valueLabel` come
+ * off the declaration, the row findings come off `validate_config/1` routed by
+ * `row` in `panes.js`, and the value control is `controlFor(field.type.map)` -
+ * so `core.invoke` and `core.subchart` get this control by declaring the type,
+ * and a host type that declares it gets the same one.
+ *
+ * A key commits on `change`, which is blur: rows sort by key, so committing per
+ * keystroke would make a row jump out from under the cursor mid-word.
+ */
+function mapControl(field, id, commit) {
+  // The map as the form last derived it. `fromEntries` defines own properties
+  // rather than assigning them, so a `"__proto__"` row is a key here and not a
+  // prototype - the same rule `writeAtPath` states for a path segment.
+  const current = () =>
+    Object.fromEntries(field.rows.map((row) => [row.key, row.value]));
+
+  const list = el("div", { class: "sb-rows sb-rows--map", id });
+
+  list.append(
+    el("div", { class: "sb-rows__head" }, [
+      el("span", { class: "sb-rows__head-cell", text: field.keyLabel }),
+      el("span", { class: "sb-rows__head-cell", text: field.valueLabel }),
+      el("span", { class: "sb-rows__head-spacer" }),
+    ])
+  );
+
+  for (const row of field.rows) {
+    list.append(mapRow(field, row, current, commit));
+  }
+
+  if (field.rows.length === 0) {
+    list.append(el("p", { class: "sb-rows__empty", text: "No rows yet." }));
+  }
+
+  const unnamed = field.rows.some((row) => row.key === "");
+  const add = el("button", {
+    class: "sb-button sb-button--quiet sb-rows__add",
+    type: "button",
+    text: "Add row",
+    title: unnamed ? `Name the empty ${field.keyLabel.toLowerCase()} first` : "",
+  });
+
+  // A map cannot hold two unnamed rows. Said with a disabled button and a
+  // title rather than with a click that appears to do nothing.
+  add.disabled = unnamed;
+  add.addEventListener("click", () => commit(addMapRow(current())));
+
+  return el("div", { class: "sb-field__control" }, [list, add]);
+}
+
+function mapRow(field, row, current, commit) {
+  const name = row.key === "" ? "unnamed row" : row.key;
+
+  const key = el("input", { class: "sb-input sb-rows__input sb-rows__key", type: "text" });
+  key.value = row.key;
+  key.setAttribute("aria-label", `${field.keyLabel} for ${name}`);
+
+  const value = el("input", { class: "sb-input sb-rows__input", type: "text" });
+  value.value = row.value === undefined || row.value === null ? "" : String(row.value);
+  value.setAttribute("aria-label", `${field.valueLabel} for ${name}`);
+
+  const wrapper = el("div", { class: "sb-rows__row", "data-row-key": row.key }, [
+    key,
+    value,
+    rowButton("×", `Remove ${name}`, false, "remove", () =>
+      commit(removeMapRow(current(), row.key))
+    ),
+  ]);
+
+  key.addEventListener("change", () => {
+    const attempted = key.value.trim();
+    const renamed = renameMapRow(current(), row.key, attempted);
+
+    if (renamed === null) {
+      // The one gesture a map makes destructive, refused where the author can
+      // see it: nothing is stored and the old key goes back in the box.
+      key.value = row.key;
+      collision(wrapper, attempted);
+      return;
+    }
+
+    commit(renamed);
+  });
+
+  value.addEventListener("change", () =>
+    commit(setMapValue(current(), row.key, coerceRow(field.valueType, value.value)))
+  );
+
+  for (const finding of row.findings ?? []) {
+    wrapper.append(
+      el("p", {
+        class: "sb-field__finding sb-rows__finding",
+        "data-severity": finding.severity ?? "error",
+        text: finding.message,
+      })
+    );
+  }
+
+  return wrapper;
+}
+
+function collision(wrapper, key) {
+  for (const stale of wrapper.querySelectorAll("[data-collision]")) stale.remove();
+
+  wrapper.append(
+    el("p", {
+      class: "sb-field__finding sb-rows__finding",
+      "data-severity": "error",
+      "data-collision": "true",
+      text: `Another row is already named "${key}", so the rename was not stored.`,
+    })
+  );
 }
 
 function coerceRow(itemType, raw) {

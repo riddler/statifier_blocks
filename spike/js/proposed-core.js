@@ -85,81 +85,237 @@ const INVOKE_TYPE = /^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/;
  * for them to drift. */
 const EVENT_NAME = /^[A-Za-z_][A-Za-z0-9_.\-]*$/;
 
-/* One `name=path` pair, with whitespace around either side tolerated. The
- * name is an identifier; the path is any non-empty run of non-whitespace,
- * because this file does not own the datamodel path grammar and guessing at
- * it here would be a second, quieter proposal. */
-const PARAM_LINE = /^\s*([a-z][a-z0-9_]*)\s*=\s*(\S+)\s*$/;
-
 const nonEmptyString = (value) => typeof value === "string" && value !== "";
 const isIdentifier = (value) => nonEmptyString(value) && IDENTIFIER.test(value);
 const isInvokeType = (value) => nonEmptyString(value) && INVOKE_TYPE.test(value);
 const isEventName = (value) => nonEmptyString(value) && EVENT_NAME.test(value);
 const verdict = (findings) => (findings.length === 0 ? null : findings);
 
-/**
- * The non-blank lines of a `params` block, in order. Blank lines are ignored
- * rather than refused: an author who leaves a trailing newline in a textarea
- * has not made an error, and a validator that says otherwise trains people to
- * stop reading it.
+/* --------------------------------------------------------------- params
+ *
+ * ## The storage shape (sb-e2x): a MAP, not text
+ *
+ * `params` used to be a plain `string`, one `name=path` pair per line, and
+ * this file called that a compromise in so many words: ADR-0002 decision 7's
+ * field types are a closed set and none of them is "a list of pairs". The
+ * compromise is gone, and it is gone from the STORED BYTES rather than hidden
+ * behind a nicer control:
+ *
+ *     "params": { "amount": "amount_cents", "currency": "currency" }
+ *
+ * Two principles decided it, in this order.
+ *
+ * ONE HOME FOR ONE FACT. A param binding is two facts - a name the host
+ * handler receives, and a datamodel path the value is read from. In the text
+ * form neither has a home: they live inside a line, inside a newline-joined
+ * blob, in a micro-format no record defines, and every reader that wants
+ * either one - `validate_config/1`, the document-level declaration pass, the
+ * compile sketch, and one day a compiler - has to re-derive it by parsing.
+ * Four parsers of an undocumented format is four chances to disagree about
+ * what a document says. As a map each fact has a JSON address, and ADR-0002's
+ * `value_path` amendment already gives the editor the vocabulary to point at
+ * one (`["params", "amount"]`).
+ *
+ * THE HONEST REPLAYER. The spike's documents are meant to be what a host
+ * would really store. A structured editor over a flattened text field would
+ * show an author rows while storing prose, and the parse/serialize layer
+ * between the two is exactly where a spike stops being evidence: line order,
+ * blank lines, padding whitespace and duplicate names all survive in the
+ * stored bytes but not in the control, so the round trip is lossy in the
+ * direction that matters (what the author sees is not what the document
+ * holds). Removing the compromise means removing it from storage.
+ *
+ * WHAT THE MAP BOUGHT, beyond the two principles:
+ *
+ *   - duplicate names are structurally impossible, so the "two params cannot
+ *     share the name" finding is deleted rather than reworded - the shape
+ *     enforces what the validator used to have to say;
+ *   - ADR-0001 decision 8 sorts object keys, so a document's identity stops
+ *     depending on the order an author happened to type the lines in. Two
+ *     documents that bind the same params are now byte-identical;
+ *   - ADR-0001 decision 6 is untouched: keys and values are strings, and
+ *     nothing here is a float.
+ *
+ * WHAT IT COST, paid rather than dodged: a document migration. Both shipped
+ * fixture documents were rewritten by hand (five `params` values), along with
+ * the selftest's assertions about them. `fixtures/runs.json` carries no
+ * `params` and needed no change. That is the whole bill, and it is the reason
+ * to pay it now rather than after a host has stored any.
+ *
+ * WHAT ORDER STOPPED BEING. A map has no row order, so the control has no
+ * "move row up" gesture and the rows render in key order. That is a real loss
+ * against the text field and it is the right one: nothing downstream reads
+ * params positionally (a handler receives them by name), so row order was a
+ * fact the document was storing on the author's behalf without anyone needing
+ * it - and storing it is what made two equivalent documents hash differently.
  */
-export function paramLines(value) {
-  if (typeof value !== "string") return [];
-  return value.split("\n").filter((line) => line.trim() !== "");
-}
+
+/* The path grammar this file is willing to assert: non-empty, no whitespace.
+ * Deliberately not tighter - this file does not own the datamodel path
+ * grammar, and guessing at it here would be a second, quieter proposal. The
+ * same latitude the `name=path` line took for its right-hand side. */
+const isPathish = (value) =>
+  typeof value === "string" && value.trim() !== "" && !/\s/.test(value.trim());
+
+const isConfigMap = (value) =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
 
 /**
- * `params` parsed into `{ name, path }` pairs, or the ordered list of the
- * lines that did not parse. Exported because `dev/selftest.html` checks the
- * parse directly - the string field is a spike compromise (see below) and the
- * shape it stands in for is the part worth pinning down.
+ * `params` as `{ name, path }` rows, in key order. Exported because
+ * `dev/selftest.html` checks the derivation directly and because the compile
+ * sketches below describe what a row becomes.
+ *
+ * Key order, not insertion order, and the two agree with ADR-0001 decision
+ * 8's canonical key sort: the key grammar is `[a-z][a-z0-9_]*`, so every
+ * well-formed key is ASCII and a code-unit sort IS a UTF-8 byte sort. A row
+ * whose key is mid-edit and not yet an identifier still sorts deterministically
+ * - it just may not sort where its bytes eventually will, which is a redraw an
+ * author sees on blur rather than a difference in what is stored.
  */
-export function parseParams(value) {
-  const ok = [];
-  const bad = [];
+export function paramRows(value) {
+  if (!isConfigMap(value)) return [];
 
-  for (const line of paramLines(value)) {
-    const match = PARAM_LINE.exec(line);
-    if (match) ok.push({ name: match[1], path: match[2] });
-    else bad.push(line.trim());
-  }
-
-  return { params: ok, malformed: bad };
+  return Object.keys(value)
+    .sort()
+    .map((name) => ({ name, path: value[name] }));
 }
 
 /*
  * The two config checks `core.invoke` and `core.subchart` share, written once.
  *
  * Not a general utility and not exported as one: they exist because the two
- * types make the SAME proposal - a text `params` field standing in for a list
- * of pairs (see `core.invoke`'s note), and an optional `assign_to` naming
- * where the outcome lands - and a second spelling of either would be two
- * chances for the proposal to drift from itself inside one file. The shared
- * predicates this file duplicates from `palette.js` are a different case and
- * the header says why.
+ * types make the SAME proposal - the `params` map above, and an optional
+ * `assign_to` naming where the outcome lands - and a second spelling of either
+ * would be two chances for the proposal to drift from itself inside one file.
+ * The shared predicates this file duplicates from `palette.js` are a different
+ * case and the header says why.
+ *
+ * Every row finding carries `row`, the map key it is about, beside the `key`
+ * ADR-0005 decision 11's anchor already carries. That is a PROPOSED widening
+ * of the finding shape and it is flagged as one at the field declaration; a
+ * reader that ignores `row` gets today's behaviour exactly - the message under
+ * the field - which is why the messages name their row in words as well.
  */
 function paramFindings(config) {
-  if ("params" in config && typeof config.params !== "string") {
-    return [{ key: "params", message: "must be text, one name=path pair per line" }];
+  if (config.params === undefined) return [];
+
+  if (!isConfigMap(config.params)) {
+    return [{ key: "params", message: "must be a map of names to datamodel paths" }];
   }
 
   const findings = [];
-  const { params, malformed } = parseParams(config.params);
 
-  for (const line of malformed) {
-    findings.push({ key: "params", message: `"${line}" is not a name=path pair` });
-  }
-
-  const seen = new Set();
-  for (const { name } of params) {
-    if (seen.has(name)) {
-      findings.push({ key: "params", message: `two params cannot share the name "${name}"` });
+  for (const { name, path } of paramRows(config.params)) {
+    if (name !== "" && !isIdentifier(name)) {
+      findings.push({
+        key: "params",
+        row: name,
+        message: `"${name}" is not a name: use lowercase letters, digits and underscores, starting with a letter`,
+      });
     }
-    seen.add(name);
+
+    if (isBlank(path)) continue;
+
+    if (!isPathish(path)) {
+      findings.push({
+        key: "params",
+        row: name,
+        message: `${name === "" ? "the unnamed row" : `"${name}"`} needs a datamodel path, like signup.email`,
+      });
+    }
   }
 
   return findings;
 }
+
+const isBlank = (value) => value === undefined || value === null || value === "";
+
+/*
+ * ## Why the HALF-WRITTEN row is silent, and why that is a gate consequence
+ * rather than a taste
+ *
+ * A row with no name yet, and a named row with no path yet, produce no
+ * finding. That is not leniency, it is the only shape that leaves the control
+ * usable, and finding out why is what this bead's verify pass was for.
+ *
+ * ADR-0005 decision 9's gate is absolute: an `update_config` reaches the
+ * document ONLY when `validate_config/1` returns ok (`checkConfig` in
+ * `edit.js`). So a finding about a row is not a message beside a row - it is a
+ * REFUSAL of the whole edit that contains it. "Add row" creates an unnamed row;
+ * if an unnamed row is a finding, the add is refused and the row can never come
+ * into existence. Naming it is the next edit; if a named row with no path yet
+ * is a finding, that one is refused too. A validator that spoke at either
+ * moment would have made a control that cannot be used at all - which is
+ * exactly what the first cut of this control did, and what a browserless
+ * gesture check caught.
+ *
+ * The precedent is already in this file and in sb-c2o's pass, for the same
+ * reason in different words: an empty `assign_to` is silent, and the
+ * declaration check stays silent on an empty value because "the type's own
+ * error already says the field is unfinished". Here the row itself is the
+ * thing that says so - an empty box in front of the author's cursor - and a
+ * refusal is the least useful possible way to repeat it.
+ *
+ * What stays checked is every part an author has actually written: a name that
+ * is not an identifier, and a path that is not a path. Those are wrong rather
+ * than unfinished, and refusing them is decision 9 working as intended.
+ *
+ * NAMED, NOT BUILT: nothing yet says "this row is unfinished and will bind
+ * nothing" at the moment it stops being in progress - the document-level pass
+ * is where such a warning could live, since a warning there is not a refusal,
+ * and `layout.js` already walks every annotated field. Whether an unfinished
+ * row is worth a warning, and what a compiler does with one, are Phase-B
+ * questions this file does not answer.
+ */
+
+/*
+ * The `params` field declaration, written once and shared by both types that
+ * make the proposal, for the same one-spelling reason `paramFindings` is
+ * shared. A function rather than a constant because `configSchema/1` is called
+ * per render and a shared mutable `default` would be one object every form
+ * points at.
+ *
+ * ## PROPOSED FIELD TYPE (sb-e2x): `{ map: <member of the closed set> }`
+ *
+ * FLAGGED DIVERGENCE, in the idiom the rest of this file uses for a proposed
+ * key: ADR-0002 decision 7's field-type set is CLOSED, and this is a new
+ * member of it. Nothing here amends the record - whether the set widens is an
+ * operator's call on a Phase-B finding, and this file is the evidence for it,
+ * not the decision.
+ *
+ * The shape is deliberately `{ list: T }`'s, one word over: a container type
+ * parameterised by a member of the closed set, so the editor's control mapping
+ * stays total and a host declaring one gets a control the editor can already
+ * draw. Keys are strings (ADR-0001 decision 6 says config keys are), and this
+ * type's key grammar is the identifier grammar - which is a rule
+ * `validate_config/1` states and the schema only hints at, exactly as decision
+ * 7 asks.
+ *
+ * What is NOT proposed here is a `datamodel_path` field type. sb-c2o already
+ * settled that question the other way: the fact "this string names a datamodel
+ * path" is an ANNOTATION beside the type, and `datamodelPath: "reads"` below is
+ * that same annotation reading the map's VALUES rather than a bare string. A
+ * host type that wants the declaration warning on its own map field gets it by
+ * declaring the annotation, and `layout.js` still never learns a type name.
+ *
+ * `keyLabel` and `valueLabel` are the third proposed key, and the smallest one:
+ * a two-column row control has two column headings, and "Name"/"Datamodel path"
+ * are facts about this field that only this field knows. Absent, the control
+ * falls back to "Key"/"Value".
+ */
+const paramsField = () => ({
+  key: "params",
+  type: { map: "string" },
+  label: "Params",
+  required: false,
+  default: {},
+  keyLabel: "Name",
+  valueLabel: "Datamodel path",
+  /* sb-c2o's annotation, applied per map VALUE: a params path is a path this
+   * block READS, so an undeclared one warns with the "read a path it already
+   * declares" ending rather than the "write it somewhere else" one. */
+  datamodelPath: "reads",
+});
 
 /*
  * Optional, so an absent key and an empty string are both fine; anything
@@ -219,15 +375,12 @@ function assignToFindings(config) {
  * how a two-outcome block reconciles with ADR-0004's single-final emission -
  * is a Phase-B finding.
  *
- * ## The params field is a spike compromise
+ * ## The params field
  *
- * `params` is a plain `string`, one `name=path` pair per line, because
- * ADR-0002 decision 7's field types are a CLOSED set and none of them is "a
- * list of pairs". The honest options were to propose a new field type or to
- * flatten the pairs into text; the second one proves the block type's shape
- * without also proposing an editor feature. A structured param editor - a
- * `{ list: { record: ... } }` field type, or a dedicated control - is a
- * Phase-B question, and the shape it would carry is `parseParams` above.
+ * A map of name to datamodel path, edited as key/path rows. The text-field
+ * compromise this section used to describe is gone, in the bytes as well as in
+ * the control; the reasoning, the migration it cost and the field type it
+ * proposes are all in the `params` section above, which both types share.
  */
 const coreInvoke = {
   name: "core.invoke",
@@ -254,13 +407,7 @@ const coreInvoke = {
        * fact about the string, not a new control. */
       datamodelPath: "writes",
     },
-    {
-      key: "params",
-      type: "string",
-      label: "Params (one name=path per line)",
-      required: false,
-      default: "",
-    },
+    paramsField(),
   ],
   validateConfig: (config) => {
     const findings = [];
@@ -365,8 +512,9 @@ const coreInvoke = {
  * `event.*`, are both open. The datamodel fixture already declares payload
  * fields for `signup.abandoned`, so the second question has a shape; a
  * `payload` config field would need ADR-0002 decision 7's closed field-type
- * set to grow, or the same flattening compromise `params` makes above. Left
- * out on purpose rather than guessed at.
+ * set to grow. `params` above now proposes one such widening and says what it
+ * cost; a second widening proposed here, for a payload nothing has asked this
+ * type to carry, would be guessing rather than evidence. Left out on purpose.
  */
 const coreRaise = {
   name: "core.raise",
@@ -529,18 +677,11 @@ const coreSubchart = {
        * the demo carries one honest warning rather than a clean board. */
       datamodelPath: "writes",
     },
-    {
-      /* The same text compromise `core.invoke` makes, for the same closed
-       * field-type reason, and named as a compromise in the same words.
-       * sb-e2x replaces BOTH with a key/path row control; it had not landed
-       * when this type was written, so this field is deliberately the existing
-       * idiom rather than a second one for sb-e2x to convert separately. */
-      key: "params",
-      type: "string",
-      label: "Params (one name=path per line)",
-      required: false,
-      default: "",
-    },
+    /* `core.invoke`'s declaration, because it is literally the same one. sb-7s2
+     * wrote this field as the existing idiom rather than a second one so that
+     * sb-e2x would have one thing to convert, and it did: the two types moved
+     * together, in one edit, with no type name anywhere in the control. */
+    paramsField(),
   ],
   validateConfig: (config) => {
     const findings = [];
@@ -748,7 +889,8 @@ const coreTimeout = {
  * A typed value - `{ literal: "boolean" }`, or a control that knows the
  * declared type of `path` - is the honest alternative and it is a Phase-B
  * question, not something this descriptor decides. It would need the field-type
- * set to grow, which is the same wall `params` hit.
+ * set to grow, which is the same wall `params` hit - and which `params` now
+ * proposes climbing, for a container shape a typed literal does not share.
  *
  * ## EXPRESSION support: a sketch, deliberately not built
  *
@@ -810,12 +952,14 @@ const coreTimeout = {
  */
 
 /* Non-empty and no whitespace, and NOT a dotted-identifier grammar, which is
- * the deliberate part. `PARAM_LINE` above takes exactly this stance and says
+ * the deliberate part. `isPathish` above takes exactly this stance and says
  * why: this file does not own the datamodel path grammar, and a regex here that
  * accepted `review.parked` and refused something `fixtures/datamodel.json`
  * legitimately declares would be a second, quieter proposal riding along with
- * this one. Whether the two paths a `params` line and an assign name are the
- * same grammar is a real question and it has one answer, not two spellings. */
+ * this one. Whether the two paths a `params` row and an assign name are the
+ * same grammar is a real question and it has one answer, not two spellings.
+ * Two predicates in one file spelling one stance is a smell the day that
+ * answer arrives; until then neither owns the grammar and both say so. */
 const isDatamodelPath = (value) => nonEmptyString(value) && !/\s/.test(value);
 
 const coreAssign = {

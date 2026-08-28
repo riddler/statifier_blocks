@@ -249,7 +249,7 @@
                       "config": {
                         "invoke_type": "myapp:authorize",
                         "assign_to": "auth",
-                        "params": "amount=amount_cents\ncurrency=currency\ncustomer=customer.id",
+                        "params": { "amount": "amount_cents", "currency": "currency", "customer": "customer.id" },
                         "label": "Authorize the card"
                       },
                       "slots": {
@@ -358,13 +358,13 @@
                 "slots": {
                   "body": [
                     {
-                      "_comment": "FAILURE IDIOM A in its minimal shape: the on_error slot holding one leaf step rather than a container. Idiom B sits directly below it, and this pair is the comparison the document exists to make. The predicate branch can only see failures the datamodel records (auth.captured == false, capture_attempts < 3); the on_error slot catches the ones it cannot, including the call never answering at all. Neither idiom subsumes the other, which is why both are kept here rather than one replacing the other. 'amount_key' is gone: params carries the same fact as a name=path pair, which is what core.invoke declares.",
+                      "_comment": "FAILURE IDIOM A in its minimal shape: the on_error slot holding one leaf step rather than a container. Idiom B sits directly below it, and this pair is the comparison the document exists to make. The predicate branch can only see failures the datamodel records (auth.captured == false, capture_attempts < 3); the on_error slot catches the ones it cannot, including the call never answering at all. Neither idiom subsumes the other, which is why both are kept here rather than one replacing the other. 'amount_key' is gone: params carries the same fact as a name/path binding, which is what core.invoke declares. sb-e2x 2026-08-28: params is stored as a MAP of name to datamodel path rather than as one name=path-per-line string - the text field was a flagged compromise and it is gone from the stored bytes, not just from the control.",
                       "type": "core.invoke",
                       "id": "blk_cp_capture",
                       "type_version": 1,
                       "config": {
                         "invoke_type": "myapp:capture",
-                        "params": "amount=amount_cents\nauth_code=auth.code",
+                        "params": { "amount": "amount_cents", "auth_code": "auth.code" },
                         "label": "Capture the funds"
                       },
                       "slots": {

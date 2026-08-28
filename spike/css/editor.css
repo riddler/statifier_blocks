@@ -2322,6 +2322,49 @@
   align-self: flex-start;
 }
 
+/* ------------------------------------------------- the map rows (sb-e2x)
+ *
+ * Two columns rather than one, and column headings, because a row of two
+ * unlabelled boxes does not say which one is the name. Everything else is the
+ * list rows above: same row flex, same action button, same empty state. Tokens
+ * only - no new value is introduced here.
+ */
+
+.sb-rows--map .sb-rows__row {
+  flex-wrap: wrap;
+}
+
+.sb-rows__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space-half);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-subtle);
+}
+
+.sb-rows__head-cell {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Holds the heading row's columns over the boxes below, against the width the
+ * row's remove button takes. */
+.sb-rows__head-spacer {
+  flex: 0 0 auto;
+  width: var(--sb-space-3);
+}
+
+.sb-rows__key {
+  flex: 1 1 0;
+}
+
+/* A row finding takes the whole width under its row rather than sitting in a
+ * column, which is what `flex-wrap` on the row above is for. */
+.sb-rows__finding {
+  flex: 1 0 100%;
+  margin: 0;
+}
+
 /* ------------------------------------------- the read-only config (d12) */
 
 .sb-form__readonly-head {

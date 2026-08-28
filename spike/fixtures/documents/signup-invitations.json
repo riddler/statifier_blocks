@@ -43,7 +43,7 @@
           "type_version": 1,
           "config": {
             "invoke_type": "myapp:notify",
-            "params": "email=signup.email\nseats=signup.seats",
+            "params": { "email": "signup.email", "seats": "signup.seats" },
             "label": "Email the invitations"
           }
         },
@@ -95,7 +95,7 @@
                       "type_version": 1,
                       "config": {
                         "chart": "bdoc_signup_demo",
-                        "params": "email=signup.email\nplan=signup.plan",
+                        "params": { "email": "signup.email", "plan": "signup.plan" },
                         "assign_to": "onboarding",
                         "label": "Run the signup wizard for the invitee"
                       },
@@ -116,7 +116,7 @@
                                   "type_version": 1,
                                   "config": {
                                     "invoke_type": "myapp:notify",
-                                    "params": "email=signup.email",
+                                    "params": { "email": "signup.email" },
                                     "label": "Tell the account owner"
                                   }
                                 },
