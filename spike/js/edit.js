@@ -71,6 +71,7 @@ import {
   insertChild,
   ok,
   removeAtPath,
+  slotChildren,
   subtreeIds,
   updateAtPath,
 } from "./document.js";
@@ -192,7 +193,10 @@ function checkSlotName(to) {
 }
 
 function checkIndex(parent, to) {
-  const children = parent.slots[to.slot] ?? [];
+  // `slotChildren` rather than a bare read: a slot name is a string off a
+  // serializable command, so an inherited `Object.prototype` key would
+  // otherwise report a bogus length here and throw further down.
+  const children = slotChildren(parent, to.slot);
   const inRange = Number.isInteger(to.index) && to.index >= 0 && to.index <= children.length;
 
   return inRange ? null : err({ tag: "index_out_of_range", target: to });

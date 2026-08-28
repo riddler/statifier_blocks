@@ -44,7 +44,7 @@
  * open set makes that unprovable.
  */
 
-import { err, ok } from "./document.js";
+import { compareUtf8, err, ok } from "./document.js";
 
 /* ------------------------------------------------- shared config checks */
 
@@ -68,7 +68,23 @@ const oneOf = (value, options) => typeof value === "string" && options.includes(
 /** `validate_config/1`'s return: `null` for `:ok`, or an ordered finding list. */
 const verdict = (findings) => (findings.length === 0 ? null : findings);
 
-const asList = (value) => (Array.isArray(value) ? value : value === undefined ? [] : [value]);
+/*
+ * `List.wrap/1`: an array is itself, `nil` is `[]`, anything else is wrapped.
+ * `null` maps to `[]` rather than `[null]` because that is what `List.wrap`
+ * does, and the two spellings of "absent" should not diverge here.
+ */
+const asList = (value) =>
+  Array.isArray(value) ? value : value === undefined || value === null ? [] : [value];
+
+/*
+ * `Map.get(config, key, default)`: the default applies to an ABSENT key only.
+ * `config[key] ?? fallback` would also swallow a stored `null`, and ADR-0001
+ * decision 6 admits `null` as a config value - so `{"arms": null}` has to
+ * reach `validate_config`'s "must be a list of arms" arm rather than being
+ * coalesced into a valid empty list.
+ */
+const configGet = (config, key, fallback) =>
+  Object.hasOwn(config, key) ? config[key] : fallback;
 
 /* ------------------------------------------------- the core vocabulary */
 
@@ -234,7 +250,7 @@ const coreBranch = {
       valuePath: ["arms", index, "cond"],
     })),
   validateConfig: (config) => {
-    const arms = config.arms ?? [];
+    const arms = configGet(config, "arms", []);
     if (!Array.isArray(arms)) {
       return [{ key: "arms", message: "must be a list of arms" }];
     }
@@ -319,7 +335,7 @@ const coreParallel = {
     },
   ],
   validateConfig: (config) => {
-    const lanes = config.lanes ?? [];
+    const lanes = configGet(config, "lanes", []);
     if (!Array.isArray(lanes)) {
       return [{ key: "lanes", message: "must be a list of lane names" }];
     }
@@ -817,9 +833,15 @@ export function paletteEntryFor(descriptor) {
 }
 
 /**
- * The palette browser's view: entries grouped by their `group`, groups in
- * first-appearance order of their lowest `order`, entries sorted by `order`
- * then label. Presentation only - nothing here decides validity.
+ * The palette browser's view: entries grouped by their `group`, sorted group
+ * NAME, then `order`, then label - `ViewModel`'s `palette_groups/1` rule
+ * exactly (ADR-0005 decision 10's grouping rule). Presentation only; nothing
+ * here decides validity.
+ *
+ * Group name rather than lowest `order` within the group, which is the
+ * tempting alternative and is wrong: `order` is documented as a sort position
+ * WITHIN a group, and reaching across groups with it makes a host's palette
+ * reorder itself the moment a group's lowest-ordered entry changes.
  */
 export function paletteGroups(registry) {
   const entries = Object.values(registry.types).map((descriptor) => ({
@@ -839,11 +861,10 @@ export function paletteGroups(registry) {
     .map(([name, items]) => ({
       name,
       entries: items.sort(
-        (a, b) => a.entry.order - b.entry.order || a.entry.label.localeCompare(b.entry.label)
+        (a, b) => a.entry.order - b.entry.order || compareUtf8(a.entry.label, b.entry.label)
       ),
     }))
-    .sort((a, b) => a.entries[0].entry.order - b.entries[0].entry.order
-      || a.name.localeCompare(b.name));
+    .sort((a, b) => compareUtf8(a.name, b.name));
 }
 
 /* --------------------------------------------- assignability primitives */
