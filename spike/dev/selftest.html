@@ -1,0 +1,1011 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>statifier_blocks spike - JS core self-test</title>
+
+    <!--
+      A dependency-free check on the spike's client-side core: document model,
+      block-type registry, command algebra, and drop-target enumeration. It is
+      a DEV page, not part of the editor: it loads no spike CSS, styles itself
+      inline, and never reaches the shell.
+
+      Why a page rather than a test runner: this repository's toolchain is
+      Node-free on purpose (ADR-0005 decision 1's asset argument, sui-ADR-0009's
+      reasons), so the committed verification artifact has to be something a
+      browser can run from the same static server the spike is already served
+      by. Open it at http://localhost:8642/dev/selftest.html.
+
+      What it does NOT replace: `mix test`. Nothing here tests lib/ - these are
+      assertions about the spike's own mirror of semantics that lib/ owns, and
+      when the two disagree the ADR is the contract and this file is the bug.
+    -->
+    <style>
+      :root {
+        color-scheme: light dark;
+        --pass: #1a7f37;
+        --fail: #b3261e;
+      }
+      body {
+        margin: 0;
+        padding: 2rem;
+        font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        max-width: 60rem;
+      }
+      h1 {
+        font-size: 1.35rem;
+        margin: 0 0 0.25rem;
+      }
+      p.lede {
+        margin: 0 0 1.5rem;
+        opacity: 0.75;
+      }
+      #summary {
+        font-weight: 600;
+        padding: 0.7rem 1rem;
+        border-radius: 0.4rem;
+        border: 1px solid currentColor;
+        display: inline-block;
+        margin-bottom: 1.5rem;
+      }
+      #summary[data-state="pass"] {
+        color: var(--pass);
+      }
+      #summary[data-state="fail"] {
+        color: var(--fail);
+      }
+      section {
+        margin-bottom: 1.5rem;
+      }
+      h2 {
+        font-size: 1rem;
+        margin: 0 0 0.4rem;
+      }
+      ul {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+      li {
+        margin-bottom: 0.15rem;
+      }
+      li[data-state="pass"]::marker {
+        content: "\2713  ";
+        color: var(--pass);
+      }
+      li[data-state="fail"]::marker {
+        content: "\2717  ";
+        color: var(--fail);
+      }
+      li[data-state="fail"] {
+        color: var(--fail);
+      }
+      pre {
+        margin: 0.3rem 0 0.6rem;
+        padding: 0.6rem 0.8rem;
+        overflow-x: auto;
+        border-radius: 0.3rem;
+        background: rgba(127, 127, 127, 0.12);
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>JS core self-test</h1>
+    <p class="lede">
+      spike/js: document model, palette registry, command algebra, drop targets.
+      Results also go to the console with a <code>[selftest]</code> prefix.
+    </p>
+
+    <div id="summary" data-state="running">running...</div>
+    <div id="results"></div>
+
+    <script type="module">
+      import {
+        blocks,
+        block,
+        createDocument,
+        findBlock,
+        fetchPath,
+        fromJson,
+        mintBlockId,
+        parentOf,
+        subtreeIds,
+        toJson,
+        validate,
+      } from "../js/document.js";
+
+      import {
+        admits,
+        coreTypes,
+        describe,
+        paletteEntryFor,
+        paletteGroups,
+        resolveBlock,
+        spikeRegistry,
+      } from "../js/palette.js";
+
+      import {
+        applyCommand,
+        canRedo,
+        canUndo,
+        checkConfig,
+        commit,
+        createHistory,
+        insert,
+        move,
+        redo,
+        remove,
+        target,
+        undo,
+        updateConfig,
+      } from "../js/edit.js";
+
+      import { droppableSlots, droppableSlotsFor } from "../js/targets.js";
+
+      /* ------------------------------------------------ the assert harness */
+
+      const groups = [];
+      let current = null;
+
+      function suite(name, body) {
+        current = { name, checks: [] };
+        groups.push(current);
+        try {
+          body();
+        } catch (error) {
+          current.checks.push({
+            state: "fail",
+            label: "suite threw",
+            detail: String(error && error.stack ? error.stack : error),
+          });
+        }
+        current = null;
+      }
+
+      function check(label, passed, detail) {
+        current.checks.push({
+          state: passed ? "pass" : "fail",
+          label,
+          detail: passed ? null : detail ?? null,
+        });
+      }
+
+      function equal(label, actual, expected) {
+        const passed = deepEqual(actual, expected);
+        check(
+          label,
+          passed,
+          passed ? null : `expected ${show(expected)}\n     got ${show(actual)}`
+        );
+      }
+
+      function show(value) {
+        return typeof value === "string" ? value : JSON.stringify(value);
+      }
+
+      function deepEqual(a, b) {
+        if (a === b) return true;
+        if (typeof a !== typeof b || a === null || b === null) return false;
+        if (typeof a !== "object") return false;
+
+        if (Array.isArray(a) !== Array.isArray(b)) return false;
+        if (Array.isArray(a)) {
+          return a.length === b.length && a.every((item, i) => deepEqual(item, b[i]));
+        }
+
+        const ak = Object.keys(a).sort();
+        const bk = Object.keys(b).sort();
+        return deepEqual(ak, bk) && ak.every((key) => deepEqual(a[key], b[key]));
+      }
+
+      /* ------------------------------------------------- inline fixtures */
+
+      /*
+       * Defined here rather than read from spike/fixtures/, so this page runs
+       * on its own branch with nothing else present. Card-processing and
+       * signup-wizard content only, and the three approved invoke flavors.
+       *
+       * The shape mirrors ADR-0001's worked example: a sequence root, an
+       * authorize step, a resumable group carrying one interrupt rule, a
+       * branch with one arm plus otherwise, and a parallel block with two
+       * lanes - which between them exercise every schema feature decision 10
+       * lists.
+       */
+      const registry = spikeRegistry();
+
+      function cardDocument() {
+        return createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_AUTH",
+                  type: "myapp.authorize",
+                  typeVersion: 2,
+                  config: { assign_to: "authorization", timeout: "PT30S" },
+                }),
+                block({
+                  id: "blk_GRP",
+                  type: "core.resumable_group",
+                  config: { history: "deep" },
+                  slots: {
+                    body: [
+                      block({
+                        id: "blk_BR",
+                        type: "core.branch",
+                        config: {
+                          arms: [
+                            { slot: "arm_approved", cond: "budget_remaining > amount" },
+                          ],
+                        },
+                        slots: {
+                          arm_approved: [
+                            block({
+                              id: "blk_PAR",
+                              type: "core.parallel",
+                              config: { lanes: ["capture", "receipt"] },
+                              slots: {
+                                lane_capture: [
+                                  block({
+                                    id: "blk_CAP",
+                                    type: "myapp.capture",
+                                    config: { amount_key: "amount", retries: 2 },
+                                  }),
+                                ],
+                                lane_receipt: [
+                                  block({
+                                    id: "blk_WAI",
+                                    type: "core.wait",
+                                    config: { duration: "PT48H" },
+                                  }),
+                                  block({
+                                    id: "blk_SIG",
+                                    type: "myapp.signup",
+                                    config: { step: "confirm" },
+                                  }),
+                                ],
+                              },
+                            }),
+                          ],
+                          otherwise: [
+                            block({
+                              id: "blk_SG2",
+                              type: "myapp.signup",
+                              config: { step: "email" },
+                            }),
+                          ],
+                        },
+                      }),
+                    ],
+                    interrupts: [
+                      block({
+                        id: "blk_INT",
+                        type: "core.on_event",
+                        config: { event: "myapp.cancelled", outcome: "abandon" },
+                      }),
+                    ],
+                  },
+                }),
+              ],
+            },
+          }),
+          { id: "bdoc_CARD", revision: 17, metadata: { name: "Card authorization" } }
+        );
+      }
+
+      /* A tiny document carrying a block type this registry does not have. */
+      function retiredDocument() {
+        return createDocument(
+          block({
+            id: "blk_R1",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_GONE",
+                  type: "myapp.retired",
+                  typeVersion: 3,
+                  config: { note: "a step whose block type the host removed" },
+                  slots: {
+                    body: [
+                      block({
+                        id: "blk_KEPT",
+                        type: "myapp.capture",
+                        config: { amount_key: "amount" },
+                      }),
+                    ],
+                  },
+                }),
+              ],
+            },
+          }),
+          { id: "bdoc_RETIRED" }
+        );
+      }
+
+      const step = (id, stepName = "email") =>
+        block({ id, type: "myapp.signup", config: { step: stepName } });
+
+      /* ----------------------------------------------------------- suites */
+
+      suite("document: load and serialize round-trip (ADR-0001 d8)", () => {
+        const doc = cardDocument();
+
+        check("the fixture validates", validate(doc) === null, JSON.stringify(validate(doc)));
+
+        const bytes = toJson(doc);
+        const decoded = fromJson(bytes);
+
+        check("decoding succeeds", decoded.ok, JSON.stringify(decoded.error));
+        equal("decode(encode(d)) == d", decoded.value, doc);
+        equal("encode(decode(encode(d))) == encode(d)", toJson(decoded.value), bytes);
+
+        check(
+          "canonical keys are sorted and unspaced",
+          bytes.startsWith('{"id":"bdoc_CARD","metadata":'),
+          bytes.slice(0, 60)
+        );
+        check(
+          "an empty slot list is omitted, not encoded as []",
+          !bytes.includes('"slots":{}') && !bytes.includes("[]"),
+          bytes.slice(0, 200)
+        );
+        check(
+          "type_version is spelled as stored",
+          bytes.includes('"type_version":2'),
+          "missing type_version"
+        );
+
+        const withFloat = cardDocument();
+        withFloat.root.config = { ratio: 1.5 };
+        equal("a float in config is rejected by name", validate(withFloat)?.tag, "malformed_block");
+        equal("...and named as a float", validate(withFloat)?.problem?.tag, "float");
+
+        const dup = cardDocument();
+        dup.root.slots.body.push(step("blk_AUTH"));
+        equal("a duplicate id is rejected", validate(dup)?.tag, "duplicate_block_id");
+
+        equal(
+          "bytes that are not a block document refuse",
+          fromJson('{"hello":1}').error.tag,
+          "not_a_block_document"
+        );
+      });
+
+      suite("document: traversal", () => {
+        const doc = cardDocument();
+
+        equal(
+          "blocks/1 is pre-order with UTF-8-sorted slots",
+          blocks(doc).map((b) => b.id),
+          [
+            "blk_ROOT",
+            "blk_AUTH",
+            "blk_GRP",
+            "blk_BR",
+            "blk_PAR",
+            "blk_CAP",
+            "blk_WAI",
+            "blk_SIG",
+            "blk_SG2",
+            "blk_INT",
+          ]
+        );
+
+        equal("findBlock reaches a deep block", findBlock(doc, "blk_WAI").type, "core.wait");
+        check("findBlock on an absentee is null", findBlock(doc, "blk_NOPE") === null);
+
+        equal("the root's path is empty", fetchPath(doc, "blk_ROOT"), []);
+        equal("a deep path names every step", fetchPath(doc, "blk_SIG"), [
+          { parentId: "blk_ROOT", slot: "body", index: 1 },
+          { parentId: "blk_GRP", slot: "body", index: 0 },
+          { parentId: "blk_BR", slot: "arm_approved", index: 0 },
+          { parentId: "blk_PAR", slot: "lane_receipt", index: 1 },
+        ]);
+        check("an absent id has no path", fetchPath(doc, "blk_NOPE") === null);
+
+        equal("parentOf walks one step up", parentOf(doc, "blk_SIG").id, "blk_PAR");
+        check("the root has no parent", parentOf(doc, "blk_ROOT") === null);
+
+        equal(
+          "subtreeIds includes the block itself",
+          [...subtreeIds(findBlock(doc, "blk_PAR"))].sort(),
+          ["blk_CAP", "blk_PAR", "blk_SIG", "blk_WAI"]
+        );
+      });
+
+      suite("palette: the core vocabulary, transcribed", () => {
+        equal("seven core entries", Object.keys(coreTypes).length, 7);
+
+        equal(
+          "core.sequence declares one body slot",
+          coreTypes["core.sequence"].slots({}),
+          [{ name: "body", arity: "any", label: "Steps" }]
+        );
+
+        equal(
+          "core.branch's slots follow its arms, then otherwise",
+          coreTypes["core.branch"]
+            .slots({ arms: [{ slot: "arm_approved", cond: "x > 1" }] })
+            .map((s) => [s.name, s.arity]),
+          [
+            ["arm_approved", "at_least_one"],
+            ["otherwise", "any"],
+          ]
+        );
+
+        equal(
+          "a branch arm's condition field reads through value_path",
+          coreTypes["core.branch"].configSchema({
+            arms: [{ slot: "arm_bad" }, { slot: "arm_approved", cond: "x > 1" }],
+          })[1],
+          {
+            key: "arm_approved",
+            type: "expression",
+            label: 'When "approved"',
+            required: true,
+            default: "",
+            valuePath: ["arms", 1, "cond"],
+          }
+        );
+
+        equal(
+          "a lane stores its bare name and the slot prefixes it",
+          coreTypes["core.parallel"].slots({ lanes: ["capture", "receipt"] }).map((s) => s.name),
+          ["lane_capture", "lane_receipt"]
+        );
+
+        equal(
+          "core.parallel renders as columns (d10)",
+          paletteEntryFor(coreTypes["core.parallel"]).layout,
+          "columns"
+        );
+        equal(
+          "a group's interrupts render as a secondary rail (d10)",
+          paletteEntryFor(coreTypes["core.group"]).slotStyle.interrupts,
+          "secondary"
+        );
+
+        equal(
+          "core.wait rejects a duration that is not ISO-8601",
+          coreTypes["core.wait"].validateConfig({ duration: "48 hours" }),
+          [{ key: "duration", message: "must be an ISO-8601 duration, like PT30S or P1D" }]
+        );
+        check(
+          "...and accepts one that is",
+          coreTypes["core.wait"].validateConfig({ duration: "PT48H" }) === null
+        );
+
+        equal(
+          "core.on_event is an interrupt handler and nothing else",
+          coreTypes["core.on_event"].io({}).kinds,
+          ["interrupt_handler"]
+        );
+
+        const groupsView = paletteGroups(registry);
+        check(
+          "the palette browser groups the demo types separately",
+          groupsView.some((g) => g.name === "Card processing") &&
+            groupsView.some((g) => g.name === "Signup wizard") &&
+            groupsView.some((g) => g.name === "Structure"),
+          JSON.stringify(groupsView.map((g) => g.name))
+        );
+      });
+
+      suite("palette: resolution, migration, and defaults", () => {
+        const stored = block({
+          id: "blk_OLD",
+          type: "myapp.authorize",
+          typeVersion: 1,
+          config: { field: "authorization" },
+        });
+
+        const resolved = resolveBlock(registry, stored);
+        check("a stale type_version resolves", resolved.ok, JSON.stringify(resolved.error));
+        equal("...migrating the config in memory", resolved.value.block.config, {
+          assign_to: "authorization",
+        });
+        equal(
+          "...and leaving type_version as stored",
+          resolved.value.block.typeVersion,
+          1
+        );
+        equal("the document's own block is untouched", stored.config, { field: "authorization" });
+
+        const tooNew = block({ id: "blk_NEW", type: "myapp.capture", typeVersion: 9 });
+        equal(
+          "a block authored by a newer type is a hard error",
+          resolveBlock(registry, tooNew).error.tag,
+          "block_type_too_new"
+        );
+
+        const current = block({ id: "blk_NM", type: "myapp.capture", typeVersion: 1 });
+        check("a current-version block resolves untouched", resolveBlock(registry, current).ok);
+
+        const noMigration = block({ id: "blk_NM2", type: "myapp.capture", typeVersion: 0 });
+        equal(
+          "a stale type with no migrate_config refuses",
+          resolveBlock(registry, noMigration).error.tag,
+          "migration_failed"
+        );
+
+        const bare = { name: "myapp.bare", currentVersion: 1, slots: () => [] };
+        equal("a type declaring no palette_entry still renders", paletteEntryFor(bare), {
+          label: "myapp.bare",
+          group: "Other",
+          description: "",
+          icon: null,
+          keywords: [],
+          order: 0,
+          layout: "stack",
+          slotStyle: {},
+        });
+      });
+
+      suite("palette: unresolvable types never crash (d12)", () => {
+        const doc = retiredDocument();
+
+        check("a document naming an unknown type decodes", fromJson(toJson(doc)).ok);
+
+        const view = describe(registry, findBlock(doc, "blk_GONE"));
+        check("it resolves to a placeholder", view.unresolved === true);
+        equal("...naming the missing type", view.reason.tag, "unknown_block_type");
+        equal("...labelled by its type name", paletteEntryFor(view.descriptor).label, "myapp.retired");
+        equal("...declaring no slots, so it is no drop target", view.descriptor.slots({}), []);
+        check(
+          "...and validating nothing, so no form is offered",
+          view.descriptor.validateConfig({ anything: true }) === null
+        );
+
+        equal(
+          "its children are still in the document",
+          findBlock(doc, "blk_KEPT").type,
+          "myapp.capture"
+        );
+
+        // The preservation property: edit an unrelated part of the tree, and
+        // the unresolvable block's bytes are unchanged.
+        const before = JSON.stringify(findBlock(doc, "blk_GONE"));
+        const edited = applyCommand(doc, insert(target("blk_R1", "body", 0), step("blk_NEW1")));
+        check("an unrelated edit succeeds", edited.ok, JSON.stringify(edited.error));
+        equal(
+          "...and the unresolvable block is byte-identical",
+          JSON.stringify(findBlock(edited.value.document, "blk_GONE")),
+          before
+        );
+
+        const targets = droppableSlots(doc, registry, "blk_GONE");
+        equal(
+          "the unresolvable block is itself movable (d12)",
+          targets,
+          [{ parentId: "blk_R1", slot: "body" }]
+        );
+        check(
+          "...but offers none of its own slots",
+          !targets.some((t) => t.parentId === "blk_GONE"),
+          JSON.stringify(targets)
+        );
+      });
+
+      suite("edit: insert and its inverse", () => {
+        const doc = cardDocument();
+        const node = step("blk_NEW1", "profile");
+
+        const applied = applyCommand(doc, insert(target("blk_ROOT", "body", 1), node));
+        check("an insert applies", applied.ok, JSON.stringify(applied.error));
+        equal(
+          "...at the named index",
+          applied.value.document.root.slots.body.map((b) => b.id),
+          ["blk_AUTH", "blk_NEW1", "blk_GRP"]
+        );
+        equal("...with a remove as its inverse", applied.value.inverse, remove("blk_NEW1"));
+
+        const undone = applyCommand(applied.value.document, applied.value.inverse);
+        equal("apply then inverse restores the document", undone.value.document, doc);
+
+        const intoAbsent = applyCommand(
+          doc,
+          insert(target("blk_AUTH", "review", 0), step("blk_NEW2"))
+        );
+        check("an insert creates an absent slot key (rule 2)", intoAbsent.ok);
+        equal(
+          "...with the block in it",
+          intoAbsent.value.document.root.slots.body[0].slots.review.map((b) => b.id),
+          ["blk_NEW2"]
+        );
+
+        equal(
+          "an index past the end refuses",
+          applyCommand(doc, insert(target("blk_ROOT", "body", 3), step("blk_NEW3"))).error.tag,
+          "index_out_of_range"
+        );
+        equal(
+          "an index at the end is in range",
+          applyCommand(doc, insert(target("blk_ROOT", "body", 2), step("blk_NEW4"))).ok,
+          true
+        );
+        equal(
+          "an id already in the document refuses",
+          applyCommand(doc, insert(target("blk_ROOT", "body", 0), step("blk_WAI"))).error.tag,
+          "duplicate_block_id"
+        );
+        equal(
+          "an empty slot name refuses",
+          applyCommand(doc, insert(target("blk_ROOT", "", 0), step("blk_NEW5"))).error.tag,
+          "no_such_slot"
+        );
+        equal(
+          "a parent that is not there refuses",
+          applyCommand(doc, insert(target("blk_NOPE", "body", 0), step("blk_NEW6"))).error.tag,
+          "no_such_block"
+        );
+      });
+
+      suite("edit: remove and its inverse", () => {
+        const doc = cardDocument();
+
+        const applied = applyCommand(doc, remove("blk_INT"));
+        check("a remove applies", applied.ok, JSON.stringify(applied.error));
+        check(
+          "...pruning the slot key it empties (rule 3)",
+          !("interrupts" in findBlock(applied.value.document, "blk_GRP").slots),
+          JSON.stringify(Object.keys(findBlock(applied.value.document, "blk_GRP").slots))
+        );
+        equal("...carrying the detached subtree in its inverse", applied.value.inverse.op, "insert");
+        equal(
+          "...at the position it came from",
+          applied.value.inverse.target,
+          { parentId: "blk_GRP", slot: "interrupts", index: 0 }
+        );
+
+        const restored = applyCommand(applied.value.document, applied.value.inverse);
+        equal("remove then inverse restores the document", restored.value.document, doc);
+
+        const subtree = applyCommand(doc, remove("blk_PAR"));
+        check(
+          "removing a container takes its subtree with it",
+          findBlock(subtree.value.document, "blk_CAP") === null
+        );
+        equal(
+          "...and putting it back restores every child",
+          applyCommand(subtree.value.document, subtree.value.inverse).value.document,
+          doc
+        );
+
+        equal("removing the root refuses", applyCommand(doc, remove("blk_ROOT")).error.tag,
+          "cannot_remove_root");
+        equal("removing an absentee refuses", applyCommand(doc, remove("blk_X")).error.tag,
+          "no_such_block");
+      });
+
+      suite("edit: move, its index semantics (d4), and its inverse", () => {
+        const doc = cardDocument();
+
+        const applied = applyCommand(doc, move("blk_SIG", target("blk_BR", "otherwise", 0)));
+        check("a move applies", applied.ok, JSON.stringify(applied.error));
+        equal(
+          "...landing at the target index",
+          findBlock(applied.value.document, "blk_BR").slots.otherwise.map((b) => b.id),
+          ["blk_SIG", "blk_SG2"]
+        );
+        equal(
+          "...leaving the source slot shortened",
+          findBlock(applied.value.document, "blk_PAR").slots.lane_receipt.map((b) => b.id),
+          ["blk_WAI"]
+        );
+        equal(
+          "...with a move back as its inverse",
+          applied.value.inverse,
+          move("blk_SIG", { parentId: "blk_PAR", slot: "lane_receipt", index: 1 })
+        );
+        equal(
+          "move then inverse restores the document",
+          applyCommand(applied.value.document, applied.value.inverse).value.document,
+          doc
+        );
+
+        // Decision 4: the target index is read against the slot with the
+        // moved block ALREADY REMOVED. Moving index 0 to index 1 of a
+        // two-child slot is a swap, not a no-op.
+        const reorder = applyCommand(doc, move("blk_WAI", target("blk_PAR", "lane_receipt", 1)));
+        equal(
+          "an in-slot move reads the index post-removal",
+          findBlock(reorder.value.document, "blk_PAR").slots.lane_receipt.map((b) => b.id),
+          ["blk_SIG", "blk_WAI"]
+        );
+        equal(
+          "...and its inverse carries the same source index",
+          reorder.value.inverse.target,
+          { parentId: "blk_PAR", slot: "lane_receipt", index: 0 }
+        );
+        equal(
+          "...and round-trips",
+          applyCommand(reorder.value.document, reorder.value.inverse).value.document,
+          doc
+        );
+
+        equal(
+          "moving a block into its own subtree refuses",
+          applyCommand(doc, move("blk_GRP", target("blk_PAR", "lane_capture", 0))).error.tag,
+          "would_cycle"
+        );
+        equal(
+          "moving a block into itself refuses",
+          applyCommand(doc, move("blk_PAR", target("blk_PAR", "lane_capture", 0))).error.tag,
+          "would_cycle"
+        );
+        equal("moving the root refuses", applyCommand(doc, move("blk_ROOT",
+          target("blk_GRP", "body", 0))).error.tag, "cannot_remove_root");
+      });
+
+      suite("edit: update_config and its inverse", () => {
+        const doc = cardDocument();
+
+        const applied = applyCommand(doc, updateConfig("blk_WAI", { duration: "PT12H" }));
+        check("an update applies", applied.ok, JSON.stringify(applied.error));
+        equal("...replacing the config", findBlock(applied.value.document, "blk_WAI").config, {
+          duration: "PT12H",
+        });
+        equal("...with the previous config as its inverse", applied.value.inverse, {
+          op: "updateConfig",
+          id: "blk_WAI",
+          config: { duration: "PT48H" },
+        });
+        equal(
+          "update then inverse restores the document",
+          applyCommand(applied.value.document, applied.value.inverse).value.document,
+          doc
+        );
+
+        equal(
+          "updating an absentee refuses",
+          applyCommand(doc, updateConfig("blk_X", {})).error.tag,
+          "no_such_block"
+        );
+      });
+
+      suite("edit: the config gate (d9)", () => {
+        const doc = cardDocument();
+
+        check(
+          "a valid config passes the gate",
+          checkConfig(registry, doc, updateConfig("blk_WAI", { duration: "PT12H" })) === null
+        );
+
+        const refused = checkConfig(registry, doc, updateConfig("blk_WAI", { duration: "48h" }));
+        equal("an invalid config is refused", refused.tag, "invalid_config");
+        equal("...naming the block", refused.id, "blk_WAI");
+        equal("...and the offending key", refused.findings[0].key, "duration");
+
+        check(
+          "a structural command is never gated",
+          checkConfig(registry, doc, remove("blk_INT")) === null
+        );
+
+        const retired = retiredDocument();
+        check(
+          "an unresolvable block's config is not gated (nothing to consult)",
+          checkConfig(registry, retired, updateConfig("blk_GONE", { anything: 1 })) === null
+        );
+      });
+
+      suite("edit: the undo and redo stacks (d3)", () => {
+        const doc = cardDocument();
+        let history = createHistory();
+
+        check("a fresh history can do neither", !canUndo(history) && !canRedo(history));
+        equal("undo on an empty stack refuses", undo(history, registry, doc).error.tag,
+          "nothing_to_undo");
+        equal("redo on an empty stack refuses", redo(history, registry, doc).error.tag,
+          "nothing_to_redo");
+
+        const first = commit(history, registry, doc,
+          insert(target("blk_ROOT", "body", 0), step("blk_N1")));
+        check("a commit applies", first.ok, JSON.stringify(first.error));
+        check("...and fills the undo stack", canUndo(first.value.history));
+        check("...leaving redo empty", !canRedo(first.value.history));
+
+        const second = commit(first.value.history, registry, first.value.document,
+          updateConfig("blk_WAI", { duration: "PT1H" }));
+
+        const back = undo(second.value.history, registry, second.value.document);
+        check("undo applies", back.ok, JSON.stringify(back.error));
+        equal(
+          "...stepping the document back one command",
+          back.value.document,
+          first.value.document
+        );
+        check("...and filling the redo stack", canRedo(back.value.history));
+
+        const forward = redo(back.value.history, registry, back.value.document);
+        equal("redo replays the original command", forward.value.document, second.value.document);
+        check("...and returns it to the undo stack", canUndo(forward.value.history));
+
+        const back2 = undo(forward.value.history, registry, forward.value.document);
+        const back3 = undo(back2.value.history, registry, back2.value.document);
+        equal("undoing to the bottom restores the original", back3.value.document, doc);
+        check("...leaving nothing to undo", !canUndo(back3.value.history));
+
+        const branched = commit(back3.value.history, registry, back3.value.document,
+          insert(target("blk_ROOT", "body", 0), step("blk_N2")));
+        check("a fresh commit clears the redo stack", !canRedo(branched.value.history));
+
+        // The gate runs on undo and redo too, not only on the initial commit.
+        const gated = commit(createHistory(), registry, doc,
+          updateConfig("blk_WAI", { duration: "not a duration" }));
+        equal("the history refuses an invalid config", gated.error.tag, "invalid_config");
+
+        let bounded = createHistory({ limit: 2 });
+        let boundedDoc = doc;
+        for (const id of ["blk_B1", "blk_B2", "blk_B3"]) {
+          const done = commit(bounded, registry, boundedDoc,
+            insert(target("blk_ROOT", "body", 0), step(id)));
+          bounded = done.value.history;
+          boundedDoc = done.value.document;
+        }
+        equal("the undo stack honors its limit", bounded.undo.length, 2);
+      });
+
+      suite("targets: the four rules (d5)", () => {
+        const doc = cardDocument();
+
+        equal(
+          "every slot that accepts an ordinary step, and only those",
+          droppableSlots(doc, registry, "blk_SIG"),
+          [
+            { parentId: "blk_ROOT", slot: "body" },
+            { parentId: "blk_GRP", slot: "body" },
+            { parentId: "blk_BR", slot: "arm_approved" },
+            { parentId: "blk_BR", slot: "otherwise" },
+            { parentId: "blk_PAR", slot: "lane_capture" },
+            { parentId: "blk_PAR", slot: "lane_receipt" },
+            { parentId: "blk_SG2", slot: "on_complete" },
+          ]
+        );
+
+        check(
+          "rule 2: a step is not admitted into an interrupts slot",
+          !droppableSlots(doc, registry, "blk_SIG").some(
+            (t) => t.parentId === "blk_GRP" && t.slot === "interrupts"
+          )
+        );
+
+        equal(
+          "rule 2: an interrupt handler is admitted only into interrupts",
+          droppableSlots(doc, registry, "blk_INT"),
+          [{ parentId: "blk_GRP", slot: "interrupts" }]
+        );
+
+        check(
+          "rule 1: an undeclared slot key is never a target",
+          !droppableSlots(doc, registry, "blk_SIG").some((t) => t.slot === "review"),
+          "an undeclared slot leaked into the target set"
+        );
+
+        // Rule 1 again, from the other side: a config change removes a slot,
+        // and the slot stops being a target with no other edit.
+        const oneLane = applyCommand(doc, updateConfig("blk_PAR", { lanes: ["capture"] }));
+        check(
+          "rule 1: a slot config no longer declares is not a target",
+          !droppableSlots(oneLane.value.document, registry, "blk_CAP").some(
+            (t) => t.slot === "lane_receipt"
+          )
+        );
+
+        // Rule 3: myapp.signup's on_complete is zero_or_one.
+        const filled = applyCommand(doc, insert(target("blk_SG2", "on_complete", 0),
+          step("blk_FILL")));
+        check(
+          "rule 3: a zero_or_one slot with a child has no room",
+          !droppableSlots(filled.value.document, registry, "blk_SIG").some(
+            (t) => t.parentId === "blk_SG2" && t.slot === "on_complete"
+          ),
+          JSON.stringify(droppableSlots(filled.value.document, registry, "blk_SIG"))
+        );
+        check(
+          "...and an any-arity slot with children still does",
+          droppableSlots(filled.value.document, registry, "blk_SIG").some(
+            (t) => t.parentId === "blk_PAR" && t.slot === "lane_capture"
+          )
+        );
+
+        equal(
+          "rule 4: dragging a container excludes its own subtree",
+          droppableSlots(doc, registry, "blk_GRP"),
+          [{ parentId: "blk_ROOT", slot: "body" }]
+        );
+        check(
+          "...including every slot beneath it",
+          !droppableSlots(doc, registry, "blk_GRP").some((t) =>
+            ["blk_GRP", "blk_BR", "blk_PAR", "blk_SG2"].includes(t.parentId)
+          )
+        );
+
+        equal(
+          "dragging a block that is not there yields nothing",
+          droppableSlots(doc, registry, "blk_NOPE"),
+          []
+        );
+
+        // ADR-0005 decision 8: the "+" button uses the SAME predicate, over a
+        // block the document does not hold yet.
+        equal(
+          "a palette insert asks the same question",
+          droppableSlotsFor(doc, registry, block({
+            id: mintBlockId(),
+            type: "core.on_event",
+            config: { event: "myapp.cancelled", outcome: "abandon" },
+          })),
+          [{ parentId: "blk_GRP", slot: "interrupts" }]
+        );
+
+        check(
+          "the enumeration is deterministic",
+          JSON.stringify(droppableSlots(doc, registry, "blk_SIG")) ===
+            JSON.stringify(droppableSlots(doc, registry, "blk_SIG"))
+        );
+
+        check(
+          "kind admission defaults to permissive for an undeclared slot",
+          admits(coreTypes["core.wait"], {}, "anything", coreTypes["core.wait"], {}),
+          "an absent slot_accepts entry should read as any"
+        );
+      });
+
+      /* ------------------------------------------------------- reporting */
+
+      const results = document.getElementById("results");
+      const summary = document.getElementById("summary");
+
+      let passed = 0;
+      let failed = 0;
+
+      for (const group of groups) {
+        const section = document.createElement("section");
+        const heading = document.createElement("h2");
+        heading.textContent = group.name;
+        section.append(heading);
+
+        const list = document.createElement("ul");
+
+        for (const item of group.checks) {
+          if (item.state === "pass") passed += 1;
+          else failed += 1;
+
+          const li = document.createElement("li");
+          li.dataset.state = item.state;
+          li.textContent = item.label;
+
+          if (item.detail) {
+            const pre = document.createElement("pre");
+            pre.textContent = item.detail;
+            li.append(pre);
+          }
+
+          list.append(li);
+          console.log(
+            `[selftest] ${item.state === "pass" ? "PASS" : "FAIL"} ${group.name} / ${item.label}` +
+              (item.detail ? `\n[selftest]   ${item.detail.replace(/\n/g, "\n[selftest]   ")}` : "")
+          );
+        }
+
+        section.append(list);
+        results.append(section);
+      }
+
+      const state = failed === 0 ? "pass" : "fail";
+      summary.dataset.state = state;
+      summary.textContent =
+        failed === 0
+          ? `all ${passed} checks passed`
+          : `${failed} of ${passed + failed} checks FAILED`;
+
+      console.log(`[selftest] ${summary.textContent}`);
+    </script>
+  </body>
+</html>
