@@ -983,6 +983,19 @@
   flex: 0 0 auto;
   gap: var(--sb-space-2);
   width: var(--sb-rail-width);
+}
+
+/*
+ * The rail's edge belongs to the SLOT, not to the rail (sb-68b).
+ *
+ * It sat on `.sb-rail` while every rail carried one vocabulary, and one
+ * container's rails can now differ - an interrupt rail and a failure rail are
+ * both placed here and painted differently. A single edge down the whole
+ * column could only tell one of those stories. Every rail in both demo
+ * documents holds exactly one slot, so the line this draws is the same line
+ * in the same place; what changed is that it can now say two things.
+ */
+.sb-rail__slot {
   padding-left: var(--sb-space-2);
   border-left: var(--sb-border-width) dashed var(--sb-warning);
 }
@@ -1022,9 +1035,10 @@
  * the flow you are reading"; the steps INSIDE an error path are an ordinary
  * flow, and only their root is out of band.
  *
- * Scoping to the rail's direct members is a bug fix, not a ruling: whether an
- * `on_error` root should look like an interrupt rule AT ALL is sb-p0k's
- * open Phase-B question, and this change leaves it looking exactly as it did.
+ * Scoping to the rail's direct members was a bug fix, not a ruling: whether an
+ * `on_error` root should look like an interrupt rule AT ALL was sb-p0k's open
+ * Phase-B question. sb-68b answers it below - it should not - and this rule
+ * narrows to the INTERRUPT vocabulary it was always describing.
  */
 .sb-rail__slot > .sb-node > .sb-card {
   width: 100%;
@@ -1037,6 +1051,64 @@
 .sb-rail__slot > .sb-node > .sb-card .sb-card__icon {
   background: transparent;
   color: var(--sb-warning);
+}
+
+/*
+ * The FAILURE rail (sb-68b), and the sentence the dashed-warning rail above
+ * could not say.
+ *
+ * Both rails are placed the same way, so before this the only rail vocabulary
+ * the editor had was "out of band": dashed, warning-tinted, deliberately
+ * unlike an ordinary card. An `on_error` subtree borrowed it and came out
+ * reading as a second set of interrupt rules - "fires whether or not you get
+ * there" - when what it actually is, is the continuation this step takes when
+ * it goes badly. That is in-band: it runs because the step ran, it runs once,
+ * and it is on the path the author is reading.
+ *
+ * So the treatment says in-band with a bad outcome. SOLID rather than dashed
+ * (the dash is what the whole editor uses for "not on the path you are
+ * reading" - the advisory outline, the empty placeholder, the unresolvable
+ * card); the ERROR family rather than the warning one, which is where every
+ * other "this went wrong" in the editor already lives; and the ordinary card
+ * shadow back, because a card sitting in the flow has depth and an annotation
+ * on the side does not.
+ *
+ * Every difference is a token or a border style. Nothing here names a colour,
+ * and nothing here names a block type: the selector reads the slot style the
+ * TYPE declared, so a host type with a failure path gets this for free and a
+ * type that renames itself keeps it.
+ */
+.sb-rail__slot[data-slot-style="failure"] {
+  border-left-style: solid;
+  border-left-color: var(--sb-error);
+}
+
+/* The rail's label goes with its line. Two words in the subtle grey over a
+ * red edge reads as a colour that leaked from somewhere else; the same two
+ * words in the error family read as the heading of the thing below them. */
+.sb-rail__slot[data-slot-style="failure"] > .sb-rail__header > .sb-rail__label {
+  color: var(--sb-error);
+}
+
+.sb-rail__slot[data-slot-style="failure"] > .sb-node > .sb-card {
+  border-style: solid;
+  border-color: var(--sb-error);
+  background: var(--sb-error-bg);
+  box-shadow: var(--sb-shadow-sm);
+}
+
+.sb-rail__slot[data-slot-style="failure"] > .sb-node > .sb-card .sb-card__icon {
+  color: var(--sb-error);
+}
+
+/* An EMPTY failure slot has no card to carry the distinction, and empty is
+ * now the ordinary state of a freshly inserted block (sb-mu2). The
+ * placeholder therefore takes the same solid error edge the rail does,
+ * against the dashed `--sb-border-strong` one every other empty slot keeps -
+ * so "nothing here yet" says WHICH nothing before an author fills it. */
+.sb-rail__slot[data-slot-style="failure"] > .sb-slot__empty {
+  border-style: solid;
+  border-color: var(--sb-error);
 }
 
 .sb-rail .sb-gap {

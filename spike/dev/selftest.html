@@ -943,9 +943,9 @@
           [{ name: "on_error", arity: "zero_or_one", label: "If it fails" }]
         );
         equal(
-          "the failure path is a secondary rail, the group.interrupts precedent",
+          "the failure path is a rail, in its own vocabulary (sb-68b)",
           paletteEntryFor(invoke).slotStyle.on_error,
-          "secondary"
+          "failure"
         );
         equal("the slot accepts steps", invoke.io({}).slotAccepts.on_error, ["step"]);
         check(
@@ -1298,11 +1298,10 @@
         equal("a type that declares none carries null", plainNode.badge, null);
         equal("and so does the wait inside on_error", errorSlot.children[0].badge, "timer");
 
-        // The rail treatment the badge shares a card with. `secondary` is
-        // what `core.group`'s interrupts slot already declares, so the
-        // failure path needed no new renderer machinery - that claim is
-        // exactly this assertion.
-        equal("on_error is a secondary slot, like an interrupts rail", errorSlot.style, "secondary");
+        // The rail treatment the badge shares a card with. Placed like an
+        // interrupts rail and painted unlike one (sb-68b), which is why the
+        // style is `failure` and the rail partition still holds it.
+        equal("on_error is a failure slot, placed like an interrupts rail", errorSlot.style, "failure");
         equal("it is the node's only slot", invokeNode.slots.length, 1);
         equal("and it is not a primary one", invokeNode.primary.length, 0);
         equal("it is a secondary one", invokeNode.secondary.length, 1);
@@ -2044,7 +2043,7 @@
 
         equal("an empty invoke is a container", at("blk_INV").shape, "container");
         equal(
-          "...whose on_error slot is drawn, empty, as a secondary rail",
+          "...whose on_error slot is drawn, empty, as a rail",
           at("blk_INV").secondary.map((one) => [one.name, one.label, one.children.length]),
           [["on_error", "If it fails", 0]]
         );
@@ -2121,7 +2120,7 @@
           nodeFor("blk_INV").querySelector(".sb-rail .sb-rail__slot") !== null
         );
         equal(
-          "...which is a boundary, because it declares a secondary slot",
+          "...which is a boundary, because it declares a rail slot",
           nodeFor("blk_INV").dataset.boundary,
           "true"
         );
@@ -4416,6 +4415,174 @@
         );
 
         editor.destroy();
+        mount.remove();
+      });
+
+      /*
+       * sb-68b. The third slot style, and the two claims it rests on.
+       *
+       * The first is a LAYOUT claim: `failure` is a rail style, so a slot
+       * declaring it is placed exactly where a `secondary` slot is - same
+       * partition, same boundary box - and the only thing that differs is the
+       * word carried out to the DOM. The second is the EMIT claim: that word
+       * actually reaches the element the stylesheet selects, as a direct
+       * child relationship the CSS depends on.
+       *
+       * What is NOT asserted here is the paint. This page loads no spike CSS
+       * on purpose, so there is no computed style to read; that the two rails
+       * end up looking different is a screenshot, in three themes, on the
+       * bead. What these checks pin is the seam the paint hangs off, which is
+       * the half that can rot silently.
+       *
+       * Sabotage: restoring layout.js's old
+       * `entry.slotStyle?.[slot.name] === "secondary" ? "secondary" : "primary"`
+       * turns the failure-style checks below red (on_error falls back to
+       * primary and leaves the rail entirely) while every other suite in this
+       * file stays green - which is the blindness this suite exists to close.
+       */
+      suite("layout + render: a failure rail is placed like an interrupt rail (sb-68b)", () => {
+        const proposing = proposingRegistry();
+
+        const doc = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_INV",
+                  type: "core.invoke",
+                  config: { invoke_type: "myapp:authorize" },
+                  slots: {
+                    on_error: [
+                      block({ id: "blk_PARK", type: "core.wait", config: { duration: "PT1H" } }),
+                    ],
+                  },
+                }),
+                block({
+                  id: "blk_GRP",
+                  type: "core.group",
+                  slots: {
+                    body: [
+                      block({ id: "blk_STEP", type: "core.wait", config: { duration: "PT1M" } }),
+                    ],
+                    interrupts: [
+                      block({
+                        id: "blk_RULE",
+                        type: "core.on_event",
+                        config: { event: "order.cancelled", outcome: "abandon" },
+                      }),
+                    ],
+                  },
+                }),
+                block({
+                  id: "blk_INV_EMPTY",
+                  type: "core.invoke",
+                  config: { invoke_type: "myapp:capture" },
+                }),
+              ],
+            },
+          }),
+          { id: "bdoc_RAILS" }
+        );
+
+        const tree = layoutDocument(doc, proposing);
+        const body = tree.root.slots.find((one) => one.name === "body");
+        const at = (id) => body.children.find((child) => child.id === id);
+
+        // The two vocabularies, side by side in one document.
+        equal(
+          "the failure path declares its own style",
+          at("blk_INV").slots.map((one) => [one.name, one.style]),
+          [["on_error", "failure"]]
+        );
+        equal(
+          "an interrupt rail is untouched",
+          at("blk_GRP").slots.map((one) => [one.name, one.style]),
+          [
+            ["body", "primary"],
+            ["interrupts", "secondary"],
+          ]
+        );
+
+        // Placement is what the two share: the rail partition holds both, so
+        // both containers keep their boundary box (amendment 10c).
+        equal("a failure slot is on the rail", at("blk_INV").secondary.map((one) => one.name), [
+          "on_error",
+        ]);
+        equal("...and is not a primary slot", at("blk_INV").primary.length, 0);
+        equal("an interrupt slot is on the same rail", at("blk_GRP").secondary.map((one) => one.name), [
+          "interrupts",
+        ]);
+
+        // An unknown style is a metadata typo, and the safe reading of one is
+        // the ordinary rendering rather than a slot hidden beside the body.
+        const groupType = proposing.types["core.group"];
+        const typo = {
+          ...proposing,
+          types: {
+            ...proposing.types,
+            "core.group": {
+              ...groupType,
+              paletteEntry: {
+                ...groupType.paletteEntry,
+                slotStyle: { body: "primary", interrupts: "sideways" },
+              },
+            },
+          },
+        };
+
+        const typoTree = layoutDocument(doc, typo);
+        const typoGroup = typoTree.root.slots
+          .find((one) => one.name === "body")
+          .children.find((child) => child.id === "blk_GRP");
+
+        equal(
+          "a style nothing recognizes falls back to primary",
+          typoGroup.slots.map((one) => one.style),
+          ["primary", "primary"]
+        );
+        equal("...so nothing is hidden on a rail", typoGroup.secondary.length, 0);
+
+        /* ------------------------------------------------------- the DOM */
+
+        const mount = el("div");
+        document.body.append(mount);
+        renderCanvas(mount, tree, { center: false });
+
+        const railSlot = (id, name) =>
+          mount.querySelector(`.sb-rail__slot[data-block-id="${id}"][data-slot="${name}"]`);
+
+        equal(
+          "the failure rail carries its style out to the DOM",
+          railSlot("blk_INV", "on_error").dataset.slotStyle,
+          "failure"
+        );
+        equal(
+          "the interrupt rail carries its own",
+          railSlot("blk_GRP", "interrupts").dataset.slotStyle,
+          "secondary"
+        );
+        equal(
+          "a failure slot still makes its container a boundary",
+          mount.querySelector('.sb-node[data-block-id="blk_INV"]').dataset.boundary,
+          "true"
+        );
+
+        // The stylesheet paints the failure card and the failure placeholder
+        // through `> .sb-node >` and `> .sb-slot__empty`, so the direct-child
+        // shape is load-bearing rather than incidental.
+        check(
+          "the failure card is a direct child of its rail slot",
+          railSlot("blk_INV", "on_error").querySelector(
+            ':scope > .sb-node[data-block-id="blk_PARK"] > .sb-card'
+          ) !== null
+        );
+        check(
+          "an EMPTY failure slot's placeholder is a direct child too (sb-mu2)",
+          railSlot("blk_INV_EMPTY", "on_error").querySelector(":scope > .sb-slot__empty") !== null
+        );
+
         mount.remove();
       });
 

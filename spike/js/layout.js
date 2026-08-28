@@ -139,7 +139,8 @@ function depthOf(node) {
  *       arrangement,  "stack" | "fan" | "lanes"
  *       joinLabel,    what the join marker reads, when one is drawn
  *       slots,        every slot view, declared order then present-but-undeclared
- *       primary/secondary, the same views partitioned by slot_style
+ *       primary/secondary, the same views partitioned by slot_style - the
+ *                     second holds every RAIL style, `failure` included
  *       collapsed,    always false here; sb-ad2 owns the interaction
  *       findings      the block's own, also appended to the document list
  *     }
@@ -234,7 +235,11 @@ function layoutBlock(node, registry, findings, { depth, slot, parentId, view }) 
   }));
 
   layoutNode.primary = layoutNode.slots.filter((one) => one.style === "primary");
-  layoutNode.secondary = layoutNode.slots.filter((one) => one.style === "secondary");
+  // The RAIL partition, not the `:secondary` one - see RAIL_STYLES below.
+  // Every style that renders beside the body is in here, so the boundary box
+  // and the rail keep deriving from one list as they did when there was only
+  // one such style.
+  layoutNode.secondary = layoutNode.slots.filter((one) => RAIL_STYLES.has(one.style));
   layoutNode.shape = shapeOf(layoutNode, schema);
   layoutNode.arrangement = arrangementOf(layoutNode, entry);
   layoutNode.descendantFindings = 0;
@@ -281,6 +286,38 @@ function safeSlots(descriptor, config) {
   }
 }
 
+/*
+ * The slot-style vocabulary (sb-68b).
+ *
+ * ADR-0005 decision 10 gives `slot_style` two values, `:primary` and
+ * `:secondary`, and the spike found a third rendering hiding inside the
+ * second. `:secondary` says two things at once - "draw this beside the body
+ * rather than under it" and "what is in it fires OUT OF BAND" - and those came
+ * apart the moment `core.invoke` declared an `on_error` slot: a failure path is
+ * beside the body like an interrupt rail, but it is an in-band continuation of
+ * the step that failed, not a rule watching a region. Rendered in one
+ * vocabulary, "fires out of band" and "runs when the call fails" were the same
+ * picture (evidence: campaign-012 journal, sb-pt1-onerror-vs-interrupts-*).
+ *
+ * `failure` is that third value. It stays presentation metadata a type
+ * declares, exactly as d10 asks - no renderer, no stylesheet and nothing here
+ * asks what a block is CALLED, and a host type with a failure path declares
+ * the same value and gets the same treatment.
+ *
+ * `RAIL_STYLES` is the part the two share: where the slot is placed. Both go
+ * to the rail beside the body, so both also mark their container a boundary
+ * (amendment 10c), and `layoutNode.secondary` is the rail partition rather
+ * than the `:secondary` partition. The name is kept because it is the one
+ * `render.js`, the selftest and d10's own prose already use; what widened is
+ * what can be in it.
+ *
+ * Anything a type declares that is not in this set falls back to `primary` -
+ * an unknown style is a metadata typo, and the safe reading of one is "draw it
+ * the ordinary way" rather than "hide it beside the body".
+ */
+const RAIL_STYLES = new Set(["secondary", "failure"]);
+const SLOT_STYLES = new Set(["primary", ...RAIL_STYLES]);
+
 /**
  * Every slot the canvas draws for one block: the declared ones in declared
  * order, then any slot key the document carries that the type did not declare.
@@ -304,7 +341,9 @@ function slotViews(node, descriptor, entry, config, schema, view) {
     label: slot.label ?? slot.name,
     arity: slot.arity ?? "any",
     undeclared: slot.undeclared === true,
-    style: entry.slotStyle?.[slot.name] === "secondary" ? "secondary" : "primary",
+    style: SLOT_STYLES.has(entry.slotStyle?.[slot.name])
+      ? entry.slotStyle[slot.name]
+      : "primary",
     guard: guardFor(schema, config, slot.name),
     rawChildren: slotChildren(node, slot.name),
     // Drop validity, asked of the session rather than derived here: this file

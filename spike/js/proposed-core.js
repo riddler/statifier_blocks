@@ -102,9 +102,10 @@ export function parseParams(value) {
  * edge the one thing an author draws by hand.
  *
  * The slot declaration itself needs no new machinery: `zero_or_one` arity and
- * a `secondary` slot style are exactly what `core.group`'s `interrupts` rail
- * already declares, and the renderer reads both off ADR-0005 decision 10's
- * metadata without learning a type name.
+ * a rail slot style are exactly what `core.group`'s `interrupts` rail already
+ * declares, and the renderer reads both off ADR-0005 decision 10's metadata
+ * without learning a type name. What it did need, once both were drawn, was a
+ * second rail VOCABULARY - see the `slotStyle` note below.
  *
  * ## What this would compile to (Phase B; nothing here compiles anything)
  *
@@ -217,9 +218,17 @@ const coreInvoke = {
     keywords: ["invoke", "call", "host", "service", "error"],
     order: 0,
     layout: "stack",
-    /* The `interrupts` precedent: the failure path is a rail beside the
-     * step, not a second body. */
-    slotStyle: { on_error: "secondary" },
+    /* The `interrupts` precedent for PLACEMENT: the failure path is a rail
+     * beside the step, not a second body.
+     *
+     * PROPOSED slot-style value (sb-68b): `failure`, not `secondary`. Placed
+     * like a `secondary` rail, painted in the error family and solid, because
+     * an `on_error` subtree is an in-band continuation of a step that went
+     * badly - not a rule that fires out of band at a region. Declared the same
+     * way d10's two values are, so it costs a metadata value and no type
+     * name. Widening d10's table to hold it is a Phase-B finding for the
+     * record, not a decision taken here. */
+    slotStyle: { on_error: "failure" },
     accentToken: "--sb-accent-invoke",
     /* PROPOSED metadata key (sb-p0k builds the renderer). A short chip on the
      * card header saying what a reader could not otherwise see: this step
