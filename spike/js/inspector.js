@@ -43,20 +43,28 @@ import {
   severityCounts,
   writeAtPath,
 } from "./panes.js";
+import { annotateCondition, conditionFields, conditionPaths } from "./datamodel.js";
 import { findBlock } from "./document.js";
 import { el } from "./render.js";
 
 const SEVERITY_LABELS = { error: "Error", warning: "Warning", info: "Note" };
 
 /**
- * Wires the two panes to one editor.
+ * Wires the inspector's panes to one editor.
  *
- *     mounts  { config, findings, findingsBadge }
- *     host    { state(), updateConfig(id, config), reveal(finding) }
+ *     mounts  { config, findings, findingsBadge, condition }
+ *     host    { state(), updateConfig(id, config), reveal(finding),
+ *               datamodel: { index, reveal(path) } }
  *
  * `state()` returns `{ session, findings }` or `null` when no document is
  * open. `updateConfig` returns `true` when the command was applied, which is
  * what tells a control whether to expect a re-render or to mark itself.
+ *
+ * `host.datamodel` is optional: without it the condition pane still renders and
+ * still edits, it simply says nothing about whether a path is declared. That is
+ * the honest degradation - a host with no datamodel document has no basis for
+ * the affirmative treatment, and inventing one would be the pane claiming to
+ * know something it does not.
  */
 export function createInspector({ mounts, host }) {
   function refresh() {
@@ -65,6 +73,7 @@ export function createInspector({ mounts, host }) {
     renderConfig(mounts.config, state, host);
     renderFindings(mounts.findings, state, host);
     renderBadge(mounts.findingsBadge, state);
+    renderCondition(mounts.condition, state, host);
   }
 
   return { refresh };
@@ -624,6 +633,311 @@ function findingRow(finding, host) {
 
   return button;
 }
+
+/* ========================================================== condition pane */
+
+/*
+ * The Condition tab: the selected block's condition-bearing fields, shown as
+ * source rather than as a form control.
+ *
+ * ## Why this is not just the config form's expression control again
+ *
+ * The config form renders an expression as a one-line mono `<input>`, which is
+ * right for a form: it sits in a column of other fields and it must not tower
+ * over them. A condition read on its own is a different job - it is the one
+ * value in a workflow document an author will get wrong, and reading it is most
+ * of the work. So this pane gives it the whole width, tokenizes it, and says
+ * which of the paths it names the datamodel actually declares. Both write
+ * through the SAME `:update_config` command path, so an edit here is one undo
+ * step exactly like an edit there, and the two never disagree about what is
+ * stored.
+ *
+ * ## Display first, edit on request
+ *
+ * The default state is the highlighted, non-editable rendering, because the
+ * paths in it are the cross-pane affordance - a `<textarea>` cannot have a
+ * clickable token inside it, and making the path clickable is worth more than
+ * making the caret land one click sooner. "Edit" swaps in a monospace textarea
+ * over the same value; `change` commits it, which is decision 9's boundary and
+ * the reason four typed characters are one undo step.
+ *
+ * ## Known and unknown, not valid and invalid
+ *
+ * A path the datamodel declares gets a quiet affirmative underline; one it does
+ * not gets a dotted advisory one and a line naming it. This is a STATIC LOOKUP
+ * and nothing here evaluates anything (D4: the real evaluator is stretch-only).
+ * A host may legitimately carry values its datamodel document does not
+ * describe, so an unknown path is a question and never an error - which is why
+ * it is not routed through the findings machinery, where every entry is a claim
+ * that something is wrong.
+ */
+
+function renderCondition(mount, state, host) {
+  if (!mount) return;
+
+  if (!state?.session) {
+    mount.replaceChildren(
+      el("p", { class: "sb-empty", text: "Load a document and select a block to see its condition." })
+    );
+    return;
+  }
+
+  const node = selected(state.session);
+
+  if (!node) {
+    mount.replaceChildren(
+      el("p", {
+        class: "sb-empty",
+        text: "Select a block on the canvas to see the conditions it carries.",
+      })
+    );
+    return;
+  }
+
+  const form = configFormFor(state.session.registry, node, state.findings);
+  const fields = conditionFields(form);
+
+  if (fields.length === 0) {
+    mount.replaceChildren(...conditionEmptyState(form));
+    return;
+  }
+
+  const index = host.datamodel?.index ?? new Map();
+
+  mount.replaceChildren(
+    el(
+      "div",
+      { class: "sb-conditions" },
+      fields.map((field) => conditionElement(field, form, host, index))
+    )
+  );
+}
+
+/*
+ * The empty state does the second half of its job: an author who selected the
+ * wrong block needs to know where conditions DO live, and "no condition" alone
+ * teaches them nothing. The unresolvable case gets its own sentence, because
+ * "carries no condition" would be a false statement about a block whose stored
+ * bytes may well hold one - decision 12 keeps them, and there is no schema here
+ * to say which key it is.
+ */
+function conditionEmptyState(form) {
+  if (form?.readOnly) {
+    return [
+      el("p", {
+        class: "sb-empty",
+        text: `This block's type is not registered here, so nothing declares which of its stored values is a condition. Its bytes are preserved and shown read-only on the Config tab.`,
+      }),
+    ];
+  }
+
+  return [
+    el("p", { class: "sb-empty", text: "This block carries no condition." }),
+    el("p", {
+      class: "sb-hint sb-condition__where",
+      text: "Conditions live on a branch's arms - one per arm, deciding which way the chart goes - and on the guarded interrupt rules that sit on a group's secondary rail. Select one of those to read or edit its condition here.",
+    }),
+  ];
+}
+
+function conditionElement(field, form, host, index) {
+  const source = typeof field.value === "string" ? field.value : "";
+  const tokens = annotateCondition(source, index);
+  const paths = conditionPaths(source, index);
+  const unknown = paths.filter((one) => !one.known);
+
+  const box = el("section", { class: "sb-condition", "data-field-key": field.key });
+
+  const edit = el("button", {
+    class: "sb-button sb-button--quiet sb-condition__edit",
+    type: "button",
+    text: source === "" ? "Write a condition" : "Edit",
+  });
+
+  box.append(
+    el("header", { class: "sb-condition__head" }, [
+      el("h4", { class: "sb-condition__label", text: field.label }),
+      el("span", { class: "sb-condition__key", text: field.key }),
+      el("div", { class: "sb-topbar__spacer" }),
+      edit,
+    ])
+  );
+
+  const surface = el("div", { class: "sb-condition__surface" });
+
+  const commit = (value) => {
+    const config = writeAtPath(currentConfig(host, form.blockId), field.path, value);
+    const refusal = host.updateConfig(form.blockId, config);
+
+    if (refusal) markRefused(box, refusal, field.key);
+    return refusal === null;
+  };
+
+  function showEditor() {
+    const input = el("textarea", {
+      class: "sb-input sb-input--mono sb-condition__input",
+      rows: "3",
+      spellcheck: "false",
+      "aria-label": field.label,
+    });
+    input.value = source;
+
+    // No completion, by settled input 3. The one keyboard nicety kept is that
+    // Escape abandons the edit and returns to the reading view, because a
+    // surface an author opened by accident should close the way every other
+    // one does.
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      showDisplay();
+    });
+
+    input.addEventListener("change", () => {
+      if (!commit(input.value)) input.focus();
+    });
+
+    surface.replaceChildren(input);
+    surface.dataset.mode = "edit";
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
+
+  function showDisplay() {
+    surface.replaceChildren(displayElement(tokens, source, host));
+    surface.dataset.mode = "read";
+  }
+
+  edit.addEventListener("click", () => {
+    if (surface.dataset.mode === "edit") showDisplay();
+    else showEditor();
+  });
+
+  showDisplay();
+  box.append(surface);
+
+  for (const finding of field.findings) {
+    box.append(
+      el("p", {
+        class: "sb-field__finding",
+        "data-severity": finding.severity ?? "error",
+        text: finding.message,
+      })
+    );
+  }
+
+  box.append(pathSummary(paths, unknown, index, host));
+
+  return box;
+}
+
+/*
+ * The tokens, rendered. Every token contributes its own text verbatim and
+ * nothing is rebuilt from parts, so what is on screen is byte-for-byte the
+ * stored condition - which is the property that makes a coloured rendering
+ * safe to trust as a reading of the document.
+ */
+function displayElement(tokens, source, host) {
+  if (source.trim() === "") {
+    return el("p", {
+      class: "sb-condition__blank",
+      text: "No expression yet. This arm cannot be taken until it has one.",
+    });
+  }
+
+  const code = el("pre", { class: "sb-code sb-condition__code" });
+
+  for (const token of tokens) {
+    if (token.kind !== "path") {
+      code.append(
+        el("span", { class: "sb-tok", "data-tok": token.kind, text: token.text })
+      );
+      continue;
+    }
+
+    // A path is a button: revealing it in the datamodel is a real navigation
+    // gesture, so it answers Enter and Space and lands in the tab order, the
+    // same way a findings row does.
+    const button = el("button", {
+      class: "sb-tok sb-tok--path",
+      type: "button",
+      "data-tok": "path",
+      "data-known": String(token.known),
+      title: token.known
+        ? `${token.entry.scopeLabel} · ${token.entry.type} · click to reveal in the datamodel`
+        : "not declared in the datamodel document",
+      text: token.text,
+    });
+
+    button.addEventListener("click", () => host.datamodel?.reveal?.(token.path));
+    code.append(button);
+  }
+
+  return code;
+}
+
+/*
+ * The footer: what this condition depends on, and which of it the datamodel has
+ * never heard of. Counting rather than only colouring, because the colour on a
+ * dotted underline is exactly the sort of thing a reader is not sure they saw.
+ */
+function pathSummary(paths, unknown, index, host) {
+  const foot = el("div", { class: "sb-condition__paths" });
+
+  if (paths.length === 0) {
+    foot.append(el("p", { class: "sb-hint", text: "This condition names no datamodel path." }));
+    return foot;
+  }
+
+  foot.append(
+    el("p", {
+      class: "sb-condition__paths-title",
+      text: `${paths.length} path${paths.length === 1 ? "" : "s"} referenced${
+        index.size === 0 ? " · no datamodel document loaded" : ""
+      }`,
+    })
+  );
+
+  const list = el("ul", { class: "sb-condition__path-list" });
+
+  for (const one of paths) {
+    const button = el("button", {
+      class: "sb-condition__path",
+      type: "button",
+      "data-known": String(one.known),
+      text: one.path,
+      title: one.known ? `Reveal ${one.path} in the datamodel` : `${one.path} is not declared`,
+    });
+
+    button.addEventListener("click", () => host.datamodel?.reveal?.(one.path));
+
+    list.append(
+      el("li", {}, [
+        button,
+        one.known
+          ? el("span", { class: "sb-condition__path-type", text: typeOf(one.entry) })
+          : el("span", { class: "sb-condition__path-type", text: "not declared" }),
+      ])
+    );
+  }
+
+  foot.append(list);
+
+  if (unknown.length > 0 && index.size > 0) {
+    foot.append(
+      el("p", {
+        class: "sb-condition__advisory",
+        text: `${unknown.map((one) => one.path).join(", ")} ${
+          unknown.length === 1 ? "is" : "are"
+        } not declared in the datamodel document. That is not necessarily wrong - a host can carry values it has not described - but it is the usual shape of a typo.`,
+      })
+    );
+  }
+
+  return foot;
+}
+
+const typeOf = (entry) =>
+  entry.type === "list" && entry.itemType ? `list of ${entry.itemType}` : entry.type;
 
 /* ================================================================ helpers */
 

@@ -73,7 +73,7 @@ const DRAG_THRESHOLD = 4;
  * one is optional, so the same module drives the full shell and a bare canvas
  * in a test page.
  */
-export function createEditor({ canvas, registry, chrome = {} }) {
+export function createEditor({ canvas, registry, chrome = {}, datamodel = null }) {
   /*
    * The ghost and the "+" picker are `position: fixed`, so they escape the
    * canvas's `overflow: auto` wherever they hang in the DOM - but they hang
@@ -104,9 +104,32 @@ export function createEditor({ canvas, registry, chrome = {} }) {
       config: chrome.configForm ?? null,
       findings: chrome.findingsPanel ?? null,
       findingsBadge: chrome.findingsBadge ?? null,
+      condition: chrome.conditionPanel ?? null,
     },
     host: {
       state: () => (session ? { session, findings } : null),
+      /*
+       * The datamodel seam, handed in by the shell. The editor knows nothing
+       * about the datamodel document beyond passing it through: the pane that
+       * owns the tree owns the reveal, and this is only the wire that lets a
+       * path in a condition reach it. `announce` carries the outcome, because
+       * a click on an undeclared path must say something rather than appear
+       * to do nothing.
+       */
+      datamodel: datamodel
+        ? {
+            index: datamodel.index,
+            reveal: (path) => {
+              const found = datamodel.reveal(path);
+              announce(
+                found
+                  ? `Revealed ${path} in the datamodel.`
+                  : `${path} is not declared in the datamodel document.`
+              );
+              return found;
+            },
+          }
+        : null,
       // `null` when the edit landed, the refusal otherwise - the form needs
       // the reason, not just the verdict, so it can say WHY under the field
       // the author is standing in rather than only in the canvas's status

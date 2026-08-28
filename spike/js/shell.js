@@ -16,6 +16,8 @@ import { fromJson } from "./document.js";
 import { coreTypes, createRegistry, demoTypes } from "./palette.js";
 import { fixtureTypes } from "./demo-types.js";
 import { createEditor } from "./interact.js";
+import { createDatamodelPane } from "./datamodel-pane.js";
+import { indexPaths } from "./datamodel.js";
 import { createPalettePane } from "./palette-pane.js";
 
 const root = document.getElementById("sb-spike");
@@ -108,6 +110,52 @@ if (paletteMount) {
 }
 
 /*
+ * The datamodel document, fetched once. Top-level `await` in a module rather
+ * than a load-time race: the condition pane's known/unknown treatment is a
+ * lookup against this index, and a pane that renders before the index arrives
+ * would flag every path in the document as undeclared for one frame - which is
+ * the one wrong answer this affordance must never give, even briefly.
+ *
+ * A failed fetch is not fatal. `datamodel` stays null, the Datamodel tab says
+ * so, and the condition pane degrades to tokenizing without the lookup - the
+ * same state a host that ships no datamodel document is in.
+ */
+const datamodelDoc = await fetch("fixtures/datamodel.json")
+  .then((response) => (response.ok ? response.json() : null))
+  .catch(() => null);
+
+const datamodelMount = document.getElementById("sb-datamodel-panel");
+
+const datamodelPane =
+  datamodelMount && datamodelDoc
+    ? createDatamodelPane({ mount: datamodelMount, doc: datamodelDoc })
+    : null;
+
+if (datamodelMount && !datamodelDoc) {
+  datamodelMount.textContent =
+    "The datamodel document could not be loaded, so there is no tree to show.";
+  datamodelMount.className = "sb-empty";
+}
+
+/*
+ * The cross-pane affordance's other half: a path clicked in a condition has to
+ * SWITCH TABS before the datamodel pane can scroll anything into view, and the
+ * tab strip is the shell's, not the editor's. So the shell composes the two -
+ * select the tab, then let the pane unfold and flash - and hands the result
+ * down as one function.
+ */
+const datamodelSeam = datamodelPane
+  ? {
+      index: indexPaths(datamodelDoc),
+      reveal: (path) => {
+        const tab = document.getElementById("sb-tab-datamodel");
+        if (tab) selectTab(tab);
+        return datamodelPane.reveal(path);
+      },
+    }
+  : null;
+
+/*
  * The editor owns the canvas, the selection, the history and the drag; the
  * shell owns the frame around it and the fixture fetch. `chrome` is the list
  * of elements the editor is allowed to write to, named here rather than
@@ -117,6 +165,7 @@ const editor = canvas
   ? createEditor({
       canvas,
       registry,
+      datamodel: datamodelSeam,
       chrome: {
         undoButton: document.getElementById("sb-undo"),
         redoButton: document.getElementById("sb-redo"),
@@ -133,6 +182,7 @@ const editor = canvas
         configForm: document.getElementById("sb-config-form"),
         findingsPanel: document.getElementById("sb-findings-panel"),
         findingsBadge: document.getElementById("sb-findings-count"),
+        conditionPanel: document.getElementById("sb-condition-panel"),
       },
     })
   : null;

@@ -1291,33 +1291,457 @@
 
 /* ---------------------------------------------------------- datamodel tree */
 
-.sb-tree {
+/* The pane reuses the palette's search row and its count line verbatim - the
+ * two are the same gesture on two lists, and giving them two treatments would
+ * make an author learn the same control twice. Everything below is what a TYPED
+ * tree needs that a flat palette does not. */
+
+.sb-datamodel {
   font-size: var(--sb-text-sm);
 }
 
-.sb-tree__scope + .sb-tree__scope {
-  margin-top: var(--sb-space-2);
+/* The whole header sticks, the same way the palette's search box does and for
+ * the same reason: filtering a long tree and losing the box you are typing
+ * into is the one thing a search box must never do. The offsets mirror
+ * `.sb-palette__search-row`'s, because both sit directly inside a
+ * `.sb-pane__body` and are cancelling the same padding. */
+/* Deliberately NOT sticky, unlike the palette's search row.
+ *
+ * Two attempts at sticking it - at the palette's negative offset and at zero -
+ * both left a band at the top of the tab panel that scrolled rows showed
+ * through, because the inspector's scroller is not the pane the palette's
+ * offsets were tuned against. A header that paints a row of the list above
+ * itself looks broken in a way that a header which simply scrolls does not,
+ * and the thing stickiness buys - keeping the box you are typing into on
+ * screen - is already bought here by scrolling back to the top on every
+ * keystroke. Whether the palette's idiom can be made to transplant is a
+ * question for the polish pass with the whole shell in view. */
+.sb-datamodel__head {
+  padding-bottom: var(--sb-space-half);
+  background: var(--sb-bg);
 }
 
-.sb-tree__row {
+.sb-datamodel__search-row {
+  margin-bottom: var(--sb-space);
+}
+
+.sb-datamodel__controls {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space-half);
+}
+
+.sb-datamodel__controls .sb-palette__count {
+  flex: 1;
+  margin: 0;
+}
+
+.sb-datamodel__toggle-all {
+  padding: 0 var(--sb-space-half);
+  font-size: var(--sb-text-xs);
+}
+
+/* A scope is a section with a lifetime, not a folder. It gets a real header
+ * and a sentence, and it does not fold away - the scope chrome is the fact
+ * that decides which of two identically-named paths an author wants, so it is
+ * the one thing that must never be the thing scrolled off. */
+.sb-datamodel__scope + .sb-datamodel__scope {
+  margin-top: var(--sb-space-3);
+  padding-top: var(--sb-space-2);
+  border-top: var(--sb-border-width) solid var(--sb-border);
+}
+
+.sb-datamodel__scope-head {
   display: flex;
   align-items: baseline;
   gap: var(--sb-space);
-  padding: var(--sb-space-half) 0;
 }
 
-.sb-tree__row--nested {
-  padding-left: var(--sb-space-2);
+.sb-datamodel__scope-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space-half);
+  margin: 0;
+  flex: 1;
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  letter-spacing: var(--sb-tracking-caps);
+  text-transform: uppercase;
+  color: var(--sb-fg-muted);
 }
 
-.sb-tree__name {
+/* The `event.` prefix, said once on the scope instead of on thirty rows. */
+.sb-datamodel__prefix {
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-accent-muted);
+  color: var(--sb-accent);
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.sb-datamodel__scope-count {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+p.sb-datamodel__scope-note {
+  margin: var(--sb-space-half) 0 var(--sb-space);
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+}
+
+p.sb-datamodel__none {
+  margin: 0 0 var(--sb-space);
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+}
+
+.sb-datamodel__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The nested indent is a rule, not padding: at depth two the eye needs a line
+ * to run back up, and a subtree that is only offset reads as a second list.
+ *
+ * Qualified by element on purpose. `reset.css` zeroes `margin`/`padding` on
+ * `.sb-spike ul`, which is a class-plus-element selector and therefore beats a
+ * bare component class - the reset says so about buttons and the same trap is
+ * here for lists. `ul.` matches its specificity and wins on order. */
+ul.sb-datamodel__list--nested {
+  margin-left: calc(var(--sb-space) + var(--sb-space-half));
+  padding-left: var(--sb-space);
+  border-left: var(--sb-border-width) solid var(--sb-border);
+}
+
+.sb-datamodel__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space-half);
+  padding: 1px var(--sb-space-half) 1px 0;
+  border-radius: var(--sb-radius-sm);
+}
+
+.sb-datamodel__row:hover {
+  background: var(--sb-bg-muted);
+}
+
+.sb-datamodel__row[data-matched="true"] {
+  background: var(--sb-accent-muted);
+}
+
+/* A button on a container, a spacer on a leaf, one width for both - so every
+ * name in the tree starts on the same x. */
+.sb-datamodel__twisty {
+  flex: none;
+  width: 1rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sb-datamodel__twisty--leaf {
+  cursor: default;
+}
+
+/* The identity line's primary is the NAME, in mono, because that is the thing
+ * an author has to type into a condition. The label explains it on the line
+ * below; putting both on one line is what made the first iteration clip. */
+.sb-datamodel__name {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sb-fg);
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.sb-datamodel__name:hover {
+  color: var(--sb-accent);
+}
+
+/* The gloss line: the sentence and the example, each with room to be read.
+ * Indented to the name's x so the two lines read as one entry. */
+.sb-datamodel__gloss {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sb-space);
+  margin: 0 0 var(--sb-space-half) calc(1rem + var(--sb-space-half));
+}
+
+.sb-datamodel__label {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+}
+
+.sb-datamodel__type {
+  flex: none;
+  margin-left: auto;
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-sunken);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  white-space: nowrap;
+}
+
+/* An object's chip is quieter than a scalar's: it is the row's structure, not
+ * its type, and a container that shouts "object" is competing with the fields
+ * underneath it that actually answer something. */
+.sb-datamodel__type[data-type="object"] {
+  background: none;
+  color: var(--sb-fg-subtle);
+}
+
+/* The example is a value, quoted the way it would be written - `"USD"` against
+ * `USD` is the difference between a condition that works and one that does
+ * not, and prose ("e.g. USD") throws that away. */
+/* Left-anchored, beside the label rather than pushed to the far edge. The
+ * right-aligned version read as an orphan on every row whose label was dropped
+ * for echoing its name: a value alone against the right margin with nothing
+ * opposite it. Under the name, next to the sentence, is where it belongs. */
+.sb-datamodel__example {
+  flex: none;
+  max-width: 100%;
+  color: var(--sb-fg-subtle);
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* `one_of` is the closed set spelled out. Three chips is the whole answer;
+ * "3 values" is a promise to go look somewhere else. */
+.sb-datamodel__one-of {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sb-space-half);
+  margin: 1px 0 var(--sb-space-half) calc(1rem + var(--sb-space-half));
+}
+
+.sb-datamodel__one-of-value {
+  padding: 0 var(--sb-space-half);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  color: var(--sb-fg-muted);
   font-family: var(--sb-font-mono);
   font-size: var(--sb-text-xs);
 }
 
-.sb-tree__type {
+p.sb-datamodel__note {
+  margin: 0 0 var(--sb-space-half) calc(1rem + var(--sb-space-half));
   color: var(--sb-fg-subtle);
   font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+}
+
+/* ------------------------------------------------------- the condition pane */
+
+/* `.sb-hint`'s own `margin-top` is a bare class against `reset.css`'s
+ * `.sb-spike p`, which is class-plus-element and wins - so the hint under the
+ * empty state sits flush against it. Qualified here for this one use rather
+ * than reaching into a shared rule another bead's panes depend on; that the
+ * shared rule is dead at all is a finding for the polish pass. */
+p.sb-condition__where {
+  margin-top: var(--sb-space);
+}
+
+.sb-conditions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-2);
+}
+
+.sb-condition + .sb-condition {
+  padding-top: var(--sb-space-2);
+  border-top: var(--sb-border-width) solid var(--sb-border);
+}
+
+.sb-condition__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space-half);
+  margin-bottom: var(--sb-space-half);
+}
+
+.sb-condition__label {
+  margin: 0;
+  font-size: var(--sb-text-sm);
+  font-weight: var(--sb-weight-strong);
+}
+
+.sb-condition__key {
+  color: var(--sb-fg-subtle);
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+}
+
+.sb-condition__edit {
+  padding: 0 var(--sb-space-half);
+  font-size: var(--sb-text-xs);
+}
+
+pre.sb-condition__code {
+  padding: var(--sb-space);
+  line-height: 1.7;
+}
+
+.sb-condition__input {
+  width: 100%;
+  padding: var(--sb-space);
+  line-height: 1.7;
+  resize: vertical;
+}
+
+.sb-condition__blank {
+  margin: 0;
+  padding: var(--sb-space);
+  border: var(--sb-border-width) dashed var(--sb-border-strong);
+  border-radius: var(--sb-radius-sm);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-sm);
+}
+
+/* The five syntax roles. A path keeps full-strength text and every other role
+ * sits below it, because the path is the thing the eye should find first. */
+.sb-tok {
+  font: inherit;
+  white-space: pre-wrap;
+}
+
+.sb-tok[data-tok="keyword"] {
+  color: var(--sb-syntax-keyword);
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-tok[data-tok="string"] {
+  color: var(--sb-syntax-string);
+}
+
+.sb-tok[data-tok="number"],
+.sb-tok[data-tok="literal"] {
+  color: var(--sb-syntax-number);
+}
+
+.sb-tok[data-tok="operator"],
+.sb-tok[data-tok="paren"] {
+  color: var(--sb-syntax-operator);
+}
+
+/* A path is a button. The affirmative treatment is a solid underline and the
+ * advisory one is dotted: "known" and "unknown", never "valid" and "invalid" -
+ * this is a static lookup against the datamodel document, not an evaluation,
+ * and a host may legitimately carry values it has not described. */
+.sb-tok--path {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--sb-syntax-path);
+  cursor: pointer;
+  text-underline-offset: 3px;
+}
+
+.sb-tok--path[data-known="true"] {
+  text-decoration: underline solid var(--sb-path-known) 1.5px;
+}
+
+.sb-tok--path[data-known="false"] {
+  text-decoration: underline dotted var(--sb-path-unknown) 1.5px;
+}
+
+.sb-tok--path:hover {
+  background: var(--sb-accent-muted);
+}
+
+.sb-condition__paths {
+  margin-top: var(--sb-space);
+}
+
+p.sb-condition__paths-title {
+  margin: 0 0 var(--sb-space-half);
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+  letter-spacing: var(--sb-tracking-caps);
+  text-transform: uppercase;
+}
+
+.sb-condition__path-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sb-condition__path-list li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space-half);
+}
+
+.sb-condition__path {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sb-fg);
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+  text-align: left;
+  cursor: pointer;
+  text-underline-offset: 3px;
+}
+
+.sb-condition__path[data-known="true"] {
+  text-decoration: underline solid var(--sb-path-known) 1.5px;
+}
+
+.sb-condition__path[data-known="false"] {
+  text-decoration: underline dotted var(--sb-path-unknown) 1.5px;
+}
+
+.sb-condition__path:hover {
+  color: var(--sb-accent);
+}
+
+.sb-condition__path-type {
+  margin-left: auto;
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+}
+
+/* Advisory, and shaped like one. It borrows the warning colour but not the
+ * findings chrome, because everything in the findings panel is a claim that
+ * something is wrong and this is a question. */
+p.sb-condition__advisory {
+  margin: var(--sb-space) 0 0;
+  padding: var(--sb-space);
+  border-left: var(--sb-focus-width) solid var(--sb-path-unknown);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-warning-bg);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
 }
 
 /* ---------------------------------------------------------- code surfaces */

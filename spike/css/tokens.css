@@ -137,6 +137,24 @@
    * purpose - it IS the palette, filtered to one slot - so it reads as the
    * same list rather than as a second vocabulary. */
   --sb-picker-max-height: 20rem;
+
+  /* Condition syntax (sb-84k). Five roles, not a palette per token kind: a
+   * condition is short and a rainbow makes it harder to read, not easier. The
+   * path is the one thing the eye should find first, so it keeps full-strength
+   * text and every other role sits below it. Whether a syntax role set belongs
+   * in the SHIPPED token surface at all is a W6 question - a host that restyles
+   * the editor will certainly want these, and a host that has its own code
+   * theme will certainly already have them. */
+  --sb-syntax-path: var(--sb-fg);
+  --sb-syntax-keyword: #7a3ea3;
+  --sb-syntax-string: #1f7a48;
+  --sb-syntax-number: #8a5a06;
+  --sb-syntax-operator: var(--sb-fg-muted);
+  /* Known and unknown, as underlines rather than as text colour. Recolouring
+   * the path itself would collide with every other role above; an underline
+   * says "checked" without taking the token's own colour away. */
+  --sb-path-known: var(--sb-success);
+  --sb-path-unknown: var(--sb-warning);
 }
 
 /* -------------------------------------------------------------------- dark */
@@ -181,4 +199,8 @@
 
   --sb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --sb-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+
+  --sb-syntax-keyword: #c99bea;
+  --sb-syntax-string: #7fce9f;
+  --sb-syntax-number: #e0b25c;
 }
