@@ -149,6 +149,14 @@
 
       import { droppableSlots, droppableSlotsFor, slotKey } from "../js/targets.js";
 
+      /*
+       * The emit pass, imported for sb-mu2. This page runs in a real browser,
+       * so `renderCanvas` needs no shim - the one discipline is to mount into
+       * a node this file appends and removes itself, and to `destroy()` the
+       * handle so its ResizeObserver does not outlive the suite.
+       */
+      import { el, renderCanvas } from "../js/render.js";
+
       import {
         accentTokenFor,
         blockAccentStyle,
@@ -433,6 +441,49 @@
 
       const step = (id, stepName = "email") =>
         block({ id, type: "myapp.signup", config: { step: stepName } });
+
+      /*
+       * sb-mu2's fixture: one of every shape, with every declared slot EMPTY.
+       *
+       * `spikeRegistry()` deliberately does not know the proposals, so a
+       * document naming `core.invoke` builds its own registry the way a host
+       * registering its own types would.
+       */
+      function proposingRegistry() {
+        return { ...registry, types: { ...registry.types, ...proposedCoreTypes } };
+      }
+
+      function emptyContainerDocument() {
+        return createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: {
+              body: [
+                block({
+                  id: "blk_INV",
+                  type: "core.invoke",
+                  config: { invoke_type: "myapp:authorize" },
+                }),
+                block({ id: "blk_GRP", type: "core.group" }),
+                block({
+                  id: "blk_BR",
+                  type: "core.branch",
+                  config: { arms: [{ slot: "arm_high", cond: "amount > 100" }] },
+                }),
+                block({ id: "blk_WAI", type: "core.wait", config: { duration: "PT2M" } }),
+                block({
+                  id: "blk_CAP",
+                  type: "myapp.capture",
+                  config: { amount_key: "amount" },
+                }),
+                block({ id: "blk_GONE", type: "myapp.retired", config: {} }),
+              ],
+            },
+          }),
+          { id: "bdoc_EMPTY" }
+        );
+      }
 
       /* ----------------------------------------------------------- suites */
 
@@ -1963,6 +2014,206 @@
         equal("a select renders as a chip", find("blk_GRP").chips, [
           { key: "history", label: "Resume at", value: "Deep" },
         ]);
+      });
+
+      /*
+       * sb-mu2. The container test moved from "some slot HAS children" to
+       * "the type DECLARES a slot", which is what makes a freshly inserted
+       * block fillable at all: a block drawn as a leaf emits no body, and a
+       * body is where the "+" gap and the drop seam live.
+       *
+       * Sabotage: restoring the old
+       * `node.slots.some((view) => view.children.length > 0)` leaves every
+       * assertion in the suite above green - the demo documents fill every
+       * slot they declare - and turns the empty-container assertions here
+       * red, which is exactly the blindness the change is fixing.
+       */
+      suite("layout: a DECLARED slot makes a container, filled or not (sb-mu2)", () => {
+        const proposing = proposingRegistry();
+        const tree = layoutDocument(emptyContainerDocument(), proposing);
+        const body = tree.root.slots.find((one) => one.name === "body");
+        const at = (id) => body.children.find((child) => child.id === id);
+
+        equal("an empty invoke is a container", at("blk_INV").shape, "container");
+        equal(
+          "...whose on_error slot is drawn, empty, as a secondary rail",
+          at("blk_INV").secondary.map((one) => [one.name, one.label, one.children.length]),
+          [["on_error", "If it fails", 0]]
+        );
+
+        equal("an empty group is a container", at("blk_GRP").shape, "container");
+        equal("...and stacks, having one primary slot", at("blk_GRP").arrangement, "stack");
+        equal(
+          "...with both declared slots present and empty",
+          at("blk_GRP").slots.map((one) => [one.name, one.style, one.children.length]),
+          [
+            ["body", "primary", 0],
+            ["interrupts", "secondary", 0],
+          ]
+        );
+
+        // Arrangement is derived from the shape, so a shape that only
+        // appeared once a slot was filled took the fan with it: an empty
+        // branch used to draw as a single card with no arms at all.
+        equal("an empty branch is a container", at("blk_BR").shape, "container");
+        equal("...and fans, having two primary slots", at("blk_BR").arrangement, "fan");
+        equal(
+          "...over the arm its config declares, plus otherwise",
+          at("blk_BR").primary.map((one) => one.name),
+          ["arm_high", "otherwise"]
+        );
+
+        // The other half of the rule: declaring NO slot is still what makes a
+        // leaf, and the chip test is untouched.
+        equal("a lone duration is still a chip", at("blk_WAI").shape, "chip");
+        equal("a leaf with fields is still a card", at("blk_CAP").shape, "card");
+        equal(
+          "an unresolvable block with nothing in it is still a card",
+          at("blk_GONE").shape,
+          "card"
+        );
+        check("...and it really is unresolvable", at("blk_GONE").unresolved === true);
+
+        // Subsumption, stated: a stranded slot is only ever listed when it
+        // has children, so nothing that was a container stops being one.
+        const strayed = layoutDocument(retiredDocument(), proposing).root;
+        equal(
+          "a stranded undeclared slot still makes its block a container",
+          strayed.slots[0].children[0].shape,
+          "container"
+        );
+      });
+
+      /*
+       * sb-mu2, in the DOM this time: the emit pass is where the change is
+       * actually cashed in, because a shape that never reaches `renderBody`
+       * produces no gap, no "+" and nothing carrying a `data-slot` for a drop
+       * to resolve against.
+       *
+       * Sabotage: dropping the `renderEmptySlot` call leaves the layout suite
+       * above green and turns the placeholder assertions here red.
+       */
+      suite("render: an empty declared slot draws a labeled drop target (sb-mu2)", () => {
+        const mount = el("div");
+        document.body.append(mount);
+
+        const handle = renderCanvas(
+          mount,
+          layoutDocument(emptyContainerDocument(), proposingRegistry()),
+          { center: false }
+        );
+
+        const nodeFor = (id) => mount.querySelector(`.sb-node[data-block-id="${id}"]`);
+        const slotIn = (id, name) =>
+          nodeFor(id).querySelector(`[data-slot="${name}"][data-block-id="${id}"]`);
+
+        check("an empty invoke emits a body", nodeFor("blk_INV").querySelector(".sb-node__body") !== null);
+        check(
+          "...and the body carries its on_error rail",
+          nodeFor("blk_INV").querySelector(".sb-rail .sb-rail__slot") !== null
+        );
+        equal(
+          "...which is a boundary, because it declares a secondary slot",
+          nodeFor("blk_INV").dataset.boundary,
+          "true"
+        );
+
+        const errorSlot = slotIn("blk_INV", "on_error");
+        equal(
+          "the empty slot offers exactly one insertion point, at index 0",
+          Array.from(errorSlot.querySelectorAll(".sb-gap")).map((gap) => gap.dataset.index),
+          ["0"]
+        );
+        check(
+          "...reachable without a pointer (d8)",
+          errorSlot.querySelector('.sb-gap__add[data-action="open-picker"]') !== null
+        );
+        equal(
+          "...and its placeholder leans on the rail header for the label",
+          errorSlot.querySelector(".sb-slot__empty").textContent,
+          "nothing here yet"
+        );
+
+        // A lone primary slot draws no header, so the placeholder is the only
+        // thing that can say which slot it is - and the label is the type's
+        // own words rather than a sentence built around them, because
+        // "If it fails" and "After this step" are not plural nouns.
+        const groupBody = slotIn("blk_GRP", "body");
+        equal(
+          "an unheaded slot labels its own placeholder",
+          groupBody.querySelector(".sb-slot__empty-label").textContent,
+          "Steps"
+        );
+        equal(
+          "...beside the same hint",
+          groupBody.querySelector(".sb-slot__empty-hint").textContent,
+          "nothing here yet"
+        );
+
+        // The empty branch: both arms drawn, each its own drop target.
+        equal(
+          "an empty fan draws a column per arm",
+          Array.from(nodeFor("blk_BR").querySelectorAll(".sb-column")).map(
+            (column) => column.dataset.slot
+          ),
+          ["arm_high", "otherwise"]
+        );
+        check(
+          "...each with an insertion point of its own",
+          Array.from(nodeFor("blk_BR").querySelectorAll(".sb-column")).every(
+            (column) => column.querySelector(".sb-gap") !== null
+          )
+        );
+
+        // A leaf is still a leaf: no body, no gap, nothing to drop into.
+        check("a chip emits no body", nodeFor("blk_WAI").querySelector(".sb-node__body") === null);
+        check("nor does a card", nodeFor("blk_CAP").querySelector(".sb-node__body") === null);
+
+        handle.destroy();
+        mount.remove();
+      });
+
+      /*
+       * sb-mu2's other half: the gap the emit pass now draws resolves to a
+       * command the edit algebra accepts, including into a `zero_or_one`
+       * failure path that has never held anything.
+       */
+      suite("session: an empty declared slot accepts a drop (sb-mu2)", () => {
+        const proposing = proposingRegistry();
+        const session = createSession(emptyContainerDocument(), proposing);
+
+        check(
+          "on_error is a live target while a step is dragged",
+          droppableSlots(session.document, proposing, "blk_CAP").some(
+            (one) => one.parentId === "blk_INV" && one.slot === "on_error"
+          )
+        );
+
+        const dropped = insertTypeAt(session, "core.wait", {
+          parentId: "blk_INV",
+          slot: "on_error",
+          index: 0,
+        });
+
+        check("the drop applies", dropped.ok, JSON.stringify(dropped.error));
+
+        const after = dropped.value.document;
+        equal(
+          "a block inserted into the empty failure path lands there",
+          findBlock(after, "blk_INV").slots.on_error.length,
+          1
+        );
+        equal(
+          "...and the invoke was a container before the drop as well as after",
+          layoutDocument(after, proposing).root.slots[0].children[0].shape,
+          "container"
+        );
+        check(
+          "...and the slot is full, so rule 3 closes it (arity zero_or_one)",
+          !droppableSlots(after, proposing, "blk_CAP").some(
+            (one) => one.parentId === "blk_INV" && one.slot === "on_error"
+          )
+        );
       });
 
       suite("layout: an unresolvable type renders, with its bytes (d12)", () => {

@@ -823,11 +823,22 @@
 
 .sb-slot__empty {
   align-self: center;
+  display: flex;
+  gap: var(--sb-space-half);
+  align-items: baseline;
   padding: var(--sb-space-half) var(--sb-space);
   border: var(--sb-border-width) dashed var(--sb-border-strong);
   border-radius: var(--sb-radius-lg);
   color: var(--sb-fg-subtle);
   font-size: var(--sb-text-xs);
+}
+
+/* sb-mu2: the label an empty placeholder carries when no header above it
+ * does. It is the slot's own name, so it reads as the label it is rather
+ * than as part of the hint beside it. */
+.sb-slot__empty-label {
+  color: var(--sb-fg-muted);
+  font-weight: 600;
 }
 
 /* The gap IS the connector's run: it is sized to the vertical distance a flow

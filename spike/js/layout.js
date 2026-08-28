@@ -479,7 +479,7 @@ function sortDeep(value) {
 /*
  * Three shapes, and a block gets the smallest one its content allows.
  *
- *   container  it has children to nest
+ *   container  it has somewhere to nest
  *   chip       it is a leaf whose entire meaning is one duration - a wait, a
  *              delay, a cool-off. Drawn compact, because a full card for
  *              "wait two minutes" is what makes a deep tree unreadable.
@@ -488,9 +488,28 @@ function sortDeep(value) {
  * The chip test is over the SCHEMA, not the type name: a leaf declaring
  * exactly one field and that field a duration. `core.wait` is the core type
  * shaped that way and a host's cool-off step would be too.
+ *
+ * ## The container test is over DECLARED slots, not over children (sb-mu2)
+ *
+ * The test used to be "some slot has children", which made the shape a
+ * function of a document's contents rather than of its types, and left a
+ * freshly inserted `core.invoke` or `core.group` with nowhere to put
+ * anything: no body was emitted, so the slot drew neither its "+" gap nor a
+ * drop target, and the only way to fill an `on_error` was to load a document
+ * that already had one filled. An authoring surface whose empty containers
+ * cannot be filled is not an authoring surface.
+ *
+ * A block that DECLARES a slot is a container whether or not that slot is
+ * occupied, which is the same reading `slotViews` above already takes (it
+ * emits every declared slot, empty or not) and the same reading ADR-0002
+ * decision 6 takes of `slots/1` - the declaration is the type's statement
+ * about its shape, and a document cannot revoke it. `node.slots` is the
+ * union of the declared slots and the stranded ones, and a stranded slot is
+ * only ever listed when it HAS children, so this test still subsumes the old
+ * one exactly: nothing that used to be a container stops being one.
  */
 function shapeOf(node, schema) {
-  if (node.slots.some((view) => view.children.length > 0)) return "container";
+  if (node.slots.length > 0) return "container";
 
   const substantive = schema.filter((field) => field.key !== "label");
   const onlyDuration =

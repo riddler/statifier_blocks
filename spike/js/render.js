@@ -513,11 +513,10 @@ function renderStackSlot(node, slot) {
     "data-drop": slot.dropState,
   });
 
-  if (node.primary.length > 1 || slot.undeclared) {
-    wrapper.append(renderSlotHeader(slot));
-  }
+  const headed = node.primary.length > 1 || slot.undeclared;
+  if (headed) wrapper.append(renderSlotHeader(slot));
 
-  wrapper.append(renderChildren(node, slot));
+  wrapper.append(renderChildren(node, slot, headed));
 
   return wrapper;
 }
@@ -535,15 +534,17 @@ function renderSlotHeader(slot) {
  * The children of one slot, with a gap before each and one after. The gaps
  * are the "+" insertion points and the drop seams sb-ad2 will animate; here
  * they are measured spacing that happens to carry the coordinates.
+ *
+ * `headed` says whether a header above this list already carries the slot's
+ * label. It decides only the wording of the empty placeholder (see
+ * `renderEmptySlot`), never whether one is drawn.
  */
-function renderChildren(node, slot) {
+function renderChildren(node, slot, headed = false) {
   const list = el("div", { class: "sb-slot__children" });
 
   if (slot.children.length === 0) {
     list.append(renderGap(node, slot, 0));
-    list.append(
-      el("div", { class: "sb-slot__empty", text: `no ${slot.label.toLowerCase()} yet` })
-    );
+    list.append(renderEmptySlot(slot, headed));
     return list;
   }
 
@@ -554,6 +555,39 @@ function renderChildren(node, slot) {
   list.append(renderGap(node, slot, slot.children.length));
 
   return list;
+}
+
+/*
+ * What an empty slot says (sb-mu2).
+ *
+ * Every declared slot is now drawn whether or not it is occupied, so this
+ * placeholder went from a rarity - a document had to strand an empty arm to
+ * produce one - to the normal look of a freshly inserted container. It has to
+ * say two things at that volume: WHICH slot this is, and that a block goes
+ * here.
+ *
+ * The label is drawn HERE only when no header above already carries it,
+ * because a lone primary slot draws no header (see `renderStackSlot`) and
+ * "nothing here yet" alone under a card does not say what would go there.
+ * Where a header does carry it - every column, every rail, every block with
+ * more than one primary slot - repeating it is noise.
+ *
+ * The wording is deliberately label-agnostic rather than the old
+ * `no ${label} yet`: a slot's label is the type's own words and need not be a
+ * plural noun. `core.invoke`'s reads "If it fails" and `myapp.signup`'s reads
+ * "After this step", both of which the old template turned into nonsense the
+ * moment an empty one could actually appear.
+ */
+function renderEmptySlot(slot, headed) {
+  const box = el("div", { class: "sb-slot__empty" });
+
+  if (!headed) {
+    box.append(el("span", { class: "sb-slot__empty-label", text: slot.label }));
+  }
+
+  box.append(el("span", { class: "sb-slot__empty-hint", text: "nothing here yet" }));
+
+  return box;
 }
 
 /*
@@ -686,7 +720,7 @@ function renderColumn(node, slot, reserveGuardLine = false) {
   }
 
   column.append(header);
-  column.append(renderChildren(node, slot));
+  column.append(renderChildren(node, slot, true));
 
   return column;
 }
@@ -716,7 +750,7 @@ function renderRail(node) {
 
     if (slot.children.length === 0) {
       group.append(renderGap(node, slot, 0));
-      group.append(el("div", { class: "sb-slot__empty", text: "no rules" }));
+      group.append(renderEmptySlot(slot, true));
     } else {
       slot.children.forEach((child, index) => {
         group.append(renderGap(node, slot, index));
