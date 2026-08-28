@@ -1314,6 +1314,50 @@
       });
 
       /*
+       * sb-pt1. The form data behind the "(default)" placeholder.
+       *
+       * `selectControl` renders an absent optional as a disabled option naming
+       * the declared default, because a blank select says "unanswered" about a
+       * field the rest of the editor is already answering. The control itself
+       * is DOM and lives in `inspector.js`; what is checkable here is the pair
+       * of facts it reads, and they are the pair that can silently drift: the
+       * view has to report the value as ABSENT rather than as the default
+       * already filled in, and it has to carry the default at all.
+       *
+       * If a later change makes `fieldView` helpfully resolve the default into
+       * `value`, the placeholder stops appearing and nothing else complains -
+       * every other surface keeps working, because they all read through
+       * `configGet`. That is the drift this suite exists to catch.
+       */
+      suite("panes: an absent optional keeps its default readable, not resolved", () => {
+        const lanes = { lanes: ["capture", "receipt"] };
+
+        const absent = configFormFor(
+          registry,
+          block({ id: "blk_PD", type: "core.parallel", config: lanes })
+        ).fields[1];
+
+        equal("the field is the select", absent.control, "select");
+        check("an absent key reads as undefined, not as the default", absent.value === undefined);
+        equal("and the default rides the view", absent.default, "all");
+        equal(
+          "the placeholder borrows the declared choice's own words",
+          absent.choices.find((choice) => choice.value === absent.default).label,
+          "All - when every lane is done"
+        );
+
+        // The other arm: an authored value leaves nothing for a placeholder to
+        // say, and the control must show the authored words instead.
+        const authored = configFormFor(
+          registry,
+          block({ id: "blk_PA", type: "core.parallel", config: { ...lanes, complete: "first" } })
+        ).fields[1];
+
+        equal("an authored value reads back as itself", authored.value, "first");
+        equal("with the default still declared beside it", authored.default, "all");
+      });
+
+      /*
        * sb-dxs. `joinLabelFor` is the renderer's whole view of the key, and
        * the discipline is `badgeFor`'s plus one: the callback is HOST code
        * running during layout, so a throw degrades to the constant the

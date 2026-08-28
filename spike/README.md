@@ -427,6 +427,53 @@ Two things were deliberately NOT built, and the reasoning is the finding:
   the anchor is already visible on the finding row. Held for an operator's
   eye rather than changed on a worker's judgment.
 
+## What the second polish pass found (sb-pt1)
+
+The same checklist re-run over the surfaces the proposed vocabulary added -
+the `core.invoke` card and its badge, the `on_error` slot in both its shapes,
+the join marker's two readings, `core.raise` beside the interrupt rail it
+raises into, and the fixture runner's invoke replay. Two findings are about
+mechanisms rather than about one surface.
+
+**A descendant selector is a promise that the tree stays shallow.** `on_error`
+is the first secondary slot in the spike that can hold a CONTAINER, and both
+rules the rail was built out of assumed it never would. `.sb-rail .sb-card`
+painted the rail's warning identity onto every card at every depth, so an
+ordinary sequence of ordinary steps inside an error path read as five
+out-of-band interrupt rules; and the rail's fixed `--sb-rail-width` stopped
+clipping and started OVERFLOWING, because nested cards will not shrink below
+their content and rendered outside the boundary box, over the connectors and
+over the sibling rail. Neither is visible in a leaf-only document, which is
+every document the spike had until Phase A. The fix scopes the paint to the
+rail's direct members and lets a rail that `:has()` a container size to it;
+six of the seven rails in the demo measure identically before and after.
+
+**A blank control is a claim, and it was the wrong one.** `core.parallel`'s
+`complete` is the spike's first optional select, and an absent key rendered
+the control EMPTY - no option matches `""` - next to a form of filled-in
+fields. Every other surface reads the key through its default, so the canvas
+was drawing "continue when all" while the form said nothing at all. The
+control now names the default in the declared choice's own words, disabled,
+because there is no value it could commit to get absence back.
+
+Two queued findings were deliberately NOT fixed, and the reasoning is the
+finding:
+
+- **`.sb-chip--config`'s dead rule was deleted, not revived.** Four beads of
+  visual judgment - including the badge's ring, chosen so a badge would not
+  read as a filled config chip - were made against the plain chip that has
+  actually been rendering. Reviving an accent fill nobody has ever seen is a
+  new design, and it lands hardest where it fits worst: the chips are on the
+  interrupt rules, whose cards already carry the rail's warning identity.
+- **An empty container still renders no slots.** `shapeOf` calls a block a
+  container only when a slot already HAS children, so a freshly inserted
+  `core.invoke` offers neither a "+" gap nor a drop target for its own
+  `on_error` - the authoring path that would fill one cannot start. The
+  one-line rule that fixes it (a block that DECLARES slots is a container)
+  moves the shape derivation that drives arrangement, boundary boxes and
+  connector routing for every block, which is a model change and not a polish
+  one.
+
 ## The proposed vocabulary
 
 `js/proposed-core.js` holds `core.*` block types the package **does not
