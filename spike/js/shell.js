@@ -12,11 +12,10 @@
  * no dependency, ever.
  */
 
-import { blocks, fromJson } from "./document.js";
+import { fromJson } from "./document.js";
 import { coreTypes, createRegistry, demoTypes } from "./palette.js";
 import { fixtureTypes } from "./demo-types.js";
-import { layoutDocument } from "./layout.js";
-import { renderCanvas } from "./render.js";
+import { createEditor } from "./interact.js";
 
 const root = document.getElementById("sb-spike");
 
@@ -95,7 +94,33 @@ const docTitle = document.getElementById("sb-doc-title");
 const docSubtitle = document.getElementById("sb-doc-subtitle");
 const documentSelect = document.getElementById("sb-document");
 
-let rendered = null;
+/*
+ * The editor owns the canvas, the selection, the history and the drag; the
+ * shell owns the frame around it and the fixture fetch. `chrome` is the list
+ * of elements the editor is allowed to write to, named here rather than
+ * discovered there, so the shell's markup stays the shell's business.
+ */
+const editor = canvas
+  ? createEditor({
+      canvas,
+      registry,
+      chrome: {
+        undoButton: document.getElementById("sb-undo"),
+        redoButton: document.getElementById("sb-redo"),
+        revision: docSubtitle,
+        count: countChip,
+        depth: depthChip,
+        blockType: document.getElementById("sb-block-type"),
+        blockId: document.getElementById("sb-block-id"),
+        blockSlot: document.getElementById("sb-block-slot"),
+        blockNote: document.getElementById("sb-block-readonly"),
+        selectionChip: document.getElementById("sb-selection-chip"),
+        dragBar: document.getElementById("sb-dragbar"),
+        status: document.getElementById("sb-status"),
+        palette: document.querySelector(".sb-pane--palette"),
+      },
+    })
+  : null;
 
 /*
  * The fixtures carry `_comment` keys - their own documentation, additive and
@@ -125,11 +150,6 @@ function stripComments(raw) {
 }
 
 async function loadDocument(name) {
-  if (rendered) {
-    rendered.destroy();
-    rendered = null;
-  }
-
   if (!name) {
     canvas.replaceChildren();
     canvas.hidden = true;
@@ -154,19 +174,15 @@ async function loadDocument(name) {
   }
 
   const doc = decoded.value;
-  const tree = layoutDocument(doc, registry);
 
   emptyState.hidden = true;
   canvas.hidden = false;
-  rendered = renderCanvas(canvas, tree);
 
-  const stored = blocks(doc).length;
-  countChip.textContent = `${stored} block${stored === 1 ? "" : "s"}`;
-  depthChip.hidden = false;
-  depthChip.textContent = `depth ${tree.maxDepth}`;
-
+  // The chips, the revision line and the inspector's Block section are all
+  // written by the editor from the session it just built, so the shell sets
+  // only the one thing the editor has no opinion about: the document's name.
   docTitle.textContent = doc.metadata.name ?? doc.id;
-  docSubtitle.textContent = `revision ${doc.revision} · ${doc.id}`;
+  editor.open(doc);
 }
 
 if (documentSelect && canvas && emptyState) {
