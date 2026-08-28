@@ -256,6 +256,14 @@
         tablesForBlock,
       } from "../js/fixtures.js";
 
+      /*
+       * The host seam itself, for sb-foh. `createEditor` wires window listeners
+       * and a ResizeObserver, so its suite mounts a canvas this file appends and
+       * removes, and calls `destroy()` on the way out; `paintInvokeMark` is pure
+       * over the cards it is handed and needs neither.
+       */
+      import { INVOKE_MARK_CLASS, createEditor, paintInvokeMark } from "../js/interact.js";
+
       /* ------------------------------------------------ the assert harness */
 
       const groups = [];
@@ -4286,6 +4294,129 @@
           structuralDeclarations('.t { /* padding: 0; */ --sb-bg: #fff; }'),
           []
         );
+      });
+
+      /* =================================================== the invoke mark */
+
+      /*
+       * sb-foh. The pane used to paint `sb-card--invoking` onto the canvas
+       * itself, because the host seam had `markActive` and nothing for the call
+       * a step is waiting on. The two suites below are the two halves of the
+       * seam that replaced it: what the painter does with a set of cards, and
+       * what the editor holding the mark buys that painting from outside could
+       * not - survival across a canvas rebuild the replay did not ask for.
+       *
+       * Sabotage (painter): dropping the `classList.remove` branch leaves the
+       * first suite's "the previous card is cleared" checks red. Sabotage
+       * (state): deleting the `applyInvokeMark()` call from `render` leaves
+       * every direct-call check green and turns the rebuild checks red, which
+       * is exactly the bug this bead exists to close.
+       */
+      suite("interact: paintInvokeMark marks one card and clears the rest (sb-foh)", () => {
+        const cards = ["blk_A", "blk_B", "blk_C"].map((id) =>
+          el("div", { class: "sb-card", "data-block-id": id })
+        );
+
+        const marked = () =>
+          cards.filter((card) => card.classList.contains(INVOKE_MARK_CLASS))
+            .map((card) => card.dataset.blockId);
+
+        paintInvokeMark(cards, { block: "blk_B", outcome: "done" });
+        equal("exactly the named card is marked", marked(), ["blk_B"]);
+        equal("...carrying the outcome as data", cards[1].dataset.invokeOutcome, "done");
+
+        paintInvokeMark(cards, { block: "blk_C", outcome: "error" });
+        equal("moving the mark clears the previous card", marked(), ["blk_C"]);
+        check(
+          "...including its outcome, which no rule should still match",
+          cards[1].dataset.invokeOutcome === undefined
+        );
+        equal("...and the new card carries its own", cards[2].dataset.invokeOutcome, "error");
+
+        paintInvokeMark(cards, null);
+        equal("null clears the mark entirely", marked(), []);
+        check("...outcome and all", cards[2].dataset.invokeOutcome === undefined);
+
+        // An id that is not on the canvas is not an error: a run can name a
+        // block an author has since deleted, and a run that threw there would
+        // take the whole transport down with it.
+        paintInvokeMark(cards, { block: "blk_GONE", outcome: "done" });
+        equal("an id no card carries marks nothing", marked(), []);
+
+        // No outcome is a legal call - a step can be calling out without an
+        // answer yet - and it must not leave a stale one behind.
+        paintInvokeMark(cards, { block: "blk_A", outcome: "error" });
+        paintInvokeMark(cards, { block: "blk_A", outcome: null });
+        equal("the mark holds without an outcome", marked(), ["blk_A"]);
+        check(
+          "...and a null outcome drops the previous one",
+          cards[0].dataset.invokeOutcome === undefined
+        );
+      });
+
+      suite("interact: the invoke mark survives a canvas rebuild (sb-foh)", () => {
+        const mount = el("div", { class: "sb-spike" });
+        const canvas = el("div", { class: "sb-canvas" });
+        mount.append(canvas);
+        document.body.append(mount);
+
+        const editor = createEditor({ canvas, registry });
+        editor.open(cardDocument());
+
+        const cardFor = (id) => canvas.querySelector(`.sb-card[data-block-id="${id}"]`);
+        const isMarked = (id) => cardFor(id)?.classList.contains(INVOKE_MARK_CLASS) ?? false;
+
+        check("nothing is marked before a step calls out", !isMarked("blk_CAP"));
+
+        editor.markInvoking("blk_CAP", "done");
+        check("the seam marks the called block", isMarked("blk_CAP"));
+        equal("...with its outcome", cardFor("blk_CAP").dataset.invokeOutcome, "done");
+
+        const before = cardFor("blk_CAP");
+
+        /*
+         * The author edits the document mid-replay: they select an unrelated
+         * block and delete it. Nothing about the replay moved, so nothing
+         * repaints the mark - which is precisely the case the old arrangement
+         * lost it in, because the canvas is rebuilt from scratch and the class
+         * the pane had painted went with the old elements.
+         */
+        editor.revealBlock("blk_SG2");
+        document.body.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Delete", bubbles: true })
+        );
+
+        check("the edit really did rebuild the canvas", cardFor("blk_SG2") === null);
+        check("...into new elements", cardFor("blk_CAP") !== before);
+        check("...and the mark came back with them", isMarked("blk_CAP"));
+        equal(
+          "...outcome included",
+          cardFor("blk_CAP").dataset.invokeOutcome,
+          "done"
+        );
+
+        editor.markInvoking("blk_AUTH", "error");
+        check("moving the mark clears the old card", !isMarked("blk_CAP"));
+        check("...and marks the new one", isMarked("blk_AUTH"));
+
+        editor.markInvoking(null);
+        check("a null block clears it", !isMarked("blk_AUTH"));
+
+        // The mark and the active highlight are independent: a step that lights
+        // blocks without calling out, and a call with no lit block, are both
+        // ordinary steps rather than states one call has to fake for the other.
+        editor.markActive(["blk_CAP"]);
+        editor.markInvoking("blk_AUTH", "done");
+        equal("the active mark is its own attribute", cardFor("blk_CAP").dataset.runActive, "true");
+        check("...on a card the invoke mark does not touch", !isMarked("blk_CAP"));
+        check("...and the invoke mark is on the other card", isMarked("blk_AUTH"));
+        check(
+          "...which the active mark does not claim",
+          cardFor("blk_AUTH").dataset.runActive === undefined
+        );
+
+        editor.destroy();
+        mount.remove();
       });
 
       /* ------------------------------------------------------- reporting */
