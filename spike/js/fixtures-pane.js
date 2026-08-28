@@ -37,6 +37,24 @@
  * reveal is separate from the mark and only fires on a deliberate gesture -
  * auto-scrolling the canvas on every "step forward" fights an author who has
  * parked the viewport somewhere on purpose.
+ *
+ * ## The one exception to that rule, and its price (sb-ig4)
+ *
+ * The invoke mark - the badge highlight on the card a step is calling out to -
+ * IS written from here, by `paintInvoke` below. There is no `markInvoking` on
+ * the host seam to route it through, and adding one reaches into files another
+ * bead owns this week, so the pane paints the class itself.
+ *
+ * The price is exactly the one the paragraph above names: a canvas rebuild
+ * drops the mark, because it is not part of the editor's own re-render. That
+ * is survivable here and would not be for the active highlight, for one
+ * reason - the mark is repainted on EVERY `draw`, and every gesture that moves
+ * the replay goes through `draw`. What it cannot survive is a rebuild that no
+ * `draw` follows, which is an author editing the document mid-replay. The mark
+ * comes back on their next transport press.
+ *
+ * Promoting this to a host member alongside `markActive` is the right shape
+ * and is a Phase-B note, not something to do from inside this file.
  */
 
 import {
@@ -58,6 +76,39 @@ import { el } from "./render.js";
 
 /** How long the "Play" transport waits between steps. */
 const PLAY_INTERVAL_MS = 900;
+
+/** The class the invoke mark writes onto a card. See the header comment. */
+const INVOKE_MARK = "sb-card--invoking";
+
+/*
+ * The invoke mark, painted onto the canvas card the current step is calling
+ * out to and cleared everywhere else. `null` clears it entirely.
+ *
+ * Cards are walked and compared rather than selected by id: a block id is
+ * author-controlled text, and building a selector out of it needs escaping
+ * that is one forgotten call away from a silent no-op. One pass over the cards
+ * costs nothing at spike sizes and cannot be got wrong that way.
+ *
+ * A page with no canvas mounted is not a special case: `querySelectorAll`
+ * finds no cards, the loop does nothing, and the pane renders its runner
+ * exactly as it does with one. The `document` guard is for a non-browser
+ * caller reaching the module at all.
+ */
+function paintInvoke(invoke) {
+  if (typeof document === "undefined") return;
+
+  const target = invoke === null ? null : invoke.block;
+
+  for (const card of document.querySelectorAll(".sb-card")) {
+    if (target !== null && card.dataset.blockId === target) {
+      card.classList.add(INVOKE_MARK);
+      card.dataset.invokeOutcome = invoke.outcome;
+    } else if (card.classList.contains(INVOKE_MARK)) {
+      card.classList.remove(INVOKE_MARK);
+      delete card.dataset.invokeOutcome;
+    }
+  }
+}
 
 const VERDICT_LABELS = {
   "not-run": "not run",
@@ -135,6 +186,12 @@ export function createFixturesPane({ mount, data, host = {} }) {
   /* ------------------------------------------------------------- drawing */
 
   function draw() {
+    // Cleared up front and re-painted by `runnerElement` if the draw lands on
+    // a step that carries a call. Every path out of `draw` therefore leaves
+    // the mark correct, including the two early returns below and every
+    // sub-view that is not the runner.
+    paintInvoke(null);
+
     for (const button of buttons) {
       button.setAttribute("aria-pressed", String(button.dataset.view === view));
     }
@@ -242,7 +299,15 @@ export function createFixturesPane({ mount, data, host = {} }) {
         ]),
         el("span", { class: "sb-fixtures__run-description", text: summary.description }),
         el("span", { class: "sb-fixtures__run-meta" }, [
-          el("span", { text: `${summary.stepCount} steps · ${summary.checkCount} checks · ` }),
+          // The host-call count only when there is one. A "0 host calls" on
+          // every other row is the count badge mistake in text form.
+          el("span", {
+            text:
+              `${summary.stepCount} steps · ${summary.checkCount} checks · ` +
+              (summary.invokeCount > 0
+                ? `${summary.invokeCount} host call${summary.invokeCount === 1 ? "" : "s"} · `
+                : ""),
+          }),
           el("span", {
             class: "sb-fixtures__expect",
             "data-expected": summary.expected,
@@ -285,6 +350,12 @@ export function createFixturesPane({ mount, data, host = {} }) {
     const state = runView(run, cursor);
 
     host.markActive?.(state.activeIds);
+    // After `markActive` rather than before. The two marks are independent -
+    // the editor's sets `data-run-active`, this one sets a class and
+    // `data-invoke-outcome` - but the editor is the one allowed to rebuild the
+    // canvas, so the pane's paint goes last and reads whatever cards exist
+    // when it runs.
+    paintInvoke(state.invoke);
 
     const back = el("button", {
       class: "sb-button sb-button--quiet sb-fixtures__back",
@@ -479,6 +550,8 @@ export function createFixturesPane({ mount, data, host = {} }) {
       );
     }
 
+    if (step.invoke) panel.append(...invokeElements(step.invoke));
+
     if (step.note) panel.append(el("p", { class: "sb-fixtures__note", text: step.note }));
 
     panel.append(activeChips(step.active));
@@ -502,6 +575,65 @@ export function createFixturesPane({ mount, data, host = {} }) {
     if (step.check) panel.append(checkElement(step.check));
 
     return panel;
+  }
+
+  /*
+   * The step's host call, rendered out of the classes the event line and the
+   * delta list already use rather than out of new ones. That is not thrift for
+   * its own sake: a call's outcome and a call's payload are the same two kinds
+   * of fact the pane already shows - a name that arrived, and lines a script
+   * wrote - and giving them a treatment of their own would say they are a
+   * third kind.
+   *
+   * The sentence under an error outcome is the load-bearing part of this
+   * whole bead. A reader watching a red badge light up on the canvas and the
+   * next step land inside the failure subtree will conclude the runner routed
+   * it there, because that is what it looks like. It did not. It is written
+   * where they are looking, not only in the fixture file's comment.
+   */
+  function invokeElements(invoke) {
+    const out = [
+      el("p", { class: "sb-fixtures__event" }, [
+        el("span", { class: "sb-fixtures__event-label", text: "host call" }),
+        el("code", {
+          class: "sb-code sb-fixtures__event-name",
+          text: `${host.labelFor?.(invoke.block) ?? invoke.block} · ${
+            invoke.outcome === "error" ? "failed" : "answered"
+          }`,
+        }),
+      ]),
+    ];
+
+    if (invoke.payload.length > 0) {
+      out.push(
+        el("p", {
+          class: "sb-fixtures__subhead",
+          text: invoke.outcome === "error" ? "what came back" : "what the host answered",
+        }),
+        el(
+          "ul",
+          { class: "sb-fixtures__deltas" },
+          invoke.payload.map((entry) =>
+            el("li", { class: "sb-fixtures__delta" }, [
+              el("code", { class: "sb-fixtures__delta-path", text: entry.name }),
+              el("code", { class: "sb-fixtures__delta-value", text: entry.value }),
+            ])
+          )
+        )
+      );
+    }
+
+    out.push(
+      el("p", {
+        class: "sb-hint",
+        text:
+          invoke.outcome === "error"
+            ? "Recorded, not routed: the steps after this one are block ids the fixture's author wrote after reading the document. Nothing here walked the failure path."
+            : "Recorded, not called: the badge on the canvas marks the block this step calls out to, and the answer above is a value in the fixture file.",
+      })
+    );
+
+    return out;
   }
 
   /*
@@ -1043,6 +1175,11 @@ export function createFixturesPane({ mount, data, host = {} }) {
       stopPlaying();
       draw();
     },
-    destroy: stopPlaying,
+    destroy() {
+      stopPlaying();
+      // The canvas outlives this pane, so a mark left behind would sit on a
+      // card claiming a call is in flight with nothing left to clear it.
+      paintInvoke(null);
+    },
   };
 }

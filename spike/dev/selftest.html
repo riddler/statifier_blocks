@@ -236,6 +236,7 @@
         endCursor,
         fixturesFor,
         fixturesText,
+        invokeView,
         moveCursor,
         parseFixtures,
         resetCursor,
@@ -3686,6 +3687,150 @@
         }
 
         equal("every fixture path is declared in the datamodel", undeclared, []);
+      });
+
+      /* ------------------------------------- a step's host call (sb-ig4) */
+
+      suite("fixtures / a step's host call", () => {
+        const run = {
+          id: "run_i",
+          name: "Invokes",
+          expected: "pass",
+          steps: [
+            { label: "before", active: ["blk_1"], deltas: [{ path: "a", value: "1" }] },
+            {
+              label: "the call",
+              active: ["blk_call"],
+              invoke: {
+                block: "blk_call",
+                outcome: "error",
+                payload: { error: "boom", retryable: "true" },
+              },
+            },
+            {
+              label: "the authored failure step",
+              active: ["blk_park"],
+              deltas: [{ path: "b", value: "2" }],
+            },
+          ],
+        };
+
+        const onCall = runView(run, 1);
+        equal("the current step carries its call", onCall.invoke.block, "blk_call");
+        equal("with the outcome the fixture wrote", onCall.invoke.outcome, "error");
+        equal("and its payload as ordered lines", onCall.invoke.payload, [
+          { name: "error", value: "boom" },
+          { name: "retryable", value: "true" },
+        ]);
+
+        // The honest-replayer rule, asserted rather than only written down: an
+        // error outcome routes nothing. The step after it is active because a
+        // human wrote `blk_park` into it, and it accumulates its deltas exactly
+        // as any other step does.
+        const after = runView(run, 2);
+        equal("the step after an error is just the next step", after.activeIds, ["blk_park"]);
+        equal("with no call of its own", after.invoke, null);
+        equal("and its writes land normally", after.bindings, [
+          { path: "a", value: "1", step: 0 },
+          { path: "b", value: "2", step: 2 },
+        ]);
+
+        equal("a step with no call exposes null", runView(run, 0).invoke, null);
+        equal("a finished run marks nothing", runView(run, 3).invoke, null);
+        equal("nor does one that has not started", runView(run, NOT_STARTED).invoke, null);
+        equal("the summary counts the calls", runSummary(run).invokeCount, 1);
+
+        // Normalization, and the two directions it refuses in. A call naming no
+        // block cannot mark anything, so it is dropped rather than rendered as
+        // a no-op; an outcome nobody recognizes reads as "done", because
+        // painting an unasked-for red failure is the worse of the two errors.
+        equal("an invoke naming no block is dropped", invokeView({ outcome: "error" }), null);
+        equal("so is one that is not an object", invokeView("blk_call"), null);
+        equal("and an absent field", invokeView(undefined), null);
+        equal("an unknown outcome reads as done", invokeView({ block: "b", outcome: "?" }).outcome, "done");
+        equal("a missing payload is an empty list", invokeView({ block: "b" }).payload, []);
+        equal("an array payload is refused, not indexed", invokeView({ block: "b", payload: [1] }).payload, []);
+      });
+
+      suite("fixtures / the shipped invoke runs", () => {
+        check("fixtures/runs.json loads", shipped.runs !== null);
+        if (shipped.runs === null || shipped.bdoc_cp_demo === null) return;
+
+        const byId = new Map();
+        const walk = (node) => {
+          if (!node || typeof node !== "object") return;
+          if (typeof node.id === "string" && typeof node.type === "string") byId.set(node.id, node);
+          for (const children of Object.values(node.slots ?? {})) for (const child of children) walk(child);
+        };
+        walk(shipped.bdoc_cp_demo.root);
+
+        const runs = fixturesFor(shipped.runs, "bdoc_cp_demo").runs;
+        const steps = runs.flatMap((run) => (run.steps ?? []).map((step) => ({ run, step })));
+        const calls = steps.filter(({ step }) => invokeView(step.invoke) !== null);
+
+        check("card-processing records host calls", calls.length > 0, "no step carries an invoke");
+
+        // A call has to name a block that EXISTS and that is actually a
+        // core.invoke. A fixture marking an ordinary step's badge would light
+        // a card with no badge on it, which looks like nothing at all.
+        const wrong = calls
+          .filter(({ step }) => byId.get(step.invoke.block)?.type !== "core.invoke")
+          .map(({ run, step }) => `${run.id}: ${step.invoke.block}`);
+        equal("every call names a core.invoke block", wrong, []);
+
+        // And the step has to be standing on it. The badge mark and the active
+        // highlight are two treatments of one fact, and a fixture that split
+        // them would light one card and outline another.
+        const adrift = calls
+          .filter(({ step }) => !(step.active ?? []).includes(step.invoke.block))
+          .map(({ run, step }) => `${run.id}: ${step.invoke.block}`);
+        equal("and the step activates it", adrift, []);
+
+        equal(
+          "both outcomes are exercised",
+          [...new Set(calls.map(({ step }) => step.invoke.outcome))].sort(),
+          ["done", "error"]
+        );
+
+        /*
+         * The authored-walk assertion. On an error outcome the NEXT step's
+         * active ids have to be inside that block's own `on_error` subtree -
+         * not because anything computed them, but because a human wrote them
+         * and this is the check that they wrote the right ones. A fixture
+         * whose failure step lands somewhere else is telling a reader the
+         * failure edge goes somewhere it does not.
+         */
+        const subtree = (blockId) => {
+          const ids = new Set();
+          const collect = (node) => {
+            if (!node) return;
+            if (typeof node.id === "string") ids.add(node.id);
+            for (const children of Object.values(node.slots ?? {})) for (const child of children) collect(child);
+          };
+          for (const child of byId.get(blockId)?.slots?.on_error ?? []) collect(child);
+          return ids;
+        };
+
+        const misplaced = [];
+        for (const run of runs) {
+          const list = run.steps ?? [];
+          list.forEach((step, index) => {
+            if (invokeView(step.invoke)?.outcome !== "error") return;
+
+            const next = list[index + 1];
+            const inside = subtree(step.invoke.block);
+
+            if (!next) {
+              misplaced.push(`${run.id}: the error step is last, so nothing shows the failure path`);
+              return;
+            }
+
+            for (const id of next.active ?? []) {
+              if (!inside.has(id)) misplaced.push(`${run.id}: ${id} is not under ${step.invoke.block}'s on_error`);
+            }
+          });
+        }
+        equal("an error step is followed by its on_error subtree", misplaced, []);
       });
 
       /* ================================================== theme (sb-957) */
