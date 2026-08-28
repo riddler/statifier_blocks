@@ -16,6 +16,7 @@ import { findBlock, fromJson } from "./document.js";
 import { coreTypes, createRegistry, demoTypes, describe } from "./palette.js";
 import { fixtureTypes } from "./demo-types.js";
 import { proposedCoreTypes } from "./proposed-core.js";
+import { fixtureDocuments } from "./fixture-documents.js";
 import { createEditor } from "./interact.js";
 import { createDatamodelPane } from "./datamodel-pane.js";
 import { createFixturesPane } from "./fixtures-pane.js";
@@ -353,6 +354,21 @@ async function loadDocument(name) {
   // After `open`, not before: a run left open from the previous document would
   // otherwise mark blocks that are no longer on the canvas.
   fixturesPane?.documentChanged();
+}
+
+/*
+ * The picker's options come from `fixture-documents.js` rather than from the
+ * markup, because they are now read twice: here, where a choice is fetched and
+ * opened, and in `proposed-core.js`, where `core.subchart`'s chart reference
+ * offers the same list (D11). Two hand-kept copies is how a reference ends up
+ * naming a document the shell has no file for.
+ *
+ * Appended after the markup's empty option, so "None" stays first.
+ */
+if (documentSelect) {
+  for (const doc of fixtureDocuments) {
+    documentSelect.append(new Option(doc.label, doc.file));
+  }
 }
 
 if (documentSelect && canvas && emptyState) {

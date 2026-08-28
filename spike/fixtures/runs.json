@@ -62,7 +62,19 @@
     "an error step as on any other; an error step simply tends to write less.",
     "See run_cp_invoke_error below, whose steps 7-8 are authored to sit inside",
     "blk_cp_authorize's on_error subtree and would be just as authored if they",
-    "sat anywhere else."
+    "sat anywhere else.",
+    "",
+    "`invoke` ALSO carries a core.subchart step (sb-7s2). The field is reused",
+    "rather than joined by a second one because the two say the same thing: the",
+    "step left this chart and something else is answering. `block` then names a",
+    "core.subchart block, `outcome` is still done|error, and the payload lines",
+    "are still display-only strings. What a subchart step does NOT get is any",
+    "replay of the CHILD chart - the spike opens one document at a time, so a",
+    "child's steps are not stepped through here, and a run that pretended to",
+    "would be claiming machinery the D4 ruling refuses. How a child chart's",
+    "several final states would map onto a parent's slots is open upstream, and",
+    "js/proposed-core.js's sketch says so; these runs use the two outcomes an",
+    "invoke has because that is all the vocabulary decides today."
   ],
   "version": 1,
   "documents": {
@@ -883,6 +895,166 @@
               "name": "Personal, unverified",
               "bindings": { "signup.plan": "'personal'", "signup.seats": "1", "signup.email_verified": "false" },
               "expected": { "arm_business": false, "arm_personal": false }
+            }
+          ]
+        }
+      ]
+    },
+    "bdoc_su_invites_demo": {
+      "_comment": [
+        "sb-7s2. The subchart document's runs: one where the child chart comes",
+        "back done and one where it comes back error and the on_error subtree",
+        "takes over. No `tables` section, and the omission is not an oversight -",
+        "this document has no condition-bearing block in it, so there is no",
+        "truth table to write and an empty one would only claim otherwise."
+      ],
+      "runs": [
+        {
+          "id": "run_si_invited",
+          "name": "The invitee signs up",
+          "description": "The happy path for a child chart: invitations go out, the signup wizard runs as a subchart, it comes back done, and the team is confirmed. The child chart's own steps are not replayed here - the runner opens one document at a time.",
+          "expected": "pass",
+          "steps": [
+            {
+              "label": "Email the invitations",
+              "active": ["blk_si_send_invites"],
+              "invoke": {
+                "block": "blk_si_send_invites",
+                "outcome": "done",
+                "payload": { "invited": "2", "template": "\"workspace_invitation\"" }
+              },
+              "deltas": [
+                { "path": "signup.email", "value": "\"dana@example.com\"" },
+                { "path": "signup.seats", "value": "3" }
+              ]
+            },
+            {
+              "label": "The child chart is running",
+              "note": "The subchart card is the active one and the whole child chart is behind it. Nothing here steps into it: the spike opens one document at a time, and a run that walked the child's blocks would be replaying a second document's ids under this one's name.",
+              "active": ["blk_si_invitee_signup"]
+            },
+            {
+              "label": "The child chart comes back done",
+              "active": ["blk_si_invitee_signup"],
+              "invoke": {
+                "block": "blk_si_invitee_signup",
+                "outcome": "done",
+                "payload": {
+                  "chart": "\"bdoc_signup_demo\"",
+                  "outcome": "\"completed\"",
+                  "plan": "\"business\""
+                }
+              },
+              "deltas": [
+                { "path": "signup.email_verified", "value": "true" },
+                { "path": "signup.plan", "value": "\"business\"" }
+              ],
+              "check": {
+                "label": "the outcome lands where assign_to names",
+                "result": "pass",
+                "detail": "assign_to is `onboarding`, which ../datamodel.json does not declare - the same undeclared-target finding sb-ig4 found on an invoke and sb-c2o owns. Recorded as a passing check because the replay is honest about what the block says; the finding belongs to the editor, not to this fixture."
+              }
+            },
+            {
+              "label": "Give the rest of the team a day",
+              "active": ["blk_si_settle"]
+            },
+            {
+              "label": "Confirm the team is set up",
+              "active": ["blk_si_confirm"],
+              "deltas": [{ "path": "signup.company", "value": "\"Northwind Trading\"" }],
+              "check": {
+                "label": "the parent carries on after the child finishes",
+                "result": "pass",
+                "detail": "A subchart that answers done is a step that finished, so the sequence moves to the next card. That is the uncontroversial half; the error half below is where the open question is."
+              }
+            }
+          ]
+        },
+        {
+          "id": "run_si_invite_abandoned",
+          "name": "The invitee never finishes",
+          "description": "The other outcome. The child chart comes back error, the subchart's on_error subtree tells the account owner and raises signup.abandoned, and the group the subchart sits in catches it. Every step after the failure is AUTHORED - the runner replays ids a human wrote after reading the document; it does not walk the on_error subtree itself.",
+          "expected": "pass",
+          "steps": [
+            {
+              "label": "Email the invitations",
+              "active": ["blk_si_send_invites"],
+              "invoke": {
+                "block": "blk_si_send_invites",
+                "outcome": "done",
+                "payload": { "invited": "1", "template": "\"workspace_invitation\"" }
+              },
+              "deltas": [
+                { "path": "signup.email", "value": "\"rowan@example.com\"" },
+                { "path": "signup.seats", "value": "1" }
+              ]
+            },
+            {
+              "label": "The child chart is running",
+              "active": ["blk_si_invitee_signup"]
+            },
+            {
+              "label": "The child chart comes back error",
+              "note": "The badge lights on the same card as in the run above, and the outcome is the difference. What the failure would compile to is proposed-core.js's sketch: a transition on statifier-ex ADR-0068's error.communication.invoke.blk_si_invitee_signup into the on_error subtree. Nothing here compiles or fires anything - the next three steps are ids an author wrote down.",
+              "active": ["blk_si_invitee_signup"],
+              "invoke": {
+                "block": "blk_si_invitee_signup",
+                "outcome": "error",
+                "payload": {
+                  "error": "\"error.communication.invoke.blk_si_invitee_signup\"",
+                  "reason": "\"child_chart_abandoned\"",
+                  "last_step": "\"send_verification\""
+                }
+              },
+              "check": {
+                "label": "a child chart's failure is the on_error slot, not a new shape",
+                "result": "pass",
+                "detail": "The subchart declares core.invoke's slot unchanged, so the failure path an author draws is the one they already know. What is NOT decided is the other direction: a child chart can finish in several final states, and flattening those to done|error is the open question this fixture parks rather than answers."
+              }
+            },
+            {
+              "label": "Tell the account owner",
+              "note": "First step inside blk_si_invitee_signup's on_error subtree, under the core.sequence the zero_or_one slot needs to hold two steps. Authored, not walked.",
+              "active": ["blk_si_notify_owner"],
+              "invoke": {
+                "block": "blk_si_notify_owner",
+                "outcome": "done",
+                "payload": { "template": "\"invitation_abandoned\"" }
+              }
+            },
+            {
+              "label": "Raise signup.abandoned",
+              "active": ["blk_si_raise_abandoned"],
+              "note": "The proposed core.raise, the same wiring signup-wizard.json uses. Nothing joins this card to the rail that catches it - they name the same event, and the innermost enclosing group is the one that hears it.",
+              "check": {
+                "label": "the raised name matches a rule on the enclosing group's rail",
+                "result": "pass",
+                "detail": "Walked by hand when the fixture was written, which is exactly the check an editor-side finding should be making instead."
+              }
+            },
+            {
+              "label": "The onboarding group's rail catches it",
+              "active": ["blk_si_abandoned"],
+              "event": "signup.abandoned",
+              "deltas": [
+                { "path": "event.signup_abandoned.last_step", "value": "\"send_verification\"" }
+              ],
+              "check": {
+                "label": "a raise from inside a failure subtree is caught like any other",
+                "result": "pass",
+                "detail": "The raise sits three levels down, inside the subchart's on_error sequence, and the rail that catches it belongs to the group the subchart sits in. Depth changes nothing: the innermost enclosing group hears it."
+              }
+            },
+            {
+              "label": "The onboarding group abandons",
+              "note": "Where this run stops. Whether the root sequence then carries on to blk_si_confirm is the SAME undecided question run_cp_invoke_error parks - what an enclosing container does once a failure path finishes, and how that reconciles with ADR-0004's single-final emission. This fixture declines to answer it by replaying an answer, so it ends here rather than authoring a confirm step nobody has decided happens.",
+              "active": ["blk_si_onboarding"],
+              "check": {
+                "label": "the team is not confirmed on this path",
+                "result": "pass",
+                "detail": "blk_si_confirm is never activated by this run. That is the fixture's claim and nothing more - it is not evidence about what the compiler would emit."
+              }
             }
           ]
         }

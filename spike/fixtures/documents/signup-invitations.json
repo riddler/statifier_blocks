@@ -1,0 +1,146 @@
+{
+  "_comment": [
+    "Spike fixture, the subchart case (sb-7s2). Same adaptations as the other",
+    "two documents: '_comment' keys are additive and not part of the ADR-0001",
+    "node shape or envelope, and the file is pretty-printed rather than",
+    "canonical.",
+    "Shape: 10 blocks, maximum nesting depth 5 (root = depth 1). Every datamodel",
+    "path named in a param or a run resolves in ../datamodel.json.",
+    "Why this document exists: core.subchart needs a parent chart to sit in, and",
+    "it needs the chart it references to be a document the shell can actually",
+    "open. Both fixture documents that already ship are candidates for the",
+    "reference; this one picks the signup wizard, because an invited teammate",
+    "completing the ordinary signup flow is the honest reading of a child chart",
+    "- the parent hands off, waits, and carries on.",
+    "TWO block types here are PROPOSED and not shipped, both in js/proposed-",
+    "core.js: core.subchart (blk_si_invitee_signup, the point of the fixture)",
+    "and core.invoke / core.raise, which the failure subtree reuses. The",
+    "subchart's on_error slot is core.invoke's, unchanged - the same slot, the",
+    "same failure rail vocabulary (sb-68b), the same D13 ruling that an outcome",
+    "path is a slot and never a port.",
+    "The raise in the failure subtree is caught by the rail of the group the",
+    "subchart sits in, exactly as in signup-wizard.json: the two are not joined",
+    "by an edge, they name the same event."
+  ],
+  "schema_version": 1,
+  "id": "bdoc_su_invites_demo",
+  "revision": 3,
+  "metadata": {
+    "name": "Signup invitations",
+    "description": "Invite teammates to a new workspace, run the signup wizard for each invitee as a child chart, and confirm the team once they are through.",
+    "domain": "signup"
+  },
+  "root": {
+    "type": "core.sequence",
+    "id": "blk_si_root",
+    "type_version": 1,
+    "slots": {
+      "body": [
+        {
+          "type": "core.invoke",
+          "id": "blk_si_send_invites",
+          "type_version": 1,
+          "config": {
+            "invoke_type": "myapp:notify",
+            "params": "email=signup.email\nseats=signup.seats",
+            "label": "Email the invitations"
+          }
+        },
+        {
+          "type": "core.group",
+          "id": "blk_si_onboarding",
+          "type_version": 1,
+          "config": {
+            "label": "While an invitee is signing up"
+          },
+          "slots": {
+            "body": [
+              {
+                "_comment": [
+                  "The proposed core.subchart. `chart` stores the CHILD DOCUMENT's",
+                  "id, which is the only chart identity a spike with no compiler",
+                  "has; a compiler would emit the identity statifier-ex ADR-0052/",
+                  "0057 defines instead. The picker that wrote this value offers",
+                  "only the spike's own fixture documents (D11)."
+                ],
+                "type": "core.subchart",
+                "id": "blk_si_invitee_signup",
+                "type_version": 1,
+                "config": {
+                  "chart": "bdoc_signup_demo",
+                  "params": "email=signup.email\nplan=signup.plan",
+                  "assign_to": "onboarding",
+                  "label": "Run the signup wizard for the invitee"
+                },
+                "slots": {
+                  "on_error": [
+                    {
+                      "type": "core.sequence",
+                      "id": "blk_si_signup_failed",
+                      "type_version": 1,
+                      "config": {
+                        "label": "The invitee never got through"
+                      },
+                      "slots": {
+                        "body": [
+                          {
+                            "type": "core.invoke",
+                            "id": "blk_si_notify_owner",
+                            "type_version": 1,
+                            "config": {
+                              "invoke_type": "myapp:notify",
+                              "params": "email=signup.email",
+                              "label": "Tell the account owner"
+                            }
+                          },
+                          {
+                            "type": "core.raise",
+                            "id": "blk_si_raise_abandoned",
+                            "type_version": 1,
+                            "config": {
+                              "event": "signup.abandoned"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "core.wait",
+                "id": "blk_si_settle",
+                "type_version": 1,
+                "config": {
+                  "duration": "PT24H",
+                  "label": "Give the rest of the team a day"
+                }
+              }
+            ],
+            "interrupts": [
+              {
+                "type": "core.on_event",
+                "id": "blk_si_abandoned",
+                "type_version": 1,
+                "config": {
+                  "event": "signup.abandoned",
+                  "outcome": "abandon"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "myapp.signup_step",
+          "id": "blk_si_confirm",
+          "type_version": 1,
+          "config": {
+            "invoke_type": "myapp:signup",
+            "step": "confirm",
+            "label": "Confirm the team is set up"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -29,16 +29,18 @@
  * Whether any of this earns an ADR-0002/0004 amendment is a Phase-B finding.
  * The specific open questions each type raises are flagged at that type.
  *
- * ## Neither type declares `label`, and that is now correct
+ * ## No type here declares `label`, and that is now correct
  *
  * It used to be a gap: `card-processing.json` stores a label on both of its
  * `core.invoke` blocks, the canvas titled the cards from it, and the config
  * form could not edit it, because a schema field keyed `label` was something
  * each type had to remember to declare. The editor injects that field now
- * (`withEditorFields` in palette.js), so these two proposals declare only
+ * (`withEditorFields` in palette.js), so the proposals here declare only
  * what their own work needs - which is what made the gap visible in the
  * first place and is the argument sb-jvz was decided on.
  */
+
+import { fixtureDocumentIds, fixtureDocumentOptions } from "./fixture-documents.js";
 
 /* ------------------------------------------------------- shared checks
  *
@@ -95,6 +97,59 @@ export function parseParams(value) {
   }
 
   return { params: ok, malformed: bad };
+}
+
+/*
+ * The two config checks `core.invoke` and `core.subchart` share, written once.
+ *
+ * Not a general utility and not exported as one: they exist because the two
+ * types make the SAME proposal - a text `params` field standing in for a list
+ * of pairs (see `core.invoke`'s note), and an optional `assign_to` naming
+ * where the outcome lands - and a second spelling of either would be two
+ * chances for the proposal to drift from itself inside one file. The shared
+ * predicates this file duplicates from `palette.js` are a different case and
+ * the header says why.
+ */
+function paramFindings(config) {
+  if ("params" in config && typeof config.params !== "string") {
+    return [{ key: "params", message: "must be text, one name=path pair per line" }];
+  }
+
+  const findings = [];
+  const { params, malformed } = parseParams(config.params);
+
+  for (const line of malformed) {
+    findings.push({ key: "params", message: `"${line}" is not a name=path pair` });
+  }
+
+  const seen = new Set();
+  for (const { name } of params) {
+    if (seen.has(name)) {
+      findings.push({ key: "params", message: `two params cannot share the name "${name}"` });
+    }
+    seen.add(name);
+  }
+
+  return findings;
+}
+
+/*
+ * Optional, so an absent key and an empty string are both fine; anything
+ * present and non-empty has to be a bare identifier, because it names a
+ * datamodel key the result is written to.
+ *
+ * What this deliberately does NOT check is whether that key is DECLARED in the
+ * datamodel document. sb-ig4 found `assign_to: "authorization"` writing to a
+ * path `fixtures/datamodel.json` never declares, and sb-c2o owns the answer:
+ * a warning-level finding rather than a refusal, so authoring stays fluid. It
+ * is a document-level check against the datamodel index, which is not
+ * something `validate_config/1` is handed - so it belongs where sb-c2o puts
+ * it and not here. Named rather than silently missing.
+ */
+function assignToFindings(config) {
+  return nonEmptyString(config.assign_to) && !isIdentifier(config.assign_to)
+    ? [{ key: "assign_to", message: "must be a bare lowercase identifier" }]
+    : [];
 }
 
 /* ----------------------------------------------------------- core.invoke
@@ -181,30 +236,7 @@ const coreInvoke = {
       });
     }
 
-    /* Optional, so an absent key and an empty string are both fine; anything
-     * present and non-empty has to be a bare identifier, because it names a
-     * datamodel key the result is written to. */
-    if (nonEmptyString(config.assign_to) && !isIdentifier(config.assign_to)) {
-      findings.push({ key: "assign_to", message: "must be a bare lowercase identifier" });
-    }
-
-    if ("params" in config && typeof config.params !== "string") {
-      findings.push({ key: "params", message: "must be text, one name=path pair per line" });
-    } else {
-      const { params, malformed } = parseParams(config.params);
-
-      for (const line of malformed) {
-        findings.push({ key: "params", message: `"${line}" is not a name=path pair` });
-      }
-
-      const seen = new Set();
-      for (const { name } of params) {
-        if (seen.has(name)) {
-          findings.push({ key: "params", message: `two params cannot share the name "${name}"` });
-        }
-        seen.add(name);
-      }
-    }
+    findings.push(...assignToFindings(config), ...paramFindings(config));
 
     return verdict(findings);
   },
@@ -350,6 +382,175 @@ const coreRaise = {
   },
 };
 
+/* --------------------------------------------------------- core.subchart
+ *
+ * A step that runs ANOTHER chart and waits for it to finish, with the same
+ * optional failure subtree `core.invoke` has.
+ *
+ * ## Why this is a leaf, and why the child is a REFERENCE
+ *
+ * The obvious alternative - a `chart` slot holding the child's blocks inline -
+ * was not on the table. A document is a tree and a chart is a build product of
+ * one (`CLAUDE.md`'s first bullet); a subchart whose body lived inside the
+ * parent would be a second copy of a document that already exists on its own,
+ * with its own id, its own revision and its own runs. So the child is named,
+ * not embedded, and this type declares no body slot at all.
+ *
+ * That makes the reference the whole design question, and D11 answers the
+ * spike's half of it: the picker offers ONLY the spike's own fixture
+ * documents, derived from `fixture-documents.js` rather than typed in here, so
+ * a reference cannot name a chart the shell could not open. What it stores is
+ * the child document's id.
+ *
+ * ## The on_error slot is `core.invoke`'s, deliberately unchanged
+ *
+ * Same declaration, same arity, same `failure` slot style (sb-68b), same D13
+ * reason: an outcome path is a SLOT, never a port. A child chart that fails is
+ * the same shape of event as a host call that fails - the step went badly and
+ * the author wants somewhere to say what happens next - and giving it a second
+ * spelling would have been a vocabulary an author has to learn twice.
+ *
+ * ## Two questions this type raises and does not answer
+ *
+ *   - a child chart has MORE than two outcomes in general. It can finish in
+ *     any of its final states, and "done / error" flattens that to the two
+ *     `core.invoke` already has. Whether a subchart should be able to declare
+ *     a slot per named child outcome - and what names those would be, given
+ *     ADR-0004's single-final emission - is open, and it is the open question
+ *     this bead's note records rather than settles;
+ *   - nothing here refuses a reference to the document the block itself sits
+ *     in. `validate_config/1` is handed a config, not a document, so a
+ *     self-reference (and a cycle through two documents) is a DOCUMENT-level
+ *     finding, the same shape of check sb-c2o describes for `assign_to`. Named
+ *     here so the gap is on the record rather than discovered by a reader.
+ *
+ * ## What this would compile to (SKETCH ONLY - nothing here compiles anything)
+ *
+ * This is the bead's compile-mapping sketch, and it is a sketch on purpose:
+ * every clause below names an upstream record and none of it is built.
+ *
+ *   - the block emits an `<invoke>` whose type is the child-chart invoke type
+ *     the host registers, resolved through the per-session registry
+ *     statifier-ex ADR-0051 defines - the same seam `core.invoke` uses, and
+ *     for the same reason: a block type NAMES an invocable thing and never
+ *     runs one. A subchart is not a new execution mechanism, it is a
+ *     particular invoke whose handler happens to start a child session;
+ *   - `chart` identifies WHICH chart, and identity is statifier-ex's
+ *     (ADR-0052 chart identity and position serialization, ADR-0057). The
+ *     spike stores a block-document id because that is the only identity it
+ *     has; a compiler would have to emit the chart identity that record
+ *     defines, and a persisted parent position is meaningful only against the
+ *     exact child revision it ran - which is the same rule a provenance map
+ *     already lives under (ADR-0004);
+ *   - `params` are the child session's initial datamodel writes and
+ *     `assign_to` is where the child's outcome lands in the parent's, exactly
+ *     as for an invoke;
+ *   - the `on_error` subtree is the target of the transition on
+ *     ADR-0068's `error.communication.invoke.<id>` event, `<id>` being this
+ *     block's own. An absent `on_error` means no such transition is emitted.
+ *
+ * OPEN, and the reason nothing above is more than a sketch: how a child
+ * chart's outcomes reach the parent's slots. An invoke answers once, with one
+ * result; a chart finishes in one of several final states, and the mapping
+ * from "which final state" to "which slot" is not something ADR-0051's invoke
+ * contract or ADR-0004's single-final emission decides today. Until it is
+ * decided upstream, a subchart has the two outcomes an invoke has, and this
+ * file says so rather than inventing a third.
+ */
+const coreSubchart = {
+  name: "core.subchart",
+  currentVersion: 1,
+  /* `core.invoke`'s declaration, character for character. The failure path is
+   * the same path; a second wording would read as a second concept. */
+  slots: () => [{ name: "on_error", arity: "zero_or_one", label: "If it fails" }],
+  configSchema: () => [
+    {
+      /* ADR-0002 decision 7's `{ select: [...] }`, built from
+       * `fixture-documents.js` at call time rather than captured at module
+       * load: the schema is a function so that it can be, and a picker whose
+       * options were frozen at import would go stale the moment the list did.
+       *
+       * The default is "" rather than the first document. A subchart with no
+       * chart chosen is an unfinished block and should read as one; defaulting
+       * to whichever fixture happens to be listed first would author a
+       * reference nobody chose. `required: true` and the finding below are
+       * what say so. */
+      key: "chart",
+      type: { select: fixtureDocumentOptions() },
+      label: "Run this chart",
+      required: true,
+      default: "",
+    },
+    {
+      key: "assign_to",
+      type: "string",
+      label: "Write the outcome to",
+      required: false,
+      default: "",
+    },
+    {
+      /* The same text compromise `core.invoke` makes, for the same closed
+       * field-type reason, and named as a compromise in the same words.
+       * sb-e2x replaces BOTH with a key/path row control; it had not landed
+       * when this type was written, so this field is deliberately the existing
+       * idiom rather than a second one for sb-e2x to convert separately. */
+      key: "params",
+      type: "string",
+      label: "Params (one name=path per line)",
+      required: false,
+      default: "",
+    },
+  ],
+  validateConfig: (config) => {
+    const findings = [];
+
+    if (!fixtureDocumentIds().includes(config.chart)) {
+      findings.push({
+        key: "chart",
+        message: "pick one of the spike's fixture documents",
+      });
+    }
+
+    findings.push(...assignToFindings(config), ...paramFindings(config));
+
+    return verdict(findings);
+  },
+  /*
+   * `core.invoke`'s io exactly: a step with two outcomes, so `produces` is
+   * `"unknown"` rather than a join of the body's type with the `on_error`
+   * subtree's (ADR-0003 decision 4 refuses to build a type lattice), and no
+   * `consumes` - a subchart reads its inputs through `params`.
+   */
+  io: () => ({
+    kinds: ["step"],
+    produces: "unknown",
+    slotAccepts: { on_error: ["step"] },
+  }),
+  paletteEntry: {
+    label: "Subchart",
+    group: "Proposed core",
+    description: "Runs another chart and waits for it to finish.",
+    /* `core.group`'s glyph, and the collision is the point: a subchart is
+     * another chart, so the boxes-in-a-box drawing is the right picture twice.
+     * Minting a new glyph would have meant editing `render.js`'s icon set for
+     * a proposal, which is the cost `core.raise` declined too. */
+    icon: "rectangle-group",
+    keywords: ["subchart", "child", "chart", "call", "compose", "error"],
+    order: 2,
+    layout: "stack",
+    /* sb-68b's `failure` value, the same one `core.invoke` declares. */
+    slotStyle: { on_error: "failure" },
+    /* `tokens.css` says the teal is for the step whose work happens outside
+     * this chart. A subchart's work happens in a different chart entirely, so
+     * it is the same fact rather than a neighbouring one, and it takes the
+     * same token rather than proposing a second one. */
+    accentToken: "--sb-accent-invoke",
+    /* The bead's badge, and short enough for `badgeFor`'s cap. What a reader
+     * cannot get from the card's title: this step is a whole other chart. */
+    badge: "subchart",
+  },
+};
+
 /* -------------------------------------------------------------- the value */
 
 /**
@@ -364,4 +565,5 @@ const coreRaise = {
 export const proposedCoreTypes = {
   "core.invoke": coreInvoke,
   "core.raise": coreRaise,
+  "core.subchart": coreSubchart,
 };
