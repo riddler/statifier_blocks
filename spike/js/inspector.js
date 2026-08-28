@@ -124,16 +124,16 @@ function renderConfig(mount, state, host) {
     return;
   }
 
-  if (form.empty) {
-    mount.replaceChildren(
-      el("p", {
-        class: "sb-empty",
-        text: "This block type declares no configuration of its own.",
-      })
-    );
-    return;
-  }
-
+  /*
+   * There used to be a `form.empty` arm here, reading "This block type
+   * declares no configuration of its own." It is gone with sb-jvz: the
+   * editor injects `label` into every resolvable type's schema, so every
+   * resolvable block has at least that one field to edit and the empty arm
+   * became unreachable. `core.sequence` and `core.group` are the types that
+   * used to land in it, and naming your sequence is the thing an author most
+   * wanted to do there. The read-only arm above still handles decision 12,
+   * which is the case that genuinely has no form.
+   */
   const memo = focusMemo(mount);
 
   mount.replaceChildren(
