@@ -32,11 +32,22 @@
       <div class="sb-editor">
         <header class="sb-topbar">
           <div class="sb-topbar__identity">
-            <span class="sb-topbar__title">Untitled document</span>
-            <span class="sb-topbar__subtitle">shell frame &middot; no document loaded</span>
+            <span class="sb-topbar__title" id="sb-doc-title">No document</span>
+            <span class="sb-topbar__subtitle" id="sb-doc-subtitle">
+              pick a demo document to load
+            </span>
           </div>
 
           <div class="sb-topbar__spacer"></div>
+
+          <div class="sb-topbar__group">
+            <label class="sb-topbar__label" for="sb-document">Document</label>
+            <select class="sb-select" id="sb-document">
+              <option value="">None</option>
+              <option value="card-processing">Card processing</option>
+              <option value="signup-wizard">Signup wizard</option>
+            </select>
+          </div>
 
           <div class="sb-topbar__group">
             <button class="sb-button sb-button--quiet" type="button" disabled>Undo</button>
@@ -174,21 +185,24 @@
               <h2 class="sb-pane__title">Canvas</h2>
               <span class="sb-chip">nested tree</span>
               <div class="sb-topbar__spacer"></div>
-              <span class="sb-chip">0 blocks</span>
+              <span class="sb-chip" id="sb-canvas-depth" hidden>depth 0</span>
+              <span class="sb-chip" id="sb-canvas-count">0 blocks</span>
             </div>
             <div class="sb-pane__body sb-pane__body--flush sb-canvas">
-              <div class="sb-canvas__viewport">
-                <div class="sb-canvas__placeholder">
-                  <p class="sb-canvas__placeholder-title">No document loaded</p>
-                  <p class="sb-canvas__placeholder-body">
-                    The auto-laid-out nested tree renders here, with SVG connector
-                    lines drawn over it. Adjacency and nesting stay the only source
-                    of truth: connectors are rendered, never authored.
-                  </p>
-                  <p class="sb-canvas__placeholder-body">
-                    Demo documents and the layout engine arrive in W1 and W2.
-                  </p>
-                </div>
+              <!-- The layout engine mounts here. It is empty until a document
+                   loads, and the empty state beside it is shown instead. -->
+              <div class="sb-canvas__viewport" id="sb-canvas" hidden></div>
+
+              <div class="sb-canvas__placeholder" id="sb-canvas-empty">
+                <p class="sb-canvas__placeholder-title">No document loaded</p>
+                <p class="sb-canvas__placeholder-body">
+                  The auto-laid-out nested tree renders here, with SVG connector
+                  lines drawn over it. Adjacency and nesting stay the only source
+                  of truth: connectors are rendered, never authored.
+                </p>
+                <p class="sb-canvas__placeholder-body">
+                  Pick a demo document from the top bar.
+                </p>
               </div>
             </div>
           </section>

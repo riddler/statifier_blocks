@@ -55,8 +55,45 @@ spike/
     themes/
       host-brand.css   the third theme, as a pure token override
   js/
-    shell.js     the shell's own behaviour: tab strip, theme selector
+    document.js    the block document model, mirrored (ADR-0001)
+    palette.js     the block-type registry + the core.* vocabulary (ADR-0002)
+    demo-types.js  the host vocabulary the demo documents are written against
+    edit.js        the command algebra and undo stacks (ADR-0005 d2-d4)
+    targets.js     drop-target enumeration (ADR-0005 d5)
+    layout.js      the layout model, and connector geometry as pure functions
+    render.js      the layout model as DOM, and the connectors as SVG
+    shell.js       the shell's own behaviour: tabs, theme, document loader
+  fixtures/
+    documents/     the two demo documents
+    datamodel.json typed, scoped datamodel for the panel and the conditions
+  dev/
+    selftest.html  browser-run assertions over every pure module above
 ```
+
+Open `index.html?doc=signup-wizard` to load a named fixture directly; the
+default is `card-processing`, the deep one.
+
+## The canvas, in two passes
+
+`layout.js` turns `{document, registry}` into a layout tree - a shape and an
+arrangement per block, its slots partitioned into primary and secondary, and
+each arm's guard read off the block type's config schema. `render.js` emits
+that tree as nested DOM and *then* measures what the browser laid out and
+draws the connectors over it. Nothing computes a coordinate: the browser does
+the layout, and the connectors are derived from where the cards actually
+landed.
+
+Three derivations do the structural work, and every one of them reads
+ADR-0005 decision 10's presentation metadata rather than a type name:
+
+| Rendering | Derived from |
+|---|---|
+| primary slots side by side | `layout: :columns`, or more than one primary slot |
+| lanes ("all of") vs arms ("one of") | `layout: :columns` distinguishes the two |
+| an interrupt rail with exit edges | a slot whose `slot_style` is `:secondary` |
+| a boundary box around a body | the same - a rule needs a region with an edge |
+| an arm's condition pill | an `:expression` config field keyed by the slot name |
+| a compact chip instead of a card | a leaf whose whole schema is one `:duration` |
 
 Later waves add `js/` modules proper (document model, palette registry, edit
 algebra, drop targets, layout and connector routing, rendering, panels) and a
