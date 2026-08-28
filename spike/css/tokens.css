@@ -202,6 +202,38 @@
   --sb-palette-width: 15rem;
   --sb-inspector-width: 21rem;
 
+  /* Shell metrics for a narrow embed (sb-bl1).
+   *
+   * `--sb-pane-left-width` and `--sb-pane-right-width` are what the shell grid
+   * actually reads; the two above are the OPEN values they default to. The
+   * indirection is what lets a collapse be a width change on the grid rather
+   * than a rule per pane, and it is what lets a host set the open width
+   * without having to know the collapsed one exists.
+   *
+   * `--sb-canvas-min-width` is the floor this bead exists to enforce: the
+   * canvas is the surface the editor is FOR, and a shell that lets it end up
+   * narrower than the inspector beside it has its priorities backwards. It is
+   * a real `min-width` rather than a `minmax()` track, so a breakpoint that
+   * stops satisfying it overflows visibly instead of silently squeezing the
+   * canvas - a tripwire, deliberately, and `editor.css` says so where it is
+   * set.
+   *
+   * `--sb-pane-collapsed-width` has to fit one icon button plus the pane's own
+   * padding, which is what ties it to `--sb-space`. */
+  --sb-pane-left-width: var(--sb-palette-width);
+  --sb-pane-right-width: var(--sb-inspector-width);
+  --sb-pane-collapsed-width: 2.25rem;
+  --sb-canvas-min-width: 24rem;
+
+  /* The canvas scale (sb-bl1). Declared here so the default is part of the
+   * token surface and a host can ship the editor opened at, say, 80%; written
+   * inline onto the canvas by `interact.js` when an author zooms. Reading it
+   * in `.sb-stage`'s `transform` rather than writing a transform from script
+   * is what makes the zoom survive the canvas rebuild every command performs -
+   * the property is on the scroller, and whatever stage is current inherits
+   * it. */
+  --sb-zoom: 1;
+
   /* Canvas metrics (W2). The sizes the tree is laid out from, here rather
    * than in editor.css so a host can make the canvas denser or roomier
    * without touching structural CSS - the same bargain d14 strikes for

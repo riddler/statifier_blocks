@@ -41,6 +41,18 @@ import { layoutDocument } from "./layout.js";
 import { collectFindings, demoFindings, resolveAnchor } from "./panes.js";
 import { renderCanvas } from "./render.js";
 import {
+  ZOOM_MAX,
+  ZOOM_MIN,
+  clampZoom,
+  fitBoxZoom,
+  fitZoom,
+  formatZoom,
+  rescaleScroll,
+  sameZoom,
+  scaleOf,
+  stepZoom,
+} from "./zoom.js";
+import {
   beginDrag,
   canRedoSession,
   canUndoSession,
@@ -559,6 +571,205 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
     });
   }
 
+  /* ------------------------------------------------------------------ zoom */
+
+  /*
+   * The zoom sb-vhu declined to build, built, and the reason it is now cheap
+   * is in the header of `zoom.js`: the drag hit-test has no coordinates of its
+   * own to divide. `elementFromPoint` and `getBoundingClientRect` are both
+   * defined on rendered geometry, `gapUnder` compares one against the other,
+   * and two viewport quantities need no scale factor between them. So the
+   * interaction layer below this comment is UNCHANGED by zoom, and that is the
+   * claim the selftest and the drag-at-67% pass exist to hold it to.
+   *
+   * The scale lives as `--sb-zoom` on the CANVAS - the scroller - rather than
+   * as an inline transform on the stage. The stage is destroyed and rebuilt by
+   * every command; a transform written onto it would be lost on the next
+   * insert, and re-applying it would be one more thing `render` has to
+   * remember. A property on the scroller is inherited by whatever stage is
+   * current, so the zoom simply survives, and the stylesheet keeps the rule
+   * that reads it - which is where a visual decision belongs.
+   */
+  let zoom = 1;
+
+  const stageEl = () => canvas.querySelector(".sb-stage");
+
+  /**
+   * Sets the scale, keeping whatever was in the middle of the viewport in the
+   * middle of the viewport, and re-routes the connectors afterwards.
+   *
+   * The re-route is not optional and it is not automatic. `renderCanvas`
+   * observes the stage with a `ResizeObserver`, but a transform changes no
+   * LAYOUT box, so the observer never fires - the connectors would keep the
+   * path data computed at the old scale until the next edit. Asking for the
+   * route explicitly, after a frame so the transform has been applied and
+   * `getBoundingClientRect` reports the new geometry, is the whole fix.
+   */
+  function setZoom(next, { announceAs = null } = {}) {
+    const to = clampZoom(next);
+    const from = zoom;
+    if (sameZoom(to, from)) {
+      if (announceAs) announce(announceAs);
+      syncZoomChrome();
+      return to;
+    }
+
+    const left = rescaleScroll({ scroll: canvas.scrollLeft, viewport: canvas.clientWidth, from, to });
+    const top = rescaleScroll({ scroll: canvas.scrollTop, viewport: canvas.clientHeight, from, to });
+
+    /*
+     * Invalidate any reveal that is still holding a receipt.
+     *
+     * `centerSmoothly` promises to correct the viewport once the canvas has
+     * stopped moving, and it keeps that promise for up to `SETTLE_TIMEOUT_MS`
+     * after the reveal - which is longer than it takes an author to press a
+     * fixture step and then Fit active. Without this line the sequence is:
+     * fit, centre, and then a correction from the PREVIOUS reveal fires and
+     * scrolls a different card back to the middle, throwing the fit away. It
+     * cost an afternoon to see, because the zoom was right and only the scroll
+     * was wrong, which reads as a centring bug rather than as a stale receipt.
+     *
+     * The token already exists for exactly this - "an old reveal must not
+     * correct the viewport out from under a newer one" - and a deliberate zoom
+     * is a newer gesture in precisely that sense. Bumping it is the whole fix.
+     */
+    settleToken += 1;
+
+    zoom = to;
+    canvas.style.setProperty("--sb-zoom", String(to));
+    canvas.dataset.zoomed = sameZoom(to, 1) ? "false" : "true";
+
+    requestAnimationFrame(() => {
+      canvas.scrollTo({ left, top, behavior: "instant" });
+      rendered?.route();
+    });
+
+    syncZoomChrome();
+    if (announceAs) announce(announceAs);
+    return to;
+  }
+
+  /**
+   * The scale at which the whole stage fits the pane's width.
+   *
+   * Measured off `offsetWidth`, which is a LAYOUT width and therefore the same
+   * number at every zoom - so pressing Fit width twice is idempotent, and
+   * pressing it after zooming in does not compound. `fitZoom` refuses to go
+   * above 1, so a document narrower than the pane leaves the canvas alone
+   * instead of magnifying it, which is the one thing a "fit" must never do to
+   * an author who pressed it to stop hunting.
+   */
+  function fitWidth() {
+    const stage = stageEl();
+    if (!stage) return zoom;
+
+    const to = fitZoom({ content: stage.offsetWidth, viewport: canvas.clientWidth });
+
+    /*
+     * The third case, and the one the first version of this got wrong: a
+     * document wider than the ladder reaches. The deep demo document is 2380px
+     * of stage in a 902px pane, which wants 38% and gets the 40% floor - and
+     * the control announced "Fitted to width at 40%" while a third of the tree
+     * was still off the edge. A control that reports success it did not have
+     * is worse than one that cannot do the job, because the author stops
+     * looking for the rest of their document.
+     *
+     * The exact ratio is recomputed here rather than teased back out of the
+     * clamp: `fitZoom` returning `ZOOM_MIN` is ambiguous between "the floor is
+     * what fits" and "the floor is as close as I can get", and only the
+     * unclamped number tells them apart.
+     */
+    const exact = stage.offsetWidth > 0 ? canvas.clientWidth / stage.offsetWidth : 1;
+
+    const announceAs =
+      exact >= 1
+        ? "The document already fits the canvas width."
+        : exact < ZOOM_MIN
+          ? `This document is too wide to fit - ${formatZoom(ZOOM_MIN)} is as far out as the canvas goes, and some of it is still off the edge.`
+          : `Fitted to width at ${formatZoom(to)}.`;
+
+    return setZoom(to, { announceAs });
+  }
+
+  /**
+   * Brings the ACTIVE set into view: zoom out far enough that the union of the
+   * blocks a replayed step lit fits the pane, then centre it.
+   *
+   * The composition is the point, and it is the answer to the case sb-9z3
+   * recorded and sb-vhu could only announce. `centerOn` alone puts the middle
+   * of a too-wide union on screen with both ends off the edges; a zoom alone
+   * leaves the union wherever it was. Together they are the gesture an author
+   * means by "show me the step".
+   *
+   * Degrades in both directions honestly. A union that already fits gets the
+   * centre and no zoom change - re-scaling a canvas that did not need it is
+   * the same broken promise as magnifying on fit. A union that cannot be made
+   * to fit even at `ZOOM_MIN` gets the closest scale there is and keeps
+   * `announceSpread`'s sentence, which is what says so out loud rather than
+   * leaving the author to conclude the step lit fewer blocks than it did.
+   */
+  function fitActive() {
+    const cards = [...activeMarks]
+      .map((id) => canvas.querySelector(`.sb-card[data-block-id="${cssEscape(id)}"]`))
+      .filter(Boolean);
+
+    if (cards.length === 0) {
+      announce("No replayed step is active, so there is nothing to fit to.");
+      return false;
+    }
+
+    const box = unionOf(cards);
+    const stage = stageEl();
+    // The union is measured in RENDERED pixels; the fit has to be computed
+    // against the size it would be at scale 1, or every press would compound
+    // the last one. One divide, and it is the same `scaleOf` the connector
+    // correction uses rather than a second reading of the same fact.
+    const current = stage ? scaleOf(stage.getBoundingClientRect().width, stage.offsetWidth) : 1;
+
+    const to = fitBoxZoom({
+      content: { width: box.width / current, height: box.height / current },
+      viewport: { width: canvas.clientWidth, height: canvas.clientHeight },
+      padding: 24,
+    });
+
+    setZoom(to);
+
+    /*
+     * Two frames, not one, and it is the same two `renderCanvas` takes for the
+     * same reason: the first is when the new geometry is live, the second is
+     * after everything else that wanted to move has moved.
+     *
+     * One frame was enough only when the canvas was already still. An author
+     * pressing Fit active immediately after a fixture step - which is when
+     * they press it - lands inside that step's own reveal, whose scroll is
+     * applied in the frame this one shares, and the centring then computes
+     * against a viewport that is about to move again. The measured symptom was
+     * the right zoom with the second lane 240px off the edge: an answer that
+     * looks like a centring bug and is really a race. Deferring one more frame
+     * costs 16ms and makes the gesture timing-independent, which a control an
+     * author mashes has to be.
+     */
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const live = [...activeMarks]
+          .map((id) => canvas.querySelector(`.sb-card[data-block-id="${cssEscape(id)}"]`))
+          .filter(Boolean);
+        if (live.length === 0) return;
+        centerOn(live);
+        announceSpread(live);
+      });
+    });
+
+    return true;
+  }
+
+  function syncZoomChrome() {
+    if (chrome.zoomLabel) chrome.zoomLabel.textContent = formatZoom(zoom);
+    if (chrome.zoomOut) chrome.zoomOut.disabled = sameZoom(zoom, ZOOM_MIN);
+    if (chrome.zoomIn) chrome.zoomIn.disabled = sameZoom(zoom, ZOOM_MAX);
+    if (chrome.zoomFitActive) chrome.zoomFitActive.disabled = activeMarks.size === 0;
+  }
+
   function syncChrome(tree) {
     if (chrome.undoButton) chrome.undoButton.disabled = !canUndoSession(session);
     if (chrome.redoButton) chrome.redoButton.disabled = !canRedoSession(session);
@@ -574,6 +785,7 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
     }
 
     syncDragBar();
+    syncZoomChrome();
   }
 
   /*
@@ -1080,6 +1292,34 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
     chrome.redoButton.addEventListener("click", () => apply(redoSession(session)));
   }
 
+  /*
+   * The zoom controls. Every one is optional, like the rest of `chrome`, so a
+   * bare canvas in a test page still works with none of them present - and
+   * `syncZoomChrome` is null-safe for the same reason.
+   */
+  if (chrome.zoomOut) {
+    chrome.zoomOut.addEventListener("click", () => setZoom(stepZoom(zoom, -1)));
+  }
+  if (chrome.zoomIn) {
+    chrome.zoomIn.addEventListener("click", () => setZoom(stepZoom(zoom, +1)));
+  }
+  if (chrome.zoomLabel) {
+    // The readout is the reset. A percentage that is also the way back to
+    // 100% is one control instead of two, and "click the number to get back
+    // to normal" is the idiom every canvas editor already taught the author.
+    chrome.zoomLabel.addEventListener("click", () =>
+      setZoom(1, { announceAs: "Zoom reset to 100%." })
+    );
+  }
+  if (chrome.zoomFit) {
+    chrome.zoomFit.addEventListener("click", () => fitWidth());
+  }
+  if (chrome.zoomFitActive) {
+    chrome.zoomFitActive.addEventListener("click", () => fitActive());
+  }
+
+  syncZoomChrome();
+
   return {
     /** Loads a decoded document, replacing whatever the editor held. */
     open(doc) {
@@ -1120,6 +1360,10 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
     markActive(ids) {
       activeMarks = new Set(ids ?? []);
       if (session) applyActiveMarks();
+      // Fit to active is only meaningful while something is active, and a
+      // control that is enabled when it can do nothing is a control that
+      // teaches an author to distrust the toolbar.
+      syncZoomChrome();
     },
 
     /**
@@ -1148,6 +1392,28 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
       if (!session) return false;
       revealFinding({ anchor: { kind: "block", blockId: id } });
       return true;
+    },
+
+    /* ------------------------------------------------------------- zoom */
+
+    /** The canvas scale. 1 is unzoomed; the range is `zoom.js`'s ladder. */
+    get zoom() {
+      return zoom;
+    },
+
+    /** Sets it, clamped to the ladder's bounds, keeping the centre fixed. */
+    setZoom(value) {
+      return setZoom(value);
+    },
+
+    /** Scales so the whole stage fits the pane's width. Never magnifies. */
+    fitWidth() {
+      return fitWidth();
+    },
+
+    /** Scales and centres so the replayed step's active blocks fit. */
+    fitActive() {
+      return fitActive();
     },
 
     /** The selected block id, or null - what the truth tables key off. */

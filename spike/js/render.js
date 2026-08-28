@@ -41,6 +41,7 @@
 
 import { fanPath, flowPath, interruptPath, inlet, joinPath, outlet } from "./layout.js";
 import { accentTokenFor, blockAccentStyle } from "./theme.js";
+import { scaleOf, unscaleRect } from "./zoom.js";
 
 /* ================================================================ icons */
 
@@ -793,15 +794,27 @@ function routeConnectors(stage, svg, edgeLayer) {
   svg.setAttribute("height", String(height));
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
-  const rect = (element) => {
-    const box = element.getBoundingClientRect();
-    return {
-      x: box.left - origin.left,
-      y: box.top - origin.top,
-      width: box.width,
-      height: box.height,
-    };
-  };
+  /*
+   * The one place in the spike that crosses coordinate spaces, and therefore
+   * the only place a zoom costs anything (sb-bl1).
+   *
+   * `getBoundingClientRect` reports RENDERED geometry, so under a scaled stage
+   * every box and the origin alike come back multiplied by the scale. The
+   * `<svg>` these coordinates are written into is a CHILD of the stage, drawn
+   * in the stage's own untransformed space and sized from `scrollWidth`, which
+   * is a layout measurement the transform does not touch. Writing rendered
+   * coordinates into it would scale the connectors twice and leave every line
+   * detached from the cards it joins.
+   *
+   * The scale is ASKED FOR rather than passed in: this function does not own
+   * the zoom and should not have to be told about it, and reading it off the
+   * element is also correct for a transform some host applied to an ancestor,
+   * which no editor state would have known about. `scaleOf` snaps to exactly 1
+   * at the default, so the unscaled case does no arithmetic.
+   */
+  const scale = scaleOf(origin.width, stage.offsetWidth);
+
+  const rect = (element) => unscaleRect(element.getBoundingClientRect(), origin, scale);
 
   const edges = [];
 
