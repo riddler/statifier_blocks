@@ -621,6 +621,10 @@
 
 /* Interrupt exits are the one genuinely different edge: they leave the group
  * rather than continuing it, so they are dashed and carry the warning hue. */
+/* A FAILURE rail's exit is deliberately not here (sb-67s): an on_error subtree
+ * completes and the parent continues in band, so its exit is an ordinary flow
+ * edge and takes `.sb-edge` above unmodified. The dashes mean escape, and
+ * nothing else may borrow them. */
 .sb-edge--interrupt {
   stroke: var(--sb-warning);
   stroke-dasharray: 4 4;

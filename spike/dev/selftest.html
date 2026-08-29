@@ -7553,6 +7553,180 @@
         );
       });
 
+
+      /* ------------------------------------------------ sb-67s appended */
+
+      /*
+       * Hoisted, and deliberately down here rather than up with the other
+       * imports: this whole block is one contiguous tail append, which is what
+       * keeps several branches growing this file at once composable.
+       */
+      import { railExitEdge } from "../js/render.js";
+
+      /*
+       * sb-67s. A rail's exit edge is drawn in the vocabulary the SLOT
+       * declares, and the operator's 2026-08-29 ruling says which vocabulary
+       * `failure` gets: an ordinary solid flow edge, because the accepted
+       * ADR-0004 amendment makes an `on_error` subtree's completion an outcome
+       * the parent continues from IN BAND. The dashed exit channel stays
+       * exclusively interrupt vocabulary.
+       *
+       * The derivation is pure and total so it can be asserted without a
+       * layout, a measurement or a frame - the bug this replaces was a
+       * hard-coded `kind: "interrupt"` for every rail child, which no amount
+       * of DOM assertion would have caught while the only rails in the
+       * fixtures were interrupt rails.
+       */
+      suite("render: a rail's exit edge reads the slot's style (sb-67s)", () => {
+        equal(
+          "a failure rail exits as flow",
+          railExitEdge("failure"),
+          { kind: "flow", routing: "flow", marker: "url(#sb-arrow)" }
+        );
+
+        equal(
+          "a secondary rail still exits as interrupt",
+          railExitEdge("secondary"),
+          { kind: "interrupt", routing: "channel", marker: "url(#sb-arrow-interrupt)" }
+        );
+
+        // The class the routing pass builds is `sb-edge sb-edge--<kind>`, so
+        // "flow" here is not a label: it is the assertion that a failure exit
+        // shares one stylesheet rule with the edge between two adjacent steps
+        // and can never pick up the dashes or the warning hue.
+        equal("...and a failure exit takes no class of its own", railExitEdge("failure").kind, "flow");
+
+        // Total, and conservatively so: an unrecognised style over-warns
+        // rather than silently hiding a way out. `layout.js` treats an unknown
+        // style as a metadata typo in exactly this direction.
+        for (const odd of [undefined, null, "", "primary", "Failure", "on_error"]) {
+          equal(
+            `an unrecognised style (${show(odd)}) falls back to interrupt`,
+            railExitEdge(odd).kind,
+            "interrupt"
+          );
+        }
+
+        // Nothing but the style reaches the decision. `"on_error"` above is
+        // the load-bearing case: the SLOT NAME of the one type that has a
+        // failure rail today gets the fallback, because a name is not
+        // metadata and this function has never been told any.
+        equal("the derivation reads one argument", railExitEdge.length, 1);
+      });
+
+      /*
+       * The same ruling in the DOM, through the real two-pass render.
+       *
+       * Two documents rather than one, because each isolates a single
+       * vocabulary: the failure document must produce NO dashed edge anywhere,
+       * and the interrupt document must still produce one. Asserting only the
+       * first would go green again the day the renderer stopped drawing rail
+       * exits at all.
+       *
+       * Sabotage: restoring the hard-coded `kind: "interrupt"` in
+       * `collectEdges` turns the first three checks red and leaves the control
+       * green.
+       */
+      suite("render: a failure exit is routed as flow, an interrupt exit is not (sb-67s)", () => {
+        const proposing = proposingRegistry();
+
+        const failureDocument = () =>
+          createDocument(
+            block({
+              id: "blk_ROOT",
+              type: "core.sequence",
+              slots: {
+                body: [
+                  block({
+                    id: "blk_INV",
+                    type: "core.invoke",
+                    config: { invoke_type: "myapp:authorize" },
+                    slots: { on_error: [step("blk_RECOVER", "verify")] },
+                  }),
+                ],
+              },
+            }),
+            { id: "bdoc_SB67S_FAILURE" }
+          );
+
+        const interruptDocument = () =>
+          createDocument(
+            block({
+              id: "blk_ROOT",
+              type: "core.sequence",
+              slots: {
+                body: [
+                  block({
+                    id: "blk_GRP",
+                    type: "core.group",
+                    slots: {
+                      body: [step("blk_INNER", "email")],
+                      interrupts: [
+                        block({
+                          id: "blk_RULE",
+                          type: "core.on_event",
+                          config: { event: "order.cancelled", outcome: "abandon" },
+                        }),
+                      ],
+                    },
+                  }),
+                ],
+              },
+            }),
+            { id: "bdoc_SB67S_INTERRUPT" }
+          );
+
+        // Mounted into the live document, because pass two measures real
+        // rectangles; `route()` is called by hand so the assertions do not
+        // wait on a frame.
+        const drawn = (doc) => {
+          const mount = el("div");
+          document.body.append(mount);
+
+          const handle = renderCanvas(mount, layoutDocument(doc, proposing), { center: false });
+          handle.route();
+
+          const edges = Array.from(mount.querySelectorAll(".sb-edge")).map((path) => ({
+            kind: path.classList.contains("sb-edge--interrupt") ? "interrupt" : "flow",
+            marker: path.getAttribute("marker-end"),
+            d: path.getAttribute("d"),
+          }));
+
+          handle.destroy();
+          mount.remove();
+
+          return edges;
+        };
+
+        const failure = drawn(failureDocument());
+        const interrupt = drawn(interruptDocument());
+
+        check("the failure document draws edges at all", failure.length > 0, JSON.stringify(failure));
+        equal(
+          "none of them is an interrupt edge",
+          failure.filter((edge) => edge.kind === "interrupt"),
+          []
+        );
+        check(
+          "...and none carries the interrupt arrowhead",
+          failure.every((edge) => edge.marker !== "url(#sb-arrow-interrupt)"),
+          JSON.stringify(failure)
+        );
+
+        // The control. An interrupt rail is untouched by this change, and a
+        // change that made every rail exit flow would be caught right here.
+        equal(
+          "an interrupt rail still draws exactly one dashed exit",
+          interrupt.filter((edge) => edge.kind === "interrupt").length,
+          1
+        );
+        check(
+          "...carrying the interrupt arrowhead",
+          interrupt.some((edge) => edge.marker === "url(#sb-arrow-interrupt)"),
+          JSON.stringify(interrupt)
+        );
+      });
+
       /* ------------------------------------------------------- reporting */
 
       const results = document.getElementById("results");
