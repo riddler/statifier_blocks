@@ -330,6 +330,14 @@ defmodule StatifierBlocks.CoreFixtures do
   def valid_config(Core.Assign), do: %{"path" => "review.parked", "value" => "false"}
   def valid_config(Core.Send), do: %{"event" => "signup.abandoned", "delay" => "PT2H"}
 
+  def valid_config(Core.Subchart),
+    do: %{
+      "chart" => "bdoc_01JWIZ",
+      "outcomes" => "done\nabandoned",
+      "assign_to" => "eligibility",
+      "params" => "email=signup.email"
+    }
+
   def valid_config(Core.Invoke),
     do: %{
       "invoke_type" => "myapp:authorize",

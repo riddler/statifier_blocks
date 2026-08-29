@@ -96,7 +96,8 @@ defmodule StatifierBlocks.Palette do
       "core.invoke" => Core.Invoke,
       "core.raise" => Core.Raise,
       "core.assign" => Core.Assign,
-      "core.send" => Core.Send
+      "core.send" => Core.Send,
+      "core.subchart" => Core.Subchart
     }
   end
 

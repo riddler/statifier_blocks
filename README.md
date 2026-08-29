@@ -155,13 +155,15 @@ yet. The editor stamps a refused slot's reason beside its validity as
 `data-drop-reason`.
 
 **2. Compose the document.** Your two types, arranged by the `core.*`
-vocabulary this package ships. Eleven types: the containers that arrange
+vocabulary this package ships. Twelve types: the containers that arrange
 other blocks (`core.sequence`, `core.group`, `core.branch`, `core.parallel`,
 `core.resumable_group`), and the leaves that do a structural thing on their
-own (`core.wait`, `core.on_event`, `core.invoke`, `core.send`, `core.raise`,
+own (`core.wait`, `core.on_event`, `core.invoke`, `core.subchart`,
+`core.send`, `core.raise`,
 `core.assign`). None of them knows a domain - `core.invoke` *names* an invoke
-type for the host to run and never runs one. `StatifierBlocks.Core` carries
-the table of all eleven with their slots. In a running system an editor
+type for the host to run and never runs one, and `core.subchart` names
+another chart the same way. `StatifierBlocks.Core` carries
+the table of all twelve with their slots. In a running system an editor
 writes this tree; it is ordinary data either way.
 
 ```elixir

@@ -53,7 +53,8 @@ defmodule StatifierBlocks.Core.SignupWizardTest do
     # than dropped from the comparison, so a core type falling out of the
     # worked examples has to be admitted deliberately, and the list shrinks
     # the day an example that uses one of them lands.
-    uncovered = MapSet.new(["core.assign", "core.invoke", "core.raise", "core.send"])
+    uncovered =
+      MapSet.new(["core.assign", "core.invoke", "core.raise", "core.send", "core.subchart"])
 
     assert MapSet.new(Map.keys(resolved))
            |> MapSet.union(MapSet.new(Map.keys(other)))
