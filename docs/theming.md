@@ -116,6 +116,37 @@ Group the names to get grouping for free: below, `myapp:authorize` and
 `myapp:capture` both resolve through `--sb-accent-myapp`, so the family reads
 as one, and the theme can still pull one of them out.
 
+## Icons are markup, and a theme does not touch them
+
+The package ships a default icon set - `StatifierBlocks.Editor.Icons`, inline
+SVG for the names the core block types declare, no font and no CDN - and the
+editor uses it whenever the host passes no `icon` component. It is **markup,
+not styling**, and the split is the same one this whole document is about: a
+glyph's shape is the package's, a glyph's colour and size are the theme's.
+
+So there is no `--sb-icon-*` token, and there is nothing here to override:
+
+- every path paints with `currentColor`, and the `<svg>` fills its tile;
+- the tile - `.sb-node__icon` on a card, `.sb-palette__icon` on a palette row -
+  is the only rule with an opinion, and it reads `--sb-block-accent` and
+  `--sb-block-accent-tint`, which the section above already covers;
+- so restyling the icons is restyling those two tokens, and a per-block-type
+  `accent_token` moves a type's tile with its stripe, for free.
+
+Two states are deliberate rather than absent, and neither is a hole a theme is
+expected to paper over:
+
+- **a block type that declares no icon gets no tile at all.** The chrome closes
+  up around the label. A type that declared nothing is not missing something.
+- **a name the shipped set does not have gets a neutral mark** - three dots, in
+  the tile, with the name in `data-icon`. A host block type declaring
+  `icon: "credit-card"` gets a chip that reads as deliberate. The right fix is
+  to pass your own `icon` component, which wins on every tile on both surfaces;
+  the mark is what the editor looks like until you do.
+
+Neither state is the white square the editor used to render (`sb-jja`). If you
+see one, you are looking at a font, not at this package.
+
 ## A complete host theme
 
 A credit-card processing host, dark, brand accent, two block types with

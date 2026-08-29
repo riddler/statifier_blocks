@@ -3,6 +3,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @moduledoc """
     The grouped, searchable, filterable palette (ADR-0005 decisions 8, 10, 13).
 
+    ## The entry's icon
+
+    An entry renders the tile the card it produces will carry, resolved by the
+    same seam and through the same `icon` assign - `Editor` hands this
+    component and `Editor.BlockNode` the identical value. The tile was declared
+    here and rendered nowhere for the whole of the graduated editor's life
+    (`sb-jja`), so a host could not put an icon on a palette row at all; a
+    palette that showed no icons above a canvas that did was the visible half
+    of that.
+
     Everything it renders comes from `palette_entry/0` through
     `StatifierBlocks.ViewModel`, which already applied decision 10's defaults -
     `label` to the type name, `group` to `"Other"`, `description` to `""`,
@@ -44,6 +54,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
+    alias StatifierBlocks.Editor.Icons
     alias StatifierBlocks.ViewModel
 
     attr(:groups, :list, required: true)
@@ -55,7 +66,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     )
 
     attr(:target, :any, required: true)
-    attr(:icon, :any, default: nil)
+
+    attr(:icon, :any,
+      default: nil,
+      doc: """
+      The host's icon component, or nil for `StatifierBlocks.Editor.Icons`.
+      The same value the canvas cards get, so a type looks the same before and
+      after the pick that puts it in the document.
+      """
+    )
+
     attr(:class, :string, default: nil)
 
     attr(:sheet_open, :boolean,
@@ -116,9 +136,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                   phx-target={@target}
                   phx-value-type={entry.type_name}
                 >
-                  {entry.entry.label}
-                  <span :if={entry.entry.description != ""} class="sb-palette__description">
-                    {entry.entry.description}
+                  <Icons.glyph icon={@icon} name={entry.entry.icon} class="sb-palette__icon" />
+                  <span class="sb-palette__pick-text">
+                    {entry.entry.label}
+                    <span :if={entry.entry.description != ""} class="sb-palette__description">
+                      {entry.entry.description}
+                    </span>
                   </span>
                 </button>
               </li>
