@@ -14,7 +14,7 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
   }
 
   describe "build/2 - a well-formed table" do
-    # Sabotage: in `select_one/2`, changed `otherwise_column?(column, outcome)
+    # sabotage: in `select_one/2`, changed `otherwise_column?(column, outcome)
     # or outcome == {:ok, true}` to `outcome == {:ok, true}` only, so the
     # otherwise column never self-selects - the "no arm matched" row's
     # statuses went red (arm_declined false/false/expected true became
@@ -47,7 +47,7 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
       assert table |> TruthTable.statuses() |> Enum.uniq() == [:match]
     end
 
-    # Sabotage: in `select_one/2`, changed the `already_selected? ->` clause
+    # sabotage: in `select_one/2`, changed the `already_selected? ->` clause
     # to fall through and re-evaluate `outcome == {:ok, true}` (removed the
     # early "already selected" short-circuit), so a second true arm was
     # selected too - this test's `selected?: false` assertion on the second
@@ -82,6 +82,10 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
                approved_cell
     end
 
+    # sabotage: in `otherwise_column?/2`, changed the `%Column{source: nil},
+    # nil -> true` clause to `false`, so the otherwise column never
+    # self-selects on its own recognition - this test's `selected?: true`
+    # assertion went red (got `false`), reverted.
     test "an otherwise row: no arm matches, otherwise is selected" do
       rows = [
         %{
@@ -95,7 +99,7 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
       assert %Cell{column_key: "otherwise", outcome: nil, selected?: true} = otherwise_cell
     end
 
-    # Sabotage: in `status_for/3`, swapped the `:match`/`:mismatch` clause
+    # sabotage: in `status_for/3`, swapped the `:match`/`:mismatch` clause
     # bodies (matched selected? == expected returned :mismatch and the
     # differing clause returned :match) - this test's :mismatch assertion
     # went red (got :match), reverted.
@@ -113,7 +117,7 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
       assert %Cell{column_key: "arm_declined", status: :mismatch} = declined_cell
     end
 
-    # Sabotage: in `status_for/3`, changed the `is_boolean(selected?) and
+    # sabotage: in `status_for/3`, changed the `is_boolean(selected?) and
     # expected == nil` clause to `is_boolean(selected?)` (dropped the nil
     # check, catching everything before the :match/:mismatch clauses) - this
     # test's :unchecked assertion still passed by coincidence for the
@@ -133,7 +137,7 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
       assert %Cell{column_key: "arm_approved", status: :unchecked, expected: nil} = approved_cell
     end
 
-    # Sabotage: in `status_for/3`, changed the leading
+    # sabotage: in `status_for/3`, changed the leading
     # `status_for({:error, _reason}, _selected?, _expected), do: :error`
     # clause's return to `:unchecked` - this test's :error assertion went
     # red (got :unchecked), reverted.
@@ -159,7 +163,7 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
              } = broken_cell
     end
 
-    # Sabotage: in `select_one/2`, changed the `match?({:error, _reason},
+    # sabotage: in `select_one/2`, changed the `match?({:error, _reason},
     # outcome) -> {..., true}` clause's undecidable-flag element from `true`
     # to `undecidable?` (never turns undecidable on), so the later column
     # stayed `selected?: false` and `status: :mismatch`/`:unchecked` instead
@@ -184,7 +188,7 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
                otherwise_cell
     end
 
-    # Sabotage: in `build_row/2`, changed the `{:error, reason} -> %Row{...,
+    # sabotage: in `build_row/2`, changed the `{:error, reason} -> %Row{...,
     # error: reason, cells: []}` clause to build cells anyway (dropped the
     # error branch, treating the failed context as `%{}`) - this test's
     # `error: {:binding, _, _}, cells: []` assertion went red, reverted.
@@ -200,6 +204,11 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
       assert [%Row{error: {:binding, "transaction.amount", _reason}, cells: []}] = table.rows
     end
 
+    # sabotage: in `put_path/4`'s two-segment clause, changed the guard from
+    # `when is_map(nested)` to `when true`, so a non-map value at an
+    # intermediate key is treated as nestable instead of a conflict - this
+    # test raised `BadMapError` instead of returning the row's
+    # `binding_conflict` error, reverted.
     test "a row with a binding conflict carries a binding_conflict row error" do
       rows = [
         %{
@@ -212,6 +221,10 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
       assert [%Row{error: {:binding_conflict, "transaction.amount"}, cells: []}] = table.rows
     end
 
+    # sabotage: in `build_row/2`'s success clause, changed `note: note` to
+    # `note: nil`, dropping the row spec's note on the way into the struct -
+    # this test's `note: "the happy path"` assertion went red (got `nil`),
+    # reverted.
     test "a row's note survives onto the Row struct" do
       rows = [
         %{
@@ -227,7 +240,7 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
   end
 
   describe "build/2 - spec validation" do
-    # Sabotage: in `validate_unique/1`, changed the `MapSet.member?(seen,
+    # sabotage: in `validate_unique/1`, changed the `MapSet.member?(seen,
     # key)` guard to `not MapSet.member?(seen, key)`, inverting the
     # duplicate check - this test went red (got {:ok, %TruthTable{}}
     # instead of the error), reverted.
@@ -243,7 +256,7 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
       assert TruthTable.build(spec, []) == {:error, {:duplicate_column, "arm_a"}}
     end
 
-    # Sabotage: in `validate_otherwise_last/1`, changed `index != last_index`
+    # sabotage: in `validate_otherwise_last/1`, changed `index != last_index`
     # to `index == last_index`, inverting which position is treated as
     # misplaced - this test went red (got {:ok, %TruthTable{}} instead of
     # the error), reverted.
@@ -259,7 +272,7 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
       assert TruthTable.build(spec, []) == {:error, {:otherwise_not_last, "otherwise"}}
     end
 
-    # Sabotage: in `validate_sources/1`, changed `is_binary(source) or
+    # sabotage: in `validate_sources/1`, changed `is_binary(source) or
     # is_nil(source)` to `is_binary(source) or not is_nil(source)` (accepts
     # anything non-nil, including a non-binary), so the invalid-source test
     # went red (got {:ok, %TruthTable{}} instead of the error), reverted.
@@ -276,6 +289,10 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
   end
 
   describe "build/2 - paths" do
+    # sabotage: in `paths/2`'s nil-spec branch, dropped the trailing
+    # `|> Enum.sort()`, leaving derived paths in flat-map/row order - this
+    # test's sorted-order assertion went red (got
+    # ["transaction.amount", "customer.verified"]), reverted.
     test "derives paths as the sorted union of the rows' binding keys when the spec omits them" do
       rows = [
         %{name: "Row 1", bindings: %{"transaction.amount" => "120"}},
@@ -286,6 +303,10 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
       assert table.paths == ["customer.verified", "transaction.amount"]
     end
 
+    # sabotage: in `paths/2`'s declared-paths branch, changed `paths -> paths`
+    # to `paths -> Enum.sort(paths)`, sorting the spec's declared order
+    # instead of passing it through unaltered - this test's assertion on the
+    # given (unsorted) order went red, reverted.
     test "uses the spec's declared paths when given" do
       spec = Map.put(@authorization_spec, :paths, ["transaction.amount", "customer.verified"])
 
@@ -295,6 +316,11 @@ defmodule StatifierBlocks.Predicates.TruthTableTest do
   end
 
   describe "statuses/1" do
+    # sabotage: in `statuses/1`, appended `|> Enum.reverse()` to the
+    # flat-mapped list, flipping the whole result end to end (a within-row
+    # reversal alone did not catch it, since both fixture rows' statuses are
+    # uniform within the row) - this test's row-then-column order assertion
+    # went red, reverted.
     test "flattens every cell's status in row-then-column order" do
       rows = [
         %{
