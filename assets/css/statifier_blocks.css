@@ -491,11 +491,84 @@
   color: var(--sb-fg-muted);
 }
 
-/* The rail partition's width. `:failure`'s own edge treatment - solid, error
- * family, with an ordinary card shadow - is 10h's and belongs to the bead that
- * renders it; what is here is the placement the two rail styles share. */
+/* The rail partition's width - the placement `:secondary` and `:failure`
+ * share. `position` is here for the exit edge below, which hangs off this
+ * box. */
 .sb-slot--rail {
+  position: relative;
   max-width: var(--sb-rail-width);
+}
+
+/* 10h's failure vocabulary, and the sentence the dashed interrupt edge above
+ * cannot say.
+ *
+ * Both rails are placed the same way, so before this the only rail vocabulary
+ * the editor had was "out of band": dashed, warning-tinted, deliberately
+ * unlike an ordinary slot. An `on_error` subtree borrowed it and came out
+ * reading as a second set of interrupt rules - "fires whether or not you get
+ * there" - when what it actually is, is the continuation this step takes when
+ * it goes badly. That is in-band: it runs because the step ran, it runs once,
+ * and it is on the path the author is reading.
+ *
+ * So the treatment says in-band with a bad outcome. SOLID rather than dashed
+ * (the dash is what the editor uses for "not on the path you are reading" -
+ * the undeclared slot, the unresolvable card), and the ERROR family rather
+ * than the warning one, which is where every other "this went wrong" in the
+ * editor already lives. 10j: no token is added for any of it, because the
+ * error family already carries every value it needs. */
+.sb-slot--failure {
+  border-left-style: solid;
+  border-left-color: var(--sb-error);
+}
+
+/* The rail's label goes with its line. Two words in the subtle grey over a
+ * red edge read as a colour that leaked from somewhere else; the same two
+ * words in the error family read as the heading of the thing below them. */
+.sb-slot--failure > .sb-slot__header > .sb-slot__label {
+  color: var(--sb-error);
+}
+
+/* The children carry the distinction too, so a failure path stays a failure
+ * path at a glance when the rail's own edge is off the side of what the
+ * reader is looking at. */
+.sb-slot--failure > .sb-node {
+  border-color: var(--sb-error);
+  background: var(--sb-error-bg);
+}
+
+/* The exit edge (10h's last row, per the 2026-08-29 `sb-67s` ruling). It
+ * hangs off the bottom of the rail and reaches back to the parent's own flow
+ * line, which is where the rail rejoins it.
+ *
+ * The DEFAULT here is the ordinary flow edge - solid, in the line colour the
+ * editor draws the lines that carry meaning in (`--sb-border-strong`, the
+ * boundary box's own, rather than the decorative `--sb-border`: an edge that
+ * says where a rail rejoins the flow is telling the reader something) - and
+ * it is what a `:failure`
+ * rail gets: ADR-0004's amendment makes a failure path end in a completion
+ * event the PARENT continues on, so it leaves in-band, and drawing it as an
+ * escape would have the canvas contradict the chart it compiles to. The
+ * dashed escape below is the interrupt's alone.
+ *
+ * Which one a rail gets is read off `data-exit-edge`, the attribute
+ * `ViewModel.exit_edge/1` stamps on the rails and nowhere else, so this file
+ * names no block type and no slot name - a host type with a failure path
+ * gets the flow edge for free by declaring the style. The selector is the
+ * attribute rather than the rail class because `--rail::after` reads as a
+ * custom-property declaration to the token audit, and a rule that has to be
+ * exempted from the audit is a rule the audit stops covering. */
+.sb-slot[data-exit-edge]::after {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--sb-space));
+  bottom: 0;
+  width: var(--sb-space-3);
+  border-top: var(--sb-border-width) solid var(--sb-border-strong);
+}
+
+.sb-slot[data-exit-edge="interrupt"]::after {
+  border-top-style: dashed;
+  border-top-color: var(--sb-warning);
 }
 
 .sb-slot--undeclared {
