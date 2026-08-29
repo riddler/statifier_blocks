@@ -1750,3 +1750,100 @@ compiles as it did before.
 - Nothing changes in the anchor vocabulary, the source list, the severity set,
   or the routing. This section adds a producer and a precondition, and no
   field.
+
+---
+
+## Amendment (2026-08-29): decision 9, the `:duration` control
+
+**Status: proposed.** Drafted 2026-08-29 from an operator ruling. Additive;
+decision 9 stands as accepted and no text above this line is changed by it. It
+closes the open item the d10/13 amendment above left as "Decision 9's
+`:duration` control: the escape hatch is evidence, not decoration".
+
+### Context
+
+Decision 9's field-type table renders `:duration` as a "structured value/unit
+control emitting an ISO-8601 string", and the prose beneath it explains why:
+ADR-0001 decision 6 forbids floats in config, so "1.5 hours" has to be
+`PT1H30M`, and the control exists so the author does not have to know that.
+
+The spike built that control and found its limit from the inside. A value/unit
+pair cannot express `PT1H30M` at all, so the spike shipped an "edit as
+ISO-8601" escape hatch beside the control - which is the escape hatch the
+d10/13 amendment records as evidence rather than decoration, and leaves as a
+question for the shipped editor: a compound control, an escape hatch, or a
+documented refusal of durations that are not one unit.
+
+Campaign 014 answered it for the spike as D4: a single text control taking
+predicator duration strings, with the author's string stored verbatim and
+compiled to the ISO pivot at emit time (`sb-709`; `core.send` reads both
+spellings). This section takes the same answer for the shipped editor, on the
+operator's ruling, and writes it down as a table row so the shipped renderer
+has a record to graduate against rather than a spike to copy.
+
+### Proposed decision
+
+Decision 9's `:duration` row is amended to read:
+
+| Field type | Rendering |
+|---|---|
+| `:duration` | one text control; predicator duration strings primary, with on-screen examples |
+
+The row's terms, in full:
+
+- **One text control**, not a value/unit pair and not a pair with an escape
+  hatch beside it. The compound control's limit is structural rather than
+  incidental, and a control plus an escape hatch is two ways to say one thing
+  with a rule about which wins.
+- **Predicator duration strings are primary**, with the examples on screen:
+  `30s`, `15m`, `1h30m`, `2d`, `3d8h`. They are the form a person types, and
+  showing them beside the field is what replaces the affordance a unit
+  dropdown used to carry.
+- **ISO-8601 is still accepted.** It is the spelling ADR-0001 decision 6
+  already admits into config and the one existing documents hold, so a field
+  that refused it would refuse values already written.
+- **Empty means the key is omitted.** A cleared field and a never-set field
+  are the same value; there is no `PT0S`, and no third state for "the author
+  touched this and then did not finish".
+- **Format is validated inline, before the document gate.** Decision 9's rule
+  that an `:update_config` command reaches the document only when
+  `validate_config/1` returns `:ok` is unchanged; the inline check is the
+  earlier, per-field one that tells the author which of the two spellings the
+  field is failing while they are still typing it.
+
+**The stored form is the author's string verbatim.** Whichever spelling was
+typed is what `config` holds - the editor canonicalises nothing on the way in.
+
+**Emitters compile to the ISO pivot at emit time.** A predicator string is
+read through `Predicator.Duration.parse/1` and canonicalised to ISO-8601; a
+stored ISO value is already at the pivot. The emitted attribute is the
+shorthand form the engine reads, which is what `core.send` already does.
+
+**Predicator owns the grammar.** Which strings parse, how a fraction expands,
+how a repeated unit accumulates, what `mo` and `y` approximate: all of that is
+`Predicator.Duration`'s to define, and this record cites it rather than
+restating it. A grammar restated here would be a second opinion that drifts.
+
+### Consequences
+
+- The open item this section closes needs no separate ruling. Of the three
+  shapes it put (a compound control, an escape hatch, or a documented refusal),
+  the answer is none of them: the compound control is what the row stops
+  requiring, so there is no longer a pair for an escape hatch to sit beside.
+- The shipped `:duration` field renderer becomes this control, graduating the
+  spike's rather than reimplementing it, and `core.wait` and `core.timeout`
+  come to accept both spellings the way `core.send` already does. Both follow
+  this record and neither precedes it.
+- ADR-0002 decision 7's closed field-type set is untouched. `:duration` is
+  still one of the seven types and still holds a string; what changed is how
+  the editor renders it and which strings that string may be.
+- ADR-0001 decision 6's no-floats rule is why the pivot is ISO and not a
+  number, and it stays the reason. A predicator string with a fractional
+  component normalises into whole ISO components or it does not compile;
+  neither spelling puts a float in `config`.
+- The verbatim stored form costs one thing and buys another. It costs a
+  canonical form: two documents can hold `1h30m` and `PT1H30M` and mean the
+  same span, so anything comparing durations compares the compiled value and
+  not the stored bytes. It buys the author's own text surviving a round trip
+  through the editor, which is the property the annotation rules in ADR-0004
+  care about and the reason a `delay` attribute is not annotated.
