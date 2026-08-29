@@ -540,3 +540,170 @@ The acceptance property for this record: those two calls consult one
 implementation and one host relation, reached through one palette value, so
 there is no arrangement of code in which the editor lights up a slot the
 compiler would reject.
+
+---
+
+## Proposed amendment (2026-08-29): decision 8, a reason vocabulary for what a seam decided
+
+**Status: PROPOSED, not accepted.** Additive; decisions 1-9 stand as accepted
+and no text above this line is changed by it. Nothing here alters a verdict,
+a typespec above, or either finding tuple.
+
+### Context
+
+Decision 8 gives an assignability failure a finding and a shape:
+`{:type_mismatch, block_id, upstream_ref, produced, consumed}`. That is enough
+to *phrase* a message, which is what decision 8 says it is for, and it was
+enough while the only consumer was a validation list.
+
+It is not enough for the editor's side of decision 7. The pre-hover marking
+that decision 7 exists to make trustworthy is per-slot (ADR-0005 decision 5),
+and a slot that a drag leaves unmarked says only "not here". The author is
+looking at a slot that refused and has nowhere to go: the finding that knows
+why is attached to a document position the slot does not have, and the
+document may not even contain the block yet. A hover affordance that could say
+why has nothing to read.
+
+There is a second gap, and it is the one decision 5's own consequences already
+name: *"a partially typed palette permits seams a fully typed one would
+catch."* That cost is stated in prose and is invisible in code. A host cannot
+ask which of its seams passed because a type really matched and which passed
+only because a block declared nothing, so a palette that is half typed looks
+exactly like a palette that is fully typed and correct.
+
+Both gaps want the same thing: a name for *how* a seam came out, distinct from
+*whether* it came out. That is what this section proposes, and the whole of its
+risk is in the word "distinct" - a vocabulary that quietly became a sixth
+decision-6 step would be the type system decision 1 refuses to build, arriving
+by the back door.
+
+### Proposed decision
+
+**8a. Five arms, and they explain rather than decide.**
+
+```elixir
+@type reason ::
+        :source_untyped
+        | :target_untyped
+        | :both_untyped
+        | :not_assignable
+        | {:fixable_by, Block.id()}
+```
+
+The classification is total over a seam, follows decision 6's own order, and
+is computed *after* `assignable?/3` has already answered:
+
+  1. both sides `:unknown` -> `:both_untyped`;
+  2. produced `:unknown` -> `:source_untyped`;
+  3. consumed `:unknown` -> `:target_untyped`;
+  4. `assignable?/3` says yes -> **no reason at all**;
+  5. refused, and the producing side is a block -> `{:fixable_by, block_id}`;
+  6. refused, and the producing side is `:slot_entry` -> `:not_assignable`.
+
+`:unknown` stays permissive in both positions, exactly as decision 5 has it.
+The first three arms therefore sit on seams that were **admitted**, not
+refused. This is the point on which the vocabulary either holds or does not,
+so it is stated flatly: **no seam is admitted or refused differently for this
+vocabulary existing.** The reason is a pure function of a verdict already
+reached; nothing in the package branches on what it returns; and steps 1-3
+cannot refuse because steps 1-3 describe passes.
+
+Arm 4 having no name is deliberate. A seam that was really checked and really
+matched has nothing to say, and giving it an arm would invite a caller to
+render one.
+
+**8b. Two refusing arms, split by decision 8's own tuple.** `producing_ref` is
+exactly the third element of a `:type_mismatch`. So `{:fixable_by, block_id}`
+names the block that finding already names - the declaration an author would
+change - and `:not_assignable` is the case where that element is
+`:slot_entry`: refused, with no block named to go and look at.
+
+Deriving the split from the tuple rather than from a fresh walk buys the
+property this record cares about most, and costs two things worth naming:
+
+  * at a slot's index 0 the producing ref is `:slot_entry` by decision 4's
+    definition of the slot inbound, so a refusal there reads `:not_assignable`
+    even when the type reached that position from a real block through a
+    container;
+  * when the named block passes a type through (`{:passthrough, slot}`), the
+    declaration to change is inside it rather than on it.
+
+Both could be closed by tracing a type to the block that declared it. Neither
+is, because that trace is a second walk producing a second answer, and a second
+answer free to disagree with the finding the author is reading is the exact
+failure decision 7 exists to prevent. One rule, one ref, one answer.
+
+**8c. The reason rides beside the finding, not inside it.** Decision 8's two
+tuples are unchanged - no element is added to either. A `:type_mismatch`
+already carries its producing ref, its produced type and its consumed type, so
+its reason is a projection of what it holds plus the palette. Stored, it would
+be a second copy of a verdict those already determine, free to drift from them;
+derived, it cannot be wrong while the finding is right.
+
+`{:kind_not_admitted, ...}` gets no reason from this vocabulary. The structural
+gate's reason is its own finding code, which names both kind sets, and decision
+3 is emphatic that kinds are not types; a data-flow vocabulary answering for it
+would be the lattice creeping back in. Where both gates refuse at once, the
+structural one is the one reported - it is the first finding `check/5` emits,
+and reporting the seam there would tell the author the second-most-interesting
+thing that is wrong.
+
+**8d. Three producers, and what each is for.**
+
+  * `Assignability.seam_reason/4` - the classifier itself. Every other producer
+    is this one applied to something.
+  * `Assignability.finding_reason/2` - one finding's reason, 8c's projection.
+    This is what the compiler-side consumer uses to render a message that says
+    why rather than only what.
+  * `Assignability.seam_reasons/3` - every seam in a document that has
+    something to say, in pre-order. **This is the producer of the three untyped
+    arms**, and it is what makes decision 5's stated cost queryable instead of
+    merely admitted: a host auditing its own palette asks here and gets back
+    the seams that passed without being checked. It is not part of validation,
+    it emits no findings, and a document whose every seam answers
+    `:source_untyped` is exactly as valid as one whose seams answer nothing.
+
+**8e. What the editor may do with it, which is presentation and stays
+sb-w50's.** ADR-0005 decision 5's granularity is per-slot, so a slot-level
+reason exists only where the slot's gaps agree: each gap's reason is that of
+its first finding, and the slot's is that value when every gap gave the same
+non-nil one. Otherwise there is none, which is honest rather than lossy - a
+slot refused for room, for the dragged block's own subtree, or for different
+reasons at different gaps has no single true sentence, and picking one would be
+picking arbitrarily.
+
+A consequence worth stating rather than leaving to be found: at per-slot
+granularity the reachable arm is `:not_assignable`. `{:fixable_by, _}` needs
+every gap in a slot to name the same producing block, and gaps name different
+ones by construction. It is a *position*-level answer, reachable where
+positions are - in a finding, and in whatever per-gap affordance decision 5's
+granularity is one day widened to allow. Nothing is lost; the finding still
+carries it.
+
+### Consequences
+
+- Decision 8's finding vocabulary is unchanged, so every existing consumer,
+  test and pattern match keeps working. This amendment adds functions and one
+  type; it removes and rewrites nothing.
+- The editor can darken a slot *and* say why, with the reason already in the
+  markup at drag start. No hover round-trip, no client-side rule, no
+  JavaScript - the same properties the purity constraints in this record's
+  context section were written to protect.
+- A host can now find its own untyped seams. That is the first mechanism in
+  this package that addresses the partial-palette cost at all, and it does so
+  without a lint, without a verdict, and without this package deciding what a
+  complete palette is.
+- Reasons are derived, so they cannot disagree with the findings they explain.
+  The cost is recomputation - `finding_reason/2` re-runs `assignable?/3` for a
+  seam already decided - which is bounded by the same pure, IO-free relation
+  the editor already runs over every position at drag start.
+- Two arms describe refusals and three describe admissions, which reads oddly
+  for something introduced as a refusal vocabulary. It is the honest shape:
+  under decision 5 an untyped side can never refuse, so an untyped arm can only
+  ever explain a pass. A vocabulary in which all five refused would require
+  narrowing `:unknown`, which is decision 5 reopened, and that is a new record.
+- `{:fixable_by, _}` is weaker than it could be at a slot's first position and
+  behind a passthrough. Closing either gap means tracing a type to its
+  declaring block, which is a second walk and therefore a second answer; the
+  day a host demonstrates it needs one, that is a new record, not a patch to
+  this section.

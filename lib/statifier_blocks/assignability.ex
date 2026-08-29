@@ -49,6 +49,16 @@ defmodule StatifierBlocks.Assignability do
   and `assignable?/3` sees exactly ADR-0003's contract; the five extra
   functions widen what is callable, never what is decided.
 
+  Four more were added by the 2026-08-29 amendment to decision 8, and they
+  hold to the same line. `seam_reason/4`, `finding_reason/2` and
+  `seam_reasons/3` are the reason vocabulary: each reads a verdict
+  `assignable?/3` has already reached and labels it, and nothing in this
+  package branches on what they return, so no seam is admitted or refused
+  differently for their existing. `target_verdicts/4` is the enumeration
+  `valid_targets/4` is now defined in terms of - the same positions in the
+  same order, with `check/5`'s verdict kept instead of discarded, so a
+  caller that has to explain a refusal does not enumerate a second time.
+
   ## Why `produces/4` terminates
 
   `{:passthrough, slot}` resolves recursively - to the last block in
@@ -98,6 +108,30 @@ defmodule StatifierBlocks.Assignability do
            [kind()] | :any}
           | {:type_mismatch, Block.id(), Block.id() | :slot_entry, type_expr() | :unknown,
              type_expr() | :unknown}
+
+  @typedoc """
+  Why a data-flow seam came out the way it did (the 2026-08-29 amendment to
+  ADR-0003 decision 8). A reason **explains a verdict; it never changes
+  one** - see `seam_reason/4`.
+
+    * `:both_untyped` - neither side declared a type, so decision 5 admitted
+      the seam without checking anything.
+    * `:source_untyped` - the producing side is `:unknown` and the consuming
+      side is not. Admitted, unchecked.
+    * `:target_untyped` - the consuming side is `:unknown` and the producing
+      side is not. Admitted, unchecked.
+    * `:not_assignable` - refused: both sides are typed, identity failed, and
+      the palette's relation did not widen. The producing side is
+      `:slot_entry`, so the refusal names no block to go and look at.
+    * `{:fixable_by, block_id}` - the same refusal, where the producing side
+      *is* a block: `block_id` is the declaration an author would change.
+  """
+  @type reason ::
+          :source_untyped
+          | :target_untyped
+          | :both_untyped
+          | :not_assignable
+          | {:fixable_by, Block.id()}
 
   @doc """
   `module.io(config)`, or `%{}` when `io/1` is absent or `module` is not
@@ -175,6 +209,145 @@ defmodule StatifierBlocks.Assignability do
       module.assignable?(produced, consumed)
     else
       false
+    end
+  end
+
+  @doc """
+  Why the seam `produced -> consumed` came out the way it did, as the
+  2026-08-29 amendment to ADR-0003 decision 8 defines it. `producing_ref`
+  is the producing side of the seam exactly as decision 8's
+  `:type_mismatch` tuple already names it: a block id, or `:slot_entry`
+  when the type came from the slot's own inbound rather than from a block.
+
+  `nil` means **there is nothing to explain**: both sides are typed and the
+  seam passed, by identity (decision 6 step 2) or because the palette's
+  relation widened it (step 4). Every other outcome names itself.
+
+  The classification is total and follows decision 6's own order:
+
+    1. both sides `:unknown` -> `:both_untyped`;
+    2. produced `:unknown` -> `:source_untyped`;
+    3. consumed `:unknown` -> `:target_untyped`;
+    4. `assignable?/3` -> `nil`;
+    5. `producing_ref` is a block id -> `{:fixable_by, producing_ref}`;
+    6. otherwise -> `:not_assignable`.
+
+  **This function decides nothing.** It reads `assignable?/3`'s verdict and
+  labels it; it never gates on its own answer, and no caller in this
+  package branches a verdict on it. That is what makes the reason
+  vocabulary strictly explanatory: the first three arms sit on seams
+  decision 5 *admitted*, and adding them cannot refuse anything, because
+  `:unknown` stays permissive in both positions and step 4 short-circuits
+  before either refusing arm is reachable.
+
+  The two refusing arms differ only in whether the author has somewhere to
+  go, and the split is decision 8's own: `producing_ref` is exactly the
+  third element of a `:type_mismatch` tuple, so `{:fixable_by, block_id}`
+  names the block that finding already names, and `:not_assignable` is the
+  case where that element is `:slot_entry`.
+
+  **Two limits, both deliberate, both consequences of deriving the split
+  from decision 8's tuple rather than from a second walk.** At a slot's
+  index 0 the producing ref is `:slot_entry` by decision 4's definition of
+  the slot inbound, even when the type reached that position from a real
+  block through a container - so a refusal there says `:not_assignable`
+  though a block upstream of the container did declare the type. And when
+  the named block passes a type through (`{:passthrough, slot}`), the
+  declaration to change is inside it rather than on it.
+
+  Both could be closed by tracing a type to its declaring block, and
+  neither is, on purpose: that trace is a second walk producing a second
+  answer, and a second answer that can disagree with the finding the author
+  is reading is the exact failure ADR-0003 decision 7 exists to prevent.
+  One rule, one ref, one answer - see the amendment's consequences.
+
+  Structural refusals carry no reason from this vocabulary.
+  `{:kind_not_admitted, ...}` already names both kind sets in the finding
+  itself, so `finding_reason/2` answers `nil` for it rather than
+  duplicating it here.
+  """
+  @spec seam_reason(
+          Palette.t(),
+          type_expr() | :unknown,
+          type_expr() | :unknown,
+          Block.id() | :slot_entry
+        ) :: reason() | nil
+  def seam_reason(%Palette{} = palette, produced, consumed, producing_ref) do
+    cond do
+      produced == :unknown and consumed == :unknown -> :both_untyped
+      produced == :unknown -> :source_untyped
+      consumed == :unknown -> :target_untyped
+      assignable?(palette, produced, consumed) -> nil
+      producing_ref == :slot_entry -> :not_assignable
+      true -> {:fixable_by, producing_ref}
+    end
+  end
+
+  @doc """
+  The reason for one finding, derived rather than stored.
+
+  A `:type_mismatch` carries its producing ref, produced type and consumed
+  type already, so its reason is `seam_reason/4` applied to what the tuple
+  holds - which is why the 2026-08-29 amendment adds no element to
+  decision 8's tuples. A reason kept *in* the finding would be a second
+  copy of a verdict the tuple plus the palette already determine, free to
+  disagree with it; derived, it cannot.
+
+  `:kind_not_admitted` answers `nil`: the structural gate's reason is its
+  own finding code, and this vocabulary is the data-flow gate's.
+  """
+  @spec finding_reason(Palette.t(), finding()) :: reason() | nil
+  def finding_reason(%Palette{}, {:kind_not_admitted, _id, _parent, _slot, _kinds, _accepts}),
+    do: nil
+
+  def finding_reason(%Palette{} = palette, {:type_mismatch, _id, ref, produced, consumed}),
+    do: seam_reason(palette, produced, consumed, ref)
+
+  @doc """
+  Every seam in `document` that has something to say about itself, in
+  `Document.blocks/1`'s pre-order: `{consuming_block_id, producing_ref,
+  reason}`.
+
+  This is the queryable form of the cost ADR-0003's consequences state in
+  prose - "a partially typed palette permits seams a fully typed one would
+  catch". The three untyped arms name exactly those seams, and they are the
+  reason this vocabulary is not merely a refusal vocabulary: a host
+  auditing its own palette's coverage asks here, gets back the seams that
+  passed without being checked, and types the blocks that produced them.
+
+  It changes no verdict and is not part of validation. A document whose
+  every seam answers `:source_untyped` is exactly as valid as one whose
+  seams answer `nil` - `validate/3` is unchanged and still reports only the
+  findings decision 8 defines. Seams with nothing to explain (typed on both
+  sides and passing) are omitted rather than listed with a `nil`.
+  """
+  @spec seam_reasons(Palette.t(), Document.t(), context()) ::
+          [{Block.id(), Block.id() | :slot_entry, reason()}]
+  def seam_reasons(%Palette{} = palette, %Document{} = document, ctx) do
+    document
+    |> Document.blocks()
+    |> Enum.flat_map(&seam_reason_row(palette, document, &1, ctx))
+  end
+
+  # One block's own upstream seam, as a zero- or one-element list. The root
+  # occupies no slot and so has no seam of its own; a seam with nothing to
+  # explain contributes nothing rather than a `nil` row.
+  @spec seam_reason_row(Palette.t(), Document.t(), Block.t(), context()) ::
+          [{Block.id(), Block.id() | :slot_entry, reason()}]
+  defp seam_reason_row(palette, document, block, ctx) do
+    case Document.fetch_path(document, block.id) do
+      {:ok, [_ | _] = path} ->
+        target = List.last(path)
+        inbound = inbound_type(palette, document, target, ctx)
+        ref = upstream_ref(document, target)
+
+        case seam_reason(palette, inbound, consumes_of(palette, block), ref) do
+          nil -> []
+          reason -> [{block.id, ref, reason}]
+        end
+
+      _root_or_missing ->
+        []
     end
   end
 
@@ -558,13 +731,34 @@ defmodule StatifierBlocks.Assignability do
   """
   @spec valid_targets(Palette.t(), Document.t(), Block.t(), context()) :: [target()]
   def valid_targets(%Palette{} = palette, %Document{} = document, %Block{} = candidate, ctx) do
+    for {target, :ok} <- target_verdicts(palette, document, candidate, ctx), do: target
+  end
+
+  @doc """
+  Every position `valid_targets/4` enumerates, each paired with `check/5`'s
+  full verdict rather than filtered down to the accepting ones.
+
+  `valid_targets/4` is defined as this function keeping the `:ok` rows, so
+  there is one enumeration and one decision, not two. It is exposed for the
+  same reason the moduledoc's other widenings are: a caller that has to say
+  *why* a position was refused - `StatifierBlocks.Edit.Targets`, which
+  projects positions to slots and needs a reason for a slot it darkens -
+  must not re-derive the position set, because a second enumeration is a
+  second answer waiting to drift from this one.
+
+  Same order and the same determinism guarantee `valid_targets/4`
+  documents.
+  """
+  @spec target_verdicts(Palette.t(), Document.t(), Block.t(), context()) ::
+          [{target(), :ok | {:error, [finding()]}}]
+  def target_verdicts(%Palette{} = palette, %Document{} = document, %Block{} = candidate, ctx) do
     for block <- Document.blocks(document),
         {module, config} = resolve_module_config(palette, block),
         module != nil,
         {slot, _arity, _label} <- module.slots(config),
-        index <- 0..length(Map.get(block.slots, slot, [])),
-        check(palette, document, {block.id, slot, index}, candidate, ctx) == :ok do
-      {block.id, slot, index}
+        index <- 0..length(Map.get(block.slots, slot, [])) do
+      target = {block.id, slot, index}
+      {target, check(palette, document, target, candidate, ctx)}
     end
   end
 

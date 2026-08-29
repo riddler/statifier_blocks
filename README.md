@@ -136,6 +136,24 @@ end
 `consumes` are opaque strings compared for identity, widened only by a
 relation the host supplies - there is no built-in type lattice.
 
+That relation rides on the palette (`Palette.new(types, assignability:
+MyApp.Blocks.Types)`) and it reaches every consumer through that one value.
+`Assignability.validate/3` - what the compiler runs over the whole document -
+and `Edit.Targets.slot_verdicts/3` - what the editor runs once at drag start
+to mark every droppable slot before the pointer moves - are the same
+implementation reading the same relation, so widening the host module opens a
+drop target and clears the matching finding in the same edit. The relation can
+only widen: identity is checked first, so a host callback can never refuse
+something the default rule accepts.
+
+Where a seam refuses, `Assignability.finding_reason/2` says why in a small
+vocabulary (`:not_assignable`, `{:fixable_by, block_id}`), and
+`Assignability.seam_reasons/3` names the seams that passed only because a
+block declared nothing (`:source_untyped`, `:target_untyped`,
+`:both_untyped`) - the way to find the parts of a palette you have not typed
+yet. The editor stamps a refused slot's reason beside its validity as
+`data-drop-reason`.
+
 **2. Compose the document.** Your two types, arranged by the `core.*`
 vocabulary this package ships. Eleven types: the containers that arrange
 other blocks (`core.sequence`, `core.group`, `core.branch`, `core.parallel`,
