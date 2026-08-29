@@ -2068,3 +2068,170 @@ needs the client to do anything a stylesheet and one command cannot.
 - The inspector rule constrains future work in the direction this record
   wants. A pane that is about the document has one place to go, so the
   question "which inspector tab does this become" stops being asked.
+
+---
+
+## Proposed amendment (2026-08-29): decision 7, a second hook that only measures
+
+**Status: PROPOSED, not accepted.** Additive; decision 7 stands exactly as
+written and no text above this line is edited by this section. It amends the
+hook count and nothing else: the drag hook, the DOM contract it depends on,
+the delivery rule, and the argument for keeping every other affordance in
+`phx-` bindings all survive unchanged.
+
+### Context
+
+Decision 7 ships exactly one JavaScript hook and says, in as many words, that
+**adding a second hook requires amending this record**, "a deliberately high
+bar: a second hook is the signal that some behaviour has started living on the
+client, and that is the thing this design is arranged to prevent."
+
+The proposed d10/13 amendment above then asked for something the one-hook rule
+does not allow. 10b decides that **the browser does the layout and geometry is
+measured, never computed**, and 10d and 10e are rules about where a measured
+edge lands and how much room a guard row reserves. Every one of them needs a
+number that only the browser knows: where the browser actually put a card,
+a column header, or an arm row, after fonts, wrapping, and a container's
+natural height have all had their say. Nothing in Elixir can produce that
+number, and nothing in CSS can hand it to the server.
+
+So the connector layer sat behind a record question rather than behind any
+missing code. The campaign-012/013 spike had already proved the rules work at
+depth (`spike/js/layout.js` and `spike/js/render.js`, over the same document
+41 blocks deep at nesting depth 7 that the section above cites), and the
+graduation bead `sb-k7r` was filed and blocked on this section.
+
+The operator ruled on `sb-y14` (2026-08-29): amend, admitting a second hook
+whose entire job is read-only measurement, and argue in the amendment why that
+does not weaken decision 7's reason.
+
+### Proposed decision
+
+**7a. A second hook is admitted, and its whole contract is measurement.** The
+editor ships two hooks. The second one, `StatifierBlocksMeasure`:
+
+- **reads laid-out boxes after render** - geometry the browser produced, off
+  elements the server rendered;
+- **pushes that geometry to the server**, and that push is the only thing it
+  sends;
+- **issues no commands.** It does not push an author intent of any kind:
+  no `:insert`, `:move`, `:remove` or `:update`, no selection, no collapse,
+  no drag event. Decision 2's closed command set is untouched by it;
+- **never mutates the DOM.** It writes no node, no attribute, no style, and
+  no class; it does not draw the connectors it makes drawable;
+- **holds no behaviour.** No validity rule, no layout rule, no routing rule,
+  and no state that survives a re-render lives inside it.
+
+The hook is named on decision 7's own naming argument - a `StatifierBlocks`
+prefix, because two packages in this family may register hooks into one host
+`app.js` - and it ships as source in `assets/` under sui-ADR-0009 with the
+same versioned-public-API obligations decision 7 places on the drag hook. Both
+are consequences of rules already accepted here, not new choices.
+
+**7b. The invariant decision 7 was defending is the one that holds, and it is
+not the count.** The count was the proxy. The rule underneath it is that
+**behaviour does not move to the client**, and a measuring hook does not move
+any, because it produces an *input* rather than a *decision*.
+
+The distinction is sharp enough to check. `StatifierBlocksDrag` reports an
+author's intent, and what it reports changes the document: a drop is a `:move`.
+`StatifierBlocksMeasure` reports a fact about the rendering the server just
+produced, and what it reports changes no document, no command, no validity
+verdict and no finding. Feed it a different measurement and the same document
+comes back; feed the drag hook a different drop and a different document does.
+That is the whole difference between input and behaviour, and it is why the
+second hook cannot become the thing the one-hook rule feared: there is nothing
+for behaviour to hide in, because the hook decides nothing and remembers
+nothing.
+
+Three properties follow, and each is a check on 7a rather than a new rule:
+
+1. **The geometry the hook pushes is authoritative about pixels and about
+   nothing else.** The server may route a connector with it. The server may
+   not learn from it what a block *is*, where it *belongs*, or whether a drop
+   is legal - those stay where decisions 2, 5 and 6 put them.
+2. **The connector geometry itself is computed on the server**, as pure
+   functions from measured rectangles to path data. That is exactly the split
+   the spike's `layout.js` already keeps - its geometry half takes measured
+   rectangles and "know[s] nothing about blocks - a rectangle is a rectangle" -
+   and it is what keeps decision 13's promise that rendering is testable
+   without a browser. 10b's "geometry is measured, never computed" is untouched
+   by this: what 10b forbids is *computing where a card goes*, and measuring is
+   still how that is answered. Deriving a path from a box the browser already
+   placed is downstream of the layout, not a second layout engine.
+3. **The editor is fully usable with the hook absent.** A host that never
+   imports it gets an editor that authors, validates, compiles and renders
+   exactly as before, minus the drawn connectors. If anything ever stops
+   working without the hook, behaviour has moved into it and this section has
+   been violated - which makes the absent-hook case the standing test of 7a,
+   not merely a graceful-degradation nicety.
+
+**7c. What the hook may observe, and what it may not.** Concretely, so that
+"read-only measurement" is a contract rather than a mood:
+
+*May observe:* the rendered box of an element the server stamped as an
+anchor - a block's card, a slot's children list, a column or arm header, a
+rail, an outlet - and the stage's own box and scroll extent, which is what
+makes the observed boxes comparable to each other. Reading is by the ordinary
+browser box-measurement APIs over the DOM the server rendered; the anchors are
+stamped with data attributes, which is decision 7's existing convention and
+sui-ADR-0007's, extended rather than replaced.
+
+*May push:* rectangles - a position and a size in the stage's coordinate
+space, each keyed to the anchor it was read from.
+
+*May not observe or push:* anything that is not geometry of a server-rendered
+anchor. Not config values, not the text an author typed, not the contents of a
+form field, not a datamodel value, not pointer positions, not timings, not
+anything read from `window` beyond what is needed to make the boxes
+comparable. A payload that carries author data has stopped being a
+measurement, and the plainest statement of this clause is that the push should
+be reconstructible from the rendering alone.
+
+**7d. Left open on purpose, and owned by `sb-k7r`.** The ruling settled that
+the hook exists and what kind of thing it is. It did not settle the wire, and
+this section does not invent one:
+
+- the **payload shape** - how a rectangle and its anchor key are spelled, and
+  whether one push carries the whole stage or a delta;
+- the **push cadence** - what triggers a measurement (first paint, a
+  re-render, a resize, an observer) and how it is coalesced, given that the
+  spike found two frames necessary before font swap and scrollbars settle;
+- the **coordinate space** - what the stage-relative space is exactly, and how
+  a host's own transform on an ancestor is handled. The spike's `render.js`
+  found this the one place a zoom costs anything and unscales against the
+  stage; whether the shipped hook does the same or pushes rendered coordinates
+  and a scale is an implementation choice with a test behind it, not a record
+  question;
+- the **anchor attribute names** themselves, which extend decision 7's DOM
+  contract and should be chosen alongside the markup that carries them.
+
+Each is a question the shipped implementation answers with a test rather than
+one this record answers by guess. If any of them turns out to force a choice
+this section forbids, that is a stop and another amendment, not a quiet
+widening.
+
+### Consequences
+
+- **The connector layer can graduate.** 10b, 10d and 10e stop being blocked on
+  a record question and become an implementation with a proposal behind it;
+  `sb-k7r` is unblocked and is the bead that spends this section. 10a
+  (connectors are rendered, never authored) is unaffected and stays the guard
+  against the reverse edge ADR-0001 refused - measuring does not make an edge
+  editable, and this section adds no gesture that could.
+- **The hook count stops being the invariant, and "one hook that pushes
+  commands" replaces it.** That is a weaker sentence to check than "exactly
+  one hook", so the burden moves to 7a's five clauses and 7b's absent-hook
+  test. A third hook still requires amending this record, and a hook that
+  pushes anything but geometry or a command is still a thing this record does
+  not have.
+- **`assets/` acquires a second entry point**, with the versioned-public-API
+  obligations sui-ADR-0009 already places on the first. A host that wants
+  connectors adds one more import; a host that does not, does not.
+- **Decision 6's round-trip count is untouched.** Measurement is not part of
+  the drag interaction: one round-trip at drag start, one at drop, zero per
+  hover, exactly as written.
+- **Nothing in decisions 2, 5, 8, 9, 11, 12 or 13 changes.** No command, no
+  droppability rule, no keyboard path, no form, no finding, no unresolvable
+  block behaviour, and no component boundary is touched by a hook that only
+  reads boxes.
