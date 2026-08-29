@@ -326,6 +326,8 @@ defmodule StatifierBlocks.CoreFixtures do
   def valid_config(Core.Wait), do: %{"duration" => "PT48H"}
   def valid_config(Core.ResumableGroup), do: %{"history" => "deep"}
   def valid_config(Core.OnEvent), do: %{"event" => "order.cancelled", "outcome" => "abandon"}
+  def valid_config(Core.Raise), do: %{"event" => "signup.abandoned"}
+  def valid_config(Core.Assign), do: %{"path" => "review.parked", "value" => "false"}
 
   def valid_config(Core.Invoke),
     do: %{

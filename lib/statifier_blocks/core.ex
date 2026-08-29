@@ -19,6 +19,8 @@ defmodule StatifierBlocks.Core do
   | `core.resumable_group` | `#{inspect(__MODULE__)}.ResumableGroup` | `body`, `interrupts` |
   | `core.on_event` | `#{inspect(__MODULE__)}.OnEvent` | none |
   | `core.invoke` | `#{inspect(__MODULE__)}.Invoke` | `on_error` |
+  | `core.raise` | `#{inspect(__MODULE__)}.Raise` | none |
+  | `core.assign` | `#{inspect(__MODULE__)}.Assign` | none |
 
   ## Structure, not domain
 
@@ -31,15 +33,14 @@ defmodule StatifierBlocks.Core do
   type declares `consumes` at all - inbound type is the host's business,
   and ADR-0003 decision 5's permissive default is the honest answer.
 
-  `produces` is declared by four of the eight. `core.sequence` declares
+  `produces` is declared by four of the core types. `core.sequence` declares
   `{:passthrough, "body"}`: it is transparent to type flow, so whatever its
   last step produces is what the sequence produces, computed by ADR-0003
   decision 4 rather than by anything here. `core.branch`, `core.parallel`
   and `core.invoke` declare `:unknown` outright rather than combining their
   arms', lanes' or outcomes' outputs, because combining them is the type lattice
   ADR-0003 decision 4 refuses to build - and spelling the default out is
-  how that refusal stays visible to a reader. The other four leave it
-  absent.
+  how that refusal stays visible to a reader. The rest leave it absent.
 
   ## Placement is kind tags, and nothing else
 
@@ -58,9 +59,9 @@ defmodule StatifierBlocks.Core do
 
   ## What they compile to
 
-  All eight emit through `#{inspect(__MODULE__)}.Emit`, which is where the
-  SCXML shapes and the one convention they share are written down: a block
-  is one compound state carrying a `<final>`, and completion is
+  Every core type emits through `#{inspect(__MODULE__)}.Emit`, which is
+  where the SCXML shapes and the one convention they share are written
+  down: a block is one compound state carrying a `<final>`, and completion is
   `done.state.<state id>` (ADR-0004 decision 2). Read that module before
   writing a host block type - a type that follows the same convention
   composes with these without either side knowing about the other, and a

@@ -4,8 +4,8 @@ defmodule StatifierBlocks.Core.Config do
   # Shared config predicates and finding helpers for the `core.*` types.
   #
   # These are the rules `validate_config/1` is the authority for (ADR-0002
-  # decision 7) factored out of seven modules that would otherwise spell
-  # them seven times. Every function is pure and total - decision 4 applies
+  # decision 7) factored out of the modules that would otherwise spell
+  # them once each. Every function is pure and total - decision 4 applies
   # to anything a callback calls, not only to the callback itself.
 
   alias StatifierBlocks.BlockType

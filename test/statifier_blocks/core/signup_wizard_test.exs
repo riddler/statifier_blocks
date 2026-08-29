@@ -4,8 +4,8 @@ defmodule StatifierBlocks.Core.SignupWizardTest do
   checked against the **real** core types, the way
   `StatifierBlocks.Core.WorkedExampleTest` checks the first one.
 
-  Two examples exist rather than one because between them they reach the
-  whole `core.*` vocabulary. The credit-card example uses
+  Two examples exist rather than one because between them they reach every
+  core container and the interrupt rail. The credit-card example uses
   `core.resumable_group` and a host interrupt handler; this one uses the
   plain `core.group` and the `core.on_event` this package ships, which is
   the half ADR-0003 decision 3's kind gate is easiest to get wrong on.
@@ -30,7 +30,9 @@ defmodule StatifierBlocks.Core.SignupWizardTest do
   end
 
   # Sabotage: dropped the `"core.group"` entry from `Palette.core_types/0`
-  # - red on the resolution assert.
+  # - red on the resolution assert. Second sabotage, for the `uncovered`
+  # set below: dropped `"core.assign"` from the registry - red, because the
+  # union then names a type the registry no longer has (verified).
   test "it reaches the two core types the credit-card example does not", ctx do
     resolved = resolved_core_types(ctx)
 
@@ -45,10 +47,12 @@ defmodule StatifierBlocks.Core.SignupWizardTest do
 
     # `core.invoke` is in neither document: both examples spell their host
     # call as a `myapp.*` type, which is what ADR-0002 decision 2 two-registry
-    # seam looks like from the authoring side. It is named here rather than
-    # dropped from the comparison, so a core type falling out of the worked
-    # examples has to be admitted deliberately.
-    uncovered = MapSet.new(["core.invoke"])
+    # seam looks like from the authoring side. `core.raise` and `core.assign`
+    # are leaves neither example uses yet. All three are named here rather
+    # than dropped from the comparison, so a core type falling out of the
+    # worked examples has to be admitted deliberately, and the list shrinks
+    # the day an example that uses one of them lands.
+    uncovered = MapSet.new(["core.assign", "core.invoke", "core.raise"])
 
     assert MapSet.new(Map.keys(resolved))
            |> MapSet.union(MapSet.new(Map.keys(other)))
