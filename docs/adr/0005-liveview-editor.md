@@ -1,6 +1,6 @@
 # ADR-0005: The editor is a pure command algebra and view model with a thin LiveView shell
 
-Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78)
+Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85)
 
 ## Context
 
@@ -792,11 +792,10 @@ What this example is chosen to demonstrate:
 
 ---
 
-## Proposed amendment (2026-08-28): decision 14, what the theming surface has to contain
+## Amendment (2026-08-28): decision 14, what the theming surface has to contain
 
-**Status: PROPOSED, not accepted.** This section is additive; nothing above it
-is changed by it, and decision 14's accepted text stands until the operator
-rules. It is drafted from what the campaign-012 editor spike (`spike/`) found
+**Status: accepted in part (2026-08-29, unqualified direction-agent verdict under the operator campaign-014 grant, PR 85): 14a, 14b, 14c, 14d and 14e are accepted; 14f stays PROPOSED for the candidate tokens not yet declared - see the Note (2026-08-29) at the end of this record for what landed.** Drafted 2026-08-28 as a proposed amendment. This section is additive; nothing above it
+is changed by it. It is drafted from what the campaign-012 editor spike (`spike/`) found
 by taking a dark theme to parity and making a third, host-brand theme carry the
 whole surface as a pure token override (`sb-957`, `sb-vhu`).
 
