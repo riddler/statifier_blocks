@@ -135,6 +135,7 @@ defmodule StatifierBlocks.Compiler do
     Cancels,
     Chart,
     Context,
+    DeclaredRoots,
     Finding,
     InvokeTypes,
     SensitivePaths,
@@ -442,9 +443,40 @@ defmodule StatifierBlocks.Compiler do
   @spec emit_stage(Resolved.t(), Document.id(), [option()]) ::
           {:ok, Emission.t()} | {:error, [Finding.t()]}
   defp emit_stage(node, document_id, opts) do
-    with {:ok, emission} <- emit(node, document_id) do
-      {:ok, scxml_element(node, document_id, emission, opts)}
+    with {:ok, emission} <- emit(node, document_id),
+         {:ok, {stripped, roots}} <- hoist(node, emission) do
+      {:ok, scxml_element(node, document_id, stripped, roots, opts)}
     end
+  end
+
+  # ADR-0004's foreach amendment, F2/F3: a block type declares a `<data>`
+  # root among its own state's children and the compiler lifts every one
+  # of them to the top of the document, because early binding means a root
+  # has to be declared before any state is entered. The refusal F6 records
+  # is the same walk's other product; see
+  # `StatifierBlocks.Compiler.DeclaredRoots`.
+  @spec hoist(Resolved.t(), Emission.t()) ::
+          {:ok, {Emission.t(), [Emission.t()]}} | {:error, [Finding.t()]}
+  defp hoist(%Resolved{block: %Block{id: root_id}}, emission) do
+    case DeclaredRoots.hoist(emission) do
+      {:ok, _stripped_and_roots} = ok -> ok
+      {:error, collisions} -> {:error, Enum.map(collisions, &duplicate_binding(&1, root_id))}
+    end
+  end
+
+  @spec duplicate_binding(DeclaredRoots.finding(), Block.id()) :: Finding.t()
+  defp duplicate_binding({:duplicate_binding, block_id, config_key, name}, root_id) do
+    owner = block_id || root_id
+
+    Finding.new(
+      :emit,
+      {:duplicate_binding, owner, name},
+      ~s(binds the name "#{name}", which a block it sits inside already declares as a ) <>
+        "datamodel root; early binding makes both of them global, so this binding would " <>
+        "overwrite the enclosing one",
+      block_id: owner,
+      config_key: config_key
+    )
   end
 
   @spec emit(Resolved.t(), Document.id()) :: {:ok, Emission.t()} | {:error, [Finding.t()]}
@@ -674,14 +706,26 @@ defmodule StatifierBlocks.Compiler do
   # 1 guarantees exists. That is what makes the provenance map total over
   # the bytes: the root element's span covers all of them, so no offset in
   # the generated chart is unowned.
-  @spec scxml_element(Resolved.t(), Document.id(), Emission.t(), [option()]) :: Emission.t()
+  @spec scxml_element(Resolved.t(), Document.id(), Emission.t(), [Emission.t()], [option()]) ::
+          Emission.t()
   defp scxml_element(
          %Resolved{block: %Block{id: root_id}} = node,
          document_id,
          root_emission,
+         roots,
          opts
        ) do
     {root, finals} = child_use(node, root_emission, opts)
+
+    # The `<datamodel>` wrapper belongs to no block either, so it takes
+    # the root block for `<scxml>`'s reason; the `<data>` elements inside
+    # it keep the owners their own blocks stamped on them. A document that
+    # declares no roots gets no element at all, which is what keeps every
+    # chart compiled before F2 existed byte-identical.
+    datamodel =
+      roots
+      |> DeclaredRoots.datamodel()
+      |> Enum.map(&%{&1 | owner: Provenance.owner(root_id)})
 
     element =
       Emission.element(
@@ -692,7 +736,7 @@ defmodule StatifierBlocks.Compiler do
           {"version", "1.0"},
           {"xmlns", @scxml_ns}
         ],
-        [root | finals]
+        datamodel ++ [root | finals]
       )
 
     %{element | owner: Provenance.owner(root_id)}
