@@ -23,6 +23,34 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     host that wants a different palette sets them here through the `theme`
     assign - a map of property name to value, rendered as an inline `style` -
     and needs no stylesheet of its own to do it.
+
+    ## The panel is the scroller; this element is the stage
+
+    Parity item 1.2 gives the canvas a bordered, dotted ground, and both halves
+    of that land on two elements rather than one. `.sb-canvas-panel` is the
+    box - the border, and `overflow` - and this element stays the stage inside
+    it, sized by the tree it holds.
+
+    The split is forced by the connector overlay above, not chosen for tidiness.
+    `.sb-connectors` is absolutely positioned against this element and sized
+    from the stage's scroll extent; put `overflow` on the same element and the
+    overlay is sized to the padding box instead, so the connectors stay put
+    while the tree scrolls out from under them. A scroller one level out leaves
+    the overlay's containing block exactly where the measurement hook already
+    reads it from.
+
+    The dots ride the panel for the same reason, one step on. A ground has to
+    be visible to be a ground, and the only place it can show is the band the
+    panel's padding opens around the tree - the root block's own surface covers
+    everything inside it. Painting them on the stage instead and padding the
+    stage to make room is the version that displaces every connector by the
+    padding, which is the trade the paragraph above already made.
+
+    So `--sb-canvas-grid` is a stylesheet-tier override rather than a `theme`
+    assign one: it is consumed above the element that assign writes to, exactly
+    as the pane widths and the drawer height are. `docs/theming.md` calls a
+    stylesheet the ordinary case and the assign the computed one, so this is
+    where the grid was always going to land.
     """
 
     use Phoenix.Component
@@ -45,24 +73,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @doc "The canvas root: the hook's element, and the tree beneath it."
     def canvas(assigns) do
       ~H"""
-      <div
-        class={["sb-canvas", @class]}
-        id="sb-canvas"
-        phx-hook="StatifierBlocksDrag"
-        phx-target={@target}
-        data-dragging={to_string(@drag != nil)}
-        data-sb-anchor={Connectors.stage_anchor()}
-        style={theme_style(@theme)}
-      >
-        <ConnectorLayer.connector_layer edges={@edges} stage={@stage} target={@target} />
-        <BlockNode.block_node
-          root?={true}
-          node={@root}
-          drag={@drag}
-          selected_id={@selected_id}
-          target={@target}
-          icon={@icon}
-        />
+      <div class="sb-canvas-panel">
+        <div
+          class={["sb-canvas", @class]}
+          id="sb-canvas"
+          phx-hook="StatifierBlocksDrag"
+          phx-target={@target}
+          data-dragging={to_string(@drag != nil)}
+          data-sb-anchor={Connectors.stage_anchor()}
+          style={theme_style(@theme)}
+        >
+          <ConnectorLayer.connector_layer edges={@edges} stage={@stage} target={@target} />
+          <BlockNode.block_node
+            root?={true}
+            node={@root}
+            drag={@drag}
+            selected_id={@selected_id}
+            target={@target}
+            icon={@icon}
+          />
+        </div>
       </div>
       """
     end

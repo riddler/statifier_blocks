@@ -427,6 +427,42 @@ defmodule StatifierBlocks.ThemeAuditTest do
     end
   end
 
+  describe "the canvas grid token (parity item 1.2)" do
+    # 14e in both directions, named rather than merely counted, and the tier
+    # line with it - the same three claims the shell and connector tokens make.
+    # Sabotage: deleting `background: var(--sb-canvas-grid)` from `.sb-canvas` -
+    # the ground goes flat and this goes red naming the token.
+    test "it is declared, read, and tier 2", context do
+      assert MapSet.member?(context.declared, "--sb-canvas-grid")
+      assert MapSet.member?(context.referenced, "--sb-canvas-grid")
+      assert tiers(context.raw)["--sb-canvas-grid"] == "2"
+    end
+
+    # ONE token carrying the whole `background` shorthand is the ruling, not an
+    # accident: a host wanting denser dots and a host wanting fainter ones are
+    # the same host reaching for the same declaration.
+    # Sabotage: splitting the size out into a second token - the default keeps
+    # working, and a theme that sets only the colour half silently loses the
+    # spacing it also meant to set.
+    test "it carries colour and spacing together, and chains to the palette",
+         %{values: values} do
+      value = values["--sb-canvas-grid"]
+
+      assert value =~ "var(--sb-border)", "the dot colour chains to the palette"
+      assert value =~ "var(--sb-space-3)", "the spacing chains to the space scale"
+      assert value =~ "/", "a `background` shorthand needs position / size to parse"
+    end
+
+    # The ground is not a line that carries information, so it is deliberately
+    # held to no contrast ratio - and the audit's colour scan must agree, or a
+    # ruling about a decoration turns into a threshold nobody decided.
+    # Sabotage: declaring it as a bare `#d7dbe2` - it lands in `colour_tokens/1`
+    # unaccounted for, and the completeness guard above goes red.
+    test "it is not a colour token, so no threshold is claimed for it", %{source: source} do
+      refute "--sb-canvas-grid" in ThemeAudit.colour_tokens(source)
+    end
+  end
+
   describe "the connector tokens (decision 7's 2026-08-29 amendment)" do
     @connector_tokens ~w(--sb-edge --sb-edge-interrupt --sb-edge-width)
     @connector_lines ~w(--sb-edge --sb-edge-interrupt)

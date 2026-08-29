@@ -137,6 +137,7 @@
  *     2  --sb-edge
  *     2  --sb-edge-interrupt
  *     2  --sb-edge-width
+ *     2  --sb-canvas-grid
  *
  *     3  --sb-color-scheme
  *
@@ -389,6 +390,21 @@
   --sb-edge: var(--sb-border-strong);
   --sb-edge-interrupt: var(--sb-warning);
   --sb-edge-width: 1.5px;
+
+  /* The canvas's dotted ground (parity item 1.2). Tier 2: the dots are drawn
+   * either way, their colour and their spacing are the host's. ONE token, and
+   * it carries the whole `background` shorthand rather than a colour beside a
+   * size, because a host that wants a denser grid and a host that wants a
+   * fainter one are the same host reaching for the same declaration - splitting
+   * it into two names makes a theme set one, see half a change, and go looking
+   * for the other. `0 0 /` is the shorthand's position, which the size needs in
+   * front of it to parse at all.
+   *
+   * Deliberately NOT held to a contrast ratio: this is ground, not a line that
+   * carries information, and a grid a reader can measure against is a grid
+   * competing with the tree drawn on it. */
+  --sb-canvas-grid: radial-gradient(var(--sb-border) var(--sb-border-width), transparent 0) 0 0 /
+    var(--sb-space-3) var(--sb-space-3);
 
   color-scheme: var(--sb-color-scheme);
 
@@ -1062,9 +1078,59 @@
   gap: var(--sb-space-half);
 }
 
+.sb-toolbar {
+  padding: var(--sb-space-half) var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius);
+  background: var(--sb-bg);
+}
+
+/* The panel's name. Small caps rather than a heading size: it labels the pane
+ * it heads and competes with nothing, which is the same treatment the palette
+ * and inspector headers take. */
+.sb-toolbar__title {
+  margin: 0;
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  letter-spacing: var(--sb-tracking-caps);
+  text-transform: uppercase;
+  color: var(--sb-fg-muted);
+}
+
+/* A read-only fact, never a control. Everything in the header row that cannot
+ * be pressed wears this, which is what keeps the two metrics from reading as
+ * two more buttons at the far end of a row of buttons. */
+.sb-toolbar__chip {
+  padding: 0 var(--sb-space-half);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-muted);
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+  white-space: nowrap;
+}
+
+/* Zoom is one control in three parts, and the border around the group is the
+ * only thing that says so. The steps drop their own borders into it so the
+ * seam between a step and the readout is one line rather than two. */
+.sb-toolbar__zoom {
+  gap: 0;
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  overflow: hidden;
+}
+
+.sb-toolbar__zoom-step {
+  padding: 0 var(--sb-space);
+  background: var(--sb-bg-muted);
+  color: var(--sb-fg);
+}
+
 .sb-toolbar__zoom-level {
   font-variant-numeric: tabular-nums;
   min-width: 3.5rem;
+  padding: 0 var(--sb-space-half);
+  border-inline: var(--sb-border-width) solid var(--sb-border);
   text-align: center;
   color: var(--sb-fg-muted);
 }
@@ -1075,11 +1141,39 @@
 }
 
 .sb-toolbar__metrics {
+  margin: 0;
   margin-left: auto;
   display: flex;
-  gap: var(--sb-space);
+  align-items: center;
+  gap: var(--sb-space-half);
   color: var(--sb-fg-subtle);
   font-size: var(--sb-text-sm);
+}
+
+/* -------------------------------------------------------- canvas panel
+ *
+ * Parity item 1.2's other half: the toolbar above is the panel's header row
+ * and this is its body. Two elements, and the reason is the connector overlay
+ * rather than tidiness - `Editor.Canvas`'s moduledoc carries it. The node
+ * layout under the `canvas` banner further up is untouched by anything here.
+ */
+
+.sb-canvas-panel {
+  min-width: 0;
+  overflow: auto;
+
+  /* The padding is the ground. Without it the root block's own surface covers
+   * the panel edge to edge and the dots are drawn under something opaque -
+   * present, correct, and invisible, which is the version the first capture of
+   * this rule showed. It is on the PANEL and not on the stage because the
+   * stage is the connector overlay's containing block: `.sb-connectors` pins
+   * to `inset: 0`, which is the padding box, while every anchor the
+   * measurement hook feeds it is measured against the border box. A padding
+   * there displaces every edge by exactly its own width. */
+  padding: var(--sb-space-2);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius);
+  background: var(--sb-canvas-grid), var(--sb-bg);
 }
 
 /* ----------------------------------------------------------- inspector */
