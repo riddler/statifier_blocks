@@ -1146,6 +1146,62 @@ compensating negative margin reapplied on every render, which is more
 machinery than the symptom justifies in a spike; the shipped editor should
 decide with a real embed in front of it.
 
+## What graduated (sb-8dc)
+
+The point of a laboratory is that things leave it. `sb-8dc` moved this
+directory's findings into the shipped `assets/` and
+`lib/statifier_blocks/editor/`, and this section is the pointer so that the
+next reader of a spike file knows whether they are looking at an experiment or
+at the source of something already shipped.
+
+**Graduated**, and now held by tests in the package rather than by
+`dev/theme-audit.html`:
+
+| From here | Where it landed |
+|---|---|
+| the `:where()`-wrapped scoped reset (`css/reset.css`) | `assets/css/statifier_blocks.css`, scoped to `.sb-editor`, with the 14b specificity rule as a lint in `test/statifier_blocks/theme_audit_test.exs` |
+| `--sb-color-scheme` and `color-scheme` on the container (14a) | the same stylesheet, and the same test |
+| token coverage in both directions (14e) | `test/statifier_blocks/theme_audit_test.exs` |
+| the space, type and shape scales, the third text step, the strong border, the status tints, the drag seam's drag-time height, the canvas sizing constants | the shipped token surface |
+| retiring a token nothing reads | `--sb-drop-no-opacity` retired; `--sb-disabled-opacity` says what it is |
+| pre-hover validity marking, one-sided | the shipped stylesheet marks the accepting slots and leaves the rest alone |
+| `accentToken` (14d) | `accent_token` on the palette entry, read by `StatifierBlocks.ViewModel.accent_token/1` and stamped by `BlockNode` and `PaletteBrowser` |
+| the boundary box for a rail-bearing container (10c/10h) | `ViewModel.boundary?/1` and `rail?/1` |
+| draft accumulation and the uncommitted-edits affordance (sb-5ow) | already present as `Editor`'s `drafts`; the affordance, the discard gesture and the tests are new |
+| placeholders chosen by control type (sb-ed7) | `Editor.Field`, for `:expression` and `:duration` |
+
+**Deliberately did not graduate**, each for a reason rather than for lack of
+time:
+
+- **The connectors** (10b, 10d, 10e) and everything in `layout.js`,
+  `render.js` and `zoom.js`. Drawing them means measuring laid-out boxes in
+  the browser, which is a second JavaScript hook, and ADR-0005 decision 7
+  makes a second hook a record amendment. The shipped editor renders nested
+  DOM and no edges until that decision is taken.
+- **The panes** - `fixtures-pane.js`, `datamodel-pane.js`, the truth-table
+  drawer (sb-054) and the `markInvoking` host seam. ADR-0005 decision 15 still
+  defers per-palette-entry fixtures to `sui-13q`, so the shipped editor has no
+  fixtures surface for any of them to attach to. Inventing one would be
+  editor surface the record has not decided, which is the same reason `sb-e3c`
+  left its evaluator unwired.
+- **The duration control** (sb-709). Decision 9's ACCEPTED text specifies a
+  structured value/unit control; the one-text-box predicator-string control
+  this spike built is what the still-proposed d10/13 amendment asks the
+  shipped editor to decide between. The record is the contract, so the shipped
+  control is unchanged and the question goes to the operator with the
+  amendment.
+- **`badge`, `joinLabel` and the demo `myapp.*` and `proposed-core` types.**
+  Each is a proposal about `palette_entry/0` or about a core type's config,
+  and none is a decided one.
+- **`--sb-syntax-*`, `--sb-path-*`, `--sb-ghost-*`, `--sb-run-mark*`, the
+  scroll shadows.** Every one is real, and every one's consumer - syntax
+  highlighting, a drag ghost, a replayed step, a clipped scroller - is a
+  surface the shipped editor does not have. 14e fails the build on a declared
+  token no rule reads, so they arrive with the rules that read them.
+
+Nothing under `spike/` other than this section changed, so `dev/selftest.html`
+and `dev/theme-audit.html` still answer for the spike exactly as they did.
+
 ## Serving it
 
 The spike is served as static files. Anything that serves this directory over
