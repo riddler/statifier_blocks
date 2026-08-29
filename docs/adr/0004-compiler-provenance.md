@@ -1416,3 +1416,94 @@ that makes it scope-shaped and keeps D13 intact.
   requires of every other derived id - is left to the bead that implements
   this section (`sb-b4f`), because the ruling settles the shape of the id and
   not the API that produces it.
+
+## Amendment (2026-08-29): the sequential `core.foreach` compile
+
+**Status: proposed.** Drafted 2026-08-29 from the operator ruling on the loop
+shape (sb-i61 / st-z4f3, "as recommended"). It records how a sequential
+`core.foreach` block compiles under this record's existing decisions and names
+one new compile finding; it amends no accepted decision above, and no accepted
+text above has been edited.
+
+### What forces the amendment
+
+`core.foreach` is the first block type whose emission is not a fixed subtree:
+it runs its body once per item of a list. Decision 2 gives it one state and
+bans sibling states, decision 3 fixes how any auxiliary state is named, and
+decision 6 makes the emission byte-deterministic - but nothing in the record
+says what shape the loop itself takes, and the block type cannot invent one
+without deciding, on its own, where the loop counter lives and whether the list
+is re-read between passes. The ruling settles that, and this section records it.
+
+### F1. The compile is a plain Appendix D loop
+
+**The sequential `core.foreach` compile is a plain Appendix D loop.** Nothing in
+it reaches outside the interpreter's ordinary macrostep semantics: no new
+executable content, no engine extension, no re-entrant compile. The loop is
+states, transitions, and assignments, and the engine runs it the way it runs
+any other chart.
+
+### F2. Cursor and snapshot are compiler-declared `<data>` roots
+
+The cursor and a per-loop snapshot of the list are **compiler-declared `<data>`
+roots**, in the generated namespace decision 3 already reserves:
+
+```
+s_blk_<id>__i        the cursor
+s_blk_<id>__items    the per-loop snapshot
+```
+
+The snapshot is **assigned once at the block's `onentry`**, which is what gives
+the loop spec 4.6.3 shallow-copy parity: the body iterates the list as it stood
+when the loop began, and a later write to the source expression does not change
+what the loop is walking. Both names sit under the `s_` prefix, so by decision
+3's uniqueness property they cannot collide with an author's `<data>` id.
+
+### F3. `item_as` / `index_as` are declared roots re-assigned by a head state
+
+The author-facing bindings are **declared `<data>` roots** too - early binding
+makes them global, so they exist for the whole session rather than only inside
+the loop - and they are **re-assigned in a head state's `onentry` on each
+pass**, from `snapshot[cursor]`. The head state is an auxiliary state under
+decision 3, so it is minted through `Context.role_id/2` like any other.
+
+### F4. The body compiles once, and `done.state` closes the loop
+
+The body **compiles once, as a compound state**. Its `done.state` event fires a
+**loop-back transition on the foreach state** that increments the cursor and
+re-targets the head. There is no unrolling: the body's states, and therefore its
+provenance entries, exist once no matter how long the list is.
+
+### F5. Termination, and the limit it carries
+
+Termination is `snapshot[cursor] === undefined`. Predicator indexes lists and
+reads out of bounds as `undefined`, but it has **no list-length function**, so
+there is no `i < len(items)` to test instead. The consequence is a **documented
+limit**: a list holding a legitimate `undefined`/`null` item stops the loop
+early, at that item.
+
+### F6. Colliding bound names are refused at compile time
+
+**The compiler must refuse bound names that collide across nesting or with
+author `<data>` ids.** A nested foreach that re-uses the outer loop's `item_as`,
+or an `index_as` equal to an author-declared `<data>` id, would silently
+overwrite the outer binding - early binding makes these roots global, so the
+inner loop's writes are visible to the outer body after the inner loop ends.
+The compiler refuses the document rather than emitting it.
+
+The refusal is a finding under decision 10: **`:duplicate_binding`**, an
+Emit-stage error with `fault: :author`, named against the foreach block whose
+binding collides and carrying the offending `config_key` (`item_as` or
+`index_as`).
+
+### What this amendment does not change
+
+- Decision 2's "one block, one state" and the ban on sibling states: the head
+  and body states are the block's own descendants, not siblings.
+- Decision 3's derivation, its three properties, or `unstate_id/1`.
+- Decision 5's provenance keys and its totality.
+- Decision 6's determinism guarantee.
+- Decisions 7 through 11, and the 2026-08-28 outcome-tagged-finals amendment,
+  in any respect.
+- ADR-0001's document schema and ADR-0002's declaration surface, neither of
+  which this section touches.
