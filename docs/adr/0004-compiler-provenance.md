@@ -1087,6 +1087,26 @@ and 2f keeps the finding at the emit site; this is a correction to the sketch's
 typespec, not a change of behaviour. `outcome_event/2` is outside this
 amendment.
 
+**Amended 2026-08-29 (operator ruling): `outcome_event/2` returns a tagged
+tuple.** The sketch above writes `outcome_event/2` as a bare `String.t()` too,
+and it cannot hold for the same reason: 2f requires an `:invalid_outcome` Emit
+finding for an outcome name failing the role shape, and decision 1 forbids
+`emit/2` raising, so that refusal also has to be reachable through a return
+value. The shipped signature (landed by PR 73 / sb-wmw, in
+`lib/statifier_blocks/compiler/context.ex`) is the one this amendment ratifies:
+
+```elixir
+  @spec outcome_event(t(), String.t()) ::
+          {:ok, String.t()} | {:error, {:invalid_outcome, Block.id(), String.t()}}
+```
+
+The `{:ok, _}` arm carries exactly the event the sketch names -
+`done.outcome.<state id>.<outcome>` - so 2c's wiring rule and 2d's
+continuation rule are unchanged. Decision 1 keeps its no-raise rule and 2f
+keeps the finding at the emit site; this is a correction to the sketch's
+typespec, not a change of behaviour, and it settles the question the paragraph
+above left open.
+
 ### 2f. Provenance, determinism, and findings
 
 - **Provenance (decision 5) is unchanged and stays total.** An outcome final is
