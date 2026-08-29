@@ -1365,11 +1365,13 @@ exists - is ADR-0002's, and its amendment of the same date holds it.
 
 `core.send` emits a delayed send that this package could not cancel, and the
 type recorded the gap rather than guessing at it: a cancel that names the send
-it cancels is a cross-subtree reference between blocks, which ADR-0005 decision
-13 refuses, and the alternative that keeps the tree invariant is scope-shaped -
-a delayed send is cancelled when the region that armed it is left. The ruling
-picks the scope-shaped alternative, which makes the cancel the *compiler's* to
-emit rather than an author's to draw.
+it cancels is a cross-subtree reference between blocks, which the umbrella's
+D13 refuses - outcome paths are slots, never ports, and connectors are
+rendered, never authored - as ADR-0001's tree invariant and ADR-0005's
+amendment 10a state at record level, and the alternative that keeps the tree
+invariant is scope-shaped - a delayed send is cancelled when the region that
+armed it is left. The ruling picks the scope-shaped alternative, which makes
+the cancel the *compiler's* to emit rather than an author's to draw.
 
 ### A. Identity and lifetime are upstream's
 
@@ -1377,7 +1379,7 @@ A pending delayed send is identified by `{session scope, send_id}` only
 (statifier-ex ADR-0054 decision 3), and it lives until it fires, is cancelled,
 or its run is found not live at fire time (decision 4 of the same record).
 Resume keeps the scope (statifier-ex ADR-0060 decision 3); restart mints a new
-one; a change of chart revision does not affect the key.
+one and the host discards; a change of chart revision does not affect the key.
 
 Those are upstream's rules and this record restates them only to name what the
 emitted cancel has to match. `statifier_oban` already keys on that pair.
@@ -1411,6 +1413,6 @@ that makes it scope-shaped and keeps D13 intact.
 ### Deferred, named rather than guessed
 
 - **How the send id is minted** - through the context, the way decision 3
-  requires of every other derived id, or otherwise - is left to the bead that
-  implements this section (`sb-b4f`), because the ruling settles the shape of
-  the id and not the API that produces it.
+  requires of every other derived id - is left to the bead that implements
+  this section (`sb-b4f`), because the ruling settles the shape of the id and
+  not the API that produces it.
