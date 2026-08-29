@@ -61,6 +61,17 @@ defmodule StatifierBlocks.Compiler.Finding do
   (st-ADR-0033) and decision 8's optional invoke-type lint are the two
   sources of warnings, and decision 8 is explicit that the lint is never
   an error.
+
+  ## `config_value_span`
+
+  Decision 9's last refinement, and the only field here that is about a
+  position *inside* a config value rather than about which config value.
+  It is `nil` on almost every finding, and every consumer must treat it
+  that way: `config_key` alone still answers "which field", and the span
+  only ever narrows an underline within that field.
+
+  `StatifierBlocks.Compiler.Chart` is the only producer, and its
+  moduledoc owns the criterion for when a finding gets one.
   """
 
   alias StatifierBlocks.{Block, Document}
@@ -71,11 +82,29 @@ defmodule StatifierBlocks.Compiler.Finding do
   @typedoc "Whose problem this is. See the moduledoc."
   @type fault :: :package | :author
 
+  @typedoc """
+  Where inside the author's own config value the finding actually is:
+  byte offsets into that value, 0-based, exclusive end.
+
+  Decision 9's last refinement (`StatifierBlocks.Compiler.Chart` composes
+  it, and its moduledoc owns the criterion). `nil` on every finding that
+  is not a chart-stage content finding carrying a sub-expression span,
+  which is the overwhelming majority - a consumer with nothing to
+  underline falls back to the whole field, exactly as it did before this
+  field existed.
+
+  The start offset is the one decision 9 names; the end is what lets an
+  editor underline the offending sub-expression rather than only put a
+  caret in front of it.
+  """
+  @type config_value_span :: {non_neg_integer(), non_neg_integer()}
+
   @type t :: %__MODULE__{
           stage: stage(),
           block_id: Block.id() | nil,
           path: Document.path() | nil,
           config_key: String.t() | nil,
+          config_value_span: config_value_span() | nil,
           severity: :error | :warning,
           fault: fault(),
           code: atom(),
@@ -89,6 +118,7 @@ defmodule StatifierBlocks.Compiler.Finding do
     :block_id,
     :path,
     :config_key,
+    :config_value_span,
     :reason,
     :message,
     :code,
@@ -99,8 +129,9 @@ defmodule StatifierBlocks.Compiler.Finding do
   @doc """
   Builds a finding.
 
-  `opts` carries `:block_id`, `:path`, `:config_key`, `:severity`,
-  `:fault` and `:code`. `code` defaults to `reason`'s own tag, which is the
+  `opts` carries `:block_id`, `:path`, `:config_key`,
+  `:config_value_span`, `:severity`, `:fault` and `:code`. `code`
+  defaults to `reason`'s own tag, which is the
   stable atom an editor switches on while `reason` keeps carrying the
   offending ids as data - the same split
   `Statifier.Validator.Error.code/1` makes upstream. `fault` defaults to
@@ -115,6 +146,7 @@ defmodule StatifierBlocks.Compiler.Finding do
       block_id: Keyword.get(opts, :block_id),
       path: Keyword.get(opts, :path),
       config_key: config_key,
+      config_value_span: Keyword.get(opts, :config_value_span),
       severity: Keyword.get(opts, :severity, :error),
       fault: Keyword.get_lazy(opts, :fault, fn -> fault(stage, config_key) end),
       code: Keyword.get_lazy(opts, :code, fn -> code(reason) end),

@@ -55,19 +55,77 @@ defmodule StatifierBlocks.Compiler.Chart do
   An upstream **error** of either kind fails the compile; a warning does
   not, and rides on `StatifierBlocks.Compiled`.
 
-  ## Deferred: the sub-expression caret
+  ## The sub-expression span (decision 9's last refinement)
 
-  Decision 9 names one further refinement - composing a predicator parse
-  error's own span into the attribute value's span, so an editor can
-  underline the offending sub-expression inside the field rather than the
-  whole field. It is not implemented here: the finding routes to the block
-  and the config key, which is what the record's acceptance property
-  requires, and the composition needs `Statifier.Parser.Location`'s
-  span-resolution seam, whose arity the record and upstream currently
-  spell differently. Raising that is a separate piece of work.
+  A content finding routes to a field. Decision 9 goes one step further:
+  the predicator parse error carries a span *within the expression
+  string*, so an editor can underline the offending sub-expression inside
+  the field rather than the whole field. That span is composed here and
+  lands on the finding as `config_value_span`.
+
+  The composition is three steps, and the middle one is upstream's:
+
+    1. Upstream reports the failure against the **attribute value's** span
+       in the generated SCXML (`Statifier.Compiler.Error`'s `location`),
+       and carries predicator's own `{line, column}` span over the
+       expression string it compiled.
+    2. `Statifier.Parser.Location.resolve_span/4` composes the two into an
+       absolute span over the generated document, walking the raw bytes
+       and the entity-expanded string in lockstep so a `&gt;` earlier in
+       the expression cannot shift the answer.
+    3. That absolute span is run **backwards** through the same
+       correspondence the provenance map is built from: subtract the
+       attribute value's own start, and unescape the prefix, which turns
+       generated-document bytes back into bytes of the value the author
+       typed.
+
+  Step 3's unescape is not decoration. A `cond` is emitted through
+  `StatifierBlocks.Compiler.Serializer`'s XML escaping, so the canonical
+  `amount > > 5000` reaches the document as `amount &gt; &gt; 5000`, where
+  the offending second `>` sits at byte 12 rather than at byte 9 - one
+  entity reference ahead of it is already enough to move it. The offsets
+  this field carries are into the author's value, so they are the ones an
+  editor can use without knowing that a serializer exists.
+
+  ### When a finding gets one
+
+  All four have to hold, and the field is `nil` otherwise:
+
+    * the finding's owning span carries a **config key** - the same test
+      the fault split above turns on, and the reason a canonicalised
+      attribute (`core.wait`'s `delay`, whose bytes the block type
+      rebuilt rather than passed through) is never annotated and so never
+      offered an in-value offset;
+    * the diagnostic is an `:expression_compile_error`, the only upstream
+      reason that carries an expression string at all;
+    * predicator supplied a **span** for the failure (`ParseError`'s
+      `:span` is optional, and `nil` on an error built through `new/3`);
+    * the resolved span lies inside the attribute value's own span - the
+      guard that keeps a degraded resolution honest rather than turning it
+      into an offset into somebody else's bytes.
+
+  `resolve_span/4` degrades rather than raising: an expression whose
+  expanded text does not describe the raw slice resolves to the value's
+  whole span, which arrives here as "underline the entire field" - the
+  same answer a consumer would have reached with no span at all, which is
+  why it is passed through rather than discarded.
+
+  ### Known limitation
+
+  The first bullet reads "carries a config key", where decision 9's
+  annotation rule means "was written verbatim from that config value".
+  Those coincide everywhere but `core.subchart`, which annotates a
+  `cond` it *builds* from an outcome name with the config key `outcomes`.
+  Its generated condition always parses, so no span is produced there
+  today; a package that made it fail to parse would get an offset into
+  the generated wrapper rather than into the author's value. Closing that
+  gap means distinguishing verbatim from derived attribution at
+  `StatifierBlocks.Emission.attribute_from_config/3`, which is a change to
+  decision 9's annotation rule and not this function's to make.
   """
 
   alias Statifier.Machine
+  alias Statifier.Parser.Location
   alias StatifierBlocks.Compiler.Finding
   alias StatifierBlocks.{Document, Provenance}
 
@@ -83,22 +141,87 @@ defmodule StatifierBlocks.Compiler.Chart do
   def validate(scxml, %Provenance{} = provenance, %Document{} = document) do
     case Statifier.compile(scxml, chart_name: document.id) do
       {:ok, %Machine{warnings: warnings}} ->
-        {:ok, Enum.map(warnings, &finding(&1, provenance, document, :warning))}
+        {:ok, Enum.map(warnings, &finding(&1, provenance, document, scxml, :warning))}
 
       {:error, errors} ->
-        {:error, Enum.map(errors, &finding(&1, provenance, document, :error))}
+        {:error, Enum.map(errors, &finding(&1, provenance, document, scxml, :error))}
     end
   end
 
-  @spec finding(struct(), Provenance.t(), Document.t(), :error | :warning) :: Finding.t()
-  defp finding(diagnostic, provenance, document, severity) do
+  @spec finding(struct(), Provenance.t(), Document.t(), binary(), :error | :warning) ::
+          Finding.t()
+  defp finding(diagnostic, provenance, document, scxml, severity) do
     owner = owner(provenance, offset(diagnostic), document)
 
     Finding.new(:chart, diagnostic.reason, diagnostic.message,
       block_id: owner.block_id,
       config_key: owner.config_key,
+      config_value_span: config_value_span(diagnostic, owner, scxml),
       severity: severity
     )
+  end
+
+  # Decision 9's last refinement; the moduledoc owns the criterion. The
+  # first clause is the one that fires almost always: a finding with no
+  # config key is about the package's own emission, and there is no
+  # author's value for an offset to be inside of.
+  @spec config_value_span(struct(), Provenance.owner(), binary()) ::
+          Finding.config_value_span() | nil
+  defp config_value_span(_diagnostic, %{config_key: nil}, _scxml), do: nil
+
+  defp config_value_span(
+         %{
+           reason:
+             {:expression_compile_error, _owner_ref, value, %{span: {_start, _stop} = span}},
+           location: %Location{} = value_location
+         },
+         _owner,
+         scxml
+       )
+       when is_binary(value) do
+    value_location
+    |> Location.resolve_span(span, value, scxml)
+    |> in_value_span(value_location, scxml)
+  end
+
+  defp config_value_span(_diagnostic, _owner, _scxml), do: nil
+
+  # The backwards step. `resolve_span/4` is documented to degrade rather
+  # than raise, so its answer is bounds-checked against the value it was
+  # anchored at before any arithmetic runs on it: decision 1 requires
+  # `compile/3` never to raise, and a `binary_part/3` on an out-of-range
+  # slice is exactly how that promise would break.
+  @spec in_value_span(Location.t(), Location.t(), binary()) ::
+          Finding.config_value_span() | nil
+  defp in_value_span(%Location{} = resolved, %Location{} = value_location, scxml) do
+    if resolved.start_offset >= value_location.start_offset and
+         resolved.end_offset <= value_location.end_offset and
+         resolved.end_offset >= resolved.start_offset do
+      {value_offset(value_location, resolved.start_offset, scxml),
+       value_offset(value_location, resolved.end_offset, scxml)}
+    end
+  end
+
+  # How many bytes of the *author's* value the generated bytes up to
+  # `offset` account for. `unescape/1` is the exact inverse of
+  # `StatifierBlocks.Compiler.Serializer`'s escaping, and the two must
+  # stay a pair: `&` is undone last because it is escaped first, so an
+  # author's literal `&lt;` round-trips as itself rather than collapsing
+  # into a `<`.
+  @spec value_offset(Location.t(), non_neg_integer(), binary()) :: non_neg_integer()
+  defp value_offset(%Location{start_offset: start}, offset, scxml) do
+    scxml
+    |> binary_part(start, offset - start)
+    |> unescape()
+    |> byte_size()
+  end
+
+  @spec unescape(binary()) :: binary()
+  defp unescape(escaped) do
+    escaped
+    |> String.replace("&lt;", "<")
+    |> String.replace("&gt;", ">")
+    |> String.replace("&amp;", "&")
   end
 
   # `%Statifier.Parser.ParseError{}` is the one diagnostic whose `location`
