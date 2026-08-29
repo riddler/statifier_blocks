@@ -487,19 +487,19 @@ defmodule StatifierBlocks.Core.ForeachTest do
     compiled
   end
 
-  # The source list is the **host's** root, and this package has no
-  # author-facing `<data>` declaration yet - so the test declares it the
-  # way a host would, by merging into the `<datamodel>` the compiler now
-  # emits. That the merge is one string replacement is the point: the
-  # element exists, and a host has somewhere to put its own roots.
+  # The source list is the **host's** root, declared through the
+  # `:declare` compile option (ADR-0004's 2026-08-29 host-declared-roots
+  # note). Until that option existed this helper merged the element into
+  # the emitted `<datamodel>` with a string replacement; the loop's own
+  # roots still follow the host's, which is the ordering rule the option
+  # is specified to keep.
   defp machine!(root, source_list) do
-    scxml =
-      root
-      |> compile!()
-      |> Map.fetch!(:scxml)
-      |> String.replace("<datamodel>", ~s(<datamodel><data expr="#{source_list}" id="steps"/>))
+    {:ok, compiled} =
+      Compiler.compile(Document.new(root, id: "bdoc_LOOP"), palette(),
+        declare: [{"steps", source_list}]
+      )
 
-    {:ok, machine} = Statifier.compile(scxml)
+    {:ok, machine} = Statifier.compile(compiled.scxml)
     machine
   end
 

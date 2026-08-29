@@ -1746,3 +1746,77 @@ family.
   `{document, palette, compiler version, options}`.
 - Decision 10's stage table. The refusal of the option pair is an `:emit`
   finding, not a new pipeline stage.
+
+## Note (2026-08-29): where a `<data>` root declaration lives - the `:declare` compile option
+
+A dated note rather than a proposed decision, because it decides nothing this
+record has not already decided. Nothing above is edited, no decision changes,
+and F2/F3/F6 stand exactly as the foreach amendment of this date wrote them.
+What is recorded here is **where a declaration lives** for a root document,
+which F6 assumed an answer to and no record had given.
+
+**What forces the note.** F6 refuses a bound name that collides "with author
+`<data>` ids", and `StatifierBlocks.Compiler.DeclaredRoots` says in the same
+breath that the package has no author- or host-facing `<data>` declaration
+concept at all. A production host publishing a root document through a strict
+compile found the gap from the other side: against statifier 2.2.0 an
+`<assign>` to an undeclared location and a `cond` reading an undeclared id both
+raise `error.execution`, so a `core.assign` writing a host-seeded flag and a
+`core.branch` guarding on one silently do nothing, and the loop's own source
+list had nowhere to be declared either.
+
+**The answer: the compile call.** `StatifierBlocks.Compiler.compile/3` takes a
+`:declare` option, a list of `{id, expr}` pairs in declaration order:
+
+    Compiler.compile(document, palette, declare: [{"targets", nil}, {"parked", "false"}])
+
+Each pair becomes one `DeclaredRoots.declare/2` emission, prepended to the root
+block's own children before `hoist/1` runs. Everything else follows from that
+placement rather than from a second mechanism: the host's roots lead the single
+`<datamodel>` in the order given, block-declared roots follow in document
+order, and a block declaring a name the host declared is F6's
+`:duplicate_binding` against that block and its config key, through the same
+walk a nested loop's collision goes through. A document that declares nothing,
+option absent or `[]` alike, still gets no `<datamodel>` element, so decision
+6's guarantee is untouched and every chart compiled before the option existed
+compiles to the same bytes.
+
+**Why the compile call and not the document.** The declaration is a property of
+the *deployment*, not of the tree an author edits: the same document published
+against two hosts, or against one host's two environments, declares what that
+host seeds. A document-level key would put it in the canonical bytes and
+therefore in the document hash, which is a schema decision ADR-0001 owns and
+this note does not take.
+
+**Validation, and whose fault a bad one is.** An id must be a bare lowercase
+identifier - the rule `core.invoke` applies to `assign_to`, because the host is
+naming a location the chart will assign to and read in a guard, and
+predicator's grammar is what both ends agree on. An `expr` is `nil` or a
+non-empty string written verbatim. An ill-formed entry, and an id the option
+lists twice, are Emit-stage findings against the root block carrying no
+`config_key`, so decision 9's split reads them as `:package` rather than as the
+author's - which is right, since no document edit fixes a compile call. Run
+creation still wins over `expr` (SCXML 5.3.2); that is the engine's behaviour
+and this note does not touch it.
+
+**Provenance (decision 5) stays total.** A host-declared root's bytes belong to
+no block, so they take the root block, exactly as `<scxml>` and the
+`<datamodel>` wrapper do. The `role` records which surface produced them and is
+spelled `:declare`, with the option's own leading colon, so that
+`StateId.role?/1` rejects it and no role a block mints out of a state id can
+ever equal it. There is no `config_key`, and the id is not a generated state
+id, so it stays out of `by_state_id` as any author's `<data id>` does.
+
+**The named follow-ups**, neither taken here:
+
+- **a document-level key**, under ADR-0001, if authors need to declare roots in
+  the editor rather than the host declaring them at publish time. That is a
+  schema change with a hash consequence, and it is ADR-0001's to make;
+- **a declaring block type**, e.g. a `core.declare`, if a declaration is better
+  read as part of the tree. That is ADR-0002's declaration surface, and the
+  argument `DeclaredRoots` already makes against a new `BlockType` callback
+  applies to it.
+
+Either one would be an additional surface, not a replacement: the hoist,
+determinism, provenance and F6 refusal are shared, and this note is what F6's
+"author-declared `<data>` ids" now points at for its first concrete case.
