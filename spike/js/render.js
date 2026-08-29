@@ -24,11 +24,17 @@
  * in the layout tree, and nothing an author can point at to change one. Three
  * kinds:
  *
- *   flow       between adjacent children of one slot, and from a container's
- *              header into the first child of its body
+ *   flow       between adjacent children of one slot, from a container's
+ *              header into the first child of its body, and out of a
+ *              `failure` rail back into the parent's flow
  *   fan/join   from a container that arranges its primary slots side by side,
  *              out to each column and back
- *   interrupt  from a rule on a secondary rail, out to its group's exit
+ *   interrupt  from a rule on a `secondary` rail, out to its group's exit
+ *
+ * The last two share a placement and nothing else, and WHICH of them a rail's
+ * exit edge gets is derived from the slot's declared `slot_style` alone -
+ * `railExitEdge` below is that derivation, and it is the only thing in this
+ * file that decides an edge's vocabulary (sb-67s).
  *
  * ## What this file deliberately does not do
  *
@@ -209,6 +215,45 @@ function markerDefs() {
   }
 
   return defs;
+}
+
+/**
+ * Which vocabulary a rail slot's exit edge is drawn in (sb-67s).
+ *
+ * Pure, total, and the whole of the decision: the argument is the slot's
+ * declared `slot_style` (ADR-0005 decision 10's presentation metadata, widened
+ * by sb-68b to carry `failure`) and NOTHING else. No block type, no label, no
+ * child, no id - a host type that declares `failure` gets the failure
+ * vocabulary for free, and a type named `on_error` that declares `secondary`
+ * gets the interrupt one, which is the point of deriving it from the metadata.
+ *
+ * The two readings, and why they are drawn apart:
+ *
+ *   secondary  an interrupt rule fires OUT OF BAND. Whatever the group was
+ *              doing stops. That is an escape, so it is dashed, warning-hued,
+ *              and routed down the channel outside the group's box.
+ *   failure    an `on_error` subtree RUNS AND COMPLETES, and its completion
+ *              emits an outcome the parent continues from in band - the
+ *              accepted ADR-0004 amendment's continuation. Nothing escapes, so
+ *              it is an ordinary solid flow edge with the ordinary arrowhead,
+ *              routed exactly like the flow edge between two adjacent steps.
+ *              The dashed channel stays exclusively interrupt vocabulary
+ *              (operator ruling, 2026-08-29, on sb-67s).
+ *
+ * `routing` is which path helper draws it, kept beside `kind` so the caller
+ * never re-derives the same distinction a second time from the class name.
+ *
+ * Unknown styles fall to the interrupt reading rather than throwing, matching
+ * `layout.js`'s treatment of an unrecognised style as a metadata typo. It is
+ * the conservative side of the fallback: an edge drawn as an escape that was
+ * meant to be flow over-warns, where the reverse silently hides a way out.
+ */
+export function railExitEdge(slotStyle) {
+  if (slotStyle === "failure") {
+    return { kind: "flow", routing: "flow", marker: "url(#sb-arrow)" };
+  }
+
+  return { kind: "interrupt", routing: "channel", marker: "url(#sb-arrow-interrupt)" };
 }
 
 /** One layout node: its card, and - when it has children - its body. */
@@ -746,6 +791,9 @@ function renderRail(node) {
       class: "sb-rail__slot",
       "data-block-id": node.id,
       "data-slot": slot.name,
+      // sb-67s: pass two reads this attribute back off the DOM to pick the
+      // exit edge's vocabulary, so placement, paint and routing all derive
+      // from the one declared word.
       // sb-68b: WHICH rail vocabulary this slot is painted in. The value is
       // the style the type declared, written through unread - the stylesheet
       // decides what `failure` looks like, this file only says which one it
@@ -924,7 +972,10 @@ function collectEdges(node, rect, edges) {
     }
   }
 
-  // --- 4. interrupt exit edges -----------------------------------------
+  // --- 4. rail exit edges ----------------------------------------------
+  //
+  // The walk is per SLOT rather than over the whole rail, because the slot is
+  // what carries the style, and one rail can hold both kinds at once.
   const rail = child(body, ":scope > .sb-rail");
   if (!rail || !outletAnchor) return;
 
@@ -938,27 +989,50 @@ function collectEdges(node, rect, edges) {
   // otherwise share every pixel of their exit path, and two edges drawn
   // exactly on top of each other look like one edge - which is the opposite
   // of what a group with two ways out needs to communicate.
+  //
+  // Lanes are counted over the interrupt edges only. A flow exit never enters
+  // the channel, so letting one consume a lane would leave a visible gap
+  // between two interrupt edges that are in fact adjacent.
   let lane = 0;
 
-  for (const rule of rail.querySelectorAll(".sb-node")) {
-    if (closestNode(rule) !== node) continue;
+  for (const slot of rail.querySelectorAll(":scope > .sb-rail__slot")) {
+    const vocabulary = railExitEdge(slot.dataset.slotStyle);
 
-    const ruleCard = child(rule, ":scope > .sb-card");
-    if (!ruleCard) continue;
+    for (const rule of slot.querySelectorAll(".sb-node")) {
+      if (closestNode(rule) !== node) continue;
 
-    const from = rect(ruleCard);
+      const ruleCard = child(rule, ":scope > .sb-card");
+      if (!ruleCard) continue;
 
-    edges.push({
-      kind: "interrupt",
-      d: interruptPath(
-        { x: from.x + from.width, y: from.y + from.height / 2 },
-        inlet(exitRect),
-        channelX + lane * 6
-      ),
-      marker: "url(#sb-arrow-interrupt)",
-    });
+      if (vocabulary.routing === "flow") {
+        // Leaves from the rule's OUTLET, the same anchor an ordinary flow edge
+        // leaves any node from, so a failure subtree that is itself a
+        // container is left from its bottom rather than from its header.
+        const from = child(rule, ":scope > .sb-node__outlet") ?? ruleCard;
 
-    lane += 1;
+        edges.push({
+          kind: vocabulary.kind,
+          d: flowPath(outlet(rect(from)), inlet(exitRect)),
+          marker: vocabulary.marker,
+        });
+
+        continue;
+      }
+
+      const from = rect(ruleCard);
+
+      edges.push({
+        kind: vocabulary.kind,
+        d: interruptPath(
+          { x: from.x + from.width, y: from.y + from.height / 2 },
+          inlet(exitRect),
+          channelX + lane * 6
+        ),
+        marker: vocabulary.marker,
+      });
+
+      lane += 1;
+    }
   }
 }
 
