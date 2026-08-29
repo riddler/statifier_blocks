@@ -90,6 +90,9 @@ defmodule StatifierBlocks.MixProject do
         ],
         "LiveView editor": [
           ~r/^StatifierBlocks\.Editor($|\.)/
+        ],
+        "Predicate evaluation": [
+          ~r/^StatifierBlocks\.Predicates($|\.)/
         ]
       ],
       skip_undefined_reference_warnings_on: ["CHANGELOG.md"]
@@ -116,6 +119,8 @@ defmodule StatifierBlocks.MixProject do
     [statifier_dep()] ++
       live_view_dep() ++
       [
+        {:predicator, "~> 9.0"},
+
         # Dev / test
         {:ex_quality, "~> 0.14", only: :dev, runtime: false},
         {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
