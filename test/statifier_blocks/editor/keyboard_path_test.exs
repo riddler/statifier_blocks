@@ -90,7 +90,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         inserted = Enum.find(Document.blocks(document), &(&1.id == first))
         assert inserted.type == "core.wait"
 
-        assert inserted.config == %{"duration" => "PT1H"},
+        assert inserted.config == %{"duration" => "1h"},
                "a new block starts from its schema's declared defaults"
       end
 

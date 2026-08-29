@@ -157,7 +157,7 @@
               "check": {
                 "label": "the 3DS group resumed rather than timing out",
                 "result": "pass",
-                "detail": "The completion event reached the interrupt rail before the PT10M wait ran out."
+                "detail": "The completion event reached the interrupt rail before the 10m wait ran out."
               }
             },
             {
@@ -347,7 +347,7 @@
         {
           "id": "run_cp_three_ds_timeout",
           "name": "3DS never completes",
-          "description": "The cardholder never answers the challenge. This fixture expects the PT15M authorization timeout to abandon the group - and the scripted run shows it does not, because the timeout rule's guard reads fraud.cleared, which the fraud lane never set either way.",
+          "description": "The cardholder never answers the challenge. This fixture expects the 15m authorization timeout to abandon the group - and the scripted run shows it does not, because the timeout rule's guard reads fraud.cleared, which the fraud lane never set either way.",
           "expected": "pass",
           "steps": [
             {
@@ -368,7 +368,7 @@
             {
               "label": "The 3DS wait runs out",
               "active": ["blk_cp_three_ds_wait"],
-              "note": "PT10M elapses with no completion event on the rail.",
+              "note": "10m elapses with no completion event on the rail.",
               "check": {
                 "label": "the 3DS group did not resume",
                 "result": "pass",
@@ -376,7 +376,7 @@
               }
             },
             {
-              "label": "The PT15M authorization timeout should fire",
+              "label": "The 15m authorization timeout should fire",
               "active": ["blk_cp_authz_timeout"],
               "check": {
                 "label": "the timeout rule abandons the authorization group",
@@ -776,7 +776,7 @@
               "event": "signup.email_verified",
               "deltas": [{ "path": "signup.email_verified", "value": "true" }],
               "check": {
-                "label": "the group resumed rather than waiting out PT24H",
+                "label": "the group resumed rather than waiting out 24h",
                 "result": "pass"
               }
             },
@@ -806,7 +806,7 @@
         {
           "id": "run_su_abandoned",
           "name": "Verification never arrives",
-          "description": "The customer never opens the email. This fixture expects the wizard to abandon; the scripted run records the PT24H wait falling through with no rule taking it, which is the gap the findings pane already warns about.",
+          "description": "The customer never opens the email. This fixture expects the wizard to abandon; the scripted run records the 24h wait falling through with no rule taking it, which is the gap the findings pane already warns about.",
           "expected": "pass",
           "steps": [
             {
@@ -821,7 +821,7 @@
             {
               "label": "The wait runs out",
               "active": ["blk_su_verify_wait"],
-              "note": "PT24H with neither signup.email_verified nor signup.abandoned on the rail."
+              "note": "24h with neither signup.email_verified nor signup.abandoned on the rail."
             },
             {
               "label": "Nothing abandons the wizard",
@@ -902,7 +902,7 @@
         {
           "id": "run_su_deadline",
           "name": "Onboarding runs out of time",
-          "description": "The third way into the same rail, and the one with a clock in it (sb-ajr). The proposed core.send at the top of the onboarding group arms signup.abandoned for PT2H; the account verifies and the business arm is taken, the company details are never filled in, and two hours later the armed event arrives and the group's rule abandons. Same rule run_su_declined's raise reaches, sent later instead of raised now.",
+          "description": "The third way into the same rail, and the one with a clock in it (sb-ajr). The proposed core.send at the top of the onboarding group arms signup.abandoned for 2h; the account verifies and the business arm is taken, the company details are never filled in, and two hours later the armed event arrives and the group's rule abandons. Same rule run_su_declined's raise reaches, sent later instead of raised now.",
           "expected": "pass",
           "steps": [
             {

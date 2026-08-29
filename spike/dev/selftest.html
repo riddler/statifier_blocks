@@ -808,7 +808,7 @@
         equal(
           "core.wait rejects a duration that is not ISO-8601",
           coreTypes["core.wait"].validateConfig({ duration: "48 hours" }),
-          [{ key: "duration", message: "must be an ISO-8601 duration, like PT30S or P1D" }]
+          [{ key: "duration", message: "must be a duration - 30s, 1h30m or 2d - or ISO-8601 like PT30S" }]
         );
         check(
           "...and accepts one that is",
@@ -2725,7 +2725,7 @@
         equal(
           "its config is seeded from the declared defaults",
           findBlock(inserted.value.document, inserted.value.selectedId).config,
-          { duration: "PT1H" }
+          { duration: "1h" }
         );
         equal(
           "and it carries the type's current version",
@@ -3051,7 +3051,7 @@
         equal("an invalid value produces one inline finding", declared(broken)[0].findings, [
           {
             key: "duration",
-            message: "must be an ISO-8601 duration, like PT30S or P1D",
+            message: "must be a duration - 30s, 1h30m or 2d - or ISO-8601 like PT30S",
             severity: "error",
             origin: "validation",
           },
@@ -5109,7 +5109,7 @@
         // `blk_cp_authz_timeout`, which used to be a `myapp.timeout_rule` and
         // was re-typed rather than re-written.
         const stored = {
-          after: "PT15M",
+          after: "15m",
           cond: "three_ds.completed == false OR fraud.cleared == false",
           outcome: "abandon",
         };
@@ -5118,7 +5118,7 @@
         equal(
           "a plain-English duration is refused",
           timeout.validateConfig({ ...stored, after: "15 minutes" }),
-          [{ key: "after", message: "must be an ISO-8601 duration, like PT15M" }]
+          [{ key: "after", message: "must be a duration - 15m, 1h30m or 2d - or ISO-8601 like PT15M" }]
         );
         equal(
           "a missing duration is the same finding, not a throw",
@@ -5196,7 +5196,7 @@
                   id: "blk_cp_authz_timeout",
                   type: "core.timeout",
                   config: {
-                    after: "PT15M",
+                    after: "15m",
                     cond: "three_ds.completed == false OR fraud.cleared == false",
                     outcome: "abandon",
                   },
@@ -5896,7 +5896,7 @@
       suite("proposed core: core.send's delay is optional and otherwise a duration", () => {
         const delayFinding = {
           key: "delay",
-          message: "must be an ISO-8601 duration, like PT2H, or empty to send now",
+          message: "must be a duration - 2h, 1h30m or 2d - or ISO-8601 like PT2H, or empty to send now",
         };
         const withDelay = (delay) => sendType.validateConfig({ event: "signup.abandoned", delay });
 

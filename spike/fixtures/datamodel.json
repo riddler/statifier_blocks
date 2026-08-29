@@ -98,7 +98,7 @@
               "path": "limits.authorization_window",
               "type": "duration",
               "label": "Authorization window",
-              "example": "PT15M"
+              "example": "15m"
             }
           ]
         },
@@ -397,7 +397,7 @@
               "path": "auth.expires_in",
               "type": "duration",
               "label": "Authorization holds for",
-              "example": "P7D"
+              "example": "7d"
             }
           ]
         },
@@ -486,7 +486,7 @@
               "path": "signup.trial_length",
               "type": "duration",
               "label": "Trial length",
-              "example": "P14D"
+              "example": "14d"
             },
             {
               "name": "invitees",

@@ -47,7 +47,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         view = select(view, "blk_email_step")
 
         assert has_element?(view, ~s([data-field="duration"][data-field-type="duration"]))
-        assert has_element?(view, ~s(input[type="text"][name="config[duration]"][value="PT1H"]))
+        assert has_element?(view, ~s(input[type="text"][name="config[duration]"][value="1h"]))
         refute has_element?(view, ~s(select[name="config[duration][unit]"]))
         assert render(view) =~ "Try 30s, 15m, 1h30m, 2d, 3d8h"
       end
@@ -149,7 +149,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         html = view |> element(~s(button[phx-click="undo"])) |> render_click()
 
-        assert config(latest_document(), "blk_email_step") == %{"duration" => "PT1H"}
+        assert config(latest_document(), "blk_email_step") == %{"duration" => "1h"}
         refute html =~ "must be a duration"
       end
 

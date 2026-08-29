@@ -24,8 +24,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           id: "blk_lanes",
           config: %{"lanes" => ["signup", "email"]},
           slots: %{
-            "lane_signup" => [EditorFixtures.wait("blk_l1", "PT1H")],
-            "lane_email" => [EditorFixtures.wait("blk_l2", "PT2H")]
+            "lane_signup" => [EditorFixtures.wait("blk_l1", "1h")],
+            "lane_email" => [EditorFixtures.wait("blk_l2", "2h")]
           }
         ),
         id: "doc_lanes"

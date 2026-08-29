@@ -475,9 +475,9 @@ const coreParallel = {
 };
 
 /*
- * core.wait - a leaf whose whole meaning is its config. The duration is an
- * ISO-8601 string rather than a number because ADR-0001 decision 6 forbids
- * floats, and "1.5 hours" has to be `PT1H30M`.
+ * core.wait - a leaf whose whole meaning is its config. The duration is a
+ * string rather than a number because ADR-0001 decision 6 forbids floats,
+ * and "1.5 hours" has to be `1h30m` - or `PT1H30M`, still accepted.
  */
 const coreWait = {
   name: "core.wait",
@@ -489,7 +489,7 @@ const coreWait = {
       type: "duration",
       label: "Wait for",
       required: true,
-      default: "PT1H",
+      default: "1h",
     },
   ],
   validateConfig: (config) => {
@@ -497,7 +497,7 @@ const coreWait = {
 
     return isDuration(config.duration)
       ? null
-      : [{ key: "duration", message: "must be an ISO-8601 duration, like PT30S or P1D" }];
+      : [{ key: "duration", message: "must be a duration - 30s, 1h30m or 2d - or ISO-8601 like PT30S" }];
   },
   io: () => ({ kinds: ["step"] }),
   paletteEntry: {
@@ -680,7 +680,7 @@ const myappAuthorize = {
       type: "duration",
       label: "Timeout",
       required: false,
-      default: "PT30S",
+      default: "30s",
     },
   ],
   validateConfig: (config) => {
@@ -690,7 +690,7 @@ const myappAuthorize = {
       findings.push({ key: "assign_to", message: "must be a bare lowercase identifier" });
     }
     if ("timeout" in config && !isDuration(config.timeout)) {
-      findings.push({ key: "timeout", message: "must be an ISO-8601 duration, like PT30S" });
+      findings.push({ key: "timeout", message: "must be a duration - 30s or 1h30m - or ISO-8601 like PT30S" });
     }
 
     return verdict(findings);
@@ -977,7 +977,7 @@ function unresolvedMessage(reason) {
  * sb-ed7: it DOES carry a `placeholder`, and that is the same ownership
  * argument one step further. Placeholders were previously chosen by control
  * type in `inspector.js` (an expression field says "an expression", a
- * duration says "PT1H30M"), and a `string` field has no type-level hint to
+ * duration says "1h30m"), and a `string` field has no type-level hint to
  * offer - so the first field every author meets rendered blank beside
  * siblings that suggested their own shape. The editor owns this field, so
  * the editor owns its hint: the placeholder is declared HERE, next to the

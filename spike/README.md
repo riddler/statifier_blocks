@@ -217,7 +217,7 @@ form to the document.
 ### Placeholders, and the editor's own field (sb-ed7)
 
 Placeholders in the config form were chosen entirely by **control type**: an
-expression field says "an expression", a duration says "PT1H30M", and a bare
+expression field says "an expression", a duration says "1h30m", and a bare
 `string` field says nothing, because there is nothing a type as wide as
 "string" can suggest. That rule left the injected `label` field - the first
 field every author meets, and the one the canvas titles every card from -
@@ -348,11 +348,13 @@ text changes here**; if D4 is not adopted, the alternative that needs no ADR
 at all is to compile at commit time and store the ISO string, which is a
 change to one branch of this control and nothing else.
 
-Open, and worth an operator's eye when this graduates under `sb-8dc`: the
-type-level refusal messages still name only ISO-8601 ("must be an ISO-8601
-duration, like PT30S or P1D"), because the selftest pins their text and the
-control's own inline message is what an author actually reads. If D4 is
-adopted, those three sentences should name both spellings.
+Closed by `sb-dkb` (2026-08-29): the type-level refusal messages named only
+ISO-8601 ("must be an ISO-8601 duration, like PT30S or P1D") while the
+control's own inline message - the one an author actually reads - already led
+with the predicator form. All three now name both spellings, predicator first,
+and the selftest pins the new text. The authored defaults moved with them:
+`core.wait` seeds `1h`, `core.invoke`'s timeout `30s`, and the proposed
+`core.timeout` `15m`. ISO-8601 stays accepted everywhere it was.
 
 Asserted in `dev/selftest.html` under "sb-709": the grammar mirror including
 every shape it declines, the compile to ISO-8601, the `''` case reading as an
@@ -940,7 +942,7 @@ time.
 `delay` is the vocabulary's first **optional** duration, which is a state
 sb-d9's open control question had never had to express: "no delay" is not
 `PT0S` and it is not an unfinished field either. The signup document arms a
-`PT2H` deadline, so that question had a case that ships - and it is what
+`2h` deadline, so that question had a case that ships - and it is what
 opened sb-709, where clearing the field turned out to commit `PT0H`. The
 control is ruled and built now; the config-pane section above says how, and
 `delay` is the field it was built against.

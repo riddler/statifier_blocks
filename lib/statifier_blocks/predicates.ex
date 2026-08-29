@@ -36,13 +36,16 @@ defmodule StatifierBlocks.Predicates do
 
   ## Durations are `15m`, not `PT15M`
 
-  ADR-0001 decision 6 stores durations as ISO-8601 in block *config*
-  (`"PT15M"`, see `StatifierBlocks.Core.Wait`). A binding's source text here
-  is predicator source, not config, and predicator's duration literal is
-  `15m` / `1h30m` - its own lexer grammar, unrelated to ISO-8601. Writing
-  `"PT15M"` as a binding does not raise; it parses as a bare identifier and
-  fails with `{:undefined_variable, "PT15M", _}`, which reads like a bug if
-  this is not known going in.
+  Block *config* stores whichever spelling the author typed, and the
+  primary one is the predicator string (`"15m"`, see
+  `StatifierBlocks.Core.Wait`); ISO-8601 stays accepted there. A binding's
+  source text here is predicator source, not config, and predicator's
+  duration literal is `15m` / `1h30m` - its own lexer grammar, unrelated to
+  ISO-8601. So the two agree on the spelling an author reaches for, but
+  only one of them accepts the other: writing `"PT15M"` as a binding does
+  not raise; it parses as a bare identifier and fails with
+  `{:undefined_variable, "PT15M", _}`, which reads like a bug if this is
+  not known going in.
 
   See `StatifierBlocks.Predicates.TruthTable` for the truth-table builder
   that composes `evaluate/2` and `context/1` over an ordered set of branch

@@ -7,6 +7,7 @@ defmodule StatifierBlocks.Core.DurationTest do
 
   use ExUnit.Case, async: true
 
+  alias StatifierBlocks.{Block, Compiler, Document, Palette}
   alias StatifierBlocks.Core.Duration
 
   doctest StatifierBlocks.Core.Duration
@@ -149,6 +150,68 @@ defmodule StatifierBlocks.Core.DurationTest do
     test "predicator?/1 is the narrower one: an ISO value is not one" do
       assert Duration.predicator?("1h30m")
       refute Duration.predicator?("PT2H")
+    end
+  end
+
+  describe "the sb-dkb authored-spelling flip emits identical bytes" do
+    # Every duration literal `sb-dkb` retyped, as it was stored before and
+    # as it is stored now. Adding a conversion to a fixture without adding
+    # it here is the mistake this table is the guard against.
+    @flipped [
+      {"PT2M", "2m"},
+      {"PT24H", "24h"},
+      {"PT30S", "30s"},
+      {"PT10M", "10m"},
+      {"PT15M", "15m"},
+      {"PT1M", "1m"},
+      {"P2D", "2d"},
+      {"PT2H", "2h"},
+      {"P7D", "7d"},
+      {"P14D", "14d"},
+      {"PT1H", "1h"}
+    ]
+
+    # Sabotage: dropped `to_iso/1`'s `Config.duration?/1` branch so a stored
+    # ISO value went to `compile/1` rather than passing through -> predicator
+    # does not lex `P` or `T`, every left-hand spelling came back `:error`,
+    # and the match on `{:ok, from_iso}` took this red (verified).
+    test "each retyped literal renders the same delay attribute as before" do
+      for {iso, predicator} <- @flipped do
+        {:ok, from_iso} = Duration.to_iso(iso)
+        {:ok, from_predicator} = Duration.to_iso(predicator)
+
+        assert Duration.to_delay(from_iso) == Duration.to_delay(from_predicator),
+               "#{iso} and #{predicator} must emit one delay, not two"
+      end
+    end
+
+    # The same claim one level up, through the real compiler rather than
+    # the duration module alone: a `core.wait` document is compiled with
+    # each spelling and the two SCXML strings are compared byte for byte.
+    #
+    # Sabotage: had `Core.Wait.emit/2` write the stored bytes as the
+    # `delay` attribute instead of `Duration.to_delay/1`'s rendering ->
+    # every pair produced two different documents (verified).
+    test "a core.wait document compiles to the same SCXML under either spelling" do
+      for {iso, predicator} <- @flipped do
+        assert wait_scxml(iso) == wait_scxml(predicator),
+               "core.wait #{iso} and core.wait #{predicator} must compile to one chart"
+      end
+    end
+
+    defp wait_scxml(duration) do
+      root =
+        Block.new("core.sequence",
+          id: "blk_ROOT",
+          slots: %{
+            "body" => [
+              Block.new("core.wait", id: "blk_WAIT", config: %{"duration" => duration})
+            ]
+          }
+        )
+
+      {:ok, compiled} = Compiler.compile(Document.new(root, id: "bdoc_DKB"), Palette.core())
+      compiled.scxml
     end
   end
 end

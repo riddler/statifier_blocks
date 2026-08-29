@@ -809,7 +809,7 @@ const coreTimeout = {
       type: "duration",
       label: "After",
       required: true,
-      default: "PT15M",
+      default: "15m",
     },
     {
       key: "outcome",
@@ -835,7 +835,7 @@ const coreTimeout = {
     const findings = [];
 
     if (!isDuration(config.after)) {
-      findings.push({ key: "after", message: "must be an ISO-8601 duration, like PT15M" });
+      findings.push({ key: "after", message: "must be a duration - 15m, 1h30m or 2d - or ISO-8601 like PT15M" });
     }
     if (!TIMEOUT_OUTCOMES.includes(config.outcome)) {
       findings.push({ key: "outcome", message: 'pick "abandon" or "resume"' });
@@ -1233,7 +1233,7 @@ const coreSend = {
     if ("delay" in config && config.delay !== "" && !isDuration(config.delay)) {
       findings.push({
         key: "delay",
-        message: "must be an ISO-8601 duration, like PT2H, or empty to send now",
+        message: "must be a duration - 2h, 1h30m or 2d - or ISO-8601 like PT2H, or empty to send now",
       });
     }
 
