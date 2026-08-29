@@ -70,12 +70,45 @@ defmodule StatifierBlocks.Compiler.DeclaredRoots do
   widening of decision 9 this module has no mandate for.
 
   Author-declared `<data>` ids, F6's other half, are covered by the same
-  walk the day they exist: the package has no author-facing `<data>`
-  declaration concept today - no block type emits one and no config field
-  declares one - so the only roots in the tree are the compiler's own.
-  Nothing here special-cases `core.foreach`, so an author declaration
-  arriving as a `<data>` element is checked against the loops beneath it
-  without this module being touched.
+  walk the day they exist: no config field declares one and no block type
+  emits one for a name an author typed as an id. Nothing here
+  special-cases `core.foreach`, so a declaration arriving as a `<data>`
+  element is checked against the loops beneath it without this module
+  being touched.
+
+  ## Host-declared roots (the `:declare` compile option)
+
+  That day arrived for the *host* rather than for the author.
+  `declarations/1` turns `StatifierBlocks.Compiler.compile/3`'s
+  `:declare` option - a list of `{id, expr}` pairs in declaration order -
+  into the same `declare/2` emissions a block type contributes, and the
+  compiler prepends them to the root block's own children before
+  `hoist/1` runs. Three things follow from that placement rather than
+  from any new code here:
+
+    * **Order.** `hoist/1` lifts an element's own declarations before it
+      descends, so the host's roots lead the single `<datamodel>` in the
+      order the option lists them and block-declared roots follow in
+      document order.
+    * **Collision.** A host root is in scope for everything beneath it,
+      so a block declaring the same name is F6's `:duplicate_binding`,
+      reported against that block and its config key exactly as a nested
+      loop's collision is. A name repeated *within* the option list never
+      reaches the walk: `declarations/1` refuses it, because there is no
+      block to name in a finding about a list the host wrote.
+    * **Nothing else.** No `<datamodel>` is emitted for a document that
+      declares nothing, option absent or `[]` alike, so every chart
+      compiled before the option existed still compiles to the same
+      bytes.
+
+  An id must be a bare lowercase identifier, the rule `core.invoke`
+  applies to `assign_to`: the host is declaring a location the chart will
+  assign to and read in a guard, and predicator's grammar is what both
+  ends have to agree on. An `expr` is either `nil`, for a root that reads
+  as `undefined` until something assigns it, or a non-empty expression
+  written verbatim into the attribute. Run creation still wins over
+  `expr` - a run seeded with a value for the id starts from that value
+  (SCXML 5.3.2), which is upstream's behaviour and not this module's.
   """
 
   alias StatifierBlocks.{Block, Emission}
@@ -83,11 +116,33 @@ defmodule StatifierBlocks.Compiler.DeclaredRoots do
   @data "data"
   @datamodel "datamodel"
 
+  # The `assign_to` rule, spelled here rather than borrowed from
+  # `StatifierBlocks.Core.Config`: that module is the `core.*` types'
+  # private shed, and the compiler reaching into it would make a host's
+  # compile option depend on the shipped vocabulary. The two spellings
+  # are the same rule, and `StatifierBlocks.Compiler.HostRootsTest` asserts
+  # the two predicates agree so the copy cannot drift silently.
+  @identifier ~r/\A[a-z][a-z0-9_]*\z/
+
   @typedoc """
   One collision: the block whose binding collides, the config key it was
   typed into (`nil` for a root no author named), and the offending name.
   """
   @type finding :: {:duplicate_binding, Block.id() | nil, String.t() | nil, String.t()}
+
+  @typedoc """
+  One entry of the `:declare` compile option: a root id and either an
+  initial expression or `nil`.
+  """
+  @type declaration :: {String.t(), String.t() | nil}
+
+  @typedoc """
+  A refusal of the `:declare` option itself, before any walk: an entry
+  that is not a well-formed declaration, or an id the list declares
+  twice.
+  """
+  @type declaration_finding ::
+          {:invalid_declaration, term()} | {:duplicate_declaration, String.t()}
 
   @doc """
   A `<data>` declaration for the root `id`, optionally with an initial
@@ -101,6 +156,34 @@ defmodule StatifierBlocks.Compiler.DeclaredRoots do
   def declare(id, expr \\ nil) when is_binary(id) do
     Emission.element(@data, [{"id", id}, {"expr", expr}])
   end
+
+  @doc """
+  The `:declare` compile option as `declare/2` emissions, in the order
+  the option lists them.
+
+  `nil` and `[]` are both "the host declares nothing" and produce no
+  emissions, which is what keeps a document compiled without the option
+  byte-identical to what it was before the option existed.
+
+  `{:error, findings}` when an entry is not a `{id, expr}` pair whose id
+  is a bare lowercase identifier and whose expr is `nil` or a non-empty
+  string, or when the list declares one id twice. Every entry is checked,
+  so a host fixing its call sees all of them at once.
+  """
+  @spec declarations(term()) :: {:ok, [Emission.t()]} | {:error, [declaration_finding()]}
+  def declarations(nil), do: {:ok, []}
+
+  def declarations(declarations) when is_list(declarations) do
+    {roots, _seen, findings} =
+      Enum.reduce(declarations, {[], MapSet.new(), []}, &check/2)
+
+    case findings do
+      [] -> {:ok, Enum.reverse(roots)}
+      _refusals -> {:error, Enum.reverse(findings)}
+    end
+  end
+
+  def declarations(other), do: {:error, [{:invalid_declaration, other}]}
 
   @doc """
   Lifts every `<data>` element out of `emission`, returning the stripped
@@ -199,4 +282,31 @@ defmodule StatifierBlocks.Compiler.DeclaredRoots do
     do: {:duplicate_binding, block_id, config_key, name}
 
   defp collision(%Emission{}, name), do: {:duplicate_binding, nil, nil, name}
+
+  @spec check(term(), {[Emission.t()], MapSet.t(String.t()), [declaration_finding()]}) ::
+          {[Emission.t()], MapSet.t(String.t()), [declaration_finding()]}
+  defp check(entry, {roots, seen, findings}) do
+    case verdict(entry, seen) do
+      {:ok, id, expr} -> {[declare(id, expr) | roots], MapSet.put(seen, id), findings}
+      {:error, finding} -> {roots, seen, [finding | findings]}
+    end
+  end
+
+  @spec verdict(term(), MapSet.t(String.t())) ::
+          {:ok, String.t(), String.t() | nil} | {:error, declaration_finding()}
+  defp verdict({id, expr} = entry, seen) when is_binary(id) do
+    cond do
+      not Regex.match?(@identifier, id) -> {:error, {:invalid_declaration, entry}}
+      not expr?(expr) -> {:error, {:invalid_declaration, entry}}
+      MapSet.member?(seen, id) -> {:error, {:duplicate_declaration, id}}
+      true -> {:ok, id, expr}
+    end
+  end
+
+  defp verdict(entry, _seen), do: {:error, {:invalid_declaration, entry}}
+
+  @spec expr?(term()) :: boolean()
+  defp expr?(nil), do: true
+  defp expr?(expr) when is_binary(expr), do: expr != "" and String.valid?(expr)
+  defp expr?(_expr), do: false
 end
