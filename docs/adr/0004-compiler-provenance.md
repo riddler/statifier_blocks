@@ -1,6 +1,6 @@
 # ADR-0004: One block, one state - a deterministic compile carrying a provenance map
 
-Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings); decision 2 amended - outcome-tagged finals (accepted 2026-08-29, operator ruling)
+Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings); decision 2 amended - outcome-tagged finals (accepted 2026-08-29, operator ruling); child-use compile and core.subchart routing amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 93)
 
 ## Context
 
@@ -1210,7 +1210,7 @@ exists in the vocabulary.
 
 ## Amendment (2026-08-29): a document compiled for use as a child, and `core.subchart` routing
 
-**Status: proposed (2026-08-29, operator ruling).** This section records the
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 93).** This section records the
 operator's 2026-08-29 ruling on the mirror pair `sb-81e` / `st-aj2k` and
 nothing else. It is additive: it amends no accepted text above, and every
 decision in the record, the 2026-08-28 amendment included, stands as written.
