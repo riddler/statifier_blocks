@@ -34,3 +34,10 @@
   suggest.
 - A theme audit test over the stylesheet, failing in both directions: a
   `var(--sb-*)` with no declaration, and a declared token no rule reads (14e).
+
+### Fixed
+
+- The editor's root rule sets `font-family` rather than the `font`
+  shorthand, so `--sb-font` reaches the editor. `font: <family-list>` is not
+  a valid shorthand, so the whole declaration was dropped and the editor's
+  text did not inherit the host page's font as the token promised.
