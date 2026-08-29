@@ -126,6 +126,9 @@
  *     2  --sb-focus-width
  *     2  --sb-focus-offset
  *     2  --sb-column-min-width
+ *     2  --sb-palette-width
+ *     2  --sb-inspector-width
+ *     2  --sb-drawer-height
  *     2  --sb-rail-width
  *     2  --sb-config-preview-max-height
  *     2  --sb-block-accent-mix
@@ -341,6 +344,17 @@
   --sb-rail-width: 13rem;
   --sb-config-preview-max-height: 8rem;
 
+  /* Shell metrics (the 2026-08-29 shell amendment, 1A and 7A). The two pane
+   * widths are tokens for the same reason the canvas metrics are: a host with
+   * a larger type scale has a cramped palette and no way to say so without
+   * editing structural CSS. `--sb-drawer-height` is the height the drawer
+   * opens at before a viewer has resized one; the resize rebinds it inline on
+   * the drawer, so a host setting it here is setting the FIRST height rather
+   * than overriding a remembered one. */
+  --sb-palette-width: 14rem;
+  --sb-inspector-width: 21rem;
+  --sb-drawer-height: 14rem;
+
   /* Per-block-type identity (d14 amendment 14d), consumption side. Two rules
    * read `--sb-block-accent` - the icon tile and the card's stripe - and they
    * are the only two, which is the property that keeps a type's identity from
@@ -362,9 +376,18 @@
   );
 
   color-scheme: var(--sb-color-scheme);
-  display: grid;
-  grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr) minmax(14rem, 1fr);
-  gap: var(--sb-space-2);
+
+  /* 7A: the breakpoints are CONTAINER queries, because the editor is a
+   * component embedded in a host page whose chrome this package does not
+   * control - a viewport width tells it nothing reliable about the width it
+   * was actually given. An element cannot be styled by a query on itself, so
+   * the container is this element and the grid it answers for is
+   * `.sb-editor__layout` one level in. That indirection is the whole cost of
+   * the ruling and it is why the layout element exists. */
+  container-type: inline-size;
+  container-name: sb-editor;
+
+  display: block;
   color: var(--sb-fg);
   background: var(--sb-bg-canvas);
   font-family: var(--sb-font);
@@ -836,6 +859,8 @@
 
 .sb-toolbar {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: var(--sb-space);
 }
 
@@ -847,4 +872,455 @@
 .sb-toolbar__button[disabled] {
   cursor: default;
   opacity: var(--sb-disabled-opacity);
+}
+
+/* ------------------------------------------------------------------ shell
+ *
+ * The 2026-08-29 shell amendment: three panes plus a full-width drawer row
+ * (1A), a resizable drawer that is never open-or-gone (2A), a three-tab
+ * inspector (3A), container-query breakpoints (7A), and the package/host
+ * split (8A).
+ *
+ * Nothing here is a hook. The resize is a server-side command carrying the
+ * height, the drawer's states are computed in `StatifierBlocks.Shell`, and the
+ * breakpoints are stylesheet rules - which is what lets all three be asserted
+ * without a browser.
+ */
+
+.sb-editor__header {
+  margin-bottom: var(--sb-space-2);
+}
+
+.sb-editor__layout {
+  display: grid;
+  grid-template-columns: var(--sb-palette-width) minmax(0, 1fr) var(--sb-inspector-width);
+  grid-template-areas:
+    "palette canvas inspector"
+    "drawer drawer drawer";
+  gap: var(--sb-space-2);
+  align-items: start;
+}
+
+.sb-editor__main {
+  grid-area: canvas;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space);
+}
+
+.sb-palette {
+  grid-area: palette;
+  position: relative;
+}
+
+.sb-inspector {
+  grid-area: inspector;
+  min-width: 0;
+}
+
+.sb-drawer {
+  grid-area: drawer;
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------- toolbar */
+
+.sb-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space-half);
+}
+
+.sb-toolbar__zoom-level {
+  font-variant-numeric: tabular-nums;
+  min-width: 3.5rem;
+  text-align: center;
+  color: var(--sb-fg-muted);
+}
+
+.sb-toolbar__button[aria-pressed="true"] {
+  color: var(--sb-accent);
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-toolbar__metrics {
+  margin-left: auto;
+  display: flex;
+  gap: var(--sb-space);
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-sm);
+}
+
+/* ----------------------------------------------------------- inspector */
+
+.sb-inspector__tabs {
+  display: flex;
+  gap: var(--sb-space-half);
+  border-bottom: var(--sb-border-width) solid var(--sb-border);
+}
+
+.sb-inspector__tab {
+  font: inherit;
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: var(--sb-space-half) var(--sb-space);
+  color: var(--sb-fg-muted);
+}
+
+.sb-inspector__tab--selected {
+  color: var(--sb-fg);
+  border-bottom-color: var(--sb-accent);
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-inspector__tab-count {
+  font-size: var(--sb-text-xs);
+  background: var(--sb-accent-muted);
+  border-radius: var(--sb-radius-sm);
+  padding: 0 var(--sb-space-half);
+}
+
+.sb-inspector__panel {
+  padding-top: var(--sb-space);
+}
+
+.sb-inspector__empty {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-inspector__findings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+}
+
+/* The Condition tab reads the source and evaluates nothing; what it answers
+ * is tabular and document-level, so 1A sends that to the drawer. */
+.sb-conditions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space);
+}
+
+.sb-condition__label {
+  display: block;
+  font-size: var(--sb-text-sm);
+  color: var(--sb-fg-muted);
+}
+
+.sb-condition__source {
+  display: block;
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-sm);
+  background: var(--sb-bg-sunken);
+  border-radius: var(--sb-radius-sm);
+  padding: var(--sb-space-half);
+  overflow-x: auto;
+}
+
+.sb-condition__source[data-empty="true"] {
+  min-height: var(--sb-space-3);
+}
+
+.sb-condition__where {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-sm);
+}
+
+/* -------------------------------------------------------------- drawer */
+
+.sb-drawer {
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius);
+  background: var(--sb-bg);
+}
+
+/* 2A: collapsed is a strip carrying a title and a count, never nothing. */
+.sb-drawer__strip {
+  font: inherit;
+  cursor: pointer;
+  width: 100%;
+  display: flex;
+  gap: var(--sb-space-half);
+  align-items: baseline;
+  background: none;
+  border: none;
+  color: inherit;
+  padding: var(--sb-space-half) var(--sb-space);
+}
+
+.sb-drawer__title {
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-drawer__count {
+  color: var(--sb-fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-drawer__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space);
+  border-bottom: var(--sb-border-width) solid var(--sb-border);
+  padding: var(--sb-space-half) var(--sb-space);
+}
+
+.sb-drawer__tab {
+  font: inherit;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 0;
+}
+
+.sb-drawer__tab--selected {
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-drawer__resize {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space-half);
+}
+
+.sb-drawer__resize-label {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+}
+
+.sb-drawer__close {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* The remembered height, rebound inline per drawer by the resize command. */
+.sb-drawer__panel {
+  max-height: var(--sb-drawer-height);
+  overflow: auto;
+  padding: var(--sb-space);
+}
+
+.sb-drawer__empty {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-drawer__jumps {
+  list-style: none;
+  margin: var(--sb-space) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sb-space-half);
+}
+
+.sb-drawer__jump {
+  font: inherit;
+  cursor: pointer;
+  background: var(--sb-bg-muted);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius);
+  padding: var(--sb-space-half) var(--sb-space);
+  color: inherit;
+}
+
+.sb-drawer__jump-id {
+  color: var(--sb-fg-subtle);
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+  margin-left: var(--sb-space-half);
+}
+
+/* --------------------------------------------------------- truth table */
+
+.sb-table {
+  margin: 0 0 var(--sb-space-2);
+}
+
+.sb-table__caption {
+  display: flex;
+  gap: var(--sb-space);
+  align-items: baseline;
+  margin-bottom: var(--sb-space-half);
+}
+
+.sb-table__name {
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-table__description {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-sm);
+}
+
+/* The drawer buys the width a truth table needs; this keeps a document with
+ * more arms than the drawer is wide scrolling the TABLE rather than the page,
+ * and keeps the conventional column order the inspector could not afford. */
+.sb-table__scroll {
+  overflow-x: auto;
+}
+
+.sb-table__scroll table {
+  border-collapse: collapse;
+  font-size: var(--sb-text-sm);
+}
+
+.sb-table__scroll th,
+.sb-table__scroll td {
+  border: var(--sb-border-width) solid var(--sb-border);
+  padding: var(--sb-space-half) var(--sb-space);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.sb-table__scroll thead th {
+  background: var(--sb-bg-muted);
+  font-weight: var(--sb-weight-medium);
+}
+
+/* Five statuses, not a severity ramp. The word is in the cell; the colour
+ * only agrees with it, so a reader who cannot tell two hues apart reads the
+ * same table. */
+.sb-table__scroll td[data-status="mismatch"],
+.sb-table__scroll td[data-status="error"],
+.sb-table__row-error {
+  color: var(--sb-error);
+  background: var(--sb-error-bg);
+}
+
+.sb-table__scroll td[data-status="undecidable"] {
+  color: var(--sb-warning);
+  background: var(--sb-warning-bg);
+}
+
+.sb-table__scroll td[data-status="unchecked"] {
+  color: var(--sb-fg-subtle);
+}
+
+.sb-table__scroll td[data-selected="true"] {
+  font-weight: var(--sb-weight-strong);
+}
+
+/* ------------------------------------------------- palette strip / sheet */
+
+/* Above 780 the palette is a column and the strip does not exist. The rule is
+ * one-sided on purpose: the wide layout is the default and the narrow one is
+ * the exception, so a container query that never fires leaves the editor in
+ * the arrangement 1A describes. */
+.sb-palette__strip {
+  display: none;
+}
+
+/* ------------------------------------------------------- breakpoints (7A)
+ *
+ * | Container width | Arrangement                                  |
+ * |-----------------|----------------------------------------------|
+ * | 1280 and up     | three panes plus the drawer row               |
+ * | 1024 and 900    | the palette stacks                            |
+ * | 780             | the inspector stacks, the palette is a strip  |
+ * | 640             | canvas first, then the panes, then the drawer  |
+ *
+ * The stacking order below 640 is narrowest scope of attention first: the
+ * canvas is the document, the panes are about a selection in it, and the
+ * drawer is about the whole document.
+ */
+
+@container sb-editor (width < 1280px) {
+  .sb-editor__layout {
+    grid-template-columns: minmax(0, 1fr) var(--sb-inspector-width);
+    grid-template-areas:
+      "palette palette"
+      "canvas inspector"
+      "drawer drawer";
+  }
+
+  .sb-palette__entries {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sb-space-half);
+  }
+
+  .sb-palette__pick {
+    width: auto;
+  }
+}
+
+@container sb-editor (width < 1024px) {
+  .sb-palette__search {
+    max-width: var(--sb-palette-width);
+  }
+}
+
+@container sb-editor (width < 900px) {
+  .sb-editor__layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, var(--sb-inspector-width));
+  }
+}
+
+/* Below 780 the palette collapses to a strip - search and a "+" - that opens
+ * as a sheet, so the inspector gets the full row. */
+@container sb-editor (width < 780px) {
+  .sb-editor__layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "palette"
+      "canvas"
+      "inspector"
+      "drawer";
+  }
+
+  .sb-palette__strip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    font: inherit;
+    cursor: pointer;
+    color: inherit;
+    background: var(--sb-bg);
+    border: var(--sb-border-width) solid var(--sb-border);
+    border-radius: var(--sb-radius);
+    padding: var(--sb-space-half) var(--sb-space);
+  }
+
+  .sb-palette__body {
+    display: none;
+  }
+
+  .sb-palette[data-sheet="open"] .sb-palette__body {
+    display: block;
+    position: absolute;
+    inset-inline: 0;
+    top: 100%;
+    z-index: 2;
+    max-height: 60vh;
+    overflow: auto;
+    background: var(--sb-bg);
+    border: var(--sb-border-width) solid var(--sb-border-strong);
+    border-radius: var(--sb-radius);
+    padding: var(--sb-space);
+  }
+}
+
+@container sb-editor (width < 640px) {
+  .sb-editor__layout {
+    grid-template-areas:
+      "canvas"
+      "palette"
+      "inspector"
+      "drawer";
+  }
 }

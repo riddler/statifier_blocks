@@ -76,7 +76,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     Which palette entries a tenant may use, who may edit or publish a
     document, where it is stored, and what publishing means are all outside
-    this package (decision 15). So is concurrency: this is a single-session
+    this package (decision 15).
+
+    The 2026-08-29 shell amendment's ruling 8A adds two more, and names the
+    seam for each: **slots for markup, events for actions.** The outer header -
+    document identity, the document switcher, the theme control, compile and
+    publish - is the `:header` slot, because markup is exactly the thing a host
+    wants to own and a slot costs this package no API surface. The drawer's
+    height is `on_drawer_resize` out and `drawer_height` back in, because the
+    height is remembered per viewer and this package has no viewer. A host that
+    renders its own publish button into the slot and receives the press as its
+    own event is the intended shape; the editor draws no header of its own and
+    is not waiting for permission to. So is concurrency: this is a single-session
     component, it surfaces the `revision` it loaded so a host can do
     optimistic concurrency on save, and it does not merge, rebase or resolve
     anything.
@@ -94,6 +105,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `icon` | no | function component resolving an icon *name* to markup |
     | `expression_component` | no | override for `:expression` fields (sui-bob's seam) |
     | `theme` | no | `--sb-*` custom properties for the canvas root |
+    | `fixtures` | no | `%{block_id => [TruthTable.t()]}` the drawer's truth-table tab reads; `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
+    | `drawer_height` | no | the drawer's height in rem, remembered **by the host** per viewer (2A); bounded on the way in |
+    | `on_drawer_resize` | no | one-argument function called with each new drawer height, which is how the host comes to have one to remember |
     | `class` | no | appended to the root element's own classes |
     | `history_limit` | no | bound on the undo stack; `:infinity` by default |
     """
@@ -112,7 +126,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     }
 
     alias StatifierBlocks.Edit.{History, Targets}
-    alias StatifierBlocks.Editor.{Canvas, ConfigForm, Findings, PaletteBrowser}
+
+    alias StatifierBlocks.Editor.{
+      Canvas,
+      ConfigForm,
+      Drawer,
+      Findings,
+      Inspector,
+      PaletteBrowser,
+      Toolbar
+    }
+
+    alias StatifierBlocks.Shell
 
     @impl Phoenix.LiveComponent
     def mount(socket) do
@@ -135,13 +160,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          palette_position: nil,
          palette_allowed: nil,
          palette_query: "",
+         palette_sheet: false,
+         fixtures: nil,
+         inspector_tab: :config,
+         drawer_open: false,
+         drawer_height: Shell.clamp_height(nil),
+         on_drawer_resize: nil,
+         zoom: Shell.default_zoom(),
+         fit: :manual,
          last_error: nil
        )}
     end
 
     @impl Phoenix.LiveComponent
     def update(assigns, socket) do
-      socket = assign(socket, assigns)
+      previous = Map.get(socket.assigns, :document)
+      socket = socket |> assign(assigns) |> switch_document(previous)
+
+      # 2A puts the remembered height on the host, so what arrives here is
+      # whatever the host stored - possibly from a build with a different band,
+      # possibly nothing at all. It is bounded on the way in rather than on the
+      # way to the style attribute, so every reader sees one value.
+      socket =
+        if Map.has_key?(assigns, :drawer_height) do
+          assign(socket, :drawer_height, Shell.clamp_height(assigns.drawer_height))
+        else
+          socket
+        end
 
       # Normalized once per update rather than once per render: the declared
       # set is the host's input, and it changes when the host changes it, not
@@ -163,68 +208,84 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:ok, rebuild(socket)}
     end
 
+    slot(:header,
+      doc: """
+      The host's outer header (8A): document identity, the document switcher,
+      the theme control, compile and publish. The package renders the slot's
+      markup and none of its own, and a host that fills nothing gets no header
+      element at all.
+      """
+    )
+
     @impl Phoenix.LiveComponent
     def render(assigns) do
+      assigns =
+        assigns
+        |> assign(:drawer, drawer_view(assigns))
+        |> assign(:depth, Shell.depth(assigns.view_model.root))
+        |> assign(:block_count, Shell.block_count(assigns.view_model.root))
+
       ~H"""
-      <div class={["sb-editor", @class]} id={@id} data-revision={@view_model.revision}>
-        <PaletteBrowser.palette_browser
-          groups={@view_model.palette_groups}
-          query={@palette_query}
-          allowed={@palette_allowed}
-          target={@myself}
-          icon={@icon}
-        />
+      <div
+        class={["sb-editor", @class]}
+        id={@id}
+        data-revision={@view_model.revision}
+        data-zoom={@zoom}
+        data-fit={@fit}
+      >
+        <header :if={@header != []} class="sb-editor__header">
+          {render_slot(@header)}
+        </header>
 
-        <div class="sb-editor__main">
-          <div class="sb-toolbar">
-            <button
-              type="button"
-              class="sb-toolbar__button"
-              phx-click="undo"
-              phx-target={@myself}
-              disabled={not History.can_undo?(@history)}
-            >
-              Undo
-            </button>
-            <button
-              type="button"
-              class="sb-toolbar__button"
-              phx-click="redo"
-              phx-target={@myself}
-              disabled={not History.can_redo?(@history)}
-            >
-              Redo
-            </button>
-            <button
-              :if={@palette_position}
-              type="button"
-              class="sb-toolbar__button"
-              phx-click="palette-close"
-              phx-target={@myself}
-            >
-              Cancel insert
-            </button>
-          </div>
-
-          <Canvas.canvas
-            root={@view_model.root}
-            drag={@drag}
-            selected_id={@selected_id}
+        <div class="sb-editor__layout">
+          <PaletteBrowser.palette_browser
+            groups={@view_model.palette_groups}
+            query={@palette_query}
+            allowed={@palette_allowed}
+            sheet_open={@palette_sheet}
             target={@myself}
             icon={@icon}
-            theme={@theme}
           />
-        </div>
 
-        <div class="sb-editor__side">
-          <ConfigForm.config_form
-            :if={@selected_node && @selected_node.form}
+          <div class="sb-editor__main">
+            <Toolbar.toolbar
+              zoom={@zoom}
+              fit={@fit}
+              depth={@depth}
+              count={@block_count}
+              can_undo?={History.can_undo?(@history)}
+              can_redo?={History.can_redo?(@history)}
+              selected?={@selected_id != nil}
+              inserting?={@palette_position != nil}
+              target={@myself}
+            />
+
+            <Canvas.canvas
+              root={@view_model.root}
+              drag={@drag}
+              selected_id={@selected_id}
+              target={@myself}
+              icon={@icon}
+              theme={@theme}
+            />
+
+            <Findings.findings view_model={@view_model} target={@myself} />
+          </div>
+
+          <Inspector.inspector
+            tab={@inspector_tab}
             node={@selected_node}
-            target={@myself}
             pending={@pending_fields}
             expression_component={@expression_component}
+            target={@myself}
           />
-          <Findings.findings view_model={@view_model} target={@myself} />
+
+          <Drawer.drawer
+            view={@drawer}
+            height={@drawer_height}
+            root={@view_model.root}
+            target={@myself}
+          />
         </div>
       </div>
       """
@@ -234,8 +295,69 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     @impl Phoenix.LiveComponent
     def handle_event("select", %{"block-id" => id}, socket) do
-      {:noreply, socket |> assign(selected_id: id) |> rebuild()}
+      # The sheet is an overlay over the canvas below 780 (7A), so a selection
+      # made from inside it has to put it away - otherwise the block the author
+      # just chose is behind the thing they chose it from.
+      {:noreply, socket |> assign(selected_id: id, palette_sheet: false) |> rebuild()}
     end
+
+    # ---------------------------------------------------------------- shell
+    #
+    # The 2026-08-29 shell amendment, and every one of its gestures is a
+    # server-side command: no hook, no resize observer, no client-side state.
+    # Decision 7 ships one JavaScript hook and this section adds none.
+
+    def handle_event("zoom-in", _params, socket),
+      do: {:noreply, assign(socket, zoom: Shell.zoom_in(socket.assigns.zoom), fit: :manual)}
+
+    def handle_event("zoom-out", _params, socket),
+      do: {:noreply, assign(socket, zoom: Shell.zoom_out(socket.assigns.zoom), fit: :manual)}
+
+    # A mode, not a measurement: a computed fit needs the rendered width of an
+    # element and nothing on the server has it. The canvas carries the mode as
+    # `data-fit` and the stylesheet does what it can with it; the measured form
+    # arrives with the read-only measurement hook (decision 7's amendment).
+    def handle_event("fit", %{"fit" => "width"}, socket),
+      do: {:noreply, assign(socket, :fit, :width)}
+
+    def handle_event("fit", %{"fit" => "active"}, socket) do
+      fit = if socket.assigns.selected_id, do: :active, else: socket.assigns.fit
+      {:noreply, assign(socket, :fit, fit)}
+    end
+
+    def handle_event("fit", _params, socket), do: {:noreply, socket}
+
+    def handle_event("inspector-tab", %{"tab" => tab}, socket),
+      do: {:noreply, assign(socket, :inspector_tab, Shell.inspector_tab(tab))}
+
+    def handle_event("drawer-open", _params, socket),
+      do: {:noreply, assign(socket, :drawer_open, true)}
+
+    def handle_event("drawer-close", _params, socket),
+      do: {:noreply, assign(socket, :drawer_open, false)}
+
+    # One tab today. The event exists because 1A reserves the other two places
+    # (fixture runs, the datamodel view) and a tab strip that grows a handler
+    # later is a different change from one that grows a tab.
+    def handle_event("drawer-tab", _params, socket), do: {:noreply, socket}
+
+    # 2A's resize, in one round trip. The height is bounded here and handed to
+    # the host, which is where a per-viewer preference belongs: the package has
+    # no viewer, and a component that persists one has quietly acquired a
+    # session.
+    def handle_event("drawer-resize", %{"height" => height}, socket) do
+      clamped = Shell.clamp_height(height)
+
+      case socket.assigns.on_drawer_resize do
+        fun when is_function(fun, 1) -> fun.(clamped)
+        _none -> :ok
+      end
+
+      {:noreply, assign(socket, :drawer_height, clamped)}
+    end
+
+    def handle_event("palette-sheet", _params, socket),
+      do: {:noreply, update(socket, :palette_sheet, &(not &1))}
 
     # One round-trip, one enumeration. Everything the client needs for the
     # rest of the drag is in the markup this re-render produces.
@@ -311,6 +433,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     def handle_event("palette-pick", %{"type" => type}, socket) do
+      socket = assign(socket, :palette_sheet, false)
       {:noreply, insert_from_palette(socket, type, socket.assigns.palette_position)}
     end
 
@@ -459,6 +582,39 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       else
         _none -> socket
       end
+    end
+
+    # 2A: the drawer closes on a document switch. A drawer left open across one
+    # would be showing the new document's blocks under the old one's subject,
+    # and the selection it follows names a block that is not there any more -
+    # so the selection goes with it, along with the drafts and the pending
+    # insert, all three of which address ids the new document does not hold.
+    @spec switch_document(Phoenix.LiveView.Socket.t(), Document.t() | nil) ::
+            Phoenix.LiveView.Socket.t()
+    defp switch_document(socket, nil), do: socket
+
+    defp switch_document(socket, %Document{id: id}) do
+      if socket.assigns.document.id == id do
+        socket
+      else
+        assign(socket,
+          drawer_open: false,
+          selected_id: nil,
+          drafts: %{},
+          palette_position: nil,
+          palette_allowed: nil,
+          palette_sheet: false
+        )
+      end
+    end
+
+    @spec drawer_view(map()) :: Shell.drawer()
+    defp drawer_view(assigns) do
+      Shell.drawer_view(%{
+        open?: assigns.drawer_open,
+        fixtures: assigns.fixtures,
+        selected_id: assigns.selected_id
+      })
     end
 
     # ------------------------------------------------------------ derived

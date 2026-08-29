@@ -370,6 +370,63 @@ defmodule StatifierBlocks.ThemeAuditTest do
     end
   end
 
+  describe "the shell's tokens and breakpoints (the 2026-08-29 amendment)" do
+    @shell_tokens ~w(--sb-palette-width --sb-inspector-width --sb-drawer-height)
+
+    # 14e in both directions, named for the tokens the shell added, so a later
+    # refactor that drops a consumer says which surface it dropped rather than
+    # only that some token went dead.
+    # Sabotage: deleting `max-height: var(--sb-drawer-height)` from
+    # `.sb-drawer__panel` - the remembered height stops reaching anything and
+    # this goes red naming the token.
+    test "each is declared and read", context do
+      for token <- @shell_tokens do
+        assert MapSet.member?(context.declared, token), "#{token} is not declared"
+        assert MapSet.member?(context.referenced, token), "#{token} is declared and never read"
+      end
+    end
+
+    # Sabotage: removing the `2  --sb-drawer-height` line from the header - a
+    # host cannot place the token in a tier, which is what 14c is for.
+    test "each carries a tier", %{raw: raw} do
+      tiers = tiers(raw)
+
+      for token <- @shell_tokens do
+        assert tiers[token] == "2", "#{token} is not tier 2 in the header"
+      end
+    end
+
+    # 7A: container queries, not media queries, because the editor is embedded
+    # in a host page whose chrome this package does not control.
+    # Sabotage: rewriting one `@container` as `@media` - the editor starts
+    # arranging itself by the viewport's width rather than by the width it was
+    # actually given, which is wrong in exactly the case that matters (a narrow
+    # column on a wide screen) and looks right everywhere else.
+    test "the editor is the query container and every recorded step has a rule",
+         %{source: source} do
+      assert source =~ ~r/container-type:\s*inline-size/
+      assert source =~ ~r/container-name:\s*sb-editor/
+
+      for width <- [1280, 1024, 900, 780, 640] do
+        assert source =~ ~r/@container sb-editor \(width < #{width}px\)/,
+               "7A lists a #{width} step and no container query answers it"
+      end
+
+      refute source =~ ~r/@media[^{]*width/,
+             "7A: the breakpoints are container queries; a media query is the arrangement this package cannot know"
+    end
+
+    # The corroborator: a scan that matched nothing would pass the step check
+    # above vacuously if the rule shape ever changed.
+    # Sabotage: narrowing the scan to a container name the stylesheet does not
+    # use - the check above goes quiet and this notices.
+    test "the scan actually saw the queries", %{source: source} do
+      found = Regex.scan(~r/@container sb-editor/, source)
+
+      assert length(found) == 5
+    end
+  end
+
   describe "a host theme is a pure token override (decision 14)" do
     # The rule the whole surface is built to keep, held against the example the
     # documentation tells a host to copy.
