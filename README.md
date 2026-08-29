@@ -449,22 +449,31 @@ in Phoenix, and none of them compile a line of editor code.
 A host that wants the editor already has LiveView, since there is nowhere else
 to put the editor, so it adds nothing to `mix.exs`. It does three things:
 
-**1. Import the hook.** The package's entire client-side surface is one hook.
-Add the package to `assets/package.json`:
+**1. Import the hooks.** The package's entire client-side surface is two hooks,
+and the default export carries both, so registering them is one line. Add the
+package to `assets/package.json`:
 
 ```json
 { "dependencies": { "statifier_blocks": "file:../deps/statifier_blocks" } }
 ```
 
-and register it in `app.js`:
+and register them in `app.js`:
 
 ```javascript
-import { StatifierBlocksDrag } from "statifier_blocks";
+import StatifierBlocks from "statifier_blocks";
 
 let liveSocket = new LiveSocket("/live", Socket, {
-  hooks: { StatifierBlocksDrag },
+  hooks: { ...StatifierBlocks },
 });
 ```
+
+Register **both**: `StatifierBlocksDrag` turns pointer gestures into commands,
+and `StatifierBlocksMeasure` reports the laid-out geometry the server draws the
+connectors from - without it nothing measures the browser's boxes, so no
+connectors are drawn and the editor renders as stacked rows with no flow lines.
+Both are still available as named exports, and a host that wants measurement
+alone can import it from `statifier_blocks/measure` (ADR-0005 decision 7 and
+its 2026-08-29 amendment, "a second hook that only measures").
 
 **2. Import the stylesheet.** It is structural CSS only - the column layout,
 the drag affordances, the finding treatments - with no visual opinion and no
