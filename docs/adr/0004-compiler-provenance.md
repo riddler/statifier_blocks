@@ -1,6 +1,6 @@
 # ADR-0004: One block, one state - a deterministic compile carrying a provenance map
 
-Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings); decision 2 amended - outcome-tagged finals (accepted 2026-08-29, operator ruling); child-use compile and core.subchart routing amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 93); delayed-send cancel emission amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95); core.foreach sequential loop amendment F1-F6 (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 94); outcome_event/2 tagged-return ratification under 2e (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 111)
+Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings); decision 2 amended - outcome-tagged finals (accepted 2026-08-29, operator ruling); child-use compile and core.subchart routing amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 93); delayed-send cancel emission amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95); core.foreach sequential loop amendment F1-F6 (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 94); outcome_event/2 tagged-return ratification under 2e (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 111); core.parallel complete-first amendment P1-P3 (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 112)
 
 ## Context
 
@@ -1554,7 +1554,7 @@ names would be a change to decision 9.
 
 ## Amendment (2026-08-29): `core.parallel` `complete: first` - per-lane transitions, losing lanes exit and cancel
 
-**Status: proposed (2026-08-29).** This section is additive: nothing above it
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 112).** This section is additive: nothing above it
 is edited, and every decision in the record stands as written. It drafts the
 operator's 2026-08-29 ruling on how a racing `core.parallel` compiles
 (`sb-olu`, mirrored to statifier-ex as `st-rau9`, "as recommended"). Upstream
