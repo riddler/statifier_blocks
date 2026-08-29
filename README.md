@@ -558,12 +558,6 @@ Honest about the edges, so you do not go looking for these:
   the live half to the family's trace conventions (`sui-13q`).
 - **Datamodel path advisories.** As above: shape only. Whether an undeclared
   path becomes an advisory finding is decision 11d, pending a ruling.
-- **A duration control over predicator strings.** The shipped `:duration`
-  control is decision 9's: a whole number and a unit, storing ISO 8601, with
-  a raw text fallback for a value it cannot parse that way. `core.send` does
-  read a stored predicator duration (`1h30m`) through
-  `StatifierBlocks.Core.Duration`, but the control that makes that spelling
-  primary lives in the spike and waits on the decision 10/13 ruling.
 
 ### Theming
 

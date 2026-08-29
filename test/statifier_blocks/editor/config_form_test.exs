@@ -19,7 +19,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use StatifierBlocks.EditorLiveCase
 
-    alias StatifierBlocks.Editor.{ConfigForm, Field}
+    alias StatifierBlocks.Editor.ConfigForm
     alias StatifierBlocks.ViewModel
 
     defp select(view, id) do
@@ -35,15 +35,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     describe "generated controls" do
-      # Sabotage: `Field.control/1`'s `:duration` clause falling through to the
-      # plain text arm - the value/unit pair disappears.
-      test "a :duration field renders a value and a unit, not an ISO string", %{conn: conn} do
+      # ADR-0005 decision 9 as amended 2026-08-29: one text control, and the
+      # examples on screen because they are what replaces the affordance the
+      # retired unit dropdown carried.
+      #
+      # Sabotage: dropped the examples paragraph from `Field.control/1`'s
+      # `:duration` clause -> 1 failure, on the last assertion alone, with the
+      # first three green: the split this test is drawn to make (verified).
+      test "a :duration field is one text control with the examples on screen", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn)
         view = select(view, "blk_email_step")
 
         assert has_element?(view, ~s([data-field="duration"][data-field-type="duration"]))
-        assert has_element?(view, ~s(input[name="config[duration][value]"][value="1"]))
-        assert has_element?(view, ~s(select[name="config[duration][unit]"]))
+        assert has_element?(view, ~s(input[type="text"][name="config[duration]"][value="PT1H"]))
+        refute has_element?(view, ~s(select[name="config[duration][unit]"]))
+        assert render(view) =~ "Try 30s, 15m, 1h30m, 2d, 3d8h"
       end
 
       # Sabotage: `ViewModel.build_fields/3` caching the schema instead of
@@ -72,7 +78,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         view
         |> form(~s(#sb-form-blk_email_step), %{
-          "config" => %{"duration" => %{"value" => "x", "unit" => "minutes"}}
+          "config" => %{"duration" => "x"}
         })
         |> render_change()
 
@@ -90,12 +96,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         html =
           view
           |> form(~s(#sb-form-blk_email_step), %{
-            "config" => %{"duration" => %{"value" => "x", "unit" => "minutes"}}
+            "config" => %{"duration" => "x"}
           })
           |> render_change()
 
-        assert html =~ ~s(name="config[duration][raw]" value="x"),
-               "the draft is what renders, through the raw fallback its value now needs"
+        assert html =~ ~s(name="config[duration]" value="x"),
+               "the draft is what renders, in the one control the field now has"
 
         assert html =~ "must be a duration",
                "the finding is about the value being typed, not the one committed"
@@ -109,13 +115,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         view
         |> form(~s(#sb-form-blk_email_step), %{
-          "config" => %{"duration" => %{"value" => "x", "unit" => "minutes"}}
+          "config" => %{"duration" => "x"}
         })
         |> render_change()
 
         html =
           view
-          |> form(~s(#sb-form-blk_email_step), %{"config" => %{"duration" => %{"raw" => "PT45M"}}})
+          |> form(~s(#sb-form-blk_email_step), %{"config" => %{"duration" => "PT45M"}})
           |> render_change()
 
         assert config(latest_document(), "blk_email_step") == %{"duration" => "PT45M"}
@@ -131,13 +137,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         view
         |> form(~s(#sb-form-blk_email_step), %{
-          "config" => %{"duration" => %{"value" => "45", "unit" => "minutes"}}
+          "config" => %{"duration" => "PT45M"}
         })
         |> render_change()
 
         view
         |> form(~s(#sb-form-blk_email_step), %{
-          "config" => %{"duration" => %{"value" => "x", "unit" => "minutes"}}
+          "config" => %{"duration" => "x"}
         })
         |> render_change()
 
@@ -228,24 +234,75 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     describe "a :duration control" do
-      # Sabotage: `Field.format_duration/2` always emitting seconds - the
-      # committed value becomes PT3S rather than PT3H.
-      test "composes an ISO-8601 string from a value and a unit", %{conn: conn} do
-        {:ok, view, _html} = mount_editor(conn)
-        view = select(view, "blk_email_step")
+      # The amendment's "the stored form is the author's string verbatim".
+      # `core.send` is the block type that reads both spellings today, so it
+      # is what a predicator string can be committed through.
+      #
+      # Sabotage: canonicalised the typed value through `Core.Duration.to_iso/1`
+      # in `Field.decode/2` -> `1h30m` was stored as `PT1H30M` and the second
+      # assertion went red (verified).
+      test "stores the author's string verbatim, in either spelling", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: sending_document())
+        view = select(view, "blk_abandon")
 
-        view
-        |> form(~s(#sb-form-blk_email_step), %{
-          "config" => %{"duration" => %{"value" => "3", "unit" => "hours"}}
-        })
-        |> render_change()
+        for typed <- ["1h30m", "PT2H", "3d8h"] do
+          view
+          |> form(~s(#sb-form-blk_abandon), %{"config" => %{"delay" => typed}})
+          |> render_change()
 
-        assert config(latest_document(), "blk_email_step") == %{"duration" => "PT3H"}
+          assert config(latest_document(), "blk_abandon") ==
+                   %{"event" => "signup.abandoned", "delay" => typed}
+        end
       end
 
-      # Sabotage: `Field.parse_duration/1` returning `{0, "seconds"}` instead of
-      # nil for an unparseable value - the raw string would be silently replaced.
-      test "a stored duration it cannot represent falls back to raw text", %{conn: conn} do
+      # Sabotage: made `omitted?/2` return false for every value -> the
+      # committed config grew a `"delay" => ""` key and 4 tests went red, the
+      # decode/3 cases below among them (verified).
+      test "an empty field omits the key, and never-set reads the same", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: sending_document())
+        view = select(view, "blk_abandon")
+
+        view
+        |> form(~s(#sb-form-blk_abandon), %{"config" => %{"delay" => ""}})
+        |> render_change()
+
+        assert config(latest_document(), "blk_abandon") == %{"event" => "signup.abandoned"},
+               "a cleared duration is an absent key, not PT0S and not an empty string"
+
+        assert has_element?(view, ~s(input[name="config[delay]"][value=""])),
+               "and a never-set field renders exactly as the cleared one does"
+      end
+
+      # The inline check is EARLIER than decision 9's gate, not a second one:
+      # it says which spelling the author is failing while they are still
+      # typing, and the gate still decides what reaches the document.
+      #
+      # Sabotage: dropped the refusal paragraph from `Field.control/1` -> the
+      # sentence never rendered, this test went red on its first case, and the
+      # gate's own refusal stayed green beside it (verified).
+      test "refuses a bad format inline, with the limit that was hit", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: sending_document())
+        view = select(view, "blk_abandon")
+
+        for {typed, sentence} <- [
+              {"soon", "Not a duration. Try 30s, 15m, 1h30m, 2d, 3d8h"},
+              {"500ms", "Milliseconds are not stored here"},
+              {"1.5s", "leaves milliseconds"}
+            ] do
+          html =
+            view
+            |> form(~s(#sb-form-blk_abandon), %{"config" => %{"delay" => typed}})
+            |> render_change()
+
+          assert html =~ sentence, typed
+          assert html =~ ~s(data-duration-refusal), typed
+        end
+      end
+
+      # Sabotage: hard-coded the control's `value` to `""` -> the stored `P1Y`
+      # vanished from the form rather than being shown, and 3 tests went red
+      # including this one (verified).
+      test "a stored duration the control did not author is still shown", %{conn: conn} do
         document =
           Document.new(
             Block.new("core.wait", id: "blk_odd", config: %{"duration" => "P1Y"}),
@@ -255,7 +312,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {:ok, view, _html} = mount_editor(conn, document: document)
         view = select(view, "blk_odd")
 
-        assert has_element?(view, ~s(input[name="config[duration][raw]"][value="P1Y"]))
+        assert has_element?(view, ~s(input[name="config[duration]"][value="P1Y"]))
         refute has_element?(view, ~s(input[name="config[duration][value]"]))
       end
     end
@@ -266,7 +323,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       test "carries the base config forward, so an unschema'd key is not deleted" do
         fields = [field("duration", :duration, "PT1H")]
         base = %{"duration" => "PT1H", "arms" => [%{"slot" => "arm_b", "cond" => "x"}]}
-        params = %{"config" => %{"duration" => %{"value" => "5", "unit" => "minutes"}}}
+        params = %{"config" => %{"duration" => "PT5M"}}
 
         assert ConfigForm.decode(fields, params, base) == %{
                  "duration" => "PT5M",
@@ -279,7 +336,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         params = %{
           "config" => %{
-            "duration" => %{"value" => "5", "unit" => "minutes"},
+            "duration" => "PT5M",
             "injected" => "not a field"
           }
         }
@@ -291,7 +348,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # rather than its current value - a control that did not post would reset.
       test "a field whose control did not post keeps the value it already had" do
         fields = [field("duration", :duration, "PT2H"), field("label", :string, "Welcome")]
-        params = %{"config" => %{"duration" => %{"value" => "5", "unit" => "minutes"}}}
+        params = %{"config" => %{"duration" => "PT5M"}}
 
         assert ConfigForm.decode(fields, params, %{}) == %{
                  "duration" => "PT5M",
@@ -359,32 +416,61 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    describe "Field.parse_duration/1 and format_duration/2" do
-      # Sabotage: `largest_unit/1` testing seconds before days - PT86400S comes
-      # back instead of P1D.
-      test "round-trip through the largest unit that divides evenly" do
-        for {iso, expected} <- [
-              {"PT30S", {30, "seconds"}},
-              {"PT90S", {90, "seconds"}},
-              {"PT30M", {30, "minutes"}},
-              {"PT1H30M", {90, "minutes"}},
-              {"PT2H", {2, "hours"}},
-              {"P1D", {1, "days"}},
-              {"P1DT12H", {36, "hours"}},
-              {"PT0S", {0, "seconds"}}
-            ] do
-          assert Field.parse_duration(iso) == expected
+    describe "an omitted :duration key" do
+      # Sabotage: made `omitted?/2` return false for every value -> the empty
+      # duration landed as `""` and 4 tests went red, this file's two other
+      # omission cases among them (verified).
+      test "an empty duration deletes its key rather than storing an emptiness" do
+        fields = [field("delay", :duration, "PT1H")]
+        base = %{"event" => "signup.abandoned", "delay" => "PT1H"}
 
-          {count, unit} = expected
-          assert Field.parse_duration(Field.format_duration(count, unit)) == expected
-        end
+        assert ConfigForm.decode(fields, %{"config" => %{"delay" => ""}}, base) ==
+                 %{"event" => "signup.abandoned"}
       end
 
-      test "anything it cannot represent is nil, not a guess" do
-        for value <- ["P1Y", "PT1.5H", "tomorrow", "", nil, 3600] do
-          assert Field.parse_duration(value) == nil
-        end
+      test "a key that was never there stays absent, rather than being created" do
+        fields = [field("delay", :duration, "")]
+
+        assert ConfigForm.decode(fields, %{"config" => %{"delay" => ""}}, %{"event" => "x"}) ==
+                 %{"event" => "x"}
       end
+
+      # The omission follows `value_path`, like every other write. Deleting a
+      # top-level key of the same name would be silent data loss beside the
+      # value the author actually cleared.
+      test "a nested duration deletes only its own key at its own path" do
+        fields = [field("arm_wait", :duration, "PT1H", ["arms", 0, "delay"])]
+        base = %{"delay" => "PT9H", "arms" => [%{"slot" => "arm_b", "delay" => "PT1H"}]}
+
+        assert ConfigForm.decode(fields, %{"config" => %{"arm_wait" => ""}}, base) ==
+                 %{"delay" => "PT9H", "arms" => [%{"slot" => "arm_b"}]}
+      end
+
+      test "a path naming something that is not there leaves the config alone" do
+        fields = [field("arm_wait", :duration, "PT1H", ["arms", 3, "delay"])]
+
+        assert ConfigForm.decode(fields, %{"config" => %{"arm_wait" => ""}}, %{"other" => 1}) ==
+                 %{"other" => 1}
+      end
+
+      # Only `:duration` omits. A `:string` that is emptied is a stored empty
+      # string, which is a value its type may well accept.
+      test "no other field type omits its key when it is emptied" do
+        fields = [field("label", :string, "Welcome")]
+
+        assert ConfigForm.decode(fields, %{"config" => %{"label" => ""}}, %{}) ==
+                 %{"label" => ""}
+      end
+    end
+
+    # A `core.send` whose delay the author edits. `core.send` is the block
+    # type that already reads both stored spellings, so it is where a
+    # predicator string can be committed without waiting on `core.wait`.
+    defp sending_document do
+      Document.new(
+        Block.new("core.send", id: "blk_abandon", config: %{"event" => "signup.abandoned"}),
+        id: "doc_abandon"
+      )
     end
 
     defp field(key, type, value, value_path \\ nil) do

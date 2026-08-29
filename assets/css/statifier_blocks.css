@@ -599,8 +599,31 @@
   min-width: 0;
 }
 
-.sb-field__input--expression {
+.sb-field__input--expression,
+.sb-field__input--duration {
   font-family: var(--sb-font-mono);
+}
+
+/* The `:duration` control's two lines beneath the field, ADR-0005 decision 9
+ * as amended 2026-08-29. The examples are always on screen because they are
+ * what replaces the affordance the retired unit dropdown carried; the refusal
+ * appears only while the typed text is not a duration.
+ *
+ * The refusal is styled like an error finding without BEING one: a finding is
+ * `validate_config/1`'s verdict on a stored value, and this is the inline
+ * check that runs before the edit is offered to the gate at all. Borrowing
+ * the class would make the two indistinguishable to a host restyling either. */
+.sb-field__examples {
+  font-size: var(--sb-text-sm);
+  color: var(--sb-fg-muted);
+}
+
+.sb-field__refusal {
+  font-size: var(--sb-text-sm);
+  border-radius: var(--sb-radius-sm);
+  padding: 0 var(--sb-space-half);
+  background: var(--sb-error-bg);
+  color: var(--sb-error);
 }
 
 /* The uncommitted-edits affordance. Decision 9 commits a config as a unit, so
