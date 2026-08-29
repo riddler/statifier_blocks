@@ -1193,3 +1193,233 @@ Recorded so the shipped editor does not re-litigate this from the stylesheet.
 Restoring a tint nobody has ever seen is a new design, not a bug fix, and if
 the shipped editor wants config chips to carry an accent it should decide that
 looking at them.
+
+---
+
+## Proposed amendment (2026-08-29): decision 10, `slot_style: :failure`
+
+**Status: PROPOSED, not accepted.** Additive; decision 10 stands as accepted
+until the operator rules, and no text above this line is changed by it. It is
+drafted from what campaign 013 built and the operator then ruled on: the
+failure-path slot style (`sb-68b`, PR 56) and the exit-edge ruling that
+followed it (`sb-67s`, 2026-08-29).
+
+### Context
+
+Decision 10's `slot_style` map is two-valued: a statically-named slot is
+`:primary` or `:secondary`, and `:secondary` is the interrupt rail. That was
+enough while the rail was the only non-body arrangement the editor drew. It
+stopped being enough the moment a block type acquired a second way to finish.
+
+`core.invoke`'s `on_error` slot is not an interrupt. An interrupt rule fires
+out of band, against a region, on an event the region did not ask for. An
+`on_error` subtree runs *because the call failed*, as the continuation of that
+outcome, and when it finishes the enclosing parent carries on. Both were
+declaring `:secondary`, so both rendered in the same dashed, warning-tinted
+vocabulary, and "fires out of band" and "runs when the call fails" were
+indistinguishable on the canvas (campaign-012 evidence:
+`sb-pt1-onerror-vs-interrupts-light.jpg`, private journal).
+
+The accepted ADR-0004 amendment (2026-08-29, decision 2, outcome-tagged
+finals) is what makes the distinction a contract rather than a matter of
+taste. Under 2c and 2d an `on_error` subtree's completion targets the block's
+error-outcome final, that final raises `done.outcome.<state id>.error`, and
+**the parent decides continuation; the block does not**. A failure path is
+therefore in-band by construction: it ends in an ordinary completion event
+that an ordinary parent transition consumes. The rendering vocabulary should
+say so, and the rendering vocabulary currently says the opposite.
+
+The spike built it and the operator ruled on the edge. Screens are in the
+private campaign journal (campaign 013, cited by filename, not copied here):
+`sb-68b-failure-vs-interrupt-light.jpg` and its `-dark`/`-host-brand` pair for
+the two vocabularies side by side, `sb-68b-empty-failure-slot-light.jpg` and
+its pair for the empty case, and `sb-ea4-failure-rail-exit-edge-light.jpg` and
+its pair for the edge that contradicted the rail it left.
+
+### Proposed decision
+
+**10g. `slot_style` admits a third value, `:failure`.** Decision 10's table row
+reads `statically-named slot to :primary or :secondary`; it would read
+`statically-named slot to :primary, :secondary or :failure`. Nothing else in
+the table changes, the key stays optional with a `%{}` default, and every
+block type that declares no `slot_style` renders exactly as it does today.
+`core.invoke` declares `slot_style: %{"on_error" => :failure}`.
+
+`:failure` means: **an in-band continuation path taken on a bad outcome.** It
+is a claim about how the slot's children are reached and what happens when
+they are done, not a claim about what they contain - a failure slot holding
+one notify block and a failure slot holding a nested group are the same
+declaration.
+
+**10h. What the renderer derives from the style, and nothing it derives from a
+type name.** The three values partition into two questions, and keeping them
+two is what stops a third value from becoming a third code path per component.
+
+| Derived property | `:primary` | `:secondary` | `:failure` |
+|---|---|---|---|
+| Placement | in the body flow | attached rail | attached rail |
+| Container is a boundary (10c) | no | yes | yes |
+| Slot edge treatment | none | dashed, warning family | solid, error family |
+| Slot card shadow | ordinary | flat | ordinary |
+| Empty slot | ordinary empty affordance | dashed warning edge | solid error edge |
+| Exit edge kind | flow | interrupt | flow |
+
+Two of those rows carry the whole proposal.
+
+*Placement and boundary are one question, asked of the rail partition.* A
+container is a boundary box (amendment 10c) if **any** of its slots declares a
+rail style, `:secondary` and `:failure` alike - not if it declares
+`:secondary` specifically. 10c's stated reason - an attached rule is about a
+region, so the region needs a visible edge - is as true of a failure path as
+of an interrupt, and deriving both the rail placement and the boundary from
+one partition is what kept the recursion in decision 13 from acquiring a
+branch (`sb-68b`: `layoutNode.secondary` became the rail partition rather than
+the `:secondary` partition, and that was the whole structural change).
+
+*The exit edge is the second question, and the operator ruled it.* Per the
+2026-08-29 `sb-67s` ruling: **a failure rail's exit renders as an ordinary
+solid flow edge**, and the dashed exit channel with the interrupt arrowhead
+stays exclusively interrupt-rail vocabulary. An error tint on that flow edge
+is the drafter's call and carries no meaning. The ruling's grounding is the
+ADR-0004 amendment quoted above: a failure path leaves through a completion
+event the parent continues on, which is flow, not escape. Before the ruling
+the renderer emitted the interrupt edge kind for every rail child without
+reading the slot style, so a failure rail was drawn in-band and left
+out-of-band in the same picture (`sb-ea4-failure-rail-exit-edge-*`).
+
+**No component reads a type name to reach any cell of that table.** The
+renderer reads the declared style; `core.invoke` declares `:failure` because
+its `on_error` slot is one, and a host block type whose slot has the same
+shape declares the same thing and gets the same rendering, with no editor
+change. That is the property decision 10 exists to preserve, and it is the
+reason this is a metadata widening rather than a special case for one core
+type.
+
+**10i. An unrecognized style resolves to `:primary`.** A `slot_style` value the
+editor does not know - a host declaring against a newer record, a typo -
+renders as an ordinary body slot rather than raising or dropping the slot.
+This is decision 3's total-resolution posture arriving at presentation, the
+same discipline ADR-0002's amendment B3 applies to the metadata trio: a
+malformed declaration in one host's registry produces the ordinary card, never
+a broken one and never an exception. The children are still rendered, still
+selectable, and still saved.
+
+**10j. No new token.** Every value the failure vocabulary needs already exists
+in the error family the theme surface carries (`--sb-error`, `--sb-error-bg`,
+and the ordinary card shadow). Declaring aliases would be three restatements
+per theme of a value that already themes correctly, and amendment 14e's token
+coverage runs in both directions, so an unread token fails the build. The
+spike's theme audit stayed green across all three themes without one
+(`sb-68b`).
+
+### Consequences
+
+- The two rail vocabularies become distinguishable at a glance and stay
+  distinguishable at depth, which is the failure the campaign-012 screens
+  recorded and campaign 013 fixed.
+- The canvas and the compiled chart now agree: what ADR-0004's amendment makes
+  an in-band outcome event, the renderer draws as an in-band edge.
+- `slot_style` becomes a small closed vocabulary rather than a boolean in
+  disguise, so 10i stops being optional - a third value means a fourth is
+  possible, and a host will eventually declare one this editor does not have.
+- Nothing here adds a component, and nothing here widens `palette_entry/0`'s
+  key set. It is a value added to a key that already exists, which is the
+  cheapest shape a rendering change can take and the reason it is proposed
+  separately from 10f and 14d.
+- It does not settle 10f. Whether a block type may declare that its rule
+  blocks carry a routable **outcome** key is still open and still the
+  operator's call; `:failure` is a slot's style, not a config-value route.
+
+---
+
+## Proposed amendment (2026-08-29): decision 11, an `:info` severity
+
+**Status: PROPOSED, not accepted.** Additive; decision 11 stands as accepted
+until the operator rules, and no text above this line is changed by it.
+
+### Context
+
+This section does not restate the case - it answers a question already put to
+this record. The d10/13 amendment above, under **Decision 11's severity set:
+`:info` proposed, open**, records that the campaign-012 spike's findings pane
+renders a third severity, that every instance of it is `origin: "demo"`, that
+the datamodel pane's undeclared-path advisories were kept out of findings for
+a related reason, and that whether the answer is a third severity or a second
+channel is the operator's call. Read that paragraph first; everything it says
+still holds.
+
+What this section adds is the drafted form of one of the two answers, so that
+the operator is ruling on a written decision rather than on a description of
+one.
+
+### Proposed decision
+
+**11a. `severity` admits `:info`, for advisory findings.** Decision 11's
+`%Finding{}` severity field reads `:error | :warning`; it would read
+`:error | :warning | :info`. The anchor, source, and message fields are
+unchanged, and the anchor stays the whole routing mechanism.
+
+`:info` means: **this is worth the author's attention and nothing is wrong.**
+That is the line decision 11 currently cannot draw. `:error` says the document
+does not compile; `:warning` says it compiles and something may not behave as
+intended - decision 11's own example, an invoke type with no registered
+handler, is correct the moment the host registers one. Neither fits a row that
+is offering information the author did not ask for and making no claim at all,
+and the spike found that such rows read wrong in warning chrome.
+
+**11b. Only `:lint` may produce it, and today nothing does.** This is the part
+to state honestly rather than to leave implied.
+
+Decision 11 says every source except `:lint` produces `:error`. That stands
+unchanged: `:config`, `:arity`, `:assignability` and `:resolution` are all
+claims that something is wrong, and none of them may produce an `:info`.
+`:lint` is the only source that may - and **no lint produces one today.** No
+validation path in the shipped package, and none in the spike, emits an
+advisory finding; every `:info` row ever rendered was fixture data marked
+`origin: "demo"`. This amendment therefore proposes a severity with no
+producer.
+
+That is deliberate and it is the argument's weakest point, so it is named
+rather than dressed up. The case for taking it anyway is that the *rendering*
+is not speculative - the pane, the anchor routing, the collapsed-subtree count
+badge and the document-level panel all handle a third severity today, and the
+question of what chrome an advisory row wears was answered by looking at it.
+The case against is that a severity nothing emits is a contract widened on
+spec, and the honest disposal of that is the operator's: **accept it as the
+place a real advisory will land, or hold it until a producer exists.** The
+first lint likely to need it is the unregistered-invoke-type lint decision 11
+already names, and that lint is `sb-iwz`'s to place, not this record's.
+
+**11c. What the renderer derives, and what it does not.** An `:info` finding
+renders in a neutral advisory chrome, distinct from the warning family and
+never in the error family. It routes by anchor exactly as the other two do, it
+appears in the document-level panel, and it contributes to a collapsed
+subtree's count badge - a finding that can hide inside something folded shut
+is the failure mode decision 11 exists to prevent, and an advisory hides just
+as well as a warning.
+
+It changes no verdict. A document whose only findings are `:info` is exactly
+as compilable and exactly as correct as one with no findings, and any consumer
+gating on findings gates on `:error`, as it did before this amendment. Sorting
+and grouping put `:info` last.
+
+**11d. It does not answer the datamodel question.** The undeclared-path
+advisories the datamodel pane deliberately keeps out of findings stay out. A
+findings entry is a claim about the document, and a host may legitimately
+carry values it has not described; whether those advisories eventually arrive
+as `:info` findings or as a separate channel is a question this section leaves
+exactly where the paragraph above left it.
+
+### Consequences
+
+- Decision 11's severity set becomes three-valued, and every existing consumer
+  keeps working, because nothing emits the new value.
+- The distinction between "wrong", "may not behave as intended" and "worth
+  knowing" becomes expressible, which is what lets a future lint be written
+  without either overstating itself or being left out of the pane.
+- Accepting a severity with no producer is a real cost: it is a contract that
+  cannot be exercised, and it will stay unexercised until `sb-iwz`'s lint or
+  something like it lands. Holding it costs the reverse - the first lint that
+  needs it arrives with a record amendment attached.
+- Nothing here changes the anchor vocabulary, the source list, or the routing.
+  It is one value on one field.
