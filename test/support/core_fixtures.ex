@@ -338,6 +338,9 @@ defmodule StatifierBlocks.CoreFixtures do
       "params" => "email=signup.email"
     }
 
+  def valid_config(Core.Foreach),
+    do: %{"items" => "signup.invitees", "item_as" => "invitee", "index_as" => "position"}
+
   def valid_config(Core.Invoke),
     do: %{
       "invoke_type" => "myapp:authorize",

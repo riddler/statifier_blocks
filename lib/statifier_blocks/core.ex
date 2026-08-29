@@ -23,6 +23,7 @@ defmodule StatifierBlocks.Core do
   | `core.assign` | `#{inspect(__MODULE__)}.Assign` | none |
   | `core.send` | `#{inspect(__MODULE__)}.Send` | none |
   | `core.subchart` | `#{inspect(__MODULE__)}.Subchart` | one per declared outcome, `on_error` last |
+  | `core.foreach` | `#{inspect(__MODULE__)}.Foreach` | `body` |
 
   ## Structure, not domain
 

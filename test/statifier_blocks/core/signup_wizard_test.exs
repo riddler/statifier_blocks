@@ -54,7 +54,14 @@ defmodule StatifierBlocks.Core.SignupWizardTest do
     # worked examples has to be admitted deliberately, and the list shrinks
     # the day an example that uses one of them lands.
     uncovered =
-      MapSet.new(["core.assign", "core.invoke", "core.raise", "core.send", "core.subchart"])
+      MapSet.new([
+        "core.assign",
+        "core.foreach",
+        "core.invoke",
+        "core.raise",
+        "core.send",
+        "core.subchart"
+      ])
 
     assert MapSet.new(Map.keys(resolved))
            |> MapSet.union(MapSet.new(Map.keys(other)))
