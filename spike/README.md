@@ -129,7 +129,7 @@ answers them there rather than probing a rendered page.
 | Pane | Contract | Notes |
 |---|---|---|
 | Palette | ADR-0005 d10 | Rendered from the registry, so registering a block type is all a host does. Search matches label, type name, description and declared `keywords`, and says which when the match is one the reader cannot see. |
-| Config | ADR-0005 d9 | Schema-driven over ADR-0002 d7's closed field-type set. Edits commit on `change`, as one `update_config`; d9's gate refuses invalid config, and the refusal is shown under the field without discarding what the author typed. |
+| Config | ADR-0005 d9 | Schema-driven over ADR-0002 d7's closed field-type set. Edits commit on `change`, as one `update_config`; d9's gate refuses invalid config, and the refusal is shown under the field without discarding what the author typed. A refused edit is held as a per-block **draft** and re-offered with the next one, so a type with several required fields can be filled in a field at a time - see below. |
 | Findings | ADR-0005 d11 | Anchored: clicking a row selects and reveals its target, unfolding every collapsed ancestor over it. Count badge on the tab, and the collapsed-card badges count the same set. |
 
 Two things there are worth naming because they are proposals rather than
@@ -148,6 +148,71 @@ There is no decimal control, on purpose: ADR-0001 d6 forbids floats in
 config, so a decimal is a `:string` holding `"12.50"` and the text control
 stores and round-trips it unchanged. Adding a `:decimal` field type would
 widen a closed set to describe something the set already covers.
+
+### Draft accumulation: filling in more than one required field (sb-5ow)
+
+ADR-0005 d9 validates a config as a **unit** and stores nothing when the
+gate refuses. That invariant is the right one - a stored config is always a
+valid config - and on its own it made a block type with two required fields
+and no usable defaults impossible to configure through a form that commits
+one field at a time. `core.assign` is the live repro: fill `path` and the
+config still carries an empty `value`, so the gate refuses; fill `value`
+afterwards and the edit is computed against the *stored* config, which never
+took `path`, so the gate refuses again. Both fields are correct on screen,
+the revision never moves, and the author is told twice that a value they
+typed correctly is wrong.
+
+The mechanism, ruled 2026-08-29 and implemented here:
+
+- The inspector holds a **draft config per block** - `createDraftStore()` in
+  `panes.js`, one `Map` of block id to config, held beside the DOM by
+  `createInspector` rather than on the session. A draft is exactly the
+  "in-progress form state" d9 puts in transient assigns, and a draft on the
+  session would be a config the document model knows about and the gate has
+  never seen.
+- Every field edit is written through the draft when one is outstanding and
+  through the stored config otherwise (`editBase`), then offered to the gate
+  **whole**, exactly as before (`commitField`). Nothing about the gate, the
+  schema, the command algebra or the undo stack moves.
+- The first config that validates lands as **one** `update_config` - one
+  revision, one undo step - and the draft is dropped. A refusal stores
+  nothing, as it always did; the difference is only that what the author
+  typed is now carried forward into the next edit instead of being computed
+  away.
+- The config pane renders its form over the draft, so a half-filled form
+  keeps showing what was typed across a re-render, and the condition pane
+  reads the same draft so the two surfaces cannot disagree about what the
+  block currently says.
+- The **uncommitted-edits affordance** (`.sb-form__pending`) names the
+  fields that are outstanding, says why nothing is stored yet, and offers
+  "Discard edits". A draft was never a command, so it cannot be undone; it
+  can only be thrown away, and that gesture has to exist somewhere.
+
+Two other shapes were considered in that ruling and rejected: relaxing
+validation per field, which lets an invalid config reach the document and is
+the thing d9 exists to prevent; and seeding defaults at insert time, which
+puts values into an author's document that the author never chose.
+
+What the store deliberately does **not** do, and what the shipped editor
+will have to decide when it inherits this design under `sb-8dc`:
+
+- It does not reconcile against edits from elsewhere. An undo, a redo, or an
+  edit to the same block from another surface changes the stored config
+  underneath an outstanding draft, and the draft is left as the author wrote
+  it. Dropping a block's draft on any command that touches that block is
+  the obvious rule; whether it is the right one is a question about what an
+  author expects undo to mean while a form is half-filled, and the spike
+  does not answer it.
+- Its only automatic clear is a document change, where every block id in the
+  store is about a block that is no longer on screen.
+- Nothing persists a draft. Reloading the page loses it, which is correct
+  for a spike and is a real question for a LiveView that may lose a socket.
+
+Asserted in `dev/selftest.html` under "config drafts": the gate still
+refuses each half on its own, two edits in either order produce one revision
+carrying both fields, a value the type refuses is still refused with the
+document keeping the last config that validated, and discarding returns the
+form to the document.
 
 ## The three themes
 

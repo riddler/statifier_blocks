@@ -857,3 +857,110 @@ export function anchorLabel(anchor) {
       return anchor.blockId;
   }
 }
+
+/* ========================================================== config drafts */
+
+/*
+ * sb-5ow: the per-block DRAFT config, and why the inspector needs one.
+ *
+ * ADR-0005 decision 9 gates every `:update_config` on `validate_config/1`
+ * over the WHOLE config, and a refusal stores nothing. That invariant is the
+ * right one - a stored config is always a valid config - but it made a block
+ * type with two required fields and no defaults unconfigurable through a form
+ * that commits per field. `core.assign` is the live repro: fill `path` and
+ * the config still has an empty `value`, so the gate refuses; fill `value`
+ * afterwards and the edit is computed against the STORED config, which never
+ * took `path`, so the gate refuses again. The revision never moves and the
+ * author is told twice that a field they filled in correctly is wrong.
+ *
+ * The operator's ruling (2026-08-29) is DRAFT ACCUMULATION. The inspector
+ * holds a draft config per block; fields edit the draft freely; the draft is
+ * offered to the gate on every edit and becomes the stored config the first
+ * time it validates AS A UNIT. Nothing about the gate, the schema, or the
+ * command algebra moves: `updateConfig` is still the only way into the
+ * document, still validated whole, still one undo step. What changes is only
+ * WHICH config the next edit is computed against - the draft, when one is
+ * outstanding, rather than the last one that happened to be storable.
+ *
+ * Two shapes were considered and rejected in that ruling. Relaxing validation
+ * per field would let an invalid config reach the document, which is d9's
+ * whole point. Seeding defaults at insert time would put values into the
+ * author's document that the author never chose.
+ *
+ * The store is deliberately dumb: a Map of block id to config, no revision
+ * tracking and no reconciliation against edits from elsewhere. `reset()` on a
+ * document change is the only automatic clear; see the spike README's panes
+ * section for what that leaves open (undo/redo under an outstanding draft).
+ */
+
+/**
+ * A draft store.
+ *
+ *     read(blockId, stored)   the draft for that block, or `stored`
+ *     pending(blockId)        is a draft outstanding for that block
+ *     stage(blockId, config)  hold `config` as the block's draft
+ *     clear(blockId)          drop that block's draft
+ *     reset()                 drop every draft (a new document)
+ *     size()                  how many blocks have one
+ *
+ * Mutable on purpose. Everything else in this file is a value transform, but
+ * a draft is exactly the "in-progress form state" decision 9 puts in transient
+ * assigns - state the shipped editor holds in its stateful component and the
+ * spike holds beside the DOM. Modelling it as a value would mean threading it
+ * through every control closure for no gain.
+ */
+export function createDraftStore() {
+  const drafts = new Map();
+
+  return {
+    read: (blockId, stored) => (drafts.has(blockId) ? drafts.get(blockId) : stored),
+    pending: (blockId) => drafts.has(blockId),
+    stage: (blockId, config) => {
+      drafts.set(blockId, config);
+      return config;
+    },
+    clear: (blockId) => drafts.delete(blockId),
+    reset: () => drafts.clear(),
+    size: () => drafts.size,
+  };
+}
+
+/**
+ * The top-level keys on which a draft and the stored config disagree, sorted.
+ *
+ * Top level rather than deep: it feeds a sentence naming the fields an author
+ * has edited but not yet stored, and a config form's fields are keyed at the
+ * top level even when a field WRITES deeper (`core.branch` keys an arm by its
+ * slot name and stores it at `["arms", i, "cond"]`). A deep diff would name
+ * `arms` in a vocabulary no label in the form uses.
+ *
+ * Compared through `stableJson` below rather than through `canonicalJson`,
+ * which pretty-prints for a human and does NOT sort keys: the order the keys
+ * of a nested value happened to be built in is not an author edit.
+ */
+export function pendingKeys(draft, stored) {
+  const left = isObject(draft) ? draft : {};
+  const right = isObject(stored) ? stored : {};
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+
+  return [...keys]
+    .filter((key) => stableJson(left[key] ?? null) !== stableJson(right[key] ?? null))
+    .sort();
+}
+
+const isObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+
+/*
+ * JSON with object keys in sorted order, at every depth. `document.js` owns
+ * the document's canonical encoding and this is deliberately not a second
+ * spelling of it: it never leaves this file, it is only ever compared against
+ * itself, and it exists because two configs that differ only in key order are
+ * the same config.
+ */
+function stableJson(value) {
+  return JSON.stringify(value, (_key, seen) =>
+    isObject(seen)
+      ? Object.fromEntries(Object.keys(seen).sort().map((key) => [key, seen[key]]))
+      : seen
+  );
+}

@@ -4187,3 +4187,41 @@
   font-size: var(--sb-text-xs);
   line-height: var(--sb-leading);
 }
+
+/* ------------------------------------------- the uncommitted-edits notice
+ *
+ * sb-5ow. A draft config accumulates in the inspector until it validates as a
+ * unit, and the pane has to say so: an author who fills two required fields
+ * and sees the revision stay put needs to be able to tell "held, waiting for
+ * the rest" from "dropped". Treated as a WARNING rather than an error - the
+ * form is mid-sentence, not wrong - and given a left rail like a finding so
+ * the two read as the same family of message.
+ */
+.sb-form__pending {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+  padding: var(--sb-space);
+  border-left: var(--sb-space-half) solid var(--sb-warning);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-warning-bg);
+}
+
+.sb-form__pending-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space-half);
+}
+
+.sb-chip--pending {
+  background: var(--sb-warning-bg);
+  color: var(--sb-warning);
+  font-family: inherit;
+}
+
+.sb-form__pending-text {
+  margin: 0;
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
+  color: var(--sb-warning);
+}
