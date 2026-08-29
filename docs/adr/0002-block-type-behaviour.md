@@ -1,6 +1,6 @@
 # ADR-0002: A block type is a behaviour module resolved through a caller-supplied palette
 
-Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings); outcomes/metadata/label amendment (accepted 2026-08-29, operator ruling); decision 7 amended - optional `datamodel_path?` key (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 10 amended - the core.assign row, section G (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 98); decision 7 amended - optional `sensitive?` key and the secrets rule (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 99); core.send send id and no core.cancel amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95); decision 10 amended - the core.send row, section G2, and the decision 7 :duration cross-reference (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 110)
+Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings); outcomes/metadata/label amendment (accepted 2026-08-29, operator ruling); decision 7 amended - optional `datamodel_path?` key (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 10 amended - the core.assign row, section G (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 98); decision 7 amended - optional `sensitive?` key and the secrets rule (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 99); core.send send id and no core.cancel amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95); decision 10 amended - the core.send row, section G2, and the decision 7 :duration cross-reference (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 110); decision 10 amended - the core.subchart and core.foreach rows, core.parallel's `complete` key and the thirteen count, G5-G8 (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 129)
 
 ## Context
 
@@ -1499,7 +1499,7 @@ the send-id amendment rules on and a separate bead brings into line.
 
 ## Amendment (2026-08-29): the `core.subchart` and `core.foreach` rows, and `core.parallel`'s `complete` key
 
-**Status: proposed.** Section G3 of this date closed the `core.send` gap and
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015b grant, PR 129).** Section G3 of this date closed the `core.send` gap and
 named the one type still owed a row: `core.subchart`, which shipped later the
 same day with its routing recorded in ADR-0004's amendment of that date and no
 decision-10 row of its own. `core.foreach` shipped after G3 was written and is
