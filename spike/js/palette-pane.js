@@ -46,7 +46,51 @@ export function createPalettePane({ mount, registry, onQueryChange = () => {} })
     text: "Drag an entry onto the canvas, or use a + on any slot.",
   });
 
-  mount.replaceChildren(el("div", { class: "sb-palette__search-row" }, [search]), count, results, hint);
+  /*
+   * The narrow-layout strip (sb-3l1, ruling 7A): "below 780px the palette
+   * collapses to a strip (search + '+') that opens as a sheet, so the
+   * inspector gets the full row".
+   *
+   * Which of the two arrangements is on screen is CSS's call, not this
+   * file's - it is a container query on the shell, and a JS breakpoint beside
+   * it would be a second source of truth that drifts the first time one of
+   * them is edited. All JS owns is whether the sheet is open, written as
+   * `data-sheet` on the pane and read by the query's rules. Above 780 the
+   * strip is `display: none` and the attribute means nothing, which is why it
+   * is safe to leave it set.
+   *
+   * The shipped editor's PaletteBrowser (sb-832) renders the same two
+   * elements under the same class names, so the graduation this spike feeds
+   * is a transcription rather than a re-derivation.
+   */
+  const stripPlus = el("span", { class: "sb-palette__strip-plus", "aria-hidden": "true", text: "+" });
+
+  const strip = el("button", {
+    class: "sb-palette__strip",
+    type: "button",
+    "aria-expanded": "false",
+    "aria-controls": "sb-palette-body",
+  });
+
+  strip.append(el("span", { class: "sb-palette__strip-label", text: "Blocks" }), stripPlus);
+
+  const body = el("div", { class: "sb-palette__body", id: "sb-palette-body" }, [
+    el("div", { class: "sb-palette__search-row" }, [search]),
+    count,
+    results,
+    hint,
+  ]);
+
+  function setSheet(open) {
+    mount.dataset.sheet = open ? "open" : "closed";
+    strip.setAttribute("aria-expanded", String(open));
+    if (open) search.focus();
+  }
+
+  strip.addEventListener("click", () => setSheet(mount.dataset.sheet !== "open"));
+
+  mount.replaceChildren(strip, body);
+  setSheet(false);
 
   function draw() {
     const view = paletteView(registry, query);
@@ -110,6 +154,14 @@ export function createPalettePane({ mount, registry, onQueryChange = () => {} })
     },
     focusSearch() {
       search.focus();
+    },
+    /** Whether the narrow-layout sheet is open. Meaningless above 780, where
+     * the strip that toggles it is not rendered. */
+    get sheetOpen() {
+      return mount.dataset.sheet === "open";
+    },
+    closeSheet() {
+      setSheet(false);
     },
     redraw: draw,
   };

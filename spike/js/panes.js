@@ -255,7 +255,7 @@ export function controlFor(type) {
  * inventing one would be guessing". The form does not half-render an
  * unresolvable block; it renders its bytes.
  */
-export function configFormFor(registry, node, documentFindings = []) {
+export function configFormFor(registry, node, documentFindings = [], { draft = false } = {}) {
   if (!node) return null;
 
   const { descriptor, block, unresolved, reason } = describe(registry, node);
@@ -269,9 +269,21 @@ export function configFormFor(registry, node, documentFindings = []) {
   // set, so the form is correct for a caller that supplies no document
   // findings at all - the self-test, and any future pane that wants a form
   // without a whole layout pass. Duplicates are collapsed on key and message.
+  //
+  // sb-3l1 / ruling 6A: two views, one rule each. When the caller says the
+  // config it handed over is a DRAFT, the document set is not merged in at
+  // all - those findings are computed against the STORED config, and repeating
+  // them under a field the author has just filled correctly is the form
+  // telling a lie about the bytes on screen. The draft's own findings are the
+  // whole set here, and each one is flagged `inDraft` so the renderer can say
+  // which config it is talking about. The stored-config reading does not
+  // disappear: it stays in the document-level findings panel, which is the
+  // view whose subject IS the stored document.
   const anchored = dedupe([
-    ...(describeValidation(descriptor, config) ?? []),
-    ...documentFindings
+    ...(describeValidation(descriptor, config) ?? []).map((finding) =>
+      draft ? { ...finding, inDraft: true } : finding
+    ),
+    ...(draft ? [] : documentFindings)
       .filter((finding) => finding.anchor?.kind === "config" && finding.anchor.blockId === node.id)
       .map((finding) => ({
         key: finding.anchor.key,

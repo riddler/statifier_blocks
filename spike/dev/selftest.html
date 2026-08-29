@@ -6020,7 +6020,12 @@
         const [sendBlock] = found;
         equal("it is the onboarding deadline", sendBlock.id, "blk_su_onboarding_deadline");
         equal("its stored config validates", sendType.validateConfig(sendBlock.config), null);
-        equal("it is the delayed case, which is sb-d9's live test", sendBlock.config.delay, "PT2H");
+        // sb-dkb retyped this fixture's delay to the predicator grammar (63ca0de,
+        // its spec item 3) but never ran this page - it is browser-run and the
+        // chrome lock was held throughout - so the assertion kept pinning the
+        // ISO spelling the fixture no longer holds. Corrected here because
+        // sb-3l1 is the bead that ran the harness and found it red.
+        equal("it is the delayed case, which is sb-d9's live test", sendBlock.config.delay, "2h");
 
         // The point of the demo appearance: a sent event and a raised one
         // reach the SAME rule, and neither is joined to it by an edge.
@@ -8558,6 +8563,138 @@
         equal("a block with none", tableCountFor(fixtures, "blk_AUTH"), 0);
         equal("no selection", tableCountFor(fixtures, null), 0);
         equal("no document open", tableCountFor(null, "blk_BRANCH"), 0);
+      });
+
+      /* ==================================================== sb-3l1 =========
+       *
+       * The pure halves of the campaign-015 polish pass: which config a form's
+       * findings are computed from (ruling 6A), and the drawer's collapsed
+       * strip (ruling 5A). The other four items in the bead are CSS and DOM
+       * order, which this page cannot see and which the browser screenshots
+       * are the evidence for.
+       *
+       * Imports are local to this block and the suites are appended at the END
+       * of the file, for the merge reason the sibling suites give: several
+       * beads append to this file in the same campaign.
+       */
+
+      import { drawerStripView } from "../js/fixtures.js";
+      import { configFormFor as sb3l1ConfigFormFor } from "../js/panes.js";
+
+      /* A `core.assign` with its path filled in correctly and its literal still
+       * missing - the half-filled draft the bug was reported against. */
+      function sb3l1Node() {
+        const registry = proposingRegistry();
+        const inserted = blockForType(registry, "core.assign");
+
+        return { registry, node: { ...inserted, config: { path: "signup.plan" } } };
+      }
+
+      /* The document-level set as `layout.js` computes it: against the STORED
+       * config, which here is the empty one the block was inserted with. Both
+       * fields are refused, including the one the author has since filled. */
+      function sb3l1StoredFindings(blockId) {
+        return [
+          {
+            anchor: { kind: "config", blockId, key: "path" },
+            message: "must be a datamodel path, like review.parked",
+            severity: "error",
+          },
+          {
+            anchor: { kind: "config", blockId, key: "value" },
+            message: 'must be a literal, written as source text - false, 42350, "manual_review"',
+            severity: "error",
+          },
+        ];
+      }
+
+      function sb3l1Messages(form, key) {
+        return form.fields.find((field) => field.key === key).findings.map((f) => f.message);
+      }
+
+      suite("sb-3l1: without a draft, the form still merges the document set (6A)", () => {
+        const { registry, node } = sb3l1Node();
+        const form = sb3l1ConfigFormFor(registry, node, sb3l1StoredFindings(node.id));
+
+        // The stored reading says `path` is wrong. Nothing has changed for the
+        // no-draft case, and this is the assertion that says so: the whole fix
+        // is scoped to a block with a draft outstanding.
+        equal("the stored refusal survives", sb3l1Messages(form, "path"), [
+          "must be a datamodel path, like review.parked",
+        ]);
+        equal(
+          "and nothing claims to be about a draft",
+          form.fields.every((field) => field.findings.every((f) => f.inDraft === undefined)),
+          true
+        );
+      });
+
+      suite("sb-3l1: a drafting block's findings read the DRAFT (6A)", () => {
+        const { registry, node } = sb3l1Node();
+        const form = sb3l1ConfigFormFor(registry, node, sb3l1StoredFindings(node.id), {
+          draft: true,
+        });
+
+        // The bug, asserted as its absence: `path` holds a valid datamodel path
+        // in the config on screen, so the field carries NO finding - the red
+        // line under it came from the stored config and belongs to the
+        // document panel, not to the form the author is typing into.
+        equal("a field the author filled correctly is clean", sb3l1Messages(form, "path"), []);
+
+        // And the half that is genuinely still wrong is still said, from the
+        // draft's own validation rather than from the stale set.
+        equal("the field that is still empty is not", sb3l1Messages(form, "value"), [
+          'must be a literal, written as source text - false, 42350, "manual_review"',
+        ]);
+        equal(
+          "labelled as the draft's",
+          form.fields.find((field) => field.key === "value").findings[0].inDraft,
+          true
+        );
+      });
+
+      suite("sb-3l1: the strip is present at a count of zero (5A)", () => {
+        // The cold-start gap, stated: a strip that hides itself when the count
+        // is zero is unfindable exactly when an author most needs telling that
+        // the document has no tables.
+        const empty = drawerStripView({
+          fixtures: { documentId: "doc_x", known: true, runs: [], tables: [] },
+          open: false,
+        });
+
+        equal("present", empty.present, true);
+        equal("count", empty.count, 0);
+        equal("plural at zero", empty.label, "Truth tables");
+        equal("collapsed", empty.expanded, false);
+      });
+
+      suite("sb-3l1: the strip counts tables and follows the open flag (5A)", () => {
+        const fixtures = sb054Fixtures();
+
+        // Three tables on two blocks: the strip says the noun it counts.
+        const closed = drawerStripView({ fixtures, open: false });
+        equal("tables, not owning blocks", closed.count, 3);
+        equal("plural", closed.label, "Truth tables");
+        equal("collapsed", closed.expanded, false);
+
+        equal("expanded follows the flag", drawerStripView({ fixtures, open: true }).expanded, true);
+
+        const one = drawerStripView({
+          fixtures: { documentId: "doc_x", known: true, runs: [], tables: [{ id: "t", blockId: "b" }] },
+          open: false,
+        });
+        equal("singular at one", one.label, "Truth table");
+        equal("count", one.count, 1);
+      });
+
+      suite("sb-3l1: no document and no fixture section have no strip (5A)", () => {
+        equal("no document open", drawerStripView({ fixtures: null, open: false }).present, false);
+        equal(
+          "a document nobody wrote fixtures for",
+          drawerStripView({ fixtures: { documentId: "d", known: false, runs: [], tables: [] }, open: false })
+            .present,
+          false
+        );
       });
 
       /* ------------------------------------------------------- reporting */

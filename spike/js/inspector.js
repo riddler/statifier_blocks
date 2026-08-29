@@ -159,16 +159,22 @@ function renderConfig(mount, state, host, ctx) {
    * correctly and the screen would still show the stored config, which is the
    * same lie the bug reported, one layer further in.
    *
-   * The findings are the document's, computed against the STORED config. That
-   * is honest rather than convenient: they are what the canvas and the
-   * findings panel are showing, and a draft that has not been offered to the
-   * gate yet has no findings of its own. The refusal the gate DID return is
+   * Which config the FINDINGS are computed from follows the config on screen
+   * (sb-3l1, ruling 6A). This used to be the document's set unconditionally,
+   * computed against the STORED config, on the reasoning that a draft has no
+   * findings of its own. In front of an author that reads as a lie: a field
+   * filled in correctly a keystroke ago still carried the red line the empty
+   * stored value produced, underneath an amber notice saying nothing is
+   * stored yet. Two views, one rule each - this form is about the draft and
+   * reads the draft, and the document-level findings panel is about the
+   * stored document and still reads that. The refusal the gate DID return is
    * rendered separately, under the field, by `markRefused`.
    */
   const draftConfig = ctx.drafts.read(node.id, node.config);
+  const pending = ctx.drafts.pending(node.id);
   const formNode = draftConfig === node.config ? node : { ...node, config: draftConfig };
 
-  const form = configFormFor(state.session.registry, formNode, state.findings);
+  const form = configFormFor(state.session.registry, formNode, state.findings, { draft: pending });
 
   if (form.readOnly) {
     mount.replaceChildren(...readOnlyConfig(form));
@@ -191,7 +197,7 @@ function renderConfig(mount, state, host, ctx) {
   mount.replaceChildren(
     el(
       "div",
-      { class: "sb-form", "data-pending-config": String(ctx.drafts.pending(node.id)) },
+      { class: "sb-form", "data-pending-config": String(pending) },
       [
         pendingNotice(form, host, scope),
         ...form.fields.map((field) => fieldElement(field, form, host, scope)),
@@ -269,6 +275,74 @@ function syncPendingNotice(form, host, scope) {
 }
 
 /*
+ * Re-draws the FIELD FINDINGS from the draft, without a re-render (sb-3l1,
+ * ruling 6A). The sibling of `syncPendingNotice`, and it exists for the same
+ * reason and under the same constraint.
+ *
+ * Ruling 6A only means anything if it reaches the screen, and a refusal is
+ * exactly when it has to: the commit path deliberately does NOT re-render -
+ * that is what keeps the text the author is standing in from vanishing - so
+ * the lines under the fields are the ones `renderConfig` drew back when there
+ * was no draft yet. Without this the first refusal leaves the stored config's
+ * findings on screen underneath an amber notice saying nothing is stored,
+ * which is the exact contradiction the ruling is about.
+ *
+ * Controls are never touched, so focus and typed text survive. The refusal
+ * lines `markRefused` just wrote are left alone and the recomputed findings
+ * are placed ABOVE them: a finding is about the config, a refusal is about the
+ * edit that was turned down, and the refusal reads last because it is the
+ * newer news.
+ */
+function syncDraftFindings(form, host, scope) {
+  const container = scope.mount?.querySelector(".sb-form");
+  if (!container) return;
+
+  const state = host.state();
+  if (!state?.session) return;
+
+  const node = findBlock(state.session.document, form.blockId);
+  if (!node) return;
+
+  const draftConfig = scope.drafts.read(node.id, node.config);
+  const pending = scope.drafts.pending(node.id);
+  const formNode = draftConfig === node.config ? node : { ...node, config: draftConfig };
+
+  const fresh = configFormFor(state.session.registry, formNode, state.findings, {
+    draft: pending,
+  });
+
+  if (!fresh || fresh.readOnly) return;
+
+  // Matched by reading the attribute rather than by building a selector out of
+  // it: a config key is author-adjacent data and `data-field-key` carries it
+  // raw, so a selector would have to escape what `cssSafe` deliberately does
+  // not preserve.
+  const wrappers = new Map(
+    [...container.querySelectorAll(".sb-field[data-field-key]")].map((el) => [
+      el.dataset.fieldKey,
+      el,
+    ])
+  );
+
+  for (const field of fresh.fields) {
+    const wrapper = wrappers.get(field.key);
+    if (!wrapper) continue;
+
+    for (const stale of wrapper.querySelectorAll(".sb-field__finding:not([data-refusal])")) {
+      stale.remove();
+    }
+
+    const firstRefusal = wrapper.querySelector(".sb-field__finding[data-refusal]");
+
+    for (const finding of field.fieldFindings ?? field.findings) {
+      const line = findingElement(finding, "sb-field__finding");
+      if (firstRefusal) wrapper.insertBefore(line, firstRefusal);
+      else wrapper.append(line);
+    }
+  }
+}
+
+/*
  * The field label for a config key, falling back to the key itself. A key with
  * no field is possible - a draft can carry a value the type stopped declaring
  * - and naming it raw beats dropping it from the sentence.
@@ -337,16 +411,37 @@ function fieldElement(field, form, host, scope) {
   // other control has no `fieldFindings` and renders the whole set here, which
   // is exactly the behaviour this loop had before.
   for (const finding of field.fieldFindings ?? field.findings) {
-    wrapper.append(
-      el("p", {
-        class: "sb-field__finding",
-        "data-severity": finding.severity ?? "error",
-        text: finding.message,
-      })
-    );
+    wrapper.append(findingElement(finding, "sb-field__finding"));
   }
 
   return wrapper;
+}
+
+/*
+ * One finding line, and the one place that says which config it is about.
+ *
+ * sb-3l1 / ruling 6A: while a draft is outstanding the form's findings are
+ * computed from the DRAFT, and a reader who is looking at an amber "not
+ * stored yet" notice needs to know that the red line under a field is about
+ * what they typed rather than about what the document holds. The tag says so
+ * in words - "in this draft" - rather than by a colour an author would have
+ * to be taught. Without a draft there is no tag at all, which is exactly the
+ * line this function has always rendered.
+ */
+function findingElement(finding, className) {
+  const line = el("p", {
+    class: className,
+    "data-severity": finding.severity ?? "error",
+    "data-in-draft": finding.inDraft === true ? "true" : null,
+  });
+
+  line.append(el("span", { class: "sb-field__finding-text", text: finding.message }));
+
+  if (finding.inDraft === true) {
+    line.append(el("span", { class: "sb-field__finding-scope", text: "in this draft" }));
+  }
+
+  return line;
 }
 
 function control(field, id, commit, host, form) {
@@ -830,13 +925,7 @@ function mapRow(field, row, current, commit) {
   );
 
   for (const finding of row.findings ?? []) {
-    wrapper.append(
-      el("p", {
-        class: "sb-field__finding sb-rows__finding",
-        "data-severity": finding.severity ?? "error",
-        text: finding.message,
-      })
-    );
+    wrapper.append(findingElement(finding, "sb-field__finding sb-rows__finding"));
   }
 
   return wrapper;
@@ -1026,7 +1115,11 @@ function renderCondition(mount, state, host, ctx) {
   const draftConfig = ctx.drafts.read(node.id, node.config);
   const formNode = draftConfig === node.config ? node : { ...node, config: draftConfig };
 
-  const form = configFormFor(state.session.registry, formNode, state.findings);
+  // And the same finding rule (sb-3l1, ruling 6A): the arm sources this pane
+  // shows are the draft's, so the messages under them are the draft's too.
+  const form = configFormFor(state.session.registry, formNode, state.findings, {
+    draft: ctx.drafts.pending(node.id),
+  });
   const fields = conditionFields(form);
 
   if (fields.length === 0) {
@@ -1185,13 +1278,7 @@ function conditionElement(field, form, host, index, scope) {
   box.append(surface);
 
   for (const finding of field.findings) {
-    box.append(
-      el("p", {
-        class: "sb-field__finding",
-        "data-severity": finding.severity ?? "error",
-        text: finding.message,
-      })
-    );
+    box.append(findingElement(finding, "sb-field__finding"));
   }
 
   box.append(pathSummary(paths, unknown, index, host));
@@ -1373,6 +1460,7 @@ export function commitField(field, form, host, scope, wrapper, value) {
     scope.drafts.stage(form.blockId, config);
     markRefused(wrapper, refusal, field.key);
     syncPendingNotice(form, host, scope);
+    syncDraftFindings(form, host, scope);
   }
 
   return refusal === null;

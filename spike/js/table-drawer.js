@@ -32,20 +32,37 @@
  * It is also not a tab panel and not a pane. It has no `role="tab"` anywhere
  * near it, deliberately: `shell.js` selects the inspector's tab strip with
  * `document.querySelectorAll('[role="tab"]')`, and anything wearing that role
- * outside the strip is adopted by it. The drawer is a `<section>` the shell
- * shows and hides with `hidden`, and its state is one boolean.
+ * outside the strip is adopted by it. The drawer is a `<section>`, and its
+ * state is one boolean.
+ *
+ * ## The collapsed strip (sb-3l1, ruling 5A)
+ *
+ * The drawer used to be open-or-gone: `hidden` when closed, and the only way
+ * to open it was the Condition pane's per-block button, which a block owning
+ * no table does not render. So the cold start was unreachable - an author who
+ * had not already selected a block that owns a table had no way in, and no
+ * way to discover which blocks did.
+ *
+ * Closed is now a STRIP carrying the noun and a count ("Truth tables 3"),
+ * present whenever a document is open, count and all, even at zero. Pressing
+ * it opens the drawer on the current selection; when that block owns no
+ * table the drawer comes up on the miss-state list, which IS its index page -
+ * every block in the document that does own one, each a press away.
  */
 
-import { drawerView, tablesForBlock } from "./fixtures.js";
+import { drawerStripView, drawerView, tablesForBlock } from "./fixtures.js";
 import { el } from "./render.js";
 
 /**
  * Mounts the truth-table drawer and returns a handle.
  *
- *     root    the drawer `<section>` - shown and hidden as a whole
+ *     root    the drawer `<section>` - hidden entirely only when no document
+ *             is open; otherwise either collapsed to its strip or expanded
  *     mount   the element inside it the tables render into
  *     title   the element carrying the drawer's heading text
  *     close   the drawer's close button, or null
+ *     strip   the collapsed strip's button, or null
+ *     stripLabel / stripCount  the two spans inside that button, or null
  *     host    { fixtures(), selectedId(), labelFor(id), revealBlock(id),
  *               announce(message) }
  *
@@ -53,7 +70,16 @@ import { el } from "./render.js";
  * than throws: it is mounted before a document is open and it is useful in a
  * bare test page with no canvas at all.
  */
-export function createTableDrawer({ root, mount, title = null, close = null, host = {} }) {
+export function createTableDrawer({
+  root,
+  mount,
+  title = null,
+  close = null,
+  strip = null,
+  stripLabel = null,
+  stripCount = null,
+  host = {},
+}) {
   let open = false;
 
   function state() {
@@ -64,10 +90,30 @@ export function createTableDrawer({ root, mount, title = null, close = null, hos
     });
   }
 
+  function stripState() {
+    return drawerStripView({ fixtures: host.fixtures?.() ?? null, open });
+  }
+
   function draw() {
     const view = state();
+    const bar = stripState();
 
-    root.hidden = !view.open;
+    /*
+     * Three states, not two (sb-3l1). `hidden` is now reserved for "there is
+     * no document", which is the only case with nothing to say; a document
+     * with no tables still gets a strip reading 0, because a strip that
+     * vanishes when the count is zero is a cold start that cannot be found.
+     */
+    root.hidden = !bar.present;
+    root.dataset.collapsed = String(!view.open);
+
+    if (strip) {
+      strip.setAttribute("aria-expanded", String(bar.expanded));
+      strip.title = view.open ? "Collapse the truth tables" : "Open the truth tables";
+    }
+    if (stripLabel) stripLabel.textContent = bar.label;
+    if (stripCount) stripCount.textContent = String(bar.count);
+
     if (title) title.textContent = view.title;
 
     // Nothing is rendered into a closed drawer. `hidden` already keeps it off
@@ -109,7 +155,8 @@ export function createTableDrawer({ root, mount, title = null, close = null, hos
       "no-fixtures":
         "Nothing in the fixture file mentions this document. A document with no fixtures is not a failing document - it is one nobody has written a table for yet.",
       "no-selection": "Select a guarded block to see the condition fixtures written for it.",
-      "none-for-block": "No truth table is written for this block.",
+      "none-for-block":
+        "No truth table is written for this block. The blocks in this document that do have one are listed below.",
     };
 
     const out = [el("p", { class: "sb-empty", text: said[view.status] ?? said["no-selection"] })];
@@ -186,12 +233,20 @@ export function createTableDrawer({ root, mount, title = null, close = null, hos
    * The table itself, transplanted from the Fixtures pane unchanged except for
    * the sentence under it, which used to apologise for the width.
    *
-   * The column ORDER is unchanged too, and that is worth a note rather than a
-   * silent fix: the pane put the verdicts before the bound values because in
-   * 21rem the conventional order pushed every answer off the right edge. The
-   * drawer removes that reason. Restoring convention - inputs left, verdicts
-   * right - is a readability change with its own before/after, so it is a bead
-   * rather than a rider on the move that made it possible.
+   * sb-3l1 / ruling 4A: "the truth-table grid orders Case, inputs, then
+   * verdicts, the verdict block separated by a heavier left rule".
+   *
+   * The Fixtures pane put the verdicts BEFORE the bound values because in a
+   * 21rem inspector the conventional order pushed every answer off the right
+   * edge. The drawer took the width constraint away and sb-054 deliberately
+   * left the inversion in place, as its own readability bead - this one. A
+   * truth table is read left to right as "given these inputs, this verdict",
+   * so the inputs go first and the verdict block is what the eye lands on
+   * last, marked off by the heavier rule rather than by a colour.
+   *
+   * The per-arm "n/6 true" summaries stay ABOVE the grid, where 4A keeps
+   * them: they are about a column across all rows, which is not something a
+   * row-shaped footer can say.
    */
   function tableElement(table) {
     const box = el("section", { class: "sb-fixtures__table", "data-table-id": table.id });
@@ -225,24 +280,25 @@ export function createTableDrawer({ root, mount, title = null, close = null, hos
 
     const head = el("tr", {}, [
       el("th", { class: "sb-fixtures__grid-corner", scope: "col", text: "Case" }),
-      ...table.columns.map((column) =>
-        el("th", {
-          class: "sb-fixtures__grid-arm",
-          scope: "col",
-          title: column.expr,
-          text: column.label,
-        })
-      ),
-      ...table.paths.map((path, index) =>
+      ...table.paths.map((path) =>
         el("th", {
           class: "sb-fixtures__grid-path",
           scope: "col",
-          // The seam between the answers and the values behind them, marked in
-          // the markup because both families are cells and CSS cannot tell
-          // them apart by position.
-          "data-column": index === 0 ? "first-arm" : null,
           title: path,
           text: path,
+        })
+      ),
+      ...table.columns.map((column, index) =>
+        el("th", {
+          class: "sb-fixtures__grid-arm",
+          scope: "col",
+          // The seam between the values and the answers they produce, marked
+          // in the markup because both families are cells and CSS cannot tell
+          // them apart by position. It sits on the FIRST VERDICT column, which
+          // is where the heavier rule belongs now that the verdicts come last.
+          "data-column": index === 0 ? "first-arm" : null,
+          title: column.expr,
+          text: column.label,
         })
       ),
     ]);
@@ -262,23 +318,25 @@ export function createTableDrawer({ root, mount, title = null, close = null, hos
 
       tr.append(
         name,
-        ...row.cells.map((cell) =>
-          el("td", { class: "sb-fixtures__grid-cell" }, [
-            el("span", {
-              class: "sb-fixtures__bool",
-              "data-value": cell.expected === null ? "unset" : String(cell.expected),
-              text: cell.expected === null ? "–" : cell.expected ? "true" : "false",
-            }),
+        ...row.bindings.map((binding) =>
+          el("td", { class: "sb-fixtures__grid-binding" }, [
+            el("code", { text: String(binding.value) }),
           ])
         ),
-        ...row.bindings.map((binding, index) =>
+        ...row.cells.map((cell, index) =>
           el(
             "td",
             {
-              class: "sb-fixtures__grid-binding",
+              class: "sb-fixtures__grid-cell",
               "data-column": index === 0 ? "first-arm" : null,
             },
-            [el("code", { text: String(binding.value) })]
+            [
+              el("span", {
+                class: "sb-fixtures__bool",
+                "data-value": cell.expected === null ? "unset" : String(cell.expected),
+                text: cell.expected === null ? "–" : cell.expected ? "true" : "false",
+              }),
+            ]
           )
         )
       );
@@ -321,6 +379,12 @@ export function createTableDrawer({ root, mount, title = null, close = null, hos
     close.addEventListener("click", () => setOpen(false));
   }
 
+  // The strip is the cold-start affordance (5A): it toggles, so the same
+  // control an author found the drawer with is the one that puts it away.
+  if (strip) {
+    strip.addEventListener("click", () => setOpen(!open));
+  }
+
   function setOpen(next) {
     if (open === next) return;
     open = next;
@@ -358,9 +422,12 @@ export function createTableDrawer({ root, mount, title = null, close = null, hos
       draw();
     },
     /** Called when the Fixtures pane applies or reverts edited fixture JSON -
-     * the tables on screen came from the copy that just changed. */
+     * the tables on screen came from the copy that just changed. Unconditional
+     * since sb-3l1: the collapsed strip carries a COUNT off the same copy, so
+     * a redraw only while open would leave a stale number on screen in the
+     * state the drawer spends most of its life in. */
     fixturesChanged() {
-      if (open) draw();
+      draw();
     },
     /** The drawer's state, for a test page and for the shell's own asserts. */
     state,
