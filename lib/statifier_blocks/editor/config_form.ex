@@ -39,6 +39,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:class, :string, default: nil)
     attr(:expression_component, :any, default: nil)
 
+    attr(:pending, :list,
+      default: [],
+      doc: """
+      The fields whose typed value is not in the document, in schema order.
+      Empty when the block has no outstanding draft.
+      """
+    )
+
     @doc "One block's form: unrouted findings, then a control per schema field."
     def config_form(assigns) do
       ~H"""
@@ -51,6 +59,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         phx-target={@target}
       >
         <input type="hidden" name="block-id" value={@node.block_id} />
+        <div :if={@pending != []} class="sb-form__pending" data-pending={length(@pending)}>
+          <p class="sb-form__pending-note">
+            Nothing is stored yet. {pending_sentence(@pending)}
+          </p>
+          <button
+            type="button"
+            class="sb-form__discard"
+            phx-click="discard-draft"
+            phx-target={@target}
+            phx-value-block-id={@node.block_id}
+          >
+            Discard edits
+          </button>
+        </div>
         <p :for={finding <- @node.form.unrouted} class={["sb-finding", severity_class(finding)]}>
           {finding.message}
         </p>
@@ -114,6 +136,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # One place spells the severity modifiers, and it is outside
     # `StatifierBlocks.Editor.*` so it is asserted with LiveView absent
     # (ADR-0005 decision 11, amended 2026-08-29 for `:info`).
+    # A draft was never a command, so it cannot be undone - it can only be
+    # thrown away, and that gesture has to exist somewhere. Naming the fields
+    # is the other half: decision 9 commits a config as a UNIT, so a block
+    # with two required fields is uncommittable until both are filled, and an
+    # author who is told only "invalid" cannot tell that from a value the type
+    # refused.
+    @spec pending_sentence([ViewModel.Field.t()]) :: String.t()
+    defp pending_sentence(fields) do
+      labels = fields |> Enum.map_join(", ", & &1.label)
+
+      "This block's config is committed as a unit, and #{labels} " <>
+        "#{if length(fields) == 1, do: "is", else: "are"} not accepted yet."
+    end
+
     @spec severity_class(StatifierBlocks.Finding.t()) :: String.t()
     defp severity_class(finding), do: StatifierBlocks.Finding.severity_class(finding)
   end

@@ -25,5 +25,12 @@
 - `StatifierBlocks.Finding.severity_class/1`, and `:info` as a third
   severity for advisory findings (decision 11, amended 2026-08-29). Nothing
   emits one yet; only `:lint` may.
+- A form whose config the gate has not accepted names the fields that are
+  outstanding, says why nothing is stored, and offers "Discard edits". A
+  draft was never a command, so it cannot be undone - it can only be thrown
+  away, and that gesture had nowhere to live.
+- `:expression` and `:duration` controls carry a placeholder. A bare
+  `:string` still carries none: there is nothing a type that wide can
+  suggest.
 - A theme audit test over the stylesheet, failing in both directions: a
   `var(--sb-*)` with no declaration, and a declared token no rule reads (14e).
