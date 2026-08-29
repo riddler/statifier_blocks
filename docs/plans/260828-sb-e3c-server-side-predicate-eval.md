@@ -561,6 +561,21 @@ fragment.
 - [ ] The `15m` / `PT15M` caution is present and correct.
 - [ ] The `:evaluation_error` clause decision from item 4 is recorded in the moduledoc.
 
+**Machine-checked (unattended, 2026-08-29):** all four items checked by an agent, not a human.
+Item 1 found a real defect and fixed it in commit `48093f2`: the notes were spelled
+`# Sabotage:` while `gate.rb`'s `SABOTAGE_NOTE_RE = /#\s*sabotage:/` is case-sensitive, so all
+27 read as absent; and one note above `describe "evaluate_value/1"` covered five tests from
+above the first, leaving four unnoted. Seven tests had had no cycle run at all - each was then
+genuinely sabotaged (mutation, confirmed red, reverted, noted). `gate.rb` now reports
+`sabotage.missing: []`, `unverifiable: []`, `scanned: true`.
+Item 2 verified: the moduledoc cites ADR-0005 decision 9 (`:336`) and decision 15 (`:567`), and
+`lib/statifier_blocks/editor.ex` has no fixtures pane, assign, or event - grep for
+`fixture|dataset|predicator|evaluat` over `lib/` returns no editor hit.
+Item 3 verified against a live probe: `Predicator.evaluate("PT15M", %{})` returns
+`{:error, %UndefinedVariableError{variable: "PT15M"}}`, and `"15m"` yields a duration.
+Item 4 verified: the moduledoc records the probe (`"true + 1"` -> `TypeMismatchError`,
+`"1 / 0"` -> `EvaluationError`) and the single catch-all clause it justifies.
+
 **Implementation Note**: Use `mix quality --profile loop` between edits; run
 the full `mix quality` as the phase gate. In looped execution the Automated
 Verification list gates advancement via `/wurk:commit --auto` and the Manual
@@ -719,6 +734,20 @@ pattern match:
 - [ ] The moduledoc's account of selection-versus-raw-truth reads correctly against `lib/statifier_blocks/core/branch.ex`'s ordered arms.
 - [ ] The five `status` values are each demonstrated by at least one test and each is named in the moduledoc.
 
+**Machine-checked (unattended, 2026-08-29):** all three items checked by an agent, not a human.
+Item 1 shares the defect and the fix recorded under Phase 1. The named ordering mutation was run
+exactly as written: inverting `otherwise_column?/2`'s `%Column{source: nil}, nil -> true` clause
+turned the otherwise-selection test red, and it was reverted. One honest negative: reversing the
+cells *within* each row left `statuses/1`'s test green, because both fixture rows happen to be
+status-uniform; reversing the whole flat-mapped result turned it red. The note records that.
+Item 2 verified: `lib/statifier_blocks/core/branch.ex` emits one conditional transition per arm
+in config order followed by an unconditional `otherwise`, which is what the moduledoc describes.
+Item 3 verified: `:match`, `:mismatch`, `:unchecked`, `:error` and `:undecidable` are each named
+in the moduledoc and each asserted in `truth_table_test.exs`.
+
+The checkboxes above are deliberately left unticked: `plan_state.rb confirm` records a HUMAN
+walking the item, and no agent may write it.
+
 **Implementation Note**: same as Phase 1 - loop gate between edits, full gate
 at the boundary, Manual items deferred under `--loop`.
 
@@ -835,6 +864,23 @@ recorded so the operator can overturn it cheaply.
    a reachable one; the tag stays, and the finding is recorded in the moduledoc.
    Flagged because the answer changes one line of code and the coverage story
    for that line.
+
+**Machine-checked (unattended, 2026-08-29).** What an agent did with these; none is marked
+settled, because a `**Settled**` note records a human and no agent may write one.
+
+1. Typed datamodel module - still deferred, and now tracked rather than only recorded: bead
+   `sb-oiq` filed and linked `discovered-from sb-e3c`, carrying the reserved name
+   `StatifierBlocks.Predicates.Datamodel`, the datamodel shape, and the advisory-not-a-gate rule.
+2. `expected` means selection, not raw truth - implemented as decided. The reading is backed by
+   the accepted record, not only by the spike data: ADR-0002 decision 10 says `core.branch` takes
+   the first arm whose condition holds. `Cell` carries both readings, so overturning it changes
+   one comparison and no data. Left for the operator to confirm.
+3. Bundle-to-spec adapter - untouched, out of scope; it needs an ADR-0002 amendment and
+   `docs/adr/` is outside this bead.
+4. Editor wiring - **done as specified**: recorded as a note on bead `sb-8dc` on 2026-08-29,
+   naming the two modules, the D11 ruling, why no seam exists today (ADR-0005 decision 15,
+   checked against `editor.ex`), and what a graduated pane inherits.
+5. `:evaluation_error` reachability - resolved in Phase 1 and recorded in the moduledoc.
 
 ## Deferred Manual Verification
 
