@@ -139,8 +139,8 @@ defmodule StatifierBlocks.Compiler.SensitivePaths do
   This pass reads `sensitive`. `declared` is carried because it is the
   same input the undeclared-path advisory of `11e` reads, so a host
   supplies one datamodel rather than two, and because the typed scoped
-  datamodel document (`sb-g8m`) derives both by one total function if it
-  lands.
+  datamodel document ADR-0006 accepts derives both by one total
+  function.
   """
   @type datamodel :: %{declared: MapSet.t(String.t()), sensitive: MapSet.t(String.t())}
 
