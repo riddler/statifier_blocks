@@ -1509,3 +1509,147 @@ without either side learning the other's type name.
 - Every block type that declares nothing keeps rendering exactly as before,
   and so does every type that declares this wrongly. That is B3's discipline
   arriving at one more key rather than a new posture.
+
+---
+
+## Note (2026-08-29): decision 14 amendment, what campaign 014 landed
+
+A dated note, not a status change. The 2026-08-28 amendment above is still
+**PROPOSED** and its Status line is untouched; this records, subsection by
+subsection, what is now true in the shipped code and what is still only
+written down. Two beads did the work: `sb-8dc` graduated the spike's CSS and
+DOM patterns into `assets/`, and `sb-2b9` completed the token contract and the
+audit. Where a subsection is true in code, the file and the test that holds it
+there are named, so the reader can check rather than take this on trust.
+
+The record is deliberately silent on whether any of it should be accepted.
+That is the operator's call, and this note exists to make it a decision about
+evidence rather than about a proposal.
+
+### 14a, `--sb-color-scheme` - TRUE IN CODE
+
+`assets/css/statifier_blocks.css` declares `--sb-color-scheme: light` on the
+editor's root and reads it as `color-scheme: var(--sb-color-scheme)` on
+`.sb-editor`, scoped to the container exactly as the subsection asks and
+nowhere near `:root`. Both halves are asserted in
+`test/statifier_blocks/theme_audit_test.exs` ("the scheme token (14a)"),
+including a check that no `:root` selector appears in the stylesheet at all.
+
+### 14b, the zero-specificity reset - TRUE IN CODE
+
+The scoped reset ships and every descendant selector matches its container
+through `:where(.sb-editor)`. The proposed rule is a lint rather than a
+convention, which is the form the subsection asks for: the same test file
+scans for `.sb-editor <element>` and fails on any hit, with a corroborating
+test that the reset is actually present so the lint cannot pass vacuously on
+an empty stylesheet.
+
+One thing the graduation decided and the record should carry: this package's
+reset does **not** strip padding, border, background and `appearance` off
+controls the way the spike's did. The spike restyles its own buttons, inputs
+and selects; this package leaves them native on purpose, so a reset that took
+their chrome away would leave a `<select>` looking like text. What graduated
+is the font inheritance, which no browser does on its own.
+
+### 14c, the three tiers - TRUE IN CODE as of `sb-2b9`
+
+Every token the stylesheet declares carries its tier in the file's header
+comment, and `docs/theming.md` is organised around the same three tiers. It is
+checked in both directions, which is what keeps a tier table from rotting: a
+declared token with no tier line fails, and a tier line naming a token the
+stylesheet does not declare fails.
+
+Two things the shipped tiering settles that the subsection's table left open,
+and they are extensions of its enumeration rather than readings of it:
+
+- The canvas metrics (`--sb-column-min-width`, `--sb-rail-width`,
+  `--sb-config-preview-max-height`), `--sb-disabled-opacity`, and the
+  per-type accent's shaping (`--sb-block-accent-mix`, `--sb-block-edge`,
+  `--sb-block-accent-tint`) are tier 2. They are not marks, but they are the
+  same bargain: a thing a host may want to disagree with without overriding a
+  rule.
+- `--sb-block-accent` itself is tier 1. It is an accent colour with a default,
+  and a host that never registers a block type of its own still inherits it
+  from `--sb-accent`.
+
+### 14d, `accent_token` - CONSUMPTION SIDE TRUE IN CODE; the declaration is elsewhere
+
+The consumption half shipped with the graduation.
+`StatifierBlocks.ViewModel.accent_token/1` validates a declared name against
+the anchored pattern the subsection specifies and returns `nil` for anything
+else, so a colour, a typo, or an injection attempt degrades to the editor's
+accent rather than reaching a style attribute.
+`StatifierBlocks.Editor.BlockNode` and `.PaletteBrowser` stamp
+`data-sb-block-accent` and rebind `--sb-block-accent` on that element only.
+Two rules in the stylesheet read it - the icon tile and the card stripe - and
+no rule and no module names a block type.
+
+`sb-2b9` added the check from the other end. The normalizer cannot know
+whether a well-formed name means anything, and an undefined one degrades
+*silently*: the block type just quietly looks like a type that declared
+nothing. `StatifierBlocks.ThemeAudit.accent_token_gaps/2` reports a name
+nothing defines, and the audit runs it over the registry `docs/theming.md`
+documents against the tokens that document's theme defines.
+
+What is **not** landed here: widening `palette_entry/0` in the block-type
+behaviour so a host can declare the key through the registry. That is a
+change to ADR-0002's callback contract and belongs to `sb-zfd`, which is in
+flight in the same campaign. Until it lands, the key is consumed but not
+declarable through the published palette API, and 14d is therefore half true.
+
+### 14e, coverage in both directions - TRUE IN CODE
+
+The audit fails on a `var(--sb-*)` reference with no declaration and on a
+declared token no rule reads, with a third test asserting the scan saw the
+surface at all. The precedent the subsection sets was followed rather than
+described: `--sb-drop-no-opacity` was **retired** when one-sided validity
+marking removed its consumer, and the 14f candidates whose consumers do not
+exist in the shipped editor (the syntax roles, the path underlines, the drag
+ghost, the run mark, the scroll shadows) are deliberately **not declared** -
+under 14e they would fail the build.
+
+### 14f, the candidates - PARTLY LANDED, the rest still PROPOSED
+
+Landed, because their consumers shipped: `--sb-gap-height`,
+`--sb-gap-drag-height`, `--sb-column-min-width`, `--sb-rail-width`,
+`--sb-config-preview-max-height`.
+
+Still proposed, with no consumer in the shipped editor and therefore no
+declaration: `--sb-card-width`, `--sb-column-empty-min-width`, the five
+`--sb-syntax-*` roles, `--sb-path-known` / `-unknown`, the `--sb-ghost-*`
+trio, `--sb-run-mark` and its `-width` / `-offset`, `--sb-gap-armed-bg`, and
+`--sb-scroll-shadow` / `-size`. Each arrives with the rule that reads it.
+
+The judgement call at the end of 14f is now enforced rather than asserted.
+`--sb-fg-subtle` clears 4.5:1 against the worst surface in the theme,
+`--sb-border-strong` clears 3:1, and `--sb-border` is held to no ratio, with
+the reason recorded beside the exemption in the test rather than only in the
+stylesheet. The arithmetic is `test/support/theme_audit.ex`, a port of the
+pure half of the spike's `js/theme.js`; it is test-only, ships in no release,
+and takes stylesheet text rather than reading a document, which is what lets
+it run in the gate instead of in Chrome by hand.
+
+### Two things the operator may want to rule on
+
+Neither is claimed as decided, and neither is implied by the proposal.
+
+**A new colour held to a ratio.** The audit found `--sb-drop-ok-border` at
+2.93:1 on the sunken surface and `sb-2b9` moved it to `#2c945a`. The reasoning
+is 14f's own: an accepting slot's outline is the editor telling an author
+where a drop will land, so it carries information and belongs with
+`--sb-border-strong` rather than with `--sb-border`. That is the same kind of
+design ruling 14f flagged as the operator's, arriving at one more token. The
+test makes it explicit either way: every colour token must be given a
+threshold or be given a recorded reason for having none, so a colour token can
+no longer arrive with no ruling at all.
+
+**Where a host theme's selector may point.** The purity rule is enforced as
+"every declaration is a `--sb-*` custom property", which is the half that is
+mechanical. The *selector* half needs a clarification the amendment does not
+make: the package declares its defaults on `.sb-editor` itself, so a host
+declaration on an ancestor loses to them however specific the ancestor's
+selector is. A working host theme therefore has to name `.sb-editor` in its
+selector, which sits awkwardly beside the spike's prose rule that a theme file
+"may not name an `sb-` class". `docs/theming.md` documents naming it as the
+supported shape; the record should either say the same or say what the
+alternative hook is.
