@@ -13,7 +13,7 @@ defmodule StatifierBlocks.ViewModel do
   mechanical, reading a view model and emitting markup with no palette
   lookups and no callback invocations of their own.
 
-  ## Two derived finding sources, and no compiler adapter
+  ## Two derived finding sources, and the compiler adapter
 
   `build/3`'s third argument is a caller-supplied `[StatifierBlocks.Finding.t()]`.
   This module derives exactly two sources of its own, because decision 13
@@ -34,11 +34,12 @@ defmodule StatifierBlocks.ViewModel do
   adapt `StatifierBlocks.Compiler.Finding` into `StatifierBlocks.Finding`
   to manufacture them. That adapter is a real, mechanical possibility
   (`Compiler.Finding` carries `block_id` and `config_key`, which map onto
-  `{:config, id, key}` / `{:block, id}` cleanly) and it is deliberately not
-  built in this bead - see the plan's Open Questions for where it belongs
-  instead. Derived and caller-supplied findings are concatenated - derived
-  first - into one list, which is both `t().findings` and the
-  document-level panel's source.
+  `{:config, id, key}` / `{:block, id}` cleanly), and it landed instead as
+  `StatifierBlocks.Finding.from_compiler/2` (`sb-kmk`) - `ViewModel` still
+  derives no findings from it; callers adapt compiler findings themselves
+  and pass the result to `build/3` as caller-supplied findings. Derived
+  and caller-supplied findings are concatenated - derived first - into one
+  list, which is both `t().findings` and the document-level panel's source.
 
   ## Routing, and the case that must not vanish
 
