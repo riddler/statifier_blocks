@@ -129,7 +129,7 @@ answers them there rather than probing a rendered page.
 | Pane | Contract | Notes |
 |---|---|---|
 | Palette | ADR-0005 d10 | Rendered from the registry, so registering a block type is all a host does. Search matches label, type name, description and declared `keywords`, and says which when the match is one the reader cannot see. |
-| Config | ADR-0005 d9 | Schema-driven over ADR-0002 d7's closed field-type set. Edits commit on `change`, as one `update_config`; d9's gate refuses invalid config, and the refusal is shown under the field without discarding what the author typed. A refused edit is held as a per-block **draft** and re-offered with the next one, so a type with several required fields can be filled in a field at a time - see below. |
+| Config | ADR-0005 d9 | Schema-driven over ADR-0002 d7's closed field-type set. Edits commit on `change`, as one `update_config`; d9's gate refuses invalid config, and the refusal is shown under the field without discarding what the author typed. A refused edit is held as a per-block **draft** and re-offered with the next one, so a type with several required fields can be filled in a field at a time - see below. The duration control takes what a person types (`1h30m`, `2d`) and stores an *omission* for an empty optional - also below. |
 | Findings | ADR-0005 d11 | Anchored: clicking a row selects and reveals its target, unfolding every collapsed ancestor over it. Count badge on the tab, and the collapsed-card badges count the same set. |
 
 Two things there are worth naming because they are proposals rather than
@@ -298,6 +298,69 @@ none for this block, ready - are asserted in `dev/selftest.html` under
 "drawer". Five of the six are reachable only through a sequence of gestures,
 which is exactly the shape of thing a screenshot cannot cover and a pure
 derivation can.
+### The duration control: what a person types, and what empty means (sb-709)
+
+d9 sketched the duration field as "a structured value/unit control emitting
+an ISO-8601 string" and left the control itself as an open question. sb-709
+gave that question a live failure: `core.send`'s `delay` is the vocabulary's
+first **optional** duration, and clearing the field committed `PT0H` - a
+zero-length durable timer where the author meant no timer at all - because
+`durationFrom("")` had nowhere else to go. "Cleared" and "never set" also drew
+differently, which is a distinction the document does not make.
+
+Ruled 2026-08-29 and implemented here as one text box:
+
+- **Predicator duration strings are the primary input**, with the examples on
+  screen: `30s`, `15m`, `1h30m`, `2d`, `3d8h`. That is predicator-ex's own
+  duration literal, so the string an author types is a string the expression
+  language already lexes rather than a spelling this package invented.
+- **ISO-8601 is still accepted**, so nothing already stored has to be retyped
+  and the escape hatch needs no button to reach. The readout under the box
+  names the reading in words and shows the ISO-8601 form the compiler will
+  emit, which is how an author who typed `3d8h` finds out it lands as `P3DT8H`
+  without having to know ISO-8601 to write it.
+- **Empty is absence.** The field commits an *omission* rather than a value
+  (`OMIT` and `omitAtPath` in `panes.js`, through the same draft path and the
+  same whole-config gate every other edit takes), so a cleared optional delay
+  leaves no `delay` key at all - and a cleared field and a never-set one are
+  the same value, so they cannot draw differently.
+- **The format is checked in the control**, before the gate is asked. A string
+  that is not a duration in either grammar never becomes an `update_config`;
+  the field says so inline as you type.
+
+The grammar the control accepts mirrors predicator's lexer rule by rule, with
+the file and line cited beside each rule in `panes.js` - a run of
+`<number><unit>` pairs, no whitespace, lower-case `y mo w d h m s`, with the
+two-letter units tried first. It deliberately refuses a strict **subset**:
+`ms`, fractional components like `1.5h`, and a repeated unit (`3h2h`) are all
+things predicator lexes and this control declines, because the ISO-8601 form
+the block types validate has no sub-second component and because picking a
+reading of a repeated unit is not this spike's call. Refusing a subset is the
+safe direction; accepting a string predicator would reject is the failure the
+repo's cross-repo rule is about.
+
+**What the document stores is a PROPOSAL.** Campaign 014's pre-decision D4,
+accepted for the spike at kickoff: store the author's own string verbatim and
+compile to ISO-8601 at emit time (`Predicator.Duration` on the Elixir side).
+That is why `core.wait`, `core.send` and `core.timeout` now validate both
+spellings. The shipped `:duration` field type is ADR-0002 d7's and **no ADR
+text changes here**; if D4 is not adopted, the alternative that needs no ADR
+at all is to compile at commit time and store the ISO string, which is a
+change to one branch of this control and nothing else.
+
+Open, and worth an operator's eye when this graduates under `sb-8dc`: the
+type-level refusal messages still name only ISO-8601 ("must be an ISO-8601
+duration, like PT30S or P1D"), because the selftest pins their text and the
+control's own inline message is what an author actually reads. If D4 is
+adopted, those three sentences should name both spellings.
+
+Asserted in `dev/selftest.html` under "sb-709": the grammar mirror including
+every shape it declines, the compile to ISO-8601, the `''` case reading as an
+omission, `PT0S` reading as a set value that a cleared field does not equal,
+`omitAtPath` removing a key without mutating its input, and a `core.send`
+whose delay is typed, cleared to nothing, and stored again - through
+`commitField`, so the omission takes the same draft-and-gate path as every
+other edit.
 
 ## The three themes
 
@@ -875,9 +938,12 @@ raise into a durable timer would make `core.raise`'s whole note false half the
 time.
 
 `delay` is the vocabulary's first **optional** duration, which is a state
-sb-d9's open control question has never had to express: "no delay" is not
+sb-d9's open control question had never had to express: "no delay" is not
 `PT0S` and it is not an unfinished field either. The signup document arms a
-`PT2H` deadline, so that question now has a case that ships.
+`PT2H` deadline, so that question had a case that ships - and it is what
+opened sb-709, where clearing the field turned out to commit `PT0H`. The
+control is ruled and built now; the config-pane section above says how, and
+`delay` is the field it was built against.
 
 Two omissions, both argued rather than accidental. No `target`: what a target
 may name is not this repo's decision - session identity is statifier-ex's

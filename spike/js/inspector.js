@@ -36,11 +36,13 @@ import {
   canonicalJson,
   configFormFor,
   createDraftStore,
-  durationFrom,
-  durationParts,
-  durationUnits,
+  DURATION_EXAMPLES,
+  durationValue,
   moveRow,
+  OMIT,
+  omitAtPath,
   pendingKeys,
+  readDuration,
   removeMapRow,
   removeRow,
   renameMapRow,
@@ -486,107 +488,137 @@ function selectControl(field, id, commit) {
 }
 
 /*
- * ADR-0005 decision 9's duration control: "a structured value/unit control
- * emitting an ISO-8601 string ... The control exists so the author does not
- * have to know that."
+ * ADR-0005 decision 9's duration control, as sb-709's operator ruling settled
+ * it: one text box that takes what a person would type.
  *
- * Two shapes, and the second is the honest half. A single-component duration
- * (`PT30S`, `P1D`) round-trips losslessly through a number and a unit, so it
- * gets the structured control. `PT1H30M` does not, and rather than rewriting
- * an author's stored value to `90 minutes` on first render, the control falls
- * back to editing the ISO string with the humanized readout beside it. Both
- * shapes show the readout, because the readout is what makes the ISO string
- * legible and that is the whole point of the control.
+ * The value/unit pair d9 sketched ("a structured value/unit control emitting an
+ * ISO-8601 string") could not express three things at once, and the ruling
+ * asked for all three:
+ *
+ *   - **`1h30m`**, the predicator duration string, PRIMARY, with the examples
+ *     on screen rather than in a doc. A number and a unit rounds every
+ *     two-component duration away; a select of five units cannot be taught to
+ *     say "a day and eight hours".
+ *   - **`PT1H30M`**, still accepted, so nothing already stored has to be
+ *     retyped and the escape hatch needs no button to reach.
+ *   - **empty**, meaning the key is not stored at all. `durationFrom("")`
+ *     wrote `PT0H` - a zero-length timer where the author meant no timer - and
+ *     that coercion is the bug this bead opened as.
+ *
+ * The readout is what the box gives up by being one box: it names the reading
+ * back in words and shows the ISO-8601 the compiler will emit, so an author who
+ * types `3d8h` can see it landed as `P3DT8H` without having to know ISO-8601 to
+ * write it. And the format is checked HERE: an invalid string is refused inline
+ * and never becomes an `update_config` at all, which is the difference between
+ * a form that answers as you type and one that answers after the gate has.
  */
 function durationControl(field, id, commit) {
-  const parts = field.duration ?? durationParts(field.value);
-  const box = el("div", { class: "sb-duration" });
+  const view = field.duration ?? durationValue(field.value);
+  const wrapper = el("div", { class: "sb-field__control sb-duration" });
 
-  // The structured control cannot express `PT1H30M`, and an author who needs
-  // one has no way to type it - the value/unit pair is a projection that
-  // rounds every two-component duration away. So the escape hatch is offered
-  // rather than hidden: one button swaps the control for the ISO string, in
-  // place and without committing anything. A control that CANNOT express a
-  // legal value is worse than a slightly busier one.
-  const wrapper = el("div", { class: "sb-field__control" });
-  let iso = !parts.simple;
+  const input = el("input", {
+    class: "sb-input sb-input--mono sb-duration__input",
+    type: "text",
+    id,
+    placeholder: DURATION_EXAMPLES[2],
+    spellcheck: "false",
+    autocapitalize: "none",
+    "aria-describedby": `${id}-hint`,
+  });
+  input.value = view.stored;
 
-  if (parts.simple) {
-    const amount = el("input", {
-      class: "sb-input sb-duration__amount",
-      type: "number",
-      min: "0",
-      step: "1",
-      id,
-    });
-    amount.value = String(parts.amount);
+  const hint = el("p", {
+    class: "sb-duration__hint",
+    id: `${id}-hint`,
+    text: [
+      `Examples: ${DURATION_EXAMPLES.join(", ")}. ISO-8601 (PT1H30M) works too.`,
+      // An optional field is the only one where empty is an ANSWER, and
+      // saying so is half of what sb-709 asked for: the author who wants
+      // "send now" has to be able to see that clearing the box is how.
+      field.required ? null : "Leave it empty to store no value.",
+    ]
+      .filter(Boolean)
+      .join(" "),
+  });
 
-    const unit = el(
-      "select",
-      { class: "sb-select sb-duration__unit", "aria-label": `${field.label} unit` },
-      durationUnits().map((one) => el("option", { value: one.unit, text: one.label }))
+  const readout = el("p", { class: "sb-duration__readout" });
+  const draw = (text) => {
+    const read = readDuration(text);
+
+    input.dataset.form = read.form;
+    if (read.form === "invalid") input.setAttribute("aria-invalid", "true");
+    else input.removeAttribute("aria-invalid");
+
+    if (read.form === "empty") {
+      // Deliberately the same two dashes a never-set field shows, because it
+      // IS a never-set field: the key is gone either way, and a control that
+      // remembered being cleared would be remembering something the document
+      // does not hold.
+      readout.replaceChildren(
+        ...[
+          el("span", { class: "sb-duration__human", text: "—" }),
+          el("code", { class: "sb-duration__iso", text: "—" }),
+          field.required
+            ? null
+            : el("span", { class: "sb-duration__note", text: "no value stored" }),
+        ].filter(Boolean)
+      );
+      return;
+    }
+
+    if (read.form === "invalid") {
+      readout.replaceChildren(
+        el("span", { class: "sb-duration__message", "data-severity": "error", text: read.message })
+      );
+      return;
+    }
+
+    readout.replaceChildren(
+      ...[
+        el("span", { class: "sb-duration__human", text: read.human }),
+        el("code", { class: "sb-duration__iso", text: read.iso }),
+        read.form === "predicator"
+          ? el("span", { class: "sb-duration__note", text: "compiles to that ISO-8601 duration" })
+          : null,
+      ].filter(Boolean)
     );
-    unit.value = parts.unit;
+  };
 
-    const fire = () => commit(durationFrom(amount.value, unit.value));
-    amount.addEventListener("change", fire);
-    unit.addEventListener("change", fire);
+  draw(view.stored);
 
-    box.append(amount, unit);
-  } else {
-    const raw = el("input", {
-      class: "sb-input sb-input--mono",
-      type: "text",
-      id,
-      placeholder: "PT1H30M",
-    });
-    raw.value = parts.iso;
-    raw.addEventListener("change", () => commit(raw.value));
+  // On `input` the readout follows the keystrokes; on `change` - blur or Enter,
+  // this file's commit boundary - the value is stored. Reading back as you type
+  // is the whole argument for a text box over a pair of widgets, and it costs
+  // no undo steps because it commits nothing.
+  input.addEventListener("input", () => draw(input.value));
 
-    box.append(raw);
-  }
+  input.addEventListener("change", () => {
+    const text = input.value.trim();
+    const read = readDuration(text);
 
-  const readout = el("span", { class: "sb-duration__readout" }, [
-    el("span", { class: "sb-duration__human", text: parts.human || "—" }),
-    el("code", { class: "sb-duration__iso", text: parts.iso || "—" }),
-  ]);
+    draw(text);
 
-  if (iso && parts.iso !== "") {
-    readout.append(
-      el("span", {
-        class: "sb-duration__note",
-        text: "more than one unit - edited as ISO-8601",
-      })
-    );
-  }
+    // An invalid string is not offered to the gate. d9's refusal path exists
+    // for config a TYPE turns down; a string that is not a duration in either
+    // grammar is not a disagreement about meaning, and spending an
+    // `update_config` to be told so would put a failed command on the stack.
+    if (read.form === "invalid") return;
 
-  wrapper.append(box, readout);
+    if (read.form === "empty") {
+      // Absent already: there is nothing to omit, and committing would put an
+      // undo step on the stack for an edit that changes no byte. A key stored
+      // as `""` is NOT that case - it is the seed an insert wrote, and
+      // clearing the field is exactly the gesture that should take it out of
+      // the document.
+      if (field.value === undefined) return;
+      commit(OMIT);
+      return;
+    }
 
-  if (!iso) {
-    const escape = el("button", {
-      class: "sb-button sb-button--quiet sb-duration__escape",
-      type: "button",
-      text: "Edit as ISO-8601",
-    });
+    if (text !== view.stored) commit(text);
+  });
 
-    escape.addEventListener("click", () => {
-      const raw = el("input", {
-        class: "sb-input sb-input--mono",
-        type: "text",
-        id,
-        placeholder: "PT1H30M",
-      });
-      raw.value = parts.iso;
-      raw.addEventListener("change", () => commit(raw.value));
-
-      iso = true;
-      box.replaceChildren(raw);
-      escape.remove();
-      raw.focus();
-    });
-
-    wrapper.append(escape);
-  }
+  wrapper.append(input, readout, hint);
 
   return wrapper;
 }
@@ -1323,7 +1355,15 @@ function editBase(host, scope, blockId) {
  * it with a stub.
  */
 export function commitField(field, form, host, scope, wrapper, value) {
-  const config = writeAtPath(editBase(host, scope, form.blockId), field.path, value);
+  const base = editBase(host, scope, form.blockId);
+
+  // sb-709: `OMIT` is an edit whose meaning is that the key is not there. It
+  // travels through the draft path like every other value - the same whole
+  // config, offered to the same gate, one undo step - because "the author
+  // cleared the optional delay" is an edit the document has to be able to hold
+  // and to step back through.
+  const config =
+    value === OMIT ? omitAtPath(base, field.path) : writeAtPath(base, field.path, value);
 
   scope.drafts.clear(form.blockId);
 

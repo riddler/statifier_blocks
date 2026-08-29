@@ -2229,21 +2229,38 @@
 
 /* ---------------------------------------------------- the duration control */
 
+/* sb-709: one text box, its reading, and the examples. A column rather than a
+ * row, because the readout is a SENTENCE about what was typed and reading it
+ * beside the box would put it where the box wants to be wide. */
 .sb-duration {
   display: flex;
+  flex-direction: column;
   gap: var(--sb-space-half);
 }
 
-.sb-duration__amount {
-  flex: 0 1 6rem;
+.sb-duration__input {
+  width: 100%;
 }
 
-.sb-duration__unit {
-  flex: 1 1 auto;
-  min-width: 0;
+/* The examples, always visible. The whole point of the ruling is that an
+ * author should not have to know ISO-8601 to type a duration, and examples
+ * behind a tooltip are examples nobody reads. */
+.sb-duration__hint {
+  margin: 0;
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-subtle);
+}
+
+.sb-duration__message {
+  color: var(--sb-error);
+}
+
+.sb-duration__input[aria-invalid="true"] {
+  border-color: var(--sb-error);
 }
 
 .sb-duration__readout {
+  margin: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -2266,12 +2283,6 @@
   flex: 1 0 100%;
   font-style: italic;
   color: var(--sb-fg-subtle);
-}
-
-.sb-duration__escape {
-  align-self: flex-start;
-  padding-left: 0;
-  font-size: var(--sb-text-xs);
 }
 
 /* --------------------------------------------------------- the list rows */

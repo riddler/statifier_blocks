@@ -350,7 +350,11 @@ function fieldView(field, config, findings) {
   };
 
   if (control === "select") view.choices = field.type.select;
-  if (control === "duration") view.duration = durationParts(value);
+  // sb-709: the dedicated duration control's value, which distinguishes an
+  // absent key from a stored zero. `durationParts` above is the older
+  // value/unit projection, kept because it is what `humanizeDuration` is
+  // exercised through and because nothing forces the two to be one function.
+  if (control === "duration") view.duration = durationValue(value);
 
   /*
    * sb-e2x's row control, derived the same way the list control's rows are:
@@ -488,6 +492,64 @@ export function writeAtPath(config, path, value) {
 
   Object.defineProperty(base, step, {
     value: next,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+
+  return base;
+}
+
+/**
+ * The value a control commits when its edit means "there is no answer here" -
+ * not an empty string, not a zero, not a `null`: the key is not stored at all.
+ *
+ * sb-709. An optional duration is the first field in the spike whose empty
+ * state is genuinely absence: `core.send`'s `delay` says "send now" by having
+ * no `delay` key, and the old control's `durationFrom("")` wrote `PT0H`, which
+ * is a zero-length timer rather than no timer. A sentinel rather than a
+ * separate `commitOmit` entry point, because a control already has exactly one
+ * way to speak (`commit(value)`) and adding a second would mean every wrapper
+ * around it - the draft store, the gate, the refusal path - grew a second
+ * shape to carry.
+ */
+export const OMIT = Symbol("sb.omit");
+
+/**
+ * `config` with the key at `path` REMOVED, copied the same way `writeAtPath`
+ * copies. Absence is not a value `writeAtPath` can express: writing `undefined`
+ * still leaves an own key, and `canonicalJson` would then encode it.
+ *
+ * A path that is not there comes back unchanged rather than throwing - clearing
+ * a field that was never set is exactly the gesture this exists for, and it has
+ * to be a no-op on the document rather than an error. An integer step is a
+ * position in a list, where removal is `removeRow`'s job (a list with a hole in
+ * it is not a shape ADR-0001 decision 6 admits), so a trailing integer step
+ * leaves the value alone.
+ */
+export function omitAtPath(config, path) {
+  if (path.length === 0) return config;
+
+  const [step, ...rest] = path;
+
+  if (Number.isInteger(step)) {
+    if (!Array.isArray(config) || rest.length === 0) return config;
+
+    const base = config.slice();
+    base[step] = omitAtPath(base[step], rest);
+    return base;
+  }
+
+  const base = cloneObject(config);
+  if (!Object.hasOwn(base, step)) return base;
+
+  if (rest.length === 0) {
+    delete base[step];
+    return base;
+  }
+
+  Object.defineProperty(base, step, {
+    value: omitAtPath(base[step], rest),
     enumerable: true,
     writable: true,
     configurable: true,
@@ -694,6 +756,206 @@ export function durationFrom(amount, unit) {
   const known = DURATION_UNITS.find((one) => one.unit === unit) ?? DURATION_UNITS[1];
 
   return known.designator === "T" ? `PT${whole}${known.unit}` : `P${whole}${known.unit}`;
+}
+
+/* ------------------------------- sb-709: the duration an author actually types */
+
+/*
+ * The dedicated duration control, as a value. Three things the value/unit
+ * projection above could not say, and the reason sb-709 widened from a coercion
+ * bug into a control:
+ *
+ *   - **Empty is absence.** `""` is the key OMITTED, not `PT0S`. `core.send`
+ *     with no `delay` sends now; `core.send` with `PT0S` arms a zero-length
+ *     durable timer. They are different documents and they were the same
+ *     keystroke.
+ *   - **A person types `1h30m`, not `PT1H30M`.** The operator's ruling on
+ *     sb-709: predicator duration strings are the PRIMARY input, with the
+ *     examples visible on the form. ISO-8601 stays accepted as the escape
+ *     hatch, so nothing an author already stored has to be retyped.
+ *   - **The format is checked here, inline**, before the edit is offered to
+ *     d9's gate at all - the control refuses `soon` itself rather than
+ *     spending an `update_config` on it.
+ *
+ * ## The grammar, and where it comes from
+ *
+ * The predicator form is predicator-ex's own duration LITERAL, which has no
+ * string parser: durations are lexed. This function mirrors that lexer rule by
+ * rule, and every rule below cites the line it mirrors:
+ *
+ *   - a run of `<number><unit>` pairs with NO whitespace anywhere
+ *     (`lib/predicator/lexer.ex:768`, "simplified approach with no-spaces
+ *     constraint", and `tokenize_chars/4` at :228, where a number token is
+ *     followed by a duration unit only when it is immediately adjacent);
+ *   - the units are lower-case `y mo w d h m s ms`
+ *     (`lexer.ex:812-850`, `extract_duration_unit/1` plus `duration_unit?/1`);
+ *   - the two-letter units win over the one-letter ones, so `5ms` is
+ *     milliseconds and `5mo` is months rather than `5m` with a stray letter
+ *     (`lexer.ex:815-819`, the `ms|mo` arms are tried first).
+ *
+ * Two of predicator's shapes this control deliberately does NOT offer. It
+ * refuses a strict SUBSET, never accepting a string predicator would reject,
+ * which is the safe direction for the repo rule about emitting what the engine
+ * does not accept:
+ *
+ *   - `ms`, and fractional components like `1.5h` (`lexer.ex:256-284`), because
+ *     the ISO-8601 form the block types validate has no sub-second component
+ *     (`palette.js`'s `DURATION`) - a control that accepted an input no stored
+ *     form can express is the bug sb-709 is about, one layer up;
+ *   - a REPEATED unit (`3h2h`), which predicator's lexer accepts and resolves
+ *     at the opcode (`parser.ex:2070-2090` keeps integer-only literals on the
+ *     pinned last-wins path). Refusing it here picks no reading of it.
+ */
+const PREDICATOR_UNITS = [
+  { unit: "y", iso: "Y", part: "date" },
+  { unit: "mo", iso: "M", part: "date" },
+  { unit: "w", iso: "W", part: "date" },
+  { unit: "d", iso: "D", part: "date" },
+  { unit: "h", iso: "H", part: "time" },
+  { unit: "m", iso: "M", part: "time" },
+  { unit: "s", iso: "S", part: "time" },
+];
+
+/** What the form shows an author who has never typed a duration before. */
+export const DURATION_EXAMPLES = ["30s", "15m", "1h30m", "2d", "3d8h"];
+
+const ISO_DURATION = /^P(?!$)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?!$)(\d+H)?(\d+M)?(\d+S)?)?$/;
+
+// Everything the predicator lexer WOULD take, including the units and the
+// fractions this control declines. Only ever used to tell an author which of
+// the two refusals they hit; acceptance is `predicatorComponents` below.
+const PREDICATOR_ANY = /^(?:\d+(?:\.\d+)?(?:ms|mo|[ydwhms]))+$/;
+
+/**
+ * `"3d8h"` as `[{ amount: 3, unit: "d" }, { amount: 8, unit: "h" }]`, or `null`
+ * when the text is not a predicator duration literal at all.
+ *
+ * Anchored and exhaustive: the scan has to consume the WHOLE string, so `2d ` -
+ * a trailing space - and `2dx` are both refused rather than half-read. The
+ * sticky flag is what makes "the next component starts exactly where the last
+ * one ended" a property of the loop rather than an assumption about `exec`.
+ */
+export function predicatorComponents(text) {
+  const source = String(text ?? "");
+  const component = /(\d+)(mo|[ydwhms])/y;
+  const out = [];
+
+  let at = 0;
+  while (at < source.length) {
+    component.lastIndex = at;
+    const match = component.exec(source);
+    if (match === null) return null;
+
+    out.push({ amount: Number(match[1]), unit: match[2] });
+    at = component.lastIndex;
+  }
+
+  return out.length === 0 ? null : out;
+}
+
+/**
+ * The components as the ISO-8601 string the compiler will emit.
+ *
+ * ISO-8601 orders its components and predicator does not, so `8h3d` and `3d8h`
+ * compile to the same `P3DT8H`. That is a projection, not the stored value:
+ * campaign 014's D4 stores the author's own string verbatim and compiles at
+ * emit time (a PROPOSAL, recorded on sb-709 and in the README - the shipped
+ * `:duration` field type is ADR-0002 decision 7's and no ADR text changes
+ * here), so the ISO form only ever appears as the readout beside the field.
+ */
+export function isoFromComponents(components) {
+  const totals = new Map();
+
+  for (const { amount, unit } of components) {
+    if (totals.has(unit)) {
+      return { ok: false, iso: "", message: `${unit} is given twice - say it once` };
+    }
+    totals.set(unit, amount);
+  }
+
+  const spell = (part) =>
+    PREDICATOR_UNITS.filter((one) => one.part === part && totals.has(one.unit))
+      .map((one) => `${totals.get(one.unit)}${one.iso}`)
+      .join("");
+
+  const date = spell("date");
+  const time = spell("time");
+
+  // `P` alone is not a duration and `PT` alone is not either, so an all-empty
+  // spelling can only come from an empty component list - which
+  // `predicatorComponents` never returns.
+  return { ok: true, iso: `P${date}${time === "" ? "" : `T${time}`}`, message: "" };
+}
+
+/**
+ * One duration string, read.
+ *
+ *     { form, iso, human, message }
+ *
+ * `form` is `"empty"`, `"predicator"`, `"iso"` or `"invalid"`, and it is the
+ * whole decision: `"empty"` means the key is omitted, the two valid forms
+ * differ only in what the author typed, and `"invalid"` carries the sentence
+ * the field shows instead of committing anything.
+ *
+ * The predicator reading is tried first. The two grammars cannot collide - an
+ * ISO duration starts with `P` and a predicator one starts with a digit - so
+ * the order is for legibility rather than precedence.
+ */
+export function readDuration(text) {
+  const trimmed = String(text ?? "").trim();
+  if (trimmed === "") return { form: "empty", iso: "", human: "", message: "" };
+
+  const components = predicatorComponents(trimmed);
+
+  if (components !== null) {
+    const compiled = isoFromComponents(components);
+
+    return compiled.ok
+      ? { form: "predicator", iso: compiled.iso, human: humanizeDuration(compiled.iso), message: "" }
+      : { form: "invalid", iso: "", human: "", message: compiled.message };
+  }
+
+  if (ISO_DURATION.test(trimmed)) {
+    return { form: "iso", iso: trimmed, human: humanizeDuration(trimmed), message: "" };
+  }
+
+  return { form: "invalid", iso: "", human: "", message: refusalFor(trimmed) };
+}
+
+/*
+ * Why this string is not a duration, said as specifically as the text allows.
+ * "Not a duration" is true of `soon` and of `500ms` alike, and the second one
+ * is a person who knows the grammar hitting a limit of the spike - telling
+ * them so is the difference between a form that teaches and a form that sulks.
+ */
+function refusalFor(text) {
+  if (PREDICATOR_ANY.test(text)) {
+    return text.includes(".")
+      ? "A part-unit like 1.5h is not stored here - say 1h30m instead."
+      : "Milliseconds are not stored here - the smallest unit is a second.";
+  }
+
+  return `Not a duration. Try ${DURATION_EXAMPLES.join(", ")}, or ISO-8601 like PT1H30M.`;
+}
+
+/**
+ * A stored config value as the duration control renders it.
+ *
+ *     { stored, set, form, iso, human, message }
+ *
+ * `set` is the acceptance criterion sb-709 exists for: a key that was CLEARED
+ * and a key that was NEVER SET are both absent, so both arrive here as
+ * `undefined` and produce the identical value. There is no third state for the
+ * form to draw, which is why there is no way for the form to draw them apart.
+ *
+ * A non-string stored value (a number an older document carried, say) reads as
+ * unset for the readout but keeps its bytes in `stored`, so the field still
+ * shows what the document holds rather than blanking it.
+ */
+export function durationValue(value) {
+  const stored = value === undefined || value === null ? "" : String(value);
+
+  return { stored, set: stored !== "", ...readDuration(stored) };
 }
 
 /* =============================================================== the findings */
