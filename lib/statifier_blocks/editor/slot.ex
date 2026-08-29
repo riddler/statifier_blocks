@@ -29,6 +29,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     only by dragging. The palette that opens is filtered by the same predicate
     the drag uses, not a parallel implementation of it.
 
+    ## The rail partition
+
+    `:secondary` and `:failure` are both **attached rails** rather than body
+    slots (amendment 10h's placement row), and `ViewModel.rail?/1` is that
+    partition. What is stamped here is the placement the two share; the
+    vocabulary that tells them apart - dashed and warning-family for an
+    interrupt, solid and error-family for a failure path - belongs to the
+    bead that renders `:failure`, and `data-slot-style` is the hook it
+    needs. The container's boundary box is derived from the same partition,
+    one level up in `BlockNode`.
+
     ## Recursion
 
     `Slot` renders children via `BlockNode` and `BlockNode` renders slots via
@@ -60,6 +71,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       <div
         class={[
           "sb-slot",
+          ViewModel.rail?(@slot) && "sb-slot--rail",
           @slot.style == :secondary && "sb-slot--secondary",
           not @slot.declared? && "sb-slot--undeclared",
           @class
@@ -68,6 +80,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-parent-id={@parent_id}
         data-declared={to_string(@slot.declared?)}
         data-arity={@slot.arity}
+        data-slot-style={@slot.style}
         data-drop={@drop}
       >
         <div class="sb-slot__header">
@@ -156,8 +169,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       if MapSet.member?(droppable, {parent_id, name}), do: "ok", else: "no"
     end
 
+    # One place spells the severity modifiers, and it is outside
+    # `StatifierBlocks.Editor.*` so it is asserted with LiveView absent
+    # (ADR-0005 decision 11, amended 2026-08-29 for `:info`).
     @spec severity_class(StatifierBlocks.Finding.t()) :: String.t()
-    defp severity_class(%StatifierBlocks.Finding{severity: :warning}), do: "sb-finding--warning"
-    defp severity_class(%StatifierBlocks.Finding{}), do: "sb-finding--error"
+    defp severity_class(finding), do: StatifierBlocks.Finding.severity_class(finding)
   end
 end

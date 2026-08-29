@@ -372,9 +372,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec input_name(ViewModel.Field.t()) :: String.t()
     def input_name(%ViewModel.Field{key: key}), do: "config[" <> key <> "]"
 
+    # One place spells the severity modifiers, and it is outside
+    # `StatifierBlocks.Editor.*` so it is asserted with LiveView absent
+    # (ADR-0005 decision 11, amended 2026-08-29 for `:info`).
     @spec severity_class(StatifierBlocks.Finding.t()) :: String.t()
-    defp severity_class(%StatifierBlocks.Finding{severity: :warning}), do: "sb-finding--warning"
-    defp severity_class(%StatifierBlocks.Finding{}), do: "sb-finding--error"
+    defp severity_class(finding), do: StatifierBlocks.Finding.severity_class(finding)
 
     @spec type_tag(StatifierBlocks.BlockType.field_type()) :: String.t()
     defp type_tag({tag, _inner}), do: Atom.to_string(tag)
