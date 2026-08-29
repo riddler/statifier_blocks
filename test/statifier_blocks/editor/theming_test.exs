@@ -96,12 +96,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         css = File.read!(@stylesheet)
 
         declared =
-          ~r/^\s*(--sb-[a-z-]+):/m
+          ~r/^\s*(--sb-[a-z0-9-]+):/m
           |> Regex.scan(css)
           |> MapSet.new(fn [_all, name] -> name end)
 
         read =
-          ~r/var\((--sb-[a-z-]+)/
+          ~r/var\((--sb-[a-z0-9-]+)/
           |> Regex.scan(css)
           |> MapSet.new(fn [_all, name] -> name end)
 
