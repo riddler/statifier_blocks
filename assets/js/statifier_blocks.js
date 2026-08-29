@@ -1,4 +1,4 @@
-// The entire client-side surface of statifier_blocks: one LiveView hook.
+// The command half of statifier_blocks' client-side surface: the drag hook.
 //
 // ADR-0005 decision 7. The hook translates pointer and drag events into
 // pushEvent calls and does nothing else. In particular it never moves a node
@@ -7,12 +7,20 @@
 // ownership of the same elements, which is the standard way drag-and-drop
 // integrations break.
 //
-// ADDING A SECOND HOOK REQUIRES AMENDING ADR-0005. That is deliberately a
-// high bar - a second hook is the signal that some behaviour has started
-// living on the client, and this design exists to prevent exactly that.
-// The bar is enforced mechanically as well as socially: test/statifier_blocks/
-// assets_test.exs reads this file, counts the hooks it exports, and fails
-// with a message naming the record.
+// ADDING A HOOK REQUIRES AMENDING ADR-0005, and one amendment has been made:
+// "decision 7, a second hook that only measures" (2026-08-29, accepted). It
+// admits `StatifierBlocksMeasure` in statifier_blocks_measure.js and nothing
+// else, and it replaces the count with the invariant the count was a proxy
+// for - ONE HOOK PUSHES COMMANDS, and this is it. A measuring hook moves no
+// behaviour to the client because it produces an input rather than a
+// decision: feed it a different measurement and the same document comes back;
+// feed this hook a different drop and a different document does.
+//
+// The bar is still enforced mechanically as well as socially:
+// test/statifier_blocks/assets_test.exs reads assets/js/, asserts the exported
+// hooks are exactly the two the record names, and fails with a message naming
+// it. A third hook, or a hook that pushes anything but geometry or a command,
+// is a thing this record does not have.
 //
 // Delivery is source, per sui-ADR-0009: a host adds
 //

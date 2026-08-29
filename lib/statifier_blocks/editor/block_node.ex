@@ -56,6 +56,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     never a colour - and a name that does not validate resolves to the
     editor's accent rather than to a broken card.
 
+    ## The measurement anchors
+
+    Three of them per block, stamped as `data-sb-anchor` and read by nothing
+    in this module: the node's own box, its card, and a zero-height outlet at
+    the very bottom of everything it contains. The outlet exists so that flow
+    leaves a container from BELOW its children rather than from its header -
+    a sequence's last block and the sequence itself have to leave from the
+    same line, or every edge out of a nested container starts in the wrong
+    place.
+
+    They are markup, and the amendment to decision 7 is why that is all they
+    are: the measurement hook reads these boxes and pushes them, and
+    `StatifierBlocks.Connectors` decides what to draw from the numbers. A host
+    that never imports the hook has three inert attributes and an empty div.
+
     ## The badge
 
     `findings_count` covers the whole subtree, so a collapsed node still shows
@@ -66,6 +81,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
+    alias StatifierBlocks.Connectors
     alias StatifierBlocks.Editor.Slot
     alias StatifierBlocks.ViewModel
 
@@ -105,9 +121,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-findings-count={@node.findings_count}
         data-dragging={to_string(@drag != nil and @drag.block_id == @node.block_id)}
         data-root={to_string(@root?)}
+        data-sb-anchor={Connectors.node_anchor(@node.block_id)}
         draggable={to_string(not @root?)}
       >
-        <div class="sb-node__chrome">
+        <div class="sb-node__chrome" data-sb-anchor={Connectors.card_anchor(@node.block_id)}>
           <.icon_glyph icon={@icon} name={@node.entry.icon} />
           <button
             type="button"
@@ -148,6 +165,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             target={@target}
             icon={@icon}
           />
+        </div>
+
+        <div
+          class="sb-node__outlet"
+          data-sb-anchor={Connectors.outlet_anchor(@node.block_id)}
+          aria-hidden="true"
+        >
         </div>
       </div>
       """

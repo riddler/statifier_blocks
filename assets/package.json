@@ -1,16 +1,18 @@
 {
   "name": "statifier_blocks",
   "version": "0.1.0",
-  "description": "The statifier_blocks editor's single LiveView hook, shipped as source (ADR-0005 decisions 7 and 14).",
+  "description": "The statifier_blocks editor's two LiveView hooks, shipped as source (ADR-0005 decisions 7 and 14, and the 2026-08-29 amendment admitting the measurement hook).",
   "license": "MIT",
   "type": "module",
   "main": "js/statifier_blocks.js",
   "exports": {
     ".": "./js/statifier_blocks.js",
+    "./measure": "./js/statifier_blocks_measure.js",
     "./css": "./css/statifier_blocks.css"
   },
   "files": [
     "js/statifier_blocks.js",
+    "js/statifier_blocks_measure.js",
     "css/statifier_blocks.css"
   ]
 }

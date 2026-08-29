@@ -72,6 +72,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     `slot_style: %{"on_error" => :failure}`, and a host type declaring the
     same gets the same.
 
+    ## The fan's landing point
+
+    The header carries `data-sb-anchor`, which is where a fan edge lands when
+    the container above arranges more than one slot (the amendment to decision
+    7, and `StatifierBlocks.Connectors`). The header rather than the first
+    card inside it: the header is what carries the slot's name and its guard,
+    and an edge that ran past it to the card would cross the very condition
+    the edge is subject to. An empty slot's header is also its exit anchor -
+    an arm with nothing in it yet is a real arm, and a fan that silently
+    skipped it would tell an author their empty arm does not exist.
+
     ## Recursion
 
     `Slot` renders children via `BlockNode` and `BlockNode` renders slots via
@@ -84,6 +95,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
+    alias StatifierBlocks.Connectors
     alias StatifierBlocks.Editor.BlockNode
     alias StatifierBlocks.ViewModel
 
@@ -121,7 +133,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-drop={@drop}
         data-drop-reason={@drop_reason}
       >
-        <div class="sb-slot__header">
+        <div class="sb-slot__header" data-sb-anchor={Connectors.slot_anchor(@parent_id, @slot.name)}>
           <span class="sb-slot__label">{@slot.label}</span>
           <span :for={finding <- @slot.findings} class={["sb-finding", severity_class(finding)]}>
             {finding.message}

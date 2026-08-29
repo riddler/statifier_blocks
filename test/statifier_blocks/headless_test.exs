@@ -46,7 +46,8 @@ defmodule StatifierBlocks.HeadlessTest do
     StatifierBlocks.Finding,
     StatifierBlocks.Datamodel,
     StatifierBlocks.ViewModel,
-    StatifierBlocks.Shell
+    StatifierBlocks.Shell,
+    StatifierBlocks.Connectors
   ]
 
   if @headless do

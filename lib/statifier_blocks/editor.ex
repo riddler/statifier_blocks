@@ -117,6 +117,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     alias StatifierBlocks.{
       Block,
       BlockType,
+      Connectors,
       Datamodel,
       Document,
       Edit,
@@ -168,6 +169,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          on_drawer_resize: nil,
          zoom: Shell.default_zoom(),
          fit: :manual,
+         measurement: %{},
          last_error: nil
        )}
     end
@@ -224,6 +226,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:drawer, drawer_view(assigns))
         |> assign(:depth, Shell.depth(assigns.view_model.root))
         |> assign(:block_count, Shell.block_count(assigns.view_model.root))
+        |> assign(:edges, Connectors.edges(assigns.view_model.root, assigns.measurement))
+        |> assign(:stage, Connectors.stage(assigns.measurement))
 
       ~H"""
       <div
@@ -267,6 +271,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               target={@myself}
               icon={@icon}
               theme={@theme}
+              edges={@edges}
+              stage={@stage}
             />
 
             <Findings.findings view_model={@view_model} target={@myself} />
@@ -300,6 +306,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # just chose is behind the thing they chose it from.
       {:noreply, socket |> assign(selected_id: id, palette_sheet: false) |> rebuild()}
     end
+
+    # ------------------------------------------------------------ measurement
+    #
+    # The 2026-08-29 amendment to decision 7, and the only event in this
+    # module that is not an author's intent. `StatifierBlocksMeasure` pushes
+    # the boxes the browser laid out; this stores them and nothing else.
+    #
+    # It touches no document, no history entry, no selection, no draft and no
+    # finding - which is clause 7b's distinction between an input and a
+    # decision, expressed as the shape of one clause. Feed it a different
+    # measurement and the same document comes back. The payload crosses from
+    # the DOM, so it is decoded by a total function rather than pattern
+    # matched: `Connectors.measurement/1` drops what it cannot read and
+    # anything unreadable at all becomes the empty measurement, which is the
+    # same state the editor holds before the first push and with no hook
+    # imported at all.
+    def handle_event("measure", params, socket),
+      do: {:noreply, assign(socket, :measurement, Connectors.measurement(params))}
 
     # ---------------------------------------------------------------- shell
     #
