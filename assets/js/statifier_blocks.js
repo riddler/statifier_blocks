@@ -1,4 +1,6 @@
-// The command half of statifier_blocks' client-side surface: the drag hook.
+// statifier_blocks' client-side surface: the package's entry point, which
+// defines the command half - the drag hook - and re-exports the measurement
+// half so the default export carries both.
 //
 // ADR-0005 decision 7. The hook translates pointer and drag events into
 // pushEvent calls and does nothing else. In particular it never moves a node
@@ -26,14 +28,33 @@
 //
 //   "statifier_blocks": "file:../deps/statifier_blocks"
 //
-// to assets/package.json and imports the hook in app.js. This repository
-// bundles nothing and has no Node toolchain. The entry point, the export name
-// and the hook name are versioned public API.
+// to assets/package.json and imports the hooks in app.js. This repository
+// bundles nothing and has no Node toolchain. The entry point, the export names
+// and the hook names are versioned public API.
+//
+// THE DEFAULT EXPORT CARRIES BOTH HOOKS, so `hooks: { ...StatifierBlocks }`
+// registers both and a host cannot get one without the other. That shape is
+// the point: the measurement hook is what feeds the server the geometry the
+// connector layer draws from, so a host that registered only the drag hook
+// got an editor with no flow lines and no error to explain it. The two named
+// exports and the `statifier_blocks/measure` entry point are unchanged, so a
+// host that wants only measurement still has a way to say so - the amendment's
+// "a host that wants connectors adds one more import" is now the default
+// rather than a step to remember.
+//
+// The sibling import below is the only import in this file, and it is a
+// relative path inside this package. sui-ADR-0009's bar is that a
+// source-shipped hook pulls no DEPENDENCIES; assets_test.exs enforces exactly
+// that, on both files.
 //
 // The DOM contract this depends on is part of the package's contract:
 //   data-block-id  on each block's root element
 //   data-slot      on each gap, with data-parent-id and data-index
 //   data-drop      on each slot during a drag session ("ok" or "no")
+
+import { StatifierBlocksMeasure } from "./statifier_blocks_measure.js";
+
+export { StatifierBlocksMeasure };
 
 export const StatifierBlocksDrag = {
   mounted() {
@@ -91,4 +112,4 @@ export const StatifierBlocksDrag = {
   },
 };
 
-export default { StatifierBlocksDrag };
+export default { StatifierBlocksDrag, StatifierBlocksMeasure };

@@ -37,6 +37,40 @@ defmodule StatifierBlocks.AssetsTest do
       """
     end
 
+    # The defect this guards is the one campaign 016 found in every host seen:
+    # registering the drag hook alone leaves the connector layer with no
+    # measurements, so the editor renders as stacked rows with no flow lines
+    # and nothing anywhere reports an error. A default export carrying both is
+    # what makes `hooks: { ...StatifierBlocks }` register both or neither.
+    # Sabotage: dropping `StatifierBlocksMeasure` from the default export of
+    # assets/js/statifier_blocks.js - the one-line registration in the README
+    # silently goes back to registering the drag hook alone, and this goes red.
+    test "the entry point's default export carries both hooks" do
+      assert default_export(@hook_source) == ["StatifierBlocksDrag", "StatifierBlocksMeasure"],
+             """
+             A host registers hooks from the default export
+             (`hooks: { ...StatifierBlocks }`, README "Embedding the editor"), so a
+             hook missing from it is a hook no host registers. `StatifierBlocksMeasure`
+             is what feeds the server the geometry `connector_layer.ex` draws from:
+             without it the editor renders stacked rows with no connectors and no
+             error to explain them.
+
+             Found: #{inspect(default_export(@hook_source))}
+             """
+    end
+
+    # The README is the page hexdocs shows and the one a host copies from, so
+    # the shape it teaches is part of this contract rather than prose beside it.
+    # Sabotage: reverting the README to `hooks: { StatifierBlocksDrag }` - the
+    # copied snippet registers one hook again and this goes red.
+    test "the README teaches the shape that registers both" do
+      readme = File.read!("README.md")
+
+      assert readme =~ "import StatifierBlocks from \"statifier_blocks\";"
+      assert readme =~ "hooks: { ...StatifierBlocks }"
+      assert readme =~ "StatifierBlocksMeasure"
+    end
+
     # The corroborator: a scan over a hard-coded file list says nothing about
     # a file that is not on it.
     # Sabotage: dropping either source from `@sources` - the check above goes
@@ -144,15 +178,26 @@ defmodule StatifierBlocks.AssetsTest do
   end
 
   describe "the command hook (decision 7)" do
+    # sui-ADR-0009's bar is DEPENDENCIES, and this file imports none: its one
+    # import is the sibling module in this same package, which the entry point
+    # needs in order to put both hooks in one default export (sb-f04). A bare
+    # specifier - anything not resolved relative to this directory - is a
+    # dependency and is what the ban is about, so that is what this checks.
+    # The measure hook imports nothing at all and is checked that way above.
     # Sabotage: adding `import { something } from "phoenix"` to the hook - the
     # source-delivery model sui-ADR-0009 permits for a self-contained hook no
     # longer applies and this goes red.
-    test "the hook is self-contained, which is what lets it ship as source" do
-      source = File.read!(@hook_source)
+    test "the hook pulls no dependency, which is what lets it ship as source" do
+      assert imports(@hook_source) == ["./statifier_blocks_measure.js"], """
+      sui-ADR-0009 bans colocated and source-shipped hooks that pull
+      dependencies. The entry point qualifies only because every specifier it
+      imports is relative to this package - today exactly one, the sibling
+      module holding the measurement hook. A bare specifier here is a
+      dependency a host would have to install, which is the thing the record
+      forbids.
 
-      refute source =~ ~r/^\s*import\s/m,
-             "sui-ADR-0009 bans colocated and source-shipped hooks that pull dependencies; " <>
-               "StatifierBlocksDrag qualifies only because it imports nothing"
+      Found: #{inspect(imports(@hook_source))}
+      """
     end
 
     # Sabotage: having the hook call `this.el.appendChild(...)` - a hook that
@@ -220,5 +265,25 @@ defmodule StatifierBlocks.AssetsTest do
       |> Regex.scan(File.read!(source))
       |> Enum.map(fn [_all, name] -> name end)
     end)
+  end
+
+  # The names in a file's `export default { ... }`, sorted. This is the object
+  # a host spreads into `hooks:`, so it is the list that decides what actually
+  # gets registered.
+  defp default_export(source) do
+    [_all, body] = Regex.run(~r/^export default \{([^}]*)\};/m, File.read!(source))
+
+    body
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.sort()
+  end
+
+  # Every module specifier a file imports, in source order.
+  defp imports(source) do
+    ~r/^\s*import\s(?:[^;]*?\sfrom\s)?\s*"([^"]+)"/m
+    |> Regex.scan(File.read!(source))
+    |> Enum.map(fn [_all, specifier] -> specifier end)
   end
 end
