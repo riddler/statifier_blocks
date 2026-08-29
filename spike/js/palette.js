@@ -63,11 +63,27 @@ const ARM_SLOT = /^arm_[a-z][a-z0-9_]*$/;
 const EVENT_NAME = /^[A-Za-z_][A-Za-z0-9_.\-]*$/;
 const DURATION = /^P(?!$)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?!$)(\d+H)?(\d+M)?(\d+S)?)?$/;
 
+/* sb-709: the OTHER duration spelling a document may hold - predicator-ex's own
+ * duration literal, `3d8h`, which the duration control makes the primary way to
+ * type one. Campaign 014's D4 stores what the author typed and compiles to ISO
+ * at emit time (a PROPOSAL, recorded on sb-709 and in the spike README; no ADR
+ * text changes here), so both spellings are values a `:duration` field can hold
+ * and a validator that took only one of them would refuse what the form writes.
+ *
+ * Mirrors predicator-ex `lib/predicator/lexer.ex:812-850` - lower-case units,
+ * `ms|mo` tried before the one-letter units, no whitespace anywhere.
+ * `panes.js`'s `predicatorComponents` is the same rule spelled as a scan and
+ * carries the full citation; it additionally declines `ms`, fractional
+ * components and a repeated unit, so the control writes a strict SUBSET of what
+ * this accepts and never the other way round. */
+const PREDICATOR_DURATION = /^(?:\d+(?:mo|[ydwhms]))+$/;
+
 const nonEmptyString = (value) => typeof value === "string" && value !== "";
 const isIdentifier = (value) => nonEmptyString(value) && IDENTIFIER.test(value);
 const isArmSlot = (value) => nonEmptyString(value) && ARM_SLOT.test(value);
 const isEventName = (value) => nonEmptyString(value) && EVENT_NAME.test(value);
-const isDuration = (value) => nonEmptyString(value) && DURATION.test(value);
+const isDuration = (value) =>
+  nonEmptyString(value) && (DURATION.test(value) || PREDICATOR_DURATION.test(value));
 const oneOf = (value, options) => typeof value === "string" && options.includes(value);
 
 /** `validate_config/1`'s return: `null` for `:ok`, or an ordered finding list. */

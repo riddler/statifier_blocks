@@ -1901,7 +1901,9 @@
           checkConfig(registry, doc, updateConfig("blk_WAI", { duration: "PT12H" })) === null
         );
 
-        const refused = checkConfig(registry, doc, updateConfig("blk_WAI", { duration: "48h" }));
+        // sb-709: `48h` is a duration a person can now type, so the sample
+        // invalid value has to be one no grammar takes.
+        const refused = checkConfig(registry, doc, updateConfig("blk_WAI", { duration: "48 hours" }));
         equal("an invalid config is refused", refused.tag, "invalid_config");
         equal("...naming the block", refused.id, "blk_WAI");
         equal("...and the offending key", refused.findings[0].key, "duration");
@@ -5905,7 +5907,9 @@
         equal("a real duration passes", withDelay("PT2H"), null);
         equal("as does one with a date part", withDelay("P1DT6H"), null);
 
-        equal("an hours-and-minutes shorthand is refused", withDelay("2h"), [delayFinding]);
+        // sb-709 reversed this one: the predicator duration literal is the
+        // PRIMARY way to type a duration now, so `2h` is a value, not a typo.
+        equal("an hours-and-minutes shorthand is a duration (sb-709)", withDelay("2h"), null);
         equal("so is a bare number", withDelay("7200"), [delayFinding]);
         equal("so is a lone P", withDelay("P"), [delayFinding]);
         // ADR-0001 decision 6: a STORED null reaches the refusal arm rather
@@ -7988,6 +7992,272 @@
 
         equal("a non-object stored config is treated as empty", pendingKeys({ a: 1 }, null), ["a"]);
       });
+
+
+      /* ====================================== sb-709: the duration control
+       *
+       * The bead opened as a coercion bug - clearing `core.send`'s optional
+       * delay committed `PT0H`, a zero-length timer where the author meant no
+       * timer - and the operator widened it to d9's open duration-control
+       * question. Three claims, and every one of them is a value transform, so
+       * every one of them is checked here rather than looked at:
+       *
+       *   - a person types `1h30m`, predicator-ex's own duration literal, and
+       *     the control reads it back and shows the ISO-8601 it compiles to;
+       *   - ISO-8601 is still accepted, so nothing stored has to be retyped;
+       *   - empty is ABSENCE. The key is not stored, `PT0S` is a different
+       *     document, and a cleared field renders exactly as a never-set one.
+       *
+       * What the document STORES is the author's own string, compiled to ISO
+       * at emit time: campaign 014's pre-decision D4, recorded on sb-709 and
+       * in the spike README as a PROPOSAL. The shipped `:duration` field type
+       * is ADR-0002 decision 7's and no ADR text moves here.
+       *
+       * Imports are local to this block and the suites are appended at the END
+       * of the file, for the merge reason the sb-5ow suites give. `commitField`
+       * and `createDraftStore` are already in scope from that block - one
+       * module cannot import the same binding twice - so this one imports only
+       * what sb-709 added.
+       */
+
+      import {
+        DURATION_EXAMPLES,
+        durationValue,
+        isoFromComponents,
+        OMIT,
+        omitAtPath,
+        predicatorComponents,
+        readDuration,
+      } from "../js/panes.js";
+
+      suite("sb-709: the predicator duration grammar, mirrored", () => {
+        equal("one component", predicatorComponents("2d"), [{ amount: 2, unit: "d" }]);
+        equal("two, in the order typed", predicatorComponents("3d8h"), [
+          { amount: 3, unit: "d" },
+          { amount: 8, unit: "h" },
+        ]);
+        equal("the operator's own example", predicatorComponents("1h30m"), [
+          { amount: 1, unit: "h" },
+          { amount: 30, unit: "m" },
+        ]);
+
+        // `ms|mo` is tried before the one-letter units, which is the lexer's
+        // own order (predicator-ex lib/predicator/lexer.ex:815-819).
+        equal("mo is months, not m with a stray o", predicatorComponents("6mo"), [
+          { amount: 6, unit: "mo" },
+        ]);
+
+        // The scan has to consume the WHOLE string, so a half-read is a
+        // refusal rather than a shorter duration.
+        equal("a trailing letter is not a duration", predicatorComponents("2dx"), null);
+        equal("nor is a bare number", predicatorComponents("7200"), null);
+        equal("nor a lone unit", predicatorComponents("h"), null);
+        equal("nor empty", predicatorComponents(""), null);
+
+        // Predicator lexes both of these; this control declines them, and
+        // declining is the safe direction - it never accepts what predicator
+        // would reject.
+        equal("milliseconds are declined", predicatorComponents("500ms"), null);
+        equal("and so is a part-unit", predicatorComponents("1.5h"), null);
+
+        // No whitespace anywhere (lexer.ex:768, the no-spaces constraint).
+        equal("a space inside is not a duration", predicatorComponents("1h 30m"), null);
+      });
+
+      suite("sb-709: components compile to ISO-8601", () => {
+        equal("hours and minutes", isoFromComponents(predicatorComponents("1h30m")).iso, "PT1H30M");
+        equal("days alone need no T", isoFromComponents(predicatorComponents("2d")).iso, "P2D");
+        equal("days and hours", isoFromComponents(predicatorComponents("3d8h")).iso, "P3DT8H");
+        equal("months are the date M", isoFromComponents(predicatorComponents("6mo")).iso, "P6M");
+        equal("minutes are the time M", isoFromComponents(predicatorComponents("6m")).iso, "PT6M");
+
+        // ISO-8601 orders its components and predicator does not, so the
+        // compile is a projection: two spellings, one emitted duration.
+        equal("the input order does not survive", isoFromComponents(predicatorComponents("8h3d")).iso, "P3DT8H");
+
+        equal("a zero compiles to a zero", isoFromComponents(predicatorComponents("0s")).iso, "PT0S");
+
+        const twice = isoFromComponents(predicatorComponents("3h2h"));
+        check("a repeated unit does not compile", !twice.ok);
+        check("...and says which unit", twice.message.includes("h"), twice.message);
+      });
+
+      suite("sb-709: one duration string, read", () => {
+        equal("empty is its own form", readDuration("").form, "empty");
+        equal("whitespace only is empty too", readDuration("   ").form, "empty");
+
+        const typed = readDuration("1h30m");
+        equal("a predicator string is one", typed.form, "predicator");
+        equal("...compiled for the readout", typed.iso, "PT1H30M");
+        equal("...and read back in words", typed.human, "1h 30m");
+
+        const iso = readDuration("PT1H30M");
+        equal("ISO-8601 is still accepted", iso.form, "iso");
+        equal("...and is its own stored form", iso.iso, "PT1H30M");
+        equal("...reading identically", iso.human, typed.human);
+
+        equal("surrounding space is trimmed, not refused", readDuration(" 2d ").form, "predicator");
+
+        const bad = readDuration("soon");
+        equal("a non-duration is refused here, before the gate sees it", bad.form, "invalid");
+        check("...naming the forms that work", bad.message.includes("1h30m"), bad.message);
+
+        // The two refusals a person who knows the grammar can hit are named
+        // specifically, because "not a duration" would be a lie about them.
+        check(
+          "milliseconds get their own sentence",
+          readDuration("500ms").message.toLowerCase().includes("millisecond"),
+          readDuration("500ms").message
+        );
+        check(
+          "and so does a part-unit",
+          readDuration("1.5h").message.includes("1h30m"),
+          readDuration("1.5h").message
+        );
+
+        // Every example the form prints has to be a duration the form takes.
+        equal(
+          "the examples on screen all read",
+          DURATION_EXAMPLES.filter((one) => readDuration(one).form !== "predicator"),
+          []
+        );
+      });
+
+      suite("sb-709: empty is absence, and PT0S is not", () => {
+        const never = durationValue(undefined);
+        const cleared = durationValue("");
+
+        equal("a never-set field has nothing stored", never.set, false);
+        equal("...and a cleared one is the same value", cleared, never);
+        equal("...down to the readout it draws", never.form, "empty");
+
+        // The bug, as a value. `PT0H` is what clearing used to commit.
+        const zero = durationValue("PT0S");
+        equal("a stored zero IS set", zero.set, true);
+        equal("...and is a duration", zero.form, "iso");
+        check("so the two are not the same value", JSON.stringify(zero) !== JSON.stringify(never));
+
+        equal("a stored predicator string round-trips its bytes", durationValue("3d8h").stored, "3d8h");
+        equal("...while the readout shows the ISO form", durationValue("3d8h").iso, "P3DT8H");
+        equal("a stored null reads as unset rather than throwing", durationValue(null).set, false);
+      });
+
+      suite("sb-709: omitAtPath removes a key", () => {
+        const config = { event: "signup.abandoned", delay: "PT2H" };
+        const without = omitAtPath(config, ["delay"]);
+
+        equal("the key is gone", Object.keys(without), ["event"]);
+        check("not merely undefined", !("delay" in without));
+        equal("the original is untouched", Object.keys(config).sort(), ["delay", "event"]);
+
+        equal("omitting an absent key is a no-op", omitAtPath({ a: 1 }, ["b"]), { a: 1 });
+        equal("a nested key too", omitAtPath({ a: { b: 1, c: 2 } }, ["a", "b"]), { a: { c: 2 } });
+        equal("an empty path changes nothing", omitAtPath({ a: 1 }, []), { a: 1 });
+        equal("a list position is removeRow's job, not this one", omitAtPath([1, 2], [0]), [1, 2]);
+      });
+
+      /* One freshly inserted `core.send`, wired the way `assignFixture` wires
+       * its assign: the same `updateConfig` seam, so a commit here is the same
+       * command an author's keystroke produces. */
+      function sendFixture() {
+        const registry = proposingRegistry();
+        const inserted = blockForType(registry, "core.send");
+
+        const document = createDocument(
+          block({ id: "blk_ROOT", type: "core.sequence", slots: { body: [inserted] } }),
+          { id: "doc_sb709", revision: 0 }
+        );
+
+        let session = select(createSession(document, registry), inserted.id);
+
+        const host = {
+          state: () => ({ session, findings: [] }),
+          updateConfig: (id, config) => {
+            const result = updateBlockConfig(session, id, config);
+            if (!result.ok) return result.error;
+            session = result.value;
+            return null;
+          },
+        };
+
+        return {
+          blockId: inserted.id,
+          host,
+          stored: () => findBlock(session.document, inserted.id).config,
+          form: (drafts) => {
+            const node = findBlock(session.document, inserted.id);
+            const config = drafts ? drafts.read(inserted.id, node.config) : node.config;
+            return configFormFor(registry, { ...node, config }, []);
+          },
+        };
+      }
+
+      suite("sb-709: clearing an optional delay omits the key", () => {
+        const fixture = sendFixture();
+        const drafts = createDraftStore();
+        const scope = { drafts, refresh: () => {}, mount: null };
+
+        const commit = (key, value) => {
+          const form = fixture.form(drafts);
+          return commitField(fieldNamed(form, key), form, fixture.host, scope, wrapperStub(), value);
+        };
+
+        check("an inserted send seeds an empty delay", !("delay" in fixture.stored()) || fixture.stored().delay === "");
+
+        equal("naming the event lands", commit("event", "signup.abandoned"), true);
+        equal("and so does a delay a person typed", commit("delay", "2d"), true);
+        equal("stored as the author's own string", fixture.stored().delay, "2d");
+
+        // The bead, in one assertion. This used to store `PT0H`.
+        equal("clearing it commits the omission", commit("delay", OMIT), true);
+        check("and the key is gone", !("delay" in fixture.stored()), JSON.stringify(fixture.stored()));
+        equal("...leaving the rest of the config alone", fixture.stored().event, "signup.abandoned");
+
+        // Cleared and never-set are the same field, so they are the same form.
+        equal("a cleared delay reads as no value", fieldNamed(fixture.form(), "delay").duration.set, false);
+        equal(
+          "identically to a field that was never set",
+          fieldNamed(fixture.form(), "delay").duration,
+          durationValue(undefined)
+        );
+
+        // And the omission is an ordinary command, so it is undoable: the
+        // document went through the gate to get here.
+        equal("the ISO spelling is still storable", commit("delay", "PT2H"), true);
+        equal("...verbatim", fixture.stored().delay, "PT2H");
+      });
+
+      suite("sb-709: both spellings validate at the type", () => {
+        const send = proposedCoreTypes["core.send"];
+        const timeout = proposedCoreTypes["core.timeout"];
+        const wait = coreTypes["core.wait"];
+
+        const delay = (value) => send.validateConfig({ event: "signup.abandoned", delay: value });
+
+        equal("a send takes the predicator form", delay("1h30m"), null);
+        equal("...and the ISO form", delay("PT1H30M"), null);
+        equal("...and no delay at all", send.validateConfig({ event: "signup.abandoned" }), null);
+        check("but not a sentence", delay("in two days") !== null);
+
+        equal("a timeout takes it too", timeout.validateConfig({ after: "3d8h", outcome: "abandon" }), null);
+        equal("and a wait", wait.validateConfig({ duration: "2d" }), null);
+
+        // One grammar across the three types, which is the property the
+        // proposed file's own comment claims and the reason the regex is
+        // spelled twice rather than diverging.
+        const strings = ["2d", "1h30m", "PT2H", "P1DT6H", "6mo", "in two days", "P", "7200", "500ms"];
+        equal(
+          "every string a wait takes, a send and a timeout take",
+          strings.filter(
+            (value) =>
+              (wait.validateConfig({ duration: value }) === null) !== (delay(value) === null) ||
+              (wait.validateConfig({ duration: value }) === null) !==
+                (timeout.validateConfig({ after: value, outcome: "abandon" }) === null)
+          ),
+          []
+        );
+      });
+
 
       /* ================================ field placeholders (sb-ed7) */
 

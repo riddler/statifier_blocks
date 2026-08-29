@@ -788,9 +788,14 @@ const coreSubchart = {
 
 /* Verbatim `palette.js`'s spelling, for the reason `EVENT_NAME` above is
  * verbatim: a duration this file accepts and `core.wait` refuses would be two
- * controls disagreeing about the same ISO-8601 string. */
+ * controls disagreeing about the same string. BOTH spellings, since sb-709 -
+ * the ISO-8601 form and predicator-ex's own `3d8h` literal, which the duration
+ * control makes the primary way to type one. `palette.js`'s comment carries
+ * the citation and the reason the predicator half is here at all. */
 const DURATION = /^P(?!$)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?!$)(\d+H)?(\d+M)?(\d+S)?)?$/;
-const isDuration = (value) => nonEmptyString(value) && DURATION.test(value);
+const PREDICATOR_DURATION = /^(?:\d+(?:mo|[ydwhms]))+$/;
+const isDuration = (value) =>
+  nonEmptyString(value) && (DURATION.test(value) || PREDICATOR_DURATION.test(value));
 
 const TIMEOUT_OUTCOMES = ["abandon", "resume"];
 
@@ -1169,14 +1174,17 @@ const coreAssign = {
  * ## The duration CONTROL question (sb-d9) gets its live test case here
  *
  * `delay` is ADR-0002 decision 7's existing `duration` field type, so it draws
- * the same ISO-8601 control `core.wait`'s duration and `core.timeout`'s
- * `after` draw. sb-d9's open item is whether that control is the right one to
- * author with; this is the first duration in the vocabulary that is OPTIONAL,
- * which is a state the control has never had to express - "no delay" is not
- * `PT0S` and it is not an unfinished field either. The demo below arms a
- * `PT2H` deadline, so the question now has a case that ships rather than a
- * hypothetical. Flagged, not answered: this descriptor takes the control as it
- * is and proposes nothing about it.
+ * the same control `core.wait`'s duration and `core.timeout`'s `after` draw.
+ * sb-d9's open item was whether that control is the right one to author with;
+ * this is the first duration in the vocabulary that is OPTIONAL, which is a
+ * state the control had never had to express - "no delay" is not `PT0S` and it
+ * is not an unfinished field either. It was this field that answered it: the
+ * old control committed `PT0H` when the box was cleared, which is sb-709, and
+ * the ruling there rebuilt the control around what a person types (`1h30m`,
+ * `2d`) with empty meaning the key is OMITTED. This descriptor still proposes
+ * nothing about the control; it is the field the control was built against,
+ * and the spike README's config-pane section is where that ruling is written
+ * down.
  */
 const coreSend = {
   name: "core.send",
