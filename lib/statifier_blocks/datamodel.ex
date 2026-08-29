@@ -42,17 +42,25 @@ defmodule StatifierBlocks.Datamodel do
     * `nil` - no datamodel, so no check;
     * a list of strings - the declared paths, blanks and non-strings
       dropped;
-    * a `MapSet` of strings - the normalized form, idempotently.
+    * a `MapSet` of strings - the normalized form, idempotently;
+    * a decoded **datamodel document** - sb ADR-0006's typed three-scope
+      shape, of which `spike/fixtures/datamodel.json` is an instance -
+      projected to its declared-path set.
 
-  It accepts nothing else. The typed three-scope datamodel document
-  (`spike/fixtures/datamodel.json` is an instance of it) is **not** read
-  here, on purpose: the record that defines it is sb ADR-0006, accepted
-  2026-08-29, and nothing in this package implements that record's
-  projection yet, so a normalizer written here would run ahead of the
-  derivation ADR-0006 specifies rather than implement it. The derivation is
-  one total function from the document to this set, which is exactly what
-  11e says: "This section is written against the set, so it holds under
-  either."
+  It accepts nothing else. The document arm is the one 11f promised and
+  `sb-oiq` built: ADR-0006 (accepted 2026-08-29) defines the shape and its
+  decision 6 gives the projection, and
+  `StatifierBlocks.Predicates.Datamodel` implements both, so this module
+  reads a document through that one total function rather than growing a
+  second reader of a schema. Nothing else here moved - the set is still the
+  whole contract this check needs, which is what 11e says: "This section is
+  written against the set, so it holds under either."
+
+  An **empty document** - one whose scopes declare no entries - projects to
+  `MapSet.new()`, not to `nil`. Decision 6 states that distinction in the
+  same words this module's own "absence is not unknown-ness" section does:
+  a host that supplied a document declaring nothing has made a claim, and
+  `nil` is reserved for the host that supplied no datamodel at all.
 
   [Correction 2026-08-29, sb-l0g: this paragraph read "no accepted record
   defines that shape, it is filed as a Proposed record (`sb-g8m`) still
@@ -67,10 +75,15 @@ defmodule StatifierBlocks.Datamodel do
   shapes listed above - and building ADR-0006's projection is separate
   work, not this correction's.]
 
-  Anything else - a bare map, a struct, a number - normalizes to `nil`, so
-  a host that passes a shape this package does not know gets the behaviour
-  it had before it passed anything, rather than a document suddenly covered
-  in advisories. That is ADR-0002 amendment B3's total-normalizer
+  [Note 2026-08-29, sb-oiq: the "separate work" that correction named is
+  this one, and the list above now carries a fourth shape. The three
+  sb-l0g left unchanged are unchanged still: the document arm is additive
+  and reads ADR-0006's projection rather than a second schema of its own.]
+
+  Anything else - a map with no `scopes` list, a struct, a number -
+  normalizes to `nil`, so a host that passes a shape this package does not
+  know gets the behaviour it had before it passed anything, rather than a
+  document suddenly covered in advisories. That is ADR-0002 amendment B3's total-normalizer
   discipline, reaching one more input.
 
   ## What this check is not
@@ -96,7 +109,7 @@ defmodule StatifierBlocks.Datamodel do
   module does not answer it either.
   """
 
-  alias StatifierBlocks.{Block, BlockType, Document, Finding, Palette}
+  alias StatifierBlocks.{Block, BlockType, Document, Finding, Palette, Predicates}
 
   @typedoc """
   The normalized datamodel: the set of paths the host declares, or `nil`
@@ -120,6 +133,15 @@ defmodule StatifierBlocks.Datamodel do
       MapSet.new(["signup.step"])
 
       iex> StatifierBlocks.Datamodel.declared_paths(%{"scopes" => []})
+      MapSet.new([])
+
+      iex> StatifierBlocks.Datamodel.declared_paths(%{"version" => 1, "scopes" => [
+      ...>   %{"scope" => "local", "entries" => [
+      ...>     %{"name" => "step", "path" => "signup.step", "type" => "string",
+      ...>       "label" => "Step"}]}]})
+      MapSet.new(["signup.step"])
+
+      iex> StatifierBlocks.Datamodel.declared_paths(%{"scopes" => "not a list"})
       nil
   """
   @spec declared_paths(term()) :: declared()
@@ -133,6 +155,16 @@ defmodule StatifierBlocks.Datamodel do
     paths
     |> Enum.filter(&declared_path?/1)
     |> MapSet.new()
+  end
+
+  # The ADR-0006 arm, additive over the three above: `index/1` is the
+  # record's admission step, and a map it declines is still an
+  # unrecognized shape rather than an empty claim.
+  def declared_paths(%{"scopes" => _scopes} = document) do
+    case Predicates.Datamodel.index(document) do
+      nil -> nil
+      index -> Predicates.Datamodel.declared_paths(index)
+    end
   end
 
   def declared_paths(_unrecognized), do: nil

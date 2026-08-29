@@ -34,20 +34,33 @@ defmodule StatifierBlocks.DatamodelTest do
   describe "declared_paths/1" do
     # sabotage: `declared_paths(_unrecognized)` returning `MapSet.new([])`
     # instead of `nil` - a host passing a shape this package does not know
-    # would get every annotated path flagged, and the map clause here goes
-    # red (verified).
+    # would get every annotated path flagged, and the string and integer
+    # assertions here go red (verified).
     test "normalizes the shapes the record names, and nothing else" do
       assert Datamodel.declared_paths(nil) == nil
       assert Datamodel.declared_paths(["a.b", "c.d"]) == MapSet.new(["a.b", "c.d"])
       assert Datamodel.declared_paths(MapSet.new(["a.b"])) == MapSet.new(["a.b"])
       assert Datamodel.declared_paths([]) == MapSet.new([])
 
-      # The spike's typed three-scope document is not an accepted shape, so
-      # it normalizes to "no datamodel" rather than to a set derived from a
-      # schema no record defines (sb-g8m).
-      assert Datamodel.declared_paths(%{"version" => 1, "scopes" => []}) == nil
       assert Datamodel.declared_paths("signup.step") == nil
       assert Datamodel.declared_paths(42) == nil
+    end
+
+    # sabotage: dropped the ADR-0006 document clause, so a typed document
+    # fell through to `_unrecognized` and returned `nil` - both assertions
+    # here go red (verified). The projection itself is asserted in
+    # `StatifierBlocks.Predicates.DatamodelTest`; what this one holds is
+    # that the arm exists and that an empty document is a claim rather
+    # than an absence (ADR-0006 decision 6).
+    test "reads an ADR-0006 document through Predicates.Datamodel" do
+      assert Datamodel.declared_paths(%{"version" => 1, "scopes" => []}) == MapSet.new([])
+
+      assert Datamodel.declared_paths(%{
+               "version" => 1,
+               "scopes" => [
+                 %{"scope" => "local", "entries" => [%{"path" => "signup.step"}]}
+               ]
+             }) == MapSet.new(["signup.step"])
     end
 
     # sabotage: dropping the `Enum.filter(&declared_path?/1)` - `""` and the
