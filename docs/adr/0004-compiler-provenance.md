@@ -1820,3 +1820,131 @@ id, so it stays out of `by_state_id` as any author's `<data id>` does.
 Either one would be an additional surface, not a replacement: the hoist,
 determinism, provenance and F6 refusal are shared, and this note is what F6's
 "author-declared `<data>` ids" now points at for its first concrete case.
+
+## Amendment (2026-08-29): the send id is minted through the context, and decision 10's finding shape gains `config_value_span`
+
+**Status: proposed (2026-08-29).** This section is additive: nothing above it
+is edited, no accepted decision changes, and the header line's status history
+is the conductor's to extend. It records two things the code already does and
+this record does not yet say: how a delayed send's `id` is minted, which the
+cancel amendment of this date deferred by name, and one optional field
+decision 10's finding shape grew after that decision was written.
+
+### S1. The deferred send-id question is discharged, and this is the answer
+
+The delayed-send cancel amendment above closes with a **Deferred, named rather
+than guessed** item - "How the send id is minted ... is left to the bead that
+implements this section (`sb-b4f`)". That bead has landed. The item is
+discharged by this section rather than by editing it: the deferral was
+honest when written, and a record reads better with the question and its
+answer both visible than with the question quietly removed.
+
+The answer is the one decision 3 already prescribes for every other derived
+id, with no new mechanism. `StatifierBlocks.Compiler.Cancels` names the role
+once:
+
+    @role "send"
+
+(`lib/statifier_blocks/compiler/cancels.ex:115`) and publishes it through
+one public accessor:
+
+    @spec armed_role() :: String.t()
+    def armed_role, do: @role
+
+(`lib/statifier_blocks/compiler/cancels.ex:136-137`). `core.send` mints its
+descriptor id through the context under that role, exactly as decision 3
+requires - "minted through `Context.role_id/2` rather than by string
+concatenation inside the block type":
+
+    with {:ok, id} <- Context.role_id(context, Cancels.armed_role()),
+
+(`lib/statifier_blocks/core/send.ex:243`), and the `Compiler.Cancels` pass
+reads the same id back by inverting it, selecting the children whose sends it
+must cancel:
+
+    {:ok, {^block_id, @role}} <- StateId.unstate_id(id) do
+
+(`lib/statifier_blocks/compiler/cancels.ex:238`).
+
+Three consequences follow from that choice, and they are why the role is
+named once in the compiler rather than left to each block type:
+
+- **The two halves name one string in one place.** The minting side and the
+  reading side both go through `armed_role/0`, so the convention cannot drift
+  between them. The module's own words: "the two halves of the convention name
+  one string in one place" (`lib/statifier_blocks/compiler/cancels.ex:132-134`).
+- **Decision 3's uniqueness argument covers the descriptor id unchanged.** The
+  id is minted by `state_id/2` even though it names a `<send>` descriptor
+  rather than a state, which is deliberate: upstream's uniqueness check is over
+  all `ID`-typed attributes in one set, and minting through the same function
+  is what keeps this id out of every other id's way. Nothing about decision 3's
+  totality clause is extended by this - no state is generated here.
+- **Selection is by inversion, not by bookkeeping.** The pass recovers the
+  owning block from the id itself, so it needs no side-channel from the child
+  to the parent. That is what lets decision 4 stand unchanged - `emit/2`
+  returns only the block's own emission, and a parent still cannot read a
+  child's emitted SCXML - while the cancel is nonetheless emitted in the
+  parent's `<onexit>`.
+
+The role is `send` for both halves; it is not an outcome role, and
+`Context.role_id/2`'s reserved-prefix refusal is untouched by it.
+
+### S2. Decision 10's finding shape carries an optional `config_value_span`
+
+Decision 10 fixes the finding's ordering, typing, and stage table. The struct
+it describes has since grown one optional field, added under decision 9's
+last refinement, and decision 10's record does not mention it. Quoted
+verbatim from `lib/statifier_blocks/compiler/finding.ex`:
+
+    @type config_value_span :: {non_neg_integer(), non_neg_integer()}
+
+(`:100`), in the struct's type:
+
+    config_value_span: config_value_span() | nil,
+
+(`:107`), in the `defstruct` list:
+
+    :config_value_span,
+
+(`:121`), and populated from `new/4`'s options:
+
+    config_value_span: Keyword.get(opts, :config_value_span),
+
+(`:149`).
+
+It is, in the field's own words, "byte offsets into that value, 0-based,
+exclusive end" (`lib/statifier_blocks/compiler/finding.ex:86-87`) - a narrowing
+of `config_key`, never a replacement for it. The field's own typedoc states
+the criterion and its owner: "Decision 9's last refinement
+(`StatifierBlocks.Compiler.Chart` composes it, and its moduledoc owns the
+criterion). `nil` on every finding that is not a chart-stage content finding
+carrying a sub-expression span, which is the overwhelming majority - a consumer
+with nothing to underline falls back to the whole field, exactly as it did
+before this field existed." (`lib/statifier_blocks/compiler/finding.ex:89-94`).
+
+Two properties this record cares about, and both hold:
+
+- **Decision 10's "Every finding names a block" is untouched.** The span is
+  optional and additive; it narrows *where inside a field*, and says nothing
+  about ownership. A finding with a span still names its block and its
+  `config_key`.
+- **The stage table is unchanged.** Only the Chart stage composes a span, and
+  Chart is already in the table. No stage is added, and no stage's error list
+  changes.
+
+### What this amendment does not change
+
+- Decision 3's derivation, its three properties, or the role grammar. S1
+  records which role `core.send` uses and where it is named, not a new way to
+  derive an id.
+- Decision 4's rule that a block type writes only its own emission, or the
+  cancel amendment's B and C sections. The pass, its scope rule and its
+  ordering all stand exactly as that amendment wrote them.
+- Decision 5's provenance totality or decision 6's determinism guarantee. No
+  byte of any compiled document moves because of this section: both facts it
+  records are already true of the code on `main`.
+- Decision 9's split, its fault rule, or which surface owns the span
+  criterion. That stays `StatifierBlocks.Compiler.Chart`'s moduledoc, as the
+  field's own typedoc says.
+- Decision 10's stopping rule, its stage table, or its rule that every finding
+  names a block.
