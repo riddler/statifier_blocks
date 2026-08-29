@@ -491,6 +491,14 @@ them through the `theme` assign, or in your own CSS against the prefix:
 Enough that a host can make the editor look like its own product without
 forking it, and not so much that the package acquires a theming DSL.
 
+[`docs/theming.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/theming.md)
+is the full guide: the three tiers the surface is organised into, why
+`--sb-color-scheme` is not optional, how a block type gets an identity of its
+own by naming a token, and a complete host theme you can copy. The rule it
+holds itself to is that a theme sets `--sb-*` properties and writes no other
+declaration - and that example is read out of the document and audited in the
+gate, so it is checked rather than promised.
+
 ### What stays yours
 
 Which palette entries a tenant may use, who may edit or publish a document,

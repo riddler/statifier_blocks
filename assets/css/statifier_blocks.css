@@ -54,6 +54,86 @@
  *     one is left alone - so nothing dimmed a slot any more, and a reserved
  *     name in a published surface is a promise. The disabled-control opacity
  *     it was doubling as is `--sb-disabled-opacity`, which says what it is.
+ *
+ * ## The three tiers (14c)
+ *
+ * Not three sets of tokens - three answers to "what is a host taking on when
+ * it sets this one?". That is what makes the surface documentable, and it is
+ * what `docs/theming.md` is organised around. Every token declared below
+ * carries its tier here, and the theme audit fails the build if a token is
+ * declared without a tier or given a tier without being declared.
+ *
+ *   Tier 1, the palette. Colour, space, shape and type. Setting these is
+ *   making the editor look like the host's own product, and it is a couple of
+ *   dozen lines. A host that stops after tier 1 has a themed editor.
+ *
+ *   Tier 2, the treatments. One specific mark - the drop affordance, the drag
+ *   seam, the focus ring, a canvas metric, the per-type accent's shaping - that
+ *   a host may want to disagree with without overriding a rule. A mark a theme
+ *   must be able to REVERSE is why these are tokens rather than literals in a
+ *   rule: `--sb-block-accent-mix` exists because 14% of a pale accent over
+ *   near-black is not a tint, and a theme that cannot raise it has a washed
+ *   icon tile and no way to say so.
+ *
+ *   Tier 3, `--sb-color-scheme`. Its own tier because it is not a value this
+ *   package paints with at all. It is what the host tells the BROWSER to paint
+ *   its own chrome in, and no colour token can reach that half of a control.
+ *
+ *     1  --sb-bg-canvas
+ *     1  --sb-bg
+ *     1  --sb-bg-muted
+ *     1  --sb-bg-sunken
+ *     1  --sb-fg
+ *     1  --sb-fg-muted
+ *     1  --sb-fg-subtle
+ *     1  --sb-fg-on-accent
+ *     1  --sb-border
+ *     1  --sb-border-strong
+ *     1  --sb-border-width
+ *     1  --sb-accent
+ *     1  --sb-accent-hover
+ *     1  --sb-accent-muted
+ *     1  --sb-error
+ *     1  --sb-error-bg
+ *     1  --sb-warning
+ *     1  --sb-warning-bg
+ *     1  --sb-info
+ *     1  --sb-info-bg
+ *     1  --sb-block-accent
+ *     1  --sb-space
+ *     1  --sb-space-half
+ *     1  --sb-space-2
+ *     1  --sb-space-3
+ *     1  --sb-radius
+ *     1  --sb-radius-sm
+ *     1  --sb-font
+ *     1  --sb-font-mono
+ *     1  --sb-text-xs
+ *     1  --sb-text-sm
+ *     1  --sb-text-md
+ *     1  --sb-leading
+ *     1  --sb-weight-medium
+ *     1  --sb-weight-strong
+ *     1  --sb-tracking-caps
+ *
+ *     2  --sb-drop-ok-border
+ *     2  --sb-drop-ok-bg
+ *     2  --sb-gap-height
+ *     2  --sb-gap-drag-height
+ *     2  --sb-gap-hover-bg
+ *     2  --sb-disabled-opacity
+ *     2  --sb-focus-ring
+ *     2  --sb-focus-width
+ *     2  --sb-focus-offset
+ *     2  --sb-column-min-width
+ *     2  --sb-rail-width
+ *     2  --sb-config-preview-max-height
+ *     2  --sb-block-accent-mix
+ *     2  --sb-block-edge
+ *     2  --sb-block-accent-tint
+ *
+ *     3  --sb-color-scheme
+ *
  */
 
 /* ----------------------------------------------------------------- reset
@@ -208,8 +288,12 @@
   /* Drag affordances (d6, d8). The seam between two cards is one height at
    * rest and a taller one while a drag runs, because a seam an author has to
    * hit with a pointer is not the same seam they read past. */
-  --sb-drop-ok-border: #2f9e5f;
-  --sb-drop-ok-bg: rgba(47, 158, 95, 0.08);
+  /* Was #2f9e5f, 2.93:1 on the sunken surface: an accepting slot's outline is
+   * the editor telling an author where a drop will land, so it carries
+   * information and is held to 3:1 like `--sb-border-strong`. Found by the
+   * audit rather than by looking at it, which is the point of the audit. */
+  --sb-drop-ok-border: #2c945a;
+  --sb-drop-ok-bg: rgba(44, 148, 90, 0.08);
   --sb-gap-height: var(--sb-space);
   --sb-gap-drag-height: var(--sb-space-3);
   --sb-gap-hover-bg: var(--sb-accent);
