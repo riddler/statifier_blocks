@@ -326,6 +326,14 @@ defmodule StatifierBlocks.CoreFixtures do
   def valid_config(Core.Wait), do: %{"duration" => "PT48H"}
   def valid_config(Core.ResumableGroup), do: %{"history" => "deep"}
   def valid_config(Core.OnEvent), do: %{"event" => "order.cancelled", "outcome" => "abandon"}
+
+  def valid_config(Core.Invoke),
+    do: %{
+      "invoke_type" => "myapp:authorize",
+      "assign_to" => "authorization",
+      "params" => "amount=order.amount"
+    }
+
   def valid_config(_module), do: %{}
 
   @doc """

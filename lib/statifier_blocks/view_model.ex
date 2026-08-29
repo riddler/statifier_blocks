@@ -148,7 +148,7 @@ defmodule StatifierBlocks.ViewModel do
             name: Block.slot_name(),
             label: String.t(),
             arity: BlockType.slot_arity() | nil,
-            style: :primary | :secondary,
+            style: :primary | :secondary | :failure,
             declared?: boolean(),
             children: [StatifierBlocks.ViewModel.Node.t()],
             findings: [Finding.t()]
@@ -472,7 +472,7 @@ defmodule StatifierBlocks.ViewModel do
           String.t(),
           BlockType.slot_arity() | nil,
           boolean(),
-          :primary | :secondary,
+          :primary | :secondary | :failure,
           [Block.t()],
           [Finding.t()],
           ctx()
@@ -623,7 +623,7 @@ defmodule StatifierBlocks.ViewModel do
     length(block_findings) + slots_count + form_count
   end
 
-  @spec slot_style(map(), Block.slot_name()) :: :primary | :secondary
+  @spec slot_style(map(), Block.slot_name()) :: :primary | :secondary | :failure
   defp slot_style(entry, name), do: Map.get(entry.slot_style, name, :primary)
 
   @spec palette_entry_with_defaults(module(), Block.type_name()) :: BlockType.palette_entry()

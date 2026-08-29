@@ -16,7 +16,7 @@ defmodule StatifierBlocks.Compiler.Finding do
   | `:resolve` | `:unknown_block_type`, `:block_type_too_new`, `:migration_failed` |
   | `:config` | `validate_config/1` findings, one per `{key, message}` pair |
   | `:structure` | assignability (ADR-0003); slot arity and `:undeclared_slot` are `sb-da9`'s |
-  | `:emit` | `emit/2` findings, `:invalid_role`, `:unspliced_child`, `:unknown_attribution` |
+  | `:emit` | `emit/2` findings, `:invalid_role`, `:reserved_role`, `:invalid_outcome`, `:unspliced_child`, `:unknown_attribution` |
   | `:chart` | mapped statifier findings, both faults (decision 9) |
 
   The pipeline stops at the first stage that produces errors and reports

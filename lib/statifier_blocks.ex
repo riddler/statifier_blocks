@@ -21,7 +21,7 @@ defmodule StatifierBlocks do
   | `StatifierBlocks.Document` | the tree plus its envelope: the pre-order walk, path lookup, validation, canonical JSON, content hash, decode |
   | `StatifierBlocks.BlockType` | the behaviour a block type implements, including `config_schema/1` and its optional `value_path` (ADR-0002) |
   | `StatifierBlocks.Palette` | a caller-supplied `type_name => module` value - never application config, never a named process |
-  | `StatifierBlocks.Core` | the seven `core.*` structural types this package ships |
+  | `StatifierBlocks.Core` | the eight `core.*` structural types this package ships |
   | `StatifierBlocks.Assignability` | may this block land in this slot, by kind tag and by host-widened data-flow type (ADR-0003) |
 
   ## The compile

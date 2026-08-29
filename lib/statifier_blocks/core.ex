@@ -18,22 +18,25 @@ defmodule StatifierBlocks.Core do
   | `core.wait` | `#{inspect(__MODULE__)}.Wait` | none |
   | `core.resumable_group` | `#{inspect(__MODULE__)}.ResumableGroup` | `body`, `interrupts` |
   | `core.on_event` | `#{inspect(__MODULE__)}.OnEvent` | none |
+  | `core.invoke` | `#{inspect(__MODULE__)}.Invoke` | `on_error` |
 
   ## Structure, not domain
 
-  None of these types invokes anything, and none of them declares a type
-  expression (ADR-0003 decision 1). They arrange other blocks; the blocks
-  they arrange are the host's. So every core `io/1` declares `kinds`, every
+  None of these types knows a host's domain, and none of them declares a
+  type expression (ADR-0003 decision 1). They arrange other blocks; the
+  blocks they arrange are the host's. `core.invoke` is structural in the
+  same sense - it *names* an invoke type and never runs one, which is
+  ADR-0002 decision 2's two-registry seam rather than domain knowledge. So every core `io/1` declares `kinds`, every
   core type that has slots declares `slot_accepts` for them, and no core
   type declares `consumes` at all - inbound type is the host's business,
   and ADR-0003 decision 5's permissive default is the honest answer.
 
-  `produces` is declared by three of the seven. `core.sequence` declares
+  `produces` is declared by four of the eight. `core.sequence` declares
   `{:passthrough, "body"}`: it is transparent to type flow, so whatever its
   last step produces is what the sequence produces, computed by ADR-0003
-  decision 4 rather than by anything here. `core.branch` and
-  `core.parallel` declare `:unknown` outright rather than combining their
-  arms' or lanes' outputs, because combining them is the type lattice
+  decision 4 rather than by anything here. `core.branch`, `core.parallel`
+  and `core.invoke` declare `:unknown` outright rather than combining their
+  arms', lanes' or outcomes' outputs, because combining them is the type lattice
   ADR-0003 decision 4 refuses to build - and spelling the default out is
   how that refusal stays visible to a reader. The other four leave it
   absent.
@@ -55,7 +58,7 @@ defmodule StatifierBlocks.Core do
 
   ## What they compile to
 
-  All seven emit through `#{inspect(__MODULE__)}.Emit`, which is where the
+  All eight emit through `#{inspect(__MODULE__)}.Emit`, which is where the
   SCXML shapes and the one convention they share are written down: a block
   is one compound state carrying a `<final>`, and completion is
   `done.state.<state id>` (ADR-0004 decision 2). Read that module before

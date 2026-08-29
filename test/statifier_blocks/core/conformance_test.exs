@@ -140,7 +140,7 @@ defmodule StatifierBlocks.Core.ConformanceTest do
 
         for {slot, style} <- Map.get(entry, :slot_style, %{}) do
           assert MapSet.member?(declared, slot)
-          assert style in [:primary, :secondary]
+          assert style in [:primary, :secondary, :failure]
         end
       end
 
