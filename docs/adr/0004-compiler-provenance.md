@@ -1,6 +1,6 @@
 # ADR-0004: One block, one state - a deterministic compile carrying a provenance map
 
-Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings); decision 2 amended - outcome-tagged finals (accepted 2026-08-29, operator ruling); child-use compile and core.subchart routing amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 93)
+Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings); decision 2 amended - outcome-tagged finals (accepted 2026-08-29, operator ruling); child-use compile and core.subchart routing amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 93); delayed-send cancel emission amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95)
 
 ## Context
 
@@ -1354,7 +1354,7 @@ The parent's `core.subchart` block, compiled:
 
 ## Amendment (2026-08-29): a delayed send's cancel, emitted in the arming state's `<onexit>`
 
-**Status: proposed (2026-08-29).** This section is additive: nothing above it
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 95).** This section is additive: nothing above it
 is edited, and every decision in the record stands as written. It records the
 emission half of the operator's 2026-08-29 delayed-send lifetime ruling
 (`sb-b4f`, mirrored to statifier-ex as `st-q3ud`); the declaration half - that
