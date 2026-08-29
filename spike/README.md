@@ -1204,6 +1204,109 @@ time:
 Nothing under `spike/` other than this section changed, so `dev/selftest.html`
 and `dev/theme-audit.html` still answer for the spike exactly as they did.
 
+## What the third polish pass ruled (sb-3l1)
+
+Campaign 014's polish pass filed five readability findings against the spike
+and fixed none of them; the operator ruled on all five plus one new item, and
+this is where those rulings landed. The rulings are the spec, and each is
+quoted where its code lives.
+
+### Findings follow the config on screen (6A)
+
+While a config draft was outstanding, the field findings were still computed
+from the STORED config. An author who had just typed a correct datamodel path
+into `Write to` still saw `must be a datamodel path` under it, directly below
+an amber notice saying nothing had been stored yet - the form contradicting
+itself in two adjacent sentences.
+
+The ruling is **two views, one rule each**: a drafting block's form reads the
+draft and labels what it says `in this draft`; the stored-config findings stay
+in the document-level findings panel, whose subject genuinely is the stored
+document. `configFormFor` grew a `{ draft }` option that suppresses the merged
+document set and flags what its own validation produces; `inspector.js` passes
+`drafts.pending(id)` from both the Config and the Condition pane, because the
+two edit one block's config through one draft and must not disagree about it.
+
+The refusal channel is untouched: a config the gate actually turned down is
+still marked by `markRefused`, under the field, and that is a different message
+from a finding.
+
+### The gap goes above the label (6A)
+
+Two consecutive fields that both carried a finding read ambiguously - a finding
+sat as close to the field above it as to its own label. The DOM attribution was
+correct all along; the space was the problem. `.sb-form` used a flex `gap`,
+which is owned by the container rather than by either box beside it, so the
+space after a finding and the space inside a field read as the same kind of
+space. The separation now belongs to the field it introduces (`> * + *` with a
+top margin), so a finding sits tight under the input it is about and the next
+label opens with the air.
+
+### The pending notice sticks (6A)
+
+At the narrowest breakpoint the inspector is short enough that the notice
+scrolled off the top while the field being edited stayed in view - the sentence
+explaining why nothing is being stored was invisible exactly while the
+behaviour it explains was happening. It is `position: sticky` at the top of the
+inspector scrollport now, using the same negative-top idiom `.sb-sticky-head`
+uses. Its background had to become opaque to do it: `--sb-warning-bg` is an
+`rgba()` in all three themes, so it is composited over `--sb-bg` rather than
+given a fourth token.
+
+### Case, inputs, then verdicts (4A)
+
+The truth-table grid put the verdicts before the bound values. That inversion
+was a width workaround from the Fixtures pane - the conventional order pushed
+every answer off the right edge of a 21rem inspector - and sb-054 deliberately
+left it in place when the drawer removed the reason for it, as its own
+readability bead. A truth table reads left to right as "given these inputs,
+this verdict", so the order is now Case, inputs, verdicts, with the verdict
+block marked off by the heavier left rule the `data-column="first-arm"` hook
+already carried. The per-arm `n/6 true` summaries stay above the grid: they are
+about a column across all rows, which is not something a row-shaped footer can
+say.
+
+### The drawer's collapsed strip is the cold start (5A)
+
+The drawer was open-or-gone, and the only way to open it was the Condition
+pane's per-block button - which a block owning no table does not render. An
+author who had not already selected the right block had no way in and no way to
+discover which block was the right one.
+
+Closed, the drawer is now a strip carrying the noun and a count. It is present
+whenever a document is open, **including at a count of zero**: a cold-start
+affordance that hides itself when there is nothing to find is the gap this
+ruling closes, not the fix for it. Pressing it opens the drawer on the current
+selection, and when that block owns no table the drawer comes up on the
+miss-state list, which is its index page - every block in the document that
+does own one, each a press away.
+
+`drawerStripView` is the pure half and counts TABLES rather than owning blocks,
+because the strip says the word "tables" beside the number.
+
+### Below 780 the palette is a strip that opens as a sheet (7A)
+
+The 53rem arm stacked the palette and the inspector side by side under the
+canvas. Below 780px both halves are too narrow to be worth the row. The palette
+collapses to a strip - a label and a `+` - that opens as a sheet, and the
+inspector gets the full row. The palette is the pane that survives this best:
+it is a list an author goes to, not one they read while working. Stacking order
+is unchanged - canvas, panes, drawer - and the sheet sits below the drag ghost
+and the slot picker so a drag started inside it still has a visible ghost.
+
+The shipped `PaletteBrowser` graduated this first (sb-832, ruling 7A), so the
+spike here is a transcription of the shipped class names rather than a second
+derivation of the same idea. One divergence worth a reviewer's eye: the ruling
+says the strip is "search + `+`", and the shipped strip reads `Blocks` + `+`
+with the search inside the sheet. The spike matches the shipped.
+
+### Covered by the selftest
+
+The two pure halves - `configFormFor`'s `{ draft }` option and
+`drawerStripView` - have suites in `dev/selftest.html`. The other four items
+are CSS and DOM order, which that page cannot see; the browser screenshots in
+the campaign journal are their evidence.
+
 ## Serving it
 
 The spike is served as static files. Anything that serves this directory over

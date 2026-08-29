@@ -365,6 +365,9 @@ const tableDrawer =
         mount: drawerMount,
         title: document.getElementById("sb-drawer-title"),
         close: document.getElementById("sb-drawer-close"),
+        strip: document.getElementById("sb-drawer-strip"),
+        stripLabel: document.getElementById("sb-drawer-strip-label"),
+        stripCount: document.getElementById("sb-drawer-strip-count"),
         host: {
           fixtures: () => fixturesPane?.fixtures() ?? null,
           selectedId: () => editor?.selectedId ?? null,

@@ -399,8 +399,32 @@
           class="sb-drawer"
           id="sb-drawer"
           aria-labelledby="sb-drawer-title"
+          data-collapsed="true"
           hidden
         >
+          <!--
+            The collapsed strip (sb-3l1, ruling 5A). Always in the markup, and
+            the only thing on screen while the drawer is collapsed: it is the
+            cold-start affordance, so a strip that appeared only once the
+            drawer had been opened some other way would close the very gap it
+            exists to close in the wrong direction.
+
+            A plain `<button>` rather than a `<summary>`: `<details>` owns its
+            own open state, and the drawer's is already owned by
+            `table-drawer.js` and driven from three other places (a document
+            switch, the Condition pane's button, the Close button).
+          -->
+          <button
+            class="sb-drawer__strip"
+            id="sb-drawer-strip"
+            type="button"
+            aria-expanded="false"
+            aria-controls="sb-drawer-panel"
+          >
+            <span class="sb-drawer__strip-label" id="sb-drawer-strip-label">Truth tables</span>
+            <span class="sb-drawer__strip-count" id="sb-drawer-strip-count">0</span>
+          </button>
+
           <header class="sb-drawer__header">
             <h2 class="sb-drawer__title" id="sb-drawer-title">Truth table</h2>
             <span class="sb-chip">recorded &middot; nothing is evaluated</span>

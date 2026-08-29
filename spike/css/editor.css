@@ -2130,10 +2130,31 @@
   line-height: var(--sb-leading);
 }
 
+/*
+ * sb-3l1 / ruling 6A: "the gap goes ABOVE a field's label, not below its
+ * input".
+ *
+ * This was a flex `gap`, and a gap is owned by the container rather than by
+ * either box beside it. On screen that made the whitespace after a field's
+ * last finding read as the SAME kind of space as the whitespace inside the
+ * field, so two consecutive fields that both carried a finding were ambiguous
+ * about which message belonged to which label - the DOM was right and the
+ * eye was not. Giving the following field a top margin makes the separation
+ * belong to the field it introduces: a finding now sits tight under the input
+ * it is about, and the next label opens with the air.
+ *
+ * `> * + *` rather than `.sb-field + .sb-field` so the pending notice, which
+ * is a sibling of the fields and not one of them, keeps the same separation
+ * from the first field that it had as a gap.
+ */
 .sb-form {
   display: flex;
   flex-direction: column;
-  gap: var(--sb-space-2);
+  gap: 0;
+}
+
+.sb-form > * + * {
+  margin-top: var(--sb-space-3);
 }
 
 .sb-field {
@@ -2198,6 +2219,10 @@
 /* d11: "a `:config` finding renders inline beneath its field". */
 .sb-field__finding {
   margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sb-space);
   padding: var(--sb-space-half) var(--sb-space);
   border-left: var(--sb-space-half) solid var(--sb-error);
   border-radius: var(--sb-radius-sm);
@@ -2205,6 +2230,21 @@
   color: var(--sb-error);
   font-size: var(--sb-text-xs);
   line-height: var(--sb-leading);
+}
+
+/*
+ * sb-3l1 / ruling 6A: while a draft is outstanding the form's findings are
+ * computed from the DRAFT, and the line says which config it is about in
+ * words. Set in the same colour as the message rather than a louder one - it
+ * is a scope note on a finding, not a second finding - and pushed to the far
+ * end by the flex rule above, where it reads as an attribute of the line and
+ * does not interrupt the sentence.
+ */
+.sb-field__finding-scope {
+  flex: 0 0 auto;
+  font-variant: all-small-caps;
+  letter-spacing: var(--sb-tracking-caps);
+  opacity: 0.8;
 }
 
 .sb-field__finding[data-severity="warning"] {
@@ -3190,20 +3230,27 @@
 }
 
 /* The arm columns are the answer and the binding columns are the question, so
- * the two halves get a rule between them rather than being one flat strip. */
+ * the two halves get a rule between them rather than being one flat strip.
+ * The answer half is also the emphasised one - the question columns stay in
+ * the muted mono treatment `.sb-fixtures__grid-path` sets. */
 .sb-fixtures__grid thead th.sb-fixtures__grid-arm {
   color: var(--sb-fg);
 }
 
+/* sb-3l1 / ruling 4A. Every column carries the light rule now that the inputs
+ * sit between the Case column and the verdicts - without it the input block
+ * was the one unruled run in the grid. */
 .sb-fixtures__grid-arm,
-.sb-fixtures__grid-cell {
+.sb-fixtures__grid-cell,
+.sb-fixtures__grid-path,
+.sb-fixtures__grid-binding {
   border-left: var(--sb-border-width) solid var(--sb-border);
 }
 
-/* The seam between the question columns and the answer columns. Marked in the
- * markup rather than with `:first-of-type`, which counts among siblings of the
- * same element name and would land on the first BINDING cell - the two column
- * families are both `td`. */
+/* The seam where the answers begin - "the verdict block separated by a heavier
+ * left rule" (4A). Marked in the markup rather than with `:first-of-type`,
+ * which counts among siblings of the same element name and would land on the
+ * first BINDING cell - the two column families are both `td`. */
 .sb-fixtures__grid [data-column="first-arm"] {
   border-left: var(--sb-border-width) solid var(--sb-border-strong);
 }
@@ -3526,6 +3573,68 @@
   display: none;
 }
 
+/* ---------------------------------------- the collapsed strip (sb-3l1, 5A)
+ *
+ * Collapsed, the drawer IS the strip: the header, the body and the cap all
+ * come off and what is left is one full-width button carrying the noun and
+ * the count. `max-block-size` has to be released with them or the collapsed
+ * drawer keeps reserving the 24rem the open one is capped at.
+ *
+ * The strip is present at a count of zero on purpose - see the module comment
+ * in `table-drawer.js`. A cold-start affordance that hides itself when there
+ * is nothing to find is the gap this ruling closes, not the fix for it.
+ */
+.sb-drawer[data-collapsed="true"] {
+  max-block-size: none;
+}
+
+.sb-drawer[data-collapsed="true"] > .sb-drawer__header,
+.sb-drawer[data-collapsed="true"] > .sb-drawer__body {
+  display: none;
+}
+
+.sb-drawer:not([data-collapsed="true"]) > .sb-drawer__strip {
+  display: none;
+}
+
+.sb-drawer__strip {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space);
+  width: 100%;
+  padding: var(--sb-space) var(--sb-space-2);
+  border: 0;
+  background: transparent;
+  color: var(--sb-fg-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sb-drawer__strip:hover {
+  background: var(--sb-bg-muted);
+  color: var(--sb-fg);
+}
+
+.sb-drawer__strip-label {
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+}
+
+/* The count reads as a count rather than as a second word: tabular figures so
+ * it does not shift as the number changes, and the muted chip treatment the
+ * rest of the shell uses for a quantity beside a label. */
+.sb-drawer__strip-count {
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-muted);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
 .sb-drawer__header {
   display: flex;
   align-items: center;
@@ -3680,6 +3789,122 @@
   .sb-editor__body > .sb-pane--inspector {
     grid-column: 2;
     grid-row: 2;
+  }
+}
+
+/* ------------------------------------- the palette strip / sheet (7A, 780) */
+
+/*
+ * Above 780 the palette is a column and the strip does not exist. The rule is
+ * one-sided on purpose: the wide layout is the default and the narrow one is
+ * the exception, so a container query that never fires leaves the shell in
+ * the arrangement it already had.
+ */
+.sb-palette__strip {
+  display: none;
+}
+
+/*
+ * sb-3l1 / ruling 7A: "below 780px the palette collapses to a strip (search
+ * and a '+') that opens as a sheet, so the inspector gets the full row;
+ * stacking order stays canvas, panes, drawer."
+ *
+ * 48.75rem is 780px at the 16px root this spike is read at. Below it the two
+ * stacked half-width panes of the 53rem arm are both too narrow to be worth
+ * the row - a 21rem inspector in ~380px is the squeeze the breakpoint above
+ * was invented to avoid, one step further down. Collapsing the palette to a
+ * strip buys the inspector the whole row for the price of one press, and the
+ * palette is the pane that survives it best: it is a list an author goes TO,
+ * not one they read while working.
+ *
+ * Stacking order is canvas, panes, drawer - unchanged, and stated as document
+ * order plus the grid rather than as z-indices. The sheet is the one overlay,
+ * and it sits above the canvas it covers and below the drag ghost (1000) and
+ * the slot picker (1001), so a drag started from inside the sheet still has a
+ * visible ghost.
+ */
+@container sb-shell (width < 48.75rem) {
+  /*
+   * Three rows, and the palette's is `auto` - the whole point. The 69rem arm
+   * gives the stacked pane row a 14rem track, and inheriting that here would
+   * leave the collapsed palette holding 14rem of empty pane under a one-line
+   * strip, which is the opposite of "the inspector gets the full row".
+   */
+  .sb-editor__body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto minmax(0, 18rem);
+  }
+
+  .sb-editor__body > .sb-pane--canvas {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .sb-editor__body > .sb-pane--palette {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .sb-editor__body > .sb-pane--inspector {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  /* The pane shrinks to its strip: no header, no body height, and the two
+   * `overflow` rules that make a pane a scroller have to come off or the
+   * absolutely positioned sheet is clipped by its own pane. */
+  .sb-editor__body > .sb-pane--palette {
+    position: relative;
+    overflow: visible;
+    min-width: 0;
+  }
+
+  .sb-editor__body > .sb-pane--palette > .sb-pane__header {
+    display: none;
+  }
+
+  .sb-editor__body > .sb-pane--palette > .sb-pane__body {
+    overflow: visible;
+    padding: var(--sb-space-half);
+  }
+
+  .sb-palette__strip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: var(--sb-space-half) var(--sb-space);
+    border: var(--sb-border-width) solid var(--sb-border);
+    border-radius: var(--sb-radius);
+    background: var(--sb-bg);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .sb-palette__strip-plus {
+    font-size: var(--sb-text-lg);
+    line-height: 1;
+    color: var(--sb-fg-muted);
+  }
+
+  .sb-palette__body {
+    display: none;
+  }
+
+  .sb-palette[data-sheet="open"] .sb-palette__body {
+    display: block;
+    position: absolute;
+    inset-inline: 0;
+    top: 100%;
+    z-index: 3;
+    max-height: 60vh;
+    overflow: auto;
+    padding: var(--sb-space);
+    border: var(--sb-border-width) solid var(--sb-border-strong);
+    border-radius: var(--sb-radius);
+    background: var(--sb-bg);
+    box-shadow: var(--sb-shadow-md);
   }
 }
 
@@ -4339,14 +4564,40 @@
  * form is mid-sentence, not wrong - and given a left rail like a finding so
  * the two read as the same family of message.
  */
+/*
+ * sb-3l1 / ruling 6A: "the pending notice is STICKY at the top of the
+ * inspector scroll area".
+ *
+ * The finding this answers: at the narrowest breakpoint the inspector pane is
+ * short enough that the notice scrolled out of the top while the field being
+ * edited was still in view, so the one sentence explaining why nothing is
+ * being stored was exactly the sentence an author could not see while the
+ * behaviour it explains was happening.
+ *
+ * The scrollport is `.sb-pane__body` (`overflow: auto`, padded by
+ * `--sb-space-2`); nothing between it and `.sb-form` establishes another one.
+ * The offset is the same negative-top idiom `.sb-sticky-head` uses further up
+ * this file, so the notice lands flush with the top of the padding box rather
+ * than a pad-width below it.
+ *
+ * The background has to be OPAQUE or the fields scrolling underneath show
+ * through: `--sb-warning-bg` is an `rgba()` at 0.12-0.14 in all three themes.
+ * Layering it over `--sb-bg` composites to the exact colour it already had on
+ * the pane, without inventing a fourth token to keep in theme audit.
+ */
 .sb-form__pending {
+  position: sticky;
+  top: calc(var(--sb-space-2) * -1);
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: var(--sb-space-half);
   padding: var(--sb-space);
   border-left: var(--sb-space-half) solid var(--sb-warning);
   border-radius: var(--sb-radius-sm);
-  background: var(--sb-warning-bg);
+  background:
+    linear-gradient(var(--sb-warning-bg), var(--sb-warning-bg)),
+    var(--sb-bg);
 }
 
 .sb-form__pending-head {

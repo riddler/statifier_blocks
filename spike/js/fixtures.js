@@ -521,6 +521,41 @@ export function tableCountFor(fixtures, blockId) {
   return fixtures === null || fixtures === undefined ? 0 : tablesForBlock(fixtures, blockId).length;
 }
 
+/**
+ * The drawer's COLLAPSED STRIP, derived (sb-3l1, ruling 5A / the 2A strip).
+ *
+ *     { present, expanded, count, label }
+ *
+ * `present` is whether the strip exists at all: a document has to be open for
+ * there to be a drawer, but a document with no tables still gets the strip
+ * reading a count of 0. That is the whole point of the ruling. The cold-start
+ * gap it closes was that the ONLY way into the drawer was a per-block button
+ * that a block owning no table does not render - so an author who had not
+ * already selected the right block had no way in, and no way to find out
+ * which block was the right one. The strip is always there, so the drawer is
+ * always one press away, and opening it on a block with no table lands on the
+ * miss-state list, which is the drawer's index page.
+ *
+ * The count is TABLES rather than owning blocks: the strip says the words
+ * "Truth tables", and counting something other than the noun beside it is how
+ * a count becomes a thing a reader has to decode. The two numbers differ only
+ * when one block owns several.
+ */
+export function drawerStripView({ fixtures, open }) {
+  if (fixtures === null || fixtures === undefined || !fixtures.known) {
+    return { present: false, expanded: false, count: 0, label: "Truth tables" };
+  }
+
+  const count = fixtures.tables.length;
+
+  return {
+    present: true,
+    expanded: open === true,
+    count,
+    label: count === 1 ? "Truth table" : "Truth tables",
+  };
+}
+
 /* ======================================================== the JSON editor */
 
 /**
