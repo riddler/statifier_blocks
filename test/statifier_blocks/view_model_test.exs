@@ -407,7 +407,7 @@ defmodule StatifierBlocks.ViewModelTest do
       # `BlockTypeFixtures.raw_palette/0` contributes "toy.budget_check" (its own
       # `palette_entry/0` puts it in "Authorization") and three types with no
       # `palette_entry/0` at all, which default to "Other" - alongside the
-      # seven real `core.*` types, all "Structure". Three groups, sorted by
+      # eight real `core.*` types, all "Structure". Three groups, sorted by
       # name: "Authorization" < "Other" < "Structure".
       assert [
                %PaletteGroup{name: "Authorization"} = authorization,
@@ -430,7 +430,8 @@ defmodule StatifierBlocks.ViewModelTest do
                "Branch",
                "Parallel",
                "Wait",
-               "On event"
+               "On event",
+               "Invoke"
              ]
     end
   end

@@ -43,7 +43,16 @@ defmodule StatifierBlocks.Core.SignupWizardTest do
 
     other = resolved_core_types(%{ctx | document: DocumentFixtures.worked_example()})
 
-    assert MapSet.new(Map.keys(resolved)) |> MapSet.union(MapSet.new(Map.keys(other))) ==
+    # `core.invoke` is in neither document: both examples spell their host
+    # call as a `myapp.*` type, which is what ADR-0002 decision 2 two-registry
+    # seam looks like from the authoring side. It is named here rather than
+    # dropped from the comparison, so a core type falling out of the worked
+    # examples has to be admitted deliberately.
+    uncovered = MapSet.new(["core.invoke"])
+
+    assert MapSet.new(Map.keys(resolved))
+           |> MapSet.union(MapSet.new(Map.keys(other)))
+           |> MapSet.union(uncovered) ==
              MapSet.new(Map.keys(StatifierBlocks.Palette.core_types()))
   end
 

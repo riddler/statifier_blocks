@@ -18,7 +18,13 @@ defmodule StatifierBlocks.Core.EmitTest do
         scxml = compile!(block, Palette.core()).scxml
 
         assert scxml =~ ~s(<state id="s_blk_ONE"), type_name
-        assert scxml =~ ~s(<final id="s_blk_ONE__done"/>), type_name
+        # The `done` role for a single-outcome type; an outcome final for
+        # one that declares more than one way to finish (ADR-0004 outcome
+        # amendment, 2b). Either way the state is compound and carries a
+        # `<final>`, which is the whole of the convention.
+        assert scxml =~ ~s(<final id="s_blk_ONE__done"/>) or
+                 scxml =~ ~s(<final id="s_blk_ONE__o_),
+               type_name
       end
     end
   end

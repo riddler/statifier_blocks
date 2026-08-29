@@ -505,6 +505,28 @@ defmodule StatifierBlocks.Compiler do
     ]
   end
 
+  defp emit_findings(%Block{id: id}, {:reserved_role, _block_id, role} = reason) do
+    [
+      Finding.new(
+        :emit,
+        reason,
+        ~s(minted the state role "#{role}", which is in the reserved outcome namespace),
+        block_id: id
+      )
+    ]
+  end
+
+  defp emit_findings(%Block{id: id}, {:invalid_outcome, _block_id, outcome} = reason) do
+    [
+      Finding.new(
+        :emit,
+        reason,
+        ~s(minted the outcome "#{outcome}", which is not a lowercase identifier free of "__"),
+        block_id: id
+      )
+    ]
+  end
+
   defp emit_findings(%Block{id: id}, findings) when is_list(findings) do
     Enum.map(findings, fn
       {key, message} when is_binary(key) and is_binary(message) ->

@@ -59,7 +59,7 @@ defmodule StatifierBlocks.Palette do
   @doc """
   The `core.*` structural vocabulary as a palette (ADR-0002 decision 10).
 
-  Seven entries, described in `StatifierBlocks.Core`. They are ordinary
+  Eight entries, described in `StatifierBlocks.Core`. They are ordinary
   palette entries with no privileged path anywhere in this package - a
   palette without them is as valid as a palette with them, and a host that
   wants only some of them builds a map with only those.
@@ -91,7 +91,8 @@ defmodule StatifierBlocks.Palette do
       "core.parallel" => Core.Parallel,
       "core.wait" => Core.Wait,
       "core.resumable_group" => Core.ResumableGroup,
-      "core.on_event" => Core.OnEvent
+      "core.on_event" => Core.OnEvent,
+      "core.invoke" => Core.Invoke
     }
   end
 

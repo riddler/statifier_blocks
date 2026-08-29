@@ -245,7 +245,7 @@ defmodule StatifierBlocks.BlockType do
           optional(:keywords) => [String.t()],
           optional(:order) => integer(),
           optional(:layout) => :stack | :columns,
-          optional(:slot_style) => %{optional(String.t()) => :primary | :secondary}
+          optional(:slot_style) => %{optional(String.t()) => :primary | :secondary | :failure}
         }
 
   @doc """

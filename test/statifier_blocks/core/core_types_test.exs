@@ -16,10 +16,10 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
 
   describe "Palette.core/0 and core_types/0" do
     # Sabotage: dropped `"core.group"` from `core_types/0` - red on the
-    # seven-entry assert and on the fetch below.
+    # eight-entry assert and on the fetch below.
     test "hand a host every core type, by the name a document stores" do
       assert %Palette{} = palette = Palette.core()
-      assert map_size(Palette.core_types()) == 7
+      assert map_size(Palette.core_types()) == 8
       assert palette.types == Palette.core_types()
 
       assert {:ok, Core.Sequence} = Palette.fetch(palette, "core.sequence")
@@ -29,6 +29,7 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
       assert {:ok, Core.Wait} = Palette.fetch(palette, "core.wait")
       assert {:ok, Core.ResumableGroup} = Palette.fetch(palette, "core.resumable_group")
       assert {:ok, Core.OnEvent} = Palette.fetch(palette, "core.on_event")
+      assert {:ok, Core.Invoke} = Palette.fetch(palette, "core.invoke")
     end
 
     # Sabotage: made `core_types/0` return a `%Palette{}` - red, because a

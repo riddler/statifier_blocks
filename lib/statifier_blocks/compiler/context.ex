@@ -32,10 +32,24 @@ defmodule StatifierBlocks.Compiler.Context do
   or from using a different one, so long as some final child is reachable.
   A block whose state can never reach a final is a block no parent can
   sequence after.
+
+  ## The `o_` role namespace is reserved
+
+  A block type with more than one way to finish emits one `<final>` per
+  outcome it reaches (ADR-0004's outcome amendment). Those finals live in
+  the role namespace under the prefix `"o_"`, they are minted only by
+  `outcome_id/2`, and `role_id/2` refuses the prefix outright - without the
+  reservation an outcome final and a hand-minted role could produce the
+  same id and provenance could not say which it was.
   """
 
   alias StatifierBlocks.{Block, Document}
   alias StatifierBlocks.Compiler.StateId
+
+  # ADR-0004's outcome amendment reserves this role prefix: an outcome
+  # final is minted only by `outcome_id/2`, and `role_id/2` refuses it, so
+  # an outcome final and a hand-minted role can never produce the same id.
+  @outcome_prefix "o_"
 
   @typedoc """
   Everything a parent may know about one compiled child: its block id, the
@@ -98,9 +112,18 @@ defmodule StatifierBlocks.Compiler.Context do
   compiler could not invert; a block type that passes a literal role never
   sees that arm, and one that builds a role from config handles it as the
   ordinary Emit finding it is.
+
+  A role beginning with `"o_"` is refused with `{:error, {:reserved_role,
+  block_id, role}}`: that namespace belongs to outcome finals and
+  `outcome_id/2` is the only way into it.
   """
   @spec role_id(t(), StateId.role()) ::
-          {:ok, StateId.t()} | {:error, {:invalid_role, Block.id(), StateId.role()}}
+          {:ok, StateId.t()}
+          | {:error, {:invalid_role, Block.id(), StateId.role()}}
+          | {:error, {:reserved_role, Block.id(), StateId.role()}}
+  def role_id(%__MODULE__{block_id: block_id}, @outcome_prefix <> _rest = role),
+    do: {:error, {:reserved_role, block_id, role}}
+
   def role_id(%__MODULE__{block_id: block_id}, role), do: StateId.state_id(block_id, role)
 
   @doc """
@@ -120,4 +143,60 @@ defmodule StatifierBlocks.Compiler.Context do
   """
   @spec done_event(t()) :: String.t()
   def done_event(%__MODULE__{state_id: state_id}), do: StateId.done_event(state_id)
+
+  @doc """
+  Mints the `<final>` id for one declared outcome (ADR-0004's outcome
+  amendment, 2b):
+
+      outcome_id(block_id, outcome) = "s_" <> block_id <> "__o_" <> outcome
+
+  This is the **only** home for an outcome final's id. A block type with
+  more than one way to finish emits one `<final>` per outcome it reaches
+  and mints every one of them here rather than by string concatenation, for
+  decision 3's reason: the ids stay injective, `unstate_id/1` still inverts
+  them, and provenance can still say which block a final came from.
+
+  `outcome` is a name in the role shape - `~r/\\A[a-z][a-z0-9_]*\\z/`, no
+  `"__"` - and one that is not is refused with `{:error, {:invalid_outcome,
+  block_id, outcome}}` rather than raising.
+
+  > #### This return shape refines the amendment's sketch {: .info}
+  >
+  > 2e writes the signature as returning a bare `String.t()`. It cannot,
+  > and stay honest: 2f requires an `:invalid_outcome` Emit finding for a
+  > name failing the role shape, and decision 1 forbids `emit/2` raising,
+  > so the error has to be reachable through a return value. The `{:ok, _}`
+  > arm carries exactly the id 2e names.
+  """
+  @spec outcome_id(t(), String.t()) ::
+          {:ok, StateId.t()} | {:error, {:invalid_outcome, Block.id(), String.t()}}
+  def outcome_id(%__MODULE__{block_id: block_id}, outcome) do
+    with true <- StateId.role?(outcome),
+         {:ok, id} <- StateId.state_id(block_id, @outcome_prefix <> outcome) do
+      {:ok, id}
+    else
+      _not_an_outcome -> {:error, {:invalid_outcome, block_id, outcome}}
+    end
+  end
+
+  @doc """
+  The completion event a parent wires on for one outcome:
+  `done.outcome.<state id>.<outcome>` (ADR-0004's outcome amendment, 2c).
+
+  The tag rides on an event rather than on the final's identity, because
+  `done.state.<state id>` is generated whichever final is entered and a
+  parent can therefore not see which one it was. A parent that does not
+  care wires the prefix `done.outcome.<state id>` and matches every outcome
+  of that child; one that discriminates names the full event. Refuses a
+  malformed outcome name for the same reason `outcome_id/2` does.
+  """
+  @spec outcome_event(t(), String.t()) ::
+          {:ok, String.t()} | {:error, {:invalid_outcome, Block.id(), String.t()}}
+  def outcome_event(%__MODULE__{block_id: block_id, state_id: state_id}, outcome) do
+    if StateId.role?(outcome) do
+      {:ok, "done.outcome." <> state_id <> "." <> outcome}
+    else
+      {:error, {:invalid_outcome, block_id, outcome}}
+    end
+  end
 end

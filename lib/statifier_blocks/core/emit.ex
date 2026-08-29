@@ -1,7 +1,7 @@
 defmodule StatifierBlocks.Core.Emit do
   @moduledoc """
   The SCXML shapes the `core.*` vocabulary compiles to (ADR-0004 decisions
-  2-4), and the small builders the seven types share.
+  2-4), and the small builders the core types share.
 
   ## The one convention everything else rests on
 
