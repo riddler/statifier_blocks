@@ -234,8 +234,31 @@ defmodule StatifierBlocks.BlockType do
   @callback fixtures() :: term()
 
   @typedoc """
+  What `join_label` declares: a one-argument function of the block's
+  config (ADR-0002 amendment B2).
+
+  It is the first executable thing to hang off a palette entry, so
+  decision 4's purity rule applies to it in full - no process dictionary,
+  no application-configuration lookup, no IO, no clock, no randomness.
+  A captured
+  named function (`&MyApp.Blocks.Split.join_label/1`) is the form to
+  prefer over an anonymous closure, for exactly that reason: a closure
+  over host state at registration time is the impurity decision 4
+  forbids, wearing a shape the type system cannot tell apart from a pure
+  one.
+  """
+  @type join_label :: (Block.config() -> String.t())
+
+  @typedoc """
   All keys optional. `icon` is a name resolved by a host-supplied
   component, never markup (ADR-0005 decision 10).
+
+  `accent_token`, `badge` and `join_label` are ADR-0002 amendment B's
+  presentation trio, whose contents stay ADR-0005 decision 10's (B1). The
+  first two are inert data and the third is code (B2); all three are read
+  through a total normalizer with refuse-never-truncate semantics (B3) -
+  `badge/1` and `join_label/2` here, `StatifierBlocks.ViewModel.accent_token/1`
+  for the one whose value is interpolated into a style attribute.
   """
   @type palette_entry :: %{
           optional(:label) => String.t(),
@@ -246,7 +269,10 @@ defmodule StatifierBlocks.BlockType do
           optional(:order) => integer(),
           optional(:layout) => :stack | :columns,
           optional(:slot_style) => %{optional(String.t()) => :primary | :secondary | :failure},
-          optional(:slot_outcome_key) => %{optional(String.t()) => String.t()}
+          optional(:slot_outcome_key) => %{optional(String.t()) => String.t()},
+          optional(:accent_token) => String.t(),
+          optional(:badge) => String.t(),
+          optional(:join_label) => join_label()
         }
 
   @doc """
@@ -408,4 +434,120 @@ defmodule StatifierBlocks.BlockType do
   end
 
   def outcome_name(_config, _key), do: nil
+
+  # ADR-0002 amendment B3 leaves the badge and join-marker length cap to
+  # ADR-0005 decision 10 and notes the spike's number, chosen so that
+  # "calls the host" and "timer" fit and a sentence does not. Decision 10
+  # carries no number today, so it lives here, named once, and this is the
+  # value proposed to that record rather than a second opinion about it.
+  @presentation_cap 24
+
+  @doc """
+  The chip a palette entry declares for its block type's card header, or
+  `nil` when it declared none or declared one this package will not draw
+  (ADR-0002 amendment B's `badge`).
+
+  Total, under B3's refuse-do-not-truncate discipline. Refused: a
+  non-string, an empty or all-whitespace string, one carrying a newline,
+  carriage return or tab, and one longer than #{@presentation_cap}
+  characters. An over-long badge is **dropped, not clipped**, and one
+  carrying a newline is dropped rather than collapsed to a space: a
+  truncated chip reads as a rendering bug a host files against the editor,
+  where a missing chip reads as the declaration it is.
+
+  `nil` means no chip, which is the card every block type had before the
+  declaration existed. A malformed declaration in one host's registry
+  produces the ordinary card, never a broken one and never an exception -
+  decision 3's totality, arriving at presentation.
+
+      iex> StatifierBlocks.BlockType.badge(%{badge: "calls the host"})
+      "calls the host"
+
+      iex> StatifierBlocks.BlockType.badge(%{badge: "a chip that says altogether too much"})
+      nil
+
+      iex> StatifierBlocks.BlockType.badge(%{})
+      nil
+  """
+  @spec badge(palette_entry() | map()) :: String.t() | nil
+  def badge(entry) when is_map(entry), do: chip(Map.get(entry, :badge))
+  def badge(_entry), do: nil
+
+  @doc """
+  What the join marker under this block type's side-by-side arrangement
+  says for `config`, or `nil` when the entry declares none and the editor
+  should use its own word (ADR-0002 amendment B's `join_label`).
+
+  The declaration is a one-argument function of the block's config -
+  `t:join_label/0` - and it is host code on the editor's layout path, so
+  two rules from amendment B2 and B3 apply and are implemented here:
+
+    * **It is a pure function of its argument.** That is decision 4, and
+      it is enforced by convention rather than by the gate, exactly as it
+      is for every other callback. A host needing external data to phrase
+      a marker resolves it before the operation and threads it through
+      config.
+    * **A raise degrades to the default.** The call happens inside a
+      rescue, so a host type with a bug in its `join_label` gets an
+      ordinary join marker rather than taking the canvas down. A throw and
+      an exit are caught on the same grounds - B3's own heading names the
+      throw. This is a deliberate, bounded exception to this package's
+      "nothing rescued to a default" rule: the value being defaulted is
+      one word of chrome and the alternative is a blank editor.
+      `validate_config/1`, `slots/1`, `emit/2` and every other callback
+      keep the rule unweakened.
+
+  The **return** is then held to `badge/1`'s refusal set, so a callback
+  that answers with a sentence, a newline, or something that is not a
+  string at all reads as no declaration rather than as a broken marker.
+  A declaration that is not a one-argument function is refused without
+  being called.
+
+      iex> StatifierBlocks.BlockType.join_label(%{join_label: fn _config -> "all lanes" end}, %{})
+      "all lanes"
+
+      iex> StatifierBlocks.BlockType.join_label(%{join_label: fn _config -> raise "boom" end}, %{})
+      nil
+
+      iex> StatifierBlocks.BlockType.join_label(%{join_label: "not a function"}, %{})
+      nil
+  """
+  @spec join_label(palette_entry() | map(), Block.config()) :: String.t() | nil
+  def join_label(entry, config) when is_map(entry) do
+    case Map.get(entry, :join_label) do
+      declared when is_function(declared, 1) -> declared |> call_join_label(config) |> chip()
+      _refused -> nil
+    end
+  end
+
+  def join_label(_entry, _config), do: nil
+
+  # B3's "a callback that raises degrades to the default", widened to a
+  # throw and an exit because a host callback that does either leaves the
+  # layout pass in the same place a raise does. The rescued value is never
+  # inspected: what comes back is the editor's own word either way.
+  @spec call_join_label(join_label(), Block.config()) :: term()
+  defp call_join_label(declared, config) do
+    declared.(config)
+  rescue
+    _raised -> nil
+  catch
+    :throw, _thrown -> nil
+    :exit, _reason -> nil
+  end
+
+  # The one refusal set B3's badge row and join-marker row share. Refuse,
+  # never truncate, and never repair: every arm answers `nil`, which every
+  # caller already renders as the default it owns.
+  @spec chip(term()) :: String.t() | nil
+  defp chip(text) when is_binary(text) do
+    cond do
+      String.trim(text) == "" -> nil
+      String.contains?(text, ["\n", "\r", "\t"]) -> nil
+      String.length(text) > @presentation_cap -> nil
+      true -> text
+    end
+  end
+
+  defp chip(_refused), do: nil
 end

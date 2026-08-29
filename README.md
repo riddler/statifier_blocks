@@ -292,6 +292,127 @@ invents an intermediate map or list a block type did not write. A host block
 type that stores a value somewhere other than a top-level key declares the
 path the same way.
 
+## Registering your own block types
+
+The `core.*` vocabulary is structural on purpose: it knows sequencing,
+branching, waiting and parallelism, and nothing about anyone's domain. A
+card-processing host adds the steps its own product has by writing a module
+per step and handing the editor an **explicit list** of them where the editor
+is mounted. There is no global registry, no application-configuration lookup,
+and no discovery pass that finds every module implementing the behaviour -
+each of those would make two tenants in one runtime share a vocabulary that
+is supposed to be per palette.
+
+```elixir
+defmodule MyApp.Blocks.RiskHold do
+  @moduledoc "myapp.risk_hold: parks an authorization until a reviewer clears it."
+
+  @behaviour StatifierBlocks.BlockType
+
+  alias StatifierBlocks.Compiler.Context
+  alias StatifierBlocks.Core.Emit
+
+  @impl true
+  def current_version, do: 1
+
+  @impl true
+  def slots(_config), do: []
+
+  @impl true
+  def config_schema(_config),
+    do: [
+      %{
+        key: "queue",
+        type: :string,
+        label: "Review queue",
+        required?: true,
+        default: "fraud"
+      }
+    ]
+
+  @impl true
+  def validate_config(config) do
+    case Map.get(config, "queue") do
+      queue when is_binary(queue) and queue != "" -> :ok
+      _missing -> {:error, [{"queue", "name the queue a reviewer picks this up from"}]}
+    end
+  end
+
+  @impl true
+  def palette_entry,
+    do: %{
+      label: "Risk hold",
+      group: "Payments",
+      description: "Parks the authorization until a reviewer clears it.",
+      badge: "manual review",
+      accent_token: "--sb-accent-risk"
+    }
+
+  @impl true
+  def emit(_block, context) do
+    done = Context.done_id(context)
+
+    with {:ok, holding} <- Context.role_id(context, "holding") do
+      waiting =
+        Emit.state(holding, nil, [
+          Emit.transition(event: "myapp.risk.cleared", target: done)
+        ])
+
+      {:ok, Emit.state(context.state_id, holding, [waiting, Emit.final(done)])}
+    end
+  end
+end
+
+palette =
+  StatifierBlocks.Palette.from_modules(
+    [{"myapp.risk_hold", MyApp.Blocks.RiskHold}],
+    core: true
+  )
+
+{:ok, risk_hold} = StatifierBlocks.Palette.fetch(palette, "myapp.risk_hold")
+
+Map.has_key?(palette.types, "core.sequence")
+#=> true
+
+StatifierBlocks.BlockType.badge(risk_hold.palette_entry())
+#=> "manual review"
+
+StatifierBlocks.ViewModel.accent_token(risk_hold.palette_entry())
+#=> "--sb-accent-risk"
+```
+
+`from_modules/2` is a value constructor and nothing more - the palette it
+returns is passed into the editor, the compiler and validation explicitly,
+the same way `Palette.new/2` and `Palette.core/0` are. The list is ordered
+and later entries win, so `core: true` puts the core vocabulary underneath
+and a host that deliberately swaps in its own `core.wait` writes it after.
+The registration carries the type **name** as well as the module because the
+document names a type by string and the palette resolves the string: the
+mapping is the host's fact, which is what lets one module serve two names in
+two tenants' palettes.
+
+### The three presentation declarations
+
+A palette entry may also say how the editor should draw the type, and three
+of those keys are worth calling out because a host reaches for them
+immediately:
+
+| Key | What it declares | Absent means |
+|---|---|---|
+| `accent_token` | the NAME of a `--sb-*` custom property, never a colour | the editor's own accent |
+| `badge` | a short chip for the card header | no chip |
+| `join_label` | a one-argument function of config, phrasing the join marker under a side-by-side arrangement | the editor's own word |
+
+All three are read through a total normalizer that **refuses rather than
+repairs**: a badge longer than 24 characters is dropped, not clipped, and one
+carrying a newline is dropped rather than collapsed to a space, because a
+truncated chip reads as a bug in the editor where a missing one reads as the
+declaration it is. An accent that is not an anchored `--sb-*` name never
+reaches a style attribute. A `join_label` is host code on the layout path, so
+it is a pure function of its argument and it is called inside a rescue - a
+type with a bug in it gets an ordinary join marker rather than taking the
+canvas down.
+
 ## Using the editor
 
 The editor ships in this package, and a host that never renders anything must

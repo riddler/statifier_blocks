@@ -30,7 +30,10 @@ defmodule StatifierBlocks.Core.ConformanceTest do
     :order,
     :layout,
     :slot_style,
-    :slot_outcome_key
+    :slot_outcome_key,
+    :accent_token,
+    :badge,
+    :join_label
   ]
   @bundle_keys [:scenarios, :events, :datasets, :expressions]
 

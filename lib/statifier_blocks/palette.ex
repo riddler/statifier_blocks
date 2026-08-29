@@ -100,6 +100,91 @@ defmodule StatifierBlocks.Palette do
     }
   end
 
+  @typedoc """
+  One registration: the name a document uses, and the module implementing
+  it. ADR-0002 decision 1 puts the string in the document and the mapping
+  in the palette, so a registration carries both halves - see
+  `from_modules/2` for why the name is not derived from the module.
+  """
+  @type registration :: {Block.type_name(), module()}
+
+  @doc """
+  Builds a palette from an **ordered, explicit list** of registrations -
+  the shape a host uses to contribute its own block types.
+
+      Palette.from_modules(
+        [
+          {"myapp.risk_hold", MyApp.Blocks.RiskHold},
+          {"myapp.settle", MyApp.Blocks.Settle}
+        ],
+        core: true
+      )
+
+  This is `new/2` with the ergonomics the registration story actually
+  wants, and nothing more: it is still a value, built where the editor is
+  mounted and handed in explicitly. There is no global registry, no
+  application-configuration lookup, and no compile- or boot-time discovery
+  of modules implementing the behaviour - every reason the moduledoc gives
+  for that applies here unchanged, and a discovery pass would additionally
+  make two tenants in one runtime share whatever the code path happened to
+  find.
+
+  Options:
+
+    * `:core` - when `true`, the registrations sit on top of
+      `core_types/0` rather than on an empty map. Defaults to `false`, so
+      `from_modules([])` is the empty palette.
+    * `:assignability` - passed through to `new/2`.
+
+  The list is ordered and **later entries win**, which is what makes it a
+  list rather than a map: a host that deliberately swaps in its own
+  `core.wait` writes it after `core: true` and reads the override in the
+  order it happens, and the same name appearing twice in one list has an
+  answer rather than a coin flip.
+
+  ## Why a name per entry, and not a name per module
+
+  A bare `[module]` list would be shorter, and this function does not take
+  one, because nothing in `StatifierBlocks.BlockType` declares a type
+  name. ADR-0002 decision 1 is explicit that the document names a type by
+  string and the palette resolves the string - the mapping is the *host's*
+  fact, not the module's, which is exactly what lets one module serve two
+  names in two tenants' palettes. Deriving a name from a module would
+  need a declaration the accepted behaviour does not have, and adding one
+  is a change to that record rather than an implementation convenience.
+
+  ## What it does not check
+
+  It does not load the module, does not assert the behaviour, and does not
+  call a callback. A palette is a value that may name a module compiled
+  later, and every consumer already carries the unresolvable case as an
+  ordinary arm (ADR-0002 decision 3). What it *does* refuse is an entry
+  that is not a `{type_name, module}` pair at all: that is a mount-time
+  programmer error with no sensible degraded reading, so it raises
+  `ArgumentError` naming the offending entry rather than quietly building
+  a palette missing a type the host believes it registered.
+  """
+  @spec from_modules([registration()], keyword()) :: t()
+  def from_modules(registrations, opts \\ []) when is_list(registrations) do
+    base = if Keyword.get(opts, :core, false), do: core_types(), else: %{}
+
+    registrations
+    |> Enum.reduce(base, &register/2)
+    |> new(opts)
+  end
+
+  @spec register(registration(), %{optional(Block.type_name()) => module()}) ::
+          %{optional(Block.type_name()) => module()}
+  defp register({type_name, module}, types)
+       when is_binary(type_name) and type_name != "" and is_atom(module) do
+    Map.put(types, type_name, module)
+  end
+
+  defp register(entry, _types) do
+    raise ArgumentError,
+          "expected a {type_name, module} registration, got: #{inspect(entry)}"
+  end
+
   @doc """
   Resolves a `type_name` to its module. Total; never raises (ADR-0002
   decision 3). `Map.fetch/2` rather than a sentinel default, so a palette
