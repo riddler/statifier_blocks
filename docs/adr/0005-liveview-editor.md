@@ -1,6 +1,6 @@
 # ADR-0005: The editor is a pure command algebra and view model with a thin LiveView shell
 
-Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85)
+Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90)
 
 ## Context
 
@@ -1657,7 +1657,7 @@ alternative hook is.
 
 ## Amendment (2026-08-29): decision 11, undeclared datamodel paths arrive as `:info` findings
 
-**Status: proposed (drafted 2026-08-29 from the operator's ruling).** Additive;
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 90).** Additive;
 decision 11 and the accepted `:info` amendment above both stand exactly as
 written, and no text above this line is edited by this section. It amends
 11d, which is the only clause it touches.
@@ -1680,7 +1680,7 @@ producer, named that as the argument's weakest point, and left the disposal to
 the operator: "accept it as the place a real advisory will land, or hold it
 until a producer exists." This is the place, and this is the first producer.
 
-### Proposed decision
+### Decision
 
 **11e. An undeclared datamodel path produces an `:info` finding, routed by the
 same anchor as everything else.** A config field a block type has annotated as

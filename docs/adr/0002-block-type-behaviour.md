@@ -1,6 +1,6 @@
 # ADR-0002: A block type is a behaviour module resolved through a caller-supplied palette
 
-Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings); outcomes/metadata/label amendment (accepted 2026-08-29, operator ruling)
+Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings); outcomes/metadata/label amendment (accepted 2026-08-29, operator ruling); decision 7 amended - optional `datamodel_path?` key (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90)
 
 ## Context
 
@@ -986,7 +986,7 @@ works.
 
 ## Amendment (2026-08-29): decision 7, an optional `datamodel_path?` key
 
-**Status: proposed (drafted 2026-08-29 from the operator's ruling).** Additive;
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 90).** Additive;
 decision 7 and its 2026-08-27 `value_path` amendment both stand exactly as
 written, and no text above this line is edited by this section.
 
@@ -1000,7 +1000,7 @@ fixes what that check produces (an `:info` finding anchored on the field's
 check, because that is a block type's claim about its own config, and decision
 7 owns those.
 
-### Proposed decision
+### Decision
 
 One sentence is added to decision 7: **a field declaration may carry an
 optional `datamodel_path?: true` key beside `value_path`, declaring that the
