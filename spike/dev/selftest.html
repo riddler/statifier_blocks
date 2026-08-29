@@ -7464,6 +7464,95 @@
         );
       });
 
+      /*
+       * The shell's document loader is async, and until sb-3kf it was
+       * unguarded: two switches inside one frame meant the fetch that resolved
+       * last painted the canvas, so the picker and the canvas could disagree
+       * persistently. `sequence.js` is the guard, kept pure precisely so this
+       * page can assert it.
+       *
+       * Imported here rather than in the block at the top of the file because
+       * imports hoist and this suite is additive; nothing above it moves.
+       */
+      const { createSequence: makeSequence } = await import("../js/sequence.js");
+
+      suite("sequence: the generation token, which is the whole guard (sb-3kf)", () => {
+        const seq = makeSequence();
+
+        check("no generation is current before the first begin", !seq.isCurrent(0));
+        check("and a token from nowhere is not current either", !seq.isCurrent(1));
+
+        const first = seq.begin();
+        check("the first token is current", seq.isCurrent(first));
+
+        const second = seq.begin();
+        check("beginning again supersedes the first", !seq.isCurrent(first));
+        check("and makes the second current", seq.isCurrent(second));
+        check("tokens are distinct", first !== second);
+
+        // The property that matters is monotonic, not merely different: an
+        // older token must never come back into force.
+        const third = seq.begin();
+        check("the first stays superseded after a third", !seq.isCurrent(first));
+        check("the second is superseded too", !seq.isCurrent(second));
+        check("only the newest is current", seq.isCurrent(third));
+
+        // Two sequences do not share a namespace, so a token cannot leak
+        // across loaders and accidentally read as current.
+        const other = makeSequence();
+        const foreign = other.begin();
+        check("a foreign sequence's token is not current here", !seq.isCurrent(foreign));
+
+        equal("the readout reports the generation", seq.generation, third);
+      });
+
+      /*
+       * The loader itself is not importable here - `shell.js` reaches for the
+       * shell's DOM at module scope and would throw on this page - so what
+       * this asserts is the loader's SHAPE, written out against the same
+       * guard: take a token, await, discard unless the token is still current.
+       *
+       * What is deliberately NOT covered: that `shell.js` actually wires the
+       * guard this way, and that the picker's own value converges. Both need
+       * the shell's DOM, and the spike is a static page with no runner; they
+       * are covered by the base-vs-branch manual pass on the demo documents.
+       */
+      const outOfOrder = (() => {
+        const seq = makeSequence();
+        const painted = [];
+
+        // Two "fetches", resolving in the opposite order to their requests -
+        // the exact race the bug needed.
+        const load = (name, resolveAfter) => {
+          const token = seq.begin();
+          return resolveAfter.then(() => {
+            if (!seq.isCurrent(token)) return;
+            painted.push(name);
+          });
+        };
+
+        let releaseFirst;
+        const first = new Promise((resolve) => {
+          releaseFirst = resolve;
+        });
+
+        const runs = [load("card-processing", first), load("signup-wizard", Promise.resolve())];
+
+        releaseFirst();
+
+        return Promise.all(runs).then(() => painted);
+      })();
+
+      const outOfOrderPainted = await outOfOrder;
+
+      suite("sequence: the loader shape converges on the last request (sb-3kf)", () => {
+        equal(
+          "the superseded load paints nothing, however late it lands",
+          outOfOrderPainted,
+          ["signup-wizard"]
+        );
+      });
+
       /* ------------------------------------------------------- reporting */
 
       const results = document.getElementById("results");

@@ -22,6 +22,7 @@ import { createDatamodelPane } from "./datamodel-pane.js";
 import { createFixturesPane } from "./fixtures-pane.js";
 import { indexPaths } from "./datamodel.js";
 import { createPalettePane } from "./palette-pane.js";
+import { createSequence } from "./sequence.js";
 
 const root = document.getElementById("sb-spike");
 
@@ -376,7 +377,22 @@ function stripComments(raw) {
   return out;
 }
 
+/*
+ * Every load takes a generation token before its first `await` and re-checks
+ * it after, so the LAST REQUESTED document wins rather than the last fetch to
+ * resolve. Two switches in one frame used to leave the picker and the canvas
+ * disagreeing until the next switch (sb-3kf, sb-ea4's F5); now the superseded
+ * load discards its own result and writes nothing.
+ *
+ * The token is taken for the empty-name branch too, even though that branch
+ * never awaits: picking "None" while a fetch is in flight has to supersede it
+ * as firmly as picking another document does.
+ */
+const documentLoads = createSequence();
+
 async function loadDocument(name) {
+  const token = documentLoads.begin();
+
   if (!name) {
     editor.clear();
     canvas.hidden = true;
@@ -390,7 +406,14 @@ async function loadDocument(name) {
   }
 
   const response = await fetch(`fixtures/documents/${name}.json`);
-  const decoded = fromJson(stripComments(await response.json()));
+  const raw = await response.json();
+
+  // The one gate. Past here the function only writes to the DOM, so a load
+  // that has been superseded stops here and leaves the winner's canvas alone.
+  // The fetch itself is not cancelled - it cannot be - it is only ignored.
+  if (!documentLoads.isCurrent(token)) return;
+
+  const decoded = fromJson(stripComments(raw));
 
   if (!decoded.ok) {
     // A refusal is a typed value, not an exception, so it renders as one.
