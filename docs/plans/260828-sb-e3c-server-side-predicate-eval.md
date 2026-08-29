@@ -705,14 +705,14 @@ pattern match:
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Full `mix quality` passes.
-- [ ] `mix format` leaves no diff.
-- [ ] Coverage at or above 90% with both new modules included.
-- [ ] `git diff mix.lock` is empty for this phase.
-- [ ] `git status --porcelain spike/ docs/adr/` is empty.
-- [ ] `grep -rniE "enrich|scoring|\bscore\b|crm_push" lib/statifier_blocks/predicates test/statifier_blocks/predicates changelog.d/sb-e3c.md` returns nothing.
-- [ ] `grep -rn "Phoenix" lib/statifier_blocks/predicates/truth_table.ex` returns nothing.
-- [ ] `git status --porcelain lib/statifier_blocks/editor.ex lib/statifier_blocks/editor/ assets/` is empty.
+- [x] Full `mix quality` passes.
+- [x] `mix format` leaves no diff.
+- [x] Coverage at or above 90% with both new modules included.
+- [x] `git diff mix.lock` is empty for this phase.
+- [x] `git status --porcelain spike/ docs/adr/` is empty.
+- [x] `grep -rniE "enrich|scoring|\bscore\b|crm_push" lib/statifier_blocks/predicates test/statifier_blocks/predicates changelog.d/sb-e3c.md` returns nothing.
+- [x] `grep -rn "Phoenix" lib/statifier_blocks/predicates/truth_table.ex` returns nothing.
+- [x] `git status --porcelain lib/statifier_blocks/editor.ex lib/statifier_blocks/editor/ assets/` is empty.
 
 #### Manual Verification:
 - [ ] Every new test asserting `lib/` behaviour has been sabotaged and carries its one-line mutation note. In particular the selection pass: invert the first-match-wins guard, confirm the ordering test goes red, revert.
@@ -853,5 +853,16 @@ before considering the plan fully landed.
 the full `mix quality` as the phase gate. In looped execution the Automated
 Verification list gates advancement via `/wurk:commit --auto` and the Manual
 items are deferred to `/wurk:verify`.
+
+---
+
+### Phase 2
+
+- [ ] Every new test asserting `lib/` behaviour has been sabotaged and carries its one-line mutation note. In particular the selection pass: invert the first-match-wins guard, confirm the ordering test goes red, revert.
+- [ ] The moduledoc's account of selection-versus-raw-truth reads correctly against `lib/statifier_blocks/core/branch.ex`'s ordered arms.
+- [ ] The five `status` values are each demonstrated by at least one test and each is named in the moduledoc.
+
+**Implementation Note**: same as Phase 1 - loop gate between edits, full gate
+at the boundary, Manual items deferred under `--loop`.
 
 ---

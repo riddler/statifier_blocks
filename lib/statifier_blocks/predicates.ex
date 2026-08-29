@@ -44,6 +44,10 @@ defmodule StatifierBlocks.Predicates do
   fails with `{:undefined_variable, "PT15M", _}`, which reads like a bug if
   this is not known going in.
 
+  See `StatifierBlocks.Predicates.TruthTable` for the truth-table builder
+  that composes `evaluate/2` and `context/1` over an ordered set of branch
+  arms, with first-match-wins selection.
+
   ## Where this is not wired
 
   ADR-0005 decision 9 (`docs/adr/0005-liveview-editor.md:336`) ships
