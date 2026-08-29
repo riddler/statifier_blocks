@@ -367,6 +367,14 @@ defmodule StatifierBlocks.Core.Subchart do
 
   # C2: one conditioned transition per outcome the child can report, then
   # the unconditioned default, last.
+  #
+  # The condition is composed here from the outcome name rather than read
+  # out of a config field, so it carries no `cond_key`: ADR-0004 decision
+  # 9 attributes an attribute value to a config key only when the value
+  # came from that field verbatim. Annotating it with "outcomes" would
+  # make a chart finding landing in these bytes read `fault: :author` and
+  # let decision 9's sub-expression span point into bytes this package
+  # generated, in a field the author could not fix it from.
   @spec done_transitions([route()], [Emission.t()]) :: [Emission.t()]
   defp done_transitions(routes, result) do
     routed = Enum.filter(routes, & &1.routed?)
@@ -377,7 +385,6 @@ defmodule StatifierBlocks.Core.Subchart do
           [
             event: @done_event,
             cond: condition(route.name),
-            cond_key: "outcomes",
             target: route.target
           ],
           result
