@@ -1,6 +1,6 @@
 # ADR-0005: The editor is a pure command algebra and view model with a thin LiveView shell
 
-Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant)
+Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78)
 
 ## Context
 
@@ -1426,9 +1426,9 @@ exactly where the paragraph above left it.
 
 ---
 
-## Proposed amendment (2026-08-29): decision 10, `slot_outcome_key`
+## Amendment (2026-08-29): decision 10, `slot_outcome_key`
 
-**Status: PROPOSED, not accepted.** Additive; decision 10 stands as accepted
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-014 grant, PR 78).** Drafted 2026-08-29 as a proposed amendment. Additive; decision 10 stands as accepted
 and no text above this line is changed by it. It answers the question the
 d10/13 amendment above deliberately left open as **10f**, and it is drafted
 from what `sb-77n` built rather than from a shape guessed ahead of the code.
