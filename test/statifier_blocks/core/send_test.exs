@@ -7,7 +7,7 @@ defmodule StatifierBlocks.Core.SendTest do
   use ExUnit.Case, async: true
 
   alias StatifierBlocks.{Block, Compiler, Document, Palette, Provenance}
-  alias StatifierBlocks.Compiler.Context
+  alias StatifierBlocks.Compiler.{Cancels, Context}
   alias StatifierBlocks.Core.{Raise, Send}
 
   describe "validate_config/1" do
@@ -129,7 +129,9 @@ defmodule StatifierBlocks.Core.SendTest do
       scxml = compile!(send_block(%{"event" => "signup.abandoned"})).scxml
 
       assert scxml =~ ~s(<state id="s_blk_SND" initial="s_blk_SND__o_done">)
-      assert scxml =~ ~s(<onentry><send event="signup.abandoned"/></onentry>)
+
+      assert scxml =~
+               ~s(<onentry><send event="signup.abandoned" id="s_blk_SND__send"/></onentry>)
 
       assert scxml =~
                ~s(<final id="s_blk_SND__o_done"><onentry>) <>
@@ -147,7 +149,7 @@ defmodule StatifierBlocks.Core.SendTest do
           ] do
         scxml = compile!(send_block(config)).scxml
 
-        assert scxml =~ ~s(<send event="signup.abandoned"/>)
+        assert scxml =~ ~s(<send event="signup.abandoned" id="s_blk_SND__send"/>)
         refute scxml =~ "delay="
       end
     end
@@ -158,7 +160,7 @@ defmodule StatifierBlocks.Core.SendTest do
     test "an ISO delay is emitted as the shorthand the engine reads" do
       scxml = compile!(send_block(%{"event" => "signup.abandoned", "delay" => "PT2H"})).scxml
 
-      assert scxml =~ ~s(<send delay="2h" event="signup.abandoned"/>)
+      assert scxml =~ ~s(<send delay="2h" event="signup.abandoned" id="s_blk_SND__send"/>)
     end
 
     # Sabotage: had `delay/1` answer `{:ok, value}` with the stored bytes
@@ -167,10 +169,14 @@ defmodule StatifierBlocks.Core.SendTest do
     # `3d8h`, taking this red on the second case (verified).
     test "a predicator delay compiles through the ISO pivot and back" do
       scxml = compile!(send_block(%{"event" => "signup.abandoned", "delay" => "1h30m"})).scxml
-      assert scxml =~ ~s(<send delay="1h30m" event="signup.abandoned"/>)
+
+      assert scxml =~
+               ~s(<send delay="1h30m" event="signup.abandoned" id="s_blk_SND__send"/>)
 
       reordered = compile!(send_block(%{"event" => "signup.abandoned", "delay" => "8h3d"})).scxml
-      assert reordered =~ ~s(<send delay="3d8h" event="signup.abandoned"/>)
+
+      assert reordered =~
+               ~s(<send delay="3d8h" event="signup.abandoned" id="s_blk_SND__send"/>)
     end
   end
 
@@ -205,6 +211,34 @@ defmodule StatifierBlocks.Core.SendTest do
 
         assert {:ok, _milliseconds} = Statifier.Duration.to_ms(delay)
       end
+    end
+  end
+
+  describe "the send id" do
+    # ADR-0002's 2026-08-29 amendment, section A: the id is
+    # `<the block's state id>__send`, derived and never authored, and
+    # ADR-0004 decision 3 wants every derived id minted through the
+    # context rather than concatenated.
+    #
+    # Sabotage: changed the reserved role to `"sent"` -> the minted id
+    # became `s_blk_SND__sent`, which is not the shape the record fixes,
+    # taking both assertions red (verified).
+    test "is the block's state id under the reserved role, minted through the context" do
+      context = Context.new("blk_SND", "bdoc_T")
+
+      assert Context.role_id(context, Cancels.armed_role()) == {:ok, "s_blk_SND__send"}
+
+      assert compile!(send_block(%{"event" => "signup.abandoned"})).scxml =~
+               ~s(id="s_blk_SND__send")
+    end
+
+    # No config field names it, so decision 7's schema is unchanged and
+    # the editor gains no control for it.
+    #
+    # Sabotage: added a `send_id` field to `config_schema/1` -> the schema
+    # pin above went red, and so did this (verified).
+    test "is not authorable" do
+      refute Enum.any?(Send.config_schema(%{}), &(&1.key == "send_id"))
     end
   end
 

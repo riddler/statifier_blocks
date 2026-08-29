@@ -39,18 +39,38 @@ defmodule StatifierBlocks.Core.Send do
   session's own external queue, which is exactly what `statifier_oban`
   turns into a durable timer.
 
-  **No cancel - and that is a recorded gap, not an oversight.** A delayed
-  send this block arms is never cancelled by anything this package emits:
-  no `<cancel>`, and no `sendid` an author could name. A cancel names the
-  send it cancels, which makes it a cross-subtree reference to another
-  block - the exact shape ADR-0005 decision 13 refused - and the
+  **No cancel block, and there will not be one.** A cancel that names the
+  send it cancels is a cross-subtree reference between blocks, which is
+  the exact shape the umbrella's D13 refuses - outcome paths are slots,
+  never ports, and connectors are rendered, never authored - as ADR-0001's
+  tree invariant and ADR-0005's amendment 10a state at record level. The
   alternative that keeps the tree invariant is scope-shaped rather than
-  reference-shaped: a delayed send is cancelled when the region that armed
-  it is left. Which of those is right is the delayed-send lifetime ruling,
-  filed here as **`sb-b4f`** and mirrored to statifier-ex as `st-q3ud`. It
-  is out of scope for campaign 014 and nothing here should grow a cancel
-  until it is ruled. The consequence a reader needs today: an armed send
-  fires even if the block, its group, or the whole chart moved on.
+  reference-shaped, and that is the one the 2026-08-29 delayed-send
+  lifetime ruling picked. So there is no `core.cancel` type, the palette
+  gains no entry, and cancellation is the compiler's to emit rather than
+  an author's to draw. The next section is what ships in its place.
+
+  ## The send carries an id, and its scope cancels it
+
+  The `<send>` carries `id="<this block's state id>__send"`, minted
+  through the context under the role `"send"` the way ADR-0004 decision 3
+  requires of every derived id. Nothing authors it: no config field names
+  it, the editor gains no control, and a reader of the document never sees
+  it. It exists so the send can be named later, because a send with no id
+  is a send nothing can cancel.
+
+  What cancels it is a `<cancel sendid="..."/>` the **compiler** emits in
+  the `<onexit>` of the nearest enclosing scope state - the sequence or
+  group this block sits in, not this block's own state, and the nearest
+  one when scopes nest. A delayed send therefore lives exactly as long as
+  the scope that meant it to. `StatifierBlocks.Compiler.Cancels` is where
+  that emission lives and why it reads the id rather than the emitter.
+
+  Upstream owns what the pair means at runtime: a pending delayed send is
+  identified by `{session scope, send id}` and nothing else, and it lives
+  until it fires, is cancelled, or its run is found not live at fire time
+  (statifier-ex ADR-0054 decisions 3 and 4, ADR-0060 decision 3 for
+  resume).
 
   ## The delay's stored form
 
@@ -71,7 +91,7 @@ defmodule StatifierBlocks.Core.Send do
   @behaviour StatifierBlocks.BlockType
 
   alias StatifierBlocks.Block
-  alias StatifierBlocks.Compiler.Context
+  alias StatifierBlocks.Compiler.{Cancels, Context}
   alias StatifierBlocks.Core.{Config, Duration, Emit}
   alias StatifierBlocks.Emission
 
@@ -172,7 +192,9 @@ defmodule StatifierBlocks.Core.Send do
   A compound state whose entry sends the event and immediately goes final.
 
       <state id="s_blk_SND" initial="s_blk_SND__done">
-        <onentry><send delay="2h" event="signup.abandoned"/></onentry>
+        <onentry>
+          <send delay="2h" event="signup.abandoned" id="s_blk_SND__send"/>
+        </onentry>
         <final id="s_blk_SND__done"/>
       </state>
 
@@ -198,22 +220,32 @@ defmodule StatifierBlocks.Core.Send do
   at a span the author never typed. `core.wait` leaves its own `delay`
   unannotated for the same reason.
 
-  ## No `<cancel>`, and no `id` to cancel by
+  ## The `id`, and the half of the cancel that is not here
 
-  The `<send>` is deliberately anonymous: minting a `sendid` here would be
-  half of a cancel mechanism whose other half `sb-b4f` (mirrored as
-  statifier-ex `st-q3ud`) has not ruled on, and a half-built one is worse
-  than none. See the moduledoc.
+  `id` is minted with `Context.role_id/2` under
+  `StatifierBlocks.Compiler.Cancels.armed_role/0`, so the one string the
+  convention turns on is written once and read back once. It is emitted
+  whether or not the send is delayed: ADR-0002's amendment states the
+  descriptor's id unconditionally, and an id costs nothing on a send that
+  fires now.
+
+  The matching `<cancel>` is deliberately absent from this function. It
+  belongs to the enclosing scope's state, which this block cannot reach -
+  ADR-0004 decision 4 gives a block type no way to write into its parent,
+  and it should not gain one for this. The compiler adds it on the
+  parent's own pass; see the moduledoc and
+  `StatifierBlocks.Compiler.Cancels`.
   """
   @impl true
   def emit(%Block{config: config}, context) do
     done = Context.done_id(context)
 
-    with {:ok, event} <- event(Map.get(config, "event")),
+    with {:ok, id} <- Context.role_id(context, Cancels.armed_role()),
+         {:ok, event} <- event(Map.get(config, "event")),
          {:ok, delay} <- delay(config) do
       send_element =
         "send"
-        |> Emission.element([{"delay", delay}, {"event", event}])
+        |> Emission.element([{"delay", delay}, {"event", event}, {"id", id}])
         |> Emission.attribute_from_config("event", "event")
 
       onentry = Emission.element("onentry", [], [send_element])
