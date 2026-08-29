@@ -2334,6 +2334,18 @@
   flex-wrap: wrap;
 }
 
+/* Both boxes share the row, against the heading row that already promises two
+ * columns. `.sb-rows__input` sets `flex-basis: auto`, and `.sb-input` sets
+ * `width: 100%`, so each box's flex base size is the WHOLE row - two of them
+ * cannot fit, and the wrap above (which is there so a row finding can take
+ * 100%) sent the value box to its own line under headings that stayed in two
+ * columns. The key box never showed it because `.sb-rows__key` overrides the
+ * basis to 0 further down. This gives the value box the same zero basis, so
+ * both shrink into their columns instead of wrapping out of them. */
+.sb-rows--map .sb-rows__input {
+  flex: 1 1 0;
+}
+
 .sb-rows__head {
   display: flex;
   align-items: center;
