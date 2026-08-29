@@ -13,7 +13,7 @@ defmodule StatifierBlocks.Core.ParallelCompleteTest do
 
   use ExUnit.Case, async: true
 
-  alias Statifier.Effect.{Cancel, CancelInvoke}
+  alias Statifier.Effect.CancelInvoke
   alias Statifier.Invoke.Types, as: InvokeTypes
   alias StatifierBlocks.{Block, BlockType, Compiler, Document, Palette}
   alias StatifierBlocks.Compiler.Context
@@ -258,15 +258,17 @@ defmodule StatifierBlocks.Core.ParallelCompleteTest do
                  ~s(<onexit><cancel sendid="s_blk_SND__send"/></onexit>)
     end
 
-    # One send, one cancel, wherever the scope turns out to be.
+    # One armed send, one cancel, wherever the scope turns out to be. This
+    # chart arms two: the fraud lane's `core.send` and the authorize lane's
+    # `core.wait`, which mints under the same reserved role (`sb-cqg`).
     #
     # Sabotage: let a scope claim ids it had already emitted a cancel for
     # -> the wrapper repeated the region's cancel and this went red
     # (verified).
-    test "the send is cancelled once" do
+    test "each armed send is cancelled exactly once" do
       scxml = compile!(racing_with_send()).scxml
 
-      assert [_one] = Regex.scan(~r/<cancel /, scxml)
+      assert cancelled(scxml) == ["s_blk_AUTHW__send", "s_blk_SND__send"]
     end
 
     # A `core.parallel` lane is not the only region in the vocabulary: a
@@ -285,13 +287,17 @@ defmodule StatifierBlocks.Core.ParallelCompleteTest do
 
       assert scxml =~
                ~s(<state id="s_blk_GRP__body" initial="s_blk_SND">) <>
-                 ~s(<onexit><cancel sendid="s_blk_SND__send"/></onexit>)
+                 ~s(<onexit><cancel sendid="s_blk_SND__send"/>) <>
+                 ~s(<cancel sendid="s_blk_HOLD__send"/></onexit>)
 
       {:ok, machine} = Statifier.compile(scxml)
       {machine_state, _effects} = Statifier.initialize(machine)
       {:ok, _machine_state, effects} = Statifier.send_event(machine_state, "payment.cancelled")
 
-      assert [%Cancel{send_id: "s_blk_SND__send"}] = cancels(effects)
+      assert Enum.map(cancels(effects), & &1.send_id) == [
+               "s_blk_SND__send",
+               "s_blk_HOLD__send"
+             ]
     end
   end
 
@@ -373,15 +379,31 @@ defmodule StatifierBlocks.Core.ParallelCompleteTest do
     # nothing had armed, and this went red on the id (verified). Taking
     # the `<state>` clause off `Cancels.claim/3`, which moves the cancel
     # back onto the block wrapper, takes it red too.
+    #
+    # The winning lane's `core.wait` is cancelled on the same way out
+    # (`sb-cqg`): the parallel exits both regions, and a wait mints its
+    # delayed send under the same reserved role a `core.send` does.
     test "the losing lane's delayed send is cancelled on the way out", ctx do
       {:ok, _machine_state, effects} =
         Statifier.send_event(ctx.machine_state, "payment.authorized")
 
-      assert [%Cancel{send_id: "s_blk_SND__send"}] = cancels(effects)
+      assert Enum.sort(Enum.map(cancels(effects), & &1.send_id)) == [
+               "s_blk_AUTHW__send",
+               "s_blk_SND__send"
+             ]
     end
   end
 
   defp cancels(effects), do: for({:cancel, cancel} <- effects, do: cancel)
+
+  # Every `sendid` the compiled chart cancels, sorted, so a repeat shows up
+  # as a duplicate entry rather than as a count nobody can read.
+  defp cancelled(scxml) do
+    ~r/<cancel sendid="([^"]+)"\/>/
+    |> Regex.scan(scxml, capture: :all_but_first)
+    |> List.flatten()
+    |> Enum.sort()
+  end
 
   defp complete_field do
     Enum.find(Parallel.config_schema(%{}), &(&1.key == "complete"))

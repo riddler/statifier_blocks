@@ -74,6 +74,13 @@ defmodule StatifierBlocks.Compiler.ProvenanceTest do
     end
   end
 
+  # The match carries the attribute's leading space, which the serializer
+  # writes before every attribute name: without it `id="s_blk_WAI__send"`
+  # also matches inside the `sendid="s_blk_WAI__send"` of the `<cancel>`
+  # its scope emits, and that element belongs to the scope rather than to
+  # the block that armed the send - a disagreement in the harness, not in
+  # the map.
+  #
   # Sabotage: made `record_state/2` store `Provenance.owner(id)` - a fresh
   # owner with no role - instead of the resolved one, and the two keys
   # stopped agreeing on every auxiliary state.
@@ -82,8 +89,8 @@ defmodule StatifierBlocks.Compiler.ProvenanceTest do
 
     disagreements =
       for {state_id, owner} <- provenance.by_state_id do
-        {start, _length} = :binary.match(scxml, ~s(id="#{state_id}"))
-        {:ok, by_span} = Provenance.owner_at(provenance, start + 4)
+        {start, _length} = :binary.match(scxml, ~s( id="#{state_id}"))
+        {:ok, by_span} = Provenance.owner_at(provenance, start + 5)
         {state_id, by_span, owner}
       end
       |> Enum.reject(fn {_id, by_span, owner} -> by_span == owner end)

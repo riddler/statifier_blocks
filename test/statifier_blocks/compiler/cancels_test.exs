@@ -12,9 +12,9 @@ defmodule StatifierBlocks.Compiler.CancelsTest do
   alias StatifierBlocks.Compiler.Cancels
 
   describe "armed_role/0" do
-    # Sabotage: returned "timer" instead of "send" -> `core.send`'s id
-    # became `s_blk___timer`, `core.wait`'s timers started matching, and
-    # the whole suite below went red at once (verified).
+    # Sabotage: returned "timer" instead of "send" -> every arming block's
+    # id became `s_blk___timer` and the whole suite below went red at once
+    # (verified).
     test "names the one role both halves of the convention turn on" do
       assert Cancels.armed_role() == "send"
     end
@@ -91,15 +91,16 @@ defmodule StatifierBlocks.Compiler.CancelsTest do
       refute scxml =~ "<cancel"
     end
 
-    # `core.wait` has minted a delayed `<send>` with an id since it
-    # shipped, under the role "timer", and its timer is bounded by the
-    # wait's own state. The amendment is about `core.send` and must move
-    # none of its bytes.
+    # `core.wait` mints a delayed `<send>` of its own, and a wait left
+    # before its delay elapses would otherwise leave that send armed in a
+    # durable host - the interpreter's exit of the wait's state cancels
+    # nothing an external scheduler already holds. So the wait mints under
+    # the same reserved role and the scope reaches it.
     #
-    # Sabotage: matched on the presence of an `id` rather than on the
-    # reserved role -> every `core.wait` in the vocabulary grew a scope
-    # cancel, taking this red (verified).
-    test "a core.wait timer is not a cancellable armed send" do
+    # Sabotage: put `core.wait`'s send back under a role of its own -> the
+    # id read `s_blk_WAI__timer`, no cancel was emitted, and both
+    # assertions went red (verified).
+    test "a core.wait timer is a cancellable armed send" do
       root =
         Block.new("core.sequence",
           id: "blk_SEQ",
@@ -110,8 +111,8 @@ defmodule StatifierBlocks.Compiler.CancelsTest do
 
       scxml = compile!(root).scxml
 
-      assert scxml =~ ~s(id="s_blk_WAI__timer")
-      refute scxml =~ "<cancel"
+      assert scxml =~ ~s(id="s_blk_WAI__send")
+      assert scxml =~ ~s(<onexit><cancel sendid="s_blk_WAI__send"/></onexit>)
     end
   end
 
@@ -172,20 +173,24 @@ defmodule StatifierBlocks.Compiler.CancelsTest do
       {:ok, _machine_state, effects} =
         Statifier.send_event(ctx.machine_state, "signup.abandoned")
 
-      assert [%Cancel{send_id: "s_blk_SND__send"}] = cancels(effects)
+      assert [%Cancel{send_id: "s_blk_SND__send"} | _rest] = cancels(effects)
     end
 
-    # `core.wait`'s own delayed send sits in the same scope and is armed
-    # in the same macrostep, and the amendment does not reach it.
+    # `core.wait`'s own delayed send sits in the same scope and is armed in
+    # the same macrostep, and the run is parked behind it when the scope is
+    # left - which is exactly the abandoned wait a durable host would
+    # otherwise be left holding a timer for.
     #
-    # Sabotage: dropped the reserved-role test from `armed?/2` -> the
-    # wait's timer was cancelled alongside the send, two cancels came back
-    # and this went red (verified).
-    test "the wait's timer in the same scope is not cancelled", ctx do
+    # Sabotage: put `core.wait`'s send back under a role of its own -> only
+    # the `core.send`'s cancel came back and this went red (verified).
+    test "the wait's timer in the same scope is cancelled too", ctx do
       {:ok, _machine_state, effects} =
         Statifier.send_event(ctx.machine_state, "signup.abandoned")
 
-      refute Enum.any?(cancels(effects), &(&1.send_id == "s_blk_WAI__timer"))
+      assert Enum.map(cancels(effects), & &1.send_id) == [
+               "s_blk_SND__send",
+               "s_blk_WAI__send"
+             ]
     end
   end
 
