@@ -1652,3 +1652,101 @@ selector, which sits awkwardly beside the spike's prose rule that a theme file
 "may not name an `sb-` class". `docs/theming.md` documents naming it as the
 supported shape; the record should either say the same or say what the
 alternative hook is.
+
+---
+
+## Amendment (2026-08-29): decision 11, undeclared datamodel paths arrive as `:info` findings
+
+**Status: proposed (drafted 2026-08-29 from the operator's ruling).** Additive;
+decision 11 and the accepted `:info` amendment above both stand exactly as
+written, and no text above this line is edited by this section. It amends
+11d, which is the only clause it touches.
+
+### Context
+
+11d ended with the datamodel question open, in its own words: "whether those
+advisories eventually arrive as `:info` findings or as a separate channel is a
+question this section leaves exactly where the paragraph above left it." The
+d10/13 amendment had put the same question as a choice between a third
+severity and a second channel, and named it the operator's call.
+
+Both halves now have the same answer. The third severity is accepted - the
+amendment above. This section spends it: the advisories are findings, and
+there is no second channel. **The d10/13 "third severity or a second channel"
+question is closed by this section; nothing further is open on it.**
+
+It also answers 11b's honest weakness. That clause proposed a severity with no
+producer, named that as the argument's weakest point, and left the disposal to
+the operator: "accept it as the place a real advisory will land, or hold it
+until a producer exists." This is the place, and this is the first producer.
+
+### Proposed decision
+
+**11e. An undeclared datamodel path produces an `:info` finding, routed by the
+same anchor as everything else.** A config field a block type has annotated as
+holding a datamodel path (ADR-0002 decision 7's `datamodel_path?: true` key,
+amended the same day as this section) is checked against the host-supplied
+datamodel. A path the datamodel does not declare produces one `%Finding{}`:
+anchor `{:config, block_id, key}` - the field's `key`, its identity per
+decision 7, not its `value_path`; severity `:info`, the value the amendment
+above added; source `:lint`, which 11b already fixes as the only source
+permitted to produce an `:info`.
+
+Nothing else about the finding is special. It renders in the advisory chrome
+11c describes, it appears in the document-level panel, it counts toward a
+collapsed subtree's badge, and per 11c it changes no verdict: a document whose
+only findings are these is exactly as compilable as one with none.
+
+**11f. Produced only when the host supplies a datamodel. No datamodel, nothing
+produced.** This qualifier is the whole of what answers 11d's objection, so it
+is stated as a condition on production rather than as guidance.
+
+11d's objection was that "a host may legitimately carry values it has not
+described", which makes an undeclared-path claim unfounded. It is unfounded
+precisely when nothing was described. A host that hands the editor a datamodel
+is making the claim itself - it is saying *these are the paths this document
+may address* - and a path outside that set is then worth the author's
+attention, which is exactly what 11a says `:info` means. A host that supplies
+no datamodel has made no claim, and the editor makes none on its behalf.
+
+**Absence is not unknown-ness.** With no datamodel supplied, the check does not
+run, produces no findings, and reports nothing anywhere - not a quieter
+severity, not an empty pane, not a "datamodel unknown" row.
+
+The input shape is not this record's to fix. The shipped editor takes an
+optional datamodel that normalizes to a set of declared paths, which is the
+whole contract this check needs; the typed, scoped datamodel *document* is a
+separate Proposed record (`sb-g8m`), and the declared-path set is derivable
+from it by one total function. This section is written against the set, so it
+holds under either.
+
+**11g. Not a separate channel.** The datamodel pane grows no advisory list of
+its own, and no consumer gets a second stream to merge with findings. The
+findings pane is where these arrive, because the reason 11d gave for keeping
+them out - a findings entry is a claim about the document - is satisfied once
+11f's qualifier is in place: with a datamodel in hand the entry *is* a claim
+about the document, and a well-founded one.
+
+Worked example, signup wizard: a `core.assign` block writes to
+`signup.variant`, the host supplies a datamodel declaring `signup.variant_id`
+and `signup.step`, and the editor anchors one `:info` finding on that block's
+`path` field saying the path is not declared. The author either fixes the
+typo or extends the datamodel; nothing is blocked either way, and the document
+compiles as it did before.
+
+### Consequences
+
+- `:info` acquires a producer, so the contract the amendment above accepted
+  stops being one that cannot be exercised. `sb-iwz`'s unregistered-invoke-type
+  lint remains the other candidate and is unaffected by this.
+- The check is conditional on an input, which is a shape no other finding has:
+  every other source produces from the document alone. That is the cost of
+  11f, and it is deliberate - it is what keeps the claim well-founded.
+- `sb-6b1`'s datamodel-path annotation half has a record to build against: the
+  anchor, the severity, the source, and the no-datamodel behaviour are all
+  fixed here rather than chosen in the editor.
+- ADR-0002 decision 7 gains the annotation this depends on, in its own dated
+  amendment of the same date. Neither section is useful without the other.
+- Nothing changes in the anchor vocabulary, the source list, the severity set,
+  or the routing. This section adds a producer and a precondition, and no
+  field.

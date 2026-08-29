@@ -981,3 +981,67 @@ works.
   constant two implementations can disagree about.
 - **`core.invoke`'s params field**, per D1.
 - **`core.raise`'s emission and payload**, per D2.
+
+---
+
+## Amendment (2026-08-29): decision 7, an optional `datamodel_path?` key
+
+**Status: proposed (drafted 2026-08-29 from the operator's ruling).** Additive;
+decision 7 and its 2026-08-27 `value_path` amendment both stand exactly as
+written, and no text above this line is edited by this section.
+
+### Context
+
+The editor needs to know which config fields hold datamodel paths, because a
+path is the one field value it can check against something outside the
+document: a host-supplied datamodel. ADR-0005's amendment of the same date
+fixes what that check produces (an `:info` finding anchored on the field's
+`key`, only when the host supplies a datamodel). It cannot say which fields to
+check, because that is a block type's claim about its own config, and decision
+7 owns those.
+
+### Proposed decision
+
+One sentence is added to decision 7: **a field declaration may carry an
+optional `datamodel_path?: true` key beside `value_path`, declaring that the
+field's value is a path into the host's datamodel.**
+
+What that sentence deliberately is not:
+
+- **Not a new field type.** Decision 7's type set - `:string`, `:integer`,
+  `:boolean`, `:select`, `:expression`, `:duration`, and `:list` of one of
+  those - stays closed. A datamodel-path field is a `:string` that carries one
+  more claim about itself; adding a `:path` type would give the editor a second
+  control to render for what is textually identical input.
+- **Not a `path_kind` enum.** A boolean is what the ruling admits. There is one
+  kind of path today, and an enum would be a vocabulary invented ahead of its
+  second member.
+- **A boolean, on the `required?: boolean()` convention** decision 7 and the
+  typespec appendix already establish. It reads the same way and needs no new
+  spelling.
+
+A declaration without the key behaves exactly as before, as with `value_path`.
+The key is orthogonal to `value_path`: one says where the value lives, the
+other says what the value means, and a field may carry both, either, or
+neither.
+
+**First consumer: `core.assign`'s `path` field.** Its decision-10 vocabulary row
+is a sibling change and not this section's. Signup wizard, for the shape: an
+assign block writing `signup.variant` declares its `path` field with
+`datamodel_path?: true`, and the editor checks that value against the supplied
+datamodel and anchors any advisory on the `path` key.
+
+### Consequences
+
+- One optional key on one map. Every existing declaration is unchanged and
+  every existing consumer keeps working, because absence means what it meant
+  before.
+- The type set stays closed, which is what keeps the editor's control table
+  finite - the property the closed set exists for.
+- The schema is still not a validation language. The key declares what a value
+  is, not what it must be; `validate_config/1` remains the authority per
+  decision 7, and the datamodel check produces an advisory that changes no
+  verdict, per ADR-0005.
+- A boolean forecloses nothing. If a second kind of path ever appears, it
+  arrives as its own key or as a widening amendment, with a real second member
+  to name.
