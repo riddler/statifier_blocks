@@ -28,7 +28,9 @@ defmodule StatifierBlocks.Compiler do
      (may this block land in this slot, by kind tag and by data-flow type -
      ADR-0003), reported together.
   5. **Emit** - bottom-up. Each block's `emit/2` is called with its
-     children already compiled and summarized, its emission is attributed
+     children already compiled and summarized, the scope-shaped cancel for
+     any delayed send a direct child armed is added to its own state
+     (`StatifierBlocks.Compiler.Cancels`), its emission is attributed
      (`StatifierBlocks.Compiler.Attribution`), and its child placeholders
      are spliced with those children's own emissions.
   6. **Chart** - serialize once through
@@ -130,6 +132,7 @@ defmodule StatifierBlocks.Compiler do
 
   alias StatifierBlocks.Compiler.{
     Attribution,
+    Cancels,
     Chart,
     Context,
     Finding,
@@ -451,8 +454,13 @@ defmodule StatifierBlocks.Compiler do
       context = Context.new(block.id, document_id, summaries(slots))
 
       case module.emit(block, context) do
-        {:ok, %Emission{} = emission} -> attribute(emission, block, compiled_slots)
-        {:error, reason} -> {:error, emit_findings(block, reason)}
+        {:ok, %Emission{} = emission} ->
+          emission
+          |> Cancels.arm(children(compiled_slots))
+          |> attribute(block, compiled_slots)
+
+        {:error, reason} ->
+          {:error, emit_findings(block, reason)}
       end
     end
   end
