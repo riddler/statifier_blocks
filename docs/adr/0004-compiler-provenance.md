@@ -1,6 +1,6 @@
 # ADR-0004: One block, one state - a deterministic compile carrying a provenance map
 
-Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings); decision 2 amended - outcome-tagged finals (accepted 2026-08-29, operator ruling); child-use compile and core.subchart routing amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 93); delayed-send cancel emission amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95)
+Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings); decision 2 amended - outcome-tagged finals (accepted 2026-08-29, operator ruling); child-use compile and core.subchart routing amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 93); delayed-send cancel emission amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95); core.foreach sequential loop amendment F1-F6 (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 94)
 
 ## Context
 
@@ -1419,7 +1419,7 @@ that makes it scope-shaped and keeps D13 intact.
 
 ## Amendment (2026-08-29): the sequential `core.foreach` compile
 
-**Status: proposed.** Drafted 2026-08-29 from the operator ruling on the loop
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 94).** Drafted 2026-08-29 from the operator ruling on the loop
 shape (sb-i61 / st-z4f3, "as recommended"). It records how a sequential
 `core.foreach` block compiles under this record's existing decisions and names
 one new compile finding; it amends no accepted decision above, and no accepted
