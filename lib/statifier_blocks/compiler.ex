@@ -71,6 +71,15 @@ defmodule StatifierBlocks.Compiler do
       that ADR-0003's context is caller-supplied and therefore has to
       arrive through this function. This is that arrival, not a second
       decision about what assignability means.
+    * `:datamodel` - the host's declared datamodel, which
+      `StatifierBlocks.Compiler.SensitivePaths` reads to refuse a document
+      that carries a declared-sensitive path into a position the chart
+      evaluates against the datamodel (ADR-0002 decision 7's `sensitive?`
+      key and the secrets rule behind it). Absent, or declaring nothing
+      sensitive, the check does not run and produces nothing - absence is
+      not unknown-ness (ADR-0005 `11f`). See
+      `StatifierBlocks.Compiler.SensitivePaths.datamodel/1` for the shapes
+      it accepts, and that module for the criterion the refusal applies.
 
   ## Determinism (decision 6)
 
@@ -113,6 +122,7 @@ defmodule StatifierBlocks.Compiler do
     Context,
     Finding,
     InvokeTypes,
+    SensitivePaths,
     Serializer,
     StateId
   }
@@ -144,12 +154,14 @@ defmodule StatifierBlocks.Compiler do
 
   @typedoc """
   `:known_invoke_types` enables decision 8's optional two-registry lint;
-  `:entry_type` is ADR-0003 decision 4's caller-supplied context. See the
-  moduledoc.
+  `:entry_type` is ADR-0003 decision 4's caller-supplied context;
+  `:datamodel` is the host's declared datamodel, read only by the
+  sensitive-path refusal. See the moduledoc.
   """
   @type option ::
           {:known_invoke_types, Enumerable.t()}
           | {:entry_type, Assignability.type_expr() | :unknown}
+          | {:datamodel, term()}
 
   @doc """
   Compiles `document` against `palette`.
@@ -166,7 +178,8 @@ defmodule StatifierBlocks.Compiler do
          {:ok, node} <- resolve_stage(document, palette),
          :ok <- config_stage(node),
          :ok <- structure_stage(document, palette, opts),
-         {:ok, emission} <- emit_stage(node, document.id) do
+         {:ok, emission} <- emit_stage(node, document.id),
+         :ok <- sensitive_stage(emission, opts) do
       chart_stage(document, node, emission, opts)
     end
     |> in_document_order(document)
@@ -649,6 +662,25 @@ defmodule StatifierBlocks.Compiler do
       )
 
     %{element | owner: Provenance.owner(root_id)}
+  end
+
+  # -- Stage 5b: the sensitive-path refusal -----------------------------------
+
+  # Runs on the assembled emission, between Emit and Chart, because the
+  # criterion it applies is about the emission: which attributes the chart
+  # will evaluate against the datamodel (see
+  # `StatifierBlocks.Compiler.SensitivePaths`). Its findings carry the
+  # `:emit` stage they were produced in and, because every one of them
+  # anchors on a config field, the author's side of decision 9's fault
+  # split. It is not a new pipeline stage - decision 10's table is
+  # unchanged - and it stops the compile before Chart for the same reason
+  # every other error does: there is nothing worth serializing.
+  @spec sensitive_stage(Emission.t(), [option()]) :: :ok | {:error, [Finding.t()]}
+  defp sensitive_stage(emission, opts) do
+    case SensitivePaths.check(emission, Keyword.get(opts, :datamodel)) do
+      [] -> :ok
+      findings -> {:error, findings}
+    end
   end
 
   # -- Stage 6: chart --------------------------------------------------------
