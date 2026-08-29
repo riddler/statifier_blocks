@@ -1,6 +1,6 @@
 # ADR-0002: A block type is a behaviour module resolved through a caller-supplied palette
 
-Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings)
+Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings); outcomes/metadata/label amendment (accepted 2026-08-29, operator ruling)
 
 ## Context
 
@@ -689,11 +689,14 @@ What this example is chosen to demonstrate:
 
 ---
 
-## Proposed amendment (2026-08-28): outcomes, presentation metadata, the invoke row, and who owns a label
+## Amendment (2026-08-28): outcomes, presentation metadata, the invoke row, and who owns a label
 
-**Status: PROPOSED, not accepted.** This section is additive. Nothing above it
-is edited, the record's `Status:` line is untouched, and every accepted
-decision stands as written until the operator rules. It amends decision 5's
+**Status: accepted (2026-08-29, operator ruling).** Drafted 2026-08-28 as a
+proposed amendment; the operator accepted it in full on 2026-08-29, including
+the two-declaration reading of D13, the `{name, label}` outcome-declaration
+shape, and the editor-owned-fields generalization of decision 7. This section
+is additive: nothing above it is edited, and every earlier accepted decision
+stands as written. It amends decision 5's
 callback table, decision 7's schema ownership, decision 10's vocabulary table
 and decision 11's boundary list, and it does so in one section because the
 four are one seam seen from four sides: what a block type declares about
@@ -716,9 +719,9 @@ they break the invariant the editor rests on: every edge in a document is a
 parent/slot/child relationship, so connectors are rendered and never authored.
 
 D13 lands on two records at once, and they have already been separated. The
-**emission** is ADR-0004's, and its own Proposed amendment of the same date
-(`docs/adr/0004-compiler-provenance.md`, "decision 2, outcome-tagged finals")
-holds it: outcome-tagged finals, `Context.outcome_id/2`, the reserved `o_`
+**emission** is ADR-0004's, and its own amendment of the same date, also
+accepted 2026-08-29 (`docs/adr/0004-compiler-provenance.md`, "decision 2,
+outcome-tagged finals"), holds it: outcome-tagged finals, `Context.outcome_id/2`, the reserved `o_`
 role namespace, and the completion event a parent wires on. That section
 explicitly parks the declaration surface here - "where the declaration surface
 lives is not this record's call" - and this section is the answer. Nothing
