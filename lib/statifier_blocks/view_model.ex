@@ -205,6 +205,21 @@ defmodule StatifierBlocks.ViewModel do
     side reads one field instead of a metadata key plus a config lookup,
     and so it never learns that `core.on_event` is the type with an
     `outcome`.
+
+    `join_label` is what the join marker under a side-by-side arrangement
+    reads: the string this block type's `join_label` callback returned for
+    this block's config, normalized by `StatifierBlocks.BlockType.join_label/2`,
+    and `nil` when the type declared none or the callback answered with
+    something the refusal set rejects (ADR-0002 amendment B). It is resolved
+    here for the same reason `outcome` is - the rendering side reads a string
+    and never learns that `core.parallel` is the type with a completion rule.
+
+    It is derived for **every** node, including the ones whose slots stack
+    and never draw a marker: a field that exists only sometimes is a field
+    every consumer has to remember to guard, and `entry.layout` already says
+    whether the marker is drawn. An unresolvable block reaches `nil` by the
+    ordinary route rather than by a special case - its entry is the
+    placeholder's, which declares no callback.
     """
 
     @type status :: :ok | {:unresolvable, term()}
@@ -216,6 +231,7 @@ defmodule StatifierBlocks.ViewModel do
             status: status(),
             entry: BlockType.palette_entry(),
             outcome: String.t() | nil,
+            join_label: String.t() | nil,
             slots: [StatifierBlocks.ViewModel.Slot.t()],
             form: StatifierBlocks.ViewModel.Form.t() | nil,
             raw_config_json: String.t() | nil,
@@ -231,6 +247,7 @@ defmodule StatifierBlocks.ViewModel do
       :status,
       entry: %{},
       outcome: nil,
+      join_label: nil,
       slots: [],
       form: nil,
       raw_config_json: nil,
@@ -541,6 +558,7 @@ defmodule StatifierBlocks.ViewModel do
       type_version: block.type_version,
       status: :ok,
       entry: entry,
+      join_label: BlockType.join_label(entry, config),
       slots: slots,
       form: form,
       raw_config_json: nil,

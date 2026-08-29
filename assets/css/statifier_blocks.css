@@ -600,6 +600,32 @@
   min-width: 0;
 }
 
+/* The join marker: what the columns come back together as, in the block
+ * type's own words (ADR-0002 amendment B's `join_label`). It is drawn only
+ * under a side-by-side arrangement, so the rule needs no layout of its own -
+ * it centres one chip under the columns above it.
+ *
+ * The same caps treatment the editor already uses for chrome that labels a
+ * structure rather than naming a thing, and no new token: the marker is a
+ * line of muted text in a bordered chip, and every value that takes is
+ * already declared. */
+.sb-node__join {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--sb-space);
+}
+
+.sb-node__join-label {
+  border: var(--sb-border-width) solid var(--sb-border-strong);
+  border-radius: var(--sb-radius);
+  padding: var(--sb-space-half) var(--sb-space);
+  background: var(--sb-bg);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+}
+
 /* ----------------------------------------------------------------- slots */
 
 .sb-slot {

@@ -18,6 +18,65 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use StatifierBlocks.EditorLiveCase
 
+    defmodule StackedJoin do
+      @moduledoc """
+      A host type that phrases a join marker but stacks its slots - the case
+      that separates "this type declared words" from "this arrangement draws
+      a marker". Nothing in the core vocabulary is both, so the guard would
+      otherwise be asserted against a type that declares nothing and pass
+      whether or not it existed.
+      """
+
+      @behaviour StatifierBlocks.BlockType
+
+      @impl true
+      def current_version, do: 1
+
+      @impl true
+      def slots(_config), do: [{"body", :zero_or_more, "Body"}]
+
+      @impl true
+      def config_schema(_config), do: []
+
+      @impl true
+      def validate_config(_config), do: :ok
+
+      @impl true
+      def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+
+      @impl true
+      def palette_entry,
+        do: %{label: "Stacked", join_label: fn _config -> "back together" end}
+    end
+
+    defmodule ColumnsNoWords do
+      @moduledoc """
+      The other half of the same pair: a type that fans out and declares no
+      words for the marker. ADR-0002 amendment B's `nil` means the editor
+      uses its own word, so this is what that sentence looks like rendered.
+      """
+
+      @behaviour StatifierBlocks.BlockType
+
+      @impl true
+      def current_version, do: 1
+
+      @impl true
+      def slots(_config), do: [{"left", :zero_or_more, "Left"}, {"right", :zero_or_more, "Right"}]
+
+      @impl true
+      def config_schema(_config), do: []
+
+      @impl true
+      def validate_config(_config), do: :ok
+
+      @impl true
+      def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+
+      @impl true
+      def palette_entry, do: %{label: "Both at once", layout: :columns}
+    end
+
     defp lanes_document do
       Document.new(
         Block.new("core.parallel",
@@ -29,6 +88,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           }
         ),
         id: "doc_lanes"
+      )
+    end
+
+    defp first_lanes_document do
+      Document.new(
+        Block.new("core.parallel",
+          id: "blk_lanes",
+          config: %{"lanes" => ["signup", "email"], "complete" => "first"},
+          slots: %{
+            "lane_signup" => [EditorFixtures.wait("blk_l1", "1h")],
+            "lane_email" => [EditorFixtures.wait("blk_l2", "2h")]
+          }
+        ),
+        id: "doc_lanes_first"
       )
     end
 
@@ -48,6 +121,68 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert has_element?(view, ~s([data-block-id="blk_lanes"] > .sb-node__slots--columns))
         refute has_element?(view, ~s([data-block-id="blk_lanes"] > .sb-node__slots--stack))
+      end
+
+      # Sabotage: drop the `:if={join_label(@node)}` marker div from
+      # `BlockNode.block_node/1` - the lanes fan out and nothing says what
+      # happens when they are done, which is the state the shipped editor was
+      # in while the callback existed and was exercised.
+      test "the join marker under the lanes reads the type's own words", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: first_lanes_document())
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_lanes"] > .sb-node__join > .sb-node__join-label),
+                 "continue at first"
+               )
+      end
+
+      # Sabotage: return `label` alone from `BlockNode.join_label/1` instead of
+      # `label || @default_join_label` - a type that fans out without phrasing
+      # a rule loses its marker, and amendment B's "the editor should use its
+      # own word" stops being true of the editor.
+      test "a side-by-side type declaring no words gets the editor's own", %{conn: conn} do
+        document =
+          Document.new(
+            Block.new("host.columns_no_words", id: "blk_cols", config: %{}),
+            id: "doc_cols"
+          )
+
+        palette = Palette.new(%{"host.columns_no_words" => ColumnsNoWords})
+
+        {:ok, view, _html} = mount_editor(conn, document: document, palette: palette)
+
+        # The view model carries nothing: the word below is the editor's.
+        assert StatifierBlocks.ViewModel.build(document, palette, []).root.join_label == nil
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_cols"] > .sb-node__join > .sb-node__join-label),
+                 "continue"
+               )
+      end
+
+      # Sabotage: drop the `layout: :columns` clause from
+      # `BlockNode.join_label/1` so it reads the field for every node - a type
+      # whose slots stack draws a marker under a single column, which says
+      # nothing came back together because nothing fanned out.
+      test "a type whose slots stack draws no marker, however it phrases one", %{conn: conn} do
+        document =
+          Document.new(
+            Block.new("host.stacked_join", id: "blk_stacked", config: %{}),
+            id: "doc_stacked"
+          )
+
+        palette = Palette.new(%{"host.stacked_join" => StackedJoin})
+
+        {:ok, view, _html} = mount_editor(conn, document: document, palette: palette)
+
+        # The words are on the view model - this refutation is about where the
+        # marker is drawn, not about a type that declared nothing.
+        assert StatifierBlocks.ViewModel.build(document, palette, []).root.join_label ==
+                 "back together"
+
+        refute has_element?(view, ~s([data-block-id="blk_stacked"] > .sb-node__join))
       end
 
       # Sabotage: `ViewModel.slot_presentation/2` returning `:primary` always -
