@@ -764,9 +764,15 @@ already accepted.
 **A2. A slot is not an outcome, and this record does not marry them.** D13's
 sentence - outcomes are slots - is about the *authoring surface*, and it is
 honoured by section D below: `core.invoke`'s failure path is an `on_error`
-slot with `zero_or_one` arity and a `secondary` slot style, which is machinery
+slot with `zero_or_one` arity and a `:failure` slot style, which is machinery
 `core.group`'s `interrupts` rail already provides and the renderer already
-reads without learning a type name. It is not a claim that the two
+reads without learning a type name. [Correction 2026-08-29, sb-4kh: was "a
+`secondary` slot style". ADR-0005 amendment 10g, accepted 2026-08-29, names the
+`on_error` rail `slot_style: :failure` and has `core.invoke` declare
+`slot_style: %{"on_error" => :failure}`. The claim this paragraph makes - that
+the rail is existing renderer machinery and needs no type name - is unchanged;
+10h derives rail placement from the rail partition, `:secondary` and `:failure`
+alike.] It is not a claim that the two
 declarations are one list. They answer different questions: `slots/1` says
 where children live, `outcomes/1` says how finishing can differ, and a type
 can have either without the other. `core.branch` has many slots and one

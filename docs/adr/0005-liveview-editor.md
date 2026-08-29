@@ -362,8 +362,11 @@ exists so the author does not have to know that.
 source is statifier-ui's subject (sui-bob, sui-ADR-0006), and a richer
 affordance - completion against the datamodel, inline evaluation against a
 dataset - is a component this package should consume rather than reimplement.
-Decision 12 records that as a deferral, and the field renderer is written to
-accept a host-supplied override component for exactly this reason.
+Decision 15 records that as a deferral, and the field renderer is written to
+accept a host-supplied override component for exactly this reason. [Correction
+2026-08-29, sb-4kh: was "Decision 12". The rich-expression-editing deferral is
+decision 15's "Rich expression editing is statifier-ui's (sui-bob)" bullet;
+decision 12 is about unresolvable blocks. Found by sb-e3c.]
 
 Now the part that falls out of ADR-0002 and is easy to get wrong. ADR-0002
 decision 6 guarantees `slots/1` returns without raising only for config that
@@ -400,6 +403,18 @@ decision 5 hung off the block-type module and left to this record to fill in.
 
 Every default is specified because a block type omitting `palette_entry/0`
 entirely must still render, and ADR-0002 decision 5 promised it would.
+
+[Open item 2026-08-29, sb-4kh - NEEDS A DECISION, none taken here. ADR-0002's
+amendment section B closes with "The cap itself is a number ADR-0005 decision
+10 should carry rather than this record; the spike's is 24 characters for both
+the badge and the join marker." The cap now exists in code as
+`@presentation_cap 24` in `lib/statifier_blocks/block_type.ex` (sb-zfd), with
+ADR-0002 B3's refuse-never-truncate semantics. Adopting it into this decision
+is more than a correction, for two reasons: decision 10's table above carries
+no `badge` or `join_label` row at all, and ADR-0002 B1 says explicitly that it
+"does not adopt the trio into decision 10 on that record's behalf". So adopting
+the cap means first adopting the trio into this table, which is a decision for
+the operator or the direction-agent gate. Recorded, not decided.]
 
 **`icon` is a name, never markup.** The editor takes an icon component as an
 attr and passes the name to it; a host that ships heroicons renders heroicons,
@@ -456,6 +471,32 @@ record's** - so this record decides only that the presentation layer has a
 place to put the answer, and that it renders as a warning rather than an error
 because a document with one is still compilable and still correct if the host
 registers the handler before it runs.
+
+[Open items 2026-08-29, sb-4kh - BOTH NEED A DECISION, neither taken here.
+Building the adapter from compiler findings to this shape (`Finding.from_compiler/2`,
+sb-kmk) and the palette-aware slot validation behind it (sb-da9) exposed two
+gaps in the `source` enum above.
+
+1. **No bucket for an `:emit`, `:chart` or `:document` stage error.** The
+   adapter maps compiler findings to a source by stage: `:config` to `:config`,
+   `:resolve` to `:resolution`, `:structure` to `:assignability`, and anything
+   else at `:error` severity is refused as `{:no_presentation_source, finding}`.
+   So an error raised against generated SCXML or against the document envelope
+   has no source in this enum and cannot render in the editor today. The
+   adapter refuses rather than lying about where the rule lives, which is the
+   right refusal for it to make, but it leaves real compile errors unroutable.
+   Closing the gap means adding a value to an accepted enum.
+
+2. **`:arity` is unreachable by construction.** Slot arity and undeclared-slot
+   violations landed as `StatifierBlocks.SlotValidation`, reported through the
+   compiler's `:structure` stage, so they adapt to `:assignability`. No rule in
+   the adapter yields `:arity`, and no other producer exists. It remains
+   reachable only by a caller passing `source: :arity` explicitly to
+   `from_compiler/2`. Whether to drop the enum entry or keep it with a note is
+   a decision, and the prose above ("arity and undeclared-slot violations are
+   about a slot") should follow whichever way it goes.
+
+Both are recorded here so the gap is not re-derived; neither is decided.]
 
 **12. Unresolvable blocks render, and never lose data.** ADR-0001 decision 9
 made decoding registry-free and ADR-0002 decision 3 made resolution total,
@@ -813,7 +854,14 @@ The evidence is a working three-theme prototype, not an argument. `host-brand.cs
 holds itself to a hard rule - a theme file may set `--sb-*` properties and may
 do nothing else, no structural declaration and no `sb-` class - and every hole
 below was found by that rule failing: a restyle needed something the theme file
-was not allowed to do. `spike/dev/theme-audit.html` checks the rule and the
+was not allowed to do. [Correction 2026-08-29, sb-4kh: the "no `sb-` class"
+half of that sentence was never literally true of the file.
+`spike/css/themes/host-brand.css` does name `sb-` classes, in the two selectors
+that scope the theme (`.sb-spike[data-sb-theme="host-brand"]` and
+`[data-sb-theme="host-brand"] .sb-spike`). The rule the file actually holds
+itself to is the one the findings below rest on: it carries no declaration
+other than `--sb-*` custom properties, the `sb-` classes it names being scoping
+selectors only. Found by sb-2b9; no finding in this amendment is affected.] `spike/dev/theme-audit.html` checks the rule and the
 arithmetic against the real stylesheets rather than asserting them in a comment
 (52 checks). Screenshots are in the private campaign journal (campaign 012
 journal, private: `sb-957-13`/`-14` for the browser-chrome pair, `-10`/`-11`
@@ -1050,6 +1098,14 @@ depth-7 document into nested rectangles that read as noise.
 So `slot_style` with any `:secondary` entry both places the rail and marks the
 container as a boundary. One piece of metadata, two renderings, no type name -
 which is the property decision 10 exists to preserve.
+
+[Correction 2026-08-29, sb-4kh: 10c's "and for nothing else" is superseded by
+amendment 10h, accepted 2026-08-29. The boundary is now derived from the **rail
+partition**, not from `:secondary` specifically: a container is a boundary box
+if **any** of its slots declares a rail style, `:secondary` and `:failure`
+alike. 10c's stated reason - an attached rule is about a region, so the region
+needs a visible edge - is unchanged and is what 10h extends; only the set it
+ranges over widened.]
 
 **10d. A fan lands on the column header, not on the first card.** Where one
 block's edge fans out to several - a branch's arms, a parallel's lanes - each
@@ -1297,7 +1353,9 @@ type.
 **10i. An unrecognized style resolves to `:primary`.** A `slot_style` value the
 editor does not know - a host declaring against a newer record, a typo -
 renders as an ordinary body slot rather than raising or dropping the slot.
-This is decision 3's total-resolution posture arriving at presentation, the
+This is ADR-0002 decision 3's total-resolution posture (correction 2026-08-29,
+sb-4kh: was "decision 3", which reads as this record's decision 3 - the undo
+stack) arriving at presentation, the
 same discipline ADR-0002's amendment B3 applies to the metadata trio: a
 malformed declaration in one host's registry produces the ordinary card, never
 a broken one and never an exception. The children are still rendered, still
