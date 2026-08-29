@@ -1,6 +1,6 @@
 # ADR-0005: The editor is a pure command algebra and view model with a thin LiveView shell
 
-Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 9 amended - the `:duration` control, predicator strings primary (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 91)
+Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 9 amended - the `:duration` control, predicator strings primary (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 91); the shell arrangement recorded - three panes and a drawer, rulings 1A/2A/3A/7A/8A (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 92)
 
 ## Context
 
@@ -1910,7 +1910,7 @@ restating it. A grammar restated here would be a second opinion that drifts.
 
 ## Amendment (2026-08-29): the shell arrangement - three panes and a drawer
 
-**Status: proposed.** Drafted 2026-08-29 from the operator layout rulings
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 92).** Drafted 2026-08-29 from the operator layout rulings
 taken in the campaign-014 decision walkthrough (walkthrough artifact
 `ff7335cf`; the rulings are recorded on `sb-054`, `sb-3l1` and `sb-eb2`).
 Additive; decision 13 is untouched and no text above this line is changed by
@@ -1941,7 +1941,7 @@ what kind of content each region holds, and that claim is what this section
 records so the shell graduation (`sb-832`) implements a decided shape rather
 than re-deriving one.
 
-### Proposed decision
+### Decision
 
 **1A. The shell is a grid of three columns - palette, canvas, inspector -
 plus one full-width drawer row.** The drawer holds tabular, document-level
