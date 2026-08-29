@@ -30,7 +30,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
-    alias StatifierBlocks.BlockType
+    alias StatifierBlocks.{BlockType, DurationInput}
     alias StatifierBlocks.Editor.Field
     alias StatifierBlocks.ViewModel
 
@@ -116,6 +116,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     shape of a key. Writing through the path is also what stops a top-level
     `config["arm_approved"]` from accumulating beside the arm the author
     actually edited.
+
+    ## The one value that is not written at all
+
+    An empty `:duration` **omits its key** rather than storing `""`
+    (ADR-0005 decision 9, amended 2026-08-29). A cleared field and a
+    never-set field are the same value - there is no `PT0S` and no third
+    state for "the author touched this and then did not finish" - so the
+    two have to produce the same config, and the only config an absent key
+    can produce is one without the key.
+
+    This is the only place that can perform it. `Field.decode/2` returns a
+    value and every value it could return is a value the key would then
+    hold; whether a key exists is a property of the map, which is this
+    function's to write. The omission is still the ordinary path in every
+    other respect: the resulting config goes to the same whole-config gate
+    through `StatifierBlocks.Edit.check_config/3`, and a required duration
+    left empty is refused there rather than here.
     """
     @spec decode([ViewModel.Field.t()], map(), StatifierBlocks.Block.config()) ::
             StatifierBlocks.Block.config()
@@ -129,8 +146,42 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             :error -> field.value
           end
 
-        BlockType.put_value(config, ViewModel.Field.value_path(field), value)
+        path = ViewModel.Field.value_path(field)
+
+        if omitted?(field.type, value) do
+          drop_value(config, path)
+        else
+          BlockType.put_value(config, path, value)
+        end
       end)
+    end
+
+    # A `:duration` is the one field type with a value that means "no key".
+    # The reading is `StatifierBlocks.DurationInput`'s so that the control
+    # and this function cannot disagree about which strings are empty.
+    @spec omitted?(StatifierBlocks.BlockType.field_type(), term()) :: boolean()
+    defp omitted?(:duration, value), do: not DurationInput.set?(value)
+    defp omitted?(_type, _value), do: false
+
+    # `BlockType` has `put_value/3` and no counterpart, because until now
+    # nothing needed one. Deleting is the same walk with `Map.delete/2` at
+    # the end, expressed through the public pair rather than by re-deriving
+    # the traversal: a path naming something that is not there leaves the
+    # config alone, which is what an omitted key already looks like.
+    @spec drop_value(StatifierBlocks.Block.config(), BlockType.value_path()) ::
+            StatifierBlocks.Block.config()
+    defp drop_value(config, [key]) when is_map(config) and is_binary(key),
+      do: Map.delete(config, key)
+
+    defp drop_value(config, path) do
+      {parent, last} = Enum.split(path, -1)
+
+      with [key] when is_binary(key) <- last,
+           {:ok, map} when is_map(map) <- BlockType.fetch_value(config, parent) do
+        BlockType.put_value(config, parent, Map.delete(map, key))
+      else
+        _other -> config
+      end
     end
 
     # One place spells the severity modifiers, and it is outside

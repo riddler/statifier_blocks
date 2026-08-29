@@ -14,15 +14,28 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `:boolean` | checkbox |
     | `{:select, choices}` | select, choices in declared order |
     | `:expression` | single-line source input |
-    | `:duration` | structured value/unit control emitting an ISO-8601 string |
+    | `:duration` | one text control; predicator duration strings primary, with on-screen examples |
     | `{:list, t}` | repeatable rows of `t`'s renderer, with add and remove |
 
-    `:duration` emits a string rather than a number because ADR-0001
-    decision 6 forbids floats in config and "1.5 hours" has to be `PT1H30M`.
-    The control exists so the author does not have to know that. A stored
-    duration this module cannot parse is **not** discarded: it falls back to
-    a plain text input carrying the original string, on the same principle
-    as decision 12 - the editor never loses data it did not author.
+    `:duration`'s row is decision 9 as amended 2026-08-29. One text control,
+    not a value/unit pair and not a pair with an escape hatch beside it: the
+    compound control could not spell `PT1H30M` at all, and a control plus an
+    escape hatch is two ways to say one thing with a rule about which wins.
+    Predicator duration strings are primary with the examples on screen,
+    ISO-8601 stays accepted, and an empty field omits the key.
+
+    What the typed text means is `StatifierBlocks.DurationInput`'s, not this
+    module's - it is a function of the text alone, so it is asserted with
+    LiveView absent. Where an omitted key is omitted is
+    `StatifierBlocks.Editor.ConfigForm`'s, which owns where a decoded value
+    is written. This module renders the control and shows the refusal.
+
+    The refusal shown beneath a `:duration` is the **inline** check, and it
+    is earlier than decision 9's gate rather than a second one: the gate
+    still decides what reaches the document, and the inline sentence tells
+    the author which spelling they are failing while they are still typing
+    it. Nothing here is stored - the stored form is the author's string
+    verbatim, byte for byte.
 
     Two control types carry a **placeholder**, and neither is chosen by key
     or by type name: an `:expression` says what kind of thing belongs in it,
@@ -50,13 +63,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
-    alias StatifierBlocks.ViewModel
-
-    @units ~w(seconds minutes hours days)
-
-    @doc "The unit names the `:duration` control offers, largest last."
-    @spec units() :: [String.t()]
-    def units, do: @units
+    alias StatifierBlocks.{DurationInput, ViewModel}
 
     attr(:field, ViewModel.Field, required: true)
     attr(:target, :any, required: true)
@@ -162,34 +169,28 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp control(%{field: %ViewModel.Field{type: :duration}} = assigns) do
-      assigns = assign(assigns, :parsed, parse_duration(assigns.field.value))
+      assigns =
+        assigns
+        |> assign(:reading, DurationInput.read(assigns.field.value))
+        |> assign(:examples_id, input_id(assigns.field) <> "-examples")
 
       ~H"""
-      <div :if={@parsed} class="sb-field__row">
-        <input
-          class="sb-field__input"
-          type="number"
-          step="1"
-          min="0"
-          id={input_id(@field)}
-          name={input_name(@field) <> "[value]"}
-          value={elem(@parsed, 0)}
-        />
-        <select class="sb-field__input" name={input_name(@field) <> "[unit]"}>
-          <option :for={unit <- units()} value={unit} selected={elem(@parsed, 1) == unit}>
-            {unit}
-          </option>
-        </select>
-      </div>
       <input
-        :if={is_nil(@parsed)}
-        class="sb-field__input sb-field__input--expression"
+        class="sb-field__input sb-field__input--duration"
         type="text"
         id={input_id(@field)}
-        name={input_name(@field) <> "[raw]"}
+        name={input_name(@field)}
         value={to_text(@field.value)}
-        placeholder="PT1H30M"
+        placeholder={DurationInput.placeholder()}
+        spellcheck="false"
+        aria-describedby={@examples_id}
       />
+      <p class="sb-field__examples" id={@examples_id}>
+        Try {Enum.join(DurationInput.examples(), ", ")}, or ISO-8601 like PT1H30M.
+      </p>
+      <p :if={@reading.form == :invalid} class="sb-field__refusal" data-duration-refusal>
+        {@reading.message}
+      </p>
       """
     end
 
@@ -310,73 +311,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     def decode(:boolean, raw), do: raw in [true, "true", "on", "1"]
 
-    def decode(:duration, %{"raw" => raw}), do: raw
-
-    def decode(:duration, %{"value" => value, "unit" => unit}) do
-      case decode(:integer, value) do
-        int when is_integer(int) and int >= 0 -> format_duration(int, unit)
-        _other -> to_text(value)
-      end
-    end
-
     def decode({:list, inner}, raw) when is_list(raw), do: Enum.map(raw, &decode(inner, &1))
     def decode({:list, inner}, raw), do: [decode(inner, raw)]
     def decode(_type, raw) when is_binary(raw), do: raw
     def decode(_type, raw), do: raw
-
-    @doc """
-    An ISO-8601 duration from a whole number of one unit. The inverse of
-    `parse_duration/1` on everything `parse_duration/1` accepts.
-    """
-    @spec format_duration(non_neg_integer(), String.t()) :: String.t()
-    def format_duration(n, "days"), do: "P#{n}D"
-    def format_duration(n, "hours"), do: "PT#{n}H"
-    def format_duration(n, "minutes"), do: "PT#{n}M"
-    def format_duration(n, _seconds), do: "PT#{n}S"
-
-    @doc """
-    An ISO-8601 duration as `{count, unit}` in the largest unit that divides
-    it evenly, or `nil` for anything this control cannot represent - a value
-    with a month or year component, a fractional one, or a string that is
-    not a duration at all. `nil` is what routes the value to the raw text
-    fallback rather than to the structured control, which is how a duration
-    the editor did not author survives being rendered.
-    """
-    @spec parse_duration(term()) :: {non_neg_integer(), String.t()} | nil
-    def parse_duration(value) when is_binary(value) do
-      case Regex.run(~r/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/, value) do
-        nil -> nil
-        [^value] -> nil
-        [_all | parts] -> parts |> total_seconds() |> largest_unit()
-      end
-    end
-
-    def parse_duration(_value), do: nil
-
-    @spec total_seconds([String.t()]) :: non_neg_integer()
-    defp total_seconds(parts) do
-      [days, hours, minutes, seconds] =
-        Enum.map(0..3, fn index -> parts |> Enum.at(index, "") |> int_or_zero() end)
-
-      days * 86_400 + hours * 3600 + minutes * 60 + seconds
-    end
-
-    @spec int_or_zero(String.t() | nil) :: non_neg_integer()
-    defp int_or_zero(nil), do: 0
-    defp int_or_zero(""), do: 0
-    defp int_or_zero(text), do: String.to_integer(text)
-
-    @spec largest_unit(non_neg_integer()) :: {non_neg_integer(), String.t()}
-    defp largest_unit(0), do: {0, "seconds"}
-
-    defp largest_unit(total) do
-      cond do
-        rem(total, 86_400) == 0 -> {div(total, 86_400), "days"}
-        rem(total, 3600) == 0 -> {div(total, 3600), "hours"}
-        rem(total, 60) == 0 -> {div(total, 60), "minutes"}
-        true -> {total, "seconds"}
-      end
-    end
 
     @doc "The DOM id for a field's control. Part of decision 7's DOM contract."
     @spec input_id(ViewModel.Field.t()) :: String.t()
