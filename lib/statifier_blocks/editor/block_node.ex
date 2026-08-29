@@ -45,6 +45,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     quietly dropped it would turn a missing palette entry into silent data
     loss.
 
+    ## The accent, and why the stylesheet still names no type
+
+    A palette entry may declare `accent_token`, the NAME of a `--sb-*`
+    custom property (ADR-0005 decision 14's amendment). This component
+    stamps it on the card and rebinds `--sb-block-accent` there; the
+    stylesheet reads that property in exactly two rules, an icon tile and a
+    card stripe, so adding a block type with its own identity adds no CSS
+    and no branch. The value is the theme's - a descriptor carries a name,
+    never a colour - and a name that does not validate resolves to the
+    editor's accent rather than to a broken card.
+
     ## The badge
 
     `findings_count` covers the whole subtree, so a collapsed node still shows
@@ -82,8 +93,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           "sb-node",
           @node.block_id == @selected_id && "sb-node--selected",
           unresolvable?(@node) && "sb-node--unresolvable",
+          ViewModel.boundary?(@node) && "sb-node--boundary",
           @class
         ]}
+        data-sb-block-accent={accent_token(@node)}
+        style={accent_style(@node)}
         id={"sb-block-" <> @node.block_id}
         data-block-id={@node.block_id}
         data-type={@node.type}
@@ -157,6 +171,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
+    # 14d's consumption side, and the only place a card learns it has an
+    # identity. `ViewModel.accent_token/1` decides whether the palette entry
+    # declared a usable one; this renders the rebinding on that card and
+    # nothing else, so the stylesheet still reads one property and still
+    # names no block type.
+    @spec accent_token(ViewModel.Node.t()) :: String.t() | nil
+    defp accent_token(%ViewModel.Node{entry: entry}), do: ViewModel.accent_token(entry)
+
+    @spec accent_style(ViewModel.Node.t()) :: String.t() | nil
+    defp accent_style(node) do
+      case accent_token(node) do
+        nil -> nil
+        name -> "--sb-block-accent: var(#{name}, var(--sb-accent))"
+      end
+    end
+
     @spec unresolvable?(ViewModel.Node.t()) :: boolean()
     defp unresolvable?(%ViewModel.Node{status: {:unresolvable, _reason}}), do: true
     defp unresolvable?(%ViewModel.Node{}), do: false
@@ -169,8 +199,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp layout_class(%ViewModel.Node{entry: %{layout: :columns}}), do: "sb-node__slots--columns"
     defp layout_class(%ViewModel.Node{}), do: "sb-node__slots--stack"
 
+    # One place spells the severity modifiers, and it is outside
+    # `StatifierBlocks.Editor.*` so it is asserted with LiveView absent
+    # (ADR-0005 decision 11, amended 2026-08-29 for `:info`).
     @spec severity_class(StatifierBlocks.Finding.t()) :: String.t()
-    defp severity_class(%StatifierBlocks.Finding{severity: :warning}), do: "sb-finding--warning"
-    defp severity_class(%StatifierBlocks.Finding{}), do: "sb-finding--error"
+    defp severity_class(finding), do: StatifierBlocks.Finding.severity_class(finding)
   end
 end

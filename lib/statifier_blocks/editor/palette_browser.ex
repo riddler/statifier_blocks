@@ -77,6 +77,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               <button
                 type="button"
                 class="sb-palette__pick"
+                data-sb-block-accent={ViewModel.accent_token(entry.entry)}
+                style={accent_style(entry.entry)}
                 phx-click="palette-pick"
                 phx-target={@target}
                 phx-value-type={entry.type_name}
@@ -91,6 +93,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         </div>
       </section>
       """
+    end
+
+    # The palette row carries the same accent as the card the pick produces,
+    # so a block type's identity is the same before and after it is in the
+    # document. See `StatifierBlocks.Editor.BlockNode` for the seam.
+    @spec accent_style(map()) :: String.t() | nil
+    defp accent_style(entry) do
+      case ViewModel.accent_token(entry) do
+        nil -> nil
+        name -> "--sb-block-accent: var(#{name}, var(--sb-accent))"
+      end
     end
 
     @doc """

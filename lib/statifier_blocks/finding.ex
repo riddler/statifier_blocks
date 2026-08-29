@@ -44,8 +44,25 @@ defmodule StatifierBlocks.Finding do
   @typedoc "Where this finding's rule lives. See `StatifierBlocks.ViewModel`'s moduledoc."
   @type source :: :config | :arity | :assignability | :resolution | :lint
 
+  @typedoc """
+  Three-valued since the 2026-08-29 amendment to ADR-0005 decision 11.
+
+  `:error` says the document does not compile. `:warning` says it compiles
+  and something may not behave as intended - the record's own example, an
+  invoke type with no registered handler, is correct the moment the host
+  registers one. `:info` says **this is worth the author's attention and
+  nothing is wrong**, which is the line decision 11 could not draw before.
+
+  Amendment `11b` reserves `:info` to the `:lint` source, and states
+  honestly that no lint produces one today: it is accepted as the place a
+  real advisory will land. It changes no verdict - a document whose only
+  findings are `:info` is exactly as compilable as one with none, and any
+  consumer gating on findings gates on `:error`, as it did before.
+  """
+  @type severity :: :error | :warning | :info
+
   @type t :: %__MODULE__{
-          severity: :error | :warning,
+          severity: severity(),
           anchor: anchor(),
           source: source(),
           message: String.t()
@@ -179,6 +196,30 @@ defmodule StatifierBlocks.Finding do
        }}
     end
   end
+
+  @doc """
+  The modifier class a finding's severity renders under (ADR-0005 decision
+  11, amended 2026-08-29 for `:info`).
+
+  It lives here rather than in each of the five components that render a
+  finding, because it was five copies of the same two clauses and the
+  amendment would have made it five copies of three. Decision 14's `sb-`
+  prefix is a contract, so the one place that spells these names is worth
+  having; and this module is outside `StatifierBlocks.Editor.*`, so a class
+  name here costs a headless host nothing and is asserted with LiveView
+  absent.
+
+  `:info` renders in a neutral advisory chrome, distinct from the warning
+  family and never in the error family (amendment `11c`).
+
+      iex> StatifierBlocks.Finding.severity_class(%StatifierBlocks.Finding{
+      ...>   anchor: {:block, "blk_1"}, source: :lint, message: "x", severity: :info})
+      "sb-finding--info"
+  """
+  @spec severity_class(t()) :: String.t()
+  def severity_class(%__MODULE__{severity: :warning}), do: "sb-finding--warning"
+  def severity_class(%__MODULE__{severity: :info}), do: "sb-finding--info"
+  def severity_class(%__MODULE__{}), do: "sb-finding--error"
 
   @doc """
   Adapts every finding in `findings`, partitioning into adapted findings

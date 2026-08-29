@@ -315,6 +315,81 @@ defmodule StatifierBlocks.ViewModel do
 
   # `:resolution` from a block that does not resolve; `:config` from
   # `validate_config/1` on one that does. One pass, pre-order.
+  @accent_token ~r/^--sb-[a-z0-9]+(-[a-z0-9]+)*$/
+
+  @doc """
+  The custom-property NAME a palette entry declares as its block type's
+  accent, or `nil` when it declared none or declared one this package will
+  not put in a style attribute (ADR-0005 decision 14's `accent_token`).
+
+  This is the **consumption** half of that seam. The editor stamps the name
+  on the block's card and its palette row and rebinds `--sb-block-accent`
+  there; two rules in the stylesheet read that property - an icon tile and
+  a card stripe - and they are the only two, which is what keeps a block
+  type's identity from becoming a rule per type. The editor never learns a
+  type name at any point in that path.
+
+  A descriptor carries a name and never a colour, on the same discipline
+  `icon` is under: a block type naming a hex value would be deciding what
+  it looks like in themes it has never seen. The value is the theme's.
+
+  Total, and validating for the reason the spike's `theme.js` was: the
+  return value is interpolated into a `style` attribute, so anything but an
+  anchored `--sb-*` name resolves to `nil` and the card falls back to the
+  editor's accent. A typo in a host's registry degrades to the default
+  rather than producing a broken card or an injection point - ADR-0002
+  amendment B3's discipline, arriving at one more key.
+
+      iex> StatifierBlocks.ViewModel.accent_token(%{accent_token: "--sb-accent-invoke"})
+      "--sb-accent-invoke"
+
+      iex> StatifierBlocks.ViewModel.accent_token(%{accent_token: "red; background: url(x)"})
+      nil
+
+      iex> StatifierBlocks.ViewModel.accent_token(%{})
+      nil
+  """
+  @spec accent_token(map()) :: String.t() | nil
+  def accent_token(entry) when is_map(entry) do
+    case Map.get(entry, :accent_token) do
+      name when is_binary(name) -> if Regex.match?(@accent_token, name), do: name
+      _undeclared_or_malformed -> nil
+    end
+  end
+
+  def accent_token(_entry), do: nil
+
+  @doc """
+  Whether a container draws as a boundary box: true when ANY of its slots
+  declares a rail style (ADR-0005 amendment 10c, as amended by 10h).
+
+  The partition is the **rail** partition, `:secondary` and `:failure`
+  alike, not the `:secondary` partition. 10c's stated reason - an attached
+  rule is about a region, so the region needs a visible edge - is as true of
+  a failure path as of an interrupt, and deriving both the rail placement
+  and the boundary from one partition is what kept decision 13's recursion
+  from acquiring a branch.
+
+  Drawing a box around every container instead turns a deeply nested
+  document into nested rectangles that read as noise, which is why this
+  reads metadata rather than depth.
+  """
+  @spec boundary?(Node.t()) :: boolean()
+  def boundary?(%Node{slots: slots}), do: Enum.any?(slots, &rail?/1)
+
+  @doc """
+  Whether one slot is placed as an attached rail rather than in the body
+  flow: `:secondary` and `:failure`, and nothing else (amendment 10h's
+  placement row).
+
+  10i's posture applies above this: a `slot_style` value this editor does
+  not know resolves to `:primary` before it ever reaches here, so a host
+  declaring against a newer record gets an ordinary body slot rather than a
+  raise or a dropped slot.
+  """
+  @spec rail?(Slot.t()) :: boolean()
+  def rail?(%Slot{style: style}), do: style in [:secondary, :failure]
+
   @spec derived_findings(Document.t(), Palette.t()) :: [Finding.t()]
   defp derived_findings(%Document{} = document, %Palette{} = palette) do
     document
