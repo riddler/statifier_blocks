@@ -1,6 +1,6 @@
 # ADR-0004: One block, one state - a deterministic compile carrying a provenance map
 
-Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings); decision 2 amended - outcome-tagged finals (accepted 2026-08-29, operator ruling); child-use compile and core.subchart routing amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 93); delayed-send cancel emission amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95); core.foreach sequential loop amendment F1-F6 (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 94); outcome_event/2 tagged-return ratification under 2e (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 111); core.parallel complete-first amendment P1-P3 (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 112); root-termination note, the terminate option (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 123); host-declared-roots note, the declare option (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 124)
+Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings); decision 2 amended - outcome-tagged finals (accepted 2026-08-29, operator ruling); child-use compile and core.subchart routing amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 93); delayed-send cancel emission amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95); core.foreach sequential loop amendment F1-F6 (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 94); outcome_event/2 tagged-return ratification under 2e (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 111); core.parallel complete-first amendment P1-P3 (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 112); root-termination note, the terminate option (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 123); host-declared-roots note, the declare option (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 124); send-id minting and the config_value_span finding field amendment (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 130)
 
 ## Context
 
@@ -1823,7 +1823,7 @@ determinism, provenance and F6 refusal are shared, and this note is what F6's
 
 ## Amendment (2026-08-29): the send id is minted through the context, and decision 10's finding shape gains `config_value_span`
 
-**Status: proposed (2026-08-29).** This section is additive: nothing above it
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015b grant, PR 130).** This section is additive: nothing above it
 is edited, no accepted decision changes, and the header line's status history
 is the conductor's to extend. It records two things the code already does and
 this record does not yet say: how a delayed send's `id` is minted, which the
