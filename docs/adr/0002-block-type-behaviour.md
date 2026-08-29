@@ -1496,3 +1496,234 @@ existed - and this section makes it false, so the same change replaces it with
 a pointer at this row, exactly as section G did for `core.assign`. The
 module's other recorded notes are untouched, including the cancel note, which
 the send-id amendment rules on and a separate bead brings into line.
+
+## Amendment (2026-08-29): the `core.subchart` and `core.foreach` rows, and `core.parallel`'s `complete` key
+
+**Status: proposed.** Section G3 of this date closed the `core.send` gap and
+named the one type still owed a row: `core.subchart`, which shipped later the
+same day with its routing recorded in ADR-0004's amendment of that date and no
+decision-10 row of its own. `core.foreach` shipped after G3 was written and is
+in exactly that position too. And `core.parallel`, whose original row lists one
+config key, has since gained a second - `complete` - that the row does not
+carry. This section writes the two rows and records the key.
+
+It is additive. Nothing above it is edited: decision 10's original seven-row
+table stands, the 2026-08-28 amendment's section D stands, sections G and G2
+stand, and G3's count sentence stands exactly as accepted - G8 below records
+the count the table now carries rather than rewriting that sentence.
+
+Every row is read off the shipped module rather than off the bead that proposed
+it, and each quoted callback names its file and line so a reader can diff the
+record against the source.
+
+### G5. `core.subchart` joins the core vocabulary
+
+| Block type | `slots(config)` | Config schema | `outcomes(config)` | Notes |
+|---|---|---|---|---|
+| `core.subchart` | one `zero_or_one` slot per declared outcome, named `on_<outcome>`, in declaration order with `on_error` last | `chart`: `:string`, required; `outcomes`: `:string`, optional; `assign_to`: `:string`, optional; `params`: `:string`, optional | the outcomes the referenced chart declares, as the author listed them, with `error` appended unless they listed it | a step that runs another chart through one host-registered invoke type, and finishes at the outcome the child reported |
+
+In full, so a reader need not open the module. `current_version/0` is `1`
+(`lib/statifier_blocks/core/subchart.ex:117`). `slots/1` (`:144`) maps the
+outcome names through the `on_` slot prefix, each with arity `zero_or_one` -
+an outcome path is one continuation, not a list of them, which is
+`core.invoke`'s reason. `outcomes/1` (`:156`) returns those same names with
+their labels, so section A's default does not apply and the type's outcome list
+is the author's. `io/1` (`:248`) is
+`%{kinds: [:step], produces: :unknown, slot_accepts: accepts}`, where `accepts`
+maps every slot to `[:step]`; `produces` is `:unknown` rather than a join over
+the subtrees reaching each outcome, which is the lattice ADR-0003 decision 4
+refuses to build, and there is no `consumes` because a subchart reads its
+inputs through `params`. The invoke type is a constant rather than a config
+field: `invoke_type/0` (`:132`) returns `"statifier_blocks:subchart"` (`:106`),
+because *which handler* starts a child session is deployment state rather than
+authoring state (st-ADR-0051).
+
+`config_schema/1` (`:163`), verbatim:
+
+```elixir
+def config_schema(_config),
+  do: [
+    %{
+      key: "chart",
+      type: :string,
+      label: "Run this chart",
+      required?: true,
+      default: ""
+    },
+    %{
+      key: "outcomes",
+      type: :string,
+      label: "It can finish with",
+      required?: false,
+      default: ""
+    },
+    %{
+      key: "assign_to",
+      type: :string,
+      label: "Write the outcome to",
+      required?: false,
+      default: ""
+    },
+    %{
+      key: "params",
+      type: :string,
+      label: "Send along",
+      required?: false,
+      default: ""
+    }
+  ]
+```
+
+**G5a. What it emits is ADR-0004's, not this row's.** A compiled
+`core.subchart` is a compound state whose inner state carries one `<invoke>`
+with an `id`, an `src` stamped as coming from `chart`, and the `type` above,
+plus one `<param>` per parsed `params` row; every declared outcome gets one
+conditioned `done.invoke` transition in declaration order, and the
+unconditioned one comes last and lands on the first declared outcome, so a
+subchart that declares nothing behaves exactly like a `core.invoke`. The
+`error.communication.invoke` route is emitted only when the `on_error` slot is
+occupied. This row records that the type declares that shape; the emitted bytes
+are ADR-0004's, as G2c says for `core.send`.
+
+### G6. `core.foreach` joins the core vocabulary
+
+| Block type | `slots(config)` | Config schema | `outcomes(config)` | Notes |
+|---|---|---|---|---|
+| `core.foreach` | `[{"body", :any, "For each item"}]` | `items`: `:string`, required, `datamodel_path?: true`; `item_as`: `:string`, required, default `"item"`; `index_as`: `:string`, optional | default (`done`) | a container whose body runs once per item of a datamodel list; the body's states exist once however long the list is |
+
+In full. `current_version/0` is `1` (`lib/statifier_blocks/core/foreach.ex:162`).
+`slots/1` (`:169`) is total and constant:
+`def slots(_config), do: [{@body_slot, :any, "For each item"}]`, with
+`@body_slot` being `"body"` (`:152`). There is no `outcomes/1`, so section A's
+default applies and the type has the single outcome `done`. `io/1` (`:271`) is
+`def io(_config), do: %{kinds: [:step], slot_accepts: %{@body_slot => [:step]}}`,
+which is `core.group`'s shape, with `produces` absent rather than `:unknown`
+because a foreach has one outcome and so no join to refuse, and `consumes`
+absent because `items` is a config path rather than a value arriving through
+the type flow.
+`items` carries decision 7's `datamodel_path?: true`, as `core.assign`'s `path`
+does.
+
+`config_schema/1` (`:172`), verbatim, its source comment included because it is
+where the read-only case is argued:
+
+```elixir
+def config_schema(_config),
+  do: [
+    %{
+      key: "items",
+      type: :string,
+      label: "For each item in",
+      required?: true,
+      default: "",
+      # A foreach only ever reads this path. ADR-0002 decision 7's key is
+      # a boolean, so "reads" is not expressible in the declaration; the
+      # editor's lint is the same either way (the path must be one the
+      # host's datamodel declares).
+      datamodel_path?: true
+    },
+    %{
+      key: "item_as",
+      type: :string,
+      label: "Call the item",
+      required?: true,
+      default: @default_item
+    },
+    %{
+      key: "index_as",
+      type: :string,
+      label: "Call the position (optional)",
+      required?: false,
+      default: ""
+    }
+  ]
+```
+
+`@default_item` is `"item"` (`:154`).
+
+**G6a. Two compiler-owned roots, which no other core row has.** A compiled
+`core.foreach` is a plain Appendix D loop: a compound state whose `<onentry>`
+snapshots the list into `s_blk_<id>__items` and zeroes a cursor in
+`s_blk_<id>__i`, an inner head state that assigns the item (and the position,
+when `index_as` is set) and either leaves for the block's `<final>` or enters
+the body, and a loop-back transition that increments the cursor. Both roots are
+minted through `Context.role_id/2` and declared through
+`Compiler.DeclaredRoots`, so decision 3's uniqueness keeps them out of any name
+an author can write. The loop-back transition is `type="internal"` and must be:
+an external transition exits and re-enters its own source, which would re-run
+the `<onentry>` and reset the cursor on every pass. The bytes are ADR-0004's
+2026-08-29 amendment (F1 through F6); what this row records is that the type
+declares the callbacks above.
+
+### G7. `core.parallel`'s `complete` key, recorded
+
+Decision 10's row for `core.parallel` gives its config schema as "`lanes`: a
+list of lane names". That was the whole schema when the row was written and is
+no longer: the type gained a second key. The row is not edited; the schema it
+names is superseded by this one, which is the shipped `config_schema/1`
+(`lib/statifier_blocks/core/parallel.ex:76`) in full:
+
+```elixir
+def config_schema(_config),
+  do: [
+    %{
+      key: "lanes",
+      type: {:list, :string},
+      label: "Lanes",
+      required?: true,
+      default: []
+    },
+    %{
+      key: "complete",
+      type:
+        {:select,
+         [
+           {"all", "All - when every lane is done"},
+           {"first", "First - when any one lane is done"}
+         ]},
+      label: "Continue",
+      required?: false,
+      default: "all"
+    }
+  ]
+```
+
+The permitted values are `["all", "first"]` (`:57`) and the default is `"all"`.
+Nothing else in the row changes: `slots/1` is still one `:any` slot per
+well-formed lane in config order, and the type still has the default single
+outcome.
+
+**G7a. The key is read through its default, so no stored block moved.** Every
+`core.parallel` stored before the key existed decodes, validates, and compiles
+to the byte it did before, because `complete` is absent and absent reads as
+`"all"` everywhere. A stored `null` is *not* an absent key and is still refused
+(ADR-0001 decision 6): `Map.get/3` hands the `nil` straight to the one-of
+check, which rejects it with `pick "all" or "first"`.
+
+**G7b. What the two values emit.** Under `"all"` the wrapper carries a single
+`done.state.<run>` transition to the block's `<final>`, which is the shape the
+original row's emission has always had - a `<parallel>` is done when every
+region is, so no join logic of its own is needed. Under `"first"` that single
+transition is replaced by one transition per lane, placed on the `<parallel>`
+element itself and taken on that lane's own `done.state.<region id>`; they are
+external, they come before the regions, and the `done.state.<run>` transition
+is dropped rather than kept because it could never be taken. A parallel with no
+lanes emits no `<parallel>` at all under either value, so `complete` moves no
+byte of that case. Those bytes are ADR-0004's 2026-08-29 amendment (P1, P2);
+this section records only that the config key declaring the choice is in the
+shipped schema.
+
+### G8. The count, corrected
+
+With G5 and G6 the table records **thirteen** types: the seven of decision 10,
+the two of section D, `core.assign` from section G, `core.send` from section
+G2, and these two. `StatifierBlocks.Palette.core_types/0` registers
+**thirteen** (`lib/statifier_blocks/palette.ex:87-103`). The table and the
+palette now agree, and no type is owed a row.
+
+G3 said the table records eleven and the palette twelve. Both halves were true
+when G3 was accepted and neither is now - `core.foreach` registered after that
+section was written, and G5 and G6 add the two rows. That sentence is not
+edited, per this record's amendment convention; it is **superseded by this
+section**, and a reader who reaches G3 should carry the counts above rather
+than the ones there.
