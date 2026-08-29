@@ -44,15 +44,28 @@ defmodule StatifierBlocks.Datamodel do
       dropped;
     * a `MapSet` of strings - the normalized form, idempotently.
 
-  It accepts nothing else. The spike's typed three-scope datamodel document
-  (`spike/fixtures/datamodel.json`) is **not** read here, on purpose: no
-  accepted record defines that shape, it is filed as a Proposed record
-  (`sb-g8m`) still being checked against statifier-ui's ADR-0006 datasets,
-  and a normalizer written against it here would ship an unratified
-  document schema as a side effect of a lint. When that record is accepted,
-  the derivation is one total function from it to this set, which is
-  exactly what 11e says: "This section is written against the set, so it
-  holds under either."
+  It accepts nothing else. The typed three-scope datamodel document
+  (`spike/fixtures/datamodel.json` is an instance of it) is **not** read
+  here, on purpose: the record that defines it is sb ADR-0006, accepted
+  2026-08-29, and nothing in this package implements that record's
+  projection yet, so a normalizer written here would run ahead of the
+  derivation ADR-0006 specifies rather than implement it. The derivation is
+  one total function from the document to this set, which is exactly what
+  11e says: "This section is written against the set, so it holds under
+  either."
+
+  [Correction 2026-08-29, sb-l0g: this paragraph read "no accepted record
+  defines that shape, it is filed as a Proposed record (`sb-g8m`) still
+  being checked against statifier-ui's ADR-0006 datasets, and a normalizer
+  written against it here would ship an unratified document schema as a
+  side effect of a lint. When that record is accepted, the derivation is
+  ...". The record landed: sb ADR-0006, "The datamodel document is a typed,
+  three-scope declaration, and the declared-path set is its projection",
+  accepted 2026-08-29 (PR 101), and the sui-ADR-0006 cross-check it was
+  waiting on was done in that record. Stale status only. What this module
+  accepts is unchanged - `declared_paths/1` still takes exactly the three
+  shapes listed above - and building ADR-0006's projection is separate
+  work, not this correction's.]
 
   Anything else - a bare map, a struct, a number - normalizes to `nil`, so
   a host that passes a shape this package does not know gets the behaviour

@@ -1774,9 +1774,17 @@ severity, not an empty pane, not a "datamodel unknown" row.
 The input shape is not this record's to fix. The shipped editor takes an
 optional datamodel that normalizes to a set of declared paths, which is the
 whole contract this check needs; the typed, scoped datamodel *document* is a
-separate Proposed record (`sb-g8m`), and the declared-path set is derivable
+separate accepted record, ADR-0006, and the declared-path set is derivable
 from it by one total function. This section is written against the set, so it
-holds under either.
+holds under either. [Correction 2026-08-29, sb-l0g: was "a separate Proposed
+record (`sb-g8m`)". That record landed as ADR-0006, "The datamodel document is
+a typed, three-scope declaration, and the declared-path set is its
+projection", accepted 2026-08-29 (PR 101) - it names this paragraph as the
+deferral it discharges. Stale status only; the deferral itself, and the
+sentence that this section is written against the set, are unchanged. Note
+that ADR-0006's Context quotes this paragraph in its pre-correction wording,
+on purpose: it is quoting the deferral as it stood when the record was
+proposed.]
 
 **11g. Not a separate channel.** The datamodel pane grows no advisory list of
 its own, and no consumer gets a second stream to merge with findings. The
