@@ -35,10 +35,12 @@ import {
   anchorLabel,
   canonicalJson,
   configFormFor,
+  createDraftStore,
   durationFrom,
   durationParts,
   durationUnits,
   moveRow,
+  pendingKeys,
   removeMapRow,
   removeRow,
   renameMapRow,
@@ -71,16 +73,37 @@ const SEVERITY_LABELS = { error: "Error", warning: "Warning", info: "Note" };
  * know something it does not.
  */
 export function createInspector({ mounts, host }) {
+  /*
+   * sb-5ow's draft store. Held by the inspector rather than by the session,
+   * because a draft is in-progress FORM state: ADR-0005 decision 9 puts it in
+   * transient assigns explicitly, and a draft that lived on the session would
+   * be a config the document model knows about but the gate never saw.
+   */
+  const drafts = createDraftStore();
+  let lastDocumentId = null;
+
   function refresh() {
     const state = host.state();
 
-    renderConfig(mounts.config, state, host);
+    // A different document is a different set of block ids, so every
+    // outstanding draft is about blocks that are no longer on screen. The
+    // only automatic clear the store has.
+    const documentId = state?.session?.document?.id ?? null;
+    if (documentId !== lastDocumentId) {
+      drafts.reset();
+      lastDocumentId = documentId;
+    }
+
+    renderConfig(mounts.config, state, host, { drafts, refresh });
     renderFindings(mounts.findings, state, host);
     renderBadge(mounts.findingsBadge, state);
-    renderCondition(mounts.condition, state, host);
+    renderCondition(mounts.condition, state, host, { drafts, refresh });
   }
 
-  return { refresh };
+  // `drafts` is returned so a caller can ask whether anything is outstanding -
+  // the self-test does, and a shell that wanted to warn before closing a
+  // document could. Nothing outside this file may stage or clear one.
+  return { refresh, drafts };
 }
 
 /* ================================================================== badge */
@@ -106,7 +129,7 @@ function renderBadge(badge, state) {
 
 /* ============================================================ config pane */
 
-function renderConfig(mount, state, host) {
+function renderConfig(mount, state, host, ctx) {
   if (!mount) return;
 
   const node = state?.session ? selected(state.session) : null;
@@ -121,7 +144,24 @@ function renderConfig(mount, state, host) {
     return;
   }
 
-  const form = configFormFor(state.session.registry, node, state.findings);
+  /*
+   * The form is built over the DRAFT when one is outstanding, so the fields an
+   * author already filled in keep showing what they typed after a re-render -
+   * a selection that went away and came back, an edit to a different block, an
+   * undo elsewhere in the document. Without this the draft would accumulate
+   * correctly and the screen would still show the stored config, which is the
+   * same lie the bug reported, one layer further in.
+   *
+   * The findings are the document's, computed against the STORED config. That
+   * is honest rather than convenient: they are what the canvas and the
+   * findings panel are showing, and a draft that has not been offered to the
+   * gate yet has no findings of its own. The refusal the gate DID return is
+   * rendered separately, under the field, by `markRefused`.
+   */
+  const draftConfig = ctx.drafts.read(node.id, node.config);
+  const formNode = draftConfig === node.config ? node : { ...node, config: draftConfig };
+
+  const form = configFormFor(state.session.registry, formNode, state.findings);
 
   if (form.readOnly) {
     mount.replaceChildren(...readOnlyConfig(form));
@@ -139,16 +179,95 @@ function renderConfig(mount, state, host) {
    * which is the case that genuinely has no form.
    */
   const memo = focusMemo(mount);
+  const scope = { ...ctx, mount };
 
   mount.replaceChildren(
     el(
       "div",
-      { class: "sb-form" },
-      form.fields.map((field) => fieldElement(field, form, host))
+      { class: "sb-form", "data-pending-config": String(ctx.drafts.pending(node.id)) },
+      [
+        pendingNotice(form, host, scope),
+        ...form.fields.map((field) => fieldElement(field, form, host, scope)),
+      ]
     )
   );
 
   restoreFocus(mount, memo);
+}
+
+/* ------------------------------------------------ the uncommitted-edits affordance */
+
+/*
+ * sb-5ow's affordance. A draft that accumulates silently is worse than the bug
+ * it fixes: the author would type two fields, see no revision move, and have
+ * no way to tell "held, waiting for the rest" from "dropped on the floor".
+ *
+ * So the pane says which fields are outstanding, says WHY nothing is stored
+ * yet in the vocabulary of the gate, and offers the one gesture that is
+ * otherwise unreachable - throwing the draft away and going back to what the
+ * document actually holds. The discard is not undo: a draft was never on the
+ * undo stack, because it was never a command.
+ */
+function pendingNotice(form, host, scope) {
+  if (!scope.drafts.pending(form.blockId)) return null;
+
+  const stored = storedConfig(host, form.blockId);
+  const keys = pendingKeys(scope.drafts.read(form.blockId, stored), stored);
+  const named = keys.map((key) => labelForKey(form, key));
+
+  const discard = el("button", {
+    class: "sb-button sb-button--quiet sb-form__pending-discard",
+    type: "button",
+    text: "Discard edits",
+  });
+
+  discard.addEventListener("click", () => {
+    scope.drafts.clear(form.blockId);
+    scope.refresh();
+  });
+
+  return el("div", { class: "sb-form__pending", "data-refusal-scope": "form", role: "status" }, [
+    el("div", { class: "sb-form__pending-head" }, [
+      el("span", { class: "sb-chip sb-chip--pending", text: "not stored yet" }),
+      el("div", { class: "sb-topbar__spacer" }),
+      discard,
+    ]),
+    el("p", {
+      class: "sb-form__pending-text",
+      text:
+        named.length === 0
+          ? "This block has edits that have not been stored yet."
+          : `${named.join(", ")} ${named.length === 1 ? "has" : "have"} been edited but not stored. ` +
+            "A config is stored whole and only when it validates, so keep filling the form in - " +
+            "everything you have typed lands as one edit the moment the block is valid.",
+    }),
+  ]);
+}
+
+/*
+ * Re-draws the notice WITHOUT a re-render, which is the constraint the whole
+ * config pane is built under: a refusal must not replace the controls, or the
+ * text the author is standing in disappears. See the file header.
+ */
+function syncPendingNotice(form, host, scope) {
+  const container = scope.mount?.querySelector(".sb-form");
+  if (!container) return;
+
+  for (const stale of container.querySelectorAll(".sb-form__pending")) stale.remove();
+
+  container.dataset.pendingConfig = String(scope.drafts.pending(form.blockId));
+
+  const notice = pendingNotice(form, host, scope);
+  if (notice) container.prepend(notice);
+}
+
+/*
+ * The field label for a config key, falling back to the key itself. A key with
+ * no field is possible - a draft can carry a value the type stopped declaring
+ * - and naming it raw beats dropping it from the sentence.
+ */
+function labelForKey(form, key) {
+  return form.fields.find((field) => field.key === key)?.label ?? key;
 }
 
 /*
@@ -180,7 +299,7 @@ function unresolvedNote(form) {
 
 /* ------------------------------------------------------------ one field */
 
-function fieldElement(field, form, host) {
+function fieldElement(field, form, host, scope) {
   const id = `sb-field-${form.blockId}-${cssSafe(field.key)}`;
 
   const label = el("label", { class: "sb-field__label", for: id }, [
@@ -198,13 +317,7 @@ function fieldElement(field, form, host) {
     [label]
   );
 
-  const commit = (value) => {
-    const config = writeAtPath(currentConfig(host, form.blockId), field.path, value);
-    const refusal = host.updateConfig(form.blockId, config);
-
-    if (refusal) markRefused(wrapper, refusal, field.key);
-    return refusal === null;
-  };
+  const commit = (value) => commitField(field, form, host, scope, wrapper, value);
 
   wrapper.append(control(field, id, commit, host, form));
 
@@ -837,7 +950,7 @@ function findingRow(finding, host) {
  * that something is wrong.
  */
 
-function renderCondition(mount, state, host) {
+function renderCondition(mount, state, host, ctx) {
   if (!mount) return;
 
   if (!state?.session) {
@@ -859,7 +972,14 @@ function renderCondition(mount, state, host) {
     return;
   }
 
-  const form = configFormFor(state.session.registry, node, state.findings);
+  // Over the draft too (sb-5ow). The condition surface edits the same block's
+  // config through the same command, so a pane that read the stored config
+  // while the config pane read the draft would give the same block two
+  // different answers about what it currently says.
+  const draftConfig = ctx.drafts.read(node.id, node.config);
+  const formNode = draftConfig === node.config ? node : { ...node, config: draftConfig };
+
+  const form = configFormFor(state.session.registry, formNode, state.findings);
   const fields = conditionFields(form);
 
   if (fields.length === 0) {
@@ -873,7 +993,7 @@ function renderCondition(mount, state, host) {
     el(
       "div",
       { class: "sb-conditions" },
-      fields.map((field) => conditionElement(field, form, host, index))
+      fields.map((field) => conditionElement(field, form, host, index, { ...ctx, mount }))
     )
   );
 }
@@ -905,7 +1025,7 @@ function conditionEmptyState(form) {
   ];
 }
 
-function conditionElement(field, form, host, index) {
+function conditionElement(field, form, host, index, scope) {
   const source = typeof field.value === "string" ? field.value : "";
   const tokens = annotateCondition(source, index);
   const paths = conditionPaths(source, index);
@@ -930,13 +1050,10 @@ function conditionElement(field, form, host, index) {
 
   const surface = el("div", { class: "sb-condition__surface" });
 
-  const commit = (value) => {
-    const config = writeAtPath(currentConfig(host, form.blockId), field.path, value);
-    const refusal = host.updateConfig(form.blockId, config);
-
-    if (refusal) markRefused(box, refusal, field.key);
-    return refusal === null;
-  };
+  // Same funnel as the config pane's fields, so a condition typed into a block
+  // whose other required fields are still empty accumulates into the same
+  // draft rather than being refused and lost (sb-5ow).
+  const commit = (value) => commitField(field, form, host, scope, box, value);
 
   function showEditor() {
     const input = el("textarea", {
@@ -1116,9 +1233,54 @@ function selected(session) {
  * otherwise have the second one write through a config the first had already
  * replaced, and silently undo it.
  */
-function currentConfig(host, blockId) {
+function storedConfig(host, blockId) {
   const node = findBlock(host.state().session.document, blockId);
   return node ? node.config : {};
+}
+
+/*
+ * The config the NEXT edit is written through: the draft when one is
+ * outstanding, the stored config otherwise. sb-5ow, and the whole fix in one
+ * function - the old code read `storedConfig` here unconditionally, which is
+ * why filling the second required field discarded the first.
+ */
+function editBase(host, scope, blockId) {
+  return scope.drafts.read(blockId, storedConfig(host, blockId));
+}
+
+/*
+ * One field edit, offered to ADR-0005 decision 9's gate as a WHOLE config.
+ *
+ * The draft is cleared BEFORE the gate is asked, not after. `host.updateConfig`
+ * re-renders synchronously when the edit lands, and that re-render reads the
+ * store; a draft still sitting there would draw the "not stored yet" notice
+ * over a config that had just been stored. Clearing first and re-staging on a
+ * refusal is the ordering that makes the accepted path draw exactly once.
+ *
+ * The refusal path deliberately does NOT re-render (see the file header), so
+ * the notice is patched in place rather than rebuilt with the form.
+ *
+ * Exported for `dev/selftest.html`. It is the one piece of this file that is
+ * not "turn a value into an element", and the accumulation bug it fixes is a
+ * sequencing bug across two edits - the kind a rendered page demonstrates and
+ * an assertion pins down. `wrapper` needs only `dataset`, `append` and
+ * `querySelectorAll`, and `scope.mount` may be `null`, so a caller can drive
+ * it with a stub.
+ */
+export function commitField(field, form, host, scope, wrapper, value) {
+  const config = writeAtPath(editBase(host, scope, form.blockId), field.path, value);
+
+  scope.drafts.clear(form.blockId);
+
+  const refusal = host.updateConfig(form.blockId, config);
+
+  if (refusal) {
+    scope.drafts.stage(form.blockId, config);
+    markRefused(wrapper, refusal, field.key);
+    syncPendingNotice(form, host, scope);
+  }
+
+  return refusal === null;
 }
 
 /*

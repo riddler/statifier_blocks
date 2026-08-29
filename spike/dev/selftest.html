@@ -7727,6 +7727,268 @@
         );
       });
 
+
+      /* =========================================== sb-5ow: draft accumulation
+       *
+       * The bug these suites pin down: ADR-0005 decision 9 validates a config
+       * as a UNIT and stores nothing on a refusal, so a type with two required
+       * fields and no usable defaults could not be configured through a form
+       * that commits per field. Fill `path` and `value` is still empty, so the
+       * gate refuses; fill `value` and the edit is computed against the stored
+       * config, which never took `path`, so the gate refuses again.
+       *
+       * The operator's ruling is DRAFT ACCUMULATION, and what these check is
+       * that the fix moved only ONE thing: which config the next edit is
+       * written through. The gate is asked the same question, over a whole
+       * config, every time; a refusal still stores nothing; the document still
+       * only ever holds a config that validated.
+       *
+       * Imports are local to this block, and the suites are appended at the
+       * END of the file, for the merge reason `core.subchart`'s suites give:
+       * sibling beads are appending their own suites to this file tonight.
+       */
+
+      import { createDraftStore, pendingKeys } from "../js/panes.js";
+      import { commitField } from "../js/inspector.js";
+
+      /* One freshly inserted `core.assign` in a sequence, plus the editor host
+       * `commitField` talks to - `interact.js`'s `updateConfig` seam, verbatim:
+       * `null` when the edit landed, the refusal otherwise. */
+      function assignFixture() {
+        const registry = proposingRegistry();
+        const inserted = blockForType(registry, "core.assign");
+
+        const document = createDocument(
+          block({
+            id: "blk_ROOT",
+            type: "core.sequence",
+            slots: { body: [inserted] },
+          }),
+          { id: "doc_sb5ow", revision: 0 }
+        );
+
+        let session = select(createSession(document, registry), inserted.id);
+
+        const host = {
+          state: () => ({ session, findings: [] }),
+          updateConfig: (id, config) => {
+            const result = updateBlockConfig(session, id, config);
+            if (!result.ok) return result.error;
+            session = result.value;
+            return null;
+          },
+        };
+
+        return {
+          registry,
+          blockId: inserted.id,
+          host,
+          session: () => session,
+          stored: () => findBlock(session.document, inserted.id).config,
+          revision: () => session.document.revision,
+          /* The form as the config pane builds it: over the DRAFT when one is
+           * outstanding, which is the second half of the fix. */
+          form: (drafts) => {
+            const node = findBlock(session.document, inserted.id);
+            const config = drafts ? drafts.read(inserted.id, node.config) : node.config;
+            return configFormFor(registry, { ...node, config }, []);
+          },
+        };
+      }
+
+      const fieldNamed = (form, key) => form.fields.find((field) => field.key === key);
+
+      /* `commitField` needs only these three things off its wrapper, which is
+       * why it is exported: the sequencing is assertable without a page. */
+      const wrapperStub = () => ({ dataset: {}, append: () => {}, querySelectorAll: () => [] });
+
+      suite("config drafts: the bug, still true of the gate (sb-5ow)", () => {
+        const fixture = assignFixture();
+
+        equal("an insert seeds both required fields empty", fixture.stored(), {
+          path: "",
+          value: "",
+        });
+
+        // Straight at the seam, with no draft anywhere: this is what the
+        // inspector used to do, and both halves of it are refused.
+        const first = fixture.host.updateConfig(fixture.blockId, {
+          path: "review.parked",
+          value: "",
+        });
+        check("a config with only the path filled in is refused", first !== null);
+
+        const second = fixture.host.updateConfig(fixture.blockId, {
+          path: "",
+          value: "true",
+        });
+        check("and so is one with only the value", second !== null);
+
+        equal("so nothing was stored", fixture.stored(), { path: "", value: "" });
+        equal("and the revision never moved", fixture.revision(), 0);
+      });
+
+      suite("config drafts: two required fields, configured (sb-5ow)", () => {
+        const fixture = assignFixture();
+        const drafts = createDraftStore();
+        const scope = { drafts, refresh: () => {}, mount: null };
+
+        const commit = (key, value) => {
+          const form = fixture.form(drafts);
+          return commitField(
+            fieldNamed(form, key),
+            form,
+            fixture.host,
+            scope,
+            wrapperStub(),
+            value
+          );
+        };
+
+        equal("the first edit does not land", commit("path", "review.parked"), false);
+        check("but it is held as a draft", drafts.pending(fixture.blockId));
+        equal("the document is untouched", fixture.stored(), { path: "", value: "" });
+        equal("and the revision has not moved", fixture.revision(), 0);
+
+        // The half-filled form still shows what the author typed. Without
+        // this the draft would accumulate correctly and the screen would go
+        // on showing the stored config - the same lie, one layer in.
+        equal(
+          "the form renders the draft, not the stored config",
+          fieldNamed(fixture.form(drafts), "path").value,
+          "review.parked"
+        );
+        equal(
+          "and names the outstanding field",
+          pendingKeys(drafts.read(fixture.blockId, fixture.stored()), fixture.stored()),
+          ["path"]
+        );
+
+        equal("the second edit completes the config", commit("value", "true"), true);
+        equal("which lands whole", fixture.stored(), { path: "review.parked", value: "true" });
+        equal("as ONE revision, not two", fixture.revision(), 1);
+        check("and the draft is gone", !drafts.pending(fixture.blockId));
+        equal("with nothing left outstanding anywhere", drafts.size(), 0);
+
+        // d9's invariant, asserted about the thing that actually landed.
+        equal(
+          "the stored config is one the type validates",
+          proposedCoreTypes["core.assign"].validateConfig(fixture.stored()),
+          null
+        );
+      });
+
+      suite("config drafts: the other orders, and a wrong value (sb-5ow)", () => {
+        const reversed = assignFixture();
+        const drafts = createDraftStore();
+        const scope = { drafts, refresh: () => {}, mount: null };
+
+        const commit = (key, value) => {
+          const form = reversed.form(drafts);
+          return commitField(
+            fieldNamed(form, key),
+            form,
+            reversed.host,
+            scope,
+            wrapperStub(),
+            value
+          );
+        };
+
+        equal("value first is refused too", commit("value", '"manual_review"'), false);
+        equal("path second completes it", commit("path", "review.resolution"), true);
+        equal("in the order the author chose", reversed.stored(), {
+          path: "review.resolution",
+          value: '"manual_review"',
+        });
+
+        // A draft accumulates edits; it does not launder them. A value the
+        // type refuses is still refused when the rest of the config is fine.
+        const refused = commit("path", "review parked");
+        equal("a value the type refuses is still refused", refused, false);
+        equal(
+          "the document keeps the last config that validated",
+          reversed.stored(),
+          { path: "review.resolution", value: '"manual_review"' }
+        );
+        check("and the bad edit is held, not stored", drafts.pending(reversed.blockId));
+        equal(
+          "the draft carries what was typed",
+          drafts.read(reversed.blockId, reversed.stored()).path,
+          "review parked"
+        );
+
+        // Discarding is the affordance's second half: a draft was never a
+        // command, so it cannot be undone - it can only be thrown away.
+        drafts.clear(reversed.blockId);
+        check("discarding drops it", !drafts.pending(reversed.blockId));
+        equal(
+          "and the form goes back to the document",
+          fieldNamed(reversed.form(drafts), "path").value,
+          "review.resolution"
+        );
+      });
+
+      suite("config drafts: the store itself (sb-5ow)", () => {
+        const drafts = createDraftStore();
+
+        equal("no draft reads through to the stored config", drafts.read("blk_1", { a: 1 }), {
+          a: 1,
+        });
+        check("and nothing is outstanding", !drafts.pending("blk_1"));
+        equal("nothing at all", drafts.size(), 0);
+
+        drafts.stage("blk_1", { a: 2 });
+        equal("a staged draft shadows the stored config", drafts.read("blk_1", { a: 1 }), { a: 2 });
+        check("and says so", drafts.pending("blk_1"));
+
+        drafts.stage("blk_2", { b: 1 });
+        equal("drafts are per block", drafts.size(), 2);
+        equal("one block's draft is not another's", drafts.read("blk_2", {}), { b: 1 });
+        equal("and blk_1 still has its own", drafts.read("blk_1", { a: 1 }), { a: 2 });
+
+        drafts.clear("blk_1");
+        equal("clearing one leaves the other", drafts.size(), 1);
+        equal("and the cleared block reads through again", drafts.read("blk_1", { a: 1 }), { a: 1 });
+
+        // The one automatic clear: a different document is a different set of
+        // block ids, so every outstanding draft is about a block that is gone.
+        drafts.reset();
+        equal("a reset drops everything", drafts.size(), 0);
+      });
+
+      suite("config drafts: which fields are outstanding (sb-5ow)", () => {
+        equal("an untouched draft names nothing", pendingKeys({ a: 1 }, { a: 1 }), []);
+        equal("a changed key is named", pendingKeys({ a: 2 }, { a: 1 }), ["a"]);
+        equal("an added key is named", pendingKeys({ a: 1, b: 2 }, { a: 1 }), ["b"]);
+        equal("a removed key is named", pendingKeys({ a: 1 }, { a: 1, b: 2 }), ["b"]);
+        equal("several, sorted", pendingKeys({ b: 2, a: 2 }, { a: 1, b: 1 }), ["a", "b"]);
+
+        // Compared with keys sorted at every depth, so the order the keys of a
+        // nested value happened to be built in is not mistaken for an author edit.
+        equal(
+          "key order inside a value is not a change",
+          pendingKeys({ a: { x: 1, y: 2 } }, { a: { y: 2, x: 1 } }),
+          []
+        );
+        equal(
+          "an actual nested change is",
+          pendingKeys({ a: { x: 1 } }, { a: { x: 2 } }),
+          ["a"]
+        );
+
+        // Top-level keys, deliberately: a form's fields are keyed at the top
+        // level even when a field writes deeper, so a deep diff would name
+        // `arms` in a vocabulary no label in the form uses.
+        equal(
+          "a deep edit is named by its top-level key",
+          pendingKeys({ arms: [{ cond: "a" }] }, { arms: [{ cond: "b" }] }),
+          ["arms"]
+        );
+
+        equal("a non-object stored config is treated as empty", pendingKeys({ a: 1 }, null), ["a"]);
+      });
+
       /* ------------------------------------------------------- reporting */
 
       const results = document.getElementById("results");
