@@ -20,41 +20,272 @@
  *
  * A host wanting more than this restyles against the `sb-` prefix, which is a
  * stable surface the record commits to.
+ *
+ * ## What graduated from the spike (sb-8dc)
+ *
+ * The campaign-012/013 editor spike (`spike/`, never shipped) took a dark
+ * theme to parity and made a third host-brand theme carry the whole surface as
+ * a pure token override. What it found about this file - the d14 amendment's
+ * evidence - graduated here:
+ *
+ *   * The reset below is `:where()`-wrapped on its container half. The spike
+ *     found the same bug twice: `.sb-spike button` and `.sb-spike p` each
+ *     weigh one class plus one element, which beats any single-class component
+ *     rule, so the reset silently stripped padding, borders and margins off
+ *     the components it exists to make room for. `:where()` contributes zero
+ *     specificity, which is what a reset wants.
+ *   * `--sb-color-scheme` is a token and not a colour. The half of a control
+ *     the BROWSER paints - a `<select>`'s drop-down, the scrollbars, the
+ *     caret, the selection highlight - is reachable by no colour token at all,
+ *     and a dark theme without this one line opens a white menu over a dark
+ *     editor. It is set on the editor's own container, never on `:root`:
+ *     telling the host page which scheme it is in is the editor reaching
+ *     outside its box.
+ *   * Token coverage runs in BOTH directions, and
+ *     `test/statifier_blocks/theme_audit_test.exs` fails the build on either.
+ *     A declared token no rule reads is worse than a missing one - a host sets
+ *     it, nothing moves, and there is no way to tell that from a bug. So every
+ *     name below has a consumer, and candidates from the spike whose consumer
+ *     does not exist in the shipped editor yet (the syntax roles, the path
+ *     underlines, the drag ghost, the run mark, the scroll shadows) are NOT
+ *     declared here. They arrive with the rules that read them.
+ *   * `--sb-drop-no-opacity` was RETIRED rather than left in place. Validity
+ *     marking is now one-sided - an accepting slot is marked and a refusing
+ *     one is left alone - so nothing dimmed a slot any more, and a reserved
+ *     name in a published surface is a promise. The disabled-control opacity
+ *     it was doubling as is `--sb-disabled-opacity`, which says what it is.
  */
 
+/* ----------------------------------------------------------------- reset
+ *
+ * Scoped under `.sb-editor`, on purpose. The editor drops into a host page
+ * that already has its own stylesheet, and a global reset would be the editor
+ * reaching outside its own box to rewrite that page. This neutralises the
+ * host's inherited styling INSIDE the editor's subtree and touches nothing
+ * outside it.
+ *
+ * `:where(.sb-editor)` on every descendant selector, per the rule above. Each
+ * of these lands at one element's worth of specificity, which ties with a host
+ * page's own `p { margin: 1em }`; source order decides a tie and the editor's
+ * stylesheet loads after the host's, so the reset still wins the thing it
+ * exists to win, while every `sb-` component rule below beats it.
+ *
+ * What the spike's reset does and this one deliberately does NOT: strip
+ * padding, border, background and `appearance` off every control. The spike
+ * restyles buttons, inputs and selects itself, so it can afford to take the
+ * native chrome away first. This package styles almost none of them - the
+ * toolbar's buttons and every form control are native on purpose - so a reset
+ * that stripped their chrome would leave a `<select>` looking like text. The
+ * font inheritance, which no browser does on its own, is the part that
+ * graduates.
+ */
+
+.sb-editor,
+.sb-editor *,
+.sb-editor *::before,
+.sb-editor *::after {
+  box-sizing: border-box;
+}
+
+:where(.sb-editor) h1,
+:where(.sb-editor) h2,
+:where(.sb-editor) h3,
+:where(.sb-editor) h4,
+:where(.sb-editor) h5,
+:where(.sb-editor) h6,
+:where(.sb-editor) p,
+:where(.sb-editor) figure,
+:where(.sb-editor) blockquote,
+:where(.sb-editor) dl,
+:where(.sb-editor) dd,
+:where(.sb-editor) ol,
+:where(.sb-editor) ul,
+:where(.sb-editor) pre {
+  margin: 0;
+  padding: 0;
+}
+
+:where(.sb-editor) h1,
+:where(.sb-editor) h2,
+:where(.sb-editor) h3,
+:where(.sb-editor) h4,
+:where(.sb-editor) h5,
+:where(.sb-editor) h6 {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+:where(.sb-editor) ol,
+:where(.sb-editor) ul {
+  list-style: none;
+}
+
+:where(.sb-editor) pre,
+:where(.sb-editor) code,
+:where(.sb-editor) kbd,
+:where(.sb-editor) samp {
+  font-family: var(--sb-font-mono);
+  font-size: 1em;
+}
+
+/* No browser inherits `font` into a form control, which is why a host page's
+ * type never reaches the editor's inputs without this. */
+:where(.sb-editor) button,
+:where(.sb-editor) input,
+:where(.sb-editor) select,
+:where(.sb-editor) textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* One visible focus treatment for the whole subtree, token-driven, so no
+ * surface has to remember to style focus and none can quietly drop it. */
+:where(.sb-editor) :focus-visible {
+  outline: var(--sb-focus-width) solid var(--sb-focus-ring);
+  outline-offset: var(--sb-focus-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.sb-editor) *,
+  :where(.sb-editor) *::before,
+  :where(.sb-editor) *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------- tokens */
+
 .sb-editor {
-  /* Palette */
+  /* Which scheme the BROWSER paints its own chrome in - the `<select>`
+   * drop-down, the scrollbars, the caret, the selection highlight. None of
+   * those are ours to style and none of them read a colour token, so a theme
+   * that does not set this leaves half the editor's controls in the light
+   * scheme however dark the rest goes. A token rather than a literal for the
+   * same reason every colour is: a host has to be able to say which scheme it
+   * is in without writing a rule. */
+  --sb-color-scheme: light;
+
+  /* Surfaces, back to front. */
+  --sb-bg-canvas: #f4f5f7;
   --sb-bg: #ffffff;
   --sb-bg-muted: #f6f7f9;
+  --sb-bg-sunken: #eceef2;
+
+  /* Text. `--sb-fg-subtle` is a third step rather than a lighter muted: it is
+   * held to 4.5:1 against the WORST surface in the theme, because it is the
+   * colour of captions a reader is expected to read. */
   --sb-fg: #16181d;
   --sb-fg-muted: #5b6270;
-  --sb-border: #d7dbe2;
-  --sb-accent: #2f6feb;
+  --sb-fg-subtle: #646c7a;
+  --sb-fg-on-accent: #ffffff;
 
-  /* Drag affordances */
+  /* Lines. `--sb-border-strong` carries meaning - the boundary box's edge and
+   * the undeclared-slot outline - and clears 3:1. `--sb-border` is
+   * deliberately NOT held to a ratio: it divides two panes of one surface, it
+   * is decoration rather than a boundary carrying information, and holding it
+   * to 3:1 turns every pane edge into a rule. That is a design ruling, and it
+   * is the operator's (d14 amendment, 2026-08-29). */
+  --sb-border: #d7dbe2;
+  --sb-border-strong: #7f8a9d;
+  --sb-border-width: 1px;
+
+  /* Accent. */
+  --sb-accent: #1c62e9;
+  --sb-accent-hover: #245bc7;
+  --sb-accent-muted: rgba(28, 98, 233, 0.12);
+
+  /* Findings and status (decision 11, with `:info` per the 2026-08-29
+   * amendment). Each is a text colour and a tint: a finding row reads as text
+   * on the tint, so both move together when a theme moves either. */
+  --sb-error: #c0362c;
+  --sb-error-bg: rgba(192, 54, 44, 0.1);
+  --sb-warning: #966009;
+  --sb-warning-bg: rgba(150, 96, 9, 0.12);
+  --sb-info: #1c62e9;
+  --sb-info-bg: rgba(28, 98, 233, 0.1);
+
+  /* Drag affordances (d6, d8). The seam between two cards is one height at
+   * rest and a taller one while a drag runs, because a seam an author has to
+   * hit with a pointer is not the same seam they read past. */
   --sb-drop-ok-border: #2f9e5f;
   --sb-drop-ok-bg: rgba(47, 158, 95, 0.08);
-  --sb-drop-no-opacity: 0.45;
-  --sb-gap-height: 0.5rem;
+  --sb-gap-height: var(--sb-space);
+  --sb-gap-drag-height: var(--sb-space-3);
   --sb-gap-hover-bg: var(--sb-accent);
 
-  /* Findings */
-  --sb-error: #c0362c;
-  --sb-warning: #a2680a;
+  /* Disabled controls. Its own name because it is not a drag treatment; the
+   * token it replaces (`--sb-drop-no-opacity`) was retired with the dimming
+   * of refusing slots. */
+  --sb-disabled-opacity: 0.45;
 
-  /* Metrics */
-  --sb-radius: 6px;
+  /* Space. One base step, everything else derived, so a host that wants a
+   * denser editor sets one property. */
   --sb-space: 0.5rem;
-  --sb-border-width: 1px;
+  --sb-space-half: calc(var(--sb-space) / 2);
+  --sb-space-2: calc(var(--sb-space) * 2);
+  --sb-space-3: calc(var(--sb-space) * 3);
+
+  /* Shape. */
+  --sb-radius: 6px;
+  --sb-radius-sm: 4px;
+
+  /* Type. `font-family`, never the `font` shorthand: `font: <family-list>` is
+   * invalid CSS - the shorthand requires a size and a family together - so the
+   * whole declaration is dropped and the host page's type inherits straight
+   * through. The spike shipped that bug for two beads and the symptom was
+   * every card and label rendering in the demo page's serif. */
   --sb-font: inherit;
   --sb-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sb-text-xs: 0.6875rem;
+  --sb-text-sm: 0.8125rem;
+  --sb-text-md: 0.875rem;
+  --sb-leading: 1.5;
+  --sb-weight-medium: 500;
+  --sb-weight-strong: 600;
+  --sb-tracking-caps: 0.06em;
 
+  /* Focus, one treatment for the whole subtree (see the reset above). */
+  --sb-focus-ring: var(--sb-accent);
+  --sb-focus-width: 2px;
+  --sb-focus-offset: 2px;
+
+  /* Canvas metrics. The sizes the tree is laid out from, here rather than in a
+   * rule so a host with a larger type scale can fix a cramped column without
+   * editing structural CSS - the same bargain d14 strikes for colour. */
+  --sb-column-min-width: 15rem;
+  --sb-rail-width: 13rem;
+  --sb-config-preview-max-height: 8rem;
+
+  /* Per-block-type identity (d14 amendment 14d), consumption side. Two rules
+   * read `--sb-block-accent` - the icon tile and the card's stripe - and they
+   * are the only two, which is the property that keeps a type's identity from
+   * becoming a rule per type. A block type declares a token NAME in its
+   * palette entry and the renderer rebinds this property on that card;
+   * anything it did not declare, or declared malformed, resolves here.
+   *
+   * `--sb-block-accent-mix` is how much of the accent the tile is tinted with
+   * (a dark theme raises it, because 14% of a pale colour over near-black is
+   * not a tint) and `--sb-block-edge` is the stripe's width - `0` keeps the
+   * colour and drops the stripe. */
+  --sb-block-accent: var(--sb-accent);
+  --sb-block-accent-mix: 14%;
+  --sb-block-edge: 3px;
+  --sb-block-accent-tint: color-mix(
+    in srgb,
+    var(--sb-block-accent) var(--sb-block-accent-mix),
+    var(--sb-bg)
+  );
+
+  color-scheme: var(--sb-color-scheme);
   display: grid;
   grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr) minmax(14rem, 1fr);
-  gap: calc(var(--sb-space) * 2);
+  gap: var(--sb-space-2);
   color: var(--sb-fg);
-  background: var(--sb-bg);
-  font: var(--sb-font);
+  background: var(--sb-bg-canvas);
+  font-family: var(--sb-font);
+  font-size: var(--sb-text-md);
+  line-height: var(--sb-leading);
 }
 
 /* ---------------------------------------------------------------- canvas */
@@ -64,10 +295,24 @@
 }
 
 .sb-node {
+  position: relative;
   border: var(--sb-border-width) solid var(--sb-border);
   border-radius: var(--sb-radius);
   padding: var(--sb-space);
   background: var(--sb-bg);
+}
+
+/* 14d's stripe. The whole per-block-type accent seam on the card, and it
+ * names no block type: the property it reads is rebound inline by the
+ * renderer from the palette entry's declared token name, or resolves to the
+ * editor's own accent when nothing declared one. */
+.sb-node::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--sb-block-edge);
+  border-radius: var(--sb-radius) 0 0 var(--sb-radius);
+  background: var(--sb-block-accent);
 }
 
 .sb-node--selected {
@@ -79,29 +324,53 @@
   background: var(--sb-bg-muted);
 }
 
+/* 10c, as amended by 10h: a container is a boundary box when ANY of its slots
+ * declares a rail style - `:secondary` and `:failure` alike, which is the rail
+ * PARTITION rather than the `:secondary` partition. The stated reason holds
+ * for both: an attached rule is about a region, so the region needs a visible
+ * edge. Drawing a box around every container instead turns a deep document
+ * into nested rectangles that read as noise, which is why this is derived
+ * from metadata and not from depth. */
+.sb-node--boundary {
+  border-color: var(--sb-border-strong);
+}
+
 .sb-node__chrome {
   display: flex;
   align-items: center;
   gap: var(--sb-space);
 }
 
+.sb-node__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sb-space-3);
+  height: var(--sb-space-3);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-block-accent-tint);
+  color: var(--sb-block-accent);
+}
+
 .sb-node__label {
-  font-weight: 600;
+  font-weight: var(--sb-weight-strong);
 }
 
 .sb-node__type {
   color: var(--sb-fg-muted);
   font-family: var(--sb-font-mono);
-  font-size: 0.85em;
+  font-size: var(--sb-text-sm);
 }
 
 .sb-node__raw-config {
   font-family: var(--sb-font-mono);
-  font-size: 0.85em;
+  font-size: var(--sb-text-sm);
   white-space: pre-wrap;
-  background: var(--sb-bg-muted);
+  background: var(--sb-bg-sunken);
   border-radius: var(--sb-radius);
   padding: var(--sb-space);
+  max-height: var(--sb-config-preview-max-height);
+  overflow: auto;
 }
 
 /* d10: the two layouts, and the only thing that distinguishes a group from a
@@ -117,8 +386,12 @@
   align-items: flex-start;
 }
 
+/* The column width is a flex BASIS rather than a `min-width`, so a host that
+ * raises it gets roomier columns without a narrow embed overflowing. 10b's
+ * consequence stands either way: columns take their natural height and
+ * equalizing them is not attempted. */
 .sb-node__slots--columns > .sb-slot {
-  flex: 1 1 0;
+  flex: 1 1 var(--sb-column-min-width);
   min-width: 0;
 }
 
@@ -134,27 +407,42 @@
   color: var(--sb-fg-muted);
 }
 
+/* The rail partition's width. `:failure`'s own edge treatment - solid, error
+ * family, with an ordinary card shadow - is 10h's and belongs to the bead that
+ * renders it; what is here is the placement the two rail styles share. */
+.sb-slot--rail {
+  max-width: var(--sb-rail-width);
+}
+
 .sb-slot--undeclared {
-  border-left-color: var(--sb-warning);
+  border-left-color: var(--sb-border-strong);
 }
 
 .sb-slot__header {
   display: flex;
   align-items: baseline;
   gap: var(--sb-space);
-  font-size: 0.9em;
+  font-size: var(--sb-text-sm);
   color: var(--sb-fg-muted);
 }
 
+.sb-slot__label {
+  font-weight: var(--sb-weight-medium);
+}
+
 /* d6: validity reaches the client as markup, and hover highlighting is CSS on
- * these attributes. It costs nothing and it cannot disagree with the server. */
+ * these attributes. It costs nothing and it cannot disagree with the server.
+ *
+ * The marking is ONE-SIDED, which is what the spike found: mark the slots that
+ * accept the block and leave the rest alone. Dimming every refusing slot means
+ * a drag repaints the whole document to say "no" about places the author was
+ * never looking, and the accepting slots then have to compete with the noise
+ * for attention. There is no `[data-drop="no"]` rule here on purpose; the
+ * attribute is still stamped, because it is part of decision 7's DOM contract
+ * and it is how "not a target" stays distinguishable from "no drag running". */
 .sb-slot[data-drop="ok"] {
   border-left-color: var(--sb-drop-ok-border);
   background: var(--sb-drop-ok-bg);
-}
-
-.sb-slot[data-drop="no"] {
-  opacity: var(--sb-drop-no-opacity);
 }
 
 .sb-gap {
@@ -162,6 +450,12 @@
   align-items: center;
   gap: var(--sb-space);
   min-height: var(--sb-gap-height);
+}
+
+/* A seam an author has to hit with a pointer is not the seam they read past,
+ * so the gaps grow for the duration of a drag session and only then. */
+.sb-canvas[data-dragging="true"] .sb-gap {
+  min-height: var(--sb-gap-drag-height);
 }
 
 .sb-slot[data-drop="ok"] .sb-gap:hover {
@@ -176,8 +470,14 @@
   color: var(--sb-accent);
   background: none;
   border: none;
+  border-radius: var(--sb-radius-sm);
   cursor: pointer;
   padding: 0 var(--sb-space);
+}
+
+.sb-gap__add:hover {
+  color: var(--sb-accent-hover);
+  background: var(--sb-accent-muted);
 }
 
 /* ------------------------------------------------------------------ form */
@@ -192,11 +492,11 @@
 .sb-field {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--sb-space) / 2);
+  gap: var(--sb-space-half);
 }
 
 .sb-field__label {
-  font-size: 0.9em;
+  font-size: var(--sb-text-sm);
   color: var(--sb-fg-muted);
 }
 
@@ -219,27 +519,52 @@
   font-family: var(--sb-font-mono);
 }
 
+/* The duration control's readout: what the string the author typed means, in
+ * words, and the ISO-8601 the compiler will emit. It is how an author who
+ * typed `1h30m` finds out it lands as `PT1H30M` without having to know
+ * ISO-8601 to write it. */
+.sb-field__readout {
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-subtle);
+}
+
+.sb-field__readout code {
+  font-family: var(--sb-font-mono);
+}
+
 /* -------------------------------------------------------------- findings */
 
 .sb-finding {
-  font-size: 0.9em;
+  font-size: var(--sb-text-sm);
+  border-radius: var(--sb-radius-sm);
+  padding: 0 var(--sb-space-half);
 }
 
 .sb-finding--error {
   color: var(--sb-error);
+  background: var(--sb-error-bg);
 }
 
 .sb-finding--warning {
   color: var(--sb-warning);
+  background: var(--sb-warning-bg);
+}
+
+/* 11c: an advisory row, neutral, distinct from the warning family and never
+ * in the error family. It changes no verdict - a document whose only findings
+ * are `:info` is exactly as compilable as one with none - and it sorts last. */
+.sb-finding--info {
+  color: var(--sb-info);
+  background: var(--sb-info-bg);
 }
 
 /* d11's last sentence: a finding can never hide inside something folded shut. */
 .sb-badge {
-  border-radius: var(--sb-radius);
+  border-radius: var(--sb-radius-sm);
   background: var(--sb-error);
-  color: var(--sb-bg);
-  font-size: 0.75em;
-  padding: 0 calc(var(--sb-space) / 2);
+  color: var(--sb-fg-on-accent);
+  font-size: var(--sb-text-xs);
+  padding: 0 var(--sb-space-half);
 }
 
 .sb-findings {
@@ -252,7 +577,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: calc(var(--sb-space) / 2);
+  gap: var(--sb-space-half);
 }
 
 .sb-findings__reveal {
@@ -280,10 +605,10 @@
 }
 
 .sb-palette__group-name {
-  font-size: 0.85em;
+  font-size: var(--sb-text-sm);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--sb-fg-muted);
+  letter-spacing: var(--sb-tracking-caps);
+  color: var(--sb-fg-subtle);
 }
 
 .sb-palette__entries {
@@ -299,9 +624,10 @@
   text-align: left;
   background: none;
   border: none;
+  border-left: var(--sb-block-edge) solid var(--sb-block-accent);
   cursor: pointer;
   border-radius: var(--sb-radius);
-  padding: calc(var(--sb-space) / 2);
+  padding: var(--sb-space-half);
   color: inherit;
 }
 
@@ -311,8 +637,8 @@
 
 .sb-palette__description {
   display: block;
-  color: var(--sb-fg-muted);
-  font-size: 0.85em;
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-sm);
 }
 
 .sb-toolbar {
@@ -327,5 +653,5 @@
 
 .sb-toolbar__button[disabled] {
   cursor: default;
-  opacity: var(--sb-drop-no-opacity);
+  opacity: var(--sb-disabled-opacity);
 }
