@@ -494,20 +494,28 @@ drop the `slot_finding/1` clause so the reason falls through unmapped.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `mix quality` (the full gate) is green, including the coverage floor
-- [ ] `mix test` passes with no change to any existing test file - the
-      whole existing corpus (`compiler_test.exs`, `readme_test.exs`,
-      `editor/*`, `core/*`) still green
-- [ ] `test/statifier_blocks/compiler/slot_findings_test.exs` exists and
+- [ ] `mix quality` (the full gate) is green, including the coverage floor -
+      **not run by this phase's implementer**; `mix quality --profile loop`
+      is green (format, compile, credo, changed-scope tests all pass). The
+      orchestrator runs the full gate under a cross-machine lock.
+- [x] `mix test` passes - **with one existing test file changed**, under an
+      explicit, authorized exception (see the addendum below): the whole
+      existing corpus otherwise unedited and green (562 tests, 9 doctests,
+      0 failures)
+- [x] `test/statifier_blocks/compiler/slot_findings_test.exs` exists and
       passes
-- [ ] `changelog.d/sb-da9.md` exists and carries a `### Changed` entry for
+- [x] `changelog.d/sb-da9.md` exists and carries a `### Changed` entry for
       the new refusal
-- [ ] `git diff` for the phase touches only `lib/statifier_blocks/compiler.ex`,
+- [x] `git diff` for the phase touches `lib/statifier_blocks/compiler.ex`,
       `lib/statifier_blocks/compiler/finding.ex`, the new test file, and
-      `changelog.d/sb-da9.md` - no `docs/adr/`, no `mix.exs`, no `mix.lock`,
-      no existing test file
-- [ ] `grep -rn "sb-da9" lib/` returns nothing: no comment still says the
-      work is unworked
+      `changelog.d/sb-da9.md` as specified, **plus one authorized exception**
+      - `test/statifier_blocks/compiler/provenance_test.exs` - see the
+      addendum below. No `docs/adr/`, no `mix.exs`, no `mix.lock`.
+- [ ] `grep -rn "sb-da9" lib/` returns nothing - **one mention remains**,
+      `lib/statifier_blocks/view_model.ex:31`, which belongs to a
+      concurrent worker's bead (sb-kmk) and is a hard exclusion for this
+      phase's implementer. Every mention this bead owns
+      (`compiler.ex`, `compiler/finding.ex`) is cleared.
 
 #### Manual Verification:
 - [ ] the reworked moduledoc section and the `structure_stage/3` comment
@@ -525,6 +533,23 @@ drop the `slot_finding/1` clause so the reason falls through unmapped.
       and the signup wizard
 
 **Implementation Note**: same as Phase 1.
+
+**Addendum (2026-08-29): the one authorized exception to "no existing test
+file" - `provenance_test.exs`'s sampled range.** The regression triage in
+section 3 above surfaced a second pre-existing test the plan did not
+anticipate, beyond the `findings_test.exs` edge it names: the corpus
+property test in `test/statifier_blocks/compiler/provenance_test.exs`,
+`"the map is total over a generated corpus, not just the worked example"`.
+`test/support/document_generator.ex` mints slot names that no `core.*` type
+declares, so before this bead those children were silently dropped and the
+generated documents compiled anyway; the new `:undeclared_slot` check now
+correctly refuses them, which dropped the compilable share of the sampled
+range `0..199` below the test's `> 10` threshold (measured: 9 documents
+compile over `0..199`, versus 25 over `0..499`). The bead owner ruled: widen
+the sample rather than lower the bar. The range became `0..499`, the
+`> 10` assertion is untouched, and a comment was added above the test
+recording why. This is the only pre-existing test file this phase touched,
+and only in that one way.
 
 ---
 
@@ -597,5 +622,42 @@ before considering the plan fully landed.
 the human to confirm the manual testing before moving to the next phase. In
 looped execution, this phase's Automated Verification gates advancement and
 Manual Verification items are deferred and surfaced at the end.
+
+---
+
+### Phase 2
+
+- [ ] the reworked moduledoc section and the `structure_stage/3` comment
+      state the together-not-short-circuit reasoning and cite ADR-0004
+      decision 10
+- [ ] the two finding messages are readable to an author who has never seen
+      the ADR, and each names its slot
+- [ ] no existing test was edited to make it pass; if one went red, it was
+      reported rather than changed
+- [ ] the diff to `compiler.ex` and `compiler/finding.ex` is additive apart
+      from the named comment sites and `structure_stage/3`'s body - nothing
+      reordered, nothing reformatted (campaign 014's shared-file rule)
+- [ ] no employer or product terminology anywhere in the diff; example names
+      stay `myapp.*` / `myapp:*` and the domains stay credit-card processing
+      and the signup wizard
+
+**Implementation Note**: same as Phase 1.
+
+**Addendum (2026-08-29): the one authorized exception to "no existing test
+file" - `provenance_test.exs`'s sampled range.** The regression triage in
+section 3 above surfaced a second pre-existing test the plan did not
+anticipate, beyond the `findings_test.exs` edge it names: the corpus
+property test in `test/statifier_blocks/compiler/provenance_test.exs`,
+`"the map is total over a generated corpus, not just the worked example"`.
+`test/support/document_generator.ex` mints slot names that no `core.*` type
+declares, so before this bead those children were silently dropped and the
+generated documents compiled anyway; the new `:undeclared_slot` check now
+correctly refuses them, which dropped the compilable share of the sampled
+range `0..199` below the test's `> 10` threshold (measured: 9 documents
+compile over `0..199`, versus 25 over `0..499`). The bead owner ruled: widen
+the sample rather than lower the bar. The range became `0..499`, the
+`> 10` assertion is untouched, and a comment was added above the test
+recording why. This is the only pre-existing test file this phase touched,
+and only in that one way.
 
 ---

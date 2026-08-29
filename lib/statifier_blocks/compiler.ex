@@ -23,9 +23,10 @@ defmodule StatifierBlocks.Compiler do
      `StatifierBlocks.Palette.resolve/2`, which also applies an in-memory
      config migration (ADR-0002 decision 8). Nothing is written back.
   3. **Config** - every block's `validate_config/1`.
-  4. **Structure** - `StatifierBlocks.Assignability.validate/3`: may this
-     block land in this slot, by kind tag and by data-flow type
-     (ADR-0003)?
+  4. **Structure** - `StatifierBlocks.SlotValidation.validate/2` (slot
+     arity, `:undeclared_slot`) and `StatifierBlocks.Assignability.validate/3`
+     (may this block land in this slot, by kind tag and by data-flow type -
+     ADR-0003), reported together.
   5. **Emit** - bottom-up. Each block's `emit/2` is called with its
      children already compiled and summarized, its emission is attributed
      (`StatifierBlocks.Compiler.Attribution`), and its child placeholders
@@ -40,17 +41,21 @@ defmodule StatifierBlocks.Compiler do
   `StatifierBlocks.Document.blocks/1`'s pre-order - which is how upstream's
   own document-order sort survives the trip.
 
-  ### The Structure stage is not yet whole
+  ### The Structure stage is whole
 
   Decision 10's table names three things in this stage: slot **arity**,
-  `:undeclared_slot`, and assignability. Only the third runs here.
-  Palette-aware arity and undeclared-slot validation is **`sb-da9`'s**,
-  filed and unworked; this module draws the seam and leaves it empty
-  rather than growing a second implementation of ADR-0002 decision 6's
-  rules beside the one that bead will ship. Until it lands the pipeline
-  simply never visits a slot `slots/1` did not declare, so an undeclared
-  slot's blocks are absent from the emission rather than misplaced in it -
-  which is a silent drop, and exactly what `sb-da9` exists to make loud.
+  `:undeclared_slot`, and assignability. All three run here, and their
+  findings are reported together rather than either short-circuiting the
+  other: an undeclared slot key does not induce an assignability finding
+  (a slot with no declaration gets `slot_accepts` `:any`, which admits
+  everything), and an arity violation is a count, which no assignability
+  rule reads. Neither is a consequence of the other - they are siblings,
+  which is decision 10's own rule for what one stage reports - so
+  `StatifierBlocks.SlotValidation.validate/2` and
+  `StatifierBlocks.Assignability.validate/3` are both always run and their
+  findings concatenated. Before this, the pipeline never visited a slot
+  `slots/1` did not declare, so an undeclared slot's blocks were absent
+  from the emission rather than misplaced in it - a silent drop.
 
   ## Options
 
@@ -97,7 +102,8 @@ defmodule StatifierBlocks.Compiler do
     Document,
     Emission,
     Palette,
-    Provenance
+    Provenance,
+    SlotValidation
   }
 
   alias StatifierBlocks.Compiler.{
@@ -310,16 +316,33 @@ defmodule StatifierBlocks.Compiler do
 
   # -- Stage 4: structure ----------------------------------------------------
 
-  # Assignability only. Slot arity and `:undeclared_slot` are `sb-da9`'s -
-  # see the moduledoc's seam note. This stage runs over the *document*
-  # rather than the resolved tree because `Assignability.validate/3` is
-  # the one implementation both the editor and the compiler consult
-  # (ADR-0003 decision 6), and the editor has no resolved tree.
+  # Slot arity, `:undeclared_slot`, and assignability - decision 10's full
+  # table for this stage. Both sources are collected and concatenated
+  # rather than either short-circuiting the other: decision 10 says every
+  # finding within a stage is reported, because those findings are
+  # siblings rather than consequences, and neither of these two is a
+  # consequence of the other (see the moduledoc). This stage runs over
+  # the *document* rather than the resolved tree because both
+  # `SlotValidation.validate/2` and `Assignability.validate/3` are the one
+  # implementation the editor and the compiler consult (ADR-0002 decision
+  # 6, ADR-0003 decision 6), and the editor has no resolved tree.
   @spec structure_stage(Document.t(), Palette.t(), keyword()) :: :ok | {:error, [Finding.t()]}
   defp structure_stage(document, palette, opts) do
-    case Assignability.validate(palette, document, assignability_context(opts)) do
-      :ok -> :ok
-      {:error, findings} -> {:error, Enum.map(findings, &structure_finding/1)}
+    slot_findings =
+      case SlotValidation.validate(palette, document) do
+        :ok -> []
+        {:error, findings} -> Enum.map(findings, &slot_finding/1)
+      end
+
+    assignability_findings =
+      case Assignability.validate(palette, document, assignability_context(opts)) do
+        :ok -> []
+        {:error, findings} -> Enum.map(findings, &structure_finding/1)
+      end
+
+    case slot_findings ++ assignability_findings do
+      [] -> :ok
+      findings -> {:error, findings}
     end
   end
 
@@ -351,6 +374,33 @@ defmodule StatifierBlocks.Compiler do
       block_id: id
     )
   end
+
+  @spec slot_finding(SlotValidation.finding()) :: Finding.t()
+  defp slot_finding({:slot_arity_violated, id, slot, arity, count} = reason) do
+    Finding.new(
+      :structure,
+      reason,
+      ~s(the "#{slot}" slot holds #{count} blocks, and this block type declares it ) <>
+        arity_phrase(arity),
+      block_id: id
+    )
+  end
+
+  defp slot_finding({:undeclared_slot, id, slot, count} = reason) do
+    Finding.new(
+      :structure,
+      reason,
+      ~s(the "#{slot}" slot holds #{count} blocks but this block type declares no such slot, ) <>
+        "so they would be dropped",
+      block_id: id
+    )
+  end
+
+  @spec arity_phrase(StatifierBlocks.BlockType.slot_arity()) :: String.t()
+  defp arity_phrase(:any), do: "as holding any number"
+  defp arity_phrase(:at_least_one), do: "as holding at least one"
+  defp arity_phrase(:exactly_one), do: "as holding exactly one"
+  defp arity_phrase(:zero_or_one), do: "as optional"
 
   # -- Stage 5: emit ---------------------------------------------------------
 

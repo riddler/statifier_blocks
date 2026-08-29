@@ -15,7 +15,7 @@ defmodule StatifierBlocks.Compiler.Finding do
   | `:document` | `:invalid_document` - `Document.validate/1`'s reason |
   | `:resolve` | `:unknown_block_type`, `:block_type_too_new`, `:migration_failed` |
   | `:config` | `validate_config/1` findings, one per `{key, message}` pair |
-  | `:structure` | assignability (ADR-0003); slot arity and `:undeclared_slot` are `sb-da9`'s |
+  | `:structure` | `:slot_arity_violated`, `:undeclared_slot` (ADR-0002 decision 6); assignability (ADR-0003) |
   | `:emit` | `emit/2` findings, `:invalid_role`, `:reserved_role`, `:invalid_outcome`, `:unspliced_child`, `:unknown_attribution` |
   | `:chart` | mapped statifier findings, both faults (decision 9) |
 

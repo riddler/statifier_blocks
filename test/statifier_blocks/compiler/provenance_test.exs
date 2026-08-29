@@ -35,6 +35,12 @@ defmodule StatifierBlocks.Compiler.ProvenanceTest do
     assert unmapped == []
   end
 
+  # sb-da9 widened the sampled range from 0..199 to 0..499: the new
+  # :undeclared_slot check correctly refuses generated documents whose
+  # slot names no `core.*` type declares, which dropped the compilable
+  # share of the corpus. The `> 10` threshold below is deliberately left
+  # unchanged.
+  #
   # The same property over a corpus rather than one document. The
   # generator draws arbitrary type names and slot names, so most of what
   # it produces does not compile at all; the ones that do are the point,
@@ -46,7 +52,7 @@ defmodule StatifierBlocks.Compiler.ProvenanceTest do
   # chose, which is what catches the case a hand-written example misses.
   test "the map is total over a generated corpus, not just the worked example" do
     compiled =
-      for index <- 0..199,
+      for index <- 0..499,
           {:ok, artifact} <-
             [
               Compiler.compile(
