@@ -337,6 +337,15 @@ function fieldView(field, config, findings) {
     type: field.type,
     value,
     default: field.default,
+    /*
+     * sb-ed7. Carried, never invented: a field that declares a placeholder
+     * gets it, and one that does not gets `undefined` and leaves the choice to
+     * the control type (`inspector.js`). The derivation stays type-driven -
+     * there is no key here and no type name - which is what keeps the editor's
+     * own `label` field (`LABEL_FIELD`, the only declarer today) an ordinary
+     * declaring field rather than a case in this switch.
+     */
+    placeholder: field.placeholder,
     findings: findings.filter((finding) => finding.key === field.key),
   };
 
