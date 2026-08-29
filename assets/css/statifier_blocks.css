@@ -125,6 +125,7 @@
  *     2  --sb-focus-ring
  *     2  --sb-focus-width
  *     2  --sb-focus-offset
+ *     2  --sb-card-width
  *     2  --sb-column-min-width
  *     2  --sb-palette-width
  *     2  --sb-inspector-width
@@ -342,7 +343,17 @@
 
   /* Canvas metrics. The sizes the tree is laid out from, here rather than in a
    * rule so a host with a larger type scale can fix a cramped column without
-   * editing structural CSS - the same bargain d14 strikes for colour. */
+   * editing structural CSS - the same bargain d14 strikes for colour.
+   *
+   * `--sb-card-width` is the one the diagram hangs off. A card is a FIXED
+   * width centred in the box it sits in, never the width of what it contains:
+   * a full-width card puts every block's centre on one x, and the connector
+   * geometry takes a card's centre as its outlet and its inlet, so every edge
+   * in the document collapses onto a single spine running through the cards it
+   * is meant to join (`sb-ay0`'s evidence). Narrow cards are what make the
+   * measured geometry say something, which is why this is a layout metric and
+   * not a visual opinion. */
+  --sb-card-width: 14rem;
   --sb-column-min-width: 15rem;
   --sb-rail-width: 13rem;
   --sb-config-preview-max-height: 8rem;
@@ -489,10 +500,45 @@
 
 .sb-node {
   position: relative;
+  display: flex;
+  flex-direction: column;
   border: var(--sb-border-width) solid var(--sb-border);
   border-radius: var(--sb-radius);
   padding: var(--sb-space);
   background: var(--sb-bg);
+}
+
+/* 10b's card, both halves of it.
+ *
+ * A LEAF's box is its card - there is nothing inside it but the card face -
+ * so the box takes the card width and centres itself in the slot it sits in.
+ * A CONTAINER's box has to be as wide as everything it holds, so it keeps its
+ * width and centres its own chrome inside it instead: a container's header is
+ * the thing its body hangs from and it reads as one at a leaf's width, where
+ * stretching it to the width of everything below makes the root sequence's
+ * header as wide as the whole diagram and says nothing with the space.
+ *
+ * Centred rather than left-aligned because the connector geometry takes the
+ * horizontal centre of a measured box as its outlet and its inlet. Centring
+ * the card is what puts the flow line where a reader already expects it, and
+ * `margin-inline: auto` is the whole of the "geometry is measured, never
+ * computed" bargain from this end: the stylesheet says where the card sits
+ * and the browser answers with the number.
+ *
+ * `data-container` rather than `:has(.sb-slot)`: whether a block has slots is
+ * a fact the view model already carries, and re-deriving it in a selector
+ * makes the rule depend on markup this file does not own.
+ */
+.sb-node[data-container="false"] {
+  width: var(--sb-card-width);
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+.sb-node[data-container="true"] > .sb-node__chrome {
+  width: var(--sb-card-width);
+  max-width: 100%;
+  margin-inline: auto;
 }
 
 /* 14d's stripe. The whole per-block-type accent seam on the card, and it
@@ -586,18 +632,91 @@
   gap: var(--sb-space);
 }
 
+/* 10b: "columns are a grid", and they are one literally. `align-items: start`
+ * is the sentence that record spends a paragraph on - a lane with two steps
+ * beside a lane with nine is honest about that, and stretching the short one
+ * either lies about where its work ends or hides a scroll region inside it.
+ *
+ * A grid rather than the flex row this replaced, because `grid-auto-columns`
+ * says the column sizing once for every column, where a flex BASIS is a
+ * per-item negotiation that lets a long lane steal width from a short one -
+ * and two lanes of different widths make the fan above them read as ragged
+ * rather than as one distribution. */
 .sb-node__slots--columns {
-  flex-direction: row;
-  align-items: flex-start;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(var(--sb-column-min-width), 1fr);
+  align-items: start;
+  gap: var(--sb-space-2);
 }
 
-/* The column width is a flex BASIS rather than a `min-width`, so a host that
- * raises it gets roomier columns without a narrow embed overflowing. 10b's
- * consequence stands either way: columns take their natural height and
- * equalizing them is not attempted. */
+/* Every column's own contents stack, whatever the parent is doing. */
 .sb-node__slots--columns > .sb-slot {
-  flex: 1 1 var(--sb-column-min-width);
   min-width: 0;
+}
+
+/* The column header is card-width and CENTRED, not stretched to its column.
+ *
+ * 10d lands a fan on the header rather than on the first card inside it, and
+ * an arm label pinned to the far-left edge of an arm a thousand pixels wide
+ * is a label nobody connects to the flow it governs. Centred, it sits
+ * directly above the first card it governs, which is where the fan edge
+ * arrives - the geometry and the reading agree because both take the centre.
+ */
+.sb-node__slots--columns > .sb-slot > .sb-slot__header {
+  width: var(--sb-card-width);
+  max-width: 100%;
+  margin-inline: auto;
+  justify-content: center;
+}
+
+/* The fan pill: `ONE OF` above a set of alternatives, `ALL OF` above a set of
+ * concurrent lanes (10b, campaign 016).
+ *
+ * It is the only place the exclusive/concurrent distinction is stated. Side
+ * by side columns look identical either way - the arrangement says the block
+ * divides and says nothing about whether one column runs or all of them do -
+ * and every other signal a reader might use for it is a type name the editor
+ * refuses to draw from.
+ *
+ * It sits ON the flow line rather than beside it, and the connectors treat it
+ * as the point the fan leaves from (`Connectors.fan_anchor/1`), so the line
+ * arrives at its top edge and the arms leave its bottom. An opaque background
+ * because the overlay paints above the tree: a transparent pill would have
+ * the flow edge drawn straight through its own word.
+ *
+ * The same caps chip the join marker below the columns already uses, and no
+ * new token - the two markers are the two ends of one gesture and reading as
+ * a pair is the point.
+ */
+.sb-node__fan {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--sb-space);
+}
+
+.sb-node__fan-label {
+  border: var(--sb-border-width) solid var(--sb-border-strong);
+  border-radius: var(--sb-radius);
+  padding: var(--sb-space-half) var(--sb-space);
+  background: var(--sb-bg);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+}
+
+/* Lanes take the accent and a fan stays neutral, so the two arrangements are
+ * distinguishable before the words are read - a reader scanning a deep
+ * document is looking for the one place everything runs at once, and colour
+ * finds it faster than text does. Read off `data-arrangement` because the
+ * pill is the slot box's SIBLING: a modifier on the slot box could not reach
+ * it, and the arrangement is a fact about the block, which is where the
+ * attribute already sits. */
+.sb-node[data-arrangement="lanes"] > .sb-node__fan > .sb-node__fan-label {
+  border-color: var(--sb-accent);
+  background: var(--sb-accent-muted);
+  color: var(--sb-accent);
 }
 
 /* The join marker: what the columns come back together as, in the block
@@ -683,40 +802,30 @@
   background: var(--sb-error-bg);
 }
 
-/* The exit edge (10h's last row, per the 2026-08-29 `sb-67s` ruling). It
- * hangs off the bottom of the rail and reaches back to the parent's own flow
- * line, which is where the rail rejoins it.
+/* The exit edge (10h's last row, per the 2026-08-29 `sb-67s` ruling) is DRAWN
+ * now, and the stub tick that stood in for it is RETIRED (`sb-rx1`, ruled on
+ * `sb-otg`, campaign 016).
  *
- * The DEFAULT here is the ordinary flow edge - solid, in the line colour the
- * editor draws the lines that carry meaning in (`--sb-border-strong`, the
- * boundary box's own, rather than the decorative `--sb-border`: an edge that
- * says where a rail rejoins the flow is telling the reader something) - and
- * it is what a `:failure`
- * rail gets: ADR-0004's amendment makes a failure path end in a completion
- * event the PARENT continues on, so it leaves in-band, and drawing it as an
- * escape would have the canvas contradict the chart it compiles to. The
- * dashed escape below is the interrupt's alone.
+ * `sb-rx1` shipped `.sb-slot[data-exit-edge]::after` as a short horizontal
+ * mark hanging off the bottom-left of a rail, a placeholder for an edge
+ * nothing was drawing yet. `Connectors.rail_edges/2` draws that edge now, in
+ * the vocabulary `ViewModel.exit_edge/1` derives, from the rail child's own
+ * measured outlet to the container's exit - and once both are on the page the
+ * tick is not a second rendering of one fact, it is a SECOND CLAIM that can
+ * disagree with the first. Its length was a constant in this file and the
+ * edge's is a measurement, so the two point at different places by
+ * construction, which is exactly what amendment 10b's "geometry is measured,
+ * never computed" forbids a stylesheet from doing.
  *
- * Which one a rail gets is read off `data-exit-edge`, the attribute
- * `ViewModel.exit_edge/1` stamps on the rails and nowhere else, so this file
- * names no block type and no slot name - a host type with a failure path
- * gets the flow edge for free by declaring the style. The selector is the
- * attribute rather than the rail class because `--rail::after` reads as a
- * custom-property declaration to the token audit, and a rule that has to be
- * exempted from the audit is a rule the audit stops covering. */
-.sb-slot[data-exit-edge]::after {
-  content: "";
-  position: absolute;
-  left: calc(-1 * var(--sb-space));
-  bottom: 0;
-  width: var(--sb-space-3);
-  border-top: var(--sb-border-width) solid var(--sb-border-strong);
-}
-
-.sb-slot[data-exit-edge="interrupt"]::after {
-  border-top-style: dashed;
-  border-top-color: var(--sb-warning);
-}
+ * Kept as the hook-absent affordance instead? No: it was never an affordance.
+ * Nothing is clicked, focused or dropped on it, so a host that imports no
+ * measure hook loses decoration and keeps every way of doing anything, which
+ * is what clause 7b.3 asks of that host and all it asks.
+ *
+ * `data-exit-edge` itself STAYS stamped. It is decision 7's DOM contract, it
+ * is the same derivation the drawn edge reads, and `failure_rail_test.exs`
+ * asserts the two vocabularies through it without a browser.
+ */
 
 .sb-slot--undeclared {
   border-left-color: var(--sb-border-strong);
@@ -749,9 +858,21 @@
   background: var(--sb-drop-ok-bg);
 }
 
+/* R3's insertion marker (operator ruling 2026-08-29): "a marker on the edge
+ * between siblings, subtle at rest, highlighted on hover and during drag;
+ * empty slots keep a placeholder".
+ *
+ * The marker IS the gap. A gap already sits between two siblings and the flow
+ * edge between them already runs through it, so the affordance and the mark
+ * are one element rather than an overlay decoration next to a click target.
+ * `justify-content: center` is what puts it on the edge: the flow line runs
+ * down the centre of the column, because that is where the cards' measured
+ * centres are.
+ */
 .sb-gap {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--sb-space);
   min-height: var(--sb-gap-height);
 }
@@ -769,19 +890,44 @@
 /* d8: every drop target is reachable without dragging. The "+" is not only
  * the accessible path - it is what makes the insertion path exercisable in
  * LiveViewTest without simulating a drag. */
+/* Subtle at rest. Opaque rather than transparent so the marker masks the flow
+ * edge it sits on instead of letting the line run through the "+", and muted
+ * rather than accented because a document of forty blocks has forty-one of
+ * these and an accent on every one of them is a canvas of plus signs. */
 .sb-gap__add {
   font: inherit;
-  color: var(--sb-accent);
-  background: none;
+  color: var(--sb-fg-subtle);
+  background: var(--sb-bg);
   border: none;
   border-radius: var(--sb-radius-sm);
   cursor: pointer;
   padding: 0 var(--sb-space);
 }
 
-.sb-gap__add:hover {
+/* Highlighted on hover, on keyboard focus, and for the whole of a drag. The
+ * drag clause is what the ruling asks for and what the pointer alone cannot
+ * give: an author carrying a block needs to see every place it could land
+ * before deciding which one to aim at, not one at a time as they pass over
+ * them. Focus is here rather than left to the focus ring because the ring
+ * says "this is where the keyboard is" and this says "this is a place to
+ * insert" - the same two sentences the pointer gets. */
+.sb-gap__add:hover,
+.sb-gap__add:focus-visible,
+.sb-canvas[data-dragging="true"] .sb-gap__add {
   color: var(--sb-accent-hover);
   background: var(--sb-accent-muted);
+}
+
+/* The empty slot's placeholder. An empty arm is a real arm - 10d draws a fan
+ * edge into one for exactly that reason - and an arm whose only content is a
+ * dim "+" reads as a rendering that ran out rather than as somewhere to drop.
+ * The dashed ring is the editor's existing word for "nothing is here yet",
+ * the same one an undeclared slot's edge uses, and it is always visible
+ * because there is nothing else in the slot to hover. */
+.sb-slot[data-empty="true"] > .sb-gap > .sb-gap__add {
+  color: var(--sb-fg-muted);
+  border: var(--sb-border-width) dashed var(--sb-border-strong);
+  padding: var(--sb-space-half) var(--sb-space-2);
 }
 
 /* ------------------------------------------------------------------ form */

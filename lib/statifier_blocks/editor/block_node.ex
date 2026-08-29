@@ -146,6 +146,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-findings-count={@node.findings_count}
         data-dragging={to_string(@drag != nil and @drag.block_id == @node.block_id)}
         data-root={to_string(@root?)}
+        data-container={to_string(@node.slots != [])}
+        data-arrangement={ViewModel.arrangement(@node)}
         data-sb-anchor={Connectors.node_anchor(@node.block_id)}
         draggable={to_string(not @root?)}
       >
@@ -180,6 +182,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         <pre :if={@node.raw_config_json} class="sb-node__raw-config">{@node.raw_config_json}</pre>
 
+        <div
+          :if={ViewModel.fan_label(@node)}
+          class="sb-node__fan"
+          data-sb-anchor={Connectors.fan_anchor(@node.block_id)}
+        >
+          <span class="sb-node__fan-label">{ViewModel.fan_label(@node)}</span>
+        </div>
+
         <div class={["sb-node__slots", layout_class(@node)]}>
           <Slot.slot
             :for={slot <- @node.slots}
@@ -192,7 +202,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           />
         </div>
 
-        <div :if={join_label(@node)} class="sb-node__join">
+        <div
+          :if={join_label(@node)}
+          class="sb-node__join"
+          data-sb-anchor={Connectors.join_anchor(@node.block_id)}
+        >
           <span class="sb-node__join-label">{join_label(@node)}</span>
         </div>
 
@@ -243,9 +257,28 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp join_label(%ViewModel.Node{}), do: nil
 
+    # The slot box's arrangement, read off `ViewModel.arrangement/1` so the
+    # class, the pill's words and the connector geometry cannot disagree
+    # (ADR-0005 amendment 10b). A branch reaches `:fan` by declaring one slot
+    # per arm and a parallel reaches `:lanes` by declaring `layout: :columns`;
+    # both put their columns side by side, and neither is named here.
+    #
+    # Before campaign 016 only `:columns` was arranged, so a branch stacked
+    # its arms full-width - every fan edge then ran straight down through the
+    # arm above the one it was going to, which is the picture `sb-ay0`
+    # recorded.
+    #
+    # One class, and `data-arrangement` on the card above carries which of the
+    # two arranged answers it was. A `--fan` and a `--lanes` modifier here
+    # would be a second spelling of a fact the attribute already states, and
+    # the two spellings are one edit apart from disagreeing.
     @spec layout_class(ViewModel.Node.t()) :: String.t()
-    defp layout_class(%ViewModel.Node{entry: %{layout: :columns}}), do: "sb-node__slots--columns"
-    defp layout_class(%ViewModel.Node{}), do: "sb-node__slots--stack"
+    defp layout_class(%ViewModel.Node{} = node) do
+      case ViewModel.arrangement(node) do
+        :stack -> "sb-node__slots--stack"
+        _arranged -> "sb-node__slots--columns"
+      end
+    end
 
     # One place spells the severity modifiers, and it is outside
     # `StatifierBlocks.Editor.*` so it is asserted with LiveView absent

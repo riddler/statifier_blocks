@@ -437,6 +437,77 @@ defmodule StatifierBlocks.ViewModel do
   def exit_edge(%Slot{style: :secondary}), do: :interrupt
   def exit_edge(%Slot{}), do: :flow
 
+  @doc """
+  How a container arranges its body slots: `:lanes`, `:fan` or `:stack`
+  (ADR-0005 amendment 10b, and the campaign-012 spike's `arrangementOf`).
+
+  One derivation, read by three consumers that would otherwise each grow
+  their own: the class `BlockNode` puts on the slot box, the words the
+  `ONE OF` / `ALL OF` pill reads, and `Connectors`' decision between a fan
+  and a single entry edge. Three answers derived separately from the same
+  two facts is how they drift, and the pill disagreeing with the layout is
+  the drift a reader would see first.
+
+  The two facts, and neither of them a type name:
+
+    * `layout: :columns` - decision 10's own metadata - is `:lanes`, the
+      concurrent arrangement. `core.parallel` declares it.
+    * More than one **body** slot is `:fan`, the exclusive one.
+      `core.branch` reaches it by declaring one slot per arm, and a host
+      type of the same shape reaches it the same way.
+
+  Rails are excluded from the count for the same reason `Connectors` excludes
+  them: a rail is attached beside the body, so it is not one of the things
+  the body fans into.
+
+  A container with no body slot at all arranges nothing and is `:stack`,
+  whatever it declares - there is no second column for a marker to sit over.
+  """
+  @spec arrangement(Node.t()) :: :lanes | :fan | :stack
+  def arrangement(%Node{} = node) do
+    case body_slots(node) do
+      [] -> :stack
+      body -> arrangement_of(node.entry, body)
+    end
+  end
+
+  @spec arrangement_of(map(), [Slot.t()]) :: :lanes | :fan | :stack
+  defp arrangement_of(%{layout: :columns}, _body), do: :lanes
+  defp arrangement_of(_entry, [_one]), do: :stack
+  defp arrangement_of(_entry, _several), do: :fan
+
+  @doc """
+  Every slot placed in the body flow, in order: the arrangement's columns.
+  """
+  @spec body_slots(Node.t()) :: [Slot.t()]
+  def body_slots(%Node{slots: slots}), do: Enum.reject(slots, &rail?/1)
+
+  @doc """
+  The words on the pill drawn on the edge below an arranged container, or
+  `nil` when nothing is arranged (ADR-0005 amendment 10b, campaign 016).
+
+  The distinction the pill states is the one the arrangement already makes
+  and nothing else in the picture does: a fan's columns are alternatives and
+  a parallel's lanes are concurrent, and side-by-side columns look identical
+  either way. The spike drew the same two words off the same derivation, and
+  its note is the reason this is here rather than in the renderer: the words
+  are the only place the exclusive/concurrent distinction is stated.
+
+  It is the editor's own vocabulary rather than a type's, which is what
+  separates it from `join_label` - a type phrases what its columns come back
+  together as, because only the type knows its completion rule, but whether
+  its columns are alternatives is a fact about the arrangement this module
+  already derived.
+  """
+  @spec fan_label(Node.t()) :: String.t() | nil
+  def fan_label(%Node{} = node) do
+    case arrangement(node) do
+      :lanes -> "all of"
+      :fan -> "one of"
+      :stack -> nil
+    end
+  end
+
   @spec derived_findings(Document.t(), Palette.t()) :: [Finding.t()]
   defp derived_findings(%Document{} = document, %Palette{} = palette) do
     document
