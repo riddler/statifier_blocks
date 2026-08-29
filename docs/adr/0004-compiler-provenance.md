@@ -1423,7 +1423,7 @@ that makes it scope-shaped and keeps D13 intact.
 shape (sb-i61 / st-z4f3, "as recommended"). It records how a sequential
 `core.foreach` block compiles under this record's existing decisions and names
 one new compile finding; it amends no accepted decision above, and no accepted
-text above has been edited.
+text above has been edited. Upstream pin: st-wlrx.
 
 ### What forces the amendment
 
@@ -1482,6 +1482,13 @@ there is no `i < len(items)` to test instead. The consequence is a **documented
 limit**: a list holding a legitimate `undefined`/`null` item stops the loop
 early, at that item.
 
+In the resolved predicator the limit is **narrower than that wording**, and the
+emitter must know it: `===` is strict, so a `nil` item does *not* trip
+`=== undefined` - only an actual `:undefined` does, which for a list read means
+only an out-of-bounds index. A list holding `nil` items therefore iterates to
+its end. (Do not reach for loose `==` to widen it: `items[i] == undefined`
+evaluates to `:undefined` rather than to a boolean.)
+
 ### F6. Colliding bound names are refused at compile time
 
 **The compiler must refuse bound names that collide across nesting or with
@@ -1496,6 +1503,20 @@ Emit-stage error with `fault: :author`, named against the foreach block whose
 binding collides and carrying the offending `config_key` (`item_as` or
 `index_as`).
 
+This is a **narrow, ruling-mandated carve-out from decision 9's delegation**,
+and it is stated as a carve-out rather than as an amendment of decision 9: the
+compiler here does perform an id-uniqueness check, which decision 9 says the
+package ships none of, and it pre-empts for these names the
+`{:duplicate_id, id}` over `<data>` that decision 9 routes to the Chart stage.
+The carve-out covers **foreach bound names only** - an `item_as` or `index_as`
+against an enclosing foreach's bindings and against author-declared `<data>`
+ids - because those names are the only ones the block vocabulary lets an author
+choose that early binding then makes global. Every other chart-semantic check
+decision 9 delegates stays delegated: no reachability analysis, no
+transition-target check, no expression well-formedness check, and no general
+id-uniqueness check over `<data>`. Widening the carve-out past foreach bound
+names would be a change to decision 9.
+
 ### What this amendment does not change
 
 - Decision 2's "one block, one state" and the ban on sibling states: the head
@@ -1503,7 +1524,10 @@ binding collides and carrying the offending `config_key` (`item_as` or
 - Decision 3's derivation, its three properties, or `unstate_id/1`.
 - Decision 5's provenance keys and its totality.
 - Decision 6's determinism guarantee.
-- Decisions 7 through 11, and the 2026-08-28 outcome-tagged-finals amendment,
-  in any respect.
+- Decisions 7, 8, 10 and 11, and the 2026-08-28 outcome-tagged-finals
+  amendment, in any respect.
+- Decision 9's delegation in every respect except the narrow foreach bound-name
+  carve-out F6 records; the decision's text is not edited, and its delegation
+  holds everywhere else.
 - ADR-0001's document schema and ADR-0002's declaration surface, neither of
   which this section touches.
