@@ -94,6 +94,24 @@ defmodule StatifierBlocks.Core.Subchart do
   match by SCXML's descriptor prefix rule and name no invocation, which is
   safe for `core.invoke`'s reason: they sit on the inner state, active only
   while this block's own call is outstanding.
+
+  ## What `src` names, and what it does not
+
+  The emitted `src` is the **document id** the author typed into `chart`,
+  and nothing else (ADR-0004's subchart-src amendment). It is *not*
+  statifier-ex ADR-0052 chart identity: that identity is a hash of emitted
+  bytes, so it moves every time the child is republished and cannot be
+  known when the parent is authored. A document id is the stable
+  authoring-time reference, and the host's handler registered under
+  `statifier_blocks:subchart` (st-ADR-0051) resolves it to whichever
+  chart the host currently publishes for that document. Pinning a
+  *particular* child revision at publish time is a host provenance
+  concern, carried in run metadata; the compiler does not do it.
+
+  One thing a compile of one document can decide about that id, and it
+  does: a subchart may not name the document it sits in. See
+  `StatifierBlocks.Compiler.SelfReference`, which also says why a cycle
+  through two or more documents is the host resolver's to refuse.
   """
 
   @behaviour StatifierBlocks.BlockType
@@ -518,10 +536,15 @@ defmodule StatifierBlocks.Core.Subchart do
     end
   end
 
-  # Deliberately loose, for the reason `core.invoke`'s path check is: this
-  # package does not own the identity of a chart - statifier-ex ADR-0052
-  # does - and a tighter rule here would be a second, quieter proposal
-  # about what a chart reference may say.
+  # Deliberately loose, for the reason `core.invoke`'s path check is: the
+  # value is a **document id** the host's handler resolves (ADR-0004's
+  # subchart-src amendment), and this package does not own the shape of a
+  # host's document ids any more than it owns statifier-ex ADR-0052's
+  # chart identity. A tighter rule here would be a second, quieter
+  # proposal about what a chart reference may say. The one thing a compile
+  # can decide about the value it does decide, in
+  # `StatifierBlocks.Compiler.SelfReference`: it may not be the id of the
+  # document the block sits in.
   @spec chart?(term()) :: boolean()
   defp chart?(value), do: Config.non_empty_string?(value) and not String.contains?(value, " ")
 

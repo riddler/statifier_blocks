@@ -1961,3 +1961,162 @@ scheduled outlived it; charts containing a `core.wait` therefore compile to
 different bytes than they did (`s_<block id>__send` where the id read
 `s_<block id>__timer`), which decision 3's derivation makes a per-block change
 and nothing else in the record is edited by (`sb-cqg`).
+
+## Amendment (2026-08-29): `core.subchart`'s `src` is a document id, and a document may not run itself
+
+**Status: proposed (2026-08-29).** This section is additive: nothing above it
+is edited, no accepted decision changes, and the header line's status history
+is the conductor's to extend. It records the operator's ruling on a question
+the `core.subchart` amendment of this date left open - what the emitted `src`
+resolves against - and the one refusal that ruling makes decidable inside a
+single compile.
+
+The ruling, in the operator's own words as recorded on `sb-0cm`:
+
+> the emitted core.subchart src resolves against the DOCUMENT ID, not
+> ADR-0052 chart identity. Reasons recorded with the ruling: chart identity is
+> a hash of the emitted bytes, changes on every republish of the child, and
+> cannot be known when the parent is authored; the document id is the stable
+> authoring-time reference; the host's invoke handler (the ADR-0051 registry
+> key statifier_blocks:subchart) resolves a document id to the host's current
+> published chart, and pinning a specific child identity at publish time is
+> the host's provenance concern (run metadata), not the compiler's. Refusal
+> half: the package refuses a subchart whose chart equals the document it sits
+> in (direct self-reference); cross-document cycles need a host-supplied
+> document graph the compiler does not have and are named host-side.
+
+### R1. What `src` is: the document id, written through verbatim
+
+The shipped emission already does exactly what the ruling settles, and the
+ruling is what makes it a decision rather than an accident. Quoted verbatim
+from `lib/statifier_blocks/core/subchart.ex`, the `<invoke>` this type builds:
+
+    [{"id", context.block_id}, {"src", chart}, {"type", @invoke_type}],
+
+(`:323`), and the annotation that stamps the attribute back to the field the
+author typed into:
+
+    |> Emission.attribute_from_config("src", "chart")
+
+(`:326`). `chart` is the author's `chart` config value, unchanged - no hash is
+taken of it, no revision is appended to it, and nothing about the referenced
+document is read, because `emit/2` cannot read one (decision 4, and the
+subchart amendment's "a block type cannot read the document it references").
+
+Three properties follow, and they are the reasons the ruling gives:
+
+- **A document id is knowable at authoring time.** The parent is authored
+  before the child is next published, so a reference minted then must survive
+  that publish. A document id does. This is the same stability ADR-0001
+  decision 8 gives a block id, one level up.
+- **Chart identity is not, and moving would break the reference.** st-ADR-0052
+  identity is a content hash of the emitted chart, so it changes on every
+  republish of the child. A `src` holding one would name a chart revision that
+  the very next edit of the child orphans, and the parent would have to be
+  recompiled every time an unrelated document changed.
+- **The resolution happens at run time, in the host.** The `type` in the same
+  three attributes above is `statifier_blocks:subchart`, and st-ADR-0051 makes
+  the handler set deployment state supplied per session. So the handler
+  registered under that key is what turns a document id into a chart, against
+  whatever the host currently publishes for that document.
+
+### R2. What `src` is not: ADR-0052 chart identity, and where pinning lives
+
+The Context above lists "how the document's identity relates to the engine's
+chart identity (st-ADR-0052)" as one of the four questions this record owes an
+answer to, and decision 6 answers it for the **compilation record**:
+`StatifierBlocks.CompilationRecord` carries both, so a compiled artifact says
+which document at which revision produced which chart identity. This section
+answers it for the **reference**, which is a different direction and gets a
+different answer: the compile of a parent emits a document id and takes no
+position on which child identity a run will reach.
+
+A host that must pin a run to a particular child revision - for audit, for
+replay, for a provenance chain - records that on the **run**, in run metadata,
+from the identity the handler actually resolved. That is host-side for the
+reason the compiler cannot do it at all: the compiler is handed one document
+and a palette, and the child's identity does not exist in that input. Nothing
+here narrows decision 6's determinism guarantee or changes a byte of any
+compiled document.
+
+### R3. The refusal: a document may not name itself
+
+The half of the reference a single compile *can* adjudicate is whether the id
+it names is the id of the document it sits in. It refuses that case.
+
+| | |
+|---|---|
+| Code | `:self_reference` |
+| Stage | `:emit` |
+| Severity | `:error` |
+| Attributed to | the offending `core.subchart` block |
+| `config_key` | `"chart"` - the author's verbatim value |
+| `fault` | `:author`, by decision 9's split, since a config key is present |
+
+Quoted verbatim from `lib/statifier_blocks/compiler/self_reference.ex`, the
+criterion:
+
+    @element "invoke"
+    @attribute "src"
+
+(`:64-65`), applied to the assembled emission:
+
+    defp element_findings(%Emission{name: @element} = emission, document_id) do
+
+(`:91`) and
+
+    {@attribute, ^document_id} -> [finding(emission, document_id)]
+
+(`:93`). The equality is exact: a document whose id merely shares a prefix with
+another is a different document.
+
+**It is not a new pipeline stage.** Decision 10's table is unchanged; the
+finding carries the `:emit` stage it is produced in, exactly as the
+sensitive-path refusal and the chart-use refusal do, and for the same reason -
+the criterion is about the assembled emission rather than about one block's
+config, and the pass runs between Emit and Chart where the document id and
+every emitted `src` are both in hand:
+
+    :ok <- self_reference_stage(emission, document.id),
+
+(`lib/statifier_blocks/compiler.ex:274`). Decision 10's stopping rule applies
+to it unchanged: a document that refers to itself does not reach the Chart
+stage, because there is nothing worth serializing.
+
+Decision 10's "every finding names a block" holds. The finding anchors on the
+`core.subchart` block through the emission's owner, and on `chart` through the
+`attribute_from_config` annotation quoted in R1, which is why the author sees
+an underline on the field they typed rather than a chart-level complaint.
+
+### R4. Cross-document cycles are host-side, and this record says so rather than deferring
+
+`A -> B -> A` is the same defect one document further out, and this package
+cannot decide it. A compile is handed **one** document and a palette; deciding
+a cycle needs the document graph - who references whom across the host's whole
+library - and no input to `compile/3` carries it. Inventing a compile option
+that took a caller-supplied graph would put the check here while leaving the
+truth of its input entirely to the caller, which is a worse answer than naming
+the owner.
+
+So the check belongs to the host's resolver, behind the same st-ADR-0051
+registry key that resolves a document id to a chart: it is the one component
+that sees every reference and the only one that can see a cycle. This is
+**documented, not built** - a deliberate scope line, not a deferral waiting on
+a bead. Should a later record give this package a document graph, the
+criterion in R3 generalizes to it without a second mechanism; nothing here
+depends on that happening.
+
+### What this amendment does not change
+
+- The `core.subchart` amendment's C1, C2 or C3. The routing, the outcome
+  crossing, and the explicit `<invoke id>` all stand exactly as written; only
+  what `src` *means* is settled here, and the shipped bytes already meant it.
+- Decision 6's determinism guarantee or the compilation record's fields. No
+  byte of any compiled document moves because of this section.
+- Decision 9's fault split or which surface owns `config_value_span`. The
+  refusal carries no span: only the Chart stage composes one.
+- Decision 10's stage table, its stopping rule, or its rule that every finding
+  names a block.
+- The loose grammar `core.subchart` accepts for the `chart` field. This
+  package does not own the shape of a host's document ids, and tightening the
+  check would be a second, quieter proposal about what a reference may say.
