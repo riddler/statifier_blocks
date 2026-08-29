@@ -76,6 +76,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     `StatifierBlocks.Connectors` decides what to draw from the numbers. A host
     that never imports the hook has three inert attributes and an empty div.
 
+    ## The join marker
+
+    A container whose slots sit side by side draws a marker under them saying
+    what happens when they are done - `core.parallel` completing on its first
+    lane says "continue at first". The words are the block type's, resolved by
+    `StatifierBlocks.BlockType.join_label/2` and carried on the view model, so
+    this component draws a string and never learns that a completion rule
+    exists. A type that declares none gets the editor's own word, which is what
+    ADR-0002 amendment B's `nil` means and what the spike drew before any type
+    could carry a completion rule: the marker is about the arrangement, so an
+    arrangement that fans out still says where it comes back together.
+
+    A node whose slots stack draws no marker at all. There is nothing to
+    rejoin, and a word under a single column reads as a rendering bug.
+
     ## The badge
 
     `findings_count` covers the whole subtree, so a collapsed node still shows
@@ -85,6 +100,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     """
 
     use Phoenix.Component
+
+    # The editor's own word, drawn under a side-by-side arrangement whose
+    # type declares none of its own. It says what every join has in common
+    # and nothing a type would have to correct.
+    @default_join_label "continue"
 
     alias StatifierBlocks.Connectors
     alias StatifierBlocks.Editor.{Icons, Slot}
@@ -172,6 +192,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           />
         </div>
 
+        <div :if={join_label(@node)} class="sb-node__join">
+          <span class="sb-node__join-label">{join_label(@node)}</span>
+        </div>
+
         <div
           class="sb-node__outlet"
           data-sb-anchor={Connectors.outlet_anchor(@node.block_id)}
@@ -205,6 +229,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec status_tag(ViewModel.Node.t()) :: String.t()
     defp status_tag(%ViewModel.Node{status: {:unresolvable, _reason}}), do: "unresolvable"
     defp status_tag(%ViewModel.Node{}), do: "ok"
+
+    # The join marker's words, when one is drawn at all. Two facts, and
+    # neither of them a type name: the slots are arranged side by side
+    # (decision 10's `layout`, the same metadata `layout_class/1` reads), and
+    # what the marker says (`ViewModel.Node.join_label`, resolved through
+    # ADR-0002 amendment B's callback, falling back to this module's own word
+    # when the type declared none - which is what the record's `nil` means).
+    # A stacked node draws nothing: there is nothing to rejoin.
+    @spec join_label(ViewModel.Node.t()) :: String.t() | nil
+    defp join_label(%ViewModel.Node{entry: %{layout: :columns}, join_label: label}),
+      do: label || @default_join_label
+
+    defp join_label(%ViewModel.Node{}), do: nil
 
     @spec layout_class(ViewModel.Node.t()) :: String.t()
     defp layout_class(%ViewModel.Node{entry: %{layout: :columns}}), do: "sb-node__slots--columns"
