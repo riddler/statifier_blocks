@@ -436,7 +436,8 @@ defmodule StatifierBlocks.ViewModelTest do
                "On event",
                "Invoke",
                "Raise",
-               "Assign"
+               "Assign",
+               "Send"
              ]
     end
   end

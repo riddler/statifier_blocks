@@ -119,8 +119,11 @@ defmodule StatifierBlocks.MixProject do
     [statifier_dep()] ++
       live_view_dep() ++
       [
+        # Direct because `StatifierBlocks.Core.Duration` calls
+        # `Predicator.Duration.parse/1` to read a stored predicator duration
+        # string. It already resolves at 9.0.1 through statifier, so naming
+        # it here records the call rather than moving the lock.
         {:predicator, "~> 9.0"},
-
         # Dev / test
         {:ex_quality, "~> 0.14", only: :dev, runtime: false},
         {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

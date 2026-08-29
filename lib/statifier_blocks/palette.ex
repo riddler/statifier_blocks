@@ -95,7 +95,8 @@ defmodule StatifierBlocks.Palette do
       "core.on_event" => Core.OnEvent,
       "core.invoke" => Core.Invoke,
       "core.raise" => Core.Raise,
-      "core.assign" => Core.Assign
+      "core.assign" => Core.Assign,
+      "core.send" => Core.Send
     }
   end
 
