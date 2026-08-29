@@ -19,6 +19,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     distinguishes "not a target for the block being dragged" from "no drag is
     happening".
 
+    A refused slot that has a data-flow reason to give also carries
+    `data-drop-reason` - `not_assignable`, or `fixable_by:<block id>` naming
+    the block whose declaration an author would change (ADR-0003's 2026-08-29
+    amendment). It is absent when the refusal was structural, when it was for
+    room or for the dragged block's own subtree, or when different gaps in
+    the slot refused for different reasons: those are refusals with no single
+    honest sentence to show, and an attribute is not the place to guess one.
+    Nothing reads it yet; it is markup so that the hover affordance that
+    eventually does needs no round-trip and no JavaScript, exactly as
+    `data-drop` needs none.
+
     ## The gaps, and why "+" is always there
 
     A slot with n children has n+1 gaps, each carrying `data-parent-id`,
@@ -65,7 +76,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     @doc "One slot: header, findings, and alternating gaps and children."
     def slot(assigns) do
-      assigns = assign(assigns, :drop, drop_state(assigns.drag, assigns.parent_id, assigns.slot))
+      assigns =
+        assigns
+        |> assign(:drop, drop_state(assigns.drag, assigns.parent_id, assigns.slot))
+        |> assign(:drop_reason, drop_reason(assigns.drag, assigns.parent_id, assigns.slot))
 
       ~H"""
       <div
@@ -82,6 +96,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-arity={@slot.arity}
         data-slot-style={@slot.style}
         data-drop={@drop}
+        data-drop-reason={@drop_reason}
       >
         <div class="sb-slot__header">
           <span class="sb-slot__label">{@slot.label}</span>
@@ -168,6 +183,40 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp drop_state(%{droppable: droppable}, parent_id, %ViewModel.Slot{name: name}) do
       if MapSet.member?(droppable, {parent_id, name}), do: "ok", else: "no"
     end
+
+    # The refusal reason for a slot the drag session refused, as a string
+    # the CSS and a future hover affordance can read (ADR-0003's 2026-08-29
+    # amendment). `nil` - so the attribute is absent - outside a drag, for
+    # an accepted slot, and for a refusal with no data-flow reason to give.
+    #
+    # It is stamped beside `data-drop`, not folded into it. `data-drop`
+    # decides what the slot looks like and the graduation made that marking
+    # one-sided; the reason decides what it could later say, and a reader
+    # that does not care never has to parse one attribute to find the
+    # other. No JavaScript is added by either (ADR-0005 decision 7 ships one
+    # hook, and this is not it).
+    #
+    # Only the two refusing arms can appear: the untyped arms sit on
+    # admitted seams, and an admitted gap makes its slot `"ok"`.
+    @spec drop_reason(map() | nil, StatifierBlocks.Block.id(), ViewModel.Slot.t()) ::
+            String.t() | nil
+    defp drop_reason(nil, _parent_id, _slot), do: nil
+
+    defp drop_reason(%{reasons: reasons}, parent_id, %ViewModel.Slot{name: name}) do
+      case Map.fetch(reasons, {parent_id, name}) do
+        {:ok, reason} -> reason_string(reason)
+        :error -> nil
+      end
+    end
+
+    defp drop_reason(_drag_without_reasons, _parent_id, _slot), do: nil
+
+    # `{:fixable_by, id}` keeps the id in the attribute: it is the whole
+    # point of that arm - the block an author would go and change - and an
+    # attribute that dropped it would be `:not_assignable` spelled longer.
+    @spec reason_string(StatifierBlocks.Assignability.reason()) :: String.t()
+    defp reason_string({:fixable_by, block_id}), do: "fixable_by:" <> block_id
+    defp reason_string(reason) when is_atom(reason), do: Atom.to_string(reason)
 
     # One place spells the severity modifiers, and it is outside
     # `StatifierBlocks.Editor.*` so it is asserted with LiveView absent

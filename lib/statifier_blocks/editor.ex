@@ -20,12 +20,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     ## The drag, in two round-trips
 
-    `dragstart` pushes one event. `Edit.Targets.droppable_slots/3` runs once,
+    `dragstart` pushes one event. `Edit.Targets.slot_verdicts/3` runs once,
     the result goes into the drag session, and the re-render stamps
     `data-drop` on every slot - so every valid target highlights before the
     pointer has moved, and hover costs nothing. `drop` pushes the position, one
     `:move` is built and applied, and the tree re-renders. `dragend` clears the
     session. There is no third round-trip and no client-side validity logic.
+
+    That one enumeration answers both halves of the drag. The accepting slots
+    are `data-drop`; the refusing ones that have a data-flow reason to give
+    (the 2026-08-29 ADR-0003 amendment's vocabulary) carry it as
+    `data-drop-reason` beside it, so a later hover affordance has the reason
+    already in the markup and still needs no round-trip and no JavaScript.
+    The host's widening relation reaches all of this the way ADR-0003
+    decision 6 says it does and the way nothing else could: through
+    `palette.assignability`, consulted by the one `Assignability` the
+    compiler's `validate/3` consults.
 
     ## Config, and the gate that keeps the document sound
 
@@ -200,7 +210,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # known; it is not a workaround for the `MatchError`
     # `Assignability.valid_targets/4` used to raise here (sb-rzr).
     def handle_event("dragstart", %{"block-id" => id}, socket) do
-      {:noreply, assign(socket, :drag, %{block_id: id, droppable: droppable_for(socket, id)})}
+      {:noreply, assign(socket, :drag, drag_session(socket, id))}
     end
 
     def handle_event("dragend", _params, socket) do
@@ -560,17 +570,48 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       |> MapSet.new()
     end
 
-    @spec droppable_for(Phoenix.LiveView.Socket.t(), Block.id()) ::
-            MapSet.t({Block.id(), Block.slot_name()})
-    defp droppable_for(socket, id) do
-      if id == socket.assigns.view_model.root.block_id do
-        MapSet.new()
+    # Everything the drag needs, from one enumeration: the accepting slots,
+    # and the reason for each slot that refused.
+    #
+    # The reasons ride *beside* `:droppable` rather than replacing it. The
+    # accepting set is what decides `data-drop`, and it is a `MapSet` for
+    # the membership test `Slot` runs once per rendered slot; a reason is
+    # only ever read for a slot that already lost that test, so folding the
+    # two into one map would make the hot path pay for the explanation.
+    # Refusals with no data-flow reason (`nil`) are left out of the map
+    # entirely - absent and "present, `nil`" would render identically, and
+    # one of them is a lie about having asked.
+    @spec drag_session(Phoenix.LiveView.Socket.t(), Block.id()) :: map()
+    defp drag_session(socket, id) do
+      verdicts = slot_verdicts_for(socket, id)
+
+      droppable =
+        for({slot_ref, :ok} <- verdicts, do: slot_ref) |> MapSet.new()
+
+      reasons =
+        for {slot_ref, {:refused, reason}} <- verdicts, reason != nil, into: %{} do
+          {slot_ref, reason}
+        end
+
+      %{block_id: id, droppable: droppable, reasons: reasons}
+    end
+
+    @spec slot_verdicts_for(Phoenix.LiveView.Socket.t(), Block.id()) ::
+            [{{Block.id(), Block.slot_name()}, Targets.slot_verdict()}]
+    defp slot_verdicts_for(socket, id) do
+      %{document: document, palette: palette, view_model: view_model} = socket.assigns
+
+      with false <- id == view_model.root.block_id,
+           block when not is_nil(block) <- find_document_block(document, id) do
+        Targets.slot_verdicts(document, palette, block)
       else
-        socket.assigns.document
-        |> Targets.droppable_slots(socket.assigns.palette, id)
-        |> MapSet.new()
+        _root_or_missing -> []
       end
     end
+
+    @spec find_document_block(Document.t(), Block.id()) :: Block.t() | nil
+    defp find_document_block(document, id),
+      do: Enum.find(Document.blocks(document), &(&1.id == id))
 
     @spec fields_for(Phoenix.LiveView.Socket.t(), Block.id()) :: [ViewModel.Field.t()]
     defp fields_for(socket, id) do
