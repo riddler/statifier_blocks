@@ -1045,3 +1045,102 @@ datamodel and anchors any advisory on the `path` key.
 - A boolean forecloses nothing. If a second kind of path ever appears, it
   arrives as its own key or as a widening amendment, with a real second member
   to name.
+
+---
+
+## Amendment (2026-08-29): the `core.assign` row on decision 10
+
+**Status: proposed (2026-08-29, operator ruling on sb-jhj).** The 2026-08-28
+amendment's section D promoted `core.invoke` and `core.raise` and stopped
+there, so `core.assign` - built in the campaign-013 spike, shipped in
+campaign 014, and registered in `StatifierBlocks.Palette.core_types/0` - has
+been running with no row in decision 10's vocabulary table and a
+`PROVISIONAL` admonition in its moduledoc saying so. The operator's ruling of
+this date is that the type is in the shipped vocabulary and is owed the row.
+
+This section is additive. Nothing above it is edited: decision 10's original
+seven-row table stands, section D's two-row table stands, and D2's parked
+questions about `core.raise`'s emission and payload are untouched by this
+record.
+
+### G. `core.assign` joins the core vocabulary
+
+| Block type | `slots(config)` | Config schema | `outcomes(config)` | Notes |
+|---|---|---|---|---|
+| `core.assign` | `[]` | `path`: `:string`; `value`: `:string` | default (`done`) | a leaf that assigns one value to one datamodel path, emitting `<assign>`; `validate_config/1` checks shape only |
+
+The row is read off the shipped `StatifierBlocks.Core.Assign`, not off the
+spike proposal that preceded it. In full, so a reader need not open the
+module: `slots/1` returns `[]` for every config; `config_schema/1` returns
+exactly two field declarations, `path` (label "Write to") and `value` (label
+"This literal"), both `:string`, both `required?: true`, both defaulting to
+`""`; there is no `outcomes/1`, so section A's default applies and the type
+has the single outcome `done`; `io/1` is `%{kinds: [:step]}`, one outcome and
+nothing consumed through the type flow; `current_version/0` is `1`.
+
+With this row the table records **ten** types: the seven of decision 10, the
+two of section D, and this one. `StatifierBlocks.Palette.core_types/0`
+registers **eleven** - `core.send` is the difference, shipped in the same
+campaign and under the same `PROVISIONAL` admonition, and still owed a row of
+its own. That gap is named here rather than closed, because a row is written
+off a ruling and this record carries one ruling.
+
+**G1. `validate_config/1` checks shape only, and that is the whole rule.**
+The callback refuses an empty or whitespace-bearing `path` and an empty
+`value`, and stops there. Whether the path is *declared* is a document-level
+pass over the whole tree, not this callback's business - `validate_config/1`
+is handed a config and has no document to answer the question against - and
+the type's own moduledoc is where that boundary is spelled out. The `path`
+check is deliberately not a dotted-identifier grammar either: this package
+does not own the datamodel path grammar, and a regex here that accepted
+`signup.variant` while refusing something a host legitimately declares would
+be a second, quieter proposal riding along with this row.
+
+**G2. `value` is `:string` in the shipped type, and stores source text.**
+The ruling anticipated an `:expression` field, and the shipped module is
+narrower on purpose: `value` holds the literal exactly as an author typed it
+- `true`, `42`, `"control"`, quotes included for a string - which is what
+lets it land in the compiled `expr` attribute unchanged. Expressions computed
+from datamodel state are explicitly not supported in V1, because which
+expression language, how it would be stored, and whether a block document may
+carry an expression that must be evaluated to compile are jointly
+predicator-ex's and statifier-ex's calls. Widening `value` to `:expression`
+is therefore a later change to this row, not a correction of it, and it
+arrives with those answers rather than ahead of them.
+
+**G3. `path` and decision 7's `datamodel_path?` key.** The amendment of this
+date above this one - "decision 7, an optional `datamodel_path?` key", drafted
+on sb-1ba - admits that optional field key, and it is the key a field like
+this one exists to carry: a `:string` whose values are datamodel locations
+rather than free text, so an editor can offer what the document's datamodel
+declares instead of a bare text box. That sentence is that section's, cited
+here and not restated. The shipped `path` declaration does **not** yet set
+the key - it is `%{key: "path", type: :string, label: "Write to", required?:
+true, default: ""}` and nothing more - so this row records the field as
+shipped. Setting `datamodel_path?: true` on it is a one-key change to
+`config_schema/1` with no `current_version/0` bump behind it, and it is named
+here so that it is picked up deliberately rather than discovered.
+
+**G4. What it compiles to.** A compound state whose entry writes `expr` to
+`location` and immediately goes final. A signup wizard recording which
+variant an arriving author was bucketed into:
+
+```xml
+<state id="s_blk_ASN" initial="s_blk_ASN__done">
+  <onentry><assign expr="&quot;control&quot;" location="signup.variant"/></onentry>
+  <final id="s_blk_ASN__done"/>
+</state>
+```
+
+Both attribute values are annotated back to the config fields they came from
+- `location` from `"path"`, `expr` from `"value"` - per ADR-0004 decision 9:
+the `<assign>` element is the block's own, but each attribute *value* is the
+author's. The emission itself is ADR-0004's, and this row states only what
+the type declares.
+
+**G5. What stays open.** What an assign to an undeclared datamodel location
+means, and how the write is ordered against a state's other `onentry`
+content, are both statifier-ex's and both still open. Neither blocks the row:
+a vocabulary table records what a type declares, and a type whose declared
+shape is settled belongs in it whether or not the engine has finished
+answering what a host can do to itself with it.

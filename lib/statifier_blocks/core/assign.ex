@@ -2,13 +2,9 @@ defmodule StatifierBlocks.Core.Assign do
   @moduledoc """
   `core.assign`: a leaf step that writes one literal to one datamodel path.
 
-  > #### PROVISIONAL - not yet in the vocabulary table {: .warning}
-  >
-  > `core.assign` is a campaign-013 spike proposal (`spike/js/proposed-core.js`)
-  > that ADR-0002 decision 10's vocabulary table, and its 2026-08-28
-  > amendment, do **not** yet carry - the amendment's section D promotes
-  > `core.invoke` and `core.raise` only. This type is shipped under the
-  > campaign's filing; the decision-10 row it is owed has not been written.
+  ADR-0002 decision 10 carries the row, through its 2026-08-29 amendment
+  (section G): `slots(config)` is `[]`, the config is `path` and `value`, and
+  the type has the single default outcome.
 
   Two config fields: `path`, the datamodel location to write; `value`, the
   literal to write there.
