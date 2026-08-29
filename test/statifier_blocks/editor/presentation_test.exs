@@ -50,8 +50,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute has_element?(view, ~s([data-block-id="blk_lanes"] > .sb-node__slots--stack))
       end
 
-      # Sabotage: `ViewModel.slot_style/2` returning `:primary` always - the
-      # interrupts rail renders as a second body.
+      # Sabotage: `ViewModel.slot_presentation/2` returning `:primary` always -
+      # the interrupts rail renders as a second body.
       test "slot_style renders an interrupts rail as secondary, and body as primary", %{
         conn: conn
       } do

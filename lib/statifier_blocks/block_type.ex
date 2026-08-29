@@ -245,7 +245,8 @@ defmodule StatifierBlocks.BlockType do
           optional(:keywords) => [String.t()],
           optional(:order) => integer(),
           optional(:layout) => :stack | :columns,
-          optional(:slot_style) => %{optional(String.t()) => :primary | :secondary | :failure}
+          optional(:slot_style) => %{optional(String.t()) => :primary | :secondary | :failure},
+          optional(:slot_outcome_key) => %{optional(String.t()) => String.t()}
         }
 
   @doc """
@@ -339,4 +340,72 @@ defmodule StatifierBlocks.BlockType do
   end
 
   def put_value(target, _path, _value), do: target
+
+  # ADR-0002 decision 10's outcome names, and the shape a config key is
+  # allowed to have. One regex for both, because the declaration and the
+  # value it points at are the same alphabet: `outcome` names a key, the
+  # key holds `abandon`, and neither is free text.
+  @outcome_name ~r/\A[a-z][a-z0-9_]*\z/
+
+  @doc """
+  The config key the blocks in `slot_name` carry their outcome under, or
+  `nil` when the entry declares none.
+
+  ADR-0005 decision 10's `slot_outcome_key` (proposed there as 10f): a
+  block type with a statically-named slot whose children finish the
+  container in more than one way may say **where that answer lives**, so a
+  consumer routes on the value without knowing which type declared it.
+  `core.group` declares `%{"interrupts" => "outcome"}`; the renderer reads
+  the declaration, never the type name, which is the property decision 10
+  exists to preserve.
+
+  It names a key and never a value, for `icon`'s reason: an entry carrying
+  the outcome itself would be one declaration per slot for a fact that is
+  per **block**, and the container does not know its children's config.
+  Which outcome a given slot's completion reaches stays undeclared -
+  ADR-0002's amendment A2 parks that deliberately, and this is not it.
+
+  Total, under ADR-0002 amendment B3's refuse-do-not-truncate discipline: a
+  missing declaration, a non-map, a slot the map does not name, a
+  non-binary key, and a key outside `#{inspect(@outcome_name)}` all read as
+  `nil`, which means the uniform rendering every consumer did before the
+  declaration existed. Nothing here raises and nothing is repaired into
+  something almost right.
+  """
+  @spec slot_outcome_key(palette_entry() | map(), Block.slot_name()) :: String.t() | nil
+  def slot_outcome_key(entry, slot_name) when is_map(entry) and is_binary(slot_name) do
+    with declared when is_map(declared) <- Map.get(entry, :slot_outcome_key),
+         key when is_binary(key) <- Map.get(declared, slot_name),
+         true <- Regex.match?(@outcome_name, key) do
+      key
+    else
+      _refused -> nil
+    end
+  end
+
+  def slot_outcome_key(_entry, _slot_name), do: nil
+
+  @doc """
+  The outcome `config` declares at `key`, or `nil`.
+
+  The other half of `slot_outcome_key/2`: the container says where to look,
+  this reads it out of one block's config. The value is an outcome name in
+  ADR-0002 amendment A1's alphabet, so a config that holds something else
+  there - a number, a sentence, a key that was never filled in - reads as
+  no declared outcome rather than as a route nobody can render. `nil` for
+  `key` is the no-declaration case, so a caller threads the pair without
+  branching on it.
+  """
+  @spec outcome_name(Block.config(), String.t() | nil) :: String.t() | nil
+  def outcome_name(config, key) when is_map(config) and is_binary(key) do
+    case Map.get(config, key) do
+      value when is_binary(value) ->
+        if Regex.match?(@outcome_name, value), do: value
+
+      _refused ->
+        nil
+    end
+  end
+
+  def outcome_name(_config, _key), do: nil
 end

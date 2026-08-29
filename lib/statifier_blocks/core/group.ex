@@ -59,6 +59,12 @@ defmodule StatifierBlocks.Core.Group do
       slot_accepts: %{"body" => [:step], "interrupts" => [:interrupt_handler]}
     }
 
+  # `slot_outcome_key` names where a rule in `interrupts` says what it does
+  # to this group (ADR-0005 decision 10, proposed 10f). The declaration is
+  # what lets a canvas route an abandon differently from a resume without
+  # asking what a block is CALLED; the compiler still cannot read it, and
+  # must not - `StatifierBlocks.Core.Emit` wires both outcomes blind, for
+  # ADR-0004 decision 4's reason.
   @impl true
   def palette_entry,
     do: %{
@@ -69,7 +75,8 @@ defmodule StatifierBlocks.Core.Group do
       keywords: ["interrupt", "boundary", "scope"],
       order: 1,
       layout: :stack,
-      slot_style: %{"body" => :primary, "interrupts" => :secondary}
+      slot_style: %{"body" => :primary, "interrupts" => :secondary},
+      slot_outcome_key: %{"interrupts" => "outcome"}
     }
 
   @doc """

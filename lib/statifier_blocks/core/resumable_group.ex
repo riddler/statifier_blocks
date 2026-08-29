@@ -74,6 +74,9 @@ defmodule StatifierBlocks.Core.ResumableGroup do
       slot_accepts: %{"body" => [:step], "interrupts" => [:interrupt_handler]}
     }
 
+  # `slot_outcome_key`, exactly as `StatifierBlocks.Core.Group` declares it
+  # and for that module's reason: the rules in `interrupts` are the same
+  # `core.on_event` blocks, carrying the same config key.
   @impl true
   def palette_entry,
     do: %{
@@ -84,7 +87,8 @@ defmodule StatifierBlocks.Core.ResumableGroup do
       keywords: ["history", "resume", "interrupt"],
       order: 2,
       layout: :stack,
-      slot_style: %{"body" => :primary, "interrupts" => :secondary}
+      slot_style: %{"body" => :primary, "interrupts" => :secondary},
+      slot_outcome_key: %{"interrupts" => "outcome"}
     }
 
   @doc """

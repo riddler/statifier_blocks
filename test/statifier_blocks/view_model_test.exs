@@ -63,8 +63,10 @@ defmodule StatifierBlocks.ViewModelTest do
 
   describe "d10: palette_entry defaults" do
     # Sabotage: change `default_entry/1`'s `group: "Other"` to `group:
-    # "Uncategorized"` - this test fails on the group assertion.
-    test "a type with no palette_entry/0 still yields all eight keys, label the type name" do
+    # "Uncategorized"` - this test fails on the group assertion. Dropping
+    # `slot_outcome_key: %{}` from `@default_entry` fails it the same way,
+    # which is what keeps d10's key set complete rather than nearly so.
+    test "a type with no palette_entry/0 still yields every key, label the type name" do
       child = Block.new("toy.minimal", id: "blk_MIN")
       vm = build(document_with(child))
       node = find_node(vm, "blk_MIN")
@@ -77,7 +79,8 @@ defmodule StatifierBlocks.ViewModelTest do
                keywords: [],
                order: 0,
                layout: :stack,
-               slot_style: %{}
+               slot_style: %{},
+               slot_outcome_key: %{}
              }
     end
 

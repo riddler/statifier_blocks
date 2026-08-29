@@ -16,12 +16,22 @@ defmodule StatifierBlocks.Core.ConformanceTest do
 
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{Assignability, Block, CoreFixtures, Emission}
+  alias StatifierBlocks.{Assignability, Block, BlockType, CoreFixtures, Emission}
   alias StatifierBlocks.Compiler.Context
 
   @arities [:any, :at_least_one, :exactly_one, :zero_or_one]
   @io_keys [:kinds, :consumes, :produces, :slot_accepts]
-  @entry_keys [:label, :group, :description, :icon, :keywords, :order, :layout, :slot_style]
+  @entry_keys [
+    :label,
+    :group,
+    :description,
+    :icon,
+    :keywords,
+    :order,
+    :layout,
+    :slot_style,
+    :slot_outcome_key
+  ]
   @bundle_keys [:scenarios, :events, :datasets, :expressions]
 
   # Config no core type should accept as-is and none may raise on.
@@ -141,6 +151,16 @@ defmodule StatifierBlocks.Core.ConformanceTest do
         for {slot, style} <- Map.get(entry, :slot_style, %{}) do
           assert MapSet.member?(declared, slot)
           assert style in [:primary, :secondary, :failure]
+        end
+
+        # d10's 10f declaration is under the same rule as `slot_style`: it
+        # keys a slot the type actually declares, and it names a config key
+        # rather than an outcome value. A declaration the normalizer would
+        # refuse is a core type shipping dead metadata, which is what this
+        # arm catches.
+        for {slot, key} <- Map.get(entry, :slot_outcome_key, %{}) do
+          assert MapSet.member?(declared, slot)
+          assert BlockType.slot_outcome_key(entry, slot) == key
         end
       end
 

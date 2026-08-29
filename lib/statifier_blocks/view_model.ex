@@ -71,11 +71,25 @@ defmodule StatifierBlocks.ViewModel do
 
   ## d10's defaults
 
-  `palette_entry/0` is optional, and every one of its eight keys has a
+  `palette_entry/0` is optional, and every one of its keys has a
   default (decision 10) so a block type that implements none of it still
   renders: `label` defaults to the type name, `group` to `"Other"`,
   `description` to `""`, `icon` to `nil`, `keywords` to `[]`, `order` to
-  `0`, `layout` to `:stack`, `slot_style` to `%{}`.
+  `0`, `layout` to `:stack`, `slot_style` to `%{}`, and `slot_outcome_key`
+  (decision 10's proposed 10f) to `%{}`.
+
+  ## d10's outcome declaration
+
+  A container whose statically-named slot holds blocks that finish it in
+  more than one way may declare, per slot, the config key those blocks
+  carry the answer under - `core.group` says
+  `slot_outcome_key: %{"interrupts" => "outcome"}`. Two things come out of
+  it here, both read through `BlockType`'s total normalizers: the slot
+  carries the declared key as `Slot.outcome_key`, and every child in that
+  slot carries the resolved value as `Node.outcome`. A malformed
+  declaration, or a child whose config holds no well-formed outcome name,
+  is `nil` in both places - the uniform rendering, never a broken one
+  (ADR-0002 amendment B3).
 
   ## d12: unresolvable nodes
 
@@ -143,7 +157,15 @@ defmodule StatifierBlocks.ViewModel do
   end
 
   defmodule Slot do
-    @moduledoc "One named slot: declared or raw, with its children and its own findings."
+    @moduledoc """
+    One named slot: declared or raw, with its children and its own findings.
+
+    `outcome_key` is the container's `slot_outcome_key` declaration for
+    this slot, normalized (ADR-0005 decision 10, proposed 10f) - the config
+    key each child in this slot carries its outcome under, or `nil` when
+    the type declared none. It is here as well as on the children so that a
+    consumer can ask the question of the slot without walking into it.
+    """
 
     @type t :: %__MODULE__{
             name: Block.slot_name(),
@@ -151,6 +173,7 @@ defmodule StatifierBlocks.ViewModel do
             arity: BlockType.slot_arity() | nil,
             style: :primary | :secondary | :failure,
             declared?: boolean(),
+            outcome_key: String.t() | nil,
             children: [StatifierBlocks.ViewModel.Node.t()],
             findings: [Finding.t()]
           }
@@ -162,6 +185,7 @@ defmodule StatifierBlocks.ViewModel do
       arity: nil,
       style: :primary,
       declared?: true,
+      outcome_key: nil,
       children: [],
       findings: []
     ]
@@ -171,6 +195,15 @@ defmodule StatifierBlocks.ViewModel do
     @moduledoc """
     One block, rendered: its resolved status, its presentation metadata,
     its slots (recursive), its form, and its own findings.
+
+    `outcome` is the outcome this block produces for the slot it sits in,
+    when the **parent's** type declared a `slot_outcome_key` for that slot
+    and this block's config holds a well-formed outcome name there; `nil`
+    otherwise, which is every block whose parent declared nothing. It is
+    resolved here rather than by a consumer so that the picture-drawing
+    side reads one field instead of a metadata key plus a config lookup,
+    and so it never learns that `core.on_event` is the type with an
+    `outcome`.
     """
 
     @type status :: :ok | {:unresolvable, term()}
@@ -181,6 +214,7 @@ defmodule StatifierBlocks.ViewModel do
             type_version: pos_integer(),
             status: status(),
             entry: BlockType.palette_entry(),
+            outcome: String.t() | nil,
             slots: [StatifierBlocks.ViewModel.Slot.t()],
             form: StatifierBlocks.ViewModel.Form.t() | nil,
             raw_config_json: String.t() | nil,
@@ -195,6 +229,7 @@ defmodule StatifierBlocks.ViewModel do
       :type_version,
       :status,
       entry: %{},
+      outcome: nil,
       slots: [],
       form: nil,
       raw_config_json: nil,
@@ -248,7 +283,8 @@ defmodule StatifierBlocks.ViewModel do
     keywords: [],
     order: 0,
     layout: :stack,
-    slot_style: %{}
+    slot_style: %{},
+    slot_outcome_key: %{}
   }
 
   @doc """
@@ -370,7 +406,7 @@ defmodule StatifierBlocks.ViewModel do
           label,
           arity,
           true,
-          slot_style(entry, name),
+          slot_presentation(entry, name),
           Map.get(block.slots, name, []),
           Map.get(slot_findings, name, []),
           ctx
@@ -384,7 +420,7 @@ defmodule StatifierBlocks.ViewModel do
           name,
           nil,
           false,
-          slot_style(entry, name),
+          slot_presentation(entry, name),
           Map.get(block.slots, name, []),
           Map.get(slot_findings, name, []),
           ctx
@@ -444,7 +480,7 @@ defmodule StatifierBlocks.ViewModel do
           name,
           nil,
           false,
-          :primary,
+          {:primary, nil},
           Map.get(block.slots, name, []),
           Map.get(slot_findings, name, []),
           ctx
@@ -468,26 +504,48 @@ defmodule StatifierBlocks.ViewModel do
   @spec raw_config_json(Block.config()) :: String.t()
   defp raw_config_json(config), do: config |> CanonicalJson.encode_term() |> IO.iodata_to_binary()
 
+  @typedoc """
+  What the parent's `palette_entry/0` says about ONE slot: how it is placed
+  (decision 10's `slot_style`) and where its children carry their outcome
+  (decision 10's `slot_outcome_key`, proposed as 10f). Passed as a pair
+  rather than as two arguments because `build_slot/8` is already at the
+  arity the style guide allows, and because the two are read together.
+  """
+  @type slot_presentation :: {:primary | :secondary | :failure, String.t() | nil}
+
   @spec build_slot(
           Block.slot_name(),
           String.t(),
           BlockType.slot_arity() | nil,
           boolean(),
-          :primary | :secondary | :failure,
+          slot_presentation(),
           [Block.t()],
           [Finding.t()],
           ctx()
         ) :: Slot.t()
-  defp build_slot(name, label, arity, declared?, style, children_blocks, findings, ctx) do
+  defp build_slot(name, label, arity, declared?, presentation, children_blocks, findings, ctx) do
+    {style, outcome_key} = presentation
+
     %Slot{
       name: name,
       label: label,
       arity: arity,
       declared?: declared?,
       style: style,
-      children: Enum.map(children_blocks, &build_node(&1, ctx)),
+      outcome_key: outcome_key,
+      children: Enum.map(children_blocks, &build_child(&1, outcome_key, ctx)),
       findings: findings
     }
+  end
+
+  # A child node, plus the one fact only its PARENT's slot declaration can
+  # supply: which outcome this block produces for the slot it sits in. The
+  # config read happens here, where the block is still in hand, so nothing
+  # downstream needs a block's config to answer it.
+  @spec build_child(Block.t(), String.t() | nil, ctx()) :: Node.t()
+  defp build_child(%Block{} = block, outcome_key, ctx) do
+    node = build_node(block, ctx)
+    %{node | outcome: BlockType.outcome_name(block.config, outcome_key)}
   end
 
   @spec build_fields([BlockType.field_decl()], Block.config(), %{
@@ -624,8 +682,10 @@ defmodule StatifierBlocks.ViewModel do
     length(block_findings) + slots_count + form_count
   end
 
-  @spec slot_style(map(), Block.slot_name()) :: :primary | :secondary | :failure
-  defp slot_style(entry, name), do: Map.get(entry.slot_style, name, :primary)
+  @spec slot_presentation(map(), Block.slot_name()) :: slot_presentation()
+  defp slot_presentation(entry, name) do
+    {Map.get(entry.slot_style, name, :primary), BlockType.slot_outcome_key(entry, name)}
+  end
 
   @spec palette_entry_with_defaults(module(), Block.type_name()) :: BlockType.palette_entry()
   defp palette_entry_with_defaults(module, type_name) do
