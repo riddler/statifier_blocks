@@ -91,6 +91,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          selected_id: nil,
          drag: nil,
          drafts: %{},
+         pending_fields: [],
          palette_position: nil,
          palette_allowed: nil,
          palette_query: "",
@@ -170,6 +171,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             :if={@selected_node && @selected_node.form}
             node={@selected_node}
             target={@myself}
+            pending={@pending_fields}
             expression_component={@expression_component}
           />
           <Findings.findings view_model={@view_model} target={@myself} />
@@ -265,6 +267,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     def handle_event("config-change", %{"block-id" => id} = params, socket) do
       config = ConfigForm.decode(fields_for(socket, id), params, effective_config(socket, id))
       {:noreply, change_config(socket, id, config)}
+    end
+
+    # A draft is config the document never accepted, so there is no command
+    # to invert and no history entry to step back through - discarding is the
+    # only way out of one, and the form returns to what the document holds.
+    def handle_event("discard-draft", %{"block-id" => id}, socket) do
+      {:noreply, socket |> update(:drafts, &Map.delete(&1, id)) |> rebuild()}
     end
 
     def handle_event("field-list-add", %{"key" => key}, socket) do
@@ -413,9 +422,46 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       %{document: document, palette: palette, findings: findings} = socket.assigns
       view_model = ViewModel.build(document, palette, findings)
 
+      selected = selected_node(socket, view_model)
+
       socket
       |> assign(:view_model, view_model)
-      |> assign(:selected_node, selected_node(socket, view_model))
+      |> assign(:selected_node, selected)
+      |> assign(:pending_fields, pending_fields(socket, selected))
+    end
+
+    # The fields the author has typed that the document does not hold.
+    #
+    # Decision 9 commits a config as a unit, which is the invariant that makes
+    # a block type with two required fields and no usable defaults impossible
+    # to fill one field at a time - fill the first and the gate refuses,
+    # because the second is still empty. The draft is what carries the first
+    # value forward into the second edit, and this is what says so on screen:
+    # without it the author is told twice that a value they typed correctly is
+    # wrong, and the revision never moves.
+    #
+    # Compared against the document rather than against the draft's key set,
+    # so a field the author typed and then typed back is not still reported as
+    # outstanding.
+    @spec pending_fields(Phoenix.LiveView.Socket.t(), ViewModel.Node.t() | nil) ::
+            [ViewModel.Field.t()]
+    defp pending_fields(_socket, nil), do: []
+    defp pending_fields(_socket, %ViewModel.Node{form: nil}), do: []
+
+    defp pending_fields(socket, %ViewModel.Node{block_id: id, form: form}) do
+      case Map.fetch(socket.assigns.drafts, id) do
+        :error ->
+          []
+
+        {:ok, draft} ->
+          committed = committed_config(socket.assigns.document, id)
+
+          Enum.filter(form.fields, fn field ->
+            path = ViewModel.Field.value_path(field)
+
+            BlockType.fetch_value(draft, path) != BlockType.fetch_value(committed, path)
+          end)
+      end
     end
 
     @spec selected_node(Phoenix.LiveView.Socket.t(), ViewModel.t()) :: ViewModel.Node.t() | nil

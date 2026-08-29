@@ -24,6 +24,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     a plain text input carrying the original string, on the same principle
     as decision 12 - the editor never loses data it did not author.
 
+    Two control types carry a **placeholder**, and neither is chosen by key
+    or by type name: an `:expression` says what kind of thing belongs in it,
+    and a `:duration` shows the spelling it stores. A bare `:string` says
+    nothing, because there is nothing a type as wide as "string" can suggest -
+    which is the rule, and it is what makes the two that do say something the
+    editor's own presentation rather than a special case.
+
+    Whether a block type may declare a `placeholder` on its own fields is a
+    question this module deliberately does not answer: ADR-0002 decision 7
+    closes the field TYPE set, not the keys of a field record, so admitting
+    one is a widening of that record and belongs to whoever amends it.
+
     `:expression` renders as a plain source input here. Predicator source is
     statifier-ui's subject (sui-bob, sui-ADR-0006), and decision 9 records a
     richer affordance as a deferral, so this component accepts an
@@ -126,6 +138,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         id={input_id(@field)}
         name={input_name(@field)}
         value={to_text(@field.value)}
+        placeholder="an expression"
         spellcheck="false"
       />
       """
@@ -175,6 +188,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         id={input_id(@field)}
         name={input_name(@field) <> "[raw]"}
         value={to_text(@field.value)}
+        placeholder="PT1H30M"
       />
       """
     end

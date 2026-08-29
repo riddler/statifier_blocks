@@ -519,17 +519,25 @@
   font-family: var(--sb-font-mono);
 }
 
-/* The duration control's readout: what the string the author typed means, in
- * words, and the ISO-8601 the compiler will emit. It is how an author who
- * typed `1h30m` finds out it lands as `PT1H30M` without having to know
- * ISO-8601 to write it. */
-.sb-field__readout {
-  font-size: var(--sb-text-xs);
-  color: var(--sb-fg-subtle);
+/* The uncommitted-edits affordance. Decision 9 commits a config as a unit, so
+ * a block whose type has two required fields is uncommittable until both are
+ * filled; the draft carries the first value into the second edit, and this
+ * says so rather than leaving the author to read a refusal twice. */
+.sb-form__pending {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+  border-radius: var(--sb-radius-sm);
+  padding: var(--sb-space-half);
+  background: var(--sb-warning-bg);
+  color: var(--sb-warning);
+  font-size: var(--sb-text-sm);
 }
 
-.sb-field__readout code {
-  font-family: var(--sb-font-mono);
+.sb-form__discard {
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 /* -------------------------------------------------------------- findings */
