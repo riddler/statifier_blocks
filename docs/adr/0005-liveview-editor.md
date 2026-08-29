@@ -2301,3 +2301,108 @@ half an answer:
 Recorded so the shipped editor does not re-derive this from the stylesheet, and
 so that a later reading of "a host that ships nothing gets a neutral glyph"
 does not restore the square.
+
+---
+
+## Amendment (2026-08-29): decision 10, the shipped `icon` names are heroicon names
+
+**Status: PROPOSED, not accepted.** Additive; decision 10 stands exactly as
+written and no text above this line is edited by this section. It changes no
+callback, no default, and no resolution rule. It names the vocabulary the
+shipped names already draw from, which is the one thing every existing
+sentence on the subject leaves the reader to infer.
+
+### Context
+
+Decision 10's table row for `icon` gives its type as "an icon *name*" (:398),
+and the prose beneath it says only that "a host that ships heroicons renders
+heroicons, a host that ships nothing gets a neutral glyph" (:420). The Note
+(2026-08-29) above quotes that same clause (:2258).
+`StatifierBlocks.Editor.BlockNode` says it the same way - "a host that ships
+heroicons renders heroicons"
+(`lib/statifier_blocks/editor/block_node.ex:22-23`).
+
+Every one of those is a **conditional about the host**. None of them says what
+the package's own names *are*. A reader holding only this record cannot tell
+whether `bars-3` is a heroicon name or a coincidence, and that is precisely the
+question a host has to answer before deciding whether prefixing is enough or a
+mapping table is needed.
+
+The README already answers it, in a code comment rather than in a record:
+
+> `# A heroicons-style component: the name in, your markup out. The core types`
+> `# name heroicons ("clock", "bars-3", "arrow-path", ...), so a host already`
+> `# using them resolves every one by prefixing.`
+>
+> - `README.md:517-519`
+
+and its example resolves them exactly that way:
+
+> `<span class={[@class, "hero-" <> @name]} aria-hidden="true" />`
+>
+> - `README.md:525`
+
+A convention that lives only in a README comment is a convention a reader finds
+after guessing, not before.
+
+### Decision
+
+**10k. The `icon` names the core palette emits are heroicon outline names, and
+this record says so.** `Palette.core/0` registers thirteen types, through
+`core_types/0` (`lib/statifier_blocks/palette.ex:89-101`); their `icon` values,
+verbatim and in registration order, are:
+
+| Type | Declaration | `icon` |
+|---|---|---|
+| `core.sequence` | `lib/statifier_blocks/core/sequence.ex:58` | `icon: "bars-3",` |
+| `core.group` | `lib/statifier_blocks/core/group.ex:74` | `icon: "rectangle-group",` |
+| `core.branch` | `lib/statifier_blocks/core/branch.ex:153` | `icon: "arrows-right-left",` |
+| `core.parallel` | `lib/statifier_blocks/core/parallel.ex:178` | `icon: "view-columns",` |
+| `core.wait` | `lib/statifier_blocks/core/wait.ex:86` | `icon: "clock",` |
+| `core.resumable_group` | `lib/statifier_blocks/core/resumable_group.ex:86` | `icon: "arrow-path",` |
+| `core.on_event` | `lib/statifier_blocks/core/on_event.ex:118` | `icon: "bolt",` |
+| `core.invoke` | `lib/statifier_blocks/core/invoke.ex:158` | `icon: "arrow-up-right",` |
+| `core.raise` | `lib/statifier_blocks/core/raise.ex:94` | `icon: "megaphone",` |
+| `core.assign` | `lib/statifier_blocks/core/assign.ex:136` | `icon: "inbox",` |
+| `core.send` | `lib/statifier_blocks/core/send.ex:186` | `icon: "paper-airplane",` |
+| `core.subchart` | `lib/statifier_blocks/core/subchart.ex:260` | `icon: "rectangle-group",` |
+| `core.foreach` | `lib/statifier_blocks/core/foreach.ex:283` | `icon: "arrow-path",` |
+
+Thirteen rows, **eleven distinct names**: `rectangle-group` is shared by
+`core.group` and `core.subchart`, and `arrow-path` by `core.resumable_group`
+and `core.foreach`. That is why the Note above, and the `Editor.Icons` test it
+describes, count eleven and not thirteen - the count is of names, not of types.
+
+**10l. The naming is a convention, never a dependency.** Three consequences
+follow, and none of them is new behaviour:
+
+- **A host that ships heroicons resolves every name by prefixing `hero-`**, as
+  the README example does at `README.md:525`. No mapping table, no per-type
+  registration, no coordination with this package's release cadence.
+- **A host that ships a different icon set maps the names itself**, and the
+  eleven above are the complete list it has to cover for the core palette. A
+  host type declaring its own name is that host's problem, exactly as the Note
+  above already says.
+- **The package does not depend on heroicons.** There is no `heroicons` entry
+  in `mix.exs` or `mix.lock`, and there will not be one. What ships instead is
+  `StatifierBlocks.Editor.Icons`, this package's own inline SVG for the eleven
+  names, used when the host passes no `icon` - the arrangement the Note above
+  records. Naming the vocabulary is what lets a host predict the names; it is
+  not a claim on the host's asset pipeline.
+
+### Consequences
+
+- **Adding a fourteenth core type with a new icon obliges two things**: the
+  name is drawn from the heroicon outline set, and `Editor.Icons` gains the
+  matching glyph. The Note above already holds the second half with a test in
+  both directions; 10k is what makes the first half checkable by a reader
+  rather than by taste.
+- **A name that has no heroicon is the signal to stop**, not to invent one. The
+  choice then is a different heroicon that fits, or an amendment to this
+  section - the same bar decision 10 sets everywhere else.
+- **Nothing in the `icon` seam moves.** `icon` is still a name and never
+  markup, the host's component still wins on every tile, `nil` still means no
+  tile, and decision 14's markup/styling line is untouched.
+- **The README comment stops being the only statement of the convention.** It
+  is now a restatement of this section rather than the sole source, which is
+  the defect this amendment exists to close.
