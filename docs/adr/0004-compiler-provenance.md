@@ -1207,3 +1207,140 @@ exists in the vocabulary.
 - Decisions 7 through 10 in any respect.
 - ADR-0002's declaration surface, which is sb-0b0's to amend, and ADR-0001's
   document schema, which nothing here touches.
+
+## Amendment (2026-08-29): a document compiled for use as a child, and `core.subchart` routing
+
+**Status: proposed (2026-08-29, operator ruling).** This section records the
+operator's 2026-08-29 ruling on the mirror pair `sb-81e` / `st-aj2k` and
+nothing else. It is additive: it amends no accepted text above, and every
+decision in the record, the 2026-08-28 amendment included, stands as written.
+The upstream pin for the ruling is `st-iz97`.
+
+### What the ruling settles
+
+The 2026-08-28 amendment gave a block's outcome an event of its own -
+`done.outcome.<state id>.<outcome>` - and made a parent route on it. That
+works inside one document. It does not work across an `<invoke>`, because
+raised events are internal to the session that raises them: a child session's
+internal events do not appear in its parent's queue, and the only thing a
+parent observes of a finished child is the completion event and the data the
+child chose to send with it (SCXML 3.7 and 5.5, and statifier-ex ADR-0051
+decision 5).
+
+That gap is the one `core.subchart` recorded and declined to invent an answer
+for. Its sketch in `spike/js/proposed-core.js` names the mapping from "which
+final state" to "which slot" as open, verbatim: it "is not something ADR-0051's
+invoke contract or ADR-0004's single-final emission decides today. Until it is
+decided upstream, a subchart has the two outcomes an invoke has, and this file
+says so rather than inventing a third." This amendment is that decision,
+arriving.
+
+**A child chart's outcome crosses the invoke boundary as
+`done.invoke.<invoke_id>` data** - that is, as the child's top-level
+`<final>`'s `<donedata>`.
+
+### C1. A document compiled for use as a child emits one top-level `<final>` per root-block outcome
+
+Compiling a document *for use as a child* adds one thing to the emission the
+record already prescribes: a top-level `<final>` for each outcome the document's
+root block declares, reached by a transition on that outcome's completion event
+and carrying the outcome name as done data.
+
+```
+transition on   done.outcome.s_blk_ROOT.<outcome>
+target          a top-level <final>
+donedata        <param name="outcome" expr="'<outcome>'"/>
+```
+
+`s_blk_ROOT` is the root block's own state id, minted by decision 3 as any
+other is; `<outcome>` is a root-block outcome name in the sense amendment 2a
+fixed. The root block's outcome finals and the raises inside them are unchanged
+- the document keeps emitting `done.outcome.s_blk_ROOT.<outcome>` exactly as
+amendment 2c prescribes, and the top-level finals added here are what turn that
+internal signal into something a parent session can see.
+
+**This is not the alternative amendment 2c rejected.** 2c rejected `<donedata>`
+plus a `cond` on `_event.data` for *structural parents inside one document*,
+where an event is available and a routing decision would have been turned into
+an expression evaluation for no gain. Across an invoke boundary there is no
+event to route on: `<donedata>` is the channel the spec provides, and the
+choice is between using it and having no answer at all.
+
+### C2. `core.subchart`'s state routes `done.invoke` on `_event.data.outcome`
+
+The block's own state carries, per outcome the referenced chart declares, a
+transition on `done.invoke` conditioned on the outcome name:
+
+```
+<transition event="done.invoke" cond="_event.data.outcome == '<outcome>'" .../>
+```
+
+**The unconditioned `done.invoke` transition comes last**, as the default path:
+document order decides which of several matching transitions is taken, so an
+unconditioned transition placed anywhere but last would shadow every
+conditioned one after it. Last, it is what a child that finished with an
+outcome the parent does not route - or with none the parent recognizes - falls
+through to.
+
+`error.communication.invoke` routing to the `on_error` slot is **unchanged**.
+The failure path is the one `core.invoke` already has and the one the spike's
+sketch already declares; nothing in this amendment touches it.
+
+### C3. Parallel subcharts write `<invoke id>`
+
+Where subcharts run in parallel, the compiler writes an explicit `id` on the
+`<invoke>` rather than letting the engine mint one, so that `_event.invokeid`
+is static and a parent can tell its concurrent children apart by a value it
+knows at compile time.
+
+### Illustration
+
+A signup wizard whose eligibility step runs another chart, that chart's root
+block declaring the outcomes `done` and `abandoned`. Nothing here is a new
+decision; it is C1 through C3 written out.
+
+The child document's emission, at top level:
+
+```xml
+<transition event="done.outcome.s_blk_ROOT.done" target="f_done"/>
+<transition event="done.outcome.s_blk_ROOT.abandoned" target="f_abandoned"/>
+
+<final id="f_done">
+  <donedata><param name="outcome" expr="'done'"/></donedata>
+</final>
+<final id="f_abandoned">
+  <donedata><param name="outcome" expr="'abandoned'"/></donedata>
+</final>
+```
+
+The parent's `core.subchart` block, compiled:
+
+```xml
+<state id="s_blk_ELIGIBILITY" initial="s_blk_ELIGIBILITY__running">
+
+  <state id="s_blk_ELIGIBILITY__running">
+    <invoke type="scxml" src="..."/>
+
+    <transition event="done.invoke" cond="_event.data.outcome == 'done'"
+                target="s_blk_ELIGIBILITY__o_done"/>
+    <transition event="done.invoke" cond="_event.data.outcome == 'abandoned'"
+                target="s_blk_ELIGIBILITY__o_abandoned"/>
+    <!-- unconditioned, and last: the default path. Which outcome it lands
+         on is the block type's call, not this record's. -->
+    <transition event="done.invoke" target="..."/>
+
+    <transition event="error.communication.invoke" target="s_blk_ELIGIBILITY_error"/>
+  </state>
+
+  ...
+
+</state>
+```
+
+### What this amendment does not change
+
+- Amendment 2c's completion-event shape, or its rejection of `<donedata>`
+  routing between structural parents inside one document.
+- `core.invoke`'s emission, or `error.communication.invoke` routing to
+  `on_error` in either type.
+- Any accepted decision in this record, or the header above it.
