@@ -87,7 +87,8 @@ defmodule StatifierBlocks.BlockType do
           required(:label) => String.t(),
           required(:required?) => boolean(),
           required(:default) => Block.json(),
-          optional(:value_path) => value_path()
+          optional(:value_path) => value_path(),
+          optional(:datamodel_path?) => boolean()
         }
 
   @typedoc "Names the offending config key; message is author-facing."
@@ -136,6 +137,25 @@ defmodule StatifierBlocks.BlockType do
   the form keys its control by. `value_path` says only where the bytes
   are. Use `value_path/1`, `fetch_value/2` and `put_value/3` rather than
   reading the map key directly - they collapse both cases into one path.
+
+  ## What a field's value means
+
+  A declaration may also carry the optional `datamodel_path?: true`,
+  declaring that the field's value is a path into the host's datamodel
+  (ADR-0002 decision 7, amended 2026-08-29). It is orthogonal to
+  `value_path`: one says where the value lives, the other says what the
+  value means, and a field may carry both, either, or neither.
+
+  It is a claim, not a rule. `validate_config/1` remains the authority on
+  validity, and the annotation buys exactly one thing: the editor checks
+  the value against a host-supplied datamodel and anchors an `:info`
+  advisory on the field's `key` when the path is not declared (ADR-0005
+  amendment 11e-11g, implemented in `StatifierBlocks.Datamodel`). With no
+  datamodel supplied nothing is produced, so a declaration carrying the
+  key behaves exactly as one without it until a host opts in.
+
+  Read it through `datamodel_path?/1`, never by matching the key: a
+  declaration that omits it is the common case.
   """
   @callback config_schema(Block.config()) :: [field_decl()]
 
@@ -298,6 +318,31 @@ defmodule StatifierBlocks.BlockType do
   @spec value_path(field_decl()) :: value_path()
   def value_path(%{value_path: [_first | _rest] = path}), do: path
   def value_path(%{key: key}), do: [key]
+
+  @doc """
+  Whether a field declaration says its value is a datamodel path
+  (ADR-0002 decision 7's optional `datamodel_path?` key, amended
+  2026-08-29).
+
+  Total, and true only for the literal `true` that the amendment admits.
+  Absence means what it meant before the key existed, and any other value
+  - a string, `nil`, a map - reads as absence rather than as truthiness,
+  on the same normalizer discipline `value_path/1` and
+  `StatifierBlocks.ViewModel.accent_token/1` are under: a typo in a host's
+  registry degrades to the behaviour that predates the key.
+
+      iex> StatifierBlocks.BlockType.datamodel_path?(%{key: "path", datamodel_path?: true})
+      true
+
+      iex> StatifierBlocks.BlockType.datamodel_path?(%{key: "path"})
+      false
+
+      iex> StatifierBlocks.BlockType.datamodel_path?(%{key: "path", datamodel_path?: "yes"})
+      false
+  """
+  @spec datamodel_path?(field_decl()) :: boolean()
+  def datamodel_path?(%{datamodel_path?: true}), do: true
+  def datamodel_path?(_decl), do: false
 
   @doc """
   The config value at `path`, or `:error` when the path does not resolve.

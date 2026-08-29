@@ -41,6 +41,7 @@ defmodule StatifierBlocks.HeadlessTest do
     StatifierBlocks.Edit.History,
     StatifierBlocks.Edit.Targets,
     StatifierBlocks.Finding,
+    StatifierBlocks.Datamodel,
     StatifierBlocks.ViewModel
   ]
 

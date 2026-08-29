@@ -40,6 +40,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          document: session["document"],
          palette: session["palette"],
          findings: session["findings"] || [],
+         datamodel: session["datamodel"],
          theme: session["theme"] || %{},
          test_pid: session["test_pid"]
        )}
@@ -54,6 +55,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         document={@document}
         palette={@palette}
         findings={@findings}
+        datamodel={@datamodel}
         theme={@theme}
         on_change={notifier(@test_pid)}
       />
@@ -99,7 +101,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @doc """
     Mounts the editor over a document, connected, and returns the live view.
 
-    Options: `:document`, `:palette`, `:findings`, `:theme`. The defaults are
+    Options: `:document`, `:palette`, `:findings`, `:datamodel`, `:theme`. The
+    `:datamodel` default is `nil` - no datamodel supplied - which is what the
+    editor's own default is and what ADR-0005 amendment 11f makes meaningful.
+    The other defaults are
     the signup wizard and the core palette, which is the pairing that leaves
     `signup.track_conversion` unresolvable.
 
@@ -123,6 +128,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "document" => Keyword.get_lazy(opts, :document, &EditorFixtures.signup_wizard/0),
         "palette" => Keyword.get_lazy(opts, :palette, &EditorFixtures.palette/0),
         "findings" => Keyword.get(opts, :findings, []),
+        "datamodel" => Keyword.get(opts, :datamodel),
         "theme" => Keyword.get(opts, :theme, %{}),
         "test_pid" => test_pid
       }

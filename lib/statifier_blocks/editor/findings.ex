@@ -18,13 +18,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     finding against a block that has since been deleted sees it, which is the
     only honest thing to do with it.
 
-    Severity is two-valued and every source except `:lint` produces
-    `:error`. `:lint` exists because a block type can emit an invoke type for
-    which the host has registered no runtime handler; it renders as a warning
-    because a document carrying one is still compilable and still correct
-    once the host registers the handler. Whether the lint belongs to the
-    compiler or the editor is not this record's to settle - decision 11
-    commits only to there being a place to put the answer, and this is it.
+    Severity is three-valued since the 2026-08-29 amendments, and every
+    source except `:lint` produces `:error`. `:lint` covers both of the
+    others. It renders as a **warning** for something still compilable and
+    correct once the host acts - the record's example, an invoke type with
+    no registered handler. It renders as **`:info`** for something worth
+    the author's attention with nothing wrong at all: the first producer is
+    `StatifierBlocks.Datamodel`'s undeclared-path advisory (amendment
+    11e-11g), which arrives here rather than through a channel of its own,
+    because 11g says there is no second channel to build.
+
+    Nothing in this panel branches on which of the two it is. The severity
+    reaches the markup as a class and a `data-severity`, exactly as it did
+    when there were two values, which is the property that let a third one
+    be added without touching the list view.
     """
 
     use Phoenix.Component

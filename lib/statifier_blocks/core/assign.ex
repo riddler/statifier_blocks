@@ -33,6 +33,15 @@ defmodule StatifierBlocks.Core.Assign do
   to answer against. That check, if a host wants one, is a document-level
   pass over the whole tree - not this type's business.
 
+  It exists now, and this type reaches it by declaration rather than by
+  checking anything: `path` is declared `datamodel_path?: true` (ADR-0002
+  decision 7, amended 2026-08-29, which names this field as the key's
+  first consumer). `StatifierBlocks.Datamodel` is the document-level pass,
+  and it produces an `:info` advisory anchored on `path` when a host
+  supplies a datamodel that does not declare the value - and nothing at
+  all when the host supplies no datamodel. The verdict is unchanged
+  either way: an assign to an undeclared location still compiles.
+
   What an assign to an undeclared location means, and how the write is
   ordered against a state's other `onentry` content, are both statifier-ex's
   and both open.
@@ -60,7 +69,14 @@ defmodule StatifierBlocks.Core.Assign do
   @impl true
   def config_schema(_config),
     do: [
-      %{key: "path", type: :string, label: "Write to", required?: true, default: ""},
+      %{
+        key: "path",
+        type: :string,
+        label: "Write to",
+        required?: true,
+        default: "",
+        datamodel_path?: true
+      },
       %{key: "value", type: :string, label: "This literal", required?: true, default: ""}
     ]
 

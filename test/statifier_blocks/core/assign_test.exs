@@ -67,9 +67,22 @@ defmodule StatifierBlocks.Core.AssignTest do
 
   # sabotage: swapped the two fields in `config_schema/1` -> red, because
   # the declared order is the order the form renders them in (verified)
+  #
+  # sabotage: dropped `datamodel_path?: true` from the `path` declaration ->
+  # red here, and the editor stops checking the written location against the
+  # host's datamodel entirely (verified). ADR-0002 decision 7's 2026-08-29
+  # amendment names this field as the key's first consumer; `value` carries a
+  # literal and is deliberately not annotated.
   test "config_schema/1 declares path then value, both required strings" do
     assert Assign.config_schema(%{}) == [
-             %{key: "path", type: :string, label: "Write to", required?: true, default: ""},
+             %{
+               key: "path",
+               type: :string,
+               label: "Write to",
+               required?: true,
+               default: "",
+               datamodel_path?: true
+             },
              %{key: "value", type: :string, label: "This literal", required?: true, default: ""}
            ]
   end
