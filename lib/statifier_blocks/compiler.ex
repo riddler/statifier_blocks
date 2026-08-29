@@ -184,6 +184,7 @@ defmodule StatifierBlocks.Compiler do
     DeclaredRoots,
     Finding,
     InvokeTypes,
+    SelfReference,
     SensitivePaths,
     Serializer,
     StateId
@@ -270,6 +271,7 @@ defmodule StatifierBlocks.Compiler do
          :ok <- structure_stage(document, palette, opts),
          :ok <- chart_use_stage(node, opts),
          {:ok, emission} <- emit_stage(node, document.id, opts),
+         :ok <- self_reference_stage(emission, document.id),
          :ok <- sensitive_stage(emission, opts) do
       chart_stage(document, node, emission, opts)
     end
@@ -997,6 +999,25 @@ defmodule StatifierBlocks.Compiler do
        ]}
     else
       :ok
+    end
+  end
+
+  # -- Stage 5a'': the self-reference refusal ---------------------------------
+
+  # Runs on the assembled emission, between Emit and Chart, for the reason
+  # the sensitive-path refusal below runs there: the criterion is about
+  # the emission - which `<invoke>` names which document - rather than
+  # about one block's config, and it is the first point where the
+  # document's own id and every emitted `src` are both in hand. Its
+  # findings carry the `:emit` stage they were produced in, and it is not
+  # a new pipeline stage: decision 10's table is unchanged. See
+  # `StatifierBlocks.Compiler.SelfReference` for the criterion and for why
+  # cross-document cycles are the host resolver's.
+  @spec self_reference_stage(Emission.t(), Document.id()) :: :ok | {:error, [Finding.t()]}
+  defp self_reference_stage(emission, document_id) do
+    case SelfReference.check(emission, document_id) do
+      [] -> :ok
+      findings -> {:error, findings}
     end
   end
 
