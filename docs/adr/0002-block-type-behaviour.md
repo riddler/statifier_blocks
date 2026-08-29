@@ -1229,13 +1229,21 @@ What it deliberately is not:
 **Where the annotation lives.** It annotates a declared path, so it rides on
 whatever surface declares paths: today, a config field declaration carrying
 `datamodel_path?: true`, per the accepted amendment above. The typed, scoped
-datamodel *document* is a separate Proposed record (`sb-g8m`, in flight at the
-time of writing), and if that record lands, the same boolean belongs on its
-per-entry shape, from which the declared-path set is derivable by one total
-function. This section is written against the declared-path set - the
-normalized input the shipped editor already takes and `sb-6b1` implements - so
-it holds under either shape and asserts nothing about which one wins. `sb-g8m`
-owns that question.
+datamodel *document* is a separate accepted record, ADR-0006, and the same
+boolean belongs on its per-entry shape, from which the declared-path set is
+derivable by one total function. This section is written against the
+declared-path set - the normalized input the shipped editor already takes and
+`sb-6b1` implements - so it holds under either shape and asserts nothing about
+which one wins. ADR-0006 owns that question. [Correction 2026-08-29, sb-l0g:
+was "a separate Proposed record (`sb-g8m`, in flight at the time of writing),
+and if that record lands, the same boolean belongs ..." and closed "`sb-g8m`
+owns that question." The record landed as ADR-0006, "The datamodel document is
+a typed, three-scope declaration, and the declared-path set is its
+projection", accepted 2026-08-29 (PR 101). Stale status and a stale bead-id
+citation only; the substantive claim - that this section is written against
+the declared-path set and asserts nothing about which shape wins - is
+unchanged, and this correction places the `sensitive?` boolean on ADR-0006's
+per-entry shape no more firmly than the original sentence did.]
 
 **Worked example, credit-card processing.** A payment step's datamodel
 declares `card.last_four` and `card.token_id`, neither of them sensitive, and
