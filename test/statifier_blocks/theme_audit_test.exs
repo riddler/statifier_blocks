@@ -95,6 +95,10 @@ defmodule StatifierBlocks.ThemeAuditTest do
       """
     end
 
+    # Not a claim about the stylesheet: it is what stops the two checks above
+    # from passing vacuously if the scan regexes ever stop matching anything.
+    # Sabotage: narrowing `declared_tokens/1` to a name that does not exist -
+    # both directions go quiet and this is what notices.
     test "the scan actually saw the surface", context do
       assert MapSet.member?(context.declared, "--sb-accent")
       assert MapSet.member?(context.referenced, "--sb-accent")
@@ -143,6 +147,10 @@ defmodule StatifierBlocks.ThemeAuditTest do
       """
     end
 
+    # The same corroborator for the check above: a stylesheet with no reset at
+    # all satisfies the specificity rule perfectly.
+    # Sabotage: deleting the reset block - the lint above stays green and this
+    # goes red.
     test "the reset is actually present", %{source: source} do
       assert source =~ ":where(.sb-editor) button"
       assert source =~ ":where(.sb-editor) :focus-visible"
