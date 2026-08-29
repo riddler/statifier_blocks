@@ -672,13 +672,25 @@ slot refused for room, for the dragged block's own subtree, or for different
 reasons at different gaps has no single true sentence, and picking one would be
 picking arbitrarily.
 
-A consequence worth stating rather than leaving to be found: at per-slot
-granularity the reachable arm is `:not_assignable`. `{:fixable_by, _}` needs
-every gap in a slot to name the same producing block, and gaps name different
-ones by construction. It is a *position*-level answer, reachable where
-positions are - in a finding, and in whatever per-gap affordance decision 5's
-granularity is one day widened to allow. Nothing is lost; the finding still
-carries it.
+A consequence worth stating rather than leaving to be found: which arms can
+reach a slot, and by which path. A slot's *insertion* seams cannot agree on
+`{:fixable_by, _}`: gap 0's producing side is the slot's own inbound
+(`:slot_entry`) and gap `i`'s is the sibling at `i - 1`, so gaps name different
+blocks by construction and the arm an insertion seam can carry to slot level is
+`:not_assignable`. The *vacated* seam is different, and it is the per-slot path
+for `{:fixable_by, _}`: a move that would break the seam it leaves behind
+(`check/5`'s third seam - the block before the candidate's current position
+against the block after it) yields the same `:type_mismatch` at every position
+in the document, and its producing ref is that before-block. Every otherwise
+accepting gap then agrees, so every such slot reads `{:fixable_by, id}` -
+including slots in other parts of the tree, whose reason names a seam in the
+*source* slot rather than in themselves. That is the correct sentence for the
+author: the block cannot move anywhere until the declaration it is holding
+together is changed, and the reason says which one. A gap that also refuses
+on its own insertion seam takes that seam's reason instead (insertion seams
+precede the vacated seam in `check/5`'s order), and the slot then reports what
+its gaps agree on, or nothing. Nothing is lost; the finding still carries the
+position-level answer in every case.
 
 ### Consequences
 

@@ -203,11 +203,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # The root is excluded before the enumeration rather than after it. It has
     # no valid target in any case - `Edit.apply/2`'s `check_not_root/2`
     # refuses a `:move` of the root, so the correct answer is the empty set,
-    # and `Targets.droppable_slots/3` now independently arrives at the same
-    # empty set (rule 4 excludes the root's own subtree, which is every
-    # block). The guard stays because it says why the answer is empty at the
-    # place that asks, and it short-circuits an enumeration whose result is
-    # known; it is not a workaround for the `MatchError`
+    # and `Targets.slot_verdicts/3` (which the drag session runs) now
+    # independently arrives at the same empty set (rule 4 excludes the root's
+    # own subtree, which is every block). The guard stays because it says why
+    # the answer is empty at the place that asks, and it short-circuits an
+    # enumeration whose result is known; it is not a workaround for the `MatchError`
     # `Assignability.valid_targets/4` used to raise here (sb-rzr).
     def handle_event("dragstart", %{"block-id" => id}, socket) do
       {:noreply, assign(socket, :drag, drag_session(socket, id))}

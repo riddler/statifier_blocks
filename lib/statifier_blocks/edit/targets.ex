@@ -166,19 +166,26 @@ defmodule StatifierBlocks.Edit.Targets do
   explains, it never refuses more" holding at this layer too, by
   construction rather than by discipline.
 
-  In practice the reachable slot-level arm is `:not_assignable`, and this
-  is worth saying rather than leaving to be discovered.
-  `{:fixable_by, block_id}` needs every gap in a slot to name the *same*
-  producing block, and a slot's gaps name different ones by construction:
-  gap 0's producing side is the slot's own inbound (`:slot_entry`) or the
-  candidate itself, and gap `i`'s is the sibling at `i - 1`. So a slot with
-  more than one gap that refuses at all of them almost always disagrees
-  with itself and reports `nil`. `{:fixable_by, _}` is a *position*-level
-  answer, and it is reachable exactly where positions are: in a
-  `:type_mismatch` finding, and in whatever per-gap affordance ADR-0005
-  decision 5's per-slot granularity is eventually widened to allow. Nothing
-  here is lost - the finding still carries it - and the per-slot attribute
-  does not pretend to an answer the granularity cannot support.
+  Which refusing arm reaches slot level depends on which seam refused, and
+  this is worth saying rather than leaving to be discovered. Through a
+  slot's *insertion* seams only `:not_assignable` can: `{:fixable_by,
+  block_id}` needs every gap in a slot to name the *same* producing block,
+  and a slot's gaps name different ones by construction - gap 0's producing
+  side is the slot's own inbound (`:slot_entry`) and gap `i`'s is the
+  sibling at `i - 1` - so a slot with more than one gap refusing at all of
+  them disagrees with itself and reports `nil`. Through the *vacated* seam
+  (`Assignability.check/5`'s third seam, present only for a move)
+  `{:fixable_by, _}` is reachable and expected: a move that would break the
+  seam it leaves behind yields the same `:type_mismatch` at every position
+  in the document, naming the block before the candidate's current position,
+  so every otherwise-accepting gap agrees and every such slot reads
+  `{:refused, {:fixable_by, id}}` - including slots elsewhere in the tree,
+  whose reason then names a seam in the *source* slot. A gap that also
+  refuses on its own insertion seam takes that seam's reason instead
+  (insertion seams precede the vacated seam in `check/5`'s order). The
+  finding still carries the position-level answer in every case, and the
+  per-slot attribute does not pretend to an answer the granularity cannot
+  support.
   """
   @spec slot_verdicts(Document.t(), Palette.t(), Block.t()) ::
           [{{Block.id(), Block.slot_name()}, slot_verdict()}]
