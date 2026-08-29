@@ -1,6 +1,6 @@
 # ADR-0005: The editor is a pure command algebra and view model with a thin LiveView shell
 
-Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling)
+Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant)
 
 ## Context
 
@@ -1196,10 +1196,10 @@ looking at them.
 
 ---
 
-## Proposed amendment (2026-08-29): decision 10, `slot_style: :failure`
+## Amendment (2026-08-29): decision 10, `slot_style: :failure`
 
-**Status: PROPOSED, not accepted.** Additive; decision 10 stands as accepted
-until the operator rules, and no text above this line is changed by it. It is
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-014 grant, PR 69).** Drafted 2026-08-29 as a proposed amendment. Additive; decision 10 stands as accepted
+and no text above this line is changed by it. It is
 drafted from what campaign 013 built and the operator then ruled on: the
 failure-path slot style (`sb-68b`, PR 56) and the exit-edge ruling that
 followed it (`sb-67s`, 2026-08-29).
@@ -1332,10 +1332,10 @@ spike's theme audit stayed green across all three themes without one
 
 ---
 
-## Proposed amendment (2026-08-29): decision 11, an `:info` severity
+## Amendment (2026-08-29): decision 11, an `:info` severity
 
-**Status: PROPOSED, not accepted.** Additive; decision 11 stands as accepted
-until the operator rules, and no text above this line is changed by it.
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-014 grant, PR 69).** Drafted 2026-08-29 as a proposed amendment. Additive; decision 11 stands as accepted
+and no text above this line is changed by it.
 
 ### Context
 
