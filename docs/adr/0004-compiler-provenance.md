@@ -1,6 +1,6 @@
 # ADR-0004: One block, one state - a deterministic compile carrying a provenance map
 
-Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings)
+Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings); decision 2 amended - outcome-tagged finals (accepted 2026-08-29, operator ruling)
 
 ## Context
 
@@ -875,11 +875,15 @@ What this example is chosen to demonstrate:
   document hash, leaves the SCXML byte-identical, and leaves every running session
   resumable.
 
-## Proposed amendment (2026-08-28): decision 2, outcome-tagged finals
+## Amendment (2026-08-28): decision 2, outcome-tagged finals
 
-**Status: proposed.** Nothing in this section is accepted. It amends decision
-2's single-final emission and nothing else; every other decision in the record
-stands as written, and no accepted text above has been edited.
+**Status: accepted (2026-08-29, operator ruling).** Drafted 2026-08-28 as a
+proposed amendment; the operator accepted it in full on 2026-08-29, including
+the completion-event shape, the reserved `o_` role prefix, the
+no-grandfathering migration stance, and the outcome/state wiring exclusion. It
+amends decision 2's single-final emission and nothing else; every other
+decision in the record stands as written, and no accepted text above has been
+edited.
 
 ### What forces the amendment
 
