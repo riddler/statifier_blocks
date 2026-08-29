@@ -1150,3 +1150,194 @@ content, are both statifier-ex's and both still open. Neither blocks the row:
 a vocabulary table records what a type declares, and a type whose declared
 shape is settled belongs in it whether or not the engine has finished
 answering what a host can do to itself with it.
+
+---
+
+## Amendment (2026-08-29): decision 7, an optional `sensitive?` key, and the secrets rule behind it
+
+**Status: proposed (2026-08-29).** Additive; decision 7, its 2026-08-27
+`value_path` amendment and the accepted 2026-08-29 `datamodel_path?`
+amendment above all stand exactly as written, and no text above this line is
+edited by this section. It sits beside the `datamodel_path?` section because
+it annotates the same surface - a field declaration - and because the two keys
+are read together: one says a field's value is a datamodel path, this one says
+what may be true of the path it names.
+
+### Context
+
+**The rule, first, because the key exists only to serve it: credentials, API
+keys and other secrets never enter a chart datamodel.** A secret is referenced
+by an identifier and fetched by the invoke handler at effect time. The
+datamodel carries the identifier; it never carries the value.
+
+The reason is that encryption at rest answers one leak surface and there are
+several. A value that lives in a datamodel also flows into:
+
+- **traces** - the execution record a session leaves behind;
+- **telemetry** - measurement events emitted as the chart runs;
+- **job payloads** - the serialized state a durable step hands to a queue;
+- **the editor's fixtures and truth tables** - authoring artifacts that are
+  written down, shared, and checked in;
+- **LiveView diffs** - the wire updates the editor pushes to a browser.
+
+Encrypting storage covers the first surface a reader thinks of and none of
+these five. They are not defects to be fixed one at a time either: each of
+them exists because someone wanted the datamodel visible, which is exactly
+what a datamodel is for. The only durable answer is that the value is not
+there to be seen.
+
+That is a rule about hosts, not about this package. This package emits SCXML
+and never sees a value. What it can do is refuse to compile a document that
+would carry a value it has been told is a secret into a position where one of
+those five surfaces would read it - and to do that it needs the host to have
+said which paths those are. Hence a key.
+
+### Decision
+
+**A declared datamodel path may carry `sensitive?: true`.** It is a boolean,
+on the same convention `required?: boolean()` and `datamodel_path?: true`
+already establish, and it is read the same way: absent means what absence
+meant before, and a declaration without it behaves exactly as it does today.
+
+What it deliberately is not:
+
+- **Not a field type.** Decision 7's type set stays closed for the reason the
+  `datamodel_path?` section gives: a sensitive path is textually a path, and
+  a `:secret` type would give the editor a second control to render for
+  identical input. The closed set is what keeps the control table finite.
+- **Not encryption, masking, redaction, or any runtime behaviour.** Nothing in
+  this package reads a value, so nothing here can protect one. The key buys
+  exactly one thing: a claim the compiler can check a document against.
+- **Not a licence to store a secret.** This is the part worth saying in the
+  record rather than leaving to a reviewer's charity. The annotation exists
+  for the values a host insists on describing anyway - so that the compiler
+  can refuse them where they would leak - and describing a secret does not
+  make storing it correct. The rule above is unconditional. A host that reads
+  `sensitive?: true` as permission has read it backwards.
+
+**Where the annotation lives.** It annotates a declared path, so it rides on
+whatever surface declares paths: today, a config field declaration carrying
+`datamodel_path?: true`, per the accepted amendment above. The typed, scoped
+datamodel *document* is a separate Proposed record (`sb-g8m`, in flight at the
+time of writing), and if that record lands, the same boolean belongs on its
+per-entry shape, from which the declared-path set is derivable by one total
+function. This section is written against the declared-path set - the
+normalized input the shipped editor already takes and `sb-6b1` implements - so
+it holds under either shape and asserts nothing about which one wins. `sb-g8m`
+owns that question.
+
+**Worked example, credit-card processing.** A payment step's datamodel
+declares `card.last_four` and `card.token_id`, neither of them sensitive, and
+a host that insists on describing the raw pan and the processor credential
+declares `card.number` and `processor.api_key` with `sensitive?: true`. The
+correct document reads `card.token_id` into the invoke's params and lets the
+handler exchange it for the card data at effect time. A document that reads
+`card.number` or `processor.api_key` into those params is the case this
+annotation exists to catch.
+
+### What the compiler half does once this section is accepted
+
+Named here so the record says what it authorizes, and built by this bead's
+second half rather than by this one.
+
+**Refusal, and its shape.** When the host supplies a datamodel declaring a
+path sensitive, the compiler refuses a document that reads that path into a
+trace-visible position, with a finding whose fault is the document's - the
+author's side of ADR-0004 decision 9's split, the side that carries a config
+key - anchored `{:config, block_id, key}` on the offending field, source
+`:lint` from decision 11's source list, and a message naming the path and
+saying why it cannot go there.
+
+**The trace-visible positions, refused:**
+
+- a `core.invoke` param, whether the read is the whole declared path or a
+  prefix of it - a prefix drags the sensitive leaf along with everything else
+  under it, so a prefix read is the same leak spelled shorter;
+- a `core.send` payload;
+- a `core.assign` target or source - either direction: writing a sensitive
+  value somewhere else spreads it, reading one out publishes it;
+- a `core.branch` arm predicate.
+
+**No datamodel supplied, nothing produced.** The check does not run, reports
+nothing, and makes no claim - the same qualifier ADR-0005's 11f states for the
+undeclared-path advisories, and in 11f's own words: absence is not
+unknown-ness. A host that has described nothing has claimed nothing, and the
+compiler does not claim on its behalf.
+
+**Findings, not runtime checks.** This package emits SCXML and never sees a
+value, so every word above is about what a document says, checked at compile
+time. Nothing here inspects, masks, or intercepts anything at run time, and a
+record that appeared to promise that would be promising something this package
+is structurally unable to do.
+
+### What is not refused, and what this section leaves open
+
+A read of a sensitive path in a position that never leaves the session is not
+refused. The criterion is that one: a position whose value reaches none of the
+five surfaces above - no trace, no telemetry event, no job payload, no
+authoring fixture, no LiveView diff.
+
+What is clearly on that side today:
+
+- **The declaration itself.** Annotating a path is not a read of it, and a
+  datamodel that declares `processor.api_key` sensitive is not thereby a
+  document that reads it.
+- **The identifier pattern the rule prescribes.** A field reading
+  `card.token_id` - a declared path that is not sensitive, holding the
+  identifier the handler exchanges at effect time - is not a read of a
+  sensitive path at all. There is nothing to refuse, and the refusal must not
+  grow into a suspicion of any field near a secret.
+
+**And the honest remainder: in the accepted `core.*` vocabulary as it stands,
+that side of the line is otherwise empty.** Every position in decision 10's
+table, and in the `core.invoke` row the 2026-08-28 amendment added, that can
+read a datamodel path at all is in the refused list above. So the complement
+is a criterion with no members yet rather than a list, and this section states
+it as one deliberately.
+
+Two consequences of that, both left open on purpose:
+
+- **Where exactly the boundary falls is the compiler half's to refine**, against
+  the accepted trace and telemetry contracts, not this section's to decide. A
+  position argued to be session-local - a value consumed only by the next
+  block and never serialized, say - is admitted by an amendment naming it and
+  the surfaces it is shown to miss, not by a compiler bead reading the
+  criterion generously.
+- **Two of the four refused positions name types the vocabulary does not
+  declare today.** `core.send` is not in decision 10's table and not in the
+  2026-08-28 amendment's two additions; `core.assign`'s vocabulary row is a
+  sibling change the `datamodel_path?` section already names as not its own.
+  The clauses above bind those types when they exist. Today the refusal has
+  two live positions, `core.invoke` params and `core.branch` arm predicates,
+  and stating the other two now is what keeps the rule from having to be
+  rediscovered when the rows land.
+
+One further thing this section does not fix: **the severity a refusal
+carries.** Decision 11's severity set is `:error | :warning | :info` as
+amended, and the accepted amendments give `:lint` one producer at `:info`, for
+advisories that change no verdict. A refusal is not an advisory - it stops a
+compile - so it is not `:info`; which of the remaining two it is, and whether a
+`:lint` source may carry it, is one decision, and the compiler half is where it
+is asked. It is named here rather than assumed so that accepting this section
+does not silently settle it.
+
+### Consequences
+
+- One optional boolean on one declaration. Every existing declaration is
+  unchanged and every existing consumer keeps working, because absence means
+  what it meant before - the same property the `datamodel_path?` key has, for
+  the same reason.
+- The type set stays closed, and the editor's control table stays finite.
+- The compiler gains its first refusal that depends on an input outside the
+  document. ADR-0005's 11f already accepted that shape for advisories and
+  named it a real cost; this section spends it a second time, and at a higher
+  stake, because a refusal blocks where an advisory only informs. The
+  no-datamodel qualifier is what keeps that honest: a host that describes
+  nothing loses nothing.
+- The rule is stated as a rule, not as a feature. A host can obey it with no
+  annotation at all - by not putting secrets in the datamodel, which is the
+  whole instruction - and the annotation is the fallback for hosts that
+  describe what they should not be carrying.
+- Nothing changes in the anchor vocabulary, the source list, the severity set,
+  the field-type set, or the emission. This section adds one key and describes
+  one refusal.
