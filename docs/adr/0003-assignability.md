@@ -1,6 +1,6 @@
 # ADR-0003: Assignability is opaque-string identity plus a host-supplied widening relation
 
-Status: accepted (2026-08-26)
+Status: accepted (2026-08-26); decision 8 amended (2026-08-29, operator acceptance after the campaign-014 direction-agent gate on PR 88)
 
 ## Context
 
@@ -543,9 +543,9 @@ compiler would reject.
 
 ---
 
-## Proposed amendment (2026-08-29): decision 8, a reason vocabulary for what a seam decided
+## Amendment (2026-08-29): decision 8, a reason vocabulary for what a seam decided
 
-**Status: PROPOSED, not accepted.** Additive; decisions 1-9 stand as accepted
+**Status: accepted (2026-08-29, operator ruling: the campaign-014 direction-agent verdict on PR 88 was QUALIFIED on one claim in 8e, the text was corrected per that verdict and merged, and the operator accepted the section on 2026-08-29).** Drafted 2026-08-29 as a proposed amendment. Additive; decisions 1-9 stand as accepted
 and no text above this line is changed by it. Nothing here alters a verdict,
 a typespec above, or either finding tuple.
 
@@ -577,7 +577,7 @@ risk is in the word "distinct" - a vocabulary that quietly became a sixth
 decision-6 step would be the type system decision 1 refuses to build, arriving
 by the back door.
 
-### Proposed decision
+### Decision
 
 **8a. Five arms, and they explain rather than decide.**
 
