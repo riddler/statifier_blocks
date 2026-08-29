@@ -1551,3 +1551,110 @@ names would be a change to decision 9.
   holds everywhere else.
 - ADR-0001's document schema and ADR-0002's declaration surface, neither of
   which this section touches.
+
+## Amendment (2026-08-29): `core.parallel` `complete: first` - per-lane transitions, losing lanes exit and cancel
+
+**Status: proposed (2026-08-29).** This section is additive: nothing above it
+is edited, and every decision in the record stands as written. It drafts the
+operator's 2026-08-29 ruling on how a racing `core.parallel` compiles
+(`sb-olu`, mirrored to statifier-ex as `st-rau9`, "as recommended"). Upstream
+pin: `st-iefu`.
+
+### What forces the amendment
+
+`core.parallel` ships one completion mode. Its emission wraps a single
+`<parallel>` inside a compound state and takes one transition on
+`done.state.<run>` - a `<parallel>` is done when every region is, so "done when
+every lane is" needs no join logic and no decision of its own. A racing
+parallel - done when the *first* lane finishes - has neither property. It needs
+a completion event per lane rather than one for the block, and it leaves lanes
+running that the block is already finished with, which raises a question no
+decision above answers: what happens to a losing lane's `<invoke>`. The block
+type cannot pick either half on its own, and the ruling settles both.
+
+### P1. `complete: first` is one transition per lane, on the `<parallel>` element itself
+
+**`complete: first` compiles to one transition per lane on the `<parallel>`
+element itself, each taken on that lane's completion event and targeting the
+block's done final.**
+
+The transition set is per lane, not per block: nothing joins, and no auxiliary
+state counts arrivals. A lane's completion event is the one decision 2 already
+mints for it - each lane is a region, and a region reaching its `<final>`
+raises `done.state.<region id>` - so the block type computes every event it
+needs from decision 3's ids alone, exactly as the shipped mode computes its
+single one.
+
+The transitions sit on the `<parallel>` element and not on the compound state
+around it. That is what makes the first arrival win: a transition on the
+`<parallel>` is enabled while the `<parallel>` is in the configuration, and
+taking it exits the `<parallel>` - every region with it - rather than waiting
+for the element to be done.
+
+### P2. A losing lane gets Appendix D exit semantics: `onexit`, then one `CancelInvoke` per live invocation
+
+**Losing lanes get Appendix D exit semantics.** Exiting the `<parallel>` exits
+every region still in the configuration, and for each of those the engine runs
+the region's `<onexit>` and then raises one `CancelInvoke` per live invocation
+the region owns, dispatched through the registry handler's `cancel/2` - spec
+6.4's "as if it were the final `<onexit>` handler". **That cancel is never
+refused**: a handler does not get to decline it, and this compile does not
+depend on whether a particular invocation is cancellable.
+
+For an `scxml` child that means the child halts cancelled: it runs its own
+`<onexit>` content and raises no `done.invoke`. A completion or failure report
+that arrives after the cancel is **discarded at drain** (statifier-ex ADR-0068
+decision 4), so a losing lane cannot deliver an outcome to a block that has
+already finished.
+
+None of that is this package's to implement. It is the engine's Appendix D
+behaviour, and this section records it because it is what makes `complete:
+first` a compile rather than a runtime protocol: the compiler emits the
+transitions of P1 and nothing else, and the orderly exit of the losing lanes is
+a consequence of them.
+
+### P3. Each lane's scope-shaped `<cancel>` is emitted in that lane's `<onexit>`
+
+`CancelInvoke` covers invocations. A delayed send is not one, and the same exit
+has to reach it. The composition is the one this record's delayed-send
+amendment already fixes: **the compiler emits each lane's scope-shaped
+`<cancel sendid="..."/>` in that lane's `<onexit>`**, under "Amendment
+(2026-08-29): a delayed send's cancel, emitted in the arming state's
+`<onexit>`", section **B. The cancel is emitted in the arming state's
+`<onexit>`**.
+
+Nothing new is decided here. Section B makes a delayed send's cancel a
+consequence of where the `core.send` sits in the tree; a lane is a region and
+therefore a scope, so a `core.send` in a losing lane is cancelled when that
+lane is exited, by the `<onexit>` the compiler already emits for it. This
+section records only that `complete: first` is the case that makes the scope
+shape load-bearing rather than merely tidy.
+
+### Note: the winning lane cancels too, and that is upstream's
+
+Recorded for reviewers, and **not a decision of this record**: `st-iefu` found
+that the *winning* lane also draws a `CancelInvoke` on exit, for an invocation
+that has already completed. That is pre-existing engine behaviour rather than
+anything `complete: first` introduces, and it was ruled upstream as an
+`Invoke.Handler` documentation line (`st-9wkc`) rather than as a change of
+behaviour. Nothing in P1 through P3 contradicts it, and an emitter implementing
+this section must not assume that a cancel it observes names a live
+invocation.
+
+### What this amendment does not change
+
+- The completion mode `core.parallel` ships today - one `<parallel>` in a
+  compound state, one transition on `done.state.<run>`, done when every region
+  is. This section records a second mode and edits nothing about the first.
+- Decision 2's "one block, one state" and the ban on sibling states. The lanes
+  are regions inside the block's own `<parallel>`, exactly as they are today,
+  and the added transitions are structure inside a state that already exists.
+- Decision 3's derivation, or the `lane_<name>` and `done_lane_<name>` role
+  families the block already mints through the context.
+- Decision 5's provenance keys and their totality, or decision 6's determinism
+  guarantee: the transition set stays a pure function of the ordered lane
+  list.
+- The `core.subchart` amendment of this date, C3 included - a parallel subchart
+  still writes an explicit `<invoke id>`.
+- The delayed-send amendment of this date in any respect beyond citing its
+  section B.
