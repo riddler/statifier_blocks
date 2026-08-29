@@ -1,6 +1,6 @@
 # ADR-0005: The editor is a pure command algebra and view model with a thin LiveView shell
 
-Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90)
+Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 9 amended - the `:duration` control, predicator strings primary (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 91)
 
 ## Context
 
@@ -1755,7 +1755,7 @@ compiles as it did before.
 
 ## Amendment (2026-08-29): decision 9, the `:duration` control
 
-**Status: proposed.** Drafted 2026-08-29 from an operator ruling. Additive;
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 91).** Drafted 2026-08-29 from an operator ruling. Additive;
 decision 9 stands as accepted and no text above this line is changed by it. It
 closes the open item the d10/13 amendment above left as "Decision 9's
 `:duration` control: the escape hatch is evidence, not decoration".
@@ -1781,7 +1781,7 @@ spellings). This section takes the same answer for the shipped editor, on the
 operator's ruling, and writes it down as a table row so the shipped renderer
 has a record to graduate against rather than a spike to copy.
 
-### Proposed decision
+### Decision
 
 Decision 9's `:duration` row is amended to read:
 
