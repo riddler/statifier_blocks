@@ -1585,11 +1585,12 @@ raises `done.state.<region id>` - so the block type computes every event it
 needs from decision 3's ids alone, exactly as the shipped mode computes its
 single one.
 
-The transitions sit on the `<parallel>` element and not on the compound state
-around it. That is what makes the first arrival win: a transition on the
-`<parallel>` is enabled while the `<parallel>` is in the configuration, and
-taking it exits the `<parallel>` - every region with it - rather than waiting
-for the element to be done.
+The transitions sit on the `<parallel>` element itself, as ruled. What makes
+the first arrival win is the event each transition is taken on:
+`done.state.<region id>` is raised the moment one region reaches its
+`<final>`, and taking the transition exits the `<parallel>` - every region
+with it - instead of waiting for `done.state.<run>`, which the element raises
+only when every region is done.
 
 ### P2. A losing lane gets Appendix D exit semantics: `onexit`, then one `CancelInvoke` per live invocation
 
@@ -1610,8 +1611,9 @@ already finished.
 None of that is this package's to implement. It is the engine's Appendix D
 behaviour, and this section records it because it is what makes `complete:
 first` a compile rather than a runtime protocol: the compiler emits the
-transitions of P1 and nothing else, and the orderly exit of the losing lanes is
-a consequence of them.
+transitions of P1 - and, for a delayed send, the `<cancel>` P3 records - and
+no join, counter, or cancellation protocol of its own; the orderly exit of the
+losing lanes is a consequence of the transitions.
 
 ### P3. Each lane's scope-shaped `<cancel>` is emitted in that lane's `<onexit>`
 
@@ -1626,7 +1628,7 @@ amendment already fixes: **the compiler emits each lane's scope-shaped
 Nothing new is decided here. Section B makes a delayed send's cancel a
 consequence of where the `core.send` sits in the tree; a lane is a region and
 therefore a scope, so a `core.send` in a losing lane is cancelled when that
-lane is exited, by the `<onexit>` the compiler already emits for it. This
+lane is exited, by the `<onexit>` section B has the compiler emit for it. This
 section records only that `complete: first` is the case that makes the scope
 shape load-bearing rather than merely tidy.
 
@@ -1637,9 +1639,8 @@ that the *winning* lane also draws a `CancelInvoke` on exit, for an invocation
 that has already completed. That is pre-existing engine behaviour rather than
 anything `complete: first` introduces, and it was ruled upstream as an
 `Invoke.Handler` documentation line (`st-9wkc`) rather than as a change of
-behaviour. Nothing in P1 through P3 contradicts it, and an emitter implementing
-this section must not assume that a cancel it observes names a live
-invocation.
+behaviour. Nothing in P1 through P3 contradicts it, and a reader of a trace
+should not assume that a cancel it observes names a live invocation.
 
 ### What this amendment does not change
 
