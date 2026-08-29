@@ -1,6 +1,6 @@
 # ADR-0002: A block type is a behaviour module resolved through a caller-supplied palette
 
-Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings); outcomes/metadata/label amendment (accepted 2026-08-29, operator ruling); decision 7 amended - optional `datamodel_path?` key (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90)
+Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings); outcomes/metadata/label amendment (accepted 2026-08-29, operator ruling); decision 7 amended - optional `datamodel_path?` key (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 10 amended - the core.assign row, section G (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 98)
 
 ## Context
 
@@ -1056,7 +1056,7 @@ datamodel and anchors any advisory on the `path` key.
 
 ## Amendment (2026-08-29): the `core.assign` row on decision 10
 
-**Status: proposed (2026-08-29, operator ruling on sb-jhj).** The 2026-08-28
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 98).** The 2026-08-28
 amendment's section D promoted `core.invoke` and `core.raise` and stopped
 there, so `core.assign` - built in the campaign-013 spike, shipped in
 campaign 014, and registered in `StatifierBlocks.Palette.core_types/0` - has
