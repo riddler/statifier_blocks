@@ -28,8 +28,9 @@ defmodule StatifierBlocks.ViewModel do
       `:error`.
 
   `:arity`, `:assignability` and `:lint` findings are never produced here;
-  their producers live elsewhere - `sb-da9` (palette-aware arity and
-  undeclared-slot checks, not yet built), `Assignability.validate/3`, and
+  their producers live elsewhere - `StatifierBlocks.SlotValidation`
+  (palette-aware slot arity and undeclared-slot checks; landed under `sb-da9`,
+  was described here as "not yet built"), `Assignability.validate/3`, and
   the compiler's invoke-type lint respectively - and this module does not
   adapt `StatifierBlocks.Compiler.Finding` into `StatifierBlocks.Finding`
   to manufacture them. That adapter is a real, mechanical possibility

@@ -423,8 +423,13 @@ record got it wrong. Chart-stage findings are of two kinds:
   whole.
 
 Content findings get one refinement. The predicator parse error carries a span
-within the expression string, and statifier ships `Location.resolve_span/3` to
-compose such a span into an absolute document span. Running that composition
+within the expression string, and statifier ships `Location.resolve_span/4` to
+compose such a span into an absolute document span. [Correction 2026-08-29,
+sb-4kh: was `Location.resolve_span/3`. The resolved dependency, statifier
+2.2.0, exports `Statifier.Parser.Location.resolve_span/4`
+(`value_location, span, value, source`) and no `/3` - verified with
+`function_exported?` against `deps/`. Stale cross-reference only; the
+composition itself is sb-aal's work.] Running that composition
 backwards through provenance yields an offset *within the author's config value*,
 so the editor can underline the offending sub-expression inside the field. This is
 the payoff for keeping spans rather than ids as the routing key, and it is
@@ -787,7 +792,7 @@ editor anchors the finding to (amended 2026-08-27) - so:
 ```
 
 Same stage, same pipeline, opposite fault, and a config key the editor can focus.
-Composing the predicator span through `Location.resolve_span/3` and back through
+Composing the predicator span through `Location.resolve_span/4` and back through
 the owning span puts the caret on the second `>` inside the field the author
 typed into.
 
