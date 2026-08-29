@@ -328,6 +328,7 @@ defmodule StatifierBlocks.CoreFixtures do
   def valid_config(Core.OnEvent), do: %{"event" => "order.cancelled", "outcome" => "abandon"}
   def valid_config(Core.Raise), do: %{"event" => "signup.abandoned"}
   def valid_config(Core.Assign), do: %{"path" => "review.parked", "value" => "false"}
+  def valid_config(Core.Send), do: %{"event" => "signup.abandoned", "delay" => "PT2H"}
 
   def valid_config(Core.Invoke),
     do: %{

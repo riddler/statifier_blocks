@@ -21,6 +21,7 @@ defmodule StatifierBlocks.Core do
   | `core.invoke` | `#{inspect(__MODULE__)}.Invoke` | `on_error` |
   | `core.raise` | `#{inspect(__MODULE__)}.Raise` | none |
   | `core.assign` | `#{inspect(__MODULE__)}.Assign` | none |
+  | `core.send` | `#{inspect(__MODULE__)}.Send` | none |
 
   ## Structure, not domain
 
