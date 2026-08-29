@@ -225,7 +225,6 @@ defmodule StatifierBlocks.Core.Invoke do
   def emit(%Block{config: config}, context) do
     with {:ok, running} <- Context.role_id(context, "running"),
          {:ok, done_final} <- Context.outcome_id(context, "done"),
-         {:ok, done_raise} <- Context.outcome_event(context, "done"),
          {:ok, invoke_type} <- invoke_type(Map.get(config, "invoke_type")),
          {:ok, rows} <- params(Map.get(config, "params")),
          {:ok, result} <- assign(Map.get(config, "assign_to")),
@@ -245,7 +244,7 @@ defmodule StatifierBlocks.Core.Invoke do
       children =
         [inner] ++
           error_children(error_parts) ++
-          [outcome_final(done_final, done_raise)] ++ error_final(error_parts)
+          [Emit.final(done_final)] ++ error_final(error_parts)
 
       {:ok, Emit.state(context.state_id, running, children)}
     end
@@ -254,8 +253,12 @@ defmodule StatifierBlocks.Core.Invoke do
   # The error half is emitted only when the `on_error` slot is occupied,
   # and it is all of one piece: the transition out of the call, the
   # child's subtree, the transition into the final, and the final itself.
+  # The completion event each outcome final raises is no longer carried
+  # here: `StatifierBlocks.Core.Emit.final/1` derives it from the id, so
+  # there is one implementation of an outcome final rather than this
+  # type's and the shared vocabulary's.
   @spec error_parts(Context.t()) ::
-          {:ok, nil | {Context.child_summary(), String.t(), String.t()}}
+          {:ok, nil | {Context.child_summary(), String.t()}}
           | {:error, {:invalid_outcome, Block.id(), String.t()}}
   defp error_parts(context) do
     case Context.children(context, "on_error") do
@@ -263,21 +266,20 @@ defmodule StatifierBlocks.Core.Invoke do
         {:ok, nil}
 
       [child | _rest] ->
-        with {:ok, final} <- Context.outcome_id(context, "error"),
-             {:ok, raise_event} <- Context.outcome_event(context, "error") do
-          {:ok, {child, final, raise_event}}
+        with {:ok, final} <- Context.outcome_id(context, "error") do
+          {:ok, {child, final}}
         end
     end
   end
 
   defp failure_transition(nil), do: []
 
-  defp failure_transition({child, _final, _raise_event}),
+  defp failure_transition({child, _final}),
     do: [Emit.transition(event: @error_event, target: child.state_id)]
 
   defp error_children(nil), do: []
 
-  defp error_children({child, final, _raise_event}) do
+  defp error_children({child, final}) do
     [
       Emission.child_ref(child.block_id),
       [event: child.done_event, target: final, internal: true]
@@ -287,18 +289,7 @@ defmodule StatifierBlocks.Core.Invoke do
   end
 
   defp error_final(nil), do: []
-  defp error_final({_child, final, raise_event}), do: [outcome_final(final, raise_event)]
-
-  # A `<final>` whose entry raises the outcome's own completion event. The
-  # `done.state` the engine generates beside it stays what it was - the
-  # "finished, do not care how" signal - so a parent written against the
-  # accepted record still sequences after this block unchanged.
-  @spec outcome_final(String.t(), String.t()) :: Emission.t()
-  defp outcome_final(id, event) do
-    Emission.element("final", [{"id", id}], [
-      Emission.element("onentry", [], [Emission.element("raise", [{"event", event}])])
-    ])
-  end
+  defp error_final({_child, final}), do: [Emit.final(final)]
 
   # `assign_to` is written on the success transition rather than in a
   # `<finalize>`: the result is only a result when the call succeeded, and

@@ -1,8 +1,9 @@
 defmodule StatifierBlocks.BlockTypeFixtures do
   @moduledoc """
   Test-only `StatifierBlocks.BlockType` implementations for phase 1 of
-  ADR-0002. `Toy` implements all nine callbacks so a test can exercise
-  every one of them; `Minimal` implements only the five required callbacks
+  ADR-0002. `Toy` implements nine of the ten callbacks - every one but
+  `outcomes/1`, which `Outcomes` below covers - so a test can exercise
+  each of them; `Minimal` implements only the five required callbacks
   so a test can confirm the four optional ones genuinely degrade rather
   than being silently required. `StringKeyedFixtures` and `PathFixtures`
   exist only to cover two of the four `fixtures/0` spellings amendment 9a
@@ -12,6 +13,13 @@ defmodule StatifierBlocks.BlockTypeFixtures do
   that itself errors, and a type whose config shape has changed with no
   `migrate_config/2` at all.
 
+  `Outcomes`, `OutcomeParent`, `MalformedOutcomes` and `DuplicateOutcomes`
+  (sb-x5v) cover ADR-0002 amendment A's `outcomes/1`: a type that declares
+  several, a container that reads its children's outcomes out of the
+  summary, and the two ways a declaration is refused. They emit real
+  `StatifierBlocks.Emission` trees rather than marker tuples, because what
+  they are for is a compile that reaches the chart stage.
+
   `raw_palette/0` returns the plain `%{type_name => module}` map phase 1
   needed, kept for anything that wants the bare map. `palette/0` (phase 2)
   wraps the same map in a `StatifierBlocks.Palette`, which is what every
@@ -19,11 +27,15 @@ defmodule StatifierBlocks.BlockTypeFixtures do
   """
 
   alias StatifierBlocks.Block
+  alias StatifierBlocks.Compiler.Context
+  alias StatifierBlocks.Core.Emit
+  alias StatifierBlocks.Emission
   alias StatifierBlocks.Palette
 
   defmodule Toy do
     @moduledoc """
-    Implements all nine `StatifierBlocks.BlockType` callbacks, modelled on
+    Implements nine of the ten `StatifierBlocks.BlockType` callbacks -
+    every one but `outcomes/1` - modelled on
     ADR-0002's `MyApp.Blocks.BudgetCheck` worked example: a config-parameterized
     review slot, a cross-field validation rule that lives only in
     `validate_config/1`, and a v1 -> v2 config-key rename.
@@ -229,6 +241,147 @@ defmodule StatifierBlocks.BlockTypeFixtures do
 
     @impl true
     def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+  end
+
+  defmodule Outcomes do
+    @moduledoc """
+    A leaf declaring three outcomes (ADR-0002 amendment A1), deliberately
+    **not** in alphabetical order: `done`, `error`, `abandoned`. Declaration
+    order is what ADR-0004 decision 6's byte determinism reads, so a
+    resolver that sorted the list would be visible here.
+
+    It emits one `<final>` per declared outcome, minted through
+    `StatifierBlocks.Compiler.Context.outcome_id/2`, and enters the default
+    one - which is enough of a real emission to compile.
+    """
+
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+
+    @impl true
+    def slots(_config), do: []
+
+    @impl true
+    def config_schema(_config), do: []
+
+    @impl true
+    def validate_config(_config), do: :ok
+
+    @impl true
+    def outcomes(_config), do: [{"done", "Done"}, {"error", "Failed"}, {"abandoned", "Given up"}]
+
+    @impl true
+    def emit(%Block{config: config}, context) do
+      finals =
+        __MODULE__
+        |> StatifierBlocks.BlockType.outcome_names(config)
+        |> Enum.map(fn name ->
+          {:ok, id} = Context.outcome_id(context, name)
+          Emit.final(id)
+        end)
+
+      {:ok, Emit.state(context.state_id, Context.done_id(context), finals)}
+    end
+  end
+
+  defmodule OutcomeParent do
+    @moduledoc """
+    A container that wires **every** outcome of every child in its `body`
+    slot to its own final, reading the ids and events out of the child
+    summaries rather than knowing any child's type (ADR-0004's outcome
+    amendment, 2e). What a parent can see of its children's outcomes is
+    therefore observable in the bytes it emits.
+    """
+
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+
+    @impl true
+    def slots(_config), do: [{"body", :any, "Body"}]
+
+    @impl true
+    def config_schema(_config), do: []
+
+    @impl true
+    def validate_config(_config), do: :ok
+
+    @impl true
+    def emit(%Block{}, context) do
+      done = Context.done_id(context)
+      children = Context.children(context, "body")
+
+      transitions =
+        for child <- children, outcome <- child.outcomes do
+          Emit.transition(event: outcome.done_event, target: done, internal: true)
+        end
+
+      refs = Enum.map(children, &Emission.child_ref(&1.block_id))
+      initial = if children == [], do: done, else: hd(children).state_id
+
+      {:ok, Emit.state(context.state_id, initial, transitions ++ refs ++ [Emit.final(done)])}
+    end
+  end
+
+  defmodule MalformedOutcomes do
+    @moduledoc """
+    Declares an outcome name outside the role shape, so the compiler
+    refuses it with an `:invalid_outcome` Emit finding against the block
+    whose type declared it (ADR-0004's outcome amendment, 2f).
+    """
+
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+
+    @impl true
+    def slots(_config), do: []
+
+    @impl true
+    def config_schema(_config), do: []
+
+    @impl true
+    def validate_config(_config), do: :ok
+
+    @impl true
+    def outcomes(_config), do: [{"done", "Done"}, {"Gave Up", "Gave up"}]
+
+    @impl true
+    def emit(%Block{}, context),
+      do: {:ok, Emit.state(context.state_id, Context.done_id(context), [])}
+  end
+
+  defmodule DuplicateOutcomes do
+    @moduledoc """
+    Declares the same outcome name twice, the other half of 2f's
+    `:invalid_outcome`: two finals would carry one id, so the compiler
+    refuses rather than emitting a chart whose ids collide.
+    """
+
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+
+    @impl true
+    def slots(_config), do: []
+
+    @impl true
+    def config_schema(_config), do: []
+
+    @impl true
+    def validate_config(_config), do: :ok
+
+    @impl true
+    def outcomes(_config), do: [{"done", "Done"}, {"error", "Failed"}, {"error", "Failed again"}]
+
+    @impl true
+    def emit(%Block{}, context),
+      do: {:ok, Emit.state(context.state_id, Context.done_id(context), [])}
   end
 
   defmodule StringKeyedFixtures do

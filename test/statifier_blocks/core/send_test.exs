@@ -128,9 +128,12 @@ defmodule StatifierBlocks.Core.SendTest do
     test "emits <send> inside <onentry>, in a compound state with its own <final>" do
       scxml = compile!(send_block(%{"event" => "signup.abandoned"})).scxml
 
-      assert scxml =~ ~s(<state id="s_blk_SND" initial="s_blk_SND__done">)
+      assert scxml =~ ~s(<state id="s_blk_SND" initial="s_blk_SND__o_done">)
       assert scxml =~ ~s(<onentry><send event="signup.abandoned"/></onentry>)
-      assert scxml =~ ~s(<final id="s_blk_SND__done"/>)
+
+      assert scxml =~
+               ~s(<final id="s_blk_SND__o_done"><onentry>) <>
+                 ~s(<raise event="done.outcome.s_blk_SND.done"/></onentry></final>)
     end
 
     # Sabotage: returned `{:ok, "0s"}` from both of `delay/1`'s "no delay"
@@ -182,7 +185,7 @@ defmodule StatifierBlocks.Core.SendTest do
       {:ok, machine} = Statifier.compile(compiled.scxml)
       {machine_state, _effects} = Statifier.initialize(machine)
 
-      assert MapSet.member?(Statifier.active_leaf_states(machine_state), "s_blk_SND__done")
+      assert MapSet.member?(Statifier.active_leaf_states(machine_state), "s_blk_SND__o_done")
     end
 
     # The check that makes the shorthand a contract rather than a habit:

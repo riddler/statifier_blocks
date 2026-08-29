@@ -1,7 +1,7 @@
 defmodule StatifierBlocks.Core.EmitTest do
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{Block, Compiler, Document, Palette}
+  alias StatifierBlocks.{Block, Compiler, Document, Emission, Palette}
   alias StatifierBlocks.Compiler.Context
   alias StatifierBlocks.Core.{Emit, OnEvent}
   alias StatifierBlocks.CoreFixtures
@@ -18,14 +18,53 @@ defmodule StatifierBlocks.Core.EmitTest do
         scxml = compile!(block, Palette.core()).scxml
 
         assert scxml =~ ~s(<state id="s_blk_ONE"), type_name
-        # The `done` role for a single-outcome type; an outcome final for
-        # one that declares more than one way to finish (ADR-0004 outcome
-        # amendment, 2b). Either way the state is compound and carries a
-        # `<final>`, which is the whole of the convention.
-        assert scxml =~ ~s(<final id="s_blk_ONE__done"/>) or
-                 scxml =~ ~s(<final id="s_blk_ONE__o_),
-               type_name
+        # Every final is an outcome final now (ADR-0004 outcome amendment,
+        # 2b): the default outcome's for a single-outcome type, one per
+        # outcome reached for a type that declares more than one. Either
+        # way the state is compound and carries a `<final>`, which is the
+        # whole of the convention.
+        assert scxml =~ ~s(<final id="s_blk_ONE__o_), type_name
       end
+    end
+  end
+
+  describe "final/1 (ADR-0004's outcome amendment, 2c)" do
+    # sabotage: emitted a bare `<final>` for every id, as `final/1` did
+    # before the amendment -> the summary advertises
+    # `done.outcome.<sid>.<name>` for every child and nothing raises it,
+    # which is what this assert catches (verified red)
+    test "an outcome final raises its own completion event" do
+      assert Emit.final("s_blk_AUTH__o_error") ==
+               Emission.element("final", [{"id", "s_blk_AUTH__o_error"}], [
+                 Emission.element("onentry", [], [
+                   Emission.element("raise", [{"event", "done.outcome.s_blk_AUTH.error"}])
+                 ])
+               ])
+    end
+
+    # The default outcome is an outcome like any other, which is the whole
+    # of the `__done -> __o_done` migration.
+    # sabotage: special-cased `"done"` back to a bare `<final>` -> the one
+    # outcome every core type has stops raising and this goes red (verified)
+    test "the default outcome's final raises too" do
+      final = Emit.final(Context.done_id(Context.new("blk_SEQ", "bdoc_T")))
+
+      assert final.attributes == [{"id", "s_blk_SEQ__o_done"}]
+      assert [%{name: "onentry", children: [raise_element]}] = final.children
+      assert raise_element.attributes == [{"event", "done.outcome.s_blk_SEQ.done"}]
+    end
+
+    # A role outside the `o_` namespace is a completion marker inside the
+    # block, not an outcome a parent can wire on - `guarded/4`'s
+    # `body_done` is the live example.
+    # sabotage: had `StateId.unoutcome_id/1` take any role whole as the
+    # outcome rather than matching the `o_` prefix -> `body_done` reads as
+    # an outcome and this goes red (verified)
+    test "an ordinary role's final stays bare" do
+      assert Emit.final("s_blk_GRP__body_done") ==
+               Emission.element("final", [{"id", "s_blk_GRP__body_done"}])
+
+      assert Emit.final("s_blk_GRP") == Emission.element("final", [{"id", "s_blk_GRP"}])
     end
   end
 
@@ -38,7 +77,7 @@ defmodule StatifierBlocks.Core.EmitTest do
 
       {machine_state, _effects} = run(root)
 
-      assert done?(machine_state, "s_blk_SEQ__done")
+      assert done?(machine_state, "s_blk_SEQ__o_done")
     end
 
     # sabotage: make chain/2 return the first child as `initial` even for an
@@ -48,7 +87,7 @@ defmodule StatifierBlocks.Core.EmitTest do
       root = sequence([])
 
       assert {:ok, _machine} = Statifier.compile(compile!(root, Palette.core()).scxml)
-      assert compile!(root, Palette.core()).scxml =~ ~s(initial="s_blk_SEQ__done")
+      assert compile!(root, Palette.core()).scxml =~ ~s(initial="s_blk_SEQ__o_done")
     end
   end
 
@@ -62,7 +101,7 @@ defmodule StatifierBlocks.Core.EmitTest do
 
       scxml = compiled_branch()
 
-      assert done?(machine_state, "s_blk_BR__done")
+      assert done?(machine_state, "s_blk_BR__o_done")
       assert scxml =~ ~s(cond="budget_remaining &gt; amount" target="s_blk_HIT")
 
       # Order is the whole of the semantics here: an unconditional
@@ -83,7 +122,7 @@ defmodule StatifierBlocks.Core.EmitTest do
           slots: %{"arm_hit" => [container("blk_HIT")]}
         )
 
-      assert compile!(root, Palette.core()).scxml =~ ~s(<transition target="s_blk_BR__done"/>)
+      assert compile!(root, Palette.core()).scxml =~ ~s(<transition target="s_blk_BR__o_done"/>)
     end
   end
 
@@ -101,7 +140,7 @@ defmodule StatifierBlocks.Core.EmitTest do
 
       {machine_state, _effects} = run(root)
 
-      assert done?(machine_state, "s_blk_PAR__done")
+      assert done?(machine_state, "s_blk_PAR__o_done")
     end
 
     # sabotage: emit an empty <parallel> for a lane-less config -> the
@@ -123,7 +162,7 @@ defmodule StatifierBlocks.Core.EmitTest do
       {machine_state, _effects} = run(group("abandon"))
       {:ok, machine_state, _effects} = Statifier.send_event(machine_state, "order.cancelled")
 
-      assert done?(machine_state, "s_blk_GRP__done")
+      assert done?(machine_state, "s_blk_GRP__o_done")
     end
 
     # sabotage: drop the `statifier_blocks.interrupt.resume` transition from
@@ -133,7 +172,7 @@ defmodule StatifierBlocks.Core.EmitTest do
       {machine_state, _effects} = run(group("resume"))
       {:ok, machine_state, _effects} = Statifier.send_event(machine_state, "order.cancelled")
 
-      refute done?(machine_state, "s_blk_GRP__done")
+      refute done?(machine_state, "s_blk_GRP__o_done")
       assert done?(machine_state, "s_blk_STEP__waiting")
       # The re-armed handler is what distinguishes a resume from an event
       # nothing acted on: without the resume transition the body would also
@@ -178,7 +217,7 @@ defmodule StatifierBlocks.Core.EmitTest do
 
       assert done?(machine_state, "s_blk_AFTER__waiting")
       assert done?(machine_state, "s_blk_OH__armed")
-      refute done?(machine_state, "s_blk_OUT__done")
+      refute done?(machine_state, "s_blk_OUT__o_done")
     end
 
     # sabotage: make Core.Group.emit/2 pass a history mode -> a plain group

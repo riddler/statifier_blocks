@@ -28,11 +28,11 @@ defmodule StatifierBlocks.BlockType do
   ## Required and optional callbacks
 
   Five callbacks are required; a module missing one of them is not a valid
-  `StatifierBlocks.BlockType` and fails to compile as one. Four are
+  `StatifierBlocks.BlockType` and fails to compile as one. Five are
   optional (`@optional_callbacks io: 1, migrate_config: 2, fixtures: 0,
-  palette_entry: 0`); a module that implements only the five required ones
-  compiles cleanly, and each optional absence degrades to a stated default
-  rather than an error:
+  palette_entry: 0, outcomes: 1`); a module that implements only the five
+  required ones compiles cleanly, and each optional absence degrades to a
+  stated default rather than an error:
 
   | Callback | Required? | Absent means |
   |---|---|---|
@@ -45,6 +45,7 @@ defmodule StatifierBlocks.BlockType do
   | `migrate_config/2` | no | the type has never changed its config shape |
   | `fixtures/0` | no | the palette entry has no executable examples |
   | `palette_entry/0` | no | the editor falls back to the type name |
+  | `outcomes/1` | no | the block has one outcome, `{"done", "Done"}` |
 
   ## Who owns what
 
@@ -57,6 +58,7 @@ defmodule StatifierBlocks.BlockType do
   | `io/1` | ADR-0003 (assignability) |
   | `emit/2` | ADR-0004 (compiler provenance) |
   | `palette_entry/0` | ADR-0005 (LiveView editor) |
+  | `outcomes/1` | this record's amendment A; the emission is ADR-0004's |
   """
 
   alias StatifierBlocks.Block
@@ -93,6 +95,17 @@ defmodule StatifierBlocks.BlockType do
 
   @typedoc "Names the offending config key; message is author-facing."
   @type finding :: {key :: String.t(), message :: String.t()}
+
+  @typedoc """
+  One declared outcome: the name the compiled event carries, and human
+  text on the same footing as a slot declaration's label (ADR-0002
+  amendment A1).
+
+  Names match `~r/\\A[a-z][a-z0-9_]*\\z/` and contain no `"__"` - the role
+  shape ADR-0004 decision 3 mints ids under, checked by
+  `StatifierBlocks.Compiler.StateId.role?/1`.
+  """
+  @type outcome_decl :: {name :: String.t(), label :: String.t()}
 
   @doc """
   Slots this block carries given this config (ADR-0001 decision 5).
@@ -301,7 +314,84 @@ defmodule StatifierBlocks.BlockType do
   """
   @callback palette_entry() :: palette_entry()
 
-  @optional_callbacks io: 1, migrate_config: 2, fixtures: 0, palette_entry: 0
+  @doc """
+  The ways this block can finish, in a fixed order (ADR-0002 amendment A1).
+
+  A type that does not export it has exactly one outcome, `{"done",
+  "Done"}`, which is the case every accepted `core.*` type is in and none
+  of them changes meaning. `outcomes/2`'s doc on this module is the
+  resolver every consumer reads it through.
+
+  It takes `config` for decision 5's reason: a type whose alternative
+  paths are config-parameterized declares one outcome per arm, the same
+  shape `slots/1` and `config_schema/1` already have.
+
+  **Order is declaration order and is never sorted.** ADR-0004 decision
+  6's byte determinism reads it: outcomes serialize in the order this
+  callback returns them, so reordering the list moves compiled bytes.
+
+  Stability rule (decision 6, and decision 4's purity): `outcomes/1` is a
+  pure function of `config`, returns the same list for the same config,
+  and returns without raising for any config `validate_config/1` accepts -
+  the editor calls it mid-edit and the compiler calls it against config
+  the type has already accepted.
+
+  A name failing the role shape, or declared twice, is an
+  `:invalid_outcome` Emit finding against this block (ADR-0004's
+  amendment, 2f), not a raise.
+  """
+  @callback outcomes(Block.config()) :: [outcome_decl()]
+
+  @optional_callbacks io: 1, migrate_config: 2, fixtures: 0, palette_entry: 0, outcomes: 1
+
+  # ADR-0002 amendment A1's default: a type that declares no outcomes has
+  # exactly one, named `done`. Named once, here, so the compiler and the
+  # editor cannot disagree about what a defaulting type declares.
+  @default_outcomes [{"done", "Done"}]
+
+  @doc """
+  `module.outcomes(config)`, or `#{inspect(@default_outcomes)}` when
+  `outcomes/1` is absent or `module` is not loadable (ADR-0002 amendment
+  A1). Checked with `Code.ensure_loaded?/1` plus `function_exported?/3`,
+  the pattern `StatifierBlocks.Palette.resolve/2` already uses.
+
+  The list comes back in **declaration order**, never sorted: ADR-0004
+  decision 6's byte determinism reads that order, and a resolver that
+  tidied it would move a host's compiled bytes for no reason it could
+  name.
+  """
+  @spec outcomes(module(), Block.config()) :: [outcome_decl()]
+  def outcomes(module, config) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :outcomes, 1) do
+      module.outcomes(config)
+    else
+      @default_outcomes
+    end
+  end
+
+  @doc """
+  The names `outcomes/2` declares, in declaration order.
+
+  What the compiler mints ids and events from; the labels are the
+  editor's.
+
+  Total over any return value, including one the `t:outcome_decl/0` spec
+  does not describe: a declaration that is not a `{name, label}` pair with
+  a binary name comes back as its `inspect/1` rendering, which no role
+  shape matches, so a host type that declares nonsense gets the ordinary
+  `:invalid_outcome` finding naming what it wrote rather than a crash
+  inside the compiler.
+  """
+  @spec outcome_names(module(), Block.config()) :: [String.t()]
+  def outcome_names(module, config) do
+    module
+    |> outcomes(config)
+    |> Enum.map(&outcome_name/1)
+  end
+
+  @spec outcome_name(term()) :: String.t()
+  defp outcome_name({name, _label}) when is_binary(name), do: name
+  defp outcome_name(malformed), do: inspect(malformed)
 
   @doc """
   Where a field declaration's value lives, as a path from the config root.

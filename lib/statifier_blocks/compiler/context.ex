@@ -22,16 +22,18 @@ defmodule StatifierBlocks.Compiler.Context do
   compiler's job, and would make `emit/2`'s purity depend on a value it did
   not receive.
 
-  ## The `"done"` role is conventional, not reserved
+  ## The conventional `<final>` is the default outcome's final
 
   Decision 2 makes every block's state compound with a `<final>` child, so
   that entering the final raises `done.state.<state id>` and a parent needs
-  nothing but the child's id to wire it. `done_id/1` mints that child's id
-  under the role `"done"`; the core vocabulary uses it uniformly. Nothing
-  stops a host type from minting the same role itself - it is the same id -
-  or from using a different one, so long as some final child is reachable.
-  A block whose state can never reach a final is a block no parent can
-  sequence after.
+  nothing but the child's id to wire it. Under ADR-0004's outcome
+  amendment that child is the **default outcome's** final: a block type
+  that declares no outcomes has exactly one, named `"done"`, so the
+  conventional final is `outcome_id(ctx, "done")` and lives in the
+  reserved `o_` namespace below rather than under an ordinary role.
+  `done_id/1` is its minting function and the core vocabulary uses it
+  uniformly. A block whose state can never reach a final is a block no
+  parent can sequence after.
 
   ## The `o_` role namespace is reserved
 
@@ -49,16 +51,36 @@ defmodule StatifierBlocks.Compiler.Context do
   # ADR-0004's outcome amendment reserves this role prefix: an outcome
   # final is minted only by `outcome_id/2`, and `role_id/2` refuses it, so
   # an outcome final and a hand-minted role can never produce the same id.
-  @outcome_prefix "o_"
+  # Read from `StateId`, which owns the derivation the prefix is part of.
+  @outcome_prefix StateId.outcome_prefix()
+
+  @typedoc """
+  One of a child's declared outcomes: its name, the `<final>` its block
+  compiled that outcome to, and the event entering that final raises
+  (ADR-0004's outcome amendment, 2e).
+  """
+  @type outcome :: %{
+          name: String.t(),
+          state_id: StateId.t(),
+          done_event: String.t()
+        }
 
   @typedoc """
   Everything a parent may know about one compiled child: its block id, the
-  state it compiled to, and the event that state raises when it is done.
+  state it compiled to, the event that state raises when it is done, and
+  its declared outcomes.
+
+  `done_event` keeps its accepted meaning - `done.state.<state id>`, the
+  "finished, do not care how" signal - so a structural parent written
+  before outcomes existed still compiles and still behaves identically.
+  `outcomes` is in the type's declaration order, is always non-empty, and
+  holds exactly one entry, `done`, for a type that declared none.
   """
   @type child_summary :: %{
           block_id: Block.id(),
           state_id: StateId.t(),
-          done_event: String.t()
+          done_event: String.t(),
+          outcomes: [outcome()]
         }
 
   @type t :: %__MODULE__{
@@ -90,11 +112,51 @@ defmodule StatifierBlocks.Compiler.Context do
   @doc """
   The summary of one compiled child, for a parent building a summary of its
   own or wiring a transition to a sibling.
+
+  `summary/1` is the ordinary case: a child whose type declares no
+  outcomes, which is the single default outcome named `"done"`. The
+  default lives in one place - this delegation - so a caller that does not
+  know a child's module still produces a summary of the same shape.
   """
   @spec summary(Block.id()) :: child_summary()
-  def summary(block_id) do
+  def summary(block_id), do: summary(block_id, ["done"])
+
+  @doc """
+  The summary of one compiled child whose type declared `outcome_names`,
+  in declaration order (ADR-0004's outcome amendment, 2e).
+
+  Order is preserved and never sorted: it is decision 6's byte determinism
+  that depends on it. Every entry's `state_id` and `done_event` are
+  computed against the **child's** block id through `outcome_id/2` and
+  `outcome_event/2`, so a summary can name only ids and events the child
+  itself would mint.
+
+  A name that is not role-shaped is dropped rather than raising, which
+  keeps this function total. It is unreachable in the compiler: the Emit
+  stage refuses a malformed or duplicated outcome name with an
+  `:invalid_outcome` finding on the misbehaving block's own pass, before
+  any parent sees it in a summary.
+  """
+  @spec summary(Block.id(), [String.t()]) :: child_summary()
+  def summary(block_id, outcome_names) when is_list(outcome_names) do
     state_id = StateId.state_id(block_id)
-    %{block_id: block_id, state_id: state_id, done_event: StateId.done_event(state_id)}
+
+    %{
+      block_id: block_id,
+      state_id: state_id,
+      done_event: StateId.done_event(state_id),
+      outcomes: Enum.flat_map(outcome_names, &outcome_summary(block_id, &1))
+    }
+  end
+
+  @spec outcome_summary(Block.id(), String.t()) :: [outcome()]
+  defp outcome_summary(block_id, name) do
+    with {:ok, id} <- outcome_id_for(block_id, name),
+         {:ok, event} <- outcome_event_for(block_id, name) do
+      [%{name: name, state_id: id, done_event: event}]
+    else
+      {:error, _not_an_outcome} -> []
+    end
   end
 
   @doc """
@@ -127,13 +189,20 @@ defmodule StatifierBlocks.Compiler.Context do
   def role_id(%__MODULE__{block_id: block_id}, role), do: StateId.state_id(block_id, role)
 
   @doc """
-  The id of this block's conventional `<final>` child - `role_id(ctx,
-  "done")` with the error arm discharged, since `"done"` is a literal role
-  this module knows is valid.
+  The id of this block's conventional `<final>` child - the **default
+  outcome's** final, `outcome_id(ctx, "done")` with the error arm
+  discharged, since `"done"` is a literal outcome name this module knows
+  is valid.
+
+  Under ADR-0004's outcome amendment (2b) that id is
+  `"s_" <> block_id <> "__o_done"`. It moved there from the ad-hoc role
+  `"done"` the core vocabulary used before, which is what makes the
+  amendment move compiled bytes for every document. The name and arity are
+  unchanged, so no block type had to be edited to follow it.
   """
   @spec done_id(t()) :: StateId.t()
   def done_id(%__MODULE__{block_id: block_id}) do
-    {:ok, id} = StateId.state_id(block_id, "done")
+    {:ok, id} = outcome_id_for(block_id, "done")
     id
   end
 
@@ -170,7 +239,15 @@ defmodule StatifierBlocks.Compiler.Context do
   """
   @spec outcome_id(t(), String.t()) ::
           {:ok, StateId.t()} | {:error, {:invalid_outcome, Block.id(), String.t()}}
-  def outcome_id(%__MODULE__{block_id: block_id}, outcome) do
+  def outcome_id(%__MODULE__{block_id: block_id}, outcome),
+    do: outcome_id_for(block_id, outcome)
+
+  # The block-id-level half of `outcome_id/2`, shared with `summary/2`,
+  # which builds an outcome entry for a **child** and so has no context of
+  # its own to mint through.
+  @spec outcome_id_for(Block.id(), String.t()) ::
+          {:ok, StateId.t()} | {:error, {:invalid_outcome, Block.id(), String.t()}}
+  defp outcome_id_for(block_id, outcome) do
     with true <- StateId.role?(outcome),
          {:ok, id} <- StateId.state_id(block_id, @outcome_prefix <> outcome) do
       {:ok, id}
@@ -192,9 +269,16 @@ defmodule StatifierBlocks.Compiler.Context do
   """
   @spec outcome_event(t(), String.t()) ::
           {:ok, String.t()} | {:error, {:invalid_outcome, Block.id(), String.t()}}
-  def outcome_event(%__MODULE__{block_id: block_id, state_id: state_id}, outcome) do
+  def outcome_event(%__MODULE__{block_id: block_id}, outcome),
+    do: outcome_event_for(block_id, outcome)
+
+  # The block-id-level half of `outcome_event/2`, shared with `summary/2`
+  # for `outcome_id_for/2`'s reason.
+  @spec outcome_event_for(Block.id(), String.t()) ::
+          {:ok, String.t()} | {:error, {:invalid_outcome, Block.id(), String.t()}}
+  defp outcome_event_for(block_id, outcome) do
     if StateId.role?(outcome) do
-      {:ok, "done.outcome." <> state_id <> "." <> outcome}
+      {:ok, StateId.outcome_event(StateId.state_id(block_id), outcome)}
     else
       {:error, {:invalid_outcome, block_id, outcome}}
     end

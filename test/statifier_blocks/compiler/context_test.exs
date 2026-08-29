@@ -69,6 +69,87 @@ defmodule StatifierBlocks.Compiler.ContextTest do
     end
   end
 
+  describe "done_id/1" do
+    # sabotage: minted `done_id/1` through `StateId.state_id(block_id,
+    # "done")` again, as it did before the amendment -> the id comes back
+    # "s_blk_AUTH__done" and this goes red (verified)
+    test "is the default outcome's final, in the reserved namespace" do
+      assert Context.done_id(context()) == "s_blk_AUTH__o_done"
+    end
+
+    # The two have to stay the same function, or a block type calling
+    # `done_id/1` and a parent wiring `outcome_id/2` would name different
+    # states.
+    # sabotage: had `done_id/1` mint the outcome `"complete"` -> the two
+    # ids stop agreeing and this goes red (verified)
+    test "agrees with outcome_id/2 on the default outcome" do
+      assert {:ok, Context.done_id(context())} == Context.outcome_id(context(), "done")
+    end
+  end
+
+  describe "summary/1 and summary/2 (2e)" do
+    # sabotage: dropped the `outcomes` key from `summary/2`'s map -> the
+    # match goes red, which is the "always non-empty" half of 2e (verified)
+    test "a defaulting child carries exactly one outcome, done" do
+      assert %{
+               block_id: "blk_STEP",
+               state_id: "s_blk_STEP",
+               done_event: "done.state.s_blk_STEP",
+               outcomes: [
+                 %{
+                   name: "done",
+                   state_id: "s_blk_STEP__o_done",
+                   done_event: "done.outcome.s_blk_STEP.done"
+                 }
+               ]
+             } = Context.summary("blk_STEP")
+    end
+
+    # sabotage: sorted `summary/2`'s names -> "abandoned" leads and the
+    # list match goes red (verified)
+    test "a multi-outcome child carries every outcome, in declaration order" do
+      summary = Context.summary("blk_MANY", ["done", "error", "abandoned"])
+
+      assert Enum.map(summary.outcomes, & &1.name) == ["done", "error", "abandoned"]
+
+      assert Enum.map(summary.outcomes, & &1.state_id) == [
+               "s_blk_MANY__o_done",
+               "s_blk_MANY__o_error",
+               "s_blk_MANY__o_abandoned"
+             ]
+
+      assert Enum.map(summary.outcomes, & &1.done_event) == [
+               "done.outcome.s_blk_MANY.done",
+               "done.outcome.s_blk_MANY.error",
+               "done.outcome.s_blk_MANY.abandoned"
+             ]
+    end
+
+    # `done_event` is the accepted record's, unchanged: a parent written
+    # before outcomes existed still wires the same event.
+    # sabotage: had `summary/2` set `done_event` to the default outcome's
+    # completion event -> every pre-amendment parent's wiring breaks and
+    # this goes red (verified)
+    test "the summary's own done_event stays done.state" do
+      assert Context.summary("blk_MANY", ["done", "error"]).done_event ==
+               "done.state.s_blk_MANY"
+    end
+
+    # Total rather than raising, which is what lets `summary/2` be called
+    # with names the Emit stage has already refused elsewhere.
+    # sabotage: had `outcome_summary/2` raise on its error arm instead of
+    # answering `[]` -> this goes red with the raise (verified)
+    test "a name outside the role shape is dropped rather than raising" do
+      assert Context.summary("blk_MANY", ["done", "Nope"]).outcomes == [
+               %{
+                 name: "done",
+                 state_id: "s_blk_MANY__o_done",
+                 done_event: "done.outcome.s_blk_MANY.done"
+               }
+             ]
+    end
+  end
+
   describe "the reserved `o_` namespace" do
     # sabotage: dropped the reserved clause from `role_id/2` -> the role is
     # minted and collides with `outcome_id/2`'s id, taking this red

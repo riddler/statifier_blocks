@@ -115,8 +115,27 @@ defmodule StatifierBlocks.Compiler.ProvenanceTest do
     assert {:ok, %{block_id: "blk_AUTH", role: "running"}} =
              Provenance.owner_of_state(provenance, "s_blk_AUTH__running")
 
-    assert {:ok, %{block_id: "blk_AUTH", role: "done"}} =
-             Provenance.owner_of_state(provenance, "s_blk_AUTH__done")
+    assert {:ok, %{block_id: "blk_AUTH", role: "o_done"}} =
+             Provenance.owner_of_state(provenance, "s_blk_AUTH__o_done")
+  end
+
+  # An outcome final and the `<raise>` inside it are owned by the block
+  # with `role: "o_" <> outcome` and no config key - ADR-0004's outcome
+  # amendment, 2f, which says provenance stays total and gains nothing
+  # unowned.
+  #
+  # sabotage: emitted the `<onentry><raise/></onentry>` from
+  # `Core.Emit.final/1` with `Emission.from_config("done")` - red on the
+  # `config_key: nil` match, because the raise then reads as bytes an
+  # author typed.
+  test "an outcome final's raise is owned by the block, under the outcome's role", ctx do
+    %{scxml: scxml, provenance: provenance} = ctx.compiled
+
+    {offset, _length} =
+      :binary.match(scxml, ~s(<raise event="done.outcome.s_blk_AUTH.done"/>))
+
+    assert {:ok, %{block_id: "blk_AUTH", role: "o_done", config_key: nil}} =
+             Provenance.owner_at(provenance, offset)
   end
 
   # Sabotage: removed the `Emission.attributed_to/2` call from

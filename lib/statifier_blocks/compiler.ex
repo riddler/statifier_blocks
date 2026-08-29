@@ -97,6 +97,7 @@ defmodule StatifierBlocks.Compiler do
   alias StatifierBlocks.{
     Assignability,
     Block,
+    BlockType,
     CompilationRecord,
     Compiled,
     Document,
@@ -413,13 +414,39 @@ defmodule StatifierBlocks.Compiler do
 
   @spec emit(Resolved.t(), Document.id()) :: {:ok, Emission.t()} | {:error, [Finding.t()]}
   defp emit(%Resolved{block: block, module: module, slots: slots}, document_id) do
-    with {:ok, compiled_slots} <- emit_slots(slots, document_id) do
-      context = Context.new(block.id, document_id, summaries(compiled_slots))
+    with {:ok, compiled_slots} <- emit_slots(slots, document_id),
+         :ok <- validate_outcomes(block, module) do
+      context = Context.new(block.id, document_id, summaries(slots))
 
       case module.emit(block, context) do
         {:ok, %Emission{} = emission} -> attribute(emission, block, compiled_slots)
         {:error, reason} -> {:error, emit_findings(block, reason)}
       end
+    end
+  end
+
+  # A block type's own outcome declarations, checked on **this** node's
+  # pass and reported against **this** block - the one whose type
+  # misbehaved, never its parent (ADR-0004's outcome amendment, 2f). It
+  # runs before `emit/2` so a type that cannot mint its own outcome ids
+  # never gets asked to emit with them, and it is why `summaries/1` below
+  # can build a child's outcome entries without re-checking them: by the
+  # time a parent sees a child in a summary, the child's own pass has
+  # already refused a malformed or duplicated name.
+  @spec validate_outcomes(Block.t(), module()) :: :ok | {:error, [Finding.t()]}
+  defp validate_outcomes(block, module) do
+    module
+    |> BlockType.outcome_names(block.config)
+    |> Enum.reduce_while({:ok, MapSet.new()}, fn name, {:ok, seen} ->
+      cond do
+        not StateId.role?(name) -> {:halt, {:invalid, name}}
+        MapSet.member?(seen, name) -> {:halt, {:invalid, name}}
+        true -> {:cont, {:ok, MapSet.put(seen, name)}}
+      end
+    end)
+    |> case do
+      {:ok, _seen} -> :ok
+      {:invalid, name} -> {:error, emit_findings(block, {:invalid_outcome, block.id, name})}
     end
   end
 
@@ -480,12 +507,22 @@ defmodule StatifierBlocks.Compiler do
     end
   end
 
-  @spec summaries([{Block.slot_name(), [{Block.id(), Emission.t()}]}]) ::
+  # Built from the **resolved** slots rather than the compiled ones: a
+  # summary now carries the child's declared outcomes (ADR-0004's outcome
+  # amendment, 2e), and a compiled slot holds only `{block_id, emission}`
+  # pairs, which cannot say which module declared what. The resolved slots
+  # are the same slots in the same order carrying the same children, so
+  # the walk is unchanged; what is added is the module and config each
+  # child was already resolved with.
+  @spec summaries([{Block.slot_name(), [Resolved.t()]}]) ::
           %{optional(Block.slot_name()) => [Context.child_summary()]}
-  defp summaries(compiled_slots) do
-    Map.new(compiled_slots, fn {name, children} ->
-      {name, Enum.map(children, fn {block_id, _emission} -> Context.summary(block_id) end)}
-    end)
+  defp summaries(slots) do
+    Map.new(slots, fn {name, children} -> {name, Enum.map(children, &summary/1)} end)
+  end
+
+  @spec summary(Resolved.t()) :: Context.child_summary()
+  defp summary(%Resolved{block: block, module: module}) do
+    Context.summary(block.id, BlockType.outcome_names(module, block.config))
   end
 
   # Replaces every `{:child, block_id}` placeholder with that child's own
@@ -571,7 +608,8 @@ defmodule StatifierBlocks.Compiler do
       Finding.new(
         :emit,
         reason,
-        ~s(minted the outcome "#{outcome}", which is not a lowercase identifier free of "__"),
+        ~s(declared or minted the outcome "#{outcome}", which is either declared twice ) <>
+          ~s(or not a lowercase identifier free of "__"),
         block_id: id
       )
     ]

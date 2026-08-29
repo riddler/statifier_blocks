@@ -89,6 +89,31 @@ defmodule StatifierBlocks.Compiler.StateIdTest do
     end
   end
 
+  describe "unoutcome_id/1" do
+    # The inversion `Core.Emit.final/1` rests on: it must round-trip every
+    # outcome name, and it must not read an ordinary role as an outcome
+    # just because the role contains `o_`.
+    # sabotage: derived the outcome by splitting the role on `"o_"` rather
+    # than matching it as a prefix -> "not_o_here" reads as the outcome
+    # "here" and the refusal loop goes red (verified)
+    test "round-trips every outcome name and refuses every ordinary role" do
+      for outcome <- ["done", "error", "abandoned", "o_looking"] do
+        {:ok, id} = StateId.state_id("blk_ABC", "o_" <> outcome)
+
+        assert StateId.unoutcome_id(id) == {:ok, {"s_blk_ABC", outcome}}
+      end
+
+      for role <- ["done", "not_o_here", "body_done", "o"] do
+        {:ok, id} = StateId.state_id("blk_ABC", role)
+
+        assert StateId.unoutcome_id(id) == :error
+      end
+
+      assert StateId.unoutcome_id("s_blk_ABC") == :error
+      assert StateId.unoutcome_id("blk_ABC__o_done") == :error
+    end
+  end
+
   describe "done_event/1" do
     # sabotage: change the prefix to "done." -> this goes red (verified)
     test "names the SCXML done.state event of a state id" do
