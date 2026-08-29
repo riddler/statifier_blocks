@@ -1,6 +1,6 @@
 # ADR-0005: The editor is a pure command algebra and view model with a thin LiveView shell
 
-Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 9 amended - the `:duration` control, predicator strings primary (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 91); the shell arrangement recorded - three panes and a drawer, rulings 1A/2A/3A/7A/8A (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 92); decision 7 amended - a second, read-only measurement hook (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 100); decision 10 amended - the shipped `icon` names are heroicon names, 10k/10l (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 128)
+Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 9 amended - the `:duration` control, predicator strings primary (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 91); the shell arrangement recorded - three panes and a drawer, rulings 1A/2A/3A/7A/8A (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 92); decision 7 amended - a second, read-only measurement hook (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 100); decision 10 amended - the shipped `icon` names are heroicon names, 10k/10l (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 128); decisions 10 and 13 amended - rendering the tree and its connectors, 10a-10c (2026-08-29, accepted under the operator campaign-016 direction-agent gate grant, PR <n>)
 
 ## Context
 
@@ -1036,9 +1036,9 @@ not a measurement, and it belongs to the operator.
 
 ---
 
-## Proposed amendment (2026-08-28): decisions 10 and 13, rendering the tree and its connectors
+## Amendment (2026-08-28): decisions 10 and 13, rendering the tree and its connectors
 
-**Status: PROPOSED, not accepted.** Additive; decisions 10 and 13 stand as
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-016 grant, PR <n>).** Additive; decisions 10 and 13 stand as
 accepted until the operator rules.
 
 ### Context
@@ -1056,7 +1056,7 @@ What follows is the set of rules that made those edges legible at depth, each
 of which is currently a property of one prototype and would otherwise be
 re-derived - probably differently - by whoever builds the shipped canvas.
 
-### Proposed decision
+### Decision
 
 **10a. Connectors are rendered, never authored.** Adjacency and nesting stay
 the sole source of truth for what connects to what. There is no edge in the
@@ -1204,6 +1204,10 @@ are not one unit.
   groups, branch arms, parallel lanes, interrupt rails, resumable history, and
   an unresolvable block at depth 7 - which is the strongest available evidence
   that decision 13's uniformity holds under load.
+
+[Note 2026-08-29: campaign 016 implements this section - sb-otg carries the
+tier-2 layout (narrow centred cards, measured SVG connectors, ONE OF / ALL OF
+pills, insertion markers) and sb-8yb carries the boundary box of 10c.]
 
 ---
 
