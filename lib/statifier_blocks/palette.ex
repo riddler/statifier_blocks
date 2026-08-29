@@ -59,10 +59,11 @@ defmodule StatifierBlocks.Palette do
   @doc """
   The `core.*` structural vocabulary as a palette (ADR-0002 decision 10).
 
-  Eight entries, described in `StatifierBlocks.Core`. They are ordinary
-  palette entries with no privileged path anywhere in this package - a
-  palette without them is as valid as a palette with them, and a host that
-  wants only some of them builds a map with only those.
+  The core vocabulary's entries, described in `StatifierBlocks.Core`.
+  They are ordinary palette entries with no privileged path anywhere in
+  this package - a palette without them is as valid as a palette with
+  them, and a host that wants only some of them builds a map with only
+  those.
 
       Palette.core()
       #=> %StatifierBlocks.Palette{types: %{"core.sequence" => ..., ...}}
@@ -92,7 +93,9 @@ defmodule StatifierBlocks.Palette do
       "core.wait" => Core.Wait,
       "core.resumable_group" => Core.ResumableGroup,
       "core.on_event" => Core.OnEvent,
-      "core.invoke" => Core.Invoke
+      "core.invoke" => Core.Invoke,
+      "core.raise" => Core.Raise,
+      "core.assign" => Core.Assign
     }
   end
 

@@ -5,7 +5,7 @@ defmodule StatifierBlocks.Core.PlacementTest do
   kind tags.
 
   The property is checked exhaustively rather than sampled. The core
-  vocabulary is finite - seven types, and a bounded slot set once each type
+  vocabulary is finite - a fixed set of types, and a bounded slot set once each type
   is given a config - so every `{parent, slot, child}` triple in it can be
   enumerated, and enumerating them all is a stronger statement than any
   number of random draws: there is no unvisited corner left for a
