@@ -40,6 +40,8 @@ defmodule StatifierBlocks.ViewModel.AccentAndRailTest do
       assert ViewModel.accent_token(%{accent_token: "--sb-a1"}) == "--sb-a1"
     end
 
+    # Sabotage: the same mutation - without the pattern check every one of
+    # these is returned and interpolated into a style attribute.
     test "anything that is not one degrades to no accent" do
       for declared <- [
             "--accent",
