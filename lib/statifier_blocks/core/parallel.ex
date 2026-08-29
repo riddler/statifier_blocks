@@ -27,6 +27,24 @@ defmodule StatifierBlocks.Core.Parallel do
   `produces` is `:unknown` for the same reason `core.branch`'s is: joining
   the lanes' outputs is a type lattice, and ADR-0003 decision 4 refuses to
   build one.
+
+  ## `complete`: when the block is done
+
+  A second config key, `"complete"`, picks the completion rule
+  (ADR-0004's 2026-08-29 amendment, "`core.parallel` `complete: first`"):
+
+    * `"all"` (the default, and what an absent key reads as) is the
+      statifier-native rule - a `<parallel>` is done when every region is,
+      so one transition on `done.state.<run>` needs no join logic.
+    * `"first"` is the racing rule - the block is done at the *first*
+      lane's completion, which is one transition per lane on the
+      `<parallel>` element itself, each taken on that lane's own
+      `done.state.<region id>`.
+
+  The key is read through its default everywhere, so every
+  `core.parallel` stored before it existed decodes, validates, and
+  compiles to the byte it did before (ADR-0001 decision 6: a stored
+  `null` is *not* an absent key and is still refused).
   """
 
   @behaviour StatifierBlocks.BlockType
@@ -35,6 +53,9 @@ defmodule StatifierBlocks.Core.Parallel do
   alias StatifierBlocks.Compiler.Context
   alias StatifierBlocks.Core.{Config, Emit}
   alias StatifierBlocks.Emission
+
+  @complete ["all", "first"]
+  @complete_message ~s(pick "all" or "first")
 
   @impl true
   def current_version, do: 1
@@ -60,11 +81,55 @@ defmodule StatifierBlocks.Core.Parallel do
         label: "Lanes",
         required?: true,
         default: []
+      },
+      %{
+        key: "complete",
+        type:
+          {:select,
+           [
+             {"all", "All - when every lane is done"},
+             {"first", "First - when any one lane is done"}
+           ]},
+        label: "Continue",
+        required?: false,
+        default: "all"
       }
     ]
 
+  @doc """
+  The lane findings, then the `complete` one.
+
+  `complete` is read through its default, so an *absent* key validates
+  exactly as it did before the key existed and a config that carries only
+  lanes still answers with only lane findings. A stored `null` is not an
+  absent key: `Map.get/3` hands the `nil` straight to `one_of/2`, which
+  refuses it (ADR-0001 decision 6).
+  """
   @impl true
   def validate_config(config) do
+    combine(check_lanes_of(config), check_complete(config))
+  end
+
+  @spec combine(
+          :ok | {:error, [{String.t(), String.t()}]},
+          :ok | {:error, [{String.t(), String.t()}]}
+        ) ::
+          :ok | {:error, [{String.t(), String.t()}]}
+  defp combine(:ok, :ok), do: :ok
+  defp combine(lanes, complete), do: {:error, findings(lanes) ++ findings(complete)}
+
+  defp findings(:ok), do: []
+  defp findings({:error, findings}), do: findings
+
+  defp check_complete(config) do
+    if Config.one_of(complete(config), @complete) do
+      :ok
+    else
+      {:error, [{"complete", @complete_message}]}
+    end
+  end
+
+  defp check_lanes_of(config) do
     case Map.get(config, "lanes", []) do
       lanes when is_list(lanes) -> check_lanes(lanes)
       _other -> {:error, [{"lanes", "must be a list of lane names"}]}
@@ -113,8 +178,29 @@ defmodule StatifierBlocks.Core.Parallel do
       icon: "view-columns",
       keywords: ["lanes", "concurrent", "fork", "at once"],
       order: 4,
-      layout: :columns
+      layout: :columns,
+      join_label: &__MODULE__.join_label/1
     }
+
+  @doc """
+  What the join marker under the lanes reads, given the block's config.
+
+  A `paletteEntry` callback rather than a case in a renderer: the type
+  owns its own completion rule and therefore its own words, and nothing
+  on the layout path learns the string `"core.parallel"` (ADR-0005
+  decision 10). A host type that fans into lanes with a rule of its own
+  declares its own callback and gets its own.
+
+      iex> StatifierBlocks.Core.Parallel.join_label(%{"complete" => "first"})
+      "continue at first"
+
+      iex> StatifierBlocks.Core.Parallel.join_label(%{})
+      "continue when all"
+  """
+  @spec join_label(Block.config()) :: String.t()
+  def join_label(config) do
+    if complete(config) == "first", do: "continue at first", else: "continue when all"
+  end
 
   @doc """
   A compound state wrapping one `<parallel>` whose regions are the lanes
@@ -142,27 +228,95 @@ defmodule StatifierBlocks.Core.Parallel do
   A parallel with no lanes emits no `<parallel>` at all: an empty one is
   not valid SCXML, and "run nothing concurrently" is done the moment it
   starts, so the block compiles to a state whose `initial` is its `<final>`.
+  That is true of both completion rules: there is no first lane to win
+  and no last lane to wait for, so `complete` moves no byte of it.
+
+  ## `complete: "first"`: one transition per lane, on the `<parallel>`
+
+  The racing rule replaces the single `done.state.<run>` transition with
+  one transition **per lane**, placed on the `<parallel>` element itself
+  (ADR-0004's 2026-08-29 amendment, P1):
+
+      <state id="s_PAR" initial="s_PAR__run">
+        <parallel id="s_PAR__run">
+          <transition event="done.state.s_PAR__lane_authorize" target="s_PAR__done"/>
+          <transition event="done.state.s_PAR__lane_fraud_check" target="s_PAR__done"/>
+          <state id="s_PAR__lane_authorize" ...>
+          <state id="s_PAR__lane_fraud_check" ...>
+        </parallel>
+        <final id="s_PAR__done"/>
+      </state>
+
+  Three properties of that shape are decisions rather than accidents.
+
+  **The transitions come before the regions.** Document order among the
+  children of one element is the emitter's to fix, and this is the fixed
+  position: the joins ahead of the lanes they join, which is the order the
+  upstream ruling's worked chart is written in and the order the wrapper
+  already uses for its own transition. One position, chosen once, is what
+  ADR-0004 decision 6's determinism asks for; the transition set stays a
+  pure function of the ordered lane list either way.
+
+  **They are external.** The block's done `<final>` is a sibling of the
+  `<parallel>`, not a descendant of it, so there is nothing for
+  `type="internal"` to preserve - and exiting the `<parallel>`, with every
+  region still in it, is precisely the effect wanted. Appendix D then runs
+  each losing region's `<onexit>` and raises one `CancelInvoke` per live
+  invocation it owns (P2). None of that is this package's to emit.
+
+  **The `done.state.<run>` transition is dropped, not kept.** It could
+  never be taken: `done.state.<run>` is raised only once every region is
+  final, and the first region to reach its own `<final>` raises
+  `done.state.<region>` first and exits the `<parallel>` on it. Keeping it
+  would write bytes that cannot fire, which a reader of the chart - or of
+  the provenance map - would have to explain to themselves. P1 says the
+  transition set is per lane and that nothing joins, so it is per lane and
+  nothing joins.
   """
   @impl true
   def emit(%Block{config: config}, context) do
     done = Context.done_id(context)
+    complete = complete(config)
 
-    case lanes(config) do
-      [] ->
+    cond do
+      complete not in @complete ->
+        {:error, [{"complete", @complete_message}]}
+
+      lanes(config) == [] ->
         {:ok, Emit.state(context.state_id, done, [Emit.final(done)])}
 
-      lanes ->
+      true ->
         with {:ok, run} <- Context.role_id(context, "run"),
-             {:ok, regions} <- regions(context, lanes) do
-          children = [
-            Emit.transition(event: "done.state." <> run, target: done, internal: true),
-            Emission.element("parallel", [{"id", run}], regions),
-            Emit.final(done)
-          ]
-
-          {:ok, Emit.state(context.state_id, run, children)}
+             {:ok, regions} <- regions(context, lanes(config)) do
+          {:ok, Emit.state(context.state_id, run, running(complete, run, regions, done))}
         end
     end
+  end
+
+  # The wrapper's children, under each completion rule. `regions` is the
+  # `{region id, region}` list in lane order, which is the only thing the
+  # two rules disagree about reading.
+  @spec running(String.t(), String.t(), [{String.t(), Emission.t()}], String.t()) :: [
+          Emission.t()
+        ]
+  defp running("all", run, regions, done) do
+    [
+      Emit.transition(event: "done.state." <> run, target: done, internal: true),
+      Emission.element("parallel", [{"id", run}], Enum.map(regions, &elem(&1, 1))),
+      Emit.final(done)
+    ]
+  end
+
+  defp running("first", run, regions, done) do
+    joins =
+      Enum.map(regions, fn {region_id, _region} ->
+        Emit.transition(event: "done.state." <> region_id, target: done)
+      end)
+
+    [
+      Emission.element("parallel", [{"id", run}], joins ++ Enum.map(regions, &elem(&1, 1))),
+      Emit.final(done)
+    ]
   end
 
   defp regions(context, lanes) do
@@ -184,9 +338,14 @@ defmodule StatifierBlocks.Core.Parallel do
       {initial, transitions, refs} =
         Emit.chain(Context.children(context, "lane_" <> lane), region_done)
 
-      {:ok, Emit.state(region_id, initial, transitions ++ refs ++ [Emit.final(region_done)])}
+      {:ok,
+       {region_id,
+        Emit.state(region_id, initial, transitions ++ refs ++ [Emit.final(region_done)])}}
     end
   end
+
+  # The stored completion rule, read through its default.
+  defp complete(config), do: Map.get(config, "complete", "all")
 
   # The well-formed lane names of `config`, in stored order.
   defp lanes(config) do
