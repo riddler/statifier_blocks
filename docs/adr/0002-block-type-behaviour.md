@@ -1341,3 +1341,60 @@ does not silently settle it.
 - Nothing changes in the anchor vocabulary, the source list, the severity set,
   the field-type set, or the emission. This section adds one key and describes
   one refusal.
+
+---
+
+## Amendment (2026-08-29): `core.send`'s descriptor carries a send id, and there is no `core.cancel`
+
+**Status: proposed (2026-08-29).** This section is additive: nothing above it
+is edited, and every earlier accepted decision stands as written. It records
+the operator's 2026-08-29 delayed-send lifetime ruling - filed here as
+`sb-b4f` and mirrored to statifier-ex as `st-q3ud` - on the side this record
+owns, which is what a block type *declares*. The emission is ADR-0004's, and
+its amendment of the same date holds it; where the two touch, that one is the
+authority on emission and this one on declaration.
+
+### What forces the amendment
+
+`core.send` shipped with a gap it recorded rather than papered over: a delayed
+send it arms is never cancelled by anything this package emits - no `<cancel>`,
+and no `sendid` an author could name - because a cancel that *names* the send
+it cancels is a cross-subtree reference to another block, the exact shape
+ADR-0005 decision 13 refused. The module note named the alternative that keeps
+the tree invariant, said it was scope-shaped rather than reference-shaped, and
+parked the choice on `sb-b4f` instead of guessing it.
+
+The ruling picks the scope-shaped alternative. Two things follow for this
+record, and nothing else does.
+
+### A. The descriptor gains a send id
+
+`core.send` emits `<send id="<its state id>__send" ...>`.
+
+The id is derived, not authored. No config field names it, so decision 7's
+schema for the type is unchanged and the editor gains no control; a reader of
+the document cannot see it and does not need to. What the descriptor gains is
+one attribute that was previously absent, which is what makes a cancel
+possible at all - a send with no id is a send nothing can name later.
+
+Where an id of that shape is minted, and by what, is ADR-0004's call. This
+section records only that the descriptor carries one.
+
+### B. Cancellation is scope-shaped, so there is no `core.cancel`
+
+Cancellation is **not a block**. The compiler emits the cancel from the scope
+that armed the send (ADR-0004's amendment of this date says exactly where), so
+no `core.cancel` type exists and none will: decision 10's vocabulary table does
+not grow, the palette gains no entry, and D13 holds - a cancel block would have
+been the first author-drawn cross-subtree edge in a document, which is the
+thing D13 exists to refuse.
+
+### C. What this amendment does not change
+
+- Decision 10's vocabulary table, in either direction. It gains no
+  `core.cancel` row, and this section does not write the `core.send` row that
+  type is still owed; that remains a separate bead's.
+- Decision 7's field types, and `core.send`'s config schema, which keeps its
+  two fields.
+- Any other block type's declarations. Nothing but `core.send` arms a delayed
+  send, so nothing but `core.send` is touched.
