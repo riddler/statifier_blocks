@@ -254,6 +254,51 @@ every presentation key a schema admits is one more thing a host can make the
 form say, and the closed set is what makes the form provable. `sb-8dc` inherits
 the question along with the code.
 
+### The truth table moved to a bottom drawer (sb-054)
+
+The condition fixtures - the precomputed truth tables - were the Fixtures
+tab's middle sub-view, and the pane had written down what was wrong with that
+in three places before it was filed. The inspector is `--sb-inspector-width`
+(21rem). A truth table is one column per arm plus one per bound path. The
+pane's three workarounds for that were to scroll the grid sideways, to invert
+the conventional column order so the verdicts rather than the inputs were the
+part on screen, and to say in a sentence under the table that the values were
+off to the right.
+
+The operator's ruling is a **bottom drawer**, over keeping the tables in the
+inspector until the shipped editor graduates the pattern. What that buys is
+the one axis the inspector could never give: the drawer is row three of the
+shell grid, so it is the full width of the embed by construction rather than
+by a rule that every breakpoint would have to restate.
+
+What moved, and what deliberately did not:
+
+- **The derivation did not move.** `tableView` is still `fixtures.js`'s and
+  is unchanged, and its suites in `dev/selftest.html` are untouched. What is
+  new beside it is `drawerView`, which decides *which* tables are on screen
+  and never what one flattens to.
+- **The drawer does not own a selection.** It shows the selected block's
+  tables and follows the canvas. A drawer that pinned its own subject would
+  be a second cursor in the editor.
+- **The way in is anchored to the condition.** The Condition pane renders one
+  "Truth table" button per *block* - a branch's arms are separate condition
+  fields covered by a single table whose columns are those arms - and only
+  when a table exists. A button that opens a drawer saying "nothing here" is
+  the affordance teaching an author to stop pressing it.
+- **The drawer closes on a document switch** rather than re-deriving, because
+  the block it was showing does not exist in the next document.
+- **The column order did not change**, and that is now a finding rather than
+  a workaround: the verdicts-before-inputs inversion existed because of the
+  21rem, the drawer removes that reason, and restoring convention is a
+  readability change with its own before/after rather than a rider on the
+  move that made it possible.
+
+`drawerView`'s six states - closed, no document, no fixtures, no selection,
+none for this block, ready - are asserted in `dev/selftest.html` under
+"drawer". Five of the six are reachable only through a sequence of gestures,
+which is exactly the shape of thing a screenshot cannot cover and a pure
+derivation can.
+
 ## The three themes
 
 One mechanism, exercised three ways:
@@ -521,7 +566,11 @@ first paint, no scroll listener, and it disappears exactly when there is
 nothing more to see. It is only intermittent on the grid, because a background
 paints below content and the verdict cells carry opaque chips. Making that one
 reliable means an overlay, which is a change to the pane's markup and belongs
-with the decision about where a truth table lives, not ahead of it.
+with the decision about where a truth table lives, not ahead of it. That
+decision has since been made - sb-054 moved the tables to a bottom drawer - and
+it downgraded rather than answered this one: at the shell's full width the
+fixtures' tables do not clip at all, so the mark is now the answer for a narrow
+embed rather than for every reader.
 
 **A smooth scroll is a request, and a reveal has to check it was granted.**
 Anything that scrolls the canvas mid-animation cancels it and the browser

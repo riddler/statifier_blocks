@@ -432,6 +432,95 @@ function derivePaths(table) {
   return seen;
 }
 
+/* ===================================================== the drawer's state */
+
+/**
+ * What the truth-table drawer shows, derived from the drawer's own open flag
+ * and the current selection (sb-054).
+ *
+ *     {
+ *       open,        the drawer is on screen at all
+ *       subjectId,   the block the tables on screen belong to, or null
+ *       status,      "closed" | "no-fixtures" | "no-document" | "no-selection"
+ *                    | "none-for-block" | "ready"
+ *       tables,      [tableView(...)] - empty for every status but "ready"
+ *       title,       the drawer header's own text
+ *       jumps        block ids that DO own a table, for the miss states
+ *     }
+ *
+ * Pure, and separated from the DOM for the reason the rest of this file is:
+ * the interesting part of a drawer is not the sliding, it is which of six
+ * states it is in, and five of those are reachable only through a sequence of
+ * gestures a screenshot cannot show. The `tableView` derivation below it is
+ * untouched - this function decides WHICH tables are shown, never what one
+ * flattens to.
+ *
+ * `fixtures` is `fixturesFor(...)`'s value, or null when no document is open
+ * (which is a different state from a document whose fixtures are missing, and
+ * an author reading "nothing has a table here" would be told something false
+ * about a document nobody has opened).
+ */
+export function drawerView({ open, fixtures, selectedId }) {
+  const closed = {
+    open: false,
+    subjectId: null,
+    status: "closed",
+    tables: [],
+    title: "Truth table",
+    jumps: [],
+  };
+
+  if (!open) return closed;
+
+  if (fixtures === null || fixtures === undefined) {
+    return { ...closed, open: true, status: "no-document", title: "Truth table" };
+  }
+
+  if (!fixtures.known) {
+    return { ...closed, open: true, status: "no-fixtures", title: "Truth table" };
+  }
+
+  const jumps = tableBlockIds(fixtures);
+
+  if (selectedId === null || selectedId === undefined) {
+    return { ...closed, open: true, status: "no-selection", title: "Truth table", jumps };
+  }
+
+  const mine = tablesForBlock(fixtures, selectedId);
+
+  if (mine.length === 0) {
+    return {
+      ...closed,
+      open: true,
+      subjectId: selectedId,
+      status: "none-for-block",
+      title: "Truth table",
+      jumps,
+    };
+  }
+
+  const tables = mine.map(tableView);
+
+  return {
+    open: true,
+    subjectId: selectedId,
+    status: "ready",
+    tables,
+    // The count is in the title rather than in a badge beside it: a drawer
+    // holding two tables is the case a reader has to scroll for, and a "2"
+    // they have to interpret is worse than a word.
+    title: tables.length === 1 ? tables[0].name : `${tables.length} truth tables`,
+    jumps,
+  };
+}
+
+/** How many tables one block owns - what the condition pane's open affordance
+ * asks before offering itself. A button that opens a drawer saying "nothing
+ * here" is the affordance teaching an author to stop pressing it. */
+export function tableCountFor(fixtures, blockId) {
+  return fixtures === null || fixtures === undefined ? 0 : tablesForBlock(fixtures, blockId).length;
+}
+
 /* ======================================================== the JSON editor */
 
 /**

@@ -85,7 +85,7 @@ const DRAG_THRESHOLD = 4;
  * one is optional, so the same module drives the full shell and a bare canvas
  * in a test page.
  */
-export function createEditor({ canvas, registry, chrome = {}, datamodel = null }) {
+export function createEditor({ canvas, registry, chrome = {}, datamodel = null, tables = null }) {
   /*
    * The ghost and the "+" picker are `position: fixed`, so they escape the
    * canvas's `overflow: auto` wherever they hang in the DOM - but they hang
@@ -180,6 +180,26 @@ export function createEditor({ canvas, registry, chrome = {}, datamodel = null }
                   : `${path} is not declared in the datamodel document.`
               );
               return found;
+            },
+          }
+        : null,
+      /*
+       * The truth-table seam (sb-054), handed in by the shell for the same
+       * reason the datamodel one is: the drawer is the shell's surface, the
+       * condition pane is the editor's, and the editor is the wire between
+       * them and nothing more. It knows how many tables a block owns only by
+       * asking, and opening one is a call it forwards.
+       *
+       * `announce` is here rather than in the drawer because the live region
+       * is the canvas's, and a surface opening with nothing said is a gesture
+       * that did nothing as far as a screen reader is concerned.
+       */
+      tables: tables
+        ? {
+            countFor: (blockId) => tables.countFor(blockId),
+            open: (blockId) => {
+              tables.open(blockId);
+              announce("Opened the truth table drawer.");
             },
           }
         : null,

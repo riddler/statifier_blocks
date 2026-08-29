@@ -20,6 +20,8 @@ import { fixtureDocuments } from "./fixture-documents.js";
 import { createEditor } from "./interact.js";
 import { createDatamodelPane } from "./datamodel-pane.js";
 import { createFixturesPane } from "./fixtures-pane.js";
+import { createTableDrawer } from "./table-drawer.js";
+import { tableCountFor } from "./fixtures.js";
 import { indexPaths } from "./datamodel.js";
 import { createPalettePane } from "./palette-pane.js";
 import { createSequence } from "./sequence.js";
@@ -199,6 +201,18 @@ const editor = canvas
       canvas,
       registry,
       datamodel: datamodelSeam,
+      /*
+       * The truth-table seam (sb-054). Declared here, resolved later: the
+       * drawer needs the editor (it follows the selection) and the editor
+       * needs the drawer (the condition pane opens it), so one of the two has
+       * to be reached through a closure. The editor is built first because the
+       * drawer is the cheaper thing to defer - it renders nothing until an
+       * author opens it.
+       */
+      tables: {
+        countFor: (blockId) => tableCountFor(fixturesPane?.fixtures() ?? null, blockId),
+        open: (blockId) => tableDrawer?.open(blockId),
+      },
       chrome: {
         undoButton: document.getElementById("sb-undo"),
         redoButton: document.getElementById("sb-redo"),
@@ -322,12 +336,55 @@ const fixturesPane = fixturesMount
         revealBlocks: (ids) => editor?.revealBlocks(ids) ?? false,
         revealBlock: (id) => editor?.revealBlock(id) ?? false,
         labelFor: (id) => blockLabel(id),
+        // Apply and Revert replace the whole fixture set, and the drawer is
+        // rendering out of the same copy.
+        fixturesChanged: () => tableDrawer?.fixturesChanged(),
       },
     })
   : null;
 
-if (editor && fixturesPane) {
-  editor.onSelectionChange = () => fixturesPane.selectionChanged();
+/* --------------------------------------------------- truth-table drawer */
+
+/*
+ * The drawer (sb-054). Mounted by the shell rather than by the inspector,
+ * because it is not in the inspector: it is row three of the shell grid, the
+ * full width of the editor, which is the whole reason the tables moved out of
+ * a 21rem column.
+ *
+ * The editor's seam above closes over this binding rather than holding the
+ * value: both are module-scoped consts and the calls all happen after this
+ * line runs, so the cycle costs a closure and nothing else.
+ */
+const drawerRoot = document.getElementById("sb-drawer");
+const drawerMount = document.getElementById("sb-drawer-panel");
+
+const tableDrawer =
+  drawerRoot && drawerMount
+    ? createTableDrawer({
+        root: drawerRoot,
+        mount: drawerMount,
+        title: document.getElementById("sb-drawer-title"),
+        close: document.getElementById("sb-drawer-close"),
+        host: {
+          fixtures: () => fixturesPane?.fixtures() ?? null,
+          selectedId: () => editor?.selectedId ?? null,
+          labelFor: (id) => blockLabel(id),
+          revealBlock: (id) => editor?.revealBlock(id) ?? false,
+        },
+      })
+    : null;
+
+if (editor) {
+  /*
+   * The selection follower, now the drawer alone. The Fixtures pane wanted
+   * this callback only for its tables sub-view; with the tables in the drawer
+   * the pane's two remaining surfaces - a recorded run and the raw fixture
+   * JSON - are about the document rather than about the selection, so it no
+   * longer has a `selectionChanged` to call. The editor holds exactly one
+   * handler, deliberately, so if a second follower ever appears the shell
+   * composes them here rather than the editor growing subscribers.
+   */
+  editor.onSelectionChange = () => tableDrawer?.selectionChanged();
 }
 
 /*
@@ -402,6 +459,7 @@ async function loadDocument(name) {
     docTitle.textContent = "No document";
     docSubtitle.textContent = "pick a demo document to load";
     fixturesPane?.documentChanged();
+    tableDrawer?.documentChanged();
     return;
   }
 
@@ -438,6 +496,7 @@ async function loadDocument(name) {
   // After `open`, not before: a run left open from the previous document would
   // otherwise mark blocks that are no longer on the canvas.
   fixturesPane?.documentChanged();
+  tableDrawer?.documentChanged();
 }
 
 /*

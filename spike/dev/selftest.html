@@ -8089,6 +8089,207 @@
         );
       });
 
+      /* ============================================ sb-054: the drawer state
+       *
+       * The truth tables moved from the inspector's Fixtures tab to a bottom
+       * drawer (operator ruling: DRAWER, over inspector-until-graduation). The
+       * derivation they render from did NOT move and did not change - the
+       * `tableView` suites above are the check on that, and they are untouched.
+       *
+       * What is new is `drawerView`, which decides WHICH tables are on screen,
+       * and it is worth a pure suite for the same reason the run cursor was:
+       * five of its six states are reachable only through a sequence of
+       * gestures, and a screenshot can show one of them at a time.
+       *
+       * Imports are local to this block and the suites are appended at the END
+       * of the file, for the merge reason the sibling suites give: several
+       * beads are appending to this file in the same campaign.
+       */
+
+      import { drawerView as sb054DrawerView, tableCountFor } from "../js/fixtures.js";
+
+      /* One document's fixtures, in `fixturesFor`'s shape - two tables on one
+       * block, one on another, so "which block" and "how many" are separable. */
+      function sb054Fixtures() {
+        return {
+          documentId: "doc_cards",
+          known: true,
+          runs: [],
+          tables: [
+            {
+              id: "tbl_risk",
+              name: "Authorization outcome",
+              description: "What each arm answers.",
+              blockId: "blk_BRANCH",
+              paths: ["order.total", "customer.verified"],
+              columns: [
+                { key: "arm_1", label: "Over limit", expr: "order.total > 500" },
+                { key: "otherwise", label: "Otherwise", expr: "" },
+              ],
+              rows: [
+                {
+                  name: "Large order",
+                  bindings: { "order.total": 900, "customer.verified": true },
+                  expected: { arm_1: true, otherwise: false },
+                },
+                {
+                  name: "Small order",
+                  bindings: { "order.total": 20, "customer.verified": true },
+                  expected: { arm_1: false, otherwise: true },
+                },
+              ],
+            },
+            {
+              id: "tbl_retry",
+              name: "Retry guard",
+              blockId: "blk_BRANCH",
+              paths: ["attempts"],
+              columns: [{ key: "arm_1", label: "Retry", expr: "attempts < 3" }],
+              rows: [{ name: "First try", bindings: { attempts: 1 }, expected: { arm_1: true } }],
+            },
+            {
+              id: "tbl_signup",
+              name: "Email confirmed",
+              blockId: "blk_GUARD",
+              paths: ["signup.confirmed"],
+              columns: [{ key: "arm_1", label: "Confirmed", expr: "signup.confirmed" }],
+              rows: [
+                { name: "Confirmed", bindings: { "signup.confirmed": true }, expected: { arm_1: true } },
+              ],
+            },
+          ],
+        };
+      }
+
+      const sb054Empty = { documentId: "doc_empty", known: true, runs: [], tables: [] };
+
+      suite("drawer: closed is closed, whatever else is true (sb-054)", () => {
+        const view = sb054DrawerView({
+          open: false,
+          fixtures: sb054Fixtures(),
+          selectedId: "blk_BRANCH",
+        });
+
+        equal("status", view.status, "closed");
+        equal("open", view.open, false);
+        // The whole point of the flag: a closed drawer derives no tables even
+        // with a selection that has two, so nothing is rendered into a surface
+        // nobody can see.
+        equal("no tables derived", view.tables, []);
+        equal("no subject", view.subjectId, null);
+      });
+
+      suite("drawer: the four miss states are four different sentences (sb-054)", () => {
+        const open = (over) => sb054DrawerView({ open: true, selectedId: null, ...over });
+
+        equal("no document at all", open({ fixtures: null }).status, "no-document");
+        equal(
+          "a document nobody wrote fixtures for",
+          open({ fixtures: { documentId: "doc_x", known: false, runs: [], tables: [] } }).status,
+          "no-fixtures"
+        );
+        equal("fixtures, no selection", open({ fixtures: sb054Fixtures() }).status, "no-selection");
+        equal(
+          "a selection that owns none",
+          open({ fixtures: sb054Fixtures(), selectedId: "blk_AUTH" }).status,
+          "none-for-block"
+        );
+
+        // The distinction the pane could not draw, and the reason this is a
+        // status rather than a boolean: "load a document" and "no table for
+        // this block" are different advice, and the second is a false
+        // statement about a document nobody has opened.
+        equal(
+          "no-document is not none-for-block",
+          open({ fixtures: null }).status === open({ fixtures: sb054Fixtures(), selectedId: "blk_AUTH" }).status,
+          false
+        );
+      });
+
+      suite("drawer: the jump list is offered by the miss states (sb-054)", () => {
+        const view = sb054DrawerView({
+          open: true,
+          fixtures: sb054Fixtures(),
+          selectedId: "blk_AUTH",
+        });
+
+        // Each owning block once, in first-seen order - two tables on
+        // blk_BRANCH is one entry, not two.
+        equal("blocks that do own a table", view.jumps, ["blk_BRANCH", "blk_GUARD"]);
+        equal("and no tables are shown for the wrong block", view.tables, []);
+        equal("but the block asked about is remembered", view.subjectId, "blk_AUTH");
+
+        // A document with a section and nothing in it has nowhere to send an
+        // author, and the drawer says so instead of offering an empty list.
+        const bare = sb054DrawerView({ open: true, fixtures: sb054Empty, selectedId: "blk_AUTH" });
+        equal("nothing to jump to", bare.jumps, []);
+        equal("still a miss", bare.status, "none-for-block");
+      });
+
+      suite("drawer: a hit renders the block's tables, flattened (sb-054)", () => {
+        const view = sb054DrawerView({
+          open: true,
+          fixtures: sb054Fixtures(),
+          selectedId: "blk_BRANCH",
+        });
+
+        equal("status", view.status, "ready");
+        equal("subject", view.subjectId, "blk_BRANCH");
+        equal("both of that block's tables", view.tables.length, 2);
+        equal("in fixture order", view.tables.map((table) => table.id), ["tbl_risk", "tbl_retry"]);
+
+        // The rows are `tableView`'s, unchanged: the drawer decides WHICH
+        // tables, never what one flattens to. If this drifts, the move broke
+        // the derivation it was supposed to leave alone.
+        equal("rows are the flattened view", view.tables[0].rows.length, 2);
+        equal(
+          "cells are the flattened view",
+          view.tables[0].rows[0].cells.map((cell) => cell.expected),
+          [true, false]
+        );
+        equal("true counts survive", view.tables[0].trueCounts, [1, 1]);
+        equal(
+          "bindings are the declared paths",
+          view.tables[0].rows[0].bindings.map((binding) => binding.path),
+          ["order.total", "customer.verified"]
+        );
+      });
+
+      suite("drawer: the title names what is on screen (sb-054)", () => {
+        const one = sb054DrawerView({
+          open: true,
+          fixtures: sb054Fixtures(),
+          selectedId: "blk_GUARD",
+        });
+        const two = sb054DrawerView({
+          open: true,
+          fixtures: sb054Fixtures(),
+          selectedId: "blk_BRANCH",
+        });
+
+        // One table: its own name, which is more use in the header than the
+        // word "table" and is what an author is looking for.
+        equal("one table names itself", one.title, "Email confirmed");
+        equal("two tables are counted", two.title, "2 truth tables");
+        equal(
+          "a miss keeps the generic heading",
+          sb054DrawerView({ open: true, fixtures: null, selectedId: null }).title,
+          "Truth table"
+        );
+      });
+
+      suite("drawer: the condition pane's open affordance counts first (sb-054)", () => {
+        const fixtures = sb054Fixtures();
+
+        equal("a block with two", tableCountFor(fixtures, "blk_BRANCH"), 2);
+        equal("a block with one", tableCountFor(fixtures, "blk_GUARD"), 1);
+        // Zero is what keeps the button off a condition whose drawer would
+        // open on "nothing here".
+        equal("a block with none", tableCountFor(fixtures, "blk_AUTH"), 0);
+        equal("no selection", tableCountFor(fixtures, null), 0);
+        equal("no document open", tableCountFor(null, "blk_BRANCH"), 0);
+      });
+
       /* ------------------------------------------------------- reporting */
 
       const results = document.getElementById("results");

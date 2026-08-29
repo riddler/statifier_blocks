@@ -60,11 +60,16 @@ const SEVERITY_LABELS = { error: "Error", warning: "Warning", info: "Note" };
  *
  *     mounts  { config, findings, findingsBadge, condition }
  *     host    { state(), updateConfig(id, config), reveal(finding),
- *               datamodel: { index, reveal(path) } }
+ *               datamodel: { index, reveal(path) },
+ *               tables: { countFor(blockId), open(blockId) } }
  *
  * `state()` returns `{ session, findings }` or `null` when no document is
  * open. `updateConfig` returns `true` when the command was applied, which is
  * what tells a control whether to expect a re-render or to mark itself.
+ *
+ * `host.tables` is optional the same way `host.datamodel` is: without it the
+ * condition pane renders exactly as it did before sb-054, minus the one button
+ * that opens the truth-table drawer.
  *
  * `host.datamodel` is optional: without it the condition pane still renders and
  * still edits, it simply says nothing about whether a path is declared. That is
@@ -1000,12 +1005,52 @@ function renderCondition(mount, state, host, ctx) {
   const index = host.datamodel?.index ?? new Map();
 
   mount.replaceChildren(
-    el(
-      "div",
-      { class: "sb-conditions" },
-      fields.map((field) => conditionElement(field, form, host, index, { ...ctx, mount }))
-    )
+    el("div", { class: "sb-conditions" }, [
+      ...tableAffordance(node.id, host),
+      ...fields.map((field) => conditionElement(field, form, host, index, { ...ctx, mount })),
+    ])
   );
+}
+
+/*
+ * The anchored open-from-condition affordance (sb-054).
+ *
+ * The truth table for a condition now lives in the bottom drawer, and this is
+ * the way in from the surface an author is standing on when they want it: they
+ * are reading a condition, they want to know what it answers for which inputs,
+ * and the drawer is one press away rather than a tab strip and a sub-view
+ * away.
+ *
+ * ONE button for the block, not one per field. A branch's arms are separate
+ * condition fields and a single table covers all of them - its columns ARE the
+ * arms - so a button per field would be three buttons opening the same table.
+ *
+ * It is rendered only when a table exists. A button that opens a drawer saying
+ * "nothing here" is the affordance teaching an author to stop pressing it, and
+ * the drawer's own empty states are for arriving there some other way.
+ */
+function tableAffordance(blockId, host) {
+  const count = host.tables?.countFor?.(blockId) ?? 0;
+  if (count === 0) return [];
+
+  const button = el("button", {
+    class: "sb-button sb-button--quiet sb-condition__tables",
+    type: "button",
+    text: count === 1 ? "Truth table" : `${count} truth tables`,
+  });
+
+  button.addEventListener("click", () => host.tables.open(blockId));
+
+  return [
+    el("div", { class: "sb-condition__tables-bar" }, [
+      el("span", {
+        class: "sb-hint",
+        text: "Recorded cases for this block's conditions:",
+      }),
+      el("div", { class: "sb-topbar__spacer" }),
+      button,
+    ]),
+  ];
 }
 
 /*

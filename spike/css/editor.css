@@ -64,8 +64,15 @@
    * `minmax(topbar-height, auto)` rather than a fixed height, because the top
    * bar is allowed to wrap now - see `.sb-topbar`. At every width where it
    * does not wrap this resolves to exactly the token, so nothing moves.
+   *
+   * The third row is the truth-table drawer (sb-054). `auto` and not a track
+   * with a floor: the drawer is `hidden` until an author opens it, and a
+   * hidden grid item generates no box, so a closed drawer costs exactly zero
+   * pixels and the body keeps the whole shell. The drawer caps its own height
+   * and scrolls inside it, so an open one takes a bounded bite out of `1fr`
+   * rather than pushing the canvas off the bottom.
    */
-  grid-template-rows: minmax(var(--sb-topbar-height), auto) minmax(0, 1fr);
+  grid-template-rows: minmax(var(--sb-topbar-height), auto) minmax(0, 1fr) auto;
   height: 100%;
   min-height: 0;
   /*
@@ -3100,10 +3107,14 @@
 }
 
 /*
- * The grid is wider than the pane and is allowed to be. A bindings column per
- * referenced path plus one per arm does not fit in `--sb-inspector-width`, and
- * squeezing it produces a table nobody can read. Whether a truth table wants a
- * wider home than the inspector is the open question this pane found.
+ * The grid, now in the drawer (sb-054). It was wider than the inspector and
+ * allowed to be - a bindings column per referenced path plus one per arm does
+ * not fit in `--sb-inspector-width`, and squeezing it produces a table nobody
+ * can read. "Whether a truth table wants a wider home than the inspector" was
+ * the open question this pane found; the operator's ruling is that it does,
+ * and that the home is a bottom drawer. These rules did not have to change to
+ * follow it, which is the useful part of the finding: the grid was already
+ * written to take whatever width it was given.
  */
 /* The same four-layer mark as `.sb-form__raw`, turned on its side. It does not
  * settle the open question above - whether a truth table wants a wider home
@@ -3119,10 +3130,10 @@
  * a chip lands on the clipped edge it hides the shadow behind it. The mark is
  * reliable on the left edge, where the case-name column is plain text, and
  * intermittent on the right. Making it reliable on both sides means an
- * overlay rather than a background - a sticky pseudo-element, or a wrapper -
- * and that is a change to the pane's markup, which belongs with the decision
- * about where the table lives rather than ahead of it. The sentence under the
- * table says the same thing in words in the meantime. */
+ * overlay rather than a background - a sticky pseudo-element, or a wrapper.
+ * In the drawer that matters far less than it did: at the shell's full width
+ * the fixtures' tables do not clip at all, and the mark is now the answer for
+ * the narrow embed rather than for every reader. */
 .sb-fixtures__table-scroll {
   overflow-x: auto;
   border: var(--sb-border-width) solid var(--sb-border);
@@ -3447,6 +3458,126 @@
   margin-top: var(--sb-space-half);
   font-size: var(--sb-text-xs);
   color: var(--sb-fg-subtle);
+}
+
+/* ------------------------------------------------------------------ drawer */
+
+/*
+ * The truth-table drawer (sb-054), and the whole of what makes it a drawer.
+ *
+ * Row three of the shell grid, outside `.sb-editor__body` and therefore
+ * outside the three-column track list: the drawer is the shell's full width by
+ * construction rather than by a span, so no breakpoint below has to restate
+ * it. That is the point of the placement - the width is what the inspector
+ * could not give a truth table, and a rule that had to be re-derived at every
+ * breakpoint would be a rule that loses it at one of them.
+ *
+ * Visually it is a pane: same surface, same border, same header. It is a
+ * heavier shadow than `.sb-pane` and that is the one deliberate difference -
+ * a surface that appears over the editor on a gesture has to read as being IN
+ * FRONT of it, or an author meets a fourth pane that was somehow always there
+ * and wonders what they broke.
+ *
+ * No transition. A drawer that slides is a drawer whose contents are mid-
+ * animation when the author's eye arrives, and the spike has already paid for
+ * that lesson once with the canvas reveal (the `scrollend` receipt). If the
+ * shipped component wants motion it can add it where prefers-reduced-motion is
+ * honoured; the placement decision this bead is about does not need it.
+ */
+.sb-drawer {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /*
+   * A cap, not a height. The tables decide how tall the drawer is up to this
+   * point and the body scrolls past it, so a one-row table is a thin strip
+   * rather than a half-empty panel - and a six-row one never eats more than a
+   * quarter of a 1080px shell.
+   */
+  max-block-size: 24rem;
+  margin: 0 var(--sb-space) var(--sb-space);
+  background: var(--sb-bg-raised);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius);
+  box-shadow: var(--sb-shadow-md);
+  overflow: hidden;
+}
+
+/*
+ * `display: flex` on the rule above beats the UA's `[hidden] { display: none }`
+ * on specificity, so a class that sets `display` has to say what `hidden`
+ * means for it. Every other surface in this file that toggles with the
+ * attribute carries the same pair - `.sb-tabpanel`, `.sb-tabs__badge`,
+ * `.sb-canvas__placeholder` - and the drawer shipped visible-when-closed for
+ * exactly as long as it took to open the page once without it.
+ */
+.sb-drawer[hidden] {
+  display: none;
+}
+
+.sb-drawer__header {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space);
+  padding: var(--sb-space) var(--sb-space-2);
+  border-bottom: var(--sb-border-width) solid var(--sb-border);
+  background: var(--sb-bg);
+}
+
+.sb-drawer__title {
+  margin: 0;
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+  color: var(--sb-fg-muted);
+  /* The title carries a table's own name, which is author text of any length,
+   * so it truncates rather than pushing the Close button off the edge. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sb-drawer__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-2);
+  padding: var(--sb-space-2);
+  overflow: auto;
+  min-height: 0;
+}
+
+/*
+ * The one thing the tables do differently for having the width: the column
+ * expressions lay out as a wrapping ROW instead of a stack.
+ *
+ * In the inspector they had to be a column - a `risk_rating >= 70 OR ...` in
+ * 21rem is already wrapping. Stacked at the shell's full width they were three
+ * near-empty full-width bands between the heading and the grid, and they
+ * pushed the grid itself below the drawer's fold, which is the one thing the
+ * move was supposed to fix. `18rem` is a basis rather than a width, so a
+ * two-arm table gets two wide cards and a five-arm one wraps.
+ */
+.sb-drawer .sb-fixtures__exprs {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.sb-drawer .sb-fixtures__expr {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+/*
+ * On a narrow embed the drawer keeps its width - it is the one surface that
+ * has all of it - but not its height: below the second breakpoint the panes
+ * are already stacked under the canvas, and a 24rem drawer on top of that
+ * leaves the canvas a band.
+ */
+@container sb-shell (max-width: 53rem) {
+  .sb-drawer {
+    max-block-size: 15rem;
+  }
 }
 
 /* ------------------------------------------------------------------ narrow */
