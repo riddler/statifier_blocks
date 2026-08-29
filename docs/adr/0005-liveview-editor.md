@@ -1423,3 +1423,89 @@ exactly where the paragraph above left it.
   needs it arrives with a record amendment attached.
 - Nothing here changes the anchor vocabulary, the source list, or the routing.
   It is one value on one field.
+
+---
+
+## Proposed amendment (2026-08-29): decision 10, `slot_outcome_key`
+
+**Status: PROPOSED, not accepted.** Additive; decision 10 stands as accepted
+and no text above this line is changed by it. It answers the question the
+d10/13 amendment above deliberately left open as **10f**, and it is drafted
+from what `sb-77n` built rather than from a shape guessed ahead of the code.
+
+### Context
+
+10f names a real loss and declines to fix it. `core.on_event` carries an
+`outcome` of `abandon` or `resume`, the canvas draws every interrupt exit edge
+identically, and "does this rule end the group or return to it" - the question
+an author reading the picture is asking - is therefore invisible at the edge
+level. The spike refused the obvious fix because it is not the fix it looks
+like: a renderer reading `config["outcome"]` and routing on its value is a
+branch over a config key of one core type, which is a type-name branch wearing
+a different hat.
+
+10f proposes metadata instead, and stops there: "A block type may declare, per
+statically-named slot, that its rule blocks carry an **outcome** - a declared
+key whose value the renderer may route on without knowing which type declared
+it." It calls the shape the operator's, because the right one depends on
+whether a second consumer exists. This section takes that sentence at its word
+and writes it down as a table row.
+
+### Proposed decision
+
+One row is added to decision 10's metadata table:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `slot_outcome_key` | `%{}` | statically-named slot to the config key the blocks in that slot carry their outcome under |
+
+A block type may declare, per statically-named slot, the config key its rule
+blocks carry their outcome under. It names a KEY and never an outcome value,
+so a renderer routes on the value without knowing which type declared it - the
+property this decision exists to preserve - and ADR-0002 amendment A2's parked
+question, which outcome a given slot completion reaches, stays parked. The
+declaration is read through a total normalizer under ADR-0002 amendment B3: a
+non-map declaration, a non-string key, and a key or value outside the
+outcome-name alphabet all read as no declared outcome, which is the uniform
+rendering every consumer had before the declaration existed.
+
+### Why a key rather than an outcome
+
+The tempting shape is the other one - a map from slot name to the outcome that
+slot's escape produces - and it is the one this section refuses. ADR-0002's
+accepted amendment says so directly in section A2: "Which outcome a given
+slot's completion reaches is deliberately not a third declaration", and it
+records the alternative as a deferred question in that record's section F
+rather than as a decision. A row here binding a slot to an outcome name would
+decide, on ADR-0002's behalf and in the wrong record, the exact question that
+record parked.
+
+The `slot_style: :failure` amendment accepted earlier the same day reaches
+the same reading from the other side. Its last consequence says the question
+left open is "whether a block type may declare that its rule blocks carry a
+routable **outcome** key" - a key, not a binding - and that `:failure` is "a
+slot's style, not a config-value route". This row is that key, and it leaves
+`:failure` exactly where that amendment put it.
+
+Naming a key decides nothing about that binding. It says only where a per-BLOCK
+fact lives, which is a thing the container genuinely knows about its own slot
+and cannot be derived any other way: the outcome belongs to the rule block, the
+container declares the slot, and the key is the only thing that joins them
+without either side learning the other's type name.
+
+### Consequences
+
+- `slot_outcome_key` widens `palette_entry/0`, which decision 10 says is a
+  change to this record and to that callback's contract. That is the friction
+  decision 10 asks for, and this is a record amendment asking for it.
+- A canvas may route an abandon differently from a resume. Nothing in this
+  record says it must, or says what either routing looks like - 10a-10e own
+  the drawing, and the value reaching them is all this row provides.
+- The compiler reads none of it, and must not. ADR-0004 decision 4 keeps a
+  child's config out of its parent's compile context, so a group wires both
+  interrupt outcomes unconditionally and the handler picks one by raising. A
+  compiler read of this key would be exactly the parent-reads-child-config
+  move that record forbids; the declaration's consumer is presentational.
+- Every block type that declares nothing keeps rendering exactly as before,
+  and so does every type that declares this wrongly. That is B3's discipline
+  arriving at one more key rather than a new posture.
