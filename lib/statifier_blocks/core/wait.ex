@@ -26,7 +26,7 @@ defmodule StatifierBlocks.Core.Wait do
   @behaviour StatifierBlocks.BlockType
 
   alias StatifierBlocks.Block
-  alias StatifierBlocks.Compiler.Context
+  alias StatifierBlocks.Compiler.{Cancels, Context}
   alias StatifierBlocks.Core.{Duration, Emit}
   alias StatifierBlocks.Emission
 
@@ -94,7 +94,7 @@ defmodule StatifierBlocks.Core.Wait do
 
       <state id="s_WAI" initial="s_WAI__waiting">
         <state id="s_WAI__waiting">
-          <onentry><send delay="48h" event="statifier_blocks.wait.blk_WAI" id="s_WAI__timer"/></onentry>
+          <onentry><send delay="48h" event="statifier_blocks.wait.blk_WAI" id="s_WAI__send"/></onentry>
           <transition event="statifier_blocks.wait.blk_WAI" target="s_WAI__done"/>
         </state>
         <final id="s_WAI__done"/>
@@ -106,6 +106,18 @@ defmodule StatifierBlocks.Core.Wait do
   queue is exactly what `statifier_oban` turns into a durable timer. This
   type still does not know durable timers exist; it emits an ordinary
   delayed send and the host's session decides what backs it.
+
+  ## The send id rides the reserved role
+
+  The id is minted with `Context.role_id/2` under
+  `StatifierBlocks.Compiler.Cancels.armed_role/0`, the same reserved role
+  `core.send` mints under, so `StatifierBlocks.Compiler.Cancels` reaches
+  this send as it reaches any other: a wait left before its delay elapses -
+  by an interrupt, by a losing `complete: first` lane, by an abandoned
+  group - has its timer cancelled in the enclosing scope's `<onexit>`. The
+  wait's own state bounds only what the interpreter holds; a delayed send
+  a durable host has already scheduled outlives the state that armed it
+  unless something cancels it.
 
   ## The duration is compiled, not read out
 
@@ -130,12 +142,12 @@ defmodule StatifierBlocks.Core.Wait do
     done = Context.done_id(context)
 
     with {:ok, waiting} <- Context.role_id(context, "waiting"),
-         {:ok, timer} <- Context.role_id(context, "timer"),
+         {:ok, send_id} <- Context.role_id(context, Cancels.armed_role()),
          {:ok, delay} <- delay(Map.get(config, "duration")) do
       event = "statifier_blocks.wait." <> block_id
 
       send_element =
-        Emission.element("send", [{"delay", delay}, {"event", event}, {"id", timer}])
+        Emission.element("send", [{"delay", delay}, {"event", event}, {"id", send_id}])
 
       armed =
         Emit.state(waiting, nil, [

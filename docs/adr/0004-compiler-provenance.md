@@ -1948,3 +1948,16 @@ Two properties this record cares about, and both hold:
   field's own typedoc says.
 - Decision 10's stopping rule, its stage table, or its rule that every finding
   names a block.
+
+## Note (2026-08-29): `core.wait`'s timer rides the reserved send role
+
+`core.wait` mints its delayed `<send>` id under the reserved role the cancel
+amendment above turns on - `StatifierBlocks.Compiler.Cancels.armed_role/0`,
+the role `core.send` already mints under - rather than a role of its own, so a
+wait left before its delay elapses has its timer cancelled in the enclosing
+scope's `<onexit>` like any other armed send. The wait's own state bounds only
+what the interpreter holds, so a delayed send a durable host has already
+scheduled outlived it; charts containing a `core.wait` therefore compile to
+different bytes than they did (`s_<block id>__send` where the id read
+`s_<block id>__timer`), which decision 3's derivation makes a per-block change
+and nothing else in the record is edited by (`sb-cqg`).

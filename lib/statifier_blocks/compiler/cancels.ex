@@ -65,10 +65,13 @@ defmodule StatifierBlocks.Compiler.Cancels do
       grandchild, so it fails the direct-child test here and was already
       cancelled by the nearer scope on its own pass. No send is cancelled
       twice and none is missed.
-    * **`core.wait`'s timer is untouched.** It mints its own delayed
-      `<send>` under the role `"timer"` (a wait's timer is bounded by the
-      wait's own state, which is why it has never leaked), so it does not
-      match and no `core.wait` moves a byte.
+    * **`core.wait`'s timer is one of these sends.** It mints its own
+      delayed `<send>` under this same reserved role rather than a role of
+      its own, so a wait left before its delay elapses is cancelled by its
+      scope exactly as a `core.send` is. The wait's own state bounds only
+      what the interpreter holds: a delayed send a durable host has already
+      scheduled outlives that state, and would fire into a run that no
+      longer wants it.
     * **A host block type opts in by minting the same role.** Nothing here
       names `StatifierBlocks.Core.Send`, so a host type that arms a
       cancellable delayed send gets the scope cancel by using

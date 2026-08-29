@@ -225,9 +225,16 @@ defmodule StatifierBlocks.CompilerTest do
     # two edits over the new bytes reproduces
     # `sha256:3c0f170c...` - the hash pinned before - byte for byte, so
     # nothing else in this document's emission changed.
+    #
+    # Moved again, deliberately, by `core.wait`'s move onto the reserved
+    # send role: the wait's delayed send id migrated from
+    # `s_<block>__timer` to `s_<block>__send`, and the scope around it
+    # gained the `<cancel>` that role earns. Verified the same way -
+    # renaming that one id back and deleting that one `<cancel>` over the
+    # new bytes reproduces `sha256:0410c745...`, the hash pinned before.
     test "the worked example's chart identity is pinned" do
       assert compile_worked_example().record.chart_identity.content_hash ==
-               "sha256:0410c745ba6bfb52fb36b3e502e20dfdb8d63ba26bfdfd5170d9e31b5c9d9ae7"
+               "sha256:9e792393af59e51db2ad1e70ade3ed66ba5f7c2794fb9f21b4bfe1ba223b647a"
     end
 
     # sabotage: drop `module` from the palette_hash triples -> swapping one
