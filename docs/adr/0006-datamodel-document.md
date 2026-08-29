@@ -1,11 +1,11 @@
 # ADR-0006: The datamodel document is a typed, three-scope declaration, and the declared-path set is its projection
 
 Status: **proposed** (2026-08-29, sb-g8m). Nothing in this record is accepted.
-It is drafted under the operator's campaign-015 held-PR lane; acceptance is the
-operator's, and the direction-agent gate does not flip a new record. Every
-consumer named below is written against the declared-path *set*, which already
-exists as an accepted contract (ADR-0005, 11f), so nothing is blocked while
-this record waits.
+It is drafted under the operator's campaign-015 held-PR lane; status stays
+proposed until the campaign's direction-agent gate or the operator flips it.
+Every consumer named below is written against the declared-path *set*, which
+already exists as an accepted contract (ADR-0005, 11f), so nothing is blocked
+while this record waits.
 
 ## Context
 
@@ -37,7 +37,7 @@ written (sb-ajk): every datamodel path named in a `cond` in `documents/*.json`
 resolves to an entry in it.
 
 **What does not exist.** `StatifierBlocks.Predicates` has no declaration type to
-reuse. Its `context/0` is a nested string-keyed map of *values*, and `context/1`
+reuse. Its `context()` type is a string-keyed map of *values*, and `context/1`
 folds a `%{dotted_path => source_text}` map into one by evaluating each source
 through predicator. A binding context says what a path is worth in one
 situation; it never says which paths a host declares. "Reuse `Predicates`' type"
@@ -58,7 +58,7 @@ that there is no shape here to adopt.
 
 `sui-ADR-0006` (datasets and expression fixtures, accepted 2026-08-16) adds two
 optional keys to statifier-ui's fixture bundle: **datasets**, "named, reusable
-datamodel records - each a name mapped to an example datamodel for that
+datamodel records - each a name ... mapped to an example datamodel for that
 situation", and **expressions**, each a predicator source string plus an
 `expect` map keyed by dataset name. It says of itself, under "What this decision
 does not do":
@@ -209,12 +209,15 @@ nothing, because the codomain is a set of strings.
 **Total, and what that claims.** The function is total over the documents this
 record admits: the recursion is over a finite tree and terminates; every clause
 returns a list for every admitted input; there is no error return and no partial
-case. The empty-entry document maps to the empty set, which is the same value a
-host that supplies no datamodel produces at 11f - so the check's two quiet cases
-stay distinguishable at the call site (`nil` versus `MapSet.new()`) and neither
-one is a failure. Totality is over *admitted* documents: a malformed input is a
-loader concern, rejected before this function is reached, which is why the
-function has no `{:error, _}` arm to explain.
+case. The empty-entry document projects to `MapSet.new()`, which is a different
+value from `nil`: `nil` is *no datamodel supplied*, and at 11f the check does not
+run at all. `MapSet.new()` is a host claim - the host supplied a datamodel and
+declared nothing - so every `datamodel_path?: true`-annotated path in the
+document is undeclared and earns its `:info` advisory. Only the `nil` case is
+quiet. Neither is a failure, and the two stay distinguishable at the call site.
+Totality is over *admitted* documents: a malformed input is a loader concern,
+rejected before this function is reached, which is why the function has no
+`{:error, _}` arm to explain.
 
 **One direction only.** The document projects onto the set; the set does not
 lift back to a document. That asymmetry is why the document is the artifact this
@@ -236,9 +239,13 @@ paths is a consumer of this document.
 **8. `version` is its own axis and stays at 1.** It versions this record's
 envelope, and it is not ADR-0001's `schema_version` (the block document's), not
 `revision` (the host's editing counter), and not `type_version` (a block type's).
-Adding an optional key is not a bump, on the same rule ADR-0001 decision 7 sets
-for its axes: a bump means a consumer of the old version would misread the file,
-and a consumer that ignores a key it does not know misreads nothing.
+Adding an optional key is not a bump, on the rule `sui-ADR-0006` adopts from
+`sui-ADR-0005` for its sidecar: consumers ignore unknown keys, additive change
+is not a version bump, and a bump means a consumer of the old version would
+misread the file. A consumer that ignores a key it does not know misreads
+nothing. ADR-0001 decision 7 sets the neighbouring rule for its own axes -
+`schema_version` "bumps only when this record is amended in a way that changes
+bytes" - and the two agree in effect here.
 
 **9. Advisory, never a gate.** An undeclared path is **unknown, not wrong**.
 This record adds no compile-time check, no validation verdict, and no refusal.
