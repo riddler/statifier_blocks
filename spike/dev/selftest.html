@@ -7989,6 +7989,106 @@
         equal("a non-object stored config is treated as empty", pendingKeys({ a: 1 }, null), ["a"]);
       });
 
+      /* ================================ field placeholders (sb-ed7) */
+
+      /*
+       * The injected label field rendered with no placeholder while its
+       * siblings had one, because placeholders were chosen entirely by
+       * control type and "string" is too wide to suggest anything. The fix
+       * is a declared `placeholder` the derivation carries, with the editor
+       * declaring one on the field it owns (README, "Placeholders, and the
+       * editor's own field").
+       *
+       * What these checks defend is that it is a DECLARATION and not a
+       * special case: the last suite declares a placeholder on a field that
+       * is neither named `label` nor owned by the editor, and it arrives.
+       * Re-introducing a `field.key === "label"` test downstream turns that
+       * one red while leaving the rest green.
+       */
+
+      import * as sbEd7Panes from "../js/panes.js";
+
+      suite("panes: the editor's own field declares its placeholder", () => {
+        check(
+          "LABEL_FIELD declares a non-empty placeholder",
+          typeof LABEL_FIELD.placeholder === "string" && LABEL_FIELD.placeholder !== "",
+          show(LABEL_FIELD.placeholder)
+        );
+
+        for (const name of Object.keys(everyType.types)) {
+          const descriptor = everyType.types[name];
+          const form = sbEd7Panes.configFormFor(
+            everyType,
+            block({ id: "blk_P", type: name, typeVersion: descriptor.currentVersion })
+          );
+
+          equal(`${name}'s label field carries it`, form.fields[0].placeholder, LABEL_FIELD.placeholder);
+        }
+
+        // An authored label is unaffected: a placeholder is what shows when
+        // there is nothing, and the value is what shows when there is.
+        const authored = sbEd7Panes.configFormFor(
+          everyType,
+          block({
+            id: "blk_A",
+            type: "core.invoke",
+            config: { invoke_type: "myapp:authorize", label: "Authorize the card" },
+          })
+        );
+
+        equal("an authored label still reads back", authored.fields[0].value, "Authorize the card");
+        equal(
+          "...beside the placeholder it will not show",
+          authored.fields[0].placeholder,
+          LABEL_FIELD.placeholder
+        );
+
+        // d12 is untouched: an unresolvable block has no fields to hint at.
+        const gone = sbEd7Panes.configFormFor(registry, findBlock(retiredDocument(), "blk_GONE"));
+        equal("an unresolvable block offers no field to place a hint on", gone.fields, []);
+      });
+
+      suite("panes: a placeholder is carried, never invented", () => {
+        const base = everyType.types["core.sequence"];
+
+        const hinting = {
+          ...base,
+          configSchema: () => [
+            {
+              key: "note",
+              type: "string",
+              label: "Note",
+              required: false,
+              placeholder: "a hint this field declared itself",
+            },
+            { key: "bare", type: "string", label: "Bare", required: false },
+          ],
+          validateConfig: () => null,
+        };
+
+        const hintingRegistry = {
+          ...everyType,
+          types: { ...everyType.types, "myapp.hinting": hinting },
+        };
+
+        const form = sbEd7Panes.configFormFor(
+          hintingRegistry,
+          block({ id: "blk_H", type: "myapp.hinting", typeVersion: base.currentVersion })
+        );
+
+        equal("the injected field is still first", form.fields[0].key, "label");
+        equal(
+          "a declaring field that is NOT the editor's gets its own hint",
+          form.fields[1].placeholder,
+          "a hint this field declared itself"
+        );
+        equal(
+          "a field that declares none derives none",
+          form.fields[2].placeholder,
+          undefined
+        );
+      });
+
       /* ------------------------------------------------------- reporting */
 
       const results = document.getElementById("results");

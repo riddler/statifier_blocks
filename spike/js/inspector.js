@@ -366,13 +366,23 @@ function control(field, id, commit, host, form) {
   }
 }
 
+/*
+ * `placeholder` here is the CONTROL TYPE's hint - what any expression field
+ * should say, what any bare string field should say (nothing). sb-ed7: a
+ * field that declares its own wins over it, because a declared hint is about
+ * that one field and a control-type hint is a fallback for every field that
+ * did not bother. The editor's injected `label` field is the only declarer
+ * today; this code does not know that, and does not name a key or a type.
+ */
 function textControl(field, id, commit, { mono = false, placeholder = "" }) {
+  const hint = field.placeholder ?? placeholder;
+
   const input = el("input", {
     class: mono ? "sb-input sb-input--mono" : "sb-input",
     type: "text",
     id,
     value: field.value === undefined || field.value === null ? "" : String(field.value),
-    placeholder,
+    placeholder: hint,
   });
 
   input.value = field.value === undefined || field.value === null ? "" : String(field.value);

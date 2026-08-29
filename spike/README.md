@@ -214,6 +214,46 @@ carrying both fields, a value the type refuses is still refused with the
 document keeping the last config that validated, and discarding returns the
 form to the document.
 
+### Placeholders, and the editor's own field (sb-ed7)
+
+Placeholders in the config form were chosen entirely by **control type**: an
+expression field says "an expression", a duration says "PT1H30M", and a bare
+`string` field says nothing, because there is nothing a type as wide as
+"string" can suggest. That rule left the injected `label` field - the first
+field every author meets, and the one the canvas titles every card from -
+rendering blank beside siblings that told the author what they wanted.
+
+The mechanism, implemented here: **a field may declare a `placeholder`, and a
+declared one wins over the control type's**. Three small pieces, none of which
+knows a key or a type name:
+
+- `LABEL_FIELD` in `palette.js` declares `placeholder: "Authorize the card"`,
+  beside its `label` and its optionality. The editor owns this field
+  (ADR-0002's amendment section C: the editor injects it, a type that declared
+  one was writing boilerplate), so the editor owns its hint too.
+- `fieldView` in `panes.js` carries `field.placeholder` onto the derived
+  control view, exactly as it already carries `label` and `default`. Absent
+  stays `undefined`.
+- `textControl` in `inspector.js` prefers `field.placeholder` over the
+  control-type hint it is passed.
+
+That is deliberately **not** a by-key or by-type-name special case, which is
+what the finding warned against: nothing downstream tests for `"label"`, and
+the same three lines would serve any field that declared a hint. The editor's
+own field is simply the only declarer today.
+
+**Open proposal, recorded as a proposal.** Whether a HOST block type may
+declare `placeholder` on its own fields is *not* decided here and no ADR is
+edited by this change. ADR-0002 decision 7 closes the field **type** set, not
+the keys of a field record - `keyLabel` and `valueLabel` are already
+presentation-only keys the derivation reads - so admitting `placeholder` is a
+widening of the same kind rather than a new mechanism. The argument for
+admitting it is that a host type knows what its own `path` or `event` field
+should look like far better than the editor does; the argument against is that
+every presentation key a schema admits is one more thing a host can make the
+form say, and the closed set is what makes the form provable. `sb-8dc` inherits
+the question along with the code.
+
 ## The three themes
 
 One mechanism, exercised three ways:

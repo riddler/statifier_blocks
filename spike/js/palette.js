@@ -957,12 +957,30 @@ function unresolvedMessage(reason) {
  * Deliberately NO `default`. It is optional, and a default would seed
  * `{"label": ""}` into the config of every block ever inserted - bytes in
  * every document to say nothing at all.
+ *
+ * sb-ed7: it DOES carry a `placeholder`, and that is the same ownership
+ * argument one step further. Placeholders were previously chosen by control
+ * type in `inspector.js` (an expression field says "an expression", a
+ * duration says "PT1H30M"), and a `string` field has no type-level hint to
+ * offer - so the first field every author meets rendered blank beside
+ * siblings that suggested their own shape. The editor owns this field, so
+ * the editor owns its hint: the placeholder is declared HERE, next to the
+ * label and the optionality, rather than special-cased downstream by key or
+ * by type name. `panes.js` carries whatever a field declares and
+ * `inspector.js` prefers it over the control-type default; neither one knows
+ * that `label` exists.
+ *
+ * Whether a HOST type may declare `placeholder` on its own fields is a
+ * PROPOSAL, not a decision - see the README section of the same name. Nothing
+ * here needs it answered: the mechanism is the same either way, and today the
+ * editor's own field is the only declarer.
  */
 export const LABEL_FIELD = Object.freeze({
   key: "label",
   type: "string",
   label: "Step name",
   required: false,
+  placeholder: "Authorize the card",
 });
 
 /*
