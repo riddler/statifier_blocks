@@ -547,11 +547,16 @@ A draft is never in the document and never on the undo stack: a form whose
 config has not been accepted names the fields that are outstanding and offers
 "Discard edits", because a draft was never a command and so cannot be undone.
 
-There is deliberately **no `datamodel` assign**. A field that names a
-datamodel path - `core.assign`'s `path`, a `core.invoke` param - is checked
-for *shape* and nothing more, because this package does not own the datamodel
-path grammar and holds no declaration to check a path against. A host that
-knows its own datamodel checks paths itself and hands the result in through
+There is a **`datamodel` assign**, and it carries paths rather than logic. A
+host hands in the datamodel paths it declares, and the one thing that buys is
+the undeclared-path advisory ADR-0005 amendments `11e`-`11g` specify: a config
+field a block type annotated `datamodel_path?: true` whose value is not in
+that set gets an `:info` finding anchored on the field. `nil` is the default,
+and per `11f` it produces nothing anywhere - the check does not run at all -
+which is not the same as an empty set, a host declaring that its documents
+address nothing. Beyond that set the package still checks *shape* and nothing
+more, because it does not own the datamodel path grammar: a host that wants
+more than the advisory checks paths itself and hands the result in through
 `findings`.
 
 ### The host seams that exist today
@@ -569,6 +574,7 @@ the theme - rather than a callback the editor calls back into:
 | `slot_outcome_key` | palette entry | names the config key the blocks in one slot carry their outcome under, so a renderer routes an interrupt rule's escape without branching on a type name; it reaches the view model as `Slot.outcome_key` and the resolved value as `Node.outcome` |
 | `--sb-*` tokens | the `theme` assign, or your own CSS | every colour, space, radius and drag treatment - see [`docs/theming.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/theming.md) |
 | compile findings | `findings` assign | `StatifierBlocks.Finding.from_compiler/2` adapts a compiler finding into the shape the editor renders, so a compile result routes back to the field somebody typed it into |
+| `datamodel` | the `datamodel` assign | the datamodel paths the host declares; drives the undeclared-path advisory of ADR-0005 `11e`-`11g`, and `nil` (the default) turns it off entirely |
 
 The metadata readers are total and refuse rather than repair: a badge that is
 blank, carries a newline, or runs past 24 characters is dropped rather than
@@ -600,8 +606,10 @@ Honest about the edges, so you do not go looking for these:
 - **A fixtures pane.** No panel drives a document against fixture rows, and
   nothing marks a block as currently invoking. ADR-0005 decision 15 defers
   the live half to the family's trace conventions (`sui-13q`).
-- **Datamodel path advisories.** As above: shape only. Whether an undeclared
-  path becomes an advisory finding is decision 11d, pending a ruling.
+- **A datamodel path grammar.** The undeclared-path advisory `11e`-`11g`
+  settled is shipped, but only against the set of paths a host declares.
+  Nothing here parses or validates a path beyond its shape, and a host that
+  supplies no datamodel gets no advisory at all.
 
 ### Theming
 
