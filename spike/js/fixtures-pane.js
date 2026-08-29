@@ -19,11 +19,13 @@
  * would be wrong in a way that costs them a production incident. Every view
  * carries the word "replay" or "recorded" where a reader will meet it.
  *
- * ## Three sub-views, and why they are not a tab strip
+ * ## Two sub-views, and why they are not a tab strip
  *
- * Runs, Tables and JSON are three whole surfaces rather than three stacked
- * sections: the pane is 21rem wide and a step list plus a truth table plus a
- * textarea stacked would be a scroll with no map. They are buttons with
+ * Runs and JSON are whole surfaces rather than stacked sections: the pane is
+ * 21rem wide and a step list plus a textarea stacked would be a scroll with no
+ * map. There were three until sb-054 moved the truth tables to the bottom
+ * drawer, which is the same argument taken one step further - a table needs
+ * width this pane does not have at all. They are buttons with
  * `aria-pressed`, NOT `role="tab"` - `shell.js` selects the inspector's tab
  * strip with `document.querySelectorAll('[role="tab"]')`, so a nested tablist
  * would be adopted by it and the inspector's own tabs would start hiding this
@@ -58,9 +60,6 @@ import {
   runById,
   runSummary,
   runView,
-  tableBlockIds,
-  tableView,
-  tablesForBlock,
 } from "./fixtures.js";
 import { el } from "./render.js";
 
@@ -82,7 +81,7 @@ const VERDICT_LABELS = {
  *     data    the parsed fixture file, or null when it could not be fetched
  *     host    { documentId(), selectedId(), markActive(ids),
  *               markInvoking(block, outcome), revealBlocks(ids),
- *               revealBlock(id), labelFor(id) }
+ *               revealBlock(id), labelFor(id), fixturesChanged() }
  *
  * Every `host` member is optional in the sense that the pane degrades rather
  * than throws - it is mounted by the shell before a document is open, and it is
@@ -109,9 +108,14 @@ export function createFixturesPane({ mount, data, host = {} }) {
   const body = el("div", { class: "sb-fixtures__body" });
   const nav = el("div", { class: "sb-fixtures__nav", role: "group", "aria-label": "Fixture views" });
 
+  /*
+   * Two sub-views, not three. The truth tables were the middle one until
+   * sb-054 moved them to the drawer, where they have the width they always
+   * needed; the pane keeps the run replay and the raw-JSON editor, which both
+   * read fine in 21rem.
+   */
   const buttons = [
     ["runs", "Runs"],
-    ["tables", "Tables"],
     ["json", "JSON"],
   ].map(([key, label]) => {
     const button = el("button", {
@@ -188,18 +192,14 @@ export function createFixturesPane({ mount, data, host = {} }) {
 
     body.replaceChildren(
       ...(notice ? [noticeElement()] : []),
-      ...(view === "runs"
-        ? runsView(fixtures, documentId)
-        : view === "tables"
-          ? tablesView(fixtures)
-          : jsonView())
+      ...(view === "runs" ? runsView(fixtures, documentId) : jsonView())
     );
 
     updateCounts(fixtures);
   }
 
   function updateCounts(fixtures) {
-    const counts = { runs: fixtures.runs.length, tables: fixtures.tables.length, json: null };
+    const counts = { runs: fixtures.runs.length, json: null };
 
     for (const button of buttons) {
       const count = counts[button.dataset.view];
@@ -827,244 +827,14 @@ export function createFixturesPane({ mount, data, host = {} }) {
     return box;
   }
 
-  /* ============================================================ the tables */
-
-  function tablesView(fixtures) {
-    const selectedId = host.selectedId?.() ?? null;
-    const mine = tablesForBlock(fixtures, selectedId);
-
-    if (mine.length === 0) return tablesEmptyState(fixtures, selectedId);
-
-    return [
-      el("p", {
-        class: "sb-hint",
-        text: "Precomputed truth tables. Every expected value is fixture data - the pane renders them, it does not evaluate the expressions beside them.",
-      }),
-      ...mine.map((table) => tableElement(tableView(table))),
-    ];
-  }
-
   /*
-   * The empty state's second job, same as the condition pane's: an author who
-   * selected the wrong block needs to know which blocks DO have tables, and a
-   * list of them that selects and reveals on click is worth more than a
-   * sentence telling them to go looking.
+   * The tables used to be here, as the middle sub-view. sb-054 moved them to
+   * the bottom drawer (`table-drawer.js`): a truth table is a bindings column
+   * per referenced path plus one per arm, and no amount of tuning gives that
+   * `--sb-inspector-width`. The derivation they render from did not move and
+   * did not change - `tableView` is still `fixtures.js`'s, and the drawer
+   * reads it through `drawerView`.
    */
-  function tablesEmptyState(fixtures, selectedId) {
-    const ids = tableBlockIds(fixtures);
-
-    const out = [
-      el("p", {
-        class: "sb-empty",
-        text:
-          selectedId === null
-            ? "Select a guarded block to see the condition fixtures written for it."
-            : "No truth table is written for this block.",
-      }),
-    ];
-
-    if (ids.length === 0) {
-      out.push(
-        el("p", {
-          class: "sb-hint",
-          text: "This document has no condition fixtures at all. Tables live on branch arms and on guarded interrupt rules.",
-        })
-      );
-      return out;
-    }
-
-    out.push(
-      el("p", {
-        class: "sb-hint",
-        text: `${ids.length} block${ids.length === 1 ? " has" : "s have"} a table in this document:`,
-      })
-    );
-
-    const list = el("ul", { class: "sb-fixtures__table-jumps" });
-
-    for (const id of ids) {
-      const mine = tablesForBlock(fixtures, id);
-
-      // The TABLE's name, not the block's. A branch and an interrupt rule
-      // carry no `label` in their config, so the block label falls back to the
-      // palette entry - and the first pass rendered three rows reading
-      // "Branch", "On event, when", "Branch", which is a list that tells an
-      // author nothing about which one they want. The table is the thing being
-      // offered, so the table names it; the block's own label is the second
-      // line, and its id is in the tooltip.
-      const button = el("button", {
-        class: "sb-fixtures__table-jump",
-        type: "button",
-        title: `${id} · select and reveal`,
-      });
-
-      button.append(
-        el("span", { class: "sb-fixtures__table-jump-name" }, [
-          el("span", { text: mine.length === 1 ? (mine[0].name ?? id) : `${mine.length} tables` }),
-          el("span", {
-            class: "sb-fixtures__table-jump-block",
-            text: host.labelFor?.(id) ?? id,
-          }),
-        ]),
-        el("span", { class: "sb-fixtures__table-jump-count", text: "reveal" })
-      );
-
-      button.addEventListener("click", () => {
-        host.revealBlock?.(id);
-        draw();
-      });
-
-      list.append(el("li", {}, [button]));
-    }
-
-    out.push(list);
-
-    return out;
-  }
-
-  /*
-   * The table itself. It is wider than the pane and it is allowed to be: the
-   * bindings column plus one column per arm does not fit in 21rem and never
-   * will, so the table scrolls inside its own box rather than being squeezed
-   * into an unreadable one. Whether a truth table wants a wider home than the
-   * inspector is the design question this pane found - see the bead note.
-   */
-  function tableElement(table) {
-    const box = el("section", { class: "sb-fixtures__table", "data-table-id": table.id });
-
-    box.append(
-      el("header", { class: "sb-fixtures__table-head" }, [
-        el("h4", { class: "sb-fixtures__table-name", text: table.name }),
-        el("p", { class: "sb-fixtures__table-description", text: table.description }),
-      ])
-    );
-
-    box.append(
-      el(
-        "ul",
-        { class: "sb-fixtures__exprs" },
-        table.columns.map((column, index) =>
-          el("li", { class: "sb-fixtures__expr" }, [
-            el("span", { class: "sb-fixtures__expr-label", text: column.label }),
-            el("code", { class: "sb-code sb-fixtures__expr-source", text: column.expr }),
-            el("span", {
-              class: "sb-fixtures__expr-count",
-              text: `${table.trueCounts[index]}/${table.rows.length} true`,
-            }),
-          ])
-        )
-      )
-    );
-
-    const scroller = el("div", { class: "sb-fixtures__table-scroll" });
-    const grid = el("table", { class: "sb-fixtures__grid" });
-
-    /*
-     * Expected results BEFORE the bound values, which inverts how a truth table
-     * is conventionally read.
-     *
-     * The reason is the pane's width. Convention puts the inputs on the left
-     * and the answers on the right, and in `--sb-inspector-width` that puts
-     * every answer off the right edge behind a horizontal scroll - so the one
-     * thing the table exists to show is the one thing not on screen. Each case
-     * carries a name that says what it is ("Rated high", "Low but unverified"),
-     * so name-plus-verdict is a complete reading on its own and the exact
-     * bindings are the detail a reader scrolls for. Whether a truth table wants
-     * a wider home than the inspector is the open question this pane found; in
-     * the home it has, this is the ordering that works.
-     */
-    const head = el("tr", {}, [
-      el("th", { class: "sb-fixtures__grid-corner", scope: "col", text: "Case" }),
-      ...table.columns.map((column) =>
-        el("th", {
-          class: "sb-fixtures__grid-arm",
-          scope: "col",
-          title: column.expr,
-          text: column.label,
-        })
-      ),
-      ...table.paths.map((path, index) =>
-        el("th", {
-          class: "sb-fixtures__grid-path",
-          scope: "col",
-          // The seam between the answers and the values behind them, marked in
-          // the markup because both families are cells and CSS cannot tell
-          // them apart by position.
-          "data-column": index === 0 ? "first-arm" : null,
-          title: path,
-          text: path,
-        })
-      ),
-    ]);
-
-    grid.append(el("thead", {}, [head]));
-
-    const rows = el("tbody", {});
-
-    for (const row of table.rows) {
-      const tr = el("tr", { class: "sb-fixtures__grid-row" });
-
-      const name = el("th", { class: "sb-fixtures__grid-name", scope: "row" }, [
-        el("span", { text: row.name }),
-      ]);
-
-      if (row.note) name.append(el("span", { class: "sb-fixtures__grid-note-mark", text: "*" }));
-
-      tr.append(
-        name,
-        ...row.cells.map((cell) =>
-          el("td", { class: "sb-fixtures__grid-cell" }, [
-            el("span", {
-              class: "sb-fixtures__bool",
-              "data-value": cell.expected === null ? "unset" : String(cell.expected),
-              text: cell.expected === null ? "–" : cell.expected ? "true" : "false",
-            }),
-          ])
-        ),
-        ...row.bindings.map((binding, index) =>
-          el(
-            "td",
-            {
-              class: "sb-fixtures__grid-binding",
-              "data-column": index === 0 ? "first-arm" : null,
-            },
-            [el("code", { text: String(binding.value) })]
-          )
-        )
-      );
-
-      rows.append(tr);
-    }
-
-    grid.append(rows);
-    scroller.append(grid);
-    box.append(
-      scroller,
-      el("p", {
-        class: "sb-hint",
-        text: `Scroll the table sideways for the bound values behind each verdict: ${table.paths.join(", ")}.`,
-      })
-    );
-
-    const notes = table.rows.filter((row) => row.note);
-
-    if (notes.length > 0) {
-      box.append(
-        el(
-          "ul",
-          { class: "sb-fixtures__table-notes" },
-          notes.map((row) =>
-            el("li", { class: "sb-fixtures__table-note" }, [
-              el("span", { class: "sb-fixtures__table-note-name", text: row.name }),
-              el("span", { text: row.note }),
-            ])
-          )
-        )
-      );
-    }
-
-    return box;
-  }
 
   /* ============================================================== the JSON */
 
@@ -1127,6 +897,8 @@ export function createFixturesPane({ mount, data, host = {} }) {
       clearMarks();
       notice = "Applied. These fixtures live in memory only - the file on disk is unchanged.";
       draw();
+      // The drawer renders the same copy that just changed.
+      host.fixturesChanged?.();
     });
 
     revert.addEventListener("click", () => {
@@ -1139,6 +911,7 @@ export function createFixturesPane({ mount, data, host = {} }) {
       clearMarks();
       notice = "Reverted to the fixtures as fetched.";
       draw();
+      host.fixturesChanged?.();
     });
 
     const out = [
@@ -1184,9 +957,20 @@ export function createFixturesPane({ mount, data, host = {} }) {
 
   return {
     redraw: draw,
-    /** Called by the shell when the canvas selection moves. */
-    selectionChanged() {
-      if (view === "tables") draw();
+    /**
+     * The applied fixtures for the open document - what the truth-table drawer
+     * renders and what the condition pane's open affordance counts.
+     *
+     * A function rather than a value, and reading `applied` rather than the
+     * fetched original, because the JSON sub-view replaces the whole fixture
+     * set: a drawer holding the file as fetched would go on showing a table an
+     * author had just edited away.
+     */
+    fixtures() {
+      const documentId = host.documentId?.() ?? null;
+      return applied === null || documentId === null
+        ? null
+        : fixturesFor(applied, documentId);
     },
     /** Called when a document loads, so a run from the last one does not linger. */
     documentChanged() {

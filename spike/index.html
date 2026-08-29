@@ -359,13 +359,14 @@
                 hidden
               >
                 <div class="sb-inspector__section">
-                  <!-- The runner, the truth tables and the raw-JSON editor,
-                       rendered from `fixtures/runs.json` by
-                       `fixtures-pane.js`. Everything it shows is MOCKED per the
-                       campaign's D4 ruling: a run is a scripted step sequence
-                       and a truth table's cells are precomputed. Nothing here
-                       interprets a chart or evaluates a predicate, and the pane
-                       says so on screen. -->
+                  <!-- The runner and the raw-JSON editor, rendered from
+                       `fixtures/runs.json` by `fixtures-pane.js`. The truth
+                       tables were a third sub-view here until sb-054 moved
+                       them to the drawer below the editor. Everything both
+                       surfaces show is MOCKED per the campaign's D4 ruling: a
+                       run is a scripted step sequence and a truth table's
+                       cells are precomputed. Nothing here interprets a chart
+                       or evaluates a predicate, and both say so on screen. -->
                   <div id="sb-fixtures-panel" class="sb-fixtures"></div>
                 </div>
               </div>
@@ -376,6 +377,40 @@
             </div>
           </section>
         </div>
+
+        <!-- ----------------------------------------------------- drawer -->
+        <!--
+          The truth-table drawer (sb-054). A sibling of `.sb-editor__body`
+          rather than a fourth pane inside it: a drawer is the shell's full
+          width, and that width is exactly what a truth table could not get in
+          a 21rem inspector column however the pane was tuned.
+
+          It is a `<section>` the shell shows and hides with `hidden`, and it
+          carries NO `role="tab"` or `role="tabpanel"`: `shell.js` drives the
+          inspector's strip with `querySelectorAll('[role="tab"]')`, so a role
+          worn out here would be adopted by that strip.
+
+          `aria-live` is deliberately absent. The drawer opening is announced
+          through the canvas's own live region, which is where every other
+          outcome in the editor is spoken; a second live region on a surface
+          this large would read its whole table out on every selection.
+        -->
+        <section
+          class="sb-drawer"
+          id="sb-drawer"
+          aria-labelledby="sb-drawer-title"
+          hidden
+        >
+          <header class="sb-drawer__header">
+            <h2 class="sb-drawer__title" id="sb-drawer-title">Truth table</h2>
+            <span class="sb-chip">recorded &middot; nothing is evaluated</span>
+            <div class="sb-topbar__spacer"></div>
+            <button class="sb-button sb-button--quiet" id="sb-drawer-close" type="button">
+              Close
+            </button>
+          </header>
+          <div class="sb-drawer__body" id="sb-drawer-panel"></div>
+        </section>
       </div>
     </div>
 
