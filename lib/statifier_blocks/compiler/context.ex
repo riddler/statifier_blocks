@@ -160,13 +160,15 @@ defmodule StatifierBlocks.Compiler.Context do
   `"__"` - and one that is not is refused with `{:error, {:invalid_outcome,
   block_id, outcome}}` rather than raising.
 
-  > #### This return shape refines the amendment's sketch {: .info}
+  > #### The tagged return is the ratified shape {: .info}
   >
-  > 2e writes the signature as returning a bare `String.t()`. It cannot,
-  > and stay honest: 2f requires an `:invalid_outcome` Emit finding for a
-  > name failing the role shape, and decision 1 forbids `emit/2` raising,
-  > so the error has to be reachable through a return value. The `{:ok, _}`
-  > arm carries exactly the id 2e names.
+  > 2e's original sketch wrote the signature as returning a bare
+  > `String.t()`. It cannot, and stay honest: 2f requires an
+  > `:invalid_outcome` Emit finding for a name failing the role shape, and
+  > decision 1 forbids `emit/2` raising, so the error has to be reachable
+  > through a return value. The `{:ok, _}` arm carries exactly the id 2e
+  > names. 2e was amended to this signature on 2026-08-29 (operator
+  > ruling); see its "Amended 2026-08-29" paragraph.
   """
   @spec outcome_id(t(), String.t()) ::
           {:ok, StateId.t()} | {:error, {:invalid_outcome, Block.id(), String.t()}}

@@ -1068,6 +1068,24 @@ child's emitted SCXML is still not in the context.
 @spec outcome_event(t(), outcome :: String.t()) :: String.t()
 ```
 
+**Amended 2026-08-29 (operator ruling): `outcome_id/2` returns a tagged tuple.**
+The sketch above writes `outcome_id/2` as returning a bare `String.t()`, which
+cannot hold together with the rest of the record: 2f requires an
+`:invalid_outcome` Emit finding for an outcome name failing the role shape, and
+decision 1 forbids `emit/2` raising, so the refusal has to be reachable through
+a return value. The shipped signature is the one this amendment ratifies:
+
+```elixir
+  @spec outcome_id(t(), String.t()) ::
+          {:ok, StateId.t()} | {:error, {:invalid_outcome, Block.id(), String.t()}}
+```
+
+The `{:ok, _}` arm carries exactly the id the sketch names, so 2b's minting rule
+and decision 3's injectivity are unchanged. Decision 1 keeps its no-raise rule
+and 2f keeps the finding at the emit site; this is a correction to the sketch's
+typespec, not a change of behaviour. `outcome_event/2` is unaffected and stays a
+bare `String.t()`.
+
 ### 2f. Provenance, determinism, and findings
 
 - **Provenance (decision 5) is unchanged and stays total.** An outcome final is
