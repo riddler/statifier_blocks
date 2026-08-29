@@ -74,7 +74,7 @@ defmodule StatifierBlocks.MixProject do
       # each module to the first group whose pattern matches.
       groups_for_modules: [
         "Document model": [
-          ~r/^StatifierBlocks\.(Document|Block|Id|CanonicalJson|Decode|Validation)($|\.)/
+          ~r/^StatifierBlocks\.(Document|Block|Id|CanonicalJson|Decode|Validation|SlotValidation)($|\.)/
         ],
         "Block types and assignability": [
           ~r/^StatifierBlocks\.(BlockType|Palette|Assignability)($|\.)/

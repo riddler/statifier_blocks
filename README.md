@@ -137,10 +137,14 @@ end
 relation the host supplies - there is no built-in type lattice.
 
 **2. Compose the document.** Your two types, arranged by the `core.*`
-structural vocabulary this package ships (`core.sequence`, `core.group`,
-`core.branch`, `core.parallel`, `core.wait`, `core.resumable_group`,
-`core.on_event`). In a running system an editor writes this tree; it is
-ordinary data either way.
+vocabulary this package ships. Eleven types: the containers that arrange
+other blocks (`core.sequence`, `core.group`, `core.branch`, `core.parallel`,
+`core.resumable_group`), and the leaves that do a structural thing on their
+own (`core.wait`, `core.on_event`, `core.invoke`, `core.send`, `core.raise`,
+`core.assign`). None of them knows a domain - `core.invoke` *names* an invoke
+type for the host to run and never runs one. `StatifierBlocks.Core` carries
+the table of all eleven with their slots. In a running system an editor
+writes this tree; it is ordinary data either way.
 
 ```elixir
 alias StatifierBlocks.{Block, Compiler, Document, Palette, Provenance}
@@ -413,7 +417,7 @@ it is a pure function of its argument and it is called inside a rescue - a
 type with a bug in it gets an ordinary join marker rather than taking the
 canvas down.
 
-## Using the editor
+## Embedding the editor
 
 The editor ships in this package, and a host that never renders anything must
 not pay for it. `phoenix_live_view` is therefore an **optional** dependency,
@@ -472,6 +476,76 @@ Underneath the component is a pure command algebra - `StatifierBlocks.Edit`
 `StatifierBlocks.ViewModel` - with no UI framework dependency at all. A host
 that wants to drive document edits from something other than this editor uses
 those directly.
+
+### What the mounted component holds
+
+The `document` you pass in, an undo history over it, the current selection,
+and a `drafts` map of config edits the validation gate has not accepted yet.
+A draft is never in the document and never on the undo stack: a form whose
+config has not been accepted names the fields that are outstanding and offers
+"Discard edits", because a draft was never a command and so cannot be undone.
+
+There is deliberately **no `datamodel` assign**. A field that names a
+datamodel path - `core.assign`'s `path`, a `core.invoke` param - is checked
+for *shape* and nothing more, because this package does not own the datamodel
+path grammar and holds no declaration to check a path against. A host that
+knows its own datamodel checks paths itself and hands the result in through
+`findings`.
+
+### The host seams that exist today
+
+Everything a host can say about how its own types behave and look is a
+declaration on a value it already passes in - the palette, the palette entry,
+the theme - rather than a callback the editor calls back into:
+
+| Seam | Declared on | What it does |
+|---|---|---|
+| `:assignability` | `Palette.new/2` (also `from_modules/2`) | the host's widening relation for "may this block land in this slot" - both gates, kind admission and data flow, run against the palette the caller passed (ADR-0003 decision 6) |
+| `accent_token` | palette entry | the NAME of a `--sb-*` property, stamped on that type's cards and palette rows |
+| `badge` | palette entry | a short chip for the card header |
+| `join_label` | palette entry | a one-argument function of config, phrasing the join marker under a side-by-side arrangement |
+| `slot_outcome_key` | palette entry | names the config key the blocks in one slot carry their outcome under, so a renderer routes an interrupt rule's escape without branching on a type name; it reaches the view model as `Slot.outcome_key` and the resolved value as `Node.outcome` |
+| `--sb-*` tokens | the `theme` assign, or your own CSS | every colour, space, radius and drag treatment - see [`docs/theming.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/theming.md) |
+| compile findings | `findings` assign | `StatifierBlocks.Finding.from_compiler/2` adapts a compiler finding into the shape the editor renders, so a compile result routes back to the field somebody typed it into |
+
+The metadata readers are total and refuse rather than repair: a badge that is
+blank, carries a newline, or runs past 24 characters is dropped rather than
+clipped, an accent that is not an anchored `--sb-*` name never reaches a style
+attribute, and a `join_label` that raises degrades to the editor's own word.
+Assignability answers with reason-carrying refusals (sb-ue7, in flight).
+
+Routing a compile pass into the findings pane is two calls:
+
+```elixir
+{lint_findings, _refused} =
+  StatifierBlocks.Finding.from_compiler_all(compiled.warnings)
+```
+
+`from_compiler_all/2` returns the findings it could anchor and, separately,
+the ones it refused with the reason - a finding that names no block has
+nowhere in the editor to land, and dropping it silently would be the wrong
+answer. Pass the anchored ones as the `findings` assign, or straight into
+`StatifierBlocks.ViewModel.build/3` if you are driving the view model
+yourself.
+
+### Not yet
+
+Honest about the edges, so you do not go looking for these:
+
+- **Connectors.** Blocks are arranged by containment, and there is no
+  free-floating edge between two cards. Whether the editor grows one is an
+  open ADR-0005 decision-7 question (`sb-y14`).
+- **A fixtures pane.** No panel drives a document against fixture rows, and
+  nothing marks a block as currently invoking. ADR-0005 decision 15 defers
+  the live half to the family's trace conventions (`sui-13q`).
+- **Datamodel path advisories.** As above: shape only. Whether an undeclared
+  path becomes an advisory finding is decision 11d, pending a ruling.
+- **A duration control over predicator strings.** The shipped `:duration`
+  control is decision 9's: a whole number and a unit, storing ISO 8601, with
+  a raw text fallback for a value it cannot parse that way. `core.send` does
+  read a stored predicator duration (`1h30m`) through
+  `StatifierBlocks.Core.Duration`, but the control that makes that spelling
+  primary lives in the spike and waits on the decision 10/13 ruling.
 
 ### Theming
 
