@@ -97,7 +97,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert html =~ ~s(name="config[duration][raw]" value="x"),
                "the draft is what renders, through the raw fallback its value now needs"
 
-        assert html =~ "must be an ISO-8601 duration",
+        assert html =~ "must be a duration",
                "the finding is about the value being typed, not the one committed"
       end
 
@@ -119,7 +119,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           |> render_change()
 
         assert config(latest_document(), "blk_email_step") == %{"duration" => "PT45M"}
-        refute html =~ "must be an ISO-8601 duration"
+        refute html =~ "must be a duration"
       end
 
       # Sabotage: `Editor.replay/2` keeping `drafts` across a history move - the
@@ -144,7 +144,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         html = view |> element(~s(button[phx-click="undo"])) |> render_click()
 
         assert config(latest_document(), "blk_email_step") == %{"duration" => "PT1H"}
-        refute html =~ "must be an ISO-8601 duration"
+        refute html =~ "must be a duration"
       end
 
       # Sabotage: `ConfigForm.decode/3` starting from `%{}` instead of `base` -
