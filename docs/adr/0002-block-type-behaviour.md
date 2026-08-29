@@ -185,6 +185,17 @@ flag, and a default. The closed field-type set is `:string`, `:integer`,
 string, st-ADR-0004), `:duration` (an ISO-8601 string, since ADR-0001
 decision 6 forbids floats), and `:list` of one of those.
 
+*[Cross-reference added 2026-08-29. The wording above is unchanged and no
+decision changes here.]* `:duration`'s stored form was widened by ADR-0005's
+2026-08-29 amendment to its decision 9, accepted the same day (PR 91): a
+predicator duration string (`1h30m`, `2d`, `3d8h`) is the primary spelling,
+whichever spelling an author typed is stored verbatim, and ISO-8601 is the
+pivot a compile canonicalises through before the attribute is emitted. That
+record states in terms that this field-type set is untouched - `:duration` is
+still one of the seven types and still holds a string - so read "an ISO-8601
+string" above as naming the pivot rather than the only spelling `config` may
+hold.
+
 It takes `config` for the same reason `slots/1` does: a branch's schema
 gains a condition field per arm as arms are added, and a select's choices
 can depend on an earlier field's value. The editor re-derives the form after
@@ -1401,3 +1412,79 @@ thing D13 exists to refuse.
   two fields.
 - Any other block type's declarations. Nothing but `core.send` arms a delayed
   send, so nothing but `core.send` is touched.
+
+---
+
+## Amendment (2026-08-29): the `core.send` row on decision 10
+
+**Status: proposed.** Section G of this date gave `core.assign` its row and
+named the one type still owed one: `core.send`, shipped in the same campaign,
+registered in `StatifierBlocks.Palette.core_types/0`, and running under a
+`PROVISIONAL` admonition in its moduledoc saying decision 10's vocabulary
+table does not carry it. The send-id amendment of this date settled what the
+type's descriptor emits and said, in its section C, that it was not the record
+that writes the row. This section writes it.
+
+It is additive. Nothing above it is edited: decision 10's original seven-row
+table stands, the 2026-08-28 amendment's section D stands, section G stands,
+and the send-id amendment's two rulings stand exactly as accepted - this
+section records them in the table rather than revisiting them.
+
+### G2. `core.send` joins the core vocabulary
+
+| Block type | `slots(config)` | Config schema | `outcomes(config)` | Notes |
+|---|---|---|---|---|
+| `core.send` | `[]` | `event`: `:string`; `delay`: `:duration`, optional | default (`done`) | a leaf that sends one event, now or after a delay, emitting a `<send>` inside its `<onentry>`; the block finishes when the send is armed, and cancellation is scope-shaped rather than a block, per the send-id amendment of this date |
+
+The row is read off the shipped `StatifierBlocks.Core.Send`, not off the
+campaign-013 spike proposal that preceded it. In full, so a reader need not
+open the module: `slots/1` returns `[]` for every config; `config_schema/1`
+returns exactly two field declarations, `event` (label "Send this event",
+`:string`, `required?: true`, default `""`) and `delay` (label "After",
+`:duration`, `required?: false`, default `""`); there is no `outcomes/1`, so
+section A's default applies and the type has the single outcome `done`; `io/1`
+is `%{kinds: [:step]}`, one outcome and nothing consumed through the type
+flow; `current_version/0` is `1`.
+
+**G2a. `delay` is optional, and both spellings are stored forms.** An absent
+`delay` key and the field's own `""` default are both "no delay", and neither
+is a finding; a present `delay` is accepted in either spelling through
+`StatifierBlocks.Core.Duration` - a predicator duration string (`1h30m`, `2d`)
+or ISO-8601 (`PT2H`) - which is ADR-0005's accepted decision-9 `:duration`
+amendment of this date, cross-referenced beside decision 7 above. Decision 7's
+field type is untouched by this row: `delay` is a `:duration` and holds a
+string.
+
+**G2b. `validate_config/1` checks shape only.** It refuses an `event` that is
+not an event name and a stored `delay` that is neither spelling, and it
+refuses nothing else - the same rule section G1 states for `core.assign`, and
+for the same reason: a config callback is not a validation language.
+
+**G2c. What the descriptor emits is the send-id amendment's, not this row's.**
+A compiled `core.send` is a compound state whose `<onentry>` carries one
+`<send>`, with `event` attributed as the author's verbatim, `delay` written
+only when there is one and never attributed (its bytes are canonicalised), and
+an `id` of the shape that amendment's section A fixes. This row records that
+the type declares such a descriptor; the emitted bytes are ADR-0004's, and the
+shipped emitter follows the accepted record on its own bead rather than in
+this one.
+
+### G3. The count, and what is still owed a row
+
+With this row the table records **eleven** types: the seven of decision 10,
+the two of section D, `core.assign` from section G, and this one.
+`StatifierBlocks.Palette.core_types/0` registers **twelve**. Section G, written
+when the palette registered eleven, named `core.send` as the difference and
+declined to close it; this section closes it, and the difference is now
+`core.subchart`, which shipped later the same day with its routing recorded in
+ADR-0004's amendment of this date and no decision-10 row of its own. That gap
+is named here rather than closed, for section G's reason: a row is written off
+a ruling, and this record carries one ruling.
+
+### G4. The moduledoc admonition goes
+
+`core.send`'s `PROVISIONAL` admonition said one true thing - that no row
+existed - and this section makes it false, so the same change replaces it with
+a pointer at this row, exactly as section G did for `core.assign`. The
+module's other recorded notes are untouched, including the cancel note, which
+the send-id amendment rules on and a separate bead brings into line.

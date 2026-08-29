@@ -2,14 +2,9 @@ defmodule StatifierBlocks.Core.Send do
   @moduledoc """
   `core.send`: a leaf step that names an event and says **when**.
 
-  > #### PROVISIONAL - not yet in the vocabulary table {: .warning}
-  >
-  > `core.send` is a campaign-013 spike proposal
-  > (`spike/js/proposed-core.js`) that ADR-0002 decision 10's vocabulary
-  > table, and its 2026-08-28 amendment, do **not** yet carry - the
-  > amendment's section D promotes `core.invoke` and `core.raise` only.
-  > This type is shipped under the campaign's filing; the decision-10 row
-  > it is owed has not been written.
+  ADR-0002 decision 10 carries the row, through its 2026-08-29 amendment
+  (section G2): `slots(config)` is `[]`, the config is `event` and an
+  optional `delay`, and the type has the single default outcome.
 
   Two config fields: `event`, in the same grammar `core.raise` and
   `core.on_event` speak, and `delay`, an **optional** duration.
