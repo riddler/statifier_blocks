@@ -318,6 +318,14 @@ defmodule StatifierBlocks.ViewModel do
   # `validate_config/1` on one that does. One pass, pre-order.
   @accent_token ~r/^--sb-[a-z0-9]+(-[a-z0-9]+)*$/
 
+  # Decision 10's `slot_style` vocabulary, as widened by amendment 10g, and
+  # the rail partition inside it (10h's placement row). Both are spelled once
+  # here: 10i makes the closed set load-bearing - anything outside it is a
+  # declaration this editor cannot read - and a second copy is how the
+  # partition and the vocabulary drift apart.
+  @slot_styles [:primary, :secondary, :failure]
+  @rail_styles [:secondary, :failure]
+
   @doc """
   The custom-property NAME a palette entry declares as its block type's
   accent, or `nil` when it declared none or declared one this package will
@@ -389,7 +397,28 @@ defmodule StatifierBlocks.ViewModel do
   raise or a dropped slot.
   """
   @spec rail?(Slot.t()) :: boolean()
-  def rail?(%Slot{style: style}), do: style in [:secondary, :failure]
+  def rail?(%Slot{style: style}), do: style in @rail_styles
+
+  @doc """
+  Which edge vocabulary a slot's exit is drawn in (amendment 10h's exit-edge
+  row, as ruled on `sb-67s`, 2026-08-29).
+
+  `:interrupt` for the interrupt rail alone. A `:failure` rail's exit is
+  `:flow`, the same edge an ordinary body slot leaves by: ADR-0004's
+  amendment makes a failure path end in an error-outcome final whose
+  completion event the PARENT continues on, so it leaves in-band, and the
+  dashed exit channel with the interrupt arrowhead stays exclusively
+  interrupt vocabulary. Before the ruling the spike drew a failure rail
+  in-band and drew it leaving out-of-band in the same picture.
+
+  It is total over the three styles rather than defined on rails only: the
+  answer for a body slot is the same `:flow` its children already leave by,
+  and a partial function here would make every caller re-derive the rail
+  test this module already owns.
+  """
+  @spec exit_edge(Slot.t()) :: :flow | :interrupt
+  def exit_edge(%Slot{style: :secondary}), do: :interrupt
+  def exit_edge(%Slot{}), do: :flow
 
   @spec derived_findings(Document.t(), Palette.t()) :: [Finding.t()]
   defp derived_findings(%Document{} = document, %Palette{} = palette) do
@@ -760,7 +789,29 @@ defmodule StatifierBlocks.ViewModel do
 
   @spec slot_presentation(map(), Block.slot_name()) :: slot_presentation()
   defp slot_presentation(entry, name) do
-    {Map.get(entry.slot_style, name, :primary), BlockType.slot_outcome_key(entry, name)}
+    {slot_style(entry, name), BlockType.slot_outcome_key(entry, name)}
+  end
+
+  # 10i: a `slot_style` this editor does not know - a host declaring against
+  # a newer record, or a typo - resolves to `:primary`, so the slot renders
+  # as an ordinary body slot with its children still rendered, still
+  # selectable and still saved. That is decision 3's total-resolution posture
+  # arriving at presentation, and the same discipline ADR-0002's amendment B3
+  # applies to the metadata trio: a malformed declaration in one host's
+  # registry produces the ordinary card, never a broken one and never an
+  # exception.
+  #
+  # A `slot_style` that is not a map at all is the same defect one level up -
+  # a declaration this editor cannot read - and it degrades the same way
+  # rather than raising `BadMapError` out of a render.
+  @spec slot_style(map(), Block.slot_name()) :: :primary | :secondary | :failure
+  defp slot_style(entry, name) do
+    styles = Map.get(entry, :slot_style)
+
+    case is_map(styles) and Map.get(styles, name, :primary) do
+      style when style in @slot_styles -> style
+      _unrecognized_or_malformed -> :primary
+    end
   end
 
   @spec palette_entry_with_defaults(module(), Block.type_name()) :: BlockType.palette_entry()

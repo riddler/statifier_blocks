@@ -44,12 +44,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     `:secondary` and `:failure` are both **attached rails** rather than body
     slots (amendment 10h's placement row), and `ViewModel.rail?/1` is that
-    partition. What is stamped here is the placement the two share; the
-    vocabulary that tells them apart - dashed and warning-family for an
-    interrupt, solid and error-family for a failure path - belongs to the
-    bead that renders `:failure`, and `data-slot-style` is the hook it
-    needs. The container's boundary box is derived from the same partition,
-    one level up in `BlockNode`.
+    partition. The container's boundary box is derived from the same
+    partition, one level up in `BlockNode`.
+
+    What tells the two apart is a class each and nothing else:
+    `sb-slot--secondary` for the interrupt's dashed warning edge, and
+    `sb-slot--failure` for the failure path's solid error-family one. The
+    vocabularies say opposite things about the same placement - an interrupt
+    fires whether or not you get there, a failure path is the continuation
+    this step takes when it goes badly - so a shared placement with no
+    distinction read as a second set of interrupt rules, which is what
+    campaign 013's screens recorded.
+
+    ## The exit edge
+
+    A rail's exit is the second question 10h asks of the style, and the
+    operator ruled it on `sb-67s`: a failure rail leaves by the **ordinary
+    flow edge**, and the dashed exit channel stays interrupt vocabulary.
+    `ViewModel.exit_edge/1` is that derivation and `data-exit-edge` is it in
+    the markup, stamped on the rails and nowhere else: a rail is the only
+    slot whose exit rejoins a flow the reader can see, and the stylesheet
+    draws the mark off the attribute's presence, so an attribute on a body
+    slot would be a claim about a mark that is not there. The function is
+    total over the three styles all the same - the rail test belongs here,
+    not in every caller. Nothing here reads a type name to reach either
+    answer: `core.invoke` gets the failure vocabulary by declaring
+    `slot_style: %{"on_error" => :failure}`, and a host type declaring the
+    same gets the same.
 
     ## Recursion
 
@@ -87,6 +108,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           "sb-slot",
           ViewModel.rail?(@slot) && "sb-slot--rail",
           @slot.style == :secondary && "sb-slot--secondary",
+          @slot.style == :failure && "sb-slot--failure",
           not @slot.declared? && "sb-slot--undeclared",
           @class
         ]}
@@ -95,6 +117,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-declared={to_string(@slot.declared?)}
         data-arity={@slot.arity}
         data-slot-style={@slot.style}
+        data-exit-edge={ViewModel.rail?(@slot) && ViewModel.exit_edge(@slot)}
         data-drop={@drop}
         data-drop-reason={@drop_reason}
       >
