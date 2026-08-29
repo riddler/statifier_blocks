@@ -3,40 +3,38 @@ defmodule StatifierBlocks.Core.Duration do
   The two duration spellings a `:duration` field may hold, and the one
   form the engine reads.
 
-  > #### RECORDED PROPOSAL - no ADR says this yet {: .warning}
-  >
-  > The two-spelling stored form is campaign 014's D4 proposal, filed as
-  > `sb-709` and implemented in the spike's duration control. ADR-0002
-  > decision 7's `:duration` field type is unchanged and no ADR text was
-  > touched. Only `core.send` reads this module today; `core.wait` still
-  > accepts ISO-8601 alone, which is the seam `sb-709`'s control has
-  > already crossed and this package has not.
-
   ## The three forms, and why there are three
 
   A `:duration` field may be **stored** two ways:
 
+    * a predicator duration string - `1h30m`, `2d`, `3d8h` - the primary
+      form, because it is the form a person types;
     * ISO-8601 with integer components - `PT2H`, `P1DT6H` - which is what
-      `core.wait` has always held and what ADR-0001 decision 6's no-floats
-      rule permits;
-    * a predicator duration string - `1h30m`, `2d`, `3d8h` - which is the
-      form `sb-709`'s control makes primary because it is the form a
-      person types.
+      documents written before the two-spelling rule hold and what
+      ADR-0001 decision 6's no-floats rule permits.
 
-  Neither is what SCXML's `delay` attribute wants. Statifier resolves a
-  `delay` through `Statifier.Duration.to_ms/1`, which reads the predicator
-  unit grammar **only** - it answers `{:error, {:invalid_delay, "PT2H"}}`
-  for the ISO spelling - so the emitted form is the shorthand `48h`, never
-  `PT48H`. A chart carrying ISO in a `delay` attribute compiles and then
-  fails to arm, which is why `core.wait` translates too.
+  Whichever was typed is what `config` holds, byte for byte: the stored
+  form is the author's own spelling and nothing canonicalises on the way
+  in. That is ADR-0005's 2026-08-29 `:duration` amendment (accepted;
+  ADR-0002 decision 7's field type is untouched - `:duration` still holds
+  a string, and what changed is which strings). Every type with a
+  `:duration` field reads this module: `core.send`'s `delay` and
+  `core.wait`'s `duration`.
+
+  Neither stored form is what SCXML's `delay` attribute wants. Statifier
+  resolves a `delay` through `Statifier.Duration.to_ms/1`, which reads the
+  predicator unit grammar **only** - it answers
+  `{:error, {:invalid_delay, "PT2H"}}` for the ISO spelling - so the
+  emitted form is the shorthand `48h`, never `PT48H`. A chart carrying ISO
+  in a `delay` attribute compiles and then fails to arm, which is why an
+  emitter never writes out what it was handed.
 
   So a compile is two steps rather than one: `to_iso/1` canonicalises
   whichever spelling was stored into ISO-8601, and `to_delay/1` renders
   that canonical value as the attribute the engine reads. ISO is the pivot
-  because it is the spelling ADR-0001 already admits into `config` and the
-  one `core.wait` validates against - a single canonical form keeps "which
-  of the two did the author type?" out of everything downstream of the
-  emitter.
+  because it is the spelling ADR-0001 already admits into `config` - a
+  single canonical form keeps "which of the two did the author type?" out
+  of everything downstream of the emitter.
 
   ## The predicator grammar has one home, and it is not here
 
@@ -133,10 +131,22 @@ defmodule StatifierBlocks.Core.Duration do
   Renders a canonical ISO-8601 duration as the `delay` attribute the
   engine reads.
 
-  Component-wise and lossless, for the reason `StatifierBlocks.Core.Wait`
-  writes out at length: every ISO component has an exact counterpart in
-  the predicator unit vocabulary, so the translation is a rename and
-  nothing here decides how many days a month is.
+  Component-wise and lossless. `Statifier.Duration` recognizes `y`, `mo`,
+  `w`, `d`, `h`, `m`, `s` and `ms` - a strict superset of the SCXML
+  schema's five units - so every ISO component has an exact counterpart
+  and the translation is a rename rather than an arithmetic conversion:
+
+  | ISO | `delay` |
+  |---|---|
+  | `P1Y` | `1y` |
+  | `P1M` (before `T`) | `1mo` |
+  | `P1W` / `P1D` | `1w` / `1d` |
+  | `PT1H` / `PT1M` / `PT1S` | `1h` / `1m` / `1s` |
+
+  This is the vocabulary's one such table, and the emitters cite it rather
+  than carrying their own. Nothing here decides how many days a month is,
+  because nothing here has to: the ambiguity stays where the author wrote
+  it and is resolved by the one duration vocabulary the platform shares.
 
       iex> StatifierBlocks.Core.Duration.to_delay("PT2H")
       "2h"

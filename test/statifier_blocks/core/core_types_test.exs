@@ -100,18 +100,37 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
   end
 
   describe "core.wait" do
-    # Sabotage: dropped the trailing `\\z` anchor from the duration regex -
-    # red on `"PT48H later"`.
-    test "accepts ISO-8601 durations and rejects everything else" do
-      for good <- ["PT30S", "PT48H", "P1D", "P1Y2M3DT4H5M6S", "P2W"] do
-        assert Core.Wait.validate_config(%{"duration" => good}) == :ok
+    # `"48h"` was pinned as INVALID here until ADR-0005's 2026-08-29
+    # `:duration` amendment; the assertion is reversed deliberately, not
+    # relaxed - see `sb-ag6`. Everything the amendment does not name is
+    # refused exactly as before.
+    #
+    # sabotage: had `validate_config/1` call `Config.duration?/1` again
+    # instead of `Duration.duration?/1` - red on every predicator string.
+    test "accepts both stored spellings and rejects everything else" do
+      for good <- ["1h30m", "2d", "3d8h", "48h", "PT30S", "PT48H", "P1D", "P1Y2M3DT4H5M6S", "P2W"] do
+        assert Core.Wait.validate_config(%{"duration" => good}) == :ok, good
       end
 
-      for bad <- ["", "P", "PT", "48h", "PT1.5S", "PT48H later", 30, nil] do
+      for bad <- ["", "P", "PT", "PT1.5S", "PT48H later", "soon", "500ms", 30, nil] do
         assert {:error, [{"duration", _}]} = Core.Wait.validate_config(%{"duration" => bad})
       end
 
       assert {:error, [{"duration", "required"}]} = Core.Wait.validate_config(%{})
+    end
+
+    # The message is the author-facing half of the amendment: a field that
+    # accepts two spellings and names one of them tells the author their
+    # own is wrong.
+    #
+    # sabotage: put the old ISO-only text back on `@duration_message` -
+    # red on the `1h30m` assertion.
+    test "the refusal names both spellings" do
+      assert {:error, [{"duration", message}]} =
+               Core.Wait.validate_config(%{"duration" => "soon"})
+
+      assert message =~ "1h30m"
+      assert message =~ "PT2H"
     end
 
     # Sabotage: gave `core.wait` a `body` slot - red, since a wait is a leaf.

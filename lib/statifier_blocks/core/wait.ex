@@ -3,11 +3,20 @@ defmodule StatifierBlocks.Core.Wait do
   `core.wait`: a leaf whose whole meaning is its config (ADR-0002 decision
   10).
 
-  No slots, one `:duration` field. The duration is an ISO-8601 duration
-  string rather than a number of seconds because ADR-0001 decision 6
-  forbids floats in `config`, and a bare integer would have to carry its
-  unit somewhere else. `"PT30S"`, `"PT48H"`, `"P1D"` - integer components
-  only, for the same reason.
+  No slots, one `:duration` field. The duration is a string rather than a
+  number of seconds because ADR-0001 decision 6 forbids floats in
+  `config`, and a bare integer would have to carry its unit somewhere
+  else.
+
+  Either stored spelling is accepted: a predicator duration string
+  (`"1h30m"`, `"2d"`, `"3d8h"`), which is the primary form and the one the
+  author types, or ISO-8601 with integer components (`"PT30S"`, `"PT48H"`,
+  `"P1D"`). Whichever was typed is what `config` holds, verbatim;
+  `StatifierBlocks.Core.Duration` is where the two meet and the ISO pivot
+  is taken at emit time. That is ADR-0005's 2026-08-29 `:duration`
+  amendment, under which this type "comes to accept both spellings the way
+  `core.send` already does" - and it is the whole of why a `"48h"` this
+  type once refused is now a duration.
 
   This type validates the *string*; it does not resolve it to a number of
   milliseconds, mint a timer, or know that durable timers exist. Turning it
@@ -18,8 +27,13 @@ defmodule StatifierBlocks.Core.Wait do
 
   alias StatifierBlocks.Block
   alias StatifierBlocks.Compiler.Context
-  alias StatifierBlocks.Core.{Config, Emit}
+  alias StatifierBlocks.Core.{Duration, Emit}
   alias StatifierBlocks.Emission
+
+  # Both spellings, in one sentence, at both refusal sites. `core.send`'s
+  # own message reads the same way and adds its "or empty to send now" -
+  # the shapes differ because a wait's duration is required.
+  @duration_message "must be a duration - 1h30m, 2d or PT2H"
 
   @impl true
   def current_version, do: 1
@@ -43,10 +57,10 @@ defmodule StatifierBlocks.Core.Wait do
   def validate_config(config) do
     case Map.fetch(config, "duration") do
       {:ok, duration} ->
-        if Config.duration?(duration) do
+        if Duration.duration?(duration) do
           :ok
         else
-          {:error, [{"duration", "must be an ISO-8601 duration, like PT30S or P1D"}]}
+          {:error, [{"duration", @duration_message}]}
         end
 
       :error ->
@@ -93,26 +107,23 @@ defmodule StatifierBlocks.Core.Wait do
   type still does not know durable timers exist; it emits an ordinary
   delayed send and the host's session decides what backs it.
 
-  ## The duration translation is component-wise and lossless
+  ## The duration is compiled, not read out
 
-  ADR-0001 decision 6 forbids floats in `config`, so `duration` is an
-  ISO-8601 duration with integer components only. Statifier resolves a
-  `delay` attribute through `Statifier.Duration`, which delegates to
-  `Predicator.Duration.parse/1` and recognizes `y`, `mo`, `w`, `d`, `h`,
-  `m`, `s` and `ms` - a strict superset of the SCXML schema's five units.
-  Every ISO component therefore has an exact counterpart, and the
-  translation is a rename rather than an arithmetic conversion:
+  The stored value is the author's own spelling, so the emitted `delay`
+  attribute is never simply those bytes: a predicator string is
+  canonicalised to the ISO pivot and rendered back out as the shorthand
+  `Statifier.Duration` reads, and a stored ISO value is already at the
+  pivot and only rendered. Both steps live in
+  `StatifierBlocks.Core.Duration` - `to_iso/1` then `to_delay/1`, exactly
+  the pair `core.send` calls - which is why the component-to-unit table
+  that used to sit here is now in that module's moduledoc and nowhere
+  else. Two duration tables would be two grammars the day one of them was
+  edited.
 
-  | ISO | `delay` |
-  |---|---|
-  | `P1Y` | `1y` |
-  | `P1M` (before `T`) | `1mo` |
-  | `P1W` / `P1D` | `1w` / `1d` |
-  | `PT1H` / `PT1M` / `PT1S` | `1h` / `1m` / `1s` |
-
-  Nothing here decides how many days a month is, because nothing here has
-  to: the ambiguity stays where the author wrote it and is resolved by the
-  one duration vocabulary the platform shares.
+  The attribute is left unannotated for the reason `core.send`'s emit
+  writes out: ADR-0004 decision 9 annotates an attribute whose value is
+  the author's verbatim, and these bytes are not - `1h30m` and `PT1H30M`
+  both emit `1h30m`.
   """
   @impl true
   def emit(%Block{id: block_id, config: config}, context) do
@@ -136,31 +147,15 @@ defmodule StatifierBlocks.Core.Wait do
     end
   end
 
-  # `PT48H` -> `48h`. Returns an ordinary Emit finding rather than raising
-  # for a duration `validate_config/1` would have rejected, since `emit/2`
-  # has to answer for the config it was handed.
+  # `PT48H` -> `48h`, and `1h30m` -> `PT1H30M` -> `1h30m`. Returns an
+  # ordinary Emit finding rather than raising for a duration
+  # `validate_config/1` would have rejected, since `emit/2` has to answer
+  # for the config it was handed.
+  @spec delay(term()) :: {:ok, String.t()} | {:error, [{String.t(), String.t()}]}
   defp delay(duration) do
-    if Config.duration?(duration) do
-      {:ok, translate(duration)}
-    else
-      {:error, [{"duration", "must be an ISO-8601 duration, like PT30S or P1D"}]}
+    case Duration.to_iso(duration) do
+      {:ok, iso} -> {:ok, Duration.to_delay(iso)}
+      :error -> {:error, [{"duration", @duration_message}]}
     end
-  end
-
-  defp translate("P" <> rest) do
-    {date, time} =
-      case String.split(rest, "T", parts: 2) do
-        [date] -> {date, ""}
-        [date, time] -> {date, time}
-      end
-
-    components(date, %{"Y" => "y", "M" => "mo", "W" => "w", "D" => "d"}) <>
-      components(time, %{"H" => "h", "M" => "m", "S" => "s"})
-  end
-
-  defp components(source, units) do
-    ~r/(\d+)([A-Z])/
-    |> Regex.scan(source)
-    |> Enum.map_join(fn [_whole, value, unit] -> value <> Map.fetch!(units, unit) end)
   end
 end

@@ -225,6 +225,27 @@ defmodule StatifierBlocks.Core.EmitTest do
       end
     end
 
+    # A stored predicator string mostly round-trips, which is the point of
+    # the pivot rather than an argument against it: `1.5h` is the witness
+    # that the value is compiled and not copied.
+    #
+    # sabotage: have Core.Wait.delay/1 return the stored bytes instead of
+    # compiling through Core.Duration -> the `1.5h` row goes red, the
+    # attribute reading `1.5h` rather than the pivot's `1h30m` (verified)
+    test "a stored predicator string compiles through the pivot" do
+      for {duration, delay} <- [
+            {"1h30m", "1h30m"},
+            {"2d", "2d"},
+            {"3d8h", "3d8h"},
+            {"48h", "48h"},
+            {"1.5h", "1h30m"}
+          ] do
+        root = Block.new("core.wait", id: "blk_WAI", config: %{"duration" => duration})
+
+        assert compile!(root, Palette.core()).scxml =~ ~s(delay="#{delay}"), duration
+      end
+    end
+
     # sabotage: use a constant event name rather than one carrying the block
     # id -> two waits in one chart wake each other and this goes red
     # (verified)
