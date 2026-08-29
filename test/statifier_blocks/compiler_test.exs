@@ -2,9 +2,19 @@ defmodule StatifierBlocks.CompilerTest do
   use ExUnit.Case, async: true
 
   alias Statifier.Machine.Identity
-  alias StatifierBlocks.{Block, Compiled, Compiler, Document, Emission, Palette}
+
+  alias StatifierBlocks.{
+    Block,
+    BlockTypeFixtures,
+    Compiled,
+    Compiler,
+    CoreFixtures,
+    Document,
+    Emission,
+    Palette
+  }
+
   alias StatifierBlocks.Compiler.{Context, Finding}
-  alias StatifierBlocks.CoreFixtures
 
   @worked_example "test/fixtures/documents/worked_example.json"
 
@@ -206,9 +216,18 @@ defmodule StatifierBlocks.CompilerTest do
     # the ADR asks for, not noise to be re-pinned past.
     # sabotage: append one byte to the serialized SCXML before hashing ->
     # the pinned identity moves and this goes red (verified)
+    #
+    # Moved once, deliberately, by ADR-0004's outcome amendment (2b/2f):
+    # the default outcome's final id migrated from `s_<block>__done` to
+    # `s_<block>__o_done` and each such final gained
+    # `<onentry><raise event="done.outcome.<state id>.done"/></onentry>`.
+    # The move was verified rather than accepted: reversing exactly those
+    # two edits over the new bytes reproduces
+    # `sha256:3c0f170c...` - the hash pinned before - byte for byte, so
+    # nothing else in this document's emission changed.
     test "the worked example's chart identity is pinned" do
       assert compile_worked_example().record.chart_identity.content_hash ==
-               "sha256:3c0f170cd91d8ec21fd43b455a4014d4ed3f06d67b77c1bd21176e4b0c206cb2"
+               "sha256:0410c745ba6bfb52fb36b3e502e20dfdb8d63ba26bfdfd5170d9e31b5c9d9ae7"
     end
 
     # sabotage: drop `module` from the palette_hash triples -> swapping one
@@ -321,6 +340,96 @@ defmodule StatifierBlocks.CompilerTest do
 
       refute match?({:ok, %Compiled{}}, Compiler.compile(document, CoreFixtures.palette()))
     end
+  end
+
+  describe "outcomes (ADR-0004's outcome amendment, 2e and 2f)" do
+    # sabotage: had `summaries/1` build every child summary with
+    # `Context.summary/1` rather than the child's own declared names -> the
+    # parent sees one `done` outcome per child and the two `error` and
+    # `abandoned` transitions disappear (verified red)
+    test "a child summary carries its type's declared outcomes, in declaration order" do
+      scxml = compile!(outcome_document(), outcome_palette()).scxml
+
+      assert wired_outcome_events(scxml) == [
+               "done.outcome.s_blk_PLAIN.done",
+               "done.outcome.s_blk_MANY.done",
+               "done.outcome.s_blk_MANY.error",
+               "done.outcome.s_blk_MANY.abandoned"
+             ]
+    end
+
+    # A summary that named a final the child never emitted would be a lie
+    # the compiler told its own parents, so the ids it hands out are
+    # checked against the bytes the child actually wrote.
+    #
+    # sabotage: had `Context.summary/2` mint each entry's `state_id`
+    # against a fixed block id rather than the child's -> the summary names
+    # finals that are nowhere in the emission and this goes red (verified)
+    test "every outcome entry names a final the child actually emitted" do
+      scxml = compile!(outcome_document(), outcome_palette()).scxml
+
+      summaries = [
+        Context.summary("blk_PLAIN"),
+        Context.summary("blk_MANY", ["done", "error", "abandoned"])
+      ]
+
+      for summary <- summaries, outcome <- summary.outcomes do
+        assert scxml =~ ~s(<final id="#{outcome.state_id}">)
+      end
+    end
+
+    # sabotage: dropped the `StateId.role?/1` arm from
+    # `validate_outcomes/2` -> the malformed name is minted as a role and
+    # the compile succeeds, taking this red (verified)
+    test "a malformed outcome name is an :invalid_outcome finding on the block that declared it" do
+      child = Block.new("toy.malformed", id: "blk_BAD")
+      root = Block.new("toy.parent", id: "blk_P", slots: %{"body" => [child]})
+
+      assert {:error, [%Finding{stage: :emit, block_id: "blk_BAD", reason: reason}]} =
+               Compiler.compile(Document.new(root, id: "bdoc_MO"), outcome_palette())
+
+      assert reason == {:invalid_outcome, "blk_BAD", "Gave Up"}
+    end
+
+    # sabotage: dropped the `MapSet.member?/2` arm from
+    # `validate_outcomes/2` -> the duplicate is accepted, two finals are
+    # minted under one id, and this goes red on the finding (verified)
+    test "an outcome declared twice is refused, against the block that declared it" do
+      child = Block.new("toy.duplicate", id: "blk_DUP")
+      root = Block.new("toy.parent", id: "blk_P", slots: %{"body" => [child]})
+
+      assert {:error, [%Finding{stage: :emit, block_id: "blk_DUP", reason: reason}]} =
+               Compiler.compile(Document.new(root, id: "bdoc_DO"), outcome_palette())
+
+      assert reason == {:invalid_outcome, "blk_DUP", "error"}
+    end
+  end
+
+  defp outcome_document do
+    plain = Block.new("toy.leaf", id: "blk_PLAIN")
+    many = Block.new("toy.outcomes", id: "blk_MANY")
+
+    Document.new(Block.new("toy.parent", id: "blk_P", slots: %{"body" => [plain, many]}),
+      id: "bdoc_OC"
+    )
+  end
+
+  defp outcome_palette do
+    Palette.new(%{
+      "toy.leaf" => CoreFixtures.Notify,
+      "toy.parent" => BlockTypeFixtures.OutcomeParent,
+      "toy.outcomes" => BlockTypeFixtures.Outcomes,
+      "toy.malformed" => BlockTypeFixtures.MalformedOutcomes,
+      "toy.duplicate" => BlockTypeFixtures.DuplicateOutcomes
+    })
+  end
+
+  # The events the parent wired, in the order it wired them - which is the
+  # order the summaries handed it, which is declaration order.
+  defp wired_outcome_events(scxml) do
+    ~r/<transition event="(done\.outcome\.[^"]+)"/
+    |> Regex.scan(scxml)
+    |> Enum.map(fn [_whole, event] -> event end)
   end
 
   defp compile_worked_example, do: compile!(document())

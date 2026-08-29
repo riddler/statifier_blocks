@@ -57,16 +57,19 @@ defmodule StatifierBlocks.Core.RaiseTest do
 
       scxml = compile!(root).scxml
 
-      assert scxml =~ ~s(<state id="s_blk_RAI" initial="s_blk_RAI__done">)
+      assert scxml =~ ~s(<state id="s_blk_RAI" initial="s_blk_RAI__o_done">)
       assert scxml =~ ~s(<onentry><raise event="signup.abandoned"/></onentry>)
-      assert scxml =~ ~s(<final id="s_blk_RAI__done"/>)
+
+      assert scxml =~
+               ~s(<final id="s_blk_RAI__o_done"><onentry>) <>
+                 ~s(<raise event="done.outcome.s_blk_RAI.done"/></onentry></final>)
     end
   end
 
   describe "end to end" do
     # The body is `[raise_block, waiting]` rather than `[raise_block]` alone
     # on purpose: a body that finishes the instant it raises would reach
-    # `blk_GRP__done` through the body's own completion regardless of
+    # `blk_GRP__o_done` through the body's own completion regardless of
     # whether the interrupt handler ever saw the event, and the property
     # under test - that the raise is caught in the same macrostep, before
     # the sequence can advance to `waiting` - would go unchecked either way.
@@ -104,7 +107,7 @@ defmodule StatifierBlocks.Core.RaiseTest do
 
       active = Statifier.active_leaf_states(machine_state)
 
-      assert MapSet.member?(active, "s_blk_GRP__done")
+      assert MapSet.member?(active, "s_blk_GRP__o_done")
       refute MapSet.member?(active, "s_blk_WAI__waiting")
     end
   end

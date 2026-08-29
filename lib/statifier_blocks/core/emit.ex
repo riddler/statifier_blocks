@@ -62,7 +62,7 @@ defmodule StatifierBlocks.Core.Emit do
   ADR-0002 decision 10 could leave it as one `:select` field.
   """
 
-  alias StatifierBlocks.Compiler.Context
+  alias StatifierBlocks.Compiler.{Context, StateId}
   alias StatifierBlocks.Emission
 
   @abandon "statifier_blocks.interrupt.abandon"
@@ -83,9 +83,48 @@ defmodule StatifierBlocks.Core.Emit do
     Emission.element("state", [{"id", id}, {"initial", initial}], children)
   end
 
-  @doc "A `<final>`, the state whose entry raises the owning block's `done.state`."
+  @doc """
+  A `<final>`, the state whose entry raises the owning block's
+  `done.state`.
+
+  An id in the reserved `o_` namespace is an **outcome** final, so it also
+  raises that outcome's own completion event (ADR-0004's outcome
+  amendment, 2c):
+
+      <final id="s_blk_AUTH__o_done">
+        <onentry><raise event="done.outcome.s_blk_AUTH.done"/></onentry>
+      </final>
+
+  Any other id stays a bare `<final>` - the `body_done` role `guarded/4`
+  mints is a completion marker inside the block, not an outcome a parent
+  can wire on.
+
+  The raise is what makes the summary honest. 2e's child summary
+  advertises `done.outcome.<state id>.<name>` for **every** child,
+  single-outcome ones included, and a summary naming an event nothing
+  raises would be a lie the compiler told its own parents. 2c makes the
+  raise constitutive of an outcome final, and `core.invoke` already
+  emitted exactly this shape by hand before this builder did.
+
+  The id is inverted back to `{state id, outcome}` by
+  `StatifierBlocks.Compiler.StateId.unoutcome_id/1`, which is exact
+  because a generated id contains exactly one `"__"` - a block id carries
+  none and a role is refused if it does.
+  """
   @spec final(String.t()) :: Emission.t()
-  def final(id), do: Emission.element("final", [{"id", id}])
+  def final(id) do
+    case StateId.unoutcome_id(id) do
+      {:ok, {state_id, outcome}} ->
+        Emission.element("final", [{"id", id}], [
+          Emission.element("onentry", [], [
+            Emission.element("raise", [{"event", StateId.outcome_event(state_id, outcome)}])
+          ])
+        ])
+
+      :error ->
+        Emission.element("final", [{"id", id}])
+    end
+  end
 
   @doc """
   A `<transition>`. `opts` carries `:event`, `:cond`, `:target` and

@@ -2,7 +2,27 @@ defmodule StatifierBlocks.BlockTypeTest do
   use ExUnit.Case, async: true
 
   alias StatifierBlocks.BlockType
-  alias StatifierBlocks.BlockTypeFixtures.{Minimal, PathFixtures, StringKeyedFixtures, Toy}
+
+  alias StatifierBlocks.BlockTypeFixtures.{
+    Minimal,
+    Outcomes,
+    PathFixtures,
+    StringKeyedFixtures,
+    Toy
+  }
+
+  defmodule BadShape do
+    @moduledoc """
+    An `outcomes/1` that answers with neither a `{name, label}` pair nor a
+    binary name. Not a full `StatifierBlocks.BlockType`: it exists only to
+    show `outcome_names/2` staying total over a return value the spec does
+    not describe.
+    """
+
+    @doc "A deliberately malformed outcome declaration."
+    @spec outcomes(map()) :: [term()]
+    def outcomes(_config), do: ["done", :error]
+  end
 
   @closed_slot_arities [:any, :at_least_one, :exactly_one, :zero_or_one]
   @closed_field_types [:string, :integer, :boolean, :expression, :duration]
@@ -10,7 +30,7 @@ defmodule StatifierBlocks.BlockTypeTest do
   describe "behaviour_info/1" do
     # sabotage: drop `@callback current_version() :: pos_integer()` from
     # block_type.ex -> the callbacks list drops {:current_version, 0} -> red
-    test "callbacks/1 is exactly the nine declared callbacks" do
+    test "callbacks/1 is exactly the ten declared callbacks" do
       callbacks = BlockType.behaviour_info(:callbacks)
 
       assert MapSet.new(callbacks) ==
@@ -23,25 +43,26 @@ defmodule StatifierBlocks.BlockTypeTest do
                  io: 1,
                  migrate_config: 2,
                  fixtures: 0,
-                 palette_entry: 0
+                 palette_entry: 0,
+                 outcomes: 1
                )
 
-      assert length(callbacks) == 9
+      assert length(callbacks) == 10
     end
 
     # sabotage: add `migrate_config: 2` to the `@optional_callbacks` list
     # without `fixtures: 0` -> the set no longer matches -> red
-    test "optional_callbacks/1 is exactly io/1, migrate_config/2, fixtures/0, palette_entry/0" do
+    test "optional_callbacks/1 is exactly the five optional callbacks" do
       optional = BlockType.behaviour_info(:optional_callbacks)
 
       assert MapSet.new(optional) ==
-               MapSet.new(io: 1, migrate_config: 2, fixtures: 0, palette_entry: 0)
+               MapSet.new(io: 1, migrate_config: 2, fixtures: 0, palette_entry: 0, outcomes: 1)
 
-      assert length(optional) == 4
+      assert length(optional) == 5
     end
   end
 
-  describe "Toy exercises every one of the nine callbacks" do
+  describe "Toy exercises every one of the nine callbacks it implements" do
     # sabotage: change Toy's fallback `slots/1` clause to return the review
     # slot too -> the `Toy.slots(%{}) == []` assertion goes red
     test "slots/1 returns the review slot only when review_above is present" do
@@ -152,6 +173,37 @@ defmodule StatifierBlocks.BlockTypeTest do
       refute function_exported?(Minimal, :migrate_config, 2)
       refute function_exported?(Minimal, :fixtures, 0)
       refute function_exported?(Minimal, :palette_entry, 0)
+    end
+  end
+
+  describe "outcomes/2 (ADR-0002 amendment A1)" do
+    # sabotage: changed the resolver's default arm to `[]` -> a type that
+    # declares nothing gets no outcomes at all, and the summary that is
+    # supposed to be "always non-empty" empties out (verified red)
+    test "a type declaring no outcomes/1 has exactly one, done" do
+      assert BlockType.outcomes(Minimal, %{}) == [{"done", "Done"}]
+      assert BlockType.outcomes(Toy, %{"policy" => "standard_v3"}) == [{"done", "Done"}]
+    end
+
+    # sabotage: sorted the resolver's return with `Enum.sort/1` ->
+    # "abandoned" leads and both asserts go red, which is the byte
+    # determinism ADR-0004 decision 6 reads out of this order (verified)
+    test "a type declaring several gets them in declaration order, never sorted" do
+      assert BlockType.outcomes(Outcomes, %{}) == [
+               {"done", "Done"},
+               {"error", "Failed"},
+               {"abandoned", "Given up"}
+             ]
+
+      assert BlockType.outcome_names(Outcomes, %{}) == ["done", "error", "abandoned"]
+    end
+
+    # sabotage: made `outcome_name/1`'s catch-all return the term unchanged
+    # -> the declarations come back as `["done", :error]`, a non-binary the
+    # `:invalid_outcome` finding's message could not interpolate, and this
+    # goes red (verified)
+    test "a declaration outside the pair shape comes back as text, not a crash" do
+      assert BlockType.outcome_names(BadShape, %{}) == [~s("done"), ":error"]
     end
   end
 

@@ -88,9 +88,12 @@ defmodule StatifierBlocks.Core.AssignTest do
 
       scxml = compile!(root).scxml
 
-      assert scxml =~ ~s(<state id="s_blk_ASN" initial="s_blk_ASN__done">)
+      assert scxml =~ ~s(<state id="s_blk_ASN" initial="s_blk_ASN__o_done">)
       assert scxml =~ ~s(<onentry><assign expr="false" location="review.parked"/></onentry>)
-      assert scxml =~ ~s(<final id="s_blk_ASN__done"/>)
+
+      assert scxml =~
+               ~s(<final id="s_blk_ASN__o_done"><onentry>) <>
+                 ~s(<raise event="done.outcome.s_blk_ASN.done"/></onentry></final>)
     end
   end
 
@@ -109,7 +112,7 @@ defmodule StatifierBlocks.Core.AssignTest do
       {:ok, machine} = Statifier.compile(compile!(root).scxml)
       {machine_state, _effects} = Statifier.initialize(machine)
 
-      assert MapSet.member?(Statifier.active_leaf_states(machine_state), "s_blk_ASN__done")
+      assert MapSet.member?(Statifier.active_leaf_states(machine_state), "s_blk_ASN__o_done")
     end
   end
 

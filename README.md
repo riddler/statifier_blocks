@@ -233,7 +233,7 @@ block, completion signalled by `done.state`:
 <scxml initial="s_blk_root" name="bdoc_card_capture" version="1.0" xmlns="...">
   <state id="s_blk_root" initial="s_blk_authorize">
     <transition event="done.state.s_blk_authorize" target="s_blk_approved" type="internal"/>
-    <transition event="done.state.s_blk_approved" target="s_blk_root__done" type="internal"/>
+    <transition event="done.state.s_blk_approved" target="s_blk_root__o_done" type="internal"/>
     <state id="s_blk_authorize" initial="s_blk_authorize__running">
       <state id="s_blk_authorize__running">
         <invoke id="s_blk_authorize__invocation" type="myapp:authorize"/>

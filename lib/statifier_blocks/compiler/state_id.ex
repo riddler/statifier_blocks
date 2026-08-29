@@ -49,6 +49,13 @@ defmodule StatifierBlocks.Compiler.StateId do
   @separator "__"
   @role ~r/\A[a-z][a-z0-9_]*\z/
 
+  # ADR-0004's outcome amendment (2b) reserves this role prefix for outcome
+  # finals. It lives here, beside the derivation it is a role of, and
+  # `StatifierBlocks.Compiler.Context` reads it from here rather than
+  # spelling it a second time - a reserved namespace with two spellings is
+  # a reservation that can drift.
+  @outcome_prefix "o_"
+
   @typedoc "A block-type-chosen local name for an auxiliary state."
   @type role :: String.t()
 
@@ -125,6 +132,52 @@ defmodule StatifierBlocks.Compiler.StateId do
   def unstate_id(_state_id), do: :error
 
   @doc ~S"""
+  The reserved role prefix an outcome final's role carries (ADR-0004's
+  outcome amendment, 2b).
+
+      iex> StatifierBlocks.Compiler.StateId.outcome_prefix()
+      "o_"
+  """
+  @spec outcome_prefix() :: String.t()
+  def outcome_prefix, do: @outcome_prefix
+
+  @doc ~S"""
+  Inverts an outcome final's id back into the block's **own** state id and
+  the outcome name, or `:error` for an id that is not one.
+
+  This is `unstate_id/1` with the outcome namespace read off the role, and
+  it lives here for that reason: the inversion belongs beside the
+  derivation it inverts, not inside a caller that would have to rediscover
+  why it is exact. It is exact because a generated id contains exactly one
+  `"__"` - a block id carries none (ADR-0001 decision 3) and a role is
+  refused if it does - so the role is unambiguous, and a role in the `o_`
+  namespace is minted only by
+  `StatifierBlocks.Compiler.Context.outcome_id/2`.
+
+  The state id that comes back is `state_id(block_id)`, which is what the
+  outcome's completion event names.
+
+      iex> StatifierBlocks.Compiler.StateId.unoutcome_id("s_blk_AUTH__o_error")
+      {:ok, {"s_blk_AUTH", "error"}}
+
+      iex> StatifierBlocks.Compiler.StateId.unoutcome_id("s_blk_AUTH__done")
+      :error
+
+      iex> StatifierBlocks.Compiler.StateId.unoutcome_id("s_blk_AUTH")
+      :error
+  """
+  @spec unoutcome_id(t()) :: {:ok, {t(), role()}} | :error
+  def unoutcome_id(state_id) do
+    case unstate_id(state_id) do
+      {:ok, {block_id, @outcome_prefix <> outcome}} when outcome != "" ->
+        {:ok, {state_id(block_id), outcome}}
+
+      _not_an_outcome_final ->
+        :error
+    end
+  end
+
+  @doc ~S"""
   The `done.state` event a compound state raises when it enters a `<final>`
   child (ADR-0004 decision 2). This is the whole of what a parent needs to
   know about a child it did not compile.
@@ -134,4 +187,18 @@ defmodule StatifierBlocks.Compiler.StateId do
   """
   @spec done_event(t()) :: String.t()
   def done_event(state_id) when is_binary(state_id), do: "done.state." <> state_id
+
+  @doc ~S"""
+  The completion event one declared outcome raises (ADR-0004's outcome
+  amendment, 2c): `done.outcome.<state id>.<outcome>`.
+
+  Spelled once, here, so the event a `<final>` raises and the event a
+  parent wires on cannot drift apart.
+
+      iex> StatifierBlocks.Compiler.StateId.outcome_event("s_blk_AUTH", "error")
+      "done.outcome.s_blk_AUTH.error"
+  """
+  @spec outcome_event(t(), role()) :: String.t()
+  def outcome_event(state_id, outcome) when is_binary(state_id) and is_binary(outcome),
+    do: "done.outcome." <> state_id <> "." <> outcome
 end
