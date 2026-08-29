@@ -1,6 +1,6 @@
 # ADR-0005: The editor is a pure command algebra and view model with a thin LiveView shell
 
-Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 9 amended - the `:duration` control, predicator strings primary (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 91); the shell arrangement recorded - three panes and a drawer, rulings 1A/2A/3A/7A/8A (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 92)
+Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 9 amended - the `:duration` control, predicator strings primary (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 91); the shell arrangement recorded - three panes and a drawer, rulings 1A/2A/3A/7A/8A (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 92); decision 7 amended - a second, read-only measurement hook (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 100)
 
 ## Context
 
@@ -2071,9 +2071,9 @@ needs the client to do anything a stylesheet and one command cannot.
 
 ---
 
-## Proposed amendment (2026-08-29): decision 7, a second hook that only measures
+## Amendment (2026-08-29): decision 7, a second hook that only measures
 
-**Status: PROPOSED, not accepted.** Additive; decision 7 stands exactly as
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 100).** Additive; decision 7 stands exactly as
 written and no text above this line is edited by this section. It amends the
 hook count and nothing else: the drag hook, the DOM contract it depends on,
 the delivery rule, and the argument for keeping every other affordance in
@@ -2105,7 +2105,7 @@ The operator ruled on `sb-y14` (2026-08-29): amend, admitting a second hook
 whose entire job is read-only measurement, and argue in the amendment why that
 does not weaken decision 7's reason.
 
-### Proposed decision
+### Decision
 
 **7a. A second hook is admitted, and its whole contract is measurement.** The
 editor ships two hooks. The second one, `StatifierBlocksMeasure`:
