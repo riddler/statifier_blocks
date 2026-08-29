@@ -71,6 +71,7 @@ spike/
     panes.js       the palette / config-form / findings view models (d9-d11)
     palette-pane.js the left pane, rendered from the registry
     inspector.js   the Config and Findings panes, rendered
+    sequence.js    the generation token the async document loader guards with
     shell.js       the shell's own behaviour: tabs, theme, document loader
   fixtures/
     documents/     the two demo documents
