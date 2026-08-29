@@ -110,18 +110,17 @@ defmodule StatifierBlocks.Compiler.Chart do
   same answer a consumer would have reached with no span at all, which is
   why it is passed through rather than discarded.
 
-  ### Known limitation
+  ### Why "carries a config key" is enough
 
   The first bullet reads "carries a config key", where decision 9's
   annotation rule means "was written verbatim from that config value".
-  Those coincide everywhere but `core.subchart`, which annotates a
-  `cond` it *builds* from an outcome name with the config key `outcomes`.
-  Its generated condition always parses, so no span is produced there
-  today; a package that made it fail to parse would get an offset into
-  the generated wrapper rather than into the author's value. Closing that
-  gap means distinguishing verbatim from derived attribution at
-  `StatifierBlocks.Emission.attribute_from_config/3`, which is a change to
-  decision 9's annotation rule and not this function's to make.
+  Those coincide because the annotation is only ever left on a verbatim
+  value: a block type that *composes* an attribute leaves it
+  unannotated, so its bytes have no config key and a finding inside them
+  is the package's. `core.subchart` was the one exception - it annotated
+  a `cond` it builds from an outcome name with the config key
+  `outcomes` - and that annotation was dropped rather than this
+  criterion widened.
   """
 
   alias Statifier.Machine
