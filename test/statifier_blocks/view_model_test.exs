@@ -437,7 +437,8 @@ defmodule StatifierBlocks.ViewModelTest do
                "Invoke",
                "Raise",
                "Assign",
-               "Send"
+               "Send",
+               "Subchart"
              ]
     end
   end

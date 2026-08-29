@@ -22,6 +22,7 @@ defmodule StatifierBlocks.Core do
   | `core.raise` | `#{inspect(__MODULE__)}.Raise` | none |
   | `core.assign` | `#{inspect(__MODULE__)}.Assign` | none |
   | `core.send` | `#{inspect(__MODULE__)}.Send` | none |
+  | `core.subchart` | `#{inspect(__MODULE__)}.Subchart` | one per declared outcome, `on_error` last |
 
   ## Structure, not domain
 
@@ -29,16 +30,18 @@ defmodule StatifierBlocks.Core do
   type expression (ADR-0003 decision 1). They arrange other blocks; the
   blocks they arrange are the host's. `core.invoke` is structural in the
   same sense - it *names* an invoke type and never runs one, which is
-  ADR-0002 decision 2's two-registry seam rather than domain knowledge. So every core `io/1` declares `kinds`, every
+  ADR-0002 decision 2's two-registry seam rather than domain knowledge, and
+  `core.subchart` is that seam again: it names another chart and the
+  host-registered invoke type that runs one. So every core `io/1` declares `kinds`, every
   core type that has slots declares `slot_accepts` for them, and no core
   type declares `consumes` at all - inbound type is the host's business,
   and ADR-0003 decision 5's permissive default is the honest answer.
 
-  `produces` is declared by four of the core types. `core.sequence` declares
+  `produces` is declared by five of the core types. `core.sequence` declares
   `{:passthrough, "body"}`: it is transparent to type flow, so whatever its
   last step produces is what the sequence produces, computed by ADR-0003
-  decision 4 rather than by anything here. `core.branch`, `core.parallel`
-  and `core.invoke` declare `:unknown` outright rather than combining their
+  decision 4 rather than by anything here. `core.branch`, `core.parallel`,
+  `core.invoke` and `core.subchart` declare `:unknown` outright rather than combining their
   arms', lanes' or outcomes' outputs, because combining them is the type lattice
   ADR-0003 decision 4 refuses to build - and spelling the default out is
   how that refusal stays visible to a reader. The rest leave it absent.
