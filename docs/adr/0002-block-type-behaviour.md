@@ -1360,9 +1360,12 @@ authority on emission and this one on declaration.
 send it arms is never cancelled by anything this package emits - no `<cancel>`,
 and no `sendid` an author could name - because a cancel that *names* the send
 it cancels is a cross-subtree reference to another block, the exact shape
-ADR-0005 decision 13 refused. The module note named the alternative that keeps
-the tree invariant, said it was scope-shaped rather than reference-shaped, and
-parked the choice on `sb-b4f` instead of guessing it.
+the umbrella's D13 refuses - outcome paths are slots, never ports, and
+connectors are rendered, never authored - as ADR-0001's tree invariant and
+ADR-0005's amendment 10a state at record level. The module note named the
+alternative that keeps the tree invariant, said it was scope-shaped rather
+than reference-shaped, and parked the choice on `sb-b4f` instead of guessing
+it.
 
 The ruling picks the scope-shaped alternative. Two things follow for this
 record, and nothing else does.
