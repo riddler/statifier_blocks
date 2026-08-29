@@ -1905,3 +1905,166 @@ restating it. A grammar restated here would be a second opinion that drifts.
   not the stored bytes. It buys the author's own text surviving a round trip
   through the editor, which is the property the annotation rules in ADR-0004
   care about and the reason a `delay` attribute is not annotated.
+
+---
+
+## Amendment (2026-08-29): the shell arrangement - three panes and a drawer
+
+**Status: proposed.** Drafted 2026-08-29 from the operator layout rulings
+taken in the campaign-014 decision walkthrough (walkthrough artifact
+`ff7335cf`; the rulings are recorded on `sb-054`, `sb-3l1` and `sb-eb2`).
+Additive; decision 13 is untouched and no text above this line is changed by
+it. The rulings are recorded here under the operator's own labels - 1A, 2A, 3A,
+7A, 8A - so a reader can trace each clause back to the walkthrough rather than
+to this record's paraphrase.
+
+### Context
+
+Decision 13 names the component tree and says where the boundary between pure
+and rendered falls. It does not say how those components are arranged on a
+page, and until campaign 014 nothing needed it to: the shipped editor was a
+canvas with an inspector beside it, and everything document-level - findings,
+the truth table for a condition, the datamodel view the spike was sketching -
+went into another inspector tab because that was the only place there was.
+
+That stopped working for one measurable reason. Document-level content here is
+tabular, and tables need width. A truth table for a branch in a credit-card
+processing document has one row per case and one column per bound input plus
+the verdicts; at the inspector's 21rem it either scrolls sideways or inverts
+its column order to keep the answers on screen, and campaign 014 did the
+second and then filed the inversion as a readability defect (`sb-3l1` item d).
+The spike moved the table to a full-width bottom drawer (`sb-054`, PR 79) and
+the defect went away, because the drawer is as wide as the editor is.
+
+The arrangement is therefore not a styling preference. It is a claim about
+what kind of content each region holds, and that claim is what this section
+records so the shell graduation (`sb-832`) implements a decided shape rather
+than re-deriving one.
+
+### Proposed decision
+
+**1A. The shell is a grid of three columns - palette, canvas, inspector -
+plus one full-width drawer row.** The drawer holds tabular, document-level
+content. Three things belong there, in the order they arrive:
+
+- truth tables, today;
+- fixture runs, when the fixtures seam lands (decision 15 defers those to
+  `sui-13q` and this section does not disturb that deferral - it reserves the
+  drawer tab, not the feature);
+- the datamodel declared-path view, per the `sb-6b1` ruling of the same date.
+
+"Tabular" and "document-level" are both load-bearing, and together they are
+the rule that decides where a future pane goes. Content that is a grid of rows
+about the whole document goes to the drawer. Content that is about one block
+does not, whatever its shape.
+
+**2A. The drawer is a resizable split with a viewer-remembered height and a
+collapsed strip; it is never open-or-gone.** Collapsed, it is a strip carrying
+a title and a count - "Truth tables (3)" - which is what makes the content
+discoverable from any state rather than only from the affordance that opens
+it. The spike's cold-start gap (`sb-3l1` item e: with tables out of the
+inspector, the only cold open was a per-block button on a block that owns a
+table) is closed by the strip itself, and opening the drawer with no table on
+the selected block shows the miss-state list as the drawer's index page.
+
+The height is remembered per viewer. It is not remembered by the package: the
+package has no viewer, and a component that persists a per-person preference
+is a component that has quietly acquired a session. The resize sends a
+server-side command carrying the new height and the host stores it, on the
+same reasoning decision 6 uses for the drag - one round trip, the state that
+matters lives where state already lives.
+
+**3A. The inspector is about the selected block, and carries exactly Config,
+Findings, Condition.** Anything about the document goes to the drawer. That is
+the whole rule, and it is worth stating as a rule rather than as a list
+because the list will grow and the rule will not. The document-level findings
+panel decision 13 names stays a document-level panel; the inspector's Findings
+tab is the selected block's findings, which is the distinction `sb-3l1` item a
+turns on.
+
+Datamodel and Fixtures, which the spike had as inspector tabs, are drawer tabs
+under this rule. They were never about the selected block.
+
+**7A. Breakpoints are container queries on `.sb-editor`.** They are container
+queries and not media queries because the editor is a component embedded in a
+host page whose chrome the package does not control; a viewport width tells it
+nothing reliable about the width it was actually given. The steps:
+
+| Container width | Arrangement |
+|---|---|
+| 1280 and up | three panes plus the drawer row |
+| 1024 and 900 | the palette stacks |
+| 780 | the inspector stacks |
+| 640 | canvas first, then the panes, then the drawer last |
+
+Below 780 the palette collapses to a strip - search and a "+" - that opens as
+a sheet, so the inspector gets the full row. The stacking order below 640 is
+canvas, panes, drawer: the canvas is the document, the panes are about a
+selection in it, and the drawer is about the whole document, so the order is
+narrowest scope of attention first.
+
+**8A. The package ships the editing surface; the host ships the document
+chrome.** The split, stated once so a host knows what it is expected to
+provide:
+
+| Side | Surface |
+|---|---|
+| package | the canvas toolbar (zoom, fit width, fit active, depth and count), the tabbed inspector, the drawer, the grouped palette with descriptions |
+| host | the outer header: document identity, the document switcher, the theme control, compile and publish |
+
+The package's half is everything that operates on the document that is open.
+The host's half is everything that decides which document is open or what
+happens to it next - which is decision 15's existing boundary ("which palette
+entries a tenant may use, who may edit or publish a document, where it is
+stored, and what publishing means are all outside this package") applied to
+the header rather than restated.
+
+**How the host's half attaches: slots for markup, events for actions.** A
+header region is a named slot the host fills with its own markup, because
+markup is exactly the thing a host wants to own and a slot costs the package
+no API surface at all. An action the host must react to - publish was pressed,
+the switcher chose a document - is a documented event, because an event is a
+contract the package can keep stable while the host's markup changes under it.
+The two are not alternatives; the header is one of each, and a host that
+renders its own publish button in a slot and receives the press as an event is
+the intended shape.
+
+### No new JavaScript
+
+Nothing in this section adds a JavaScript hook. Decision 7 ships exactly one -
+the drag hook - and the only amendment to that in flight is the read-only
+measurement hook `sb-y14` records for the connector layer; this section cites
+it and does not draft it. The drawer resize is a server-side command carrying
+the height, which is the same round-trip discipline decision 6 sets for the
+drag, and the breakpoints are container queries in CSS, which is why 7A is
+written as a stylesheet rule and not as a resize observer.
+
+The temptation is real and worth naming: a resize handle, a remembered height
+and five breakpoints all look like client-side concerns, and every one of them
+has a JavaScript shape that is shorter to write. The reason to refuse it is
+decision 7's reason - behaviour that lives on the client is behaviour the
+server cannot test and the host cannot override - and none of these three
+needs the client to do anything a stylesheet and one command cannot.
+
+### Consequences
+
+- `sb-832` implements this: the canvas toolbar, the tabbed inspector, the
+  drawer skeleton with its strip and resize, the grouped palette, and the
+  breakpoints. This section is its specification and the reason it can be one
+  bead rather than a design conversation.
+- The drawer's tab set is open by construction and closed by rule. Truth
+  tables ship first, fixture runs and the datamodel view have reserved places,
+  and anything later is admitted by the 1A test - tabular and document-level -
+  or it is not admitted.
+- The host acquires a small obligation it did not have: it renders the header
+  and it stores the drawer height. Both are stated here so a host embedding
+  the editor in a signup wizard with A/B testing knows the editor will not
+  draw its own document switcher and is not waiting for permission to draw
+  one.
+- Decision 13's component tree is unchanged. Every component this section
+  arranges either exists there or is a new function component under the same
+  recursion rules; nothing here makes a second stateful component and nothing
+  here needs one.
+- The inspector rule constrains future work in the direction this record
+  wants. A pane that is about the document has one place to go, so the
+  question "which inspector tab does this become" stops being asked.
