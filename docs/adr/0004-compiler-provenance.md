@@ -1073,7 +1073,8 @@ The sketch above writes `outcome_id/2` as returning a bare `String.t()`, which
 cannot hold together with the rest of the record: 2f requires an
 `:invalid_outcome` Emit finding for an outcome name failing the role shape, and
 decision 1 forbids `emit/2` raising, so the refusal has to be reachable through
-a return value. The shipped signature is the one this amendment ratifies:
+a return value. The shipped signature (landed by PR 73 / sb-wmw) is the one
+this amendment ratifies:
 
 ```elixir
   @spec outcome_id(t(), String.t()) ::
@@ -1083,8 +1084,8 @@ a return value. The shipped signature is the one this amendment ratifies:
 The `{:ok, _}` arm carries exactly the id the sketch names, so 2b's minting rule
 and decision 3's injectivity are unchanged. Decision 1 keeps its no-raise rule
 and 2f keeps the finding at the emit site; this is a correction to the sketch's
-typespec, not a change of behaviour. `outcome_event/2` is unaffected and stays a
-bare `String.t()`.
+typespec, not a change of behaviour. `outcome_event/2` is outside this
+amendment.
 
 ### 2f. Provenance, determinism, and findings
 
