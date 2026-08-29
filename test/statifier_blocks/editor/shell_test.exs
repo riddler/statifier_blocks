@@ -169,6 +169,81 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "the canvas panel's header row (parity item 1.2)" do
+      # The header is what makes the middle pane a pane: the palette and the
+      # inspector name themselves, and before this the canvas was the one
+      # region an author had to recognise by its contents.
+      # Sabotage: dropping the `<h2 class="sb-toolbar__title">` element - the
+      # row goes back to being an unlabelled strip of buttons and this goes red.
+      test "names the pane and says what is in it", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        row = view |> element(".sb-toolbar") |> render()
+
+        assert row =~ ~s(<h2 class="sb-toolbar__title">)
+        assert row =~ "Canvas"
+        assert row =~ "nested tree"
+      end
+
+      # Sabotage: moving the readout out of `.sb-toolbar__zoom` - the two steps
+      # and the number they move stop being one control, which is the whole of
+      # what a segmented control claims, and the CSS that draws the seam has
+      # nothing to draw it around.
+      test "zoom is ONE segmented control, minus / readout / plus", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        zoom = view |> element(".sb-toolbar__zoom") |> render()
+
+        assert zoom =~ ~s(role="group")
+        assert zoom =~ ~s(phx-click="zoom-out")
+        assert zoom =~ ~s(<output class="sb-toolbar__zoom-level">100%</output>)
+        assert zoom =~ ~s(phx-click="zoom-in")
+      end
+
+      # The two metrics are read, never pressed, and a chip is the shape this
+      # editor gives a read-only fact.
+      # Sabotage: rendering the metrics as bare spans - they sit at the end of a
+      # row of buttons looking exactly like two more of them.
+      test "the metrics are chips, depth then count", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: EditorFixtures.credit_card())
+
+        metrics = view |> element(".sb-toolbar__metrics") |> render()
+
+        assert metrics =~ ~s(<span class="sb-toolbar__chip" data-metric="depth">depth 3</span>)
+        assert metrics =~ ~s(<span class="sb-toolbar__chip" data-metric="blocks">6 blocks</span>)
+      end
+
+      # Sabotage: rendering the stage without the panel around it - `overflow`
+      # then has to go on the stage itself, where it sizes the connector overlay
+      # to the padding box and the edges stop scrolling with the tree.
+      test "the stage sits inside a panel that is the scroller", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        assert has_element?(view, ".sb-canvas-panel > #sb-canvas")
+      end
+
+      # The stylesheet half of the same item, held here rather than in a comment.
+      # The padding is not decoration: the root block's surface covers the panel
+      # edge to edge, so the band it opens is the only place a ground can show.
+      # A capture of this rule without it showed dots that were present,
+      # correct, and invisible.
+      # Sabotage: dropping `padding` from `.sb-canvas-panel` - every assertion
+      # about the token stays green and the ground disappears, which is what
+      # this names.
+      test "the panel is bordered, padded, and carries the dotted ground" do
+        css = File.read!("assets/css/statifier_blocks.css")
+        panel = Regex.run(~r/\.sb-canvas-panel\s*\{(.*?)\n\}/s, css)
+
+        assert panel, "the scan actually found the rule"
+        [_all, body] = panel
+
+        assert body =~ ~r/overflow:\s*auto/
+        assert body =~ ~r/padding:\s*var\(--sb-space-2\)/
+        assert body =~ ~r/border:\s*var\(--sb-border-width\)/
+        assert body =~ ~r/background:\s*var\(--sb-canvas-grid\)/
+      end
+    end
+
     describe "the tabbed inspector (3A)" do
       # Sabotage: adding a fourth tab to the strip - 3A is exactly three, and
       # the reason it is a rule rather than a list is that the list will be

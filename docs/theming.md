@@ -61,8 +61,10 @@ this?". Every token in the stylesheet's header comment carries its tier.
 1. **The palette.** Colour, space, shape, type. A couple of dozen lines, and a
    host that stops here has a themed editor.
 2. **The treatments.** One specific mark - the drop affordance, the drag seam,
-   the focus ring, a canvas metric, the shaping of a per-type accent - that
-   you can disagree with without overriding a rule.
+   the focus ring, a canvas metric, the canvas's dotted ground
+   (`--sb-canvas-grid`, which carries the whole `background` shorthand so its
+   colour and its spacing move together), the shaping of a per-type accent -
+   that you can disagree with without overriding a rule.
 3. **`--sb-color-scheme`.** Its own tier, because it is not a value this
    package paints with. See below.
 

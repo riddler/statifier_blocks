@@ -28,6 +28,27 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     block" with no active block is a control whose only outcome is nothing
     happening.
 
+    ## It is the canvas panel's header row (parity item 1.2)
+
+    The toolbar is not a floating strip of controls above a bare canvas: it is
+    the header row of the canvas panel, and it says which panel it heads. The
+    `Canvas` heading and the `nested tree` chip are what make the three panes
+    read as three panes - the palette and the inspector name themselves the
+    same way - and without a name a row of unlabelled buttons is the only pane
+    in the editor that has to be recognised by its contents.
+
+    Zoom is ONE segmented control rather than three loose buttons: minus,
+    readout, plus, in one bordered group. That grouping is the whole claim the
+    control makes - the readout is not a fourth button and the two steps are
+    two ends of one thing - and it is made in CSS off `.sb-toolbar__zoom`
+    rather than in markup, so the events underneath are the same three the
+    shell has always sent.
+
+    The two metrics are chips for the same reason the `nested tree` label is:
+    they are read, never pressed, and a chip is the shape this editor gives a
+    read-only fact. They stay right-aligned, which is where a reader looks last
+    and where a number that changes under them belongs.
+
     ## Undo and redo are here too
 
     They are not in 8A's list, which enumerates what was newly arranged rather
@@ -54,38 +75,43 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     def toolbar(assigns) do
       ~H"""
       <div class={["sb-toolbar", @class]} data-zoom={@zoom} data-fit={@fit}>
-        <button
-          type="button"
-          class="sb-toolbar__button"
-          phx-click="undo"
-          phx-target={@target}
-          disabled={not @can_undo?}
-        >
-          Undo
-        </button>
-        <button
-          type="button"
-          class="sb-toolbar__button"
-          phx-click="redo"
-          phx-target={@target}
-          disabled={not @can_redo?}
-        >
-          Redo
-        </button>
-        <button
-          :if={@inserting?}
-          type="button"
-          class="sb-toolbar__button"
-          phx-click="palette-close"
-          phx-target={@target}
-        >
-          Cancel insert
-        </button>
+        <h2 class="sb-toolbar__title">Canvas</h2>
+        <span class="sb-toolbar__chip">nested tree</span>
 
-        <div class="sb-toolbar__group sb-toolbar__zoom">
+        <div class="sb-toolbar__group">
           <button
             type="button"
             class="sb-toolbar__button"
+            phx-click="undo"
+            phx-target={@target}
+            disabled={not @can_undo?}
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            class="sb-toolbar__button"
+            phx-click="redo"
+            phx-target={@target}
+            disabled={not @can_redo?}
+          >
+            Redo
+          </button>
+          <button
+            :if={@inserting?}
+            type="button"
+            class="sb-toolbar__button"
+            phx-click="palette-close"
+            phx-target={@target}
+          >
+            Cancel insert
+          </button>
+        </div>
+
+        <div class="sb-toolbar__group sb-toolbar__zoom" role="group" aria-label="Canvas zoom">
+          <button
+            type="button"
+            class="sb-toolbar__button sb-toolbar__zoom-step"
             phx-click="zoom-out"
             phx-target={@target}
             disabled={@zoom <= hd(Shell.zoom_steps())}
@@ -96,7 +122,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <output class="sb-toolbar__zoom-level">{@zoom}%</output>
           <button
             type="button"
-            class="sb-toolbar__button"
+            class="sb-toolbar__button sb-toolbar__zoom-step"
             phx-click="zoom-in"
             phx-target={@target}
             disabled={@zoom >= List.last(Shell.zoom_steps())}
@@ -131,8 +157,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         </div>
 
         <p class="sb-toolbar__metrics">
-          <span class="sb-toolbar__metric" data-metric="blocks">{@count} blocks</span>
-          <span class="sb-toolbar__metric" data-metric="depth">depth {@depth}</span>
+          <span class="sb-toolbar__chip" data-metric="depth">depth {@depth}</span>
+          <span class="sb-toolbar__chip" data-metric="blocks">{@count} blocks</span>
         </p>
       </div>
       """
