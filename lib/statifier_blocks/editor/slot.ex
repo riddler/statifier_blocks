@@ -40,6 +40,29 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     only by dragging. The palette that opens is filtered by the same predicate
     the drag uses, not a parallel implementation of it.
 
+    ## The gap IS the insertion marker (R3, operator ruling 2026-08-29)
+
+    The ruling asks for "a marker on the edge between siblings, subtle at
+    rest, highlighted on hover and during drag; empty slots keep a
+    placeholder". A gap already sits between two siblings, and the flow edge
+    between them already runs through it - the marker is therefore the gap,
+    restyled, rather than a second thing drawn on the overlay beside it.
+
+    That is the whole reason it is not on the connector layer. The overlay is
+    `aria-hidden`, carries `pointer-events: none`, and is redrawn from a
+    measurement that does not exist until a host imports the measure hook; a
+    marker living there would be an insertion affordance that is invisible to
+    a screen reader, unreachable by keyboard, and absent entirely from the
+    hook-absent editor. Riding the gap keeps every server event, the
+    `phx-click` palette path and the keyboard path exactly as they shipped,
+    and the marker degrades to the affordance it already was.
+
+    `data-empty` is the placeholder half: a slot with no children has one gap
+    and nothing else, so it is the gap that has to say an empty arm is a real
+    arm you can drop into. It is stamped on the slot rather than derived in
+    CSS from the absence of a child, because "this slot is empty" is a fact
+    the view model already has and `:has()` would be re-deriving.
+
     ## The rail partition
 
     `:secondary` and `:failure` are both **attached rails** rather than body
@@ -128,6 +151,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-parent-id={@parent_id}
         data-declared={to_string(@slot.declared?)}
         data-arity={@slot.arity}
+        data-empty={to_string(@slot.children == [])}
         data-slot-style={@slot.style}
         data-exit-edge={ViewModel.rail?(@slot) && ViewModel.exit_edge(@slot)}
         data-drop={@drop}

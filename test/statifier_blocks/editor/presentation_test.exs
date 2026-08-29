@@ -49,6 +49,36 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         do: %{label: "Stacked", join_label: fn _config -> "back together" end}
     end
 
+    defmodule TwoArms do
+      @moduledoc """
+      A host type with two body slots and no declared `layout` - the shape
+      `core.branch` has, without the name. It is what separates "this type
+      said columns" from "this type has more than one body slot", and it is
+      the half of `ViewModel.arrangement/1` a `layout: :columns` fixture
+      cannot reach.
+      """
+
+      @behaviour StatifierBlocks.BlockType
+
+      @impl true
+      def current_version, do: 1
+
+      @impl true
+      def slots(_config), do: [{"left", :any, "Left"}, {"right", :any, "Right"}]
+
+      @impl true
+      def config_schema(_config), do: []
+
+      @impl true
+      def validate_config(_config), do: :ok
+
+      @impl true
+      def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+
+      @impl true
+      def palette_entry, do: %{label: "Either way"}
+    end
+
     defmodule ColumnsNoWords do
       @moduledoc """
       The other half of the same pair: a type that fans out and declares no
@@ -103,6 +133,38 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         ),
         id: "doc_lanes_first"
       )
+    end
+
+    # The two-armed block is NESTED rather than the root, so a container that
+    # is not the root and a leaf that is not the root are both on the page:
+    # `data-container` has to be read off the node's slots, and a rendering
+    # that read it off `@root?` would answer correctly for a root container by
+    # accident.
+    defp two_armed_document do
+      Document.new(
+        Block.new("core.sequence",
+          id: "blk_root",
+          config: %{},
+          slots: %{
+            "body" => [
+              Block.new("host.two_arms",
+                id: "blk_arms",
+                config: %{},
+                slots: %{"left" => [EditorFixtures.wait("blk_left", "1h")], "right" => []}
+              )
+            ]
+          }
+        ),
+        id: "doc_arms"
+      )
+    end
+
+    defp two_armed_palette do
+      Palette.new(%{
+        "core.sequence" => StatifierBlocks.Core.Sequence,
+        "core.wait" => StatifierBlocks.Core.Wait,
+        "host.two_arms" => TwoArms
+      })
     end
 
     defp resumable_document do
@@ -225,6 +287,128 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert has_element?(
                  view,
                  ~s([data-block-id="blk_email_step"] .sb-node__icon[data-icon="clock"])
+               )
+      end
+    end
+
+    describe "the tier-2 layout: cards, columns and the pill (10b, campaign 016)" do
+      # Sabotage: `BlockNode.layout_class/1` reading `entry.layout` again
+      # instead of `ViewModel.arrangement/1` - a branch's arms stack full-width
+      # once more, and every fan edge runs straight down through the arm above
+      # the one it is going to (`sb-ay0`). The two assertions are the two
+      # spellings that have to agree: the class the columns are laid out by,
+      # and the attribute the pill is tinted off.
+      test "a type with several body slots puts them side by side too", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: two_armed_document(), palette: two_armed_palette())
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_arms"][data-arrangement="fan"] > .sb-node__slots--columns)
+               )
+
+        refute has_element?(view, ~s([data-block-id="blk_arms"] > .sb-node__slots--stack))
+      end
+
+      # Sabotage: giving `ViewModel.fan_label/1` one word for both
+      # arrangements - side-by-side columns look identical either way, so the
+      # canvas stops saying whether one column runs or all of them do.
+      test "the pill says one of over a fan and all of over lanes", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: two_armed_document(), palette: two_armed_palette())
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_arms"] > .sb-node__fan > .sb-node__fan-label),
+                 "one of"
+               )
+
+        {:ok, lanes, _html} = mount_editor(conn, document: lanes_document())
+
+        assert has_element?(
+                 lanes,
+                 ~s([data-block-id="blk_lanes"] > .sb-node__fan > .sb-node__fan-label),
+                 "all of"
+               )
+      end
+
+      # Sabotage: dropping the `:if={ViewModel.fan_label(@node)}` guard - a
+      # sequence draws a pill over a single column, which claims a division
+      # that is not there.
+      test "a stacked container draws no pill", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: resumable_document())
+
+        refute has_element?(view, ~s([data-block-id="blk_resume"] > .sb-node__fan))
+      end
+
+      # The pill and the join marker are hubs, not decoration: `Connectors`
+      # resolves the fan and the rejoin to them when they were measured.
+      # Sabotage: dropping `data-sb-anchor` from either marker - the hook stops
+      # measuring it, `marker_or/3` falls back to the card and the outlet, and
+      # every arm is drawn through the marker's own words.
+      test "both markers carry the anchor the measurement hook reads", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: first_lanes_document())
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-node__fan[data-sb-anchor="#{StatifierBlocks.Connectors.fan_anchor("blk_lanes")}"])
+               )
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-node__join[data-sb-anchor="#{StatifierBlocks.Connectors.join_anchor("blk_lanes")}"])
+               )
+      end
+
+      # The card's width and centring are one CSS rule each, and both hang off
+      # this attribute - a leaf's box IS its card, a container's box holds its
+      # children and centres its chrome instead.
+      # Sabotage: stamping `data-container` from `@root?` instead of from the
+      # node's slots - every non-root container is styled as a leaf, so a
+      # nested branch's box shrinks to a card width and its arms overflow it.
+      # The fixture nests the container for exactly this reason: a root-only
+      # document cannot tell the two readings apart.
+      test "a leaf says it is not a container and a container says it is", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: two_armed_document(), palette: two_armed_palette())
+
+        assert has_element?(view, ~s([data-block-id="blk_root"][data-container="true"]))
+        assert has_element?(view, ~s([data-block-id="blk_arms"][data-container="true"]))
+        assert has_element?(view, ~s([data-block-id="blk_left"][data-container="false"]))
+      end
+
+      # R3's placeholder half (operator ruling 2026-08-29): an empty arm is a
+      # real arm and has to look like somewhere to drop.
+      # Sabotage: stamping `data-empty` off the slot's arity rather than its
+      # children - a filled `:any` slot claims to be empty and keeps the
+      # placeholder ring for the rest of its life.
+      test "an empty slot says so, and a filled one does not", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: two_armed_document(), palette: two_armed_palette())
+
+        assert has_element?(
+                 view,
+                 ~s([data-parent-id="blk_arms"][data-slot-name="right"][data-empty="true"])
+               )
+
+        assert has_element?(
+                 view,
+                 ~s([data-parent-id="blk_arms"][data-slot-name="left"][data-empty="false"])
+               )
+      end
+
+      # R3 keeps the affordance it restyles: the marker IS the gap, so the
+      # server events and the keyboard path are the ones that already shipped.
+      # Sabotage: moving the insertion marker onto the connector overlay - the
+      # overlay is `aria-hidden` with `pointer-events: none` and is absent
+      # entirely without the measure hook, so this button stops existing.
+      test "the marker is still the gap's own button, with its own events", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: two_armed_document(), palette: two_armed_palette())
+
+        assert has_element?(
+                 view,
+                 ~s([data-parent-id="blk_arms"][data-slot="right"][data-index="0"] .sb-gap__add)
                )
       end
     end

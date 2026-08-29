@@ -102,7 +102,7 @@ defmodule StatifierBlocks.Connectors do
   whose value is the anchor key. One attribute rather than a family of them
   because the hook's read is then `querySelectorAll("[data-sb-anchor]")` -
   one query, no knowledge of block structure, and no key composed on the
-  client. The five kinds of anchor the shipped markup stamps:
+  client. The seven kinds of anchor the shipped markup stamps:
 
     * `stage` - the canvas root, which is what makes the other boxes
       comparable to each other (7c names the stage box explicitly);
@@ -114,7 +114,16 @@ defmodule StatifierBlocks.Connectors do
     * `slot:<block id>/<slot name>` - a slot's header, which is where a fan
       edge lands. Not the first card inside it: the header carries the
       slot's name and its guard, and an edge that ran past it would cross
-      the very condition it is subject to.
+      the very condition it is subject to;
+    * `fan:<block id>` - the `ONE OF` / `ALL OF` pill below an arranged
+      container, the point its fan leaves from;
+    * `join:<block id>` - the join marker below that container's columns,
+      the point their rejoins arrive at.
+
+  The last two are the only anchors that may be absent while the block they
+  name is on the page: a stacked container renders no pill and a type that
+  phrased no join renders no marker. Both fall back to the card and the
+  outlet, which is where every fan left and arrived before campaign 016.
   """
 
   alias StatifierBlocks.ViewModel
@@ -206,6 +215,36 @@ defmodule StatifierBlocks.Connectors do
   @doc "A slot's header: where a fan edge lands."
   @spec slot_anchor(StatifierBlocks.Block.id(), StatifierBlocks.Block.slot_name()) :: String.t()
   def slot_anchor(parent_id, slot_name), do: "slot:" <> parent_id <> "/" <> slot_name
+
+  @doc """
+  The `ONE OF` / `ALL OF` pill below an arranged container: the point the
+  fan leaves from, when one is drawn.
+
+  A hub anchor rather than a decoration the edges ignore. The pill sits on
+  the flow line between the container's card and its columns, and the
+  connector overlay paints ABOVE the tree - so a fan that left the card
+  would draw a line straight through the pill's own words. Leaving from the
+  pill instead makes it what it looks like: the point the flow divides at.
+
+  Absent from the measurement whenever no pill is rendered, and the fan
+  falls back to the card. That is the same skip-when-unmeasured rule every
+  other anchor here follows, so the pill is never a thing the geometry
+  requires to exist.
+  """
+  @spec fan_anchor(StatifierBlocks.Block.id()) :: String.t()
+  def fan_anchor(block_id), do: "fan:" <> block_id
+
+  @doc """
+  The join marker below an arranged container's columns: the point the
+  rejoins arrive at, when one is drawn.
+
+  The mirror of `fan_anchor/1`, and there for the same reason - a rejoin
+  aimed past the marker crosses the word that says what the rejoin means.
+  Absent unless the container's type phrased a join (ADR-0002 amendment B),
+  and the rejoin falls back to the container's outlet.
+  """
+  @spec join_anchor(StatifierBlocks.Block.id()) :: String.t()
+  def join_anchor(block_id), do: "join:" <> block_id
 
   # ------------------------------------------------------------- decoding
 
@@ -300,14 +339,17 @@ defmodule StatifierBlocks.Connectors do
       block's outlet to the later block's card. Every slot, rails included:
       two rules attached to one rail still run in the order they are in.
 
-    * **the fan and the rejoin**, for a container arranged side by side -
-      `layout: :columns`, or more than one primary slot, which is the
-      spike's own derivation and the one that gives `core.parallel` and
-      `core.branch` the same treatment without naming either. A fan edge
-      runs from the container's card to each slot's HEADER, and a rejoin
-      runs from the last thing in that slot back to the container's outlet.
-      A container with a single primary slot instead gets one flow edge from
-      its card into the first block of that slot.
+    * **the fan and the rejoin**, for a container `ViewModel.arrangement/1`
+      says is arranged side by side - `layout: :columns`, or more than one
+      body slot, which gives `core.parallel` and `core.branch` the same
+      treatment without naming either. It is the same function the renderer
+      read to lay those columns out, so the lines and the layout answer one
+      question once. A fan edge runs from the container's hub to each slot's
+      HEADER, and a rejoin runs from the last thing in that slot back to the
+      container's join hub; the hubs are the `ONE OF` / `ALL OF` pill and the
+      join marker when those were measured, and the card and the outlet when
+      they were not. A container with a single body slot instead gets one
+      flow edge from its card into the first block of that slot.
 
     * **rail exits**, one per attached rule, in the vocabulary
       `ViewModel.exit_edge/1` derives from the slot's style: a `:failure`
@@ -360,42 +402,62 @@ defmodule StatifierBlocks.Connectors do
   # edge into the single body slot it has.
   @spec entry_edges(Node.t(), measurement()) :: [Edge.t()]
   defp entry_edges(%Node{} = node, m) do
-    case body_slots(node) do
-      [] -> []
-      [only] -> [single_entry(node, only, m)] |> Enum.reject(&is_nil/1)
-      several -> fan_edges(node, several, m)
+    case {arranged?(node), body_slots(node)} do
+      {_arranged, []} -> []
+      {true, body} -> fan_edges(node, body, m)
+      {false, [only | _rest]} -> Enum.reject([single_entry(node, only, m)], &is_nil/1)
     end
   end
 
   @spec single_entry(Node.t(), Slot.t(), measurement()) :: Edge.t() | nil
-  defp single_entry(%Node{} = node, %Slot{} = slot, m) do
-    cond do
-      arranged?(node) -> nil
-      slot.children == [] -> nil
-      true -> flow_edge(:flow, card_anchor(node.block_id), first_card(slot), m)
-    end
-  end
+  defp single_entry(%Node{}, %Slot{children: []}, _m), do: nil
 
-  # `arranged?` is decision 10's `layout: :columns`; more than one primary
-  # slot reaches the same treatment through `entry_edges/2`'s clause above.
-  # Together they are the spike's rule 1 - side by side when a type declares
-  # columns, or when it declares more than one primary slot - and a host type
-  # of the same shape gets the same rendering, which is d10's whole promise.
+  defp single_entry(%Node{} = node, %Slot{} = slot, m),
+    do: flow_edge(:flow, card_anchor(node.block_id), first_card(slot), m)
+
+  # The side-by-side arrangement's edges. `ViewModel.arrangement/1` is what
+  # decided the columns exist - the same function the renderer read to put
+  # them side by side and to word the pill above them - so the picture and
+  # the lines cannot disagree about what is arranged.
+  #
+  # Both hubs are the MARKER when one was measured and the card or the outlet
+  # otherwise. The markers sit on the flow line and the overlay paints above
+  # the tree, so a fan leaving the card would cross the pill's own words on
+  # the way past it; leaving from the pill draws what the pill looks like.
+  # The short edge from the card into the pill, and out of the join marker
+  # into the container's outlet, are ordinary flow.
   @spec fan_edges(Node.t(), [Slot.t()], measurement()) :: [Edge.t()]
   defp fan_edges(%Node{} = node, slots, m) do
-    hub = card_anchor(node.block_id)
-    join = outlet_anchor(node.block_id)
+    card = card_anchor(node.block_id)
+    outlet = outlet_anchor(node.block_id)
+    hub = marker_or(fan_anchor(node.block_id), card, m)
+    join = marker_or(join_anchor(node.block_id), outlet, m)
 
-    Enum.flat_map(slots, fn slot ->
-      head = slot_anchor(node.block_id, slot.name)
+    arm_edges =
+      Enum.flat_map(slots, fn slot ->
+        head = slot_anchor(node.block_id, slot.name)
 
+        [
+          path_edge(:fan, hub, head, m, &fan_path(outlet(&1), inlet(&2))),
+          path_edge(:join, slot_exit(node, slot), join, m, &join_path(outlet(&1), inlet(&2)))
+        ]
+      end)
+
+    marker_edges =
       [
-        path_edge(:fan, hub, head, m, &fan_path(outlet(&1), inlet(&2))),
-        path_edge(:join, slot_exit(node, slot), join, m, &join_path(outlet(&1), inlet(&2)))
+        if(hub != card, do: flow_edge(:flow, card, hub, m)),
+        if(join != outlet, do: flow_edge(:flow, join, outlet, m))
       ]
-      |> Enum.reject(&is_nil/1)
-    end)
+
+    Enum.reject(marker_edges ++ arm_edges, &is_nil/1)
   end
+
+  # A marker's anchor when the browser measured one, and the fallback when it
+  # did not. A container whose type phrased no join renders no join marker,
+  # and a stacked container renders no pill: neither is a hole to guess at.
+  @spec marker_or(String.t(), String.t(), measurement()) :: String.t()
+  defp marker_or(marker, fallback, m),
+    do: if(Map.has_key?(m, marker), do: marker, else: fallback)
 
   # A slot's exit anchor: the last block's outlet, or the slot's own header
   # when it is empty. An empty arm is a real arm of the branch, and a fan
@@ -467,11 +529,15 @@ defmodule StatifierBlocks.Connectors do
   end
 
   @spec body_slots(Node.t()) :: [Slot.t()]
-  defp body_slots(%Node{slots: slots}), do: Enum.reject(slots, &ViewModel.rail?/1)
+  defp body_slots(%Node{} = node), do: ViewModel.body_slots(node)
 
+  # One derivation of "is this arranged", shared with the renderer. A
+  # container the editor drew side by side and this module drew a single
+  # entry edge into would be a line contradicting the layout it was measured
+  # off, which is the class of bug ADR-0005 amendment 10b's measure-never-
+  # compute rule cannot catch on its own.
   @spec arranged?(Node.t()) :: boolean()
-  defp arranged?(%Node{entry: %{layout: :columns}}), do: true
-  defp arranged?(%Node{}), do: false
+  defp arranged?(%Node{} = node), do: ViewModel.arrangement(node) != :stack
 
   @spec flow_edge(Edge.kind(), String.t() | nil, String.t() | nil, measurement()) ::
           Edge.t() | nil

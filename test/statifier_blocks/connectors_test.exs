@@ -152,12 +152,14 @@ defmodule StatifierBlocks.ConnectorsTest do
     # Sabotage: composing an anchor key on the client, or parsing one here -
     # a block id containing `:` or `/` then splits wrong; keys are built here
     # and compared whole, and this is the check that says so.
-    test "the anchor keys are the five the markup stamps" do
+    test "the anchor keys are the seven the markup stamps" do
       assert Connectors.stage_anchor() == "stage"
       assert Connectors.node_anchor("blk_a") == "node:blk_a"
       assert Connectors.card_anchor("blk_a") == "card:blk_a"
       assert Connectors.outlet_anchor("blk_a") == "outlet:blk_a"
       assert Connectors.slot_anchor("blk_a", "on_error") == "slot:blk_a/on_error"
+      assert Connectors.fan_anchor("blk_a") == "fan:blk_a"
+      assert Connectors.join_anchor("blk_a") == "join:blk_a"
     end
   end
 
@@ -276,7 +278,108 @@ defmodule StatifierBlocks.ConnectorsTest do
     end
   end
 
+  describe "the hubs a fan turns on (10b, campaign 016)" do
+    # The fallback, and the behaviour every fan had before the markers were
+    # anchored: with no pill measured the fan still leaves the card.
+    # Sabotage: making `marker_or/3` return the marker unconditionally - a
+    # stacked-marker-less container's fan resolves to an anchor nothing
+    # measured, `path_edge/5` drops every arm, and the branch loses its fan.
+    test "with no pill measured the fan leaves the container's card" do
+      edges = Connectors.edges(branch(), branch_measurement())
+
+      # `card:blk_branch` is 400 wide at the top of the stage, so its outlet
+      # is (200, 30) - and both arms turn there.
+      assert Enum.count(edges, &(&1.kind == :fan)) == 2
+      assert Enum.all?(fan_edges(edges), &String.starts_with?(&1.d, "M 200 30"))
+    end
+
+    # Sabotage: leaving the fan on the card once a pill is measured - the
+    # overlay paints above the tree, so every arm is drawn straight through
+    # the pill's own word on the way past it.
+    test "a measured pill is the point the fan leaves from" do
+      measurement =
+        Map.merge(branch_measurement(), measured(%{"fan:blk_branch" => {150, 34, 100, 20}}))
+
+      edges = Connectors.edges(branch(), measurement)
+
+      # The pill is 100 wide from x=150, so its outlet is (200, 54).
+      assert Enum.count(edges, &(&1.kind == :fan)) == 2
+      assert Enum.all?(fan_edges(edges), &String.starts_with?(&1.d, "M 200 54"))
+    end
+
+    # The pill is a hub, not an island: the flow has to reach it.
+    # Sabotage: dropping the `hub != card` marker edge - the card and the pill
+    # are drawn with nothing between them, so the flow appears to stop at the
+    # container's header and start again below it.
+    test "a measured pill gains the short flow edge that reaches it" do
+      measurement =
+        Map.merge(branch_measurement(), measured(%{"fan:blk_branch" => {150, 34, 100, 20}}))
+
+      edges = Connectors.edges(branch(), measurement)
+
+      # From the card's outlet (200, 30) to the pill's inlet (200, 34): the one
+      # `:flow` edge this tree has, and it is aligned, so it is one line.
+      assert Enum.filter(edges, &(&1.kind == :flow)) == [
+               %Edge{kind: :flow, d: "M 200 30 L 200 34"}
+             ]
+    end
+
+    # Sabotage: aiming the rejoins past a measured join marker at the outlet -
+    # every arm's rejoin crosses the word that says what the rejoin means.
+    test "a measured join marker is the point the rejoins arrive at" do
+      measurement =
+        Map.merge(branch_measurement(), measured(%{"join:blk_branch" => {150, 260, 100, 20}}))
+
+      edges = Connectors.edges(branch(), measurement)
+
+      # The marker's inlet is (200, 260), and the rejoins end there rather
+      # than at the container's outlet 40px below it.
+      assert Enum.count(edges, &(&1.kind == :join)) == 2
+      assert Enum.all?(join_edges(edges), &String.ends_with?(&1.d, "V 260"))
+
+      # And the flow leaves the marker for the outlet: (200, 280) to (200, 300).
+      assert Enum.filter(edges, &(&1.kind == :flow)) == [
+               %Edge{kind: :flow, d: "M 200 280 L 200 300"}
+             ]
+    end
+
+    # `ViewModel.arrangement/1` is what decides a fan exists, so a type that
+    # declares `layout: :columns` fans into its single lane rather than taking
+    # the single-entry edge a stacked container takes.
+    # Sabotage: routing `entry_edges/2` on the body-slot count again - a
+    # one-lane parallel is laid out as columns with a pill above it and drawn
+    # with a straight edge into the first card, so the picture and the lines
+    # disagree about what is arranged.
+    test "a declared columns layout fans, even into one lane" do
+      lane =
+        block("blk_par",
+          type: "core.parallel",
+          entry: %{layout: :columns},
+          slots: [slot("lane_a", [block("blk_a")])]
+        )
+
+      edges = Connectors.edges(lane, lane_measurement())
+
+      assert Enum.count(edges, &(&1.kind == :fan)) == 1
+      assert Enum.count(edges, &(&1.kind == :join)) == 1
+    end
+  end
+
   # ------------------------------------------------------------- fixtures
+
+  defp fan_edges(edges), do: Enum.filter(edges, &(&1.kind == :fan))
+  defp join_edges(edges), do: Enum.filter(edges, &(&1.kind == :join))
+
+  defp lane_measurement do
+    measured(%{
+      "stage" => {0, 0, 400, 400},
+      "card:blk_par" => {0, 0, 400, 30},
+      "outlet:blk_par" => {0, 300, 400, 0},
+      "slot:blk_par/lane_a" => {0, 50, 400, 20},
+      "card:blk_a" => {0, 80, 400, 30},
+      "outlet:blk_a" => {0, 120, 400, 0}
+    })
+  end
 
   defp block(id, opts \\ []) do
     %Node{
