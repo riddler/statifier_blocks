@@ -1,7 +1,7 @@
 defmodule StatifierBlocks.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.2.0"
   @source_url "https://github.com/riddler/statifier_blocks"
 
   # ADR-0005 decision 1's acceptance property: the package must compile clean
@@ -163,7 +163,7 @@ defmodule StatifierBlocks.MixProject do
   # so the override never lands in a commit by accident.
   defp statifier_dep do
     case System.get_env("STATIFIER_PATH") do
-      nil -> {:statifier, "~> 2.0"}
+      nil -> {:statifier, "~> 2.2"}
       path -> {:statifier, path: path, override: true}
     end
   end
