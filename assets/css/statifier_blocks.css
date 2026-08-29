@@ -534,15 +534,27 @@
   gap: var(--sb-space);
 }
 
-.sb-node__icon {
+.sb-node__icon,
+.sb-palette__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: none;
   width: var(--sb-space-3);
   height: var(--sb-space-3);
   border-radius: var(--sb-radius-sm);
   background: var(--sb-block-accent-tint);
   color: var(--sb-block-accent);
+}
+
+/* The shipped glyphs paint with `currentColor` and carry no size of their
+   own, so the tile above decides both. A host icon component that renders an
+   svg gets the same treatment, which is what keeps an overridden set the same
+   size as the one it replaced. */
+.sb-node__icon svg,
+.sb-palette__icon svg {
+  width: 68%;
+  height: 68%;
 }
 
 .sb-node__label {
@@ -921,7 +933,9 @@
 
 .sb-palette__pick {
   font: inherit;
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space-half);
   width: 100%;
   text-align: left;
   background: none;
@@ -935,6 +949,10 @@
 
 .sb-palette__pick:hover {
   background: var(--sb-bg-muted);
+}
+
+.sb-palette__pick-text {
+  min-width: 0;
 }
 
 .sb-palette__description {

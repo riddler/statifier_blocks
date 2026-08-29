@@ -45,6 +45,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          fixtures: session["fixtures"],
          drawer_height: session["drawer_height"],
          header: session["header"],
+         icon: session["icon"] && (&host_icon/1),
          test_pid: session["test_pid"]
        )}
     end
@@ -60,6 +61,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         findings={@findings}
         datamodel={@datamodel}
         theme={@theme}
+        icon={@icon}
         fixtures={@fixtures}
         drawer_height={@drawer_height}
         on_change={notifier(@test_pid)}
@@ -78,6 +80,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @impl Phoenix.LiveView
     def handle_info({:swap_document, document}, socket),
       do: {:noreply, assign(socket, :document, document)}
+
+    # A host's own icon component, in the shape the `icon` assign takes: a
+    # name in, markup out. Built here for the same reason `on_change` is - a
+    # session is signed with `:erlang.term_to_binary/1` and carries no
+    # functions - and deliberately unlike the shipped set, so a test can tell
+    # which one rendered.
+    defp host_icon(assigns) do
+      ~H"""
+      <span class={@class} data-icon={@name} data-host-icon="true" aria-hidden="true">
+        <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" /></svg>
+      </span>
+      """
+    end
 
     defp notifier(nil), do: nil
     defp notifier(pid), do: fn document -> send(pid, {:document, document}) end
@@ -124,7 +139,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     Mounts the editor over a document, connected, and returns the live view.
 
     Options: `:document`, `:palette`, `:findings`, `:datamodel`, `:theme`,
-    `:fixtures`, `:drawer_height` and `:header` - the last three being the
+    `:fixtures`, `:drawer_height`, `:header` and `:icon` - the last three being the
     shell amendment's host seam (8A), a truth-table source, the height the host
     remembered, and markup for the header slot. The
     `:datamodel` default is `nil` - no datamodel supplied - which is what the
@@ -158,6 +173,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "fixtures" => Keyword.get(opts, :fixtures),
         "drawer_height" => Keyword.get(opts, :drawer_height),
         "header" => Keyword.get(opts, :header),
+        "icon" => Keyword.get(opts, :icon),
         "test_pid" => test_pid
       }
     end

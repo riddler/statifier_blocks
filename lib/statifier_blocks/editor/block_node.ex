@@ -20,10 +20,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     `icon` is a **name**, never markup. This component takes an icon component
     as an assign and passes the name to it; a host that ships heroicons
-    renders heroicons, a host that ships nothing gets a neutral glyph.
-    Accepting raw SVG from a callback would be injecting host-authored markup
-    into this package's own render tree - an injection surface, and a
-    guarantee that the icon set fragments across palettes.
+    renders heroicons. Accepting raw SVG from a callback would be injecting
+    host-authored markup into this package's own render tree - an injection
+    surface, and a guarantee that the icon set fragments across palettes.
+
+    A host that ships nothing gets `StatifierBlocks.Editor.Icons`, this
+    package's own set for the names its own palette emits, and an entry that
+    names no icon at all gets no tile. Neither is a hole in the paragraph
+    above: the default is markup this package wrote, resolved from a name by
+    the same seam, and the host's `icon` still wins wherever it is passed.
 
     ## Unresolvable blocks (decision 12)
 
@@ -82,7 +87,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     use Phoenix.Component
 
     alias StatifierBlocks.Connectors
-    alias StatifierBlocks.Editor.Slot
+    alias StatifierBlocks.Editor.{Icons, Slot}
     alias StatifierBlocks.ViewModel
 
     attr(:node, ViewModel.Node, required: true)
@@ -125,7 +130,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         draggable={to_string(not @root?)}
       >
         <div class="sb-node__chrome" data-sb-anchor={Connectors.card_anchor(@node.block_id)}>
-          <.icon_glyph icon={@icon} name={@node.entry.icon} />
+          <Icons.glyph icon={@icon} name={@node.entry.icon} class="sb-node__icon" />
           <button
             type="button"
             class="sb-node__label"
@@ -174,24 +179,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         >
         </div>
       </div>
-      """
-    end
-
-    attr(:icon, :any, default: nil)
-    attr(:name, :string, default: nil)
-
-    # A host-supplied icon component gets the name; a host that supplied none
-    # gets a neutral glyph. Either way this package never emits markup a
-    # callback handed it.
-    defp icon_glyph(%{icon: nil} = assigns) do
-      ~H"""
-      <span class="sb-node__icon" data-icon={@name} aria-hidden="true">&#9633;</span>
-      """
-    end
-
-    defp icon_glyph(assigns) do
-      ~H"""
-      {@icon.(%{name: @name, class: "sb-node__icon"})}
       """
     end
 

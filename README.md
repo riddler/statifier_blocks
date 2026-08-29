@@ -487,9 +487,51 @@ framework:
 ```
 
 Optional assigns: `findings` (yours, merged with the ones the view model
-derives), `icon` (a function component that turns an icon *name* into markup -
-this package never emits an icon set of its own), `expression_component` (an
-override for `:expression` fields), `theme`, and `class`.
+derives), `icon` (a function component that turns an icon *name* into markup),
+`expression_component` (an override for `:expression` fields), `theme`, and
+`class`.
+
+**Icons.** You do not have to pass `icon`. The package ships
+`StatifierBlocks.Editor.Icons`, a small set of inline SVGs for the names the
+core block types declare - no font, no CDN, nothing to register in your asset
+pipeline - and the editor uses it when you pass nothing. Every glyph paints
+with `currentColor` and fills its tile, so the two tokens the tile reads
+(`--sb-block-accent` and `--sb-block-accent-tint`) are all a theme has to
+touch. See [`docs/theming.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/theming.md).
+
+Pass `icon` when you have an icon set of your own, and it wins on every tile -
+the canvas cards and the palette rows alike. It is a component taking `name`
+and `class`, and the *name* is what the block type declared:
+
+```heex
+<.live_component
+  module={StatifierBlocks.Editor}
+  id="editor"
+  document={@document}
+  palette={@palette}
+  icon={&icon/1}
+/>
+```
+
+```elixir
+# A heroicons-style component: the name in, your markup out. The core types
+# name heroicons ("clock", "bars-3", "arrow-path", ...), so a host already
+# using them resolves every one by prefixing.
+attr :name, :string, required: true
+attr :class, :string, default: nil
+
+def icon(assigns) do
+  ~H"""
+  <span class={[@class, "hero-" <> @name]} aria-hidden="true" />
+  """
+end
+```
+
+Two rules the seam keeps. A block type declares a **name**, never markup, so
+nothing a palette entry carries is injected into the editor's render tree. And
+a block type that declares no icon at all gets **no tile** rather than an empty
+one, in the shipped set and in yours: your component is never called with a
+`nil` name.
 
 Underneath the component is a pure command algebra - `StatifierBlocks.Edit`
 (insert, remove, move, update config, each with its inverse) over

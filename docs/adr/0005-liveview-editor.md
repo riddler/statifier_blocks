@@ -2243,3 +2243,61 @@ widening.
   droppability rule, no keyboard path, no form, no finding, no unresolvable
   block behaviour, and no component boundary is touched by a hook that only
   reads boxes.
+
+---
+
+## Note (2026-08-29): decision 10, a default icon set ships as markup
+
+A dated note rather than a proposed decision, because it decides nothing this
+record has not already decided. Decision 10's `icon` seam is unchanged, and so
+is decision 14's line between markup and styling. What is recorded here is
+which side of that line the package's own glyphs fall on, and why the sentence
+that produced the defect was read too literally.
+
+**The sentence.** Decision 10 says `icon` is "a name, never markup", and adds
+that "a host that ships heroicons renders heroicons, a host that ships nothing
+gets a neutral glyph". The second clause was implemented as a `U+25A1` white
+square in every tile. That is a neutral glyph in the sense the sentence meant
+and a broken page in the sense a reader means: a white square is what a font
+renders when it has nothing, so the shipped editor's first impression on a host
+that had not yet written an icon component was of a failure to load. The
+palette got no tile at all, because the `icon` attr `Editor` passes
+`PaletteBrowser` was declared and never rendered.
+
+**What ships now.** `StatifierBlocks.Editor.Icons`, inline SVG for the eleven
+names `Palette.core/0` emits, used when the host passes no `icon`, and a test
+holds the set to those names in both directions. A host's `icon` still wins on
+every tile, on the canvas and on the palette rows alike, which is the seam
+exactly as decision 10 wrote it - the default is only what resolves the name
+when nobody else does.
+
+**Why this is markup and not styling, which is the part worth recording.**
+14d's rule is that a block type carries a *name* and the theme decides what it
+means, so nothing that varies by theme may be baked into a component. The
+glyphs do not vary by theme: every path paints with `currentColor` and the
+`<svg>` fills its tile, so `.sb-node__icon` and `.sb-palette__icon` - two rules,
+reading `--sb-block-accent` and `--sb-block-accent-tint`, which 14d already
+governs - decide colour and size. The set adds no token, reads no token, and
+names no block type. 14d is untouched, and a theme restyles the icons by
+restyling the two tokens it was already restyling.
+
+The injection argument in decision 10 is untouched too. It is about markup
+arriving from a *host callback*, and this is markup this package wrote for
+names this package emits. Nothing about it makes the editor accept SVG from a
+palette entry, and nothing should.
+
+**The two deliberate empty states**, because "never a white square" is only
+half an answer:
+
+- an entry that declares no icon (`icon: nil`, decision 10's default) renders
+  **no tile**. A type that declared nothing is not missing something, and this
+  holds for a host's component too - it is never called with a `nil` name,
+  which is a narrowing of the seam a host can only benefit from;
+- a name the shipped set does not have renders a **neutral mark**, three dots,
+  with the name in `data-icon`. A host type declaring `icon: "credit-card"`
+  gets a chip that reads as deliberate rather than as a failure, and the fix
+  stays the one decision 10 already named: pass an `icon` component.
+
+Recorded so the shipped editor does not re-derive this from the stylesheet, and
+so that a later reading of "a host that ships nothing gets a neutral glyph"
+does not restore the square.
