@@ -33,7 +33,10 @@ defmodule StatifierBlocks.HeadlessTest do
     StatifierBlocks.Editor.ConfigForm,
     StatifierBlocks.Editor.Field,
     StatifierBlocks.Editor.PaletteBrowser,
-    StatifierBlocks.Editor.Findings
+    StatifierBlocks.Editor.Findings,
+    StatifierBlocks.Editor.Toolbar,
+    StatifierBlocks.Editor.Inspector,
+    StatifierBlocks.Editor.Drawer
   ]
 
   @pure [
@@ -42,7 +45,8 @@ defmodule StatifierBlocks.HeadlessTest do
     StatifierBlocks.Edit.Targets,
     StatifierBlocks.Finding,
     StatifierBlocks.Datamodel,
-    StatifierBlocks.ViewModel
+    StatifierBlocks.ViewModel,
+    StatifierBlocks.Shell
   ]
 
   if @headless do

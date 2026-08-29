@@ -22,6 +22,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         same predicate as decision 5, not a parallel implementation, and this
         component deliberately computes none of it: it is handed a set.
 
+    ## The strip, below 780 (7A)
+
+    The 2026-08-29 shell amendment gives the palette a second shape: below a
+    container width of 780 it collapses to a strip - a label and a "+" - that
+    opens as a sheet over the canvas, so the inspector gets the full row. Both
+    shapes are always in the markup and the **stylesheet** decides which one is
+    on screen, because the breakpoint is a container query and the server does
+    not know how wide the host gave the editor. What the server owns is whether
+    the sheet is open, which is one boolean and one event; selecting a block or
+    picking an entry closes it, since a sheet left open covers the thing the
+    author just chose.
+
     Picking an entry emits an `:insert` at exactly the position the "+" named,
     which is the identical command a successful drop would produce. That is
     what makes the whole insertion path exercisable in `LiveViewTest` without
@@ -46,50 +58,72 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:icon, :any, default: nil)
     attr(:class, :string, default: nil)
 
+    attr(:sheet_open, :boolean,
+      default: false,
+      doc: "Whether the narrow-layout sheet is open (7A). Ignored above 780."
+    )
+
     @doc "The palette: a search box, then a section per `entry.group`."
     def palette_browser(assigns) do
       assigns = assign(assigns, :visible, filter(assigns.groups, assigns.query, assigns.allowed))
 
       ~H"""
-      <section class={["sb-palette", @class]} data-filtered={to_string(@allowed != nil)}>
-        <form
-          id="sb-palette-search"
-          phx-change="palette-search"
-          phx-submit="palette-search"
+      <section
+        class={["sb-palette", @class]}
+        data-filtered={to_string(@allowed != nil)}
+        data-sheet={if @sheet_open, do: "open", else: "closed"}
+      >
+        <button
+          type="button"
+          class="sb-palette__strip"
+          phx-click="palette-sheet"
           phx-target={@target}
+          aria-expanded={to_string(@sheet_open)}
         >
-          <input
-            class="sb-palette__search"
-            type="text"
-            name="q"
-            value={@query}
-            placeholder="Search blocks"
-            autocomplete="off"
-          />
-        </form>
+          <span class="sb-palette__strip-label">Blocks</span>
+          <span class="sb-palette__strip-plus" aria-hidden="true">+</span>
+        </button>
 
-        <p :if={@visible == []} class="sb-palette__empty">No block types match.</p>
+        <div class="sb-palette__body">
+          <form
+            id="sb-palette-search"
+            phx-change="palette-search"
+            phx-submit="palette-search"
+            phx-target={@target}
+          >
+            <input
+              class="sb-palette__search"
+              type="text"
+              name="q"
+              value={@query}
+              placeholder="Search blocks"
+              autocomplete="off"
+            />
+          </form>
 
-        <div :for={group <- @visible} class="sb-palette__group" data-group={group.name}>
-          <h3 class="sb-palette__group-name">{group.name}</h3>
-          <ul class="sb-palette__entries">
-            <li :for={entry <- group.entries} data-type={entry.type_name}>
-              <button
-                type="button"
-                class="sb-palette__pick"
-                data-sb-block-accent={ViewModel.accent_token(entry.entry)}
-                style={accent_style(entry.entry)}
-                phx-click="palette-pick"
-                phx-target={@target}
-                phx-value-type={entry.type_name}
-              >
-                {entry.entry.label}
-                <span :if={entry.entry.description != ""} class="sb-palette__description">
-                  {entry.entry.description}
-                </span>
-              </button>
-            </li>
-          </ul>
+          <p :if={@visible == []} class="sb-palette__empty">No block types match.</p>
+
+          <div :for={group <- @visible} class="sb-palette__group" data-group={group.name}>
+            <h3 class="sb-palette__group-name">{group.name}</h3>
+            <ul class="sb-palette__entries">
+              <li :for={entry <- group.entries} data-type={entry.type_name}>
+                <button
+                  type="button"
+                  class="sb-palette__pick"
+                  data-sb-block-accent={ViewModel.accent_token(entry.entry)}
+                  style={accent_style(entry.entry)}
+                  phx-click="palette-pick"
+                  phx-target={@target}
+                  phx-value-type={entry.type_name}
+                >
+                  {entry.entry.label}
+                  <span :if={entry.entry.description != ""} class="sb-palette__description">
+                    {entry.entry.description}
+                  </span>
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
       </section>
       """

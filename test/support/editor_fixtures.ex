@@ -21,6 +21,7 @@ defmodule StatifierBlocks.EditorFixtures do
   """
 
   alias StatifierBlocks.{Block, Document, Palette}
+  alias StatifierBlocks.Predicates.TruthTable
 
   @unknown_type "signup.track_conversion"
 
@@ -95,5 +96,99 @@ defmodule StatifierBlocks.EditorFixtures do
       config: %{"event" => "signup.completed", "variant_key" => "ab_variant"},
       slots: %{"after" => [wait("blk_settle_pause", "PT5M")]}
     )
+  end
+
+  @doc """
+  A **credit-card processing** document: one branch, three ways out.
+
+  The shell's fixture (`sb-832`), and a second domain on purpose. The signup
+  wizard above is what the edit algebra is exercised against; what the drawer
+  needs is a branch whose arms are worth tabulating - an amount threshold, a
+  risk band, and the ordinary path in `otherwise` - because a truth table over
+  it is one row per case and one column per arm, which is the shape the
+  amendment moved into a full-width drawer.
+
+  Ids are fixed, so a test and a screenshot name the same blocks.
+  """
+  @spec credit_card() :: Document.t()
+  def credit_card do
+    Document.new(
+      Block.new("core.sequence",
+        id: "blk_cc_flow",
+        slots: %{
+          "body" => [
+            Block.new("core.branch",
+              id: "blk_cc_decision",
+              config: %{
+                "arms" => [
+                  %{"slot" => "arm_review", "cond" => "amount > 500"},
+                  %{"slot" => "arm_declined", "cond" => "risk_band == 'high'"}
+                ]
+              },
+              slots: %{
+                "arm_review" => [wait("blk_cc_manual_hold", "PT24H")],
+                "arm_declined" => [wait("blk_cc_decline_notice", "PT1M")],
+                "otherwise" => [wait("blk_cc_settle_pause", "PT15M")]
+              }
+            ),
+            wait("blk_cc_capture_pause", "PT5M")
+          ]
+        }
+      ),
+      id: "doc_credit_card"
+    )
+  end
+
+  @doc """
+  The truth tables a host would hand the drawer for `credit_card/0`.
+
+  Keyed by block id, which is the whole of the `fixtures` seam: this package
+  does not invent a fixture-bundle format (ADR-0002 decision 9 puts that
+  convention in statifier-ui), so what crosses is tables already built.
+
+  The rows are chosen so the drawer shows more than one status: a case that
+  matches, a case whose declared expectation is contradicted, and a case whose
+  bindings do not name everything the arms read.
+  """
+  @spec credit_card_tables() :: %{String.t() => [TruthTable.t()]}
+  def credit_card_tables do
+    {:ok, table} =
+      TruthTable.build(
+        %{
+          name: "Authorization routing",
+          description: "Which arm takes an authorization, by amount and risk band.",
+          paths: ["amount", "risk_band"],
+          columns: [
+            %{key: "arm_review", label: "Review", source: "amount > 500"},
+            %{key: "arm_declined", label: "Declined", source: "risk_band == 'high'"},
+            %{key: "otherwise", label: "Capture", source: nil}
+          ]
+        },
+        [
+          %{
+            name: "small, low risk",
+            bindings: %{"amount" => "120", "risk_band" => "'low'"},
+            expected: %{"arm_review" => false, "arm_declined" => false}
+          },
+          %{
+            name: "large, low risk",
+            bindings: %{"amount" => "900", "risk_band" => "'low'"},
+            expected: %{"arm_review" => true}
+          },
+          %{
+            name: "large, high risk",
+            bindings: %{"amount" => "900", "risk_band" => "'high'"},
+            note: "The first arm wins; the decline arm is never reached.",
+            expected: %{"arm_declined" => true}
+          },
+          %{
+            name: "band unbound",
+            bindings: %{"amount" => "120"},
+            expected: %{"arm_declined" => false}
+          }
+        ]
+      )
+
+    %{"blk_cc_decision" => [table]}
   end
 end

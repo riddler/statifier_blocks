@@ -42,6 +42,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          findings: session["findings"] || [],
          datamodel: session["datamodel"],
          theme: session["theme"] || %{},
+         fixtures: session["fixtures"],
+         drawer_height: session["drawer_height"],
+         header: session["header"],
          test_pid: session["test_pid"]
        )}
     end
@@ -57,13 +60,32 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         findings={@findings}
         datamodel={@datamodel}
         theme={@theme}
+        fixtures={@fixtures}
+        drawer_height={@drawer_height}
         on_change={notifier(@test_pid)}
-      />
+        on_drawer_resize={height_notifier(@test_pid)}
+      >
+        <:header :if={@header}>
+          <p class="host-header">{@header}</p>
+        </:header>
+      </.live_component>
       """
     end
 
+    # A host swapping the open document, which is 8A's half of the split: which
+    # document is open is the host's decision, and 2A says the drawer closes
+    # when it changes.
+    @impl Phoenix.LiveView
+    def handle_info({:swap_document, document}, socket),
+      do: {:noreply, assign(socket, :document, document)}
+
     defp notifier(nil), do: nil
     defp notifier(pid), do: fn document -> send(pid, {:document, document}) end
+
+    # 8A's other half of the host seam: the height arrives as an event and the
+    # host is what remembers it. Here the "host" is a test process.
+    defp height_notifier(nil), do: nil
+    defp height_notifier(pid), do: fn height -> send(pid, {:drawer_height, height}) end
   end
 
   defmodule StatifierBlocks.EditorLiveCase do
@@ -101,7 +123,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @doc """
     Mounts the editor over a document, connected, and returns the live view.
 
-    Options: `:document`, `:palette`, `:findings`, `:datamodel`, `:theme`. The
+    Options: `:document`, `:palette`, `:findings`, `:datamodel`, `:theme`,
+    `:fixtures`, `:drawer_height` and `:header` - the last three being the
+    shell amendment's host seam (8A), a truth-table source, the height the host
+    remembered, and markup for the header slot. The
     `:datamodel` default is `nil` - no datamodel supplied - which is what the
     editor's own default is and what ADR-0005 amendment 11f makes meaningful.
     The other defaults are
@@ -130,6 +155,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "findings" => Keyword.get(opts, :findings, []),
         "datamodel" => Keyword.get(opts, :datamodel),
         "theme" => Keyword.get(opts, :theme, %{}),
+        "fixtures" => Keyword.get(opts, :fixtures),
+        "drawer_height" => Keyword.get(opts, :drawer_height),
+        "header" => Keyword.get(opts, :header),
         "test_pid" => test_pid
       }
     end
