@@ -134,6 +134,9 @@
  *     2  --sb-block-accent-mix
  *     2  --sb-block-edge
  *     2  --sb-block-accent-tint
+ *     2  --sb-edge
+ *     2  --sb-edge-interrupt
+ *     2  --sb-edge-width
  *
  *     3  --sb-color-scheme
  *
@@ -375,6 +378,18 @@
     var(--sb-bg)
   );
 
+  /* Connectors (the 2026-08-29 amendment to decision 7, and d10). Tier 2:
+   * the edges are drawn either way, their ink is the host's. Both colours
+   * are var() references rather than literals, and that is the ruling
+   * rather than laziness - a connector is a line that carries meaning, so
+   * it is held to the same 3:1 `--sb-border-strong` is, and an out-of-band
+   * way out is marked in the same hue a warning is. A theme that moves
+   * either of those and forgets the edges would otherwise ship a diagram
+   * drawn in the previous palette. */
+  --sb-edge: var(--sb-border-strong);
+  --sb-edge-interrupt: var(--sb-warning);
+  --sb-edge-width: 1.5px;
+
   color-scheme: var(--sb-color-scheme);
 
   /* 7A: the breakpoints are CONTAINER queries, because the editor is a
@@ -397,8 +412,79 @@
 
 /* ---------------------------------------------------------------- canvas */
 
+/* `position` is what makes this the containing block for the two absolutely
+ * positioned children below - the measurement hook's element and the
+ * connector overlay - which is also what makes it the coordinate origin the
+ * hook measures every anchor against. */
 .sb-canvas {
+  position: relative;
   min-width: 0;
+}
+
+/* ------------------------------------------------------------- connectors
+ *
+ * The 2026-08-29 amendment to decision 7. Nothing here is a rule about where
+ * a connector goes: `StatifierBlocks.Connectors` decided that on the server
+ * from rectangles the browser measured, and every declaration below is ink.
+ */
+
+/* The measurement hook's element, and nothing else: no size, no ink, out of
+ * the flow. A host that never imports the hook has an element that changes
+ * no layout; a host that does has one that never moves. */
+.sb-measure {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* The drawn connectors, over the stage rather than in its flow. The layer is
+ * sized FROM the stage's scroll extent, so a layer that could grow that
+ * extent would measure itself into a bigger box on every pass. Out of flow
+ * it cannot, which is what makes measure -> render -> measure converge
+ * rather than drift. `pointer-events` because an overlay that swallowed a
+ * drag would break decision 6's whole interaction, and `z-index` because a
+ * card has an opaque background: an overlay painted under the tree is an
+ * overlay the root block hides completely, which is what the first capture
+ * of this layer showed. */
+.sb-connectors {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.sb-edge {
+  fill: none;
+  stroke: var(--sb-edge);
+  stroke-width: var(--sb-edge-width);
+}
+
+/* 10e: the out-of-band way out, and the only edge marked as one. A failure
+ * exit is an ordinary flow edge and shares the rule above - that is the
+ * `sb-67s` ruling rather than an omission here. */
+.sb-edge--interrupt {
+  stroke: var(--sb-edge-interrupt);
+  stroke-dasharray: 4 3;
+}
+
+/* A marker's fill cannot inherit the stroke of the path that references it
+ * in every browser that matters yet, so each arrowhead reads the token
+ * directly and a theme still moves both. */
+.sb-arrow--flow {
+  fill: var(--sb-edge);
+}
+
+.sb-arrow--interrupt {
+  fill: var(--sb-edge-interrupt);
+}
+
+/* The flow outlet: a zero-height anchor at the bottom of everything a block
+ * contains, so flow leaves a container from below its children rather than
+ * from its header. Measured, never seen. */
+.sb-node__outlet {
+  height: 0;
 }
 
 .sb-node {

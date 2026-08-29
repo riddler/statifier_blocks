@@ -9,6 +9,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     each block, so adding a block adds no listeners and the hook has one
     lifetime rather than one per node.
 
+    It is also the measurement stage. The 2026-08-29 amendment to decision 7
+    admits a second hook whose whole job is reading laid-out boxes, and every
+    box it reads is relative to this element - which is why this element
+    carries `data-sb-anchor="stage"` and why the connector overlay is drawn
+    inside it, in its own untransformed coordinate space. The hook itself
+    rides a child element rather than this one, because an element carries one
+    `phx-hook` and this one is the drag hook's; `ConnectorLayer` renders that
+    child and says why.
+
     It is also where decision 14's theming lands. The `--sb-*` custom
     properties are declared on this element by the package's stylesheet, so a
     host that wants a different palette sets them here through the `theme`
@@ -18,7 +27,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
+    alias StatifierBlocks.Connectors
     alias StatifierBlocks.Editor.BlockNode
+    alias StatifierBlocks.Editor.ConnectorLayer
     alias StatifierBlocks.ViewModel
 
     attr(:root, ViewModel.Node, required: true)
@@ -27,6 +38,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:theme, :map, default: %{})
+    attr(:edges, :list, default: [])
+    attr(:stage, :any, default: nil)
     attr(:class, :string, default: nil)
 
     @doc "The canvas root: the hook's element, and the tree beneath it."
@@ -38,8 +51,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         phx-hook="StatifierBlocksDrag"
         phx-target={@target}
         data-dragging={to_string(@drag != nil)}
+        data-sb-anchor={Connectors.stage_anchor()}
         style={theme_style(@theme)}
       >
+        <ConnectorLayer.connector_layer edges={@edges} stage={@stage} target={@target} />
         <BlockNode.block_node
           root?={true}
           node={@root}

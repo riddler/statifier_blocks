@@ -427,6 +427,119 @@ defmodule StatifierBlocks.ThemeAuditTest do
     end
   end
 
+  describe "the connector tokens (decision 7's 2026-08-29 amendment)" do
+    @connector_tokens ~w(--sb-edge --sb-edge-interrupt --sb-edge-width)
+    @connector_lines ~w(--sb-edge --sb-edge-interrupt)
+
+    # 14e in both directions, named for the tokens the connector layer added,
+    # so a later refactor that drops a consumer says which surface it dropped
+    # rather than only that some token went dead.
+    #
+    # The two stroke assertions are not redundant with the coverage check
+    # above them: an arrowhead's `fill` also reads `--sb-edge`, so 14e stays
+    # green with the STROKE gone and every connector falls back to the SVG
+    # default, which is no stroke at all. The load-bearing consumer has to be
+    # named, not merely counted.
+    # Sabotage: deleting `stroke: var(--sb-edge)` from `.sb-edge` - the
+    # coverage check stays green, the connectors disappear, and this is what
+    # notices.
+    test "each is declared and read, and the stroke is the consumer that matters",
+         %{declared: declared, referenced: referenced, source: source} do
+      for token <- @connector_tokens do
+        assert MapSet.member?(declared, token), "#{token} is not declared"
+        assert MapSet.member?(referenced, token), "#{token} is declared and never read"
+      end
+
+      assert source =~ ~r/\.sb-edge\s*\{[^}]*stroke:\s*var\(--sb-edge\)/,
+             "an edge with no stroke is an edge nobody can see"
+
+      assert source =~ ~r/\.sb-edge--interrupt\s*\{[^}]*stroke:\s*var\(--sb-edge-interrupt\)/,
+             "10e: the out-of-band way out is marked, and the mark is a token"
+
+      assert source =~ ~r/\.sb-edge\s*\{[^}]*stroke-width:\s*var\(--sb-edge-width\)/
+    end
+
+    # Sabotage: removing the `2  --sb-edge-interrupt` line from the header - a
+    # host cannot place the token in a tier, which is what 14c is for.
+    test "each carries a tier", %{raw: raw} do
+      tiers = tiers(raw)
+
+      for token <- @connector_tokens do
+        assert tiers[token] == "2", "#{token} is not tier 2 in the header"
+      end
+    end
+
+    # A connector is a line that carries information - it is the whole of what
+    # the editor says about order and about ways out - so it is held to the
+    # non-text threshold, exactly as `--sb-border-strong` is. Both defaults
+    # are `var()` references to tokens that already clear it, which is what
+    # makes this check about the CHAIN rather than about two literals: a theme
+    # that moves `--sb-border-strong` moves the edges with it.
+    # Sabotage: pointing `--sb-edge` at `--sb-border` - the decorative line
+    # that is deliberately held to no ratio - and this goes red with the
+    # ratio and the surface.
+    test "a connector clears 3:1 on the worst surface, in the shipped palette", context do
+      for token <- @connector_lines do
+        colour = ThemeAudit.resolve(context.values, token)
+        assert colour, "#{token} does not resolve to a colour"
+
+        {ratio, surface, on} = ThemeAudit.worst_contrast(colour, context.values, @surfaces)
+
+        assert ratio >= 3,
+               "#{token} (#{colour}) is #{ratio}:1 on #{surface} (#{on}), under 3:1"
+      end
+    end
+
+    # And in the documented example, which is the file a host copies. A dark
+    # theme is where a line hue goes wrong: the grey that reads on white does
+    # not read on near-black, and the example overrides both tokens the
+    # connector defaults chain to.
+    # Sabotage: taking the example's `--sb-warning` to `#8a6a1f` - it looks
+    # plausible in the file, the interrupt channel stops being visible against
+    # the canvas, and this goes red where the screenshot would not.
+    test "and in the documented example, which is where a line hue goes wrong", %{
+      example_values: values
+    } do
+      for token <- @connector_lines do
+        colour = ThemeAudit.resolve(values, token)
+        {ratio, surface, on} = ThemeAudit.worst_contrast(colour, values, @surfaces)
+
+        assert ratio >= 3, "#{token} (#{colour}) is #{ratio}:1 on #{surface} (#{on})"
+      end
+    end
+
+    # The connector layer is drawn from the shipped `--sb-*` surface and from
+    # nothing else, which is what "the shipped theming surface for stroke
+    # colours" means. A literal in one of these rules is a colour a host
+    # cannot reach.
+    # Sabotage: writing `stroke: #7f8a9d` into `.sb-edge` - the edges stop
+    # moving with the theme and this goes red naming the declaration.
+    test "no connector rule paints with a literal", %{source: source} do
+      literals =
+        ~r/\.sb-(?:edge|arrow|connectors)[^{]*\{([^}]*)\}/
+        |> Regex.scan(source)
+        |> Enum.flat_map(fn [_all, body] -> Regex.scan(~r/:\s*(#[0-9a-fA-F]{3,8})/, body) end)
+        |> Enum.map(fn [_all, colour] -> colour end)
+
+      assert literals == [], """
+      ADR-0005 decision 14: the connector layer paints through the `--sb-*`
+      surface. A literal colour in one of these rules is a colour a host
+      cannot reach and a diagram that stays in the package's palette.
+
+      Found: #{inspect(literals)}
+      """
+    end
+
+    # The corroborator for the check above: a scan that matched no rule would
+    # report no literal however many there were.
+    # Sabotage: narrowing the scan to a class the stylesheet does not use -
+    # the check above goes quiet and this notices.
+    test "the scan actually saw the connector rules", %{source: source} do
+      assert length(Regex.scan(~r/\.sb-edge\b/, source)) >= 2
+      assert source =~ ~r/\.sb-connectors\s*\{/
+    end
+  end
+
   describe "a host theme is a pure token override (decision 14)" do
     # The rule the whole surface is built to keep, held against the example the
     # documentation tells a host to copy.
