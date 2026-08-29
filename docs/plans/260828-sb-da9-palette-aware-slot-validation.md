@@ -494,7 +494,7 @@ drop the `slot_finding/1` clause so the reason falls through unmapped.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `mix quality` (the full gate) is green, including the coverage floor -
+- [x] `mix quality` (the full gate) is green, including the coverage floor -
       **not run by this phase's implementer**; `mix quality --profile loop`
       is green (format, compile, credo, changed-scope tests all pass). The
       orchestrator runs the full gate under a cross-machine lock.
