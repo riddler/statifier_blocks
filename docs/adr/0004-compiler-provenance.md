@@ -2008,7 +2008,7 @@ Three properties follow, and they are the reasons the ruling gives:
 - **A document id is knowable at authoring time.** The parent is authored
   before the child is next published, so a reference minted then must survive
   that publish. A document id does. This is the same stability ADR-0001
-  decision 8 gives a block id, one level up.
+  decision 3 gives a block id, one level up.
 - **Chart identity is not, and moving would break the reference.** st-ADR-0052
   identity is a content hash of the emitted chart, so it changes on every
   republish of the child. A `src` holding one would name a chart revision that
@@ -2024,7 +2024,7 @@ Three properties follow, and they are the reasons the ruling gives:
 
 The Context above lists "how the document's identity relates to the engine's
 chart identity (st-ADR-0052)" as one of the four questions this record owes an
-answer to, and decision 6 answers it for the **compilation record**:
+answer to, and decision 7 answers it for the **compilation record**:
 `StatifierBlocks.CompilationRecord` carries both, so a compiled artifact says
 which document at which revision produced which chart identity. This section
 answers it for the **reference**, which is a different direction and gets a
@@ -2059,15 +2059,15 @@ criterion:
     @element "invoke"
     @attribute "src"
 
-(`:64-65`), applied to the assembled emission:
+(`:80-81`), applied to the assembled emission:
 
     defp element_findings(%Emission{name: @element} = emission, document_id) do
 
-(`:91`) and
+(`:107`) and
 
     {@attribute, ^document_id} -> [finding(emission, document_id)]
 
-(`:93`). The equality is exact: a document whose id merely shares a prefix with
+(`:109`). The equality is exact: a document whose id merely shares a prefix with
 another is a different document.
 
 **It is not a new pipeline stage.** Decision 10's table is unchanged; the
