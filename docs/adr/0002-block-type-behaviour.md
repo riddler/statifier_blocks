@@ -1,6 +1,6 @@
 # ADR-0002: A block type is a behaviour module resolved through a caller-supplied palette
 
-Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings); outcomes/metadata/label amendment (accepted 2026-08-29, operator ruling); decision 7 amended - optional `datamodel_path?` key (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 10 amended - the core.assign row, section G (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 98); decision 7 amended - optional `sensitive?` key and the secrets rule (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 99); core.send send id and no core.cancel amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95)
+Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings); outcomes/metadata/label amendment (accepted 2026-08-29, operator ruling); decision 7 amended - optional `datamodel_path?` key (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 10 amended - the core.assign row, section G (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 98); decision 7 amended - optional `sensitive?` key and the secrets rule (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 99); core.send send id and no core.cancel amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95); decision 10 amended - the core.send row, section G2, and the decision 7 :duration cross-reference (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 110)
 
 ## Context
 
@@ -1417,7 +1417,7 @@ thing D13 exists to refuse.
 
 ## Amendment (2026-08-29): the `core.send` row on decision 10
 
-**Status: proposed.** Section G of this date gave `core.assign` its row and
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 110).** Section G of this date gave `core.assign` its row and
 named the one type still owed one: `core.send`, shipped in the same campaign,
 registered in `StatifierBlocks.Palette.core_types/0`, and running under a
 `PROVISIONAL` admonition in its moduledoc saying decision 10's vocabulary
