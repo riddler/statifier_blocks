@@ -16,7 +16,7 @@ defmodule StatifierBlocks.Compiler.Finding do
   | `:resolve` | `:unknown_block_type`, `:block_type_too_new`, `:migration_failed` |
   | `:config` | `validate_config/1` findings, one per `{key, message}` pair |
   | `:structure` | `:slot_arity_violated`, `:undeclared_slot` (ADR-0002 decision 6); assignability (ADR-0003) |
-  | `:emit` | `emit/2` findings, `:invalid_role`, `:reserved_role`, `:invalid_outcome`, `:duplicate_binding` (ADR-0004's foreach amendment, F6), `:unspliced_child`, `:unknown_attribution` |
+  | `:emit` | `emit/2` findings, `:invalid_role`, `:reserved_role`, `:invalid_outcome`, `:duplicate_binding` (ADR-0004's foreach amendment, F6), `:unspliced_child`, `:unknown_attribution`, `:conflicting_chart_use` |
   | `:chart` | mapped statifier findings, both faults (decision 9) |
 
   The pipeline stops at the first stage that produces errors and reports
