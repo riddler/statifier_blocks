@@ -1283,13 +1283,18 @@ decision; it is C1 through C3 written out.
 The child document's emission, at top level:
 
 ```xml
-<transition event="done.outcome.s_blk_ROOT.done" target="f_done"/>
-<transition event="done.outcome.s_blk_ROOT.abandoned" target="f_abandoned"/>
+<!-- These transitions sit on the root block's own state, s_blk_ROOT, and
+     target the top-level finals below. -->
+<transition event="done.outcome.s_blk_ROOT.done" target="..."/>
+<transition event="done.outcome.s_blk_ROOT.abandoned" target="..."/>
 
-<final id="f_done">
+<!-- Each top-level final's id is minted under decision 3 and is the
+     emitter's to choose; this record does not settle it, and the
+     transition targets above are those same ids. -->
+<final id="...">
   <donedata><param name="outcome" expr="'done'"/></donedata>
 </final>
-<final id="f_abandoned">
+<final id="...">
   <donedata><param name="outcome" expr="'abandoned'"/></donedata>
 </final>
 ```
@@ -1300,7 +1305,9 @@ The parent's `core.subchart` block, compiled:
 <state id="s_blk_ELIGIBILITY" initial="s_blk_ELIGIBILITY__running">
 
   <state id="s_blk_ELIGIBILITY__running">
-    <invoke type="scxml" src="..."/>
+    <!-- The invoke type is the block type's call under the spike sketch -
+         the host-registered child-chart invoke type - not this record's. -->
+    <invoke type="..." src="..."/>
 
     <transition event="done.invoke" cond="_event.data.outcome == 'done'"
                 target="s_blk_ELIGIBILITY__o_done"/>
