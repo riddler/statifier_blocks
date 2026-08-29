@@ -175,6 +175,16 @@ defmodule StatifierBlocks.Finding do
   four-field shape and are dropped by this adaptation. A caller that needs
   the fault split keeps the `Compiler.Finding` alongside the adapted one.
 
+  `config_value_span` is dropped for the same reason and is the one drop
+  that costs a consumer something visible: it is decision 9's
+  sub-expression span, and an editor rendering only the adapted finding
+  underlines the whole field rather than the offending sub-expression. The
+  anchor has nowhere to put it - `{:config, id, key}` names a field, not a
+  range inside one - so widening decision 11's shape is what it would take,
+  and that is an ADR-0005 change rather than an adapter change. Until then
+  the same rule applies as for the fault split: keep the
+  `Compiler.Finding` alongside.
+
   ## The `:source` override
 
   `opts[:source]` lets a caller that knows better than the default rule
