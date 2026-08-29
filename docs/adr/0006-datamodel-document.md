@@ -1,11 +1,8 @@
 # ADR-0006: The datamodel document is a typed, three-scope declaration, and the declared-path set is its projection
 
-Status: **proposed** (2026-08-29, sb-g8m). Nothing in this record is accepted.
-It is drafted under the operator's campaign-015 held-PR lane; status stays
-proposed until the campaign's direction-agent gate or the operator flips it.
+Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 gate grant, PR 101).
 Every consumer named below is written against the declared-path *set*, which
-already exists as an accepted contract (ADR-0005, 11f), so nothing is blocked
-while this record waits.
+already exists as an accepted contract (ADR-0005, 11f).
 
 ## Context
 
@@ -336,10 +333,10 @@ is blocked either way, and the document compiles as it did before.
   validation gate without a record saying so - is decision 9 here, so the two
   cannot drift.
 - `spike/fixtures/datamodel.json` stops being an unratified proposal and becomes
-  an instance of a proposed record, if this is accepted. It is not edited by
+  an instance of an accepted record. It is not edited by
   this record and does not need to be: the shape above is the shape it already
   carries. Its `_comment` header claim ("no accepted record defines a datamodel
-  document yet") is the one line acceptance would falsify, and correcting it
+  document yet") is now false, and correcting it
   belongs to whichever bead touches the spike next - `spike/` is not this bead's
   to edit.
 - Two `ADR-0006`s now exist in the family, on unrelated subjects. The citation
