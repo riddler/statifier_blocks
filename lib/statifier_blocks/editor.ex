@@ -55,6 +55,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     nothing else, which is what keeps the draft from reaching a callback that
     was only promised valid config.
 
+    ## The datamodel, and why it is one assign and no logic
+
+    A host may hand the editor the datamodel paths it declares. The only
+    thing that buys is the undeclared-path advisory ADR-0005 amendment
+    11e-11g specifies: a config field a block type annotated
+    `datamodel_path?: true` whose value is not in that set gets an `:info`
+    finding anchored on the field. The rule itself is
+    `StatifierBlocks.Datamodel`'s and is pure, so it is tested with
+    LiveView absent; what happens here is one normalization on `update/3`
+    and one concatenation in `rebuild/1`, which is the same translation-only
+    posture as everything else in this module.
+
+    `nil` is the default and means *no datamodel supplied*, which per 11f
+    produces nothing anywhere - the check does not run at all. That is not
+    the same as an empty set, which is a host declaring that its documents
+    address nothing.
+
     ## What stays the host's
 
     Which palette entries a tenant may use, who may edit or publish a
@@ -72,6 +89,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `document` | yes | the document being edited |
     | `palette` | yes | the host's palette |
     | `findings` | no | caller-supplied findings, merged with the two `ViewModel` derives |
+    | `datamodel` | no | the paths the host declares; drives the undeclared-path advisories, and `nil` (the default) turns them off entirely |
     | `on_change` | no | one-argument function called with each new document |
     | `icon` | no | function component resolving an icon *name* to markup |
     | `expression_component` | no | override for `:expression` fields (sui-bob's seam) |
@@ -82,7 +100,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.LiveComponent
 
-    alias StatifierBlocks.{Block, BlockType, Document, Edit, Finding, Palette, ViewModel}
+    alias StatifierBlocks.{
+      Block,
+      BlockType,
+      Datamodel,
+      Document,
+      Edit,
+      Finding,
+      Palette,
+      ViewModel
+    }
+
     alias StatifierBlocks.Edit.{History, Targets}
     alias StatifierBlocks.Editor.{Canvas, ConfigForm, Findings, PaletteBrowser}
 
@@ -91,6 +119,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:ok,
        assign(socket,
          findings: [],
+         datamodel: nil,
+         declared_paths: nil,
          on_change: nil,
          icon: nil,
          expression_component: nil,
@@ -112,6 +142,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @impl Phoenix.LiveComponent
     def update(assigns, socket) do
       socket = assign(socket, assigns)
+
+      # Normalized once per update rather than once per render: the declared
+      # set is the host's input, and it changes when the host changes it, not
+      # when the author moves a block.
+      socket =
+        if Map.has_key?(assigns, :datamodel) do
+          assign(socket, :declared_paths, Datamodel.declared_paths(assigns.datamodel))
+        else
+          socket
+        end
 
       socket =
         if Map.has_key?(assigns, :history_limit) and socket.assigns.history.undo == [] do
@@ -429,8 +469,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # function of config (ADR-0002 decision 7), not a cache of one.
     @spec rebuild(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
     defp rebuild(socket) do
-      %{document: document, palette: palette, findings: findings} = socket.assigns
-      view_model = ViewModel.build(document, palette, findings)
+      %{
+        document: document,
+        palette: palette,
+        findings: findings,
+        declared_paths: declared_paths
+      } = socket.assigns
+
+      # The advisories go in through the same caller-findings seam every
+      # other supplied finding uses, so `ViewModel.build/3` needs no notion
+      # of a datamodel and the routing is the one already tested.
+      advisories = Datamodel.findings(document, palette, declared_paths)
+      view_model = ViewModel.build(document, palette, findings ++ advisories)
 
       selected = selected_node(socket, view_model)
 
