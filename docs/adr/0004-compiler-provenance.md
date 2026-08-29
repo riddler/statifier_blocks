@@ -1351,3 +1351,66 @@ The parent's `core.subchart` block, compiled:
 - `core.invoke`'s emission, or `error.communication.invoke` routing to
   `on_error` in either type.
 - Any accepted decision in this record, or the header above it.
+
+## Amendment (2026-08-29): a delayed send's cancel, emitted in the arming state's `<onexit>`
+
+**Status: proposed (2026-08-29).** This section is additive: nothing above it
+is edited, and every decision in the record stands as written. It records the
+emission half of the operator's 2026-08-29 delayed-send lifetime ruling
+(`sb-b4f`, mirrored to statifier-ex as `st-q3ud`); the declaration half - that
+`core.send`'s descriptor carries a send id, and that no `core.cancel` block
+exists - is ADR-0002's, and its amendment of the same date holds it.
+
+### What forces the amendment
+
+`core.send` emits a delayed send that this package could not cancel, and the
+type recorded the gap rather than guessing at it: a cancel that names the send
+it cancels is a cross-subtree reference between blocks, which ADR-0005 decision
+13 refuses, and the alternative that keeps the tree invariant is scope-shaped -
+a delayed send is cancelled when the region that armed it is left. The ruling
+picks the scope-shaped alternative, which makes the cancel the *compiler's* to
+emit rather than an author's to draw.
+
+### A. Identity and lifetime are upstream's
+
+A pending delayed send is identified by `{session scope, send_id}` only
+(statifier-ex ADR-0054 decision 3), and it lives until it fires, is cancelled,
+or its run is found not live at fire time (decision 4 of the same record).
+Resume keeps the scope (statifier-ex ADR-0060 decision 3); restart mints a new
+one; a change of chart revision does not affect the key.
+
+Those are upstream's rules and this record restates them only to name what the
+emitted cancel has to match. `statifier_oban` already keys on that pair.
+
+### B. The cancel is emitted in the arming state's `<onexit>`
+
+The compiler emits
+
+```xml
+<cancel sendid="..."/>
+```
+
+in the `<onexit>` of the state that armed the send - the enclosing group for a
+rail - naming the send id ADR-0002's amendment of this date gives the
+descriptor.
+
+Nothing about this is authored. There is no cancel block, no `sendid` in any
+config, and no edge in the document that carries it: the cancel is a
+consequence of where the `core.send` sits in the tree, which is the property
+that makes it scope-shaped and keeps D13 intact.
+
+### C. What this amendment does not change
+
+- Decision 2's "one block, one state". A cancel is executable content inside a
+  state that already exists, not a state.
+- Decision 3's id derivation, decision 5's provenance keys and their totality,
+  or decision 6's determinism guarantee.
+- The `core.send` emission in any other respect - the event, the optional
+  delay, and the absence of a `target` are all as shipped.
+
+### Deferred, named rather than guessed
+
+- **How the send id is minted** - through the context, the way decision 3
+  requires of every other derived id, or otherwise - is left to the bead that
+  implements this section (`sb-b4f`), because the ruling settles the shape of
+  the id and not the API that produces it.
