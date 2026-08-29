@@ -46,7 +46,7 @@ defmodule StatifierBlocks.EditorFixtures do
         id: "blk_wizard",
         slots: %{
           "body" => [
-            wait("blk_email_step", "PT1H"),
+            wait("blk_email_step", "1h"),
             variant_branch(),
             tracking()
           ]
@@ -76,8 +76,8 @@ defmodule StatifierBlocks.EditorFixtures do
       id: "blk_variant",
       config: %{"arms" => [%{"slot" => "arm_variant_b", "cond" => "variant == 'b'"}]},
       slots: %{
-        "arm_variant_b" => [wait("blk_variant_b_pause", "PT30M")],
-        "otherwise" => [wait("blk_control_pause", "PT2H")]
+        "arm_variant_b" => [wait("blk_variant_b_pause", "30m")],
+        "otherwise" => [wait("blk_control_pause", "2h")]
       }
     )
   end
@@ -94,7 +94,7 @@ defmodule StatifierBlocks.EditorFixtures do
     Block.new(@unknown_type,
       id: "blk_track_conversion",
       config: %{"event" => "signup.completed", "variant_key" => "ab_variant"},
-      slots: %{"after" => [wait("blk_settle_pause", "PT5M")]}
+      slots: %{"after" => [wait("blk_settle_pause", "5m")]}
     )
   end
 
@@ -126,12 +126,12 @@ defmodule StatifierBlocks.EditorFixtures do
                 ]
               },
               slots: %{
-                "arm_review" => [wait("blk_cc_manual_hold", "PT24H")],
-                "arm_declined" => [wait("blk_cc_decline_notice", "PT1M")],
-                "otherwise" => [wait("blk_cc_settle_pause", "PT15M")]
+                "arm_review" => [wait("blk_cc_manual_hold", "24h")],
+                "arm_declined" => [wait("blk_cc_decline_notice", "1m")],
+                "otherwise" => [wait("blk_cc_settle_pause", "15m")]
               }
             ),
-            wait("blk_cc_capture_pause", "PT5M")
+            wait("blk_cc_capture_pause", "5m")
           ]
         }
       ),

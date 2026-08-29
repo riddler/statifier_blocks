@@ -108,7 +108,7 @@ defmodule StatifierBlocks.Core.Send do
   The event first, then the delay.
 
   The delay's default is `""` and not a duration: a send with no delay is
-  the ordinary case, and `core.wait`'s `PT1H` default would author a timer
+  the ordinary case, and `core.wait`'s `1h` default would author a timer
   nobody asked for.
   """
   @impl true

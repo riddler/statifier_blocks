@@ -49,7 +49,7 @@ defmodule StatifierBlocks.Core.Wait do
         type: :duration,
         label: "Wait for",
         required?: true,
-        default: "PT1H"
+        default: "1h"
       }
     ]
 

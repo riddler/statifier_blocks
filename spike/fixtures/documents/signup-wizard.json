@@ -17,7 +17,7 @@
     "  it. The verify group further up names the same event on its own rail, which",
     "  is a second scope rather than a second catcher for this raise.",
     "  core.send (sb-ajr) - the same wiring with a CLOCK in it. The first block in",
-    "  the onboarding group arms signup.abandoned for PT2H, so the group has two",
+    "  the onboarding group arms signup.abandoned for 2h, so the group has two",
     "  senders of one event feeding one rule: the raise, immediately, when no plan",
     "  matches, and the delayed send, later, when nobody finished. Nothing joins",
     "  either card to the rail; all three name the same string.",
@@ -70,7 +70,7 @@
                 "id": "blk_su_verify_wait",
                 "type_version": 1,
                 "config": {
-                  "duration": "PT24H"
+                  "duration": "24h"
                 }
               }
             ],
@@ -108,7 +108,7 @@
                 "type_version": 1,
                 "config": {
                   "event": "signup.abandoned",
-                  "delay": "PT2H",
+                  "delay": "2h",
                   "label": "Give onboarding two hours"
                 }
               },

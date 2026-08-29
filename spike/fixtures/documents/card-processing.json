@@ -12,7 +12,7 @@
     "  3. Empty slots are omitted and leaf blocks carry no 'slots' key, which DOES",
     "     follow decision 8.",
     "  4. No floats anywhere (decision 6): money is integer minor units, durations",
-    "     are ISO-8601 strings.",
+    "     are predicator duration strings (ISO-8601 stays accepted).",
     "Block types: the seven core.* types this document uses from",
     "StatifierBlocks.Core are real. Three more core.* types here are NOT - they",
     "are proposed descriptors in spike/js/proposed-core.js, registered beside the",
@@ -104,7 +104,7 @@
                                   "id": "blk_cp_fraud_wait",
                                   "type_version": 1,
                                   "config": {
-                                    "duration": "PT2M"
+                                    "duration": "2m"
                                   }
                                 },
                                 {
@@ -143,7 +143,7 @@
                                         "type_version": 3,
                                         "config": {
                                           "ruleset": "velocity-v2",
-                                          "window": "PT24H",
+                                          "window": "24h",
                                           "thresholds": {
                                             "count": 5,
                                             "amount_cents": 250000
@@ -195,7 +195,7 @@
                             "id": "blk_cp_balance_wait",
                             "type_version": 1,
                             "config": {
-                              "duration": "PT30S"
+                              "duration": "30s"
                             }
                           }
                         ],
@@ -221,7 +221,7 @@
                                   "id": "blk_cp_three_ds_wait",
                                   "type_version": 1,
                                   "config": {
-                                    "duration": "PT10M"
+                                    "duration": "10m"
                                   }
                                 }
                               ],
@@ -301,12 +301,12 @@
                       }
                     },
                     {
-                      "_comment": "The PT15M authorization timeout, authored on the PROPOSED core type core.timeout (spike/js/proposed-core.js) since 2026-08-28 (sb-0o4, umbrella D12) - not a shipped core type. It used to be myapp.timeout_rule, a demo type that existed because no core type expressed 'interrupt this group after a duration': core.wait is a step inside a body, not a rule on an interrupt rail. The stored config did not move - after, cond and outcome are spelled exactly as they were - which is the argument for the proposal: the core form covers what the host form was standing in for, key for key.",
+                      "_comment": "The 15m authorization timeout, authored on the PROPOSED core type core.timeout (spike/js/proposed-core.js) since 2026-08-28 (sb-0o4, umbrella D12) - not a shipped core type. It used to be myapp.timeout_rule, a demo type that existed because no core type expressed 'interrupt this group after a duration': core.wait is a step inside a body, not a rule on an interrupt rail. The stored config did not move - after, cond and outcome are spelled exactly as they were - which is the argument for the proposal: the core form covers what the host form was standing in for, key for key.",
                       "type": "core.timeout",
                       "id": "blk_cp_authz_timeout",
                       "type_version": 1,
                       "config": {
-                        "after": "PT15M",
+                        "after": "15m",
                         "cond": "three_ds.completed == false OR fraud.cleared == false",
                         "outcome": "abandon"
                       }
@@ -408,7 +408,7 @@
                                   "id": "blk_cp_retry_wait",
                                   "type_version": 1,
                                   "config": {
-                                    "duration": "PT1M"
+                                    "duration": "1m"
                                   }
                                 },
                                 {
@@ -482,7 +482,7 @@
                       "id": "blk_cp_manual_wait",
                       "type_version": 1,
                       "config": {
-                        "duration": "P2D"
+                        "duration": "2d"
                       }
                     },
                     {

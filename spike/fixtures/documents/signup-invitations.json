@@ -142,7 +142,7 @@
                 "id": "blk_si_settle",
                 "type_version": 1,
                 "config": {
-                  "duration": "PT24H",
+                  "duration": "24h",
                   "label": "Give the rest of the team a day"
                 }
               }
