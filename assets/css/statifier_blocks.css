@@ -522,15 +522,20 @@
 /* The uncommitted-edits affordance. Decision 9 commits a config as a unit, so
  * a block whose type has two required fields is uncommittable until both are
  * filled; the draft carries the first value into the second edit, and this
- * says so rather than leaving the author to read a refusal twice. */
+ * says so rather than leaving the author to read a refusal twice.
+ *
+ * The INFO family, not the warning family: nothing is wrong. That is the line
+ * decision 11's `:info` amendment draws, and a half-filled form is the case it
+ * describes - worth the author's attention, and making no claim that anything
+ * is broken. */
 .sb-form__pending {
   display: flex;
   align-items: baseline;
   gap: var(--sb-space);
   border-radius: var(--sb-radius-sm);
   padding: var(--sb-space-half);
-  background: var(--sb-warning-bg);
-  color: var(--sb-warning);
+  background: var(--sb-info-bg);
+  color: var(--sb-info);
   font-size: var(--sb-text-sm);
 }
 
