@@ -238,10 +238,10 @@ defmodule StatifierBlocks.ValidationTest do
       {"a non-UTF-8 binary", <<255, 255>>}
     ]
 
-    # sabotage: remove the catch-all `defp canonical_json_check(value, _path),
-    # do: {:error, {:not_json, value}}` clause -> FunctionClauseError instead
-    # of a returned value -> red
     for {label, term} <- hostile_terms do
+      # sabotage: remove the catch-all `defp canonical_json_check(value,
+      # _path), do: {:error, {:not_json, value}}` clause ->
+      # FunctionClauseError instead of a returned value -> red
       test "returns an error rather than raising for #{label} inside config" do
         term = unquote(Macro.escape(term))
         root = Block.new("core.sequence", id: "blk_root", config: %{"value" => term})
