@@ -10,6 +10,149 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.2.0] 2026-08-29
+
+The editor ships. Campaign 014 graduated the authoring spike into the
+package: `StatifierBlocks.Editor` renders from `assets/` with a documented
+`--sb-*` theming surface, a drag marks the slots that accept a block and can
+say why a slot refused, and a host registers its own block types through
+`Palette.from_modules/2`. The `core.*` vocabulary grows by `core.invoke`,
+`core.raise`, `core.assign` and `core.send`; the compiler now evaluates
+predicator conditions, refuses slot-arity and undeclared-slot violations, and
+adapts its findings into the shape the editor renders.
+
+Dependency floor: `statifier ~> 2.2` (was `~> 2.0`); `predicator ~> 9.0` is
+now a direct dependency.
+
+### Added
+
+- `core.raise` raises an event for an enclosing group's interrupt rules.
+- `core.assign` writes a literal to a datamodel path.
+- `docs/theming.md`: the theming guide - the three tiers of the `--sb-*`
+  surface, the scheme token, per-block-type accents, and a complete host
+  theme that sets custom properties and nothing else.
+- `core.send` sends an event, now or after a delay.
+- A block type may declare `slot_outcome_key` in its palette entry, naming the
+  config key the blocks in one of its slots carry their outcome under, so a
+  renderer can route an interrupt rule's escape without branching on a type
+  name; the declaration reaches the view model as `Slot.outcome_key` and the
+  resolved value as `Node.outcome`.
+- `StatifierBlocks.BlockType.slot_outcome_key/2` and
+  `StatifierBlocks.BlockType.outcome_name/2` read that declaration totally: a
+  malformed declaration or value is refused rather than repaired, and reads as
+  no declared outcome.
+- A block type may declare `accent_token`, the NAME of a `--sb-*` property,
+  and the editor stamps it on that type's cards and palette rows. Two rules
+  in the stylesheet read it; no rule and no module names a block type
+  (ADR-0005 amendment 14d, consumption side).
+- `StatifierBlocks.Finding.severity_class/1`, and `:info` as a third
+  severity for advisory findings (decision 11, amended 2026-08-29). Nothing
+  emits one yet; only `:lint` may.
+- A form whose config the gate has not accepted names the fields that are
+  outstanding, says why nothing is stored, and offers "Discard edits". A
+  draft was never a command, so it cannot be undone - it can only be thrown
+  away, and that gesture had nowhere to live.
+- `:expression` and `:duration` controls carry a placeholder. A bare
+  `:string` still carries none: there is nothing a type that wide can
+  suggest.
+- A theme audit test over the stylesheet, failing in both directions: a
+  `var(--sb-*)` with no declaration, and a declared token no rule reads (14e).
+- `StatifierBlocks.SlotValidation`, a palette-aware whole-document check for
+  a block's declared slots (`:undeclared_slot`) and each declared slot's
+  arity (`:slot_arity_violated`).
+- `StatifierBlocks.Predicates` evaluates a condition expression against a
+  binding context through predicator, returning a boolean or a tagged error.
+- `StatifierBlocks.Predicates.TruthTable` builds a checked truth table over
+  fixture rows, applying first-match-wins arm ordering.
+- `StatifierBlocks.Finding.from_compiler/2` and `from_compiler_all/2` adapt a
+  compiler finding into the presentation shape the editor renders, so a host
+  can route compile findings through `ViewModel.build/3`.
+- `StatifierBlocks.Assignability.seam_reason/4`, `finding_reason/2` and
+  `seam_reasons/3` name why a data-flow seam came out the way it did:
+  `:not_assignable` and `{:fixable_by, block_id}` for a refusal, and
+  `:source_untyped` / `:target_untyped` / `:both_untyped` for a seam that
+  passed only because a block declared no type. `seam_reasons/3` is how a
+  host finds the parts of its palette it has not typed yet.
+- `StatifierBlocks.Assignability.target_verdicts/4` returns every position
+  `valid_targets/4` enumerates with its full verdict, and
+  `StatifierBlocks.Edit.Targets.slot_verdicts/3` projects those to slots -
+  the accepting ones and the reason each refusing one gives.
+- The editor stamps a refused slot's reason as `data-drop-reason` beside
+  `data-drop`, so a hover affordance can explain a refusal with no
+  round-trip and no JavaScript.
+- A `core.invoke` block type: it names an invoke type for the host to run,
+  sends datamodel values along as `<param>`s, writes the result where its
+  `assign_to` names, and takes an optional `on_error` subtree entered on a
+  permanent invoke failure.
+- `StatifierBlocks.Compiler.Context.outcome_id/2` and `outcome_event/2`, for a
+  block type with more than one way to finish: one `<final>` per outcome, and
+  the `done.outcome.<state id>.<outcome>` event a parent wires on.
+- `StatifierBlocks.Palette.from_modules/2`, the registration API a host uses
+  to contribute its own block types: an ordered, explicit list of
+  `{type_name, module}` registrations, with `core: true` to sit on top of
+  the `core.*` vocabulary. Later entries win. It is still a value - no
+  global registry, no application-configuration lookup, and no discovery
+  pass.
+- A palette entry may declare `badge`, a short chip for the card header, and
+  `join_label`, a one-argument function of the block's config phrasing the
+  join marker under a side-by-side arrangement (ADR-0002 amendment B).
+  `StatifierBlocks.BlockType.badge/1` and `join_label/2` read them.
+- Both readers are total and **refuse rather than repair**: a chip that is
+  blank, carries a newline or tab, or runs past 24 characters is dropped,
+  not clipped, and a `join_label` that raises degrades to the editor's own
+  word rather than taking the canvas down.
+- `accent_token`, `badge` and `join_label` are admitted keys of
+  `t:StatifierBlocks.BlockType.palette_entry/0`.
+- The README carries a worked host example - a `myapp.risk_hold` block type
+  registered beside the core vocabulary, with a badge and an accent token -
+  and it is executed on every build rather than trusted.
+
+### Changed
+
+- `Compiler.compiler_version/0` (and every compilation record's
+  `compiler_version`) moves to `0.2.0` with the package, per ADR-0004
+  decision 6: a record compiled by 0.1.0 identifies itself as such.
+- `--sb-drop-ok-border` moves from `#2f9e5f` to `#2c945a`. The outline that
+  says a slot accepts a drop was 2.93:1 on the sunken surface, under the 3:1
+  a mark carrying information is held to; the tint follows it.
+- `predicator` is now a direct dependency (`~> 9.0`), because
+  `StatifierBlocks.Core.Duration` calls `Predicator.Duration.parse/1`. It
+  already resolved transitively through `statifier`, so the resolved version
+  does not move; naming it records the call.
+- The editor's stylesheet carries a scoped reset, and every selector in it
+  matches the container through `:where(.sb-editor)` so a component rule
+  always wins (ADR-0005 amendment 14b).
+- `--sb-color-scheme` is declared and read as `color-scheme` on the editor's
+  own container, so the parts of a control the browser paints - a `<select>`'s
+  drop-down, the scrollbars, the caret - follow the theme (14a).
+- The `--sb-*` surface gains the space, type and shape scales, a third text
+  step, a strong border, status tints, the drag seam's drag-time height, and
+  the canvas sizing constants that were literals in rules.
+- A `:secondary` and a `:failure` slot are both placed as attached rails,
+  and a container declaring either is drawn as a boundary box - the rail
+  partition, not the `:secondary` partition (amendments 10c and 10h).
+- `--sb-drop-no-opacity` is **retired**. A drag now marks the slots that
+  accept the block and leaves the rest alone rather than dimming them; the
+  disabled-control opacity it doubled as is `--sb-disabled-opacity`.
+- The compiler now refuses a document whose slots violate their declared
+  arity or name a slot the block type does not declare, instead of silently
+  dropping those children from the emission.
+- Reasons change no verdict: `:unknown` stays permissive in both positions,
+  `Assignability.validate/3` reports exactly the findings it did before, and
+  neither finding tuple gained a field.
+- `slot_style` admits a third value, `:failure`, for a slot whose children
+  are an in-band continuation taken on a bad outcome; `core.invoke` declares
+  it for `on_error`.
+- The role namespace beginning `o_` is reserved for outcome finals;
+  `Context.role_id/2` now refuses such a role with a `:reserved_role` finding.
+
+### Fixed
+
+- The editor's root rule sets `font-family` rather than the `font`
+  shorthand, so `--sb-font` reaches the editor. `font: <family-list>` is not
+  a valid shorthand, so the whole declaration was dropped and the editor's
+  text did not inherit the host page's font as the token promised.
+
 ## [0.1.0] 2026-08-27
 
 First release: the authoring layer above the
@@ -283,4 +426,5 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.2.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.2.0
 [0.1.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.1.0
