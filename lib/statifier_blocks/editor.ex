@@ -37,6 +37,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     `palette.assignability`, consulted by the one `Assignability` the
     compiler's `validate/3` consults.
 
+    ## The other thing a drag can carry (sb-4nep)
+
+    A palette entry is a drag source too, and dragging one onto a gap inserts
+    a block of that type there. It is the same two round-trips with the same
+    one enumeration: `insert-dragstart` builds the session against a **probe**
+    block of the dragged type instead of against a block the document holds,
+    and `insert-drop` hands the gap's position to the same
+    `insert_from_palette/3` a pick uses. The drop therefore produces decision
+    2's `:insert` at a position the author named, exactly as the "+" and the
+    pick do, and ADR-0005's command set is untouched - what is new is a
+    gesture, not a command.
+
+    Which is also why the position comes from the gap rather than from
+    `palette_position`. Arming is how the *click* path names a destination; a
+    drag names one by landing on it. A drop made while some other gap is armed
+    lands where it was dropped and clears the mode, because the gesture that
+    just finished is the one that said where.
+
     ## Config, and the gate that keeps the document sound
 
     ADR-0002 decision 6 guarantees `slots/1` returns without raising only for
@@ -508,6 +526,37 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:noreply, socket}
     end
 
+    # The insert half of the drag (sb-4nep). Same two round-trips, same one
+    # enumeration, same markup: what differs is that the thing being carried
+    # is a TYPE the document does not hold yet rather than a block it does, so
+    # the verdicts are asked of a probe block - `Targets.slot_verdicts/3`
+    # against a block that is not in the document, which is the case
+    # `accepted_types/3` already uses one type at a time and this uses once.
+    #
+    # A palette entry the palette cannot resolve gets an empty session rather
+    # than an error: every slot then stamps `data-drop="no"`, which is the
+    # honest answer and the one that refuses the drop in the client before it
+    # is ever pushed.
+    def handle_event("insert-dragstart", %{"type" => type}, socket) do
+      {:noreply, assign(socket, :drag, insert_drag_session(socket, type))}
+    end
+
+    # The drop reuses the pick's path exactly - `insert_from_palette/3` mints
+    # the block, commits the one `:insert`, and clears the armed mode with it.
+    # The position comes from the gap rather than from `palette_position`,
+    # because a drag names its destination by landing on it; arming is the
+    # other gesture's way of naming the same thing.
+    def handle_event("insert-drop", params, socket) do
+      %{"type" => type, "parent-id" => parent_id, "slot" => slot, "index" => index} = params
+
+      socket =
+        socket
+        |> assign(:drag, nil)
+        |> insert_from_palette(type, {parent_id, slot, to_index(index)})
+
+      {:noreply, socket}
+    end
+
     def handle_event("remove", %{"block-id" => id}, socket) do
       socket =
         socket
@@ -925,8 +974,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # one of them is a lie about having asked.
     @spec drag_session(Phoenix.LiveView.Socket.t(), Block.id()) :: map()
     defp drag_session(socket, id) do
-      verdicts = slot_verdicts_for(socket, id)
+      socket
+      |> slot_verdicts_for(id)
+      |> session(%{block_id: id, type: nil})
+    end
 
+    # The insert session (sb-4nep). `block_id` is `nil` and stays a key: it is
+    # what `BlockNode` compares a card against to grey the card being dragged,
+    # and a session missing the key would raise there rather than simply match
+    # no card. Nothing is being dragged out of the document, so no card greys,
+    # which is the right answer and not a special case.
+    @spec insert_drag_session(Phoenix.LiveView.Socket.t(), Block.type_name()) :: map()
+    defp insert_drag_session(socket, type) do
+      %{document: document, palette: palette} = socket.assigns
+
+      case new_block(palette, type) do
+        {:ok, probe} ->
+          document
+          |> Targets.slot_verdicts(palette, probe)
+          |> session(%{block_id: nil, type: type})
+
+        :error ->
+          session([], %{block_id: nil, type: type})
+      end
+    end
+
+    @spec session([{{Block.id(), Block.slot_name()}, Targets.slot_verdict()}], map()) :: map()
+    defp session(verdicts, carried) do
       droppable =
         for({slot_ref, :ok} <- verdicts, do: slot_ref) |> MapSet.new()
 
@@ -935,7 +1009,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           {slot_ref, reason}
         end
 
-      %{block_id: id, droppable: droppable, reasons: reasons}
+      Map.merge(carried, %{droppable: droppable, reasons: reasons})
     end
 
     @spec slot_verdicts_for(Phoenix.LiveView.Socket.t(), Block.id()) ::

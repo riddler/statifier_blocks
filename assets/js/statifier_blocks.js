@@ -48,11 +48,27 @@
 // that, on both files.
 //
 // The DOM contract this depends on is part of the package's contract:
-//   data-block-id  on each block's root element
-//   data-slot      on each gap, with data-parent-id and data-index
-//   data-drop      on each slot during a drag session ("ok" or "no")
-//   data-sb-reveal on the canvas, "<n>:<block id>", when the server has just
-//                  been asked to bring that block into view
+//   data-block-id       on each block's root element
+//   data-slot           on each gap, with data-parent-id and data-index
+//   data-drop           on each slot during a drag session ("ok" or "no")
+//   data-sb-drag-type   on each palette entry, naming the type it inserts
+//   data-sb-reveal      on the canvas, "<n>:<block id>", when the server has
+//                       just been asked to bring that block into view
+//
+// TWO GESTURES, ONE HOOK, ONE COMMAND SET (sb-4nep). A card dragged between
+// gaps is a move; a palette entry dragged onto a gap is an insert - the same
+// `:insert` a "+" and a pick already produce (ADR-0005 decision 8), reached by
+// a different gesture. So this adds hook EVENTS ("insert-dragstart",
+// "insert-drop") and no command, and ADR-0005's command set is unchanged.
+//
+// The palette lives OUTSIDE the canvas, and the canvas root is the one element
+// carrying this hook (decision 7's element rule, which the connector layer
+// depends on). A dragstart on a palette entry therefore never reaches
+// `this.el`, so the insert half listens on the owning document and scopes
+// itself back to this editor through the `.sb-editor` root that contains both
+// panes. Two editors on one page keep their own sessions, and the listeners
+// are removed in `destroyed()`. The drop half needs nothing new: a palette
+// drop lands on a gap inside `this.el` like any other.
 
 import { StatifierBlocksMeasure } from "./statifier_blocks_measure.js";
 
@@ -61,6 +77,8 @@ export { StatifierBlocksMeasure };
 export const StatifierBlocksDrag = {
   mounted() {
     this.dragged = null;
+    this.draggedType = null;
+    this.editor = this.el.closest(".sb-editor");
 
     this.el.addEventListener("dragstart", (event) => {
       const block = event.target.closest("[data-block-id]");
@@ -84,22 +102,57 @@ export const StatifierBlocksDrag = {
 
     this.el.addEventListener("drop", (event) => {
       const gap = this.gapFor(event.target);
-      if (!gap || !this.dragged) return;
+      if (!gap) return;
 
-      event.preventDefault();
-      this.pushEventTo(this.el, "drop", {
-        "block-id": this.dragged,
+      const position = {
         "parent-id": gap.dataset.parentId,
         slot: gap.dataset.slot,
         index: gap.dataset.index,
-      });
+      };
+
+      if (this.draggedType) {
+        event.preventDefault();
+        this.pushEventTo(this.el, "insert-drop", {
+          type: this.draggedType,
+          ...position,
+        });
+        this.draggedType = null;
+        return;
+      }
+
+      if (!this.dragged) return;
+
+      event.preventDefault();
+      this.pushEventTo(this.el, "drop", { "block-id": this.dragged, ...position });
       this.dragged = null;
     });
 
-    this.el.addEventListener("dragend", () => {
+    this.el.addEventListener("dragend", () => this.endSession());
+
+    // The insert half. `dragstart` fires on the palette entry and `dragend`
+    // fires there too, so both are listened for on the document and both are
+    // filtered back down to this editor's own palette.
+    this.onInsertDragStart = (event) => {
+      const entry = this.entryFor(event.target);
+      if (!entry) return;
+
       this.dragged = null;
-      this.pushEventTo(this.el, "dragend", {});
-    });
+      this.draggedType = entry.dataset.sbDragType;
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "copy";
+        // Firefox refuses to start a drag without data on the transfer.
+        event.dataTransfer.setData("text/plain", this.draggedType);
+      }
+      this.pushEventTo(this.el, "insert-dragstart", { type: this.draggedType });
+    };
+
+    this.onInsertDragEnd = (event) => {
+      if (this.entryFor(event.target)) this.endSession();
+    };
+
+    const doc = this.el.ownerDocument;
+    doc.addEventListener("dragstart", this.onInsertDragStart);
+    doc.addEventListener("dragend", this.onInsertDragEnd);
 
     this.reveal();
   },
@@ -160,15 +213,49 @@ export const StatifierBlocksDrag = {
     this.extent = extent;
   },
 
-  // The gap under this node, if it is inside a slot the server marked as
-  // accepting the block currently being dragged.
+  destroyed() {
+    const doc = this.el.ownerDocument;
+    doc.removeEventListener("dragstart", this.onInsertDragStart);
+    doc.removeEventListener("dragend", this.onInsertDragEnd);
+  },
+
+  // Both gestures end the same way: the client forgets what it was carrying
+  // and the server drops the session that stamped `data-drop`.
+  endSession() {
+    this.dragged = null;
+    this.draggedType = null;
+    this.pushEventTo(this.el, "dragend", {});
+  },
+
+  // The palette entry under this node, if it belongs to the same editor as
+  // the canvas this hook is mounted on.
+  entryFor(node) {
+    if (!node || !node.closest || !this.editor) return null;
+    const entry = node.closest("[data-sb-drag-type]");
+    return entry && this.editor.contains(entry) ? entry : null;
+  },
+
+  // The gap under this node, if the slot it belongs to is one the server
+  // marked as accepting what is being dragged.
+  //
+  // THE GAP'S OWN SLOT, not the nearest ACCEPTING ancestor (sb-4nep). Slots
+  // nest - a container in a slot has slots of its own - so asking for the
+  // closest ancestor already stamped accepting walked straight past the gap's
+  // own refused slot to whatever accepting slot happened to contain it, and
+  // every gap in a refused slot inside an accepting one became a live drop
+  // target that pushed the REFUSED slot's coordinates. The server then applied
+  // it: `Edit.apply/2` deliberately permits arity-violating documents and
+  // reports them as findings (decision 5), so the stamp is the enforcement
+  // point for exactly the refusals that were being skipped. Found by driving
+  // the two gestures in a real browser, which is the half of this interaction
+  // no ExUnit test reaches.
   gapFor(node) {
     if (!node || !node.closest) return null;
     const gap = node.closest("[data-slot][data-index]");
     if (!gap) return null;
 
-    const slot = gap.closest('[data-drop="ok"]');
-    return slot ? gap : null;
+    const slot = gap.closest("[data-drop]");
+    return slot && slot.getAttribute("data-drop") === "ok" ? gap : null;
   },
 };
 
