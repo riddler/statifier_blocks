@@ -13,10 +13,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     LiveView absent. What is asserted here is the half that only exists once
     there is markup: that a `:config` finding really does appear beneath its
     field, a `:slot` finding on that slot's header, a `:block` finding on the
-    block's chrome, that the drawer's Findings tab lists all of them, and that
-    a collapsed subtree still carries a count - because a finding that can hide
-    inside something folded shut is the failure mode that makes tree editors
-    feel unreliable.
+    block's chrome, that the drawer's Findings tab lists all of them, and
+    that every node carries its subtree rollup - because a finding that can
+    hide inside something folded shut is the failure mode that makes tree
+    editors feel unreliable. The rollup is the number a collapsed badge will
+    read once a collapse command exists; until then no face carries one.
 
     The document-level list is a drawer tab since operator ruling R4
     (2026-08-29) and no longer a block under the canvas, so every assertion
@@ -193,11 +194,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    describe "the count badge (d11's last sentence)" do
+    # The rollup and the badge are two different things, and sb-vamn separated
+    # them. `findings_count` - the rollup - is unchanged and still covers a
+    # whole subtree. The `.sb-badge` span that painted it on every container
+    # face is gone: ADR-0005 :461 and :1457 put that badge on a **collapsed**
+    # subtree, and this editor has no collapse command (decision 2's closed
+    # set, restated at :2130), so no node is ever collapsed and no face carries
+    # one. The counts an author reads are the drawer's Findings tab and the
+    # inspector's grouping, both of which consume the rollup.
+    #
+    # There is deliberately **no test of the collapsed case**. It cannot be
+    # written until a collapse command exists; when one lands, its own bead
+    # writes it against `.sb-badge`, whose rule the stylesheet still carries.
+    describe "the subtree rollup and the badge (d11's last sentence)" do
       # Sabotage: `ViewModel`'s `findings_count/3` counting only a node's own
-      # findings rather than its whole subtree - the wizard's badge drops from
-      # 3 to 1 and this goes red.
-      test "a node's badge covers its whole subtree, so nothing hides folded shut", %{conn: conn} do
+      # findings rather than its whole subtree - the wizard's rollup drops
+      # from 4 to 1 and this goes red.
+      test "a node's rollup covers its whole subtree, so nothing can hide folded shut",
+           %{conn: conn} do
         {:ok, _view, html} = mount_editor(conn, findings: findings())
 
         # Three supplied - one :slot on the wizard, one :block on the branch,
@@ -208,6 +222,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert badge(html, "blk_variant") == 1
         assert badge(html, "blk_email_step") == 1
         assert badge(html, "blk_control_pause") == 0
+      end
+
+      # Sabotage: restoring the `.sb-badge` span on `BlockNode`'s chrome - the
+      # wizard's expanded face carries a count again and this goes red.
+      test "an expanded container with findings in its subtree renders no badge on its face",
+           %{conn: conn} do
+        {:ok, view, html} = mount_editor(conn, findings: findings())
+
+        # The wizard is a container, it is expanded - nothing in this editor
+        # can collapse it - and its subtree rollup is 4. The rollup is on the
+        # node, the badge is on no face.
+        assert badge(html, "blk_wizard") == 4
+        refute html =~ "sb-badge"
+        refute has_element?(view, ".sb-badge")
       end
     end
 
