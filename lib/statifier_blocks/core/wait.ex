@@ -89,6 +89,36 @@ defmodule StatifierBlocks.Core.Wait do
     }
 
   @doc """
+  `timer <duration>` for the stored duration, or `nil` (ADR-0002
+  amendment H6).
+
+  The stored bytes rather than the compiled ones: `1h30m` and `PT1H30M`
+  both emit `1h30m`, and the card shows the author their own spelling,
+  which is what the inspector field beside it holds.
+
+  Read with no default, exactly as `emit/2` reads it. A wait with no
+  duration stored has nothing to say yet, and a card that filled in the
+  schema's `1h` would be asserting a value while the finding
+  `validate_config/1` files says the key is required.
+
+      iex> StatifierBlocks.Core.Wait.summary(%{"duration" => "30s"})
+      "timer 30s"
+
+      iex> StatifierBlocks.Core.Wait.summary(%{})
+      nil
+  """
+  @impl true
+  def summary(config) do
+    case Map.get(config, "duration") do
+      duration when is_binary(duration) ->
+        if String.trim(duration) == "", do: nil, else: "timer " <> duration
+
+      _absent_or_malformed ->
+        nil
+    end
+  end
+
+  @doc """
   A compound state that sends itself a delayed event on entry and finishes
   when that event arrives.
 

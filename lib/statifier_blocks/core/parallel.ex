@@ -183,6 +183,28 @@ defmodule StatifierBlocks.Core.Parallel do
     }
 
   @doc """
+  The lane names, as a chip list (ADR-0002 amendment H6).
+
+  Read through the same filter `slots/1` reads them through, so a
+  malformed lane is absent from the card exactly as it is absent from the
+  slot list and the two cannot disagree about which lanes exist.
+
+  Chips, not one string: a lane name longer than the presentation cap
+  loses its own chip and no other, since
+  `StatifierBlocks.BlockType.summary/2` refuses each one on its own. That
+  is the whole reason this is the shape it is - the authoring spike wrote
+  the same line as `fraud_review, balance_chec...` and clipped it.
+
+      iex> StatifierBlocks.Core.Parallel.summary(%{"lanes" => ["capture", "receipt"]})
+      ["capture", "receipt"]
+
+      iex> StatifierBlocks.Core.Parallel.summary(%{})
+      []
+  """
+  @impl true
+  def summary(config), do: lanes(config)
+
+  @doc """
   What the join marker under the lanes reads, given the block's config.
 
   A `paletteEntry` callback rather than a case in a renderer: the type

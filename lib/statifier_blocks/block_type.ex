@@ -342,7 +342,51 @@ defmodule StatifierBlocks.BlockType do
   """
   @callback outcomes(Block.config()) :: [outcome_decl()]
 
-  @optional_callbacks io: 1, migrate_config: 2, fixtures: 0, palette_entry: 0, outcomes: 1
+  @typedoc """
+  What a block type says about one block's config on the card's second
+  line (ADR-0002 amendment H1).
+
+  `nil` is no second line and is what a type that exports no `summary/1`
+  means. A string is one summary line. A list of strings is a **chip
+  list**, each entry read as one chip.
+
+  Every shape reaches consumers as a chip list through `summary/2`, so
+  nothing downstream branches on which one a type chose.
+  """
+  @type summary :: nil | String.t() | [String.t()]
+
+  @doc """
+  What this block's card says under its title, given this config
+  (ADR-0002 amendment H1).
+
+  Optional. A type that does not export it has no summary, which is the
+  card every block type had before the callback existed, and it is the
+  case eight of the thirteen `core.*` types are in.
+
+  It exists so the editor can draw a per-type second line without ever
+  naming a type: ADR-0005 decision 2 has the editor work off the
+  caller-supplied palette, so a host type that declares a summary gets
+  the same card face `core.wait` gets.
+
+  The three rules `slots/1` and `config_schema/1` already carry apply
+  unchanged. It is a **pure function of `config`**, it is **total** - the
+  editor calls it mid-edit, so it answers for config `validate_config/1`
+  rejects - and it **never raises**. A callback that raises anyway
+  degrades to no summary rather than taking the canvas down (amendment
+  H4), the bounded exception `join_label/2` already documents.
+
+  Each chip is a presentation string, so amendment B3's refusal set
+  governs it: an over-long chip is **dropped, not clipped**. See
+  `summary/2`, which is the resolver every consumer reads it through.
+  """
+  @callback summary(Block.config()) :: summary()
+
+  @optional_callbacks io: 1,
+                      migrate_config: 2,
+                      fixtures: 0,
+                      palette_entry: 0,
+                      outcomes: 1,
+                      summary: 1
 
   # ADR-0002 amendment A1's default: a type that declares no outcomes has
   # exactly one, named `done`. Named once, here, so the compiler and the
@@ -656,6 +700,64 @@ defmodule StatifierBlocks.BlockType do
   end
 
   def join_label(_entry, _config), do: nil
+
+  @doc """
+  The chips `module.summary(config)` declares, or `[]` (ADR-0002
+  amendment H2).
+
+  The one shape every consumer reads: a possibly-empty list of chips. A
+  `nil`, a module that does not export `summary/1`, and a module that is
+  not loadable all come back `[]`; a string comes back as a one-element
+  list; a list comes back filtered. Absence is checked with
+  `Code.ensure_loaded?/1` plus `function_exported?/3`, the pattern
+  `outcomes/2` already uses.
+
+  Each chip is held to `badge/1`'s refusal set, unchanged: a non-string,
+  an empty or all-whitespace string, one carrying a newline, carriage
+  return or tab, and one longer than #{@presentation_cap} characters are
+  **refused, never truncated** (amendment H3). A refused chip is dropped
+  and its siblings survive, so one over-long lane name costs its own chip
+  and nothing else. A summary whose every chip is refused is `[]`, which
+  is the card that type had before it declared one.
+
+  A callback that raises, throws or exits answers `[]` on the grounds
+  `join_label/2` documents: this is host code on the editor's layout
+  path, and the value being defaulted is one line of chrome.
+
+      iex> StatifierBlocks.BlockType.summary(StatifierBlocks.Core.Send, %{"event" => "order.paid"})
+      ["order.paid"]
+
+      iex> StatifierBlocks.BlockType.summary(StatifierBlocks.Core.Sequence, %{})
+      []
+
+      iex> StatifierBlocks.BlockType.summary(NoSuchModule, %{})
+      []
+  """
+  @spec summary(module(), Block.config()) :: [String.t()]
+  def summary(module, config) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :summary, 1) do
+      module
+      |> call_summary(config)
+      |> List.wrap()
+      |> Enum.map(&chip/1)
+      |> Enum.reject(&is_nil/1)
+    else
+      []
+    end
+  end
+
+  # H4's degradation, on the same grounds and with the same shape as
+  # `call_join_label/2`: the rescued value is never inspected, because
+  # what comes back is the ordinary card either way.
+  @spec call_summary(module(), Block.config()) :: term()
+  defp call_summary(module, config) do
+    module.summary(config)
+  rescue
+    _raised -> []
+  catch
+    :throw, _thrown -> []
+    :exit, _reason -> []
+  end
 
   # B3's "a callback that raises degrades to the default", widened to a
   # throw and an exit because a host callback that does either leaves the

@@ -189,6 +189,30 @@ defmodule StatifierBlocks.Core.Send do
     }
 
   @doc """
+  The event name, or `nil` (ADR-0002 amendment H6).
+
+  Only the event. The delay is the other half of what this block does and
+  it is deliberately not on the card: `core.wait` already owns the timer
+  chip, and a second line reading `signup.abandoned after 2h` is a
+  sentence rather than a summary and would not fit under the presentation
+  cap in any case.
+
+  A value that is not an event name is no chip rather than a chip nobody
+  can read - the same reading `emit/2` gives it.
+
+      iex> StatifierBlocks.Core.Send.summary(%{"event" => "signup.abandoned"})
+      "signup.abandoned"
+
+      iex> StatifierBlocks.Core.Send.summary(%{"event" => ""})
+      nil
+  """
+  @impl true
+  def summary(config) do
+    event = Map.get(config, "event")
+    if Config.event_name?(event), do: event, else: nil
+  end
+
+  @doc """
   A compound state whose entry sends the event and immediately goes final.
 
       <state id="s_blk_SND" initial="s_blk_SND__done">
