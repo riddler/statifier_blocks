@@ -1911,3 +1911,37 @@ wants the one-line card keeps it by exporting nothing.
   later bead's to ship. Until it does, a chip list renders joined, which is
   the spike's own reading of a two-chip `core.on_event` line minus the
   truncation.
+
+## Note (2026-08-30): amendment H, what the chip row draws for none and for one
+
+A dated precision note rather than an amendment: amendment H is unchanged in
+every particular, and what is recorded here is what the deferral it left behind
+resolved to once the markup existed. The chip row is ADR-0005's, per H's own
+Consequences, and it landed there as that record's 2026-08-30 amendment
+(decision 10, the summary chip row) with `sb-2mxa` as the implementing bead.
+This note says only what a reader of H cannot otherwise tell about the two
+degenerate cases, both of which H's table produces.
+
+**A type that declares no summary draws no row.** `summary/1` is optional and
+eight of the thirteen core types export none; a type whose every chip is
+refused under H3 lands in the same place, since refusal drops a chip rather
+than replacing it. In both cases `ViewModel.Node.summary` is `[]` and the card
+draws **no row element at all** - not an empty one. That is the card those
+types had before H, and H's "the other eight core types are unchanged" is true
+of the markup and not only of the callback.
+
+**A string summary draws exactly one chip.** Three of H6's five rows declare a
+string rather than a chip list - `core.wait`'s `timer <duration>`,
+`core.send`'s event name and `core.branch`'s `N arms + otherwise` - and
+`StatifierBlocks.BlockType.summary/2` wraps a string
+into a one-element list, so `Node.summary` is always a list and a string is the
+one-chip case of it. The card draws one chip, with no join marker and no
+separator of any kind. The `core.branch` row is the sharpest reading of that:
+`3 arms + otherwise` is one fact whose own words contain a `+`, and it stays
+one chip.
+
+The `", "` join H described as the interim rendering is gone with the deferral
+it belonged to; the arm of `ViewModel.subtitle/1` that H5 added for it now
+answers `nil` and the chips are read from the node. H5's rule about **which**
+fact the second line carries - the type's label when the author named the
+block, the summary otherwise - is untouched and is what the row is placed by.

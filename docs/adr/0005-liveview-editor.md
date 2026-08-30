@@ -2766,3 +2766,97 @@ bead and a note, not a quiet widening.
 No new hook, no new command, no new anchor vocabulary, and nothing in decision
 7's contract moves: the client still measures, `Shell` still decides which
 step, and the stylesheet still scales.
+
+---
+
+## Amendment (2026-08-30): decision 10, the summary chip row
+
+**Status: proposed (2026-08-30, drafted under the operator campaign-018 grant, implementing bead `sb-2mxa`).** Additive; decision 10 stands exactly as
+written and no text above this line is edited by this section. It answers the
+question ADR-0002's amendment H deferred to this record by name: "The chip
+*markup* on the card - a `.sb-node__summary` chip row rather than one joined
+string - is ADR-0005's to describe and a later bead's to ship."
+
+### Context
+
+ADR-0002 amendment H gave a block type an optional `summary/1` returning a
+string or a list of chips, and H5 put the result on the card's second line
+through `ViewModel.subtitle/1`. What ships today joins a chip list with `", "`
+into the one span the second line has ever had, `.sb-node__type`
+(`lib/statifier_blocks/view_model.ex`, `lib/statifier_blocks/editor/block_node.ex`).
+H said so in as many words and called it the deferral it was.
+
+The join is wrong in two ways that only show on a real document. A two-chip
+`core.on_event` reads `Abandon, fraud.aborted` - an outcome and an event name
+punctuated as though they were one phrase - and a three-lane `core.parallel`
+wraps mid-join, so the second line breaks between a comma and the chip it
+belongs to. The card cannot say which of those tokens are separate facts,
+because the markup does not distinguish them.
+
+Two decisions already taken constrain the answer rather than leaving it open.
+ADR-0002 B3's refuse-never-truncate discipline applies **per chip** at the
+`@presentation_cap`, and it is already enforced where the view model is built
+(`StatifierBlocks.BlockType.summary/2` drops an over-long or newline-carrying
+chip and keeps its siblings), so a chip row draws what survived rather than
+policing anything itself. And the Note above (2026-08-28, decision 14, config
+chips carry no accent) already settled what a chip on this card looks like: the
+card spends its one identity on the icon tile and the stripe, and a third
+accent-bearing element inside it is a second claim on the same signal.
+
+### Proposed decision
+
+**10p. A chip list renders as a chip row, one element per chip.** The row is
+`.sb-node__summary`, the name ADR-0002 H already used, and each chip is its own
+inline element inside it (`.sb-node__chip`). The row is a direct child of
+`.sb-node__chrome`, which is the flat-markup rule the card face is built on: a
+grid places the row without a wrapper per column, and every `> .sb-node__chrome
+> .sb-*` selector a host or a test already holds keeps reading the same card.
+
+The row reads `ViewModel.Node.summary` directly, which is what H5 anticipated,
+so no block type changes and nothing new is stored or serialized.
+
+**10q. The row is the second line, so it never shares one with the type
+label.** H5's rule stands untouched: the card's second line is the type's own
+label when the author named the block, and the type's summary of this block's
+config otherwise. The chip row is that second fact drawn as chips, and it
+renders exactly where the joined string rendered - so `.sb-node__summary` and
+`.sb-node__type` are mutually exclusive by construction and occupy one grid
+cell. `ViewModel.subtitle/1` keeps its type-label arm and stops joining chips;
+the summary arm becomes the row.
+
+Two edges, stated rather than left to the markup: a summary of `[]` - eight of
+the thirteen core types, and every type that declared none - renders **no row
+at all**, not an empty element; a one-chip summary renders **exactly one chip**
+and no join marker of any kind.
+
+**10r. The row wraps, and a chip carries no accent.** The card has a fixed
+width (`--sb-card-width`) and a three-lane `core.parallel` is an ordinary
+document, so the row wraps to a second line rather than clipping: a clipped row
+would hide a lane the slots directly underneath it still draw, and the card and
+the slot list disagreeing about which lanes exist is the failure ADR-0002 H's
+own `core.parallel` note exists to prevent. A chip is muted, on the theming
+surface the stylesheet already declares - this section introduces no `--sb-*`
+token, and the 2026-08-28 Note is why it introduces no tint.
+
+### Consequences
+
+- **`ViewModel.subtitle/1` narrows.** Its chip-joining arm is the thing this
+  section replaces, so the function answers the type label or `nil` and the
+  chips are read from the node. That is a visible change to a public function's
+  return for exactly the nodes that grow a chip row, and its documentation and
+  doctests move with it. Nothing else about the card face moves.
+- **A card can now be taller than it was.** A wrapped chip row is two lines
+  where the joined string was one, and the invoke line under it moves down with
+  it. That is the same wrap the join already produced on a three-chip summary,
+  landing on chip boundaries instead of inside the punctuation.
+- **The cap keeps one home.** This section adds no second opinion about length:
+  refusal stays ADR-0002 B3's, at the number decision 10 carries since the
+  amendment above, applied where the summary is built.
+- **`.sb-node__chip` is a new class and not a new token.** Decision 14's
+  markup/styling line is unchanged: the class is a hook the stylesheet paints
+  from the existing surface, and a host restyling it does so the way it
+  restyles every other `.sb-*` element.
+- **ADR-0002's deferral is discharged.** H's Consequences named this record and
+  a later bead; the bead was `sb-2mxa` (2026-08-30, campaign 018), which shipped
+  the markup, the stylesheet rules and the tests in the same request as this
+  section.
