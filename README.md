@@ -638,6 +638,14 @@ them through the `theme` assign, or in your own CSS against the prefix:
 Enough that a host can make the editor look like its own product without
 forking it, and not so much that the package acquires a theming DSL.
 
+One of them is worth knowing before you embed rather than after. By default the
+editor is as tall as the document in it and your page scrolls, which puts the
+drawer below the fold on a long document. Set `--sb-editor-height` to a length -
+`calc(100vh - 4rem)`, or `100%` inside a box your own layout has already sized -
+to bound the editor instead: the panes scroll in their own boxes and the drawer
+stays pinned at the bottom of it. The default is `auto`, so a host that does not
+set it is unchanged.
+
 [`docs/theming.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/theming.md)
 is the full guide: the three tiers the surface is organised into, why
 `--sb-color-scheme` is not optional, how a block type gets an identity of its

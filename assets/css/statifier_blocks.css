@@ -127,6 +127,7 @@
  *     2  --sb-focus-offset
  *     2  --sb-card-width
  *     2  --sb-column-min-width
+ *     2  --sb-editor-height
  *     2  --sb-palette-width
  *     2  --sb-palette-collapsed-width
  *     2  --sb-inspector-width
@@ -367,6 +368,23 @@
    * opens at before a viewer has resized one; the resize rebinds it inline on
    * the drawer, so a host setting it here is setting the FIRST height rather
    * than overriding a remembered one. */
+  /* The editor's own height, and the one token that decides whether the shell
+   * scrolls as a page or as a pane (sb-ceb).
+   *
+   * The default is `auto`, which is the height the shell has always had: the
+   * grid is as tall as its content and the host page scrolls. A host that sets
+   * this to a length - `calc(100vh - 4rem)`, `40rem`, `100%` inside a box it
+   * has already sized - gets the bounded mode instead: the canvas row takes
+   * the slack, `.sb-canvas-panel` scrolls inside it, and the drawer row stays
+   * pinned at the bottom of the editor rather than below the fold.
+   *
+   * A host cannot do this from outside. Setting a height on `.sb-editor` from
+   * a host stylesheet bounds the wrong box: the grid one level in is still
+   * content-height, so it overflows the editor instead of handing the overflow
+   * to the pane that has an `overflow` of its own. That is why this is a token
+   * the package honours rather than something a host was already able to do. */
+  --sb-editor-height: auto;
+
   --sb-palette-width: 14rem;
   /* What the palette column narrows to when the author folds it (parity item
    * 1.1). A token rather than a literal for the reason the two pane widths
@@ -436,7 +454,22 @@
   container-type: inline-size;
   container-name: sb-editor;
 
-  display: block;
+  /* A column of two: the optional header slot, then the layout grid. It was a
+   * block and the arrangement is identical - two full-width children stacked -
+   * but a flex column is what lets the grid take "the rest of the editor" when
+   * the editor has a bounded height, which a block cannot express. With the
+   * height at its `auto` default there is no free space to distribute and this
+   * is the same two boxes it always was. */
+  display: flex;
+  flex-direction: column;
+
+  /* The bounded-height mode's entry point (sb-ceb). `auto` is the shipped
+   * arrangement: the editor is as tall as its content and the host page
+   * scrolls. A length makes the editor a pane - the grid below takes what is
+   * left after the header slot, the canvas scrolls inside it, and the drawer
+   * row is at the bottom of THIS box rather than at the bottom of the page. */
+  height: var(--sb-editor-height);
+
   color: var(--sb-fg);
   background: var(--sb-bg-canvas);
   font-family: var(--sb-font);
@@ -1700,14 +1733,86 @@
   margin-bottom: var(--sb-space-2);
 }
 
+/* The grid 1A describes, and the element 7A's container query answers for.
+ *
+ * `flex` and `grid-template-rows` are the bounded-height mode's half of the
+ * shell (sb-ceb). Read them in the default first: the editor's height is
+ * `auto`, so a flex column has no free space to hand out and an `fr` row in a
+ * container of indefinite height sizes to its content. The arrangement is the
+ * one that shipped - the grid is as tall as the tree and the host page
+ * scrolls.
+ *
+ * With a length in `--sb-editor-height` the same declarations mean the other
+ * thing. `flex: 1` takes the editor's height minus the header slot, and the
+ * canvas row's `minmax(0, 1fr)` takes what is left of THAT after the drawer
+ * row - so the canvas can be SHORTER than its content, which is the half
+ * `auto` cannot do, and the drawer row lands at the bottom of the editor
+ * rather than at the bottom of the document.
+ *
+ * `min-height: 0` is not a tidy-up. A flex item's automatic minimum size is
+ * its content, and a content-based minimum beats the height flex assigned it,
+ * so without this line the grid grows back to the height of the tree and the
+ * bound reaches nothing.
+ *
+ * `align-items: start` is deliberately unchanged. Stretching the panes would
+ * hand the canvas its row height, which is the obvious way to do this and is
+ * wrong: it also stretches them in the default mode, where a short canvas
+ * beside a tall palette would start painting its frame down to meet it. The
+ * clamp is on the children instead, as a `max-height` that resolves to nothing
+ * while the editor's height is `auto`. */
 .sb-editor__layout {
   display: grid;
   grid-template-columns: var(--sb-palette-width) minmax(0, 1fr) var(--sb-inspector-width);
   grid-template-areas:
     "palette canvas inspector"
     "drawer drawer drawer";
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: var(--sb-space-2);
   align-items: start;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* The bounded mode's other half, on the grid children (sb-ceb).
+ *
+ * `max-height: 100%` is a percentage against the grid area, which is definite
+ * only when the grid has a definite height - so in the default mode it
+ * computes to `none` and nothing here does anything at all. That is what makes
+ * one pair of declarations serve both modes.
+ *
+ * `min-height: 0` is what lets the clamp bite. A grid item's automatic minimum
+ * size is its content, and a content-based `min-height` beats a `max-height`
+ * outright, so without this the pane grows past the row it was clamped to and
+ * the overflow lands on the page again - the exact defect the bead reports,
+ * one level further in.
+ *
+ * Written as a child selector rather than on the four panes by name because it
+ * is a statement about being IN this grid, not about being a palette or a
+ * drawer: a fifth pane arriving in the layout wants it for the same reason. */
+.sb-editor__layout > * {
+  min-height: 0;
+  max-height: 100%;
+}
+
+/* And the clamp needs somewhere for the overflow to go.
+ *
+ * A pane clamped with no `overflow` of its own spills its content down the
+ * host page, which is the bug the bound was supposed to fix wearing a
+ * different pane's name - a 47-block document bounds the canvas correctly and
+ * then the palette's own list runs past the fold instead. Like the pair above,
+ * it does nothing at all in the default mode: nothing is clamped, so nothing
+ * overflows, and `auto` shows no scrollbar for content that fits.
+ *
+ * Scoped to the arrangements at 780 and up, and that is the load-bearing part.
+ * Below 780 the palette's body is an absolutely positioned SHEET hanging out
+ * of the pane's box (`[data-sheet="open"]`, in the 7A block further down), and
+ * a scroll container clips its own absolutely positioned descendants - so an
+ * unscoped rule here would trade a spilling palette for one that cannot be
+ * opened. */
+@container sb-editor (width >= 780px) {
+  .sb-editor__layout > * {
+    overflow: auto;
+  }
 }
 
 .sb-editor__main {
@@ -1846,6 +1951,16 @@
 
 .sb-canvas-panel {
   min-width: 0;
+
+  /* The flex-item half of the bounded mode (sb-ceb). `.sb-editor__main` is a
+   * flex column of the toolbar and this panel; when the grid clamps it, the
+   * shrink has to land HERE and not on the toolbar. It does, and the toolbar
+   * needs no rule of its own: a flex item's automatic minimum size stops the
+   * toolbar at its own content height, and this `0` is what lets the panel go
+   * below its content instead - which is the only way an `overflow` on it ever
+   * has anything to scroll. In the default mode nothing is clamped, so nothing
+   * shrinks and this changes nothing. */
+  min-height: 0;
   overflow: auto;
 
   /* The padding is the ground. Without it the root block's own surface covers
@@ -2413,6 +2528,15 @@
       "palette palette"
       "canvas inspector"
       "drawer drawer";
+
+    /* Every arrangement that moves the canvas to a different row restates
+     * which row takes the slack (sb-ceb), because the base rule's
+     * `minmax(0, 1fr) auto` is written for the row order 1A has and this one
+     * has another. Getting it wrong is silent in the default mode - an `fr`
+     * row and an `auto` row size the same when the height is `auto` - and in
+     * the bounded mode it hands the whole editor's slack to the stacked
+     * palette while the canvas keeps the scrollbar. */
+    grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
   /* `row` is stated rather than left to the initial value because the palette
@@ -2454,6 +2578,7 @@
       "canvas"
       "inspector"
       "drawer";
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
   }
 
   /* The strip is the palette's whole chrome down here, so the pane's own
@@ -2509,5 +2634,6 @@
       "palette"
       "inspector"
       "drawer";
+    grid-template-rows: minmax(0, 1fr) auto auto auto;
   }
 }
