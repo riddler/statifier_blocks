@@ -2961,12 +2961,11 @@ token, and the 2026-08-28 Note is why it introduces no tint.
 
 ## Note (2026-08-30): decision 10, the cap signals
 
-**Status: proposed (2026-08-30). Awaiting the independent direction-agent
-verdict.** Drafted 2026-08-30, implementing bead `sb-z80a` (campaign 019). A
-dated Note rather than an amendment: decision 10 and the chip-row amendment
-above are unchanged in every particular, the presentation cap keeps its number
-and its refuse-never-truncate discipline, and no text above this line is edited
-by this section. What is recorded here is a consequence of the refusal that
+Drafted 2026-08-30, implementing bead `sb-z80a` (campaign 019). A dated Note
+rather than an amendment: decision 10 and the chip-row amendment above are
+unchanged in every particular, the presentation cap keeps its number and its
+refuse-never-truncate discipline, and no text above this line is edited by
+this section. What is recorded here is a consequence of the refusal that
 neither record states, and the reader the editor now has for it.
 
 ### What the refusal costs
@@ -3008,8 +3007,8 @@ the cap - "summary chip 2 is 30 characters; the cap is 24, so it is not
 drawn" - because those are the three facts that turn "nothing drew" into a fix,
 and none of them is on the card. The sentence is built in
 `StatifierBlocks.BlockType` (`summary_refusal_message/3`), which is where the
-number lives; ADR-0002's own 2026-08-30 Note asks for one number in one place,
-and a sentence quoting it from the editor would be a second home for it.
+number lives; ADR-0002 amendment H's Consequences ask for one number in one
+place, and a sentence quoting it from the editor would be a second home for it.
 
 **Why `:lint` and `:warning` rather than an error.** Decision 11 reserves every
 non-error severity to `:lint`, and the document compiles with an undrawn chip

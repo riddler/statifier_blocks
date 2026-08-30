@@ -805,8 +805,9 @@ defmodule StatifierBlocks.BlockType do
   one-based here and zero-based in the tuple: the tuple indexes a list and
   the sentence counts chips.
 
-  The cap lives in this module (ADR-0002's 2026-08-30 Note: one number in
-  one place), so the sentence is built here rather than by the editor.
+  The cap lives in this module (ADR-0002 amendment H's Consequences: one
+  number in one place), so the sentence is built here rather than by the
+  editor.
   Total: an entry naming a position the type no longer declares still
   answers a sentence.
 
