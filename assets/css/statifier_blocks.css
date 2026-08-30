@@ -488,6 +488,73 @@
   min-width: 0;
 }
 
+/* ---- zoom (sb-6ai)
+ *
+ * The ladder is enumerated rather than computed, and that is the decision
+ * rather than a shortcut. A transform is the only way to scale a tree without
+ * relaying it out - a font-size zoom reflows every card and moves every
+ * connector the server just routed - and a transform needs a number. That
+ * number can come from a custom property the server writes per render, or
+ * from the ladder itself, and the ladder is a closed set of ten steps that
+ * `StatifierBlocks.Shell` already owns. Ten rules is what buys a stylesheet a
+ * host can read, override and diff, with no computed value anywhere in it.
+ *
+ * `zoom_test.exs` holds the two halves together: every step the ladder offers
+ * has a rule here, at the scale the step names.
+ *
+ * The origin is the top left corner because that is where the tree starts and
+ * where the scroller's own origin is; scaling about the centre would put the
+ * root block's first card off the left edge at every step above 100%.
+ */
+
+.sb-canvas-zoom {
+  min-width: 0;
+}
+
+.sb-editor[data-zoom] .sb-canvas {
+  transform-origin: 0 0;
+}
+
+.sb-editor[data-zoom="50"] .sb-canvas {
+  transform: scale(0.5);
+}
+
+.sb-editor[data-zoom="67"] .sb-canvas {
+  transform: scale(0.67);
+}
+
+.sb-editor[data-zoom="80"] .sb-canvas {
+  transform: scale(0.8);
+}
+
+.sb-editor[data-zoom="90"] .sb-canvas {
+  transform: scale(0.9);
+}
+
+.sb-editor[data-zoom="100"] .sb-canvas {
+  transform: scale(1.0);
+}
+
+.sb-editor[data-zoom="110"] .sb-canvas {
+  transform: scale(1.1);
+}
+
+.sb-editor[data-zoom="125"] .sb-canvas {
+  transform: scale(1.25);
+}
+
+.sb-editor[data-zoom="150"] .sb-canvas {
+  transform: scale(1.5);
+}
+
+.sb-editor[data-zoom="175"] .sb-canvas {
+  transform: scale(1.75);
+}
+
+.sb-editor[data-zoom="200"] .sb-canvas {
+  transform: scale(2.0);
+}
+
 /* ------------------------------------------------------------- connectors
  *
  * The 2026-08-29 amendment to decision 7. Nothing here is a rule about where

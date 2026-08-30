@@ -213,13 +213,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert metrics =~ ~s(<span class="sb-toolbar__chip" data-metric="blocks">6 blocks</span>)
       end
 
+      # The zoom wrapper `sb-6ai` added sits between the two, which is the one
+      # thing that may ever come between them: it carries the scaled extent so
+      # the panel scrolls the size the stage is drawn at, and it is outside the
+      # stage because everything inside the stage is measured in the stage's
+      # own untransformed space.
       # Sabotage: rendering the stage without the panel around it - `overflow`
       # then has to go on the stage itself, where it sizes the connector overlay
       # to the padding box and the edges stop scrolling with the tree.
       test "the stage sits inside a panel that is the scroller", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn)
 
-        assert has_element?(view, ".sb-canvas-panel > #sb-canvas")
+        assert has_element?(view, ".sb-canvas-panel > .sb-canvas-zoom > #sb-canvas")
       end
 
       # The stylesheet half of the same item, held here rather than in a comment.

@@ -59,6 +59,16 @@
 //   routing against a pre-swap measurement is the classic way connectors end
 //   up a few pixels off their cards, and the spike found exactly this.
 //
+//   The payload carries ONE box that is not measured in the stage's space:
+//   the scroller the stage sits in, stamped `data-sb-anchor="viewport"` and
+//   sent under its own key rather than among the anchors. It is what the
+//   stage has to FIT INTO, so it is the one box that must not be unscaled -
+//   it lives outside the transform - and its usable width is its content
+//   box, padding removed, because padding is width the tree cannot use. 7c
+//   admits it: it is the geometry of a server-stamped anchor and nothing
+//   else, and 7d left the payload shape to the implementation. Without it a
+//   fit is a mode with no number behind it, which is what shipped first.
+//
 //   COORDINATE SPACE. The stage's own UNTRANSFORMED pixels: each rectangle
 //   has the stage's origin subtracted and is divided by the scale read off
 //   the stage. The <svg> the server writes these into is a child of the
@@ -76,6 +86,14 @@ export const StatifierBlocksMeasure = {
 
     const stage = this.stage();
     if (stage) this.observer.observe(stage);
+
+    // The scroller is observed too, because it is the box a fit compares
+    // against and it resizes without the stage resizing: a zoomed stage has
+    // an explicit size in its wrapper, so a narrowed window moves this
+    // element and nothing else. Observing only the stage leaves the server
+    // fitting against the width the panel had before the drag.
+    const viewport = this.viewport();
+    if (viewport) this.observer.observe(viewport);
 
     this.schedule();
   },
@@ -95,6 +113,33 @@ export const StatifierBlocksMeasure = {
   // editors on one page measures each against its own stage.
   stage() {
     return this.el.closest('[data-sb-anchor="stage"]');
+  },
+
+  // The scroller the stage is laid out inside. Found the same way and by the
+  // same attribute, one key further out, so two editors on one page get one
+  // scroller each without either knowing the other exists.
+  viewport() {
+    const stage = this.stage();
+    if (!stage || !stage.parentElement) return null;
+
+    return stage.parentElement.closest('[data-sb-anchor="viewport"]');
+  },
+
+  // The scroller's usable box: its content box with padding removed. The
+  // padding is the canvas ground - width the tree is never laid out into -
+  // so a fit computed against it is a fit that overflows by exactly it.
+  viewportBox() {
+    const viewport = this.viewport();
+    if (!viewport) return null;
+
+    const box = window.getComputedStyle(viewport);
+    const horizontal = parseFloat(box.paddingLeft) + parseFloat(box.paddingRight);
+    const vertical = parseFloat(box.paddingTop) + parseFloat(box.paddingBottom);
+
+    return {
+      w: Math.max(0, viewport.clientWidth - (horizontal || 0)),
+      h: Math.max(0, viewport.clientHeight - (vertical || 0)),
+    };
   },
 
   // Two frames, coalesced. A second schedule while one is pending replaces
@@ -150,6 +195,7 @@ export const StatifierBlocksMeasure = {
     // is unscaled first.
     this.pushEventTo(this.el, "measure", {
       stage: { w: stage.scrollWidth, h: stage.scrollHeight },
+      viewport: this.viewportBox(),
       anchors: anchors,
     });
   },

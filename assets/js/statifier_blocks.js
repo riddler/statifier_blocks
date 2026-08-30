@@ -51,6 +51,8 @@
 //   data-block-id  on each block's root element
 //   data-slot      on each gap, with data-parent-id and data-index
 //   data-drop      on each slot during a drag session ("ok" or "no")
+//   data-sb-reveal on the canvas, "<n>:<block id>", when the server has just
+//                  been asked to bring that block into view
 
 import { StatifierBlocksMeasure } from "./statifier_blocks_measure.js";
 
@@ -98,6 +100,64 @@ export const StatifierBlocksDrag = {
       this.dragged = null;
       this.pushEventTo(this.el, "dragend", {});
     });
+
+    this.reveal();
+  },
+
+  updated() {
+    this.reveal();
+  },
+
+  // `Fit active` has two halves and only one of them is a number. The step
+  // that fits the selected card is decided on the server off the measurement
+  // (`Shell.fit_zoom/3`); bringing that card into view is a scroll position,
+  // which no server holds and no stylesheet can set.
+  //
+  // So the server states the intent and this carries it out: it stamps
+  // `data-sb-reveal="<n>:<block id>"` on the canvas, and the counter is what
+  // makes the gesture one-shot. Without it every re-render would re-centre
+  // the card and an author could not scroll away from their own selection.
+  // This is a view position, not a document command: decision 2's command set
+  // is untouched, nothing is pushed, and an editor whose author never presses
+  // `Fit active` never runs a line of it.
+  reveal() {
+    const stamp = this.el.getAttribute("data-sb-reveal");
+
+    if (stamp && stamp !== this.revealed) {
+      this.revealed = stamp;
+      this.revealing = stamp.slice(stamp.indexOf(":") + 1);
+      this.extent = null;
+    }
+
+    if (!this.revealing) return;
+
+    const card = this.el.querySelector(`[data-block-id="${CSS.escape(this.revealing)}"]`);
+    const panel = this.el.closest('[data-sb-anchor="viewport"]');
+
+    if (!card || !panel) {
+      this.revealing = null;
+      return;
+    }
+
+    // The scroller is moved directly rather than through `scrollIntoView`,
+    // which walks every scrollable ancestor and takes the whole page with it.
+    // A host embedding the editor in a longer page had `Fit active` scroll the
+    // page out from under the editor, which is not a fit.
+    const cardBox = card.getBoundingClientRect();
+    const panelBox = panel.getBoundingClientRect();
+
+    const extent = `${panel.scrollWidth}x${panel.scrollHeight}`;
+
+    panel.scrollLeft += cardBox.left - panelBox.left - (panelBox.width - cardBox.width) / 2;
+    panel.scrollTop += cardBox.top - panelBox.top - (panelBox.height - cardBox.height) / 2;
+
+    // A zoom and its scroll extent do not land in the same render: the wrapper
+    // is sized from the measurement the zoomed layout produces, which is a
+    // round trip away. So the request stays alive until a re-render arrives
+    // with the extent unchanged, and the last of those is the one that centres
+    // the card against the size it is actually drawn at.
+    if (extent === this.extent) this.revealing = null;
+    this.extent = extent;
   },
 
   // The gap under this node, if it is inside a slot the server marked as
