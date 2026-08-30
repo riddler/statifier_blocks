@@ -10,6 +10,69 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.7.0] 2026-08-30
+
+0.7.0 is the release where a finding looks like a finding wherever it is
+read. One row anatomy - severity word, anchor tail, source chip, message -
+now draws on the drawer's tab and on both inspector panels, which used to
+show the bare message, and the two document-level surfaces carry a severity
+pill row above the list. Alongside that, the 24-character presentation cap
+on summary chips stops failing silently: a dropped chip raises a `:lint`
+warning against its block and `summary_refusals/2` says which chip and why,
+so a card with no second line can be told apart from a type that declared
+none. And an editor opened with a fit no longer flashes at 100% before
+snapping to it. Hosts: see Removed - `:no_presentation_source` leaves
+`Finding.from_compiler/2`'s refusal type, and the canvas toolbar's dead
+`inserting?` attribute is gone.
+
+### Added
+
+- `StatifierBlocks.Shell.severity_counts/1` cuts a findings list by severity,
+  in `:error`, `:warning`, `:info` order and omitting any with nothing at
+  them; it sums to `findings_count/1` for the same list.
+- `StatifierBlocks.Editor.Findings.row/1` and `anchor_tag/1` are public, so a
+  host rendering findings of its own gets the editor's row anatomy rather than
+  re-deriving it.
+- `StatifierBlocks.BlockType.summary_refusals/2` reports the summary chips the
+  24-character presentation cap dropped, as `{index, reason}` with `reason` in
+  `:too_long`, `:blank`, `:multiline` or `:not_a_string`, and
+  `summary_refusal_message/3` puts one into the words an author reads.
+
+### Changed
+
+- A finding renders the same way everywhere: severity word, anchor tail
+  (`config.duration`, `slot:body`, nothing for a block anchor), source chip
+  and message. The inspector's two findings panels showed only the message
+  before.
+- Both document-level findings surfaces - the drawer's Findings tab and the
+  inspector's with nothing selected - carry a severity pill row above the
+  list. The list itself is still grouped by block.
+- The view model raises a `:lint` warning against a block for every summary
+  chip the presentation cap refused, so a card that draws no second line can
+  be told apart from a type that declared none. A well-formed document gains
+  no findings.
+
+### Removed
+
+- `StatifierBlocks.Finding.from_compiler/2` no longer declares the
+  `:no_presentation_source` refusal in `from_compiler_error/0`; nothing has
+  produced it since the adapter began mapping unplaced compiler findings to
+  `:compile`, so a caller that matched on it can drop the clause and keep the
+  `{:unanchorable, finding}` one.
+- The canvas toolbar's dead `inserting?` attribute, left declared when
+  0.6.0 removed its "Cancel insert" button. A host still passing it to
+  `StatifierBlocks.Editor.Toolbar` gets an undefined-attribute warning;
+  drop the assignment (statifier_blocks#172).
+
+### Fixed
+
+- An editor opened with `fit: :width` or `fit: :active` no longer paints its
+  first frame at 100% and then snaps to the fit. While a fit is armed the
+  root carries `data-fit-pending` and the stylesheet keeps the stage
+  unpainted under it, so the first frame an author sees is the fitted one; a
+  host that never imported the measurement hook, and so never spends the fit,
+  is revealed by a CSS-only fallback half a second in rather than left blank.
+
 ## [0.6.0] 2026-08-30
 
 0.6.0 is the release where the editor tells one story about findings. The
@@ -1014,6 +1077,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.7.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.7.0
 [0.6.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.6.0
 [0.5.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.5.0
 [0.4.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.4.0
