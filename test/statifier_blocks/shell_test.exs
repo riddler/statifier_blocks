@@ -201,6 +201,97 @@ defmodule StatifierBlocks.ShellTest do
     end
   end
 
+  # The descriptor half of the drawer's host-tab seam (8A: slots for markup,
+  # events for actions). What a host tab's body renders is
+  # `StatifierBlocks.Editor.HostTabTest`'s claim, because it needs a host
+  # LiveView to have a render pass at all; what belongs here is where a host
+  # tab lands on the strip, which picks of it stand, and which of them never
+  # become a tab.
+  describe "a host's own drawer tabs" do
+    # Sabotage: putting the host tabs before `own` in `drawer_view/1` - the
+    # first assertion reads ["runs", :tables, :findings] and goes red, and so
+    # does the unchosen-tab resolution below, which is the order's real reader.
+    test "join the strip after the package's, in the order they were given" do
+      view =
+        Shell.drawer_view(%{
+          open?: true,
+          host_tabs: [host_tab("runs", "Runs", 3), host_tab("jobs", "Jobs", 0)]
+        })
+
+      assert Enum.map(view.tabs, & &1.id) == [:tables, :findings, "runs", "jobs"]
+      assert Enum.map(view.tabs, & &1.title) == ["Truth tables", "Findings", "Runs", "Jobs"]
+      assert Enum.map(view.tabs, & &1.count) == [0, 0, 3, 0]
+    end
+
+    # Sabotage: keeping `resolve_tab/2`'s old `when tab in @drawer_tabs` guard
+    # - a host tab can be listed but never selected, which is the whole seam.
+    test "can be picked, and the pick stands" do
+      view =
+        Shell.drawer_view(%{open?: true, tab: "runs", host_tabs: [host_tab("runs", "Runs", 0)]})
+
+      assert view.tab == "runs"
+      assert view.title == "Runs"
+      assert view.count == 0
+    end
+
+    # Sabotage: resolving against `@drawer_tabs` rather than against the strip
+    # - a withdrawn tab stays selected and the drawer names a panel that is not
+    # in the DOM.
+    test "a pick the host has since withdrawn resolves again" do
+      view = Shell.drawer_view(%{open?: true, tab: "runs", host_tabs: []})
+
+      assert view.tab == :tables
+    end
+
+    # 2A's rule about the strip, reaching a host tab: a strip is worth having
+    # because it says what the drawer holds.
+    # Sabotage: `resolve_tab/2` searching `own` instead of `tabs` for a
+    # non-zero count - the drawer opens on `Truth tables 0` beside a running
+    # feed, which is the state 2A says the strip exists to prevent.
+    test "an unchosen tab resolves through them when nothing else holds anything" do
+      view = Shell.drawer_view(%{open?: true, host_tabs: [host_tab("runs", "Runs", 4)]})
+
+      assert view.tab == "runs"
+      assert view.count == 4
+    end
+
+    # Sabotage: dropping the `reject` in `host_tabs/1` - two tabs called
+    # "Findings" render, both stamped `sb-drawer-tab-findings`, and the strip
+    # has an id collision an author cannot see and a screen reader cannot
+    # resolve.
+    test "one named for a package tab never becomes a tab" do
+      view =
+        Shell.drawer_view(%{
+          open?: true,
+          host_tabs: [host_tab("findings", "Mine", 9), host_tab("tables", "Also mine", 9)]
+        })
+
+      assert Enum.map(view.tabs, & &1.id) == [:tables, :findings]
+      assert Shell.host_tabs([host_tab("findings", "Mine", 9)]) == []
+    end
+
+    # Sabotage: `Enum.uniq/1` instead of `Enum.uniq_by/2` on the id - two
+    # entries differing only in title both survive and collide.
+    test "a repeated id is kept once" do
+      kept = Shell.host_tabs([host_tab("runs", "Runs", 1), host_tab("runs", "Runs again", 2)])
+
+      assert kept == [host_tab("runs", "Runs", 1)]
+    end
+
+    # The payload half. A tab name arrives as a string off a `phx-value-tab`
+    # attribute, so this is the function a crafted one reaches.
+    # Sabotage: `String.to_atom(value)` for an unmatched name - the assertion
+    # on the crafted payload reads `:not_a_tab` and goes red, and the atom
+    # table grows once per distinct payload.
+    test "are resolved by name without any of them becoming an atom" do
+      assert Shell.drawer_tab("runs", ["runs"]) == "runs"
+      assert Shell.drawer_tab("runs", []) == :tables
+      assert Shell.drawer_tab("findings", ["findings"]) == :findings
+      assert Shell.drawer_tab("not_a_tab", ["runs"]) == :tables
+      assert Shell.drawer_tab("runs") == :tables
+    end
+  end
+
   # sb-ukgu: one number, defined once. The claim that the *host's* number is
   # this one is `StatifierBlocks.Editor.FindingsCountTest`'s, because it needs
   # a rendered drawer to compare against; what belongs here is that the tab a
@@ -496,6 +587,10 @@ defmodule StatifierBlocks.ShellTest do
       assert Enum.all?(words, &(&1 in ~w(match mismatch unchecked error undecidable)))
     end
   end
+
+  # One host tab descriptor, in the shape the editor derives from a
+  # `:drawer_tab` slot entry.
+  defp host_tab(id, title, count), do: %{id: id, title: title, count: count}
 
   defp find(%ViewModel.Node{block_id: id} = node, id), do: node
 

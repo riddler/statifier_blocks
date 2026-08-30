@@ -47,6 +47,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          invoke_types: session["invoke_types"] || [],
          drawer_height: session["drawer_height"],
          header: session["header"],
+         host_tabs: session["host_tabs"] || [],
+         feed: session["feed"] || [],
          icon: session["icon"] && (&host_icon/1),
          test_pid: session["test_pid"]
        )}
@@ -68,6 +70,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         fixtures={@fixtures}
         invoke_types={@invoke_types}
         drawer_height={@drawer_height}
+        drawer_tabs={drawer_tabs(@host_tabs, @feed)}
         on_change={notifier(@test_pid)}
         on_drawer_resize={height_notifier(@test_pid)}
       >
@@ -84,6 +87,44 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @impl Phoenix.LiveView
     def handle_info({:swap_document, document}, socket),
       do: {:noreply, assign(socket, :document, document)}
+
+    # The seam's live half, driven the way a host drives it: the feed is this
+    # LiveView's own assign, and the descriptors carrying it are rebuilt on
+    # the re-render that assign causes.
+    def handle_info({:feed, line}, socket),
+      do: {:noreply, assign(socket, :feed, socket.assigns.feed ++ [line])}
+
+    def handle_info({:host_tabs, tabs}, socket),
+      do: {:noreply, assign(socket, :host_tabs, tabs)}
+
+    # The `drawer_tabs` descriptors. The tab called `runs` renders the feed
+    # and counts it, which is what makes both live; every other tab draws its
+    # own name and reports the count it was declared with.
+    defp drawer_tabs(tabs, feed) do
+      Enum.map(tabs, fn
+        %{id: "runs"} = tab ->
+          %{tab | count: length(feed)} |> Map.put(:content, &host_feed(&1, feed))
+
+        tab ->
+          Map.put(tab, :content, &host_panel/1)
+      end)
+    end
+
+    defp host_feed(assigns, feed) do
+      assigns = assign(assigns, :feed, feed)
+
+      ~H"""
+      <ul class="host-feed" data-tab={@id} data-count={@count}>
+        <li :for={line <- @feed}>{line}</li>
+      </ul>
+      """
+    end
+
+    defp host_panel(assigns) do
+      ~H"""
+      <p class="host-panel" data-tab={@id}>panel for {@id}</p>
+      """
+    end
 
     # A host's own icon component, in the shape the `icon` assign takes: a
     # name in, markup out. Built here for the same reason `on_change` is - a
@@ -155,9 +196,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     Mounts the editor over a document, connected, and returns the live view.
 
     Options: `:document`, `:palette`, `:findings`, `:datamodel`, `:theme`,
-    `:fit`, `:fixtures`, `:invoke_types`, `:drawer_height`, `:header` and `:icon` - the last three being the
+    `:fit`, `:fixtures`, `:invoke_types`, `:drawer_height`, `:header`, `:icon`,
+    `:host_tabs` and `:feed` - the last five being the
     shell amendment's host seam (8A), a truth-table source, the height the host
-    remembered, and markup for the header slot. The
+    remembered, markup for the header slot, and the drawer tabs the host
+    contributes together with the feed the one called `runs` renders.
+    `:host_tabs` takes `%{id:, title:, count:}` descriptors; this host supplies
+    the `content` function for each. The
     `:datamodel` default is `nil` - no datamodel supplied - which is what the
     editor's own default is and what ADR-0005 amendment 11f makes meaningful.
     The other defaults are
@@ -191,6 +236,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "invoke_types" => Keyword.get(opts, :invoke_types, []),
         "drawer_height" => Keyword.get(opts, :drawer_height),
         "header" => Keyword.get(opts, :header),
+        "host_tabs" => Keyword.get(opts, :host_tabs, []),
+        "feed" => Keyword.get(opts, :feed, []),
         "icon" => Keyword.get(opts, :icon),
         "test_pid" => test_pid
       }

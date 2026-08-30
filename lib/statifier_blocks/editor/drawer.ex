@@ -42,6 +42,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     because nothing happens to be selected would tell an author something false
     about their document.
 
+    ## A host's own tab
+
+    8A's split is that the package ships the editing surface and the host
+    ships what surrounds it. A host tab is that reaching the drawer: the
+    editor's `drawer_tabs` assign carries a label, a count and a **function
+    component**, the function is called here when its tab is the active one,
+    and the package learns nothing about what it draws.
+
+    This admits no new *package* tab. 1A's test - tabular, and about the whole
+    document - is what governs the tabs shipped here, and it is unchanged and
+    unweakened; a host applies the same test to its own content, which is what
+    the drawer's tab set being "open by construction and closed by rule" has
+    said since the amendment. What the seam adds is who may do the applying.
+
+    It is called the way HEEx calls `<.tab />` rather than by applying it to a
+    bare map, which is `StatifierBlocks.Editor.Icons`' rule (sb-b8g) and the
+    same one for the same reason: a host component that derives a value with
+    `assign/3`, which is what an ordinary component does, raises on an assigns
+    map with no change-tracking key in it.
+
+    A function rather than a slot, for the reason `StatifierBlocks.Editor`'s
+    own moduledoc gives: the first thing a host wants a tab for is a feed of
+    something happening now, and a slot body reading a host assign does not
+    redraw when that assign moves, because the editor is a `LiveComponent` and
+    a slot body is not one of the assigns it was passed. A pushed descriptor
+    is.
+
     ## The resize is a command, not a hook
 
     Decision 7 ships exactly one JavaScript hook and this section adds none.
@@ -65,10 +92,25 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:target, :any, required: true)
     attr(:class, :string, default: nil)
 
+    attr(:host_tabs, :list,
+      default: [],
+      doc: """
+      The host's tab descriptors, already through
+      `StatifierBlocks.Shell.host_tabs/1`. The active one's `content` is
+      called for the panel; the strip draws them all from `@view.tabs`, where
+      their labels and counts already are.
+      """
+    )
+
     @doc "The drawer row: a strip when collapsed, tabs and a table when open."
     def drawer(assigns) do
       {min, max, _default} = Shell.height_band()
-      assigns = assigns |> assign(:min, min) |> assign(:max, max)
+
+      assigns =
+        assigns
+        |> assign(:min, min)
+        |> assign(:max, max)
+        |> assign(:host_tab, Enum.find(assigns.host_tabs, &(&1.id == assigns.view.tab)))
 
       ~H"""
       <section
@@ -150,27 +192,34 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             id={"sb-drawer-panel-#{@view.tab}"}
             aria-labelledby={"sb-drawer-tab-#{@view.tab}"}
           >
-            <%= if @view.tab == :findings do %>
-              <Findings.findings
-                findings={@view.findings}
-                orphans={@view.orphans}
-                root={@root}
-                target={@target}
-              />
-            <% else %>
-              <p :if={@view.status == :no_fixtures} class="sb-drawer__empty">
-                No fixtures source is attached to this editor, so there are no recorded
-                cases to show. A host supplies them alongside the document.
-              </p>
+            <%= cond do %>
+              <% @host_tab -> %>
+                {Phoenix.LiveView.TagEngine.component(
+                  @host_tab.content,
+                  %{id: @host_tab.id, count: @view.count},
+                  {__MODULE__, {:drawer, 1}, __ENV__.file, __ENV__.line}
+                )}
+              <% @view.tab == :findings -> %>
+                <Findings.findings
+                  findings={@view.findings}
+                  orphans={@view.orphans}
+                  root={@root}
+                  target={@target}
+                />
+              <% true -> %>
+                <p :if={@view.status == :no_fixtures} class="sb-drawer__empty">
+                  No fixtures source is attached to this editor, so there are no recorded
+                  cases to show. A host supplies them alongside the document.
+                </p>
 
-              <.index_page
-                :if={@view.status in [:no_selection, :none_for_block]}
-                view={@view}
-                root={@root}
-                target={@target}
-              />
+                <.index_page
+                  :if={@view.status in [:no_selection, :none_for_block]}
+                  view={@view}
+                  root={@root}
+                  target={@target}
+                />
 
-              <.table :for={table <- @view.tables} table={table} />
+                <.table :for={table <- @view.tables} table={table} />
             <% end %>
           </div>
         </div>
