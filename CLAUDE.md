@@ -59,7 +59,7 @@ irreversible step, and report.
 | `git merge`, merging a request | never | always - merging is the operator's, in every campaign and outside every campaign |
 | `bd close <id>` | never for a mirrored bead; otherwise the operator's call | always for a bead whose description carries a `mirrors:` line, campaign consent included |
 | `bd dolt push` | the operator's call | inside a campaign that spans mirrored trackers - the conductor pushes those atomically |
-| a release, a version bump | never | always |
+| a release, a version bump | never, with one named exception: a release-prep request - a version bump and a changelog promotion, no tag - under a campaign consent clause that names it | always for the tag, the publish and the release itself, and always for the prep request too when the consent does not name it |
 
 The organizing principle is the same one the other packages use: the human gate
 belongs where an action stops being reversible. A commit on a per-bead branch
@@ -78,8 +78,12 @@ authority is the operator's and the subagent is only the hands, so it may act.
 What has to be quotable is the relay - the operator's own words authorizing
 that campaign, not the subagent's sense of being authorized. A subagent that
 cannot quote them reports and stops. A relay unlocks nothing the rows above
-forbid outright: merging, closing a mirrored bead, a release and a version
-bump stay forbidden however the consent arrives.
+forbid outright: merging, closing a mirrored bead, and tagging, publishing or
+cutting a release stay forbidden however the consent arrives. The release-prep
+request in the row above is the one named exception, and it is narrow: a
+version bump and a changelog promotion with no tag, opened and landed only
+under a campaign's own explicit consent clause naming it, with the tag and the
+publish that follow still the operator's.
 
 Widening this section is a decision for the operator to make and record here.
 An agent may draft the change; it does not adopt it.
