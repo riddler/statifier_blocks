@@ -333,7 +333,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       >
         <button
           type="button"
-          class="sb-gap__add"
+          class="sb-button sb-gap__add"
           phx-click="palette-open"
           phx-target={@target}
           phx-value-parent-id={@parent_id}
