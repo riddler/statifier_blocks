@@ -116,19 +116,15 @@ defmodule StatifierBlocks.Finding do
   finding that names no block cannot be routed. Only the `:document` stage
   produces these today (`Document.validate/1` failing).
 
-  `:no_presentation_source` - the finding's stage names no source in
-  decision 11's enum. **No input to `from_compiler/2` produces this
-  today.** It was the answer for `:document`, `:emit` and `:chart` at
-  `:error` severity until ADR-0005 amendment `11h` gave those a source
-  (`:compile`); the amendment retains the refusal's meaning for inputs
-  that are not compiler findings at all, so it stays in this union rather
-  than being dropped the way `11j` dropped `:arity` from `source/0`.
-  `from_compiler/2` pattern-matches a `StatifierBlocks.Compiler.Finding`,
-  so there is no such input through this door yet.
+  This union carried a second member until ADR-0005 amendment `11h`: the
+  refusal for a finding whose stage named no source in decision 11's enum,
+  which was the answer for `:document`, `:emit` and `:chart` at `:error`
+  severity until `11h` gave those a source (`:compile`). Nothing produced
+  it after that, and `11j`'s rule - a value with no producer is worse than
+  absent - dropped it, the way the same amendment dropped `:arity` from
+  `source/0`.
   """
-  @type from_compiler_error ::
-          {:unanchorable, StatifierBlocks.Compiler.Finding.t()}
-          | {:no_presentation_source, StatifierBlocks.Compiler.Finding.t()}
+  @type from_compiler_error :: {:unanchorable, StatifierBlocks.Compiler.Finding.t()}
 
   @doc """
   Adapts one `StatifierBlocks.Compiler.Finding` (ADR-0004 decision 10) into
@@ -173,10 +169,9 @@ defmodule StatifierBlocks.Finding do
        `:structure` -> `:assignability`.
     4. Any other stage (`:document`, `:emit`, `:chart` at `:error`) ->
        `:compile`, under ADR-0005 amendment `11h`. Rule 4 used to refuse
-       with `{:no_presentation_source, finding}`; a compile error against
-       generated SCXML or against the document envelope had no bucket in
-       decision 11's enum, so the adapter refused rather than lie about
-       where the rule lived. `:compile` is that bucket, and it is why an
+       instead: a compile error against generated SCXML or against the
+       document envelope had no bucket in decision 11's enum, so the
+       adapter refused rather than lie about where the rule lived. `:compile` is that bucket, and it is why an
        error the compiler raises at a stage this mapping does not name can
        now render in the editor at all - which is the half of `11h` that
        makes the document-level panel's promise ("no finding can hide")

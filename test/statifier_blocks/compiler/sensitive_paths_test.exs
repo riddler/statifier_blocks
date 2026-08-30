@@ -291,11 +291,11 @@ defmodule StatifierBlocks.Compiler.SensitivePathsTest do
   end
 
   describe "presentation (ADR-0005 decision 11)" do
-    # sabotage: passed no `source:` override -> the adapter's default rule
-    # refuses an :error at the :emit stage with {:no_presentation_source,
-    # _} and this goes red (verified). The default derivation cannot reach
-    # {:lint, :error}; `opts[:source]` is the documented seam and this is
-    # the wiring a host uses.
+    # Sabotage: passed no `source:` override -> the adapter's default rule
+    # maps an :error at the :emit stage to `:compile` (11h) and this goes
+    # red (verified). The default derivation cannot reach {:lint, :error};
+    # `opts[:source]` is the documented seam and this is the wiring a host
+    # uses.
     test "adapts to an anchored :lint finding at :error severity" do
       block = invoke(%{"invoke_type" => "myapp:capture", "params" => "pan=card.number"})
 

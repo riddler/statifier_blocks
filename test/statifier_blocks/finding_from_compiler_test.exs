@@ -58,8 +58,9 @@ defmodule StatifierBlocks.FindingFromCompilerTest do
 
           "blk_X" ->
             # Since 11h nothing anchored is refused: a stage the mapping
-            # cannot place takes `:compile` rather than
-            # `{:no_presentation_source, _}`.
+            # cannot place takes `:compile`. The refusal it used to take
+            # is gone from `from_compiler_error/0` under 11j (sb-mmyj),
+            # so `{:unanchorable, _}` is the only member left.
             assert {:ok, %Finding{} = adapted} = result
             assert adapted.severity == finding.severity
             assert adapted.message == finding.message
