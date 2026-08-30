@@ -78,6 +78,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     label - `StatifierBlocks.Shell.slot_label/2`'s answer - because a card
     seen on its own does not say which arm of a branch it is in.
 
+    Under the three rows, and only for a block whose type did not resolve,
+    the Block section holds that block's **stored config as canonical JSON**
+    (campaign-017 ruling D4). It used to sit on the card, where it made the
+    one broken block the widest thing in its lane; it is the same bytes in
+    the same order, moved to the surface an author reaches by asking about
+    that block in particular. It is read-only here for the reason the Config
+    tab is empty there: nothing declares which of those values are editable,
+    and a form over them would be invented rather than derived.
+
+    It is the only thing in this pane that wraps mid-token. A block id
+    ellipsises and a condition source scrolls, because both are strings an
+    author matches character by character and neither is long by design; a
+    stored config carries whatever the host that wrote it carried, so the
+    only two honest choices are wrapping anywhere and clipping bytes the
+    author is here to read.
+
     The Configuration section's empty state is a **box**, not the one-line
     sentence the other tabs use. It is the only empty state in the editor
     standing where a control would be, and an unboxed sentence in that
@@ -196,6 +212,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <.meta_row label="Id" value={@node && @node.block_id} mono />
           <.meta_row label="Slot" value={@node && @slot_label} />
         </dl>
+        <pre :if={@node && @node.raw_config_json} class="sb-inspector__raw-config">{@node.raw_config_json}</pre>
       </section>
       """
     end
@@ -227,9 +244,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:target, :any, required: true)
 
     # Decision 12's read-only case reaches here as `form: nil`, and it is the
-    # ConfigForm's own message rather than a second one written here: an
-    # unresolvable block's bytes are shown on its card, and the tab says why
-    # there is nothing to edit.
+    # ConfigForm's own message rather than a second one written here: the tab
+    # says why there is nothing to edit, and points at the Block section
+    # above, which is where D4 moved the bytes themselves.
     defp config_panel(assigns) do
       ~H"""
       <ConfigForm.config_form
@@ -241,7 +258,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       />
       <p :if={@node.form == nil} class="sb-inspector__empty">
         This block's type is not registered here, so nothing declares which of its
-        stored values are editable. Its config is preserved and shown on its card.
+        stored values are editable. Its config is preserved, and shown as stored
+        under Block above.
       </p>
       """
     end

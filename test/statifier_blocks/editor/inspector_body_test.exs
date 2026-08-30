@@ -127,6 +127,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert meta_value(html, "Slot") == "&mdash;"
         assert length(Regex.scan(~r{data-empty="true"}, html)) == 3
       end
+
+      # Campaign-017 ruling D4: the stored config sits under the three rows,
+      # and only for the block that has one. A resolvable block's values are
+      # in the form below; a pane that showed the JSON as well would be
+      # saying the same thing twice, in the notation an author does not edit
+      # in.
+      # Sabotage: dropping the `:if` from the `<pre>` - it renders for
+      # `blk_email_step` as an empty box under its rows, and this goes red on
+      # a card that had nothing to preserve in the first place.
+      test "holds the stored config, for an unresolvable block only" do
+        unresolvable = inspector_html(node: node_for("blk_track_conversion"))
+
+        assert unresolvable =~ ~s(class="sb-inspector__raw-config")
+        assert unresolvable =~ "&quot;event&quot;:&quot;signup.completed&quot;"
+
+        refute inspector_html(node: node_for("blk_email_step")) =~ "sb-inspector__raw-config"
+        refute inspector_html(node: nil) =~ "sb-inspector__raw-config"
+      end
     end
 
     describe "the CONFIGURATION section" do
