@@ -205,7 +205,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       test "carries a Cancel control that closes the palette" do
         html = palette_html(insert_target: %{slot: "Steps", parent: "Sequence"})
 
-        assert html =~ ~s(class="sb-palette__cancel")
+        assert html =~ ~s(class="sb-button sb-palette__cancel")
         assert html =~ ~s(phx-click="palette-close")
         assert [_button] = Regex.run(~r|<button[^>]*sb-palette__cancel.*?</button>|s, html)
       end

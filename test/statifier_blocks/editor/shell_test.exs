@@ -102,7 +102,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {:ok, view, html} = mount_editor(conn)
         before = EditorFixtures.signup_wizard()
 
-        assert html =~ ~s(<button type="button" class="sb-toolbar__button" phx-click="undo")
+        assert html =~
+                 ~s(<button type="button" class="sb-button sb-toolbar__button" phx-click="undo")
 
         view
         |> element(~s([data-block-id="blk_email_step"] > .sb-node__chrome > .sb-node__remove))
@@ -120,6 +121,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert has_element?(view, ~s(button[phx-click="undo"][disabled]))
         assert has_element?(view, ~s(button[phx-click="redo"][disabled]))
+
+        # sb-sl6f: disabled has to READ as disabled, and the only thing that
+        # makes it read is the vocabulary class - `[disabled]` alone is a
+        # native-chrome button in a pane that dresses everything else.
+        # Sabotage: dropping `sb-button` from the toolbar's class attributes.
+        assert has_element?(view, ~s(button.sb-button[phx-click="undo"][disabled]))
+        assert has_element?(view, ~s(button.sb-button[phx-click="redo"][disabled]))
       end
     end
 

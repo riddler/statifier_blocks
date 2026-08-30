@@ -81,7 +81,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <div class="sb-toolbar__group">
           <button
             type="button"
-            class="sb-toolbar__button"
+            class="sb-button sb-toolbar__button"
             phx-click="undo"
             phx-target={@target}
             disabled={not @can_undo?}
@@ -90,7 +90,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </button>
           <button
             type="button"
-            class="sb-toolbar__button"
+            class="sb-button sb-toolbar__button"
             phx-click="redo"
             phx-target={@target}
             disabled={not @can_redo?}
@@ -100,7 +100,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <button
             :if={@inserting?}
             type="button"
-            class="sb-toolbar__button"
+            class="sb-button sb-toolbar__button"
             phx-click="palette-close"
             phx-target={@target}
           >
@@ -111,7 +111,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <div class="sb-toolbar__group sb-toolbar__zoom" role="group" aria-label="Canvas zoom">
           <button
             type="button"
-            class="sb-toolbar__button sb-toolbar__zoom-step"
+            class="sb-button sb-toolbar__button sb-toolbar__zoom-step"
             phx-click="zoom-out"
             phx-target={@target}
             disabled={@zoom <= hd(Shell.zoom_steps())}
@@ -122,7 +122,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <output class="sb-toolbar__zoom-level">{@zoom}%</output>
           <button
             type="button"
-            class="sb-toolbar__button sb-toolbar__zoom-step"
+            class="sb-button sb-toolbar__button sb-toolbar__zoom-step"
             phx-click="zoom-in"
             phx-target={@target}
             disabled={@zoom >= List.last(Shell.zoom_steps())}
@@ -135,7 +135,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <div class="sb-toolbar__group">
           <button
             type="button"
-            class="sb-toolbar__button"
+            class="sb-button sb-toolbar__button"
             phx-click="fit"
             phx-value-fit="width"
             phx-target={@target}
@@ -145,7 +145,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </button>
           <button
             type="button"
-            class="sb-toolbar__button"
+            class="sb-button sb-toolbar__button"
             phx-click="fit"
             phx-value-fit="active"
             phx-target={@target}

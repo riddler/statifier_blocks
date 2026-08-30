@@ -220,7 +220,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           />
           <button
             type="button"
-            class="sb-field__remove"
+            class="sb-button sb-field__remove"
             phx-click="field-list-remove"
             phx-target={@target}
             phx-value-key={@field.key}
@@ -232,7 +232,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <input :if={@rows == []} type="hidden" name={input_name(@field) <> "[]"} value="" />
         <button
           type="button"
-          class="sb-field__add"
+          class="sb-button sb-field__add"
           phx-click="field-list-add"
           phx-target={@target}
           phx-value-key={@field.key}

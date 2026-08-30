@@ -204,7 +204,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             </span>
             <button
               type="button"
-              class="sb-palette__cancel"
+              class="sb-button sb-palette__cancel"
               phx-click="palette-close"
               phx-target={@target}
             >

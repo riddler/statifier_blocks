@@ -477,6 +477,69 @@
   line-height: var(--sb-leading);
 }
 
+/* --------------------------------------------------------------- buttons
+ *
+ * One button vocabulary for the editor's plain controls (sb-sl6f).
+ *
+ * The reset above keeps native chrome ON for form controls on purpose, so a
+ * button that declares nothing beyond `font: inherit` renders as whatever the
+ * host's browser paints it. That is how Undo, Redo, the zoom steps, the two
+ * fits, Cancel insert and a list field's add/remove came to read as bare text
+ * beside controls this stylesheet does dress.
+ *
+ * `sb-button` is that vocabulary, and it is quiet on purpose: a border, the
+ * pane's own background, and a hover that raises the border rather than
+ * filling the box. Quiet is what separates a control from `sb-toolbar__chip`,
+ * which is a read-only fact sitting in the same row and is the reason a
+ * button here is NOT painted with `--sb-bg-muted`.
+ *
+ * It carries the two states a control has to be able to report - `[disabled]`
+ * muted and `[aria-pressed="true"]` accented - so no surface restates them.
+ *
+ * Two things are deliberately absent. Focus: the subtree has exactly one
+ * focus treatment, declared in the reset, and a second one on the button
+ * family is how a surface drifts out of it. And a colour of its own beyond
+ * `--sb-fg`: a button that wants to be accented (`sb-palette__cancel`) or to
+ * shed its border into a group (`sb-toolbar__zoom-step`) says so in its own
+ * rule, which is why this section sits ABOVE every component section rather
+ * than beside the toolbar - a vocabulary a component refines has to be
+ * declared before the component does the refining.
+ */
+
+.sb-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sb-space-half);
+  padding: 0 var(--sb-space);
+  font: inherit;
+  cursor: pointer;
+  color: var(--sb-fg);
+  background: var(--sb-bg);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+}
+
+/* `:not([disabled])` and not `:enabled`, because the hover has to stay off a
+ * disabled Undo and `:enabled` would also claim every non-button this class
+ * is ever put on. */
+.sb-button:hover:not([disabled]) {
+  border-color: var(--sb-border-strong);
+  background: var(--sb-bg-muted);
+}
+
+.sb-button[disabled] {
+  cursor: default;
+  opacity: var(--sb-disabled-opacity);
+}
+
+/* A toggle that is on. The weight is half of it: opacity and hue alone do not
+ * survive a host theme with a low-contrast accent. */
+.sb-button[aria-pressed="true"] {
+  color: var(--sb-accent);
+  border-color: var(--sb-accent);
+  font-weight: var(--sb-weight-medium);
+}
+
 /* ---------------------------------------------------------------- canvas */
 
 /* `position` is what makes this the containing block for the two absolutely
@@ -1461,6 +1524,37 @@
   gap: var(--sb-space);
 }
 
+/* A column, so `add` sits under the rows rather than beside the last one.
+ * `stretch` and not `flex-start`: a row holds the value's input and has to
+ * keep the field's full width; `add` opts out of that on its own line. */
+.sb-field__list {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sb-space-half);
+}
+
+/* Both wear `sb-button`. What is here is the pair's own shape: `remove` is
+ * subordinate to the row it ends - subtle rather than foreground, and narrow
+ * enough that it does not compete with the value it removes - and `add` is
+ * the only one of the two an author looks for, so it keeps the family's
+ * foreground. */
+.sb-field__add {
+  flex: 0 0 auto;
+  align-self: flex-start;
+}
+
+.sb-field__remove {
+  flex: 0 0 auto;
+  padding: 0 var(--sb-space-half);
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-field__remove:hover:not([disabled]) {
+  color: var(--sb-fg);
+}
+
 .sb-field__input {
   font: inherit;
   min-width: 0;
@@ -1754,20 +1848,16 @@
   color: var(--sb-warning);
 }
 
-/* A real control, not a run of text with a click handler. `font: inherit`
- * alone is what the toolbar's buttons get and it is why the spike's chrome
- * reads as chrome and this pane's did not; the Cancel out of a mode is the
- * one button in the editor an author reaches for while lost. */
+/* A real control, not a run of text with a click handler - it wears
+ * `sb-button` for that now. What stays here is the part that is this button
+ * and not the family: it is accented rather than quiet, because the Cancel
+ * out of a mode is the one button in the editor an author reaches for while
+ * lost (sb-dfyk), and it does not stretch in the header's flex row. */
 .sb-palette__cancel {
   flex: 0 0 auto;
-  font: inherit;
   font-weight: var(--sb-weight-medium);
-  cursor: pointer;
   color: var(--sb-accent);
-  background: var(--sb-bg);
-  border: var(--sb-border-width) solid var(--sb-accent);
-  border-radius: var(--sb-radius-sm);
-  padding: 0 var(--sb-space);
+  border-color: var(--sb-accent);
 }
 
 .sb-palette__cancel:hover,
@@ -1887,14 +1977,11 @@
   gap: var(--sb-space);
 }
 
+/* The toolbar wraps, and a label breaking mid-phrase ("Fit / width") is the
+ * one thing a row of controls cannot do. Everything else these buttons wear
+ * is `sb-button`. */
 .sb-toolbar__button {
-  font: inherit;
-  cursor: pointer;
-}
-
-.sb-toolbar__button[disabled] {
-  cursor: default;
-  opacity: var(--sb-disabled-opacity);
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------------------ shell
@@ -2094,6 +2181,8 @@
 
 .sb-toolbar__zoom-step {
   padding: 0 var(--sb-space);
+  border: 0;
+  border-radius: 0;
   background: var(--sb-bg-muted);
   color: var(--sb-fg);
 }
@@ -2105,11 +2194,6 @@
   border-inline: var(--sb-border-width) solid var(--sb-border);
   text-align: center;
   color: var(--sb-fg-muted);
-}
-
-.sb-toolbar__button[aria-pressed="true"] {
-  color: var(--sb-accent);
-  font-weight: var(--sb-weight-medium);
 }
 
 .sb-toolbar__metrics {

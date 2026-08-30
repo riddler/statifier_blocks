@@ -15,6 +15,7 @@ defmodule StatifierBlocks.AssetsTest do
 
   @hook_source "assets/js/statifier_blocks.js"
   @measure_source "assets/js/statifier_blocks_measure.js"
+  @stylesheet "assets/css/statifier_blocks.css"
 
   # Every file in `assets/js/`, so a third hook cannot arrive by arriving in a
   # third file the scan below was never told about.
@@ -254,6 +255,173 @@ defmodule StatifierBlocks.AssetsTest do
         assert File.regular?(Path.join("assets", path))
       end
     end
+  end
+
+  describe "the button vocabulary (sb-sl6f)" do
+    # The defect: the reset keeps native chrome ON for form controls on
+    # purpose, so a button whose class the stylesheet never mentions renders
+    # as whatever the host's browser paints. That is invisible to every other
+    # test in the suite - the markup is correct, the events fire, and the
+    # control simply does not look like one.
+    # Sabotage: dropping the `.sb-field__add` rule from the stylesheet - the
+    # add control goes back to native chrome and this names it.
+    test "every class a button carries has a rule in the stylesheet" do
+      unstyled =
+        for {class, source} <- button_classes(), not styled?(class), do: {class, source}
+
+      assert unstyled == [], """
+      A button whose classes the stylesheet never mentions is painted by the
+      browser, not by this package - which is exactly the state sb-sl6f found
+      Undo, Redo, the zoom steps, the two fits, Cancel insert and a list
+      field's add/remove in. Every class below is emitted on a `<button>` and
+      matched by no selector in #{@stylesheet}:
+
+      #{Enum.map_join(unstyled, "\n", fn {class, source} -> "  #{class} (#{source})" end)}
+      """
+    end
+
+    # The vocabulary is a vocabulary only if the plain controls actually speak
+    # it. Named rather than derived: "which buttons are quiet ones" is a
+    # design ruling, and a rule that derived it from the markup would pass
+    # whatever the markup happened to say.
+    # Sabotage: removing `sb-button` from the toolbar's class attributes - the
+    # toolbar's buttons keep working and stop looking like controls, and this
+    # goes red naming them.
+    test "the quiet controls wear it" do
+      wearing = vocabulary_wearers()
+
+      for class <- ~w(
+            sb-toolbar__button sb-toolbar__zoom-step
+            sb-field__add sb-field__remove sb-palette__cancel
+          ) do
+        assert class in wearing, """
+        `#{class}` is one of the controls sb-sl6f put in the button
+        vocabulary, and it is not carrying `sb-button`. Either it wears the
+        family or the bead's ruling changed; a per-class copy of the family's
+        border and hover is the outcome the vocabulary exists to prevent.
+
+        Carrying `sb-button`: #{inspect(Enum.sort(wearing))}
+        """
+      end
+    end
+
+    # A control has to be able to report two things about itself, and the
+    # vocabulary is where they are said once. `[disabled]` is the half the
+    # bead's acceptance names: Undo and Redo are disabled with an empty
+    # history (shell_test), and this is what makes that state visible.
+    # Sabotage: deleting the `.sb-button[disabled]` rule - a disabled Undo
+    # renders at full strength with a pointer cursor and only a human looking
+    # at the screen would know.
+    test "it carries the two states a control reports" do
+      css = stylesheet()
+
+      assert css =~ ~r/\.sb-button\[disabled\]\s*\{[^}]*opacity:\s*var\(--sb-disabled-opacity\)/,
+             "a disabled control has to read as disabled, and `--sb-disabled-opacity` is the " <>
+               "token a host reverses that with"
+
+      assert css =~ ~r/\.sb-button\[aria-pressed="true"\]\s*\{[^}]*var\(--sb-accent\)/,
+             "Fit width and Fit active are toggles; `aria-pressed` is what says which is on"
+
+      assert css =~ ~r/\.sb-button:hover:not\(\[disabled\]\)\s*\{/,
+             "the hover is what separates a control from `sb-toolbar__chip`, which is not one"
+    end
+
+    # 14b's reset is `:where()`-wrapped for a reason and the button family is
+    # the surface most likely to tempt someone into widening it: styling the
+    # bare `button` element would reach every host button inside the editor's
+    # subtree, including ones this package did not render.
+    # Sabotage: adding `:where(.sb-editor) button { border: ... }` to the
+    # reset - the package starts painting controls it does not own and this
+    # goes red.
+    test "it is a class vocabulary, not a widened element reset" do
+      refute stylesheet() =~ ~r/:where\(\.sb-editor\)\s+button\s*\{[^}]*border\s*:/,
+             "the reset restores inherited type and nothing else; a button LOOK belongs to a " <>
+               "class, so a host's own button inside the editor is left alone"
+    end
+
+    # The corroborator: a scan over a hard-coded directory says nothing about
+    # a button that lives outside it.
+    # Sabotage: moving a `<button>` into a module outside `editor/` - the scan
+    # above goes quiet about it and this notices.
+    test "the scan covers every button in lib" do
+      files_with_buttons =
+        "lib/**/*.ex"
+        |> Path.wildcard()
+        |> Enum.filter(&(File.read!(&1) =~ "<button"))
+        |> Enum.sort()
+
+      assert files_with_buttons -- button_sources() == [], """
+      A `<button>` outside `lib/statifier_blocks/editor/` is a control the
+      scan above never looks at, so it could carry any class at all and no
+      test would say so.
+
+      Outside the scan: #{inspect(files_with_buttons -- button_sources())}
+      """
+
+      assert files_with_buttons != []
+    end
+  end
+
+  # Every `<button>` in the editor components, paired with the classes it
+  # carries. The pairing is nearest-following: between a `<button` and its own
+  # `class=` no other element can open, so the next class attribute in the
+  # source is always that button's.
+  defp button_classes do
+    for source <- button_sources(),
+        text = File.read!(source),
+        {position, _length} <- :binary.matches(text, "<button"),
+        class <- classes_after(text, position),
+        do: {class, source}
+  end
+
+  defp button_sources, do: Path.wildcard("lib/statifier_blocks/editor/*.ex")
+
+  # The `sb-` classes in the first class attribute at or after `position`.
+  # Both HEEx forms are read: `class="a b"` and `class={["a", cond && "b"]}`,
+  # where every literal in the list is a class the element can carry.
+  defp classes_after(text, position) do
+    rest = binary_part(text, position, byte_size(text) - position)
+
+    case Regex.run(~r/class=(?:"([^"]*)"|\{(.*?)\n?\s*\}\n)/s, rest, capture: :all_but_first) do
+      nil ->
+        []
+
+      captures ->
+        captures
+        |> Enum.join(" ")
+        |> then(&Regex.scan(~r/[\w-]+/, &1))
+        |> List.flatten()
+        |> Enum.filter(&String.starts_with?(&1, "sb-"))
+    end
+  end
+
+  # The classes that appear beside `sb-button` on the same element.
+  defp vocabulary_wearers do
+    for {class, _source} <- button_classes(),
+        class != "sb-button",
+        "sb-button" in classes_beside(class),
+        uniq: true,
+        do: class
+  end
+
+  defp classes_beside(class) do
+    for source <- button_sources(),
+        text = File.read!(source),
+        {position, _length} <- :binary.matches(text, "<button"),
+        classes = classes_after(text, position),
+        class in classes,
+        found <- classes,
+        do: found
+  end
+
+  # A class is styled when some selector in the stylesheet names it - on its
+  # own, in a group, or qualified by a state.
+  defp styled?(class) do
+    stylesheet() =~ ~r/\.#{Regex.escape(class)}(?![\w-])/
+  end
+
+  defp stylesheet do
+    @stylesheet |> File.read!() |> StatifierBlocks.ThemeAudit.strip_comments()
   end
 
   # Every hook exported by every file in `assets/js/`, in file order and then
