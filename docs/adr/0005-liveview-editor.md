@@ -2003,8 +2003,9 @@ there is no selection. With `node: nil` the Findings tab has no block to be
 about, and since `sb-dbqq` (campaign-018 ruling D1) it lists the **document's**
 findings, grouped by block. That is 3A's empty state and not a fourth surface:
 the moment anything is selected the tab is that block's findings again, the
-document-level list an author *navigates* is still the drawer's (R4), and no
-tab was added. What 3A forbids is a pane that is about two subjects at once;
+document-level list an author *navigates* is still the drawer's (3A's own
+sentence above: anything about the document goes to the drawer), and no tab
+was added. What 3A forbids is a pane that is about two subjects at once;
 what it does not require is a pane that says nothing when its subject is
 missing.
 
@@ -3112,7 +3113,8 @@ author reaches by asking a question is where a long or document-shaped answer
 can be given honestly. D4 moved the read-only config there because a card
 could not hold it; `sb-dbqq` gave the Findings tab the document's findings
 because a pane with no selection had nothing to hold at all. Both leave the
-card and the drawer exactly as decision 12 and R4 describe them.
+card and the drawer exactly as decision 12 and shell amendment 3A
+("anything about the document goes to the drawer") describe them.
 
 ---
 
