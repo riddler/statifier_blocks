@@ -852,7 +852,35 @@
  * geometry the connectors are measured from does not shift under a rule about
  * paint.
  */
+/* And a container is as wide as what it holds, rather than as wide as the
+ * box it was handed. That is the spike's "every box means exactly what it
+ * encloses", and it is a geometry fix before it is a look.
+ *
+ * Left to stretch, a container takes its parent's width and its body is
+ * forced to the same, while the work inside overflows to the right. None of
+ * that is visible - a container draws no box - but `Connectors` measures
+ * those boxes, and an interrupt channel offset from the right edge of one is
+ * then drawn straight through the contents it is escaping, which is the one
+ * thing the channel exists to prevent. Measured on the `card_processing`
+ * fixture, the validation group's body box was 386px wide around 811px of
+ * content, so its channel turned down 425px inside its own body.
+ *
+ * At `max-content` every box is as wide as what it encloses and the channel
+ * turns down just clear of it - which, with the body anchor the interrupt
+ * walk now measures off, is the whole of the "go down right away" routing.
+ * No new routing logic; two boxes that stopped lying.
+ *
+ * `width` rather than the spike's `align-items: center`, which is the same
+ * rule expressed against a different canvas. The spike's canvas grows to its
+ * content; this one is sized from the server's measured extent, so centring
+ * an over-wide body inside an under-wide box pushes half the overflow LEFT,
+ * off the side of a pane that only scrolls right - the document is then
+ * partly unreachable. Sizing the box itself keeps every left edge where it
+ * was and sends the whole overflow into the scroll direction that exists.
+ *
+ * Containers only. A leaf is already `--sb-card-width` above. */
 .sb-node[data-container="true"] {
+  width: max-content;
   border-color: transparent;
   padding: 0;
   background: none;
@@ -1511,7 +1539,21 @@
  * down the centre of the column, because that is where the cards' measured
  * centres are.
  */
+/* `position: relative` and a stacking order, because the masking claim two
+ * rules below was, until this rule existed, only a claim. The connector
+ * overlay is an absolutely positioned `<svg>` over the whole canvas, so the
+ * flow edge between two siblings paints ON TOP of the "+" that sits on it
+ * however opaque the button's own surface is: an untouched element has no
+ * stacking context, and the overlay's does not lose to one that is not there.
+ * Positioned, the gap gets its own context and a `z-index` above the overlay,
+ * and the button's surface finally does what the comment below says it does -
+ * the line stops at the marker and picks up again beneath it, which is what
+ * makes the "+" read as sitting ON the flow rather than under a line through
+ * it. Scoped to the gap and not to the slot, so nothing else in the canvas
+ * climbs over the connectors with it. */
 .sb-gap {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1551,9 +1593,25 @@
  * the vocabulary exists to prevent - and `border: none`, which this rule used
  * to carry, is the specific way that copy goes wrong: it silently cancels the
  * family on the one control that most needs to look like one. */
+/* The glyph is sized and weighted here for one reason: the canvas is read at
+ * a zoom. At 50% the family's default text size puts the "+" at five or six
+ * device pixels of stroke, where two thin strokes crossing at a point wash
+ * out into a grey dot - the control is still there, still clickable, and no
+ * longer legible as a plus, which is the one thing it has to say. A step up
+ * in size and the strong weight are what survive the halving; `line-height:
+ * 1` keeps the taller glyph from growing the button's box and pushing every
+ * card on the canvas apart, since the gap's height is what sets the spacing
+ * between siblings.
+ *
+ * Size and weight only. Colour stays muted above for the reason stated
+ * there - forty legible plus signs are a canvas of markers, forty ACCENTED
+ * ones are a canvas of plus signs. */
 .sb-gap__add {
   padding: 0 var(--sb-space-half);
   color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-md);
+  font-weight: var(--sb-weight-strong);
+  line-height: 1;
 }
 
 /* Highlighted on hover, on keyboard focus, and for the whole of a drag. The
@@ -1591,7 +1649,6 @@
   background: var(--sb-accent-muted);
   outline: var(--sb-border-width) solid var(--sb-accent);
   outline-offset: var(--sb-border-width);
-  font-weight: var(--sb-weight-strong);
 }
 
 /* The empty slot's placeholder. An empty arm is a real arm - 10d draws a fan

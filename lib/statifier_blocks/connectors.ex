@@ -102,12 +102,18 @@ defmodule StatifierBlocks.Connectors do
   whose value is the anchor key. One attribute rather than a family of them
   because the hook's read is then `querySelectorAll("[data-sb-anchor]")` -
   one query, no knowledge of block structure, and no key composed on the
-  client. The seven kinds of anchor the shipped markup stamps:
+  client. The eight kinds of anchor the shipped markup stamps:
 
     * `stage` - the canvas root, which is what makes the other boxes
       comparable to each other (7c names the stage box explicitly);
-    * `node:<block id>` - a block's whole box, which is where an interrupt
+    * `node:<block id>` - a block's whole box, the fallback an interrupt
       channel is placed relative to;
+    * `slots:<block id>` - a container's BODY box, the one an interrupt
+      channel is placed relative to when it was measured. A container's node
+      box is only as wide as the width its parent handed down, which is not
+      the width of what it holds: the body overflows it to the right. A
+      channel offset from that box is a channel drawn through the container's
+      own contents, which is the one thing the channel exists to avoid;
     * `card:<block id>` - a block's chrome, the box an edge arrives at;
     * `outlet:<block id>` - a zero-height anchor at the bottom of a block,
       the box flow leaves from;
@@ -203,6 +209,27 @@ defmodule StatifierBlocks.Connectors do
   @doc "A block's whole box."
   @spec node_anchor(StatifierBlocks.Block.id()) :: String.t()
   def node_anchor(block_id), do: "node:" <> block_id
+
+  @doc """
+  A container's body: the box its slots occupy, and the box an interrupt
+  channel is offset from.
+
+  Separate from `node_anchor/1` because the two boxes are not the same box.
+  A container's node box takes the width its own parent handed down, and the
+  body inside it is as wide as the work it holds - so the body OVERFLOWS the
+  node box rather than fitting inside it. Measured on the `card_processing`
+  fixture, one container's node box was 386px wide around 811px of content.
+  A channel offset from the node box is therefore drawn straight through the
+  contents it is supposed to be escaping. The body box is the container's
+  real extent, so a channel offset from it clears everything the container
+  holds - the routing rule, restored to the box it was written for.
+
+  Absent on a leaf and on a collapsed container - neither renders a body -
+  which is why the interrupt walk falls back to `node_anchor/1` rather than
+  skipping the edge.
+  """
+  @spec slots_anchor(StatifierBlocks.Block.id()) :: String.t()
+  def slots_anchor(block_id), do: "slots:" <> block_id
 
   @doc "A block's chrome: the box an edge arrives at."
   @spec card_anchor(StatifierBlocks.Block.id()) :: String.t()
@@ -516,7 +543,7 @@ defmodule StatifierBlocks.Connectors do
   end
 
   defp rail_edge(%Node{} = node, :interrupt, %Node{block_id: id}, exit_key, lane, m) do
-    with %Rect{} = box <- Map.get(m, node_anchor(node.block_id)),
+    with %Rect{} = box <- channel_box(node.block_id, m),
          %Rect{} = card <- Map.get(m, card_anchor(id)),
          %Rect{} = target <- Map.get(m, exit_key) do
       from = %{x: card.x + card.width, y: card.y + card.height / 2}
@@ -525,6 +552,20 @@ defmodule StatifierBlocks.Connectors do
       {%Edge{kind: :interrupt, d: interrupt_path(from, inlet(target), channel_x)}, lane + 1}
     else
       _missing -> :none
+    end
+  end
+
+  # The box an interrupt channel is measured off: the container's body when
+  # the browser measured one, its node box when it did not. The body is the
+  # right box for the reason `slots_anchor/1` gives, and the fallback is
+  # here rather than a skipped edge because a container whose body anchor is
+  # missing is a container that renders no body at all - collapsed - and an
+  # edge out of a collapsed group still has to be drawn.
+  @spec channel_box(StatifierBlocks.Block.id(), measurement()) :: Rect.t() | nil
+  defp channel_box(block_id, m) do
+    case Map.get(m, slots_anchor(block_id)) do
+      %Rect{} = body -> body
+      _absent -> Map.get(m, node_anchor(block_id))
     end
   end
 
@@ -573,9 +614,28 @@ defmodule StatifierBlocks.Connectors do
   Straight when the two are vertically aligned; otherwise down to the
   halfway line, across, and down again, with the corners rounded by `radius`
   - clamped so a short edge cannot turn its own corners inside out.
+
+  **Down, or level, and never up.** A head above its tail is clamped to the
+  tail's own `y` and the edge is drawn level rather than ascending. The
+  vocabulary has no upward flow: every arrowhead on the canvas is oriented
+  along its path, so a path that climbed would render an arrow pointing back
+  at the block the flow just left, and an author reads that as a loop the
+  document does not contain. Clamping rather than routing around is the
+  honest rendering, because the input is not a real upward edge - it is two
+  boxes that were measured against different layout passes, or a slot whose
+  header sits above the hub that feeds it. Level says "these two are at the
+  same height", which is what the numbers actually said; a detour would draw
+  a descent nothing in the tree asked for.
+
+  Two coincident points therefore draw a zero-length path and no visible
+  edge, which is the same sentence: there is no distance between them to
+  draw an edge along.
   """
   @spec flow_path(point(), point(), number()) :: String.t()
   def flow_path(from, to, radius \\ @default_radius)
+
+  def flow_path(%{y: fy} = from, %{y: ty} = to, radius) when ty < fy,
+    do: flow_path(from, %{to | y: fy}, radius)
 
   def flow_path(%{x: fx, y: fy}, %{x: tx, y: ty}, _radius)
       when abs(tx - fx) < @straight_epsilon,

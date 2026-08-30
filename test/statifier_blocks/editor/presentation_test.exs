@@ -1416,6 +1416,89 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "the gap marker's stylesheet (campaign-021 ruling R6)" do
+      @stylesheet "assets/css/statifier_blocks.css"
+
+      # The gap's masking claim, made true. The connector overlay is an
+      # absolutely positioned `<svg>` over the whole canvas, so an unpositioned
+      # "+" has no stacking context to win with and the flow line paints
+      # straight through it however opaque the button's surface is.
+      # Sabotage: dropping `position: relative` from `.sb-gap` (leaving the
+      # `z-index`) - `z-index` on a static element is inert, the line goes back
+      # over the marker, and this goes red on the missing declaration.
+      test "the gap owns a stacking context above the connector overlay" do
+        css = File.read!(@stylesheet)
+
+        rule = Regex.run(~r/^\.sb-gap\s*\{(.*?)\n\}/ms, css)
+        assert rule, "the scan actually found the gap rule"
+
+        body = Enum.at(rule, 1)
+        assert body =~ ~r/position:\s*relative/
+        assert body =~ ~r/z-index:\s*[1-9]/
+      end
+
+      # The glyph at a zoom. Halved, the family's default text size puts the
+      # "+" at a few device pixels of stroke and two thin strokes crossing at
+      # a point wash out into a grey dot.
+      # Sabotage: removing the `font-weight` declaration - the marker is
+      # bigger and still washes out at 50%, which is the half of the fix that
+      # a size change alone does not buy.
+      test "the glyph is a step larger and carries the strong weight" do
+        css = File.read!(@stylesheet)
+
+        rule = Regex.run(~r/^\.sb-gap__add\s*\{(.*?)\n\}/ms, css)
+        assert rule, "the scan actually found the glyph rule"
+
+        body = Enum.at(rule, 1)
+        assert body =~ ~r/font-size:\s*var\(--sb-text-md\)/
+        assert body =~ ~r/font-weight:\s*var\(--sb-weight-strong\)/
+      end
+
+      # The dashed ring is the editor's word for "nothing is here yet", so it
+      # belongs to the empty slot's placeholder and to nothing else. Forty
+      # dashed rings down a populated sequence say the document is empty.
+      # Sabotage: moving the `border` declaration up into `.sb-gap__add` -
+      # every gap on the canvas wears the placeholder's ring and this goes red
+      # on the base rule.
+      test "the dashed ring stays scoped to the empty slot's placeholder" do
+        css = File.read!(@stylesheet)
+
+        assert css =~
+                 ~r/\.sb-slot\[data-empty="true"\] > \.sb-gap > \.sb-gap__add \{[^}]*dashed/ms
+
+        base = Enum.at(Regex.run(~r/^\.sb-gap__add\s*\{(.*?)\n\}/ms, css), 1)
+        refute base =~ "dashed"
+      end
+    end
+
+    describe "the container's own width (campaign-021 ruling R7)" do
+      @stylesheet "assets/css/statifier_blocks.css"
+
+      # A geometry rule before it is a look. Left to stretch, a container is
+      # as wide as its parent and its body is forced to the same while the
+      # work inside overflows to the right; `Connectors` measures that box,
+      # and an interrupt channel offset from its right edge turns down inside
+      # the very contents it is escaping.
+      # Sabotage: dropping `width: max-content` from the container rule - the
+      # box goes back to its parent's width, `Connectors` measures the lie
+      # again, and this goes red on the missing declaration.
+      test "a container is as wide as what it holds, and a leaf keeps the card width" do
+        css = File.read!(@stylesheet)
+
+        container =
+          Enum.at(Regex.run(~r/^\.sb-node\[data-container="true"\]\s*\{(.*?)\n\}/ms, css), 1)
+
+        assert container =~ ~r/width:\s*max-content/
+
+        # The leaf rule is untouched by that: a card is one width everywhere,
+        # and shrink-wrapping one to its own text is a different canvas.
+        leaf =
+          Enum.at(Regex.run(~r/^\.sb-node\[data-container="false"\]\s*\{(.*?)\n\}/ms, css), 1)
+
+        assert leaf =~ ~r/width:\s*var\(--sb-card-width\)/
+      end
+    end
+
     describe "the operator pre-decision" do
       # Sabotage: adding `defp layout_class(%Node{type: "core.parallel"}), do: ...`
       # to BlockNode - the type name appears in a component source and this goes
