@@ -3589,3 +3589,106 @@ own beyond the pane's name and the control that brings it back.
 Filed with `sb-flae`, under campaign-021 rulings R2 and R3 - the fullscreen
 stance and the inspector's fold, in one section because they are one claim
 about the shell read from two sides.
+
+---
+
+## Amendment (2026-08-30): the shell arrangement, the drawer's tab strip is also a host seam
+
+**Status: proposed (2026-08-30), implementing bead `sb-lpdt`, a block-B
+constituent of campaign-021.** Additive; the 2026-08-29 shell arrangement
+amendment stands as written and no text above this line is edited by this
+section. What it qualifies, it qualifies by naming a second party rather than
+by moving a rule: every clause below keeps its force over the package's own
+tabs exactly as it reads today.
+
+An amendment rather than a note, deliberately. A note records what accepted
+text already meant; this section says something the accepted text does not
+say, and a reader of that text alone would reach the opposite conclusion.
+
+### Context
+
+Two clauses of the shell amendment bear on this, and both are quoted here
+rather than paraphrased because the whole of the question is what their words
+cover.
+
+The first is the summary bullet: "The drawer's tab set is open by construction
+and closed by rule. Truth tables ship first, fixture runs and the datamodel
+view have reserved places, and anything later is admitted by the 1A test -
+tabular and document-level - or it is not admitted." It is written about the
+surface unqualified. Read on its own it says that every tab the drawer will
+ever carry passes through this record.
+
+The second is 8A's table, whose package row reads "the canvas toolbar (zoom,
+fit width, fit active, depth and count), the tabbed inspector, **the drawer**,
+the grouped palette with descriptions", against a host row of "the outer
+header: document identity, the document switcher, the theme control, compile
+and publish". The drawer is on the package's side of that split, whole. So the
+`:header` slot is not a precedent that carries here: the header is the host's
+surface by that table, and the drawer is not.
+
+Both are true and neither anticipated a host with content that passes 1A's own
+test. A host executing the open document has one: a run feed is one row per
+step about the whole document, which is what 1A admits and what the inspector
+cannot hold.
+
+### The qualification
+
+**For a tab the host contributes, the 1A admission test transfers to the host
+as its own obligation.** The package draws the tab, activates it, counts it on
+the strip and gives it a panel; what goes in the panel is the host's, and
+whether it is tabular and document-level is the host's judgement to make about
+its own content. This is 8A's existing shape, not a new one: 8A already states
+that "the host acquires a small obligation it did not have: it renders the
+header and it stores the drawer height", and it already makes host markup the
+host's responsibility under "slots for markup, events for actions". The drawer
+gains a third item on that list.
+
+**The package's built-in set stays governed by the bullet exactly as written.**
+Truth tables and findings ship; fixture runs and the datamodel view keep their
+reserved places; anything this package adds to its own tab set is admitted by
+1A here, in this record, or it is not admitted. The bullet loses nothing. What
+it gains is a stated scope, and 8A's package row gains one clause: the drawer
+is the package's surface, and its tab strip is a seam.
+
+**The first tenant is the examples app's run feed**, the consumer campaign-021
+names for this seam. It is a different bead in a different repo and nothing in
+this package knows about it.
+
+### How it attaches
+
+`drawer_tabs`, an assign: a list of `%{id:, title:, content:}` descriptors with
+an optional `count:`, where `content` is a function component the drawer calls
+when its tab is active. That is decision 9's existing seam shape, the one
+`icon` and `expression_component` already use.
+
+An assign rather than a slot, and the reason is empirical rather than
+stylistic: a slot cannot carry live host content through a `LiveComponent`,
+because such a component re-renders when the assigns it was passed change and
+a host assign read only inside a slot body is not one of them, so an appended
+step never reaches the screen. A run feed that does not move is not a run feed,
+which is what settles the shape.
+
+Two admission rules are the package's and are about the strip rather than about
+content: a host tab named for one of the package's own tabs is dropped, because
+that name already resolves to the package's tab and two identically titled tabs
+on one strip cannot be told apart; and a repeated id is kept once, because the
+id is stamped into the tab's DOM id and its panel's and a duplicate breaks the
+`aria-controls` pairing for both.
+
+### Unchanged by this amendment
+
+Decision 1A's test, in its own words and in its own scope. 2A's five drawer
+states, its strip, its per-viewer height and the resize that is a command
+rather than a hook. The package's two tabs and the reserved places behind them.
+3A's inspector. The component tree of decision 13, and decision 7's single
+hook - a host tab adds no JavaScript.
+
+One consequence is worth stating rather than leaving to be discovered: the
+strip's unchosen-tab rule, which 2A gives as the first tab that actually holds
+something, now reaches host tabs too, so a document with no truth tables, no
+findings and a running feed opens on the feed. That is 2A's own reasoning about
+the strip applied to a third tab, the way the 2026-08-29 findings ruling
+applied it to a second.
+
+Filed with `sb-lpdt`, as campaign-021's block-B constituent for the drawer
+seam.

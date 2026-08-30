@@ -205,9 +205,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     8A's split gives the drawer to the package, and 1A's test - tabular, and
     about the whole document - governs what the package puts in it. Neither
-    says the package is the only party with content that passes that test: a
-    host executing the open document has a run feed, and a feed of steps is a
-    grid of rows about the whole document. `drawer_tabs` is where it goes.
+    anticipated a host with content that passes that test: a host executing the
+    open document has a run feed, and a feed of steps is a grid of rows about
+    the whole document. The 2026-08-30 amendment recording the drawer's tab
+    strip as a host seam transfers 1A to the host for the tabs it contributes,
+    and `drawer_tabs` is where they go.
 
     Each entry is `%{id:, title:, content:}` with an optional `count:`. `id` is
     the host's own name for the tab and is what its DOM id and its panel's are
