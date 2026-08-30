@@ -138,6 +138,47 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       def palette_entry, do: %{label: "Intake"}
     end
 
+    defmodule NamedAndSummarising do
+      @moduledoc """
+      A host type that both names its instances and summarises them - the
+      only shape that can draw both second lines at once, and therefore the
+      only fixture that can prove it draws one (ADR-0005 amendment 10q).
+      """
+
+      @behaviour StatifierBlocks.BlockType
+
+      @impl true
+      def current_version, do: 1
+
+      @impl true
+      def slots(_config), do: []
+
+      @impl true
+      def config_schema(_config),
+        do: [%{key: "label", type: :string, label: "Name", required?: false, default: ""}]
+
+      @impl true
+      def validate_config(_config), do: :ok
+
+      @impl true
+      def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+
+      @impl true
+      def palette_entry, do: %{label: "Intake"}
+
+      @impl true
+      def summary(_config), do: ["from the type"]
+    end
+
+    defp both_document do
+      Document.new(
+        Block.new("host.both", id: "blk_both", config: %{"label" => "Collect the details"}),
+        id: "doc_both"
+      )
+    end
+
+    defp both_palette, do: Palette.new(%{"host.both" => NamedAndSummarising})
+
     # Three cards and a root: one block with a name of its own, one without,
     # and one that calls a handler. Every line of the card face is on the page
     # once, and every one of them is absent from at least one other card.
@@ -550,11 +591,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
 
       # An unnamed block still says its type once: the second line is either
-      # the type's summary of this block's config (ADR-0002 amendment H5) or
-      # nothing at all, and never the type label the line above already
-      # carries.
+      # the type's summary of this block's config, drawn as a chip row
+      # (ADR-0002 amendment H5, ADR-0005 amendment 10q), or nothing at all,
+      # and never the type label the line above already carries.
       # Sabotage: dropping the `:if={ViewModel.subtitle(@node)}` guard - the
-      # invoke card, which declares no summary, grows an empty second line.
+      # unnamed cards grow a second line repeating their own title.
       test "an unnamed block says its type once", %{conn: conn} do
         {:ok, view, _html} =
           mount_editor(conn, document: named_document(), palette: named_palette())
@@ -565,15 +606,87 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  "Wait"
                )
 
-        assert has_element?(
+        refute has_element?(
                  view,
-                 ~s([data-block-id="blk_wait"] > .sb-node__chrome > .sb-node__type),
-                 "timer 1h"
+                 ~s([data-block-id="blk_wait"] > .sb-node__chrome > .sb-node__type)
                )
 
         refute has_element?(
                  view,
                  ~s([data-block-id="blk_call"] > .sb-node__chrome > .sb-node__type)
+               )
+      end
+
+      # ADR-0005's 2026-08-30 amendment (decision 10, the summary chip row).
+      # Placement only: which chips a type declares is `card_summary_test`'s,
+      # and it runs with LiveView absent.
+      # Sabotage: rendering `Enum.join(chips, ", ")` into one span instead of
+      # the `:for` - the row holds one chip carrying both lanes, and the card
+      # is back to the joined line this amendment replaced.
+      test "a multi-chip summary draws one element per chip", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: lanes_document())
+
+        row =
+          view
+          |> element(~s([data-block-id="blk_lanes"] > .sb-node__chrome > .sb-node__summary))
+          |> render()
+
+        chips =
+          ~r|<span[^>]*class="sb-node__chip"[^>]*>\s*([^<]*?)\s*</span>|
+          |> Regex.scan(row)
+          |> Enum.map(&Enum.at(&1, 1))
+
+        assert chips == ["signup", "email"]
+      end
+
+      # The two degenerate cases 10q states: a string summary is one chip,
+      # and no summary is no row rather than an empty one.
+      # Sabotage: dropping the `:if={ViewModel.summary_chips(@node) != []}`
+      # guard - the invoke card, which declares no summary, draws an empty
+      # row element, which is chrome with nothing in it.
+      test "one chip for a string summary, and no row without one", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: named_document(), palette: named_palette())
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_wait"] > .sb-node__chrome > ) <>
+                   ~s(.sb-node__summary > .sb-node__chip),
+                 "timer 1h"
+               )
+
+        refute has_element?(
+                 view,
+                 ~s([data-block-id="blk_call"] > .sb-node__chrome > .sb-node__summary)
+               )
+      end
+
+      # A card has one second line, and a named card has already spent it on
+      # the type label (H5). The host type here names its instances and
+      # declares no summary, so this pins the placement rule rather than the
+      # view model's exclusion, which `card_summary_test` pins directly.
+      # Sabotage: giving the row the `:if={@node.summary != []}` guard
+      # instead of `summary_chips/1` - a named card that also summarises
+      # draws both second lines.
+      test "a named card draws the type label and no chip row", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: both_document(), palette: both_palette())
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_both"] > .sb-node__chrome > .sb-node__label),
+                 "Collect the details"
+               )
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_both"] > .sb-node__chrome > .sb-node__type),
+                 "Intake"
+               )
+
+        refute has_element?(
+                 view,
+                 ~s([data-block-id="blk_both"] > .sb-node__chrome > .sb-node__summary)
                )
       end
 
@@ -948,6 +1061,50 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         body = Enum.at(rule, 1)
         assert body =~ ~r/border:\s*var\(--sb-border-width\) solid var\(--sb-border-strong\)/
         assert body =~ ~r/padding:\s*var\(--sb-space\)/
+      end
+    end
+
+    describe "the summary chip row's stylesheet (ADR-0005 amendment 10r)" do
+      # ADR-0005 amendment 10r: the row wraps rather than clipping, because a
+      # clipped row hides a lane the slots underneath it still draw.
+      # Sabotage: `flex-wrap: nowrap` - a three-lane `core.parallel` loses its
+      # last chip off the edge of a fixed-width card, and every test above
+      # stays green because the markup is unchanged.
+      test "the chip row wraps, in the cell the type label would have used" do
+        css = File.read!(@stylesheet)
+
+        row = Regex.run(~r/^\.sb-node__summary\s*\{(.*?)\n\}/ms, css)
+        assert row, "the scan actually found the row rule"
+
+        body = Enum.at(row, 1)
+        assert body =~ ~r/display:\s*flex/
+        assert body =~ ~r/flex-wrap:\s*wrap/
+
+        cell =
+          Regex.run(~r/^\.sb-node__chrome > \.sb-node__summary\s*\{(.*?)\n\}/ms, css)
+
+        assert cell, "the scan actually found the placement rule"
+
+        placement = Enum.at(cell, 1)
+        assert placement =~ ~r/grid-column:\s*2/
+        assert placement =~ ~r/grid-row:\s*2/
+      end
+
+      # The 2026-08-28 note on decision 14: config chips carry no accent, so
+      # the card's one identity stays the tile and the stripe.
+      # Sabotage: `background: var(--sb-block-accent-tint)` on the chip - a
+      # third accent-bearing element inside the card, which is the tint that
+      # note ratified the deletion of.
+      test "a summary chip carries no accent" do
+        css = File.read!(@stylesheet)
+
+        rule = Regex.run(~r/^\.sb-node__chip\s*\{(.*?)\n\}/ms, css)
+
+        assert rule, "the scan actually found the chip rule"
+
+        body = Enum.at(rule, 1)
+        assert body =~ ~r/color:\s*var\(--sb-fg-subtle\)/
+        refute body =~ ~r/--sb-block-accent/
       end
     end
 

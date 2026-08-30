@@ -1,7 +1,9 @@
 defmodule StatifierBlocks.ViewModel.CardSummaryTest do
   @moduledoc """
   ADR-0002 amendment H5, consumption side: the card's second line when
-  nobody has named the block.
+  nobody has named the block, and ADR-0005's 2026-08-30 amendment (decision
+  10, the summary chip row) for the shape it arrives in - a list of chips
+  read through `summary_chips/1`, never a joined string.
 
   `card_face_test.exs` covers the other arm - a renamed card keeps the type
   label - and that arm is asserted here too, because the value of this seam
@@ -14,6 +16,8 @@ defmodule StatifierBlocks.ViewModel.CardSummaryTest do
   use ExUnit.Case, async: true
 
   alias StatifierBlocks.{Block, Document, Palette, ViewModel}
+
+  doctest StatifierBlocks.ViewModel, only: [summary_chips: 1]
 
   defmodule NamedAndSummarising do
     @moduledoc """
@@ -75,45 +79,53 @@ defmodule StatifierBlocks.ViewModel.CardSummaryTest do
              }).summary == ["fraud_review", "balance_check"]
     end
 
-    # sabotage: gave `Node`'s `summary` a `nil` default instead of `[]` -
-    # `subtitle/1`'s empty-list clause stops matching on an unresolvable card
-    # and the join clause is handed a nil.
+    # sabotage: gave `Node`'s `summary` a `nil` default instead of `[]` - an
+    # unresolvable card's chip row is handed a nil and the card that has the
+    # least to say is the one that stops rendering.
     test "an unresolvable node has none, because there is no type to ask" do
       node = unresolved("host.missing", %{"duration" => "30s"})
 
       assert {:unresolvable, _reason} = node.status
       assert node.summary == []
       assert ViewModel.subtitle(node) == nil
+      assert ViewModel.summary_chips(node) == []
     end
   end
 
-  describe "subtitle/1 picks the line by whose words the title is" do
-    # sabotage: made the summary clause come first - a renamed card then says
-    # its summary and never its type, and the one fact a renamed card cannot
-    # get anywhere else on the canvas is gone.
+  describe "the second line is picked by whose words the title is" do
+    # A card has one second line, so the two arms are exclusive: the named
+    # card says its type, and the chips it also declared draw nowhere.
+    # Sabotage: dropped `summary_chips/1`'s titled clause - a renamed card
+    # draws the type label AND a chip row under it, which is the second line
+    # twice and the collision this seam exists to prevent.
     test "a named block keeps the type label, summary or not" do
       node = root("host.both", NamedAndSummarising, %{"label" => "Collect the details"})
 
       assert ViewModel.title(node) == "Collect the details"
       assert node.summary == ["from the type"]
       assert ViewModel.subtitle(node) == "Intake"
+      assert ViewModel.summary_chips(node) == []
     end
 
-    # sabotage: kept `subtitle/1`'s old `def subtitle(%Node{}), do: nil`
-    # catch-all ahead of the summary clauses - the whole core vocabulary is
-    # back to a one-line card and every assert in this describe block reads
-    # nil.
+    # Sabotage: had `summary_chips/1` read `[]` for every node - the whole
+    # core vocabulary is back to a one-line card, and it goes red here rather
+    # than only in the markup test beside it.
     test "an unnamed block draws its summary" do
       node = root("host.both", NamedAndSummarising, %{})
 
       assert ViewModel.title(node) == "Intake"
-      assert ViewModel.subtitle(node) == "from the type"
+      assert ViewModel.subtitle(node) == nil
+      assert ViewModel.summary_chips(node) == ["from the type"]
     end
 
-    # sabotage: replaced the `", "` join with `Enum.at(chips, 0)` - a
-    # two-chip line silently loses its second half, which reads as a
-    # correctly rendered card rather than as a missing one.
-    test "a chip list joins into one line until the card grows chip markup" do
+    # The chips stay chips: an outcome and an event name are two facts, and
+    # the join that used to punctuate them as one phrase is what ADR-0005's
+    # amendment replaced.
+    # Sabotage: restored `Enum.join(chips, ", ")` in `summary_chips/1` - the
+    # row draws one chip reading "Abandon, fraud.aborted", which is the
+    # rendering this bead exists to remove and which no markup test would
+    # notice.
+    test "a chip list stays a list, one element per chip" do
       node =
         core("core.on_event", StatifierBlocks.Core.OnEvent, %{
           "outcome" => "abandon",
@@ -121,7 +133,23 @@ defmodule StatifierBlocks.ViewModel.CardSummaryTest do
         })
 
       assert node.summary == ["Abandon", "fraud.aborted"]
-      assert ViewModel.subtitle(node) == "Abandon, fraud.aborted"
+      assert ViewModel.summary_chips(node) == ["Abandon", "fraud.aborted"]
+    end
+
+    # ADR-0002 H6 declares three of its five summaries as a STRING, and
+    # `BlockType.summary/2` wraps one into a one-element list - so the
+    # one-chip case is a real card and not a degenerate shape nothing
+    # produces. `core.branch`'s line is the sharpest of the three: its own
+    # words contain a `+`, and it is still one chip.
+    # Sabotage: `List.wrap/1` dropped from `BlockType.summary/2` - a string
+    # summary becomes a chip of a string, the row draws nothing readable,
+    # and three of the five core summaries go with it.
+    test "a string summary is the one-chip case" do
+      assert core("core.wait", StatifierBlocks.Core.Wait, %{"duration" => "30s"})
+             |> ViewModel.summary_chips() == ["timer 30s"]
+
+      assert core("core.send", StatifierBlocks.Core.Send, %{"event" => "order.paid"})
+             |> ViewModel.summary_chips() == ["order.paid"]
     end
 
     # The three spike lines this bead exists to reproduce, read off the view
@@ -132,26 +160,27 @@ defmodule StatifierBlocks.ViewModel.CardSummaryTest do
       assert core("core.parallel", StatifierBlocks.Core.Parallel, %{
                "lanes" => ["fraud_review", "balance_check"]
              })
-             |> ViewModel.subtitle() == "fraud_review, balance_check"
+             |> ViewModel.summary_chips() == ["fraud_review", "balance_check"]
 
       assert core("core.wait", StatifierBlocks.Core.Wait, %{"duration" => "30s"})
-             |> ViewModel.subtitle() == "timer 30s"
+             |> ViewModel.summary_chips() == ["timer 30s"]
 
       assert core("core.on_event", StatifierBlocks.Core.OnEvent, %{
                "outcome" => "abandon",
                "event" => "fraud.aborted"
              })
-             |> ViewModel.subtitle() == "Abandon, fraud.aborted"
+             |> ViewModel.summary_chips() == ["Abandon", "fraud.aborted"]
     end
 
-    # sabotage: dropped the empty-list clause - a silent type's card draws an
-    # empty second line, which is chrome with nothing in it rather than no
-    # chrome.
+    # Sabotage: had `summary_chips/1` answer `["-"]` for an empty summary -
+    # a silent type's card draws chrome with nothing in it rather than no
+    # chrome, which is the empty-row case ADR-0005 amendment 10q rules out.
     test "a silent core type still draws no second line" do
       node = core("core.sequence", StatifierBlocks.Core.Sequence, %{})
 
       assert node.summary == []
       assert ViewModel.subtitle(node) == nil
+      assert ViewModel.summary_chips(node) == []
     end
   end
 end

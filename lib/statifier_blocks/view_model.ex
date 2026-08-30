@@ -457,22 +457,16 @@ defmodule StatifierBlocks.ViewModel do
   def title(%Node{entry: entry, type: type}), do: Map.get(entry, :label) || type
 
   @doc """
-  The line under the title, which is one of two different facts depending on
-  whose words the line above it is (ADR-0002 amendment H5).
+  The block type's own label, drawn under the title when the title is the
+  **author's** - the one thing a renamed card says nowhere else, and `nil`
+  when the author's name and the type's label are the same word.
 
-  When the title is the **author's**, it is the block type's own label - the
-  one thing a renamed card says nowhere else. When the title is the
-  **type's**, it is the type's summary of this block's config, joined into
-  one line, and `nil` when the type declares none. A subtitle repeating the
-  line above it is still noise, so the type label is never drawn twice.
-
-  The summary arm is what gives the `core.*` vocabulary a second line at
-  all: `summary/1` is optional and eight of the thirteen core types export
-  none, so `nil` stays the common answer.
-
-  A chip list is joined with `", "` here rather than dropped. The card has
-  no chip markup for a summary yet; when it grows some, it reads
-  `node.summary` directly and no block type changes.
+  `nil` for every block the author has not named, because there the second
+  line is the type's summary of this block's config and that line is a row
+  of chips rather than a string: it is `summary_chips/1`, drawn as its own
+  markup (ADR-0005's 2026-08-30 amendment, decision 10, the summary chip
+  row). This function and that one are the two arms ADR-0002 amendment H5
+  describes, and exactly one of them answers for any card.
 
       iex> alias StatifierBlocks.ViewModel
       iex> ViewModel.subtitle(%ViewModel.Node{
@@ -486,14 +480,7 @@ defmodule StatifierBlocks.ViewModel do
       ...>   block_id: "b", type: "core.wait", type_version: 1, status: :ok,
       ...>   entry: %{label: "Wait"}, summary: ["timer 30s"]
       ...> })
-      "timer 30s"
-
-      iex> alias StatifierBlocks.ViewModel
-      iex> ViewModel.subtitle(%ViewModel.Node{
-      ...>   block_id: "b", type: "core.on_event", type_version: 1, status: :ok,
-      ...>   entry: %{label: "On event"}, summary: ["Abandon", "fraud.aborted"]
-      ...> })
-      "Abandon, fraud.aborted"
+      nil
 
       iex> alias StatifierBlocks.ViewModel
       iex> ViewModel.subtitle(%ViewModel.Node{
@@ -510,8 +497,53 @@ defmodule StatifierBlocks.ViewModel do
     end
   end
 
-  def subtitle(%Node{summary: []}), do: nil
-  def subtitle(%Node{summary: chips}), do: Enum.join(chips, ", ")
+  def subtitle(%Node{}), do: nil
+
+  @doc """
+  The chips on the card's second line: the type's summary of this block's
+  config, one element per chip, and `[]` when there is no row to draw.
+
+  The other arm of ADR-0002 amendment H5, and the reader ADR-0005's
+  2026-08-30 amendment (decision 10, the summary chip row) describes. `[]`
+  means **no row at all** rather than an empty one, which is the card every
+  type had before it declared a summary: `summary/1` is optional and eight
+  of the thirteen core types declare none.
+
+  Empty for a block the author has named, because that card's second line
+  is already the type's label (`subtitle/1`) and a card has one second
+  line. A string summary arrives here as a one-element list, so the one-chip
+  case draws one chip and no separator of any kind.
+
+  Nothing is refused here. An over-long or newline-carrying chip was already
+  dropped where the node was built (`StatifierBlocks.BlockType.summary/2`,
+  under ADR-0002 B3's refuse-never-truncate discipline), so this reads what
+  survived.
+
+      iex> alias StatifierBlocks.ViewModel
+      iex> ViewModel.summary_chips(%ViewModel.Node{
+      ...>   block_id: "b", type: "core.on_event", type_version: 1, status: :ok,
+      ...>   entry: %{label: "On event"}, summary: ["Abandon", "fraud.aborted"]
+      ...> })
+      ["Abandon", "fraud.aborted"]
+
+      iex> alias StatifierBlocks.ViewModel
+      iex> ViewModel.summary_chips(%ViewModel.Node{
+      ...>   block_id: "b", type: "core.sequence", type_version: 1, status: :ok,
+      ...>   entry: %{label: "Sequence"}
+      ...> })
+      []
+
+      iex> alias StatifierBlocks.ViewModel
+      iex> ViewModel.summary_chips(%ViewModel.Node{
+      ...>   block_id: "b", type: "host.step", type_version: 1, status: :ok,
+      ...>   entry: %{label: "Intake"}, title: "Collect the details",
+      ...>   summary: ["from the type"]
+      ...> })
+      []
+  """
+  @spec summary_chips(Node.t()) :: [String.t()]
+  def summary_chips(%Node{title: title}) when is_binary(title), do: []
+  def summary_chips(%Node{summary: summary}), do: summary
 
   @doc """
   Whether a container draws as a boundary box: true when ANY of its slots

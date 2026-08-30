@@ -903,6 +903,14 @@
   grid-row: 2;
 }
 
+/* The chip row is the OTHER second line (ADR-0005 amendment 10q, 2026-08-30):
+ * a card draws the type label or the type's summary and never both, so the two
+ * share one cell rather than stacking into a row nothing ever occupies. */
+.sb-node__chrome > .sb-node__summary {
+  grid-column: 2;
+  grid-row: 2;
+}
+
 .sb-node__chrome > .sb-node__invoke {
   grid-column: 2;
   grid-row: 3;
@@ -965,6 +973,30 @@
 .sb-node__type {
   color: var(--sb-fg-subtle);
   font-size: var(--sb-text-xs);
+}
+
+/* The summary chips, one element per chip the block type declared. The row
+ * WRAPS: the card has a fixed width and a three-lane `core.parallel` is an
+ * ordinary document, so a clipped row would hide a lane the slots directly
+ * underneath it still draw - and the card and the slot list disagreeing about
+ * which lanes exist is the thing ADR-0002 amendment H's own `core.parallel`
+ * note exists to prevent. */
+.sb-node__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sb-space-half);
+}
+
+/* Muted and unaccented, per the 2026-08-28 note on ADR-0005 decision 14: the
+ * card spends its one identity on the icon tile and the stripe, and a tinted
+ * pill inside it is a second claim on the same signal. */
+.sb-node__chip {
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-muted);
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+  overflow-wrap: anywhere;
 }
 
 /* An unresolvable card's second line is a raw TYPE NAME rather than a
