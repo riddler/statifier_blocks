@@ -279,6 +279,82 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "the pre-fit gate (sb-oje0)" do
+      # The frame between the mount and the first payload is the whole defect:
+      # it is laid out at 100% and the frame after it is at the fit. The attr
+      # is what the stylesheet holds that frame back by, so it has to be on
+      # the DEAD render too - the dead render is the first thing painted.
+      # Sabotage: rendering `data-fit-pending` only when `measured?` is true -
+      # the attr appears one frame after the flash it exists to cover, which
+      # is every frame except the one that matters.
+      test "an armed fit is stamped on the root, dead render included", %{conn: conn} do
+        dead =
+          render_component(StatifierBlocks.Editor,
+            id: "editor",
+            document: EditorFixtures.signup_wizard(),
+            palette: EditorFixtures.palette(),
+            fit: :width
+          )
+
+        assert dead =~ ~s(data-fit-pending="width")
+
+        {:ok, view, html} = mount_editor(conn, fit: :width)
+
+        assert html =~ ~s(data-fit-pending="width")
+        assert has_element?(view, ~s(.sb-editor[data-fit-pending="width"][data-zoom="100"]))
+      end
+
+      # The gate is the armed fit's shadow and nothing else: it has to lift on
+      # the same payload that spends the fit, in the same render, or the stage
+      # stays hidden past the frame it was hidden for.
+      # Sabotage: stamping the attr off `@fit` instead of `@fit_pending` - it
+      # never drops for a host that opened at `:width`, and the canvas is
+      # revealed only by the 500ms fallback, on every mount, forever.
+      test "the stamp drops on the measurement that spends the fit", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, fit: :width)
+
+        measure(view)
+
+        assert has_element?(view, ~s(.sb-editor[data-fit="width"][data-zoom="80"]))
+        refute has_element?(view, ~s(.sb-editor[data-fit-pending]))
+        refute render(view) =~ "data-fit-pending"
+      end
+
+      # A host that did not opt into a fit has no frame to hide, and hiding
+      # one would be this bead inventing a blank first paint for every editor
+      # in the family.
+      # Sabotage: stamping the attr unconditionally - every editor opens
+      # hidden, and a hook-less host with `fit: :manual` waits 500ms for a
+      # canvas that was correct from the first frame.
+      test "a manual editor is never stamped, before or after measuring", %{conn: conn} do
+        for opts <- [[], [fit: :manual]] do
+          {:ok, view, html} = mount_editor(conn, opts)
+
+          refute html =~ "data-fit-pending"
+
+          measure(view)
+
+          refute render(view) =~ "data-fit-pending"
+        end
+      end
+
+      # `:active` arms a fit that resolves against a selection a mount does
+      # not have, so it moves no canvas - but it is still armed, and it is
+      # still spent by the first payload. The gate follows the arming, not the
+      # outcome, or `fit: :active` flashes exactly as `:width` used to.
+      # Sabotage: arming the gate only for `:width` - the mode a host uses to
+      # open on the selected card is the one mode left unguarded.
+      test "an armed :active fit is gated and released the same way", %{conn: conn} do
+        {:ok, view, html} = mount_editor(conn, fit: :active)
+
+        assert html =~ ~s(data-fit-pending="active")
+
+        measure(view)
+
+        refute render(view) =~ "data-fit-pending"
+      end
+    end
+
     describe "the client half of the reveal" do
       # Sabotage: dropping the `stamp === this.revealed` guard from the hook -
       # every re-render re-centres the selection, so an author cannot scroll

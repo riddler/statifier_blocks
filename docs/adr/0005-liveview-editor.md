@@ -2769,6 +2769,99 @@ step, and the stylesheet still scales.
 
 ---
 
+## Note (2026-08-30): decision 7, the pre-fit gate on an armed fit
+
+A dated note rather than an amendment: nothing in decision 7, its 2026-08-29
+amendment, or the fit note above it changes. 7a's five clauses hold as
+written and the measuring hook still writes nothing to the DOM. What this
+records is one more server-stamped attr and two stylesheet rules, both of
+them inside the contract already written down, and the reason the pairing
+needed saying out loud.
+
+### What the fit note left showing
+
+Opening at a fit is spent by the first measurement payload, so between the
+mount and that payload the canvas is laid out at 100%. The dead render and
+the first connected render both carry `data-zoom="100"`, and the render
+after them carries the fitted step. On a document wide enough to want a fit
+- which is the only document a host opts in for - the author sees the whole
+chart painted at full size and then snap. Campaign 018's host capture
+recorded it (`w4-host-light-prefit-flash`), and it reads as a bug in the
+editor rather than as a fit arriving.
+
+That flash is not a defect in the fit note's reasoning; it is the visible
+cost of what the note settled deliberately. The fit needs numbers only the
+browser has, the browser has them only once the tree is laid out, and laying
+the tree out is what paints the frame. Nothing moves that ordering. What is
+available is holding the ink back for the one frame the ordering costs.
+
+### Decision
+
+**The armed fit is stamped, and the stylesheet holds the stage back under
+it.** `.sb-editor` carries `data-fit-pending` for exactly as long as
+`fit_pending` is armed - present in the dead render, gone in the same render
+that spends the fit - and the stylesheet keeps `.sb-canvas-zoom` at
+`visibility: hidden` while it is there.
+
+Three things about that, each of them the reason a different alternative was
+not taken:
+
+- **It is `visibility`, not `display` and not `opacity`.** A hidden box is
+  still laid out, and the layout is exactly what the hook measures; the
+  measurement is what spends the fit. `display: none` would remove the
+  layout and deadlock the state it is waiting for. `opacity` would leave the
+  frame paintable and merely transparent, which is a weaker claim about a
+  frame this note says should not be shown at all.
+- **The attr is the server's, like every other.** It is stamped by the code
+  path that arms the fit and cleared by the code path that spends it, so the
+  DOM says what the assigns say and no re-render can leave a stale gate
+  behind. 7a's "writes no node, no attribute, no style, and no class" is
+  untouched: the measuring hook is not involved in this at all, and the gate
+  is reconstructible from the rendering alone.
+- **The gate follows the arming, not the outcome.** `:active` with nothing
+  selected arms a fit that moves no canvas, and it is gated all the same:
+  what is being held back is the frame before a decision, not the frame
+  before a change.
+
+**A CSS-only delayed reveal ends the wait unconditionally.** A host that
+never imports the measurement hook measures nothing, so it never spends the
+fit - the fit note says so in as many words - and with no fallback that
+host's stage would be gated forever. Blank is a worse failure than unfitted,
+and it would be a new failure introduced into a configuration that works
+today. So the same rule carries `animation: sb-fit-reveal 1ms linear 500ms
+forwards`, over a keyframe whose only declaration is `visibility: visible`.
+It fires once, half a second after the attr appears, and it is a floor
+rather than a schedule: a host that did import the hook has measured long
+before it, and the rule has stopped matching by then.
+
+The reveal is CSS because the alternative is a timer, and a timer is
+behaviour. A `Process.send_after` in the component would make a render
+depend on wall-clock time and give every mount a message to schedule and to
+drain; a timer in the hook would be 7a's "holds no behaviour" breaking in
+the one hook that is allowed none. An `animation` is a declaration in a
+stylesheet a host can read, override and diff, which is what the zoom ladder
+beside it is too.
+
+### Consequences
+
+The hook-less host is unchanged in every way an author can name but one: its
+stage appears half a second after the rest of the editor, at 100%, with the
+mode set. That is the state the fit note already describes, arriving a
+little later, and the cost is paid only by a host that opted into a fit
+without importing the hook - which is the pairing the README's registration
+section already tells a host not to build.
+
+A host that overrides the gate rule away gets the flash back and nothing
+else moves: the attr is inert to everything except the stylesheet. A host
+that overrides the keyframe away and has no hook gets a stage that never
+appears, and that is the one combination a theme must not ship.
+
+No new hook, no new command, no new anchor vocabulary and no new state: one
+attr the server already had a value for, and two rules in the section that
+already scales the canvas.
+
+---
+
 ## Amendment (2026-08-30): decision 10, the summary chip row
 
 **Status: accepted (2026-08-30, unqualified direction-agent verdict under the operator campaign-018 grant, PR 166).** Drafted 2026-08-30 as a proposed amendment, implementing bead `sb-2mxa`. Additive; decision 10 stands exactly as
