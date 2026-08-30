@@ -91,6 +91,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     simulating a drag, and it is why decision 8 is not only an accessibility
     affordance - though it is that, drag-and-drop being unusable by keyboard
     and hostile on touch.
+
+    ## The entry is also a drag source (sb-4nep)
+
+    A row carries `draggable="true"` and `data-sb-drag-type`, which is the
+    whole of this component's part in palette drag-to-insert. Dragging a type
+    onto a gap and picking it at an armed gap produce the *same* `:insert` at
+    the same position, so this is a second gesture onto decision 8's one path
+    rather than a second path - the record's command set is untouched, and the
+    keyboard route above is unchanged and still the one the tests drive.
+
+    The type name rather than a payload: the server owns what a new block of
+    that type is (`Editor.new_block/2` mints the id and the default config at
+    gesture time, decision 2), so what crosses the wire is the name the author
+    reached for and nothing that would have to be trusted.
     """
 
     use Phoenix.Component
@@ -254,6 +268,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 <button
                   type="button"
                   class="sb-palette__pick"
+                  draggable="true"
+                  data-sb-drag-type={entry.type_name}
                   data-sb-block-accent={ViewModel.accent_token(entry.entry)}
                   style={accent_style(entry.entry)}
                   phx-click="palette-pick"

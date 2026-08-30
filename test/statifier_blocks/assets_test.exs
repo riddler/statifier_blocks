@@ -219,6 +219,31 @@ defmodule StatifierBlocks.AssetsTest do
         assert source =~ attribute
       end
     end
+
+    # d5 puts validity on the SLOT, and slots nest. A drop target selected with
+    # `closest('[data-drop="ok"]')` walks past the gap's own refused slot to
+    # whatever accepting slot contains it, and the drop is then pushed with the
+    # refused slot's coordinates - which `Edit.apply/2` applies, because
+    # decision 5 has it report arity violations as findings rather than refuse
+    # them. So the stamp is the enforcement point, and reading the wrong stamp
+    # is a document corruption no ExUnit test reaches: it was found by driving
+    # both gestures in a browser (sb-4nep).
+    # Sabotage: restoring `gap.closest('[data-drop="ok"]')` in `gapFor` - this
+    # goes red naming the selector, which is the thing that was wrong.
+    test "a gap's drop target is its own slot's answer, not an ancestor's" do
+      source = File.read!(@hook_source)
+
+      refute source =~ ~s|closest('[data-drop="ok"]')|, """
+      A refused slot nested inside an accepting one would inherit the
+      ancestor's "ok", and every gap in it would become a live drop target
+      pushing the refused slot's parent-id, slot and index.
+
+      Ask the gap's nearest `[data-drop]` and compare it, so a refusal is read
+      where it was stamped.
+      """
+
+      assert source =~ ~s|gap.closest("[data-drop]")|
+    end
   end
 
   describe "packaging (decision 1)" do

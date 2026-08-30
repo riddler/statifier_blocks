@@ -1846,6 +1846,16 @@
   border-color: var(--sb-border);
 }
 
+/* The row is a drag source as well as a click target (sb-4nep), and the resting
+ * cursor stays `pointer` for that reason: the click path is the one every
+ * author can reach, and a `grab` cursor at rest would advertise the gesture
+ * that is optional over the one that is not. The pressed state is where the
+ * two diverge, so that is where the cursor says so. No token is added: this is
+ * a cursor, and the drag's own feedback is the canvas stamping `data-drop`. */
+.sb-palette__pick:active {
+  cursor: grabbing;
+}
+
 /* The tile is the slot and the glyph is what goes in it, which is why the
  * markup wraps the icon component rather than handing it the tile's class: a
  * type that declares no icon renders no glyph at all, and an entry with no
