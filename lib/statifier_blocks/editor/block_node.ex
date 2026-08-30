@@ -51,6 +51,41 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     config KEY, so a host type that calls a handler gets the same line
     `core.invoke` does by carrying the same key.
 
+    ## The unresolvable card's face (campaign-017 ruling D4)
+
+    Decision 12's card is the one exception to "the face is four lines", and
+    since ruling D4 it is a *smaller* exception than it was: a type name and
+    **one** short reason, and nothing else. Its findings and its raw config
+    are the inspector's - the Block section holds the bytes, the Findings tab
+    holds every finding - which is what keeps the card the same width as the
+    siblings it sits beside.
+
+    Before D4 this face carried both, and the pair is what made the card
+    misread. The findings are sentences, the config is a canonical JSON
+    object, and a lane is as wide as the widest thing in it: one unresolvable
+    block pushed its whole column out and buried the shape of the document
+    under the detail of its one broken part. Detail an author reads once, on
+    demand, is what a selection is for.
+
+    The reason is read off `status` - `Palette.resolve/2`'s own error term,
+    which has three shapes - and phrased here, rather than taken from the
+    first finding. Two reasons, and neither is about length alone:
+
+      * a finding's message is a sentence written for a list, and the only
+        presentation cap this package has (`BlockType`'s 24-character chip)
+        **refuses rather than truncates** under ADR-0002 amendment B3. Fed a
+        finding, it would answer `nil` every time and leave the face blank;
+        truncating one here instead would be a second, contradictory
+        presentation policy on the same card.
+      * a phrase chosen from a closed set is bounded by construction. No
+        host-authored string reaches this line, so no host can widen the
+        card by writing a longer finding - which is the failure D4 is
+        undoing.
+
+    The chrome stays dashed and the badge still counts, so the card says it
+    is broken and how much is wrong with it; what it no longer does is say
+    all of it at once.
+
     ## The container box
 
     A container draws a box around its body only when it is a BOUNDARY, and
@@ -95,11 +130,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     ## Unresolvable blocks (decision 12)
 
     A block whose type does not resolve renders rather than vanishing: its
-    type name, unavailable chrome, a `:block` finding, its config read-only as
-    canonical JSON (there is no `config_schema/1` to drive a form and
-    inventing one would be guessing), and **its existing children rendered
-    normally, recursively** - the document's `slots` map preserved every one
-    of them, decoding never having consulted a registry.
+    type name, unavailable chrome, one reason line, and **its existing
+    children rendered normally, recursively** - the document's `slots` map
+    preserved every one of them, decoding never having consulted a registry.
+
+    Its findings and its config read-only as canonical JSON (there is no
+    `config_schema/1` to drive a form and inventing one would be guessing)
+    are still rendered, and still nowhere else in the editor - campaign-017
+    ruling D4 moved them from this card to the inspector's Block and Findings
+    sections, for the reason the card-face section above gives. Decision 12's
+    "nothing is lost" is unchanged by that; what changed is which surface
+    shows it.
 
     It may be selected, moved and deleted. Its config may not be edited. It is
     never a drop target, because decision 5's first rule needs `slots/1` and
@@ -250,11 +291,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </button>
         </div>
 
-        <p :for={finding <- @node.findings} class={["sb-finding", severity_class(finding)]}>
+        <p :if={unresolvable?(@node)} class="sb-node__reason">{reason_line(@node)}</p>
+
+        <p :for={finding <- face_findings(@node)} class={["sb-finding", severity_class(finding)]}>
           {finding.message}
         </p>
-
-        <pre :if={@node.raw_config_json} class="sb-node__raw-config">{@node.raw_config_json}</pre>
 
         <div
           :if={ViewModel.fan_label(@node)}
@@ -310,6 +351,29 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         name -> "--sb-block-accent: var(#{name}, var(--sb-accent))"
       end
     end
+
+    # D4's split, stated once. A resolvable card still reads its findings on
+    # the face - a lint on a `core.wait` is one line and belongs where the
+    # author is looking. An unresolvable card reads the reason line above
+    # instead, and every one of its findings is in the inspector's Findings
+    # tab, counted by the badge the chrome already draws.
+    @spec face_findings(ViewModel.Node.t()) :: [StatifierBlocks.Finding.t()]
+    defp face_findings(%ViewModel.Node{status: {:unresolvable, _reason}}), do: []
+    defp face_findings(%ViewModel.Node{findings: findings}), do: findings
+
+    # The moduledoc says why this is a closed set of phrases rather than a
+    # clipped finding. The three shapes are `Palette.resolve/2`'s own error
+    # terms; the fourth clause is totality, not a guess - `status` is typed
+    # `{:unresolvable, term()}`, so a card cannot be the thing that raises
+    # when that set grows.
+    @spec reason_line(ViewModel.Node.t()) :: String.t()
+    defp reason_line(%ViewModel.Node{status: {:unresolvable, reason}}), do: reason_words(reason)
+
+    @spec reason_words(term()) :: String.t()
+    defp reason_words({:unknown_block_type, _type}), do: "type is not registered here"
+    defp reason_words({:block_type_too_new, _id, _stored}), do: "stored by a newer version"
+    defp reason_words({:migration_failed, _id, _reason}), do: "config migration failed"
+    defp reason_words(_unnamed), do: "type did not resolve"
 
     @spec unresolvable?(ViewModel.Node.t()) :: boolean()
     defp unresolvable?(%ViewModel.Node{status: {:unresolvable, _reason}}), do: true

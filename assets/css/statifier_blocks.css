@@ -879,15 +879,18 @@
   color: var(--sb-error);
 }
 
-.sb-node__raw-config {
-  font-family: var(--sb-font-mono);
+/* D4: the whole of an unresolvable card's face below its chrome - one line,
+ * in the editor's own words. Muted rather than in the error family: the
+ * dashed chrome and the count badge already say the card is broken, and a
+ * third red thing on a two-line card reads as three problems. The type name
+ * above it is the other half of the sentence, so this line never repeats it.
+ *
+ * `overflow-wrap` deliberately absent. Every phrase this line can hold is
+ * written in this package and is short, so a card that needed to break one
+ * mid-word would be a bug in the phrase rather than in the wrapping. */
+.sb-node__reason {
   font-size: var(--sb-text-sm);
-  white-space: pre-wrap;
-  background: var(--sb-bg-sunken);
-  border-radius: var(--sb-radius);
-  padding: var(--sb-space);
-  max-height: var(--sb-config-preview-max-height);
-  overflow: auto;
+  color: var(--sb-fg-muted);
 }
 
 /* d10: the two layouts, and the only thing that distinguishes a group from a
@@ -2251,6 +2254,25 @@
 
 .sb-inspector__meta-value[data-empty="true"] {
   color: var(--sb-fg-subtle);
+}
+
+/* D4: an unresolvable block's stored config, moved off the card into the
+ * Block section. Height-bounded as it always was, and now width-bounded too:
+ * `overflow-wrap: anywhere` is the line that was missing on the card, where
+ * a single unbreakable token - a URL, a base64 value, a long key - spilled
+ * past the card instead of wrapping inside it. `pre-wrap` decides what to do
+ * with the newlines the encoder wrote; `anywhere` decides what to do with a
+ * token that has none. A pane needs both answers, and the card had one. */
+.sb-inspector__raw-config {
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--sb-bg-sunken);
+  border-radius: var(--sb-radius);
+  padding: var(--sb-space);
+  max-height: var(--sb-config-preview-max-height);
+  overflow: auto;
 }
 
 .sb-inspector__findings {
