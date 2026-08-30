@@ -201,6 +201,45 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     optimistic concurrency on save, and it does not merge, rebase or resolve
     anything.
 
+    ## The drawer tabs a host contributes
+
+    8A's split gives the drawer to the package, and 1A's test - tabular, and
+    about the whole document - governs what the package puts in it. Neither
+    says the package is the only party with content that passes that test: a
+    host executing the open document has a run feed, and a feed of steps is a
+    grid of rows about the whole document. `drawer_tabs` is where it goes.
+
+    Each entry is `%{id:, title:, content:}` with an optional `count:`. `id` is
+    the host's own name for the tab and is what its DOM id and its panel's are
+    built from; `title` and `count` are what the tab and the collapsed strip
+    draw; `content` is a **function component** - the same seam shape `icon`
+    and `expression_component` already use, for the same reason ADR-0005
+    decision 9's does: HEEx has no dynamic-component tag, and a one-argument
+    function returning a rendered struct is the whole of the contract. It is
+    called with the tab's `id` and `count`.
+
+        Phoenix.LiveView.send_update(StatifierBlocks.Editor,
+          id: "editor",
+          drawer_tabs: [
+            %{id: "runs", title: "Runs", count: length(events),
+              content: fn assigns -> MyApp.run_feed(Map.put(assigns, :events, events)) end}
+          ]
+        )
+
+    A function and not a slot, and the reason is the live feed the seam exists
+    for. A slot's body is a closure over the *host's* assigns, which sounds
+    like the shorter path to live content and is not: a `LiveComponent` is
+    re-rendered when the assigns **it** was passed change, and a host assign
+    read only inside a slot body is not one of them, so the appended step
+    never reaches the screen. Pushing the descriptors is how every other thing
+    a host tells this editor arrives, `send_update/3` included, and it is live
+    for the same reason the run marks are.
+
+    Held as editor state, like the marks and for the same reason: an update
+    that says nothing about the tabs changes nothing about them. A host tab
+    named for one of the package's own tabs, or repeating an id already used,
+    is not drawn - `StatifierBlocks.Shell.host_tabs/1` says why.
+
     ## The findings number a host may show (sb-ukgu)
 
     A host that draws its own header usually wants to say how many findings
@@ -275,6 +314,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `theme` | no | `--sb-*` custom properties for the canvas root |
     | `fit` | no | the fit the editor **opens** in: `:manual` (the default), `:width` or `:active`; the first measurement performs it once, and an unknown value is refused into `:manual` |
     | `fixtures` | no | `%{block_id => [TruthTable.t()]}` the drawer's truth-table tab reads; `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
+    | `drawer_tabs` | no | tabs the host contributes to the drawer, each `%{id:, title:, content:}` with an optional `count:`; drawn beside the package's own and rendered by calling `content` |
     | `drawer_height` | no | the drawer's height in rem, remembered **by the host** per viewer (2A); bounded on the way in |
     | `on_drawer_resize` | no | one-argument function called with each new drawer height, which is how the host comes to have one to remember |
     | `class` | no | appended to the root element's own classes |
@@ -342,7 +382,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          fixtures: nil,
          inspector_tab: :config,
          drawer_open: false,
-         drawer_tab: nil,
+         drawer_tabs: [],
+         drawer_tab_id: nil,
          drawer_height: Shell.clamp_height(nil),
          on_drawer_resize: nil,
          zoom: Shell.default_zoom(),
@@ -564,6 +605,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             view={@drawer}
             height={@drawer_height}
             root={@view_model.root}
+            host_tabs={Shell.host_tabs(@drawer_tabs)}
             target={@myself}
           />
         </div>
@@ -674,9 +716,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # `Shell.drawer_view/1` resolves an unchosen tab to whichever one actually
     # holds something, and a pick that lands here stops it resolving. The
     # remaining reserved places (fixture runs, the datamodel view) arrive as
-    # entries in `Shell.drawer_tabs/0` and need no second handler.
-    def handle_event("drawer-tab", %{"tab" => tab}, socket),
-      do: {:noreply, assign(socket, :drawer_tab, Shell.drawer_tab(tab))}
+    # entries in `Shell.drawer_tabs/0` and need no second handler. Neither
+    # does a host's tab: it is resolved against the ids the host is currently
+    # contributing, and a pick is stored the same way whichever side named it.
+    def handle_event("drawer-tab", %{"tab" => tab}, socket) do
+      picked = Shell.drawer_tab(tab, host_tab_ids(socket.assigns))
+      {:noreply, assign(socket, :drawer_tab_id, picked)}
+    end
 
     # 2A's resize, in one round trip. The height is bounded here and handed to
     # the host, which is where a per-viewer preference belongs: the package has
@@ -1036,7 +1082,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       else
         {assign(socket,
            drawer_open: false,
-           drawer_tab: nil,
+           drawer_tab_id: nil,
            selected_id: nil,
            collapsed_ids: MapSet.new(),
            drafts: %{},
@@ -1108,12 +1154,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp drawer_view(assigns) do
       Shell.drawer_view(%{
         open?: assigns.drawer_open,
-        tab: assigns.drawer_tab,
+        tab: assigns.drawer_tab_id,
         fixtures: assigns.fixtures,
         findings: assigns.view_model.findings,
         orphan_findings: assigns.view_model.orphan_findings,
+        host_tabs: assigns.drawer_tabs,
         selected_id: assigns.selected_id
       })
+    end
+
+    # The ids the strip is actually carrying, which is what a `phx-value-tab`
+    # payload is answered against. `Shell.host_tabs/1` is applied first for
+    # the same reason it is applied to the strip: a host tab shadowing a
+    # package tab, or repeating an id, never became a tab, so it cannot be
+    # picked.
+    @spec host_tab_ids(map()) :: [Shell.host_tab_id()]
+    defp host_tab_ids(assigns) do
+      assigns.drawer_tabs |> Shell.host_tabs() |> Enum.map(& &1.id)
     end
 
     # ------------------------------------------------------------ derived

@@ -57,13 +57,40 @@ defmodule StatifierBlocks.Shell do
   @type inspector_tab :: :config | :findings | :condition
 
   @typedoc """
-  Which of the drawer's tabs is showing (1A, and the R4 ruling of
+  Which of the drawer's own tabs is showing (1A, and the R4 ruling of
   2026-08-29 that put document findings here).
+
+  The package's tabs are atoms and a host's are strings, which is what keeps
+  the two namespaces apart without a registry: `drawer_tab/2` never turns an
+  incoming tab name into an atom, so a crafted `phx-value-tab` reaches at
+  worst a host tab the host itself declared.
   """
   @type drawer_tab :: :tables | :findings
 
+  @typedoc "A host tab's id: its own name for it, and the DOM id it is stamped into."
+  @type host_tab_id :: String.t()
+
+  @typedoc "Either kind of drawer tab, as `drawer_view/1` reports the active one."
+  @type tab_id :: drawer_tab() | host_tab_id()
+
+  @typedoc """
+  A tab a host contributes, as the editor's `drawer_tabs` assign carries it.
+
+  `content` is a function component and is the editor's to call, not this
+  module's - nothing here renders anything. What the shell reads is the
+  descriptor: what the tab is called, and how much it holds. `count` is
+  optional and absent means none.
+  """
+  @type host_tab :: %{
+          :id => host_tab_id(),
+          :title => String.t(),
+          optional(:count) => non_neg_integer(),
+          optional(:content) => (map() -> term()),
+          optional(any()) => any()
+        }
+
   @typedoc "One entry in the drawer's tab strip: what it is called and how much it holds."
-  @type drawer_tab_entry :: %{id: drawer_tab(), title: String.t(), count: non_neg_integer()}
+  @type drawer_tab_entry :: %{id: tab_id(), title: String.t(), count: non_neg_integer()}
 
   @typedoc """
   One block's findings, as the inspector's unselected Findings tab lists them.
@@ -91,7 +118,7 @@ defmodule StatifierBlocks.Shell do
   @typedoc "What the drawer is showing, from its own flag, its tab and the selection."
   @type drawer :: %{
           open?: boolean(),
-          tab: drawer_tab(),
+          tab: tab_id(),
           tabs: [drawer_tab_entry()],
           status: :closed | :no_fixtures | :no_selection | :none_for_block | :ready,
           subject_id: Block.id() | nil,
@@ -394,25 +421,67 @@ defmodule StatifierBlocks.Shell do
 
   def inspector_tab(_other), do: :config
 
-  @doc "The drawer's tabs, in the order the strip lists them."
+  @doc """
+  The drawer's own tabs, in the order the strip lists them.
+
+  The package's, not the strip's whole set: a host's tabs follow these, and
+  `drawer_view/1` is where the two are put together.
+  """
   @spec drawer_tabs() :: [drawer_tab()]
   def drawer_tabs, do: @drawer_tabs
 
   @doc """
-  The drawer tab `value` names, or `:tables`.
+  The drawer tab `value` names, out of the package's tabs and `host_ids`, or
+  `:tables`.
 
   The same shape as `inspector_tab/1` and for the same reason: the tab arrives
   from a `phx-value-tab` attribute, so an unknown one is a crafted payload
   rather than a bug, and the answer to it is the first tab.
-  """
-  @spec drawer_tab(term()) :: drawer_tab()
-  def drawer_tab(value) when value in @drawer_tabs, do: value
 
-  def drawer_tab(value) when is_binary(value) do
-    Enum.find(@drawer_tabs, :tables, &(Atom.to_string(&1) == value))
+  `host_ids` are the ids of the tabs the host is currently contributing, and
+  they stay strings on the way through. A tab name is never turned into an
+  atom here: the package's tabs are matched by comparing *their* names to the
+  payload, and a host tab is matched by string equality against a list the
+  host itself declared, so no payload can grow the atom table.
+  """
+  @spec drawer_tab(term(), [host_tab_id()]) :: tab_id()
+  def drawer_tab(value, host_ids \\ [])
+
+  def drawer_tab(value, _host_ids) when value in @drawer_tabs, do: value
+
+  def drawer_tab(value, host_ids) when is_binary(value) do
+    cond do
+      match = Enum.find(@drawer_tabs, &(Atom.to_string(&1) == value)) -> match
+      value in host_ids -> value
+      true -> :tables
+    end
   end
 
-  def drawer_tab(_other), do: :tables
+  def drawer_tab(_other, _host_ids), do: :tables
+
+  @doc """
+  The host tabs that may join the strip, in the order the host declared them.
+
+  Two rules, and both are about the strip staying readable rather than about
+  what a host is allowed to want. A host tab named for one of the package's
+  own tabs is dropped, because the package's tab is the one `drawer_tab/2`
+  resolves that name to and a strip with two "Findings" on it is a strip an
+  author cannot use. A repeated id is dropped after its first appearance,
+  because the id is stamped into the tab's DOM id and its panel's, and a
+  duplicate there breaks the `aria-controls` pairing for both.
+
+  Nothing else is filtered. Which content belongs in the drawer is 1A's test -
+  tabular, and about the whole document - and the host applies it to its own
+  content the same way this package applies it to its own.
+  """
+  @spec host_tabs([host_tab()]) :: [host_tab()]
+  def host_tabs(tabs) do
+    reserved = Enum.map(@drawer_tabs, &Atom.to_string/1)
+
+    tabs
+    |> Enum.reject(&(&1.id in reserved))
+    |> Enum.uniq_by(& &1.id)
+  end
 
   @doc "The title a drawer tab carries, on the strip and on the tab itself."
   @spec drawer_title(drawer_tab()) :: String.t()
@@ -724,13 +793,28 @@ defmodule StatifierBlocks.Shell do
   the drawer currently holds. Ties never arise - the order is the tie-break -
   and once the author picks a tab the pick stands, empty or not, because at
   that point the strip is reporting a choice rather than making one.
+
+  ## A host's own tabs
+
+  `:host_tabs` are the descriptors of the tabs the host is contributing, and
+  they join the strip after the package's, in the order the host declared
+  them. They are ordinary entries from there on: the strip resolves an
+  unchosen tab through them on the same rule, so a document with no tables and
+  no findings and a running feed opens on the feed rather than on an empty
+  `Truth tables 0` - which is 2A's reasoning about the strip, not an exception
+  to it.
+
+  Only the descriptor is read here. A host tab's `content` is a function the
+  editor calls when that tab is active, so nothing about what it draws is
+  decided in this module.
   """
   @spec drawer_view(%{
           optional(:open?) => boolean(),
-          optional(:tab) => drawer_tab() | nil,
+          optional(:tab) => tab_id() | nil,
           optional(:fixtures) => fixtures(),
           optional(:findings) => [Finding.t()],
           optional(:orphan_findings) => [Finding.t()],
+          optional(:host_tabs) => [host_tab()],
           optional(:selected_id) => Block.id() | nil
         }) :: drawer()
   def drawer_view(state) do
@@ -738,7 +822,7 @@ defmodule StatifierBlocks.Shell do
     selected_id = Map.get(state, :selected_id)
     findings = Map.get(state, :findings) || []
 
-    tabs =
+    own =
       Enum.map(@drawer_tabs, fn
         :tables ->
           %{id: :tables, title: drawer_title(:tables), count: table_count(fixtures)}
@@ -746,6 +830,15 @@ defmodule StatifierBlocks.Shell do
         :findings ->
           %{id: :findings, title: drawer_title(:findings), count: findings_count(findings)}
       end)
+
+    contributed =
+      state
+      |> Map.get(:host_tabs)
+      |> Kernel.||([])
+      |> host_tabs()
+      |> Enum.map(&%{id: &1.id, title: &1.title, count: Map.get(&1, :count) || 0})
+
+    tabs = own ++ contributed
 
     tab = resolve_tab(Map.get(state, :tab), tabs)
     active = Enum.find(tabs, &(&1.id == tab))
@@ -769,13 +862,20 @@ defmodule StatifierBlocks.Shell do
 
   # An explicit pick stands, empty or not. An unchosen tab is resolved rather
   # than defaulted, so the strip carries something to open the drawer for.
-  @spec resolve_tab(drawer_tab() | nil, [drawer_tab_entry()]) :: drawer_tab()
-  defp resolve_tab(tab, _tabs) when tab in @drawer_tabs, do: tab
-
-  defp resolve_tab(_unchosen, tabs) do
-    case Enum.find(tabs, &(&1.count > 0)) do
-      nil -> :tables
-      entry -> entry.id
+  #
+  # The pick is checked against the strip rather than against `@drawer_tabs`,
+  # which is what makes a host tab a real pick and what makes a host tab the
+  # host has since withdrawn resolve again instead of naming a panel that is
+  # no longer there.
+  @spec resolve_tab(tab_id() | nil, [drawer_tab_entry()]) :: tab_id()
+  defp resolve_tab(tab, tabs) do
+    if Enum.any?(tabs, &(&1.id == tab)) do
+      tab
+    else
+      case Enum.find(tabs, &(&1.count > 0)) do
+        nil -> :tables
+        entry -> entry.id
+      end
     end
   end
 
