@@ -10,6 +10,79 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.6.0] 2026-08-30
+
+0.6.0 is the release where the editor tells one story about findings. The
+Findings tab reads the whole document when nothing is selected, the drawer's
+strip and a host header can finally show the same number, and a container no
+longer wears a badge on every uncollapsed face. Alongside that: a block type's
+summary draws as a row of chips rather than one joined string, the palette's
+search field wears the package's own chrome, and a host can open a document
+already fitted to the canvas. Hosts: see Removed - `source: :arity` leaves
+`StatifierBlocks.Finding` (pass `:assignability`) and `:compile` joins the enum;
+`ViewModel.subtitle/1` now answers only a type label, with the chips behind the
+new `summary_chips/1`; `.sb-badge` is rendered by nothing; and the canvas
+toolbar's "Cancel insert" is gone, its job done by the palette's Cancel.
+
+### Added
+
+- `StatifierBlocks.Finding`'s `source` gains `:compile`, and
+  `from_compiler/2` maps any compiler finding its by-stage rule cannot place
+  onto it instead of refusing, so a compile error raised against generated
+  SCXML or against the document envelope can be rendered by the editor.
+- `StatifierBlocks.Shell.findings_groups/3` groups a document's findings by
+  the block each is anchored to, unanchored ones last, without dropping any -
+  the grouping behind that panel, and headless like the rest of `Shell`.
+- The editor takes a `fit` attr - `:manual` (the default, unchanged
+  behaviour), `:width` or `:active` - so a host can open a document already
+  fitted to the canvas instead of leaving the author to press `Fit width` on
+  every document. The first measurement performs the fit once; after it the
+  editor behaves exactly as if the author had pressed the button, and an
+  unknown value is refused into `:manual`.
+- `StatifierBlocks.Editor.findings_count/3` returns the number of findings the
+  editor's Findings tab reports for a document, from the same `document`,
+  `palette`, `findings` and `datamodel` a host already passes the component, so
+  a host header and the drawer cannot show two different numbers.
+
+### Changed
+
+- A block type's `summary/1` chips draw as a row of separate chips under the
+  card's title (`.sb-node__summary`, one `.sb-node__chip` per chip) instead of
+  one string joined with `", "`; the row wraps, and a type declaring no summary
+  draws no row at all.
+- `StatifierBlocks.ViewModel.subtitle/1` answers only the type label an author-
+  named card carries, and `nil` otherwise. Read the chips from the new
+  `StatifierBlocks.ViewModel.summary_chips/1` instead of the joined string.
+- The inspector's Findings tab reads the whole document when nothing is
+  selected: the count beside the tab is the document's findings number - the
+  same one the drawer's strip and `StatifierBlocks.Editor.findings_count/3`
+  report - and the panel lists those findings grouped by block, each row
+  selecting its block. Findings anchored to a block the document no longer
+  holds get an `Unanchored` group of their own, since they are inside the
+  count. With a block selected the tab is that block's findings, unchanged.
+  A host styling the panel has three new classes: `.sb-inspector__groups`,
+  `.sb-inspector__group` (with `data-block-id` and `data-unanchored`) and
+  `.sb-inspector__group-title`, plus `.sb-inspector__group-row` on the rows.
+- The palette's search field is drawn by the package - a border, a surface, padding and a radius, all from `--sb-*` tokens - rather than left to whatever box the host's browser paints inside the pane.
+- A gap's "+" wears the editor's button chrome at rest, so an insertion point reads as a control without being hovered first. Its hover, armed and drag states are unchanged.
+- The finding count badge no longer renders on a container's face. ADR-0005
+  places it on a collapsed subtree and the editor has no collapse command yet,
+  so a badge on every container read as an error on every card while the counts
+  multiplied up the tree. Every finding is still reachable: the node keeps its
+  subtree rollup in `data-findings-count`, and the drawer's Findings tab and the
+  inspector both list them. A host styling `.sb-badge` should know the class is
+  now rendered by nothing.
+
+### Removed
+
+- `:arity` leaves `StatifierBlocks.Finding`'s `source` type. Nothing ever
+  produced it: slot arity and undeclared-slot violations arrive through the
+  compiler's `:structure` stage and have always carried `:assignability`.
+  Pass `:assignability` where you passed `source: :arity`; the finding's
+  `{:slot, block_id, slot_name}` anchor, and so where it renders, is
+  unchanged.
+- The canvas toolbar's "Cancel insert" button. Leaving an insert is the palette's Cancel, beside the line that names the slot the next pick fills, or Escape.
+
 ## [0.5.0] 2026-08-30
 
 0.5.0 is the release where the editor behaves like the spike it was drawn
@@ -38,8 +111,8 @@ buttons carry a new `sb-button` class, and two band tokens
   so an editor nobody bounds is unchanged.
 - Two theming tokens for the editor's nesting bands, `--sb-band-even` and
   `--sb-band-odd` (tier 2). Both default to a surface the theme already
-  carries, so a host that restates `--sb-bg` and `--sb-bg-sunken` bands in its
-  own palette without setting either one.
+  carries, so a host that restates `--sb-bg` and `--sb-bg-sunken` in its own
+  palette bands the canvas without setting either one.
 - Block types may export an optional `summary/1`, returning `nil`, a short
   string, or a list of chips, which the editor draws as a card's second line
   when the author has not named the block. It is read through
@@ -941,6 +1014,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.6.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.6.0
 [0.5.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.5.0
 [0.4.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.4.0
 [0.3.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.3.0
