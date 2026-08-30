@@ -1383,18 +1383,28 @@
 /* d8: every drop target is reachable without dragging. The "+" is not only
  * the accessible path - it is what makes the insertion path exercisable in
  * LiveViewTest without simulating a drag. */
-/* Subtle at rest. Opaque rather than transparent so the marker masks the flow
- * edge it sits on instead of letting the line run through the "+", and muted
- * rather than accented because a document of forty blocks has forty-one of
- * these and an accent on every one of them is a canvas of plus signs. */
+/* Subtle at rest, and since sb-lti6 a member of the button family rather than
+ * a bare glyph: it wears `sb-button`, so the border, the opaque surface, the
+ * radius and the pointer come from the one vocabulary every other quiet
+ * control in the editor speaks. The surface is what makes the marker mask the
+ * flow edge it sits on instead of letting the line run through the "+", and
+ * the border is what makes a resting gap read as a control rather than as
+ * punctuation - R3's "the gap IS the insertion marker" asks for a marker an
+ * author can see, not one they have to hover to find.
+ *
+ * What stays here is only what is this button's own: gap scale, half the
+ * family's padding because forty-one of these ride the flow edges of a
+ * document and the family's full step turns every edge into a bar; and the
+ * muted foreground, because muted rather than accented is what keeps forty
+ * blocks from rendering as a canvas of plus signs.
+ *
+ * Nothing else. A border or a background restated here is the per-class copy
+ * the vocabulary exists to prevent - and `border: none`, which this rule used
+ * to carry, is the specific way that copy goes wrong: it silently cancels the
+ * family on the one control that most needs to look like one. */
 .sb-gap__add {
-  font: inherit;
+  padding: 0 var(--sb-space-half);
   color: var(--sb-fg-subtle);
-  background: var(--sb-bg);
-  border: none;
-  border-radius: var(--sb-radius-sm);
-  cursor: pointer;
-  padding: 0 var(--sb-space);
 }
 
 /* Highlighted on hover, on keyboard focus, and for the whole of a drag. The

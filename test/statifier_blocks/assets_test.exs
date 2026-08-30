@@ -317,7 +317,7 @@ defmodule StatifierBlocks.AssetsTest do
 
       for class <- ~w(
             sb-toolbar__button sb-toolbar__zoom-step
-            sb-field__add sb-field__remove sb-palette__cancel
+            sb-field__add sb-field__remove sb-palette__cancel sb-gap__add
           ) do
         assert class in wearing, """
         `#{class}` is one of the controls sb-sl6f put in the button
@@ -430,6 +430,31 @@ defmodule StatifierBlocks.AssetsTest do
       pane that ignores their theme.
 
       Literals: #{inspect(literals)}
+      """
+    end
+
+    # The gap "+" joined the family last (sb-lti6), and it is the member most
+    # likely to drift back out: its old rule carried `border: none`, which
+    # reads as harmless and silently cancels the family on the one control
+    # that most needs to look like one - forty-one of them ride the flow edges
+    # of a document, and a canvas of borderless glyphs is what R3's "the gap
+    # IS the insertion marker" is not.
+    # Sabotage: putting `border: none` (or the old `background: var(--sb-bg)`)
+    # back on `.sb-gap__add` - the resting "+" goes back to a bare glyph while
+    # the class enumeration above still passes, and this goes red naming it.
+    test "the gap button refines the family instead of restating it" do
+      restated =
+        for {property, value} <- declarations_of(".sb-gap__add"),
+            property in ~w(border background border-radius font cursor),
+            do: "#{property}: #{value}"
+
+      assert restated == [], """
+      `.sb-gap__add` wears `sb-button`, so the border, the surface, the radius
+      and the pointer are the family's to declare. Restating one here is the
+      per-class copy the vocabulary exists to prevent, and cancelling one -
+      `border: none` - is how the resting "+" stopped reading as a control.
+
+      Restated: #{inspect(restated)}
       """
     end
 
