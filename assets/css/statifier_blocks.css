@@ -165,11 +165,12 @@
  * What the spike's reset does and this one deliberately does NOT: strip
  * padding, border, background and `appearance` off every control. The spike
  * restyles buttons, inputs and selects itself, so it can afford to take the
- * native chrome away first. This package styles almost none of them - the
- * toolbar's buttons and every form control are native on purpose - so a reset
- * that stripped their chrome would leave a `<select>` looking like text. The
- * font inheritance, which no browser does on its own, is the part that
- * graduates.
+ * native chrome away first. This package dresses the controls it has words
+ * for one rule at a time instead - the button vocabulary, and the
+ * form-control box below it - and a reset that stripped `appearance` from
+ * every control in the subtree would take the disclosure arrow off a
+ * `<select>` those rules do not reach. The font inheritance, which no
+ * browser does on its own, is the part that graduates.
  */
 
 .sb-editor,
@@ -1790,9 +1791,78 @@
   color: var(--sb-fg);
 }
 
+/* --------------------------------------------------- the form-control box
+ *
+ * The config form's fields and the palette's search box, in one rule,
+ * graduated from the spike's `.sb-input` and `.sb-select` (campaign-021
+ * ruling R4). Before it the two disagreed: the search box was built out of
+ * the pane's own tokens and the config form's fields were left native, on
+ * the reasoning that a host's browser should paint them the way it paints
+ * that host's other forms. That reasoning does not survive the two sitting
+ * a pane apart on one screen. A native box beside a token-built one is not
+ * read as the host's own type; it is read as the one field the package
+ * forgot, and the inspector - which is nothing but these fields - was the
+ * surface wearing it.
+ *
+ * So the vocabulary is shared rather than copied, and the search box is a
+ * member of it rather than the exception it had become. Built from the
+ * `--sb-border`, `--sb-radius-sm` and `--sb-bg` the button vocabulary and
+ * the pane frame already take, so a host retuning any of them moves every
+ * control together. No literal here is this rule's own.
+ *
+ * The checkbox is out, by selector and not by hoping no one puts the class
+ * on one: a `:boolean` field renders `sb-field__input` on an
+ * `<input type="checkbox">`, and `width: 100%` with a painted box turns a
+ * checkbox into a full-width empty rectangle. `min-width: 0` stays on the
+ * base rule so the checkbox keeps it - an input's intrinsic minimum is what
+ * stops a flex parent from shrinking, and that is true of the one control
+ * this treatment skips too.
+ *
+ * `appearance: auto` is stated rather than left to the default for the
+ * reason the spike states it (spike `editor.css`, the `.sb-select` note):
+ * once a select is painted it looks like a text box, and without the arrow
+ * it reads as one that ignores typing. Saying it here keeps the arrow with
+ * the box that made it necessary.
+ *
+ * No focus rule. The subtree has exactly one focus treatment, declared in
+ * the reset, and a second one on a control family is how a surface drifts
+ * out of it - the same sentence the button vocabulary is written under. The
+ * ring lands on these fields through that rule; what this bead changes is
+ * that it now lands on a box instead of on native chrome.
+ */
+
 .sb-field__input {
   font: inherit;
   min-width: 0;
+}
+
+.sb-field__input:not([type="checkbox"]),
+.sb-palette__search {
+  appearance: auto;
+  width: 100%;
+  padding: var(--sb-space-half) var(--sb-space);
+  color: var(--sb-fg);
+  background: var(--sb-bg);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+}
+
+/* The prompt is a prompt, not a value. `--sb-fg-subtle` is the step the rest
+ * of the subtree spends on text that is present to be read past. */
+.sb-field__input::placeholder,
+.sb-palette__search::placeholder {
+  color: var(--sb-fg-subtle);
+}
+
+/* The state half of the vocabulary, phrased exactly as `sb-button[disabled]`
+ * phrases it, because a form that mutes a control differently from the
+ * button beside it has two disabled states and a host theming one of them
+ * misses the other. Nothing in this package renders a field disabled today;
+ * the rule is here so a host that does gets the family's answer rather than
+ * the browser's grey. */
+.sb-field__input[disabled] {
+  cursor: default;
+  opacity: var(--sb-disabled-opacity);
 }
 
 .sb-field__input--expression,
@@ -2052,34 +2122,17 @@
   white-space: nowrap;
 }
 
-/* The search box (sb-lti6). The reset keeps native chrome ON for form
- * controls, and for the config form's fields that is the right answer - they
- * sit in a plain pane and a host's browser paints them the way that host's
- * other forms are painted. This one is not that case: it is the first thing
- * inside a bordered, rounded surface card, directly above a count line and a
- * list of `sb-palette__pick` rows, and a native box in that company reads as
- * the one element the package forgot rather than as the host's own type.
- *
- * Built from the tokens the rest of the pane is built from - the same
- * `--sb-border`, `--sb-radius-sm` and `--sb-bg` the button vocabulary and the
- * pane frame take - so a host retuning any of them moves the search with
- * everything else instead of leaving it behind. No literal here is this
- * rule's own.
- *
- * No focus rule: the subtree has exactly one focus treatment, declared in the
- * reset, and a second one on a single control is how a surface drifts out of
- * it. `min-width: 0` for the same reason `sb-field__input` carries it - an
- * input's intrinsic minimum is what stops a flex parent from shrinking.
+/* The search box (sb-lti6). Its box, its placeholder and its disabled state
+ * are the shared form-control rule above; what is left here is the two
+ * things that are this control's own and not the vocabulary's. `font:
+ * inherit` because the reset gives it to controls and this rule must not
+ * look like it is withholding it. `min-width: 0` because this one sits in a
+ * flex header beside a cancel button, which is the case an input's
+ * intrinsic minimum breaks.
  */
 .sb-palette__search {
   font: inherit;
-  width: 100%;
   min-width: 0;
-  padding: var(--sb-space-half) var(--sb-space);
-  color: var(--sb-fg);
-  background: var(--sb-bg);
-  border: var(--sb-border-width) solid var(--sb-border);
-  border-radius: var(--sb-radius-sm);
 }
 
 /* The count line (parity item 1.3). It sits directly under the search box

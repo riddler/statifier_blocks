@@ -388,11 +388,17 @@ defmodule StatifierBlocks.AssetsTest do
   end
 
   describe "the palette search and the toolbar's one rule (sb-lti6)" do
-    # The defect: the reset keeps native chrome ON for form controls, so the
+    # The defect: the reset kept native chrome ON for form controls, so the
     # search rendered as whatever the host's browser paints - a plain native
     # box as the first thing inside a bordered, rounded surface card. Every
     # other test in the suite is happy with that: the markup is right, the
     # filter works, and only a human looking at the pane would say so.
+    #
+    # Since campaign-021 ruling R4 the box is not the search box's alone: the
+    # config form's fields were the same defect one pane over, and the two are
+    # now one rule. What this test asks is unchanged - does this control
+    # declare a box - and it is `declarations_of/1`, not the assertion, that
+    # knows the rule may be shared.
     # Sabotage: reverting `.sb-palette__search` to `font: inherit; width: 100%`
     # - the box goes back to native and this names the properties it lost.
     test "the search declares the box the pane's other surfaces have" do
@@ -541,15 +547,28 @@ defmodule StatifierBlocks.AssetsTest do
         do: found
   end
 
-  # Every declaration made for exactly this selector, as a map. Merged across
-  # blocks rather than taken from the first, because a rule can legitimately
-  # be extended inside a container query and a check that read only one of the
+  # Every declaration made for this selector, as a map. Merged across blocks
+  # rather than taken from the first, because a rule can legitimately be
+  # extended inside a container query and a check that read only one of the
   # two would be answering about half the rule.
+  #
+  # A selector is matched as a MEMBER of a block's comma-separated list and
+  # not by string equality with the whole list, because whether a control's
+  # box is written on its own or shared with the control beside it is a
+  # question about duplication, not about what the control declares. Equality
+  # answered "nothing" for a rule that declares everything (campaign-021
+  # ruling R4 shared `.sb-palette__search`'s box with `.sb-field__input`), and
+  # a guard that reports a themed control as unthemed is worse than no guard.
   defp declarations_of(selector) do
     @stylesheet
     |> File.read!()
     |> StatifierBlocks.ThemeAudit.declaration_blocks()
-    |> Enum.filter(&(&1.selector == selector))
+    |> Enum.filter(fn block ->
+      block.selector
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+      |> Enum.member?(selector)
+    end)
     |> Enum.flat_map(& &1.declarations)
     |> Map.new()
   end

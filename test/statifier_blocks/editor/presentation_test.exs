@@ -1297,6 +1297,125 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "the form-control box (campaign-021 ruling R4)" do
+      @stylesheet "assets/css/statifier_blocks.css"
+
+      # The ruling's whole point is that there is ONE rule and not two copies
+      # of one: the config form's fields and the palette's search box are the
+      # same control family, and the way a family drifts apart is by being
+      # written twice and edited once. Asserting the shared selector, and not
+      # merely that each carries a border, is what pins that.
+      # Sabotage: splitting the rule back into a `.sb-field__input` half and a
+      # `.sb-palette__search` half with identical bodies - every rendered pixel
+      # is unchanged, the pane and the inspector still match, and this goes red
+      # on the only thing that keeps them matching a year from now.
+      test "the fields and the search box are one rule, not two" do
+        css = File.read!(@stylesheet)
+
+        assert css =~
+                 ~r/^\.sb-field__input:not\(\[type="checkbox"\]\),\n\.sb-palette__search \{$/m
+      end
+
+      # The box itself, in tokens. Every declaration in it is a `var()` because
+      # a literal is the thing a host cannot retune, and this rule is the one a
+      # host retunes by setting `--sb-border` once.
+      # Sabotage: replacing `var(--sb-radius-sm)` with `4px` - the box looks
+      # identical in the shipped themes, and a host that squared its corners
+      # gets one rounded control it cannot reach.
+      test "the box is built from tokens and carries no literal of its own" do
+        body = shared_rule(File.read!(@stylesheet))
+
+        assert body =~ ~r/padding: var\(--sb-space-half\) var\(--sb-space\);/
+        assert body =~ ~r/background: var\(--sb-bg\);/
+        assert body =~ ~r/border: var\(--sb-border-width\) solid var\(--sb-border\);/
+        assert body =~ ~r/border-radius: var\(--sb-radius-sm\);/
+        assert body =~ ~r/width: 100%;/
+
+        literals =
+          body
+          |> String.split("\n")
+          |> Enum.filter(&(&1 =~ ~r/^\s+[a-z-]+:/))
+          |> Enum.reject(&(&1 =~ ~r/var\(--sb-/ or &1 =~ ~r/^\s+(appearance|width):/))
+          |> Enum.map(&String.trim/1)
+
+        assert literals == [], """
+        The form-control box is retuned by setting a token, which only works
+        while every value in it is one. `appearance` and `width: 100%` are the
+        two that are structure and not palette.
+
+        Literals: #{inspect(literals)}
+        """
+      end
+
+      # The one control the treatment must NOT reach. A `:boolean` field puts
+      # `sb-field__input` on an `<input type="checkbox">`, and a checkbox with
+      # `width: 100%` and a painted background is a full-width empty rectangle
+      # with the tick somewhere inside it.
+      # Sabotage: dropping `:not([type="checkbox"])` from the selector - every
+      # boolean field in the inspector becomes that rectangle, which no test on
+      # the markup alone would notice.
+      test "the checkbox is excluded by selector, not by hope" do
+        css = File.read!(@stylesheet)
+        field = File.read!("lib/statifier_blocks/editor/field.ex")
+
+        # The exclusion is only load-bearing while a checkbox actually wears
+        # the class. If the renderer stops doing that, this test is measuring
+        # nothing, and it should say so rather than pass quietly.
+        assert field =~ ~r/class="sb-field__input"\n\s+type="checkbox"/
+
+        refute css =~ ~r/^\.sb-field__input,\n\.sb-palette__search \{$/m
+      end
+
+      # The two states R4 adds that the spike never had. `disabled` is phrased
+      # exactly as the button vocabulary phrases it - a host that themes one
+      # disabled state has themed both - and the placeholder takes the family's
+      # subtle step rather than the browser's grey.
+      # Sabotage: writing the disabled rule as `opacity: 0.45`, the literal the
+      # token was extracted from, so it renders identically today and a host
+      # raising `--sb-disabled-opacity` moves its buttons and not its fields.
+      test "the disabled and placeholder states are the family's, not the browser's" do
+        css = File.read!(@stylesheet)
+
+        assert css =~
+                 ~r/^\.sb-field__input\[disabled\] \{\n  cursor: default;\n  opacity: var\(--sb-disabled-opacity\);\n\}$/m
+
+        assert css =~
+                 ~r/^\.sb-field__input::placeholder,\n\.sb-palette__search::placeholder \{\n  color: var\(--sb-fg-subtle\);\n\}$/m
+      end
+
+      # The subtree has exactly one focus treatment, declared in the reset, and
+      # R4's focus ring is that rule landing on a box instead of on native
+      # chrome - not a second rule. This is the refutation that keeps it one.
+      # Sabotage: adding `.sb-field__input:focus-visible { outline-color: ... }`
+      # beside the box - the ring looks better on the inspector alone, the
+      # package now has two focus treatments, and a host tuning
+      # `--sb-focus-ring` gets one of them.
+      test "the fields take the subtree's one focus treatment and declare none" do
+        css = File.read!(@stylesheet)
+
+        assert css =~ ~r/^:where\(\.sb-editor\) :focus-visible \{$/m
+
+        refute css =~ ~r/^\.sb-field__input[^\n{]*:focus-visible/m
+        refute css =~ ~r/^\.sb-palette__search[^\n{]*:focus-visible/m
+      end
+
+      # What is left on the search box once the vocabulary took the box away.
+      # `width: 100%` moved to the shared rule, so a second one here would be a
+      # copy that outlives the rule it copies.
+      # Sabotage: leaving `width: 100%` behind in the search box's own rule -
+      # nothing renders differently, and the duplication R4 removed is back.
+      test "the search box keeps only what is its own" do
+        own =
+          ~r/\*\/\n\.sb-palette__search \{\n(.*?)\n\}$/ms
+          |> Regex.run(File.read!(@stylesheet))
+          |> Enum.at(1)
+          |> String.split("\n")
+          |> Enum.map(&String.trim/1)
+
+        assert own == ["font: inherit;", "min-width: 0;"]
+      end
+    end
+
     describe "the operator pre-decision" do
       # Sabotage: adding `defp layout_class(%Node{type: "core.parallel"}), do: ...`
       # to BlockNode - the type name appears in a component source and this goes
@@ -1329,6 +1448,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute "parallel.ex" in modules
         assert "block_node.ex" in modules
       end
+    end
+
+    # The declarations of the shared form-control rule, without its selector.
+    defp shared_rule(css) do
+      ~r/^\.sb-field__input:not\(\[type="checkbox"\]\),\n\.sb-palette__search \{\n(.*?)\n\}$/ms
+      |> Regex.run(css)
+      |> Enum.at(1)
     end
 
     # Three levels of nesting and a leaf at the bottom, all of one type: what
