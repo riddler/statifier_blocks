@@ -168,4 +168,33 @@ defmodule StatifierBlocks.ZoomLadderTest do
       assert Shell.zoom_extent(%{width: 400.0}, 200) == nil
     end
   end
+
+  describe "the fit a host opens at (sb-ehqn)" do
+    # Sabotage: dropping the guarded clause so every value falls through to
+    # the default - a host that asks for `:width` opens at `:manual`, and the
+    # attr is a documented no-op.
+    test "the three modes are themselves" do
+      assert Shell.fit_mode(:manual) == :manual
+      assert Shell.fit_mode(:width) == :width
+      assert Shell.fit_mode(:active) == :active
+    end
+
+    # Sabotage: dropping the binary clause - a host templating the attr from
+    # a query string or a stored preference gets `:manual` for the value it
+    # asked for, silently.
+    test "a mode spelled as a string is the same mode" do
+      assert Shell.fit_mode("manual") == :manual
+      assert Shell.fit_mode("width") == :width
+      assert Shell.fit_mode("active") == :active
+    end
+
+    # Sabotage: making the fallback `raise` - a typo in a host's template
+    # takes the whole editor down on mount, where the same typo in a tab name
+    # only picks the first tab. An unknown attr is refused, not fatal.
+    test "anything else is refused into the default" do
+      for value <- [:cover, :Width, "Width", "fit-width", nil, 100, %{}, ["width"]] do
+        assert Shell.fit_mode(value) == :manual
+      end
+    end
+  end
 end

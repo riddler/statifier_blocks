@@ -47,6 +47,12 @@ defmodule StatifierBlocks.Shell do
   @typedoc "Truth tables a host supplies, keyed by the block they describe."
   @type fixtures :: %{optional(Block.id()) => [TruthTable.t()]} | nil
 
+  @typedoc """
+  Which fit the canvas is in: `:manual` is every zoom an author stepped to
+  themselves, and the other two are the two toolbar buttons.
+  """
+  @type fit_mode :: :manual | :width | :active
+
   @typedoc "Which of the inspector's three tabs is showing (3A)."
   @type inspector_tab :: :config | :findings | :condition
 
@@ -85,6 +91,8 @@ defmodule StatifierBlocks.Shell do
   @viewport_anchor "viewport"
 
   @inspector_tabs [:config, :findings, :condition]
+
+  @fit_modes [:manual, :width, :active]
 
   # Tab order, and it is also the order the strip resolves an unchosen tab in
   # (see `drawer_view/1`). Truth tables first because they are what 2A shipped
@@ -203,6 +211,25 @@ defmodule StatifierBlocks.Shell do
   end
 
   def fit_zoom(_content, _available, current), do: clamp_zoom(current)
+
+  @doc """
+  The fit `value` names, or `:manual`.
+
+  Total for `inspector_tab/1`'s reason with the source changed: this value
+  arrives from a **host's** `fit` attr rather than from the DOM, and a host
+  templating it from a stored preference or a query string is as likely to
+  spell it wrongly as an author is to craft a payload. A fit the editor does
+  not have is refused into the one every editor opens in, so the canvas is
+  never stamped with a mode no stylesheet rule and no button can leave.
+  """
+  @spec fit_mode(term()) :: fit_mode()
+  def fit_mode(value) when value in @fit_modes, do: value
+
+  def fit_mode(value) when is_binary(value) do
+    Enum.find(@fit_modes, :manual, &(Atom.to_string(&1) == value))
+  end
+
+  def fit_mode(_other), do: :manual
 
   @doc """
   The scaled extent of a measured box, or `nil` at 100% and unmeasured.
