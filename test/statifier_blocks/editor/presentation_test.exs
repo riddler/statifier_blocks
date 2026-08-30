@@ -232,6 +232,56 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       })
     end
 
+    defmodule GuardedArm do
+      @moduledoc """
+      A host type that keys an `:expression` field by one of its own slot
+      names - `core.branch`'s shape without `core.branch`'s name.
+
+      It is what separates "the editor draws a chip for a branch" from "the
+      editor draws a chip for a slot its container declared a condition for".
+      Only the second is a rendering rule; the first is a type name in the
+      renderer, which ADR-0005 forbids and the last test in this module
+      scans for.
+      """
+
+      @behaviour StatifierBlocks.BlockType
+
+      @impl true
+      def current_version, do: 1
+
+      @impl true
+      def slots(_config), do: [{"when_hot", :any, "When hot"}, {"otherwise", :any, "Otherwise"}]
+
+      @impl true
+      def config_schema(_config),
+        do: [
+          %{
+            key: "when_hot",
+            type: :expression,
+            label: "When hot",
+            required?: true,
+            default: "",
+            value_path: ["guard"]
+          }
+        ]
+
+      @impl true
+      def validate_config(_config), do: :ok
+
+      @impl true
+      def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+
+      @impl true
+      def palette_entry, do: %{label: "Guarded"}
+    end
+
+    defp guarded_document do
+      Document.new(
+        Block.new("host.guarded", id: "blk_guarded", config: %{"guard" => "temperature > 90"}),
+        id: "doc_guarded"
+      )
+    end
+
     defp resumable_document do
       Document.new(
         Block.new("core.resumable_group", id: "blk_resume", config: %{"history" => "deep"}),
@@ -648,6 +698,159 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> render_change()
 
         assert lanes(latest_document()) == ["signup", "sms"]
+      end
+    end
+
+    describe "slot labels, lane rules and the interrupt region (1.7, campaign 016)" do
+      @stylesheet "assets/css/statifier_blocks.css"
+
+      # The spike's arm header is two lines: the arm's name in small caps, and
+      # the predicate it is subject to beneath it. Without the second line a
+      # branch's arms on the canvas are `WHEN "VARIANT B"` and `OTHERWISE`,
+      # which names the arms and says nothing about what picks between them.
+      # Sabotage: dropping the `:if={@slot.condition}` chip from `Slot.slot/1`
+      # - every arm keeps its name and the canvas stops showing a single
+      # condition, which is the state this parity item found the editor in.
+      test "an arm's header carries its condition, in the author's own text", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        assert has_element?(
+                 view,
+                 ~s([data-parent-id="blk_variant"][data-slot-name="arm_variant_b"] > .sb-slot__header > .sb-slot__name > .sb-slot__condition),
+                 "variant == 'b'"
+               )
+      end
+
+      # The whole expression is in the `title`, because the chip is one clipped
+      # line by design and a truncated predicate an author cannot read the end
+      # of is worse than none.
+      # Sabotage: rendering the chip without `title` - the ellipsis stays and
+      # the only way to see what an arm actually tests becomes the inspector.
+      test "the whole expression is on the chip, however the line is clipped", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        assert has_element?(
+                 view,
+                 ~s([data-slot-name="arm_variant_b"] .sb-slot__condition[title="variant == 'b'"])
+               )
+      end
+
+      # A chip is a claim that a condition exists. `otherwise` is the arm that
+      # is subject to none, and every slot of every stacked group is too.
+      # Sabotage: rendering the chip unconditionally - `otherwise` grows an
+      # empty box that reads as a condition which evaluated to nothing.
+      test "a slot with no condition renders no chip, not an empty one", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        assert has_element?(
+                 view,
+                 ~s([data-parent-id="blk_variant"][data-slot-name="otherwise"] > .sb-slot__header > .sb-slot__name > .sb-slot__label),
+                 "Otherwise"
+               )
+
+        refute has_element?(
+                 view,
+                 ~s([data-parent-id="blk_variant"][data-slot-name="otherwise"] .sb-slot__condition)
+               )
+      end
+
+      # The load-bearing negative, and the reason the derivation lives on the
+      # view model rather than in the component: the chip follows a
+      # DECLARATION, never a type name.
+      # Sabotage: deriving the chip from `node.type == "core.branch"` - this
+      # goes red, and so does the type-name scan in the last describe.
+      test "a host type that guards its own arm gets the same chip", %{conn: conn} do
+        palette = Palette.new(%{"host.guarded" => GuardedArm})
+
+        {:ok, view, _html} =
+          mount_editor(conn, document: guarded_document(), palette: palette)
+
+        assert has_element?(
+                 view,
+                 ~s([data-parent-id="blk_guarded"][data-slot-name="when_hot"] .sb-slot__condition),
+                 "temperature > 90"
+               )
+
+        refute has_element?(
+                 view,
+                 ~s([data-parent-id="blk_guarded"][data-slot-name="otherwise"] .sb-slot__condition)
+               )
+      end
+
+      # The stylesheet half of the same item. Caps is what makes a slot label
+      # read as chrome labelling a structure rather than as a name the author
+      # typed, and it is the treatment the fan pill and the join marker
+      # already carry.
+      # Sabotage: dropping `text-transform` from `.sb-slot__label` - the spike
+      # reads `WHEN "VALID"` and the editor reads `When "valid"`, which is the
+      # parity gap this item names, and every markup assertion above stays
+      # green through it.
+      test "the label is small, caps and tracked" do
+        css = File.read!(@stylesheet)
+        label = Regex.run(~r/^\.sb-slot__label\s*\{(.*?)\n\}/ms, css)
+
+        assert label, "the scan actually found the rule"
+        [_all, body] = label
+
+        assert body =~ ~r/text-transform:\s*uppercase/
+        assert body =~ ~r/letter-spacing:\s*var\(--sb-tracking-caps\)/
+        assert body =~ ~r/font-size:\s*var\(--sb-text-xs\)/
+      end
+
+      # The lane rule carries "these run at once" down the page, past the pill
+      # at the top of the block that says it once.
+      # Sabotage: hanging the rule off `.sb-node__slots--columns` instead of
+      # `data-arrangement="lanes"` - a branch's arms take the accent too, and
+      # the one distinction side-by-side columns have stops being drawn.
+      test "a lane's header takes the accent rule, and it is read off the arrangement" do
+        css = File.read!(@stylesheet)
+
+        rule =
+          Regex.run(
+            ~r/^\.sb-node\[data-arrangement="lanes"\][^\{]*>\s*\.sb-slot__header\s*\{(.*?)\n\}/ms,
+            css
+          )
+
+        assert rule, "the scan actually found the rule"
+        [_all, body] = rule
+
+        assert body =~ ~r/border-top:\s*var\(--sb-block-edge\)\s+solid\s+var\(--sb-block-accent\)/
+      end
+
+      # 10h's `:secondary` placement, in the colour the connector layer already
+      # draws an interrupt edge in - the rail and the edge leaving it are one
+      # thing and were drawn in two vocabularies.
+      # Sabotage: colouring the label `--sb-fg-muted` again - two grey words
+      # over a warning-coloured dashed edge read as a colour that leaked from
+      # somewhere else rather than as the heading of the region below.
+      test "the interrupt rail and its label take the interrupt edge's colour" do
+        css = File.read!(@stylesheet)
+
+        rail = Regex.run(~r/^\.sb-slot--secondary\s*\{(.*?)\n\}/ms, css)
+
+        label =
+          Regex.run(~r/^\.sb-slot--secondary\s*>[^\{]*\.sb-slot__label\s*\{(.*?)\n\}/ms, css)
+
+        assert rail, "the scan actually found the rail rule"
+        assert label, "the scan actually found the label rule"
+
+        assert elem(List.to_tuple(rail), 1) =~ ~r/border-left-color:\s*var\(--sb-edge-interrupt\)/
+        assert elem(List.to_tuple(label), 1) =~ ~r/color:\s*var\(--sb-edge-interrupt\)/
+      end
+
+      # The words are the block type's, not the stylesheet's: `INTERRUPT RULES`
+      # is `core.resumable_group`'s own "Interrupt rules" in caps.
+      # Sabotage: hard-coding the region's heading in CSS with `content:` - a
+      # host type declaring `:secondary` gets someone else's words, and this
+      # goes red because the type's own string is no longer in the markup.
+      test "the region's heading is the type's own words", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: resumable_document())
+
+        assert has_element?(
+                 view,
+                 ~s([data-parent-id="blk_resume"][data-slot-name="interrupts"].sb-slot--secondary > .sb-slot__header > .sb-slot__name > .sb-slot__label),
+                 "Interrupt rules"
+               )
       end
     end
 

@@ -106,6 +106,32 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     an arm with nothing in it yet is a real arm, and a fan that silently
     skipped it would tell an author their empty arm does not exist.
 
+    ## The label, and the condition under it
+
+    A slot's name and the condition it is subject to are ONE unit in the
+    header, wrapped in `sb-slot__name`, and the findings sit beside that unit
+    rather than beside the label. The wrapper is what lets the chip sit
+    *under* the words it qualifies while the header stays the baseline row
+    the fan lands on and the column layout centres: a header that stacked its
+    own children would have to be a column, and the arrangement rules above
+    it place a row.
+
+    The chip carries `ViewModel.Slot.condition` - the expression source, in
+    the author's own text, read-only. Read-only because this is the canvas:
+    the condition is editable in the inspector's form, where it is a field
+    with a schema, a finding anchor and a value path, and a second editable
+    spelling of one value on a surface with none of those is two controls
+    that can disagree about what was typed.
+
+    A slot with no condition source renders NO chip - not an empty one. Every
+    slot in a stacked group would otherwise grow a blank box, and a blank box
+    under a label reads as a condition that evaluated to nothing rather than
+    as a slot that is not subject to one.
+
+    Nothing here reads a type name to decide any of it. `core.branch` gets
+    chips because its arms declare an `:expression` field keyed by the arm's
+    slot, and a host type that declares the same gets the same.
+
     ## Recursion
 
     `Slot` renders children via `BlockNode` and `BlockNode` renders slots via
@@ -158,7 +184,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-drop-reason={@drop_reason}
       >
         <div class="sb-slot__header" data-sb-anchor={Connectors.slot_anchor(@parent_id, @slot.name)}>
-          <span class="sb-slot__label">{@slot.label}</span>
+          <span class="sb-slot__name">
+            <span class="sb-slot__label">{@slot.label}</span>
+            <code :if={@slot.condition} class="sb-slot__condition" title={@slot.condition}>
+              {@slot.condition}
+            </code>
+          </span>
           <span :for={finding <- @slot.findings} class={["sb-finding", severity_class(finding)]}>
             {finding.message}
           </span>

@@ -166,6 +166,19 @@ defmodule StatifierBlocks.ViewModel do
     key each child in this slot carries its outcome under, or `nil` when
     the type declared none. It is here as well as on the children so that a
     consumer can ask the question of the slot without walking into it.
+
+    `condition` is the **source text of the condition this slot is subject
+    to**: the parent type's own `:expression` config field keyed by this
+    slot's name, read through the `value_path` ADR-0002 decision 7 was
+    amended to carry. `nil` when the type declares no such field, when the
+    author has not written one yet, or when the value stored there is not a
+    non-empty string.
+
+    It is resolved here for the reason `Node.outcome` is: the rendering side
+    reads one string and never learns that `core.branch` is the type whose
+    arms are guarded. A host type that keys an `:expression` field by one of
+    its own slot names gets the same chip, and nothing here tests a type name
+    to decide it.
     """
 
     @type t :: %__MODULE__{
@@ -176,7 +189,8 @@ defmodule StatifierBlocks.ViewModel do
             declared?: boolean(),
             outcome_key: String.t() | nil,
             children: [StatifierBlocks.ViewModel.Node.t()],
-            findings: [Finding.t()]
+            findings: [Finding.t()],
+            condition: String.t() | nil
           }
 
     @enforce_keys [:name, :label, :declared?]
@@ -188,7 +202,8 @@ defmodule StatifierBlocks.ViewModel do
       declared?: true,
       outcome_key: nil,
       children: [],
-      findings: []
+      findings: [],
+      condition: nil
     ]
   end
 
@@ -677,18 +692,23 @@ defmodule StatifierBlocks.ViewModel do
 
     entry = palette_entry_with_defaults(module, block.type)
 
+    conditions = slot_conditions(schema, config)
+
     declared_slots =
       Enum.map(declared, fn {name, arity, label} ->
-        build_slot(
-          name,
-          label,
-          arity,
-          true,
-          slot_presentation(entry, name),
-          Map.get(block.slots, name, []),
-          Map.get(slot_findings, name, []),
-          ctx
-        )
+        slot =
+          build_slot(
+            name,
+            label,
+            arity,
+            true,
+            slot_presentation(entry, name),
+            Map.get(block.slots, name, []),
+            Map.get(slot_findings, name, []),
+            ctx
+          )
+
+        %{slot | condition: Map.get(conditions, name)}
       end)
 
     extra_slots =
@@ -824,6 +844,35 @@ defmodule StatifierBlocks.ViewModel do
       children: Enum.map(children_blocks, &build_child(&1, outcome_key, ctx)),
       findings: findings
     }
+  end
+
+  # The condition source per key: every `:expression` field in a container's
+  # own schema, read through its `value_path`, keyed by the field's key.
+  #
+  # The key IS the slot name for the case this exists to serve - ADR-0002
+  # decision 7's amendment splits an arm's key from its value path precisely
+  # so a `core.branch` arm addresses its own condition while its findings
+  # keep routing by slot name - so the map is built over every expression
+  # field and the caller looks its slot up in it. A field keyed by something
+  # that is not a slot never matches, which is why nothing is filtered
+  # against the slot set here: this function answers "what expression is
+  # stored under this key", and which keys are slots is the caller's
+  # question.
+  #
+  # An absent, blank or non-string value is dropped rather than carried as
+  # `""`. A chip is a claim that a condition exists, and an arm whose
+  # condition an author has not written yet already carries a finding saying
+  # so; an empty chip beside that finding says the same thing twice, and says
+  # it blank.
+  @spec slot_conditions([BlockType.field_decl()], Block.config()) :: %{
+          optional(String.t()) => String.t()
+        }
+  defp slot_conditions(schema, config) do
+    schema
+    |> Enum.filter(&(&1.type == :expression))
+    |> Enum.map(fn decl -> {decl.key, value_at(config, BlockType.value_path(decl), nil)} end)
+    |> Enum.filter(fn {_key, source} -> is_binary(source) and source != "" end)
+    |> Map.new()
   end
 
   # A child node, plus the one fact only its PARENT's slot declaration can
