@@ -192,6 +192,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          zoom: Shell.default_zoom(),
          fit: :manual,
          measurement: %{},
+         viewport: nil,
+         reveal: nil,
          last_error: nil
        )}
     end
@@ -310,6 +312,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               theme={@theme}
               edges={@edges}
               stage={@stage}
+              zoom={@zoom}
+              viewport={@viewport}
+              reveal={@reveal}
             />
           </div>
 
@@ -358,8 +363,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # anything unreadable at all becomes the empty measurement, which is the
     # same state the editor holds before the first push and with no hook
     # imported at all.
-    def handle_event("measure", params, socket),
-      do: {:noreply, assign(socket, :measurement, Connectors.measurement(params))}
+    # Two values come out of one payload and they are read by different
+    # things: the anchors and the stage extent are what the connectors are
+    # routed from, and the scroller's own box is what the two fits are
+    # computed against. Neither is a command and neither is stored anywhere
+    # but here.
+    def handle_event("measure", params, socket) do
+      {:noreply,
+       socket
+       |> assign(:measurement, Connectors.measurement(params))
+       |> assign(:viewport, Shell.viewport(params))}
+    end
 
     # ---------------------------------------------------------------- shell
     #
@@ -373,16 +387,41 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     def handle_event("zoom-out", _params, socket),
       do: {:noreply, assign(socket, zoom: Shell.zoom_out(socket.assigns.zoom), fit: :manual)}
 
-    # A mode, not a measurement: a computed fit needs the rendered width of an
-    # element and nothing on the server has it. The canvas carries the mode as
-    # `data-fit` and the stylesheet does what it can with it; the measured form
-    # arrives with the read-only measurement hook (decision 7's amendment).
-    def handle_event("fit", %{"fit" => "width"}, socket),
-      do: {:noreply, assign(socket, :fit, :width)}
+    # A mode AND a measurement, since the measurement hook landed. The mode is
+    # still what the canvas carries as `data-fit` and what the pressed button
+    # reads back; the number beside it is the largest ladder step at which the
+    # measured thing fits the measured scroller, which is a fit an author can
+    # see rather than a state an author has to trust. With nothing measured -
+    # no hook imported, or the first frame not yet rendered - `fit_zoom/3`
+    # returns the step already in force and the mode is all that changes,
+    # which is exactly the behaviour that shipped before this.
+    def handle_event("fit", %{"fit" => "width"}, socket) do
+      {:noreply,
+       socket
+       |> assign(:fit, :width)
+       |> assign(:zoom, fit_zoom(socket, Connectors.stage(socket.assigns.measurement)))}
+    end
 
+    # `Fit active` fits the selected card and then brings it into view, and
+    # the second half is the one the server cannot do: a scroll position is
+    # not a document value and no stylesheet sets one. So the canvas is
+    # stamped with the block to reveal and a counter that makes the stamp
+    # change, and the drag hook carries it out once per press.
     def handle_event("fit", %{"fit" => "active"}, socket) do
-      fit = if socket.assigns.selected_id, do: :active, else: socket.assigns.fit
-      {:noreply, assign(socket, :fit, fit)}
+      case socket.assigns.selected_id do
+        nil ->
+          {:noreply, socket}
+
+        id ->
+          {:noreply,
+           socket
+           |> assign(:fit, :active)
+           |> assign(
+             :zoom,
+             fit_zoom(socket, Map.get(socket.assigns.measurement, Connectors.card_anchor(id)))
+           )
+           |> assign(:reveal, reveal(socket.assigns.reveal, id))}
+      end
     end
 
     def handle_event("fit", _params, socket), do: {:noreply, socket}
@@ -953,6 +992,36 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # A DOM value, so it is a string; `to_index/1` is total because the DOM
     # is not a trusted source. A non-numeric index becomes 0, which
     # `Edit.apply/2` then accepts or refuses on its own terms.
+    # The two fits, in the one shape they share: a measured box against the
+    # measured scroller, resolved on the ladder. An unmeasured box on either
+    # side leaves the zoom where it is - see `Shell.fit_zoom/3`.
+    @spec fit_zoom(Phoenix.LiveView.Socket.t(), term()) :: pos_integer()
+    defp fit_zoom(socket, box) do
+      Shell.fit_zoom(box_width(box), box_width(socket.assigns.viewport), socket.assigns.zoom)
+    end
+
+    @spec box_width(term()) :: number() | nil
+    defp box_width(%{width: width}), do: width
+    defp box_width(_other), do: nil
+
+    # `<n>:<block id>`, and the counter is the whole point: pressing `Fit
+    # active` twice on the same block has to produce two different values or
+    # the second press reveals nothing. The client compares the stamp with the
+    # last one it acted on, so an unchanged stamp is a re-render rather than a
+    # request and an author who scrolled away stays where they scrolled.
+    @spec reveal(String.t() | nil, Block.id()) :: String.t()
+    defp reveal(nil, id), do: "1:" <> id
+
+    defp reveal(previous, id) do
+      count =
+        case Integer.parse(previous) do
+          {count, _rest} -> count
+          :error -> 0
+        end
+
+      "#{count + 1}:#{id}"
+    end
+
     @spec to_index(term()) :: non_neg_integer()
     defp to_index(index) when is_integer(index) and index >= 0, do: index
 

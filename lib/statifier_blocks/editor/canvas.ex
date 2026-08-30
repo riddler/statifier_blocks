@@ -46,6 +46,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     stage to make room is the version that displaces every connector by the
     padding, which is the trade the paragraph above already made.
 
+    ## Zoom is a third element between the two
+
+    A zoom is a CSS transform on the stage, and a transform is drawn after
+    layout: it changes what the stage looks like and nothing about the space
+    it takes. Left there, the panel scrolls over the unscaled tree - zoomed
+    in, the bottom right corner is unreachable; zoomed out, most of the scroll
+    range is empty. So the stage is wrapped, and the wrapper carries the
+    scaled size the server computes from the measurement
+    (`Shell.zoom_extent/2`).
+
+    The wrapper is a plain block with no size of its own, so at 100% - where
+    `zoom_extent/2` returns nothing - it lays out exactly as the stage did
+    when it was the panel's only child. It is deliberately *outside* the
+    stage: everything inside is measured in the stage's own untransformed
+    space, and a scaled box in the middle of that is the thing the overlay
+    cannot survive.
+
     So `--sb-canvas-grid` is a stylesheet-tier override rather than a `theme`
     assign one: it is consumed above the element that assign writes to, exactly
     as the pane widths and the drawer height are. `docs/theming.md` calls a
@@ -58,6 +75,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     alias StatifierBlocks.Connectors
     alias StatifierBlocks.Editor.BlockNode
     alias StatifierBlocks.Editor.ConnectorLayer
+    alias StatifierBlocks.Shell
     alias StatifierBlocks.ViewModel
 
     attr(:root, ViewModel.Node, required: true)
@@ -74,34 +92,71 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:theme, :map, default: %{})
     attr(:edges, :list, default: [])
     attr(:stage, :any, default: nil)
+    attr(:zoom, :integer, default: 100)
+    attr(:viewport, :any, default: nil)
+    attr(:reveal, :string, default: nil)
     attr(:class, :string, default: nil)
 
     @doc "The canvas root: the hook's element, and the tree beneath it."
     def canvas(assigns) do
+      assigns =
+        assigns
+        |> assign(:extent, Shell.zoom_extent(assigns.stage, assigns.zoom))
+        |> assign(:stage_width, Shell.zoom_stage_width(assigns.viewport, assigns.zoom))
+
       ~H"""
-      <div class="sb-canvas-panel">
-        <div
-          class={["sb-canvas", @class]}
-          id="sb-canvas"
-          phx-hook="StatifierBlocksDrag"
-          phx-target={@target}
-          data-dragging={to_string(@drag != nil)}
-          data-sb-anchor={Connectors.stage_anchor()}
-          style={theme_style(@theme)}
-        >
-          <ConnectorLayer.connector_layer edges={@edges} stage={@stage} target={@target} />
-          <BlockNode.block_node
-            root?={true}
-            node={@root}
-            drag={@drag}
-            selected_id={@selected_id}
-            armed={@armed}
-            target={@target}
-            icon={@icon}
-          />
+      <div class="sb-canvas-panel" data-sb-anchor={Shell.viewport_anchor()}>
+        <div class="sb-canvas-zoom" style={extent_style(@extent)}>
+          <div
+            class={["sb-canvas", @class]}
+            id="sb-canvas"
+            phx-hook="StatifierBlocksDrag"
+            phx-target={@target}
+            data-dragging={to_string(@drag != nil)}
+            data-sb-anchor={Connectors.stage_anchor()}
+            data-sb-reveal={@reveal}
+            style={stage_style(@theme, @stage_width)}
+          >
+            <ConnectorLayer.connector_layer edges={@edges} stage={@stage} target={@target} />
+            <BlockNode.block_node
+              root?={true}
+              node={@root}
+              drag={@drag}
+              selected_id={@selected_id}
+              armed={@armed}
+              target={@target}
+              icon={@icon}
+            />
+          </div>
         </div>
       </div>
       """
+    end
+
+    # The scaled extent, in pixels, and nothing at 100% or before the first
+    # measurement: a transform is drawn after layout and takes no space, so
+    # this is the only thing that makes the scroller's extent follow the zoom.
+    # Written as a size rather than as a token because it is a measurement
+    # rounded to a pixel, not a value a host would ever want to set.
+    @spec extent_style({number(), number()} | nil) :: String.t() | nil
+    defp extent_style(nil), do: nil
+
+    defp extent_style({width, height}),
+      do: "width:#{round(width)}px;height:#{round(height)}px"
+
+    # The stage's own inline style: the theme a host passed, and - only while a
+    # zoom is applied - the width the stage is laid out at. The two are joined
+    # rather than nested because an element has one `style` attribute; the
+    # width goes first so a host that somehow declares one in `theme` wins,
+    # which is the precedence every other token here has.
+    @spec stage_style(map(), number() | nil) :: String.t() | nil
+    defp stage_style(theme, nil), do: theme_style(theme)
+
+    defp stage_style(theme, width) do
+      case theme_style(theme) do
+        nil -> "width:#{round(width)}px"
+        style -> "width:#{round(width)}px;" <> style
+      end
     end
 
     # Only `--sb-*` names are emitted. A host that passes something else gets

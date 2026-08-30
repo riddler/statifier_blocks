@@ -80,6 +80,10 @@ defmodule StatifierBlocks.Shell do
   @zoom_steps [50, 67, 80, 90, 100, 110, 125, 150, 175, 200]
   @default_zoom 100
 
+  # The canvas scroller's anchor key. Reserved beside the stage's, and for the
+  # same reason - see `viewport_anchor/0`.
+  @viewport_anchor "viewport"
+
   @inspector_tabs [:config, :findings, :condition]
 
   # Tab order, and it is also the order the strip resolves an unchosen tab in
@@ -140,6 +144,122 @@ defmodule StatifierBlocks.Shell do
     |> Enum.reverse()
     |> Enum.find(hd(@zoom_steps), &(&1 < current))
   end
+
+  @doc """
+  The anchor key the canvas scroller is stamped with.
+
+  A second reserved key beside `Connectors.stage_anchor/0`, and the reason it
+  is reserved rather than derived from a block id is the same one: the stage
+  is where the boxes are measured *from* and this is what they have to fit
+  *into*, so neither is a block's anchor and neither can collide with one.
+
+  It lives here rather than beside the connector anchors because nothing
+  routes through it. The fits are the only thing that reads it, the fits are
+  a shell arrangement, and a connector never asks how wide the scroller is.
+  """
+  @spec viewport_anchor() :: String.t()
+  def viewport_anchor, do: @viewport_anchor
+
+  @doc """
+  The scroller's usable box out of a measurement payload, or `nil`.
+
+  Total for `clamp_zoom/1`'s reason: the payload is a wire value and an
+  editor whose viewport is unreadable is an editor whose fits decline to
+  move rather than one that raises. `nil` is also what the editor holds
+  before the first measurement and what it holds forever with no hook
+  imported, which is why the fits below all take it as a `term()`.
+  """
+  @spec viewport(term()) :: %{width: float(), height: float()} | nil
+  def viewport(%{"viewport" => %{"w" => w, "h" => h}}) do
+    case {positive(w), positive(h)} do
+      {{:ok, width}, {:ok, height}} -> %{width: width, height: height}
+      _other -> nil
+    end
+  end
+
+  def viewport(_other), do: nil
+
+  @doc """
+  The largest ladder step at which `content` wide fits `available` wide.
+
+  This is the whole of what a fit computes, and both fits compute it: `Fit
+  width` passes the stage's measured extent, `Fit active` passes the selected
+  card's. Neither measures anything itself - the numbers arrive from the
+  measurement hook - and neither lays anything out, which is the constraint
+  the 2026-08-30 ruling put on this: the client measures, this picks a step
+  off the same ladder the two buttons step along, and the stylesheet scales.
+
+  With nothing measured yet, or a content box wider than any step can shrink
+  to fit, the answer is the step the author is already on and the bottom of
+  the ladder respectively. A fit that cannot be computed leaves the canvas
+  where it is rather than jumping to a guess.
+  """
+  @spec fit_zoom(term(), term(), term()) :: pos_integer()
+  def fit_zoom(content, available, _current)
+      when is_number(content) and is_number(available) and content > 0 and available > 0 do
+    @zoom_steps
+    |> Enum.reverse()
+    |> Enum.find(hd(@zoom_steps), &(content * &1 / 100 <= available))
+  end
+
+  def fit_zoom(_content, _available, current), do: clamp_zoom(current)
+
+  @doc """
+  The scaled extent of a measured box, or `nil` at 100% and unmeasured.
+
+  A CSS transform is drawn after layout and takes no space, so a scaled stage
+  alone leaves the scroller sized to the unscaled tree: zoomed in, the bottom
+  right of the chart is unreachable; zoomed out, the panel scrolls over empty
+  space. The wrapper around the stage is what carries the scaled size, and
+  this is that size.
+
+  `nil` at 100% is deliberate rather than an optimisation: an unzoomed editor
+  then renders exactly the markup it rendered before there was a zoom at all,
+  so the default case has no inline geometry to be wrong.
+  """
+  @spec zoom_extent(term(), term()) :: {float(), float()} | nil
+  def zoom_extent(%{width: width, height: height}, zoom)
+      when is_number(width) and is_number(height) do
+    case clamp_zoom(zoom) do
+      100 -> nil
+      step -> {width * step / 100, height * step / 100}
+    end
+  end
+
+  def zoom_extent(_box, _zoom), do: nil
+
+  @doc """
+  The width the stage is LAID OUT at while a zoom is applied, or `nil`.
+
+  The wrapper `zoom_extent/2` sizes is the stage's parent, so its width is
+  also the width the stage is laid out into - and that is a loop: at any step
+  above 100% the wrapper is wider than the panel, the stage fills it, the
+  stage's scroll extent grows, the next measurement makes the wrapper wider
+  again. The live check at 150% found it immediately, at 33,554,428 pixels of
+  wrapper, which is where the run stops rather than where it converges.
+
+  Pinning the stage to the scroller's own width breaks it: the number the
+  stage lays out at then comes from the panel, which no zoom moves, so the
+  measurement that sizes the wrapper is the same at every step. It is the
+  width the stage already had before there was a zoom - a block filling its
+  scroller - said out loud because the wrapper is now between the two.
+
+  `nil` at 100% and unmeasured, for `zoom_extent/2`'s reason: an unzoomed
+  editor carries no inline geometry at all.
+  """
+  @spec zoom_stage_width(term(), term()) :: float() | nil
+  def zoom_stage_width(%{width: width}, zoom) when is_number(width) do
+    case clamp_zoom(zoom) do
+      100 -> nil
+      _step -> width * 1.0
+    end
+  end
+
+  def zoom_stage_width(_viewport, _zoom), do: nil
+
+  @spec positive(term()) :: {:ok, float()} | :error
+  defp positive(value) when is_number(value) and value > 0, do: {:ok, value * 1.0}
+  defp positive(_other), do: :error
 
   @doc """
   How many blocks the tree holds, the root included.
