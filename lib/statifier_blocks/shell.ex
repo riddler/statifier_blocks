@@ -527,6 +527,26 @@ defmodule StatifierBlocks.Shell do
     do: Enum.reduce(fixtures, 0, fn {_id, tables}, acc -> acc + length(tables) end)
 
   @doc """
+  How many findings the document has - the number the Findings tab reports,
+  and the one number this package means by "the document's findings".
+
+  There is exactly one such number and this is where it is defined, so that
+  the tab chip, the collapsed strip and the count a host reads through
+  `StatifierBlocks.Editor.findings_count/3` cannot say three different things
+  about one document. That was the defect: three call sites each counted a
+  list of their own, and the lists were not the same list.
+
+  The argument is `ViewModel.findings` - every finding the view model holds,
+  derived and caller-supplied alike. **Orphans are inside it.** A finding
+  anchored on a block the document no longer holds renders nowhere on the
+  canvas, but it is still something wrong with this document, and a number
+  that dropped it would report a document as clean while its findings list
+  sat under the drawer saying otherwise.
+  """
+  @spec findings_count([Finding.t()]) :: non_neg_integer()
+  def findings_count(findings) when is_list(findings), do: length(findings)
+
+  @doc """
   What the drawer shows, from its own open flag, its tab, the fixtures source,
   the document's findings and the selection (2A, and R4).
 
@@ -574,8 +594,11 @@ defmodule StatifierBlocks.Shell do
 
     tabs =
       Enum.map(@drawer_tabs, fn
-        :tables -> %{id: :tables, title: drawer_title(:tables), count: table_count(fixtures)}
-        :findings -> %{id: :findings, title: drawer_title(:findings), count: length(findings)}
+        :tables ->
+          %{id: :tables, title: drawer_title(:tables), count: table_count(fixtures)}
+
+        :findings ->
+          %{id: :findings, title: drawer_title(:findings), count: findings_count(findings)}
       end)
 
     tab = resolve_tab(Map.get(state, :tab), tabs)
