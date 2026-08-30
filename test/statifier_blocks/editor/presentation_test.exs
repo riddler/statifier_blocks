@@ -107,6 +107,71 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       def palette_entry, do: %{label: "Both at once", layout: :columns}
     end
 
+    defmodule NamedStep do
+      @moduledoc """
+      A host type whose instances are worth naming individually: it declares
+      a `:string` field keyed `label`, which is the seam the card's title
+      override reads. Nothing in the core vocabulary declares one - "Wait" is
+      what a wait is called - so the two-line card cannot be exercised
+      without a type like this.
+      """
+
+      @behaviour StatifierBlocks.BlockType
+
+      @impl true
+      def current_version, do: 1
+
+      @impl true
+      def slots(_config), do: []
+
+      @impl true
+      def config_schema(_config),
+        do: [%{key: "label", type: :string, label: "Name", required?: false, default: ""}]
+
+      @impl true
+      def validate_config(_config), do: :ok
+
+      @impl true
+      def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+
+      @impl true
+      def palette_entry, do: %{label: "Intake"}
+    end
+
+    # Three cards and a root: one block with a name of its own, one without,
+    # and one that calls a handler. Every line of the card face is on the page
+    # once, and every one of them is absent from at least one other card.
+    defp named_document do
+      Document.new(
+        Block.new("core.sequence",
+          id: "blk_named_root",
+          slots: %{
+            "body" => [
+              Block.new("host.named",
+                id: "blk_named",
+                config: %{"label" => "Collect the details"}
+              ),
+              EditorFixtures.wait("blk_wait", "1h"),
+              Block.new("core.invoke",
+                id: "blk_call",
+                config: %{"invoke_type" => "myapp:authorize"}
+              )
+            ]
+          }
+        ),
+        id: "doc_named"
+      )
+    end
+
+    defp named_palette do
+      Palette.new(%{
+        "core.sequence" => StatifierBlocks.Core.Sequence,
+        "core.wait" => StatifierBlocks.Core.Wait,
+        "core.invoke" => StatifierBlocks.Core.Invoke,
+        "host.named" => NamedStep
+      })
+    end
+
     defp lanes_document do
       Document.new(
         Block.new("core.parallel",
@@ -410,6 +475,116 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  view,
                  ~s([data-parent-id="blk_arms"][data-slot="right"][data-index="0"] .sb-gap__add)
                )
+      end
+    end
+
+    describe "the card face (parity item 1.4, campaign 016)" do
+      # Sabotage: rendering `@node.entry.label` again instead of
+      # `ViewModel.title/1` - a block the author named reads as its type, and
+      # the name they typed is visible nowhere on the canvas.
+      test "a named block reads as its name over its type", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: named_document(), palette: named_palette())
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_named"] > .sb-node__chrome > .sb-node__label),
+                 "Collect the details"
+               )
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_named"] > .sb-node__chrome > .sb-node__type),
+                 "Intake"
+               )
+      end
+
+      # Sabotage: dropping the `:if={ViewModel.subtitle(@node)}` guard - every
+      # card in the core vocabulary prints its type on both of its two lines.
+      test "an unnamed block says its type once", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: named_document(), palette: named_palette())
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_wait"] > .sb-node__chrome > .sb-node__label),
+                 "Wait"
+               )
+
+        refute has_element?(
+                 view,
+                 ~s([data-block-id="blk_wait"] > .sb-node__chrome > .sb-node__type)
+               )
+      end
+
+      # Sabotage: dropping the `:if={@node.invoke_type}` guard - every card
+      # draws an empty mono line, and a wait claims a third line it has
+      # nothing to put on.
+      test "the invoke type is a third line, and only where there is one", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: named_document(), palette: named_palette())
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_call"] > .sb-node__chrome > .sb-node__invoke),
+                 "myapp:authorize"
+               )
+
+        refute has_element?(
+                 view,
+                 ~s([data-block-id="blk_wait"] > .sb-node__chrome > .sb-node__invoke)
+               )
+      end
+
+      # R2 (operator ruling 2026-08-29): nothing at rest, revealed on hover or
+      # selection - so the control has to be in the DOM the whole time and
+      # hidden by style alone. Asserted as the attribute the stylesheet
+      # selects rather than as a computed style, which LiveViewTest cannot
+      # see.
+      # Sabotage: dropping `data-reveal` from the button - the rest rule below
+      # matches nothing, the control is visible on all forty cards again, and
+      # this goes red on the attribute rather than on a screenshot.
+      test "the delete control is present at rest, and says how it is revealed", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: named_document(), palette: named_palette())
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_wait"] > .sb-node__chrome > ) <>
+                   ~s(.sb-node__remove[data-reveal="hover-or-selected"])
+               )
+
+        refute has_element?(
+                 view,
+                 ~s([data-block-id="blk_named_root"] > .sb-node__chrome > .sb-node__remove)
+               ),
+               "the root is not deletable, so the affordance is absent"
+      end
+
+      # The other half of the same contract, and the half a LiveView test
+      # cannot reach: the attribute above is only worth asserting if a rule
+      # actually hides the control at rest and reveals it on all three of
+      # hover, focus and selection.
+      # Sabotage: deleting the `opacity: 0` declaration from the rest rule -
+      # the markup assertion above still passes and this goes red, which is
+      # the split the two tests exist for.
+      test "the stylesheet hides it at rest and reveals it three ways" do
+        css = File.read!("assets/css/statifier_blocks.css")
+
+        [_before, from_rest_rule] =
+          String.split(css, ~s(.sb-node__remove[data-reveal="hover-or-selected"] {), parts: 2)
+
+        [rest_declarations, _after] = String.split(from_rest_rule, "}", parts: 2)
+
+        assert rest_declarations =~ "opacity: 0"
+
+        for selector <- [
+              ".sb-node__chrome:hover > .sb-node__remove",
+              ".sb-node__remove:focus-visible",
+              ".sb-node--selected > .sb-node__chrome > .sb-node__remove"
+            ] do
+          assert css =~ selector, "the reveal rule lost #{selector}"
+        end
       end
     end
 
