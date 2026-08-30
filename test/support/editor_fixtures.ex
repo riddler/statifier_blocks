@@ -56,6 +56,32 @@ defmodule StatifierBlocks.EditorFixtures do
     )
   end
 
+  @doc """
+  A one-step document whose only child is a `core.invoke`.
+
+  Separate from the wizard rather than a fourth child of it: an invoke block
+  in the shared document would shift every position the move and drag tests
+  name, and what this one is for - the `invoke_type` field's control - needs
+  no surroundings at all.
+  """
+  @spec invoke_step() :: Document.t()
+  def invoke_step do
+    Document.new(
+      Block.new("core.sequence",
+        id: "blk_flow",
+        slots: %{
+          "body" => [
+            Block.new("core.invoke",
+              id: "blk_authorize",
+              config: %{"invoke_type" => "myapp:authorize"}
+            )
+          ]
+        }
+      ),
+      id: "doc_invoke_step"
+    )
+  end
+
   @doc "A `core.wait` with a valid ISO-8601 duration."
   @spec wait(Block.id(), String.t()) :: Block.t()
   def wait(id, duration) do

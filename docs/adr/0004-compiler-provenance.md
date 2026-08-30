@@ -2120,3 +2120,79 @@ depends on that happening.
 - The loose grammar `core.subchart` accepts for the `chart` field. This
   package does not own the shape of a host's document ids, and tightening the
   check would be a second, quieter proposal about what a reference may say.
+
+## Note (2026-08-30): the editor's `invoke_types` assign, a suggestion list over decision 8's data
+
+A dated note rather than an amendment, recorded for `sb-ht79` under
+campaign-021 ruling R5. It records a seam the editor now carries and changes
+nothing this record decides. The record's Status is untouched, no compiled
+byte moves, and the compiler is not edited.
+
+### What decision 8 left for a presentation to answer
+
+Decision 8 closed the compile-time question and named the one it did not
+close: "Whether the editor surfaces the mismatch live while authoring is a
+presentation decision over data this record supplies." This note is that
+presentation decision, made in the smallest form that is useful.
+
+`StatifierBlocks.Editor` accepts an optional `invoke_types` assign - a list
+of strings a host supplies, defaulting to empty. When it is non-empty, an
+`invoke_type` config field renders as a text input bound to a `<datalist>`
+of those strings; when it is absent or empty the field renders as the plain
+text input it has always been. `StatifierBlocks.Editor.Field` owns the
+rendering.
+
+### Why a datalist, and not a select
+
+Because decision 8's argument is about what may be *refused*, and a control
+that refuses would contradict it. A `<select>` would make the host's list
+the vocabulary; a `<datalist>` makes it a suggestion, and an author may type
+a type that is on no list and have it stored verbatim. That is the same
+answer decision 8 gave for the compile - the lint warns and never errors -
+carried into the control an author actually touches, so the editor and the
+compiler cannot disagree about whether an unknown type is allowed. Nothing
+about what compiles changes: an unknown type stays a lint, on request, and
+never a refusal.
+
+The lifetime argument is why the list arrives as an assign and is stored
+nowhere. Decision 8 grounds the two-registry gap in st-ADR-0051 making the
+handler set **deployment state, supplied per session**, against a palette
+that is authoring state. A suggestion list is a fact about the deployment
+the author happens to be pointed at, so it is passed in per render by the
+host that knows it, and no byte of it reaches the block, the document or
+the compiled artifact. An authoring server with no handler map at all
+supplies nothing and loses nothing, which is the case ADR-0002's
+consequences blessed and this seam must not quietly un-bless.
+
+### The two `invoke_types` surfaces, which are not the same surface
+
+The name is now used twice on purpose, and the two are read from opposite
+ends of the same vocabulary:
+
+- **`%Compiled{}`'s `invoke_types`** (decision 8) is *derived from a
+  document*: the sorted set of types the generated SCXML actually emits.
+- **the editor's `invoke_types` assign** is *supplied by a host*: the types
+  it is prepared to answer, the same set decision 8 describes a host handing
+  to `:known_invoke_types`.
+
+Neither reads the other, and no code path connects them. A host that already
+computes one for the compiler's opt-in lint has the other for free, which is
+the intended ergonomics rather than a coupling: decision 8's "one-liner over
+a field it already published" gains a second reader, not a second producer.
+
+### What this note does not do
+
+- It does not touch the compiler, `:known_invoke_types`, or the lint's tier.
+  The warning stays a warning and stays opt-in.
+- It does not make the editor validate an invoke type. The `invoke_type`
+  field's own shape check is `Core.Invoke`'s, unchanged, and the
+  two-registry check remains the compiler's on request and the host's at
+  deploy time.
+- It does not widen ADR-0002 decision 7's field-type set. No new field type
+  exists; a `:string` field keyed `invoke_type` renders differently, and a
+  block type that declares `invoke_type` as some other field type keeps that
+  type's control.
+- It does not decide whether the editor shows a *live mismatch finding*
+  while authoring. Decision 8 named that as sb-w50's, and a suggestion list
+  is not it: this note supplies the vocabulary at the point of typing and
+  leaves the surfacing question exactly where decision 8 left it.

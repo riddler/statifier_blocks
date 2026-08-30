@@ -67,6 +67,46 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     `StatifierBlocks.Edit.check_config/3`, which is why an unparseable
     integer reaches the draft config as the string the author typed rather
     than being silently coerced or dropped.
+
+    ## The `invoke_type` suggestion list
+
+    `invoke_types` is the one control this module chooses **by key**, and
+    the exception is deliberate rather than an oversight of the rule above.
+    A host that knows which invoke types it has registered can pass them as
+    an editor assign, and an `invoke_type` field then renders as a text
+    input bound to a `<datalist>` of those strings. With the assign absent
+    or empty the same field renders as the plain text input it has always
+    been, so the suggestion list is additive and a host that supplies
+    nothing loses nothing.
+
+    Three properties make this a suggestion rather than a vocabulary, and
+    each of them is ADR-0004 decision 8 rather than a choice made here:
+
+      * **Free text stays valid.** A `<datalist>` suggests; it does not
+        constrain, which is exactly why it is the control used and a
+        `{:select, choices}` is not. An author can type a type that is not
+        on the list and the editor stores it verbatim.
+      * **An unknown type stays a lint.** The two-registry check is the
+        compiler's opt-in `:known_invoke_types` lint, and it reports; it
+        never refuses. Nothing here changes what compiles.
+      * **The handler set is deployment state, not authoring state.** Which
+        types a host can actually run is a property of the deployment the
+        document is run in, not of the document, so it arrives as an assign
+        the host fills in and never as anything stored in the block.
+
+    The assign shares its name with the compiler's `invoke_types` surface -
+    `StatifierBlocks.Compiled`'s field and the compiler's
+    `:known_invoke_types` option - and the two are separate surfaces that
+    happen to describe the same vocabulary from opposite ends. The
+    compiler's is *derived from a document*: the sorted set of types that
+    document actually emits. This one is *supplied by a host*: the types it
+    is prepared to answer. Neither reads the other.
+
+    Keying a control on a field's key is a narrower thing than the
+    `placeholder` question above, which is why it does not reopen it: a
+    block type declaring an `invoke_type` field of some other type keeps
+    that type's control, because this clause is reached only after every
+    typed clause has had its turn.
     """
 
     use Phoenix.Component
@@ -83,6 +123,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "Override for `:expression`, per ADR-0005 decision 9's seam. Receives the same assigns."
     )
 
+    attr(:invoke_types, :list,
+      default: [],
+      doc: """
+      The invoke types the host is prepared to answer. Suggestions for an
+      `invoke_type` field, never a constraint on it; empty is *no list
+      supplied* and renders the plain input.
+      """
+    )
+
     @doc "One field: its label, its control, and its own findings (decision 11)."
     def field(assigns) do
       ~H"""
@@ -91,7 +140,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <span class="sb-field__label-text">{@field.label}</span>
           <span :if={@field.required?} class="sb-field__required">Required</span>
         </label>
-        <.control field={@field} target={@target} expression_component={@expression_component} />
+        <.control
+          field={@field}
+          target={@target}
+          expression_component={@expression_component}
+          invoke_types={@invoke_types}
+        />
         <p :for={finding <- @field.findings} class={["sb-finding", severity_class(finding)]}>
           {finding.message}
         </p>
@@ -102,6 +156,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:field, ViewModel.Field, required: true)
     attr(:target, :any, required: true)
     attr(:expression_component, :any, default: nil)
+    attr(:invoke_types, :list, default: [])
 
     defp control(%{field: %ViewModel.Field{type: :boolean}} = assigns) do
       ~H"""
@@ -240,6 +295,35 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           add
         </button>
       </div>
+      """
+    end
+
+    # Reached only after every typed clause, so a block type that declares
+    # `invoke_type` as something other than a string keeps that type's own
+    # control. The empty list falls through to the plain input below, which
+    # is what makes "no list supplied" and "a list that happens to be empty"
+    # the same thing on screen - a `<datalist>` with no options suggests
+    # nothing and would only add an element for a reader to trip over.
+    defp control(
+           %{field: %ViewModel.Field{key: "invoke_type"}, invoke_types: [_first | _rest]} =
+             assigns
+         ) do
+      assigns = assign(assigns, :list_id, input_id(assigns.field) <> "-types")
+
+      ~H"""
+      <input
+        class="sb-field__input"
+        type="text"
+        id={input_id(@field)}
+        name={input_name(@field)}
+        value={to_text(@field.value)}
+        list={@list_id}
+        spellcheck="false"
+        autocomplete="off"
+      />
+      <datalist id={@list_id} data-invoke-types={length(@invoke_types)}>
+        <option :for={type <- @invoke_types} value={type}></option>
+      </datalist>
       """
     end
 
