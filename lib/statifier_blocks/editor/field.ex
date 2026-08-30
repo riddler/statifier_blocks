@@ -37,6 +37,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     it. Nothing here is stored - the stored form is the author's string
     verbatim, byte for byte.
 
+    A required field is marked with the **word**, not with an asterisk
+    (parity item 1.9). An asterisk is a convention that has to be learned
+    from a legend the editor does not have, it is read aloud as "star", and
+    it is one character wide next to a label it is easy to miss. `Required`
+    says the same thing to a reader and to a screen reader, and it is the
+    field record's own `required?` that decides - never a key name and never
+    a type.
+
     Two control types carry a **placeholder**, and neither is chosen by key
     or by type name: an `:expression` says what kind of thing belongs in it,
     and a `:duration` shows the spelling it stores. A bare `:string` says
@@ -80,7 +88,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       ~H"""
       <div class={["sb-field", @class]} data-field={@field.key} data-field-type={type_tag(@field.type)}>
         <label class="sb-field__label" for={input_id(@field)}>
-          {@field.label}<span :if={@field.required?} class="sb-field__required">*</span>
+          <span class="sb-field__label-text">{@field.label}</span>
+          <span :if={@field.required?} class="sb-field__required">Required</span>
         </label>
         <.control field={@field} target={@target} expression_component={@expression_component} />
         <p :for={finding <- @field.findings} class={["sb-finding", severity_class(finding)]}>
