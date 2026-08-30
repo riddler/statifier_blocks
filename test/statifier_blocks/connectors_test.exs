@@ -72,6 +72,27 @@ defmodule StatifierBlocks.ConnectorsTest do
       assert String.ends_with?(path, "V 2")
     end
 
+    # Down, or level, and never up. An arrowhead is oriented along its path,
+    # so an ascending edge renders an arrow pointing back at the block the
+    # flow just left - a loop the document does not contain.
+    # Sabotage: dropping the `ty < fy` clause from `flow_path/3` - the aligned
+    # case draws "M 10 60 L 10 20", which is the upward-flipped head itself,
+    # and this goes red on the second coordinate.
+    test "an aligned edge whose head is above its tail is drawn level, never up" do
+      assert Connectors.flow_path(%{x: 10, y: 60}, %{x: 10, y: 20}) == "M 10 60 L 10 60"
+    end
+
+    # The offset half of the same rule, and the one that shows what clamping
+    # does to the elbow: the halfway line lands on the tail's own y, so the
+    # whole path is level and every corner radius clamps to nothing.
+    # Sabotage: clamping `fy` DOWN to `ty` instead of `ty` up to `fy` - the
+    # edge is level but at the wrong height, leaving its own source, and this
+    # goes red on every coordinate.
+    test "an offset edge whose head is above its tail turns on the tail's own line" do
+      assert Connectors.flow_path(%{x: 10, y: 60}, %{x: 50, y: 20}) ==
+               "M 10 60 V 60 Q 10 60 10 60 H 50 Q 50 60 50 60 V 60"
+    end
+
     # Sabotage: rendering every coordinate as a float - the paths stop being
     # comparable to the spike's evidence, which is the only reason the numbers
     # above can be checked by eye at all.
@@ -267,6 +288,42 @@ defmodule StatifierBlocks.ConnectorsTest do
       # box would reach at most 400. The channel is outside it, which is the
       # routing rule that keeps an exit from crossing the body at any depth.
       assert Enum.max(x_coordinates(interrupt.d)) > 400
+    end
+
+    # And the box it runs outside of is the container's BODY when one was
+    # measured. A container's node box is only as wide as the width its parent
+    # handed down; the body inside it is as wide as the work it holds, and
+    # OVERFLOWS it. Offsetting the channel from the node box therefore turns
+    # the edge down inside the very contents it is escaping, which is the one
+    # thing the channel exists to prevent.
+    # Sabotage: reading `node_anchor/1` in `channel_box/2` - the channel goes
+    # back to 410, which is 190px inside the body, and this goes red.
+    test "the channel is offset from the container's body, not its narrower node box" do
+      [interrupt] =
+        railed(:secondary)
+        |> Connectors.edges(overflowing_measurement())
+        |> Enum.filter(&(&1.kind == :interrupt))
+
+      # The node box is 400 wide and the body inside it is 600, so the only
+      # channel that clears the container's contents is the one offset from
+      # the body: 600 + `@channel_offset`.
+      assert Enum.max(x_coordinates(interrupt.d)) == 610
+    end
+
+    # The fallback, which is what keeps the rule above from silently dropping
+    # an edge: a collapsed container renders no body at all, so its body anchor
+    # is absent and the node box answers instead.
+    # Sabotage: making `channel_box/2` return `nil` when the body anchor is
+    # missing - a collapsed container's exit edge disappears entirely and this
+    # goes red on the empty list rather than on the number.
+    test "a container whose body was never measured falls back to its node box" do
+      [interrupt] =
+        railed(:secondary)
+        |> Connectors.edges(rail_measurement())
+        |> Enum.filter(&(&1.kind == :interrupt))
+
+      refute Map.has_key?(rail_measurement(), "slots:blk_group")
+      assert Enum.max(x_coordinates(interrupt.d)) == 410
     end
 
     # The collapse case, at the layer it is decided: a folded container
@@ -490,6 +547,14 @@ defmodule StatifierBlocks.ConnectorsTest do
       "card:blk_a" => {0, 80, 190, 30},
       "outlet:blk_a" => {0, 120, 190, 0}
     })
+  end
+
+  # The same rail, with the body OVERFLOWING the node box the way a stretched
+  # container's does on the canvas: the node box stays 400 and the body is
+  # 600. The two anchors disagreeing is the only condition under which
+  # `channel_box/2` says anything at all.
+  defp overflowing_measurement do
+    Map.merge(rail_measurement(), measured(%{"slots:blk_group" => {0, 40, 600, 250}}))
   end
 
   defp rail_measurement do

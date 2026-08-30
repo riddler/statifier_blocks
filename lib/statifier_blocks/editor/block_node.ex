@@ -374,7 +374,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <span class="sb-node__fan-label">{ViewModel.fan_label(@node)}</span>
         </div>
 
-        <div :if={not @collapsed?} class={["sb-node__slots", layout_class(@node)]}>
+        <div
+          :if={not @collapsed?}
+          class={["sb-node__slots", layout_class(@node)]}
+          data-sb-anchor={Connectors.slots_anchor(@node.block_id)}
+        >
           <Slot.slot
             :for={slot <- @node.slots}
             slot={slot}

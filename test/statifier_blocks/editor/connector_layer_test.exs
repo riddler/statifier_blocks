@@ -108,6 +108,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert html =~ ~s(data-sb-anchor="#{Connectors.slot_anchor(@branch_id, "arm_review")}")
       end
 
+      # The body anchor, which is a container's real extent rather than the
+      # narrower node box its contents overflow. It is what an interrupt
+      # channel is offset from, and it is a server-side stamp: the hook's read
+      # is `querySelectorAll("[data-sb-anchor]")`, so a new kind of anchor is
+      # a new attribute on an element and nothing else.
+      # Sabotage: dropping `data-sb-anchor` from `BlockNode`'s slots element -
+      # `channel_box/2` finds no body, falls silently back to the node box,
+      # and every interrupt edge on the canvas goes back to turning down
+      # inside the container it is escaping.
+      test "a container's body carries its own anchor", %{conn: conn} do
+        {:ok, _view, html} = mount_editor(conn, document: EditorFixtures.credit_card())
+
+        assert html =~ ~s(data-sb-anchor="#{Connectors.slots_anchor(@branch_id)}")
+      end
+
       # Decision 7's element rule: one element carries one `phx-hook`, and the
       # canvas root is the drag hook's by decision.
       # Sabotage: moving the measure hook onto the canvas root - the drag hook
@@ -223,6 +238,28 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert drawn =~ "sb-edge sb-edge--interrupt"
         assert drawn =~ "url(#sb-arrow-interrupt)"
+      end
+
+      # The arrowhead's own geometry, which is the difference between a head
+      # that lands on the endpoint at every stroke width and one that does
+      # neither. Asserted in the markup because that is where it lives: an
+      # SVG marker is declarative, so there is no function to hold to it.
+      # Sabotage: dropping `markerUnits="userSpaceOnUse"` - the default unit
+      # is `strokeWidth`, so the same head renders at a different size on a
+      # hairline rejoin than on a hovered edge, and this goes red.
+      test "an arrowhead is sized in user space, boxed by a viewBox, and referenced at its tip",
+           %{conn: conn} do
+        {:ok, view, html} = mount_editor(conn, document: EditorFixtures.credit_card())
+
+        drawn = measure(view, measurement_of(html))
+
+        assert drawn =~ ~s(markerUnits="userSpaceOnUse")
+        assert drawn =~ ~s(viewBox="0 0 8 8")
+
+        # The path draws to 7 and the reference point is 6.5, so the tip - not
+        # the tail - is what lands on the point the geometry computed.
+        assert drawn =~ ~s(refX="6.5")
+        assert drawn =~ ~s(d="M0 0.5 L7 4 L0 7.5 z")
       end
     end
 

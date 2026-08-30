@@ -59,18 +59,41 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <%!-- Two arrowheads rather than one, because a marker's fill cannot
                 inherit the stroke of the path that references it in every
                 browser that matters yet. Both read a token, so a theme still
-                moves them. --%>
+                moves them.
+
+                The geometry is the spike's, and all three of the parts it
+                carries that this def used to lack are load-bearing:
+
+                `markerUnits="userSpaceOnUse"` is the default `strokeWidth`
+                unit corrected. Left at the default, a marker is scaled BY the
+                stroke width of whichever path references it, so the same
+                arrowhead renders at a different size on a hairline rejoin
+                than on a hovered edge - one head per stroke width, which is
+                not what a vocabulary means by one arrowhead.
+
+                `viewBox` is what makes `markerWidth`/`markerHeight` a size
+                rather than a crop. Without one the marker's content is placed
+                in the referencing path's user space and the box merely clips
+                it, so the numbers below only ever happened to fit the `d`
+                beneath them.
+
+                `refX` sits at the TIP rather than behind it (6.5 of the 7 the
+                path draws to), which is what lands the point of the arrow on
+                the endpoint the geometry computed. Behind the tip, every head
+                on the canvas overshoots its card by the length of the arrow. --%>
           <marker
             :for={{id, class} <- markers()}
             id={id}
             class={class}
-            markerWidth="6"
-            markerHeight="6"
-            refX="5"
-            refY="3"
-            orient="auto"
+            viewBox="0 0 8 8"
+            markerWidth="7"
+            markerHeight="7"
+            refX="6.5"
+            refY="4"
+            orient="auto-start-reverse"
+            markerUnits="userSpaceOnUse"
           >
-            <path d="M 0 0 L 6 3 L 0 6 z" />
+            <path d="M0 0.5 L7 4 L0 7.5 z" />
           </marker>
         </defs>
         <g class="sb-connectors__edges">
