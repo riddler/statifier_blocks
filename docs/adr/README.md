@@ -22,8 +22,9 @@ A `## Note` on a record carries no Status line. Every Status line in these
 records sits on the record's own header or under a `## Amendment`, because an
 amendment changes what the record decides and a note does not: a note records
 where something already decided renders, or what a sentence already accepted
-was about. The form recent notes use is an opening on "A dated note rather
-than an amendment", the decision the note is about named, and a close on what
-the note leaves unchanged; three of the older notes open some other way, so the
-form is a convention these records converged on rather than a rule they were
-written to.
+was about. Most of these notes open by saying what the note is not - a dated
+note rather than an amendment, or rather than a proposed decision - then name
+the decision they are about and close on what they leave unchanged. That is
+the usual shape and not a required one: several open some other way, on the
+finding itself or on why it came to be recorded, and a note is not wrong for
+doing so.
