@@ -124,6 +124,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     excludes: with `phoenix_live_view` absent the editor does not compile, so
     there is nothing for these to drive. The tag is on the case rather than on
     each test so a new editor test cannot forget it.
+
+    `Phoenix.Component.assign/3` drops a value equal to the one already held, so
+    re-sending an identical value never reaches `update/2`: a re-render test has
+    to move a value for there to be a re-render at all.
     """
 
     use ExUnit.CaseTemplate

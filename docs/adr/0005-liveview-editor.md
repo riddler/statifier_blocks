@@ -1844,9 +1844,9 @@ d10/13 amendment records as evidence rather than decoration, and leaves as a
 question for the shipped editor: a compound control, an escape hatch, or a
 documented refusal of durations that are not one unit.
 
-Campaign 014 answered it for the spike as D4: a single text control taking
-predicator duration strings, with the author's string stored verbatim and
-compiled to the ISO pivot at emit time (`sb-709`; `core.send` reads both
+The campaign-014 ruling D4 answered it for the spike: a single text control
+taking predicator duration strings, with the author's string stored verbatim
+and compiled to the ISO pivot at emit time (`sb-709`; `core.send` reads both
 spellings). This section takes the same answer for the shipped editor, on the
 operator's ruling, and writes it down as a table row so the shipped renderer
 has a record to graduate against rather than a spike to copy.
@@ -3545,8 +3545,10 @@ editor with a pane pre-folded. Like the palette's fold it is NOT reset by a
 document switch: a pane fold addresses no block, so nothing about it stops
 being true when a different document opens, which is the same sentence the
 2026-08-30 amendment on decision 2 writes to exempt the palette from the
-collapsed-ids reset. Unlike the collapsed-ids set, and for that reason, it is
-not editor state about the document at all.
+collapsed-ids reset. Clause 2b of that amendment is where the document-switch
+reset itself is written down, and it is the clause to cite for it: the shell
+arrangement's own rulings name no part of that reset. Unlike the collapsed-ids
+set, and for that reason, it is not editor state about the document at all.
 
 3A is untouched. A folded inspector is still a pane about the selected block;
 it is a pane about the selected block that is not on screen. No tab was added,

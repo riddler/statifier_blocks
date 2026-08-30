@@ -234,7 +234,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # opening, so none of them may re-fit; the swap that *is* an opening is
       # the test below it. The revision has to move for the re-render to
       # happen at all: `assign/3` drops a value equal to the one it holds, so
-      # a host handing back an identical struct never reaches `update/3` and
+      # a host handing back an identical struct never reaches `update/2` and
       # would prove nothing either way.
       # Sabotage: re-arming whenever the host re-renders with the attr - a
       # host that re-renders for any reason of its own resets the author's

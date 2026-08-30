@@ -592,7 +592,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    describe "a document switch (2A)" do
+    describe "a document switch (decision 2's amendment, 2b)" do
       # Sabotage: leaving the drawer open across a switch - it shows the old
       # document's subject under the new document, and the selection it follows
       # names a block that is not there.

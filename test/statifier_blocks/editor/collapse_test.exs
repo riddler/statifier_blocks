@@ -313,7 +313,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    describe "a document switch (2A)" do
+    describe "a document switch (decision 2's amendment, 2b)" do
       # A block id from the old document names nothing in the new one, so the
       # set goes the way the selection goes. The palette's own fold is the
       # deliberate exception - it addresses no block.

@@ -947,7 +947,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # It answers with the socket *and* whether the identity actually changed,
     # because `arm_fit/4` needs the same answer and there is only one place
     # that knows it. The flag is returned rather than assigned: it is true for
-    # the length of one `update/3` and an assign would still be true on the
+    # the length of one `update/2` and an assign would still be true on the
     # next render, which is precisely the host re-render that must not re-fit.
     @spec switch_document(Phoenix.LiveView.Socket.t(), Document.t() | nil) ::
             {Phoenix.LiveView.Socket.t(), boolean()}
