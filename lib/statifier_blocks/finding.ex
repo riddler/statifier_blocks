@@ -116,13 +116,15 @@ defmodule StatifierBlocks.Finding do
   finding that names no block cannot be routed. Only the `:document` stage
   produces these today (`Document.validate/1` failing).
 
-  This union carried a second member until ADR-0005 amendment `11h`: the
-  refusal for a finding whose stage named no source in decision 11's enum,
-  which was the answer for `:document`, `:emit` and `:chart` at `:error`
-  severity until `11h` gave those a source (`:compile`). Nothing produced
-  it after that, and `11j`'s rule - a value with no producer is worse than
-  absent - dropped it, the way the same amendment dropped `:arity` from
-  `source/0`.
+  This union carried a second member for part of this package's history:
+  the refusal for a finding whose stage named no source in decision 11's
+  enum, which was the answer for `:document`, `:emit` and `:chart` at
+  `:error` severity. ADR-0005 amendment `11h` gave those stages a source
+  (`:compile`), which left nothing producing the refusal; a later change
+  in the 0.7.0 cycle removed the member itself, under `11j`'s rule that a
+  value with no producer is worse than absent - the way the same amendment
+  dropped `:arity` from `source/0`. The record keeps the refusal as
+  history.
   """
   @type from_compiler_error :: {:unanchorable, StatifierBlocks.Compiler.Finding.t()}
 
@@ -171,7 +173,8 @@ defmodule StatifierBlocks.Finding do
        `:compile`, under ADR-0005 amendment `11h`. Rule 4 used to refuse
        instead: a compile error against generated SCXML or against the
        document envelope had no bucket in decision 11's enum, so the
-       adapter refused rather than lie about where the rule lived. `:compile` is that bucket, and it is why an
+       adapter refused rather than lie about where the rule lived.
+       `:compile` is that bucket, and it is why an
        error the compiler raises at a stage this mapping does not name can
        now render in the editor at all - which is the half of `11h` that
        makes the document-level panel's promise ("no finding can hide")

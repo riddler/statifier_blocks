@@ -3007,10 +3007,14 @@ dropped, as `{index, reason}` in declaration order, with `reason` in
 `:too_long | :blank | :multiline | :not_a_string` - B3's refusal set,
 enumerated. The index is the position in the list the **type declared**, not in
 what survived: `summary/2` has already closed the gap and cannot be indexed
-against, and the author is looking at their own declaration. `summary/2` and
-the private `chip/1` are unchanged in behaviour and are defined against the
-same refusal pass, so the chips that draw and the chips that are reported can
-never be computed from two readings of one callback.
+against, and the author is looking at their own declaration. That index is
+zero-based, as a list index is, while the position the sentence
+`summary_refusal_message/3` builds counts is one-based, as a reader counting
+chips does - the same split `StatifierBlocks.BlockType`'s own `@doc` on that
+function records. `summary/2` and the private `chip/1` are unchanged in
+behaviour and are defined against the same refusal pass, so the chips that
+draw and the chips that are reported can never be computed from two readings
+of one callback.
 
 `StatifierBlocks.ViewModel.derived_findings/2` reads it once per resolved
 block and emits one finding per refusal: source `:lint`, severity `:warning`,
@@ -3019,8 +3023,9 @@ the cap - "summary chip 2 is 30 characters; the cap is 24, so it is not
 drawn" - because those are the three facts that turn "nothing drew" into a fix,
 and none of them is on the card. The sentence is built in
 `StatifierBlocks.BlockType` (`summary_refusal_message/3`), which is where the
-number lives; ADR-0002 amendment H's Consequences ask for one number in one
-place, and a sentence quoting it from the editor would be a second home for it.
+number lives; ADR-0002 amendment H's Consequences section states one number in
+one place, and a sentence quoting it from the editor would be a second home
+for it.
 
 **Why `:lint` and `:warning` rather than an error.** Decision 11 reserves every
 non-error severity to `:lint`, and the document compiles with an undrawn chip
@@ -3110,11 +3115,11 @@ block's existing children rendered normally.
 `sb-dbqq` (campaign-018 ruling D1) is the second application of the same
 reasoning and is cited here so the pair is readable as one move: the pane an
 author reaches by asking a question is where a long or document-shaped answer
-can be given honestly. D4 moved the read-only config there because a card
-could not hold it; `sb-dbqq` gave the Findings tab the document's findings
-because a pane with no selection had nothing to hold at all. Both leave the
-card and the drawer exactly as decision 12 and shell amendment 3A
-("anything about the document goes to the drawer") describe them.
+can be given honestly. The campaign-017 ruling D4 moved the read-only config
+there because a card could not hold it; `sb-dbqq` gave the Findings tab the
+document's findings because a pane with no selection had nothing to hold at
+all. Both leave the card and the drawer exactly as decision 12 and shell
+amendment 3A ("anything about the document goes to the drawer") describe them.
 
 ---
 
@@ -3148,3 +3153,45 @@ compiler seam produces. The sentence describes where such a finding belongs;
 the seam that would put it there is still future work.
 
 No decision moves, no enum moves, no anchor moves. Filed with `sb-dbqq`.
+
+---
+
+## Note (2026-08-30): decision 11, the readers the findings surfaces share
+
+A dated note rather than an amendment: decision 11 is unchanged in every
+particular, and so is the note above it that records the number a host reads.
+What this records is that the same discipline - one number computed in one
+place, every surface reading it - has named readers for the rest of what a
+findings surface draws, so a surface added later calls one instead of
+tallying a second time.
+
+`StatifierBlocks.Shell.severity_counts/1` is that number's breakdown. It
+takes the same list `findings_count/1` takes and returns one
+`%{severity: _, count: _}` per severity that has something at it, in the
+order the shell orders severities, omitting a severity with nothing at it
+rather than drawing a zero. Both document-level surfaces read it and neither
+counts for itself.
+
+`StatifierBlocks.Editor.Findings.severity_pills/1` is the pill row that
+renders it, and both of those surfaces render *it* rather than repeating its
+markup - the drawer's Findings tab and the inspector's unselected Findings
+tab. That is what makes the pills sum to the count on the tab beside them by
+construction rather than by agreement.
+
+`StatifierBlocks.Editor.Findings.row/1` is the finding anatomy decision 11
+describes, and its `subject` attribute is an opt-in that defaults to false: a
+row names the block only where the surface around it does not already. The
+document-wide list passes it; the inspector's rows do not, because the pane's
+header or the group's heading is the subject there and a subject on every
+line would repeat it.
+
+`StatifierBlocks.Editor.Findings.anchor_tag/1` is a finding's anchor as the
+`data-anchor` string, and both surfaces call it rather than building the
+string. It is a function of the anchor alone, so a test or a host looking for
+a finding's row in the DOM builds exactly what the renderer built.
+
+Unchanged by this note: the number and the ruling that names it, what a
+finding is, what it is anchored to, which severities exist, and which
+surfaces render a finding. Nothing here adds vocabulary; it records which
+functions are the shared readers, so the next surface reads rather than
+re-derives.

@@ -17,3 +17,11 @@ so there is no local "record architecture decisions" record; the umbrella's
 decision D8 governs. A bare `ADR-NNNN` cites this repository's own records;
 a cross-repo citation carries the owning repo's beads prefix (`st-ADR-0052`
 is statifier-ex's ADR-0052, `sp-ADR-0003` is statifier_persistence's).
+
+A `## Note` on a record carries no Status line. Every Status line in these
+records sits on the record's own header or under a `## Amendment`, because an
+amendment changes what the record decides and a note does not: a note records
+where something already decided renders, or what a sentence already accepted
+was about. The form these records use is a note that opens on "A dated note
+rather than an amendment", names the decision it is about, and closes on what
+it leaves unchanged.
