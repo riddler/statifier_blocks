@@ -74,9 +74,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     by the ordinary route and falls back to its raw type name, which is the
     only thing about it that is still known.
 
-    The inspector has no collapse. The palette's fold is the wide
-    arrangement's answer to a cramped canvas and one pane is enough of an
-    answer; a second one is a separate ruling and is not made here.
+    ## The inspector folds too (ADR-0005, the 2026-08-30 shell amendment)
+
+    This pane used to say it had no collapse - that the palette's fold was the
+    wide arrangement's answer to a cramped canvas, that one pane was enough of
+    an answer, and that a second one would be a separate ruling. It is that
+    separate ruling that has now been made: the 2026-08-30 amendment to the
+    shell arrangement grants the inspector its own fold, and the paragraph
+    above is superseded rather than merely out of date.
+
+    What it is, is the palette's fold on the other side of the canvas:
+    `collapsed` in, `"inspector-collapse"` out, `data-collapsed` on the pane
+    and `data-inspector` on the layout, and the width given back by one
+    stylesheet rule. No hook, no client state, no fourth tab, and nothing
+    about 3A changes - a folded pane is still about the selected block, it is
+    just not on screen. The chevron points the way the press will MOVE the
+    pane, which on this side is the mirror of the palette's.
 
     ## The Config tab's two sections (parity item 1.9)
 
@@ -130,6 +143,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     alias StatifierBlocks.{Finding, Shell, ViewModel}
 
     attr(:tab, :atom, required: true)
+
+    attr(:collapsed, :boolean,
+      default: false,
+      doc: "folded to a rail - the 2026-08-30 shell amendment's inspector fold"
+    )
+
     attr(:node, :any, default: nil, doc: "the selected `ViewModel.Node`, or nil")
 
     attr(:slot_label, :any,
@@ -173,6 +192,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       <section
         class={["sb-inspector", @class]}
         data-tab={@tab}
+        data-collapsed={to_string(@collapsed)}
         data-block-id={@node && @node.block_id}
       >
         <div class="sb-inspector__header">
@@ -180,6 +200,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <span class="sb-inspector__status" data-selected={to_string(@node != nil)}>
             {selection_status(@node)}
           </span>
+          <button
+            type="button"
+            class="sb-inspector__toggle"
+            phx-click="inspector-collapse"
+            phx-target={@target}
+            aria-expanded={to_string(not @collapsed)}
+            aria-label={if @collapsed, do: "Expand the inspector", else: "Collapse the inspector"}
+            title={if @collapsed, do: "Expand the inspector", else: "Collapse the inspector"}
+          ></button>
         </div>
 
         <div class="sb-inspector__tabs" role="tablist" aria-label="Inspector">
