@@ -1,0 +1,356 @@
+{
+  "edges": [
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_intake",
+      "to": "card:blk_cp_validation"
+    },
+    {
+      "kind": "flow",
+      "from": "outlet:blk_cp_validation",
+      "to": "card:blk_cp_outcome"
+    },
+    {
+      "kind": "flow",
+      "from": "outlet:blk_cp_outcome",
+      "to": "card:blk_cp_tail"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_root",
+      "to": "card:blk_cp_intake"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_validation",
+      "to": "fan:blk_cp_validation"
+    },
+    {
+      "kind": "fan",
+      "from": "fan:blk_cp_validation",
+      "to": "slot:blk_cp_validation/arm_valid"
+    },
+    {
+      "kind": "join",
+      "from": "outlet:blk_cp_authz",
+      "to": "outlet:blk_cp_validation"
+    },
+    {
+      "kind": "fan",
+      "from": "fan:blk_cp_validation",
+      "to": "slot:blk_cp_validation/otherwise"
+    },
+    {
+      "kind": "join",
+      "from": "card:blk_cp_validation_fail",
+      "to": "outlet:blk_cp_validation"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_authz_deadline",
+      "to": "card:blk_cp_lanes"
+    },
+    {
+      "kind": "flow",
+      "from": "join:blk_cp_lanes",
+      "to": "card:blk_cp_authorize"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_cancelled",
+      "to": "card:blk_cp_authz_timeout"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_authz",
+      "to": "card:blk_cp_authz_deadline"
+    },
+    {
+      "kind": "interrupt",
+      "from": "card:blk_cp_cancelled",
+      "exit": "outlet:blk_cp_authz",
+      "region": "blk_cp_authz",
+      "channel_x": 1387.0
+    },
+    {
+      "kind": "interrupt",
+      "from": "card:blk_cp_authz_timeout",
+      "exit": "outlet:blk_cp_authz",
+      "region": "blk_cp_authz",
+      "channel_x": 1393.0
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_balance",
+      "to": "card:blk_cp_balance_wait"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_three_ds",
+      "to": "card:blk_cp_three_ds_group"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_lanes",
+      "to": "fan:blk_cp_lanes"
+    },
+    {
+      "kind": "flow",
+      "from": "join:blk_cp_lanes",
+      "to": "outlet:blk_cp_lanes"
+    },
+    {
+      "kind": "fan",
+      "from": "fan:blk_cp_lanes",
+      "to": "slot:blk_cp_lanes/lane_fraud_review"
+    },
+    {
+      "kind": "join",
+      "from": "outlet:blk_cp_fraud",
+      "to": "join:blk_cp_lanes"
+    },
+    {
+      "kind": "fan",
+      "from": "fan:blk_cp_lanes",
+      "to": "slot:blk_cp_lanes/lane_balance_check"
+    },
+    {
+      "kind": "join",
+      "from": "card:blk_cp_balance_wait",
+      "to": "join:blk_cp_lanes"
+    },
+    {
+      "kind": "fan",
+      "from": "fan:blk_cp_lanes",
+      "to": "slot:blk_cp_lanes/lane_three_ds"
+    },
+    {
+      "kind": "join",
+      "from": "outlet:blk_cp_three_ds_group",
+      "to": "join:blk_cp_lanes"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_risk_rating",
+      "to": "card:blk_cp_fraud_wait"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_fraud_wait",
+      "to": "card:blk_cp_risk_branch"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_fraud",
+      "to": "card:blk_cp_risk_rating"
+    },
+    {
+      "kind": "interrupt",
+      "from": "card:blk_cp_fraud_abort",
+      "exit": "outlet:blk_cp_fraud",
+      "region": "blk_cp_fraud",
+      "channel_x": 842.0
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_risk_branch",
+      "to": "fan:blk_cp_risk_branch"
+    },
+    {
+      "kind": "fan",
+      "from": "fan:blk_cp_risk_branch",
+      "to": "slot:blk_cp_risk_branch/arm_high_risk"
+    },
+    {
+      "kind": "join",
+      "from": "card:blk_cp_manual_flag",
+      "to": "outlet:blk_cp_risk_branch"
+    },
+    {
+      "kind": "fan",
+      "from": "fan:blk_cp_risk_branch",
+      "to": "slot:blk_cp_risk_branch/arm_low_risk"
+    },
+    {
+      "kind": "join",
+      "from": "outlet:blk_cp_legacy",
+      "to": "outlet:blk_cp_risk_branch"
+    },
+    {
+      "kind": "fan",
+      "from": "fan:blk_cp_risk_branch",
+      "to": "slot:blk_cp_risk_branch/otherwise"
+    },
+    {
+      "kind": "join",
+      "from": "card:blk_cp_risk_notify",
+      "to": "outlet:blk_cp_risk_branch"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_three_ds_group",
+      "to": "card:blk_cp_three_ds_wait"
+    },
+    {
+      "kind": "interrupt",
+      "from": "card:blk_cp_three_ds_done",
+      "exit": "outlet:blk_cp_three_ds_group",
+      "region": "blk_cp_three_ds_group",
+      "channel_x": 1376.0
+    },
+    {
+      "kind": "flow",
+      "from": "outlet:blk_cp_authz_error",
+      "to": "outlet:blk_cp_authorize"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_authz_park",
+      "to": "card:blk_cp_authz_error_notify"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_authz_error",
+      "to": "card:blk_cp_authz_park"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_outcome",
+      "to": "fan:blk_cp_outcome"
+    },
+    {
+      "kind": "fan",
+      "from": "fan:blk_cp_outcome",
+      "to": "slot:blk_cp_outcome/arm_approved"
+    },
+    {
+      "kind": "join",
+      "from": "outlet:blk_cp_capture_group",
+      "to": "outlet:blk_cp_outcome"
+    },
+    {
+      "kind": "fan",
+      "from": "fan:blk_cp_outcome",
+      "to": "slot:blk_cp_outcome/arm_declined"
+    },
+    {
+      "kind": "join",
+      "from": "card:blk_cp_decline_notify",
+      "to": "outlet:blk_cp_outcome"
+    },
+    {
+      "kind": "fan",
+      "from": "fan:blk_cp_outcome",
+      "to": "slot:blk_cp_outcome/arm_manual_review"
+    },
+    {
+      "kind": "join",
+      "from": "outlet:blk_cp_manual",
+      "to": "outlet:blk_cp_outcome"
+    },
+    {
+      "kind": "fan",
+      "from": "fan:blk_cp_outcome",
+      "to": "slot:blk_cp_outcome/otherwise"
+    },
+    {
+      "kind": "join",
+      "from": "card:blk_cp_outcome_fallback",
+      "to": "outlet:blk_cp_outcome"
+    },
+    {
+      "kind": "flow",
+      "from": "outlet:blk_cp_capture",
+      "to": "card:blk_cp_capture_retry"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_capture_group",
+      "to": "card:blk_cp_capture"
+    },
+    {
+      "kind": "interrupt",
+      "from": "card:blk_cp_capture_cancel",
+      "exit": "outlet:blk_cp_capture_group",
+      "region": "blk_cp_capture_group",
+      "channel_x": 561.0
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_capture_park",
+      "to": "outlet:blk_cp_capture"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_capture_retry",
+      "to": "fan:blk_cp_capture_retry"
+    },
+    {
+      "kind": "fan",
+      "from": "fan:blk_cp_capture_retry",
+      "to": "slot:blk_cp_capture_retry/arm_retry"
+    },
+    {
+      "kind": "join",
+      "from": "outlet:blk_cp_retry_seq",
+      "to": "outlet:blk_cp_capture_retry"
+    },
+    {
+      "kind": "fan",
+      "from": "fan:blk_cp_capture_retry",
+      "to": "slot:blk_cp_capture_retry/otherwise"
+    },
+    {
+      "kind": "join",
+      "from": "slot:blk_cp_capture_retry/otherwise",
+      "to": "outlet:blk_cp_capture_retry"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_retry_wait",
+      "to": "card:blk_cp_capture_retry_call"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_retry_seq",
+      "to": "card:blk_cp_retry_wait"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_park",
+      "to": "card:blk_cp_manual_wait"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_manual_wait",
+      "to": "card:blk_cp_resolve"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_resolve",
+      "to": "card:blk_cp_review_cleared"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_manual",
+      "to": "card:blk_cp_park"
+    },
+    {
+      "kind": "interrupt",
+      "from": "card:blk_cp_manual_resolved",
+      "exit": "outlet:blk_cp_manual",
+      "region": "blk_cp_manual",
+      "channel_x": 1095.0
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_receipt",
+      "to": "card:blk_cp_final_notify"
+    },
+    {
+      "kind": "flow",
+      "from": "card:blk_cp_tail",
+      "to": "card:blk_cp_receipt"
+    }
+  ]
+}

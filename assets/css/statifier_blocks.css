@@ -970,15 +970,34 @@
  * beside a lane with nine is honest about that, and stretching the short one
  * either lies about where its work ends or hides a scroll region inside it.
  *
- * A grid rather than the flex row this replaced, because `grid-auto-columns`
- * says the column sizing once for every column, where a flex BASIS is a
- * per-item negotiation that lets a long lane steal width from a short one -
- * and two lanes of different widths make the fan above them read as ragged
- * rather than as one distribution. */
+ * A column is sized the same way, and for the same reason. 10b's whole
+ * argument for measuring rather than computing is that "natural CSS behaviour
+ * - a column growing to its content - is free rather than something the
+ * layout engine has to reimplement", so `max-content` is the track sizing
+ * that record already assumes: each lane is as wide as the work in it, and a
+ * `minmax()` floor keeps a one-card arm from collapsing narrower than a card.
+ * `width: max-content` on the row is the other half - without it the grid is
+ * sized by whatever box it happens to sit in, and the tracks are negotiated
+ * against a width that has nothing to do with the tree.
+ *
+ * This retires an earlier equal-width argument (`1fr` tracks, so that "two
+ * lanes of different widths" could not "make the fan above them read as
+ * ragged"). It reads well and it does not survive nesting. `1fr` is a share
+ * of the row's own width, not a request for room: an arm holding a nested
+ * arrangement needs more than one track and gets one anyway, so it overflows
+ * to the right, INTO its siblings' x band. Measured on the card_processing
+ * fixture, a three-arm branch inside one lane made that lane's content 769px
+ * wide in a 240px track, which put two of its arms underneath the two lanes
+ * beside it. No two cards collide, so the page still looks plausible - but a
+ * rejoin edge dropping down its own lane's band to reach the join marker then
+ * crosses cards that were never in that lane, which is what `Connectors`
+ * draws and what the eye reads as a line straight through a card. A ragged
+ * fan is a legible layout; overlapping arms are not one. */
 .sb-node__slots--columns {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(var(--sb-column-min-width), 1fr);
+  grid-auto-columns: minmax(var(--sb-column-min-width), max-content);
+  width: max-content;
   align-items: start;
   gap: var(--sb-space-2);
 }
