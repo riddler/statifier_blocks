@@ -10,6 +10,206 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.4.0] 2026-08-30
+
+### Added
+
+- The inspector's Config tab is two labelled sections. **Block** states the
+  selected block's type label, its id and the slot it sits in, and renders with
+  nothing selected too - three rows in the same place, reading as a dash.
+- `StatifierBlocks.Shell.slot_label/2` answers which slot a block sits in, by
+  the slot's label rather than its name, with `"root"` for the document root.
+- A block type may declare a `:string` config field keyed `label`, and the
+  editor draws that value as the card's title with the type's own label as a
+  subtitle underneath - so a host's steps read as the names an author gave
+  them without the type ever being hidden.
+- A card carrying `invoke_type` in its config draws it in mono on a third
+  line, which is the fact an author checks most on a step that calls out to a
+  handler.
+- `StatifierBlocks.ViewModel.title/1` and `subtitle/1` answer what a card's
+  two name lines say, and `ViewModel.Node` carries `title` and `invoke_type`
+  for a host rendering its own cards.
+- The compiler refuses a `core.subchart` whose `chart` names the document the
+  block sits in, as an `:emit`-stage `:self_reference` finding against that
+  block: a document cannot run itself. A cycle through two or more documents
+  needs the host's document graph and stays the host resolver's to refuse.
+- `StatifierBlocks.Shell.drawer_tabs/0`, `drawer_tab/1` and `drawer_title/1`,
+  in the same shape as the inspector's tab helpers - an unknown tab from a
+  crafted `phx-value-tab` resolves to the first one.
+- `.sb-findings__row`, `__severity`, `__subject`, `__label`, `__id` and
+  `__message`, the row's parts. The severity colour stays on `.sb-finding`
+  and its severity modifier, so a host that had restyled one severity keeps
+  that styling with no edit. No new custom property.
+- A slot's header shows the condition it is subject to: the expression source,
+  read-only, in a monospaced chip under the slot's name, clipped to one line
+  with the whole of it in the chip's `title`. A branch's arms on the canvas now
+  say what picks between them instead of only naming themselves.
+- `StatifierBlocks.ViewModel.Slot.condition` carries that source. It is derived
+  from the container's own `:expression` config field keyed by the slot's name,
+  read through the field's declared `value_path`, so a host block type that
+  guards a slot the way `core.branch` guards an arm gets the same chip without
+  the editor learning either type's name.
+- The palette and the inspector render as framed panes with a header row. The
+  palette's names the pane and carries a chevron that folds it to a rail,
+  giving its width back to the canvas; the inspector's names the pane and
+  states its subject on the right - the selected block type's label, or
+  `no selection`.
+- `--sb-palette-collapsed-width`, the width the folded palette narrows to
+  (tier 2, default `2.25rem`).
+- The palette carries a count line under its search box: the size of the
+  palette when nothing is filtering it, and how much of it is left plus what
+  is doing the narrowing when something is - a query, or the acceptance set of
+  the slot the palette was opened from.
+- Each group header carries the number of rows currently under it, so a
+  filtered section says how much of it survived the filter.
+- The editor draws the join marker under a container whose slots sit side by
+  side, reading the words the block type's `join_label` callback returns -
+  `core.parallel` completing on its first lane says "continue at first" - and
+  falling back to the editor's own word for a type that declares none.
+- `StatifierBlocks.ViewModel.Node` carries `join_label`, the normalized words
+  that callback returned for the block's config, or `nil` when it declared
+  none.
+- The editor's canvas is a named panel: the toolbar is its header row, with a
+  `Canvas` label, a `nested tree` chip, one segmented zoom control, and the
+  depth and block-count metrics as right-aligned chips.
+- The canvas sits on a bordered, dotted ground, and `--sb-canvas-grid` is the
+  tier-2 token a theme sets to change the dots' colour and spacing together.
+- The editor draws a `ONE OF` pill above a container whose body slots are
+  alternatives and an `ALL OF` pill above one whose lanes run concurrently,
+  which is the only place that distinction is stated on the canvas.
+- `StatifierBlocks.ViewModel.arrangement/1`, `body_slots/1` and `fan_label/1`
+  derive how a container arranges its body slots, shared by the renderer and
+  the connector geometry so the layout and the lines cannot disagree.
+- `StatifierBlocks.Connectors.fan_anchor/1` and `join_anchor/1` name the two
+  markers a fan leaves from and rejoins at, so an edge is no longer drawn
+  through the words that say what it means.
+- `--sb-card-width` sets the width of a block's card, which is what keeps the
+  measured connector geometry from collapsing every edge onto one spine.
+
+### Changed
+
+- **Configuration**'s empty state is a box standing where the form stands,
+  saying what selecting a block would let the author do, rather than the
+  one-line sentence the other tabs use for having nothing to read.
+- A required field is marked with the word `Required` beside its label instead
+  of an asterisk on the end of it - the asterisk needed a legend the editor
+  does not have and is read aloud as "star".
+- The Findings tab's count is a pill in the error hue rather than a tinted
+  rectangle, and it is still the block's own findings, never the subtree's.
+- The delete control on a card is revealed on hover, on keyboard focus and on
+  the selected card, and is hidden at rest. It is still in the DOM and still
+  focusable, so the keyboard path is unchanged.
+- The card title reads as a title rather than as a native button, and the
+  count badge, the subtitle and the invoke line are placed by a grid on the
+  card's chrome.
+- The per-block-type accent stripe is drawn on cards whose type declared an
+  `accent_token` and on no others. A type that declared nothing keeps a plain
+  card; its icon tile is unchanged.
+- The document-level findings list is the drawer's **Findings** tab, beside
+  Truth tables, and no longer a block of text under the canvas (operator
+  ruling R4, 2026-08-29, under ADR-0005 ruling 1A: a list of findings is a
+  grid of rows about the whole document). Each row carries the finding's
+  severity, the block it is about - label and id - and the message, and
+  clicking one selects and reveals that block. The inspector's Findings tab
+  is unaffected and stays the selected block's findings (3A), as do the
+  per-card counts.
+- The collapsed drawer strip reports the **active tab**. An author who has
+  not picked a tab gets the first one that holds something, so a document
+  with findings and no fixtures reads `Findings 4` rather than
+  `Truth tables 0`; once a tab is picked the pick stands. A host swapping the
+  open document resets the pick along with the drawer's open state.
+- `StatifierBlocks.Shell.drawer_view/1` accepts `:tab`, `:findings` and
+  `:orphan_findings`, and its result gains `tab`, `tabs`, `findings` and
+  `orphans`. `title` and `count` now describe the active tab rather than the
+  truth tables specifically; the truth-table `status` values are unchanged.
+- `StatifierBlocks.Editor.Findings.findings/1` takes `findings`, `orphans`,
+  `root` and `target` instead of `view_model`, and renders the tab's panel
+  rather than a headed section: the tab is the heading.
+- Slot labels are small, uppercased and letter-spaced - the treatment the fan
+  pill and the join marker already carry for chrome that labels a structure.
+  The transform is presentation only: the string a block type declares for a
+  slot is unchanged, and every other reader still sees it as written.
+- Concurrent lanes carry a rule in the block accent across the top of each
+  lane's header, drawn off `data-arrangement="lanes"`. The pill above says
+  `ALL OF` once; the rule is what carries that distinction down a document
+  taller than one screen, where a set of lanes and a set of branch arms
+  otherwise look alike.
+- An interrupt rail's dashed edge and its heading take the colour the connector
+  layer already draws an interrupt edge in, so the rail and the edge leaving it
+  read as one thing.
+- `StatifierBlocks.Editor.PaletteBrowser` takes a `collapsed` attribute, and
+  the editor answers a `palette-collapse` event with one boolean and no hook,
+  in the same shape as the shell amendment's other gestures. The fold is not
+  reset when the host swaps the open document: it is a preference about the
+  pane rather than state about the document.
+- The narrow arrangement (ADR-0005 ruling 7A) is unchanged. Below a container
+  width of 780 the strip and its sheet are still the palette's whole chrome
+  and the pane header stands down, so the fold has nothing to do there.
+- A container draws a box around its body only when it is a boundary - a
+  container with a slot in the rail partition (ADR-0005 decision 10c, as
+  amended by 10h). Every other container draws none: its own card stays at
+  the head of its body and its children sit under it with the connectors,
+  where a box around each of them turned a deep document into nested
+  rectangles.
+- A boundary's box is the border, the radius and the inset that enclose its
+  body and its rail, rather than the border colour it was before.
+- A container's card carries its own border, its accent stripe and its
+  selection ring, so the block is still a card on the canvas when the box
+  around its subtree is gone. A leaf card is unchanged.
+- A palette row is now a tile, a name, and the type's description on a second
+  line, at a row height that gives the description room to wrap. The tile is a
+  slot rather than an icon: a block type that declared no icon still renders
+  the box, so every name in the list lines up.
+- A row's accent moved from a stripe down its leading edge onto the tile, which
+  is where the card the pick produces carries it. The stamp itself is
+  unchanged - a type that declares no accent token still gets neither the
+  attribute nor the custom property.
+- A `core.wait` mints its delayed send under the reserved `send` role, so a
+  chart containing one now compiles to `s_<block id>__send` where it compiled
+  to `s_<block id>__timer`.
+- The package's default JavaScript export now carries both hooks, so
+  `hooks: { ...StatifierBlocks }` registers `StatifierBlocksDrag` and
+  `StatifierBlocksMeasure` together - a host that registered only the drag hook
+  got an editor with no connectors and no error explaining it. Both names are
+  still exported individually, and `statifier_blocks/measure` still resolves for
+  a host that wants measurement alone.
+- The canvas stage renders inside a `.sb-canvas-panel` element, which is now
+  the scrolling box; `#sb-canvas` stays the drag hook's element, the stage
+  anchor, and where the `theme` assign's declarations land.
+- A container with more than one body slot now lays its slots out side by side
+  and fans into them, as a container declaring `layout: :columns` already did -
+  a branch's arms no longer stack full-width with each fan edge running down
+  through the arm above its target.
+- Columns are a CSS grid taking their natural heights, cards are a fixed width
+  centred in the box they sit in, and a column's header is card-width and
+  centred over the first card it governs.
+- The "+" between two blocks is now the insertion marker: subtle at rest,
+  highlighted on hover, on keyboard focus and for the whole of a drag, and
+  drawn as a placeholder ring in a slot that is still empty. It is the same
+  button with the same events, so nothing about the keyboard path changed.
+- `StatifierBlocks.Editor.Slot` stamps `data-empty`, and
+  `StatifierBlocks.Editor.BlockNode` stamps `data-container` and
+  `data-arrangement`, on the markup a host may style against.
+- The collapsed drawer's strip reads as a label and a quantity: a small-caps
+  title with letter-spacing, and the count as a chip carrying a bare number
+  rather than a parenthesised one inline with the title.
+
+### Removed
+
+- The stub exit tick a rail drew below itself in CSS. The exit edge is
+  measured and drawn now, and a fixed-length mark beside it was a second claim
+  about the same thing that pointed somewhere else.
+
+### Fixed
+
+- Leaving the scope around a `core.wait` cancels the wait's delayed timer, so
+  a wait abandoned before its duration elapses no longer leaves an armed timer
+  behind in a durable host.
+- A `core.subchart` outcome-routing condition is no longer attributed to the
+  `outcomes` config field, so a chart finding landing inside it reports
+  `fault: :package` with no `config_key` rather than blaming the author for
+  bytes the compiler composed.
+
 ## [0.3.0] 2026-08-29
 
 Charts get more shapes to compile into. Campaign 015 adds four emitters to the
