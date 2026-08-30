@@ -2580,6 +2580,11 @@ lint's severity is unchanged and stays `:warning`.
 - **`Finding.from_compiler/2` gains a mapping rule.** That is a code follow-up
   in its own bead, not a change this section makes.
 
+> Note (2026-08-30): that follow-up landed as `sb-3pv4` - rule 4 in
+> `lib/statifier_blocks/finding.ex` maps an unplaced compiler finding to
+> `:compile` instead of refusing, and `:no_presentation_source` is retained but
+> no longer produced through that door.
+
 ## Amendment (2026-08-30): decision 11, `:arity` leaves the source enum
 
 **Status: accepted (2026-08-30, unqualified direction-agent verdict under the operator campaign-017 grant, PR 155).** Additive; decision 11 stands as accepted
@@ -2637,6 +2642,11 @@ that it never depended on it.
   docs-only; until that bead lands, an explicit `source: :arity` passed to
   `from_compiler/2` is still accepted by the code and is no longer a value this
   record defines.
+
+> Note (2026-08-30): that bead was `sb-3pv4`; `@type source` and the
+> `view_model.ex` sentence now match this section, and `source: :arity` is no
+> longer a value `source/0` admits, so passing it no longer typechecks.
+
 - **The remaining four-plus-one enum is fully reachable.** `:config`,
   `:assignability` and `:resolution` come from the by-stage mapping, `:lint`
   from the lint seam, and `:compile` from everything else the compiler says -

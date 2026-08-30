@@ -371,7 +371,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           mount_editor(conn,
             findings: [
               Finding.new({:block, "blk_variant"}, :lint, "one", severity: :warning),
-              Finding.new({:slot, "blk_wizard", "body"}, :arity, "two"),
+              Finding.new({:slot, "blk_wizard", "body"}, :assignability, "two"),
               Finding.new({:config, "blk_email_step", "duration"}, :config, "three")
             ],
             fixtures: EditorFixtures.credit_card_tables()

@@ -315,10 +315,14 @@ defmodule StatifierBlocks.Compiler.SensitivePathsTest do
     # derivation is ever widened to reach {:lint, :error} without this
     # module's docs being updated to match (verified by widening rule 2 to
     # map the :emit stage to :lint)
-    test "the default derivation refuses these, which is why the override is passed" do
+    test "the default derivation says :compile, which is why the override is passed" do
       block = invoke(%{"invoke_type" => "myapp:capture", "params" => "pan=card.number"})
 
-      assert {[], [{_finding, {:no_presentation_source, _same}}]} =
+      # ADR-0005 amendment 11h: an :emit-stage error is no longer refused,
+      # it is `:compile` - "the compiler said so". `source: :lint` above
+      # is still what says the rule is a lint rather than a stage the
+      # mapping could not place.
+      assert {[%Finding{source: :compile, severity: :error}], []} =
                block
                |> refuse()
                |> Finding.from_compiler_all()

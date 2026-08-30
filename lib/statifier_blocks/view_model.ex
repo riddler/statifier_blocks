@@ -27,11 +27,12 @@ defmodule StatifierBlocks.ViewModel do
       `{key, message}` pair, anchored `{:config, id, key}`, severity
       `:error`.
 
-  `:arity`, `:assignability` and `:lint` findings are never produced here;
-  their producers live elsewhere - `StatifierBlocks.SlotValidation`
+  `:assignability` and `:lint` findings are never produced here; their
+  producers live elsewhere - `StatifierBlocks.SlotValidation`
   (palette-aware slot arity and undeclared-slot checks; landed under `sb-da9`,
-  was described here as "not yet built"), `Assignability.validate/3`, and
-  the compiler's invoke-type lint respectively - and this module does not
+  was described here as "not yet built") and `Assignability.validate/3` for
+  the first, the compiler's invoke-type lint for the second - and this module
+  does not
   adapt `StatifierBlocks.Compiler.Finding` into `StatifierBlocks.Finding`
   to manufacture them. That adapter is a real, mechanical possibility
   (`Compiler.Finding` carries `block_id` and `config_key`, which map onto

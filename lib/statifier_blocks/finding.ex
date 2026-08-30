@@ -41,8 +41,26 @@ defmodule StatifierBlocks.Finding do
           | {:slot, Block.id(), Block.slot_name()}
           | {:block, Block.id()}
 
-  @typedoc "Where this finding's rule lives. See `StatifierBlocks.ViewModel`'s moduledoc."
-  @type source :: :config | :arity | :assignability | :resolution | :lint
+  @typedoc """
+  Where this finding's rule lives. See `StatifierBlocks.ViewModel`'s
+  moduledoc.
+
+  The enum as ADR-0005 decision 11's 2026-08-30 amendments leave it:
+
+    * `:arity` is gone (`11j`). Slot arity and undeclared-slot violations
+      come through the compiler's `:structure` stage and have always
+      adapted to `:assignability`; nothing ever produced `:arity`, and an
+      enum value with no producer invites a presentation rule that can
+      never fire. What those findings are *anchored* to is unchanged -
+      still `{:slot, block_id, slot_name}` - which is what decision 11's
+      prose about slots was ever describing.
+    * `:compile` is new (`11h`), and it is deliberately stage-agnostic. It
+      says "the compiler said so" and nothing more, so this enum does not
+      grow a value every time the compiler grows a stage. The anchor still
+      decides where the finding renders; the source only says where it
+      came from.
+  """
+  @type source :: :config | :assignability | :resolution | :lint | :compile
 
   @typedoc """
   Three-valued since the 2026-08-29 amendment to ADR-0005 decision 11.
@@ -99,12 +117,14 @@ defmodule StatifierBlocks.Finding do
   produces these today (`Document.validate/1` failing).
 
   `:no_presentation_source` - the finding's stage names no source in
-  decision 11's enum: `:document`, `:emit`, and `:chart` at `:error`
-  severity all fall here. Decision 11's source enum has no bucket for an
-  error raised against generated SCXML or against the document envelope,
-  and the adapter refuses rather than lying about where the rule lives.
-  This is a known gap in decision 11's source set, not a bug in this
-  adapter.
+  decision 11's enum. **No input to `from_compiler/2` produces this
+  today.** It was the answer for `:document`, `:emit` and `:chart` at
+  `:error` severity until ADR-0005 amendment `11h` gave those a source
+  (`:compile`); the amendment retains the refusal's meaning for inputs
+  that are not compiler findings at all, so it stays in this union rather
+  than being dropped the way `11j` dropped `:arity` from `source/0`.
+  `from_compiler/2` pattern-matches a `StatifierBlocks.Compiler.Finding`,
+  so there is no such input through this door yet.
   """
   @type from_compiler_error ::
           {:unanchorable, StatifierBlocks.Compiler.Finding.t()}
@@ -152,12 +172,20 @@ defmodule StatifierBlocks.Finding do
     3. Otherwise by stage: `:config` -> `:config`, `:resolve` -> `:resolution`,
        `:structure` -> `:assignability`.
     4. Any other stage (`:document`, `:emit`, `:chart` at `:error`) ->
-       refused, `{:no_presentation_source, finding}`.
+       `:compile`, under ADR-0005 amendment `11h`. Rule 4 used to refuse
+       with `{:no_presentation_source, finding}`; a compile error against
+       generated SCXML or against the document envelope had no bucket in
+       decision 11's enum, so the adapter refused rather than lie about
+       where the rule lived. `:compile` is that bucket, and it is why an
+       error the compiler raises at a stage this mapping does not name can
+       now render in the editor at all - which is the half of `11h` that
+       makes the document-level panel's promise ("no finding can hide")
+       true for compile errors too.
 
-  The anchor refusal takes priority over the source refusal: a block-less
-  finding is `{:unanchorable, _}` even when its stage or severity would
-  otherwise have mapped to a source, because there is nowhere to route it
-  regardless of what it is about.
+  Because rule 4 no longer refuses, the anchor is the only thing that can:
+  a block-less finding is `{:unanchorable, _}` even when its stage or
+  severity would otherwise have mapped to a source, because there is
+  nowhere to route it regardless of what it is about.
 
   ## Severity (pass-through, not a two-clause case)
 
@@ -195,12 +223,11 @@ defmodule StatifierBlocks.Finding do
   @spec from_compiler(StatifierBlocks.Compiler.Finding.t(), keyword()) ::
           {:ok, t()} | {:error, from_compiler_error()}
   def from_compiler(%StatifierBlocks.Compiler.Finding{} = finding, opts \\ []) do
-    with {:ok, anchor} <- anchor_from_compiler(finding),
-         {:ok, source} <- source_from_compiler(finding, opts) do
+    with {:ok, anchor} <- anchor_from_compiler(finding) do
       {:ok,
        %__MODULE__{
          anchor: anchor,
-         source: source,
+         source: source_from_compiler(finding, opts),
          message: finding.message,
          severity: finding.severity
        }}
@@ -284,35 +311,35 @@ defmodule StatifierBlocks.Finding do
   defp anchor_from_compiler(%StatifierBlocks.Compiler.Finding{block_id: id, config_key: key}),
     do: {:ok, {:config, id, key}}
 
-  @spec source_from_compiler(StatifierBlocks.Compiler.Finding.t(), keyword()) ::
-          {:ok, source()}
-          | {:error, {:no_presentation_source, StatifierBlocks.Compiler.Finding.t()}}
+  @spec source_from_compiler(StatifierBlocks.Compiler.Finding.t(), keyword()) :: source()
   defp source_from_compiler(finding, opts) do
     case Keyword.fetch(opts, :source) do
-      {:ok, source} -> {:ok, source}
+      {:ok, source} -> source
       :error -> source_by_rule(finding)
     end
   end
 
   # Rule 2: a finding that is not an error cannot honestly be any source
   # but `:lint` (decision 11 - every other source produces `:error`).
-  @spec source_by_rule(StatifierBlocks.Compiler.Finding.t()) ::
-          {:ok, source()}
-          | {:error, {:no_presentation_source, StatifierBlocks.Compiler.Finding.t()}}
+  # Amendment `11i` made the converse false - `:lint` may carry `:error` -
+  # which is why this rule reads the severity in one direction only.
+  @spec source_by_rule(StatifierBlocks.Compiler.Finding.t()) :: source()
   defp source_by_rule(%StatifierBlocks.Compiler.Finding{severity: severity})
        when severity != :error do
-    {:ok, :lint}
+    :lint
   end
 
-  # Rule 3/4: by stage, never by `code` - a `case` with a refusing
-  # catch-all rather than a list of codes, so an unknown code maps
-  # correctly by construction.
-  defp source_by_rule(%StatifierBlocks.Compiler.Finding{stage: stage} = finding) do
+  # Rule 3/4: by stage, never by `code` - a `case` with a catch-all rather
+  # than a list of codes, so an unknown code maps correctly by
+  # construction. The catch-all is `:compile` under amendment `11h`: one
+  # stage-agnostic value, so this mapping never has to grow a clause when
+  # the compiler grows a stage.
+  defp source_by_rule(%StatifierBlocks.Compiler.Finding{stage: stage}) do
     case stage do
-      :config -> {:ok, :config}
-      :resolve -> {:ok, :resolution}
-      :structure -> {:ok, :assignability}
-      _other_stage -> {:error, {:no_presentation_source, finding}}
+      :config -> :config
+      :resolve -> :resolution
+      :structure -> :assignability
+      _other_stage -> :compile
     end
   end
 end
