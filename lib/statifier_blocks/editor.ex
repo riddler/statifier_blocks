@@ -90,6 +90,55 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     the same as an empty set, which is a host declaring that its documents
     address nothing.
 
+    ## The run marks a host paints
+
+    A host replaying or executing a document has two different things to say
+    about it on the canvas: **where the run is** - the blocks a step has
+    activated - and **who it is waiting on** - the block whose call out to a
+    handler has not come back yet, and how it came back once it did. Those are
+    `active_marks` and `invoke_mark`, and they are two assigns rather than one
+    because a step can carry either without the other. One seam that took both
+    would make every caller holding one of them pass a placeholder for the
+    other.
+
+    They are assigns and not a new API, because every other thing a host tells
+    this editor is an assign. A host that re-renders for its own reasons can
+    pass them in the component call; a host reacting to a run event it received
+    out of band pushes them, which is `send_update/3` and needs nothing from
+    this package:
+
+        Phoenix.LiveView.send_update(StatifierBlocks.Editor,
+          id: "editor",
+          active_marks: ["blk_capture"],
+          invoke_mark: {"blk_authorize", "done"}
+        )
+
+    Which is exactly why a mark is held as editor state rather than read out of
+    the assigns at render time. `send_update/3` delivers only the keys it
+    names, so a component whose marks lived only in the assigns the host most
+    recently passed would drop them on the next unrelated re-render - an author
+    moving a block, a header the host redrew for its own reasons. Each mark is
+    written only by an update that carries it, the way `datamodel` and
+    `drawer_height` already are, so a render that says nothing about the marks
+    changes nothing about them.
+
+    A **different document** clears them, and that is the one place they part
+    company with the pane folds. ADR-0005's 2026-08-30 amendment to decision 2
+    exempts a fold from the document-switch reset because a fold addresses no
+    block; a mark addresses exactly one, so it stops being true the moment the
+    block it names is gone. Marks reset in `switch_document/2` beside
+    `selected_id` and the collapsed set. A host that swaps a document and marks
+    the new one in the same update is not fighting that reset: the reset runs
+    first and the marks it passed are applied after.
+
+    What reaches the markup is `data-run-active`, `data-run-invoking` and -
+    only for a call that has come back - `data-invoke-outcome`, on the block's
+    `.sb-node`. The outcome is passed through rather than checked against a
+    set: which outcomes a call can have is the block type's vocabulary, the
+    one `slot_outcome_key` already reads, so a closed set here would be this
+    package inventing a second one. The stylesheet tints the two the spike
+    proved and leaves every other outcome the neutral treatment.
+
     ## Opening at a fit (sb-ehqn)
 
     A document wider than the canvas opens with its right-hand columns off
@@ -221,6 +270,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `icon` | no | function component resolving an icon *name* to markup |
     | `expression_component` | no | override for `:expression` fields (sui-bob's seam) |
     | `invoke_types` | no | the invoke types the host is prepared to answer; suggestions on an `invoke_type` field, never a constraint, and `[]` (the default) means *no list supplied* |
+    | `active_marks` | no | the block ids a run has activated; held as editor state, and cleared when the host opens a different document |
+    | `invoke_mark` | no | the block a run is calling out to and how the call came back - `{block_id, outcome}`, a bare `block_id` for no answer yet, or `nil` for no call at all |
     | `theme` | no | `--sb-*` custom properties for the canvas root |
     | `fit` | no | the fit the editor **opens** in: `:manual` (the default), `:width` or `:active`; the first measurement performs it once, and an unknown value is refused into `:manual` |
     | `fixtures` | no | `%{block_id => [TruthTable.t()]}` the drawer's truth-table tab reads; `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
@@ -274,6 +325,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          history: History.new(),
          selected_id: nil,
          collapsed_ids: MapSet.new(),
+         active_marks: [],
+         invoke_mark: nil,
+         active_ids: MapSet.new(),
+         invoking: nil,
          drag: nil,
          drafts: %{},
          pending_fields: [],
@@ -344,6 +399,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           socket
         end
 
+      # A mark is written only by an update that carries it. `send_update/3`
+      # delivers the keys it names and nothing else, so a mark read straight
+      # out of the assigns would vanish on the next re-render the host made
+      # for a reason of its own. Same guard as `datamodel` above, for the same
+      # reason, and after `switch_document/2` above so a host that swaps a
+      # document and marks it in one update gets the marks it just passed.
+      socket =
+        if Map.has_key?(assigns, :active_marks) do
+          assign(socket, :active_ids, active_ids(assigns.active_marks))
+        else
+          socket
+        end
+
+      socket =
+        if Map.has_key?(assigns, :invoke_mark) do
+          assign(socket, :invoking, invoke_mark(assigns.invoke_mark))
+        else
+          socket
+        end
+
       socket =
         if Map.has_key?(assigns, :history_limit) and socket.assigns.history.undo == [] do
           assign(socket, :history, History.new(limit: socket.assigns.history_limit))
@@ -397,6 +472,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       assigns =
         assigns
         |> assign(:drawer, drawer_view(assigns))
+        |> assign(:marks, marks(assigns))
         |> assign(:depth, Shell.depth(assigns.view_model.root))
         |> assign(:block_count, Shell.block_count(assigns.view_model.root))
         |> assign(:edges, Connectors.edges(assigns.view_model.root, assigns.measurement))
@@ -457,6 +533,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               drag={@drag}
               selected_id={@selected_id}
               collapsed={@collapsed_ids}
+              marks={@marks}
               armed={@palette_position}
               target={@myself}
               icon={@icon}
@@ -966,8 +1043,64 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
            palette_position: nil,
            palette_allowed: nil,
            palette_unarmed_pick: false,
-           palette_sheet: false
+           palette_sheet: false,
+           # A mark addresses one block, so it stops being true when that
+           # block is gone. The amendment's exemption from this reset is the
+           # pane folds', and for the reason that does not reach a mark: a
+           # fold addresses no block at all.
+           active_ids: MapSet.new(),
+           invoking: nil
          ), true}
+      end
+    end
+
+    # Total, like every other host-input normalizer here, and for a reason
+    # this one has more of than most: a host holding a run's state is holding
+    # it in whatever shape its own runtime produced. The editor's answer to a
+    # shape it does not recognise is to mark nothing, never to raise inside
+    # somebody's render.
+    @spec active_ids(term()) :: MapSet.t(String.t())
+    defp active_ids(%MapSet{} = ids), do: ids
+
+    defp active_ids(ids) when is_list(ids),
+      do: ids |> Enum.filter(&(is_binary(&1) and &1 != "")) |> MapSet.new()
+
+    defp active_ids(_other), do: MapSet.new()
+
+    # `{block_id, outcome}` is what the mark is: which block, and how the call
+    # came back. A bare id is the same mark with no answer yet - the state a
+    # call spends most of its life in - so it is worth not making a caller
+    # write `{id, nil}` for it.
+    @spec invoke_mark(term()) :: {String.t(), String.t() | nil} | nil
+    defp invoke_mark(id) when is_binary(id) and id != "", do: {id, nil}
+
+    defp invoke_mark({id, outcome}) when is_binary(id) and id != "",
+      do: {id, outcome_text(outcome)}
+
+    defp invoke_mark(_other), do: nil
+
+    # The outcome reaches the markup as the host's own text. An atom is
+    # accepted because a host writing Elixir has one; anything that is not a
+    # word is dropped to "no answer yet", which is a state the mark already
+    # has rather than a new one invented to hold junk.
+    @spec outcome_text(term()) :: String.t() | nil
+    defp outcome_text(outcome) when is_binary(outcome) and outcome != "", do: outcome
+
+    defp outcome_text(outcome) when is_atom(outcome) and not is_nil(outcome),
+      do: Atom.to_string(outcome)
+
+    defp outcome_text(_other), do: nil
+
+    # Nothing at all when nothing is marked, which is the ordinary case: a
+    # document with no run over it threads `nil` down the tree, and every node
+    # below skips the question instead of asking a set it knows is empty.
+    @spec marks(map()) ::
+            %{active: MapSet.t(String.t()), invoke: {String.t(), String.t() | nil} | nil} | nil
+    defp marks(%{active_ids: active, invoking: invoking}) do
+      if MapSet.size(active) == 0 and invoking == nil do
+        nil
+      else
+        %{active: active, invoke: invoking}
       end
     end
 

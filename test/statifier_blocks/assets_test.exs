@@ -495,6 +495,54 @@ defmodule StatifierBlocks.AssetsTest do
     end
   end
 
+  describe "the run marks (the host marking seam)" do
+    # Sabotage: dropping the leading `.sb-node` from one mark selector - the
+    # rule reaches anything else that ever carries the attribute, and this
+    # goes red. `.sb-palette` already carries data attributes of its own,
+    # which is why the scoping is asserted rather than trusted.
+    test "every mark rule is scoped to .sb-node" do
+      for {selector, _tokens} <- mark_rules(), part <- String.split(selector, ",") do
+        assert String.starts_with?(String.trim(part), ".sb-node"),
+               "an unscoped mark rule reaches whatever else carries the attribute: #{part}"
+      end
+    end
+
+    # A colour token declared only in this stylesheet's `:root` is a token no
+    # host theme overrides, so a mark painted in one is right in the light
+    # theme and wrong in every other. The marks are therefore drawn in
+    # families a theme already retunes.
+    # Sabotage: replacing `var(--sb-accent)` in the active rule with the
+    # literal `#1c62e9` - the mark stops following the host's theme, the
+    # token disappears from this list, and the assertion goes red.
+    test "the marks are painted only in tokens, and only in reachable families" do
+      tokens = mark_rules() |> Enum.flat_map(&elem(&1, 1)) |> Enum.uniq() |> Enum.sort()
+
+      assert tokens == ~w(
+               --sb-accent --sb-accent-muted --sb-bg-muted --sb-border-strong
+               --sb-error --sb-error-bg --sb-info --sb-info-bg --sb-space-half
+             )
+
+      for {_selector, declarations} <- mark_declarations(),
+          {property, value} <- declarations,
+          property in ~w(border-color background box-shadow) do
+        assert value =~ "var(--sb-", "a mark paints `#{property}` with a literal: #{value}"
+      end
+    end
+
+    # Sabotage: deleting the `error` rule - a call that came back badly is
+    # painted the same as one that came back, and this goes red on the count
+    # and on the selector.
+    test "there is a rule for each mark and for each outcome the sheet names" do
+      selectors = Enum.map_join(mark_rules(), " ", &elem(&1, 0))
+
+      assert length(mark_rules()) == 4
+      assert selectors =~ ~s(data-run-active="true")
+      assert selectors =~ ~s(data-run-invoking="true")
+      assert selectors =~ ~s(data-invoke-outcome="done")
+      assert selectors =~ ~s(data-invoke-outcome="error")
+    end
+  end
+
   # Every `<button>` in the editor components, paired with the classes it
   # carries. The pairing is nearest-following: between a `<button` and its own
   # `class=` no other element can open, so the next class attribute in the
@@ -577,6 +625,28 @@ defmodule StatifierBlocks.AssetsTest do
   # own, in a group, or qualified by a state.
   defp styled?(class) do
     stylesheet() =~ ~r/\.#{Regex.escape(class)}(?![\w-])/
+  end
+
+  # The mark rules, as `{selector, tokens}`. `data-run-` is the whole family:
+  # both marks and both outcomes carry it, and nothing else in the stylesheet
+  # does.
+  defp mark_rules do
+    for {selector, declarations} <- mark_declarations() do
+      tokens =
+        declarations
+        |> Enum.flat_map(fn {_property, value} -> Regex.scan(~r/var\((--sb-[\w-]+)\)/, value) end)
+        |> Enum.map(&Enum.at(&1, 1))
+
+      {selector, tokens}
+    end
+  end
+
+  defp mark_declarations do
+    @stylesheet
+    |> File.read!()
+    |> StatifierBlocks.ThemeAudit.declaration_blocks()
+    |> Enum.filter(&String.contains?(&1.selector, "data-run-"))
+    |> Enum.map(&{&1.selector, &1.declarations})
   end
 
   defp stylesheet do

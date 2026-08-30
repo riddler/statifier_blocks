@@ -929,6 +929,64 @@
   background: var(--sb-bg-muted);
 }
 
+/* ---- the run marks
+ *
+ * Two of them, because a host replaying or executing a document is saying two
+ * different things: `data-run-active` is where the run IS, and
+ * `data-run-invoking` is who it is WAITING ON. A step can carry either without
+ * the other, so neither treatment can be a variant of the other's.
+ *
+ * They land on the element the selection ring lands on - the node's box on a
+ * leaf, the card on a container - which is also what keeps a mark on a FOLDED
+ * container visible, because the card is all a folded container shows. And
+ * they take different PROPERTIES so all three stack: selection has the
+ * outline, the active mark casts a halo outside the border, the invoke mark
+ * takes the border colour and the fill. A block that is selected, active and
+ * still waiting on an answer wears all three, and none of them cancels
+ * another.
+ *
+ * No new colour token, which is a constraint rather than a preference. A token
+ * declared only in this file's `:root` is a token no host theme overrides, so
+ * it would be right in the light theme and wrong in every other one - the trap
+ * `--sb-block-accent-mix` exists to name. So the marks are drawn in token
+ * families every theme already retunes: `--sb-accent` for the active mark,
+ * which is this editor's own "here" colour, and the finding severities for the
+ * outcomes. `done` takes `--sb-info` because the package declares no success
+ * colour and inventing one is precisely the token above; what the pair has to
+ * carry is "came back" against "came back badly", and info against error
+ * carries it in all three themes.
+ *
+ * An outcome named here gets its tint and every other outcome keeps the
+ * neutral one. Which outcomes a call can have is the block TYPE's vocabulary -
+ * `slot_outcome_key` is declared, not enumerated here - so these rules tint
+ * the two the spike proved and do not pretend the set is closed.
+ */
+.sb-node[data-run-active="true"][data-container="false"],
+.sb-node[data-run-active="true"][data-container="true"] > .sb-node__chrome {
+  border-color: var(--sb-accent);
+  box-shadow: 0 0 0 var(--sb-space-half) var(--sb-accent-muted);
+}
+
+.sb-node[data-run-invoking="true"][data-container="false"],
+.sb-node[data-run-invoking="true"][data-container="true"] > .sb-node__chrome {
+  border-color: var(--sb-border-strong);
+  background: var(--sb-bg-muted);
+}
+
+.sb-node[data-run-invoking="true"][data-invoke-outcome="done"][data-container="false"],
+.sb-node[data-run-invoking="true"][data-invoke-outcome="done"][data-container="true"]
+  > .sb-node__chrome {
+  border-color: var(--sb-info);
+  background: var(--sb-info-bg);
+}
+
+.sb-node[data-run-invoking="true"][data-invoke-outcome="error"][data-container="false"],
+.sb-node[data-run-invoking="true"][data-invoke-outcome="error"][data-container="true"]
+  > .sb-node__chrome {
+  border-color: var(--sb-error);
+  background: var(--sb-error-bg);
+}
+
 /* ---- card face (parity item 1.4, and R2's delete affordance)
  *
  * Three text lines beside one tile, and every element in it is a DIRECT child

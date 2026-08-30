@@ -202,6 +202,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:marks, :any,
+      default: nil,
+      doc: """
+      The host's run marks - `%{active: MapSet.t(), invoke: {block_id, outcome}
+      | nil}`, or `nil` when nothing is marked - threaded the way `collapsed`
+      is and for the same reason: a mark is editor state that addresses a
+      block, and nothing in the view model carries it.
+      """
+    )
+
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:class, :string, default: nil)
@@ -272,6 +282,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           drag={@drag}
           selected_id={@selected_id}
           collapsed={@collapsed}
+          marks={@marks}
           armed={@armed}
           target={@target}
           icon={@icon}
@@ -290,6 +301,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:drag, :any, default: nil)
     attr(:selected_id, :string, default: nil)
     attr(:collapsed, :any, default: nil)
+    attr(:marks, :any, default: nil)
     attr(:armed, :any, default: nil)
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
@@ -303,6 +315,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         drag={@drag}
         selected_id={@selected_id}
         collapsed={@collapsed}
+        marks={@marks}
         armed={@armed}
         target={@target}
         icon={@icon}
