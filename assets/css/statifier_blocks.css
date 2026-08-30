@@ -597,6 +597,41 @@
   min-width: 0;
 }
 
+/* ---- the pre-fit gate (sb-oje0)
+ *
+ * A host that opens at a fit arms one at mount and only the first measurement
+ * payload can spend it, so the dead render and the first connected render are
+ * both at 100% and the frame after them is at the fit. Painting that first
+ * frame lays the whole chart out at full size and then snaps it, which is the
+ * flash 019 recorded. The server stamps `data-fit-pending` for exactly as
+ * long as the fit is armed, and this rule keeps the stage unpainted under it.
+ *
+ * `visibility` rather than `display` or `opacity` deliberately: the stage has
+ * to be laid out, because the layout is what the hook measures and the
+ * measurement is what spends the fit. A hidden box is still laid out; a
+ * `display: none` one is not, and would deadlock the thing it is waiting for.
+ *
+ * The animation is the fallback, not decoration. A host that never imported
+ * the measurement hook measures nothing and so never spends the fit
+ * (decision 7's fit note), which would leave the attr stamped forever and the
+ * canvas blank rather than merely unfitted - a worse defect than the flash.
+ * `sb-fit-reveal` fires once, 500ms after the attr appears, and forces the
+ * stage back into view; a host that did import the hook has measured long
+ * before that and this rule has already stopped matching. The hook writes
+ * nothing either way, which decision 7a requires.
+ */
+
+@keyframes sb-fit-reveal {
+  to {
+    visibility: visible;
+  }
+}
+
+.sb-editor[data-fit-pending] .sb-canvas-zoom {
+  visibility: hidden;
+  animation: sb-fit-reveal 1ms linear 500ms forwards;
+}
+
 .sb-editor[data-zoom] .sb-canvas {
   transform-origin: 0 0;
 }

@@ -255,6 +255,31 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert body =~ ~r/border:\s*var\(--sb-border-width\)/
         assert body =~ ~r/background:\s*var\(--sb-canvas-grid\)/
       end
+
+      # The stylesheet half of the pre-fit gate (sb-oje0). The server half is
+      # in `zoom_test.exs`; this is the rule that makes the stamp mean
+      # anything, and the fallback that keeps it from meaning too much.
+      # Sabotage: dropping `visibility: hidden` - the attr is stamped and
+      # dropped exactly as the tests say and the author still sees the chart
+      # painted at 100% and snapped, which is the whole defect.
+      test "an armed fit keeps the stage unpainted, and a delayed reveal ends the wait" do
+        css = File.read!("assets/css/statifier_blocks.css")
+        gate = Regex.run(~r/\.sb-editor\[data-fit-pending\] \.sb-canvas-zoom\s*\{(.*?)\n\}/s, css)
+
+        assert gate, "the scan actually found the rule"
+        [_all, body] = gate
+
+        assert body =~ ~r/visibility:\s*hidden/
+
+        # The fallback: a hook-less host never spends the fit, so the gate has
+        # to lift on its own or that host is left blank instead of unfitted.
+        # Sabotage: dropping the delay, or the `forwards` fill - the reveal
+        # either happens immediately, which is the flash again, or never
+        # sticks, which is the blank canvas.
+        assert body =~ ~r/animation:\s*sb-fit-reveal\s+\S+\s+\S+\s+500ms\s+forwards/
+
+        assert css =~ ~r/@keyframes sb-fit-reveal\s*\{\s*to\s*\{\s*visibility:\s*visible;/
+      end
     end
 
     describe "the tabbed inspector (3A)" do

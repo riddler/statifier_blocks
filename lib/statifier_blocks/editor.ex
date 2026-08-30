@@ -116,6 +116,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     fit is never armed away and never spent: the mode is set, the canvas is
     at 100%, and that is decision 7's absent-hook test holding here too.
 
+    Between the mount and that first payload the canvas is laid out at 100%,
+    which is a frame the author should not be shown: it paints the whole
+    chart at full size and then snaps to the fit. So for exactly as long as
+    a fit is armed the root carries `data-fit-pending`, and the stylesheet
+    keeps the stage unpainted under it - the layout still happens, because
+    the layout is what the hook has to measure; only the ink waits. The
+    stylesheet also carries a delayed reveal so the wait cannot outlive the
+    frame it exists for: a hook-less host never spends the fit, and a blank
+    canvas forever would be a worse defect than the flash. Nothing about
+    this is the hook's - it writes no attribute, no style and no class
+    (decision 7a), and the attr is server-stamped like every other.
+
     ## What stays the host's
 
     Which palette entries a tenant may use, who may edit or publish a
@@ -391,6 +403,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-revision={@view_model.revision}
         data-zoom={@zoom}
         data-fit={@fit}
+        data-fit-pending={@fit_pending}
         data-inserting={to_string(@palette_position != nil)}
         phx-window-keydown={@palette_position != nil && "palette-close"}
         phx-key={@palette_position != nil && "Escape"}
