@@ -549,8 +549,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                )
       end
 
-      # Sabotage: dropping the `:if={ViewModel.subtitle(@node)}` guard - every
-      # card in the core vocabulary prints its type on both of its two lines.
+      # An unnamed block still says its type once: the second line is either
+      # the type's summary of this block's config (ADR-0002 amendment H5) or
+      # nothing at all, and never the type label the line above already
+      # carries.
+      # Sabotage: dropping the `:if={ViewModel.subtitle(@node)}` guard - the
+      # invoke card, which declares no summary, grows an empty second line.
       test "an unnamed block says its type once", %{conn: conn} do
         {:ok, view, _html} =
           mount_editor(conn, document: named_document(), palette: named_palette())
@@ -561,9 +565,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  "Wait"
                )
 
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_wait"] > .sb-node__chrome > .sb-node__type),
+                 "timer 1h"
+               )
+
         refute has_element?(
                  view,
-                 ~s([data-block-id="blk_wait"] > .sb-node__chrome > .sb-node__type)
+                 ~s([data-block-id="blk_call"] > .sb-node__chrome > .sb-node__type)
                )
       end
 

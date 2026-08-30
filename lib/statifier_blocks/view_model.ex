@@ -267,6 +267,7 @@ defmodule StatifierBlocks.ViewModel do
             status: status(),
             entry: BlockType.palette_entry(),
             title: String.t() | nil,
+            summary: [String.t()],
             invoke_type: String.t() | nil,
             outcome: String.t() | nil,
             join_label: String.t() | nil,
@@ -285,6 +286,7 @@ defmodule StatifierBlocks.ViewModel do
       :status,
       entry: %{},
       title: nil,
+      summary: [],
       invoke_type: nil,
       outcome: nil,
       join_label: nil,
@@ -454,12 +456,22 @@ defmodule StatifierBlocks.ViewModel do
   def title(%Node{entry: entry, type: type}), do: Map.get(entry, :label) || type
 
   @doc """
-  The line under the title: the block type's own label, drawn only when the
-  title is the author's rather than the type's.
+  The line under the title, which is one of two different facts depending on
+  whose words the line above it is (ADR-0002 amendment H5).
 
-  `nil` for every block that has no name of its own - a subtitle repeating
-  the line above it is noise on a card whose whole budget is three lines,
-  and it is the state the whole `core.*` vocabulary is in.
+  When the title is the **author's**, it is the block type's own label - the
+  one thing a renamed card says nowhere else. When the title is the
+  **type's**, it is the type's summary of this block's config, joined into
+  one line, and `nil` when the type declares none. A subtitle repeating the
+  line above it is still noise, so the type label is never drawn twice.
+
+  The summary arm is what gives the `core.*` vocabulary a second line at
+  all: `summary/1` is optional and eight of the thirteen core types export
+  none, so `nil` stays the common answer.
+
+  A chip list is joined with `", "` here rather than dropped. The card has
+  no chip markup for a summary yet; when it grows some, it reads
+  `node.summary` directly and no block type changes.
 
       iex> alias StatifierBlocks.ViewModel
       iex> ViewModel.subtitle(%ViewModel.Node{
@@ -467,6 +479,20 @@ defmodule StatifierBlocks.ViewModel do
       ...>   entry: %{label: "Wait"}
       ...> })
       nil
+
+      iex> alias StatifierBlocks.ViewModel
+      iex> ViewModel.subtitle(%ViewModel.Node{
+      ...>   block_id: "b", type: "core.wait", type_version: 1, status: :ok,
+      ...>   entry: %{label: "Wait"}, summary: ["timer 30s"]
+      ...> })
+      "timer 30s"
+
+      iex> alias StatifierBlocks.ViewModel
+      iex> ViewModel.subtitle(%ViewModel.Node{
+      ...>   block_id: "b", type: "core.on_event", type_version: 1, status: :ok,
+      ...>   entry: %{label: "On event"}, summary: ["Abandon", "fraud.aborted"]
+      ...> })
+      "Abandon, fraud.aborted"
 
       iex> alias StatifierBlocks.ViewModel
       iex> ViewModel.subtitle(%ViewModel.Node{
@@ -483,7 +509,8 @@ defmodule StatifierBlocks.ViewModel do
     end
   end
 
-  def subtitle(%Node{}), do: nil
+  def subtitle(%Node{summary: []}), do: nil
+  def subtitle(%Node{summary: chips}), do: Enum.join(chips, ", ")
 
   @doc """
   Whether a container draws as a boundary box: true when ANY of its slots
@@ -735,6 +762,7 @@ defmodule StatifierBlocks.ViewModel do
       status: :ok,
       entry: entry,
       title: title_override(schema, config),
+      summary: BlockType.summary(module, config),
       invoke_type: invoke_type(config),
       join_label: BlockType.join_label(entry, config),
       slots: slots,

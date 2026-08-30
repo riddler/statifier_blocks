@@ -157,6 +157,35 @@ defmodule StatifierBlocks.Core.Branch do
     }
 
   @doc """
+  `N arms + otherwise`, counting the well-formed arms (ADR-0002 amendment
+  H6).
+
+  A count rather than a list of conditions: an arm's condition is an
+  expression, and an expression is not a chip. `otherwise` is named
+  rather than counted because it is always there - `slots/1` appends it
+  to every branch, including one with no arms at all, and a card reading
+  `1 arm` would be under-reporting the paths out of the block by one.
+
+  Counted through the same filter `slots/1` and `config_schema/1` read
+  arms through, so a malformed arm an author is mid-edit on is not
+  counted and the card agrees with the slot list.
+
+      iex> StatifierBlocks.Core.Branch.summary(%{"arms" => [%{"slot" => "arm_approved", "cond" => "x"}]})
+      "1 arm + otherwise"
+
+      iex> StatifierBlocks.Core.Branch.summary(%{})
+      nil
+  """
+  @impl true
+  def summary(config) do
+    case length(arms(config)) do
+      0 -> nil
+      1 -> "1 arm + otherwise"
+      count -> "#{count} arms + otherwise"
+    end
+  end
+
+  @doc """
   Two datasets and one condition evaluated against both, so a palette panel
   can show what an arm's expression does before the author commits to it.
 

@@ -121,6 +121,38 @@ defmodule StatifierBlocks.Core.OnEvent do
     }
 
   @doc """
+  The outcome's word, then the event name, as a chip list (ADR-0002
+  amendment H6).
+
+  The outcome comes first because it is what the block *does*; the event
+  is only when. Each half is dropped on its own when it is not there or
+  not well formed, so a handler mid-edit shows the half the author has
+  filled in rather than nothing.
+
+      iex> StatifierBlocks.Core.OnEvent.summary(%{"outcome" => "abandon", "event" => "order.cancelled"})
+      ["Abandon", "order.cancelled"]
+
+      iex> StatifierBlocks.Core.OnEvent.summary(%{"outcome" => "resume"})
+      ["Resume"]
+
+      iex> StatifierBlocks.Core.OnEvent.summary(%{})
+      []
+  """
+  @impl true
+  def summary(config) do
+    [outcome_word(Map.get(config, "outcome")), event_chip(Map.get(config, "event"))]
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp outcome_word("abandon"), do: "Abandon"
+  defp outcome_word("resume"), do: "Resume"
+  defp outcome_word(_undeclared), do: nil
+
+  defp event_chip(event) do
+    if Config.event_name?(event), do: event, else: nil
+  end
+
+  @doc """
   One example event payload, so a palette panel can show what `_event.data`
   looks like when this handler fires.
 
