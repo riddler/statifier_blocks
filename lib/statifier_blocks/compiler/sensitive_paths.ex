@@ -112,10 +112,11 @@ defmodule StatifierBlocks.Compiler.SensitivePaths do
 
   `StatifierBlocks.Finding.from_compiler/2`'s **default** derivation
   cannot reach `{source: :lint, severity: :error}` - its rule 2 maps only
-  a non-error to `:lint`, and this finding's `:emit` stage has no default
-  source. That is what `opts[:source]` is documented for ("lets a caller
-  that knows better than the default rule say so explicitly"), so a caller
-  adapting these findings for presentation passes it:
+  a non-error to `:lint`, and this finding's `:emit` stage at `:error`
+  maps to `:compile` under ADR-0005 amendment `11h`, not to `:lint`. That
+  is what `opts[:source]` is documented for ("lets a caller that knows
+  better than the default rule say so explicitly"), so a caller adapting
+  these findings for presentation passes it:
 
       {presentation, []} =
         StatifierBlocks.Finding.from_compiler_all(findings, source: :lint)

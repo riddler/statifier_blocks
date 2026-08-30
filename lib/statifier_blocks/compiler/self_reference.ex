@@ -57,18 +57,19 @@ defmodule StatifierBlocks.Compiler.SelfReference do
   ## Presenting one
 
   `StatifierBlocks.Finding.from_compiler/2`'s default derivation cannot
-  reach this finding, for the reason `SensitivePaths` records: its rule 2
-  maps only a non-error to `:lint`, and an `:emit` stage has no default
-  source, so a bare adaptation refuses with `:no_presentation_source`.
-  That is what `opts[:source]` exists for, and a caller adapting these for
-  the editor passes it:
+  reach `:lint` for this finding, for the reason `SensitivePaths` records:
+  its rule 2 maps only a non-error to `:lint`, and an `:emit` stage at
+  `:error` severity maps to `:compile` under ADR-0005 amendment `11h`, so
+  a bare adaptation presents it as a compile error rather than as the lint
+  it is. That is what `opts[:source]` exists for, and a caller adapting
+  these for the editor passes it:
 
       {presentation, []} =
         StatifierBlocks.Finding.from_compiler_all(findings, source: :lint)
 
   Widening the default derivation would mean switching on `code`, which
   `StatifierBlocks.Finding` forbids by construction; the seam is named
-  here rather than bent, exactly as the sensitive-path refusal named it.
+  here rather than bent, exactly as the sensitive-path mapping names it.
   """
 
   alias StatifierBlocks.{Block, Document, Emission}
