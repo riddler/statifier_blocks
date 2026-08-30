@@ -256,6 +256,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "The `{parent_id, slot, index}` the palette is armed at, passed through to `Slot`."
     )
 
+    attr(:marks, :any,
+      default: nil,
+      doc: """
+      The host's run marks - `%{active: MapSet.t(), invoke: {block_id, outcome}
+      | nil}`, or `nil` when nothing is marked - threaded the way `collapsed`
+      is and for the same reason: a mark is editor state that addresses a
+      block, and nothing in the view model carries it.
+      """
+    )
+
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:class, :string, default: nil)
@@ -282,7 +292,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     @doc "One block: chrome, findings, and its slots, recursively."
     def block_node(assigns) do
-      assigns = assign(assigns, :collapsed?, collapsed?(assigns.node, assigns.collapsed))
+      assigns =
+        assigns
+        |> assign(:collapsed?, collapsed?(assigns.node, assigns.collapsed))
+        |> assign(:run_active?, run_active?(assigns.node, assigns.marks))
+        |> assign(:invoke_outcome, invoke_outcome(assigns.node, assigns.marks))
+        |> assign(:invoking?, invoke(assigns.node, assigns.marks) != nil)
 
       ~H"""
       <div
@@ -304,6 +319,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-root={to_string(@root?)}
         data-container={to_string(container?(@node))}
         data-collapsed={to_string(@collapsed?)}
+        data-run-active={to_string(@run_active?)}
+        data-run-invoking={to_string(@invoking?)}
+        data-invoke-outcome={@invoke_outcome}
         data-arrangement={ViewModel.arrangement(@node)}
         data-sb-anchor={Connectors.node_anchor(@node.block_id)}
         draggable={to_string(not @root?)}
@@ -387,6 +405,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             drag={@drag}
             selected_id={@selected_id}
             collapsed={@collapsed}
+            marks={@marks}
             armed={@armed}
             target={@target}
             icon={@icon}
@@ -418,6 +437,39 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec container?(ViewModel.Node.t()) :: boolean()
     defp container?(%ViewModel.Node{slots: slots}), do: slots != []
 
+    # The two run marks, read the way `collapsed?/2` below reads its set: the
+    # marks are the editor's state rather than the document's, so they are
+    # threaded in and asked about per node rather than derived from anything
+    # the view model carries.
+    #
+    # `nil` marks - the ordinary case, a document with no run over it - answer
+    # every question here without touching a set.
+    @spec run_active?(ViewModel.Node.t(), map() | nil) :: boolean()
+    defp run_active?(_node, nil), do: false
+
+    defp run_active?(%ViewModel.Node{block_id: id}, %{active: active}),
+      do: MapSet.member?(active, id)
+
+    # The outcome, or `nil` for a call with no answer yet AND for a block that
+    # is not the marked one. The two are told apart by `invoke/2` rather than
+    # here, which is what keeps `data-invoke-outcome` off an unmarked card
+    # instead of stamping an empty one on every block on the canvas.
+    @spec invoke_outcome(ViewModel.Node.t(), map() | nil) :: String.t() | nil
+    defp invoke_outcome(node, marks) do
+      case invoke(node, marks) do
+        {_id, outcome} -> outcome
+        nil -> nil
+      end
+    end
+
+    # Single-valued, unlike the active set: a step calls out to one handler at
+    # a time, so the mark is one block and its answer rather than a set.
+    @spec invoke(ViewModel.Node.t(), map() | nil) :: {String.t(), String.t() | nil} | nil
+    defp invoke(_node, nil), do: nil
+
+    defp invoke(%ViewModel.Node{block_id: id}, %{invoke: {id, _outcome} = mark}), do: mark
+
+    defp invoke(_node, _marks), do: nil
     # A leaf is never collapsed, whatever the set says. It renders no fold
     # button, so nothing can put it in there - and a set that somehow held one
     # would otherwise hide a card with no way to get it back.
