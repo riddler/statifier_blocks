@@ -39,9 +39,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       * the title, the most specific name available for this step - the
         author's own when the block carries one, and the type's label
         otherwise (`ViewModel.title/1`);
-      * the type's label underneath, drawn only when the title above is the
-        author's (`ViewModel.subtitle/1`), so a named block never hides
-        what type it is and an unnamed one never says its type twice;
+      * the second line, which is one of two facts and never both: the
+        type's label when the title above is the author's
+        (`ViewModel.subtitle/1`), so a named block never hides what type it
+        is; otherwise the type's summary of this block's config, drawn as a
+        row of chips (`ViewModel.summary_chips/1`, ADR-0005's 2026-08-30
+        amendment) and absent entirely when the type declares none, so an
+        unnamed block never says its type twice;
       * the invoke type in mono, when the block's config carries one - the
         one fact about a step that calls out to a handler that an author
         checks most and a label cannot carry.
@@ -301,6 +305,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <span :if={ViewModel.subtitle(@node)} class="sb-node__type">
             {ViewModel.subtitle(@node)}
           </span>
+          <div :if={ViewModel.summary_chips(@node) != []} class="sb-node__summary">
+            <span :for={chip <- ViewModel.summary_chips(@node)} class="sb-node__chip">
+              {chip}
+            </span>
+          </div>
           <span :if={@node.invoke_type} class="sb-node__invoke">{@node.invoke_type}</span>
           <button
             :if={not @root?}
