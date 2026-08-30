@@ -854,6 +854,93 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "the container box (10c, as amended by 10h)" do
+      @stylesheet "assets/css/statifier_blocks.css"
+
+      # The record's rule, in markup terms: whether a container draws a box is
+      # `ViewModel.boundary?/1` and nothing else, and the class is the whole of
+      # the contract a stylesheet - this one, or a host's - reads it through.
+      # `boundary?/1` itself is unchanged by this bead; what is asserted here
+      # is that the two containers are distinguishable by class alone.
+      # Sabotage: stamping `sb-node--boundary` unconditionally in
+      # `BlockNode.block_node/1` - every container is a box again and the
+      # refutation below goes red, which is the state the shipped editor was in.
+      test "a container is marked a box only when it has a rail", %{conn: conn} do
+        {:ok, plain, _html} = mount_editor(conn)
+
+        assert has_element?(plain, ~s([data-block-id="blk_wizard"][data-container="true"]))
+        refute has_element?(plain, ~s([data-block-id="blk_wizard"].sb-node--boundary))
+        refute has_element?(plain, ~s([data-block-id="blk_variant"].sb-node--boundary))
+
+        {:ok, railed, _html} = mount_editor(conn, document: resumable_document())
+
+        assert has_element?(
+                 railed,
+                 ~s([data-block-id="blk_resume"][data-container="true"].sb-node--boundary)
+               )
+      end
+
+      # And the stylesheet's half of it. A container has its box TAKEN OFF -
+      # before this bead the base `.sb-node` rule drew one around every node,
+      # leaf and container alike, so the boundary class only ever moved its
+      # colour and every sequence on the canvas was a rectangle.
+      # Sabotage: deleting the rule - a depth-7 document is nested rectangles
+      # again, which is the state the shipped canvas was captured in.
+      test "the box comes off a container" do
+        css = File.read!(@stylesheet)
+
+        rule = Regex.run(~r/^\.sb-node\[data-container="true"\]\s*\{(.*?)\n\}/ms, css)
+
+        assert rule, "the scan actually found the rule"
+
+        body = Enum.at(rule, 1)
+        assert body =~ ~r/border-color:\s*transparent/
+        assert body =~ ~r/background:\s*none/
+        assert body =~ ~r/padding:\s*0/
+      end
+
+      # The card at the head of the body is what survives the box coming off,
+      # so the card's border has to be drawn by the CARD on a container rather
+      # than by the box that is no longer there.
+      # Sabotage: dropping the `border` declaration from the container's chrome
+      # rule - a sequence's header stops reading as a card at all, which is the
+      # regression the box removal would otherwise ship.
+      test "a container's own card keeps its border" do
+        css = File.read!(@stylesheet)
+
+        rule =
+          Regex.run(
+            ~r/^\.sb-node\[data-container="true"\] > \.sb-node__chrome\s*\{(.*?)\n\}/ms,
+            css
+          )
+
+        assert rule, "the scan actually found the rule"
+
+        body = Enum.at(rule, 1)
+        assert body =~ ~r/border:\s*var\(--sb-border-width\) solid var\(--sb-border\)/
+        assert body =~ ~r/width:\s*var\(--sb-card-width\)/
+      end
+
+      # A boundary's box is a box, and it is drawn around the BODY - the slot
+      # box holding the body and the rail - which is where the spike draws it
+      # and what a rule attached to a region needs an edge around.
+      # Sabotage: leaving `.sb-node--boundary` at `border-color` on the node -
+      # the rule above has already taken the node's border and padding away, so
+      # an interrupt region draws no box at all and 10c loses the one case it
+      # exists for.
+      test "a boundary draws the box around its body, in the strong border" do
+        css = File.read!(@stylesheet)
+
+        rule = Regex.run(~r/^\.sb-node--boundary > \.sb-node__slots\s*\{(.*?)\n\}/ms, css)
+
+        assert rule, "the scan actually found the rule"
+
+        body = Enum.at(rule, 1)
+        assert body =~ ~r/border:\s*var\(--sb-border-width\) solid var\(--sb-border-strong\)/
+        assert body =~ ~r/padding:\s*var\(--sb-space\)/
+      end
+    end
+
     describe "the operator pre-decision" do
       # Sabotage: adding `defp layout_class(%Node{type: "core.parallel"}), do: ...`
       # to BlockNode - the type name appears in a component source and this goes

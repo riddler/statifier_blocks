@@ -51,6 +51,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     config KEY, so a host type that calls a handler gets the same line
     `core.invoke` does by carrying the same key.
 
+    ## The container box
+
+    A container draws a box around its body only when it is a BOUNDARY, and
+    `ViewModel.boundary?/1` is the whole of that question: the node has a slot
+    in the rail partition (ADR-0005 decision 10c, as amended by 10h, which
+    widened the partition from `:secondary` to any rail style and left 10c's
+    reason - an attached rule is about a region, so the region needs a visible
+    edge - unchanged). This module stamps `sb-node--boundary` from that
+    predicate and decides nothing else about it.
+
+    Every other container draws no box, which is the rest of 10c: a box around
+    each of them turns a deep document into nested rectangles that read as
+    noise, and what an author needs to see there is the cards and the edges
+    between them. The container's own card stays at the head of its body, so
+    the block is still a thing on the canvas without its subtree being fenced.
+
+    None of that is in this file beyond the class and `data-container`: the
+    box is paint, the stylesheet owns paint, and a host restyling the editor
+    reads the same two hooks the package's own stylesheet does.
+
     ## The delete affordance (operator ruling R2, campaign 016)
 
     "`x` on hover, `-` + `x` on the selected card, nothing at rest." A
