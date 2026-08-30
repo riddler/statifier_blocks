@@ -1,6 +1,31 @@
 # ADR-0005 decision 1: with `phoenix_live_view` absent the editor does not
 # compile, so neither can a test that drives it.
 if Code.ensure_loaded?(Phoenix.LiveView) do
+  defmodule StatifierBlocks.Editor.AssigningIconHost do
+    @moduledoc """
+    A host icon component that derives its one value the ordinary way.
+
+    Nothing here is exotic: `assign/3` before the template is how a
+    `Phoenix.Component` is written, and it is the whole reason the icon seam
+    has to render a host's component as a component rather than apply it to a
+    map (`sb-b8g`). A tracked assigns map is what every helper in
+    `Phoenix.Component` requires.
+    """
+
+    use Phoenix.Component
+
+    attr(:name, :string, required: true)
+    attr(:class, :string, default: nil)
+
+    def icon(assigns) do
+      assigns = assign(assigns, :title, "icon: " <> assigns.name)
+
+      ~H"""
+      <span class={@class} data-icon={@name} data-assigning-host="true" title={@title}></span>
+      """
+    end
+  end
+
   defmodule StatifierBlocks.Editor.IconsTest do
     @moduledoc """
     The shipped default icon set (`sb-jja`), and the seam it does not move.
@@ -20,7 +45,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use StatifierBlocks.EditorLiveCase
 
-    alias StatifierBlocks.Editor.Icons
+    alias StatifierBlocks.Editor.{AssigningIconHost, Icons}
 
     # The glyph the editor used to render in every tile, in all three of the
     # forms it could reach a comparison: the character, the entity the
@@ -151,8 +176,32 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert palette_entry(html, "core.wait") =~ ~s(data-host-icon="true"),
                "and it is the same component on both surfaces"
 
+        assert tile(html, "clock") =~ ~s(title="icon: clock"),
+               "sb-b8g: the host component derives its title with `assign/3`, so the " <>
+                 "assigns it was called with were a tracked map"
+
         refute html =~ ~s(stroke-linejoin="round"),
                "the shipped set is not rendered alongside the host's"
+      end
+
+      # Sabotage: restoring `{@icon.(%{name: @name, class: @class})}` as
+      # `Icons.glyph/1`'s host clause - the host is handed a bare map with no
+      # `__changed__` key, `assign/3` raises, and this goes red with the
+      # ArgumentError the examples host had to work around.
+      test "a host component may use the Phoenix.Component helpers" do
+        rendered =
+          render_component(&Icons.glyph/1,
+            icon: &AssigningIconHost.icon/1,
+            name: "clock",
+            class: "sb-node__icon"
+          )
+
+        assert rendered =~ ~s(data-assigning-host="true"),
+               "the host's component is what rendered"
+
+        assert rendered =~ ~s(title="icon: clock"),
+               "sb-b8g: `assign/3` ran inside it, so the seam rendered it as a function " <>
+                 "component rather than applying it to a bare map"
       end
 
       # Sabotage: dropping the `%{name: nil}` clause - the host component is

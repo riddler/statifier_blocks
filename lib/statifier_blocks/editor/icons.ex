@@ -52,6 +52,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         chrome closes up around the label. This is the deliberate empty state
         the bead asked for, and it applies to a host-supplied `icon` component
         too: a host is never called with a `nil` name.
+
+    ## What a host's component may do
+
+    A host's `icon` is rendered as a **function component**, exactly as if the
+    editor had written `<.icon name={...} class={...} />` against it, so its
+    assigns are a tracked assigns map and every `Phoenix.Component` helper
+    works inside it: `assign/3`, `assign_new/3`, whatever a host reaches for
+    to derive one value before the markup. It must return a `~H` template,
+    which is the one thing the seam has always required.
     """
 
     use Phoenix.Component
@@ -152,9 +161,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
+    # The host's component is rendered the way HEEx renders `<.icon ... />`,
+    # not by applying the function to a bare map. `~H` cannot name a runtime
+    # function in a tag, so the call goes through the same entry point the
+    # engine compiles that tag into - it is what puts `__changed__` in the
+    # assigns and what checks the return is a `%Rendered{}`.
+    #
+    # Calling `@icon.(%{name: ..., class: ...})` instead handed the host a map
+    # with no `__changed__` key, so any host component that derived a value
+    # the ordinary way - `assign/3`, `assign_new/3`, anything expecting a
+    # tracked assigns map - raised on a seam that renders straight from its
+    # arguments in every example we ship (sb-b8g).
     def glyph(assigns) do
       ~H"""
-      {@icon.(%{name: @name, class: @class})}
+      {Phoenix.LiveView.TagEngine.component(
+        @icon,
+        %{name: @name, class: @class},
+        {__MODULE__, {:glyph, 1}, __ENV__.file, __ENV__.line}
+      )}
       """
     end
 
