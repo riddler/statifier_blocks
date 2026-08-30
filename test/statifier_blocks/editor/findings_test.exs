@@ -137,6 +137,92 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert has_element?(view, "#{row} .sb-findings__message", "far too long a wait")
       end
 
+      # D4's anatomy, the two cells the row did not carry before: which part of
+      # the block the finding is about, and who says so. The tail is the half
+      # of the anchor the subject does not already say - the subject is the
+      # block, so the tail is the key or the slot name and nothing else.
+      #
+      # Sabotage: `anchor_tail/1`'s `{:config, _, _}` clause returning the
+      # whole `anchor_tag/1` string - the row reads
+      # "config:blk_email_step:duration", which repeats the id the subject
+      # column already carries, and the first assertion goes red (verified).
+      test "a row names the part of the block it is about, and its source", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, findings: findings())
+        open_findings(view)
+
+        config = ~s(li[data-anchor="config:blk_email_step:duration"])
+        assert has_element?(view, "#{config} .sb-findings__anchor", "config.duration")
+        assert has_element?(view, "#{config} .sb-findings__source", "config")
+
+        slot = ~s(li[data-anchor="slot:blk_wizard:body"])
+        assert has_element?(view, "#{slot} .sb-findings__anchor", "slot:body")
+        assert has_element?(view, "#{slot} .sb-findings__source", "assignability")
+      end
+
+      # A `{:block, id}` finding's anchor IS its subject, so a tail would say
+      # the id twice on the widest row in the list - the same reasoning the
+      # orphan's subject already follows.
+      #
+      # Sabotage: `anchor_tail/1`'s `{:block, _}` clause returning
+      # `"block:#{id}"` instead of nil - the block-anchored row grows a tail
+      # and this refute goes red (verified).
+      test "a block-anchored row has no tail, because its anchor is its subject", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, findings: findings())
+        open_findings(view)
+
+        block = ~s(li[data-anchor="block:blk_variant"])
+        refute has_element?(view, "#{block} .sb-findings__anchor")
+        assert has_element?(view, "#{block} .sb-findings__id", "blk_variant")
+        assert has_element?(view, "#{block} .sb-findings__source", "lint")
+      end
+
+      # D2/D3: how much is wrong, in the enum's own words, above a list that is
+      # still ordered by the document rather than by severity. Four supplied
+      # plus the derived `:resolution` finding is five, of which one is the
+      # `:lint` warning.
+      #
+      # Sabotage: `severity_pills/1` rendering `@counts` in `Enum.reverse/1` -
+      # the warning pill leads the triage row and the ordering assertion goes
+      # red (verified); dropping the pill row entirely makes all of them red.
+      test "a pill row above the list says how many at each severity", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, findings: findings())
+        html = open_findings(view)
+
+        assert has_element?(view, ~s(.sb-findings__pills [data-severity="error"]), "4")
+        assert has_element?(view, ~s(.sb-findings__pills [data-severity="warning"]), "1")
+        refute has_element?(view, ~s(.sb-findings__pills [data-severity="info"]))
+
+        # The pills sit above the list, not inside it: they summarise the rows
+        # and are not one of them. D2: the list below is still the document's
+        # order, so the pills are the only thing severity arranges.
+        refute has_element?(view, ".sb-findings__list .sb-findings__pills")
+        {pills, _len} = :binary.match(html, "sb-findings__pills")
+        {list, _len} = :binary.match(html, "sb-findings__list")
+        assert pills < list
+
+        # Most urgent first. The first match of each is its pill, because the
+        # pills are above the rows that carry the same stamp.
+        {error_at, _len} = :binary.match(html, ~s(data-severity="error"))
+        {warning_at, _len} = :binary.match(html, ~s(data-severity="warning"))
+        assert error_at < warning_at
+      end
+
+      # C7: the stamp is `Shell.findings_count/1`'s answer and not a `length/1`
+      # taken here. The two agree today, which is exactly why the coupling has
+      # to be pinned by a mutation of the function rather than by a number.
+      #
+      # Sabotage: `Shell.findings_count/1` returning `length(findings) + 1` -
+      # the stamp follows it to 6 and this goes red (verified). Replacing the
+      # call with `length(@findings)` and repeating the mutation leaves the
+      # stamp at 5 while the drawer's own chip reads 6, which is the
+      # two-numbers defect that function was extracted to close.
+      test "the stamped count is Shell.findings_count/1's", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, findings: findings())
+        html = open_findings(view)
+
+        assert html =~ ~s(data-findings-count="5")
+      end
+
       # Sabotage: `Findings.findings/1` rendering a reveal button for orphans
       # too - clicking it would select a block that is not there.
       test "an orphan is listed but has nothing to reveal", %{conn: conn} do

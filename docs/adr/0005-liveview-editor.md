@@ -1997,6 +1997,17 @@ turns on.
 Datamodel and Fixtures, which the spike had as inspector tabs, are drawer tabs
 under this rule. They were never about the selected block.
 
+**Precision (2026-08-30, `sb-1g4q`), because 3A reads narrower than it is:**
+"about the selected block" says what a tab is about, not what it does when
+there is no selection. With `node: nil` the Findings tab has no block to be
+about, and since `sb-dbqq` (campaign-018 ruling D1) it lists the **document's**
+findings, grouped by block. That is 3A's empty state and not a fourth surface:
+the moment anything is selected the tab is that block's findings again, the
+document-level list an author *navigates* is still the drawer's (R4), and no
+tab was added. What 3A forbids is a pane that is about two subjects at once;
+what it does not require is a pane that says nothing when its subject is
+missing.
+
 **7A. Breakpoints are container queries on `.sb-editor`.** They are container
 queries and not media queries because the editor is a component embedded in a
 host page whose chrome the package does not control; a viewport width tells it
@@ -3075,7 +3086,8 @@ Decision 12's second bullet - "its config shown read-only as canonical JSON,
 because there is no `config_schema/1` to drive a form and inventing one would
 be guessing" - is **the inspector's Block section**, not the card's face.
 Campaign-017 ruling D4 moved those bytes there, as `sb-u1j` / PR 153, which
-also renamed the rule that paints them `.sb-inspector__raw-config`. `ViewModel.Node.raw_config_json` is still built exactly as
+also renamed the rule that paints them `.sb-inspector__raw-config`.
+`ViewModel.Node.raw_config_json` is still built exactly as
 before, from `CanonicalJson.encode_term/1` over the stored config, and it now
 has exactly one reader in `lib/`:
 `StatifierBlocks.Editor.Inspector`'s `block_section/1`. Nothing on the canvas
@@ -3093,6 +3105,14 @@ Unchanged by this note: the bullet's content, the encoding, the fact that the
 config may not be edited, and every other clause of decision 12. A card still
 carries the type name, the unavailable chrome, the `:block` finding, and the
 block's existing children rendered normally.
+
+`sb-dbqq` (campaign-018 ruling D1) is the second application of the same
+reasoning and is cited here so the pair is readable as one move: the pane an
+author reaches by asking a question is where a long or document-shaped answer
+can be given honestly. D4 moved the read-only config there because a card
+could not hold it; `sb-dbqq` gave the Findings tab the document's findings
+because a pane with no selection had nothing to hold at all. Both leave the
+card and the drawer exactly as decision 12 and R4 describe them.
 
 ---
 
@@ -3114,8 +3134,9 @@ sentence ever depended on an `:arity` value existing, which is why dropping
 one did not cost it anything.
 
 One precision the sentence does not carry on its own, true in code today:
-**nothing in this package constructs a `{:slot, _, _}` anchor.** `from_compiler/2`
-cannot - `Compiler.Finding` carries no slot name, so the mechanical anchor
+**nothing in this package constructs a `{:slot, _, _}` anchor.**
+`from_compiler/2` cannot - `Compiler.Finding` carries no slot name, so the
+mechanical anchor
 rules produce `{:config, id, key}` or `{:block, id}` and nothing else, which
 that function's own moduledoc states as a known gap. So the slot-shaped
 structural findings `sb-da9` shipped (`:slot_arity_violated`,

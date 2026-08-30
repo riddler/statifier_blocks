@@ -77,6 +77,17 @@ defmodule StatifierBlocks.Shell do
           findings: [Finding.t()]
         }
 
+  @typedoc """
+  One severity's share of a findings list, as the pill row above the list
+  reports it.
+
+  `count` is always positive: a severity with nothing at it has no pill, on
+  the same reasoning the inspector's tab chip is absent at zero rather than
+  reading `0` - a row of pills where two of the three say nothing is a row an
+  author learns to stop reading.
+  """
+  @type severity_count :: %{severity: Finding.severity(), count: pos_integer()}
+
   @typedoc "What the drawer is showing, from its own flag, its tab and the selection."
   @type drawer :: %{
           open?: boolean(),
@@ -116,6 +127,10 @@ defmodule StatifierBlocks.Shell do
   # The heading over the findings whose anchor names no block in the document.
   # A word rather than a block id, because there is no block to name.
   @unanchored_label "Unanchored"
+
+  # Most to least urgent. It is the order `Finding.severity/0` declares and the
+  # order an author triages in, and `severity_counts/1` is its only reader.
+  @severity_order [:error, :warning, :info]
 
   # Rem, and the drawer's own. The floor is a strip plus one row of a table -
   # below it the drawer is open and shows nothing, which is a worse state than
@@ -588,6 +603,36 @@ defmodule StatifierBlocks.Shell do
   """
   @spec findings_count([Finding.t()]) :: non_neg_integer()
   def findings_count(findings) when is_list(findings), do: length(findings)
+
+  @doc """
+  The same findings cut by severity, for the pill row above the list.
+
+  It is `findings_count/1` again, told a second way, and the two are pinned
+  to each other by construction: summing every entry's `count` is
+  `findings_count/1` again, for every list. That is the property
+  `findings_groups/3` documents about its own grouping, and it is here for the
+  same reason - a summary line that disagrees with the list beneath it is the
+  two-numbers defect `findings_count/1` exists to close, and a pill row is a
+  second place for it to reappear.
+
+  Order is `:error`, `:warning`, `:info` - most to least urgent, which is the
+  order the severities are declared in and the order an author triages in.
+  A severity with nothing at it is **omitted** rather than rendered as zero,
+  so the row's width is what the document actually holds.
+
+  The argument is the same list `findings_count/1` takes: `ViewModel.findings`
+  for the document, a group's or a block's list for a narrower surface.
+  Orphans are inside it wherever they are inside the list handed in.
+  """
+  @spec severity_counts([Finding.t()]) :: [severity_count()]
+  def severity_counts(findings) when is_list(findings) do
+    tally = Enum.frequencies_by(findings, & &1.severity)
+
+    for severity <- @severity_order,
+        count = Map.get(tally, severity, 0),
+        count > 0,
+        do: %{severity: severity, count: count}
+  end
 
   @doc """
   The document's findings grouped by the block each one is anchored to, for

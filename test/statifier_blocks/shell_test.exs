@@ -227,6 +227,62 @@ defmodule StatifierBlocks.ShellTest do
     end
   end
 
+  # sb-1g4q / campaign-019 D2: the pill row above both document-level findings
+  # lists. The markup is the components' tests; what belongs here is that the
+  # pills are the same list the count counts, cut a second way.
+  describe "the findings number, cut by severity (D2)" do
+    defp mixed_findings do
+      [
+        Finding.new({:block, "blk_cc_decision"}, :lint, "worth a look", severity: :info),
+        Finding.new({:config, "blk_cc_capture_pause", "duration"}, :config, "not a number"),
+        Finding.new({:block, "blk_variant"}, :lint, "no handler", severity: :warning),
+        Finding.new({:block, "blk_gone"}, :resolution, "no such block"),
+        Finding.new({:slot, "blk_cc_decision", "then"}, :lint, "thin", severity: :warning)
+      ]
+    end
+
+    # Most urgent first, whatever order the findings arrived in - the fixture
+    # leads with the `:info` on purpose, so an implementation that reported
+    # first-appearance order (which is what `findings_groups/3` does, two
+    # functions away) would put the advisory at the front of the triage row.
+    # Sabotage: reordering `@severity_order` to `[:error, :info, :warning]` -
+    # the advisory lands ahead of the two warnings and this goes red.
+    test "reads error, warning, info, whatever order they arrived in" do
+      assert Shell.severity_counts(mixed_findings()) == [
+               %{severity: :error, count: 2},
+               %{severity: :warning, count: 2},
+               %{severity: :info, count: 1}
+             ]
+    end
+
+    # The pills and the chip are one list read twice, which is the same
+    # property `findings_groups/3` holds and for the same reason: a summary
+    # line that disagrees with the list beneath it is the two-numbers defect
+    # `findings_count/1` exists to close.
+    # Sabotage: counting with `Enum.uniq_by(findings, & &1.severity)` before
+    # the tally - every count collapses to 1, the sum reads 3 against a count
+    # of 5, and this goes red.
+    test "sums to findings_count/1" do
+      findings = mixed_findings()
+      total = findings |> Shell.severity_counts() |> Enum.map(& &1.count) |> Enum.sum()
+
+      assert total == Shell.findings_count(findings)
+      assert total == 5
+    end
+
+    # A severity with nothing at it has no pill, on the rule the inspector's
+    # tab chip already follows: a row where two of three readings say zero is
+    # a row an author learns to stop reading.
+    # Sabotage: emitting every severity in `@severity_order` unconditionally -
+    # the clean document grows three zero pills and both assertions go red.
+    test "omits a severity with nothing at it, and a clean document has no pills" do
+      only_errors = [Finding.new({:block, "blk_gone"}, :resolution, "no such block")]
+
+      assert Shell.severity_counts(only_errors) == [%{severity: :error, count: 1}]
+      assert Shell.severity_counts([]) == []
+    end
+  end
+
   # sb-dbqq: the inspector's Findings tab with nothing selected. The markup is
   # `StatifierBlocks.Editor.InspectorBodyTest`'s; what belongs here is that the
   # grouping keeps every finding the count counts, and that the ones with no
