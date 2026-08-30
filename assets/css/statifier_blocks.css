@@ -908,6 +908,9 @@
   grid-row: 3;
 }
 
+/* The chrome cell the badge will occupy. Nothing renders into it today - see
+ * `.sb-badge` below - and it is kept beside every other chrome placement so a
+ * collapsed badge lands where the grid already expects one. */
 .sb-node__chrome > .sb-badge {
   grid-column: 3;
   grid-row: 1;
@@ -1716,7 +1719,24 @@
   background: var(--sb-info-bg);
 }
 
-/* d11's last sentence: a finding can never hide inside something folded shut. */
+/* d11's last sentence: a finding can never hide inside something folded shut.
+ *
+ * Nothing renders this class today. The badge belongs to a COLLAPSED subtree
+ * (:461, :1457) and this editor has no collapse command (d2's closed set,
+ * restated at :2130), so `BlockNode` renders no badge at all (sb-vamn). The
+ * rule is kept rather than deleted: the class is the seam the collapse bead
+ * renders into.
+ *
+ * It is still the FILL that shipped, and :1233-1235 says the badge is a RING -
+ * an inset shadow carrying no new token, chosen precisely so a badge would not
+ * read like a filled config chip. Making that change here is not free and it
+ * is deliberately NOT sb-vamn's: `--sb-fg-on-accent` is a tier-1 published
+ * token and this rule is its ONLY consumer, so a ring whose count is
+ * `--sb-error` strands it, and 14e refuses a declared token no rule reads.
+ * Retiring it means the tier table above, `docs/theming.md`'s documented host
+ * theme, and its own contrast test - a public-surface removal, decided with a
+ * badge that actually renders in view. The bead that lands collapse takes
+ * both together. */
 .sb-badge {
   border-radius: var(--sb-radius-sm);
   background: var(--sb-error);

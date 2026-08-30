@@ -194,12 +194,28 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     A node whose slots stack draws no marker at all. There is nothing to
     rejoin, and a word under a single column reads as a rendering bug.
 
-    ## The badge
+    ## The badge, and why no face carries one (sb-vamn)
 
-    `findings_count` covers the whole subtree, so a collapsed node still shows
-    that something inside it needs attention. Decision 11's last sentence is
-    explicit that a finding must never hide inside something folded shut -
-    that is the failure mode that makes tree editors feel unreliable.
+    ADR-0005 puts the count badge on a **collapsed** subtree (:461, :1457):
+    `findings_count` covers a whole subtree precisely so that a node folded
+    shut can still say something inside it needs attention. Decision 11's last
+    sentence is what that is for - a finding must never hide inside something
+    folded shut, which is the failure mode that makes tree editors feel
+    unreliable.
+
+    This editor has no collapse command. Decision 2's command set is closed
+    (`:insert`, `:move`, `:remove`, `:update`) and decision 7a restates it, so
+    no node is ever collapsed and **the badge renders on no face**. What
+    shipped before was a badge on every container whenever its subtree rollup
+    was non-zero, which is not what the record says and read as an error on
+    every container face as the counts multiplied up the tree.
+
+    Nothing is lost by removing it: the rollup stays on the node as
+    `data-findings-count`, the drawer's Findings tab lists every finding, and
+    the inspector groups them. When a collapse command lands, its own bead
+    renders `.sb-badge` on the collapsed node - the stylesheet still carries
+    the class. The ring treatment :1233 argues for rides with that bead, for
+    the reason the stylesheet records beside the rule.
     """
 
     use Phoenix.Component
@@ -286,7 +302,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             {ViewModel.subtitle(@node)}
           </span>
           <span :if={@node.invoke_type} class="sb-node__invoke">{@node.invoke_type}</span>
-          <span :if={@node.findings_count > 0} class="sb-badge">{@node.findings_count}</span>
           <button
             :if={not @root?}
             type="button"
