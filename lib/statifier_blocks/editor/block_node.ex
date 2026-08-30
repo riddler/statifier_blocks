@@ -30,6 +30,48 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     above: the default is markup this package wrote, resolved from a name by
     the same seam, and the host's `icon` still wins wherever it is passed.
 
+    ## The card face
+
+    Four lines at most, and every one of them is a different question:
+
+      * the icon tile, which says what KIND of thing this is before anything
+        is read;
+      * the title, the most specific name available for this step - the
+        author's own when the block carries one, and the type's label
+        otherwise (`ViewModel.title/1`);
+      * the type's label underneath, drawn only when the title above is the
+        author's (`ViewModel.subtitle/1`), so a named block never hides
+        what type it is and an unnamed one never says its type twice;
+      * the invoke type in mono, when the block's config carries one - the
+        one fact about a step that calls out to a handler that an author
+        checks most and a label cannot carry.
+
+    None of the four is a branch on a type name. The title and the subtitle
+    read a declared field and a palette label; the invoke line reads a
+    config KEY, so a host type that calls a handler gets the same line
+    `core.invoke` does by carrying the same key.
+
+    ## The delete affordance (operator ruling R2, campaign 016)
+
+    "`x` on hover, `-` + `x` on the selected card, nothing at rest." A
+    delete control on every one of forty cards at rest is noise competing
+    with the workflow itself.
+
+    Hidden by opacity and by nothing else. `display: none` and
+    `visibility: hidden` both take the button out of the tab order, which
+    would make deleting a block a pointer-only gesture - so the rest state
+    is a control that is present, focusable, and revealed by `:focus-visible`
+    the moment a keyboard reaches it. `data-reveal` on the button is what the
+    stylesheet's rest rule selects and what the presentation test asserts,
+    so the contract is one string rather than a computed style nothing can
+    check.
+
+    The `-` half of R2 is **not** shipped: it is a collapse control, and
+    this editor has no collapse command (ADR-0005's command set is
+    `:insert`, `:move`, `:remove`, `:update`). Inventing one to hang a
+    control off would be deciding a piece of the interaction model inside a
+    presentation bead.
+
     ## Unresolvable blocks (decision 12)
 
     A block whose type does not resolve renders rather than vanishing: its
@@ -160,19 +202,25 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             phx-target={@target}
             phx-value-block-id={@node.block_id}
           >
-            {@node.entry.label}
+            {ViewModel.title(@node)}
           </button>
-          <span :if={unresolvable?(@node)} class="sb-node__type">{@node.type}</span>
+          <span :if={ViewModel.subtitle(@node)} class="sb-node__type">
+            {ViewModel.subtitle(@node)}
+          </span>
+          <span :if={@node.invoke_type} class="sb-node__invoke">{@node.invoke_type}</span>
           <span :if={@node.findings_count > 0} class="sb-badge">{@node.findings_count}</span>
           <button
             :if={not @root?}
             type="button"
             class="sb-node__remove"
+            data-reveal="hover-or-selected"
+            aria-label={"Delete " <> ViewModel.title(@node)}
+            title="Delete"
             phx-click="remove"
             phx-target={@target}
             phx-value-block-id={@node.block_id}
           >
-            delete
+            x
           </button>
         </div>
 

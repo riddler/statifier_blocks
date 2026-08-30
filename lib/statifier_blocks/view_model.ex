@@ -220,6 +220,27 @@ defmodule StatifierBlocks.ViewModel do
     whether the marker is drawn. An unresolvable block reaches `nil` by the
     ordinary route rather than by a special case - its entry is the
     placeholder's, which declares no callback.
+
+    `title` is the author's own name for THIS block - the value of a
+    declared `:string` field keyed `label` - and `nil` when the type
+    declares no such field or the config holds nothing usable there, which
+    is every block in the `core.*` vocabulary. `nil` rather than "the
+    entry's label repeated" so that the card can tell the two apart: a
+    block with a name of its own reads as its name over its type, and a
+    block without one reads as its type alone rather than as its type
+    printed twice (`ViewModel.title/1` and `ViewModel.subtitle/1` are that
+    pair). It is derived here for the same reason `outcome` is - the
+    rendering side reads a string and never learns which key an author's
+    name lives under.
+
+    `invoke_type` is what this block's config carries under `invoke_type`,
+    when that is a non-empty string. It is a config key rather than a type
+    name, so a host type that calls out to a handler gets the same third
+    line `core.invoke` does by carrying the same key, and no component
+    learns that `core.invoke` exists. Whether the value is WELL FORMED is
+    `validate_config/1`'s question and its answer arrives as a finding on
+    the same card; hiding the string while a finding complains about it
+    would be the card disagreeing with the form.
     """
 
     @type status :: :ok | {:unresolvable, term()}
@@ -230,6 +251,8 @@ defmodule StatifierBlocks.ViewModel do
             type_version: pos_integer(),
             status: status(),
             entry: BlockType.palette_entry(),
+            title: String.t() | nil,
+            invoke_type: String.t() | nil,
             outcome: String.t() | nil,
             join_label: String.t() | nil,
             slots: [StatifierBlocks.ViewModel.Slot.t()],
@@ -246,6 +269,8 @@ defmodule StatifierBlocks.ViewModel do
       :type_version,
       :status,
       entry: %{},
+      title: nil,
+      invoke_type: nil,
       outcome: nil,
       join_label: nil,
       slots: [],
@@ -384,6 +409,66 @@ defmodule StatifierBlocks.ViewModel do
   end
 
   def accent_token(_entry), do: nil
+
+  @doc """
+  The name on the face of a card: the author's own, when this block carries
+  one, and the block type's palette label otherwise.
+
+  Two questions, not one, which is why this and `subtitle/1` are a pair
+  rather than one field. A card answers "what is this step" with the most
+  specific name available, and "what kind of step is it" underneath - and
+  when the only name available IS the type's, there is nothing for the
+  second line to add.
+
+      iex> alias StatifierBlocks.ViewModel
+      iex> ViewModel.title(%ViewModel.Node{
+      ...>   block_id: "b", type: "core.wait", type_version: 1, status: :ok,
+      ...>   entry: %{label: "Wait"}
+      ...> })
+      "Wait"
+
+      iex> alias StatifierBlocks.ViewModel
+      iex> ViewModel.title(%ViewModel.Node{
+      ...>   block_id: "b", type: "host.step", type_version: 1, status: :ok,
+      ...>   entry: %{label: "Intake"}, title: "Collect the details"
+      ...> })
+      "Collect the details"
+  """
+  @spec title(Node.t()) :: String.t()
+  def title(%Node{title: title}) when is_binary(title), do: title
+  def title(%Node{entry: entry, type: type}), do: Map.get(entry, :label) || type
+
+  @doc """
+  The line under the title: the block type's own label, drawn only when the
+  title is the author's rather than the type's.
+
+  `nil` for every block that has no name of its own - a subtitle repeating
+  the line above it is noise on a card whose whole budget is three lines,
+  and it is the state the whole `core.*` vocabulary is in.
+
+      iex> alias StatifierBlocks.ViewModel
+      iex> ViewModel.subtitle(%ViewModel.Node{
+      ...>   block_id: "b", type: "core.wait", type_version: 1, status: :ok,
+      ...>   entry: %{label: "Wait"}
+      ...> })
+      nil
+
+      iex> alias StatifierBlocks.ViewModel
+      iex> ViewModel.subtitle(%ViewModel.Node{
+      ...>   block_id: "b", type: "host.step", type_version: 1, status: :ok,
+      ...>   entry: %{label: "Intake"}, title: "Collect the details"
+      ...> })
+      "Intake"
+  """
+  @spec subtitle(Node.t()) :: String.t() | nil
+  def subtitle(%Node{title: title, entry: entry, type: type}) when is_binary(title) do
+    case Map.get(entry, :label) || type do
+      ^title -> nil
+      label -> label
+    end
+  end
+
+  def subtitle(%Node{}), do: nil
 
   @doc """
   Whether a container draws as a boundary box: true when ANY of its slots
@@ -629,6 +714,8 @@ defmodule StatifierBlocks.ViewModel do
       type_version: block.type_version,
       status: :ok,
       entry: entry,
+      title: title_override(schema, config),
+      invoke_type: invoke_type(config),
       join_label: BlockType.join_label(entry, config),
       slots: slots,
       form: form,
@@ -687,6 +774,13 @@ defmodule StatifierBlocks.ViewModel do
       type_version: block.type_version,
       status: {:unresolvable, reason},
       entry: default_entry(block.type),
+      # No schema, so no declared `label` field and no title override - but
+      # the config is still bytes this module can read, and a block that
+      # says which handler it called says it whether or not its type
+      # resolves. That line is often the only clue to what the missing type
+      # was.
+      title: nil,
+      invoke_type: invoke_type(block.config),
       slots: slots,
       form: nil,
       raw_config_json: raw_config_json(block.config),
@@ -768,6 +862,40 @@ defmodule StatifierBlocks.ViewModel do
       }
     end)
   end
+
+  # The author's own name for this block, or `nil`.
+  #
+  # A declared `:string` field keyed `label` is the seam, and it is the whole
+  # of it: a block type that wants its instances named says so the same way it
+  # declares any other field, and a type that declares none has no title
+  # override rather than a special case. Read through `BlockType.value_path/1`
+  # like every other field's value, so a type that stores its name somewhere
+  # other than `config["label"]` is read where it actually put it.
+  #
+  # No block type in the `core.*` vocabulary declares one. That is the
+  # intended shape rather than a gap: "Wait" is what a wait is called, and a
+  # type whose steps are worth naming individually is a host's.
+  @spec title_override([BlockType.field_decl()], Block.config()) :: String.t() | nil
+  defp title_override(schema, config) do
+    with %{} = field <- Enum.find(schema, &(&1.key == "label" and &1.type == :string)),
+         {:ok, value} <- BlockType.fetch_value(config, BlockType.value_path(field)) do
+      non_empty_string(value)
+    else
+      _undeclared_or_absent -> nil
+    end
+  end
+
+  # The invoke type on the card's third line. A config key, never a type name:
+  # see `Node`'s moduledoc for why a malformed value still renders.
+  @spec invoke_type(Block.config()) :: String.t() | nil
+  defp invoke_type(config), do: config |> Map.get("invoke_type") |> non_empty_string()
+
+  @spec non_empty_string(term()) :: String.t() | nil
+  defp non_empty_string(value) when is_binary(value) do
+    if String.trim(value) == "", do: nil, else: value
+  end
+
+  defp non_empty_string(_value), do: nil
 
   # A declared `value_path` is read exactly as `config[key]` always was:
   # the value if it is there, the field's default if it is not. Both cases

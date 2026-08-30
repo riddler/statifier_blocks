@@ -114,6 +114,13 @@ per type in your own CSS:
   the example below defines every name its registry points at, and the audit
   has a check for exactly that mistake.
 
+The **stripe** is drawn on cards whose type declared a token, and on no
+others. A type that declared nothing keeps the plain card it has always had,
+so the stripe reads as "this one is yours" rather than as decoration every
+card carries - painted on all of them it would say nothing, an undeclared type
+resolving to the editor's own accent. The **tile** is on every card either
+way, which is why a type that declares nothing still has a coloured icon.
+
 Group the names to get grouping for free: below, `myapp:authorize` and
 `myapp:capture` both resolve through `--sb-accent-myapp`, so the family reads
 as one, and the theme can still pull one of them out.

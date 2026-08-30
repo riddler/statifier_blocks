@@ -566,9 +566,16 @@
 
 /* 14d's stripe. The whole per-block-type accent seam on the card, and it
  * names no block type: the property it reads is rebound inline by the
- * renderer from the palette entry's declared token name, or resolves to the
- * editor's own accent when nothing declared one. */
-.sb-node::before {
+ * renderer from the palette entry's declared token name.
+ *
+ * On cards whose type DECLARED a token and on no others (parity item 1.4).
+ * The attribute is stamped only by a declaration, so a core block keeps the
+ * plain card it has always had and the stripe reads as "this one is the
+ * host's" rather than as decoration every card carries - which is the whole
+ * point of an identity mark. Painted on every card it said nothing, because
+ * an undeclared type resolves the property to the editor's own accent and
+ * forty identical stripes distinguish nothing. */
+.sb-node[data-sb-block-accent]::before {
   content: "";
   position: absolute;
   inset: 0 auto 0 0;
@@ -597,10 +604,56 @@
   border-color: var(--sb-border-strong);
 }
 
+/* ---- card face (parity item 1.4, and R2's delete affordance)
+ *
+ * Three text lines beside one tile, and every element in it is a DIRECT child
+ * of the chrome: a grid places them without a wrapper element per column, and
+ * the flat markup is what keeps the existing `> .sb-node__chrome > .sb-*`
+ * selectors - the editor's own tests, and any host's - reading the same card
+ * they always did.
+ *
+ * Columns are tile / text / count. The action sits OUTSIDE the grid, absolutely
+ * placed in the padding reserved for it on the right, because it appears and
+ * disappears with hover: a control in the flow would re-wrap the title the
+ * moment a pointer came near the card, and an interface that moves when you
+ * approach it reads as unstable.
+ */
 .sb-node__chrome {
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--sb-space);
+  column-gap: var(--sb-space);
+  padding-right: var(--sb-space-3);
+}
+
+/* The tile spans whatever the text column grew to. `span 3` rather than
+ * `1 / -1`: rows 2 and 3 are implicit - a card with no subtitle and no invoke
+ * line never creates them - and `-1` names the end of the EXPLICIT grid, which
+ * would pin the tile to the title's row alone. */
+.sb-node__chrome > .sb-node__icon {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+}
+
+.sb-node__chrome > .sb-node__label {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.sb-node__chrome > .sb-node__type {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.sb-node__chrome > .sb-node__invoke {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.sb-node__chrome > .sb-badge {
+  grid-column: 3;
+  grid-row: 1;
 }
 
 .sb-node__icon,
@@ -626,14 +679,100 @@
   height: 68%;
 }
 
+/* The title is a button because clicking it selects the block, and it has to
+ * read as the card's name rather than as a control - so this is the one place
+ * the package strips a native button's chrome (the reset above deliberately
+ * does not, see its own comment). `text-align: left` because a button centres
+ * its label and a title that centres itself over a two-line card reads as a
+ * caption for the thing above it. */
 .sb-node__label {
-  font-weight: var(--sb-weight-strong);
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: var(--sb-text-md);
+  font-weight: var(--sb-weight-medium);
+  line-height: var(--sb-leading);
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
 }
 
+/* The type's own label under the author's name for this step. Subtle rather
+ * than muted: it is a caption a reader is expected to read, which is the
+ * distinction `--sb-fg-subtle` exists for. */
 .sb-node__type {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+}
+
+/* An unresolvable card's second line is a raw TYPE NAME rather than a
+ * human label - `myapp.thing_we_removed` - and a type name is an identifier.
+ * The mono treatment is what makes it read as one instead of as prose that
+ * has lost its spaces. */
+.sb-node--unresolvable > .sb-node__chrome > .sb-node__type {
+  font-family: var(--sb-font-mono);
+}
+
+/* The invoke type: mono because it is a two-part identifier an author matches
+ * against a handler registry character by character, and clipped rather than
+ * wrapped because a card whose third line grows to three is a card that no
+ * longer has one shape. The full value is in the config form either way. */
+.sb-node__invoke {
   color: var(--sb-fg-muted);
   font-family: var(--sb-font-mono);
-  font-size: var(--sb-text-sm);
+  font-size: var(--sb-text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* R2 (operator ruling, 2026-08-29): "`x` on hover, `-` + `x` on the selected
+ * card, nothing at rest." The `-` is a collapse control and this editor has no
+ * collapse command, so the `x` is the whole of what ships.
+ *
+ * Opacity, and deliberately NOT `display: none` or `visibility: hidden`: both
+ * of those take the button out of the tab order, which would make deleting a
+ * block a pointer-only gesture. Hidden this way it stays focusable, and the
+ * `:focus-visible` rule below is what a keyboard user sees on arrival - the
+ * global focus ring lands on a control they can also see.
+ *
+ * `data-reveal` rather than the bare class: the attribute names the CONTRACT
+ * ("this control is revealed on hover or selection"), which is what the
+ * presentation test asserts, so the test and this rule cannot drift apart
+ * without one of them going red. */
+.sb-node__remove[data-reveal="hover-or-selected"] {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sb-space-2);
+  height: var(--sb-space-2);
+  padding: 0;
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  line-height: 1;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 120ms ease-out;
+}
+
+.sb-node__chrome:hover > .sb-node__remove,
+.sb-node__remove:focus-visible,
+.sb-node--selected > .sb-node__chrome > .sb-node__remove {
+  opacity: 1;
+}
+
+.sb-node__remove:hover {
+  border-color: var(--sb-error);
+  background: var(--sb-error-bg);
+  color: var(--sb-error);
 }
 
 .sb-node__raw-config {
