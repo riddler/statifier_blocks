@@ -2913,16 +2913,17 @@ the attr exists to remove is back on every switch but the first.
 
 The alternative that sentence implies - a host remounting the component per
 document - is a real option and a worse one. A remount throws away the undo
-stack, the selection, the drafts and the folds together, where 2A's switch
-decides each of them separately and on its own reason. That separation is the
-reason a switch is not a remount, so it is not something to spend on getting a
-fit back.
+stack, the selection, the drafts and the folds together, where the shell's
+`switch_document/2` (decision 2's amendment, clause 2b) decides each of them
+separately and on its own reason. That separation is the reason a switch is
+not a remount, so it is not something to spend on getting a fit back.
 
 ### Decision
 
 On a change of the open document's **identity** - `Document.id` differs from
-the one the editor holds, which is the test 2A's switch already makes - the
-fit attr is armed exactly as it is armed at mount:
+the one the editor holds, which is the test `switch_document/2` already makes
+(decision 2's amendment, 2b) - the fit attr is armed exactly as it is armed
+at mount:
 
 1. What is armed is the `fit` attr the host passes **in that same update**,
    not the mode the editor happens to be holding. `:manual`, or no attr at
