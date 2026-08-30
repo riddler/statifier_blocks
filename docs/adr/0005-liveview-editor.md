@@ -3447,8 +3447,8 @@ reads.
 
 ## Amendment (2026-08-30): the shell arrangement, a fullscreen surface and a second pane fold
 
-**Status: proposed (2026-08-30), drafted under the operator's campaign-021
-grant and pending the independent direction-agent verdict.** Implements bead
+**Status: accepted (2026-08-30, unqualified direction-agent verdict under the
+operator campaign-021 grant, PR 179).** Implements bead
 `sb-flae`, from campaign-021 rulings R2 and R3. Additive; the 2026-08-29 shell
 arrangement amendment stands exactly as written and no text above this line is
 edited by this section, with one exception it names below: the sentence in
