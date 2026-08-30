@@ -220,6 +220,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `on_change` | no | one-argument function called with each new document |
     | `icon` | no | function component resolving an icon *name* to markup |
     | `expression_component` | no | override for `:expression` fields (sui-bob's seam) |
+    | `invoke_types` | no | the invoke types the host is prepared to answer; suggestions on an `invoke_type` field, never a constraint, and `[]` (the default) means *no list supplied* |
     | `theme` | no | `--sb-*` custom properties for the canvas root |
     | `fit` | no | the fit the editor **opens** in: `:manual` (the default), `:width` or `:active`; the first measurement performs it once, and an unknown value is refused into `:manual` |
     | `fixtures` | no | `%{block_id => [TruthTable.t()]}` the drawer's truth-table tab reads; `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
@@ -266,6 +267,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          on_change: nil,
          icon: nil,
          expression_component: nil,
+         invoke_types: [],
          theme: %{},
          class: nil,
          history_limit: :infinity,
@@ -477,6 +479,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             orphan_findings={@view_model.orphan_findings}
             pending={@pending_fields}
             expression_component={@expression_component}
+            invoke_types={@invoke_types}
             target={@myself}
           />
 

@@ -44,6 +44,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          theme: session["theme"] || %{},
          fit: session["fit"],
          fixtures: session["fixtures"],
+         invoke_types: session["invoke_types"] || [],
          drawer_height: session["drawer_height"],
          header: session["header"],
          icon: session["icon"] && (&host_icon/1),
@@ -65,6 +66,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         fit={@fit}
         icon={@icon}
         fixtures={@fixtures}
+        invoke_types={@invoke_types}
         drawer_height={@drawer_height}
         on_change={notifier(@test_pid)}
         on_drawer_resize={height_notifier(@test_pid)}
@@ -149,7 +151,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     Mounts the editor over a document, connected, and returns the live view.
 
     Options: `:document`, `:palette`, `:findings`, `:datamodel`, `:theme`,
-    `:fit`, `:fixtures`, `:drawer_height`, `:header` and `:icon` - the last three being the
+    `:fit`, `:fixtures`, `:invoke_types`, `:drawer_height`, `:header` and `:icon` - the last three being the
     shell amendment's host seam (8A), a truth-table source, the height the host
     remembered, and markup for the header slot. The
     `:datamodel` default is `nil` - no datamodel supplied - which is what the
@@ -182,6 +184,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "theme" => Keyword.get(opts, :theme, %{}),
         "fit" => Keyword.get(opts, :fit),
         "fixtures" => Keyword.get(opts, :fixtures),
+        "invoke_types" => Keyword.get(opts, :invoke_types, []),
         "drawer_height" => Keyword.get(opts, :drawer_height),
         "header" => Keyword.get(opts, :header),
         "icon" => Keyword.get(opts, :icon),

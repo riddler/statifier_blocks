@@ -69,6 +69,75 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "the invoke_type suggestion list" do
+      @types ["myapp:authorize", "myapp:capture", "myapp:signup"]
+
+      defp invoke_view(conn, opts) do
+        {:ok, view, _html} =
+          mount_editor(conn, [document: EditorFixtures.invoke_step()] ++ opts)
+
+        select(view, "blk_authorize")
+      end
+
+      # Sabotage: dropped `list={@list_id}` from the invoke_type input -> 1
+      # failure, on the binding assertion alone: the datalist can exist and
+      # still be attached to nothing, which is the defect worth catching.
+      test "the host's types render as a datalist the input is bound to", %{conn: conn} do
+        view = invoke_view(conn, invoke_types: @types)
+
+        assert has_element?(
+                 view,
+                 ~s(input[name="config[invoke_type]"][list="sb-field-invoke_type-types"])
+               )
+
+        assert has_element?(view, ~s(datalist#sb-field-invoke_type-types[data-invoke-types="3"]))
+
+        for type <- @types do
+          assert has_element?(
+                   view,
+                   ~s(datalist#sb-field-invoke_type-types option[value="#{type}"])
+                 )
+        end
+      end
+
+      # Sabotage: widened the clause's `[_first | _rest]` to `_any` -> 1
+      # failure here: an empty list rendered an empty `<datalist>`, which is
+      # markup that suggests nothing and only adds an element to trip over.
+      test "no types supplied is a plain input, with no list to bind to", %{conn: conn} do
+        view = invoke_view(conn, [])
+
+        assert has_element?(view, ~s(input[name="config[invoke_type]"]))
+        refute has_element?(view, "datalist")
+        refute has_element?(view, ~s(input[name="config[invoke_type]"][list]))
+      end
+
+      # Sabotage: rendered the types as a `<select>` instead - the control a
+      # constraint would use -> this goes red with "value for select
+      # config[invoke_type] must be one of ...", which is decision 8's whole
+      # point stated by the failure.
+      test "a type that is on no list still reaches the document", %{conn: conn} do
+        view = invoke_view(conn, invoke_types: @types)
+
+        view
+        |> form(~s(#sb-form-blk_authorize), %{
+          "config" => %{"invoke_type" => "myapp:refund"}
+        })
+        |> render_change()
+
+        assert config(latest_document(), "blk_authorize")["invoke_type"] == "myapp:refund",
+               "a datalist suggests; it never constrains (ADR-0004 decision 8)"
+      end
+
+      # Sabotage: dropped `key: "invoke_type"` from the clause head -> 1
+      # failure here: every string field on the block picked up the list.
+      test "the list is keyed on invoke_type alone, not on every string field", %{conn: conn} do
+        view = invoke_view(conn, invoke_types: @types)
+
+        refute has_element?(view, ~s(input[name="config[assign_to]"][list])),
+               "a sibling :string field on the same block carries no suggestion list"
+      end
+    end
+
     describe "the d9 gate" do
       # Sabotage: `Editor.change_config/3` committing on the `:invalid_config`
       # arm - the unparseable duration reaches the document and this goes red.
