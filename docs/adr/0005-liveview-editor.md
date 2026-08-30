@@ -3594,7 +3594,8 @@ about the shell read from two sides.
 
 ## Amendment (2026-08-30): the shell arrangement, the drawer's tab strip is also a host seam
 
-**Status: proposed (2026-08-30), implementing bead `sb-lpdt`, a block-B
+**Status: accepted (2026-08-30, unqualified direction-agent verdict under the
+operator campaign-021 grant, PR 186), implementing bead `sb-lpdt`, a block-B
 constituent of campaign-021.** Additive; the 2026-08-29 shell arrangement
 amendment stands as written and no text above this line is edited by this
 section. What it qualifies, it qualifies by naming a second party rather than
