@@ -2771,7 +2771,7 @@ step, and the stylesheet still scales.
 
 ## Amendment (2026-08-30): decision 10, the summary chip row
 
-**Status: proposed (2026-08-30, drafted under the operator campaign-018 grant, implementing bead `sb-2mxa`).** Additive; decision 10 stands exactly as
+**Status: accepted (2026-08-30, unqualified direction-agent verdict under the operator campaign-018 grant, PR 166).** Drafted 2026-08-30 as a proposed amendment, implementing bead `sb-2mxa`. Additive; decision 10 stands exactly as
 written and no text above this line is edited by this section. It answers the
 question ADR-0002's amendment H deferred to this record by name: "The chip
 *markup* on the card - a `.sb-node__summary` chip row rather than one joined
