@@ -249,6 +249,18 @@ holds to the rule.
    * near-black is not a tint. */
   --sb-block-accent-mix: 24%;
 
+  /* The nesting bands. The package derives these from `--sb-bg` and
+   * `--sb-bg-sunken`, so a theme that restates the four surfaces bands
+   * correctly without saying anything here at all. They are restated anyway,
+   * and that is the point worth showing: the separation this theme wants
+   * between one nesting level and the next is a little wider than the gap
+   * between two of its own surfaces, and these two names are where a host
+   * says so rather than reaching for a rule. Opaque, both of them - two
+   * translucent bands stacked by the nesting they describe accumulate into
+   * "deeper is darker", which is not what a band is for. */
+  --sb-band-even: #1a1f27;
+  --sb-band-odd: #0e1116;
+
   /* Per-type identity. These are ours, not the package's: a name a palette
    * entry points at is defined by whoever writes the theme. The family reads
    * as one, and the type that moves money is pulled out of it. */

@@ -149,6 +149,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     chips because its arms declare an `:expression` field keyed by the arm's
     slot, and a host type that declares the same gets the same.
 
+    ## Depth, and why it is threaded (sb-d7g)
+
+    `data-sb-depth` is this slot's ROOT-RELATIVE nesting depth, and it is the
+    counter the recursion carries down rather than a number looked up. The
+    root block's own slots are `0`, and each `BlockNode` a slot renders is one
+    deeper than the slot that rendered it.
+
+    `Shell.depth/1` does NOT answer this. It is the subtree MAXIMUM the
+    toolbar reports - how deep the document goes - so every slot of one
+    document would get one number from it and the bands would be flat.
+
+    The attribute is the whole of the markup contract: the stylesheet bands on
+    its parity, alternating a ground per nesting level, and there is no class
+    and no wrapper element beside it. Depth `0` is deliberately unbanded, so
+    the canvas keeps its own dotted ground and the first band is the first
+    level of nesting.
+
     ## Recursion
 
     `Slot` renders children via `BlockNode` and `BlockNode` renders slots via
@@ -184,6 +201,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:icon, :any, default: nil)
     attr(:class, :string, default: nil)
 
+    attr(:depth, :integer,
+      default: 0,
+      doc: """
+      This slot's ROOT-RELATIVE nesting depth: the root block's own slots are
+      0, the slots of a block inside one of those are 1, and so on. Stamped as
+      `data-sb-depth` and banded on by the stylesheet (sb-d7g).
+      """
+    )
+
     @doc "One slot: header, findings, and alternating gaps and children."
     def slot(assigns) do
       assigns =
@@ -203,6 +229,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         ]}
         data-slot-name={@slot.name}
         data-parent-id={@parent_id}
+        data-sb-depth={@depth}
         data-declared={to_string(@slot.declared?)}
         data-arity={@slot.arity}
         data-empty={to_string(@slot.children == [])}
@@ -236,6 +263,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           parent_id={@parent_id}
           slot={@slot.name}
           index={index}
+          depth={@depth}
           drag={@drag}
           selected_id={@selected_id}
           armed={@armed}
@@ -258,11 +286,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:armed, :any, default: nil)
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
+    attr(:depth, :integer, default: 0)
 
     defp child(assigns) do
       ~H"""
       <BlockNode.block_node
         node={@node}
+        depth={@depth + 1}
         drag={@drag}
         selected_id={@selected_id}
         armed={@armed}
