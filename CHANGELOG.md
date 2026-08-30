@@ -10,6 +10,93 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.5.0] 2026-08-30
+
+0.5.0 is the release where the editor behaves like the spike it was drawn
+from. It bounds its own height and hands scrolling to the panes; every zoom
+step and both fits scale the canvas for real; an arranged container's lanes
+size to their own content, so connectors stop crossing sibling cards;
+inserting visibly arms the gap the pick will land in, and a palette entry can
+be dragged onto one; an unresolvable block's card is compact again, with its
+findings and stored config moved to the inspector; the core block types
+summarise themselves on a card's second line; nesting depth is banded across
+the canvas; the plain controls render as buttons; and a host's `icon`
+component is rendered as a function component. Hosts: see Changed -
+`.sb-node__raw-config` is now `.sb-inspector__raw-config`, the editor's
+buttons carry a new `sb-button` class, and two band tokens
+(`--sb-band-even`, `--sb-band-odd`) join the tier-2 theming surface.
+
+### Added
+
+- A palette entry can be dragged onto a gap on the canvas to insert a block of
+  that type there. The slots that accept the dragged type highlight as soon as
+  the drag starts, exactly as they do when a card is dragged, and the drop
+  produces the same insert a "+" and a pick produce.
+- `--sb-editor-height` bounds the editor: set it to a length and the panes
+  scroll in their own boxes while the drawer stays pinned at the bottom,
+  instead of the whole document growing the host page. The default is `auto`,
+  so an editor nobody bounds is unchanged.
+- Two theming tokens for the editor's nesting bands, `--sb-band-even` and
+  `--sb-band-odd` (tier 2). Both default to a surface the theme already
+  carries, so a host that restates `--sb-bg` and `--sb-bg-sunken` bands in its
+  own palette without setting either one.
+- Block types may export an optional `summary/1`, returning `nil`, a short
+  string, or a list of chips, which the editor draws as a card's second line
+  when the author has not named the block. It is read through
+  `StatifierBlocks.BlockType.summary/2`, which normalises every shape to a
+  chip list and drops an over-long chip rather than truncating it.
+- `core.parallel`, `core.wait`, `core.on_event`, `core.send` and `core.branch`
+  summarise themselves on the card: lane names, `timer <duration>`, the outcome
+  and the event, the event, and `N arms + otherwise`.
+- `sb-button`, one class carrying the editor's button look, so a host restyling the family changes one selector rather than seven.
+
+### Changed
+
+- The measurement hook's payload carries the canvas panel's usable box under a `viewport` key, read from the element the editor stamps `data-sb-anchor="viewport"`. A host that registers the hooks from the package's default export needs no change; a host that reimplemented the hook against the documented payload should send the new key for the fits to resolve to a number.
+- Every slot on the canvas carries `data-sb-depth`, its root-relative nesting
+  depth, and the stylesheet paints a full-width band per nesting level,
+  alternating by the depth's parity. Depth 0 is deliberately unbanded, so the
+  canvas keeps its own dotted ground.
+- The interrupt-rules rail has a ground of its own, in the warning family its
+  dashed edge already uses.
+- `StatifierBlocks.ViewModel.Node` carries a `summary` field, and
+  `ViewModel.subtitle/1` returns it for a block whose title is its type's. A
+  block the author has named still reads its type's label there.
+- An unresolvable block's card reads its type and one short reason; its
+  findings and its stored config moved to the inspector, so the card is the
+  same width as its siblings.
+- The inspector's Block section shows an unresolvable block's stored config
+  as canonical JSON, wrapping mid-token rather than spilling past the pane.
+- The stored-config `<pre>` moved from the card to the inspector, and its class
+  with it: `.sb-node__raw-config` is now `.sb-inspector__raw-config`. A host
+  styling the old class should restyle the new one.
+
+### Fixed
+
+- A slot that refuses the block being dragged no longer accepts a drop when it
+  sits inside a slot that accepts it. The gaps in the refused slot were live
+  targets, and dropping on one put the block in the slot that had said no.
+- Every zoom step in the editor toolbar now scales the canvas, and the panel scrolls the scaled size rather than the unscaled one.
+- `Fit width` resolves to the largest zoom step at which the chart fits the canvas panel, instead of only recording that the fit was asked for.
+- `Fit active` resolves to the largest zoom step at which the selected block fits, and scrolls that block to the centre of the panel.
+- A host's `icon` component is rendered as a function component rather than
+  applied to a bare map, so it receives a tracked assigns map and may use
+  `Phoenix.Component` helpers such as `assign/3` and `assign_new/3`. A host
+  that worked around the old behavior by adding `__changed__` to the assigns
+  itself no longer needs to; the component must still return a `~H` template,
+  which it always had to.
+- Connector edges no longer cross sibling cards: an arranged container's lanes
+  size to their own content, so a nested arrangement wider than one lane no
+  longer overflows into the lanes beside it (ADR-0005 decision 10b).
+- Clicking a gap's "+" now visibly arms that gap, and the palette says which
+  slot of which block the pick will land in, with a Cancel beside it and
+  `Escape` as the way out.
+- A palette pick made with nothing armed says why it did nothing instead of
+  failing silently.
+- A palette narrowed to the types a slot accepts now looks different from a
+  palette that simply holds that many types.
+- The editor's plain controls - Undo, Redo, Cancel insert, the zoom steps, Fit width, Fit active, and a list field's add/remove - render as buttons rather than as whatever the host's browser paints, with a hover, a muted disabled state and an accented pressed state.
+
 ## [0.4.0] 2026-08-30
 
 ### Added
@@ -854,5 +941,8 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.5.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.5.0
+[0.4.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.4.0
+[0.3.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.3.0
 [0.2.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.2.0
 [0.1.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.1.0
