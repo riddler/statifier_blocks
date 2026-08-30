@@ -313,12 +313,30 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     describe "the drawer (1A, 2A)" do
       # Sabotage: rendering the drawer only when fixtures exist - it becomes
       # open-or-gone, which is the one thing 2A rules out by name.
-      test "is present with no fixtures source at all, reading (0)", %{conn: conn} do
+      test "is present with no fixtures source at all, reading a count of 0",
+           %{conn: conn} do
         {:ok, view, html} = mount_editor(conn)
 
         assert html =~ ~s(data-count="0")
         assert has_element?(view, ~s(.sb-drawer[data-open="false"]))
         assert view |> element(".sb-drawer__strip") |> render() =~ "Truth tables"
+      end
+
+      # Parity item 1.11: the count is a chip, and a chip reading "(0)" is a
+      # chip with punctuation baked into it. The parentheses that used to be
+      # literals in the strip's markup are what the CSS cannot take back out,
+      # so the markup carrying a bare number is the half of the treatment a
+      # stylesheet cannot hold on its own.
+      # Sabotage: putting the parentheses back around `{@view.count}` on the
+      # strip - the chip renders "(0)" and this goes red.
+      test "the strip's count is a bare number, not a parenthesised one",
+           %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        count = view |> element(".sb-drawer__strip .sb-drawer__count") |> render()
+
+        assert count =~ ~r/>\s*0\s*</
+        refute count =~ "("
       end
 
       # Sabotage: putting the selection's count on the strip - a strip reading

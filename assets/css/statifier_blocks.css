@@ -1608,27 +1608,65 @@
   background: var(--sb-bg);
 }
 
-/* 2A: collapsed is a strip carrying a title and a count, never nothing. */
+/* 2A: collapsed is a strip carrying a title and a count, never nothing.
+ *
+ * Parity item 1.11: the strip is a LABEL and a QUANTITY, not a sentence. It
+ * ran as body text reading "Truth tables (1)", which puts the drawer at the
+ * same weight as the content above it and makes the count part of the noun -
+ * a reader parses the parentheses before they parse the number. Small-caps
+ * label plus a chip is how the rest of the shell already writes a quantity
+ * beside a heading, and it is what the spike shipped
+ * (`.sb-drawer__strip-label` / `-count` in spike/css/editor.css).
+ *
+ * `align-items: center` rather than `baseline`: a padded chip has no useful
+ * baseline relationship to a label two type steps away from it. */
 .sb-drawer__strip {
   font: inherit;
   cursor: pointer;
   width: 100%;
   display: flex;
   gap: var(--sb-space-half);
-  align-items: baseline;
+  align-items: center;
   background: none;
   border: none;
-  color: inherit;
+  color: var(--sb-fg-muted);
   padding: var(--sb-space-half) var(--sb-space);
 }
 
+/* The strip is the one control in the row and it has to look like one before
+ * it is hovered as well as after, which is what the colour shift is for. */
+.sb-drawer__strip:hover {
+  background: var(--sb-bg-muted);
+  color: var(--sb-fg);
+}
+
+/* Strip-only: the open drawer's title is the tab's own text. */
 .sb-drawer__title {
-  font-weight: var(--sb-weight-medium);
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
 }
 
 .sb-drawer__count {
   color: var(--sb-fg-subtle);
   font-variant-numeric: tabular-nums;
+}
+
+/* Scoped to the strip: the open drawer's tab still writes its count in
+ * parentheses inline with the tab label, where a chip would read as a second
+ * control to click.
+ *
+ * The chip is on the SUNKEN surface and not the muted one the spike used,
+ * because the hover rule above paints the strip muted: a chip that matches
+ * its own hover background is a chip that disappears exactly when the pointer
+ * is on it. */
+.sb-drawer__strip .sb-drawer__count {
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg-sunken);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
 }
 
 .sb-drawer__bar {
