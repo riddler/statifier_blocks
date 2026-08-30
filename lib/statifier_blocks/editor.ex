@@ -90,6 +90,32 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     the same as an empty set, which is a host declaring that its documents
     address nothing.
 
+    ## Opening at a fit (sb-ehqn)
+
+    A document wider than the canvas opens with its right-hand columns off
+    the edge, and the only remedy the editor had was the author pressing
+    `Fit width` on every document they opened. `fit` is the host's opt-in to
+    having that press made for them: `:manual` (the default) is exactly
+    today's behaviour, and `:width` or `:active` makes the editor open the
+    way it looks after that button.
+
+    It is an *opening* state and not a control, which is the whole of the
+    care in it. The fit needs numbers only the browser has, so it cannot
+    happen at mount; what happens at mount is that the mode is set and a fit
+    is armed, and the **first measurement payload** spends it - the same
+    computation `handle_event("fit", ...)` runs, on the same ladder, against
+    the same measured scroller. It is spent once and never re-armed, which is
+    guarded on having measured at all rather than on the attr's value: a host
+    re-renders for reasons of its own, and an attr that re-fitted on each of
+    them would throw an author back to the fit every time their own header
+    changed. After the first measurement the attr is inert, `zoom -/+` return
+    the canvas to `:manual` as they always have, and the editor is in the
+    state it would have been in had the author pressed the button themselves.
+
+    A host that never imports the measurement hook measures nothing, so the
+    fit is never armed away and never spent: the mode is set, the canvas is
+    at 100%, and that is decision 7's absent-hook test holding here too.
+
     ## What stays the host's
 
     Which palette entries a tenant may use, who may edit or publish a
@@ -179,6 +205,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `icon` | no | function component resolving an icon *name* to markup |
     | `expression_component` | no | override for `:expression` fields (sui-bob's seam) |
     | `theme` | no | `--sb-*` custom properties for the canvas root |
+    | `fit` | no | the fit the editor **opens** in: `:manual` (the default), `:width` or `:active`; the first measurement performs it once, and an unknown value is refused into `:manual` |
     | `fixtures` | no | `%{block_id => [TruthTable.t()]}` the drawer's truth-table tab reads; `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
     | `drawer_height` | no | the drawer's height in rem, remembered **by the host** per viewer (2A); bounded on the way in |
     | `on_drawer_resize` | no | one-argument function called with each new drawer height, which is how the host comes to have one to remember |
@@ -245,6 +272,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          on_drawer_resize: nil,
          zoom: Shell.default_zoom(),
          fit: :manual,
+         fit_pending: nil,
+         measured?: false,
          measurement: %{},
          viewport: nil,
          reveal: nil,
@@ -255,6 +284,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @impl Phoenix.LiveComponent
     def update(assigns, socket) do
       previous = Map.get(socket.assigns, :document)
+
+      # Read before `assign/2` writes the host's raw attr over it: `fit` is
+      # the one assign whose live value is the editor's rather than the
+      # host's, because the author's own zoom moves it. See `arm_fit/3`.
+      held_fit = Map.get(socket.assigns, :fit, :manual)
+
       socket = socket |> assign(assigns) |> switch_document(previous)
 
       # 2A puts the remembered height on the host, so what arrives here is
@@ -264,6 +299,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       socket =
         if Map.has_key?(assigns, :drawer_height) do
           assign(socket, :drawer_height, Shell.clamp_height(assigns.drawer_height))
+        else
+          socket
+        end
+
+      # An opening state, so it is read only until the first measurement has
+      # been taken - see the moduledoc's *opening at a fit*.
+      socket =
+        if Map.has_key?(assigns, :fit) do
+          arm_fit(socket, held_fit, Shell.fit_mode(assigns.fit))
         else
           socket
         end
@@ -455,7 +499,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:noreply,
        socket
        |> assign(:measurement, Connectors.measurement(params))
-       |> assign(:viewport, Shell.viewport(params))}
+       |> assign(:viewport, Shell.viewport(params))
+       |> open_at_fit()
+       |> assign(:measured?, true)}
     end
 
     # ---------------------------------------------------------------- shell
@@ -1152,6 +1198,63 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec fit_zoom(Phoenix.LiveView.Socket.t(), term()) :: pos_integer()
     defp fit_zoom(socket, box) do
       Shell.fit_zoom(box_width(box), box_width(socket.assigns.viewport), socket.assigns.zoom)
+    end
+
+    # The `fit` attr's half of the two fits (sb-ehqn). Arming is refused once
+    # anything has been measured, which is what makes the attr an opening
+    # state rather than a control a host re-render keeps pressing; `:manual`
+    # arms nothing, so a host that names the default changes nothing at all.
+    #
+    # The refusal has to put `held` back rather than simply doing nothing:
+    # `update/3` has already assigned the host's attr over the editor's own
+    # value by the time this runs, so a later re-render would otherwise light
+    # `Fit width` back up on a canvas the author has since zoomed by hand -
+    # the mode saying one thing and the percentage another.
+    @spec arm_fit(Phoenix.LiveView.Socket.t(), Shell.fit_mode(), Shell.fit_mode()) ::
+            Phoenix.LiveView.Socket.t()
+    defp arm_fit(socket, held, mode) do
+      if socket.assigns.measured? do
+        assign(socket, :fit, held)
+      else
+        socket
+        |> assign(:fit, mode)
+        |> assign(:fit_pending, pending_fit(mode))
+      end
+    end
+
+    @spec pending_fit(Shell.fit_mode()) :: :width | :active | nil
+    defp pending_fit(:manual), do: nil
+    defp pending_fit(mode), do: mode
+
+    # The armed fit, spent on the first measurement and cleared whether or not
+    # it moved the canvas: an armed fit that survived its own measurement
+    # would fire on the next one, which is the re-fit the attr must not do.
+    #
+    # `:active` resolves against the selection exactly as the button does, and
+    # a mount has no selection, so opening at `:active` is today's "Fit active
+    # with nothing selected" - the mode, and nothing else. It stamps no
+    # reveal: a scroll the author did not ask for is a gesture, not a state.
+    @spec open_at_fit(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
+    defp open_at_fit(socket) do
+      case socket.assigns.fit_pending do
+        nil ->
+          socket
+
+        mode ->
+          socket
+          |> assign(:fit_pending, nil)
+          |> assign(:zoom, fit_zoom(socket, pending_box(socket, mode)))
+      end
+    end
+
+    @spec pending_box(Phoenix.LiveView.Socket.t(), :width | :active) :: term()
+    defp pending_box(socket, :width), do: Connectors.stage(socket.assigns.measurement)
+
+    defp pending_box(socket, :active) do
+      case socket.assigns.selected_id do
+        nil -> nil
+        id -> Map.get(socket.assigns.measurement, Connectors.card_anchor(id))
+      end
     end
 
     @spec box_width(term()) :: number() | nil

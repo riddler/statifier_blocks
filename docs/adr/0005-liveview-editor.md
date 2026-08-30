@@ -2698,3 +2698,71 @@ No new vocabulary, no new anchor, no change to what is derived. The count in
 `Editor.Findings`' own `data-findings-count` attribute is the same list
 counted at its own call site; folding it into the seam is cosmetic and was
 left alone deliberately, since it is markup this note does not need to move.
+
+---
+
+## Note (2026-08-30): decision 7, the measured `viewport` and the `fit` attr
+
+A dated note rather than an amendment, because decision 7 and its 2026-08-29
+amendment are unchanged in every particular: the editor ships two hooks, the
+second one only measures, and 7a's five clauses hold as written. What this
+records is two things the shipped implementation settled that the record does
+not yet say out loud - one of them a wire choice 7d explicitly left open, the
+other a host attr that spends what the wire now carries.
+
+**The payload carries the scroller's box under a `viewport` key.** 7d left the
+payload shape to the implementation, and `sb-6ai` chose one push per stage
+carrying `stage`, `anchors` and `viewport`. The first two are the connector
+half. The third is the box the stage has to *fit into*: the scroller the stage
+is laid out inside, stamped `data-sb-anchor="viewport"` - a reserved key beside
+the stage's own, for the same reason - and sent beside the anchors rather than
+among them, because it is the one box that must not be unscaled. It lives
+outside the transform, and its usable width is its content box with padding
+removed, since padding is width the tree is never laid out into. Without it
+`Fit width` and `Fit active` were modes with no number behind them, which is
+what shipped first. This is within 7c: it is the geometry of a
+server-stamped anchor and nothing else, it is reconstructible from the
+rendering alone, and no author data crosses with it.
+
+`sb-6ai` also landed the other half of `Fit active`, and it is worth recording
+where it lives: a scroll position is not a document value and no stylesheet
+sets one, so the server stamps the canvas with `data-sb-reveal="<n>:<block
+id>"` and the **drag** hook carries the scroll out once per stamp it has not
+already acted on. That is a command hook doing a command's work on an author's
+press, not the measuring hook acquiring behaviour: `StatifierBlocksMeasure`
+still writes nothing to the DOM and remembers nothing between renders.
+
+**The `fit` attr (`sb-ehqn`, ruling D3).** Opening at 100% leaves a document
+wider than the canvas with its right-hand columns off the edge, and the only
+remedy was the author pressing `Fit width` on every document they opened.
+Ruled: opening at a fit is a **host opt-in**, not a new default. The editor
+takes `fit`, one of `:manual` (the default, today's behaviour), `:width` or
+`:active`; an unknown value is refused into `:manual` by `Shell.fit_mode/1`,
+the way `inspector_tab/1` refuses an unknown tab, so no mode reaches the DOM
+that no rule and no button can leave.
+
+What the attr does is exactly one thing: at mount it sets the mode and arms a
+fit, and the **first measurement payload** spends it, running the same
+computation the toolbar button runs, on the same ladder, against the same
+measured `viewport`. It is spent once. The guard is *having measured*, not the
+attr's value - a host re-renders for reasons of its own, and an attr that
+re-fitted on each of them would throw an author back to the fit every time the
+host's own header changed. After that the attr is inert, `zoom -/+` return the
+canvas to `:manual` as they always have, and the editor is in the state it
+would have been in had the author pressed the button. A host that never
+imports the measurement hook measures nothing, so the fit is never spent: the
+mode is set, the canvas is at 100%, and 7b.3's absent-hook test holds here
+too.
+
+Two consequences worth stating so they are not re-derived. Opening at
+`:active` with nothing selected is today's `Fit active` with nothing selected -
+the mode and nothing else, and no reveal is stamped, because a scroll the
+author did not ask for is a gesture rather than an opening state. And a host
+that swaps the open document into an editor that has already measured does
+**not** get a second fit; the attr opens an editor, and re-opening one is a
+host remounting the component. If that turns out to be the wrong line, it is a
+bead and a note, not a quiet widening.
+
+No new hook, no new command, no new anchor vocabulary, and nothing in decision
+7's contract moves: the client still measures, `Shell` still decides which
+step, and the stylesheet still scales.

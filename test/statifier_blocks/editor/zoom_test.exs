@@ -22,6 +22,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use StatifierBlocks.EditorLiveCase
 
+    alias StatifierBlocks.Shell
+
     @card_id "blk_email_step"
 
     # What the browser would have measured: a tree wider than the scroller it
@@ -181,6 +183,98 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         view |> with_target("#editor") |> render_click("fit", %{"fit" => "active"})
 
         assert has_element?(view, ~s(.sb-editor[data-fit="manual"][data-zoom="100"]))
+        refute render(view) =~ "data-sb-reveal"
+      end
+    end
+
+    describe "the fit a host opens at (sb-ehqn)" do
+      # Sabotage: dropping the `open_at_fit/1` call from the measure handler -
+      # the attr sets the mode, the button lights up, and the canvas stays at
+      # 100%, which is `Fit width` never pressed and the defect 017's capture
+      # finding 2 recorded.
+      test "fit: :width lands on the step the ladder computes for those numbers", %{conn: conn} do
+        {:ok, view, html} = mount_editor(conn, fit: :width)
+
+        # Before the first measurement it is a mode and nothing else, which is
+        # also what a host that never imported the hook has forever.
+        assert html =~ ~s(data-fit="width")
+        assert has_element?(view, ~s(.sb-editor[data-fit="width"][data-zoom="100"]))
+
+        measure(view)
+
+        # The same number the button computes: the 1000-wide stage into the
+        # 800-wide scroller the payload carries.
+        assert Shell.fit_zoom(1000, 800, 100) == 80
+        assert has_element?(view, ~s(.sb-editor[data-fit="width"][data-zoom="80"]))
+      end
+
+      # Sabotage: leaving the armed fit armed - dropping `assign(:fit_pending,
+      # nil)` from `open_at_fit/1` - so every later measurement spends it
+      # again and an author who zooms in is thrown back to the fit by the next
+      # resize or font swap. A measurement is not a gesture, and this is the
+      # difference between opening at a fit and being held in one.
+      test "the fit happens once: a later measurement leaves the author's zoom alone", %{
+        conn: conn
+      } do
+        {:ok, view, _html} = mount_editor(conn, fit: :width)
+        measure(view)
+
+        view |> element(~s(button[phx-click="zoom-in"])) |> render_click()
+        assert has_element?(view, ~s(.sb-editor[data-fit="manual"][data-zoom="90"]))
+
+        measure(view)
+
+        assert has_element?(view, ~s(.sb-editor[data-fit="manual"][data-zoom="90"]))
+      end
+
+      # Sabotage: re-arming whenever the host re-renders with the attr - a
+      # host that re-renders for any reason of its own (a swapped document, a
+      # changed finding list, its own header) resets the author's zoom, and
+      # the attr stops being an *opening* state.
+      test "a host re-render carrying the same attr does not re-fit", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, fit: :width)
+        measure(view)
+
+        view |> element(~s(button[phx-click="zoom-out"])) |> render_click()
+        assert has_element?(view, ~s(.sb-editor[data-fit="manual"][data-zoom="67"]))
+
+        send(view.pid, {:swap_document, EditorFixtures.credit_card()})
+        measure(view)
+
+        assert has_element?(view, ~s(.sb-editor[data-fit="manual"][data-zoom="67"]))
+      end
+
+      # Sabotage: defaulting the pending fit to `:width` instead of to nothing
+      # - every editor in the family opens fitted, which is a change of
+      # behaviour for every host that never asked for one.
+      test "the default is manual, and a measurement moves nothing", %{conn: conn} do
+        for opts <- [[], [fit: :manual]] do
+          {:ok, view, _html} = mount_editor(conn, opts)
+          measure(view)
+
+          assert has_element?(view, ~s(.sb-editor[data-fit="manual"][data-zoom="100"]))
+        end
+      end
+
+      # Sabotage: assigning the raw attr instead of `Shell.fit_mode/1` - the
+      # canvas is stamped `data-fit="cover"`, no stylesheet rule matches it,
+      # and a typo in a host template is a mode the editor cannot leave.
+      test "an unknown fit is refused into manual, not carried into the DOM", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, fit: :cover)
+        measure(view)
+
+        assert has_element?(view, ~s(.sb-editor[data-fit="manual"][data-zoom="100"]))
+        refute render(view) =~ "cover"
+      end
+
+      # Sabotage: resolving `:active` against the stage - opening at `:active`
+      # with nothing selected silently becomes `Fit width`, which is a mode
+      # the host did not ask for.
+      test "fit: :active with nothing selected is a mode and nothing else", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, fit: :active)
+        measure(view)
+
+        assert has_element?(view, ~s(.sb-editor[data-fit="active"][data-zoom="100"]))
         refute render(view) =~ "data-sb-reveal"
       end
     end
