@@ -1,13 +1,31 @@
 if Code.ensure_loaded?(Phoenix.LiveView) do
   defmodule StatifierBlocks.Editor.Findings do
     @moduledoc """
-    The document-level findings panel (ADR-0005 decision 11).
+    The document-level findings list (ADR-0005 decision 11), rendered as the
+    drawer's Findings tab.
 
     Decision 11 makes the anchor the whole routing mechanism, and the three
     inline positions - beneath a field, on a slot header, on a block's chrome
     - are rendered by the components that own those positions. What is left
     for this one is the list view: every finding in the document, in one
     place, where selecting one selects and reveals its anchor.
+
+    ## Why it is a drawer tab
+
+    It shipped as a text block under the canvas, and operator ruling R4
+    (2026-08-29) retired that position: a list of findings is a grid of rows
+    about the whole document, which is exactly 1A's admission test for the
+    drawer, and the canvas is for the document rather than for a report about
+    it. The inspector's Findings tab is unaffected and stays the **selected
+    block's** findings (3A), as do the per-card counts - three positions for
+    three scopes, which is the distinction that stopped being legible while a
+    fourth list sat under the canvas saying "Findings" with no scope on it.
+
+    A row is severity, subject and message, in that order: the severity is
+    what an author scans down, the subject is the block they will click, and
+    the message is the sentence they read once they have found the row they
+    want. The subject carries both the block's label and its id - the label is
+    what they recognise, the id is what they will paste into a bug report.
 
     Two cases are easy to render wrong and are handled explicitly.
 
@@ -36,24 +54,27 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
-    alias StatifierBlocks.{Finding, ViewModel}
+    alias StatifierBlocks.{Finding, Shell, ViewModel}
 
-    attr(:view_model, ViewModel, required: true)
+    attr(:findings, :list, required: true)
+
+    attr(:orphans, :any,
+      required: true,
+      doc: "a `MapSet` of the findings with no block to reveal"
+    )
+
+    attr(:root, ViewModel.Node, required: true)
     attr(:target, :any, required: true)
-    attr(:class, :string, default: nil)
 
     @doc "Every finding in the document, each one reachable from its entry."
     def findings(assigns) do
-      assigns = assign(assigns, :orphans, MapSet.new(assigns.view_model.orphan_findings))
-
       ~H"""
-      <section class={["sb-findings", @class]} data-findings-count={length(@view_model.findings)}>
-        <h2 class="sb-findings__heading">Findings</h2>
-        <p :if={@view_model.findings == []} class="sb-findings__empty">No findings.</p>
+      <div class="sb-findings" data-findings-count={length(@findings)}>
+        <p :if={@findings == []} class="sb-drawer__empty sb-findings__empty">No findings.</p>
         <ul class="sb-findings__list">
           <li
-            :for={finding <- @view_model.findings}
-            class={["sb-finding", severity_class(finding)]}
+            :for={finding <- @findings}
+            class={["sb-finding", "sb-findings__row", Finding.severity_class(finding)]}
             data-source={finding.source}
             data-severity={finding.severity}
             data-anchor={anchor_tag(finding)}
@@ -67,14 +88,46 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               phx-target={@target}
               phx-value-block-id={block_id(finding)}
             >
-              {finding.message}
+              <.row finding={finding} root={@root} />
             </button>
             <span :if={MapSet.member?(@orphans, finding)} class="sb-findings__orphan">
-              {finding.message}
+              <.row finding={finding} root={@root} />
             </span>
           </li>
         </ul>
-      </section>
+      </div>
+      """
+    end
+
+    attr(:finding, Finding, required: true)
+    attr(:root, ViewModel.Node, required: true)
+
+    # An orphan's subject is its id and nothing else: `Shell.label_for/2` falls
+    # back to the id for a block the tree does not hold, and a row reading
+    # "blk_deleted_long_ago blk_deleted_long_ago" spends the subject column on
+    # saying the same thing twice.
+    #
+    # Severity, subject, message. The severity is a word as well as the row's
+    # colour, for the reason `Shell.cell_word/1` records about truth-table
+    # cells: a reader who cannot tell two hues apart gets the same list as
+    # everyone else. The colour itself stays on the row - `.sb-finding` and
+    # its severity modifier, unchanged from when this list sat under the
+    # canvas - so a host restyling one severity still restyles it in one
+    # place.
+    defp row(assigns) do
+      id = block_id(assigns.finding)
+      label = Shell.label_for(assigns.root, id)
+
+      assigns =
+        assigns |> assign(:block_id, id) |> assign(:label, if(label == id, do: nil, else: label))
+
+      ~H"""
+      <span class="sb-findings__severity">{@finding.severity}</span>
+      <span class="sb-findings__subject">
+        <span :if={@label} class="sb-findings__label">{@label}</span>
+        <span class="sb-findings__id">{@block_id}</span>
+      </span>
+      <span class="sb-findings__message">{@finding.message}</span>
       """
     end
 
@@ -87,11 +140,5 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp anchor_tag(%Finding{anchor: {:config, id, key}}), do: "config:#{id}:#{key}"
     defp anchor_tag(%Finding{anchor: {:slot, id, name}}), do: "slot:#{id}:#{name}"
     defp anchor_tag(%Finding{anchor: {:block, id}}), do: "block:#{id}"
-
-    # One place spells the severity modifiers, and it is outside
-    # `StatifierBlocks.Editor.*` so it is asserted with LiveView absent
-    # (ADR-0005 decision 11, amended 2026-08-29 for `:info`).
-    @spec severity_class(Finding.t()) :: String.t()
-    defp severity_class(finding), do: StatifierBlocks.Finding.severity_class(finding)
   end
 end

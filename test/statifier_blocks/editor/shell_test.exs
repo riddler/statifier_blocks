@@ -295,8 +295,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert has_element?(view, ~s(.sb-inspector[data-tab="findings"]))
         assert has_element?(view, ".sb-inspector__empty")
-        # The document-level panel still lists everything, beside the canvas.
-        assert has_element?(view, ".sb-editor__main > .sb-findings")
+
+        # The document's own list is in the drawer since R4, and never under
+        # the canvas: two lists in one column, one of them unlabelled as to
+        # scope, is the conflation 3A ends.
+        refute has_element?(view, ".sb-editor__main .sb-findings")
+        view |> element(".sb-drawer__strip") |> render_click()
+        view |> element(~s(.sb-drawer__tab[phx-value-tab="findings"])) |> render_click()
+        assert has_element?(view, ".sb-drawer__panel .sb-findings")
       end
 
       # Sabotage: passing the raw param through instead of normalizing it - a
@@ -315,11 +321,97 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # open-or-gone, which is the one thing 2A rules out by name.
       test "is present with no fixtures source at all, reading a count of 0",
            %{conn: conn} do
-        {:ok, view, html} = mount_editor(conn)
+        # A document with nothing wrong with it, so the strip has no findings
+        # to resolve to and reports the tab this test is about.
+        {:ok, view, html} = mount_editor(conn, document: unremarkable_document())
 
         assert html =~ ~s(data-count="0")
         assert has_element?(view, ~s(.sb-drawer[data-open="false"]))
         assert view |> element(".sb-drawer__strip") |> render() =~ "Truth tables"
+      end
+
+      # R4 put a second tab in the drawer, so the strip has to say WHICH tab it
+      # is counting. Resolution, and not a fixed default: a strip reading
+      # "Truth tables 0" on a document with findings in it hides the only thing
+      # the drawer is holding, which is the state 2A built the strip to avoid.
+      #
+      # Sabotage: `Shell.drawer_view/1`'s `resolve_tab/2` returning `:tables`
+      # for an unchosen tab instead of the first non-empty one - the strip
+      # reads "Truth tables 0" and this goes red.
+      test "an unchosen strip resolves to the tab that holds something", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        assert has_element?(view, ~s(.sb-drawer[data-open="false"][data-tab="findings"]))
+        assert view |> element(".sb-drawer__strip") |> render() =~ "Findings"
+      end
+
+      # The resolution is an order, not a ranking: whichever tab comes first in
+      # `Shell.drawer_tabs/0` and is not empty wins, however much the other one
+      # holds. A strip that reordered itself by volume would move under an
+      # author as they edited.
+      #
+      # Sabotage: `resolve_tab/2` preferring the fullest tab rather than the
+      # first non-empty one - four findings outnumber the one table and the
+      # strip flips to Findings (verified).
+      test "the first non-empty tab wins, however full the other is", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn,
+            findings: [
+              Finding.new({:block, "blk_variant"}, :lint, "one", severity: :warning),
+              Finding.new({:slot, "blk_wizard", "body"}, :arity, "two"),
+              Finding.new({:config, "blk_email_step", "duration"}, :config, "three")
+            ],
+            fixtures: EditorFixtures.credit_card_tables()
+          )
+
+        # One table against four findings - the three supplied plus the one the
+        # wizard's unresolvable block derives.
+        assert has_element?(view, ~s(.sb-drawer[data-tab="tables"][data-count="1"]))
+      end
+
+      # Sabotage: `handle_event("drawer-tab", ...)` left as the no-op it was
+      # before R4 - the click changes nothing and the panel stays on tables.
+      test "picking a tab switches the panel and the aria wiring", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: unremarkable_document())
+
+        view |> element(".sb-drawer__strip") |> render_click()
+
+        assert has_element?(
+                 view,
+                 ~s(#sb-drawer-panel-tables[aria-labelledby="sb-drawer-tab-tables"])
+               )
+
+        view |> element(~s(.sb-drawer__tab[phx-value-tab="findings"])) |> render_click()
+
+        assert has_element?(view, ~s(.sb-drawer[data-tab="findings"]))
+
+        assert has_element?(
+                 view,
+                 ~s(#sb-drawer-panel-findings[aria-labelledby="sb-drawer-tab-findings"])
+               )
+
+        assert has_element?(view, ~s(#sb-drawer-tab-findings[aria-selected="true"]))
+        assert has_element?(view, ~s(#sb-drawer-tab-tables[aria-selected="false"]))
+      end
+
+      # Sabotage: passing the raw param through instead of normalizing it - a
+      # crafted value reaches the template as an unknown panel id.
+      test "an unknown drawer tab falls back to the first one", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        view |> with_target("#editor") |> render_click("drawer-tab", %{"tab" => "fixtures"})
+
+        assert has_element?(view, ~s(.sb-drawer[data-tab="tables"]))
+      end
+
+      # Sabotage: `resolve_tab/2` re-resolving a chosen tab - the author's pick
+      # of an empty tab is overruled by the other one and this goes red.
+      test "a chosen tab stands even when it is empty", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        view |> with_target("#editor") |> render_click("drawer-tab", %{"tab" => "tables"})
+
+        assert has_element?(view, ~s(.sb-drawer[data-tab="tables"][data-count="0"]))
       end
 
       # Parity item 1.11: the count is a chip, and a chip reading "(0)" is a
@@ -331,7 +423,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # strip - the chip renders "(0)" and this goes red.
       test "the strip's count is a bare number, not a parenthesised one",
            %{conn: conn} do
-        {:ok, view, _html} = mount_editor(conn)
+        {:ok, view, _html} = mount_editor(conn, document: unremarkable_document())
 
         count = view |> element(".sb-drawer__strip .sb-drawer__count") |> render()
 
@@ -486,6 +578,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert has_element?(view, ~s(.sb-drawer[data-open="false"]))
         refute has_element?(view, ".sb-node--selected")
       end
+    end
+
+    # A one-block document the palette resolves, so nothing derives a finding
+    # from it. The signup wizard cannot serve here: its unresolvable block
+    # always derives a `:resolution` finding, which is decision 12 working.
+    defp unremarkable_document do
+      Document.new(EditorFixtures.wait("blk_only", "PT1H"), id: "doc_one_step")
     end
   end
 end

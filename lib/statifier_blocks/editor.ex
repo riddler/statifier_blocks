@@ -132,7 +132,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Canvas,
       ConfigForm,
       Drawer,
-      Findings,
       Inspector,
       PaletteBrowser,
       Toolbar
@@ -166,6 +165,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          fixtures: nil,
          inspector_tab: :config,
          drawer_open: false,
+         drawer_tab: nil,
          drawer_height: Shell.clamp_height(nil),
          on_drawer_resize: nil,
          zoom: Shell.default_zoom(),
@@ -279,8 +279,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               edges={@edges}
               stage={@stage}
             />
-
-            <Findings.findings view_model={@view_model} target={@myself} />
           </div>
 
           <Inspector.inspector
@@ -365,10 +363,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     def handle_event("drawer-close", _params, socket),
       do: {:noreply, assign(socket, :drawer_open, false)}
 
-    # One tab today. The event exists because 1A reserves the other two places
-    # (fixture runs, the datamodel view) and a tab strip that grows a handler
-    # later is a different change from one that grows a tab.
-    def handle_event("drawer-tab", _params, socket), do: {:noreply, socket}
+    # Two tabs since R4, and the pick is remembered as `nil` until it is made:
+    # `Shell.drawer_view/1` resolves an unchosen tab to whichever one actually
+    # holds something, and a pick that lands here stops it resolving. The
+    # remaining reserved places (fixture runs, the datamodel view) arrive as
+    # entries in `Shell.drawer_tabs/0` and need no second handler.
+    def handle_event("drawer-tab", %{"tab" => tab}, socket),
+      do: {:noreply, assign(socket, :drawer_tab, Shell.drawer_tab(tab))}
 
     # 2A's resize, in one round trip. The height is bounded here and handed to
     # the host, which is where a per-viewer preference belongs: the package has
@@ -644,6 +645,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       else
         assign(socket,
           drawer_open: false,
+          drawer_tab: nil,
           selected_id: nil,
           drafts: %{},
           palette_position: nil,
@@ -657,7 +659,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp drawer_view(assigns) do
       Shell.drawer_view(%{
         open?: assigns.drawer_open,
+        tab: assigns.drawer_tab,
         fixtures: assigns.fixtures,
+        findings: assigns.view_model.findings,
+        orphan_findings: assigns.view_model.orphan_findings,
         selected_id: assigns.selected_id
       })
     end

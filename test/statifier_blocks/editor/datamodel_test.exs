@@ -40,13 +40,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       mount_editor(conn, Keyword.put(opts, :document, document()))
     end
 
+    # The document-level list is the drawer's Findings tab since operator
+    # ruling R4 (2026-08-29), so reaching it is two clicks rather than a look
+    # at the mounted markup.
+    defp open_findings(view) do
+      view |> element(".sb-drawer__strip") |> render_click()
+      view |> element(~s(.sb-drawer__tab[phx-value-tab="findings"])) |> render_click()
+    end
+
     describe "with a datamodel supplied" do
       # sabotage: `Editor.rebuild/1` passing `findings` instead of
       # `findings ++ advisories` to `ViewModel.build/3` - the advisory never
       # reaches the view model, the count stays 0 and this goes red
       # (verified).
-      test "an undeclared path is listed in the findings panel", %{conn: conn} do
-        {:ok, view, html} = mount_wizard(conn, datamodel: @declared)
+      test "an undeclared path is listed in the findings tab", %{conn: conn} do
+        {:ok, view, _html} = mount_wizard(conn, datamodel: @declared)
+        html = open_findings(view)
 
         assert html =~ ~s(data-findings-count="1")
 
@@ -63,6 +72,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # (verified).
       test "it renders at :info severity, from the :lint source", %{conn: conn} do
         {:ok, view, _html} = mount_wizard(conn, datamodel: @declared)
+        open_findings(view)
 
         assert has_element?(
                  view,
@@ -92,7 +102,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # test catches the misrouting, which is why the declared case is
       # asserted from the rendered side too (verified).
       test "a declared path renders nothing", %{conn: conn} do
-        {:ok, _view, html} = mount_wizard(conn, datamodel: ["signup.variant"])
+        {:ok, view, _html} = mount_wizard(conn, datamodel: ["signup.variant"])
+        html = open_findings(view)
 
         assert html =~ ~s(data-findings-count="0")
         refute html =~ "not declared in the datamodel"
@@ -104,8 +115,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # `undeclared_findings/3` with an empty set - the document the host
       # said nothing about fills with advisories, the count goes to 1 and
       # this goes red (verified).
-      test "the pane says there are no findings at all", %{conn: conn} do
-        {:ok, view, html} = mount_wizard(conn, [])
+      test "the tab says there are no findings at all", %{conn: conn} do
+        {:ok, view, _html} = mount_wizard(conn, [])
+        html = open_findings(view)
 
         assert html =~ ~s(data-findings-count="0")
         assert has_element?(view, ".sb-findings__empty", "No findings.")
