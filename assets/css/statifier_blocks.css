@@ -2691,9 +2691,12 @@
  * chrome, font and centring are all wrong for a list entry, so they come off
  * and what is left is the message plus a pointer. The span the unanchored
  * group renders instead takes the same rule, so the two groups' rows sit on
- * one baseline grid rather than a button-shaped one and a text-shaped one. */
+ * one baseline grid rather than a button-shaped one and a text-shaped one.
+ *
+ * The layout is `.sb-findings__cells`', which every row here also carries -
+ * this rule un-buttons the element and that one arranges the cells inside it,
+ * so a row in this panel and a row in the drawer are laid out by one rule. */
 .sb-inspector__group-row {
-  display: block;
   width: 100%;
   margin: 0;
   padding: 0;
@@ -2921,13 +2924,87 @@ button.sb-inspector__group-row:hover {
   padding: var(--sb-space-half);
 }
 
-.sb-findings__reveal,
-.sb-findings__orphan {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
+/* The row's cells, on every surface that renders `Findings.row/1`: the
+ * drawer's reveal button and orphan span, the inspector's group rows and its
+ * selected-block rows. One rule, because one component renders all four
+ * (campaign-019 D4) and a second rule is how they drifted apart the first
+ * time.
+ *
+ * Flex rather than the grid this was: the anchor tail is absent for a
+ * `{:block, id}` finding, so a fixed column count would leave a hole in every
+ * block-anchored row, and the columns cannot align across surfaces anyway -
+ * the drawer's rows carry a subject and the inspector's do not. What is worth
+ * keeping is the baseline, so the uppercase severity, the mono id and the
+ * sentence sit on one line rather than on three. The message takes the slack;
+ * everything before it is its own width. */
+.sb-findings__cells {
+  display: flex;
   align-items: baseline;
   gap: var(--sb-space);
   width: 100%;
+  min-width: 0;
+}
+
+.sb-findings__reveal,
+.sb-findings__orphan {
+  width: 100%;
+}
+
+/* Which part of the block the finding is about - `config.duration`,
+ * `slot:body` - and nothing at all when the anchor is the block itself, whose
+ * tail would only repeat the subject. Mono and quiet, the same pairing the id
+ * uses, because it is a key or a slot name from the document and an author
+ * matches it character for character. */
+.sb-findings__anchor {
+  color: var(--sb-fg-subtle);
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+  white-space: nowrap;
+}
+
+/* Who says so. A chip rather than a word in the sentence, because it is an
+ * enum value and not prose, and the reader who cares about it is scanning for
+ * it rather than reading it. It carries no severity colour: the row already
+ * has one, and a second coloured thing on the row would compete with it. */
+.sb-findings__source {
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  padding: 0 var(--sb-space-half);
+  white-space: nowrap;
+}
+
+/* The pill row above a findings list (campaign-019 D2/D3): how many at each
+ * severity, in the enum's own words, most urgent first. It is a summary and
+ * not a filter - nothing here is clickable and the list below is unfiltered -
+ * so it is a list of readings rather than a row of controls. A severity with
+ * nothing at it has no pill (`Shell.severity_counts/1`), which is what keeps
+ * the row's width equal to what the document actually holds. */
+.sb-findings__pills {
+  list-style: none;
+  margin: 0 0 var(--sb-space);
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sb-space-half);
+}
+
+.sb-findings__pill {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space-half);
+}
+
+.sb-findings__pill-count {
+  font-weight: var(--sb-weight-strong);
+}
+
+.sb-findings__pill-label {
+  font-size: var(--sb-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
 }
 
 /* The word as well as the colour, on the reasoning `Shell.cell_word/1`

@@ -264,6 +264,64 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # sb-1g4q / campaign-019 D4. Both of this pane's findings panels rendered
+    # the bare message, so the same finding said less here than in the drawer
+    # and an author had to go and look it up somewhere else. They render
+    # `Findings.row/1` now - the one renderer, minus the subject column, whose
+    # job the group heading and the pane header already do.
+    describe "the selected block's findings carry the row anatomy (D4)" do
+      defp block_row_html do
+        findings = [
+          Finding.new({:config, "blk_email_step", "duration"}, :config, "far too long a wait")
+        ]
+
+        inspector_html(node: node_for("blk_email_step", findings), tab: :findings)
+      end
+
+      # One cell's text, with the markup and the formatter's indentation taken
+      # off, on the same reasoning `meta_value/2` above is written that way.
+      defp cell(html, class) do
+        [_whole, text] =
+          Regex.run(~r{<span class="sb-findings__#{class}">(.*?)</span>}s, html)
+
+        String.trim(text)
+      end
+
+      # Sabotage: `findings_panel/1` going back to `{finding.message}` in place
+      # of the `<Findings.row>` call - the message survives and every other
+      # assertion goes red, which is the whole defect D4 names (verified).
+      test "a row is severity, anchor tail, source and message" do
+        html = block_row_html()
+
+        assert cell(html, "severity") == "error"
+        assert cell(html, "anchor") == "config.duration"
+        assert cell(html, "source") == "config"
+        assert cell(html, "message") == "far too long a wait"
+      end
+
+      # The pane's header already names the block, so a subject column here
+      # would repeat it on every line - the reason `row/1` takes `subject` as
+      # an attr rather than always rendering one.
+      # Sabotage: passing `subject` from `findings_panel/1` - the id column
+      # comes back under a header that already says it and this goes red.
+      test "and no subject, because the pane's header is the subject" do
+        refute block_row_html() =~ "sb-findings__subject"
+      end
+
+      # The row is addressable here the way it is in the drawer: one anchor
+      # names one row, whichever surface it is on.
+      # Sabotage: dropping the `data-anchor` stamp from `findings_panel/1`'s
+      # `li` - this goes red and the row loses the only handle a host's
+      # stylesheet or a test has on it.
+      test "and is stamped with its anchor, its source and its severity" do
+        html = block_row_html()
+
+        assert html =~ ~s(data-anchor="config:blk_email_step:duration")
+        assert html =~ ~s(data-source="config")
+        assert html =~ ~s(data-severity="error")
+      end
+    end
+
     # sb-dbqq. The grouping itself is `StatifierBlocks.ShellTest`'s and runs
     # headless; what is asserted here is the half that only exists once there
     # is markup - that the chip reads the document with nothing selected, that
@@ -363,6 +421,69 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> render_click()
 
         assert has_element?(view, ~s([data-block-id="blk_variant"].sb-node--selected))
+      end
+
+      # D4 again, on the surface that had the least: a group row was the bare
+      # message, so the panel that lists a whole document's findings said less
+      # about each one than the drawer listing the same findings.
+      # Sabotage: `document_findings_panel/1` going back to `{finding.message}`
+      # inside the button - the message survives and the other three go red
+      # (verified).
+      test "a group row carries the row anatomy, minus the subject the heading is" do
+        html = unselected_html(document_findings())
+
+        [_before, row] = String.split(html, ~s(data-anchor="slot:blk_wizard:body"), parts: 2)
+
+        assert cell(row, "severity") == "error"
+        assert cell(row, "anchor") == "slot:body"
+        assert cell(row, "source") == "assignability"
+        assert cell(row, "message") == "this slot wants a step"
+
+        # The heading is the block, so the row does not repeat it.
+        refute html =~ "sb-findings__subject"
+      end
+
+      # D2/D3: the pills above the groups, in the enum's words, on the same
+      # list the groups cut up. Three supplied plus the fixture's derived
+      # `:resolution` finding is four, of which the `:lint` one is the warning.
+      # Sabotage: `document_counted/1` returning `[]` for the nil clause - the
+      # pill row disappears while the chip above it still reads 4, which is
+      # the two-numbers defect in a new place, and every assertion goes red.
+      test "a pill row above the groups says how many at each severity" do
+        html = unselected_html(document_findings())
+
+        assert html =~ "sb-findings__pills"
+
+        assert Regex.match?(
+                 ~r{sb-findings__pills.*?data-severity="error".*?pill-count">\s*3\s*<}s,
+                 html
+               )
+
+        assert Regex.match?(
+                 ~r{data-severity="warning".*?pill-count">\s*1\s*<}s,
+                 html
+               )
+
+        {pills, _len} = :binary.match(html, "sb-findings__pills")
+        {groups, _len} = :binary.match(html, "sb-inspector__groups")
+        assert pills < groups
+      end
+
+      # The pill takes its colour from the row family, so a host that restyled
+      # one severity restyled its pill too. The class is spelled by
+      # interpolation in `severity_pills/1` rather than by calling
+      # `Finding.severity_class/1`, which takes a finding and a pill has none -
+      # so what keeps the two spellings equal is this assertion.
+      # Sabotage: `severity_pills/1` emitting `"sb-pill--#{pill.severity}"` -
+      # the pill stops inheriting the severity's colour and this goes red.
+      test "a pill's class is the one Finding.severity_class/1 spells" do
+        html = unselected_html(document_findings())
+
+        warning =
+          Finding.severity_class(Finding.new({:block, "blk_x"}, :lint, "x", severity: :warning))
+
+        assert Regex.match?(~r{class="[^"]*#{warning}[^"]*sb-findings__pill\b}, html) or
+                 Regex.match?(~r{class="[^"]*sb-findings__pill\b[^"]*#{warning}}, html)
       end
     end
   end

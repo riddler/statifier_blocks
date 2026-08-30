@@ -126,7 +126,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
-    alias StatifierBlocks.Editor.ConfigForm
+    alias StatifierBlocks.Editor.{ConfigForm, Findings}
     alias StatifierBlocks.{Finding, Shell, ViewModel}
 
     attr(:tab, :atom, required: true)
@@ -166,6 +166,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:findings, findings)
         |> assign(:tab_count, tab_count(assigns.node, findings, assigns.document_findings))
         |> assign(:groups, document_groups(assigns))
+        |> assign(:counts, Shell.severity_counts(document_counted(assigns)))
         |> assign(:conditions, Shell.condition_fields(assigns.node && assigns.node.form))
 
       ~H"""
@@ -232,6 +233,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <.document_findings_panel
             :if={@node == nil and @tab == :findings}
             groups={@groups}
+            counts={@counts}
             target={@target}
           />
           <.condition_panel
@@ -313,30 +315,36 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     attr(:findings, :list, required: true)
 
+    # The selected block's findings. A row is `Findings.row/1`'s anatomy with
+    # no subject: the block is the pane's own subject, named in the header
+    # above, so a subject column here would repeat it on every line.
     defp findings_panel(assigns) do
       ~H"""
       <p :if={@findings == []} class="sb-inspector__empty">No findings on this block.</p>
       <ul :if={@findings != []} class="sb-inspector__findings">
         <li
           :for={finding <- @findings}
-          class={["sb-finding", Finding.severity_class(finding)]}
+          class={["sb-finding", "sb-findings__cells", Finding.severity_class(finding)]}
           data-source={finding.source}
           data-severity={finding.severity}
+          data-anchor={Findings.anchor_tag(finding)}
         >
-          {finding.message}
+          <Findings.row finding={finding} />
         </li>
       </ul>
       """
     end
 
     attr(:groups, :list, required: true)
+    attr(:counts, :list, required: true)
     attr(:target, :any, required: true)
 
-    # The unselected tab's panel. A group heading names the block, a row is its
-    # message, and a row is a button because the way out of a document-level
-    # list is selecting the thing the row is about - the same `select` event
-    # the canvas and the drawer's list push, so there is one way a block gets
-    # selected however an author arrives at it.
+    # The unselected tab's panel. A pill row says how much is wrong, a group
+    # heading names the block, a row is `Findings.row/1` without its subject
+    # (the heading is the subject), and a row is a button because the way out
+    # of a document-level list is selecting the thing the row is about - the
+    # same `select` event the canvas and the drawer's list push, so there is
+    # one way a block gets selected however an author arrives at it.
     #
     # The unanchored group's rows are spans: its findings name block ids the
     # document does not hold, so there is nothing to select and a button that
@@ -345,6 +353,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp document_findings_panel(assigns) do
       ~H"""
       <p :if={@groups == []} class="sb-inspector__empty">No findings in this document.</p>
+      <Findings.severity_pills counts={@counts} />
       <div :if={@groups != []} class="sb-inspector__groups">
         <section
           :for={group <- @groups}
@@ -359,19 +368,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               class={["sb-finding", Finding.severity_class(finding)]}
               data-source={finding.source}
               data-severity={finding.severity}
+              data-anchor={Findings.anchor_tag(finding)}
             >
               <button
                 :if={group.block_id != nil}
                 type="button"
-                class="sb-inspector__group-row"
+                class="sb-inspector__group-row sb-findings__cells"
                 phx-click="select"
                 phx-target={@target}
                 phx-value-block-id={group.block_id}
               >
-                {finding.message}
+                <Findings.row finding={finding} />
               </button>
-              <span :if={group.block_id == nil} class="sb-inspector__group-row">
-                {finding.message}
+              <span
+                :if={group.block_id == nil}
+                class="sb-inspector__group-row sb-findings__cells"
+              >
+                <Findings.row finding={finding} />
               </span>
             </li>
           </ul>
@@ -427,6 +440,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       do: Shell.findings_groups(assigns.root, assigns.document_findings, assigns.orphan_findings)
 
     defp document_groups(_selected), do: []
+
+    # The pills are the document's, on the same rule the chip above them
+    # follows: with a block selected this panel is not rendered, so there is
+    # nothing to count. It reads the same list `findings_groups/3` cuts up,
+    # which is what keeps the pills summing to the groups beneath them.
+    @spec document_counted(map()) :: [Finding.t()]
+    defp document_counted(%{node: nil} = assigns), do: assigns.document_findings
+    defp document_counted(_selected), do: []
 
     # The header's subject, in the vocabulary the palette and the canvas use.
     # `entry.label` is decision 10's default-applied label, so it is a string
