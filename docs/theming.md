@@ -63,8 +63,9 @@ this?". Every token in the stylesheet's header comment carries its tier.
 2. **The treatments.** One specific mark - the drop affordance, the drag seam,
    the focus ring, a canvas metric, the canvas's dotted ground
    (`--sb-canvas-grid`, which carries the whole `background` shorthand so its
-   colour and its spacing move together), the shaping of a per-type accent -
-   that you can disagree with without overriding a rule.
+   colour and its spacing move together), the editor's own height
+   (`--sb-editor-height`, below), the shaping of a per-type accent - that you
+   can disagree with without overriding a rule.
 3. **`--sb-color-scheme`.** Its own tier, because it is not a value this
    package paints with. See below.
 
@@ -86,6 +87,37 @@ So every theme states it, `light` or `dark`. The package reads it as
 `color-scheme: var(--sb-color-scheme)` on `.sb-editor` and nowhere else -
 telling the host page which scheme it is in would be the editor reaching
 outside its own box, which is the one thing decision 14 says it does not do.
+
+## Bounding the editor's height
+
+By default the editor is as tall as the document in it and your page scrolls.
+That is the right default for a page whose only content is the editor, and the
+wrong one for an application shell: on a long document the drawer - the
+findings and truth-table strip along the bottom - ends up below the fold, and
+an author scrolls the whole page to reach it.
+
+Set `--sb-editor-height` to a length and the editor scrolls as a pane instead.
+The canvas takes the slack, the canvas panel scrolls inside it, and the drawer
+stays pinned at the bottom of the editor:
+
+```text
+.myapp-page .sb-editor { --sb-editor-height: calc(100vh - 4rem); }
+```
+
+Any length works - `40rem`, or `100%` inside a box your own layout has already
+sized. The default is `auto`, so a host that never sets it sees exactly the
+arrangement it has today. In the bounded mode each pane scrolls in its own box
+rather than spilling down the page: the canvas, the palette and the inspector
+all get their own scrollbar when their content is taller than the editor.
+
+This is one of the tokens that has to be a token, and it is the clearest case
+of the rule at the top of this page. Writing `height` on `.sb-editor` yourself
+is the structural declaration the bargain rules out, and it does not work
+anyway: it bounds the editor's outer box and stops there, while the grid one
+level in is still as tall as the document and simply overflows you. Setting the
+token does both halves - the editor takes the height, and the grid inside it is
+allowed to be shorter than the tree it holds, which is what hands the scrolling
+to the panes.
 
 ## Per-block-type accents
 

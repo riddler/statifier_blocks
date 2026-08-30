@@ -712,6 +712,123 @@ defmodule StatifierBlocks.ThemeAuditTest do
     end
   end
 
+  describe "the bounded-height token (sb-ceb)" do
+    # 14e in both directions and 14c's tier line, named rather than merely
+    # counted, exactly as the shell, connector and canvas-grid tokens are.
+    # Sabotage: deleting `height: var(--sb-editor-height)` from `.sb-editor` -
+    # the token stops reaching anything, a host sets it and nothing moves, and
+    # this goes red naming it.
+    test "it is declared, read, and tier 2", context do
+      assert MapSet.member?(context.declared, "--sb-editor-height")
+      assert MapSet.member?(context.referenced, "--sb-editor-height")
+      assert tiers(context.raw)["--sb-editor-height"] == "2"
+    end
+
+    # Two elements, one bound. The token is read on the editor ROOT, so it is
+    # the whole component's height and a host's `calc(100vh - <chrome>)` means
+    # what a host thinks it means, with the header slot inside the bound. The
+    # GRID is then what yields: `flex` hands it the rest of that height and
+    # `min-height: 0` is what lets it be shorter than its content. Neither half
+    # is optional - a bounded root over a grid that will not shrink is exactly
+    # the "it overflows instead of scrolling" the bead describes.
+    #
+    # `[;{]` in front of the property is not decoration: without it the pattern
+    # also matches a `min-height`, which is a different declaration with a
+    # different failure mode.
+    # Sabotage: deleting `min-height: 0` from `.sb-editor__layout` - the root is
+    # still bounded, the grid grows back to the height of the tree inside it,
+    # and this goes red on the half that was doing the work.
+    test "the root reads it and the layout grid is what yields", %{source: source} do
+      assert source =~ ~r/\.sb-editor\s*\{[^}]*[;{]\s*height:\s*var\(--sb-editor-height\)/,
+             "the token is the editor's own height"
+
+      # The first match is the base rule; the rest are the 7A arrangements,
+      # which restate columns and rows and nothing about the bound.
+      assert [[_all, layout] | _] = Regex.scan(~r/\.sb-editor__layout\s*\{([^}]*)\}/, source)
+
+      assert layout =~ ~r/flex:\s*1/, "the grid takes the rest of the editor"
+      assert layout =~ ~r/min-height:\s*0/, "and is allowed to be shorter than its content"
+    end
+
+    # The default is the whole of "hosts that do not set it see no change": an
+    # `auto` height is the height the shell has always had, and every other
+    # declaration in this mode resolves to nothing on top of it.
+    # Sabotage: shipping `100vh` as the default - every host that never asked
+    # for a bounded editor gets one, which is a silent regression in their page
+    # rather than in this package.
+    test "its default is intrinsic, so an unset host is unchanged", %{values: values} do
+      assert values["--sb-editor-height"] == "auto"
+    end
+
+    # The clamp and the release, together: `max-height` alone is defeated by a
+    # grid item's content-based automatic minimum size, so the pair is the
+    # mechanism and either one alone is a rule that looks right and does
+    # nothing. The `overflow` is the third part and it is a separate rule
+    # because it is a separate claim - a pane may be clamped everywhere, but it
+    # may only become a scroll container where the palette is a column rather
+    # than a sheet hanging out of its own box.
+    # Sabotage: dropping `min-height: 0` - the panes grow past the row they were
+    # clamped to, the overflow lands on the host page again, and this goes red
+    # where the screenshot of a short document would not.
+    test "the grid's children are clamped, allowed to shrink, and scroll",
+         %{source: source} do
+      assert [[_all, clamp], [_all2, scroll]] =
+               Regex.scan(~r/\.sb-editor__layout\s*>\s*\*\s*\{([^}]*)\}/, source)
+
+      assert clamp =~ ~r/min-height:\s*0/
+      assert clamp =~ ~r/max-height:\s*100%/
+      assert scroll =~ ~r/overflow:\s*auto/
+
+      assert source =~
+               ~r/@container sb-editor \(width >= 780px\)\s*\{\s*\.sb-editor__layout\s*>\s*\*/,
+             "below 780 the palette body is an absolutely positioned sheet, which a scroll container clips"
+    end
+
+    # Where the scrolling actually ends up. The panel already had `overflow`;
+    # what it did not have was permission to be shorter than its content, which
+    # is what makes an `overflow` scroll rather than merely be declared.
+    # Sabotage: deleting `min-height: 0` from `.sb-canvas-panel` - the flex item
+    # refuses to shrink, the canvas pushes the drawer down again, and this goes
+    # red naming the panel.
+    test "the canvas panel may shrink below its content, which is what scrolls it",
+         %{source: source} do
+      assert [[_all, body]] = Regex.scan(~r/\.sb-canvas-panel\s*\{([^}]*)\}/, source)
+
+      assert body =~ ~r/min-height:\s*0/
+      assert body =~ ~r/overflow:\s*auto/
+    end
+
+    # 7A and the bounded mode have to agree. Three of the five breakpoints move
+    # the canvas to a different row, and a row order restated without saying
+    # which row takes the slack hands it to whatever is first - silently, since
+    # an `fr` row and an `auto` row size identically while the height is
+    # `auto`. So the rule is structural: an arrangement that names areas names
+    # rows.
+    # Sabotage: deleting `grid-template-rows` from the `width < 640px` block -
+    # every default-mode capture is unchanged and this goes red naming the
+    # arrangement that would have put the slack under the canvas.
+    test "every arrangement that restates the areas restates the rows", %{source: source} do
+      bodies =
+        ~r/\.sb-editor__layout[^{]*\{([^}]*)\}/
+        |> Regex.scan(source)
+        |> Enum.map(fn [_all, body] -> body end)
+
+      arrangements = Enum.filter(bodies, &(&1 =~ "grid-template-areas"))
+
+      assert length(arrangements) == 4,
+             "1A plus the three 7A steps that move the canvas; found #{length(arrangements)}"
+
+      for body <- arrangements do
+        assert body =~ ~r/grid-template-rows:/, """
+        An arrangement that names `grid-template-areas` and no
+        `grid-template-rows` inherits a row order written for a different one.
+
+        Found: #{inspect(body)}
+        """
+      end
+    end
+  end
+
   # The tier of every token, read from the stylesheet's header comment. Read
   # from the RAW source on purpose: this is the one check whose subject is the
   # comment rather than what the browser sees.
