@@ -227,6 +227,73 @@ defmodule StatifierBlocks.ShellTest do
     end
   end
 
+  # sb-dbqq: the inspector's Findings tab with nothing selected. The markup is
+  # `StatifierBlocks.Editor.InspectorBodyTest`'s; what belongs here is that the
+  # grouping keeps every finding the count counts, and that the ones with no
+  # block to select still get a group.
+  describe "the document's findings, grouped (sb-dbqq)" do
+    setup do
+      %{
+        findings: [
+          Finding.new({:block, "blk_cc_decision"}, :lint, "unreachable arm"),
+          Finding.new({:config, "blk_cc_capture_pause", "duration"}, :config, "not a number"),
+          Finding.new({:slot, "blk_cc_decision", "then"}, :assignability, "wants a step"),
+          Finding.new({:block, "blk_gone"}, :resolution, "no such block")
+        ]
+      }
+    end
+
+    # One group per block in first-appearance order, and a block's findings
+    # together however their anchors were shaped - the `:slot` finding on
+    # `blk_cc_decision` belongs with that block's `:block` finding, and an
+    # implementation that grouped by the anchor's tag would split them.
+    # Sabotage: grouping on the whole anchor rather than on its block id - the
+    # decision block gets two groups and the first assertion goes red.
+    test "groups by block, in first appearance order", %{root: root, findings: findings} do
+      groups = Shell.findings_groups(root, findings, [Enum.at(findings, 3)])
+
+      assert Enum.map(groups, & &1.block_id) == ["blk_cc_decision", "blk_cc_capture_pause", nil]
+      assert Enum.map(groups, & &1.label) == ["Branch", "Wait", "Unanchored"]
+
+      [decision | _rest] = groups
+      assert Enum.map(decision.findings, & &1.source) == [:lint, :assignability]
+    end
+
+    # The count and the panel are one list read twice, so the panel cannot show
+    # fewer than the chip beside it counts. Orphans are the case that breaks:
+    # they are inside `findings_count/1` and they have no block to file under.
+    # Sabotage: dropping `append_unanchored/2`'s non-empty clause - the orphan
+    # vanishes from the panel while the chip still counts it, and both the
+    # total and the last-group assertion go red.
+    test "keeps every finding the count counts, orphans last", %{root: root, findings: findings} do
+      orphan = Enum.at(findings, 3)
+      groups = Shell.findings_groups(root, findings, [orphan])
+
+      total = groups |> Enum.flat_map(& &1.findings) |> length()
+      assert total == Shell.findings_count(findings)
+
+      last = List.last(groups)
+      assert last.block_id == nil
+      assert last.findings == [orphan]
+    end
+
+    # A document with nothing wrong with it has no groups, not one empty group.
+    # Sabotage: making `append_unanchored/2` append unconditionally - the clean
+    # document grows an "Unanchored" heading over nothing and this goes red.
+    test "a clean document groups into nothing", %{root: root} do
+      assert Shell.findings_groups(root, [], []) == []
+    end
+
+    # `root` is read for labels and nothing else, so a caller that has none
+    # still gets the grouping - with the id standing in, which is what
+    # `label_for/2` answers for a block the tree does not hold anyway.
+    # Sabotage: `group_label/2` raising on a nil root - this goes red rather
+    # than the component quietly requiring an assign it does not need.
+    test "labels fall back to the block id with no root", %{findings: findings} do
+      assert [%{label: "blk_cc_decision"} | _rest] = Shell.findings_groups(nil, findings, [])
+    end
+  end
+
   describe "the index page's labels" do
     # Sabotage: returning the block id from `label_for/2` unconditionally - the
     # jump list becomes a column of opaque ids and the reason the index page

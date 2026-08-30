@@ -23,7 +23,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     use StatifierBlocks.EditorLiveCase
 
     alias StatifierBlocks.Editor.{Field, Inspector}
-    alias StatifierBlocks.{Finding, ViewModel}
+    alias StatifierBlocks.{Finding, Shell, ViewModel}
 
     # One meta row's rendered value, with the markup around it taken off, so an
     # assertion is about what an author reads rather than about how the
@@ -163,14 +163,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute html =~ "Select a block on the canvas to inspect it."
       end
 
-      # The other two tabs keep the one-line sentence: their empty state is
+      # The Condition tab keeps the one-line sentence: its empty state is
       # "nothing to read", not "nothing to edit", and 3A's rule is stated once
-      # per pane rather than once per tab.
-      # Sabotage: dropping the `@tab != :config` guard - the Config tab renders
-      # both empty states, one of them inside the box, and the `refute` above
-      # goes red.
-      test "the other tabs keep the pane's one-line empty state" do
-        html = inspector_html(node: nil, tab: :findings)
+      # per pane rather than once per tab. It used to be both of the other two;
+      # sb-dbqq gave the Findings tab something to say with no selection, so the
+      # sentence is asserted on the tab that still has nothing.
+      # Sabotage: widening the guard back to `@tab != :config` - the Findings
+      # tab renders this sentence above its grouped list and sb-dbqq's refute
+      # goes red; narrowing it to `false` makes this assertion the red one.
+      test "the Condition tab keeps the pane's one-line empty state" do
+        html = inspector_html(node: nil, tab: :condition)
 
         assert html =~ "Select a block on the canvas to inspect it."
         refute html =~ "sb-inspector__empty--boxed"
@@ -259,6 +261,108 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         html = inspector_html(node: node_for("blk_email_step"), tab: :findings)
 
         refute html =~ "sb-inspector__tab-count"
+      end
+    end
+
+    # sb-dbqq. The grouping itself is `StatifierBlocks.ShellTest`'s and runs
+    # headless; what is asserted here is the half that only exists once there
+    # is markup - that the chip reads the document with nothing selected, that
+    # the panel is the grouped list rather than a "select a block" line, and
+    # that a row pushes the canvas's own select event.
+    describe "the Findings tab with nothing selected (sb-dbqq)" do
+      defp document_findings do
+        [
+          Finding.new({:block, "blk_variant"}, :lint, "no handler for this invoke type",
+            severity: :warning
+          ),
+          Finding.new({:slot, "blk_wizard", "body"}, :assignability, "this slot wants a step"),
+          Finding.new({:block, "blk_deleted_long_ago"}, :resolution, "no such block any more")
+        ]
+      end
+
+      defp unselected_html(findings) do
+        model = view_model(findings)
+
+        inspector_html(
+          node: nil,
+          tab: :findings,
+          root: model.root,
+          document_findings: model.findings,
+          orphan_findings: model.orphan_findings
+        )
+      end
+
+      defp chip(html) do
+        [_whole, count] =
+          Regex.run(~r{<span class="sb-inspector__tab-count">\s*(\d+)\s*</span>}s, html)
+
+        count
+      end
+
+      # The number is the document's and it is `Shell.findings_count/1`'s, not
+      # a length taken at the chip: the wizard fixture derives a `:resolution`
+      # finding of its own on top of the three passed in, so a chip counting
+      # only what the caller supplied reads 3 where the drawer reads 4.
+      # Sabotage: `tab_count/3`'s nil clause returning `length(block_findings)`
+      # - the chip disappears entirely (no selection means no block findings)
+      # and both assertions go red.
+      test "the chip is the document's count, not the selection's" do
+        model = view_model(document_findings())
+        html = unselected_html(document_findings())
+
+        assert chip(html) == to_string(Shell.findings_count(model.findings))
+        assert chip(html) == "4"
+      end
+
+      # Sabotage: leaving the panel's `:if` at `@node == nil and @tab != :config`
+      # on the "select a block" line - the tab goes back to the dead end this
+      # bead is about and the refute goes red.
+      test "the panel is the grouped list, not the select-a-block line" do
+        html = unselected_html(document_findings())
+
+        refute html =~ "Select a block on the canvas to inspect it."
+        assert html =~ ~s(class="sb-inspector__groups")
+
+        headings =
+          Regex.scan(~r{<h3 class="sb-inspector__group-title">\s*(.*?)\s*</h3>}s, html)
+          |> Enum.map(fn [_whole, heading] -> heading end)
+
+        assert "Unanchored" in headings
+        assert List.last(headings) == "Unanchored"
+      end
+
+      # Sabotage: rendering the unanchored group's rows as buttons too - the
+      # refute goes red, and an author gets a control that selects a block the
+      # document does not hold.
+      test "an unanchored finding is listed with nothing to select" do
+        html = unselected_html(document_findings())
+
+        assert html =~ ~s(data-unanchored="true")
+
+        # The unanchored group is last, so everything after its marker is that
+        # group and the panel's closing tags - and none of it is a control.
+        [_before, unanchored] = String.split(html, ~s(data-unanchored="true"), parts: 2)
+
+        assert unanchored =~ "no such block any more"
+        refute unanchored =~ "<button"
+      end
+
+      # The row reuses the canvas's select event rather than an inspector one,
+      # so a block is selected the same way however an author reaches it.
+      # Sabotage: the row pushing "inspector-select" instead of "select" - the
+      # node never gains the selected class and this goes red.
+      test "a row selects the block it is about", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, findings: document_findings())
+
+        view |> element(~s(.sb-inspector__tab[phx-value-tab="findings"])) |> render_click()
+
+        view
+        |> element(
+          ~s(.sb-inspector__group[data-block-id="blk_variant"] button.sb-inspector__group-row)
+        )
+        |> render_click()
+
+        assert has_element?(view, ~s([data-block-id="blk_variant"].sb-node--selected))
       end
     end
   end

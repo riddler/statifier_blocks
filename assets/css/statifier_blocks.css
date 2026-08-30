@@ -2625,6 +2625,58 @@
   gap: var(--sb-space-half);
 }
 
+/* The unselected Findings tab (sb-dbqq): the document's findings, grouped by
+ * the block each is anchored to. The gap between groups is a full space and
+ * the gap inside one is a half, because the grouping is the only structure in
+ * this panel - flatten the two spacings and the headings stop reading as
+ * headings. */
+.sb-inspector__groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space);
+}
+
+/* The heading names the block, in the same muted small caps-free treatment the
+ * Config tab's section titles use, so the panel does not invent a second
+ * heading level for the same pane. */
+.sb-inspector__group-title {
+  margin: 0 0 var(--sb-space-half);
+  font-size: var(--sb-text-sm);
+  font-weight: var(--sb-weight-medium);
+  color: var(--sb-fg-muted);
+}
+
+/* The unanchored group's heading is a word, not a block an author can go to,
+ * so it is set apart from the ones that are. */
+.sb-inspector__group[data-unanchored="true"] .sb-inspector__group-title {
+  font-style: italic;
+}
+
+/* A row is a button whose job is to be a line of text: the browser's button
+ * chrome, font and centring are all wrong for a list entry, so they come off
+ * and what is left is the message plus a pointer. The span the unanchored
+ * group renders instead takes the same rule, so the two groups' rows sit on
+ * one baseline grid rather than a button-shaped one and a text-shaped one. */
+.sb-inspector__group-row {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+button.sb-inspector__group-row {
+  cursor: pointer;
+}
+
+button.sb-inspector__group-row:hover {
+  text-decoration: underline;
+}
+
 /* The Condition tab reads the source and evaluates nothing; what it answers
  * is tabular and document-level, so 1A sends that to the drawer. */
 .sb-conditions {

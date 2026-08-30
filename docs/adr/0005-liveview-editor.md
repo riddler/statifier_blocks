@@ -2860,3 +2860,68 @@ token, and the 2026-08-28 Note is why it introduces no tint.
   a later bead; the bead was `sb-2mxa` (2026-08-30, campaign 018), which shipped
   the markup, the stylesheet rules and the tests in the same request as this
   section.
+
+---
+
+## Note (2026-08-30): decision 12, the read-only config is an inspector surface
+
+A dated note rather than an amendment: decision 12 is unchanged in every
+particular, and what it says an author sees for an unresolvable block is what
+an author sees. What this records is *where* one of its three bullets renders,
+because the bullet was written when the answer was the card and the answer is
+now the pane.
+
+Decision 12's second bullet - "its config shown read-only as canonical JSON,
+because there is no `config_schema/1` to drive a form and inventing one would
+be guessing" - is **the inspector's Block section**, not the card's face.
+Campaign-017 ruling D4 moved those bytes there, as `sb-u1j` / PR 153, which
+also renamed the rule that paints them `.sb-inspector__raw-config`. `ViewModel.Node.raw_config_json` is still built exactly as
+before, from `CanonicalJson.encode_term/1` over the stored config, and it now
+has exactly one reader in `lib/`:
+`StatifierBlocks.Editor.Inspector`'s `block_section/1`. Nothing on the canvas
+renders it.
+
+The reason is the one decision 12's own bullet gives for the bytes being
+read-only, applied to position: a stored config carries whatever the host that
+wrote it carried, so on a card it made the one broken block the widest thing
+in its lane. The pane an author reaches by asking about that block in
+particular is where an arbitrary-length string can be shown honestly - it
+wraps mid-token there, which is the only alternative to clipping bytes the
+author is reading it to match.
+
+Unchanged by this note: the bullet's content, the encoding, the fact that the
+config may not be edited, and every other clause of decision 12. A card still
+carries the type name, the unavailable chrome, the `:block` finding, and the
+block's existing children rendered normally.
+
+---
+
+## Note (2026-08-30): decision 11, what the "about a slot" sentence is about
+
+Recorded because a campaign-017 direction-agent review left it as a
+non-qualifying note on PR 155, and a reader who re-derives it is doing the
+work twice.
+
+The 2026-08-30 amendment that drops `:arity` from the `source` enum (11j)
+keeps decision 11's prose that "arity and undeclared-slot violations are about
+a slot", and keeping it was deliberate. The sentence is about the **anchor**,
+not about the source value: what those findings are anchored to is
+`{:slot, block_id, slot_name}`, which no amendment has touched, and what they
+now carry as a source is `:assignability`, which is where
+`Finding.from_compiler/2` has always put the `:structure` stage
+(`lib/statifier_blocks/finding.ex`, the by-stage rule). Nothing in the
+sentence ever depended on an `:arity` value existing, which is why dropping
+one did not cost it anything.
+
+One precision the sentence does not carry on its own, true in code today:
+**nothing in this package constructs a `{:slot, _, _}` anchor.** `from_compiler/2`
+cannot - `Compiler.Finding` carries no slot name, so the mechanical anchor
+rules produce `{:config, id, key}` or `{:block, id}` and nothing else, which
+that function's own moduledoc states as a known gap. So the slot-shaped
+structural findings `sb-da9` shipped (`:slot_arity_violated`,
+`:undeclared_slot`) reach the editor anchored to their **block**, and a slot
+anchor is a shape a caller supplies and `ViewModel` routes, not one the
+compiler seam produces. The sentence describes where such a finding belongs;
+the seam that would put it there is still future work.
+
+No decision moves, no enum moves, no anchor moves. Filed with `sb-dbqq`.
