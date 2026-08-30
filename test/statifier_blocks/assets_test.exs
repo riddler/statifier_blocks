@@ -297,9 +297,9 @@ defmodule StatifierBlocks.AssetsTest do
       assert unstyled == [], """
       A button whose classes the stylesheet never mentions is painted by the
       browser, not by this package - which is exactly the state sb-sl6f found
-      Undo, Redo, the zoom steps, the two fits, Cancel insert and a list
-      field's add/remove in. Every class below is emitted on a `<button>` and
-      matched by no selector in #{@stylesheet}:
+      Undo, Redo, the zoom steps, the two fits and a list field's add/remove
+      in. Every class below is emitted on a `<button>` and matched by no
+      selector in #{@stylesheet}:
 
       #{Enum.map_join(unstyled, "\n", fn {class, source} -> "  #{class} (#{source})" end)}
       """
@@ -387,6 +387,83 @@ defmodule StatifierBlocks.AssetsTest do
     end
   end
 
+  describe "the palette search and the toolbar's one rule (sb-lti6)" do
+    # The defect: the reset keeps native chrome ON for form controls, so the
+    # search rendered as whatever the host's browser paints - a plain native
+    # box as the first thing inside a bordered, rounded surface card. Every
+    # other test in the suite is happy with that: the markup is right, the
+    # filter works, and only a human looking at the pane would say so.
+    # Sabotage: reverting `.sb-palette__search` to `font: inherit; width: 100%`
+    # - the box goes back to native and this names the properties it lost.
+    test "the search declares the box the pane's other surfaces have" do
+      declarations = declarations_of(".sb-palette__search")
+
+      for property <- ~w(padding background border border-radius) do
+        assert Map.has_key?(declarations, property), """
+        `.sb-palette__search` sits inside a pane this package draws - a border,
+        a radius and a surface of its own - and a control in it that declares
+        none of those three is the one element the package left to the
+        browser. Missing: #{property}.
+
+        Declared: #{inspect(Map.keys(declarations))}
+        """
+      end
+    end
+
+    # The half that makes the rule above a THEME rather than a look: a host
+    # themes this package by setting `--sb-*` and nothing else (decision 14),
+    # so a hard-coded `1px solid #ccc` here is a border no host can move.
+    # Sabotage: writing `border-radius: 4px` on the search - the box still
+    # looks right in the default theme and stops answering to the host, and
+    # this goes red naming the literal.
+    test "every value in that box is a token, not a literal" do
+      literals =
+        for {property, value} <- declarations_of(".sb-palette__search"),
+            property in ~w(padding color background border border-radius),
+            not (value =~ ~r/var\(--sb-/),
+            do: "#{property}: #{value}"
+
+      assert literals == [], """
+      ADR-0005 decision 14: a host themes this package with `--sb-*` custom
+      properties and nothing else. A literal in this rule is a value that
+      host cannot reach, and the search would then be the one control in the
+      pane that ignores their theme.
+
+      Literals: #{inspect(literals)}
+      """
+    end
+
+    # The defect this guards is the one sb-lti6 found: `.sb-toolbar` was
+    # declared TWICE - a layout half stranded at the end of the palette
+    # section and a chrome half in the toolbar's own - with disjoint
+    # properties, so reading either one told you half of what the toolbar
+    # does and editing either one moved half of it.
+    # Sabotage: splitting the rule back in two - the count goes to two and
+    # this goes red before anyone has to notice the halves by reading.
+    test "the toolbar is declared exactly once" do
+      blocks =
+        @stylesheet
+        |> File.read!()
+        |> StatifierBlocks.ThemeAudit.declaration_blocks()
+        |> Enum.filter(&(&1.selector == ".sb-toolbar"))
+
+      assert length(blocks) == 1, """
+      Two rules for one selector is how a stylesheet starts disagreeing with
+      itself: neither block is wrong, and neither is the whole answer.
+
+      Found #{length(blocks)} `.sb-toolbar` blocks.
+      """
+
+      properties = blocks |> hd() |> Map.fetch!(:declarations) |> Enum.map(&elem(&1, 0))
+
+      for property <- ~w(display align-items flex-wrap gap padding border border-radius
+                         background) do
+        assert property in properties,
+               "the merge is a pure move: `#{property}` was in one of the two halves"
+      end
+    end
+  end
+
   # Every `<button>` in the editor components, paired with the classes it
   # carries. The pairing is nearest-following: between a `<button` and its own
   # `class=` no other element can open, so the next class attribute in the
@@ -437,6 +514,19 @@ defmodule StatifierBlocks.AssetsTest do
         class in classes,
         found <- classes,
         do: found
+  end
+
+  # Every declaration made for exactly this selector, as a map. Merged across
+  # blocks rather than taken from the first, because a rule can legitimately
+  # be extended inside a container query and a check that read only one of the
+  # two would be answering about half the rule.
+  defp declarations_of(selector) do
+    @stylesheet
+    |> File.read!()
+    |> StatifierBlocks.ThemeAudit.declaration_blocks()
+    |> Enum.filter(&(&1.selector == selector))
+    |> Enum.flat_map(& &1.declarations)
+    |> Map.new()
   end
 
   # A class is styled when some selector in the stylesheet names it - on its

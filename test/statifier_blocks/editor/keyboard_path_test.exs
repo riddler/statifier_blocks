@@ -125,10 +125,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert html =~ ~s(data-filtered="false")
       end
 
-      # The selector names the TOOLBAR's cancel specifically. Since sb-dfyk the
-      # palette carries one of its own beside the insert-mode line, and a bare
-      # `[phx-click="palette-close"]` matches both - the ambiguity is the point
-      # of both controls existing, not an accident to select around loosely.
+      # The selector names the PALETTE's cancel, which since sb-lti6 is the
+      # only one: the toolbar's "Cancel insert" carried the same event from a
+      # second pane, and one command with two buttons is a command an author
+      # has to work out twice. `element/2` raises on more than one match, so
+      # this selector going ambiguous again is itself a failure.
       # Sabotage: "palette-close" clearing `palette_allowed` but not
       # `palette_position` - a later pick would then still insert, and the
       # document would change where this expects it not to.
@@ -139,7 +140,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         html =
           view
-          |> element(~s(.sb-toolbar__button[phx-click="palette-close"]))
+          |> element(~s(.sb-palette__cancel[phx-click="palette-close"]))
           |> render_click()
 
         assert html =~ ~s(data-filtered="false")
@@ -147,6 +148,32 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         view |> element(~s(.sb-palette__pick[phx-value-type="core.wait"])) |> render_click()
 
         refute latest_document(), "no position, no insert"
+      end
+
+      # sb-lti6. The insert mode used to announce its exit twice - once beside
+      # the sentence that explains the mode, and once in the toolbar above the
+      # canvas - and the two were the same event with two labels. Counted on
+      # the rendered page rather than read off the components, because "how
+      # many ways out does an author see" is a question about the page.
+      # Sabotage: restoring the toolbar's `:if={@inserting?}` Cancel button -
+      # the count goes to two and this names both.
+      test "the insert mode offers exactly one Cancel", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        html = view |> element(add_button("blk_wizard", "body", 0)) |> render_click()
+
+        assert html =~ ~s(data-inserting="true")
+
+        cancels = Regex.scan(~r/phx-click="palette-close"/, html)
+
+        assert length(cancels) == 1, """
+        One command, one button. The palette's Cancel is the one that survives
+        (sb-lti6): it sits beside the line that says which slot the next pick
+        fills, which is the sentence an author is reading when they decide to
+        leave. Escape is the third way out and is not a control on the page.
+
+        Found #{length(cancels)} controls carrying `palette-close`.
+        """
       end
     end
 
