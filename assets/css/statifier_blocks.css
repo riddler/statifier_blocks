@@ -1215,51 +1215,123 @@
   width: 100%;
 }
 
-.sb-palette__group {
-  margin-top: var(--sb-space);
+/* The count line (parity item 1.3). It sits directly under the search box
+ * because it is that box's answer, and it is the smallest, quietest step in
+ * the pane: it is read once on arrival and then only when a filter surprises
+ * someone. `[data-filtering]` is what lifts it one step out of subtle, for
+ * exactly the case where it stopped being a size and became a result. */
+.sb-palette__count {
+  margin: 0 0 var(--sb-space);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-subtle);
 }
 
+.sb-palette__count[data-filtering="true"] {
+  color: var(--sb-fg-muted);
+}
+
+/* Between groups, not above the first: the count line already put a gap
+ * there, and a second one makes the first header look detached from the box
+ * that produced it. */
+.sb-palette__group + .sb-palette__group {
+  margin-top: var(--sb-space-3);
+}
+
+/* Small caps with the count pushed to the far edge - the same label treatment
+ * the pane title gets, one level in. `space-between` and not an auto margin
+ * because there are exactly two children and neither is optional. */
 .sb-palette__group-name {
-  font-size: var(--sb-text-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sb-space);
+  margin: 0 0 var(--sb-space-half);
+  font-size: var(--sb-text-xs);
   text-transform: uppercase;
   letter-spacing: var(--sb-tracking-caps);
   color: var(--sb-fg-subtle);
 }
 
+/* Tabular figures so the column of counts does not jitter between groups, and
+ * the caps tracking released, because it is a number and not a word. */
+.sb-palette__group-count {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: normal;
+  color: var(--sb-fg-subtle);
+}
+
 .sb-palette__entries {
   list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
   margin: 0;
   padding: 0;
 }
 
+/* A two-line row: the tile, then the name over its description. The
+ * alignment is `flex-start` and not `center` so the tile sits with the name
+ * rather than floating in the middle of a tall row - a description that wraps
+ * to two lines otherwise drags the icon down away from the thing it labels.
+ *
+ * The accent is on the TILE and not on a stripe down the row's leading edge.
+ * The tile is the mark the card on the canvas carries too, so an author picks
+ * a type up by the same shape they will put down; a stripe is a second place
+ * to say the same thing, and it says it in the position the slot rails use
+ * for something else. */
 .sb-palette__pick {
   font: inherit;
   display: flex;
-  align-items: center;
-  gap: var(--sb-space-half);
+  align-items: flex-start;
+  gap: var(--sb-space);
   width: 100%;
+  padding: var(--sb-space);
   text-align: left;
+  font-size: var(--sb-text-sm);
   background: none;
-  border: none;
-  border-left: var(--sb-block-edge) solid var(--sb-block-accent);
+  border: var(--sb-border-width) solid transparent;
+  border-radius: var(--sb-radius-sm);
   cursor: pointer;
-  border-radius: var(--sb-radius);
-  padding: var(--sb-space-half);
   color: inherit;
 }
 
 .sb-palette__pick:hover {
   background: var(--sb-bg-muted);
+  border-color: var(--sb-border);
 }
 
-.sb-palette__pick-text {
+/* The tile is the slot and the glyph is what goes in it, which is why the
+ * markup wraps the icon component rather than handing it the tile's class: a
+ * type that declares no icon renders no glyph at all, and an entry with no
+ * tile is an entry whose name does not line up with its neighbours'.
+ * `display: contents` takes the component's own span out as a box, so the svg
+ * stays the tile's direct child and the shared `.sb-palette__icon svg` sizing
+ * rule up in the card banner keeps working untouched - for a host's component
+ * as much as for the shipped one. */
+.sb-palette__glyph {
+  display: contents;
+}
+
+.sb-palette__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
   min-width: 0;
+}
+
+/* Medium, not strong: it is the row's subject and has to win against the
+ * description under it, which is a smaller job than a heading's. */
+.sb-palette__name {
+  display: block;
+  font-weight: var(--sb-weight-medium);
+  color: var(--sb-fg);
 }
 
 .sb-palette__description {
   display: block;
-  color: var(--sb-fg-subtle);
-  font-size: var(--sb-text-sm);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  line-height: var(--sb-leading);
 }
 
 .sb-toolbar {
@@ -1810,8 +1882,14 @@
       "drawer drawer";
   }
 
+  /* `row` is stated rather than left to the initial value because the palette
+   * banner's base rule now makes the list a column; without it this rule would
+   * wrap a column, which wraps nothing, and the stacked palette would silently
+   * become the tall list this arrangement exists to avoid. The behaviour here
+   * is unchanged - only the thing it is overriding is. */
   .sb-palette__entries {
     display: flex;
+    flex-direction: row;
     flex-wrap: wrap;
     gap: var(--sb-space-half);
   }

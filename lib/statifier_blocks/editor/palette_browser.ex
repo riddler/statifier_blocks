@@ -32,6 +32,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         same predicate as decision 5, not a parallel implementation, and this
         component deliberately computes none of it: it is handed a set.
 
+    ## What a row says, and what the count line says (parity item 1.3)
+
+    A row is the tile, the label, and the one-line description the type
+    declared - three things, not one, because the label alone answers "what is
+    this called" and never "what would it do". The tile is a slot rather than
+    an icon: a type that named none still renders the box, so the column of
+    names lines up whether or not every type in a host's registry got around
+    to declaring a glyph.
+
+    Above the groups sits one line of arithmetic. Unfiltered it is the size of
+    the palette; filtered it is how much of the palette is left and why. The
+    "why" matters more than it looks: two different filters can be narrowing
+    this list - the author's query and the slot's acceptance set - and an
+    author who opened the palette from a gap never typed anything, so a line
+    that only ever explained queries would leave the more confusing of the two
+    cases unexplained.
+
+    The per-group count is the same idea one level down, and it is the count
+    of what is *under that header now*, not of the group in the registry.
+
     ## The strip, below 780 (7A)
 
     The 2026-08-29 shell amendment gives the palette a second shape: below a
@@ -113,9 +133,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
-    @doc "The palette: a header row, a search box, then a section per `entry.group`."
+    @doc """
+    The palette: a header row, a search box, a count line, then a section per
+    `entry.group`.
+    """
     def palette_browser(assigns) do
-      assigns = assign(assigns, :visible, filter(assigns.groups, assigns.query, assigns.allowed))
+      visible = filter(assigns.groups, assigns.query, assigns.allowed)
+
+      assigns =
+        assigns
+        |> assign(:visible, visible)
+        |> assign(:count, count_line(assigns.groups, visible, assigns.query))
+        |> assign(:filtering, narrowed?(assigns.groups, visible, assigns.query))
 
       ~H"""
       <section
@@ -165,10 +194,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             />
           </form>
 
+          <p class="sb-palette__count" role="status" data-filtering={to_string(@filtering)}>
+            {@count}
+          </p>
+
           <p :if={@visible == []} class="sb-palette__empty">No block types match.</p>
 
           <div :for={group <- @visible} class="sb-palette__group" data-group={group.name}>
-            <h3 class="sb-palette__group-name">{group.name}</h3>
+            <h3 class="sb-palette__group-name">
+              <span>{group.name}</span>
+              <span class="sb-palette__group-count">{length(group.entries)}</span>
+            </h3>
             <ul class="sb-palette__entries">
               <li :for={entry <- group.entries} data-type={entry.type_name}>
                 <button
@@ -180,9 +216,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                   phx-target={@target}
                   phx-value-type={entry.type_name}
                 >
-                  <Icons.glyph icon={@icon} name={entry.entry.icon} class="sb-palette__icon" />
-                  <span class="sb-palette__pick-text">
-                    {entry.entry.label}
+                  <span class="sb-palette__icon">
+                    <Icons.glyph icon={@icon} name={entry.entry.icon} class="sb-palette__glyph" />
+                  </span>
+                  <span class="sb-palette__text">
+                    <span class="sb-palette__name">{entry.entry.label}</span>
                     <span :if={entry.entry.description != ""} class="sb-palette__description">
                       {entry.entry.description}
                     </span>
@@ -195,6 +233,41 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       </section>
       """
     end
+
+    # The count line, under the search box. Two numbers, and which one is on
+    # screen is the whole design: an author who has filtered wants to know how
+    # much of the palette they are still looking at, and one who has not wants
+    # to know how big it is. The first two arms are the spike's wording. The
+    # third is the case the spike does not have, because it has no acceptance
+    # filter: the palette opened from a gap is narrowed by the slot rather than
+    # by anything the author typed, and a bare total there would claim the
+    # author can reach types this gap will not take.
+    @spec count_line([ViewModel.PaletteGroup.t()], [ViewModel.PaletteGroup.t()], String.t()) ::
+            String.t()
+    defp count_line(groups, visible, query) do
+      total = entry_count(groups)
+      shown = entry_count(visible)
+      needle = query |> to_string() |> String.trim()
+
+      cond do
+        needle != "" -> ~s(#{shown} of #{total} match "#{needle}")
+        shown < total -> "#{shown} of #{total} fit here"
+        total == 1 -> "1 block type"
+        true -> "#{total} block types"
+      end
+    end
+
+    # Whether anything is narrowing the list, by either of the two filters.
+    # The attribute is what lets the stylesheet lift the line out of the
+    # subtle step when it is reporting a filter rather than a size.
+    @spec narrowed?([ViewModel.PaletteGroup.t()], [ViewModel.PaletteGroup.t()], String.t()) ::
+            boolean()
+    defp narrowed?(groups, visible, query) do
+      String.trim(to_string(query)) != "" or entry_count(visible) < entry_count(groups)
+    end
+
+    @spec entry_count([ViewModel.PaletteGroup.t()]) :: non_neg_integer()
+    defp entry_count(groups), do: Enum.reduce(groups, 0, &(length(&1.entries) + &2))
 
     # The palette row carries the same accent as the card the pick produces,
     # so a block type's identity is the same before and after it is in the
