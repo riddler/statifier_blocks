@@ -2651,3 +2651,50 @@ that it never depended on it.
   `:assignability` and `:resolution` come from the by-stage mapping, `:lint`
   from the lint seam, and `:compile` from everything else the compiler says -
   which is the property the two open items together were asking for.
+
+## Note (2026-08-30): decision 11, the number a host reads
+
+A dated note rather than an amendment, because decision 11 is unchanged in
+every particular: what a finding is, what it is anchored to, where it renders
+and which of them the editor derives are all exactly as the decision and its
+amendments have them. What this records is a *reader* for a number decision 11
+already implies, and the ruling about which number that is.
+
+**The number is the drawer's.** One document had three findings numbers by
+construction. The reference host's header counted the raw compiler output; the
+drawer's Findings tab counted `ViewModel.findings` - the derived `:resolution`
+and `:config` findings, the caller's, and 11g's datamodel advisories; the
+container badges counted a per-node subtree rollup of the same list. The first
+of those disagrees with the other two on every document where a block fails to
+resolve or a path is undeclared, and it disagrees in the *other* direction for
+a compiler finding no anchor accepts. Ruled (operator, campaign 018, D1): the
+Findings tab's count is the document's findings number, and a host header shows
+that number or none.
+
+**The seam is `StatifierBlocks.Editor.findings_count/3`**, a pure function of
+`{document, palette}` plus the `:findings` and `:datamodel` options, which are
+the assigns of the same names and the same defaults. It returns
+`Shell.findings_count/1` over `ViewModel.findings` for those inputs, and the
+component's own `rebuild/1` composes its view model through the same private
+function, so the host's number and the rendered number are one computation and
+not two that agree.
+
+Taking inputs rather than exposing component state is the substantive part.
+The editor is a `LiveComponent`: a host holds no handle on its socket, so the
+alternatives were pushing a count back through `on_change` - which is one
+render late on mount and never arrives at all for a document nobody edits - or
+a new callback with a new lifetime to reason about. A pure function of the
+inputs the host already has is available on its first render and adds no
+lifecycle. Decision 15's line holds: what the host does with the number, or
+whether it shows one, stays the host's.
+
+**Orphans are inside the number.** A finding anchored on a block the document
+no longer holds renders nowhere on the canvas, and `ViewModel` keeps it in
+`orphan_findings` for exactly that reason - but it is still something wrong
+with this document, and a number that dropped it would let a header call a
+document clean while the drawer listed the finding underneath.
+
+No new vocabulary, no new anchor, no change to what is derived. The count in
+`Editor.Findings`' own `data-findings-count` attribute is the same list
+counted at its own call site; folding it into the seam is cosmetic and was
+left alone deliberately, since it is markup this note does not need to move.

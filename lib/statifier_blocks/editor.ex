@@ -110,6 +110,42 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     optimistic concurrency on save, and it does not merge, rebase or resolve
     anything.
 
+    ## The findings number a host may show (sb-ukgu)
+
+    A host that draws its own header usually wants to say how many findings
+    the open document has, and the obvious way to get that number - counting
+    whatever list the host itself passed in, or counting the compiler's raw
+    output - produces a *different* number from the one the drawer's Findings
+    tab reports. It has to: the drawer counts the caller's findings plus the
+    `:resolution` and `:config` findings `ViewModel` derives plus the
+    undeclared-path advisories, and the host's own list is only the first of
+    those three. Two numbers for one document, side by side on the same
+    screen, is the defect this seam closes.
+
+    So there is one number, the drawer's, and `findings_count/3` is how a host
+    reads it:
+
+        StatifierBlocks.Editor.findings_count(document, palette,
+          findings: findings,
+          datamodel: datamodel
+        )
+
+    Its arguments are deliberately the assigns the host already holds and
+    already passes to the component, not the editor's internal state. That is
+    what makes it usable: the editor is a `LiveComponent`, so a host has no
+    handle on its socket, and a number that could only be read out of that
+    socket would have to be pushed back through `on_change` - late by one
+    render on mount, and absent entirely for a document nobody has edited yet.
+    A pure function of the same inputs is available on the host's first
+    render, needs no round-trip, and cannot drift: the option keys are the
+    assign names, and the component's own `rebuild/1` builds its view model
+    through the very same private function this one calls.
+
+    What comes back is `Shell.findings_count/1` over `ViewModel.findings` -
+    orphans included, for the reason recorded there. A host showing a
+    different number than the drawer is a bug in the host; a host showing
+    none is fine.
+
     ## The insert mode, and the pick that lands nowhere (sb-dfyk)
 
     `palette_position` is a mode, and every visible part of it hangs off that
@@ -250,6 +286,35 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         end
 
       {:ok, rebuild(socket)}
+    end
+
+    @doc """
+    How many findings the document has, from the assigns a host already holds.
+
+    This is the same number the drawer's Findings tab reports, computed by the
+    same code - see the moduledoc's *findings number a host may show* for why
+    the seam takes inputs rather than reading component state, and
+    `StatifierBlocks.Shell.findings_count/1` for what is inside the number.
+
+    `opts` mirrors the assigns of the same name, and defaults to the
+    component's defaults:
+
+      * `:findings` - the caller-supplied findings, `[]` by default.
+      * `:datamodel` - the paths the host declares, `nil` by default, which
+        per ADR-0005 amendment 11f turns the undeclared-path advisories off
+        entirely rather than declaring that the document addresses nothing.
+    """
+    @spec findings_count(Document.t(), Palette.t(), keyword()) :: non_neg_integer()
+    def findings_count(%Document{} = document, %Palette{} = palette, opts \\ []) do
+      %ViewModel{findings: findings} =
+        view_model(
+          document,
+          palette,
+          Keyword.get(opts, :findings, []),
+          Keyword.get(opts, :datamodel)
+        )
+
+      Shell.findings_count(findings)
     end
 
     slot(:header,
@@ -816,11 +881,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         declared_paths: declared_paths
       } = socket.assigns
 
-      # The advisories go in through the same caller-findings seam every
-      # other supplied finding uses, so `ViewModel.build/3` needs no notion
-      # of a datamodel and the routing is the one already tested.
-      advisories = Datamodel.findings(document, palette, declared_paths)
-      view_model = ViewModel.build(document, palette, findings ++ advisories)
+      view_model = view_model(document, palette, findings, declared_paths)
 
       selected = selected_node(socket, view_model)
 
@@ -829,6 +890,25 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       |> assign(:selected_node, selected)
       |> assign(:selected_slot, Shell.slot_label(view_model.root, socket.assigns.selected_id))
       |> assign(:pending_fields, pending_fields(socket, selected))
+    end
+
+    # The one composition of a view model in this component, called by
+    # `rebuild/1` on every state change and by `findings_count/3` on the
+    # host's behalf. It is one function rather than two identical pipelines
+    # because sb-ukgu is precisely the defect that two of them produce: the
+    # host's number and the drawer's number are the same number only while
+    # the two pipelines agree, and nothing but sharing them keeps that true.
+    #
+    # The advisories go in through the same caller-findings seam every other
+    # supplied finding uses, so `ViewModel.build/3` needs no notion of a
+    # datamodel and the routing is the one already tested. `datamodel` is
+    # whatever the host handed over or the already-normalized set the
+    # component keeps - `Datamodel.findings/3` normalizes either.
+    @spec view_model(Document.t(), Palette.t(), [Finding.t()], term()) :: ViewModel.t()
+    defp view_model(document, palette, findings, datamodel) do
+      advisories = Datamodel.findings(document, palette, datamodel)
+
+      ViewModel.build(document, palette, findings ++ advisories)
     end
 
     # The fields the author has typed that the document does not hold.

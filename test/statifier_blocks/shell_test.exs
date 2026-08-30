@@ -15,7 +15,7 @@ defmodule StatifierBlocks.ShellTest do
 
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{EditorFixtures, Shell, ViewModel}
+  alias StatifierBlocks.{EditorFixtures, Finding, Shell, ViewModel}
   alias StatifierBlocks.Predicates.TruthTable
 
   setup_all do
@@ -201,6 +201,32 @@ defmodule StatifierBlocks.ShellTest do
     end
   end
 
+  # sb-ukgu: one number, defined once. The claim that the *host's* number is
+  # this one is `StatifierBlocks.Editor.FindingsCountTest`'s, because it needs
+  # a rendered drawer to compare against; what belongs here is that the tab a
+  # host is being pointed at counts what `findings_count/1` counts and not a
+  # list of its own.
+  describe "the findings number (R4, sb-ukgu)" do
+    # Sabotage: `findings_count/1` returning `length(findings) + 1` - the tab
+    # follows it, which is the coupling this asserts, so the literal 2 goes
+    # red; inlining a count of its own at the tab's call site instead makes
+    # the first assertion the one that goes red. Both verified.
+    test "the Findings tab's count is findings_count/1 over the document's findings" do
+      findings = [
+        Finding.new({:block, "blk_cc_decision"}, :lint, "unreachable arm"),
+        Finding.new({:block, "blk_gone"}, :resolution, "no such block")
+      ]
+
+      view = Shell.drawer_view(%{open?: false, findings: findings, orphan_findings: []})
+
+      tab = Enum.find(view.tabs, &(&1.id == :findings))
+
+      assert tab.count == Shell.findings_count(findings)
+      assert tab.count == 2
+      assert Shell.findings_count([]) == 0
+    end
+  end
+
   describe "the index page's labels" do
     # Sabotage: returning the block id from `label_for/2` unconditionally - the
     # jump list becomes a column of opaque ids and the reason the index page
@@ -310,8 +336,8 @@ defmodule StatifierBlocks.ShellTest do
     test "is the block's own, not the document's", %{document: document} do
       view_model =
         ViewModel.build(document, EditorFixtures.palette(), [
-          StatifierBlocks.Finding.new({:block, "blk_cc_decision"}, :lint, "watch this one"),
-          StatifierBlocks.Finding.new({:block, "blk_cc_capture_pause"}, :lint, "and this one")
+          Finding.new({:block, "blk_cc_decision"}, :lint, "watch this one"),
+          Finding.new({:block, "blk_cc_capture_pause"}, :lint, "and this one")
         ])
 
       node = find(view_model.root, "blk_cc_decision")
