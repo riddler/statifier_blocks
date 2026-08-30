@@ -155,8 +155,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # canvas - and the two were the same event with two labels. Counted on
       # the rendered page rather than read off the components, because "how
       # many ways out does an author see" is a question about the page.
-      # Sabotage: restoring the toolbar's `:if={@inserting?}` Cancel button -
-      # the count goes to two and this names both.
+      # Sabotage: restoring the toolbar's Cancel button - re-declare the insert
+      # attr sb-9t19 removed from the toolbar, pass it from the editor, and
+      # render a second `palette-close` control behind it. The count goes to
+      # two and this names both.
       test "the insert mode offers exactly one Cancel", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn)
 

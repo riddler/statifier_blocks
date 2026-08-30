@@ -438,7 +438,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               can_undo?={History.can_undo?(@history)}
               can_redo?={History.can_redo?(@history)}
               selected?={@selected_id != nil}
-              inserting?={@palette_position != nil}
               target={@myself}
             />
 
