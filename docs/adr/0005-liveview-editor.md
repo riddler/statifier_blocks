@@ -3251,11 +3251,13 @@ event carrying the block id, in the shape the palette fold already has. It
 touches no `Edit` function, no `Document`, and no compiler.
 
 **2b. `switch_document/2` clears it, exactly as it clears the selection.** A
-block id from the old document names nothing in the new one, so the set goes
-the way the selection, the drafts and the pending insert go under the shell
-amendment's ruling 2A. The palette's own fold is the deliberate exception it
-already was: that one addresses no block, so nothing about it stops being true
-when a different document opens, and the reset must not reach it.
+block id from the old document names nothing in the new one, so the set is
+cleared on a document identity change, as the selection, the drafts and the
+pending insert already are by the shell's `switch_document/2` - behaviour this
+record has not stated before this amendment. The palette's own fold is the
+deliberate exception it already was: that one addresses no block, so nothing
+about it stops being true when a different document opens, and the reset must
+not reach it.
 
 Not persisted, in either direction: the host is told nothing, no assign
 survives a remount, and there is no attr for a host to open an editor
