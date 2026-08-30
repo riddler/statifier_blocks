@@ -1,6 +1,6 @@
 # ADR-0005: The editor is a pure command algebra and view model with a thin LiveView shell
 
-Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 9 amended - the `:duration` control, predicator strings primary (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 91); the shell arrangement recorded - three panes and a drawer, rulings 1A/2A/3A/7A/8A (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 92); decision 7 amended - a second, read-only measurement hook (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 100); decision 10 amended - the shipped `icon` names are heroicon names, 10k/10l (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 128); decisions 10 and 13 amended - rendering the tree and its connectors, 10a-10c (2026-08-29, accepted under the operator campaign-016 direction-agent gate grant, PR 135)
+Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 9 amended - the `:duration` control, predicator strings primary (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 91); the shell arrangement recorded - three panes and a drawer, rulings 1A/2A/3A/7A/8A (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 92); decision 7 amended - a second, read-only measurement hook (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 100); decision 10 amended - the shipped `icon` names are heroicon names, 10k/10l (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 128); decisions 10 and 13 amended - rendering the tree and its connectors, 10a-10c (2026-08-29, accepted under the operator campaign-016 direction-agent gate grant, PR 135); decision 10 amended - the presentation trio and the 24-character cap, 10m-10o (2026-08-30, accepted under the operator campaign-017 direction-agent gate grant, PR 155); decision 11 amended - a `:compile` source and `:lint` at `:error`, 11h/11i (2026-08-30, same gate, PR 155); decision 11 amended - `:arity` dropped from the source enum, 11j (2026-08-30, same gate, PR 155)
 
 ## Context
 
@@ -64,7 +64,7 @@ type. A host's palette arrives as behaviour implementations; if the editor
 cannot render a block type through the callbacks alone, the deficiency is in
 the callback surface and gets fixed there. Palette contents, publishing,
 authorization, storage, and who may edit what all stay host-side and are named
-in decision 12 so nobody re-litigates them.
+in decision 15's last bullet so nobody re-litigates them.
 
 **Every gesture must reduce to something testable without a browser.** The
 brief is explicit about this and it is the single most load-bearing constraint
@@ -2410,3 +2410,234 @@ follow, and none of them is new behaviour:
 - **The README comment stops being the only statement of the convention.** It
   is now a restatement of this section rather than the sole source, which is
   the defect this amendment exists to close.
+
+## Amendment (2026-08-30): decision 10, the presentation trio and the 24-character cap
+
+**Status: accepted (2026-08-30, unqualified direction-agent verdict under the operator campaign-017 grant, PR 155).** Additive; decision 10 stands exactly as
+written and no text above this line is edited by this section. It closes the
+open item recorded in decision 10 (:407-418) - that bracket stays where it is,
+as the record of the question, and this section is the answer to it.
+
+### Context
+
+ADR-0002's amendment B named three keys the spike's palette entries carry and
+this record's decision 10 table does not: `accent_token` (a `--sb-*` custom
+property *name*), `badge` (a short chip for the card header), and `join_label`
+(what the join marker under a side-by-side arrangement says, as a function of
+config). B1 is explicit that it does not adopt them here: "This section does
+not adopt the trio into decision 10 on that record's behalf, and a host reading
+only this section learns nothing about what the editor draws."
+
+B3 is equally explicit about the length cap it leaves behind: "The cap itself
+is a number ADR-0005 decision 10 should carry rather than this record; the
+spike's is 24 characters for both the badge and the join marker, chosen so that
+'calls the host' and 'timer' fit and a sentence does not."
+
+Both halves have since landed in code. `palette_entry/0` in
+`lib/statifier_blocks/block_type.ex` already carries `accent_token`, `badge`
+and `join_label` as optional keys, `badge/1` and `join_label/2` normalize them
+under B3's discipline, `StatifierBlocks.ViewModel.accent_token/1` normalizes
+the third, and the cap exists as `@presentation_cap 24` with a comment saying
+in as many words that it lives there only because "decision 10 carries no
+number today" (`sb-zfd`). Decision 10 is the record that owns
+`palette_entry/0`'s contents, so the shipped surface is currently wider than
+the record that defines it, and the number that governs two of its keys is a
+constant in a module rather than a decision. This section fixes both, on this
+record's own behalf rather than ADR-0002's.
+
+### Decision
+
+**10m. The trio joins decision 10's metadata table.** Three rows are added:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `accent_token` | `nil` | a `--sb-*` custom-property *name*, rebound on this block's element only |
+| `badge` | `nil` | a short chip on the card header |
+| `join_label` | `nil` | a one-argument function of the block's config returning the word under a side-by-side arrangement's join marker |
+
+Every default is `nil`, meaning the editor's own behaviour: its own accent, no
+chip, its own word. That keeps decision 10's standing promise that a block type
+omitting `palette_entry/0` entirely still renders, and it is the same shape the
+`slot_style`, `slot_outcome_key` and `icon` rows already have.
+
+`accent_token` is not new here - decision 14's 14d proposed it and the Note
+above records the consumption side as true in code. What is new is that it sits
+in the table that defines `palette_entry/0` rather than only in a theming
+amendment, which is where a host reading for the callback's contract looks.
+
+**10n. The cap is 24 characters, and it belongs to this decision.** `badge` and
+the `join_label` return are each refused when longer than 24 characters. The
+number is decision 10's, not ADR-0002's and not
+`lib/statifier_blocks/block_type.ex`'s: B3 asked this record to carry it, and
+this is the record carrying it. The value is the spike's, chosen so that "calls
+the host" and "timer" fit and a sentence does not, and it is adopted because
+two independent surfaces have now been drawn against it rather than because a
+different number would be worse.
+
+**10o. The normalizer semantics stay ADR-0002 B3's, unchanged.** Adopting the
+keys adopts the discipline that already governs them: refuse, never truncate -
+an over-long badge is dropped, not clipped, and one carrying a newline is
+dropped, not collapsed to a space. A `join_label` that raises degrades to the
+editor's own word, inside the bounded rescue B3 authorizes for exactly that
+callback. This section adds nothing to that table and weakens nothing in it;
+ADR-0002 keeps ownership of the semantics because `join_label` is the first
+executable thing to hang off a palette entry and decision 4's purity rule is
+that record's to apply.
+
+### Consequences
+
+- **`palette_entry/0` is wider by three keys**, which decision 10 says is a
+  change to this record and to that callback's contract. The friction is the
+  point: the surface a host declares against is not allowed to grow by
+  accretion in a module's typespec, and this section is what makes the three
+  keys that already shipped legitimate rather than merely present.
+- **The cap has one home.** `@presentation_cap 24`'s comment currently says it
+  lives in the module because this record carries no number; once this section
+  is accepted the comment is stale and should point here instead. That is a
+  code-comment follow-up, not a behaviour change - the value is identical.
+- **A fourth presentation key is a fourth amendment.** The bar decision 10 sets
+  everywhere else is unchanged by having cleared three at once.
+- **ADR-0002 B1's refusal is honoured rather than overridden.** B1 declined to
+  adopt the trio on this record's behalf; this record adopts it on its own,
+  which is the only route B1 left open and the reason the open item sat
+  undecided rather than being closed by the record that raised it.
+
+## Amendment (2026-08-30): decision 11, a `:compile` source, and `:lint` may carry `:error`
+
+**Status: accepted (2026-08-30, unqualified direction-agent verdict under the operator campaign-017 grant, PR 155).** Additive; decision 11 stands as accepted and
+no text above this line is edited by this section. It closes the first of the
+two open items recorded under decision 11 (:479-497); the second is closed by
+the section after this one.
+
+### Context
+
+Building `Finding.from_compiler/2` (`sb-kmk`) and the palette-aware slot
+validation behind it (`sb-da9`) exposed a gap the open item states plainly: the
+adapter maps compiler findings to a presentation source by stage - `:config` to
+`:config`, `:resolve` to `:resolution`, `:structure` to `:assignability` - and
+"anything else at `:error` severity is refused as `{:no_presentation_source,
+finding}`". So an error raised against generated SCXML, against the document
+envelope, or at any other stage has no source in decision 11's enum and cannot
+render in the editor at all.
+
+The refusal is the right refusal for the adapter to make - it declines to lie
+about where a rule lives rather than guessing a bucket - but the consequence is
+that a real compile error is unroutable, which is the one class of finding an
+author most needs to see anchored.
+
+The same gap reaches decision 11 from a second direction. `sb-4e0`'s
+SensitivePaths refusals arrive as `{:lint, :error}` pairs, and decision 11's
+prose says "every source listed above except `:lint` produces `:error`", with
+`:lint` rendering "as a warning rather than an error because a document with
+one is still compilable". A refusal to compile a document that reads a
+sensitive path is not that: the document does not compile, and presenting it as
+a warning would misstate what happened.
+
+### Decision
+
+**11h. `:compile` joins decision 11's `source` enum, and it is
+stage-agnostic.** A finding the by-stage mapping cannot place, at any severity,
+takes `source: :compile`. It says "the compiler said so" and deliberately says
+nothing more: it does not name the stage, because naming the stage in the
+presentation enum would make this enum grow a value every time the compiler
+grows a stage, and the presentation layer has no use for the distinction. The
+anchor still decides where the finding renders, exactly as decision 11 says;
+`:compile` only says where the finding came from.
+
+`from_compiler/2` may then map any unplaced compiler finding to `:compile`
+instead of refusing it. The `{:no_presentation_source, finding}` refusal keeps
+its meaning for inputs that are not compiler findings at all; it stops being
+the answer for compiler findings at stages the mapping does not name.
+
+**11i. `:lint` may carry `:error`.** Decision 11's "every source listed above
+except `:lint` produces `:error`" is a statement about the one lint that
+existed when it was written - the unregistered-invoke-type lint, which is
+correctly a warning for the reason decision 11 gives. It is not a property of
+the source. `:lint` is the source for rules the editor or the compiler applies
+beyond schema validity, and some of those rules are refusals: a SensitivePaths
+refusal is an error, and rendering it as a warning would tell an author their
+document compiles when it does not.
+
+Severity and source are therefore independent, which is what decision 11's
+struct already says with two separate fields. The unregistered-invoke-type
+lint's severity is unchanged and stays `:warning`.
+
+### Consequences
+
+- **The adapter stops refusing real errors.** The class of compile error that
+  could not render in the editor now has a source, and the editor's
+  document-level panel is complete in the sense decision 11 promised: no
+  finding can hide, including inside something folded shut, and now also
+  including inside a stage the mapping does not name.
+- **The enum stops tracking the compiler's stage list.** One stage-agnostic
+  value is a bound on this enum's growth, where a value per stage would have
+  been a standing obligation to amend this record whenever the compiler
+  changed shape.
+- **`:lint` carrying `:error` is a presentation fact, not a licence.** It does
+  not decide whether any particular lint belongs to the compiler or the editor
+  - that is still `sb-iwz`'s, per decision 11 and decision 15 - and it does not
+  make any existing lint an error.
+- **`Finding.from_compiler/2` gains a mapping rule.** That is a code follow-up
+  in its own bead, not a change this section makes.
+
+## Amendment (2026-08-30): decision 11, `:arity` leaves the source enum
+
+**Status: accepted (2026-08-30, unqualified direction-agent verdict under the operator campaign-017 grant, PR 155).** Additive; decision 11 stands as accepted
+and no text above this line is edited by this section, which supersedes the
+named clauses rather than rewriting them in place - the convention every
+amendment on this record follows. It closes the second of the two open items
+recorded under decision 11 (:490-497).
+
+### Context
+
+The open item states the finding: "Slot arity and undeclared-slot violations
+landed as `StatifierBlocks.SlotValidation`, reported through the compiler's
+`:structure` stage, so they adapt to `:assignability`. No rule in the adapter
+yields `:arity`, and no other producer exists. It remains reachable only by a
+caller passing `source: :arity` explicitly to `from_compiler/2`."
+
+An enum value no producer produces is worse than absent. A reader of decision
+11 reasonably infers that arity findings arrive tagged `:arity` and writes a
+presentation rule against it that will never fire, and the mismatch is
+invisible until someone traces the adapter.
+
+### Decision
+
+**11j. `:arity` is dropped from decision 11's `source` enum.** The accepted
+enum is `:config | :assignability | :resolution | :lint | :compile`, with
+`:compile` added by the section immediately above. Slot arity and
+undeclared-slot violations are `:assignability` findings, which is where the
+adapter has always put them and what the `:structure` stage they come through
+actually means.
+
+Two passages above are superseded on this point and no other:
+
+- Decision 11's `%Finding{}` sketch (:453) lists `:arity` in the `source`
+  union. Read it without that value.
+- The typespec appendix (:738) carries the same union a second time, for the
+  same struct. It is superseded identically; it was always a duplicate of the
+  sketch rather than a second contract.
+
+Decision 11's prose immediately above the sketch - "arity and undeclared-slot
+violations are about a slot" - stands unchanged and is now more accurate, not
+less: it describes what those findings are *anchored to*, which is still
+`{:slot, block_id, slot_name}`, and says nothing about which source they carry.
+The open item asked whether that prose should follow the enum; the answer is
+that it never depended on it.
+
+### Consequences
+
+- **Nothing that renders today changes.** No producer emitted `:arity`, so no
+  finding moves, no anchor moves, and no presentation rule that ever fired
+  stops firing.
+- **`@type source` in `lib/statifier_blocks/finding.ex` is now wider than this
+  record**, since it still lists `:arity`. Narrowing it is a code follow-up in
+  its own bead, along with the `view_model.ex` moduledoc sentence that names
+  `:arity` among the sources it does not produce. This section is deliberately
+  docs-only; until that bead lands, an explicit `source: :arity` passed to
+  `from_compiler/2` is still accepted by the code and is no longer a value this
+  record defines.
+- **The remaining four-plus-one enum is fully reachable.** `:config`,
+  `:assignability` and `:resolution` come from the by-stage mapping, `:lint`
+  from the lint seam, and `:compile` from everything else the compiler says -
+  which is the property the two open items together were asking for.
