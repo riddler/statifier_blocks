@@ -92,6 +92,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     optimistic concurrency on save, and it does not merge, rebase or resolve
     anything.
 
+    ## The insert mode, and the pick that lands nowhere (sb-dfyk)
+
+    `palette_position` is a mode, and every visible part of it hangs off that
+    one assign: the armed gap on the canvas, the instruction naming where the
+    pick will land, the Cancel beside it, and the `Escape` binding - which is
+    on the root only while the mode is open, so a resting editor holds no
+    window listener for a mode nobody opened. Arming also un-collapses the
+    palette, because a mode whose only instruction is inside a folded pane is
+    the same defect in a different place.
+
+    A pick made with **nothing** armed stays a no-op, and that is a ruling
+    rather than an omission. The alternative on the table was appending to the
+    selected container's default slot, and "default slot" is a rule no accepted
+    ADR states: decision 8 ties a pick to a position the author named at a gap,
+    and inventing a destination on their behalf would be a new contract written
+    into a handler rather than into the record. What the no-op was missing was
+    not a destination but a reason, so it now gives one - `palette_unarmed_pick`
+    is that sentence, and it renders in the same region the armed case uses for
+    its instruction.
+
     ## Assigns
 
     | Assign | Required | Meaning |
@@ -162,6 +182,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          palette_query: "",
          palette_sheet: false,
          palette_collapsed: false,
+         palette_unarmed_pick: false,
          fixtures: nil,
          inspector_tab: :config,
          drawer_open: false,
@@ -229,6 +250,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:block_count, Shell.block_count(assigns.view_model.root))
         |> assign(:edges, Connectors.edges(assigns.view_model.root, assigns.measurement))
         |> assign(:stage, Connectors.stage(assigns.measurement))
+        |> assign(
+          :insert_target,
+          Shell.insert_target(assigns.view_model.root, assigns.palette_position)
+        )
 
       ~H"""
       <div
@@ -237,6 +262,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-revision={@view_model.revision}
         data-zoom={@zoom}
         data-fit={@fit}
+        data-inserting={to_string(@palette_position != nil)}
+        phx-window-keydown={@palette_position != nil && "palette-close"}
+        phx-key={@palette_position != nil && "Escape"}
+        phx-target={@myself}
       >
         <header :if={@header != []} class="sb-editor__header">
           {render_slot(@header)}
@@ -252,6 +281,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             allowed={@palette_allowed}
             sheet_open={@palette_sheet}
             collapsed={@palette_collapsed}
+            insert_target={@insert_target}
+            unarmed_pick={@palette_unarmed_pick}
             target={@myself}
             icon={@icon}
           />
@@ -273,6 +304,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               root={@view_model.root}
               drag={@drag}
               selected_id={@selected_id}
+              armed={@palette_position}
               target={@myself}
               icon={@icon}
               theme={@theme}
@@ -467,12 +499,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
        assign(socket,
          palette_position: position,
          palette_allowed: accepted_types(socket, parent_id, slot),
-         palette_query: ""
+         palette_query: "",
+         palette_collapsed: false
        )}
     end
 
     def handle_event("palette-close", _params, socket) do
-      {:noreply, assign(socket, palette_position: nil, palette_allowed: nil)}
+      {:noreply,
+       assign(socket,
+         palette_position: nil,
+         palette_allowed: nil,
+         palette_unarmed_pick: false
+       )}
     end
 
     def handle_event("palette-search", %{"q" => query}, socket) do
@@ -554,13 +592,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # have cost it determinism.
     @spec insert_from_palette(Phoenix.LiveView.Socket.t(), Block.type_name(), Edit.target() | nil) ::
             Phoenix.LiveView.Socket.t()
-    defp insert_from_palette(socket, _type, nil), do: socket
+    defp insert_from_palette(socket, _type, nil),
+      do: assign(socket, :palette_unarmed_pick, true)
 
     defp insert_from_palette(socket, type, position) do
       case new_block(socket.assigns.palette, type) do
         {:ok, block} ->
           socket
-          |> assign(palette_position: nil, palette_allowed: nil, selected_id: block.id)
+          |> assign(
+            palette_position: nil,
+            palette_allowed: nil,
+            palette_unarmed_pick: false,
+            selected_id: block.id
+          )
           |> commit({:insert, position, block})
 
         :error ->
@@ -651,6 +695,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           drafts: %{},
           palette_position: nil,
           palette_allowed: nil,
+          palette_unarmed_pick: false,
           palette_sheet: false
         )
       end

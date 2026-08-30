@@ -125,6 +125,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert html =~ ~s(data-filtered="false")
       end
 
+      # The selector names the TOOLBAR's cancel specifically. Since sb-dfyk the
+      # palette carries one of its own beside the insert-mode line, and a bare
+      # `[phx-click="palette-close"]` matches both - the ambiguity is the point
+      # of both controls existing, not an accident to select around loosely.
       # Sabotage: "palette-close" clearing `palette_allowed` but not
       # `palette_position` - a later pick would then still insert, and the
       # document would change where this expects it not to.
@@ -132,13 +136,159 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {:ok, view, _html} = mount_editor(conn)
 
         view |> element(add_button("blk_wizard", "body", 0)) |> render_click()
-        html = view |> element(~s(button[phx-click="palette-close"])) |> render_click()
+
+        html =
+          view
+          |> element(~s(.sb-toolbar__button[phx-click="palette-close"]))
+          |> render_click()
 
         assert html =~ ~s(data-filtered="false")
 
         view |> element(~s(.sb-palette__pick[phx-value-type="core.wait"])) |> render_click()
 
         refute latest_document(), "no position, no insert"
+      end
+    end
+
+    # sb-dfyk. Everything above was already true before this bead and none of it
+    # was visible: the palette narrowed, the position was stored, and the canvas
+    # said nowhere which of forty-one gaps the next pick would fill.
+    describe "the armed gap" do
+      # Sabotage: passing `armed={nil}` from `Editor` to `Canvas` rather than
+      # `@palette_position` - the gap renders `data-armed="false"` everywhere and
+      # the first assertion goes red while every insertion test above still
+      # passes, which is exactly the shape of the defect.
+      test "clicking a + arms that gap and no other", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        html = view |> element(add_button("blk_wizard", "body", 1)) |> render_click()
+
+        assert [_one] = Regex.scan(~r/<div class="sb-gap sb-gap--armed"/, html)
+
+        assert html =~
+                 ~s(data-parent-id="blk_wizard" data-slot="body" data-index="1" data-armed="true")
+
+        assert has_element?(view, ~s(#{add_button("blk_wizard", "body", 1)}[aria-pressed="true"]))
+
+        assert has_element?(
+                 view,
+                 ~s(#{add_button("blk_wizard", "body", 0)}[aria-pressed="false"])
+               )
+      end
+
+      # The armed state is a mode, so it outlives the round trips an author
+      # spends deciding - typing in the search box is the one they always make.
+      # Sabotage: clearing `palette_position` in the "palette-search" handler -
+      # the gap disarms as soon as anyone types and this goes red.
+      test "stays armed across a search", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        view |> element(add_button("blk_wizard", "body", 1)) |> render_click()
+        html = view |> form("#sb-palette-search", %{"q" => "wait"}) |> render_change()
+
+        assert html =~ ~s(data-index="1" data-armed="true")
+      end
+
+      # Sabotage: dropping `palette_position: nil` from the successful
+      # `insert_from_palette/3` clause - the gap stays lit over a document that
+      # already took the block, and this goes red.
+      test "the pick inserts and clears it", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        view |> element(add_button("blk_wizard", "body", 1)) |> render_click()
+
+        html =
+          view |> element(~s(.sb-palette__pick[phx-value-type="core.wait"])) |> render_click()
+
+        refute html =~ "sb-gap--armed"
+        refute html =~ ~s(data-armed="true")
+        assert length(body_ids(latest_document())) == 4
+      end
+
+      # Sabotage: leaving the toolbar's cancel as the only one - this selector
+      # matches nothing and the test goes red on a missing element, which is
+      # the state the bead was filed about.
+      test "the palette's own Cancel disarms it", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        view |> element(add_button("blk_wizard", "body", 1)) |> render_click()
+        html = view |> element(~s(.sb-palette__cancel)) |> render_click()
+
+        refute html =~ "sb-gap--armed"
+        assert html =~ ~s(data-inserting="false")
+      end
+
+      # Escape is net-new: before this bead nothing in `lib/` or `assets/js`
+      # listened for a key at all. It is bound only while a gap is armed, so the
+      # editor is not holding a window listener for a mode nobody opened.
+      # Sabotage: binding `phx-window-keydown` unconditionally - the first
+      # refutation goes red on a resting editor that is listening anyway.
+      test "Escape cancels, and is bound only while something is armed", %{conn: conn} do
+        {:ok, view, html} = mount_editor(conn)
+
+        refute html =~ "phx-window-keydown"
+
+        html = view |> element(add_button("blk_wizard", "body", 1)) |> render_click()
+        assert html =~ ~s(phx-window-keydown="palette-close")
+        assert html =~ ~s(phx-key="Escape")
+
+        html = view |> element("#editor") |> render_keydown(%{"key" => "Escape"})
+
+        refute html =~ "sb-gap--armed"
+        refute html =~ "phx-window-keydown"
+
+        view |> element(~s(.sb-palette__pick[phx-value-type="core.wait"])) |> render_click()
+
+        refute latest_document(), "Escape left no position behind"
+      end
+    end
+
+    describe "the insert-mode line" do
+      # Sabotage: computing `insert_target` from `palette_allowed` rather than
+      # from `palette_position` - the line renders while the palette is
+      # narrowed but names nothing, and the slot assertion goes red.
+      test "says where the pick will land, in the canvas's own words", %{conn: conn} do
+        {:ok, view, html} = mount_editor(conn)
+
+        refute html =~ "Pick a block to insert into"
+
+        html = view |> element(add_button("blk_wizard", "body", 1)) |> render_click()
+
+        assert html =~ "Pick a block to insert into"
+        assert html =~ ~s(<strong class="sb-palette__mode-slot">Steps</strong>)
+        assert html =~ ~s(<strong class="sb-palette__mode-parent">Sequence</strong>)
+        assert html =~ ~s(data-inserting="true")
+      end
+
+      # Ruling (b), asserted end to end: with nothing armed the pick still
+      # changes no document, and now says so instead of failing silently.
+      # Sabotage: making `insert_from_palette(socket, _type, nil)` return the
+      # socket untouched again - the pick goes back to being invisible and the
+      # wording assertion goes red.
+      test "a pick with nothing armed inserts nothing and gives a reason", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        html =
+          view |> element(~s(.sb-palette__pick[phx-value-type="core.wait"])) |> render_click()
+
+        refute latest_document(), "ruling (b): no armed position, no insert"
+        assert html =~ "sb-palette__mode--unarmed"
+        assert html =~ "Nothing is armed"
+      end
+
+      # The reason is hidden by the mode line's own guard rather than by a
+      # second piece of state: an armed palette has an instruction to give, and
+      # `palette-close` clears the flag on every other way out of the reason.
+      # Sabotage: dropping `@insert_target == nil` from the unarmed line's
+      # `:if` - both lines render at once and this goes red.
+      test "the reason goes away once a gap is armed", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        view |> element(~s(.sb-palette__pick[phx-value-type="core.wait"])) |> render_click()
+        html = view |> element(add_button("blk_wizard", "body", 1)) |> render_click()
+
+        refute html =~ "sb-palette__mode--unarmed"
+        assert html =~ "Pick a block to insert into"
       end
     end
 

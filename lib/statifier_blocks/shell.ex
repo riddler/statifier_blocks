@@ -324,6 +324,50 @@ defmodule StatifierBlocks.Shell do
     end)
   end
 
+  @typedoc """
+  Where an armed insertion would land, in the two names the author already
+  reads off the canvas: the slot's label and the holding block's title.
+  """
+  @type insert_target :: %{slot: String.t(), parent: String.t()}
+
+  @doc """
+  The names of the position a palette pick would insert at, or `nil`.
+
+  `nil` for no armed position at all, and `nil` again for a position naming a
+  block or a slot this view model does not hold - a gap armed just before an
+  edit removed the block under it reaches the second, and there is nothing
+  truthful to say about it. Both answers are the same to a caller, because
+  both mean "there is no destination to name".
+
+  The labels rather than the raw ids for the reason `slot_label/2` gives:
+  `arm_approved` under `blk_wizard` is the editor naming, in an instruction
+  meant to orient someone, two things the canvas never showed them.
+
+  Pure, and here rather than in the component, so the sentence the palette
+  prints is asserted directly instead of through markup.
+  """
+  @spec insert_target(ViewModel.Node.t(), StatifierBlocks.Edit.target() | nil) ::
+          insert_target() | nil
+  def insert_target(_root, nil), do: nil
+
+  def insert_target(%ViewModel.Node{} = root, {parent_id, slot_name, _index}) do
+    with %ViewModel.Node{} = parent <- find_node(root, parent_id),
+         %ViewModel.Slot{} = slot <- Enum.find(parent.slots, &(&1.name == slot_name)) do
+      %{slot: slot.label, parent: ViewModel.title(parent)}
+    else
+      _no_such_parent_or_slot -> nil
+    end
+  end
+
+  @spec find_node(ViewModel.Node.t(), Block.id()) :: ViewModel.Node.t() | nil
+  defp find_node(%ViewModel.Node{block_id: id} = node, id), do: node
+
+  defp find_node(%ViewModel.Node{slots: slots}, id) do
+    Enum.find_value(slots, fn %ViewModel.Slot{children: children} ->
+      Enum.find_value(children, &find_node(&1, id))
+    end)
+  end
+
   @doc """
   The tables `fixtures` holds for one block, or `[]`.
 

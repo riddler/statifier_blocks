@@ -50,6 +50,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       String.trim(text)
     end
 
+    # The text inside one span, with its markup taken off and its whitespace
+    # collapsed, so an assertion is about the sentence an author reads rather
+    # than about where the formatter broke the line.
+    defp text_of(html, class) do
+      [_whole, text] =
+        Regex.run(~r{<span class="#{Regex.escape(class)}"[^>]*>(.*?)</span>}s, html)
+
+      text
+      |> String.replace(~r{<[^>]*>}, "")
+      |> String.replace(~r{\s+}, " ")
+      |> String.trim()
+    end
+
     # One row, from its `<li>` to the close of it.
     defp entry(html, type_name) do
       assert [row] = Regex.run(~r|<li data-type="#{Regex.escape(type_name)}".*?</li>|s, html)
@@ -155,6 +168,63 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert row =~ ~s(<span class="sb-palette__icon">)
         refute row =~ "data-icon", "there was no glyph to put in it"
+      end
+    end
+
+    describe "the insert-mode line (sb-dfyk)" do
+      # Sabotage: rendering the line unconditionally rather than under
+      # `:if={@insert_target}` - the resting palette grows an instruction with
+      # two blanks in it and the refutation below goes red.
+      test "is absent while nothing is armed" do
+        html = palette_html()
+
+        refute html =~ "sb-palette__mode"
+        refute html =~ "Pick a block to insert into"
+        assert html =~ ~s(data-inserting="false")
+      end
+
+      # The sentence names the destination in the words the canvas already
+      # shows: the slot's LABEL and the holder's TITLE, never `body` and never
+      # a block id.
+      # Sabotage: dropping `@insert_target.slot` from the template - the line
+      # renders "insert into of Sequence" and the label assertion goes red.
+      test "names the slot and the block the pick will land in" do
+        html = palette_html(insert_target: %{slot: "Steps", parent: "Sequence"})
+
+        assert html =~ ~s(data-inserting="true")
+        assert text_of(html, "sb-palette__mode-text") =~ "Pick a block to insert into"
+        assert html =~ ~s(<strong class="sb-palette__mode-slot">Steps</strong>)
+        assert html =~ ~s(<strong class="sb-palette__mode-parent">Sequence</strong>)
+      end
+
+      # The way out of the mode, beside the sentence that announced it. A real
+      # button, not a run of text: it is the control an author reaches for
+      # while lost, and it carries the same event the toolbar's does.
+      # Sabotage: rendering the Cancel as a `<span>` - the button assertion
+      # goes red, and with it the promise that the mode has a visible exit.
+      test "carries a Cancel control that closes the palette" do
+        html = palette_html(insert_target: %{slot: "Steps", parent: "Sequence"})
+
+        assert html =~ ~s(class="sb-palette__cancel")
+        assert html =~ ~s(phx-click="palette-close")
+        assert [_button] = Regex.run(~r|<button[^>]*sb-palette__cancel.*?</button>|s, html)
+      end
+
+      # The (b) ruling made visible: a pick with nothing armed stays a no-op,
+      # and says so in the region the armed case uses for its instruction.
+      # Sabotage: leaving the `@insert_target == nil` guard off the unarmed
+      # line - both lines render together while a gap is armed, and the
+      # refutation in the second block goes red.
+      test "the unarmed pick says why it did nothing, and only when nothing is armed" do
+        armed =
+          palette_html(insert_target: %{slot: "Steps", parent: "Sequence"}, unarmed_pick: true)
+
+        refute armed =~ "sb-palette__mode--unarmed"
+
+        loose = palette_html(unarmed_pick: true)
+        assert loose =~ "sb-palette__mode--unarmed"
+        assert text_of(loose, "sb-palette__mode-text") =~ "Nothing is armed"
+        assert text_of(loose, "sb-palette__mode-text") =~ ~s(Choose a "+" on the canvas first.)
       end
     end
 
