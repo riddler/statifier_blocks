@@ -591,7 +591,7 @@ clipped, an accent that is not an anchored `--sb-*` name never reaches a style
 attribute, and a `join_label` that raises degrades to the editor's own word.
 Assignability answers with reason-carrying refusals (sb-ue7, in flight).
 
-Routing a compile pass into the findings pane is two calls:
+Routing a compile pass into the drawer's Findings tab is two calls:
 
 ```elixir
 {lint_findings, _refused} =

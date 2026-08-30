@@ -41,7 +41,7 @@ defmodule StatifierBlocks.Shell do
   host already built with `StatifierBlocks.Predicates.TruthTable.build/2`.
   """
 
-  alias StatifierBlocks.{Block, BlockType, ViewModel}
+  alias StatifierBlocks.{Block, BlockType, Finding, ViewModel}
   alias StatifierBlocks.Predicates.TruthTable
 
   @typedoc "Truth tables a host supplies, keyed by the block they describe."
@@ -50,12 +50,25 @@ defmodule StatifierBlocks.Shell do
   @typedoc "Which of the inspector's three tabs is showing (3A)."
   @type inspector_tab :: :config | :findings | :condition
 
-  @typedoc "What the drawer is showing, from its own flag and the selection."
+  @typedoc """
+  Which of the drawer's tabs is showing (1A, and the R4 ruling of
+  2026-08-29 that put document findings here).
+  """
+  @type drawer_tab :: :tables | :findings
+
+  @typedoc "One entry in the drawer's tab strip: what it is called and how much it holds."
+  @type drawer_tab_entry :: %{id: drawer_tab(), title: String.t(), count: non_neg_integer()}
+
+  @typedoc "What the drawer is showing, from its own flag, its tab and the selection."
   @type drawer :: %{
           open?: boolean(),
+          tab: drawer_tab(),
+          tabs: [drawer_tab_entry()],
           status: :closed | :no_fixtures | :no_selection | :none_for_block | :ready,
           subject_id: Block.id() | nil,
           tables: [TruthTable.t()],
+          findings: [Finding.t()],
+          orphans: MapSet.t(Finding.t()),
           count: non_neg_integer(),
           jumps: [Block.id()],
           title: String.t()
@@ -68,6 +81,13 @@ defmodule StatifierBlocks.Shell do
   @default_zoom 100
 
   @inspector_tabs [:config, :findings, :condition]
+
+  # Tab order, and it is also the order the strip resolves an unchosen tab in
+  # (see `drawer_view/1`). Truth tables first because they are what 2A shipped
+  # the drawer for; findings second because R4 moved them here.
+  @drawer_tabs [:tables, :findings]
+
+  @drawer_titles %{tables: "Truth tables", findings: "Findings"}
 
   # Rem, and the drawer's own. The floor is a strip plus one row of a table -
   # below it the drawer is open and shows nothing, which is a worse state than
@@ -196,6 +216,30 @@ defmodule StatifierBlocks.Shell do
 
   def inspector_tab(_other), do: :config
 
+  @doc "The drawer's tabs, in the order the strip lists them."
+  @spec drawer_tabs() :: [drawer_tab()]
+  def drawer_tabs, do: @drawer_tabs
+
+  @doc """
+  The drawer tab `value` names, or `:tables`.
+
+  The same shape as `inspector_tab/1` and for the same reason: the tab arrives
+  from a `phx-value-tab` attribute, so an unknown one is a crafted payload
+  rather than a bug, and the answer to it is the first tab.
+  """
+  @spec drawer_tab(term()) :: drawer_tab()
+  def drawer_tab(value) when value in @drawer_tabs, do: value
+
+  def drawer_tab(value) when is_binary(value) do
+    Enum.find(@drawer_tabs, :tables, &(Atom.to_string(&1) == value))
+  end
+
+  def drawer_tab(_other), do: :tables
+
+  @doc "The title a drawer tab carries, on the strip and on the tab itself."
+  @spec drawer_title(drawer_tab()) :: String.t()
+  def drawer_title(tab) when tab in @drawer_tabs, do: Map.fetch!(@drawer_titles, tab)
+
   @doc """
   Every finding about the selected block, in one list (3A).
 
@@ -319,41 +363,87 @@ defmodule StatifierBlocks.Shell do
     do: Enum.reduce(fixtures, 0, fn {_id, tables}, acc -> acc + length(tables) end)
 
   @doc """
-  What the drawer shows, from its own open flag, the fixtures source and the
-  selection (2A).
+  What the drawer shows, from its own open flag, its tab, the fixtures source,
+  the document's findings and the selection (2A, and R4).
 
-  Five states, and the four that are not `:ready` are exactly the ones a
-  screenshot cannot show:
+  Two tabs since R4 (operator, 2026-08-29): truth tables, and the
+  document-level findings that used to render as a block under the canvas.
+  Both are tabular and about the whole document, which is 1A's admission test.
+  The tab decides the `title` and the `count` the strip carries, so a
+  collapsed drawer says what it is holding rather than naming one tab forever.
 
-    * `:closed` - the strip, with the document's count.
+  The truth-table statuses are unchanged and stay on `status`, because they
+  describe that tab's content and nothing about the findings tab depends on
+  them:
+
+    * `:closed` - the strip, with the active tab's count.
     * `:no_fixtures` - open, with no fixtures source at all. Nothing to index.
     * `:no_selection` - open, nothing selected: the index page, listing every
       block that owns a table.
     * `:none_for_block` - open, a block selected that owns none: the index
       page again, which is 2A's answer to the spike's cold-start gap.
     * `:ready` - the selected block's tables.
+
+  ## The unchosen tab
+
+  `:tab` is `nil` until an author picks one, and an unchosen drawer resolves
+  to **the first tab in `drawer_tabs/0` order with a non-zero count, or
+  `:tables` when every count is zero**. The rule is 2A's own: the strip exists
+  so the drawer's content is discoverable from any state, and a strip reading
+  `Truth tables 0` on a document with four findings in it hides the only thing
+  the drawer currently holds. Ties never arise - the order is the tie-break -
+  and once the author picks a tab the pick stands, empty or not, because at
+  that point the strip is reporting a choice rather than making one.
   """
   @spec drawer_view(%{
           optional(:open?) => boolean(),
+          optional(:tab) => drawer_tab() | nil,
           optional(:fixtures) => fixtures(),
+          optional(:findings) => [Finding.t()],
+          optional(:orphan_findings) => [Finding.t()],
           optional(:selected_id) => Block.id() | nil
         }) :: drawer()
   def drawer_view(state) do
     fixtures = Map.get(state, :fixtures)
     selected_id = Map.get(state, :selected_id)
-    count = table_count(fixtures)
+    findings = Map.get(state, :findings) || []
+
+    tabs =
+      Enum.map(@drawer_tabs, fn
+        :tables -> %{id: :tables, title: drawer_title(:tables), count: table_count(fixtures)}
+        :findings -> %{id: :findings, title: drawer_title(:findings), count: length(findings)}
+      end)
+
+    tab = resolve_tab(Map.get(state, :tab), tabs)
+    active = Enum.find(tabs, &(&1.id == tab))
 
     base = %{
       open?: Map.get(state, :open?, false) == true,
+      tab: tab,
+      tabs: tabs,
       status: :closed,
       subject_id: nil,
       tables: [],
-      count: count,
+      findings: findings,
+      orphans: MapSet.new(Map.get(state, :orphan_findings) || []),
+      count: active.count,
       jumps: table_block_ids(fixtures),
-      title: "Truth tables"
+      title: active.title
     }
 
     if base.open?, do: opened(base, fixtures, selected_id), else: %{base | jumps: []}
+  end
+
+  # An explicit pick stands, empty or not. An unchosen tab is resolved rather
+  # than defaulted, so the strip carries something to open the drawer for.
+  @spec resolve_tab(drawer_tab() | nil, [drawer_tab_entry()]) :: drawer_tab()
+  defp resolve_tab(tab, _tabs) when tab in @drawer_tabs, do: tab
+
+  defp resolve_tab(_unchosen, tabs) do
+    case Enum.find(tabs, &(&1.count > 0)) do
+      nil -> :tables
+      entry -> entry.id
+    end
   end
 
   @spec opened(drawer(), fixtures(), Block.id() | nil) :: drawer()

@@ -7,8 +7,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     1A says what belongs here and the test is two words: **tabular** and
     **document-level**. Content that is a grid of rows about the whole document
     goes in the drawer; content about one block does not, whatever its shape.
-    Truth tables ship first; fixture runs and the datamodel view have reserved
-    places and are not drafted here.
+
+    Two tabs ship. Truth tables were first. The document-level findings list
+    joined them under operator ruling R4 (2026-08-29), which retired the text
+    block that used to sit under the canvas: a list of findings is a grid of
+    rows about the whole document, so 1A's test admits it and the canvas gets
+    its height back. Fixture runs and the datamodel view have reserved places
+    and are not drafted here.
 
     The measurable reason the drawer exists at all: a truth table for a branch
     in a credit-card processing document is one row per case and one column per
@@ -19,14 +24,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     ## Never open-or-gone
 
-    2A: collapsed, the drawer is a **strip** carrying a title and a count -
-    "Truth tables (3)" - and that is what makes the content discoverable from
-    any state rather than only from the affordance that opens it. Opening it
-    with no table on the selected block shows the **index page**: the blocks
-    that do own one, each of them a jump. That is the whole of the spike's
-    cold-start gap, closed.
+    2A: collapsed, the drawer is a **strip** carrying a title and a count - a
+    small-caps label beside a chip, "Truth tables 3" - and that is what makes
+    the content discoverable from any state rather than only from the
+    affordance that opens it. Opening it with no table on the selected block
+    shows the **index page**: the blocks that do own one, each of them a jump.
+    That is the whole of the spike's cold-start gap, closed.
 
-    The count is the document's, not the selection's. A strip reading `(0)`
+    The strip reports the **active tab**, and an author who has not picked one
+    gets the first tab that actually holds something
+    (`StatifierBlocks.Shell.drawer_view/1` resolves it). That is 2A's own
+    reasoning applied to a second tab: a strip is worth having because it says
+    what is in the drawer, and one that names an empty tab while the other has
+    four rows in it says the opposite.
+
+    The count is the document's, not the selection's. A strip reading `0`
     because nothing happens to be selected would tell an author something false
     about their document.
 
@@ -43,6 +55,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
+    alias StatifierBlocks.Editor.Findings
     alias StatifierBlocks.Predicates.TruthTable
     alias StatifierBlocks.{Shell, ViewModel}
 
@@ -61,6 +74,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       <section
         class={["sb-drawer", @class]}
         data-open={to_string(@view.open?)}
+        data-tab={@view.tab}
         data-status={@view.status}
         data-count={@view.count}
         style={"--sb-drawer-height: #{@height}rem"}
@@ -81,18 +95,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <div class="sb-drawer__bar">
             <div class="sb-drawer__tabs" role="tablist" aria-label="Drawer">
               <button
+                :for={entry <- @view.tabs}
                 type="button"
                 role="tab"
-                id="sb-drawer-tab-tables"
-                class="sb-drawer__tab sb-drawer__tab--selected"
-                aria-selected="true"
-                aria-controls="sb-drawer-panel-tables"
+                id={"sb-drawer-tab-#{entry.id}"}
+                class={[
+                  "sb-drawer__tab",
+                  entry.id == @view.tab && "sb-drawer__tab--selected"
+                ]}
+                aria-selected={to_string(entry.id == @view.tab)}
+                aria-controls={"sb-drawer-panel-#{entry.id}"}
                 phx-click="drawer-tab"
-                phx-value-tab="tables"
+                phx-value-tab={entry.id}
                 phx-target={@target}
               >
-                {@view.title}
-                <span class="sb-drawer__count">({@view.count})</span>
+                {entry.title}
+                <span class="sb-drawer__count">({entry.count})</span>
               </button>
             </div>
 
@@ -129,22 +147,31 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <div
             class="sb-drawer__panel"
             role="tabpanel"
-            id="sb-drawer-panel-tables"
-            aria-labelledby="sb-drawer-tab-tables"
+            id={"sb-drawer-panel-#{@view.tab}"}
+            aria-labelledby={"sb-drawer-tab-#{@view.tab}"}
           >
-            <p :if={@view.status == :no_fixtures} class="sb-drawer__empty">
-              No fixtures source is attached to this editor, so there are no recorded
-              cases to show. A host supplies them alongside the document.
-            </p>
+            <%= if @view.tab == :findings do %>
+              <Findings.findings
+                findings={@view.findings}
+                orphans={@view.orphans}
+                root={@root}
+                target={@target}
+              />
+            <% else %>
+              <p :if={@view.status == :no_fixtures} class="sb-drawer__empty">
+                No fixtures source is attached to this editor, so there are no recorded
+                cases to show. A host supplies them alongside the document.
+              </p>
 
-            <.index_page
-              :if={@view.status in [:no_selection, :none_for_block]}
-              view={@view}
-              root={@root}
-              target={@target}
-            />
+              <.index_page
+                :if={@view.status in [:no_selection, :none_for_block]}
+                view={@view}
+                root={@root}
+                target={@target}
+              />
 
-            <.table :for={table <- @view.tables} table={table} />
+              <.table :for={table <- @view.tables} table={table} />
+            <% end %>
           </div>
         </div>
       </section>

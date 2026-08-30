@@ -2168,16 +2168,27 @@
   padding: var(--sb-space-half) var(--sb-space);
 }
 
+.sb-drawer__tabs {
+  display: flex;
+  gap: var(--sb-space);
+}
+
+/* Two tabs since R4, so which one is selected has to be legible rather than
+ * merely encoded. Weight alone said it when there was one tab and nothing to
+ * compare it against; the unselected tab standing down to the muted
+ * foreground is what makes the pair read as a choice, and it is the same
+ * treatment the inspector's tab strip already uses. */
 .sb-drawer__tab {
   font: inherit;
   cursor: pointer;
   background: none;
   border: none;
-  color: inherit;
+  color: var(--sb-fg-muted);
   padding: 0;
 }
 
 .sb-drawer__tab--selected {
+  color: var(--sb-fg);
   font-weight: var(--sb-weight-medium);
 }
 
@@ -2234,6 +2245,71 @@
   font-family: var(--sb-font-mono);
   font-size: var(--sb-text-xs);
   margin-left: var(--sb-space-half);
+}
+
+/* The Findings tab (operator ruling R4, 2026-08-29). The list used to sit
+ * under the canvas as a heading and a column of tinted pills; in the drawer it
+ * is a table of rows, and the row is what these rules build.
+ *
+ * Three columns and not a `<table>`: the severity and the subject are fixed
+ * shapes and the message is a sentence, so `1fr` on the message with the other
+ * two sized to their content is exactly what the row wants and needs no
+ * column headers to say it. The truth table beside it IS a table, because its
+ * columns are the document's rather than this stylesheet's.
+ *
+ * The severity colour stays on the row (`.sb-finding` and its modifier,
+ * unchanged), so a host that restyled one severity when this list lived under
+ * the canvas restyled it here too, with no edit. */
+.sb-findings__row {
+  padding: var(--sb-space-half);
+}
+
+.sb-findings__reveal,
+.sb-findings__orphan {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: baseline;
+  gap: var(--sb-space);
+  width: 100%;
+}
+
+/* The word as well as the colour, on the reasoning `Shell.cell_word/1`
+ * records for truth-table cells: a reader who cannot tell two hues apart gets
+ * the same list as everyone else. It inherits the row's colour rather than
+ * declaring its own, which is what keeps one severity spelled in one place. */
+.sb-findings__severity {
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+}
+
+.sb-findings__subject {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space-half);
+  min-width: 0;
+}
+
+/* The id in mono and quieter than the label, the same pairing
+ * `.sb-drawer__jump-id` already uses two rules up: the label is what an author
+ * recognises, the id is what they paste into a bug report. */
+.sb-findings__id {
+  color: var(--sb-fg-subtle);
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+}
+
+/* The sentence, and the only part of the row that is allowed to wrap. */
+.sb-findings__message {
+  min-width: 0;
+}
+
+/* An orphan has no block to reveal, so it is not a control and must not look
+ * like one - the same distinction the reveal button's absence already makes in
+ * the markup. */
+.sb-findings__orphan {
+  cursor: default;
 }
 
 /* --------------------------------------------------------- truth table */
