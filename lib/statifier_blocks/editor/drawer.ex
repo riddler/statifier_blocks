@@ -74,7 +74,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           aria-expanded="false"
         >
           <span class="sb-drawer__title">{@view.title}</span>
-          <span class="sb-drawer__count">({@view.count})</span>
+          <span class="sb-drawer__count">{@view.count}</span>
         </button>
 
         <div :if={@view.open?} class="sb-drawer__frame">
