@@ -3637,11 +3637,11 @@ cannot hold.
 as its own obligation.** The package draws the tab, activates it, counts it on
 the strip and gives it a panel; what goes in the panel is the host's, and
 whether it is tabular and document-level is the host's judgement to make about
-its own content. This is 8A's existing shape, not a new one: 8A already states
-that "the host acquires a small obligation it did not have: it renders the
-header and it stores the drawer height", and it already makes host markup the
-host's responsibility under "slots for markup, events for actions". The drawer
-gains a third item on that list.
+its own content. This is the shell amendment's existing shape, not a new one:
+its consequences already state that "the host acquires a small obligation it
+did not have: it renders the header and it stores the drawer height", and 8A
+itself already makes host markup the host's responsibility under "slots for
+markup, events for actions". The drawer gains a third item on that list.
 
 **The package's built-in set stays governed by the bullet exactly as written.**
 Truth tables and findings ship; fixture runs and the datamodel view keep their
