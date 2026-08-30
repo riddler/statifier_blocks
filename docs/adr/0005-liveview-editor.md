@@ -2961,12 +2961,12 @@ token, and the 2026-08-28 Note is why it introduces no tint.
 
 ## Note (2026-08-30): decision 10, the cap signals
 
-Drafted 2026-08-30, implementing bead `sb-z80a` (campaign 019). A dated Note
-rather than an amendment: decision 10 and the chip-row amendment above are
-unchanged in every particular, the presentation cap keeps its number and its
-refuse-never-truncate discipline, and no text above this line is edited by
-this section. What is recorded here is a consequence of the refusal that
-neither record states, and the reader the editor now has for it.
+A dated note rather than an amendment: decision 10 and the chip-row amendment
+above are unchanged in every particular, the presentation cap keeps its number
+and its refuse-never-truncate discipline, and no text above this line is edited
+by this section. Drafted 2026-08-30, implementing bead `sb-z80a` (campaign
+019). What is recorded here is a consequence of the refusal that neither record
+states, and the reader the editor now has for it.
 
 ### What the refusal costs
 
@@ -3018,11 +3018,16 @@ is not saying what its type declared. `:warning` is decision 11's own reading:
 "it compiles and something may not behave as intended".
 
 **Why not widen the cap, and why not truncate.** Both were available and both
-are refused here for the reasons already recorded: 10n and 10o settled that
-truncation "adds nothing, weakens nothing" is false at the card, and the number
-itself is ADR-0002 B3's, chosen so that a phrase fits and a sentence does not.
-This section adds no second opinion about length. It says only that a decision
-the editor takes on the author's behalf should be legible to the author.
+are refused here for reasons already recorded, neither of which is this
+section's to revisit. Truncation is 10o's: it keeps ADR-0002 B3's
+refuse-never-truncate discipline unchanged - an over-long chip is dropped, not
+clipped - and says of itself that it adds nothing to that table and weakens
+nothing in it. The number is 10n's, which states that it is decision 10's and
+not ADR-0002's, because B3 asked this record to carry it; the value is the
+spike's, chosen there so that "calls the host" and "timer" fit and a sentence
+does not. This section adds no second opinion about length. It says only that a
+decision the editor takes on the author's behalf should be legible to the
+author.
 
 ### What this Note also names
 
