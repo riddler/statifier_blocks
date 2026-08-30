@@ -65,6 +65,18 @@ defmodule StatifierBlocks.Shell do
   @typedoc "One entry in the drawer's tab strip: what it is called and how much it holds."
   @type drawer_tab_entry :: %{id: drawer_tab(), title: String.t(), count: non_neg_integer()}
 
+  @typedoc """
+  One block's findings, as the inspector's unselected Findings tab lists them.
+
+  `block_id` is `nil` for the one group that is not about a block - the
+  unanchored findings, whose anchors name ids the document does not hold.
+  """
+  @type findings_group :: %{
+          block_id: Block.id() | nil,
+          label: String.t(),
+          findings: [Finding.t()]
+        }
+
   @typedoc "What the drawer is showing, from its own flag, its tab and the selection."
   @type drawer :: %{
           open?: boolean(),
@@ -100,6 +112,10 @@ defmodule StatifierBlocks.Shell do
   @drawer_tabs [:tables, :findings]
 
   @drawer_titles %{tables: "Truth tables", findings: "Findings"}
+
+  # The heading over the findings whose anchor names no block in the document.
+  # A word rather than a block id, because there is no block to name.
+  @unanchored_label "Unanchored"
 
   # Rem, and the drawer's own. The floor is a strip plus one row of a table -
   # below it the drawer is open and shows nothing, which is a worse state than
@@ -572,6 +588,64 @@ defmodule StatifierBlocks.Shell do
   """
   @spec findings_count([Finding.t()]) :: non_neg_integer()
   def findings_count(findings) when is_list(findings), do: length(findings)
+
+  @doc """
+  The document's findings grouped by the block each one is anchored to, for
+  the inspector's Findings tab when nothing is selected.
+
+  The grouping is the only thing this adds to `findings_count/1`'s list: the
+  same findings, in the same order, cut into runs by their anchor's block id.
+  It does not filter, and it does not re-derive - a group's findings are the
+  ones handed in, so `Enum.map(groups, & &1.findings) |> List.flatten() |>
+  length()` is `findings_count/1` again by construction. That is deliberate:
+  a panel that showed fewer findings than the chip beside it counts is the
+  same two-numbers defect `findings_count/1` exists to close.
+
+  Group order is first appearance in `findings`, which is document order for
+  everything the view model derives, and the **unanchored group is last**. An
+  unanchored finding is one of `ViewModel.orphan_findings` - its anchor names
+  a block id the document does not hold - and it gets a group rather than a
+  filter because it is inside the number and an author who cannot see it
+  reads the chip as wrong. It carries `block_id: nil`, which is what tells a
+  caller there is nothing to select.
+
+  `root` is only ever read for a label; a `nil` root labels every group with
+  its block id, which is `label_for/2`'s own fallback for an id the tree does
+  not hold.
+  """
+  @spec findings_groups(ViewModel.Node.t() | nil, [Finding.t()], Enumerable.t()) :: [
+          findings_group()
+        ]
+  def findings_groups(root, findings, orphans) when is_list(findings) do
+    orphan_set = MapSet.new(orphans || [])
+    {unanchored, anchored} = Enum.split_with(findings, &MapSet.member?(orphan_set, &1))
+
+    by_block = Enum.group_by(anchored, &finding_block_id/1)
+
+    anchored
+    |> Enum.map(&finding_block_id/1)
+    |> Enum.uniq()
+    |> Enum.map(
+      &%{block_id: &1, label: group_label(root, &1), findings: Map.fetch!(by_block, &1)}
+    )
+    |> append_unanchored(unanchored)
+  end
+
+  @spec append_unanchored([findings_group()], [Finding.t()]) :: [findings_group()]
+  defp append_unanchored(groups, []), do: groups
+
+  defp append_unanchored(groups, unanchored),
+    do: groups ++ [%{block_id: nil, label: @unanchored_label, findings: unanchored}]
+
+  @spec group_label(ViewModel.Node.t() | nil, Block.id()) :: String.t()
+  defp group_label(%ViewModel.Node{} = root, id), do: label_for(root, id)
+  defp group_label(nil, id), do: id
+
+  # The anchor's block id, whichever of the three shapes decision 11 gives it.
+  @spec finding_block_id(Finding.t()) :: Block.id()
+  defp finding_block_id(%Finding{anchor: {:config, id, _key}}), do: id
+  defp finding_block_id(%Finding{anchor: {:slot, id, _name}}), do: id
+  defp finding_block_id(%Finding{anchor: {:block, id}}), do: id
 
   @doc """
   What the drawer shows, from its own open flag, its tab, the fixtures source,

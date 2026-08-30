@@ -449,6 +449,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             tab={@inspector_tab}
             node={@selected_node}
             slot_label={@selected_slot}
+            root={@view_model.root}
+            document_findings={@view_model.findings}
+            orphan_findings={@view_model.orphan_findings}
             pending={@pending_fields}
             expression_component={@expression_component}
             target={@myself}

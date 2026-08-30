@@ -21,6 +21,29 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         block's own findings, which is the distinction the campaign-014 polish
         pass filed as `sb-3l1` item a.
 
+    ## The Findings tab with nothing selected (sb-dbqq)
+
+    3A's rule decides what a tab is **about**; it does not say what a tab
+    does when its subject is missing. With no selection the Findings tab has
+    no block to be about, and what it did was render the same "select a
+    block" line the Condition tab does - a chip-less tab beside a document
+    with four things wrong with it.
+
+    So with `node: nil` the tab reads the **document**: the chip carries
+    `StatifierBlocks.Shell.findings_count/1` over the findings the editor
+    passes in - the one number this package means by "the document's
+    findings", the same one the drawer's strip and
+    `StatifierBlocks.Editor.findings_count/3` report - and the panel lists
+    them grouped by block, each row selecting its block through the same
+    `select` event the canvas and the drawer's list push.
+
+    This is the tab's empty state and not a fourth surface. The moment
+    anything is selected the tab is that block's findings again, unchanged,
+    and the document-level list an author *navigates* is still the drawer's
+    (R4). What the inspector adds is an answer where there was a dead end:
+    the count is not recomputed here, the list is not filtered here, and
+    selecting a row hands the author back to the pane's real subject.
+
     ## The Condition tab reads; it does not evaluate
 
     It renders the per-arm predicator source the block carries, one entry per
@@ -119,11 +142,30 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:target, :any, required: true)
     attr(:class, :string, default: nil)
 
+    attr(:document_findings, :list,
+      default: [],
+      doc: "`ViewModel.findings` - what the Findings tab reads with no selection"
+    )
+
+    attr(:orphan_findings, :list,
+      default: [],
+      doc: "`ViewModel.orphan_findings` - the subset with no block to select"
+    )
+
+    attr(:root, :any,
+      default: nil,
+      doc: "the view model's root `ViewModel.Node`, read only for group labels"
+    )
+
     @doc "The three tabs and the panel of whichever one is showing."
     def inspector(assigns) do
+      findings = Shell.block_findings(assigns.node)
+
       assigns =
         assigns
-        |> assign(:findings, Shell.block_findings(assigns.node))
+        |> assign(:findings, findings)
+        |> assign(:tab_count, tab_count(assigns.node, findings, assigns.document_findings))
+        |> assign(:groups, document_groups(assigns))
         |> assign(:conditions, Shell.condition_fields(assigns.node && assigns.node.form))
 
       ~H"""
@@ -154,8 +196,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             phx-target={@target}
           >
             {label(tab)}
-            <span :if={tab == :findings and @findings != []} class="sb-inspector__tab-count">
-              {length(@findings)}
+            <span :if={tab == :findings and @tab_count > 0} class="sb-inspector__tab-count">
+              {@tab_count}
             </span>
           </button>
         </div>
@@ -166,7 +208,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           id={"sb-inspector-panel-#{@tab}"}
           aria-labelledby={"sb-inspector-tab-#{@tab}"}
         >
-          <p :if={@node == nil and @tab != :config} class="sb-inspector__empty">
+          <p :if={@node == nil and @tab == :condition} class="sb-inspector__empty">
             Select a block on the canvas to inspect it.
           </p>
 
@@ -187,6 +229,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </section>
 
           <.findings_panel :if={@node != nil and @tab == :findings} findings={@findings} />
+          <.document_findings_panel
+            :if={@node == nil and @tab == :findings}
+            groups={@groups}
+            target={@target}
+          />
           <.condition_panel
             :if={@node != nil and @tab == :condition}
             node={@node}
@@ -282,6 +329,57 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
+    attr(:groups, :list, required: true)
+    attr(:target, :any, required: true)
+
+    # The unselected tab's panel. A group heading names the block, a row is its
+    # message, and a row is a button because the way out of a document-level
+    # list is selecting the thing the row is about - the same `select` event
+    # the canvas and the drawer's list push, so there is one way a block gets
+    # selected however an author arrives at it.
+    #
+    # The unanchored group's rows are spans: its findings name block ids the
+    # document does not hold, so there is nothing to select and a button that
+    # did nothing would be worse than no button. They are listed rather than
+    # filtered because they are inside the count on the tab beside them.
+    defp document_findings_panel(assigns) do
+      ~H"""
+      <p :if={@groups == []} class="sb-inspector__empty">No findings in this document.</p>
+      <div :if={@groups != []} class="sb-inspector__groups">
+        <section
+          :for={group <- @groups}
+          class="sb-inspector__group"
+          data-block-id={group.block_id}
+          data-unanchored={to_string(group.block_id == nil)}
+        >
+          <h3 class="sb-inspector__group-title">{group.label}</h3>
+          <ul class="sb-inspector__findings">
+            <li
+              :for={finding <- group.findings}
+              class={["sb-finding", Finding.severity_class(finding)]}
+              data-source={finding.source}
+              data-severity={finding.severity}
+            >
+              <button
+                :if={group.block_id != nil}
+                type="button"
+                class="sb-inspector__group-row"
+                phx-click="select"
+                phx-target={@target}
+                phx-value-block-id={group.block_id}
+              >
+                {finding.message}
+              </button>
+              <span :if={group.block_id == nil} class="sb-inspector__group-row">
+                {finding.message}
+              </span>
+            </li>
+          </ul>
+        </section>
+      </div>
+      """
+    end
+
     attr(:node, ViewModel.Node, required: true)
     attr(:conditions, :list, required: true)
 
@@ -309,6 +407,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       </div>
       """
     end
+
+    # The chip's number, and the whole of what the selection changes about it.
+    # With a block selected it is that block's findings, as it always was; with
+    # none it is `Shell.findings_count/1` over the document's, which is the one
+    # definition of that number - counting `@document_findings` here instead
+    # would be the second one, and two of them is the defect that seam closed.
+    @spec tab_count(ViewModel.Node.t() | nil, [Finding.t()], [Finding.t()]) :: non_neg_integer()
+    defp tab_count(nil, _block_findings, document_findings),
+      do: Shell.findings_count(document_findings)
+
+    defp tab_count(%ViewModel.Node{}, block_findings, _document_findings),
+      do: length(block_findings)
+
+    # Grouped only when they will be rendered: with something selected the tab
+    # is that block's findings and the document's grouping is not asked for.
+    @spec document_groups(map()) :: [Shell.findings_group()]
+    defp document_groups(%{node: nil} = assigns),
+      do: Shell.findings_groups(assigns.root, assigns.document_findings, assigns.orphan_findings)
+
+    defp document_groups(_selected), do: []
 
     # The header's subject, in the vocabulary the palette and the canvas use.
     # `entry.label` is decision 10's default-applied label, so it is a string
