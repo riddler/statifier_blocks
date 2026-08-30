@@ -1859,9 +1859,34 @@
   white-space: nowrap;
 }
 
+/* The search box (sb-lti6). The reset keeps native chrome ON for form
+ * controls, and for the config form's fields that is the right answer - they
+ * sit in a plain pane and a host's browser paints them the way that host's
+ * other forms are painted. This one is not that case: it is the first thing
+ * inside a bordered, rounded surface card, directly above a count line and a
+ * list of `sb-palette__pick` rows, and a native box in that company reads as
+ * the one element the package forgot rather than as the host's own type.
+ *
+ * Built from the tokens the rest of the pane is built from - the same
+ * `--sb-border`, `--sb-radius-sm` and `--sb-bg` the button vocabulary and the
+ * pane frame take - so a host retuning any of them moves the search with
+ * everything else instead of leaving it behind. No literal here is this
+ * rule's own.
+ *
+ * No focus rule: the subtree has exactly one focus treatment, declared in the
+ * reset, and a second one on a single control is how a surface drifts out of
+ * it. `min-width: 0` for the same reason `sb-field__input` carries it - an
+ * input's intrinsic minimum is what stops a flex parent from shrinking.
+ */
 .sb-palette__search {
   font: inherit;
   width: 100%;
+  min-width: 0;
+  padding: var(--sb-space-half) var(--sb-space);
+  color: var(--sb-fg);
+  background: var(--sb-bg);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
 }
 
 /* The count line (parity item 1.3). It sits directly under the search box
@@ -2057,20 +2082,6 @@
   line-height: var(--sb-leading);
 }
 
-.sb-toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--sb-space);
-}
-
-/* The toolbar wraps, and a label breaking mid-phrase ("Fit / width") is the
- * one thing a row of controls cannot do. Everything else these buttons wear
- * is `sb-button`. */
-.sb-toolbar__button {
-  white-space: nowrap;
-}
-
 /* ------------------------------------------------------------------ shell
  *
  * The 2026-08-29 shell amendment: three panes plus a full-width drawer row
@@ -2225,10 +2236,21 @@
 }
 
 .sb-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sb-space);
   padding: var(--sb-space-half) var(--sb-space);
   border: var(--sb-border-width) solid var(--sb-border);
   border-radius: var(--sb-radius);
   background: var(--sb-bg);
+}
+
+/* The toolbar wraps, and a label breaking mid-phrase ("Fit / width") is the
+ * one thing a row of controls cannot do. Everything else these buttons wear
+ * is `sb-button`. */
+.sb-toolbar__button {
+  white-space: nowrap;
 }
 
 /* The panel's name. Small caps rather than a heading size: it labels the pane

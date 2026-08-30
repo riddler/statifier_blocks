@@ -67,6 +67,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:can_undo?, :boolean, required: true)
     attr(:can_redo?, :boolean, required: true)
     attr(:selected?, :boolean, default: false)
+    # sb-lti6 removed the toolbar's "Cancel insert": one command had two
+    # buttons in two panes, and the palette's own Cancel is the one that sits
+    # beside the sentence explaining the mode it leaves. The attribute stays
+    # declared because `Editor` still passes it; dropping it there is a change
+    # to a file this bead does not own.
     attr(:inserting?, :boolean, default: false)
     attr(:target, :any, required: true)
     attr(:class, :string, default: nil)
@@ -96,15 +101,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             disabled={not @can_redo?}
           >
             Redo
-          </button>
-          <button
-            :if={@inserting?}
-            type="button"
-            class="sb-button sb-toolbar__button"
-            phx-click="palette-close"
-            phx-target={@target}
-          >
-            Cancel insert
           </button>
         </div>
 
