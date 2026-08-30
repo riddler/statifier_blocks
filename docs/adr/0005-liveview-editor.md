@@ -3442,3 +3442,148 @@ Filed with `sb-2vqm`, under the campaign-020 rulings D1 through D6 - in order:
 collapse is editor state, the reset on a document switch, the collapsed face,
 the ring and the token retirement, the keyboard path, and the number the badge
 reads.
+
+---
+
+## Amendment (2026-08-30): the shell arrangement, a fullscreen surface and a second pane fold
+
+**Status: proposed (2026-08-30), drafted under the operator's campaign-021
+grant and pending the independent direction-agent verdict.** Implements bead
+`sb-flae`, from campaign-021 rulings R2 and R3. Additive; the 2026-08-29 shell
+arrangement amendment stands exactly as written and no text above this line is
+edited by this section, with one exception it names below: the sentence in
+`StatifierBlocks.Editor.Inspector`'s moduledoc that said the inspector has no
+collapse was that amendment's ruling, and campaign-021 ruling R3 is the
+separate ruling it said would be needed.
+
+### Context
+
+The 2026-08-29 amendment decided the shell's regions and the boundary between
+what the package draws and what the host draws. It did not decide the shape of
+the box the host puts the whole thing in, and for as long as the editor was a
+canvas with an inspector beside it that omission cost nothing: a component that
+fits in a column fits wherever a host has a column.
+
+The shell amendment's own arrangement is what ended that. Three panes plus a
+full-width drawer row is not a component that sits in a page's content column;
+it is a page. Every consequence of pretending otherwise has now been paid at
+least once - a drawer resized against a height the host never gave it, a
+container query answering about a column rather than about the editor, a
+canvas that scrolls inside a pane that scrolls inside a host page. `sb-ceb`'s
+bounded mode and the `--sb-editor-height` token it added are the shape of that
+bill: they exist so a host CAN hand the editor a definite height, and nothing
+in this record has ever said that a host SHOULD.
+
+The second gap is smaller and is the same gap. The shell amendment gave the
+palette a fold and refused the inspector one in a single sentence, on the
+grounds that one pane's fold was enough of an answer to a cramped canvas. That
+was a reasonable ruling against a component embedded in someone else's column,
+where the editor's width is not the editor's to spend. It reads differently
+against a surface that owns the viewport, where the canvas's width is the
+whole of what the author has and both side panes are spending it.
+
+### Decision
+
+**8B. The editor assumes it owns the viewport, and a host mounts it on a
+dedicated route.** This extends 8A's split rather than changing it: 8A says
+which surfaces each side ships, and this says what the host's side is expected
+to look like. The host's outer header, document switcher and publish controls
+are chrome ABOVE a full-bleed container, and what goes in that container is the
+editor at the viewport's height minus that chrome. Not a card in a content
+column, not a panel in a tabbed admin page, and not a region sharing a scroll
+container with anything else.
+
+Stated as an assumption rather than as a requirement, because it is not
+enforceable and should not be: `--sb-editor-height` still defaults to `auto`,
+a host that drops the editor into a column still gets a working editor, and
+nothing in the package inspects its own box. What changes is whose defect it
+is when the drawer is off the bottom of a page. Under this clause that is the
+host's mounting, not the package's layout.
+
+**The exit link is `:header` slot content.** A fullscreen route needs a way
+back out - a breadcrumb, a close control, whatever the host's application
+calls it - and the package ships no such control and adds no attr for one. It
+goes in the `:header` slot, which is 8A's answer already: the slot is where the
+host's own markup goes, and a link back to wherever the author came from is
+markup only the host can write. This is the first time this record names the
+slot; it has existed in `StatifierBlocks.Editor` since the shell graduation
+(the `slot(:header, ...)` declaration, and the `.sb-editor__header` element
+that renders it only when the host fills it), and 8A described it in prose as
+"a header region is a named slot the host fills with its own markup" without
+committing to what it is called. It is called `:header`.
+
+**Small read-only chart rendering is out of the editor's scope.** The obvious
+reading of a fullscreen editor is that a host now has nowhere to show a chart
+at thumbnail size - in a list of documents, in a card, beside a run. That is a
+real need and it is not this component's: an editing surface that also renders
+well at 200 pixels is two components wearing one name, and the compromises run
+in opposite directions. The answer is a separate read-only viewer surface. It
+is noted here so the question stops being asked of the editor, and it is noted
+as unbuilt: nothing in this campaign or this record promises it, schedules it,
+or reserves a name for it.
+
+**Consequence: window-level keyboard bindings stop being rude.** A component
+embedded in a host page may not bind window keys - it does not know what else
+is on the page, and a chart editor that swallows `/` from a host's search box
+is the defect that reasoning prevents. A surface that owns the viewport is the
+case where it is no longer true, so the spike's keyboard layer becomes
+ELIGIBLE to graduate. Eligible is the whole of the claim: it is not scheduled
+here, no binding is specified here, and the one window binding the editor
+already has (Escape, while a palette insert is armed) is unaffected either way.
+
+**1B. The inspector folds, in the palette's shape.** The 2026-08-29 amendment
+refused this and said a second one would be a separate ruling; campaign-021
+ruling R3 is that ruling, and the answer is yes. Under 8B the canvas's width is
+the author's whole budget, and 21rem of inspector is the larger of the two
+things they can get back.
+
+It is deliberately the same mechanism and not a generalisation of it. One
+boolean of shell state, one server event carrying nothing, one attribute on the
+pane and one on the layout, and one stylesheet template per fold combination -
+no hook, no client state, no persistence, and no attr for a host to open the
+editor with a pane pre-folded. Like the palette's fold it is NOT reset by a
+document switch: a pane fold addresses no block, so nothing about it stops
+being true when a different document opens, which is the same sentence the
+2026-08-30 amendment on decision 2 writes to exempt the palette from the
+collapsed-ids reset. Unlike the collapsed-ids set, and for that reason, it is
+not editor state about the document at all.
+
+3A is untouched. A folded inspector is still a pane about the selected block;
+it is a pane about the selected block that is not on screen. No tab was added,
+no tab was moved to the drawer, and the folded face renders no content of its
+own beyond the pane's name and the control that brings it back.
+
+### Consequences
+
+- **One new token, and it is tier 2.** `--sb-inspector-collapsed-width` joins
+  `--sb-palette-collapsed-width` in the structural tier, for the same reason
+  that one exists: a rail holds a chevron and a rotated word at whatever type
+  scale the host set. Two tokens rather than one shared rail width, so a host
+  retuning one pane is not forced into retuning the other. Amendment 14e's
+  check passes in both directions - it is declared, and exactly the fold's own
+  template reads it.
+
+- **The fold templates compose, and that is why there are three.** A folded
+  palette, a folded inspector, and both folded are three grid templates at the
+  1280 breakpoint, because a rule that rebound only the third column would lose
+  to the palette's template whenever both panes were shut - and both shut is
+  precisely the state an author reaches for on a wide document.
+
+- **Nothing new is asserted about the client.** Neither hook file changes. The
+  folded face is markup the server rendered, which is decision 7's one-hook
+  argument and its measurement amendment intact for the same reason the
+  container fold left them intact.
+
+- **`--sb-editor-height` is now the documented mounting, not an escape
+  hatch.** `sb-ceb` added it so a host COULD bound the editor; 8B says a host
+  SHOULD. The token, its default of `auto`, and the bounded mode's behaviour
+  are all unchanged - what changed is which of the two modes this record
+  recommends.
+
+- **A question this record has been answering by omission now has an answer.**
+  "Where does the back link go" and "can I put this in a tab" were both
+  answered case by case from 8A's prose. 8B answers them once.
+
+Filed with `sb-flae`, under campaign-021 rulings R2 and R3 - the fullscreen
+stance and the inspector's fold, in one section because they are one claim
+about the shell read from two sides.

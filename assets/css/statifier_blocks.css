@@ -130,6 +130,7 @@
  *     2  --sb-palette-width
  *     2  --sb-palette-collapsed-width
  *     2  --sb-inspector-width
+ *     2  --sb-inspector-collapsed-width
  *     2  --sb-drawer-height
  *     2  --sb-rail-width
  *     2  --sb-config-preview-max-height
@@ -393,6 +394,11 @@
    * without editing structural CSS. */
   --sb-palette-collapsed-width: 2.25rem;
   --sb-inspector-width: 21rem;
+  /* And what the inspector column narrows to when the author folds it (the
+   * 2026-08-30 shell amendment). Its own token rather than a second consumer
+   * of the palette's: the two rails are the same size today and a host that
+   * retunes one has no reason to be forced into retuning the other. */
+  --sb-inspector-collapsed-width: 2.25rem;
   --sb-drawer-height: 14rem;
 
   /* Per-block-type identity (d14 amendment 14d), consumption side. Two rules
@@ -1957,7 +1963,12 @@
   padding: var(--sb-space);
 }
 
-.sb-palette__toggle {
+/* Both pane folds' controls. One vocabulary, two panes: the inspector's fold
+ * arrived a campaign after the palette's and there is no reading under which
+ * the two chevrons should be different sizes, so the selector list grew rather
+ * than a second block of the same declarations appearing further down. */
+.sb-palette__toggle,
+.sb-inspector__toggle {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -1973,7 +1984,8 @@
   cursor: pointer;
 }
 
-.sb-palette__toggle:hover {
+.sb-palette__toggle:hover,
+.sb-inspector__toggle:hover {
   color: var(--sb-fg);
   background: var(--sb-bg-muted);
   border-color: var(--sb-border);
@@ -1991,6 +2003,21 @@
 
 .sb-palette[data-collapsed="true"] .sb-palette__toggle::before {
   content: "\203a";
+}
+
+/* The inspector's chevron is the same statement mirrored, because the pane is
+ * on the other side of the canvas: pressing it moves this pane RIGHT, so it
+ * points right while the pane is open and left once it is shut. Reading the
+ * two panes' chevrons as a pair, they always point outward from the canvas
+ * when open and inward when folded, which is the same rule twice rather than
+ * two rules. */
+.sb-inspector__toggle::before {
+  content: "\203a";
+  line-height: 1;
+}
+
+.sb-inspector[data-collapsed="true"] .sb-inspector__toggle::before {
+  content: "\2039";
 }
 
 /* Folded. The body goes with `display: none` rather than a zero width, so its
@@ -2383,6 +2410,33 @@
   }
 }
 
+/* The inspector's fold gives its width back the same way, and the two folds
+ * compose. Written as three templates rather than one because the second and
+ * third are not derivable from the first: a shorthand that rebound only the
+ * third column would be overridden by the palette's template whenever both
+ * panes were shut, and the both-shut case is exactly the one an author reaches
+ * for when a document is too wide.
+ *
+ * Scoped to 1280 for the palette's reason and one of its own: below 780 the
+ * inspector stacks (7A), so there is no inspector column to narrow, and the
+ * pane's own collapsed rules below still fold the body away - which is the
+ * whole of what folding means in a stacked arrangement. */
+@container sb-editor (width >= 1280px) {
+  .sb-editor__layout[data-inspector="collapsed"] {
+    grid-template-columns:
+      var(--sb-palette-width)
+      minmax(0, 1fr)
+      var(--sb-inspector-collapsed-width);
+  }
+
+  .sb-editor__layout[data-palette="collapsed"][data-inspector="collapsed"] {
+    grid-template-columns:
+      var(--sb-palette-collapsed-width)
+      minmax(0, 1fr)
+      var(--sb-inspector-collapsed-width);
+  }
+}
+
 .sb-inspector {
   grid-area: inspector;
   min-width: 0;
@@ -2574,6 +2628,38 @@
   padding-right: var(--sb-space);
   padding-bottom: var(--sb-space);
   padding-left: var(--sb-space);
+}
+
+/* Folded, in the palette's shape: everything below the header goes with
+ * `display: none` rather than a zero width, so the tabs and the panel's
+ * controls leave the tab order and the accessibility tree together. The status
+ * goes with them - it is a block type's label, and a rail 2.25rem wide has
+ * nowhere to put one - which leaves the header as the whole pane: a column,
+ * with the title rotated to the one orientation that fits and the chevron at
+ * the top of the rail. */
+.sb-inspector[data-collapsed="true"] {
+  align-self: stretch;
+}
+
+.sb-inspector[data-collapsed="true"] .sb-inspector__tabs,
+.sb-inspector[data-collapsed="true"] .sb-inspector__panel,
+.sb-inspector[data-collapsed="true"] .sb-inspector__status {
+  display: none;
+}
+
+.sb-inspector[data-collapsed="true"] .sb-inspector__header {
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  padding: var(--sb-space) var(--sb-space-half);
+  border-bottom: 0;
+}
+
+.sb-inspector[data-collapsed="true"] .sb-inspector__title {
+  writing-mode: vertical-rl;
+  margin-top: var(--sb-space);
+  margin-right: 0;
+  white-space: nowrap;
 }
 
 .sb-inspector__tabs {

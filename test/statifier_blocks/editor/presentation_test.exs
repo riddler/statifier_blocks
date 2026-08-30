@@ -1147,9 +1147,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert css =~ ~r/^\.sb-node--selected > \.sb-node__chrome > \.sb-node__fold \{$/m
       end
 
-      # Every collapsed selector is scoped to `.sb-node`. `.sb-palette` has
-      # carried a `data-collapsed` of its own since the pane fold shipped, so
-      # a bare `[data-collapsed]` rule would reach across to it.
+      # Every collapsed selector names the element it is about. THREE elements
+      # carry a `data-collapsed` now - a card, the palette since its pane fold
+      # shipped, and the inspector since the 2026-08-30 shell amendment's
+      # ruling 1B - so a bare `[data-collapsed]` rule reaches all three, and
+      # the three geometries have nothing in common.
       # Sabotage: writing the collapsed rule as `[data-collapsed="true"]` with
       # no element - the palette picks up a card's geometry and this goes red.
       test "no collapsed rule is written unscoped" do
@@ -1159,11 +1161,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           Regex.scan(~r/^\s*([^\n{]*\[data-collapsed[^\n{]*)\{/m, css)
           |> Enum.map(&Enum.at(&1, 1))
           |> Enum.map(&String.trim/1)
-          |> Enum.reject(&(&1 =~ ~r/^\.sb-node|^\.sb-palette/))
+          |> Enum.reject(&(&1 =~ ~r/^\.sb-node|^\.sb-palette|^\.sb-inspector/))
 
         assert unscoped == [], """
-        Every `data-collapsed` rule names the element it is about. The palette
-        and a card both carry the attribute, and an unscoped rule reaches both.
+        Every `data-collapsed` rule names the element it is about. A card, the
+        palette and the inspector all carry the attribute, and an unscoped
+        rule reaches all three.
 
         Unscoped: #{inspect(unscoped)}
         """

@@ -281,6 +281,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          palette_sheet: false,
          palette_collapsed: false,
          palette_unarmed_pick: false,
+         inspector_collapsed: false,
          fixtures: nil,
          inspector_tab: :config,
          drawer_open: false,
@@ -423,6 +424,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <div
           class="sb-editor__layout"
           data-palette={if @palette_collapsed, do: "collapsed", else: "expanded"}
+          data-inspector={if @inspector_collapsed, do: "collapsed", else: "expanded"}
         >
           <PaletteBrowser.palette_browser
             groups={@view_model.palette_groups}
@@ -467,6 +469,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
           <Inspector.inspector
             tab={@inspector_tab}
+            collapsed={@inspector_collapsed}
             node={@selected_node}
             slot_label={@selected_slot}
             root={@view_model.root}
@@ -628,6 +631,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # no breakpoint of its own.
     def handle_event("palette-collapse", _params, socket),
       do: {:noreply, update(socket, :palette_collapsed, &(not &1))}
+
+    # The other pane's fold, in the shape the one above already has: one
+    # boolean, one round trip, no hook, and the width given back by the
+    # stylesheet reading `data-inspector` off the layout.
+    #
+    # It is the second pane fold, which the shell amendment refused once and
+    # ADR-0005's amendment of 2026-08-30 on the shell arrangement grants. Like
+    # the palette's it is deliberately NOT reset by `switch_document/2`: a pane
+    # fold addresses no block, so nothing about it stops being true when a
+    # different document opens - the same sentence that amendment's decision 2
+    # section writes to exempt the palette from the collapsed-ids reset.
+    def handle_event("inspector-collapse", _params, socket),
+      do: {:noreply, update(socket, :inspector_collapsed, &(not &1))}
 
     # A container folds shut. One server event, one MapSet, in the shape the
     # palette's fold above already has - and, like it, no hook and no client

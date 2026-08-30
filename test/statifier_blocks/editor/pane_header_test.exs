@@ -6,7 +6,9 @@
 if Code.ensure_loaded?(Phoenix.LiveView) do
   defmodule StatifierBlocks.Editor.PaneHeaderTest do
     @moduledoc """
-    The two side panes' header rows, and the palette's fold (parity item 1.1).
+    The two side panes' header rows, and both panes' folds - the palette's
+    (parity item 1.1) and the inspector's (ADR-0005, the 2026-08-30 shell
+    amendment, ruling 1B).
 
     The header rows are asserted against the components themselves rather than
     through a mounted editor, because that is what they are: presentation, with
@@ -147,6 +149,38 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert html =~ ~s(data-selected="true")
         assert status_text(html) == EditorFixtures.unknown_type()
       end
+
+      # The fold's control, asserted where the palette's is: on the component,
+      # because a chevron with no event on it is a chevron that looks right in
+      # a screenshot and does nothing.
+      # Sabotage: deleting the `<button class="sb-inspector__toggle">` from
+      # `Inspector` - the pane keeps its header and loses the only way to fold
+      # it, and this goes red on the class before the event assertion.
+      test "carries the fold's control" do
+        html = inspector_html(node: nil)
+
+        assert html =~ ~s(class="sb-inspector__toggle")
+        assert html =~ ~s(phx-click="inspector-collapse")
+      end
+
+      # Both directions, for the palette's reason: a one-sided label is the
+      # defect that reads correctly in whichever state the author opened in.
+      # The words are the inspector's own, not the palette's, because a control
+      # that offers to collapse the wrong pane is worse than an unlabelled one.
+      # Sabotage: hard-coding `aria-label="Collapse the inspector"` - the
+      # expanded case still passes and the folded one goes red on the word.
+      test "the chevron says what the press will do, in both states" do
+        expanded = inspector_html(node: nil, collapsed: false)
+        folded = inspector_html(node: nil, collapsed: true)
+
+        assert expanded =~ ~s(aria-label="Collapse the inspector")
+        assert expanded =~ ~s(aria-expanded="true")
+        assert expanded =~ ~s(data-collapsed="false")
+
+        assert folded =~ ~s(aria-label="Expand the inspector")
+        assert folded =~ ~s(aria-expanded="false")
+        assert folded =~ ~s(data-collapsed="true")
+      end
     end
 
     describe "folding the palette" do
@@ -187,6 +221,75 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         _rendered = render(view)
 
         assert has_element?(view, ~s(.sb-palette[data-collapsed="true"]))
+      end
+    end
+
+    describe "folding the inspector (ruling 1B)" do
+      # The same three-press shape the palette's fold is held to, because 1B's
+      # claim is that this IS that mechanism on the other side of the canvas -
+      # a fold that cannot be undone is the failure a toggle exists to avoid,
+      # and the pane it hides is the one the author edits in.
+      # Sabotage: making `inspector-collapse` assign `true` rather than
+      # negating - the first press folds, the second does nothing, and the
+      # inspector can never be got back.
+      test "the chevron folds the pane and unfolds it again", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        assert has_element?(view, ~s(.sb-inspector[data-collapsed="false"]))
+        assert has_element?(view, ~s(.sb-editor__layout[data-inspector="expanded"]))
+
+        view |> element(".sb-inspector__toggle") |> render_click()
+
+        assert has_element?(view, ~s(.sb-inspector[data-collapsed="true"]))
+        assert has_element?(view, ~s(.sb-editor__layout[data-inspector="collapsed"]))
+
+        view |> element(".sb-inspector__toggle") |> render_click()
+
+        assert has_element?(view, ~s(.sb-inspector[data-collapsed="false"]))
+        assert has_element?(view, ~s(.sb-editor__layout[data-inspector="expanded"]))
+      end
+
+      # 1B's "in the palette's shape" is load-bearing here and nowhere else:
+      # the two folds are the only editor state that survives a document swap,
+      # and they survive it for the same reason - a pane fold addresses no
+      # block. The collapsed-ids set, which does address blocks, is cleared by
+      # the same function, so this is not a claim about `switch_document/2`
+      # being lax.
+      # Sabotage: adding `inspector_collapsed: false` to `switch_document/2`'s
+      # assign list - the preference silently resets on every host swap.
+      test "the fold survives the host swapping the document", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        view |> element(".sb-inspector__toggle") |> render_click()
+        assert has_element?(view, ~s(.sb-inspector[data-collapsed="true"]))
+
+        send(view.pid, {:swap_document, EditorFixtures.credit_card()})
+        _rendered = render(view)
+
+        assert has_element?(view, ~s(.sb-inspector[data-collapsed="true"]))
+      end
+
+      # The two folds are independent booleans, and the both-shut state is the
+      # one the stylesheet needs a third template for - so the markup that
+      # template selects on is asserted here rather than inferred from the two
+      # single-fold tests.
+      # Sabotage: passing `@palette_collapsed` to `data-inspector` on the
+      # layout - every assertion above still passes, and this one goes red the
+      # moment the two panes disagree.
+      test "the two folds are independent", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        view |> element(".sb-palette__toggle") |> render_click()
+
+        assert has_element?(view, ~s(.sb-editor__layout[data-palette="collapsed"]))
+        assert has_element?(view, ~s(.sb-editor__layout[data-inspector="expanded"]))
+
+        view |> element(".sb-inspector__toggle") |> render_click()
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-editor__layout[data-palette="collapsed"][data-inspector="collapsed"])
+               )
       end
     end
   end
