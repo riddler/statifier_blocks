@@ -1149,6 +1149,30 @@
   background: var(--sb-accent-muted);
 }
 
+/* The armed gap (sb-dfyk). Clicking a "+" opens the palette against THIS
+ * position and nothing else, and until this rule existed the canvas said so
+ * nowhere: forty-one identical plus signs, one of which was now the
+ * destination of the next pick.
+ *
+ * Louder than hover on purpose, and it has to be - hover is where the pointer
+ * is now, and this is where the next pick lands whatever the pointer does
+ * next. A ring rather than a background alone, because the drag clause above
+ * already lights every gap's background while a block is in the air, and an
+ * armed gap has to stay distinguishable during one.
+ *
+ * `outline` rather than `border`: the "+" sits on a flow edge with a settled
+ * box, and a border would move every card under it by two pixels the moment
+ * the palette opened. */
+.sb-gap--armed > .sb-gap__add,
+.sb-gap--armed > .sb-gap__add:hover,
+.sb-canvas[data-dragging="true"] .sb-gap--armed > .sb-gap__add {
+  color: var(--sb-accent);
+  background: var(--sb-accent-muted);
+  outline: var(--sb-border-width) solid var(--sb-accent);
+  outline-offset: var(--sb-border-width);
+  font-weight: var(--sb-weight-strong);
+}
+
 /* The empty slot's placeholder. An empty arm is a real arm - 10d draws a fan
  * edge into one for exactly that reason - and an arm whose only content is a
  * dim "+" reads as a rendering that ran out rather than as somewhere to drop.
@@ -1560,6 +1584,74 @@
 
 .sb-palette__count[data-filtering="true"] {
   color: var(--sb-fg-muted);
+}
+
+/* `data-filtered` was stamped on the pane from the day the acceptance filter
+ * shipped and read by no rule at all (sb-dfyk), so a palette showing four of
+ * eleven types looked exactly like a registry with four types in it. The
+ * accented edge is the pane's half of the sentence the armed gap is saying on
+ * the canvas: these two elements are in one mode together, and the author has
+ * to be able to see that without reading either of them. */
+.sb-palette[data-filtered="true"] {
+  border-color: var(--sb-accent);
+}
+
+/* The insert-mode line: what the pick will do, and the way out of it.
+ *
+ * At the top of the body rather than beside the count, because it is an
+ * instruction and the count is an observation - the instruction is read first,
+ * once, and the count answers the question it raises. It carries the accent
+ * rather than the muted step every other line in this pane uses: it is the
+ * only content in the editor that is true for as long as a mode is open, and
+ * a mode nobody can see is the defect this whole rule exists to close. */
+.sb-palette__mode {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+  margin: 0 0 var(--sb-space);
+  padding: var(--sb-space-half) var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-accent);
+  border-radius: var(--sb-radius);
+  background: var(--sb-accent-muted);
+  color: var(--sb-accent);
+  font-size: var(--sb-text-xs);
+}
+
+.sb-palette__mode-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The pick with nothing armed says why it did nothing, in the same place the
+ * armed case says what it will do - one region, two states, so an author who
+ * has learned to look at one has learned to look at the other. Warning rather
+ * than accent: this one is reporting that a gesture did not take. */
+.sb-palette__mode--unarmed {
+  border-color: var(--sb-warning);
+  background: var(--sb-bg-muted);
+  color: var(--sb-warning);
+}
+
+/* A real control, not a run of text with a click handler. `font: inherit`
+ * alone is what the toolbar's buttons get and it is why the spike's chrome
+ * reads as chrome and this pane's did not; the Cancel out of a mode is the
+ * one button in the editor an author reaches for while lost. */
+.sb-palette__cancel {
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: var(--sb-weight-medium);
+  cursor: pointer;
+  color: var(--sb-accent);
+  background: var(--sb-bg);
+  border: var(--sb-border-width) solid var(--sb-accent);
+  border-radius: var(--sb-radius-sm);
+  padding: 0 var(--sb-space);
+}
+
+.sb-palette__cancel:hover,
+.sb-palette__cancel:focus-visible {
+  color: var(--sb-accent-hover);
+  border-color: var(--sb-accent-hover);
 }
 
 /* Between groups, not above the first: the count line already put a gap

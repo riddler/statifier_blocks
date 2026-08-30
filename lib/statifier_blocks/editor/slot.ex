@@ -63,6 +63,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     CSS from the absence of a child, because "this slot is empty" is a fact
     the view model already has and `:has()` would be re-deriving.
 
+    ## The armed gap (sb-dfyk)
+
+    A gap is also where an insertion is *aimed*, and until sb-dfyk it said so
+    nowhere. Clicking a "+" opened the palette against that one position and
+    left forty other plus signs looking exactly like the one that had just
+    become the destination of the next pick, so the mode the editor was now in
+    was legible only to the server.
+
+    `armed` is that position, threaded down here the way `drag` and
+    `selected_id` already are, and for the same reason: which gap is armed is
+    a fact about the whole editor, and a component that decided it locally
+    would be a second answer to a question that has one. The gap compares the
+    tuple to its own three coordinates and says `data-armed` and
+    `aria-pressed` - the attribute for the stylesheet, the ARIA state for
+    everyone the stylesheet cannot reach, since a "+" that has become a live
+    toggle is exactly the case `aria-pressed` exists for.
+
     ## The rail partition
 
     `:secondary` and `:failure` are both **attached rails** rather than body
@@ -152,6 +169,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:parent_id, :string, required: true)
     attr(:drag, :any, default: nil)
     attr(:selected_id, :string, default: nil)
+
+    attr(:armed, :any,
+      default: nil,
+      doc: """
+      The `{parent_id, slot, index}` the palette is armed at, or nil. Threaded
+      the way `drag` and `selected_id` are, and for the same reason: the gap
+      that was clicked is the one that has to look different, and only the
+      editor knows which one that is.
+      """
+    )
+
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:class, :string, default: nil)
@@ -195,7 +223,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </span>
         </div>
 
-        <.gap parent_id={@parent_id} slot={@slot.name} index={0} target={@target} />
+        <.gap
+          parent_id={@parent_id}
+          slot={@slot.name}
+          index={0}
+          armed={@armed}
+          target={@target}
+        />
         <.child
           :for={{child, index} <- Enum.with_index(@slot.children)}
           node={child}
@@ -204,6 +238,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           index={index}
           drag={@drag}
           selected_id={@selected_id}
+          armed={@armed}
           target={@target}
           icon={@icon}
         />
@@ -220,6 +255,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:index, :integer, required: true)
     attr(:drag, :any, default: nil)
     attr(:selected_id, :string, default: nil)
+    attr(:armed, :any, default: nil)
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
 
@@ -229,25 +265,41 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         node={@node}
         drag={@drag}
         selected_id={@selected_id}
+        armed={@armed}
         target={@target}
         icon={@icon}
       />
-      <.gap parent_id={@parent_id} slot={@slot} index={@index + 1} target={@target} />
+      <.gap
+        parent_id={@parent_id}
+        slot={@slot}
+        index={@index + 1}
+        armed={@armed}
+        target={@target}
+      />
       """
     end
 
     attr(:parent_id, :string, required: true)
     attr(:slot, :string, required: true)
     attr(:index, :integer, required: true)
+    attr(:armed, :any, default: nil)
     attr(:target, :any, required: true)
 
     defp gap(assigns) do
+      assigns =
+        assign(
+          assigns,
+          :armed?,
+          assigns.armed == {assigns.parent_id, assigns.slot, assigns.index}
+        )
+
       ~H"""
       <div
-        class="sb-gap"
+        class={["sb-gap", @armed? && "sb-gap--armed"]}
         data-parent-id={@parent_id}
         data-slot={@slot}
         data-index={@index}
+        data-armed={to_string(@armed?)}
       >
         <button
           type="button"
@@ -257,6 +309,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           phx-value-parent-id={@parent_id}
           phx-value-slot={@slot}
           phx-value-index={@index}
+          aria-pressed={to_string(@armed?)}
         >
           +
         </button>

@@ -260,6 +260,49 @@ defmodule StatifierBlocks.ShellTest do
     end
   end
 
+  describe "where an armed insertion would land (sb-dfyk)" do
+    setup do
+      view_model = ViewModel.build(EditorFixtures.signup_wizard(), EditorFixtures.palette(), [])
+      %{signup_root: view_model.root}
+    end
+
+    # The same load-bearing pair `slot_label/2` has, one level out: the slot is
+    # NAMED `body` and LABELLED `Steps`, and the whole point of the sentence the
+    # palette prints is to name the place in the words already on the canvas.
+    # Sabotage: returning `slot.name` rather than `slot.label` - the instruction
+    # reads "into Steps" nowhere and "into body" instead, and this goes red.
+    test "names the slot by its label and the holder by its title", %{signup_root: root} do
+      assert Shell.insert_target(root, {"blk_wizard", "body", 0}) ==
+               %{slot: "Steps", parent: "Sequence"}
+
+      assert Shell.insert_target(root, {"blk_variant", "otherwise", 0}) ==
+               %{slot: "Otherwise", parent: "Branch"}
+    end
+
+    # The index is not part of the answer. Three gaps in one slot are three
+    # different positions and one destination, and an instruction that changed
+    # between them would be reporting an implementation detail.
+    # Sabotage: folding the index into the map - the two calls stop being equal
+    # and this goes red.
+    test "does not vary with the index within the slot", %{signup_root: root} do
+      assert Shell.insert_target(root, {"blk_wizard", "body", 0}) ==
+               Shell.insert_target(root, {"blk_wizard", "body", 3})
+    end
+
+    # Three nil cases, one answer: nothing armed, a holder that is gone, and a
+    # slot the holder does not declare all mean there is no destination to name.
+    # Sabotage: dropping the `with` and matching the slot directly - the second
+    # and third raise instead of answering nil, which takes the pane down on the
+    # render after an edit removed the block a gap was armed in.
+    test "nothing armed, a vanished holder, and an unknown slot are all nil", %{
+      signup_root: root
+    } do
+      assert Shell.insert_target(root, nil) == nil
+      assert Shell.insert_target(root, {"blk_deleted_long_ago", "body", 0}) == nil
+      assert Shell.insert_target(root, {"blk_wizard", "no_such_slot", 0}) == nil
+    end
+  end
+
   describe "the selected block's findings (3A)" do
     # Sabotage: using `view_model.findings` instead - the inspector's tab
     # becomes the document-level panel, which is exactly the conflation 3A

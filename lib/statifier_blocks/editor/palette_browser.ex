@@ -133,6 +133,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:insert_target, :any,
+      default: nil,
+      doc: """
+      Where an armed pick would land, as `%{slot: label, parent: title}`, or
+      nil when nothing is armed. `StatifierBlocks.Shell.insert_target/2`
+      computes it; this component only prints it.
+      """
+    )
+
+    attr(:unarmed_pick, :boolean,
+      default: false,
+      doc: """
+      Whether the last pick was made with nothing armed, and so did nothing.
+      The visible half of that no-op.
+      """
+    )
+
     @doc """
     The palette: a header row, a search box, a count line, then a section per
     `entry.group`.
@@ -152,6 +169,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-filtered={to_string(@allowed != nil)}
         data-sheet={if @sheet_open, do: "open", else: "closed"}
         data-collapsed={to_string(@collapsed)}
+        data-inserting={to_string(@insert_target != nil)}
       >
         <div class="sb-palette__header">
           <h2 class="sb-palette__title">Palette</h2>
@@ -178,6 +196,32 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         </button>
 
         <div class="sb-palette__body">
+          <p :if={@insert_target} class="sb-palette__mode" role="status">
+            <span class="sb-palette__mode-text">
+              Pick a block to insert into
+              <strong class="sb-palette__mode-slot">{@insert_target.slot}</strong>
+              of <strong class="sb-palette__mode-parent">{@insert_target.parent}</strong>
+            </span>
+            <button
+              type="button"
+              class="sb-palette__cancel"
+              phx-click="palette-close"
+              phx-target={@target}
+            >
+              Cancel
+            </button>
+          </p>
+
+          <p
+            :if={@insert_target == nil and @unarmed_pick}
+            class="sb-palette__mode sb-palette__mode--unarmed"
+            role="status"
+          >
+            <span class="sb-palette__mode-text">
+              Nothing is armed, so that pick had nowhere to go. Choose a "+" on the canvas first.
+            </span>
+          </p>
+
           <form
             id="sb-palette-search"
             phx-change="palette-search"

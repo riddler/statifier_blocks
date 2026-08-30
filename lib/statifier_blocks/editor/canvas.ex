@@ -63,6 +63,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:root, ViewModel.Node, required: true)
     attr(:drag, :any, default: nil)
     attr(:selected_id, :string, default: nil)
+
+    attr(:armed, :any,
+      default: nil,
+      doc: "The `{parent_id, slot, index}` the palette is armed at, or nil (sb-dfyk)."
+    )
+
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:theme, :map, default: %{})
@@ -89,6 +95,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             node={@root}
             drag={@drag}
             selected_id={@selected_id}
+            armed={@armed}
             target={@target}
             icon={@icon}
           />
