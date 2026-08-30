@@ -128,6 +128,7 @@
  *     2  --sb-card-width
  *     2  --sb-column-min-width
  *     2  --sb-palette-width
+ *     2  --sb-palette-collapsed-width
  *     2  --sb-inspector-width
  *     2  --sb-drawer-height
  *     2  --sb-rail-width
@@ -367,6 +368,12 @@
    * the drawer, so a host setting it here is setting the FIRST height rather
    * than overriding a remembered one. */
   --sb-palette-width: 14rem;
+  /* What the palette column narrows to when the author folds it (parity item
+   * 1.1). A token rather than a literal for the reason the two pane widths
+   * are: the rail has to hold a chevron and a rotated word at whatever type
+   * scale the host set, and a host with a larger one has no way to say so
+   * without editing structural CSS. */
+  --sb-palette-collapsed-width: 2.25rem;
   --sb-inspector-width: 21rem;
   --sb-drawer-height: 14rem;
 
@@ -1093,8 +1100,114 @@
 
 /* --------------------------------------------------------------- palette */
 
+/* The pane frame (parity item 1.1). A bordered, rounded surface card, which
+ * is what makes the palette read as a region of the editor rather than as a
+ * list that happens to be to the left of one. `--sb-border` and not
+ * `--sb-border-strong`: it divides two panes of one surface and carries no
+ * information, which is exactly the case the d14 amendment exempts from the
+ * 3:1 ruling.
+ *
+ * No padding here on purpose. The header's bottom rule has to span the pane's
+ * full width to read as a rule at all, so the padding lives on the header and
+ * on the body instead. */
 .sb-palette {
   min-width: 0;
+  background: var(--sb-bg);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius);
+}
+
+.sb-palette__header {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space);
+  padding: var(--sb-space);
+  border-bottom: var(--sb-border-width) solid var(--sb-border);
+}
+
+/* Small caps at the smallest step: the pane's name is a label on a region,
+ * not content, and it is read once. `margin-right: auto` is what pushes the
+ * chevron to the far edge without a spacer element. */
+.sb-palette__title {
+  margin: 0;
+  margin-right: auto;
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+  color: var(--sb-fg-muted);
+}
+
+.sb-palette__body {
+  padding: var(--sb-space);
+}
+
+.sb-palette__toggle {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  font: inherit;
+  color: var(--sb-fg-muted);
+  background: transparent;
+  border: var(--sb-border-width) solid transparent;
+  border-radius: var(--sb-radius-sm);
+  cursor: pointer;
+}
+
+.sb-palette__toggle:hover {
+  color: var(--sb-fg);
+  background: var(--sb-bg-muted);
+  border-color: var(--sb-border);
+}
+
+/* The glyph points the way the press will MOVE the pane, so the control
+ * describes its effect rather than its current state - the reading that
+ * survives an author who arrived at the editor with the pane already folded.
+ * A character rather than an icon because it is the only glyph in the package
+ * that has to flip, and a rotated SVG here would be a sprite for one arrow. */
+.sb-palette__toggle::before {
+  content: "\2039";
+  line-height: 1;
+}
+
+.sb-palette[data-collapsed="true"] .sb-palette__toggle::before {
+  content: "\203a";
+}
+
+/* Folded. The body goes with `display: none` rather than a zero width, so its
+ * controls leave the tab order and the accessibility tree together - a pane an
+ * author can still Tab into is a pane that reads as broken to everyone not
+ * using a mouse. The header becomes the whole pane: a column, so the chevron
+ * sits at the top of the rail rather than centred in a tall empty box, and
+ * with no bottom rule, because there is nothing below it to divide from. */
+.sb-palette[data-collapsed="true"] {
+  align-self: stretch;
+}
+
+.sb-palette[data-collapsed="true"] .sb-palette__body {
+  display: none;
+}
+
+.sb-palette[data-collapsed="true"] .sb-palette__header {
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  padding: var(--sb-space) var(--sb-space-half);
+  border-bottom: 0;
+}
+
+/* Rotated, because the pane's identity in a 2.25rem rail has one orientation
+ * that fits. `margin-right` is released with it: the auto margin that pushed
+ * the chevron aside in a row would push the label off the bottom in a column. */
+.sb-palette[data-collapsed="true"] .sb-palette__title {
+  writing-mode: vertical-rl;
+  margin-top: var(--sb-space);
+  margin-right: 0;
+  white-space: nowrap;
 }
 
 .sb-palette__search {
@@ -1204,6 +1317,29 @@
 .sb-palette {
   grid-area: palette;
   position: relative;
+}
+
+/* The folded palette gives its width back to the canvas (parity item 1.1).
+ *
+ * Scoped to the one arrangement that has a palette column to narrow. It has to
+ * be scoped somehow, because `[data-palette]` outranks every 7A template below
+ * on specificity and an unscoped override would quietly restore three columns
+ * at every width. The two ways to scope it are this and rebinding
+ * `--sb-palette-width` on the layout, and the second is not available: d14 puts
+ * every custom property on the editor root, where a host can reach it, and the
+ * theme audit fails a declaration further in. So the width is written as a
+ * template, at the breakpoint that has one.
+ *
+ * Below 1280 the palette stacks full width, so folding there correctly moves
+ * no column - the body still goes, which is the whole of what folding means in
+ * a stacked arrangement. */
+@container sb-editor (width >= 1280px) {
+  .sb-editor__layout[data-palette="collapsed"] {
+    grid-template-columns:
+      var(--sb-palette-collapsed-width)
+      minmax(0, 1fr)
+      var(--sb-inspector-width);
+  }
 }
 
 .sb-inspector {
@@ -1323,6 +1459,63 @@
 }
 
 /* ----------------------------------------------------------- inspector */
+
+/* The pane frame, the palette's counterpart (parity item 1.1). Unpadded for
+ * the same reason: the header's rule and the tab strip's rule both have to
+ * span the pane, so the inset lives on the rows rather than on the card. */
+.sb-inspector {
+  background: var(--sb-bg);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius);
+}
+
+.sb-inspector__header {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space);
+  padding: var(--sb-space);
+  border-bottom: var(--sb-border-width) solid var(--sb-border);
+}
+
+.sb-inspector__title {
+  margin: 0;
+  margin-right: auto;
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+  color: var(--sb-fg-muted);
+}
+
+/* The pane's subject in words. Not uppercased: it is a block type's label,
+ * which is the author's own vocabulary, and shouting it would make the name
+ * they chose read as one more piece of chrome. `min-width: 0` with the
+ * ellipsis because a host type may phrase a long one and the header is a row
+ * that must not wrap. */
+.sb-inspector__status {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--sb-text-sm);
+  color: var(--sb-fg-subtle);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb-inspector__status[data-selected="true"] {
+  color: var(--sb-fg-muted);
+}
+
+/* The inset the unpadded card owes the one row that has none. The tab strip
+ * is deliberately left flush, so its rule spans the pane the way the header's
+ * does; the tabs' own horizontal padding is one space step, which is what this
+ * matches so the panel's text starts under the first tab's. Longhands rather
+ * than the shorthand: `.sb-inspector__panel` sets its own `padding-top` below,
+ * and a shorthand here would silently take it back. */
+.sb-inspector__panel {
+  padding-right: var(--sb-space);
+  padding-bottom: var(--sb-space);
+  padding-left: var(--sb-space);
+}
 
 .sb-inspector__tabs {
   display: flex;
@@ -1650,6 +1843,19 @@
       "canvas"
       "inspector"
       "drawer";
+  }
+
+  /* The strip is the palette's whole chrome down here, so the pane's own
+   * frame and header row stand down: two stacked headers is one more than a
+   * one-column arrangement has room for, and the fold has nothing to fold -
+   * the body is already a sheet. Nothing else about 7A moves. */
+  .sb-palette {
+    background: none;
+    border: 0;
+  }
+
+  .sb-palette__header {
+    display: none;
   }
 
   .sb-palette__strip {

@@ -44,6 +44,27 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     picking an entry closes it, since a sheet left open covers the thing the
     author just chose.
 
+    ## The pane header, and the collapse (parity item 1.1)
+
+    Above the strip and the body sits the pane's own header row: the name of
+    the pane, and a chevron that folds it. It is the palette's half of the
+    frame the spike gives both side panes, and 8A puts it on the package's
+    side of the split - it operates on the document that is open rather than
+    deciding which one is.
+
+    The collapse is a server-side command in the same shape everything else in
+    the shell amendment uses: one boolean on the editor, one event, no hook.
+    Collapsed, the body goes with `display: none` rather than a zero width, so
+    a folded pane is out of the tab order and out of the accessibility tree -
+    a pane an author can still Tab into is a pane that reads as broken to
+    everyone not using a mouse. The chevron stays, because it is the way back.
+
+    The header belongs to the **wide** arrangement. Below 780 the strip (7A)
+    is the palette's whole chrome and the stylesheet puts the header away:
+    two stacked headers is one more than a one-column arrangement has room
+    for, and the collapse has nothing to fold there - the body is already a
+    sheet.
+
     Picking an entry emits an `:insert` at exactly the position the "+" named,
     which is the identical command a successful drop would produce. That is
     what makes the whole insertion path exercisable in `LiveViewTest` without
@@ -83,7 +104,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "Whether the narrow-layout sheet is open (7A). Ignored above 780."
     )
 
-    @doc "The palette: a search box, then a section per `entry.group`."
+    attr(:collapsed, :boolean,
+      default: false,
+      doc: """
+      Whether the pane is folded to its header. The wide arrangement's
+      affordance; below 780 the strip is the palette's chrome and this is
+      ignored.
+      """
+    )
+
+    @doc "The palette: a header row, a search box, then a section per `entry.group`."
     def palette_browser(assigns) do
       assigns = assign(assigns, :visible, filter(assigns.groups, assigns.query, assigns.allowed))
 
@@ -92,7 +122,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         class={["sb-palette", @class]}
         data-filtered={to_string(@allowed != nil)}
         data-sheet={if @sheet_open, do: "open", else: "closed"}
+        data-collapsed={to_string(@collapsed)}
       >
+        <div class="sb-palette__header">
+          <h2 class="sb-palette__title">Palette</h2>
+          <button
+            type="button"
+            class="sb-palette__toggle"
+            phx-click="palette-collapse"
+            phx-target={@target}
+            aria-expanded={to_string(not @collapsed)}
+            aria-label={if @collapsed, do: "Expand the palette", else: "Collapse the palette"}
+            title={if @collapsed, do: "Expand the palette", else: "Collapse the palette"}
+          ></button>
+        </div>
+
         <button
           type="button"
           class="sb-palette__strip"

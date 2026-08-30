@@ -162,6 +162,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          palette_allowed: nil,
          palette_query: "",
          palette_sheet: false,
+         palette_collapsed: false,
          fixtures: nil,
          inspector_tab: :config,
          drawer_open: false,
@@ -241,12 +242,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           {render_slot(@header)}
         </header>
 
-        <div class="sb-editor__layout">
+        <div
+          class="sb-editor__layout"
+          data-palette={if @palette_collapsed, do: "collapsed", else: "expanded"}
+        >
           <PaletteBrowser.palette_browser
             groups={@view_model.palette_groups}
             query={@palette_query}
             allowed={@palette_allowed}
             sheet_open={@palette_sheet}
+            collapsed={@palette_collapsed}
             target={@myself}
             icon={@icon}
           />
@@ -382,6 +387,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     def handle_event("palette-sheet", _params, socket),
       do: {:noreply, update(socket, :palette_sheet, &(not &1))}
+
+    # Parity item 1.1's fold, in the same shape as every other gesture in this
+    # section: one boolean, one round trip, no hook. It is deliberately NOT
+    # reset by `switch_document/2` alongside the sheet - the sheet covers the
+    # canvas and a new document's blocks under the old one's sheet is a defect,
+    # whereas a folded palette is the author saying they want the width, and
+    # that preference does not stop being true because a different document
+    # opened.
+    #
+    # The width it frees is the stylesheet's to give back: the layout carries
+    # the state as `data-palette` and rebinds `--sb-palette-width`, so nothing
+    # here measures anything. Below 780 there is no column to narrow and the
+    # header the chevron sits in is not on screen, which is why this pairs with
+    # no breakpoint of its own.
+    def handle_event("palette-collapse", _params, socket),
+      do: {:noreply, update(socket, :palette_collapsed, &(not &1))}
 
     # One round-trip, one enumeration. Everything the client needs for the
     # rest of the drag is in the markup this re-render produces.
