@@ -86,7 +86,6 @@
  *     1  --sb-fg
  *     1  --sb-fg-muted
  *     1  --sb-fg-subtle
- *     1  --sb-fg-on-accent
  *     1  --sb-border
  *     1  --sb-border-strong
  *     1  --sb-border-width
@@ -270,7 +269,6 @@
   --sb-fg: #16181d;
   --sb-fg-muted: #5b6270;
   --sb-fg-subtle: #646c7a;
-  --sb-fg-on-accent: #ffffff;
 
   /* Lines. `--sb-border-strong` carries meaning - the boundary box's edge and
    * the undeclared-slot outline - and clears 3:1. `--sb-border` is
@@ -951,9 +949,10 @@
   grid-row: 3;
 }
 
-/* The chrome cell the badge will occupy. Nothing renders into it today - see
- * `.sb-badge` below - and it is kept beside every other chrome placement so a
- * collapsed badge lands where the grid already expects one. */
+/* The chrome cell the badge occupies. It renders on a collapsed container
+ * with findings in its subtree and on nothing else - see `.sb-badge` below -
+ * and the placement sits beside every other chrome placement so the grid
+ * already expects it. */
 .sb-node__chrome > .sb-badge {
   grid-column: 3;
   grid-row: 1;
@@ -1056,8 +1055,8 @@
 }
 
 /* R2 (operator ruling, 2026-08-29): "`x` on hover, `-` + `x` on the selected
- * card, nothing at rest." The `-` is a collapse control and this editor has no
- * collapse command, so the `x` is the whole of what ships.
+ * card, nothing at rest." Both halves ship: the `-` is the collapse control
+ * `.sb-node__fold` below, on container chrome only, and the `x` is this rule.
  *
  * Opacity, and deliberately NOT `display: none` or `visibility: hidden`: both
  * of those take the button out of the tab order, which would make deleting a
@@ -1100,6 +1099,79 @@
   border-color: var(--sb-error);
   background: var(--sb-error-bg);
   color: var(--sb-error);
+}
+
+/* R2's other half, and the only control on the card that is not about the
+ * document: the fold. It sits left of the `x` on a container's chrome, in the
+ * same square the `x` uses, so a card carries at most two affordances and they
+ * line up.
+ *
+ * Every selector here is scoped to `.sb-node`, deliberately. `.sb-palette`
+ * has carried its own `data-collapsed` since the pane fold shipped, and an
+ * unscoped `[data-collapsed]` rule would reach it.
+ *
+ * Opacity again, and for the reason the `x` gives above: `display: none` and
+ * `visibility: hidden` both take a button out of the tab order, and the fold
+ * is the keyboard path to a folded region. `data-reveal` names the CONTRACT
+ * the renderer chose - "hover-or-selected" while the container is open,
+ * "always" while it is shut - so the rest state is one string a test can read
+ * rather than a computed style nothing can check. Always visible while shut
+ * is not symmetry: a control that hides a region has to be the way back to
+ * it, and hover is not a gesture a keyboard has. */
+.sb-node__fold {
+  position: absolute;
+  top: 0;
+  right: calc(var(--sb-space-2) + var(--sb-space-half));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sb-space-2);
+  height: var(--sb-space-2);
+  padding: 0;
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  line-height: 1;
+  cursor: pointer;
+  transition: opacity 120ms ease-out;
+}
+
+/* The root carries no `x`, so its fold takes the square the `x` would have. */
+.sb-node[data-root="true"] > .sb-node__chrome > .sb-node__fold {
+  right: 0;
+}
+
+.sb-node__fold[data-reveal="hover-or-selected"] {
+  opacity: 0;
+}
+
+.sb-node__chrome:hover > .sb-node__fold,
+.sb-node__fold:focus-visible,
+.sb-node--selected > .sb-node__chrome > .sb-node__fold {
+  opacity: 1;
+}
+
+.sb-node__fold:hover {
+  border-color: var(--sb-border-strong);
+  color: var(--sb-fg);
+}
+
+/* A collapsed container renders no slots, no fan and no join marker, so it has
+ * nothing under its chrome and takes the shape a leaf has: the card's width,
+ * centred in the slot it sits in, and no gap under the card for a body that is
+ * not there. Nothing here hides anything - the region is unrendered rather
+ * than display-none'd, which is why the measure hook needs no change and why
+ * `Connectors.edges` finds no anchor to draw into. */
+.sb-node[data-collapsed="true"] {
+  width: var(--sb-card-width);
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+.sb-node[data-collapsed="true"] > .sb-node__chrome {
+  margin-bottom: 0;
 }
 
 /* D4: the whole of an unresolvable card's face below its chrome - one line,
@@ -1798,26 +1870,23 @@
 
 /* d11's last sentence: a finding can never hide inside something folded shut.
  *
- * Nothing renders this class today. The badge belongs to a COLLAPSED subtree
- * (:461, :1457) and this editor has no collapse command (d2's closed set,
- * restated at :2130), so `BlockNode` renders no badge at all (sb-vamn). The
- * rule is kept rather than deleted: the class is the seam the collapse bead
- * renders into.
+ * The badge belongs to a COLLAPSED subtree (:461, :1457), and now that a
+ * container can be folded shut there is a face to put it on: `BlockNode`
+ * renders it on a collapsed container whose rollup is greater than zero, and
+ * on nothing else.
  *
- * It is still the FILL that shipped, and :1233-1235 says the badge is a RING -
- * an inset shadow carrying no new token, chosen precisely so a badge would not
- * read like a filled config chip. Making that change here is not free and it
- * is deliberately NOT sb-vamn's: `--sb-fg-on-accent` is a tier-1 published
- * token and this rule is its ONLY consumer, so a ring whose count is
- * `--sb-error` strands it, and 14e refuses a declared token no rule reads.
- * Retiring it means the tier table above, `docs/theming.md`'s documented host
- * theme, and its own contrast test - a public-surface removal, decided with a
- * badge that actually renders in view. The bead that lands collapse takes
- * both together. */
+ * It is a RING and not a fill, which is what :1233-1235 asks for - an inset
+ * shadow carrying no new token, chosen precisely so a badge would not read
+ * like a filled config chip. The count is `--sb-error` on the surface it
+ * already sits on, so nothing here paints a foreground onto an accent. That is
+ * what retired `--sb-fg-on-accent`: this rule was its only consumer, and 14e
+ * refuses a declared token no rule reads, so the token left the tier table
+ * above, the declarations, and `docs/theming.md`'s documented host theme with
+ * it. */
 .sb-badge {
   border-radius: var(--sb-radius-sm);
-  background: var(--sb-error);
-  color: var(--sb-fg-on-accent);
+  box-shadow: inset 0 0 0 var(--sb-border-width) var(--sb-error);
+  color: var(--sb-error);
   font-size: var(--sb-text-xs);
   padding: 0 var(--sb-space-half);
 }

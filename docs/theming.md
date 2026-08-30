@@ -219,7 +219,6 @@ holds to the rule.
   --sb-fg: #eef1f6;
   --sb-fg-muted: #a8b2c2;
   --sb-fg-subtle: #93a0b2;
-  --sb-fg-on-accent: #0e1116;
 
   /* Lines. `--sb-border-strong` carries meaning - a boundary box, an
    * undeclared slot - and clears 3:1. `--sb-border` divides two panes of one

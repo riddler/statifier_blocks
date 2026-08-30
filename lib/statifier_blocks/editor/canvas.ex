@@ -87,6 +87,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "The `{parent_id, slot, index}` the palette is armed at, or nil (sb-dfyk)."
     )
 
+    attr(:collapsed, :any,
+      default: nil,
+      doc: """
+      The `MapSet` of block ids the author has folded shut, threaded the way
+      `selected_id` is and for the same reason: it is editor state rather than
+      anything the document holds, and only the editor knows it.
+      """
+    )
+
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:theme, :map, default: %{})
@@ -123,6 +132,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               node={@root}
               drag={@drag}
               selected_id={@selected_id}
+              collapsed={@collapsed}
               armed={@armed}
               target={@target}
               icon={@icon}

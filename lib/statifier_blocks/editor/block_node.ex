@@ -125,11 +125,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     so the contract is one string rather than a computed style nothing can
     check.
 
-    The `-` half of R2 is **not** shipped: it is a collapse control, and
-    this editor has no collapse command (ADR-0005's command set is
-    `:insert`, `:move`, `:remove`, `:update`). Inventing one to hang a
-    control off would be deciding a piece of the interaction model inside a
-    presentation bead.
+    The `-` half of R2 now ships too, on container chrome only, as
+    `.sb-node__fold`. It is not a fifth command: ADR-0005's command set is
+    still `:insert`, `:move`, `:remove`, `:update_config`, and which
+    containers are folded shut is editor state the shell holds beside the
+    selection (the amendment to decision 2, 2026-08-30). The fold is a native
+    `<button>` carrying `aria-expanded`, so Enter and Space are the browser's
+    and no window key binding exists. Its rest state differs from the `x` in
+    one way the stylesheet reads off `data-reveal`: revealed on hover or
+    selection while the container is open, and **always** visible while it is
+    shut, because a control that hides a region has to be the way back.
 
     ## Unresolvable blocks (decision 12)
 
@@ -198,7 +203,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     A node whose slots stack draws no marker at all. There is nothing to
     rejoin, and a word under a single column reads as a rendering bug.
 
-    ## The badge, and why no face carries one (sb-vamn)
+    ## The badge, and the one face that carries it
 
     ADR-0005 puts the count badge on a **collapsed** subtree (:461, :1457):
     `findings_count` covers a whole subtree precisely so that a node folded
@@ -207,19 +212,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     folded shut, which is the failure mode that makes tree editors feel
     unreliable.
 
-    This editor has no collapse command. Decision 2's command set is closed
-    (`:insert`, `:move`, `:remove`, `:update`) and decision 7a restates it, so
-    no node is ever collapsed and **the badge renders on no face**. What
-    shipped before was a badge on every container whenever its subtree rollup
-    was non-zero, which is not what the record says and read as an error on
-    every container face as the counts multiplied up the tree.
+    So `.sb-badge` renders on a **collapsed** container whose subtree rollup is
+    greater than zero, and nowhere else: never on an expanded face, and never
+    at a count of zero. What shipped before `sb-vamn` was a badge on every
+    container whenever its rollup was non-zero, which is not what the record
+    says and read as an error on every container face as the counts multiplied
+    up the tree; `sb-vamn` removed it and left the class as the seam this
+    renders into.
 
-    Nothing is lost by removing it: the rollup stays on the node as
-    `data-findings-count`, the drawer's Findings tab lists every finding, and
-    the inspector groups them. When a collapse command lands, its own bead
-    renders `.sb-badge` on the collapsed node - the stylesheet still carries
-    the class. The ring treatment :1233 argues for rides with that bead, for
-    the reason the stylesheet records beside the rule.
+    The rollup itself is unchanged and is still on every node as
+    `data-findings-count`, expanded or not, so the drawer's Findings tab and
+    the inspector's grouping read exactly what they read before. The badge is
+    a **ring** rather than a fill - the treatment :1233-1235 argues for, and
+    the reason `--sb-fg-on-accent` had no consumer left to justify it.
     """
 
     use Phoenix.Component
@@ -236,6 +241,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:node, ViewModel.Node, required: true)
     attr(:drag, :any, default: nil)
     attr(:selected_id, :string, default: nil)
+
+    attr(:collapsed, :any,
+      default: nil,
+      doc: """
+      The `MapSet` of block ids the author has folded shut, threaded down the
+      recursion the way `selected_id` is. A node reads its own membership and
+      passes the whole set on; nothing here holds state.
+      """
+    )
 
     attr(:armed, :any,
       default: nil,
@@ -268,6 +282,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     @doc "One block: chrome, findings, and its slots, recursively."
     def block_node(assigns) do
+      assigns = assign(assigns, :collapsed?, collapsed?(assigns.node, assigns.collapsed))
+
       ~H"""
       <div
         class={[
@@ -286,7 +302,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-findings-count={@node.findings_count}
         data-dragging={to_string(@drag != nil and @drag.block_id == @node.block_id)}
         data-root={to_string(@root?)}
-        data-container={to_string(@node.slots != [])}
+        data-container={to_string(container?(@node))}
+        data-collapsed={to_string(@collapsed?)}
         data-arrangement={ViewModel.arrangement(@node)}
         data-sb-anchor={Connectors.node_anchor(@node.block_id)}
         draggable={to_string(not @root?)}
@@ -312,6 +329,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </div>
           <span :if={@node.invoke_type} class="sb-node__invoke">{@node.invoke_type}</span>
           <button
+            :if={container?(@node)}
+            type="button"
+            class="sb-node__fold"
+            data-reveal={if @collapsed?, do: "always", else: "hover-or-selected"}
+            aria-expanded={to_string(not @collapsed?)}
+            aria-label={fold_label(@collapsed?) <> " " <> ViewModel.title(@node)}
+            title={fold_label(@collapsed?)}
+            phx-click="collapse-toggle"
+            phx-target={@target}
+            phx-value-block-id={@node.block_id}
+          >
+            {if @collapsed?, do: "+", else: "-"}
+          </button>
+          <span :if={@collapsed? and @node.findings_count > 0} class="sb-badge">
+            {@node.findings_count}
+          </span>
+          <button
             :if={not @root?}
             type="button"
             class="sb-node__remove"
@@ -333,14 +367,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         </p>
 
         <div
-          :if={ViewModel.fan_label(@node)}
+          :if={not @collapsed? and ViewModel.fan_label(@node)}
           class="sb-node__fan"
           data-sb-anchor={Connectors.fan_anchor(@node.block_id)}
         >
           <span class="sb-node__fan-label">{ViewModel.fan_label(@node)}</span>
         </div>
 
-        <div class={["sb-node__slots", layout_class(@node)]}>
+        <div :if={not @collapsed?} class={["sb-node__slots", layout_class(@node)]}>
           <Slot.slot
             :for={slot <- @node.slots}
             slot={slot}
@@ -348,6 +382,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             parent_id={@node.block_id}
             drag={@drag}
             selected_id={@selected_id}
+            collapsed={@collapsed}
             armed={@armed}
             target={@target}
             icon={@icon}
@@ -355,7 +390,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         </div>
 
         <div
-          :if={join_label(@node)}
+          :if={not @collapsed? and join_label(@node)}
           class="sb-node__join"
           data-sb-anchor={Connectors.join_anchor(@node.block_id)}
         >
@@ -371,6 +406,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       </div>
       """
     end
+
+    # A container is a node with at least one declared slot, which is exactly
+    # what `data-container` has always said. A container with an empty subtree
+    # is still a container and may still fold: what folds is the region, not
+    # the children that happen to be in it.
+    @spec container?(ViewModel.Node.t()) :: boolean()
+    defp container?(%ViewModel.Node{slots: slots}), do: slots != []
+
+    # A leaf is never collapsed, whatever the set says. It renders no fold
+    # button, so nothing can put it in there - and a set that somehow held one
+    # would otherwise hide a card with no way to get it back.
+    @spec collapsed?(ViewModel.Node.t(), MapSet.t(String.t()) | nil) :: boolean()
+    defp collapsed?(_node, nil), do: false
+
+    defp collapsed?(%ViewModel.Node{} = node, collapsed),
+      do: container?(node) and MapSet.member?(collapsed, node.block_id)
+
+    @spec fold_label(boolean()) :: String.t()
+    defp fold_label(true), do: "Expand"
+    defp fold_label(false), do: "Collapse"
 
     # 14d's consumption side, and the only place a card learns it has an
     # identity. `ViewModel.accent_token/1` decides whether the palette entry

@@ -1,6 +1,6 @@
 # ADR-0005: The editor is a pure command algebra and view model with a thin LiveView shell
 
-Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 9 amended - the `:duration` control, predicator strings primary (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 91); the shell arrangement recorded - three panes and a drawer, rulings 1A/2A/3A/7A/8A (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 92); decision 7 amended - a second, read-only measurement hook (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 100); decision 10 amended - the shipped `icon` names are heroicon names, 10k/10l (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 128); decisions 10 and 13 amended - rendering the tree and its connectors, 10a-10c (2026-08-29, accepted under the operator campaign-016 direction-agent gate grant, PR 135); decision 10 amended - the presentation trio and the 24-character cap, 10m-10o (2026-08-30, accepted under the operator campaign-017 direction-agent gate grant, PR 155); decision 11 amended - a `:compile` source and `:lint` at `:error`, 11h/11i (2026-08-30, same gate, PR 155); decision 11 amended - `:arity` dropped from the source enum, 11j (2026-08-30, same gate, PR 155)
+Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 9 amended - the `:duration` control, predicator strings primary (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 91); the shell arrangement recorded - three panes and a drawer, rulings 1A/2A/3A/7A/8A (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 92); decision 7 amended - a second, read-only measurement hook (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 100); decision 10 amended - the shipped `icon` names are heroicon names, 10k/10l (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 128); decisions 10 and 13 amended - rendering the tree and its connectors, 10a-10c (2026-08-29, accepted under the operator campaign-016 direction-agent gate grant, PR 135); decision 10 amended - the presentation trio and the 24-character cap, 10m-10o (2026-08-30, accepted under the operator campaign-017 direction-agent gate grant, PR 155); decision 11 amended - a `:compile` source and `:lint` at `:error`, 11h/11i (2026-08-30, same gate, PR 155); decision 11 amended - `:arity` dropped from the source enum, 11j (2026-08-30, same gate, PR 155); decision 2 amended - a container folds shut and the fold is editor state, 2a-2f PROPOSED (2026-08-30, drafted under the operator campaign-020 direction-agent gate grant)
 
 ## Context
 
@@ -3195,3 +3195,154 @@ finding is, what it is anchored to, which severities exist, and which
 surfaces render a finding. Nothing here adds vocabulary; it records which
 functions are the shared readers, so the next surface reads rather than
 re-derives.
+
+---
+
+## Amendment (2026-08-30): decision 2, a container folds shut
+
+**Status: proposed (2026-08-30), implementing bead `sb-2vqm` under the operator campaign-020 direction-agent gate grant.** Additive; decision 2 stands exactly as
+written and no text above this line is edited by this section. It ships the
+control decision 2's own consequences left unbuilt, and it ships it **without
+adding a command**, which is the only reason a section about folding a card
+belongs to decision 2 at all.
+
+### Context
+
+Three places in this record already describe a folded container as something
+this editor has. Decision 11 says a collapsed subtree carries a count badge
+"so a finding can never hide inside something folded shut"; the `:info`
+amendment (2026-08-29) says an advisory "contributes to a collapsed subtree's
+count badge"; the undeclared-paths amendment (2026-08-29) says the same of an
+undeclared path's finding, "and per 11c it changes no verdict". The Note
+(2026-08-28) on decision 14 goes further and treats the badge's ring treatment
+as a design decision already taken.
+
+None of it was true. Nothing collapsed, so `.sb-badge` rendered on no face at
+all after `sb-vamn` removed the version that painted every container's rollup,
+and the stylesheet carried the class as a seam with a comment saying what the
+bead that landed collapse would owe. Three sentences of this record described
+an editor that did not exist, and the number they described - `findings_count`,
+the subtree rollup - was already on every node waiting for a face to be read
+on.
+
+The reason it stayed unbuilt is worth stating, because it is the objection this
+section has to answer. `BlockNode`'s moduledoc and the stylesheet both refused
+to invent the control on the grounds that decision 2's command set is closed:
+`:insert`, `:remove`, `:move`, `:update_config` and nothing else. Adding a
+fifth command to hang a fold from would be deciding a piece of the interaction
+model inside a presentation bead, so both refused and said so.
+
+That refusal was right about the command set and wrong about what collapse is.
+
+### Decision
+
+**2a. Collapse is editor state, and decision 2's four commands are unchanged.**
+The set was always the DOCUMENT's algebra - what an author does *to the
+document*, serializable, invertible, replayable. Which containers this author
+has folded shut is not in the document, so there is no fifth command, nothing
+new on the undo stack, and nothing new serialized. `{:insert, target,
+%Block{}}`, `{:remove, block_id}`, `{:move, block_id, target}` and
+`{:update_config, block_id, config}` are still the whole set, and this section
+adds none.
+
+Collapse joins the selection and the palette's own fold as state the shell
+holds: a `MapSet` of block ids beside `selected_id`, toggled by one server
+event carrying the block id, in the shape the palette fold already has. It
+touches no `Edit` function, no `Document`, and no compiler.
+
+**2b. `switch_document/2` clears it, exactly as it clears the selection.** A
+block id from the old document names nothing in the new one, so the set goes
+the way the selection, the drafts and the pending insert go under the shell
+amendment's ruling 2A. The palette's own fold is the deliberate exception it
+already was: that one addresses no block, so nothing about it stops being true
+when a different document opens, and the reset must not reach it.
+
+Not persisted, in either direction: the host is told nothing, no assign
+survives a remount, and there is no attr for a host to open an editor
+pre-folded. A fold is a thing an author did a moment ago, not a document
+property.
+
+**2c. The collapsed face renders nothing below the chrome.** A collapsed
+container carries `data-collapsed="true"` and renders **no slots region, no fan
+label and no join marker** - not hidden, not `display: none`, but not rendered
+at all. Three consequences follow from that and none of them is a new
+mechanism: no child card exists in the markup, so the measurement hook admitted
+by decision 7's amendment (2026-08-29) has nothing to measure and needs no
+change; `Connectors.edges` finds no anchor and draws no edge into the subtree,
+which is the missing-anchor case it already answers with `:none`; and the
+container's outlet sits directly under its chrome, so the flow past a folded
+container is the flow it already had.
+
+A container with an empty subtree may still fold. What folds is the region, not
+the children that happen to be in it.
+
+**2d. Against decision 8: a folded region's drop targets are not reachable
+until it is opened.** Decision 8 says every drop target is reachable without
+dragging, by the "+" on its gap. That promise is about the targets an author
+can see. A folded container renders none of its gaps, so none of its "+"
+buttons is reachable by pointer or by keyboard while it is shut - and the way
+to reach them is the fold itself, which is one control away and never hidden.
+This is stated rather than left to the markup because decision 8 is otherwise
+read as an unconditional claim about every target in the document.
+
+**2e. The control is a native button on container chrome, and there is no
+shortcut key.** A `<button>` carrying `aria-expanded`, so Enter and Space are
+the browser's, the tab order is the document's, and no window key binding
+exists. It appears on container chrome only. Its rest state is the one the
+delete control already uses - revealed on hover or on selection - while the
+container is open, and it is **always** visible while the container is shut,
+because a control that hides a region has to be the way back to it and hover is
+not a gesture a keyboard has.
+
+**2f. The badge renders on a collapsed container with findings, as a ring.** It
+carries the subtree rollup `findings_count` and it renders only where this
+record has always put it: on a collapsed subtree, when the rollup is greater
+than zero. Never on an open face, never at zero, and nothing else about the
+rollup changes - it stays on every node for the drawer and the inspector to
+read.
+
+It is a **ring** and not a fill. The Note (2026-08-28) on decision 14 argued
+that as a decision already taken - "it is a ring rather than a fill, an inset
+shadow carrying no new token, and the ring was chosen precisely so a badge
+would not read like a filled config chip" - against a badge nothing rendered.
+This section is where that becomes a rule the browser executes.
+
+### Consequences
+
+- **Three sentences of this record become true.** Decision 11's collapsed
+  subtree carries a count badge; the `:info` amendment's advisory contributes
+  to it; the undeclared-path finding counts toward it and still changes no
+  verdict. All three described a face that did not exist, and none of them
+  needed editing to become correct - which is the evidence that this section
+  implements the record rather than widening it.
+
+- **`--sb-fg-on-accent` is retired, under 14e.** The badge's fill was the
+  token's only consumer, and a ring whose count is `--sb-error` leaves nothing
+  reading it. Amendment 14e refuses a declared token no rule reads and checks
+  that in both directions, so the token cannot simply be stranded: it leaves
+  the tier table, the declarations, `docs/theming.md`'s documented host theme,
+  and its own contrast assertions together. That is a removal from a published
+  surface. A host theme that declares it keeps compiling and keeps rendering -
+  a declaration nothing reads is inert - but the name is no longer part of what
+  this package documents, and the changelog says so under `Removed`.
+
+- **A card can carry two controls where it carried one.** The fold sits beside
+  the delete control on a container's chrome, in the same square, answering to
+  the same reveal rule. The operator ruling of 2026-08-29 that the stylesheet
+  quotes beside `.sb-node__remove` asked for exactly that pair - "`x` on hover,
+  `-` + `x` on the selected card, nothing at rest" - and only the `x` half
+  could ship at the time.
+
+- **A folded container changes shape.** With nothing under its chrome it takes
+  the width a leaf takes rather than the width of a body it is not drawing.
+  That is a stylesheet rule about a card with no body, not a new layout mode.
+
+- **Nothing new is asserted about the client.** Neither hook file changes.
+  Collapse is markup the server rendered, which is what keeps decision 7's
+  one-hook argument and its measurement amendment intact: the second hook still
+  only measures, and it measures whatever is on the page.
+
+Filed with `sb-2vqm`, under the campaign-020 rulings D1 through D6 - in order:
+collapse is editor state, the reset on a document switch, the collapsed face,
+the ring and the token retirement, the keyboard path, and the number the badge
+reads.

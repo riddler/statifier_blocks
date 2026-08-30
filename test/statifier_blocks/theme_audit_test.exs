@@ -62,9 +62,6 @@ defmodule StatifierBlocks.ThemeAuditTest do
     # carrying information, and holding it to 3:1 turns every pane edge into a
     # rule.
     "--sb-border" => "a design ruling, not a measurement",
-    # Measured against the accent it sits on, not against a surface it never
-    # touches. Checked separately below.
-    "--sb-fg-on-accent" => "checked against --sb-accent",
     # A ratio against a translucent fill is a number about a guess: what it is
     # painted over decides it, and that is the surface's ratio already.
     "--sb-accent-muted" => "translucent",
@@ -294,18 +291,6 @@ defmodule StatifierBlocks.ThemeAuditTest do
         assert ratio >= 3,
                "#{token} (#{colour}) is #{ratio}:1 on #{surface} (#{on}), under 3:1"
       end
-    end
-
-    # Sabotage: setting `--sb-fg-on-accent: #cfdcf6` - a pale blue on the
-    # accent still looks fine and stops clearing the ratio, which is the case
-    # eyes are worst at.
-    test "--sb-fg-on-accent clears 4.5:1 on the accent it sits on", context do
-      {ratio, _token, _on} =
-        context.values
-        |> ThemeAudit.resolve("--sb-fg-on-accent")
-        |> ThemeAudit.worst_contrast(context.values, ["--sb-accent", "--sb-accent-hover"])
-
-      assert ratio >= 4.5, "--sb-fg-on-accent is #{ratio}:1 on the accent, under 4.5:1"
     end
 
     # The corroborator for all four: an arithmetic bug that made every ratio
@@ -654,13 +639,6 @@ defmodule StatifierBlocks.ThemeAuditTest do
         {ratio, surface, on} = ThemeAudit.worst_contrast(colour, values, @surfaces)
         assert ratio >= 3, "#{token} (#{colour}) is #{ratio}:1 on #{surface} (#{on})"
       end
-
-      {on_accent, _token, _on} =
-        values
-        |> ThemeAudit.resolve("--sb-fg-on-accent")
-        |> ThemeAudit.worst_contrast(values, ["--sb-accent", "--sb-accent-hover"])
-
-      assert on_accent >= 4.5
     end
   end
 

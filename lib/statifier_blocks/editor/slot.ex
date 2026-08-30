@@ -187,6 +187,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:drag, :any, default: nil)
     attr(:selected_id, :string, default: nil)
 
+    attr(:collapsed, :any,
+      default: nil,
+      doc: "The folded-shut block ids, threaded to the children."
+    )
+
     attr(:armed, :any,
       default: nil,
       doc: """
@@ -266,6 +271,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           depth={@depth}
           drag={@drag}
           selected_id={@selected_id}
+          collapsed={@collapsed}
           armed={@armed}
           target={@target}
           icon={@icon}
@@ -283,6 +289,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:index, :integer, required: true)
     attr(:drag, :any, default: nil)
     attr(:selected_id, :string, default: nil)
+    attr(:collapsed, :any, default: nil)
     attr(:armed, :any, default: nil)
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
@@ -295,6 +302,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         depth={@depth + 1}
         drag={@drag}
         selected_id={@selected_id}
+        collapsed={@collapsed}
         armed={@armed}
         target={@target}
         icon={@icon}

@@ -1108,6 +1108,68 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "the fold's stylesheet (ADR-0005's amendment to decision 2)" do
+      # The rest state is opacity, not `display: none` and not
+      # `visibility: hidden`: both of those take a button out of the tab
+      # order, and the fold is the keyboard path into and out of a folded
+      # region.
+      # Sabotage: `display: none` on the rest rule - the control leaves the
+      # tab order and a keyboard can no longer reach a folded container,
+      # which is the bug the `x` above already records.
+      test "the fold hides by opacity, so it stays focusable" do
+        css = File.read!(@stylesheet)
+
+        rest =
+          Regex.run(
+            ~r/^\.sb-node__fold\[data-reveal="hover-or-selected"\]\s*\{(.*?)\n\}/ms,
+            css
+          )
+
+        assert rest, "the scan actually found the rest rule"
+
+        body = Enum.at(rest, 1)
+        assert body =~ ~r/opacity:\s*0/
+        refute body =~ ~r/display:\s*none/
+        refute body =~ ~r/visibility:\s*hidden/
+      end
+
+      # Hover, `:focus-visible` and selection all reveal it while the
+      # container is open - the same three the `x` answers to, so a card's two
+      # controls appear together rather than one at a time.
+      # Sabotage: dropping the `:focus-visible` selector - a keyboard user
+      # tabs onto an invisible control, which is the case the global focus
+      # ring cannot rescue on its own.
+      test "hover, focus and selection reveal it while the container is open" do
+        css = File.read!(@stylesheet)
+
+        assert css =~ ~r/^\.sb-node__chrome:hover > \.sb-node__fold,$/m
+        assert css =~ ~r/^\.sb-node__fold:focus-visible,$/m
+        assert css =~ ~r/^\.sb-node--selected > \.sb-node__chrome > \.sb-node__fold \{$/m
+      end
+
+      # Every collapsed selector is scoped to `.sb-node`. `.sb-palette` has
+      # carried a `data-collapsed` of its own since the pane fold shipped, so
+      # a bare `[data-collapsed]` rule would reach across to it.
+      # Sabotage: writing the collapsed rule as `[data-collapsed="true"]` with
+      # no element - the palette picks up a card's geometry and this goes red.
+      test "no collapsed rule is written unscoped" do
+        css = File.read!(@stylesheet)
+
+        unscoped =
+          Regex.scan(~r/^\s*([^\n{]*\[data-collapsed[^\n{]*)\{/m, css)
+          |> Enum.map(&Enum.at(&1, 1))
+          |> Enum.map(&String.trim/1)
+          |> Enum.reject(&(&1 =~ ~r/^\.sb-node|^\.sb-palette/))
+
+        assert unscoped == [], """
+        Every `data-collapsed` rule names the element it is about. The palette
+        and a card both carry the attribute, and an unscoped rule reaches both.
+
+        Unscoped: #{inspect(unscoped)}
+        """
+      end
+    end
+
     describe "nesting depth banding (sb-d7g, ruling D5)" do
       # The number is ROOT-RELATIVE and it is the recursion's own counter. The
       # trap this pins is `Shell.depth/1`, which is right there, is called
