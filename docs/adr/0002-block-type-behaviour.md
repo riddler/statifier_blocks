@@ -1,6 +1,6 @@
 # ADR-0002: A block type is a behaviour module resolved through a caller-supplied palette
 
-Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings); outcomes/metadata/label amendment (accepted 2026-08-29, operator ruling); decision 7 amended - optional `datamodel_path?` key (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 10 amended - the core.assign row, section G (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 98); decision 7 amended - optional `sensitive?` key and the secrets rule (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 99); core.send send id and no core.cancel amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95); decision 10 amended - the core.send row, section G2, and the decision 7 :duration cross-reference (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 110); decision 10 amended - the core.subchart and core.foreach rows, core.parallel's `complete` key and the thirteen count, G5-G8 (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 129)
+Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings); outcomes/metadata/label amendment (accepted 2026-08-29, operator ruling); decision 7 amended - optional `datamodel_path?` key (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 10 amended - the core.assign row, section G (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 98); decision 7 amended - optional `sensitive?` key and the secrets rule (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 99); core.send send id and no core.cancel amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95); decision 10 amended - the core.send row, section G2, and the decision 7 :duration cross-reference (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 110); decision 10 amended - the core.subchart and core.foreach rows, core.parallel's `complete` key and the thirteen count, G5-G8 (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 129); the optional `summary/1` callback and the card's second line, section H (2026-08-30, accepted under the operator campaign-017 direction-agent gate grant, PR 150)
 
 ## Context
 
@@ -1727,3 +1727,187 @@ section was written, and G5 and G6 add the two rows. That sentence is not
 edited, per this record's amendment convention; it is **superseded by this
 section**, and a reader who reaches G3 should carry the counts above rather
 than the ones there.
+
+## Amendment (2026-08-30): an optional `summary/1`, and what a core card's second line says
+
+**Status: accepted (2026-08-30, unqualified direction-agent verdict under the operator campaign-017 grant, PR 150).** Additive; decision 5's
+callback table gains a row, decision 7 is untouched, and no text above this
+line is edited by this section. Section C of the 2026-08-28 amendment stands
+exactly as written: this section does not move who owns a label, it says what
+the line *under* the title carries when nobody has written one.
+
+### Context
+
+The 2026-08-28 amendment settled the card's first line - the block's own label
+when the author wrote one, the type's label when they did not - and left the
+second line to the editor record. ADR-0005's card face shipped it as the type
+label, drawn only when the first line is the author's, which for the whole
+`core.*` vocabulary means it is never drawn: a `core.wait` card reads "Wait"
+and nothing else.
+
+The authoring spike this package's editor is a parity target for does not read
+that way. Its cards carry a per-type second line: a `core.parallel` shows its
+lane names, a `core.wait` shows a `timer 30s` chip, a `core.on_event` shows the
+outcome and the event it waits for. The spike produces those lines from a
+`switch` on the type name inside its layout pass.
+
+That switch is the thing this record has to refuse. ADR-0005 decision 2's whole
+premise is that the editor works off the caller-supplied palette and never
+names a type: a host that registers `myapp:authorize` gets the same card the
+core vocabulary gets, and an editor carrying a table of `core.*` names would
+give the built-in types a face no host can ask for. So the second line is a
+*declaration*, made where every other claim a block type makes about itself is
+made - here - and the core types are the first thirteen callers of it rather
+than thirteen special cases in the renderer.
+
+The operator's ruling of 2026-08-30 (D3) names the shape: "core summary =
+optional BlockType summary/1, recorded as an ADR-0002 amendment through the
+direction-agent gate."
+
+### Decision
+
+**H1. A block type may export `summary(config)`, and it is optional.**
+
+    @callback summary(Block.config()) :: nil | String.t() | [String.t()]
+
+It answers one question: *what does this block's card say about itself under
+its title, given this config?* Three return shapes, because the spike's lines
+come in two shapes and most types want neither:
+
+  * `nil` - no second line. This is the default, it is what a type that does
+    not export the callback means, and it is the card every block type has
+    today.
+  * a string - one summary line. `core.send`'s event name, `core.wait`'s
+    `timer 1h`.
+  * a list of strings - a **chip list**, each entry read as one chip.
+    `core.parallel`'s lane names, `core.on_event`'s outcome and event.
+
+It joins `io/1`, `migrate_config/2`, `fixtures/0`, `palette_entry/0` and
+`outcomes/1` in `@optional_callbacks`, and it is read through a resolver on
+this module for the reason amendment A gave for `outcomes/2`: a default that
+two consumers can spell differently is a default that will eventually be
+spelled two ways.
+
+The three rules decision 6 already puts on `slots/1` and `config_schema/1`
+apply unchanged and are not restated as new law: it is a **pure function of
+config**, it is **total** - it answers for any config, including config
+`validate_config/1` rejects, because the editor calls it mid-edit - and it
+**never raises**.
+
+**H2. `BlockType.summary/2` is the resolver, and it returns a chip list.**
+
+    @spec summary(module(), Block.config()) :: [String.t()]
+
+Every caller gets the same shape - a possibly-empty list of chips - so no
+consumer branches on which of the three return shapes a type chose. `nil` and
+a module that does not export the callback both come back `[]`; a string comes
+back as a one-element list; a list comes back filtered. Absence is checked with
+`Code.ensure_loaded?/1` plus `function_exported?/3`, the pattern `outcomes/2`
+and `StatifierBlocks.Palette.resolve/2` already use.
+
+**H3. A summary chip is a presentation string, so amendment B3's refusal
+discipline governs it, unchanged.** Each chip goes through the one refusal set
+B3 wrote for the badge and the join marker: a non-string, an empty or
+all-whitespace string, one carrying a newline, carriage return or tab, and one
+longer than the presentation cap are **refused, never truncated**. A refused
+chip is dropped from the list and the rest of the list survives; a summary
+whose every chip is refused is a card with no second line, which is the card
+that type had before it declared one.
+
+This is the point where the spike and this record part company on purpose. The
+spike's parallel card reads `fraud_review, balance_chec...` - it truncates.
+The cap exists (`@presentation_cap` in `lib/statifier_blocks/block_type.ex`,
+at B3's request)
+because a clipped string reads as a rendering bug a host files against the
+editor, where a missing chip reads as the declaration it is. That reasoning
+does not weaken because the string moved from the header to the second line, so
+a lane name longer than the cap costs its own chip and nothing else: the
+sibling lanes still draw.
+
+**H4. A callback that raises degrades to no summary.** B3 widened "a callback
+that raises degrades to the default" to a throw and an exit for `join_label`,
+because host code on the editor's layout pass leaves that pass in the same
+place however it fails. `summary/1` sits on exactly that pass, so it is
+rescued the same way and the rescued value is never inspected: what comes back
+is `[]`, the card the type had before it declared anything.
+
+**H5. The view model carries it, and the second line reads it when the title
+is the type's.** `StatifierBlocks.ViewModel.Node` gains a `summary` field,
+additively, defaulting to `[]`. `ViewModel.subtitle/1` gains one arm and loses
+none:
+
+  * a node whose title is the **author's** keeps the line it has - the type's
+    label - because that is the fact the author cannot see anywhere else on the
+    card. The summary is derivable from the fields in the inspector; the type
+    name of a card the author has renamed is not.
+  * a node whose title is the **type's** now draws the summary, which is the
+    line the whole `core.*` vocabulary was missing, and `nil` when there is
+    none.
+
+A chip list reaching a renderer that has no chip markup is joined with `", "`
+rather than dropped. The list shape is in the contract because chips are what
+the second line eventually draws; nothing in this section requires the markup
+to exist first, and a package that ships the markup later changes no block
+type.
+
+**H6. The five core summaries.** Read off the shipped modules. Each is a pure
+function of the config the type already validates, and every one of them is
+data the author typed, never a type name:
+
+| Block type | `summary(config)` | Shape |
+|---|---|---|
+| `core.parallel` | the well-formed lane names, in stored order | chip list |
+| `core.wait` | `timer <duration>`, from the stored `duration` | string |
+| `core.on_event` | the outcome's word (`Abandon`, `Resume`) then the event name | chip list |
+| `core.send` | the event name | string |
+| `core.branch` | `N arms + otherwise`, `N` counting the well-formed arms | string |
+
+Notes on the three that need one. `core.parallel` reads lanes through the same
+private filter `slots/1` reads them through, so a malformed lane is absent from
+the summary exactly as it is absent from the slots - the card and the slot list
+cannot disagree about which lanes exist. `core.on_event` puts the outcome
+first, which is the order the spike's card reads in and the reverse of the
+order `config_schema/1` declares the two fields: the outcome is what the block
+*does*, and the event is only when. `core.branch` counts arms rather than listing
+their conditions, because an arm's condition is an expression and an expression
+is not a chip; the `otherwise` slot is named rather than counted because it is
+always there.
+
+The other eight core types declare no summary and are unchanged. Nothing in
+this section makes a summary mandatory for a host type either: a host that
+wants the one-line card keeps it by exporting nothing.
+
+### Consequences
+
+- **The editor still names no type.** The second line is a declaration read
+  through one resolver, so a host type gets the same card face the core
+  vocabulary gets by exporting the same callback. That is what this section
+  buys, and it is the reason it is a callback rather than a table in the
+  renderer.
+- **Decision 5's callback table is one row longer** and every existing type
+  still compiles: the callback is optional and its absence is the behavior
+  every type has today.
+- **The presentation cap now governs three things** - the badge, the join
+  marker, and a summary chip - and it is still one number in one place
+  (`@presentation_cap` in `lib/statifier_blocks/block_type.ex`; cited by name
+  rather than by line, because this section's own implementation moves the
+  number). B3 left the
+  number to ADR-0005 decision 10, which still carries none; this section adds
+  a third reader rather than a second opinion.
+- **A prose claim in the code is now false and is corrected by the same
+  change.** `lib/statifier_blocks/view_model.ex` documents `subtitle/1` as
+  `nil` "for every block that has no name of its own", and calls that "the
+  state the whole `core.*` vocabulary is in". That was true when it was
+  written and this section makes it false. The comment on `title_override/2`
+  saying no core type declares a `label` field stays true and is untouched:
+  the summary is not a label, no core type declares one, and section C's
+  editor-owned label is still the only way a card's *first* line becomes the
+  author's.
+- **Nothing serializes.** A summary is presentation, read at render time from
+  config that is already stored. No compiled byte moves, so ADR-0004 decision
+  6's byte determinism is not in reach of this section.
+- **What is deferred.** The chip *markup* on the card - a `.sb-node__summary`
+  chip row rather than one joined string - is ADR-0005's to describe and a
+  later bead's to ship. Until it does, a chip list renders joined, which is
+  the spike's own reading of a two-chip `core.on_event` line minus the
+  truncation.
