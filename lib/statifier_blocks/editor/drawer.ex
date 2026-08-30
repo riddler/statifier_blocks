@@ -51,10 +51,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     and the package learns nothing about what it draws.
 
     This admits no new *package* tab. 1A's test - tabular, and about the whole
-    document - is what governs the tabs shipped here, and it is unchanged and
-    unweakened; a host applies the same test to its own content, which is what
-    the drawer's tab set being "open by construction and closed by rule" has
-    said since the amendment. What the seam adds is who may do the applying.
+    document - governs the tabs shipped here, unchanged and unweakened; for a
+    tab the host contributes, that test transfers to the host as its own
+    obligation. The 2026-08-30 amendment recording the drawer's tab strip as a
+    host seam is where that split is written down.
 
     It is called the way HEEx calls `<.tab />` rather than by applying it to a
     bare map, which is `StatifierBlocks.Editor.Icons`' rule (sb-b8g) and the
