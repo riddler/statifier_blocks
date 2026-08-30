@@ -104,13 +104,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     happen at mount; what happens at mount is that the mode is set and a fit
     is armed, and the **first measurement payload** spends it - the same
     computation `handle_event("fit", ...)` runs, on the same ladder, against
-    the same measured scroller. It is spent once and never re-armed, which is
-    guarded on having measured at all rather than on the attr's value: a host
+    the same measured scroller. It is spent once per open document, and
+    re-armed only when the host swaps a different document in: a host
     re-renders for reasons of its own, and an attr that re-fitted on each of
     them would throw an author back to the fit every time their own header
-    changed. After the first measurement the attr is inert, `zoom -/+` return
-    the canvas to `:manual` as they always have, and the editor is in the
-    state it would have been in had the author pressed the button themselves.
+    changed. What the attr opens is a document, though, so a different
+    document is another opening and is armed from the attr the host passes in
+    that same update - `:manual` or an absent attr arming nothing, exactly as
+    at mount. Between one document's measurement and the next document's
+    arrival the attr is inert, `zoom -/+` return the canvas to `:manual` as
+    they always have, and the editor is in the state it would have been in had
+    the author pressed the button themselves.
 
     A host that never imports the measurement hook measures nothing, so the
     fit is never armed away and never spent: the mode is set, the canvas is
@@ -300,10 +304,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       # Read before `assign/2` writes the host's raw attr over it: `fit` is
       # the one assign whose live value is the editor's rather than the
-      # host's, because the author's own zoom moves it. See `arm_fit/3`.
+      # host's, because the author's own zoom moves it. See `arm_fit/4`.
       held_fit = Map.get(socket.assigns, :fit, :manual)
 
-      socket = socket |> assign(assigns) |> switch_document(previous)
+      {socket, swapped?} = socket |> assign(assigns) |> switch_document(previous)
 
       # 2A puts the remembered height on the host, so what arrives here is
       # whatever the host stored - possibly from a build with a different band,
@@ -317,10 +321,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         end
 
       # An opening state, so it is read only until the first measurement has
-      # been taken - see the moduledoc's *opening at a fit*.
+      # been taken - and a document the host swapped in is an opening of its
+      # own, which is why the swap flag reaches here. See the moduledoc's
+      # *opening at a fit*.
       socket =
         if Map.has_key?(assigns, :fit) do
-          arm_fit(socket, held_fit, Shell.fit_mode(assigns.fit))
+          arm_fit(socket, held_fit, Shell.fit_mode(assigns.fit), swapped?)
         else
           socket
         end
@@ -918,25 +924,31 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # set of block ids, and a block id from the old document names nothing in
     # the new one. The palette's own fold is the deliberate exception above -
     # it addresses no block, so nothing about it stops being true.
+    #
+    # It answers with the socket *and* whether the identity actually changed,
+    # because `arm_fit/4` needs the same answer and there is only one place
+    # that knows it. The flag is returned rather than assigned: it is true for
+    # the length of one `update/3` and an assign would still be true on the
+    # next render, which is precisely the host re-render that must not re-fit.
     @spec switch_document(Phoenix.LiveView.Socket.t(), Document.t() | nil) ::
-            Phoenix.LiveView.Socket.t()
-    defp switch_document(socket, nil), do: socket
+            {Phoenix.LiveView.Socket.t(), boolean()}
+    defp switch_document(socket, nil), do: {socket, false}
 
     defp switch_document(socket, %Document{id: id}) do
       if socket.assigns.document.id == id do
-        socket
+        {socket, false}
       else
-        assign(socket,
-          drawer_open: false,
-          drawer_tab: nil,
-          selected_id: nil,
-          collapsed_ids: MapSet.new(),
-          drafts: %{},
-          palette_position: nil,
-          palette_allowed: nil,
-          palette_unarmed_pick: false,
-          palette_sheet: false
-        )
+        {assign(socket,
+           drawer_open: false,
+           drawer_tab: nil,
+           selected_id: nil,
+           collapsed_ids: MapSet.new(),
+           drafts: %{},
+           palette_position: nil,
+           palette_allowed: nil,
+           palette_unarmed_pick: false,
+           palette_sheet: false
+         ), true}
       end
     end
 
@@ -1250,16 +1262,31 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # value by the time this runs, so a later re-render would otherwise light
     # `Fit width` back up on a canvas the author has since zoomed by hand -
     # the mode saying one thing and the percentage another.
-    @spec arm_fit(Phoenix.LiveView.Socket.t(), Shell.fit_mode(), Shell.fit_mode()) ::
+    #
+    # A document the host swapped in is the exception, and it is the same rule
+    # read properly rather than a hole in it: what the attr opens is a
+    # document, so a *different* document is another opening and gets another
+    # fit. The measurement the refusal guards on belongs to the document that
+    # just left; the one that arrives is as unmeasured as it was at mount, and
+    # the mode it opens at is the one the host passed in that same update -
+    # `:manual` or an absent attr arming nothing, exactly as at mount.
+    @spec arm_fit(Phoenix.LiveView.Socket.t(), Shell.fit_mode(), Shell.fit_mode(), boolean()) ::
             Phoenix.LiveView.Socket.t()
-    defp arm_fit(socket, held, mode) do
+    defp arm_fit(socket, _held, mode, true), do: arm(socket, mode)
+
+    defp arm_fit(socket, held, mode, false) do
       if socket.assigns.measured? do
         assign(socket, :fit, held)
       else
-        socket
-        |> assign(:fit, mode)
-        |> assign(:fit_pending, pending_fit(mode))
+        arm(socket, mode)
       end
+    end
+
+    @spec arm(Phoenix.LiveView.Socket.t(), Shell.fit_mode()) :: Phoenix.LiveView.Socket.t()
+    defp arm(socket, mode) do
+      socket
+      |> assign(:fit, mode)
+      |> assign(:fit_pending, pending_fit(mode))
     end
 
     @spec pending_fit(Shell.fit_mode()) :: :width | :active | nil

@@ -227,10 +227,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert has_element?(view, ~s(.sb-editor[data-fit="manual"][data-zoom="90"]))
       end
 
+      # The host re-renders here with the document it already has open at a
+      # later revision - a changed struct, the same `Document.id` - which is
+      # what a host does after it persists an edit, and it stands for every
+      # re-render a host makes for a reason of its own. None of them is an
+      # opening, so none of them may re-fit; the swap that *is* an opening is
+      # the test below it. The revision has to move for the re-render to
+      # happen at all: `assign/3` drops a value equal to the one it holds, so
+      # a host handing back an identical struct never reaches `update/3` and
+      # would prove nothing either way.
       # Sabotage: re-arming whenever the host re-renders with the attr - a
-      # host that re-renders for any reason of its own (a swapped document, a
-      # changed finding list, its own header) resets the author's zoom, and
-      # the attr stops being an *opening* state.
+      # host that re-renders for any reason of its own resets the author's
+      # zoom, and the attr stops being an *opening* state.
       test "a host re-render carrying the same attr does not re-fit", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn, fit: :width)
         measure(view)
@@ -238,7 +246,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         view |> element(~s(button[phx-click="zoom-out"])) |> render_click()
         assert has_element?(view, ~s(.sb-editor[data-fit="manual"][data-zoom="67"]))
 
-        send(view.pid, {:swap_document, EditorFixtures.credit_card()})
+        same = EditorFixtures.signup_wizard()
+        send(view.pid, {:swap_document, %{same | revision: same.revision + 1}})
+
+        assert has_element?(view, ~s(.sb-editor[data-revision="1"]))
+        refute render(view) =~ "data-fit-pending"
+
         measure(view)
 
         assert has_element?(view, ~s(.sb-editor[data-fit="manual"][data-zoom="67"]))
@@ -352,6 +365,57 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         measure(view)
 
         refute render(view) =~ "data-fit-pending"
+      end
+
+      # A document the host swaps in is an opening of its own, so it takes the
+      # whole of the mount path: armed from the attr in that same update,
+      # gated while the browser has not measured the new tree, and spent by
+      # the payload that arrives after the patch. The second payload is a
+      # wider stage than the first, so the zoom it lands on could only have
+      # come from re-computing the fit - the first document's 80% would still
+      # be on the canvas if nothing re-armed.
+      # Sabotage: dropping the swapped-document clause from `arm_fit/4` - the
+      # canvas keeps the zoom the *previous* document was fitted at, which is
+      # the defect a host that swaps documents sees on every switch.
+      test "a swapped document is armed, gated, and fitted again", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, fit: :width)
+        measure(view)
+
+        assert has_element?(view, ~s(.sb-editor[data-fit="width"][data-zoom="80"]))
+        refute render(view) =~ "data-fit-pending"
+
+        send(view.pid, {:swap_document, EditorFixtures.credit_card()})
+
+        assert has_element?(view, ~s(.sb-editor[data-fit-pending="width"][data-zoom="80"]))
+
+        measure(view, %{
+          @payload
+          | "stage" => %{"w" => 1600, "h" => 600}
+        })
+
+        assert has_element?(view, ~s(.sb-editor[data-fit="width"][data-zoom="50"]))
+        refute render(view) =~ "data-fit-pending"
+      end
+
+      # The re-arm is the attr's, not the swap's: a host that never asked for
+      # a fit does not start getting one because it changed document, and a
+      # swap under `:manual` stamps no gate to hide a canvas that was correct.
+      # Sabotage: arming the swapped clause unconditionally instead of from
+      # `mode` - every host that swaps documents gets a fit it never opted
+      # into, and the manual editor blanks for a frame on every switch.
+      test "a swap under :manual arms nothing and gates nothing", %{conn: conn} do
+        for opts <- [[], [fit: :manual]] do
+          {:ok, view, _html} = mount_editor(conn, opts)
+          measure(view)
+
+          send(view.pid, {:swap_document, EditorFixtures.credit_card()})
+
+          refute render(view) =~ "data-fit-pending"
+
+          measure(view, %{@payload | "stage" => %{"w" => 1600, "h" => 600}})
+
+          assert has_element?(view, ~s(.sb-editor[data-fit="manual"][data-zoom="100"]))
+        end
       end
     end
 

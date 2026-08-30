@@ -2877,6 +2877,99 @@ already scales the canvas.
 
 ---
 
+## Note (2026-08-30): decision 7, a document the host swaps in is another opening
+
+A dated note rather than an amendment, and it is the note the fit note above
+asked for by name. Decision 7 is unchanged, its 2026-08-29 amendment is
+unchanged, and the pre-fit gate note is unchanged: no clause of 7a moves, the
+measuring hook still writes nothing to the DOM, and the gate rule and the
+delayed reveal are the same two stylesheet rules that note recorded. What
+changes is one sentence the fit note itself marked provisional, and what this
+records is the reading that replaced it.
+
+### The sentence this supersedes
+
+The fit note closes on two consequences it did not want re-derived, and the
+second is this:
+
+> And a host that swaps the open document into an editor that has already
+> measured does **not** get a second fit; the attr opens an editor, and
+> re-opening one is a host remounting the component. If that turns out to be
+> the wrong line, it is a bead and a note, not a quiet widening.
+
+It turned out to be the wrong line, and this is the bead and the note. The
+sentence stays where it is as the record of what was decided first; from here
+on the rule below is what the editor does.
+
+What was wrong with it is the noun. Everywhere else the fit note says that
+what the attr opens is a *document* - it is the press an author would
+otherwise make on every document they open - and then it draws the boundary
+around the *editor*, so a host that keeps one editor mounted and changes which
+document is in it gets the opening state for the first document and never
+again. That is the whole of a host with a document switcher, which is the
+shape a host that has documents to switch between actually has: the author
+picks a second document, the canvas lays it out at 100%, and the affordance
+the attr exists to remove is back on every switch but the first.
+
+The alternative that sentence implies - a host remounting the component per
+document - is a real option and a worse one. A remount throws away the undo
+stack, the selection, the drafts and the folds together, where 2A's switch
+decides each of them separately and on its own reason. That separation is the
+reason a switch is not a remount, so it is not something to spend on getting a
+fit back.
+
+### Decision
+
+On a change of the open document's **identity** - `Document.id` differs from
+the one the editor holds, which is the test 2A's switch already makes - the
+fit attr is armed exactly as it is armed at mount:
+
+1. What is armed is the `fit` attr the host passes **in that same update**,
+   not the mode the editor happens to be holding. `:manual`, or no attr at
+   all, arms nothing, exactly as at mount: a host that never opted into a fit
+   does not start getting one because it changed document.
+2. It is armed whether or not anything has been measured. The measurement the
+   arming guard protects belongs to the document that has just left; the one
+   that arrives has been measured no more than a mount's has.
+3. The pre-fit gate is stamped again with it and lifts on the measurement that
+   spends the fit, which is the pairing the note above records and not a
+   second mechanism.
+4. A re-render carrying the document already open is untouched by every clause
+   above and still never re-fits. That is the guard the fit note was really
+   describing, and it is the one an author notices: a host re-rendering for a
+   reason of its own must not throw them back to the fit.
+
+Read together: the fit is spent once per open document rather than once per
+editor.
+
+### Consequences
+
+The frame after a swap is the frame after a mount, and the same two rules
+cover it. The gate rule keeps the stage unpainted while a fit is armed, so the
+arriving document is not painted at 100% and then snapped to its fit; the
+delayed reveal bounds a swap's wait the way it bounds a mount's, so a
+hook-less host that swaps documents gets the late stage that note already
+describes rather than a canvas that never comes back. Neither rule is edited
+here.
+
+A host that swaps documents under `:manual` sees nothing change at all: no
+attr is stamped, so there is no frame to hide and no reveal to wait for.
+
+The cost is that an author who has zoomed the first document by hand, then
+switches away and back, gets the second document at its fit rather than at the
+zoom they chose. That is the right way round - the zoom they chose was chosen
+against a document that is no longer on the canvas - and the zoom controls are
+where they always were.
+
+No new attr, no new command, no new anchor vocabulary and no new state. What
+the editor gained is one boolean that lives for the length of a single update,
+handed from the switch that already computes the identity comparison to the
+arming that now needs its answer.
+
+Implements bead `sb-e4r5`, under campaign-020 ruling D7.
+
+---
+
 ## Amendment (2026-08-30): decision 10, the summary chip row
 
 **Status: accepted (2026-08-30, unqualified direction-agent verdict under the operator campaign-018 grant, PR 166).** Drafted 2026-08-30 as a proposed amendment, implementing bead `sb-2mxa`. Additive; decision 10 stands exactly as
