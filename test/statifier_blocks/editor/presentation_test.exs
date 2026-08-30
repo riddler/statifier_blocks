@@ -951,6 +951,130 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "nesting depth banding (sb-d7g, ruling D5)" do
+      # The number is ROOT-RELATIVE and it is the recursion's own counter. The
+      # trap this pins is `Shell.depth/1`, which is right there, is called
+      # "depth", and is a subtree MAXIMUM for the toolbar: reached for here it
+      # would stamp one number on every slot of a document and the bands would
+      # come out flat while every unit reading "depth" stayed green.
+      #
+      # Three levels, because two cannot tell "one deeper than my parent" from
+      # "not the root": both answer 0/1 for a two-level document.
+      #
+      # Sabotage: `Slot.child/1` passing `depth={@depth}` instead of
+      # `@depth + 1` - the counter stops descending, every slot below the root
+      # stamps 0, and this goes red on the second level.
+      test "every slot carries its root-relative depth", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: nested_document(), palette: nested_palette())
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-slot[data-parent-id="blk_depth_root"][data-slot-name="body"][data-sb-depth="0"])
+               )
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-slot[data-parent-id="blk_depth_1"][data-slot-name="body"][data-sb-depth="1"])
+               )
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-slot[data-parent-id="blk_depth_2"][data-slot-name="body"][data-sb-depth="2"])
+               )
+      end
+
+      # The attribute is the WHOLE markup contract - "no markup beyond the
+      # attribute" is the ruling - so a band that arrived as a class or as a
+      # wrapper element would be a second spelling of one fact for the next
+      # author to keep in sync.
+      # Sabotage: adding `"sb-slot--band-#{rem(@depth, 2)}"` to the slot's
+      # class list - the editor looks identical and this goes red.
+      test "and nothing else: the depth is an attribute, not a class", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: nested_document(), palette: nested_palette())
+
+        refute has_element?(view, ~s([class*="sb-slot--band"]))
+        refute has_element?(view, ~s(.sb-slot__band))
+      end
+
+      # Both parities, both tokens, and depth 0 left out of both. The last is
+      # the load-bearing one: the outermost slot spans nearly the whole canvas,
+      # so a band there is the dotted ground painted over.
+      # Sabotage: adding `[data-sb-depth="0"]` to the even list - every capture
+      # loses the canvas grid and this goes red naming the depth.
+      test "the stylesheet bands on the parity, and leaves depth 0 alone" do
+        css = File.read!(@stylesheet)
+
+        assert [[_all, odd_list]] =
+                 Regex.scan(
+                   ~r/\.sb-slot:where\(([^)]*)\)\s*\{\s*background:\s*var\(--sb-band-odd\)/s,
+                   css
+                 )
+
+        assert [[_all, even_list]] =
+                 Regex.scan(
+                   ~r/\.sb-slot:where\(([^)]*)\)\s*\{\s*background:\s*var\(--sb-band-even\)/s,
+                   css
+                 )
+
+        assert odd_list =~ ~s([data-sb-depth="1"])
+        assert odd_list =~ ~s([data-sb-depth="3"])
+        assert even_list =~ ~s([data-sb-depth="2"])
+        assert even_list =~ ~s([data-sb-depth="4"])
+
+        refute odd_list =~ ~s([data-sb-depth="0"])
+        refute even_list =~ ~s([data-sb-depth="0"])
+      end
+
+      # `:where()` is not decoration: the rail, the drop target and the
+      # boundary box all paint their own grounds, and a band written as a bare
+      # `.sb-slot[data-sb-depth="1"]` outweighs every one of them. The failure
+      # is silent - an interrupt rail at an odd depth quietly stops being
+      # tinted - so it is checked here rather than looked at.
+      # Sabotage: dropping the `:where(` wrapper from either rule - the
+      # selector still bands and this goes red.
+      test "the parity selectors keep the specificity of the bare class" do
+        css = File.read!(@stylesheet)
+
+        bare =
+          ~r/^\.sb-slot\[data-sb-depth=/m
+          |> Regex.scan(css)
+          |> Enum.map(fn [match] -> match end)
+
+        assert bare == [], "a band at attribute specificity outweighs every ground below it"
+      end
+
+      # D5's other half. The region an author reads as the interrupt rules is a
+      # place, and a place reads as one when it has a floor - in the warning
+      # family the rail's dashed edge already uses, not in a band, because the
+      # rail is not a nesting level.
+      # Sabotage: deleting `background: var(--sb-warning-bg)` from
+      # `.sb-slot--secondary` - the region goes back to the ground of whatever
+      # depth it happens to sit at and this goes red.
+      test "the interrupt rail has a ground of its own, in the warning family" do
+        css = File.read!(@stylesheet)
+
+        assert [[_all, body]] = Regex.scan(~r/\n\.sb-slot--secondary\s*\{([^}]*)\}/, css)
+
+        assert body =~ ~r/background:\s*var\(--sb-warning-bg\)/
+        assert body =~ ~r/border-left-color:\s*var\(--sb-edge-interrupt\)/
+      end
+
+      # The bands default to surfaces the theme already carries, and that is
+      # what makes a host theme that never heard of these two names band
+      # correctly. A literal here would band every theme in the package's own
+      # light greys, which is the dark-theme failure in its purest form.
+      # Sabotage: shipping `--sb-band-odd: #eceef2` - the shipped light theme
+      # is unchanged, every dark host gets a pale stripe, and this goes red.
+      test "the defaults chain to the surfaces rather than to a literal" do
+        css = File.read!(@stylesheet)
+
+        assert css =~ ~r/--sb-band-even:\s*var\(--sb-bg\);/
+        assert css =~ ~r/--sb-band-odd:\s*var\(--sb-bg-sunken\);/
+      end
+    end
+
     describe "the operator pre-decision" do
       # Sabotage: adding `defp layout_class(%Node{type: "core.parallel"}), do: ...`
       # to BlockNode - the type name appears in a component source and this goes
@@ -983,6 +1107,41 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute "parallel.ex" in modules
         assert "block_node.ex" in modules
       end
+    end
+
+    # Three levels of nesting and a leaf at the bottom, all of one type: what
+    # separates the depth counter from the shape of the document is that the
+    # same block type appears at every level, so a rendering that read depth
+    # off anything but the recursion has nothing else to read.
+    defp nested_document do
+      Document.new(
+        Block.new("core.sequence",
+          id: "blk_depth_root",
+          slots: %{
+            "body" => [
+              Block.new("core.sequence",
+                id: "blk_depth_1",
+                slots: %{
+                  "body" => [
+                    Block.new("core.sequence",
+                      id: "blk_depth_2",
+                      slots: %{"body" => [EditorFixtures.wait("blk_depth_leaf", "1h")]}
+                    )
+                  ]
+                }
+              )
+            ]
+          }
+        ),
+        id: "doc_depth"
+      )
+    end
+
+    defp nested_palette do
+      Palette.new(%{
+        "core.sequence" => StatifierBlocks.Core.Sequence,
+        "core.wait" => StatifierBlocks.Core.Wait
+      })
     end
 
     # Source with its doc heredocs and its `#` comments removed, so a scan for

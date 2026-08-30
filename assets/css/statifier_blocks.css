@@ -141,6 +141,8 @@
  *     2  --sb-edge-interrupt
  *     2  --sb-edge-width
  *     2  --sb-canvas-grid
+ *     2  --sb-band-even
+ *     2  --sb-band-odd
  *
  *     3  --sb-color-scheme
  *
@@ -441,6 +443,27 @@
    * competing with the tree drawn on it. */
   --sb-canvas-grid: radial-gradient(var(--sb-border) var(--sb-border-width), transparent 0) 0 0 /
     var(--sb-space-3) var(--sb-space-3);
+
+  /* The nesting bands (sb-d7g, ruling D5). Two grounds that alternate by the
+   * depth of the slot they paint, so a reader can see how deep a subtree sits
+   * without counting rules or edges.
+   *
+   * Both default to a surface the theme already carries rather than to a
+   * literal, and that is the decision: a host that restates the four surfaces
+   * gets banding in its own palette for free, and the two themes shipped by
+   * the examples host - which restate `--sb-bg` and `--sb-bg-sunken` and know
+   * nothing about these two names - band correctly without being touched. A
+   * host that wants the separation louder or quieter restates these two.
+   *
+   * `--sb-band-even` is the plain ground and `--sb-band-odd` the tinted one.
+   * Both are OPAQUE on purpose: two translucent tints stacked by the nesting
+   * they describe accumulate into "deeper is darker", which is the reading
+   * this replaces rather than the one it wants.
+   *
+   * Held to no contrast ratio, for the same reason `--sb-canvas-grid` is not:
+   * a band is a floor a region sits on, not a line that carries information. */
+  --sb-band-even: var(--sb-bg);
+  --sb-band-odd: var(--sb-bg-sunken);
 
   color-scheme: var(--sb-color-scheme);
 
@@ -1170,9 +1193,63 @@
   padding-left: var(--sb-space);
 }
 
+/* Depth banding (sb-d7g, ruling D5). Each nesting level is a full-width band
+ * and adjacent levels alternate, which is the spike's reading and the one the
+ * shipped editor lost when `sb-8yb` took the container boxes off: every depth
+ * then sat on the same dotted ground and the tree's shape was carried by the
+ * left edges alone.
+ *
+ * `data-sb-depth` is ROOT-RELATIVE and it is threaded through the
+ * `BlockNode` / `Slot` recursion, not derived here. `Shell.depth/1` is a
+ * subtree MAXIMUM - the toolbar's "how deep does this document go" - so it
+ * answers a different question and would band every slot of a document the
+ * same.
+ *
+ * DEPTH 0 IS DELIBERATELY UNBANDED. The outermost slot spans nearly the whole
+ * canvas, so an opaque band there is the dotted ground painted over: the
+ * canvas keeps its grid and the first band is the first level of nesting,
+ * which is also what "a band per nesting level" says.
+ *
+ * The parities are ENUMERATED because CSS has no arithmetic on an attribute
+ * value, and `:where()` is what keeps the enumeration at the specificity of
+ * the bare class - the rail, drop-target and boundary rules below all paint
+ * their own grounds and must keep winning over a band without an
+ * `!important` or a specificity race. Twelve levels is the ceiling; a
+ * document nested deeper than that has a legibility problem a band will not
+ * fix. */
+.sb-slot:where(
+    [data-sb-depth="1"],
+    [data-sb-depth="3"],
+    [data-sb-depth="5"],
+    [data-sb-depth="7"],
+    [data-sb-depth="9"],
+    [data-sb-depth="11"]
+  ) {
+  background: var(--sb-band-odd);
+}
+
+.sb-slot:where(
+    [data-sb-depth="2"],
+    [data-sb-depth="4"],
+    [data-sb-depth="6"],
+    [data-sb-depth="8"],
+    [data-sb-depth="10"],
+    [data-sb-depth="12"]
+  ) {
+  background: var(--sb-band-even);
+}
+
+/* The interrupt rail's own ground, which is the other half of D5: the region
+ * an author reads as INTERRUPT RULES is a place, and a place reads as one
+ * when it has a floor. The warning family rather than a band, because the
+ * rail is not a nesting level - it is out-of-band by vocabulary, and it says
+ * so with the same colour its dashed edge and its exit channel already use.
+ * Declared after the bands on purpose: a rail at an odd depth is a rail
+ * first. */
 .sb-slot--secondary {
   border-left-style: dashed;
   border-left-color: var(--sb-edge-interrupt);
+  background: var(--sb-warning-bg);
   color: var(--sb-fg-muted);
 }
 

@@ -235,6 +235,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:depth, :integer,
+      default: 0,
+      doc: """
+      How many slots this node sits inside, counted from the root. The
+      recursion carries it because nothing else can: `Shell.depth/1` is a
+      subtree MAXIMUM for the toolbar, and a node has no way of asking where
+      it is from inside its own render. `Slot` stamps it and the stylesheet
+      bands on it (sb-d7g).
+      """
+    )
+
     @doc "One block: chrome, findings, and its slots, recursively."
     def block_node(assigns) do
       ~H"""
@@ -309,6 +320,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <Slot.slot
             :for={slot <- @node.slots}
             slot={slot}
+            depth={@depth}
             parent_id={@node.block_id}
             drag={@drag}
             selected_id={@selected_id}
