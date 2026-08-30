@@ -211,6 +211,55 @@ defmodule StatifierBlocks.ShellTest do
     end
   end
 
+  describe "where a block sits (the inspector's BLOCK section)" do
+    # The signup fixture is the subject here rather than `credit_card`, because
+    # its branch has two differently labelled arms and an unresolvable block
+    # with a raw slot - the three answers this function has to tell apart.
+    setup do
+      view_model = ViewModel.build(EditorFixtures.signup_wizard(), EditorFixtures.palette(), [])
+      %{signup_root: view_model.root}
+    end
+
+    # The load-bearing pair is `blk_email_step`: it sits in the slot NAMED
+    # `body` and LABELLED `Steps`, so an implementation that reached for the
+    # slot name renders a word the canvas never shows.
+    # Sabotage: returning `slot.name` instead of `slot.label` - the first
+    # assertion goes red on "body", which is the defect this row exists to
+    # avoid stating to an author.
+    test "is the slot's label, not its name", %{signup_root: root} do
+      assert Shell.slot_label(root, "blk_email_step") == "Steps"
+      assert Shell.slot_label(root, "blk_control_pause") == "Otherwise"
+    end
+
+    # A raw slot has no label to read, and `ViewModel` already answers with the
+    # name itself - the same string the canvas draws over that stranded slot.
+    # Sabotage: making the recursion skip a node whose own status is
+    # unresolvable - the child of the tracking block stops being locatable and
+    # this goes red with nil.
+    test "reaches a child of an unresolvable block, under its raw slot name", %{
+      signup_root: root
+    } do
+      assert Shell.slot_label(root, "blk_settle_pause") == "after"
+    end
+
+    # Sabotage: dropping the `block_id: id` clause - the root walks its own
+    # slots looking for itself, finds nothing, and the row reads as a dash on
+    # the one block that is always in the document.
+    test "the root sits in no slot, and says so", %{signup_root: root} do
+      assert Shell.slot_label(root, "blk_wizard") == "root"
+    end
+
+    # Both nil cases are the same answer on purpose: a selection that went away
+    # between two builds is no selection, and the row has one empty state.
+    # Sabotage: letting the walk raise on an unknown id rather than answering
+    # nil - a stale selection takes the whole pane down instead of blanking one
+    # row.
+    test "an id no node carries, and no id at all, are both nil", %{signup_root: root} do
+      assert Shell.slot_label(root, "blk_deleted_long_ago") == nil
+      assert Shell.slot_label(root, nil) == nil
+    end
+  end
+
   describe "the selected block's findings (3A)" do
     # Sabotage: using `view_model.findings` instead - the inspector's tab
     # becomes the document-level panel, which is exactly the conflation 3A

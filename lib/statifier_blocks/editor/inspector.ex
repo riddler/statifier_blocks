@@ -54,6 +54,35 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     The inspector has no collapse. The palette's fold is the wide
     arrangement's answer to a cramped canvas and one pane is enough of an
     answer; a second one is a separate ruling and is not made here.
+
+    ## The Config tab's two sections (parity item 1.9)
+
+    Under the tabs the Config tab is two labelled sections rather than a form
+    dropped into a pane. **Block** states what the pane's subject IS - its
+    type, its id, and the slot it sits in - and **Configuration** holds the
+    form.
+
+    The Block section is the one that has to be there when nothing is
+    selected, which is why its three rows render either way and read as a
+    dash when they have no value. A section that appears and disappears with
+    the selection teaches an author nothing about what the pane will show
+    them; three rows that are always in the same place, sometimes empty, say
+    what the inspector is about before they have selected anything.
+
+    The three rows are deliberately the three an author can act on. `Type` is
+    the type's label, the same string the header status reads, so the pane
+    names the block the way the palette and the canvas do. `Id` is the block
+    id verbatim and set in mono, because it is the string that appears in a
+    finding, in a provenance map and in a URL, and an author reading one of
+    those needs to match it character for character. `Slot` is the slot's
+    label - `StatifierBlocks.Shell.slot_label/2`'s answer - because a card
+    seen on its own does not say which arm of a branch it is in.
+
+    The Configuration section's empty state is a **box**, not the one-line
+    sentence the other tabs use. It is the only empty state in the editor
+    standing where a control would be, and an unboxed sentence in that
+    position reads as a caption for the form below it rather than as the
+    reason there is no form.
     """
 
     use Phoenix.Component
@@ -63,6 +92,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     attr(:tab, :atom, required: true)
     attr(:node, :any, default: nil, doc: "the selected `ViewModel.Node`, or nil")
+
+    attr(:slot_label, :any,
+      default: nil,
+      doc: "`Shell.slot_label/2` for the selection - the slot it sits in, or nil"
+    )
+
     attr(:pending, :list, default: [])
     attr(:expression_component, :any, default: nil)
     attr(:target, :any, required: true)
@@ -115,17 +150,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           id={"sb-inspector-panel-#{@tab}"}
           aria-labelledby={"sb-inspector-tab-#{@tab}"}
         >
-          <p :if={@node == nil} class="sb-inspector__empty">
+          <p :if={@node == nil and @tab != :config} class="sb-inspector__empty">
             Select a block on the canvas to inspect it.
           </p>
 
-          <.config_panel
-            :if={@node != nil and @tab == :config}
-            node={@node}
-            pending={@pending}
-            expression_component={@expression_component}
-            target={@target}
-          />
+          <.block_section :if={@tab == :config} node={@node} slot_label={@slot_label} />
+
+          <section :if={@tab == :config} class="sb-inspector__section">
+            <h3 class="sb-inspector__section-title">Configuration</h3>
+            <p :if={@node == nil} class="sb-inspector__empty sb-inspector__empty--boxed">
+              Select a block on the canvas to edit its configuration.
+            </p>
+            <.config_panel
+              :if={@node != nil}
+              node={@node}
+              pending={@pending}
+              expression_component={@expression_component}
+              target={@target}
+            />
+          </section>
+
           <.findings_panel :if={@node != nil and @tab == :findings} findings={@findings} />
           <.condition_panel
             :if={@node != nil and @tab == :condition}
@@ -134,6 +178,46 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           />
         </div>
       </section>
+      """
+    end
+
+    attr(:node, :any, required: true)
+    attr(:slot_label, :any, required: true)
+
+    # Rendered with `node: nil` too - see the moduledoc. The rows read a dash
+    # then, and they are the same three rows in the same order, so the pane's
+    # shape does not change under the author when they click a card.
+    defp block_section(assigns) do
+      ~H"""
+      <section class="sb-inspector__section">
+        <h3 class="sb-inspector__section-title">Block</h3>
+        <dl class="sb-inspector__meta">
+          <.meta_row label="Type" value={@node && selection_status(@node)} />
+          <.meta_row label="Id" value={@node && @node.block_id} mono />
+          <.meta_row label="Slot" value={@node && @slot_label} />
+        </dl>
+      </section>
+      """
+    end
+
+    attr(:label, :string, required: true)
+    attr(:value, :any, required: true)
+    attr(:mono, :boolean, default: false)
+
+    # The dash is markup rather than a `::before`, so what an author reads is
+    # what a test reads; `data-empty` is what the CSS and a host style against,
+    # for the same reason the condition source stamps one.
+    defp meta_row(assigns) do
+      ~H"""
+      <div class="sb-inspector__meta-row">
+        <dt class="sb-inspector__meta-key">{@label}</dt>
+        <dd
+          class={["sb-inspector__meta-value", @mono && "sb-inspector__meta-value--mono"]}
+          data-empty={to_string(@value in [nil, ""])}
+        >
+          <span :if={@value in [nil, ""]} class="sb-inspector__meta-dash">&mdash;</span>{@value}
+        </dd>
+      </div>
       """
     end
 

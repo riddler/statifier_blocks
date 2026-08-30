@@ -286,6 +286,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <Inspector.inspector
             tab={@inspector_tab}
             node={@selected_node}
+            slot_label={@selected_slot}
             pending={@pending_fields}
             expression_component={@expression_component}
             target={@myself}
@@ -688,6 +689,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       socket
       |> assign(:view_model, view_model)
       |> assign(:selected_node, selected)
+      |> assign(:selected_slot, Shell.slot_label(view_model.root, socket.assigns.selected_id))
       |> assign(:pending_fields, pending_fields(socket, selected))
     end
 

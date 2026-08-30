@@ -250,6 +250,37 @@ defmodule StatifierBlocks.Shell do
   def condition_source(%ViewModel.Field{value: value}), do: to_string(value)
 
   @doc """
+  The label of the slot the block carrying `block_id` sits in.
+
+  `"root"` for the document's own root, which sits in no slot, and `nil` for
+  an id no node in `root` carries - a selection that went away between two
+  builds reaches that, and it is the same answer as no selection at all.
+
+  It is the slot's **label**, not its name, for the reason the inspector's
+  header status reads a type's label: both are the vocabulary the canvas
+  already shows the author, and a raw `arm_approved` beside a card reading
+  `When approved` is the editor naming one thing two ways.
+
+  Here rather than on `ViewModel.Node` because a node does not know where it
+  sits - the containment is the parent's, and a field duplicating it on every
+  child is a second copy of the tree's shape that a re-parenting edit has to
+  remember to update.
+  """
+  @spec slot_label(ViewModel.Node.t(), Block.id() | nil) :: String.t() | nil
+  def slot_label(_root, nil), do: nil
+  def slot_label(%ViewModel.Node{block_id: id}, id), do: "root"
+  def slot_label(%ViewModel.Node{} = root, id), do: find_slot_label(root, id)
+
+  @spec find_slot_label(ViewModel.Node.t(), Block.id()) :: String.t() | nil
+  defp find_slot_label(%ViewModel.Node{slots: slots}, id) do
+    Enum.find_value(slots, fn %ViewModel.Slot{} = slot ->
+      if Enum.any?(slot.children, &(&1.block_id == id)),
+        do: slot.label,
+        else: Enum.find_value(slot.children, &find_slot_label(&1, id))
+    end)
+  end
+
+  @doc """
   The tables `fixtures` holds for one block, or `[]`.
 
   `nil` fixtures - no source at all - answers `[]` like a source that holds

@@ -969,12 +969,25 @@
 }
 
 .sb-field__label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space-half);
   font-size: var(--sb-text-sm);
   color: var(--sb-fg-muted);
 }
 
+/* The required marker is a small tag beside the label, not an asterisk on the
+ * end of it (parity item 1.9). Set in the error hue at the label's own weight,
+ * because it is a statement about the field rather than a finding against it -
+ * a field nobody has typed in yet is not yet wrong. */
 .sb-field__required {
+  padding: 0 var(--sb-space-half);
+  border-radius: var(--sb-radius-sm);
+  font-size: var(--sb-text-xs);
+  letter-spacing: var(--sb-tracking-caps);
+  text-transform: uppercase;
   color: var(--sb-error);
+  background: var(--sb-error-bg);
 }
 
 .sb-field__row {
@@ -1539,11 +1552,24 @@
   font-weight: var(--sb-weight-medium);
 }
 
+/* The Findings tab's count, as a pill rather than a tinted rectangle (parity
+ * item 1.9). It is the one number in the chrome that says an author has
+ * something to fix, so it is marked in the error hue the findings themselves
+ * are, and `min-width` with a centred single digit is what stops a `1` and a
+ * `12` from being two different shapes. The radius is a literal: a pill is
+ * "however round it takes to be a circle at this size", which is not a value
+ * a host theme has anything to say about. */
 .sb-inspector__tab-count {
-  font-size: var(--sb-text-xs);
-  background: var(--sb-accent-muted);
-  border-radius: var(--sb-radius-sm);
+  display: inline-block;
+  min-width: 1.4em;
+  margin-left: var(--sb-space-half);
   padding: 0 var(--sb-space-half);
+  border-radius: 999px;
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-medium);
+  text-align: center;
+  color: var(--sb-error);
+  background: var(--sb-error-bg);
 }
 
 .sb-inspector__panel {
@@ -1553,6 +1579,80 @@
 .sb-inspector__empty {
   color: var(--sb-fg-subtle);
   font-size: var(--sb-text-sm);
+}
+
+/* The Config tab's boxed empty state (parity item 1.9). It stands where the
+ * form stands, so it is given the form's footprint - a filled box - rather
+ * than being left as a line of prose that reads as a caption for whatever is
+ * under it. Margin off because the pane's padding is already the inset. */
+.sb-inspector__empty--boxed {
+  margin: 0;
+  padding: var(--sb-space);
+  border-radius: var(--sb-radius);
+  background: var(--sb-bg-muted);
+}
+
+/* ---- the Config tab's sections: BLOCK and CONFIGURATION (parity item 1.9)
+ *
+ * The section label is the pane title's type treatment one level down: same
+ * small-caps, same muted ink. Nothing here is a heading level - `h3` is the
+ * document outline under the pane's `h2` - and the size is the label's job
+ * rather than the tag's. */
+.sb-inspector__section + .sb-inspector__section {
+  margin-top: var(--sb-space-2);
+}
+
+.sb-inspector__section-title {
+  margin: 0 0 var(--sb-space-half);
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-strong);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+  color: var(--sb-fg-muted);
+}
+
+.sb-inspector__meta {
+  margin: 0;
+}
+
+/* Label left, value right, on one line each. `baseline` rather than `center`
+ * so the mono id sits on the same line as the label beside it - the two type
+ * families have different metrics, and centring them leaves the id visibly
+ * high. */
+.sb-inspector__meta-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+  padding: var(--sb-space-half) 0;
+}
+
+.sb-inspector__meta-key {
+  font-size: var(--sb-text-sm);
+  color: var(--sb-fg-muted);
+}
+
+/* `margin-left: auto` is what pushes the value to the right edge, and the
+ * ellipsis is for the same reason the header's status has one: a host type's
+ * label and a host's block ids are both strings this package does not get to
+ * choose the length of, and the row must not wrap. */
+.sb-inspector__meta-value {
+  min-width: 0;
+  margin: 0;
+  margin-left: auto;
+  overflow: hidden;
+  font-size: var(--sb-text-sm);
+  color: var(--sb-fg);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sb-inspector__meta-value--mono {
+  font-family: var(--sb-font-mono);
+}
+
+.sb-inspector__meta-value[data-empty="true"] {
+  color: var(--sb-fg-subtle);
 }
 
 .sb-inspector__findings {
