@@ -221,7 +221,7 @@ defmodule StatifierBlocks.Compiler do
   # since a Hex release is the only way a host's bytes change, is every
   # release. `compiler_test.exs` asserts it against `mix.exs` so the
   # two cannot drift silently.
-  @compiler_version "0.5.0"
+  @compiler_version "0.6.0"
 
   # A resolved block and its resolved children, in `slots/1` declaration
   # order. Built once by the Resolve stage and threaded through the rest, so
