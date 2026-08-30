@@ -269,6 +269,31 @@ defmodule StatifierBlocks.ConnectorsTest do
       assert Enum.max(x_coordinates(interrupt.d)) > 400
     end
 
+    # The collapse case, at the layer it is decided: a folded container
+    # renders no child card, so the browser measures none of the subtree and
+    # the walk finds no anchor to draw into. Nothing here knows what "folded"
+    # means - that is the point. `edges/2` reads the tree and the measurement,
+    # and an unmeasured subtree is one the author cannot see.
+    # Sabotage: giving `path_edge/5` a fallback rectangle for a missing anchor
+    # - a folded container sprouts connectors into cards that are not on the
+    # canvas, and this goes red.
+    test "a subtree nobody measured takes no edges, and the tree around it keeps its own" do
+      folded =
+        sequence_measurement()
+        |> Map.drop(["card:blk_two", "outlet:blk_two"])
+
+      edges = Connectors.edges(sequence(), folded)
+
+      # `blk_two` is measured nowhere, so neither the edge into it from
+      # `blk_one` nor the edge out of it into `blk_three` can be drawn.
+      refute Enum.any?(edges, &String.starts_with?(&1.d, "M 200 80"))
+      refute Enum.any?(edges, &String.starts_with?(&1.d, "M 200 140"))
+
+      # The container's own entry into its first child is untouched: folding
+      # one card inside a sequence is not folding the sequence.
+      assert Enum.count(edges, &String.starts_with?(&1.d, "M 200 30")) == 1
+    end
+
     # Sabotage: making `edges/2` read anything but its two arguments - a
     # re-push stops being safe and the measure/render loop stops converging,
     # which is the property the hook's lack of memory is paid for with.

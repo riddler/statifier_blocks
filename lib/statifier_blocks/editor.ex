@@ -267,6 +267,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          history_limit: :infinity,
          history: History.new(),
          selected_id: nil,
+         collapsed_ids: MapSet.new(),
          drag: nil,
          drafts: %{},
          pending_fields: [],
@@ -445,6 +446,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               root={@view_model.root}
               drag={@drag}
               selected_id={@selected_id}
+              collapsed={@collapsed_ids}
               armed={@palette_position}
               target={@myself}
               icon={@icon}
@@ -620,6 +622,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # no breakpoint of its own.
     def handle_event("palette-collapse", _params, socket),
       do: {:noreply, update(socket, :palette_collapsed, &(not &1))}
+
+    # A container folds shut. One server event, one MapSet, in the shape the
+    # palette's fold above already has - and, like it, no hook and no client
+    # state: the collapsed face is markup the server rendered.
+    #
+    # It is deliberately NOT an `Edit` command. Decision 2's four commands are
+    # the DOCUMENT's algebra; which containers this author has folded shut is
+    # not in the document, is not undoable, and is not serialized, so it lives
+    # here beside `selected_id` and is reset by `switch_document/2` the way a
+    # selection is. ADR-0005's amendment on decision 2 (2026-08-30) records
+    # that, and records that the four-command set did not change to admit it.
+    def handle_event("collapse-toggle", %{"block-id" => id}, socket) do
+      {:noreply,
+       update(socket, :collapsed_ids, fn ids ->
+         if MapSet.member?(ids, id), do: MapSet.delete(ids, id), else: MapSet.put(ids, id)
+       end)}
+    end
 
     # One round-trip, one enumeration. Everything the client needs for the
     # rest of the drag is in the markup this re-render produces.
@@ -894,6 +913,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # and the selection it follows names a block that is not there any more -
     # so the selection goes with it, along with the drafts and the pending
     # insert, all three of which address ids the new document does not hold.
+    #
+    # `collapsed_ids` goes for the same reason and by the same rule: it is a
+    # set of block ids, and a block id from the old document names nothing in
+    # the new one. The palette's own fold is the deliberate exception above -
+    # it addresses no block, so nothing about it stops being true.
     @spec switch_document(Phoenix.LiveView.Socket.t(), Document.t() | nil) ::
             Phoenix.LiveView.Socket.t()
     defp switch_document(socket, nil), do: socket
@@ -906,6 +930,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           drawer_open: false,
           drawer_tab: nil,
           selected_id: nil,
+          collapsed_ids: MapSet.new(),
           drafts: %{},
           palette_position: nil,
           palette_allowed: nil,
