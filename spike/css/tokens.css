@@ -88,6 +88,9 @@
    * the editor - text a reader is expected to read, not decoration - so it
    * is held to 4.5:1 against the WORST surface in the theme, not the best. */
   --sb-fg-subtle: #646c7a;
+  /* `--sb-fg-on-accent` was retired from the shipped package's token set. It
+   * stays here because the spike is reference-only: these files record what
+   * was built, and are not swept to match what shipped. */
   --sb-fg-on-accent: #ffffff;
 
   /* Lines. `--sb-border-strong` now clears 3:1 against every surface in the
