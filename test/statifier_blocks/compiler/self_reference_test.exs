@@ -96,7 +96,11 @@ defmodule StatifierBlocks.Compiler.SelfReferenceTest do
     test "needs an explicit source, exactly as the sensitive-path refusal does" do
       findings = refuse(subchart(@document_id))
 
-      assert {:error, {:no_presentation_source, _finding}} =
+      # ADR-0005 amendment 11h: the default derivation no longer refuses
+      # an unplaceable stage, it calls it `:compile`. The override is
+      # still what gets these to `:lint`, which is what the recipe below
+      # and this module's moduledoc are about.
+      assert {:ok, %StatifierBlocks.Finding{source: :compile}} =
                StatifierBlocks.Finding.from_compiler(hd(findings))
 
       assert {presentation, []} =

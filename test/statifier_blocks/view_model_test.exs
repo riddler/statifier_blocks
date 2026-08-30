@@ -237,7 +237,9 @@ defmodule StatifierBlocks.ViewModelTest do
     # finding.
     test "a :slot anchor naming a slot the node carries routes to that slot's findings" do
       child = Block.new("core.wait", id: "blk_W", config: %{"duration" => "PT1S"})
-      finding = Finding.new({:slot, "blk_ROOT", "body"}, :arity, "needs at least one step")
+
+      finding =
+        Finding.new({:slot, "blk_ROOT", "body"}, :assignability, "needs at least one step")
 
       vm = build(document_with(child), [finding])
       root_node = vm.root
@@ -254,7 +256,7 @@ defmodule StatifierBlocks.ViewModelTest do
     # matching a real slot to render it under either).
     test "a :slot anchor naming a slot the node does not carry falls back to the node's findings" do
       child = Block.new("core.wait", id: "blk_W", config: %{"duration" => "PT1S"})
-      finding = Finding.new({:slot, "blk_ROOT", "no_such_slot"}, :arity, "ghost slot")
+      finding = Finding.new({:slot, "blk_ROOT", "no_such_slot"}, :assignability, "ghost slot")
 
       vm = build(document_with(child), [finding])
 
@@ -327,8 +329,11 @@ defmodule StatifierBlocks.ViewModelTest do
       bad_wait =
         Block.new("core.wait", id: "blk_BADWAIT", config: %{"duration" => "not-a-duration"})
 
-      # :arity, :assignability, :lint (caller-supplied).
-      arity_finding = Finding.new({:slot, "blk_ROOT", "body"}, :arity, "too few children")
+      # :assignability (slot-anchored and block-anchored) and :lint,
+      # all caller-supplied. Slot arity is :assignability since ADR-0005
+      # amendment 11j; it was never its own source in practice.
+      slot_arity_finding =
+        Finding.new({:slot, "blk_ROOT", "body"}, :assignability, "too few children")
 
       assignability_finding =
         Finding.new({:block, "blk_BADWAIT"}, :assignability, "type mismatch")
@@ -343,7 +348,7 @@ defmodule StatifierBlocks.ViewModelTest do
 
       document = Document.new(root, id: "bdoc_SIGNUP")
 
-      vm = build(document, [arity_finding, assignability_finding, lint_finding])
+      vm = build(document, [slot_arity_finding, assignability_finding, lint_finding])
 
       assert length(placed_findings(vm)) == length(vm.findings)
     end

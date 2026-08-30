@@ -25,6 +25,11 @@ defmodule StatifierBlocks.FindingFromCompilerTest do
   @severities [:error, :warning]
   @stage_source %{config: :config, resolve: :resolution, structure: :assignability}
 
+  # ADR-0005 decision 11's source enum as 11h/11j leave it: `:arity`
+  # dropped (no producer ever emitted it), `:compile` added for every
+  # compiler finding the by-stage mapping cannot place.
+  @sources [:config, :assignability, :resolution, :lint, :compile]
+
   defp compiler_finding(stage, severity, block_id, config_key) do
     CompilerFinding.new(stage, {:reason_for, stage}, "message for #{stage}",
       block_id: block_id,
@@ -52,24 +57,24 @@ defmodule StatifierBlocks.FindingFromCompilerTest do
             assert {:error, {:unanchorable, ^finding}} = result
 
           "blk_X" ->
-            case result do
-              {:ok, %Finding{} = adapted} ->
-                assert adapted.severity == finding.severity
-                assert adapted.message == finding.message
-                assert same_block?(adapted.anchor, "blk_X")
-                assert adapted.source in [:config, :arity, :assignability, :resolution, :lint]
+            # Since 11h nothing anchored is refused: a stage the mapping
+            # cannot place takes `:compile` rather than
+            # `{:no_presentation_source, _}`.
+            assert {:ok, %Finding{} = adapted} = result
+            assert adapted.severity == finding.severity
+            assert adapted.message == finding.message
+            assert same_block?(adapted.anchor, "blk_X")
+            assert adapted.source in @sources
 
-                if severity != :error do
-                  assert adapted.source == :lint
-                end
+            cond do
+              severity != :error ->
+                assert adapted.source == :lint
 
-              {:error, {:no_presentation_source, ^finding}} ->
-                # Only reachable for an anchored, `:error`-severity finding
-                # whose stage names no source (rule 4) - assert that is
-                # exactly the case here, so a wrongly-refused combination
-                # cannot slip through as "any error is fine".
-                assert severity == :error
-                assert stage not in Map.keys(@stage_source)
+              Map.has_key?(@stage_source, stage) ->
+                assert adapted.source == @stage_source[stage]
+
+              true ->
+                assert adapted.source == :compile
             end
         end
       end
@@ -145,6 +150,55 @@ defmodule StatifierBlocks.FindingFromCompilerTest do
     end
   end
 
+  describe "an unplaced stage takes :compile (ADR-0005 amendment 11h)" do
+    # Sabotage: made `source_by_rule/1`'s catch-all clause return
+    # `{:ok, :lint}` instead of `{:ok, :compile}` - red on every stage
+    # below, because an unplaceable compiler finding then claims a rule
+    # the editor applies rather than saying "the compiler said so".
+    test "every stage the by-stage mapping does not name maps to :compile" do
+      for stage <- [:document, :emit, :chart] do
+        finding = compiler_finding(stage, :error, "blk_X", nil)
+
+        assert {:ok, %Finding{source: :compile, severity: :error, anchor: {:block, "blk_X"}}} =
+                 Finding.from_compiler(finding)
+      end
+    end
+
+    # Sabotage: made `anchor_from_compiler/1`'s `block_id: nil` clause
+    # return `{:ok, {:block, nil}}` instead of refusing - red, because a
+    # block-less :emit finding then adapts to `source: :compile` with a
+    # nil anchor. 11h widened rule 4 and left the anchor rule alone; this
+    # asserts that, where the cross-product test asserts the anchor rule
+    # itself.
+    test "the anchor refusal still takes priority over an unplaced stage" do
+      finding = compiler_finding(:emit, :error, nil, "operation")
+
+      assert {:error, {:unanchorable, ^finding}} = Finding.from_compiler(finding)
+    end
+
+    # Sabotage: dropped rule 2's guarded clause, leaving the by-stage
+    # `case` to decide at every severity - red, because an :emit :warning
+    # then comes back `:compile` instead of `:lint`. 11h made the
+    # catch-all stage-agnostic, not severity-agnostic.
+    test ":compile is stage-agnostic, and rule 2 still wins for a non-error" do
+      assert {:ok, %Finding{source: :lint}} =
+               Finding.from_compiler(compiler_finding(:emit, :warning, "blk_X", nil))
+
+      assert {:ok, %Finding{source: :compile}} =
+               Finding.from_compiler(compiler_finding(:emit, :error, "blk_X", nil))
+    end
+
+    # Sabotage: made `source_from_compiler/2` ignore `opts[:source]` when
+    # the stage is unplaceable - red, because the explicit override is the
+    # seam `SensitivePaths` and `SelfReference` both document, and 11h
+    # widened the default without taking it away.
+    test "an explicit source: override still wins over :compile" do
+      finding = compiler_finding(:emit, :error, "blk_X", nil)
+
+      assert {:ok, %Finding{source: :lint}} = Finding.from_compiler(finding, source: :lint)
+    end
+  end
+
   describe "from_compiler_all/2 partitions and drops nothing" do
     # Sabotage: made `from_compiler_all/2` build the ok list with
     # `Enum.reduce` but forgot to reverse it before returning - red,
@@ -166,19 +220,23 @@ defmodule StatifierBlocks.FindingFromCompilerTest do
       assert Enum.map(ok, & &1.anchor) == [
                {:config, "blk_A", "x"},
                {:block, "blk_B"},
+               # blk_C is an :emit-stage :error - unplaceable by stage, so
+               # :compile since 11h, where it used to be refused.
+               {:block, "blk_C"},
                # blk_D carries a config_key, so its anchor is still
                # {:config, ...} even though its :warning severity routes
                # its source to :lint by rule 2 (checked next).
                {:config, "blk_D", "y"}
              ]
 
-      assert Enum.map(ok, & &1.source) == [:config, :resolution, :lint]
+      assert Enum.map(ok, & &1.source) == [:config, :resolution, :compile, :lint]
 
-      assert Enum.map(refused, fn {f, _reason} -> f.stage end) == [:document, :emit]
+      # Only the block-less finding refuses now: the anchor is the one
+      # thing 11h did not make recoverable.
+      assert Enum.map(refused, fn {f, _reason} -> f.stage end) == [:document]
 
       assert Enum.map(refused, fn {_f, reason} -> reason end) == [
-               {:unanchorable, Enum.at(findings, 1)},
-               {:no_presentation_source, Enum.at(findings, 3)}
+               {:unanchorable, Enum.at(findings, 1)}
              ]
     end
   end

@@ -31,7 +31,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         Finding.new({:block, "blk_variant"}, :lint, "no handler registered for this invoke type",
           severity: :warning
         ),
-        Finding.new({:slot, "blk_wizard", "body"}, :arity, "this slot wants at least one step"),
+        Finding.new(
+          {:slot, "blk_wizard", "body"},
+          :assignability,
+          "this slot wants at least one step"
+        ),
         Finding.new({:config, "blk_email_step", "duration"}, :config, "far too long a wait"),
         Finding.new({:block, "blk_deleted_long_ago"}, :resolution, "no such block any more")
       ]
