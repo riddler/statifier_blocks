@@ -1942,6 +1942,11 @@ one chip.
 
 The `", "` join H described as the interim rendering is gone with the deferral
 it belonged to; the arm of `ViewModel.subtitle/1` that H5 added for it now
-answers `nil` and the chips are read from the node. H5's rule about **which**
-fact the second line carries - the type's label when the author named the
-block, the summary otherwise - is untouched and is what the row is placed by.
+answers `nil` and the chips are read from the node. The function that reads
+them is `StatifierBlocks.ViewModel.summary_chips/1`, which is the public reader
+a host calls rather than reaching for `Node.summary` itself (named by ADR-0005
+decision 10's 2026-08-30 Note, "the cap signals", which also records that a
+chip H3 refuses now raises a `:lint` warning against its block). H5's rule
+about **which** fact the second line carries - the type's label when the author
+named the block, the summary otherwise - is untouched and is what the row is
+placed by.

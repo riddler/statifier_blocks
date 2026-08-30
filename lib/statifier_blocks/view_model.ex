@@ -349,10 +349,14 @@ defmodule StatifierBlocks.ViewModel do
   }
 
   @doc """
-  Builds the view model. Derives `:resolution` and `:config` findings from
-  `{document, palette}`, concatenates `findings` after them, routes every
-  one of the combined list per the moduledoc's table, and groups
-  `palette`'s types into `palette_groups`.
+  Builds the view model. Derives `:resolution`, `:config` and `:lint`
+  findings from `{document, palette}`, concatenates `findings` after them,
+  routes every one of the combined list per the moduledoc's table, and
+  groups `palette`'s types into `palette_groups`.
+
+  The `:lint` half is the summary chips the presentation cap refused
+  (`StatifierBlocks.BlockType.summary_refusals/2`), one `:warning` per
+  refusal - the only derived finding here that is not an error.
   """
   @spec build(Document.t(), Palette.t(), [Finding.t()]) :: t()
   def build(%Document{} = document, %Palette{} = palette, findings) when is_list(findings) do
@@ -517,7 +521,9 @@ defmodule StatifierBlocks.ViewModel do
   Nothing is refused here. An over-long or newline-carrying chip was already
   dropped where the node was built (`StatifierBlocks.BlockType.summary/2`,
   under ADR-0002 B3's refuse-never-truncate discipline), so this reads what
-  survived.
+  survived. What did not survive is not silent: `build/3` raises a `:lint`
+  warning against the block for each refused chip, so the difference between
+  "declared nothing" and "declared something too long" is readable.
 
       iex> alias StatifierBlocks.ViewModel
       iex> ViewModel.summary_chips(%ViewModel.Node{
@@ -675,11 +681,34 @@ defmodule StatifierBlocks.ViewModel do
     |> Enum.flat_map(fn block ->
       case Palette.resolve(palette, block) do
         {:ok, module, resolved} ->
-          config_findings(block.id, module, resolved.config)
+          config_findings(block.id, module, resolved.config) ++
+            summary_findings(block.id, module, resolved.config)
 
         {:error, reason} ->
           [Finding.new({:block, block.id}, :resolution, resolution_message(reason))]
       end
+    end)
+  end
+
+  # ADR-0005 decision 10's 2026-08-30 Note, "the cap signals". The
+  # presentation cap refuses a chip rather than truncating it (ADR-0002 B3),
+  # which is the right call for the card and leaves the author with nothing
+  # to look at: a lane name one character too long draws the same card as a
+  # lane nobody declared. `:lint` at `:warning` is the honest severity -
+  # decision 11 reserves every non-error severity to `:lint`, and the
+  # document compiles either way, so this changes no verdict and only says
+  # that something declared is not being drawn.
+  @spec summary_findings(Block.id(), module(), Block.config()) :: [Finding.t()]
+  defp summary_findings(block_id, module, config) do
+    module
+    |> BlockType.summary_refusals(config)
+    |> Enum.map(fn refusal ->
+      Finding.new(
+        {:block, block_id},
+        :lint,
+        BlockType.summary_refusal_message(module, config, refusal),
+        severity: :warning
+      )
     end)
   end
 

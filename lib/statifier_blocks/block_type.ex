@@ -735,12 +735,125 @@ defmodule StatifierBlocks.BlockType do
   """
   @spec summary(module(), Block.config()) :: [String.t()]
   def summary(module, config) do
+    module
+    |> declared_chips(config)
+    |> Enum.map(&chip/1)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  @typedoc """
+  Why one declared summary chip is not drawn, in the vocabulary of
+  ADR-0002 amendment B3's refusal set as `chip/1` applies it.
+
+  `:not_a_string` is anything that is not a binary, `:blank` an empty or
+  all-whitespace string, `:multiline` one carrying a newline, carriage
+  return or tab, and `:too_long` one past `#{@presentation_cap}`
+  characters. The order is `chip/1`'s own: a string that is both
+  newline-carrying and over-long reads as `:multiline`, because that is
+  the arm that refused it.
+  """
+  @type summary_refusal_reason :: :too_long | :blank | :multiline | :not_a_string
+
+  @doc """
+  The chips `summary/2` dropped, as `{index, reason}` in declaration order.
+
+  ADR-0005 decision 10's 2026-08-30 Note, "the cap signals". Refusing a
+  chip removes the evidence that anything was declared, so the card of a
+  block whose lane name is one character too long is indistinguishable
+  from the card of a block that declared no lane at all. This is the
+  reader that says which - the editor turns each entry into a `:lint`
+  warning against the block (`StatifierBlocks.ViewModel`), and nothing
+  about the card, the cap or `summary/2` moves to make that possible.
+
+  `index` is the zero-based position in the list the type declared, so it
+  survives a refusal in front of it - `summary/2`'s output has already
+  closed the gap and cannot be indexed against. Total for the same
+  reasons `summary/2` is: a type that exports no `summary/1`, a module
+  that does not exist, and a callback that raises all answer `[]`, which
+  is "nothing was refused" and is honest in each case.
+
+      iex> StatifierBlocks.BlockType.summary_refusals(StatifierBlocks.Core.Parallel, %{"lanes" => ["capture", "balance_check_and_fraud_review"]})
+      [{1, :too_long}]
+
+      iex> StatifierBlocks.BlockType.summary_refusals(StatifierBlocks.Core.Wait, %{"duration" => "30s"})
+      []
+
+      iex> StatifierBlocks.BlockType.summary_refusals(NoSuchModule, %{})
+      []
+  """
+  @spec summary_refusals(module(), Block.config()) ::
+          [{non_neg_integer(), summary_refusal_reason()}]
+  def summary_refusals(module, config) do
+    module
+    |> declared_chips(config)
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {declared, index} ->
+      case chip_refusal(declared) do
+        nil -> []
+        reason -> [{index, reason}]
+      end
+    end)
+  end
+
+  @doc """
+  What one `summary_refusals/2` entry says to an author, in the words a
+  `:lint` finding carries.
+
+  The message names the chip's position, its length and the cap, because
+  those are the three facts an author needs to fix the declaration and
+  none of them is visible on a card that simply drew nothing. Position is
+  one-based here and zero-based in the tuple: the tuple indexes a list and
+  the sentence counts chips.
+
+  The cap lives in this module (ADR-0002's 2026-08-30 Note: one number in
+  one place), so the sentence is built here rather than by the editor.
+  Total: an entry naming a position the type no longer declares still
+  answers a sentence.
+
+      iex> StatifierBlocks.BlockType.summary_refusal_message(StatifierBlocks.Core.Parallel, %{"lanes" => ["capture", "balance_check_and_fraud_review"]}, {1, :too_long})
+      "summary chip 2 is 30 characters; the cap is 24, so it is not drawn"
+  """
+  @spec summary_refusal_message(
+          module(),
+          Block.config(),
+          {non_neg_integer(), summary_refusal_reason()}
+        ) :: String.t()
+  def summary_refusal_message(module, config, {index, reason}) do
+    module
+    |> declared_chips(config)
+    |> Enum.at(index)
+    |> refusal_message(index, reason)
+  end
+
+  @spec refusal_message(term(), non_neg_integer(), summary_refusal_reason()) :: String.t()
+  defp refusal_message(declared, index, :too_long) when is_binary(declared) do
+    "summary chip #{index + 1} is #{String.length(declared)} characters; " <>
+      "the cap is #{@presentation_cap}, so it is not drawn"
+  end
+
+  defp refusal_message(_declared, index, :too_long) do
+    "summary chip #{index + 1} is longer than the cap of #{@presentation_cap} " <>
+      "characters, so it is not drawn"
+  end
+
+  defp refusal_message(_declared, index, :blank),
+    do: "summary chip #{index + 1} is blank, so it is not drawn"
+
+  defp refusal_message(_declared, index, :multiline),
+    do: "summary chip #{index + 1} carries a line break or a tab, so it is not drawn"
+
+  defp refusal_message(_declared, index, :not_a_string),
+    do: "summary chip #{index + 1} is not a string, so it is not drawn"
+
+  # The one declaration pass `summary/2` and `summary_refusals/2` share, so
+  # the chips that are drawn and the chips that are refused can never be
+  # computed from two different readings of the same callback.
+  @spec declared_chips(module(), Block.config()) :: [term()]
+  defp declared_chips(module, config) do
     if Code.ensure_loaded?(module) and function_exported?(module, :summary, 1) do
       module
       |> call_summary(config)
       |> List.wrap()
-      |> Enum.map(&chip/1)
-      |> Enum.reject(&is_nil/1)
     else
       []
     end
@@ -777,14 +890,26 @@ defmodule StatifierBlocks.BlockType do
   # never truncate, and never repair: every arm answers `nil`, which every
   # caller already renders as the default it owns.
   @spec chip(term()) :: String.t() | nil
-  defp chip(text) when is_binary(text) do
-    cond do
-      String.trim(text) == "" -> nil
-      String.contains?(text, ["\n", "\r", "\t"]) -> nil
-      String.length(text) > @presentation_cap -> nil
-      true -> text
+  defp chip(text) do
+    case chip_refusal(text) do
+      nil -> text
+      _refused -> nil
     end
   end
 
-  defp chip(_refused), do: nil
+  # The same refusal set, answering *which* arm refused rather than only
+  # that one did. `chip/1` is defined in terms of it so the drawn chip and
+  # the reported refusal cannot disagree, and the arm order is the one B3's
+  # table reads in.
+  @spec chip_refusal(term()) :: summary_refusal_reason() | nil
+  defp chip_refusal(text) when is_binary(text) do
+    cond do
+      String.trim(text) == "" -> :blank
+      String.contains?(text, ["\n", "\r", "\t"]) -> :multiline
+      String.length(text) > @presentation_cap -> :too_long
+      true -> nil
+    end
+  end
+
+  defp chip_refusal(_refused), do: :not_a_string
 end

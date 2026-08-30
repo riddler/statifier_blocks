@@ -19,7 +19,8 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
   alias StatifierBlocks.{Block, BlockType}
   alias StatifierBlocks.Core.{Branch, OnEvent, Parallel, Send, Wait}
 
-  doctest StatifierBlocks.BlockType, only: [summary: 2]
+  doctest StatifierBlocks.BlockType,
+    only: [summary: 2, summary_refusals: 2, summary_refusal_message: 3]
 
   doctest StatifierBlocks.Core.Parallel, only: [summary: 1]
   doctest StatifierBlocks.Core.Wait, only: [summary: 1]
@@ -180,6 +181,122 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
     # as nils and the joined line reads with holes in it.
     test "a non-string entry is refused rather than inspected" do
       assert BlockType.summary(Declaring, %{"summary" => [7, :atom, %{}, "kept"]}) == ["kept"]
+    end
+  end
+
+  describe "summary_refusals/2, the cap's signal (ADR-0005 decision 10 Note)" do
+    # Sabotage: made `chip_refusal/1`'s cap arm answer `nil` instead of
+    # `:too_long` - `summary/2` still drops the chip, so the card is
+    # unchanged and the only thing that goes red is the signal, which is
+    # exactly the silence this bead exists to remove.
+    test "an over-long chip is reported at the position it was declared" do
+      assert BlockType.summary_refusals(Declaring, %{"summary" => @over_cap}) == [{0, :too_long}]
+
+      assert BlockType.summary_refusals(Declaring, %{
+               "summary" => ["capture", @over_cap, "receipt"]
+             }) == [{1, :too_long}]
+    end
+
+    # Sabotage: indexed `summary/2`'s surviving chips instead of the declared
+    # list - the second refusal then reports position 1 rather than 2,
+    # because the first refusal already closed the gap in front of it.
+    test "the index is the declared position, not the surviving one" do
+      assert BlockType.summary_refusals(Declaring, %{
+               "summary" => [@over_cap, "capture", @over_cap]
+             }) == [{0, :too_long}, {2, :too_long}]
+    end
+
+    # Sabotage: collapsed the four arms of `chip_refusal/1` to one `:too_long`
+    # - a blank chip and a non-string then read as a length problem and the
+    # message tells the author to shorten something that has no length.
+    test "each arm of B3's refusal set names itself" do
+      assert BlockType.summary_refusals(Declaring, %{"summary" => ["   "]}) == [{0, :blank}]
+      assert BlockType.summary_refusals(Declaring, %{"summary" => [""]}) == [{0, :blank}]
+      assert BlockType.summary_refusals(Declaring, %{"summary" => ["a\nb"]}) == [{0, :multiline}]
+      assert BlockType.summary_refusals(Declaring, %{"summary" => ["a\tb"]}) == [{0, :multiline}]
+      assert BlockType.summary_refusals(Declaring, %{"summary" => ["a\rb"]}) == [{0, :multiline}]
+      assert BlockType.summary_refusals(Declaring, %{"summary" => [7]}) == [{0, :not_a_string}]
+
+      assert BlockType.summary_refusals(Declaring, %{"summary" => [:atom]}) == [
+               {0, :not_a_string}
+             ]
+    end
+
+    # The property that keeps the two readers honest: a chip is refused here
+    # if and only if `summary/2` dropped it. Asserted over one list carrying
+    # every arm, so neither reader can grow a case the other does not have.
+    # Sabotage: gave `chip/1` its own copy of the cond instead of delegating
+    # to `chip_refusal/1`, then changed one arm - the two readers disagree
+    # and this is the only test that notices.
+    test "the refusals are exactly the chips summary/2 dropped" do
+      declared = ["capture", @over_cap, "", "a\nb", 7, @at_cap]
+      config = %{"summary" => declared}
+
+      refused = BlockType.summary_refusals(Declaring, config) |> Enum.map(&elem(&1, 0))
+      kept = Enum.reject(0..(length(declared) - 1), &(&1 in refused))
+
+      assert BlockType.summary(Declaring, config) == Enum.map(kept, &Enum.at(declared, &1))
+      assert refused == [1, 2, 3, 4]
+    end
+
+    # Sabotage: made `declared_chips/2`'s no-callback branch read the config
+    # directly instead of answering `[]` - a type that never declared a
+    # summary starts reporting refusals for a key it does not own, which is
+    # the same totality `summary/2` has always had, arriving at the signal.
+    test "a silent type, a missing module and a failing callback refuse nothing" do
+      assert BlockType.summary_refusals(Silent, %{"summary" => @over_cap}) == []
+      assert BlockType.summary_refusals(NoSuchModuleAnywhere, %{}) == []
+      assert BlockType.summary_refusals(Exploding, %{"how" => "raise"}) == []
+      assert BlockType.summary_refusals(Exploding, %{"how" => "throw"}) == []
+      assert BlockType.summary_refusals(Exploding, %{"how" => "exit"}) == []
+    end
+
+    # Sabotage: removed `List.wrap/1` from `declared_chips/2` - a declared
+    # string is enumerated per grapheme, so a 25-character summary reports 25
+    # refusals of a one-character chip instead of one refusal of a long one.
+    test "a declared string is the one-chip case here too" do
+      assert BlockType.summary_refusals(Declaring, %{"summary" => @at_cap}) == []
+      assert BlockType.summary_refusals(Declaring, %{"summary" => @over_cap}) == [{0, :too_long}]
+    end
+  end
+
+  describe "summary_refusal_message/3, the words the author reads" do
+    # Sabotage: dropped the `index + 1` - the message counts from zero while
+    # the author counts chips from one, so the sentence names the wrong chip
+    # on every multi-chip summary.
+    test "the message names the position, the length and the cap" do
+      message =
+        BlockType.summary_refusal_message(
+          Declaring,
+          %{"summary" => ["capture", @over_cap]},
+          {1, :too_long}
+        )
+
+      assert message == "summary chip 2 is 25 characters; the cap is 24, so it is not drawn"
+    end
+
+    # Sabotage: made every arm answer the `:too_long` sentence - a blank chip
+    # is then reported as being 0 characters against a cap of 24, which reads
+    # as a cap problem and sends the author to the wrong end of the fix.
+    test "each reason has its own sentence" do
+      config = %{"summary" => ["", "a\nb", 7]}
+
+      assert BlockType.summary_refusal_message(Declaring, config, {0, :blank}) ==
+               "summary chip 1 is blank, so it is not drawn"
+
+      assert BlockType.summary_refusal_message(Declaring, config, {1, :multiline}) ==
+               "summary chip 2 carries a line break or a tab, so it is not drawn"
+
+      assert BlockType.summary_refusal_message(Declaring, config, {2, :not_a_string}) ==
+               "summary chip 3 is not a string, so it is not drawn"
+    end
+
+    # Sabotage: removed the non-binary `:too_long` clause - an entry naming a
+    # position the type no longer declares raises inside the layout pass,
+    # which is the one thing a total normalizer may never do.
+    test "an entry naming a position that is no longer declared still answers" do
+      assert BlockType.summary_refusal_message(Silent, %{}, {3, :too_long}) ==
+               "summary chip 4 is longer than the cap of 24 characters, so it is not drawn"
     end
   end
 

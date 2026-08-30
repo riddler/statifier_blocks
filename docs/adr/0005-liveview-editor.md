@@ -2959,6 +2959,106 @@ token, and the 2026-08-28 Note is why it introduces no tint.
 
 ---
 
+## Note (2026-08-30): decision 10, the cap signals
+
+**Status: proposed (2026-08-30). Awaiting the independent direction-agent
+verdict.** Drafted 2026-08-30, implementing bead `sb-z80a` (campaign 019). A
+dated Note rather than an amendment: decision 10 and the chip-row amendment
+above are unchanged in every particular, the presentation cap keeps its number
+and its refuse-never-truncate discipline, and no text above this line is edited
+by this section. What is recorded here is a consequence of the refusal that
+neither record states, and the reader the editor now has for it.
+
+### What the refusal costs
+
+ADR-0002 B3 refuses an over-long chip rather than clipping it, and the
+amendment above adopts that per chip: "a chip row draws what survived rather
+than policing anything itself". Both halves are right. The cost is that
+refusing is *invisible*. A `core.parallel` whose lane is
+`balance_check_and_fraud_review` draws the same card as a `core.parallel` that
+declared no lanes at all, because in both cases `ViewModel.Node.summary` is
+`[]` and 10q says an empty summary draws no row. The author sees a card with
+one line and nothing anywhere says a second line was declared and dropped.
+
+This is not hypothetical. Two flagship-fixture blocks in `statifier_examples`
+rendered without their second line for weeks (campaign 018, `se-62u`), and
+what made it survive that long is exactly this: there was nothing to notice.
+A truncated chip is a rendering bug someone files; a missing chip reads as the
+declaration it is, which is the property B3 wanted and is also why it hides.
+
+### The decision
+
+**The cap gets a reader, and refusing raises a lint.** Two additions, neither
+of which touches what is drawn:
+
+`StatifierBlocks.BlockType.summary_refusals/2` answers the chips `summary/2`
+dropped, as `{index, reason}` in declaration order, with `reason` in
+`:too_long | :blank | :multiline | :not_a_string` - B3's refusal set,
+enumerated. The index is the position in the list the **type declared**, not in
+what survived: `summary/2` has already closed the gap and cannot be indexed
+against, and the author is looking at their own declaration. `summary/2` and
+the private `chip/1` are unchanged in behaviour and are defined against the
+same refusal pass, so the chips that draw and the chips that are reported can
+never be computed from two readings of one callback.
+
+`StatifierBlocks.ViewModel.derived_findings/2` reads it once per resolved
+block and emits one finding per refusal: source `:lint`, severity `:warning`,
+anchored `{:block, id}`. The message names the chip's position, its length and
+the cap - "summary chip 2 is 30 characters; the cap is 24, so it is not
+drawn" - because those are the three facts that turn "nothing drew" into a fix,
+and none of them is on the card. The sentence is built in
+`StatifierBlocks.BlockType` (`summary_refusal_message/3`), which is where the
+number lives; ADR-0002's own 2026-08-30 Note asks for one number in one place,
+and a sentence quoting it from the editor would be a second home for it.
+
+**Why `:lint` and `:warning` rather than an error.** Decision 11 reserves every
+non-error severity to `:lint`, and the document compiles with an undrawn chip
+exactly as it compiles without one - so an error would be a false verdict to
+every consumer that gates on findings, and `:info` would understate a card that
+is not saying what its type declared. `:warning` is decision 11's own reading:
+"it compiles and something may not behave as intended".
+
+**Why not widen the cap, and why not truncate.** Both were available and both
+are refused here for the reasons already recorded: 10n and 10o settled that
+truncation "adds nothing, weakens nothing" is false at the card, and the number
+itself is ADR-0002 B3's, chosen so that a phrase fits and a sentence does not.
+This section adds no second opinion about length. It says only that a decision
+the editor takes on the author's behalf should be legible to the author.
+
+### What this Note also names
+
+`ViewModel.summary_chips/1` (`lib/statifier_blocks/view_model.ex`) is **the
+public reader of the chip row**. The chip-row amendment above and ADR-0002's H
+Note both say the chips are "read from the node", which is true and does not
+name the function a host calls; a host reading `Node.summary` directly gets the
+titled-card case wrong, because it is `summary_chips/1` and not the struct
+field that carries 10q's rule that a named card draws the type label instead.
+Naming it here is the same discipline campaign 018 applied to the findings
+number a host reads. ADR-0002's H Note gains one line saying the same, so a
+reader who arrives from the declaration side lands on it too.
+
+### Consequences
+
+- **A well-formed document is unchanged.** No refusal, no finding; the findings
+  list, the drawer count and every severity a host reads are byte-for-byte what
+  they were. The only documents that move are the ones that were already
+  drawing less than they declared.
+- **A document can now carry a `:warning` it did not before**, and the drawer's
+  count includes it. That is the point, and it is why the severity matters: a
+  count that grew is not a document that stopped compiling.
+- **The refusal set is now public vocabulary.** `:too_long`, `:blank`,
+  `:multiline` and `:not_a_string` are B3's table, named. A future refusal has
+  to add a value here rather than folding into an existing one, which is the
+  cost of making the set legible and is worth paying once.
+- **Nothing serializes and nothing is stored.** The refusals are derived at
+  build time from config that is already stored, exactly as the summary is.
+- **The badge and the join marker do not get this yet.** They share `chip/1`'s
+  refusal set and could carry the same signal; this section covers the summary
+  row only, because that is where the silent drop was observed. Widening it is
+  a bead and a Note, not something a reader should assume from this one.
+
+---
+
 ## Note (2026-08-30): decision 12, the read-only config is an inspector surface
 
 A dated note rather than an amendment: decision 12 is unchanged in every
