@@ -536,6 +536,12 @@ def icon(assigns) do
 end
 ```
 
+Yours is rendered as a **function component**, exactly as if the editor had
+written `<.icon name={...} class={...} />` against it, so it gets a tracked
+assigns map and every `Phoenix.Component` helper works inside it - `assign/3`,
+`assign_new/3`, whatever you reach for to derive a value before the markup. It
+has to return a `~H` template, which is the one thing the seam requires.
+
 Two rules the seam keeps. A block type declares a **name**, never markup, so
 nothing a palette entry carries is injected into the editor's render tree. And
 a block type that declares no icon at all gets **no tile** rather than an empty

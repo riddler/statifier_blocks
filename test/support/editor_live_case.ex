@@ -86,9 +86,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # session is signed with `:erlang.term_to_binary/1` and carries no
     # functions - and deliberately unlike the shipped set, so a test can tell
     # which one rendered.
+    #
+    # It derives its one value with `assign/3` rather than inline in the
+    # template, which is what an ordinary host component does and what the
+    # seam used to make impossible (sb-b8g): the editor applied this function
+    # to a bare map with no `__changed__` key, so the helper raised. Every
+    # test that mounts with `icon: :host` now runs through that path.
     defp host_icon(assigns) do
+      assigns = assign(assigns, :label, "icon: #{assigns.name}")
+
       ~H"""
-      <span class={@class} data-icon={@name} data-host-icon="true" aria-hidden="true">
+      <span class={@class} data-icon={@name} data-host-icon="true" title={@label} aria-hidden="true">
         <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" /></svg>
       </span>
       """
