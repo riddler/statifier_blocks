@@ -777,6 +777,7 @@
 
 .sb-slot--secondary {
   border-left-style: dashed;
+  border-left-color: var(--sb-edge-interrupt);
   color: var(--sb-fg-muted);
 }
 
@@ -813,7 +814,7 @@
 /* The rail's label goes with its line. Two words in the subtle grey over a
  * red edge read as a colour that leaked from somewhere else; the same two
  * words in the error family read as the heading of the thing below them. */
-.sb-slot--failure > .sb-slot__header > .sb-slot__label {
+.sb-slot--failure > .sb-slot__header > .sb-slot__name > .sb-slot__label {
   color: var(--sb-error);
 }
 
@@ -860,10 +861,6 @@
   gap: var(--sb-space);
   font-size: var(--sb-text-sm);
   color: var(--sb-fg-muted);
-}
-
-.sb-slot__label {
-  font-weight: var(--sb-weight-medium);
 }
 
 /* d6: validity reaches the client as markup, and hover highlighting is CSS on
@@ -951,6 +948,117 @@
   color: var(--sb-fg-muted);
   border: var(--sb-border-width) dashed var(--sb-border-strong);
   padding: var(--sb-space-half) var(--sb-space-2);
+}
+
+/* ---- slot labels --------------------------------------------------------
+ *
+ * Parity item 1.7 (`sb-5p2`, campaign 016). Everything below is about what a
+ * slot's HEADER says, and it is banded off from the arrangement rules above
+ * on purpose: those decide where a slot sits, these decide what it reads as,
+ * and the two were edited by different hands in the same campaign.
+ */
+
+/* The label and its condition are one unit, stacked, so the header stays the
+ * baseline ROW that `data-sb-anchor` lands a fan on and that the column rule
+ * above centres. Making the header itself a column would have moved the
+ * anchor's baseline and re-opened the layout question this file just closed.
+ *
+ * `min-width: 0` is what lets the chip below truncate: a flex item's default
+ * `min-width: auto` is its content, so an un-broken expression would push the
+ * column wider instead of clipping. */
+.sb-slot__name {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sb-space-half);
+  min-width: 0;
+}
+
+/* Under columns the header is card-width and centred, so the unit inside it
+ * centres too - a label pinned left inside a box as wide as its own condition
+ * reads as belonging to neither the card below nor the edge above. */
+.sb-node__slots--columns > .sb-slot > .sb-slot__header > .sb-slot__name {
+  align-items: center;
+}
+
+/* Caps, tracked, small. The same treatment the fan pill and the join marker
+ * already carry, and for the same reason: this is chrome that LABELS a
+ * structure rather than naming a thing the author made, and the editor says
+ * that one way. `When "valid"` becomes `WHEN "VALID"` with no change to the
+ * string a block type declared - the transform is presentation, so a type
+ * that phrases its slots in sentence case keeps them that way in the
+ * inspector and in every other reader. */
+.sb-slot__label {
+  font-weight: var(--sb-weight-medium);
+  font-size: var(--sb-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--sb-tracking-caps);
+}
+
+/* The condition, in the author's own text, monospaced because it is source
+ * and not prose - the same font the config preview and the expression field
+ * already use, so one expression looks like itself wherever it is shown.
+ *
+ * ONE LINE, always, clipped with an ellipsis, with the whole of it in the
+ * `title`. The chip's job on the canvas is to say WHICH condition this arm
+ * is subject to, so an author scanning a branch can tell the arms apart; a
+ * chip that wrapped to four lines to show the whole of a long predicate
+ * would push every card below it down for a string the inspector already
+ * shows in full and in an editable field.
+ *
+ * `--sb-card-width` is the ruler rather than `100%`: it is the width of the
+ * card the chip sits over, so the truncation point is the same for a chip in
+ * a narrow column and one in a full-width stacked slot, and the header does
+ * not grow to fit an expression. */
+.sb-slot__condition {
+  max-width: var(--sb-card-width);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-xs);
+  color: var(--sb-fg-muted);
+  background: var(--sb-bg-muted);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  padding: 0 var(--sb-space-half);
+}
+
+/* The lane rule: a coloured line over each lane's header, in the block
+ * accent, and only under `data-arrangement="lanes"`.
+ *
+ * The pill above already says `ALL OF`, but the pill is one mark at the top
+ * of the block and the lanes run for the height of the document. A reader
+ * scrolled past the pill is looking at columns, and columns are what a
+ * branch's arms are too - the rule is what carries the "these run at once"
+ * distinction DOWN the page, and it takes the accent for the reason the pill
+ * does: lanes take the accent, a fan stays neutral.
+ *
+ * Read off `data-arrangement` for the same reason that rule is: the
+ * arrangement is a fact about the block, and it is already stamped there.
+ * No new token - the accent and the block edge width are both declared. */
+.sb-node[data-arrangement="lanes"] > .sb-node__slots > .sb-slot > .sb-slot__header {
+  border-top: var(--sb-block-edge) solid var(--sb-block-accent);
+  padding-top: var(--sb-space-half);
+}
+
+/* The interrupt region. The dashed edge was already the vocabulary (10h's
+ * `:secondary` placement, and the rule under the banner above); what it was
+ * missing is the COLOUR the connector layer already draws an interrupt edge
+ * in, so a rail and the edge leaving it stopped being recognisably one thing.
+ * That colour goes on the rail's own rule under the banner above rather than
+ * on a second rule with the same selector down here - two rules for one
+ * selector is how a stylesheet starts disagreeing with itself.
+ *
+ * The label goes with the line, exactly as the failure rail's does and for
+ * the same sentence: two grey words over a coloured edge read as a colour
+ * that leaked from somewhere else, and the same two words in the edge's own
+ * family read as the heading of the region below them. `INTERRUPT RULES` is
+ * the caps treatment applied to the words `core.resumable_group` already
+ * declares for the slot - no string is spelled twice, and a host type
+ * declaring `:secondary` gets its own words in the same place. */
+.sb-slot--secondary > .sb-slot__header > .sb-slot__name > .sb-slot__label {
+  color: var(--sb-edge-interrupt);
 }
 
 /* ------------------------------------------------------------------ form */
