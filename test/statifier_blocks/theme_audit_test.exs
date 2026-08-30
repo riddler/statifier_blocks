@@ -418,12 +418,21 @@ defmodule StatifierBlocks.ThemeAuditTest do
 
     # The corroborator: a scan that matched nothing would pass the step check
     # above vacuously if the rule shape ever changed.
+    #
+    # The two counts are different claims. 7A's steps are a closed list and are
+    # pinned exactly, which is the stricter half and the one that would notice
+    # a sixth breakpoint arriving unrecorded. The total is a floor, because a
+    # query on the same container that is not a 7A step is a legitimate thing
+    # for a pane affordance to want - the palette's fold is one (parity item
+    # 1.1), scoped to the only arrangement that has a palette column to narrow.
     # Sabotage: narrowing the scan to a container name the stylesheet does not
     # use - the check above goes quiet and this notices.
     test "the scan actually saw the queries", %{source: source} do
+      steps = Regex.scan(~r/@container sb-editor \(width < \d+px\)/, source)
       found = Regex.scan(~r/@container sb-editor/, source)
 
-      assert length(found) == 5
+      assert length(steps) == 5
+      assert length(found) >= 5
     end
   end
 

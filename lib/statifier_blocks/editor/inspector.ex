@@ -33,6 +33,27 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     Editing a condition stays on the Config tab, where every other field is
     edited, so there is exactly one form in the editor and one place a draft
     can live (decision 9).
+
+    ## The pane header, and what its status says (parity item 1.1)
+
+    Above the tabs sits the pane's own header row: the name of the pane, and a
+    right-aligned status. The status is the inspector's subject stated in
+    words - the selected block's type label, or `no selection` - and it is
+    there because 3A's rule ("the inspector is about the selected block") is
+    invisible in an empty pane otherwise: three tabs with nothing under them
+    do not say whether the author has selected nothing or selected something
+    that has nothing to show.
+
+    It reads the **type's label**, not the block's id. A label is what the
+    author picked the block by in the palette and what its card reads on the
+    canvas, so the header names the block in the vocabulary the rest of the
+    editor already uses. An unresolvable block reaches the placeholder entry
+    by the ordinary route and falls back to its raw type name, which is the
+    only thing about it that is still known.
+
+    The inspector has no collapse. The palette's fold is the wide
+    arrangement's answer to a cramped canvas and one pane is enough of an
+    answer; a second one is a separate ruling and is not made here.
     """
 
     use Phoenix.Component
@@ -60,6 +81,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-tab={@tab}
         data-block-id={@node && @node.block_id}
       >
+        <div class="sb-inspector__header">
+          <h2 class="sb-inspector__title">Inspector</h2>
+          <span class="sb-inspector__status" data-selected={to_string(@node != nil)}>
+            {selection_status(@node)}
+          </span>
+        </div>
+
         <div class="sb-inspector__tabs" role="tablist" aria-label="Inspector">
           <button
             :for={tab <- Shell.inspector_tabs()}
@@ -178,6 +206,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         </p>
       </div>
       """
+    end
+
+    # The header's subject, in the vocabulary the palette and the canvas use.
+    # `entry.label` is decision 10's default-applied label, so it is a string
+    # for every resolvable block; the fall through to `type` is the
+    # unresolvable case, whose entry is the placeholder's.
+    @spec selection_status(ViewModel.Node.t() | nil) :: String.t()
+    defp selection_status(nil), do: "no selection"
+
+    defp selection_status(%ViewModel.Node{} = node) do
+      case Map.get(node.entry, :label) do
+        label when is_binary(label) and label != "" -> label
+        _none -> node.type
+      end
     end
 
     @spec label(Shell.inspector_tab()) :: String.t()
