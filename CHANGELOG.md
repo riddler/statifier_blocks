@@ -10,6 +10,36 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.8.0] 2026-08-30
+
+0.8.0 is the release where a container folds shut. A container in the
+editor now carries a fold control on its own card, and folding it does not
+hide what is inside: a folded container wears a ring badge counting the
+findings under it, so a problem stays visible from the outside. Alongside
+that, an editor whose host swaps one document out for another fits the new
+document the way it fitted the first - the `fit` attr is spent once per
+open document rather than once per editor, so a swap now behaves exactly as
+a mount does. Hosts: see Removed - the `--sb-fg-on-accent` theme token is
+gone, and a theme that still sets it can drop the declaration.
+
+### Added
+
+- A container in the editor folds shut from a control on its own card, and a
+  folded container carries a ring badge counting the findings inside it.
+
+### Changed
+
+- The editor's `fit` attr is now spent once per open document rather than once
+  per editor: a document the host swaps in is armed from the attr passed in
+  that same update and fitted by the next measurement, exactly as at mount. A
+  host re-render carrying the document already open still never re-fits, and
+  `:manual` or an absent attr still arms nothing.
+
+### Removed
+
+- The `--sb-fg-on-accent` theme token, which no rule in the stylesheet reads
+  any more. A host theme that sets it can drop the declaration.
+
 ## [0.7.0] 2026-08-30
 
 0.7.0 is the release where a finding looks like a finding wherever it is
@@ -1077,6 +1107,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.8.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.8.0
 [0.7.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.7.0
 [0.6.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.6.0
 [0.5.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.5.0
