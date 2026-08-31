@@ -424,3 +424,28 @@ is blocked either way, and the document compiles as it did before.
   consumer would survive it; whether the document forbids it structurally or a
   loader lints it is left open, since both answers need a loader that does not
   exist yet.
+
+## Note (2026-08-31): a second thing in this repository is now spelled `datamodel`
+
+A dated note rather than an amendment, recorded for `sb-ao6l` under
+campaign-022 ruling R3: nothing in this record changes, and the note exists
+only because this record's cross-check section took on the job of keeping
+the family's datamodel vocabulary countable.
+
+ADR-0001's Amendment (2026-08-31), decision 11, adds an optional top-level
+envelope key to the block document, and the key is named `datamodel`. The two
+are told apart in one sentence each: **this record's datamodel document** is
+the host's typed, three-scope, advisory description of the data universe an
+author writes conditions against, which no compiler reads and no SCXML
+carries; **ADR-0001's `datamodel` key** is the block document's own ordered
+declaration of the `<data>` roots it needs to exist at run time, which is
+compiled, emitted, and hashed. A description of a vocabulary versus a
+declaration of storage; that amendment's 11g clause carries the full
+reconciliation, including the correspondence (an entry `id` there is what
+this record calls a top-level `local`-scope entry's `path`) and the open
+question of whether such a root counts as declared for ADR-0005's 11e
+advisory - which is ADR-0005's to answer, not this record's.
+
+Nothing in this record changes: the shape, the projection, decision 9's
+"advisory, never a gate", and every open question above stand exactly as
+written.

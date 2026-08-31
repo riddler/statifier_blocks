@@ -229,6 +229,117 @@ defmodule StatifierBlocks.DecodeTest do
     end
   end
 
+  describe "datamodel (ADR-0001 decision 11)" do
+    alias StatifierBlocks.Document.DatamodelEntry
+
+    # sabotage: in `decode_datamodel_entry/2`, change
+    # `expr: Map.get(map, "expr")` to `expr: nil` -> a document with an
+    # `expr` no longer round-trips -> red (verified: also takes the
+    # bytes-side round-trip test below with it)
+    test "decode(encode(d)) == d for a document with a datamodel" do
+      document =
+        Document.new(Block.new("core.wait", id: "blk_leaf"),
+          id: "bdoc_dm",
+          datamodel: [
+            %DatamodelEntry{id: "targets", expr: "[]", description: "the list"},
+            %DatamodelEntry{id: "parked"}
+          ]
+        )
+
+      assert Document.from_json(Document.to_json(document)) == {:ok, document}
+    end
+
+    # sabotage: same target as above, checked from the bytes side instead
+    # of the struct side -> a lossy round trip would still show up here
+    # even if the struct-equality check above were somehow satisfied by
+    # coincidence -> red (verified)
+    test "encode(decode(encode(d))) == encode(d) for a document with a datamodel" do
+      document =
+        Document.new(Block.new("core.wait", id: "blk_leaf"),
+          id: "bdoc_dm",
+          datamodel: [%DatamodelEntry{id: "targets", expr: "[]", description: "the list"}]
+        )
+
+      encoded = Document.to_json(document)
+      assert {:ok, decoded} = Document.from_json(encoded)
+      assert Document.to_json(decoded) == encoded
+    end
+
+    # sabotage: drop `"datamodel"` from `@envelope_keys` -> an envelope
+    # carrying it would be refused as `:unexpected_key` instead of
+    # decoding, which is the opposite of this test's point, so instead
+    # sabotage by dropping `ensure_known_envelope_keys/1` from the `with`
+    # chain in `decode/1` entirely -> an envelope key outside the known
+    # set would decode silently instead of being refused -> red
+    test "an envelope key outside the known set is refused" do
+      json =
+        ~s({"id":"bdoc_x","revision":0,"schema_version":1,"bogus":true,) <>
+          ~s("root":{"id":"blk_root","type":"core.wait","type_version":1}})
+
+      assert Document.from_json(json) ==
+               {:error, {:malformed_envelope, {:unexpected_key, "bogus"}}}
+    end
+
+    # sabotage: drop the `Enum.find(Map.keys(map), &(&1 not in
+    # @entry_keys))` scan from `decode_datamodel_entry/2` -> an entry
+    # object carrying an unrecognized key would decode silently instead
+    # of being refused -> red
+    test "a datamodel entry carrying an unrecognized key is refused" do
+      json =
+        ~s({"id":"bdoc_x","revision":0,"schema_version":1,) <>
+          ~s("datamodel":[{"id":"targets","bogus":true}],) <>
+          ~s("root":{"id":"blk_root","type":"core.wait","type_version":1}})
+
+      assert Document.from_json(json) ==
+               {:error,
+                {:malformed_envelope, {:datamodel, {:entry, 0, {:unexpected_key, "bogus"}}}}}
+    end
+
+    # sabotage: change `Map.get(envelope, "datamodel", [])` in
+    # `decode/1` to default to `nil` instead of `[]` -> an envelope with
+    # no `datamodel` key would build a document whose `datamodel` field
+    # is `nil`, which `Validation.check_datamodel/1`'s `is_list` guard
+    # refuses, and this test's `{:ok, _}` assertion goes red -> red
+    test "an absent datamodel key decodes to []" do
+      json =
+        ~s({"id":"bdoc_x","revision":0,"schema_version":1,) <>
+          ~s("root":{"id":"blk_root","type":"core.wait","type_version":1}})
+
+      assert {:ok, %Document{datamodel: []}} = Document.from_json(json)
+    end
+
+    # An explicit JSON `null` for `expr` is refused, distinctly from the
+    # key being absent (which is `nil` too, but valid).
+    # sabotage: in `reject_explicit_null/4`, change
+    # `is_nil(Map.fetch!(map, key))` to `false` -> an explicit `null`
+    # would pass through and build a struct indistinguishable from the
+    # key being absent -> red
+    test "an explicit null expr is refused, distinctly from an absent one" do
+      json =
+        ~s({"id":"bdoc_x","revision":0,"schema_version":1,) <>
+          ~s("datamodel":[{"id":"targets","expr":null}],) <>
+          ~s("root":{"id":"blk_root","type":"core.wait","type_version":1}})
+
+      assert Document.from_json(json) ==
+               {:error, {:malformed_envelope, {:datamodel, {:entry, 0, {:expr, :explicit_null}}}}}
+    end
+
+    # sabotage: same target, over `description` - change
+    # `reject_explicit_null(map, "description", :description, index)`'s
+    # call site to skip the check entirely (only call it for `"expr"`)
+    # -> red
+    test "an explicit null description is refused, distinctly from an absent one" do
+      json =
+        ~s({"id":"bdoc_x","revision":0,"schema_version":1,) <>
+          ~s("datamodel":[{"id":"targets","description":null}],) <>
+          ~s("root":{"id":"blk_root","type":"core.wait","type_version":1}})
+
+      assert Document.from_json(json) ==
+               {:error,
+                {:malformed_envelope, {:datamodel, {:entry, 0, {:description, :explicit_null}}}}}
+    end
+  end
+
   describe "registry-free decode" do
     # sabotage: add a clause to `Decode.build_block/1` (or `Document.from_json/1`)
     # that pattern-matches on a known set of type names and returns

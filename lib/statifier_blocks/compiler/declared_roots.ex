@@ -109,9 +109,48 @@ defmodule StatifierBlocks.Compiler.DeclaredRoots do
   written verbatim into the attribute. Run creation still wins over
   `expr` - a run seeded with a value for the id starts from that value
   (SCXML 5.3.2), which is upstream's behaviour and not this module's.
+
+  ## Document-declared roots (ADR-0001 decision 11)
+
+  The document itself carries a second declaration surface: a top-level
+  `datamodel` key of `StatifierBlocks.Document.DatamodelEntry` structs,
+  each already checked against ADR-0001's structural rules by
+  `StatifierBlocks.Validation` before a document ever reaches the
+  compiler. `document_declarations/1` turns them into the same
+  `declare/2` emissions `declarations/1` builds from the compile call's
+  `:declare` option, and `StatifierBlocks.Compiler` prepends them to the
+  root block's own children **after** the host's roots and before any
+  block-declared root, which is what puts them second in the single
+  `<datamodel>`:
+
+    1. the compile call's `:declare` roots lead,
+    2. the document's own `datamodel` roots follow,
+    3. block-declared roots follow those, in document order.
+
+  **Host wins.** A document root whose id a host root already declares is
+  dropped by `shadowed/2` before the hoist ever runs, and the compiler
+  turns the dropped id into one **warning** on the compiled artifact
+  rather than a refusal - the compile call leads, so the host's
+  declaration is the one that survives and the document's is silently
+  fine to have, not silently fine to lose track of. This is different
+  from F6: F6 is a refusal because an uncaught collision would silently
+  overwrite a binding a chart still reads from two places, while a
+  host-shadowed document root is never emitted at all, so there is
+  nothing left in the chart to overwrite.
+
+  A document root colliding with a **block-declared** root is unchanged
+  F6 `:duplicate_binding`, an **error**, through the same `hoist/1` walk
+  every other collision goes through: document roots are prepended among
+  the root block's own children before the hoist runs, so every block in
+  the document sits inside their scope exactly as it sits inside the
+  host's. Nothing about `hoist/1` needs to know a root came from the
+  document rather than the host - the walk does not distinguish the two,
+  and `shadowed/2` is what keeps a host/document collision from ever
+  reaching it as a false F6.
   """
 
   alias StatifierBlocks.{Block, Emission}
+  alias StatifierBlocks.Document.DatamodelEntry
 
   @data "data"
   @datamodel "datamodel"
@@ -184,6 +223,58 @@ defmodule StatifierBlocks.Compiler.DeclaredRoots do
   end
 
   def declarations(other), do: {:error, [{:invalid_declaration, other}]}
+
+  @doc """
+  The document's own `datamodel` entries as `declare/2` emissions, in
+  list order.
+
+  Unlike `declarations/1`, this takes **already-validated** entries: the
+  Document stage (`StatifierBlocks.Document.validate/1`, run before the
+  compiler's Emit stage) refuses a document whose `datamodel` is
+  malformed, so a `%DatamodelEntry{}` reaching here always has a bare
+  identifier for an id and either `nil` or a non-empty expression for
+  `expr`. That is why this returns a plain list rather than a tagged
+  tuple: the shape is a schema rule, checked exactly once by
+  `StatifierBlocks.Validation`, and re-checking it here would be a second
+  place for that rule to drift from the one the document was actually
+  validated against.
+
+  `description` is dropped - it is prose for a human reading the
+  document, never compiled and never written into the emitted SCXML.
+  """
+  @spec document_declarations([DatamodelEntry.t()]) :: [Emission.t()]
+  def document_declarations(entries) when is_list(entries) do
+    Enum.map(entries, &declare(&1.id, &1.expr))
+  end
+
+  @doc """
+  Splits the document's own root emissions into the ones that survive and
+  the ids a `host` root already declares.
+
+  Host wins: a document root whose id `host` also declares is dropped
+  from `kept_document_roots` and its id collected into `shadowed_ids`, in
+  `document` order. Both lists are otherwise `document`'s own order,
+  unchanged - this makes no claim about the host's own order, and does
+  not need to, since the caller prepends `host` ahead of whatever this
+  returns.
+  """
+  @spec shadowed([Emission.t()], [Emission.t()]) :: {[Emission.t()], [String.t()]}
+  def shadowed(host, document) do
+    host_ids = host |> Enum.map(&name/1) |> MapSet.new()
+
+    {kept, shadowed_ids} =
+      Enum.reduce(document, {[], []}, fn root, {kept, shadowed_ids} ->
+        id = name(root)
+
+        if MapSet.member?(host_ids, id) do
+          {kept, [id | shadowed_ids]}
+        else
+          {[root | kept], shadowed_ids}
+        end
+      end)
+
+    {Enum.reverse(kept), Enum.reverse(shadowed_ids)}
+  end
 
   @doc """
   Lifts every `<data>` element out of `emission`, returning the stripped

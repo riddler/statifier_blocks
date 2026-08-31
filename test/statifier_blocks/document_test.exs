@@ -2,6 +2,7 @@ defmodule StatifierBlocks.DocumentTest do
   use ExUnit.Case, async: true
 
   alias StatifierBlocks.{Block, Document}
+  alias StatifierBlocks.Document.DatamodelEntry
 
   # sabotage: default revision to 1 instead of 0 -> red
   test "new/2 defaults revision to 0, metadata to %{}, schema_version to 1" do
@@ -12,6 +13,7 @@ defmodule StatifierBlocks.DocumentTest do
     assert document.revision == 0
     assert document.metadata == %{}
     assert document.schema_version == 1
+    assert document.datamodel == []
     assert "bdoc_" <> _rest = document.id
   end
 
@@ -26,6 +28,17 @@ defmodule StatifierBlocks.DocumentTest do
     assert document.id == "bdoc_explicit"
     assert document.revision == 17
     assert document.metadata == %{"name" => "Example"}
+  end
+
+  # sabotage: hardcode `datamodel: []` in `new/2` instead of
+  # `Keyword.get(opts, :datamodel, [])` -> red (verified)
+  test "new/2 accepts explicit :datamodel" do
+    root = Block.new("core.sequence")
+    entry = %DatamodelEntry{id: "targets", expr: "[]", description: "the targets list"}
+
+    document = Document.new(root, datamodel: [entry])
+
+    assert document.datamodel == [entry]
   end
 
   describe "blocks/1" do
