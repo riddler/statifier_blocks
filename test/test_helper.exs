@@ -1,5 +1,10 @@
 ExUnit.start()
 
+# statifier ships no `mod:` application callback (ADR-0027 decision 1), so the
+# embedder places the session runtime. The subchart handler's children start
+# through `Statifier.start_session/2`, which needs it.
+{:ok, _runtime} = Statifier.Supervisor.start_link([])
+
 # The LiveView tests mount a real connected view, which logs a MOUNT line
 # carrying the whole session - a document struct - for every test. Useful once,
 # unreadable eighty times over.
