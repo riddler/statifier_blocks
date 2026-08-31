@@ -1950,3 +1950,97 @@ chip H3 refuses now raises a `:lint` warning against its block). H5's rule
 about **which** fact the second line carries - the type's label when the author
 named the block, the summary otherwise - is untouched and is what the row is
 placed by.
+
+## Note (2026-08-31): `core.on_event` takes an optional `cond`
+
+A dated note rather than an amendment, recorded for `sb-d65` under
+campaign-022 ruling R6. It records one optional field on a type this record
+already ships, and the reason that field belongs on the interrupt handler
+rather than on a `core.branch` after it. The record's Status is untouched, no
+existing document's compiled bytes move, and the vocabulary does not grow.
+
+### What the type carries now
+
+Decision 10's table gives `core.on_event` two config fields, `event` and
+`outcome`. It now declares a third:
+
+| Field | Type | Required? | Means |
+|---|---|---|---|
+| `cond` | `:expression` | no, default `""` | the handler fires only when this condition holds |
+
+`:expression` is already in decision 7's closed field-type set, so nothing about
+the set moves; `core.branch`'s arms were its only reader and now have a second
+one. The field's `value_path` is decision 7's default, `[key]`, because the
+condition is stored at `config["cond"]` - `core.branch` declares an explicit
+path because its conditions live inside its `arms` list, and this type has no
+such indirection to describe.
+
+What is emitted is one attribute on one transition. The watcher's
+`<transition event="..." target="...">` gains `cond="..."` when the key holds a
+non-blank string:
+
+    <transition cond="review.parked" event="review.resolved" target="s_INT__done">
+      <raise event="statifier_blocks.interrupt.resume"/>
+    </transition>
+
+A handler whose `cond` is absent, empty, or whitespace writes no `cond`
+attribute at all, which is what makes this key additive: every document authored
+before it existed compiles to the same bytes it compiled to before.
+
+### Why the guard is on the handler and not on a branch after it
+
+The alternative this note rejects is that a guarded interrupt is spelled
+`core.on_event` followed by a `core.branch` inside it, with no new key anywhere.
+It does not work, and the reason is a fact about *when* the two conditions are
+read.
+
+A `core.on_event` decides whether to leave the group it interrupts. Its
+transition raises the interrupt-protocol event, and the enclosing group
+transitions on that event unconditionally - by the time control is inside the
+handler's own body, the in-flight work has already been abandoned or re-entered.
+A branch there can decide what to do *afterwards*; it cannot decide whether the
+interrupt should have happened. The question "does this event actually interrupt
+this work" has exactly one place it can be asked, and that is the transition
+this note puts the guard on.
+
+The evidence was already in the repository. This record's own 2026-08-28
+amendment, section D, point D3 ("Two demo types are deliberately NOT promoted"),
+held two demo types back from the core vocabulary on the grounds that "a guarded
+event handler and a timeout rule are `core.on_event` and `core.wait` inside a
+group's `interrupts` slot, with the guard as a condition". That sentence
+described an affordance the shipped type did not have: `core.on_event` declared
+no condition and read none. The `card_processing` example document has carried an
+authored `cond` on an interrupt rule since 2026-08-28, stored and inert, on the
+strength of the same reading. This note makes D3's sentence true rather than
+aspirational, and the inert key live.
+
+### What validates it, and what does not
+
+`validate_config/1` asks only whether the stored value is a string. Whether the
+string is a well-formed predicator expression is not this package's question -
+ADR-0004 decision 9 puts expression checking upstream. The transition therefore
+carries the `cond_key` that decision 9's provenance needs, naming `"cond"`, and
+a malformed guard is refused at the Chart stage as an `:expression_compile_error`
+finding with `config_key: "cond"` and `fault: :author`: the same shape, from the
+same machinery, that a malformed `core.branch` arm produces with the arm's slot
+name as its key. The only difference between the two is that a branch requires
+its conditions and a handler does not.
+
+### What this note does not change
+
+- **Decision 10's placement rule.** `core.on_event` is still an
+  `:interrupt_handler` and nothing else, carried by `io/1` per ADR-0003, with no
+  validation rule of its own. A guard is a condition on firing, not on placement.
+- **The `outcome` values.** Still `"abandon"` and `"resume"`, still the pair
+  ratified 2026-08-27, and a third still costs a `current_version/0` bump.
+- **The size of the core vocabulary.** No type is added. The demo types D3 held
+  back stay held back, and the argument for holding them back is stronger now
+  than it was, not weaker.
+- **Amendment H6's card row.** `core.on_event`'s summary is still the outcome
+  word then the event name, and the guard is not a third chip. The reason
+  `core.branch` counts its arms instead of listing their conditions is the same
+  reason here: an expression is not a chip.
+- **The document schema.** ADR-0001 owns the stored bytes and `schema_version`
+  stays at `1`. An optional key inside a block's `config` object is a block-type
+  contract, which is this record's, and the stored spelling of the guarded
+  handler in `card_processing` is unchanged by being read at last.

@@ -340,9 +340,144 @@ defmodule StatifierBlocks.Core.EmitTest do
       assert {:error, [{"outcome", _message}]} =
                OnEvent.emit(block, Context.new("blk_OE", "bdoc_T"))
     end
+
+    # sabotage: drop `cond: guard(config)` from the transition opts -> the
+    # watcher's transition writes no cond and the guarded assert goes red
+    # (verified)
+    test "puts an authored cond on the watcher's transition" do
+      root =
+        Block.new("core.on_event",
+          id: "blk_OE",
+          config: %{
+            "event" => "review.resolved",
+            "cond" => "review.parked",
+            "outcome" => "resume"
+          }
+        )
+
+      scxml = compile!(root, Palette.core()).scxml
+
+      assert scxml =~
+               ~s(<transition cond="review.parked" event="review.resolved" target="s_blk_OE__)
+    end
+
+    # sabotage: make `guard/1` answer the raw string for a blank cond ->
+    # the blank case emits `cond=""` and both asserts below go red
+    # (verified)
+    test "writes no cond at all for a handler that carries none" do
+      for config <- [
+            %{"event" => "review.resolved", "outcome" => "resume"},
+            %{"event" => "review.resolved", "cond" => "", "outcome" => "resume"},
+            %{"event" => "review.resolved", "cond" => "   ", "outcome" => "resume"}
+          ] do
+        scxml =
+          Block.new("core.on_event", id: "blk_OE", config: config)
+          |> compile!(Palette.core())
+          |> Map.fetch!(:scxml)
+
+        refute scxml =~ "cond=", inspect(config)
+
+        assert scxml =~ ~s(<transition event="review.resolved" target="s_blk_OE__),
+               inspect(config)
+      end
+    end
+
+    # sabotage: pass `cond_key: "guard"` -> the owner names a key no field
+    # declares and the first half goes red (verified)
+    #
+    # The second half is the reason `cond_key` is passed unconditionally
+    # rather than only for a guarded handler: `attribute_from_config/3`
+    # records nothing for an attribute the element does not carry, so the
+    # unguarded handler is already clean and a conditional at the call
+    # site would be untestable dead weight.
+    test "attributes the cond to the config key the author typed into" do
+      guarded = %{"event" => "review.resolved", "cond" => "review.parked", "outcome" => "resume"}
+      plain = Map.delete(guarded, "cond")
+
+      assert {:ok, emission} =
+               OnEvent.emit(
+                 Block.new("core.on_event", id: "blk_OE", config: guarded),
+                 Context.new("blk_OE", "bdoc_T")
+               )
+
+      assert [%Emission{attribute_owners: [{"cond", "cond"}]}] = transitions(emission)
+
+      assert {:ok, unguarded} =
+               OnEvent.emit(
+                 Block.new("core.on_event", id: "blk_OE", config: plain),
+                 Context.new("blk_OE", "bdoc_T")
+               )
+
+      assert [%Emission{attribute_owners: []}] = transitions(unguarded)
+    end
+
+    # The end of the routing the test above only sets up: predicator is
+    # what rejects the expression, at the Chart stage, and the finding
+    # comes back naming the author's own field. `core.branch` is asserted
+    # beside it because "the existing machinery" is the whole claim -
+    # a guarded handler is not a second, quieter expression path.
+    #
+    # sabotage: drop `cond: guard(config)` from the transition opts ->
+    # there is no expression left to compile, the document compiles clean
+    # and the first assert goes red (verified)
+    test "routes a malformed cond back to the author's field, exactly as an arm's does" do
+      bad = "&& not an expression &&"
+
+      assert {:error, [handler]} =
+               compile(
+                 Block.new("core.on_event",
+                   id: "blk_OE",
+                   config: %{"event" => "review.resolved", "cond" => bad, "outcome" => "resume"}
+                 )
+               )
+
+      assert %Compiler.Finding{
+               stage: :chart,
+               block_id: "blk_OE",
+               config_key: "cond",
+               code: :expression_compile_error,
+               fault: :author
+             } = handler
+
+      assert {:error, [arm]} =
+               compile(
+                 Block.new("core.branch",
+                   id: "blk_BR",
+                   config: %{"arms" => [%{"slot" => "arm_a", "cond" => bad}]},
+                   slots: %{
+                     "arm_a" => [
+                       Block.new("core.wait", id: "blk_W", config: %{"duration" => "PT1S"})
+                     ]
+                   }
+                 )
+               )
+
+      assert %Compiler.Finding{
+               stage: :chart,
+               config_key: "arm_a",
+               code: :expression_compile_error,
+               fault: :author
+             } = arm
+    end
   end
 
   # -- helpers ---------------------------------------------------------------
+
+  # Every `<transition>` under `emission`, at any depth. `core.on_event`
+  # emits exactly one, and reading it out of the tree rather than out of
+  # the serialized SCXML is what lets the attribution assertions above see
+  # `attribute_owners`, which the string carries no trace of.
+  defp transitions(%Emission{name: "transition"} = emission), do: [emission]
+
+  defp transitions(%Emission{children: children}),
+    do: Enum.flat_map(children, &transitions/1)
+
+  defp transitions({:child, _block_id}), do: []
+
+  # The compiling half of `compile!/2`, without the match, for the cases
+  # whose whole subject is the findings a refused compile hands back.
+  defp compile(root),
+    do: Compiler.compile(Document.new(root, id: "bdoc_T"), Palette.core())
 
   defp compile!(root, palette) do
     {:ok, compiled} = Compiler.compile(Document.new(root, id: "bdoc_T"), palette)
