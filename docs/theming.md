@@ -244,6 +244,19 @@ holds to the rule.
   --sb-drop-ok-border: #57c98a;
   --sb-drop-ok-bg: rgba(87, 201, 138, 0.12);
 
+  /* The done outcome of an invoke mark, also tier 2. A dark theme has to
+     restate this even though the shipped hue is already "a green": #0e7a5f
+     clears 3:1 on four near-white surfaces and reaches 2.83:1 on the worst of
+     these four, which is a boundary under the threshold it is held to.
+     Lifting the same hue rather than changing it is the point - a theme
+     retunes the mark, it does not redefine what green means here. 8.33:1 on
+     the worst of these four, and held off `--sb-drop-ok-border` above the way
+     the shipped pair is: the drop affordance is the grassier green and the
+     run mark the colder one, so a token list read on its own does not suggest
+     the two are one idea. */
+  --sb-run-done: #4fd6bd;
+  --sb-run-done-bg: rgba(79, 214, 189, 0.12);
+
   /* Tier 2 shaping, and the reason it is a token: 14% of a pale accent over
    * near-black is not a tint. */
   --sb-block-accent-mix: 24%;

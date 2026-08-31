@@ -507,19 +507,28 @@ defmodule StatifierBlocks.AssetsTest do
       end
     end
 
-    # A colour token declared only in this stylesheet's `:root` is a token no
-    # host theme overrides, so a mark painted in one is right in the light
-    # theme and wrong in every other. The marks are therefore drawn in
-    # families a theme already retunes.
+    # Every family here is one a theme actually retunes, which is the property
+    # that keeps a mark from being right in the light theme and wrong in every
+    # other one. Three of them are families the editor already had. The fourth,
+    # `--sb-run-done`, is a token this package declares for the done mark alone
+    # (sb-ht2e), and declaring one is allowed for exactly one reason:
+    # `docs/theming.md`'s example and the spike's host-brand theme both restate
+    # it, and the theme audit fails the build on a colour token a theme leaves
+    # at the package default. A new token is reachable when the record makes it
+    # reachable; declaring one and stopping there is what this list catches.
     # Sabotage: replacing `var(--sb-accent)` in the active rule with the
     # literal `#1c62e9` - the mark stops following the host's theme, the
     # token disappears from this list, and the assertion goes red.
+    # Sabotage (sb-ht2e): pointing the done rule at `var(--sb-run-don)` - a
+    # name one character off resolves to nothing, and this goes red on the
+    # list rather than leaving an unpainted mark to be found by eye.
     test "the marks are painted only in tokens, and only in reachable families" do
       tokens = mark_rules() |> Enum.flat_map(&elem(&1, 1)) |> Enum.uniq() |> Enum.sort()
 
       assert tokens == ~w(
                --sb-accent --sb-accent-muted --sb-bg-muted --sb-border-strong
-               --sb-error --sb-error-bg --sb-info --sb-info-bg --sb-space-half
+               --sb-error --sb-error-bg --sb-run-done --sb-run-done-bg
+               --sb-space-half
              )
 
       for {_selector, declarations} <- mark_declarations(),

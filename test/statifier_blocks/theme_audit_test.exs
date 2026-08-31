@@ -54,7 +54,10 @@ defmodule StatifierBlocks.ThemeAuditTest do
   )
 
   # Lines that carry meaning rather than text: 3:1, the non-text threshold.
-  @line_tokens ~w(--sb-border-strong --sb-drop-ok-border)
+  # `--sb-run-done` is here and not in `@text_tokens` for the same reason
+  # `--sb-drop-ok-border` is: nothing is ever set in it. It is a card's border
+  # saying an invoke came back, read as a boundary and never as a glyph.
+  @line_tokens ~w(--sb-border-strong --sb-drop-ok-border --sb-run-done)
 
   @no_ratio %{
     # The operator's design ruling, recorded in the d14 amendment: it divides
@@ -68,7 +71,8 @@ defmodule StatifierBlocks.ThemeAuditTest do
     "--sb-error-bg" => "translucent",
     "--sb-warning-bg" => "translucent",
     "--sb-info-bg" => "translucent",
-    "--sb-drop-ok-bg" => "translucent"
+    "--sb-drop-ok-bg" => "translucent",
+    "--sb-run-done-bg" => "translucent"
   }
 
   setup_all do
@@ -247,6 +251,9 @@ defmodule StatifierBlocks.ThemeAuditTest do
     # what it has to clear - which is silent, because nothing fails.
     # Sabotage: adding `--sb-accent-alt: #cccccc` (with a consumer, so 14e stays
     # green) - this goes red naming it as unaccounted for.
+    # Sabotage (sb-ht2e): deleting `--sb-run-done-bg` from `@no_ratio` - red
+    # naming it, which is this check doing its job on a token that arrived
+    # with the change rather than on one written down years ago.
     test "every colour token is accounted for by a ratio or by a recorded reason",
          %{source: source} do
       accounted = MapSet.new(@surfaces ++ @text_tokens ++ @line_tokens ++ Map.keys(@no_ratio))
@@ -283,6 +290,10 @@ defmodule StatifierBlocks.ThemeAuditTest do
     # Sabotage: taking `--sb-border-strong` back to `#c3cad6` - the boundary
     # box's edge and the undeclared-slot outline stop being boundaries at all,
     # and this goes red where looking at it would not.
+    # Sabotage (sb-ht2e, for the entry this list gained): `--sb-run-done` to
+    # `#7fd4b6`, a pale green that looks like a done mark in the file and is
+    # 1.51:1 on the sunken surface - red, naming the token, the ratio and the
+    # surface.
     test "a line that carries meaning clears 3:1", context do
       for token <- @line_tokens do
         colour = ThemeAudit.resolve(context.values, token)
@@ -606,6 +617,10 @@ defmodule StatifierBlocks.ThemeAuditTest do
     # here, so a colour token added upstream lands on the example too.
     # Sabotage: deleting `--sb-bg-sunken` from the example - this goes red
     # naming it, where the rendered page would just look slightly wrong.
+    # Sabotage (sb-ht2e): deleting `--sb-run-done` from the example - red
+    # naming it. This is the check that makes a new colour token cost a theme
+    # restatement, which is what stops one being invented for the light theme
+    # alone.
     test "the example restates every colour token, and the scheme", %{
       source: source,
       example: example
