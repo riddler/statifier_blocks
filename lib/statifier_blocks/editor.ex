@@ -229,13 +229,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     and `expression_component` already use, for the same reason ADR-0005
     decision 9's does: HEEx has no dynamic-component tag, and a one-argument
     function returning a rendered struct is the whole of the contract. It is
-    called with the tab's `id` and `count`.
+    called with the tab's `id` and `count`, and with change tracking on those
+    two keys only - which is why the example reaches for `assign/2` rather
+    than `Map.put/3`. `StatifierBlocks.Editor.Drawer`'s moduledoc has what
+    goes wrong when a host merges its own values in instead.
 
         Phoenix.LiveView.send_update(StatifierBlocks.Editor,
           id: "editor",
           drawer_tabs: [
             %{id: "runs", title: "Runs", count: length(events),
-              content: fn assigns -> MyApp.run_feed(Map.put(assigns, :events, events)) end}
+              content: fn assigns -> MyApp.run_feed(assign(assigns, :events, events)) end}
           ]
         )
 
