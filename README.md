@@ -469,7 +469,8 @@ composes its own `validate_config/1` out of the checks the module exports.
 
 It still only **names** an invoke type. What runs one is a handler the host
 registers separately, per session - the two-registry seam this package
-draws, which `use` does not cross.
+draws, which `use` does not cross. One type is the exception: see
+"The one handler this package does ship" below.
 
 ### The three presentation declarations
 
@@ -492,6 +493,71 @@ reaches a style attribute. A `join_label` is host code on the layout path, so
 it is a pure function of its argument and it is called inside a rescue - a
 type with a bug in it gets an ordinary join marker rather than taking the
 canvas down.
+
+## The one handler this package does ship
+
+The seam above is unchanged: a block type still only **names** an invoke
+type, and the host still registers the handler that runs it, per session.
+`core.subchart` is the one type where that handler is generic enough to
+write once and ship: "start the child chart this document names" is the
+same code in every host, because a subchart's contract already fixes both
+ends of it (`StatifierBlocks.Core.Subchart`'s moduledoc) - a child compiled
+with `child_use: true`, its outcome carried on `<donedata>`, one final per
+outcome. Nothing host-specific is left for a handler to decide except
+*which* chart a document id names, so that is the one thing this handler
+asks the host for.
+
+`use StatifierBlocks.Runtime.Subchart` builds that handler from two
+callbacks a host supplies: `resolve_chart/2`, which turns a document id
+into a chart (or refuses to), and `palette/0`, the palette the child
+compiles against. `handlers/1` turns the resulting module into the map
+`Statifier.Session.start_link/2` expects for `:invoke_handlers`:
+
+```elixir
+defmodule MyApp.Charts do
+  @moduledoc "Resolves a document id to the chart it names."
+
+  use StatifierBlocks.Runtime.Subchart
+
+  alias StatifierBlocks.{Document, Palette}
+
+  @impl true
+  def resolve_chart(document_id, _ctx) do
+    case Map.fetch(document_store(), document_id) do
+      {:ok, %Document{} = document} -> {:ok, document}
+      :error -> :error
+    end
+  end
+
+  @impl true
+  def palette, do: Palette.core()
+
+  defp document_store, do: Application.get_env(:my_app, :charts, %{})
+end
+
+StatifierBlocks.Runtime.Subchart.handlers(MyApp.Charts)
+#=> %{"statifier_blocks:subchart" => MyApp.Charts}
+```
+
+A refusal to run the child surfaces on `error.communication.invoke` with
+one of exactly three reasons: `unknown_document` (the resolver could not
+place the id), `child_compile_findings` (the resolved document failed to
+compile as a child), or `cycle_refused` (the resolver detected a
+cross-document cycle a single-document compile cannot see for itself).
+
+Placing the runtime is the host's job, not this package's: statifier ships
+no `mod:` application callback, so a host that wants `Statifier.Session`
+to run at all - subcharts or not - adds `Statifier.Supervisor` to its own
+supervision tree, then passes `handlers/1`'s map as the `:invoke_handlers`
+option on every `Statifier.Session.start_link/2` call that should run
+subcharts.
+
+What this handler does not do: run the child as its own durably persisted
+run with parent linkage recorded in run metadata, composing with
+`statifier_persistence`/`statifier_oban`. That durable variant is a
+deliberate, named follow-up, not a gap in this one - `start/2` staying a
+pure planning callback is what scopes this handler to the in-memory
+`Statifier.Session` case in the first place.
 
 ## Embedding the editor
 
