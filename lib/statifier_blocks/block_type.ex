@@ -59,9 +59,83 @@ defmodule StatifierBlocks.BlockType do
   | `emit/2` | ADR-0004 (compiler provenance) |
   | `palette_entry/0` | ADR-0005 (LiveView editor) |
   | `outcomes/1` | this record's amendment A; the emission is ADR-0004's |
+
+  ## Declaring the defaults instead of spelling them (ADR-0007)
+
+  `use StatifierBlocks.BlockType` declares the behaviour and injects the
+  answer a type gives when it has nothing of its own to say - no slots, no
+  fields, nothing to refuse, version 1, unconstrained assignability, and
+  no migration. Each injected callback is `defoverridable`, so a type
+  writes only the rows where it differs:
+
+      defmodule MyApp.Blocks.Beep do
+        use StatifierBlocks.BlockType
+
+        @impl true
+        def config_schema(_config), do: [%{key: "note", type: :string, label: "Note",
+                                           required?: false, default: ""}]
+
+        @impl true
+        def emit(_block, context), do: {:ok, StatifierBlocks.Core.Emit.final(context.state_id)}
+      end
+
+  `emit/2` is deliberately **not** among them. There is no emission a type
+  can default to, and one injected here would let a type that forgot to
+  compile anything look complete instead of failing to.
+
+  The defaults change nothing this record decides. They are ordinary
+  function definitions, each a pure function of its arguments, so decision
+  4 holds for a `use`-ing type exactly as it does for a hand-written one,
+  and a type that writes all nine callbacks out by hand is the same type it
+  was before ADR-0007 existed.
   """
 
   alias StatifierBlocks.Block
+
+  @doc """
+  Declares the behaviour and injects the overridable defaults ADR-0007
+  decision 1 names. See the moduledoc section above for what they are and
+  why `emit/2` is not one of them.
+  """
+  defmacro __using__(_opts) do
+    quote do
+      @behaviour StatifierBlocks.BlockType
+
+      @impl StatifierBlocks.BlockType
+      def slots(_config), do: []
+
+      @impl StatifierBlocks.BlockType
+      def config_schema(_config), do: []
+
+      @impl StatifierBlocks.BlockType
+      def validate_config(_config), do: :ok
+
+      @impl StatifierBlocks.BlockType
+      def current_version, do: 1
+
+      # `%{}` is exactly what an absent `io/1` means (ADR-0003): every key
+      # of the return is optional, so an empty map constrains nothing. It
+      # is injected rather than left absent so that a type widening one key
+      # overrides a function instead of remembering the callback exists.
+      @impl StatifierBlocks.BlockType
+      def io(_config), do: %{}
+
+      # Not `{:ok, config}`. A type at `current_version` 1 has no older
+      # shape to migrate from, so every `from` reaching here names a
+      # version this module has never had - and answering an unknown old
+      # shape with "it is already current" is how a document from the
+      # future compiles as though it were understood (ADR-0002 decision 8).
+      @impl StatifierBlocks.BlockType
+      def migrate_config(from, _config), do: {:error, {:no_migration_from, from}}
+
+      defoverridable slots: 1,
+                     config_schema: 1,
+                     validate_config: 1,
+                     current_version: 0,
+                     io: 1,
+                     migrate_config: 2
+    end
+  end
 
   @type slot_arity :: :any | :at_least_one | :exactly_one | :zero_or_one
 

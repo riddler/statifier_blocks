@@ -82,7 +82,31 @@ defmodule StatifierBlocks.ReadmeRegistrationTest do
       |> then(&Regex.scan(~r/^\s*#=> (.+)$/m, &1))
       |> Enum.map(fn [_whole, claim] -> claim end)
 
-    assert claimed == ["true", ~s("manual review"), ~s("--sb-accent-risk")]
+    assert claimed == [
+             "true",
+             ~s("manual review"),
+             ~s("--sb-accent-risk"),
+             ~s("myapp:capture"),
+             ~s(["label", "invoke_type"]),
+             ~s([{"done", "Done"}, {"error", "Error"}]),
+             ~s(%{kinds: [:step], produces: "myapp.capture"})
+           ]
+  end
+
+  # Sabotage: dropped the `produces:` option from the README's `use` -
+  # the declared type stops reaching `io/1` and the claimed `#=>` no
+  # longer holds, taking this red (verified).
+  test "the declared step answers every callback the section claims" do
+    capture = Module.concat([:MyApp, :Blocks, :Capture])
+
+    assert StatifierBlocks.BlockType in (capture.module_info(:attributes)[:behaviour] || [])
+    assert capture.invoke_type() == "myapp:capture"
+    assert Enum.map(capture.config_schema(%{}), & &1.key) == ["label", "invoke_type"]
+    assert capture.outcomes(%{}) == [{"done", "Done"}, {"error", "Error"}]
+    assert capture.io(%{}) == %{kinds: [:step], produces: "myapp.capture"}
+    assert capture.slots(%{}) == []
+    assert capture.current_version() == 1
+    assert capture.validate_config(%{}) == :ok
   end
 
   # Every ```elixir block between `## <heading>` and the next `## ` heading.

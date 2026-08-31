@@ -28,12 +28,21 @@ defmodule StatifierBlocks.Core.Config do
   # its own, and a `T` with nothing after it, are both rejected.
   @duration ~r/\AP(?!\z)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?!\z)(\d+H)?(\d+M)?(\d+S)?)?\z/
 
+  # An invoke type: `namespace:name`, both halves bare lowercase
+  # identifiers. `core.invoke` and `StatifierBlocks.InvokeStep` read the
+  # same grammar out of here so a host meeting the field on a core block
+  # and on its own step is meeting one rule.
+  @invoke_type ~r/\A[a-z][a-z0-9_]*:[a-z][a-z0-9_]*\z/
+
   @spec non_empty_string?(term()) :: boolean()
   def non_empty_string?(value) when is_binary(value) and value != "", do: String.valid?(value)
   def non_empty_string?(_value), do: false
 
   @spec identifier?(term()) :: boolean()
   def identifier?(value), do: non_empty_string?(value) and Regex.match?(@identifier, value)
+
+  @spec invoke_type?(term()) :: boolean()
+  def invoke_type?(value), do: non_empty_string?(value) and Regex.match?(@invoke_type, value)
 
   @spec arm_slot?(term()) :: boolean()
   def arm_slot?(value), do: non_empty_string?(value) and Regex.match?(@arm_slot, value)
