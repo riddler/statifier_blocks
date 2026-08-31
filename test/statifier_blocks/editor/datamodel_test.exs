@@ -138,5 +138,59 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert socket.assigns.declared_paths == nil
       end
     end
+
+    describe "with roots declared (11k-11m)" do
+      # The empty datamodel is a host declaring that its documents address
+      # nothing (11f), so the check runs and the declared root is the only
+      # thing that can silence it. Without it the assertion would pass on a
+      # check that never ran, which is the shape of a test that proves
+      # nothing.
+      #
+      # sabotage: `Editor.rebuild/1` passing `[]` to `view_model/5` instead
+      # of `host_roots` - the host's `declare` roots never reach
+      # `Datamodel.findings/4`, the advisory returns and this goes red
+      # (verified).
+      test "a host declare root reaches the check through the rebuild",
+           %{conn: conn} do
+        {:ok, view, _html} =
+          mount_wizard(conn, datamodel: [], declare: [{"signup", nil}])
+
+        html = open_findings(view)
+
+        assert html =~ ~s(data-findings-count="0")
+        refute html =~ "not declared in the datamodel"
+      end
+
+      # sabotage: `Editor.update/3`'s `:declare` normalization clause removed -
+      # `host_roots` stays empty however the host assigns `declare`, the typo
+      # and the good path are both flagged, the count goes to 2 and this goes
+      # red (verified).
+      test "an undeclared root is still listed while a declared one is not",
+           %{conn: conn} do
+        {:ok, view, _html} = mount_wizard(conn, declare: [{"sigunp", nil}])
+        html = open_findings(view)
+
+        assert html =~ ~s(data-findings-count="1")
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-findings__list li[data-anchor="config:blk_variant_write:path"]),
+                 "signup.variant is not declared in the datamodel"
+               )
+      end
+
+      # The mount default, asserted where it lives for the same reason the
+      # `datamodel` default is: a mounted-editor test always passes the assign.
+      #
+      # sabotage: `Editor.mount/1` defaulting `host_roots` to `nil` rather than
+      # the empty set - `MapSet.union/2` raises on the first rebuild for every
+      # host that never passes `declare`, and this goes red (verified).
+      test "a host that never passes declare declares no roots" do
+        {:ok, socket} = StatifierBlocks.Editor.mount(%Phoenix.LiveView.Socket{})
+
+        assert socket.assigns.declare == []
+        assert socket.assigns.host_roots == MapSet.new()
+      end
+    end
   end
 end

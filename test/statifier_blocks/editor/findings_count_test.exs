@@ -133,6 +133,27 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert strip_count(view) == 1
         assert Editor.findings_count(document(), EditorFixtures.palette()) == strip_count(view)
       end
+
+      # Sabotage: `findings_count/3` dropping its `:declare` lookup and
+      # passing `[]` to `view_model/5` - the host's declared root stops
+      # covering `signup.variant`, the seam answers 4 against a strip
+      # rendering 3, and this goes red (verified). It is the same one-number
+      # defect sb-ukgu closed, reaching amendment 11k's new input.
+      test "a declared root is inside the number, on both sides", %{conn: conn} do
+        declare = [{"signup", nil}]
+
+        {:ok, view, _html} =
+          mount_editor(conn,
+            document: document(),
+            findings: caller_findings(),
+            datamodel: @declared,
+            declare: declare
+          )
+
+        assert strip_count(view) == 3
+        assert seam(document(), declare: declare) == strip_count(view)
+        assert seam() - seam(document(), declare: declare) == 1
+      end
     end
 
     describe "after a rebuild" do

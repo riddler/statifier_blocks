@@ -90,6 +90,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     the same as an empty set, which is a host declaring that its documents
     address nothing.
 
+    A datamodel is no longer the only thing that declares. ADR-0005
+    amendment 11k reads three sources, and two of them are roots rather
+    than paths: the roots the document itself declares (ADR-0001 decision
+    11), which `StatifierBlocks.Datamodel` reads off the document with no
+    help from here, and the roots the compile call names. The second is why
+    there is a `declare` assign: this component has no compile call to read,
+    so a host that will pass `declare:` to `StatifierBlocks.Compiler` passes
+    the same list here. It is the same one normalization and one
+    concatenation the datamodel gets - `[]` is the default and declares
+    nothing, so a host that never passes it sees exactly what it saw before.
+
     ## The run marks a host paints
 
     A host replaying or executing a document has two different things to say
@@ -307,6 +318,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `palette` | yes | the host's palette |
     | `findings` | no | caller-supplied findings, merged with the two `ViewModel` derives |
     | `datamodel` | no | the paths the host declares; drives the undeclared-path advisories, and `nil` (the default) turns them off entirely |
+    | `declare` | no | the `{id, expr}` roots the host will pass the compiler as `:declare`; declared roots count as declared for the advisories (11k), and `[]` (the default) declares none |
     | `on_change` | no | one-argument function called with each new document |
     | `icon` | no | function component resolving an icon *name* to markup |
     | `expression_component` | no | override for `:expression` fields (sui-bob's seam) |
@@ -357,6 +369,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          findings: [],
          datamodel: nil,
          declared_paths: nil,
+         declare: [],
+         host_roots: MapSet.new(),
          on_change: nil,
          icon: nil,
          expression_component: nil,
@@ -442,6 +456,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           socket
         end
 
+      # The host's `:declare` roots, normalized on the same schedule and
+      # behind the same `send_update/3` guard as the datamodel above: they
+      # are the host's input too, and they change when the host changes them.
+      socket =
+        if Map.has_key?(assigns, :declare) do
+          assign(socket, :host_roots, Datamodel.declared_roots(assigns.declare))
+        else
+          socket
+        end
+
       # A mark is written only by an update that carries it. `send_update/3`
       # delivers the keys it names and nothing else, so a mark read straight
       # out of the assigns would vanish on the next re-render the host made
@@ -487,6 +511,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       * `:datamodel` - the paths the host declares, `nil` by default, which
         per ADR-0005 amendment 11f turns the undeclared-path advisories off
         entirely rather than declaring that the document addresses nothing.
+      * `:declare` - the roots the host will pass the compiler, `[]` by
+        default, which per amendment 11m declares none. The document's own
+        roots need no option: they are read off `document`.
     """
     @spec findings_count(Document.t(), Palette.t(), keyword()) :: non_neg_integer()
     def findings_count(%Document{} = document, %Palette{} = palette, opts \\ []) do
@@ -495,7 +522,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           document,
           palette,
           Keyword.get(opts, :findings, []),
-          Keyword.get(opts, :datamodel)
+          Keyword.get(opts, :datamodel),
+          Keyword.get(opts, :declare, [])
         )
 
       Shell.findings_count(findings)
@@ -1187,10 +1215,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         document: document,
         palette: palette,
         findings: findings,
-        declared_paths: declared_paths
+        declared_paths: declared_paths,
+        host_roots: host_roots
       } = socket.assigns
 
-      view_model = view_model(document, palette, findings, declared_paths)
+      view_model = view_model(document, palette, findings, declared_paths, host_roots)
 
       selected = selected_node(socket, view_model)
 
@@ -1213,9 +1242,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # datamodel and the routing is the one already tested. `datamodel` is
     # whatever the host handed over or the already-normalized set the
     # component keeps - `Datamodel.findings/3` normalizes either.
-    @spec view_model(Document.t(), Palette.t(), [Finding.t()], term()) :: ViewModel.t()
-    defp view_model(document, palette, findings, datamodel) do
-      advisories = Datamodel.findings(document, palette, datamodel)
+    @spec view_model(Document.t(), Palette.t(), [Finding.t()], term(), term()) ::
+            ViewModel.t()
+    defp view_model(document, palette, findings, datamodel, declare) do
+      advisories = Datamodel.findings(document, palette, datamodel, declare)
 
       ViewModel.build(document, palette, findings ++ advisories)
     end
