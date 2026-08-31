@@ -1,7 +1,7 @@
 # ADR-0007: A block type declares its defaults with `use`, and the leaf invoke step is one declaration
 
-Status: proposed (2026-08-31, sb-0xqe, under campaign-023 ruling R-a). The
-campaign-023 direction-agent gate is what accepts it.
+Status: accepted (2026-08-31, unqualified direction-agent verdict under the
+operator campaign-023 gate grant, PR 196)
 
 ## Context
 
