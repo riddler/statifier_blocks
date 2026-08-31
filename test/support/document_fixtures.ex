@@ -22,9 +22,19 @@ defmodule StatifierBlocks.DocumentFixtures do
   insertion order in every `slots`/`config` map, so a test asserting byte
   equality against the stored JSON would fail if the encoder ever leaned on
   map iteration order instead of sorting.
+
+  Both also declare their own `<data>` roots through the document
+  `datamodel` key (ADR-0001 decision 11): exactly the roots their own
+  guards read, in the order those guards read them, and nothing else. So
+  either one compiles on its own - no `:declare` option, no host - without
+  the guard raising `error.execution` over a root that was never declared.
+  Neither entry carries an `expr`: both roots are per-run values that a
+  host seeds or a step assigns, and inventing an initial for them here
+  would be a value the example does not have.
   """
 
   alias StatifierBlocks.{Block, Document}
+  alias StatifierBlocks.Document.DatamodelEntry
 
   @fixture_path Path.join([__DIR__, "..", "fixtures", "documents", "worked_example.json"])
   @wizard_path Path.join([__DIR__, "..", "fixtures", "documents", "signup_wizard.json"])
@@ -115,7 +125,14 @@ defmodule StatifierBlocks.DocumentFixtures do
     Document.new(root,
       id: "bdoc_01JDOC",
       revision: 17,
-      metadata: %{"name" => "Card authorization"}
+      metadata: %{"name" => "Card authorization"},
+      datamodel: [
+        %DatamodelEntry{
+          id: "budget_remaining",
+          description: "What the card's budget has left before this authorization."
+        },
+        %DatamodelEntry{id: "amount", description: "The amount being authorized."}
+      ]
     )
   end
 
@@ -205,7 +222,13 @@ defmodule StatifierBlocks.DocumentFixtures do
     Document.new(root,
       id: "bdoc_01JWIZ",
       revision: 4,
-      metadata: %{"name" => "Signup wizard"}
+      metadata: %{"name" => "Signup wizard"},
+      datamodel: [
+        %DatamodelEntry{
+          id: "variant",
+          description: "The A/B bucket `myapp:assign_variant` puts the visitor in."
+        }
+      ]
     )
   end
 

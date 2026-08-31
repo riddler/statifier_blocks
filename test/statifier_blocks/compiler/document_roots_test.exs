@@ -7,7 +7,16 @@ defmodule StatifierBlocks.Compiler.DocumentRootsTest do
 
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{Block, Compiler, Document, Palette, Provenance}
+  alias StatifierBlocks.{
+    Block,
+    Compiler,
+    CoreFixtures,
+    Document,
+    DocumentFixtures,
+    Palette,
+    Provenance
+  }
+
   alias StatifierBlocks.Compiler.{Finding, StateId}
   alias StatifierBlocks.Document.DatamodelEntry
 
@@ -189,7 +198,91 @@ defmodule StatifierBlocks.Compiler.DocumentRootsTest do
     end
   end
 
+  describe "the shipped fixtures declare their own roots (sb-vjeg)" do
+    # Sabotage: emptied `datamodel:` in `DocumentFixtures.worked_example/0`
+    # -> the guard's two roots never reach the chart, no `<datamodel>` is
+    # emitted at all, and this goes red (verified)
+    test "the worked example's guard roots reach the chart with no host at all" do
+      assert fixture_scxml(DocumentFixtures.worked_example()) =~
+               ~s(<datamodel><data id="budget_remaining"/><data id="amount"/></datamodel>)
+    end
+
+    # Sabotage: emptied `datamodel:` in `DocumentFixtures.signup_wizard/0`
+    # -> the branch's root never reaches the chart and this goes red
+    # (verified)
+    test "the signup wizard's guard root reaches the chart with no host at all" do
+      assert fixture_scxml(DocumentFixtures.signup_wizard()) =~
+               ~s(<datamodel><data id="variant"/></datamodel>)
+    end
+
+    # The ratchet, derived rather than restated: whatever a shipped
+    # fixture's guards come to read, the document has to declare. Reads
+    # the identifiers straight off the stored conds, so adding an arm that
+    # reads an undeclared root turns this red without anyone remembering
+    # to update a list. A cond that ever uses a bare keyword (`true`,
+    # `and`) would land here too - that is a look worth taking, not a
+    # false alarm to suppress.
+    #
+    # Sabotage: dropped the `amount` entry from
+    # `DocumentFixtures.worked_example/0`, leaving the cond that reads it
+    # -> red naming `amount` (verified)
+    test "every root either fixture's guards read is declared by the document" do
+      for document <- [DocumentFixtures.worked_example(), DocumentFixtures.signup_wizard()] do
+        declared = MapSet.new(document.datamodel, & &1.id)
+
+        for root <- guard_roots(document) do
+          assert MapSet.member?(declared, root),
+                 "#{document.id} reads #{root} in a guard and does not declare it"
+        end
+      end
+    end
+
+    # The other direction: a declaration nothing reads is dead weight in
+    # the emitted chart, and these two documents are the family's worked
+    # examples - what they show is what a host copies.
+    #
+    # Sabotage: added `%DatamodelEntry{id: "unused"}` to
+    # `DocumentFixtures.signup_wizard/0` -> red naming `unused` (verified)
+    test "neither fixture declares a root its own guards never read" do
+      for document <- [DocumentFixtures.worked_example(), DocumentFixtures.signup_wizard()] do
+        read = MapSet.new(guard_roots(document))
+
+        for %DatamodelEntry{id: id} <- document.datamodel do
+          assert MapSet.member?(read, id),
+                 "#{document.id} declares #{id} and no guard of its own reads it"
+        end
+      end
+    end
+  end
+
   # -- the plumbing ----------------------------------------------------------
+
+  # The shipped fixtures reach `myapp.*` types, so they need the fixture
+  # palette rather than the bare core one, and no `:declare` option at all
+  # - that absence is the point.
+  defp fixture_scxml(document) do
+    {:ok, compiled} = Compiler.compile(document, CoreFixtures.palette())
+    compiled.scxml
+  end
+
+  # Every bare identifier a `core.branch` arm's `cond` reads, with
+  # single-quoted string literals taken out first so `'b'` is not mistaken
+  # for a root named `b`.
+  defp guard_roots(document) do
+    document
+    |> Document.blocks()
+    |> Enum.flat_map(fn block -> Map.get(block.config, "arms", []) end)
+    |> Enum.map(fn arm -> Map.get(arm, "cond", "") end)
+    |> Enum.flat_map(fn cond ->
+      cond
+      |> String.replace(~r/'[^']*'/, " ")
+      |> then(&Regex.scan(~r/[a-z][a-z0-9_]*/, &1))
+      |> Enum.map(&hd/1)
+    end)
+    |> Enum.uniq()
+  end
+
+  FROM
 
   defp document(datamodel \\ []) do
     Document.new(

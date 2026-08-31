@@ -264,9 +264,15 @@ defmodule StatifierBlocks.CanonicalJsonTest do
     # sabotage: drop the `maybe_put_list/3` call from `encode/1` entirely
     # -> a non-empty datamodel would never reach the bytes at all -> red
     # (verified: this also fails the two tests above)
+    # The second document is the worked example with its own declarations
+    # taken back off (sb-vjeg migrated the shipped fixtures onto the key),
+    # which is byte for byte the document as it stood before decision 11 -
+    # a full, realistic tree whose bytes the key must not touch when it is
+    # empty. Built by stripping rather than restated, so it keeps tracking
+    # the fixture.
     test "an empty datamodel is omitted from the bytes entirely" do
       with_empty = Document.new(Block.new("core.wait", id: "blk_leaf"))
-      without_key_ever_existing = DocumentFixtures.worked_example()
+      without_key_ever_existing = %{DocumentFixtures.worked_example() | datamodel: []}
 
       refute Document.to_json(with_empty) =~ "datamodel"
       refute Document.to_json(without_key_ever_existing) =~ "datamodel"

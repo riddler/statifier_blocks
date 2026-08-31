@@ -232,9 +232,18 @@ defmodule StatifierBlocks.CompilerTest do
     # gained the `<cancel>` that role earns. Verified the same way -
     # renaming that one id back and deleting that one `<cancel>` over the
     # new bytes reproduces `sha256:0410c745...`, the hash pinned before.
+    #
+    # Moved a third time, deliberately, by sb-vjeg: the worked example now
+    # declares the two roots its own guard reads through ADR-0001 decision
+    # 11's document `datamodel` key, so the emission gained
+    # `<datamodel><data id="budget_remaining"/><data id="amount"/></datamodel>`
+    # ahead of the root state. Verified the same way - deleting that one
+    # element from the new bytes and hashing them reproduces
+    # `sha256:9e792393...`, the hash pinned before, so nothing else in this
+    # document's emission moved.
     test "the worked example's chart identity is pinned" do
       assert compile_worked_example().record.chart_identity.content_hash ==
-               "sha256:9e792393af59e51db2ad1e70ade3ed66ba5f7c2794fb9f21b4bfe1ba223b647a"
+               "sha256:e89d5b21d3bd630cdffca06aa9af6e211f4977d42d021fbdb8e2d7dee70bf0ff"
     end
 
     # sabotage: drop `module` from the palette_hash triples -> swapping one
