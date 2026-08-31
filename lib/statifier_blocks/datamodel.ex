@@ -86,6 +86,32 @@ defmodule StatifierBlocks.Datamodel do
   document suddenly covered in advisories. That is ADR-0002 amendment B3's total-normalizer
   discipline, reaching one more input.
 
+  ## What counts as declared (11k-11m)
+
+  A datamodel is not the only thing that declares. Two more surfaces do,
+  and the 2026-08-31 amendment 11k folds them into the same set this check
+  reads:
+
+    * the **compile call's `:declare` roots**, which the editor takes as its
+      `declare` assign because it has no compile call of its own to read;
+    * the **document's own `datamodel` key** (ADR-0001 decision 11), which
+      this module reads straight off the `%StatifierBlocks.Document{}` it is
+      already handed - no plumbing, and no way for a caller to forget it.
+
+  Both name **bare roots**, so 11l matches them by root segment: a declared
+  root `signup` declares `signup` and everything beneath it. The datamodel's
+  own paths are unchanged and still match whole, because the two are
+  different claims - a datamodel enumerates the paths a document may
+  address, so a path it omits is a path it excluded; a root declaration says
+  storage exists at a name and says nothing about what is under it.
+
+  11m widens 11f's precondition to match: the check runs when a datamodel
+  was supplied **or** when either surface declares a root, and produces
+  nothing at all when nothing anywhere was declared. Precedence does not
+  reach here (11k): ADR-0001 11f's host-wins rule decides which `<data>`
+  element is emitted for a colliding id, and a root shadowed under it is
+  still a declared root.
+
   ## What this check is not
 
   It changes no verdict. A document whose only findings are these compiles
@@ -110,6 +136,7 @@ defmodule StatifierBlocks.Datamodel do
   """
 
   alias StatifierBlocks.{Block, BlockType, Document, Finding, Palette, Predicates}
+  alias StatifierBlocks.Document.DatamodelEntry
 
   @typedoc """
   The normalized datamodel: the set of paths the host declares, or `nil`
@@ -170,11 +197,63 @@ defmodule StatifierBlocks.Datamodel do
   def declared_paths(_unrecognized), do: nil
 
   @doc """
-  Every undeclared-path advisory in the document (11e), or `[]` when the
-  host supplied no datamodel (11f).
+  Normalizes the compile call's `:declare` roots to a set of root names.
 
-  `datamodel` is normalized through `declared_paths/1`, so a raw list and
-  an already-normalized set behave identically.
+  11k's second source. The input is the shape
+  `StatifierBlocks.Compiler.compile/3` takes - a list of `{id, expr}` pairs
+  in declaration order - so a host passes the editor the same list it passes
+  the compiler rather than a second spelling of it. A bare id is accepted
+  too, and an already-normalized `MapSet` passes through idempotently.
+
+  Total, like `declared_paths/1`, and for the same reason: a shape this
+  package does not know normalizes to the empty set, which per 11m declares
+  nothing rather than declaring that nothing exists. There is no `nil` here -
+  a root set is never a claim about paths, so it has no "no datamodel
+  supplied" state to distinguish.
+
+      iex> StatifierBlocks.Datamodel.declared_roots([{"signup", nil}, {"card", "0"}])
+      MapSet.new(["card", "signup"])
+
+      iex> StatifierBlocks.Datamodel.declared_roots(["signup"])
+      MapSet.new(["signup"])
+
+      iex> StatifierBlocks.Datamodel.declared_roots(nil)
+      MapSet.new([])
+
+      iex> StatifierBlocks.Datamodel.declared_roots([{"signup", nil}, 42, {"", nil}])
+      MapSet.new(["signup"])
+  """
+  @spec declared_roots(term()) :: MapSet.t(String.t())
+  def declared_roots(nil), do: MapSet.new()
+
+  def declared_roots(%MapSet{} = set) do
+    set |> MapSet.to_list() |> declared_roots()
+  end
+
+  def declared_roots(declare) when is_list(declare) do
+    declare
+    |> Enum.map(fn
+      {id, _expr} -> id
+      id when is_binary(id) -> id
+      _other -> nil
+    end)
+    |> Enum.filter(&declared_path?/1)
+    |> MapSet.new()
+  end
+
+  def declared_roots(_unrecognized), do: MapSet.new()
+
+  @doc """
+  Every undeclared-path advisory in the document (11e), or `[]` when nothing
+  anywhere declared anything (11f as 11m widens it).
+
+  `datamodel` is normalized through `declared_paths/1` and `declare` through
+  `declared_roots/1`, so a raw list and an already-normalized set behave
+  identically in both. The document's own roots are read off `document` and
+  take no argument.
+
+  A path is declared when the datamodel holds it whole or when either
+  declaration surface holds its root segment (11k, 11l).
 
   A block whose type the palette cannot resolve produces nothing here - it
   already has a `:resolution` finding from `StatifierBlocks.ViewModel`, and
@@ -184,42 +263,85 @@ defmodule StatifierBlocks.Datamodel do
   at `:error`, and an advisory beside it would say the same thing twice in
   two voices.
   """
-  @spec findings(Document.t(), Palette.t(), term()) :: [Finding.t()]
-  def findings(%Document{} = document, %Palette{} = palette, datamodel) do
-    case declared_paths(datamodel) do
-      nil -> []
-      declared -> undeclared_findings(document, palette, declared)
+  @spec findings(Document.t(), Palette.t(), term(), term()) :: [Finding.t()]
+  def findings(%Document{} = document, %Palette{} = palette, datamodel, declare \\ []) do
+    declared = declared_paths(datamodel)
+    roots = MapSet.union(declared_roots(declare), document_roots(document))
+
+    if is_nil(declared) and MapSet.size(roots) == 0 do
+      []
+    else
+      undeclared_findings(document, palette, declared || MapSet.new(), roots)
     end
   end
 
-  @spec undeclared_findings(Document.t(), Palette.t(), MapSet.t(String.t())) :: [Finding.t()]
-  defp undeclared_findings(document, palette, declared) do
+  # The document declares its own roots, and this module is handed the
+  # document, so 11k source 3 needs no argument: a caller cannot pass the
+  # wrong one or forget it. An `id` is a bare identifier by the time a
+  # document validates (ADR-0001 decision 11), so the filter here is the
+  # same total discipline the rest of this module applies rather than a
+  # second place for that schema rule to live.
+  @spec document_roots(Document.t()) :: MapSet.t(String.t())
+  defp document_roots(%Document{datamodel: entries}) when is_list(entries) do
+    entries
+    |> Enum.map(fn
+      %DatamodelEntry{id: id} -> id
+      _other -> nil
+    end)
+    |> Enum.filter(&declared_path?/1)
+    |> MapSet.new()
+  end
+
+  defp document_roots(_document), do: MapSet.new()
+
+  @spec undeclared_findings(
+          Document.t(),
+          Palette.t(),
+          MapSet.t(String.t()),
+          MapSet.t(String.t())
+        ) :: [Finding.t()]
+  defp undeclared_findings(document, palette, declared, roots) do
     document
     |> Document.blocks()
     |> Enum.flat_map(fn block ->
       case Palette.resolve(palette, block) do
-        {:ok, module, resolved} -> block_findings(block, module, resolved.config, declared)
-        {:error, _reason} -> []
+        {:ok, module, resolved} ->
+          block_findings(block, module, resolved.config, declared, roots)
+
+        {:error, _reason} ->
+          []
       end
     end)
   end
 
-  @spec block_findings(Block.t(), module(), Block.config(), MapSet.t(String.t())) :: [Finding.t()]
-  defp block_findings(%Block{id: id}, module, config, declared) do
+  @spec block_findings(
+          Block.t(),
+          module(),
+          Block.config(),
+          MapSet.t(String.t()),
+          MapSet.t(String.t())
+        ) :: [Finding.t()]
+  defp block_findings(%Block{id: id}, module, config, declared, roots) do
     config
     |> module.config_schema()
     |> Enum.filter(&BlockType.datamodel_path?/1)
     |> Enum.flat_map(fn decl ->
       case BlockType.fetch_value(config, BlockType.value_path(decl)) do
-        {:ok, path} -> advisory(id, decl.key, path, declared)
+        {:ok, path} -> advisory(id, decl.key, path, declared, roots)
         :error -> []
       end
     end)
   end
 
-  @spec advisory(Block.id(), String.t(), Block.json(), MapSet.t(String.t())) :: [Finding.t()]
-  defp advisory(block_id, key, path, declared) do
-    if declared_path?(path) and not MapSet.member?(declared, path) do
+  @spec advisory(
+          Block.id(),
+          String.t(),
+          Block.json(),
+          MapSet.t(String.t()),
+          MapSet.t(String.t())
+        ) :: [Finding.t()]
+  defp advisory(block_id, key, path, declared, roots) do
+    if declared_path?(path) and not declared?(path, declared, roots) do
       [
         Finding.new(
           {:config, block_id, key},
@@ -232,6 +354,17 @@ defmodule StatifierBlocks.Datamodel do
       []
     end
   end
+
+  # 11l, the two membership rules in one place. The datamodel matches a path
+  # whole; a declared root matches the segment before the first dot, so a
+  # root declares itself and everything beneath it.
+  @spec declared?(String.t(), MapSet.t(String.t()), MapSet.t(String.t())) :: boolean()
+  defp declared?(path, declared, roots) do
+    MapSet.member?(declared, path) or MapSet.member?(roots, root_segment(path))
+  end
+
+  @spec root_segment(String.t()) :: String.t()
+  defp root_segment(path), do: path |> String.split(".", parts: 2) |> hd()
 
   @spec declared_path?(term()) :: boolean()
   defp declared_path?(path), do: is_binary(path) and path != ""

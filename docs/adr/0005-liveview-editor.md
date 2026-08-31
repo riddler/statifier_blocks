@@ -1,6 +1,6 @@
 # ADR-0005: The editor is a pure command algebra and view model with a thin LiveView shell
 
-Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 9 amended - the `:duration` control, predicator strings primary (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 91); the shell arrangement recorded - three panes and a drawer, rulings 1A/2A/3A/7A/8A (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 92); decision 7 amended - a second, read-only measurement hook (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 100); decision 10 amended - the shipped `icon` names are heroicon names, 10k/10l (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 128); decisions 10 and 13 amended - rendering the tree and its connectors, 10a-10c (2026-08-29, accepted under the operator campaign-016 direction-agent gate grant, PR 135); decision 10 amended - the presentation trio and the 24-character cap, 10m-10o (2026-08-30, accepted under the operator campaign-017 direction-agent gate grant, PR 155); decision 11 amended - a `:compile` source and `:lint` at `:error`, 11h/11i (2026-08-30, same gate, PR 155); decision 11 amended - `:arity` dropped from the source enum, 11j (2026-08-30, same gate, PR 155); decision 2 amended - a container folds shut and the fold is editor state, 2a-2f (2026-08-30, accepted under the operator campaign-020 direction-agent gate grant, PR 176)
+Status: accepted (2026-08-26); decision 5 and the worked example amended (2026-08-27, operator rulings); decision 12 amended (2026-08-28, operator ruling); decisions 10 (slot_style :failure) and 11 (:info) amended (2026-08-29, accepted under the operator campaign-014 direction-agent gate grant); decision 10 slot_outcome_key amended (2026-08-29, same gate, PR 78); decision 14 amended in part - 14a to 14e accepted, 14f proposed (2026-08-29, same gate, PR 85); decision 11 amended - undeclared datamodel paths as `:info` findings, 11e-11g (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 9 amended - the `:duration` control, predicator strings primary (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 91); the shell arrangement recorded - three panes and a drawer, rulings 1A/2A/3A/7A/8A (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 92); decision 7 amended - a second, read-only measurement hook (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 100); decision 10 amended - the shipped `icon` names are heroicon names, 10k/10l (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 128); decisions 10 and 13 amended - rendering the tree and its connectors, 10a-10c (2026-08-29, accepted under the operator campaign-016 direction-agent gate grant, PR 135); decision 10 amended - the presentation trio and the 24-character cap, 10m-10o (2026-08-30, accepted under the operator campaign-017 direction-agent gate grant, PR 155); decision 11 amended - a `:compile` source and `:lint` at `:error`, 11h/11i (2026-08-30, same gate, PR 155); decision 11 amended - `:arity` dropped from the source enum, 11j (2026-08-30, same gate, PR 155); decision 2 amended - a container folds shut and the fold is editor state, 2a-2f (2026-08-30, accepted under the operator campaign-020 direction-agent gate grant, PR 176); decision 11 amended - what feeds the declared set 11e reads, 11k-11m (2026-08-31, proposed, campaign-022)
 
 ## Context
 
@@ -3693,3 +3693,144 @@ applied it to a second.
 
 Filed with `sb-lpdt`, as campaign-021's block-B constituent for the drawer
 seam.
+
+---
+
+## Amendment (2026-08-31): decision 11, what feeds the declared set 11e reads
+
+**Status: proposed (2026-08-31), implementing bead `sb-y4oa`, campaign-022's
+A2 under the operator's ruling of the same day.** Additive; 11e, 11f and 11g
+stand exactly as written and no text above this line is edited by this
+section. It answers a question those clauses did not ask, because at the time
+they were written there was only one party who could declare anything.
+
+An amendment rather than a note, deliberately, and for the reason the drawer
+amendment of 2026-08-30 gives: a note records what accepted text already
+meant, and a reader of 11e alone - "checked against the host-supplied
+datamodel" - would reach the opposite conclusion from the one below.
+
+### Context
+
+ADR-0001's amendment of 2026-08-31 gave the block document a top-level
+`datamodel` key: a list of the `<data>` roots the document's own guards and
+assigns need to exist at run time. That record was careful not to decide what
+the new key means here. Its clause 11g says so in as many words, and it is
+quoted rather than paraphrased because the quotation is the whole of this
+section's mandate:
+
+> Whether a document-declared root should therefore **count as declared** for
+> ADR-0005's 11e undeclared-path advisory is carried as an **open question,
+> not decided here**: ADR-0005's 11e is written against a set the host
+> supplies ("The input shape is not this record's to fix", its 11f), and
+> widening what feeds that set is ADR-0005's decision to take on ADR-0005's
+> record.
+
+This is that record, and this section is that decision.
+
+Two clauses of ADR-0001's amendment are untouched by it and are named here so
+that nobody has to check. Its 11g's split between the two artifacts stands: an
+ADR-0006 datamodel document describes a vocabulary, and the document's own
+`datamodel` key declares that a root exists. Its 11h stands too - "It produces
+no finding about an undeclared path, ever" - and it is a statement about the
+key, not about this check. The producer of the advisory is 11e's and stays
+11e's; nothing about the key emits a finding, before or after this section.
+What changes is one input to a check that already exists, on the record that
+owns it.
+
+The reason to take the question rather than leave it carried is 11f's own
+argument, applied to a second declarer. 11f grounds the advisory in a claim
+somebody actually made: "A host that hands the editor a datamodel is making
+the claim itself - it is saying *these are the paths this document may
+address* - and a path outside that set is then worth the author's attention."
+A document that declares its roots has made a claim of exactly that kind about
+itself. Leaving it out does not make the advisory more careful; it makes it
+wrong, and wrong in the direction 11d warned about - a document that declares
+`signup` and assigns to `signup.step` would be told its own root is
+undeclared, which is the unfounded claim 11f exists to prevent.
+
+### Decision
+
+**11k. The declared set is the union of three declarations, not one.** A path
+held by a field annotated `datamodel_path?: true` is declared when any of
+these says so:
+
+  1. the host's datamodel, ADR-0006's projection or a bare path list, exactly
+     as 11e has always read it;
+  2. the roots the compile call's `:declare` option names (ADR-0004's
+     `:declare` note, ADR-0001 11f's first precedence tier);
+  3. the roots the document's own `datamodel` key names (ADR-0001 decision
+     11).
+
+Sources 2 and 3 together are what ADR-0001 11f calls the declaration
+surfaces, in its precedence order. **Precedence does not reach here.** 11f's
+host-wins rule decides which `<data>` element is emitted for a colliding id;
+this check asks only whether an id was declared at all, and both surfaces
+answer that question with the same word. A root shadowed under 11f is still a
+declared root, and a `:shadowed_document_root` warning is ADR-0001's to
+report, not an advisory of this record's.
+
+**11l. A root is matched by root segment; a datamodel path is still matched
+whole.** An entry in sources 2 and 3 is a bare root - ADR-0001 11g's "bare
+root segment, globally addressable as itself" - so a declared root `signup`
+declares `signup` and every path beneath it. Source 1 is unchanged and is
+still exact-membership: a datamodel declaring `signup.step` declares
+`signup.step` and says nothing about `signup.variant`.
+
+The two rules are different because the two declarations are different
+claims. A datamodel enumerates the paths a document may address, so a path it
+omits is a path it excluded. A root declaration says storage exists at a name,
+and says nothing at all about what is under it, so a path beneath a declared
+root is not excluded by anything.
+
+**11m. 11f's precondition widens from "a datamodel was supplied" to
+"something was declared", and no further.** The check runs when the host
+supplied a datamodel - `nil` still suppresses it, and an empty set is still a
+claim, both exactly as 11f has them - **or** when either declaration surface
+names at least one root. When nothing is declared anywhere, nothing is
+produced: no advisory, no quieter severity, no empty pane, no "datamodel
+unknown" row. 11f's *absence is not unknown-ness* paragraph is unchanged in
+force; this clause only widens what counts as presence.
+
+Nothing else about the finding changes. The anchor is still
+`{:config, block_id, key}`, the severity is still `:info`, the source is still
+`:lint`, 11g's no-second-channel rule is untouched, and 11c's rule that this
+changes no verdict holds as it did.
+
+Worked example, the same signup wizard 11g uses: the document declares the
+root `signup`, the host supplies no datamodel, and a `core.assign` block
+writes to `signup.variant`. Nothing is reported - the root is declared, and
+the document said nothing about what lives under it. Change the block to write
+to `sigunp.variant` and one `:info` finding is anchored on its `path` field:
+no surface declares the root `sigunp`, so the typo is exactly the thing worth
+the author's attention.
+
+### Consequences
+
+- **A document that declares roots can quiet a host's finer claim, and that
+  is the deliberate cost.** A host declaring the path `signup.step` and a
+  document declaring the root `signup` together declare all of `signup.*`, so
+  the host's enumeration no longer catches `signup.variant`. 11f's priority
+  is what settles it: an advisory that is well-founded and quiet beats one
+  that is louder and unfounded, and the document's claim about its own roots
+  is not one this package may overrule.
+- **A document with no host at all now gets advisories.** Before this section
+  the check was dead for every caller that supplied no datamodel; after it,
+  a document that declares its own roots lints its own paths. That is the
+  first case in which the producer 11e added is exercised without a host
+  having to do anything.
+- **The editor grows one assign**, `declare`, mirroring the compile call's
+  option so the editor can read the same host roots the compiler will. It is
+  a translation-only addition of the kind decision 1 permits: normalized once
+  on update, concatenated once in the rebuild, with no logic of its own. Its
+  default is `[]`, which per 11m declares nothing and so changes nothing for
+  a host that does not pass it.
+- **Nothing new is added to the finding vocabulary.** No anchor, no severity,
+  no source, no field, and no second channel. This section changes one input
+  and one precondition.
+- **ADR-0001's 11g open question is discharged**, on the record 11g named and
+  in the direction 11g's own correspondence paragraph pointed: an entry `id`
+  there "is what ADR-0006's vocabulary calls a top-level `local`-scope
+  entry's `path`", and a path is what this check reads.
+- **ADR-0006 decision 9 is untouched.** The datamodel document is still
+  advisory and still never a gate; this section adds two more advisory inputs
+  beside it and gates on none of them.

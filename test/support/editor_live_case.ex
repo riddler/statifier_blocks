@@ -41,6 +41,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          palette: session["palette"],
          findings: session["findings"] || [],
          datamodel: session["datamodel"],
+         declare: session["declare"] || [],
          theme: session["theme"] || %{},
          fit: session["fit"],
          fixtures: session["fixtures"],
@@ -64,6 +65,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         palette={@palette}
         findings={@findings}
         datamodel={@datamodel}
+        declare={@declare}
         theme={@theme}
         fit={@fit}
         icon={@icon}
@@ -195,7 +197,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @doc """
     Mounts the editor over a document, connected, and returns the live view.
 
-    Options: `:document`, `:palette`, `:findings`, `:datamodel`, `:theme`,
+    Options: `:document`, `:palette`, `:findings`, `:datamodel`, `:declare`, `:theme`,
     `:fit`, `:fixtures`, `:invoke_types`, `:drawer_height`, `:header`, `:icon`,
     `:host_tabs` and `:feed` - the last five being the
     shell amendment's host seam (8A), a truth-table source, the height the host
@@ -205,6 +207,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     the `content` function for each. The
     `:datamodel` default is `nil` - no datamodel supplied - which is what the
     editor's own default is and what ADR-0005 amendment 11f makes meaningful.
+    `:declare` defaults to `[]`, the compile call's roots the editor reads
+    for amendment 11k.
     The other defaults are
     the signup wizard and the core palette, which is the pairing that leaves
     `signup.track_conversion` unresolvable.
@@ -230,6 +234,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "palette" => Keyword.get_lazy(opts, :palette, &EditorFixtures.palette/0),
         "findings" => Keyword.get(opts, :findings, []),
         "datamodel" => Keyword.get(opts, :datamodel),
+        "declare" => Keyword.get(opts, :declare, []),
         "theme" => Keyword.get(opts, :theme, %{}),
         "fit" => Keyword.get(opts, :fit),
         "fixtures" => Keyword.get(opts, :fixtures),
