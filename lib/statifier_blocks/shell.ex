@@ -80,6 +80,13 @@ defmodule StatifierBlocks.Shell do
   module's - nothing here renders anything. What the shell reads is the
   descriptor: what the tab is called, and how much it holds. `count` is
   optional and absent means none.
+
+  The editor calls `content` with `%{id: ..., count: ...}`, and a host value
+  the function adds for its own markup is added with an `assign/2` call rather
+  than merged into that map: a merged key is invisible to change tracking, and
+  the panel then draws once and never again. `StatifierBlocks.Editor.Drawer`'s
+  moduledoc carries the whole of that, and the naming rule decision 1 puts on
+  this half of the package is why it is stated there and only pointed at here.
   """
   @type host_tab :: %{
           :id => host_tab_id(),

@@ -69,6 +69,31 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     a slot body is not one of the assigns it was passed. A pushed descriptor
     is.
 
+    ## Host data enters the panel through `assign/2`
+
+    The content function is called with the two assigns this seam has -
+    `%{id: ..., count: ...}` - and everything else the panel draws comes from
+    the host, out of the closure the descriptor was built with. Getting it
+    from the closure into the markup is one line, and which line it is
+    matters:
+
+        content: fn assigns -> MyApp.run_feed(assign(assigns, :events, events)) end
+
+    `Map.merge/2` and `Map.put/3` write the same key and are the trap. The
+    assigns map that arrives carries a `__changed__` naming the two keys
+    *this* call passed, `id` and `count`, because the call is change-tracked
+    like any other component call. A merged key is absent from that map, so
+    every part of the template that reads it is treated as unchanged and never
+    reaches the diff: the panel draws once, holding whatever the closure held
+    when the tab was opened, and then stands still while the count on the tab
+    beside it keeps climbing. Nothing raises and nothing warns, because
+    nothing is missing - the value is in the assigns, and change tracking was
+    only never told about it.
+
+    `Phoenix.Component.assign/2` is what tells it. It writes the key *and*
+    records the key in `__changed__`, and that record is the whole of the
+    difference between the two lines.
+
     ## The resize is a command, not a hook
 
     Decision 7 ships exactly one JavaScript hook and this section adds none.
@@ -99,6 +124,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       `StatifierBlocks.Shell.host_tabs/1`. The active one's `content` is
       called for the panel; the strip draws them all from `@view.tabs`, where
       their labels and counts already are.
+
+      `content` is called with `%{id: ..., count: ...}` and with change
+      tracking on those two keys only, so a host value the function adds for
+      its own markup is added with `Phoenix.Component.assign/2` and never
+      merged in - see the moduledoc.
       """
     )
 
