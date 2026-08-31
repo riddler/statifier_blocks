@@ -1095,6 +1095,46 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # Sabotage: `background: var(--sb-block-accent-tint)` on the chip - a
       # third accent-bearing element inside the card, which is the tint that
       # note ratified the deletion of.
+      # campaign-022 ruling R8b: `overflow-wrap: anywhere` broke an event name
+      # across two lines - `signup.reminder_du` / `e` - which reads as two
+      # identifiers. The chip clips at its own edge instead, the trade
+      # `.sb-node__invoke` already makes on the line below it.
+      # Sabotage: putting `overflow-wrap: anywhere` back on the chip - the
+      # break returns on any card a lane has clamped, and this goes red naming
+      # the declaration that caused it.
+      test "a summary chip clips at its own edge rather than breaking a token" do
+        css = File.read!(@stylesheet)
+
+        rule = Regex.run(~r/^\.sb-node__chip\s*\{(.*?)\n\}/ms, css)
+
+        assert rule, "the scan actually found the chip rule"
+
+        body = Enum.at(rule, 1)
+        assert body =~ ~r/max-width:\s*100%/
+        assert body =~ ~r/overflow:\s*hidden/
+        assert body =~ ~r/text-overflow:\s*ellipsis/
+        assert body =~ ~r/white-space:\s*nowrap/
+        refute body =~ ~r/^\s*overflow-wrap:/m
+      end
+
+      # The other half of the same ruling: it does NOT generalise to the title,
+      # which is prose rather than an identifier and whose wrapping is
+      # ordinary. Clipping it would hide the block's name.
+      # Sabotage: clipping `.sb-node__label` the same way - a renamed card
+      # shows a prefix of its own title and this goes red on the wrap that
+      # rule is supposed to keep.
+      test "the title keeps its wrap, because a title is prose" do
+        css = File.read!(@stylesheet)
+
+        rule = Regex.run(~r/^\.sb-node__label\s*\{(.*?)\n\}/ms, css)
+
+        assert rule, "the scan actually found the title rule"
+
+        body = Enum.at(rule, 1)
+        assert body =~ ~r/overflow-wrap:\s*anywhere/
+        refute body =~ ~r/text-overflow:\s*ellipsis/
+      end
+
       test "a summary chip carries no accent" do
         css = File.read!(@stylesheet)
 

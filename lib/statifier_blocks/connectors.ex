@@ -31,7 +31,12 @@ defmodule StatifierBlocks.Connectors do
      `interrupt_path/4` - turn two points into orthogonal path data with
      rounded corners. Orthogonal rather than bezier because at nesting depth
      7 a curve that passes near a card reads as ambiguous and a right angle
-     never does.
+     never does. **All four clamp an ascending edge level**: the head is
+     raised to the tail's own `y` rather than routed upward, because every
+     arrowhead is oriented along its path and an ascending one points back
+     at the block the flow just left. `flow_path/3` carried that clamp
+     alone until campaign-022 ruling R8d; the other three drew the arrow the
+     document does not contain.
 
   ## The 7d choices this module records
 
@@ -667,9 +672,19 @@ defmodule StatifierBlocks.Connectors do
   to the hub rather than sitting halfway, so every arm of one fan turns on
   the same line and the result reads as a distribution bar rather than as
   several unrelated edges.
+
+  **Down, or level, and never up**, on `flow_path/3`'s own terms: a slot
+  whose inlet was measured above the hub that feeds it is clamped to the
+  hub's `y` and the arm is drawn level. A fan reaches that case more easily
+  than a flow does - one short lane beside a tall one puts an inlet above
+  the bar - and without the clamp that lane's arm carried the arrowhead
+  backwards.
   """
   @spec fan_path(point(), point(), number()) :: String.t()
   def fan_path(hub, to, radius \\ @default_radius)
+
+  def fan_path(%{y: hy} = hub, %{y: ty} = to, radius) when ty < hy,
+    do: fan_path(hub, %{to | y: hy}, radius)
 
   def fan_path(%{x: hx, y: hy}, %{x: tx, y: ty}, _radius)
       when abs(tx - hx) < @straight_epsilon,
@@ -698,9 +713,17 @@ defmodule StatifierBlocks.Connectors do
 
   The mirror of `fan_path/3` - the elbow sits close to the HUB, which here
   is the lower end, so every arm turns on one line again.
+
+  The clamp is the same one, and mirrored with it: the HUB is the head
+  here, so a hub measured above the slot exit that feeds it is raised to
+  that exit's own `y` and the arm is drawn level rather than climbing back
+  into the region it is leaving.
   """
   @spec join_path(point(), point(), number()) :: String.t()
   def join_path(from, hub, radius \\ @default_radius)
+
+  def join_path(%{y: fy} = from, %{y: hy} = hub, radius) when hy < fy,
+    do: join_path(from, %{hub | y: fy}, radius)
 
   def join_path(%{x: fx, y: fy}, %{x: hx, y: hy}, _radius)
       when abs(hx - fx) < @straight_epsilon,
@@ -733,9 +756,18 @@ defmodule StatifierBlocks.Connectors do
   holds. `channel_x` is that channel, and placing it outside the container's
   own box is the routing rule that keeps interrupt edges from crossing the
   body of the container at any depth: there is nothing out there to cross.
+
+  The same clamp again, on the exit rather than on an inlet: a container
+  whose exit point was measured above the rule on its rail - a rule near the
+  bottom of a tall region, or two boxes measured against different layout
+  passes - is clamped to the rule's own `y`, so the channel leg is level and
+  the edge still ends pointing into the exit rather than away from it.
   """
   @spec interrupt_path(point(), point(), number(), number()) :: String.t()
   def interrupt_path(from, exit_point, channel_x, radius \\ @default_radius)
+
+  def interrupt_path(%{y: fy} = from, %{y: ey} = exit_point, channel_x, radius) when ey < fy,
+    do: interrupt_path(from, %{exit_point | y: fy}, channel_x, radius)
 
   def interrupt_path(%{x: fx, y: fy}, %{x: ex, y: ey}, channel_x, radius) do
     r = clamp(radius, [abs(channel_x - fx), abs(ey - fy) / 2])

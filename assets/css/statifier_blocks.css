@@ -609,7 +609,24 @@
  * hook measures every anchor against. */
 .sb-canvas {
   position: relative;
-  min-width: 0;
+
+  /* The stage is as wide as the tree it holds, not as wide as the panel
+   * (campaign-022 ruling R8c). `width: auto` on a block box is the
+   * CONTAINING BLOCK's width, and the tree has a floor of its own - nesting
+   * paddings, the interrupt channel, a card that will not shrink past its
+   * token width - so a panel narrower than that floor left the stage box
+   * short of its own content: 782px of box around 1208px of tree in the
+   * capture this ruling came from. Everything read off the box was then
+   * short with it, the measurement hook's `offsetWidth` included, which is
+   * the input the fit is computed from.
+   *
+   * `min-content` rather than `max-content` deliberately: the floor is what
+   * the content cannot go below, and raising the box to exactly that covers
+   * every overflow without letting a long label widen the whole chart -
+   * `max-content` would size the tree to its longest unwrapped line. Where
+   * the panel is already wider than the floor, `auto` still wins and this
+   * declaration changes nothing. */
+  min-width: min-content;
 }
 
 /* ---- zoom (sb-6ai)
@@ -1167,7 +1184,27 @@
   background: var(--sb-bg-muted);
   color: var(--sb-fg-subtle);
   font-size: var(--sb-text-xs);
-  overflow-wrap: anywhere;
+
+  /* Clipped at the chip's own edge, never broken mid-token (campaign-022
+   * ruling R8b). A chip holds an event name or a count - `signup.reminder_due`
+   * - and `overflow-wrap: anywhere` broke that across two lines as
+   * `signup.reminder_du` / `e`, which reads as two identifiers rather than
+   * as one that ran out of room. The card's width is a token and a lane
+   * clamps it further, so there is no width to wrap into; the honest
+   * treatments are a clip and a spill, and a spill lands on the card beside
+   * it.
+   *
+   * The same trade `.sb-node__invoke` below already makes, for the same
+   * reason: the full value is one click away in the Block section, and a
+   * card that grows a line has stopped having one shape. It does NOT
+   * generalise to `.sb-node__label` above - a title is prose an author
+   * wrote, its wrapping is ordinary, and clipping it would hide the name of
+   * the block rather than a suffix of an identifier - so that rule keeps
+   * its own wrap. */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* An unresolvable card's second line is a raw TYPE NAME rather than a

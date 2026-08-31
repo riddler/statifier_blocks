@@ -93,6 +93,42 @@ defmodule StatifierBlocks.ConnectorsTest do
                "M 10 60 V 60 Q 10 60 10 60 H 50 Q 50 60 50 60 V 60"
     end
 
+    # The other three paths carry the same clamp (campaign-022 ruling R8d).
+    # A fan reaches the case first: one short lane beside a tall one puts a
+    # slot's inlet ABOVE the bar that feeds it, and an unclamped arm drew the
+    # arrowhead back into the hub.
+    # Sabotage: dropping the `ty < hy` clause from `fan_path/3` - the arm
+    # draws "M 100 100 L 100 20", an arm that climbs out of its own hub, and
+    # this goes red on the second coordinate.
+    test "a fan arm whose inlet is above its hub is drawn level, never up" do
+      assert Connectors.fan_path(%{x: 100, y: 100}, %{x: 100, y: 20}) == "M 100 100 L 100 100"
+
+      assert Connectors.fan_path(%{x: 100, y: 100}, %{x: 40, y: 20}) ==
+               "M 100 100 V 100 Q 100 100 100 100 H 40 Q 40 100 40 100 V 100"
+    end
+
+    # The mirror: here the HUB is the head, so it is the hub that is clamped
+    # down onto the exit's own line rather than the exit raised to it.
+    # Sabotage: dropping the `hy < fy` clause from `join_path/3` - the rejoin
+    # draws "M 40 100 L 40 20" and the arrow points back into the region the
+    # flow is leaving, which is the loop the document does not contain.
+    test "a rejoin arm whose hub is above its exit is drawn level, never up" do
+      assert Connectors.join_path(%{x: 40, y: 100}, %{x: 40, y: 20}) == "M 40 100 L 40 100"
+
+      assert Connectors.join_path(%{x: 40, y: 100}, %{x: 100, y: 20}) ==
+               "M 40 100 V 100 Q 40 100 40 100 H 100 Q 100 100 100 100 V 100"
+    end
+
+    # And the interrupt, whose head is the container's exit point: a rule near
+    # the bottom of a tall region can be measured below the exit it leaves by.
+    # Sabotage: dropping the `ey < fy` clause from `interrupt_path/4` - the
+    # channel leg becomes "V 50" and the edge climbs the channel with its head
+    # pointing up, which is the rendering the clamp exists to refuse.
+    test "an interrupt edge whose exit is above its rule runs level, never up" do
+      assert Connectors.interrupt_path(%{x: 100, y: 200}, %{x: 20, y: 50}, 140) ==
+               "M 100 200 H 140 Q 140 200 140 200 V 200 Q 140 200 140 200 H 20"
+    end
+
     # Sabotage: rendering every coordinate as a float - the paths stop being
     # comparable to the spike's evidence, which is the only reason the numbers
     # above can be checked by eye at all.

@@ -791,6 +791,24 @@ defmodule StatifierBlocks.ThemeAuditTest do
       assert body =~ ~r/overflow:\s*auto/
     end
 
+    # The stage's own box, which is a different claim from the panel's: the
+    # panel is the scroller and this is the thing it scrolls over.
+    # campaign-022 ruling R8c - `width: auto` gave the stage the PANEL's width
+    # while the tree has a floor of its own, so a narrow panel left an 782px
+    # box around a 1208px tree and everything read off the box, the
+    # measurement hook's `offsetWidth` included, was short with it.
+    # Sabotage: putting `min-width: 0` back on `.sb-canvas` - the box goes
+    # back to the panel's width, the tree hangs out of the element the overlay
+    # is measured against, and this goes red naming the stage.
+    test "the canvas stage is at least as wide as the tree it holds",
+         %{source: source} do
+      assert [[_all, body]] = Regex.scan(~r/^\.sb-canvas\s*\{([^}]*)\}/m, source)
+
+      assert body =~ ~r/min-width:\s*min-content/
+      assert body =~ ~r/position:\s*relative/
+      refute body =~ ~r/min-width:\s*0/
+    end
+
     # 7A and the bounded mode have to agree. Three of the five breakpoints move
     # the canvas to a different row, and a row order restated without saying
     # which row takes the slack hands it to whatever is first - silently, since
