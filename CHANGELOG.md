@@ -10,6 +10,137 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.10.0] 2026-08-31
+
+0.10.0 is the release where a document declares its own data. A block
+document carries a top-level `datamodel` key naming the `<data>` roots its
+own guards and assigns read, so a document compiles on its own rather than
+depending on whichever host happens to declare them; the compile call's
+`:declare` option stays beside it as the host-wins surface, and the editor's
+undeclared-path advisory reads both. Around that, `core.on_event` takes a
+`cond`, so an interrupt rule fires only when its event arrives *and* the
+condition holds; the `done` outcome of an invoke run mark gets theme tokens
+of its own instead of borrowing the accent blue it was indistinguishable
+from; and the canvas stops falling short of the tree it holds.
+
+### Added
+
+- The block document gains a top-level `datamodel` key: a list of
+  `StatifierBlocks.Document.DatamodelEntry` structs, each an `id` plus an
+  optional `expr` and an optional `description`, naming the `<data>` roots
+  the document's own guards and assigns read. `Document.new/2` takes a
+  `:datamodel` option (default `[]`); a document declaring none compiles
+  and encodes byte-identically to one built before this key existed. The
+  key is part of the document's canonical bytes, so it participates in
+  `content_hash/1` and in compile determinism.
+- `Compiler.compile/3`'s `:declare` compile option now leads a second
+  declaration surface rather than being the only one: the compile call's
+  roots emit first, the document's own `datamodel` roots follow, and
+  block-declared roots follow those, all in one `<datamodel>`. A root
+  both the compile call and the document declare is host-wins: the
+  compile call's declaration is emitted, the document's is dropped, and
+  the compile succeeds with a `:shadowed_document_root` warning on
+  `Compiled.warnings` rather than refusing. A document root colliding
+  with a block-declared root is still refused as `:duplicate_binding`.
+- `core.on_event` takes an optional `cond`: an `:expression` config field
+  that becomes the guard on the handler's transition, so an interrupt rule
+  fires only when its event arrives *and* the condition holds. A handler
+  whose `cond` is absent, empty, or whitespace emits exactly the bytes it
+  emitted before the key existed, so the key is additive over every
+  document authored without it. The condition is passed through to
+  predicator verbatim - `validate_config/1` only asks that the stored value
+  be a string - and the transition carries `"cond"` as its attribution key,
+  so an upstream expression error lands on the field the author typed into.
+  Recorded as ADR-0002's 2026-08-31 note.
+- `StatifierBlocks.Editor` takes a `declare` assign, the `{id, expr}` roots
+  the host will pass `StatifierBlocks.Compiler.compile/3` as `:declare`,
+  defaulting to `[]`. `Editor.findings_count/3` takes the matching
+  `:declare` option, so the host's number and the drawer's stay the same
+  number. The document's own roots need no option - they are read off the
+  document.
+- `StatifierBlocks.Datamodel.declared_roots/1`, the total normalizer for a
+  root set, beside `declared_paths/1`.
+- Two tier-2 theme tokens, `--sb-run-done` and `--sb-run-done-bg`, for the
+  `done` outcome of an invoke run mark. A host that themes the editor now
+  sets the "came back" colour directly instead of inheriting whatever it set
+  `--sb-info` to.
+
+### Changed
+
+- Decoding a document now refuses an envelope object carrying a key
+  outside `id`, `revision`, `root`, `schema_version`, `metadata`,
+  `datamodel`, and refuses a `datamodel` entry carrying a key outside
+  `id`, `expr`, `description`, or carrying an explicit JSON `null` for
+  `expr` or `description` - matching the round-trip discipline already
+  applied to unrecognized block keys.
+- The family's two worked examples - the ADR-0001 card authorization
+  document and the signup wizard - now declare the `<data>` roots their
+  own guards read through ADR-0001 decision 11's document `datamodel`
+  key, rather than leaving them to whichever host compiles them. Each
+  declares exactly what it reads and no more: `budget_remaining` and
+  `amount` for the first, `variant` for the second, none of them carrying
+  an `expr`, since all three are per-run values a host seeds or a step
+  assigns. Either document now compiles on its own, with no `:declare`
+  option, without its guard raising `error.execution` over a root nothing
+  declared.
+- Both documents' canonical bytes move with the key, and so do their
+  document hashes and the worked example's pinned chart identity. The
+  identity move was verified rather than accepted: deleting the one
+  `<datamodel>` element from the new bytes reproduces the previously
+  pinned hash exactly, so nothing else in either emission changed. Only
+  the test fixtures ship these documents; no packaged code moved.
+- The editor's undeclared-path advisory now reads three declaration
+  sources rather than one. A config field a block type annotated
+  `datamodel_path?: true` is declared when the host's datamodel holds its
+  path, when the document's own `datamodel` key declares its root, or when
+  the compile call's `:declare` option declares its root. A declared root
+  covers every path beneath it; the datamodel's own paths are still matched
+  whole. ADR-0005's decision 11 is amended as 11k-11m, taking the open
+  question ADR-0001's 2026-08-31 amendment left to it in its clause 11g.
+- The check's precondition widens to match: it runs when a datamodel was
+  supplied *or* when either surface declares a root, and still produces
+  nothing at all when nothing anywhere was declared. A host that passes no
+  datamodel and no roots sees exactly what it saw before; a document that
+  declares its own roots now lints its own paths with no host involved.
+- An invoke mark whose outcome is `done` is drawn in `--sb-run-done` rather
+  than `--sb-info`. In the shipped light palette `--sb-info` and
+  `--sb-accent` are the same blue, so a block that was *active* and a block
+  that had *come back* differed only in treatment - a halo outside the border
+  against a border and a fill - and read as one state at a glance. They are
+  now different hues in every theme the package ships or documents.
+
+  This is a visual change for a host that did not override `--sb-info`, and
+  a host that had retuned `--sb-info` specifically to colour its done marks
+  should move that value to `--sb-run-done`. Nothing else reads the new
+  tokens, and the `error` outcome still takes `--sb-error`.
+
+  The complete host theme in `docs/theming.md` restates both tokens, as the
+  theme audit requires of every colour token, and the accessibility
+  discipline is unchanged: `--sb-run-done` is held to the 3:1 non-text
+  threshold as a border that carries information, and `--sb-run-done-bg` is
+  recorded as translucent and held to no ratio.
+
+### Fixed
+
+- A summary chip whose text is a single identifier - `signup.reminder_due`
+  - no longer breaks mid-token onto a second line. The chip keeps one line
+  and clips at its own edge with an ellipsis, which is the treatment the
+  invoke type on the line below it already used. The card's title keeps its
+  wrap: a title is prose an author wrote, not an identifier.
+- The canvas stage is now at least as wide as the tree it holds
+  (`min-width: min-content`). Its box took the panel's width, while the
+  tree has a floor of its own - nesting paddings, the interrupt channel, a
+  card that will not shrink past its token width - so a panel narrower than
+  that floor left the stage short of its own content, and everything read
+  off that box, the measurement hook's `offsetWidth` included, was short
+  with it.
+- `Connectors.fan_path/3`, `Connectors.join_path/3` and
+  `Connectors.interrupt_path/4` now clamp an ascending edge level, as
+  `flow_path/3` already did: the head is raised to the tail's own `y`
+  rather than routed upward. An arrowhead is oriented along its path, so an
+  ascending arm rendered an arrow pointing back at the block the flow just
+  left - a loop the document does not contain.
+
 ## [0.9.0] 2026-08-31
 
 0.9.0 is the release where the editor can watch a run. A host hands the
@@ -1196,6 +1327,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.10.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.10.0
 [0.9.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.9.0
 [0.8.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.8.0
 [0.7.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.7.0
