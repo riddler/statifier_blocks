@@ -66,7 +66,13 @@ defmodule StatifierBlocks.Compiler.HostRootsTest do
     # document compiled with `declare: []` does not have, and this goes
     # red on both fixtures (verified)
     test "the option absent and the option empty compile to identical bytes" do
-      for document <- [DocumentFixtures.worked_example(), DocumentFixtures.signup_wizard()] do
+      # Both shipped fixtures declare their own roots since sb-vjeg, and
+      # this describe is about a document that declares *nothing at all* -
+      # so the document key comes off before the comparison, leaving the
+      # `:declare` option as the only surface in play, which is what this
+      # file is about.
+      for declared <- [DocumentFixtures.worked_example(), DocumentFixtures.signup_wizard()] do
+        document = %{declared | datamodel: []}
         {:ok, plain} = Compiler.compile(document, CoreFixtures.palette())
         {:ok, empty} = Compiler.compile(document, CoreFixtures.palette(), declare: [])
 
