@@ -1,6 +1,6 @@
 # ADR-0001: The block document is a tree of typed blocks with named slots
 
-Status: accepted (2026-08-26); fetch_path/2 doc line amended (2026-08-27); document datamodel declaration key amendment, decision 11 (proposed 2026-08-31)
+Status: accepted (2026-08-26); fetch_path/2 doc line amended (2026-08-27); document datamodel declaration key amendment, decision 11 (accepted 2026-08-31)
 
 ## Context
 
@@ -483,8 +483,8 @@ document that produced them.
 
 ## Amendment (2026-08-31): decision 11 - the document declares its own `<data>` roots
 
-**Status: proposed (2026-08-31, pending the direction-agent verdict under the
-operator campaign-022 gate), implementing bead `sb-ao6l`.** Additive; nothing
+**Status: accepted (2026-08-31, UNQUALIFIED direction-agent verdict, PR 188),
+implementing bead `sb-ao6l`.** Drafted 2026-08-31 as a proposed amendment. Additive; nothing
 above this line is edited, no accepted decision changes, and the header line's
 status history is the conductor's to extend.
 
