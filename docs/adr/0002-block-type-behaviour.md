@@ -1957,7 +1957,8 @@ A dated note rather than an amendment, recorded for `sb-d65` under
 campaign-022 ruling R6. It records one optional field on a type this record
 already ships, and the reason that field belongs on the interrupt handler
 rather than on a `core.branch` after it. The record's Status is untouched, no
-existing document's compiled bytes move, and the vocabulary does not grow.
+document authored without the key compiles differently, and the vocabulary
+does not grow.
 
 ### What the type carries now
 
