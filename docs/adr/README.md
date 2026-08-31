@@ -8,6 +8,7 @@
 | [0004](0004-compiler-provenance.md) | One block, one state - a deterministic compile carrying a provenance map | accepted |
 | [0005](0005-liveview-editor.md) | The editor is a pure command algebra and view model with a thin LiveView shell | accepted |
 | [0006](0006-datamodel-document.md) | The datamodel document is a typed, three-scope declaration, and the declared-path set is its projection | accepted |
+| [0007](0007-block-type-defaults.md) | A block type declares its defaults with `use`, and the leaf invoke step is one declaration | proposed |
 
 New ADRs: next number, same three-section format (Context, Decision,
 Consequences). Pick the number against a freshly fetched remote.

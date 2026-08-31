@@ -53,8 +53,6 @@ defmodule StatifierBlocks.Core.Invoke do
   alias StatifierBlocks.Core.{Config, Emit}
   alias StatifierBlocks.Emission
 
-  @invoke_type ~r/\A[a-z][a-z0-9_]*:[a-z][a-z0-9_]*\z/
-
   @error_event "error.communication.invoke"
   @done_event "done.invoke"
 
@@ -397,7 +395,10 @@ defmodule StatifierBlocks.Core.Invoke do
   @spec path?(String.t()) :: boolean()
   defp path?(path), do: Config.non_empty_string?(path) and not String.contains?(path, " ")
 
+  # The grammar lives in `StatifierBlocks.Core.Config` because
+  # `StatifierBlocks.InvokeStep` reads the same one: two spellings of
+  # "namespace:name" would be two chances for a core block and a host
+  # step to disagree about the same field.
   @spec invoke_type?(term()) :: boolean()
-  defp invoke_type?(value),
-    do: Config.non_empty_string?(value) and Regex.match?(@invoke_type, value)
+  defp invoke_type?(value), do: Config.invoke_type?(value)
 end

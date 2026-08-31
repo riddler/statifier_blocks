@@ -415,6 +415,62 @@ document names a type by string and the palette resolves the string: the
 mapping is the host's fact, which is what lets one module serve two names in
 two tenants' palettes.
 
+### Declaring a type instead of spelling it
+
+Most host types have nothing to say about most callbacks. `use
+StatifierBlocks.BlockType` declares the behaviour and injects the answer a
+type gives when it has none of its own - no slots, no fields, nothing to
+refuse, version 1, unconstrained assignability, no migration - each one
+overridable, so a type writes only the rows where it differs. `emit/2` is
+deliberately not among them: there is no emission to default to, and one
+injected here would let a type that compiles nothing look complete.
+
+A leaf step that **names** one host invoke type and waits for the answer is
+the shape a host writes over and over, so it has a base of its own.
+`use StatifierBlocks.InvokeStep` fills in all nine callbacks from a
+declaration:
+
+```elixir
+defmodule MyApp.Blocks.Capture do
+  @moduledoc "myapp.capture: captures the authorized amount."
+
+  use StatifierBlocks.InvokeStep,
+    invoke_type: "myapp:capture",
+    produces: "myapp.capture",
+    palette: %{
+      label: "Capture",
+      group: "Payments",
+      description: "Captures the authorized amount.",
+      icon: "banknotes"
+    }
+end
+
+MyApp.Blocks.Capture.invoke_type()
+#=> "myapp:capture"
+
+Enum.map(MyApp.Blocks.Capture.config_schema(%{}), & &1.key)
+#=> ["label", "invoke_type"]
+
+MyApp.Blocks.Capture.outcomes(%{})
+#=> [{"done", "Done"}, {"error", "Error"}]
+
+MyApp.Blocks.Capture.io(%{})
+#=> %{kinds: [:step], produces: "myapp.capture"}
+```
+
+That is the whole type. It compiles to an `<invoke>` in an inner state with
+one transition and one `<final>` per outcome - `core.invoke`'s emission with
+the `on_error` slot taken out, since a leaf step has no children and its
+failure path is an outcome a parent may wire. `:fields` adds config fields
+after `label` and `invoke_type`, and every injected callback is
+overridable: a step with extra `<param>` children calls
+`StatifierBlocks.InvokeStep.emit/4` itself, and one with a tighter rule
+composes its own `validate_config/1` out of the checks the module exports.
+
+It still only **names** an invoke type. What runs one is a handler the host
+registers separately, per session - the two-registry seam this package
+draws, which `use` does not cross.
+
 ### The three presentation declarations
 
 A palette entry may also say how the editor should draw the type, and three
