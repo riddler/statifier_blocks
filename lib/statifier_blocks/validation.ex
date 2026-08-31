@@ -16,8 +16,16 @@ defmodule StatifierBlocks.Validation do
   # and validating together means a block with a malformed `slots` is
   # reported instead of crashing the walk that would otherwise try to
   # recurse into it.
+  #
+  # The `datamodel` key's duplicate-id check (`check_datamodel/1`) is
+  # structural here, unlike the `:declare` compile option's own duplicate
+  # check (`StatifierBlocks.Compiler.DeclaredRoots.declarations/1`): the
+  # document is a *stored* artifact whose validity must not depend on a
+  # compiler ever being run over it, so the document's own duplicate rule
+  # cannot live only in the compile pipeline.
 
   alias StatifierBlocks.{Block, Document}
+  alias StatifierBlocks.Document.DatamodelEntry
 
   @typedoc "ADR-0001's typespec block. The union lives on the public side as `t:StatifierBlocks.Document.validation_error/0`; this is its internal name."
   @type error :: Document.validation_error()
@@ -52,7 +60,8 @@ defmodule StatifierBlocks.Validation do
     with :ok <- check_schema_version(document.schema_version),
          :ok <- check_document_id(document.id),
          :ok <- check_revision(document.revision),
-         :ok <- check_metadata(document.metadata) do
+         :ok <- check_metadata(document.metadata),
+         :ok <- check_datamodel(document.datamodel) do
       check_root(document.root)
     end
   end
@@ -95,6 +104,95 @@ defmodule StatifierBlocks.Validation do
   @spec check_root(term()) :: :ok | {:error, error()}
   defp check_root(%Block{}), do: :ok
   defp check_root(other), do: {:error, {:malformed_envelope, {:root, :not_a_block, other}}}
+
+  # --- datamodel (ADR-0001 decision 11) -------------------------------------
+
+  @identifier ~r/\A[a-z][a-z0-9_]*\z/
+
+  # Every entry's own shape is checked before any id is compared against
+  # another, so a malformed entry is reported as malformed rather than
+  # mistaken for a duplicate of whatever id it failed to have.
+  @spec check_datamodel(term()) :: :ok | {:error, error()}
+  defp check_datamodel(datamodel) when is_list(datamodel) do
+    with :ok <- check_datamodel_entries(datamodel, 0) do
+      check_datamodel_unique_ids(datamodel)
+    end
+  end
+
+  defp check_datamodel(_other),
+    do: {:error, {:malformed_envelope, {:datamodel, :not_a_list}}}
+
+  @spec check_datamodel_entries([term()], non_neg_integer()) :: :ok | {:error, error()}
+  defp check_datamodel_entries([], _index), do: :ok
+
+  defp check_datamodel_entries([entry | rest], index) do
+    case check_datamodel_entry(entry, index) do
+      :ok -> check_datamodel_entries(rest, index + 1)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  @spec check_datamodel_entry(term(), non_neg_integer()) :: :ok | {:error, error()}
+  defp check_datamodel_entry(%DatamodelEntry{} = entry, index) do
+    with :ok <- check_datamodel_id(entry.id, index),
+         :ok <- check_datamodel_expr(entry.expr, index) do
+      check_datamodel_description(entry.description, index)
+    end
+  end
+
+  defp check_datamodel_entry(_other, index),
+    do: {:error, {:malformed_envelope, {:datamodel, {:entry, index, :not_an_entry}}}}
+
+  @spec check_datamodel_id(term(), non_neg_integer()) :: :ok | {:error, error()}
+  defp check_datamodel_id(id, index) do
+    if is_binary(id) and Regex.match?(@identifier, id) do
+      :ok
+    else
+      {:error, {:malformed_envelope, {:datamodel, {:entry, index, {:id, :not_an_identifier}}}}}
+    end
+  end
+
+  @spec check_datamodel_expr(term(), non_neg_integer()) :: :ok | {:error, error()}
+  defp check_datamodel_expr(nil, _index), do: :ok
+
+  defp check_datamodel_expr(expr, index) do
+    if non_empty_utf8?(expr) do
+      :ok
+    else
+      {:error, {:malformed_envelope, {:datamodel, {:entry, index, {:expr, :not_an_expression}}}}}
+    end
+  end
+
+  @spec check_datamodel_description(term(), non_neg_integer()) :: :ok | {:error, error()}
+  defp check_datamodel_description(nil, _index), do: :ok
+
+  defp check_datamodel_description(description, index) do
+    if non_empty_utf8?(description) do
+      :ok
+    else
+      {:error,
+       {:malformed_envelope,
+        {:datamodel, {:entry, index, {:description, :not_a_non_empty_string}}}}}
+    end
+  end
+
+  # Every entry's own shape has already passed by the time this runs, so
+  # every id here is trustworthy to compare. Reports the *first* repeat.
+  @spec check_datamodel_unique_ids([DatamodelEntry.t()]) :: :ok | {:error, error()}
+  defp check_datamodel_unique_ids(entries) do
+    entries
+    |> Enum.reduce_while(MapSet.new(), fn %DatamodelEntry{id: id}, seen ->
+      if MapSet.member?(seen, id) do
+        {:halt, {:error, {:malformed_envelope, {:datamodel, {:duplicate_id, id}}}}}
+      else
+        {:cont, MapSet.put(seen, id)}
+      end
+    end)
+    |> case do
+      {:error, _reason} = error -> error
+      %MapSet{} -> :ok
+    end
+  end
 
   # --- The pre-order walk, validating as it goes --------------------------
 

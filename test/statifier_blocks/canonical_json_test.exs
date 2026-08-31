@@ -228,6 +228,116 @@ defmodule StatifierBlocks.CanonicalJsonTest do
     end
   end
 
+  describe "datamodel (ADR-0001 decision 11)" do
+    alias StatifierBlocks.Document.DatamodelEntry
+
+    # sabotage: reverse `pairs` immediately before the join in `object/1`
+    # -> the entry's own keys come out in insertion order (id, expr,
+    # description) instead of sorted -> red (verified)
+    test "an entry's own keys are sorted" do
+      document =
+        Document.new(Block.new("core.wait", id: "blk_leaf"),
+          datamodel: [%DatamodelEntry{id: "targets", expr: "[]", description: "the list"}]
+        )
+
+      json = Document.to_json(document)
+
+      assert json =~
+               ~s("datamodel":[{"description":"the list","expr":"[]","id":"targets"}])
+    end
+
+    # sabotage: change `maybe_put_scalar/3`'s `nil` clause to
+    # `[{key, nil} | pairs]` instead of dropping the pair -> a nil expr
+    # would encode as `"expr":null` -> red
+    test "a nil expr and a nil description are omitted, not encoded as null" do
+      document =
+        Document.new(Block.new("core.wait", id: "blk_leaf"),
+          datamodel: [%DatamodelEntry{id: "targets"}]
+        )
+
+      json = Document.to_json(document)
+
+      assert json =~ ~s("datamodel":[{"id":"targets"}])
+      refute json =~ "null"
+    end
+
+    # sabotage: drop the `maybe_put_list/3` call from `encode/1` entirely
+    # -> a non-empty datamodel would never reach the bytes at all -> red
+    # (verified: this also fails the two tests above)
+    test "an empty datamodel is omitted from the bytes entirely" do
+      with_empty = Document.new(Block.new("core.wait", id: "blk_leaf"))
+      without_key_ever_existing = DocumentFixtures.worked_example()
+
+      refute Document.to_json(with_empty) =~ "datamodel"
+      refute Document.to_json(without_key_ever_existing) =~ "datamodel"
+    end
+
+    # sabotage: reverse `value` in the `is_list(value)` clause before
+    # mapping over it (`value |> Enum.reverse() |> Enum.map(&value/1)`)
+    # -> the encoded datamodel order comes out reversed from declaration
+    # order -> red (verified)
+    test "list order is preserved rather than sorted" do
+      document =
+        Document.new(Block.new("core.wait", id: "blk_leaf"),
+          datamodel: [
+            %DatamodelEntry{id: "zeta"},
+            %DatamodelEntry{id: "alpha"}
+          ]
+        )
+
+      json = Document.to_json(document)
+
+      assert json =~ ~s("datamodel":[{"id":"zeta"},{"id":"alpha"}])
+    end
+
+    # Pinned `:id` on both documents so only the datamodel order differs
+    # - an unpinned `Document.new/2` mints a fresh random document id
+    # every call, which would make the two encodings differ regardless
+    # of whether the datamodel itself was sorted.
+    # sabotage: sort `document.datamodel` by `& &1.id` in `encode/1`
+    # before passing it to `maybe_put_list/3` -> both orderings below
+    # would encode to the identical sorted bytes and this goes red
+    # (verified)
+    test "a reordered datamodel is different bytes" do
+      forward =
+        Document.new(Block.new("core.wait", id: "blk_leaf"),
+          id: "bdoc_fixed",
+          datamodel: [%DatamodelEntry{id: "zeta"}, %DatamodelEntry{id: "alpha"}]
+        )
+
+      backward =
+        Document.new(Block.new("core.wait", id: "blk_leaf"),
+          id: "bdoc_fixed",
+          datamodel: [%DatamodelEntry{id: "alpha"}, %DatamodelEntry{id: "zeta"}]
+        )
+
+      refute Document.to_json(forward) == Document.to_json(backward)
+    end
+
+    # Pinned `:id` on both documents, for the same reason as the
+    # reordering test above: only the datamodel entry's `description`
+    # should differ between `base` and `changed`.
+    # sabotage: drop `maybe_put_scalar(pairs, "description", entry.description)`
+    # from `value/1`'s `%DatamodelEntry{}` clause -> two documents
+    # differing only in a datamodel entry's description would encode to
+    # identical bytes and hash identically -> red (verified)
+    test "content_hash/1 differs for two documents differing only in an entry's description" do
+      base =
+        Document.new(Block.new("core.wait", id: "blk_leaf"),
+          id: "bdoc_fixed",
+          datamodel: [%DatamodelEntry{id: "targets", description: "one"}]
+        )
+
+      changed =
+        Document.new(Block.new("core.wait", id: "blk_leaf"),
+          id: "bdoc_fixed",
+          datamodel: [%DatamodelEntry{id: "targets", description: "two"}]
+        )
+
+      refute Document.content_hash(base) == Document.content_hash(changed)
+    end
+  end
+
   describe "to_json/1 on an invalid document" do
     # sabotage: change `to_json/1`'s error clause to hardcode
     # `raise ArgumentError` with no message argument that mentions the

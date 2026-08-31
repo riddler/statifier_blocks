@@ -2196,3 +2196,49 @@ a field it already published" gains a second reader, not a second producer.
   while authoring. Decision 8 named that as sb-w50's, and a suggestion list
   is not it: this note supplies the vocabulary at the point of typing and
   leaves the surfacing question exactly where decision 8 left it.
+
+## Note (2026-08-31): the document-level key is taken, and the Emit stage's first warning
+
+A dated note rather than an amendment, recorded for `sb-ao6l` under
+campaign-022 ruling R3. It records where two things this record already
+anticipated now render, and one small fact the accepted text did not
+contemplate; no decision above changes and no text above is edited.
+
+**The first named follow-up is taken.** The Note (2026-08-29) on the
+`:declare` compile option closed with two named follow-ups, "neither taken
+here". The first - "**a document-level key**, under ADR-0001 ... a schema
+change with a hash consequence, and it is ADR-0001's to make" - has been
+taken, by ADR-0001's Amendment (2026-08-31), decision 11. The second - "**a
+declaring block type**, e.g. a `core.declare`" - is *not* taken and remains
+ADR-0002's, with the argument `DeclaredRoots` makes against a new `BlockType`
+callback still standing against it. That note's closing sentence held: the
+key is an additional surface, not a replacement, and the hoist, determinism,
+provenance, and the F6 refusal are shared with it unchanged.
+
+**The `:declare` option is unchanged in every particular.** Its grammar, its
+Emit-stage refusals, its `:package` fault, its provenance role, and its
+place at the head of the single `<datamodel>` all stand exactly as the note
+wrote them. What changed is one word of status: it is no longer the *only*
+surface. ADR-0001's decision 11f fixes the full order - option roots first
+in the order given, then the document's roots in its `datamodel` key's
+order, then block-declared roots in document order - and fixes host-wins for
+an id both the option and the document declare, with the document's entry
+dropped and a warning emitted.
+
+**The Emit stage now produces a warning as well as errors.** That shadow
+warning (`:shadowed_document_root`, ADR-0001 decision 11f) is minted at the
+Emit stage, and decision 10's table - "Errors it can produce" - did not
+previously contemplate an Emit-stage warning. The table is not edited, and
+does not need to be: it is a table of *errors*, and a warning is not a stage
+verdict. The stage still stops the compile only on errors, and the warning
+rides on `%Compiled{}.warnings` exactly as decision 8's invoke-type lint
+warning does - present on success, never a refusal, ordered with the rest by
+the compiler's final pass.
+
+**Provenance role `:datamodel` joins `:declare`.** A document-declared
+root's bytes belong to no block, so they take the root block under decision
+5's totality, with the role spelled `:datamodel` - a leading colon, in the
+same reserved namespace the `:declare` note opened, so `StateId.role?/1`
+rejects it and no role a block mints out of a state id can equal it. Two
+non-block surfaces, two roles, one namespace; a consumer that switched on
+`:declare` alone should switch on the leading colon instead.

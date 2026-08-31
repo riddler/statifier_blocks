@@ -1,3 +1,27 @@
+defmodule StatifierBlocks.Document.DatamodelEntry do
+  @moduledoc """
+  One root the document itself declares (ADR-0001 decision 11).
+
+  A document-declared root is a top-level `datamodel` entry: an `id` the
+  document's own guards and assigns read, an optional `expr` the root
+  starts with, and an optional `description` for a human reading the
+  document rather than for the chart - it is prose, never compiled and
+  never emitted (`StatifierBlocks.Compiler.DeclaredRoots.document_declarations/1`
+  drops it). This is the document's own declaration surface, distinct from
+  the compile call's `:declare` option, which leads it
+  (`StatifierBlocks.Compiler`'s moduledoc).
+  """
+
+  @type t :: %__MODULE__{
+          id: String.t(),
+          expr: String.t() | nil,
+          description: String.t() | nil
+        }
+
+  @enforce_keys [:id]
+  defstruct [:id, :expr, :description]
+end
+
 defmodule StatifierBlocks.Document do
   @moduledoc """
   A block document: one tree, one envelope (ADR-0001).
@@ -6,9 +30,16 @@ defmodule StatifierBlocks.Document do
   construction, the shared pre-order walk, and path lookup live here.
   Canonical encoding, content identity, and structural decoding land in
   later phases of the same bead.
+
+  The document also carries its own `datamodel` key: a list of
+  `StatifierBlocks.Document.DatamodelEntry` structs naming the `<data>`
+  roots the document's own guards and assigns read (ADR-0001 decision 11).
+  It follows, never leads, the compile call's `:declare` option - see
+  `StatifierBlocks.Compiler`'s moduledoc for the precedence rule.
   """
 
   alias StatifierBlocks.{Block, CanonicalJson, Decode, Validation}
+  alias StatifierBlocks.Document.DatamodelEntry
 
   @typedoc ~S(`"bdoc_" <> uxid`.)
   @type id :: String.t()
@@ -18,10 +49,11 @@ defmodule StatifierBlocks.Document do
           id: id(),
           revision: non_neg_integer(),
           root: Block.t(),
-          metadata: %{optional(String.t()) => Block.json()}
+          metadata: %{optional(String.t()) => Block.json()},
+          datamodel: [DatamodelEntry.t()]
         }
 
-  defstruct [:id, :root, schema_version: 1, revision: 0, metadata: %{}]
+  defstruct [:id, :root, schema_version: 1, revision: 0, metadata: %{}, datamodel: []]
 
   @typedoc "Derived, never stored. Identifies a position, not a block."
   @type path :: [{Block.id(), Block.slot_name(), non_neg_integer()}]
@@ -41,8 +73,10 @@ defmodule StatifierBlocks.Document do
   Wraps `root` in a document envelope.
 
   Options: `:id` (default a freshly minted `StatifierBlocks.Id.document/0`),
-  `:revision` (default `0`), `:metadata` (default `%{}`). `:schema_version`
-  is not an option - decision 7 fixes it at `1` for this ADR's envelope.
+  `:revision` (default `0`), `:metadata` (default `%{}`), `:datamodel`
+  (default `[]`, a list of `StatifierBlocks.Document.DatamodelEntry`
+  structs - ADR-0001 decision 11). `:schema_version` is not an option -
+  decision 7 fixes it at `1` for this ADR's envelope.
   """
   @spec new(Block.t(), keyword()) :: t()
   def new(%Block{} = root, opts \\ []) do
@@ -50,7 +84,8 @@ defmodule StatifierBlocks.Document do
       id: Keyword.get_lazy(opts, :id, &StatifierBlocks.Id.document/0),
       root: root,
       revision: Keyword.get(opts, :revision, 0),
-      metadata: Keyword.get(opts, :metadata, %{})
+      metadata: Keyword.get(opts, :metadata, %{}),
+      datamodel: Keyword.get(opts, :datamodel, [])
     }
   end
 
@@ -116,17 +151,19 @@ defmodule StatifierBlocks.Document do
 
   @doc """
   Checks `document` against ADR-0001's structural rules: schema version,
-  envelope shape, per-block shape (id, type, type_version, config, slots),
-  and document-wide id uniqueness. Never consults a block-type registry -
-  `config` is opaque here and `type` is never resolved against anything.
+  envelope shape (including the `datamodel` key's own entry shape and id
+  uniqueness - decision 11), per-block shape (id, type, type_version,
+  config, slots), and document-wide id uniqueness. Never consults a
+  block-type registry - `config` is opaque here and `type` is never
+  resolved against anything.
   """
   @spec validate(t()) :: :ok | {:error, validation_error()}
   def validate(%__MODULE__{} = document), do: Validation.validate(document)
 
   @doc """
   Canonical JSON per ADR-0001 decision 8. Deterministic: sorted object keys,
-  no insignificant whitespace, empty `slots`/`config`/`metadata` omitted, no
-  floats.
+  no insignificant whitespace, empty `slots`/`config`/`metadata`/`datamodel`
+  omitted, no floats.
 
   Runs `validate/1` first and raises `ArgumentError` carrying the validation
   reason when it fails, so an invalid document can never produce bytes that
@@ -159,6 +196,11 @@ defmodule StatifierBlocks.Document do
   a `"schema_version"` key are `:not_a_block_document`; a recognizable
   document that is wrong in a specific way gets an envelope-, block-, or
   id-level arm instead. Nothing is rescued to a default and nothing raises.
+
+  An envelope key outside the known set (`id`, `revision`, `root`,
+  `schema_version`, `metadata`, `datamodel` - decision 11 added the last)
+  is refused rather than silently dropped, the same discipline the
+  block-level decode already applies to an unrecognized block key.
   """
   @spec from_json(binary()) :: {:ok, t()} | {:error, validation_error()}
   def from_json(binary) when is_binary(binary), do: Decode.decode(binary)

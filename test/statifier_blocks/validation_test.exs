@@ -230,6 +230,144 @@ defmodule StatifierBlocks.ValidationTest do
     end
   end
 
+  describe "datamodel (ADR-0001 decision 11)" do
+    alias StatifierBlocks.Document.DatamodelEntry
+
+    # sabotage: change `check_datamodel/1`'s `is_list(datamodel)` guard
+    # clause to also accept maps -> a non-list datamodel would fall
+    # through to `check_datamodel_entries/2`, which crashes on a map
+    # instead of reporting `:not_a_list` -> red
+    test "rejects a datamodel that is not a list" do
+      document = Document.new(Block.new("core.sequence"))
+      document = %{document | datamodel: %{"targets" => nil}}
+
+      assert Document.validate(document) ==
+               {:error, {:malformed_envelope, {:datamodel, :not_a_list}}}
+    end
+
+    # sabotage: drop the `check_datamodel_entry(_other, index)` catch-all
+    # clause -> a non-entry element raises FunctionClauseError instead of
+    # being reported -> red
+    test "rejects an element that is not a %DatamodelEntry{}" do
+      document = Document.new(Block.new("core.sequence"))
+      document = %{document | datamodel: [%{"id" => "targets"}]}
+
+      assert Document.validate(document) ==
+               {:error, {:malformed_envelope, {:datamodel, {:entry, 0, :not_an_entry}}}}
+    end
+
+    # sabotage: loosen `check_datamodel_id/2`'s `@identifier` match to
+    # `String.length(id) > 0` -> "Targets" and "1st" would be accepted
+    # -> red
+    test "rejects an id that is not a bare lowercase identifier" do
+      for id <- ["Targets", "my.targets", "my targets", "_targets", "", "1st"] do
+        document = Document.new(Block.new("core.sequence"))
+        document = %{document | datamodel: [%DatamodelEntry{id: id}]}
+
+        assert Document.validate(document) ==
+                 {:error,
+                  {:malformed_envelope, {:datamodel, {:entry, 0, {:id, :not_an_identifier}}}}},
+               id
+      end
+    end
+
+    # sabotage: change `check_datamodel_expr/2`'s `non_empty_utf8?(expr)`
+    # check to always return `true` -> an empty-string expr would be
+    # accepted -> red
+    test "rejects an expr that is neither nil nor a non-empty valid string" do
+      document = Document.new(Block.new("core.sequence"))
+      document = %{document | datamodel: [%DatamodelEntry{id: "targets", expr: ""}]}
+
+      assert Document.validate(document) ==
+               {:error,
+                {:malformed_envelope, {:datamodel, {:entry, 0, {:expr, :not_an_expression}}}}}
+    end
+
+    # sabotage: same as above, over `description` - drop the
+    # `check_datamodel_description/2` non-empty-string check -> red
+    test "rejects a description that is neither nil nor a non-empty valid string" do
+      document = Document.new(Block.new("core.sequence"))
+      document = %{document | datamodel: [%DatamodelEntry{id: "targets", description: ""}]}
+
+      assert Document.validate(document) ==
+               {:error,
+                {:malformed_envelope,
+                 {:datamodel, {:entry, 0, {:description, :not_a_non_empty_string}}}}}
+    end
+
+    # sabotage: change `check_datamodel_entries/2`'s recursive call to
+    # always pass `index` unchanged instead of `index + 1` -> the second
+    # entry would be reported at index 0 -> red
+    test "reports the correct index for a malformed entry later in the list" do
+      document = Document.new(Block.new("core.sequence"))
+
+      document = %{
+        document
+        | datamodel: [
+            %DatamodelEntry{id: "targets"},
+            %DatamodelEntry{id: "ok"},
+            %DatamodelEntry{id: "Bad"}
+          ]
+      }
+
+      assert Document.validate(document) ==
+               {:error,
+                {:malformed_envelope, {:datamodel, {:entry, 2, {:id, :not_an_identifier}}}}}
+    end
+
+    # sabotage: change `check_datamodel_unique_ids/1`'s
+    # `MapSet.member?(seen, id)` check to always return `false` -> the
+    # repeated id would never be flagged -> red
+    test "rejects an id declared twice, reporting the first repeat" do
+      document = Document.new(Block.new("core.sequence"))
+
+      document = %{
+        document
+        | datamodel: [
+            %DatamodelEntry{id: "targets"},
+            %DatamodelEntry{id: "parked"},
+            %DatamodelEntry{id: "targets"}
+          ]
+      }
+
+      assert Document.validate(document) ==
+               {:error, {:malformed_envelope, {:datamodel, {:duplicate_id, "targets"}}}}
+    end
+
+    # An entry sharing an id with an earlier one, and *also* malformed in
+    # its own right (an empty expr): shape-first order reports the
+    # malformed field, not the duplicate.
+    # sabotage: run `check_datamodel_unique_ids/1` before
+    # `check_datamodel_entries/2` in `check_datamodel/1`'s `with` chain
+    # -> this reports `{:duplicate_id, "targets"}` instead of the
+    # malformed `expr` -> red
+    test "a malformed entry beats a duplicate-id report" do
+      document = Document.new(Block.new("core.sequence"))
+
+      document = %{
+        document
+        | datamodel: [
+            %DatamodelEntry{id: "targets"},
+            %DatamodelEntry{id: "targets", expr: ""}
+          ]
+      }
+
+      assert Document.validate(document) ==
+               {:error,
+                {:malformed_envelope, {:datamodel, {:entry, 1, {:expr, :not_an_expression}}}}}
+    end
+
+    # sabotage: change `check_datamodel/1`'s list clause to
+    # `is_list(datamodel) and datamodel != []` -> a document built by
+    # `Document.new/2` with no `:datamodel` option (the default `[]`)
+    # would fail validation instead of passing -> red
+    test "an absent datamodel (the default []) is valid" do
+      document = Document.new(Block.new("core.sequence"))
+
+      assert Document.validate(document) == :ok
+    end
+  end
+
   describe "totality over hostile terms" do
     hostile_terms = [
       {"a tuple", {1, 2}},

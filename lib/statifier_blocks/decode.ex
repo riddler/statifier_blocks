@@ -15,13 +15,28 @@ defmodule StatifierBlocks.Decode do
   #   decision 2's "the document is the minimum that must round-trip" - a
   #   key silently dropped here would break `encode(decode(bytes)) == bytes`
   #   with no error to say so.
+  #
+  #   The envelope never had that same rule until decision 11 added a
+  #   second envelope key (`datamodel`) for a host to declare: an old
+  #   reader handed a document carrying a key it does not know has to
+  #   *refuse* it rather than round-trip the host's declarations away
+  #   silently, which is exactly the failure mode the block-level rule
+  #   above already exists to prevent. `@envelope_keys` and
+  #   `ensure_block_document/1`'s unexpected-key check are that same rule,
+  #   now applied one level up.
   # - Everything else - schema version, envelope field shapes, per-block
   #   field shapes, id uniqueness, the no-floats rule - is built as a
   #   `%Document{}`/`%Block{}` from the raw decoded values (defaulting only
   #   where ADR-0001 says a key is optional) and handed to
   #   `Validation.validate/1`, which already implements those checks in the
   #   right order. Duplicating them here would be a second place for the
-  #   error vocabulary to drift from `Validation`'s.
+  #   error vocabulary to drift from `Validation`'s. `datamodel`'s own
+  #   shape is exactly this: a value that is not a list, or an element
+  #   that is not a JSON object, is passed through to `Validation`
+  #   unchanged rather than rejected here, because `Validation` already
+  #   has the `:not_a_list` / `:not_an_entry` arms for it - only an
+  #   entry's *unexpected key* is this module's own to catch, for the same
+  #   round-trip reason a block's is.
   #
   # Never `struct/2` over decoded input, never `String.to_atom/1` or
   # `String.to_existing_atom/1` (decision 6). Every `%Block{}`/`%Document{}`
@@ -30,20 +45,26 @@ defmodule StatifierBlocks.Decode do
   # source, never one derived from the input.
 
   alias StatifierBlocks.{Block, Document, Validation}
+  alias StatifierBlocks.Document.DatamodelEntry
 
   @block_keys ~w(id type type_version config slots)
+  @envelope_keys ~w(id revision root schema_version metadata datamodel)
+  @entry_keys ~w(id expr description)
 
   @spec decode(binary()) :: {:ok, Document.t()} | {:error, Validation.error()}
   def decode(binary) when is_binary(binary) do
     with {:ok, term} <- decode_bytes(binary),
          {:ok, envelope} <- ensure_block_document(term),
-         {:ok, root} <- decode_block(Map.get(envelope, "root")) do
+         {:ok, envelope} <- ensure_known_envelope_keys(envelope),
+         {:ok, root} <- decode_block(Map.get(envelope, "root")),
+         {:ok, datamodel} <- decode_datamodel(Map.get(envelope, "datamodel", [])) do
       document = %Document{
         id: Map.get(envelope, "id"),
         revision: Map.get(envelope, "revision"),
         root: root,
         schema_version: Map.get(envelope, "schema_version"),
-        metadata: Map.get(envelope, "metadata", %{})
+        metadata: Map.get(envelope, "metadata", %{}),
+        datamodel: datamodel
       }
 
       case Validation.validate(document) do
@@ -76,6 +97,19 @@ defmodule StatifierBlocks.Decode do
   end
 
   defp ensure_block_document(_term), do: {:error, :not_a_block_document}
+
+  # An envelope key outside `@envelope_keys` is refused the same way an
+  # unrecognized block key is (`decode_block/1` below): a key silently
+  # dropped here would break `encode(decode(bytes)) == bytes` with no
+  # error to say so, and this is what stops an old reader from
+  # round-tripping a host's `datamodel` declarations away silently.
+  @spec ensure_known_envelope_keys(map()) :: {:ok, map()} | {:error, Validation.error()}
+  defp ensure_known_envelope_keys(envelope) do
+    case Enum.find(Map.keys(envelope), &(&1 not in @envelope_keys)) do
+      nil -> {:ok, envelope}
+      key -> {:error, {:malformed_envelope, {:unexpected_key, key}}}
+    end
+  end
 
   # --- Blocks, recursively --------------------------------------------------
 
@@ -156,6 +190,86 @@ defmodule StatifierBlocks.Decode do
     case decode_block(item) do
       {:ok, block} -> {:cont, {:ok, [block | acc]}}
       {:error, _reason} = error -> {:halt, error}
+    end
+  end
+
+  # --- datamodel (ADR-0001 decision 11) -------------------------------------
+
+  # A `datamodel` value that is not a list is passed through unchanged -
+  # `Validation.check_datamodel/1` already has the `:not_a_list` arm for
+  # it, and duplicating that shape check here would be a second place for
+  # the error vocabulary to drift.
+  @spec decode_datamodel(term()) ::
+          {:ok, [DatamodelEntry.t()] | term()} | {:error, Validation.error()}
+  defp decode_datamodel(entries) when is_list(entries) do
+    entries
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, []}, fn {entry, index}, {:ok, acc} ->
+      case decode_datamodel_entry(entry, index) do
+        {:ok, decoded} -> {:cont, {:ok, [decoded | acc]}}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, reversed} -> {:ok, Enum.reverse(reversed)}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp decode_datamodel(other), do: {:ok, other}
+
+  # An element that is not a JSON object is passed through unchanged -
+  # `Validation`'s `:not_an_entry` arm already covers it. An object
+  # carrying a key outside `@entry_keys` is this module's own to refuse,
+  # for the round-trip reason `ensure_known_envelope_keys/1` and
+  # `decode_block/1` are refused for.
+  #
+  # An explicit JSON `null` for `expr` or `description` is refused too,
+  # and for the same reason: once the `%DatamodelEntry{}` struct is built,
+  # `nil` and "key absent" are indistinguishable, so `Validation`
+  # structurally cannot tell `{"id": "x", "expr": null}` from `{"id":
+  # "x"}` apart. Decision 8's canonical encoder spells absence by
+  # omission and never writes `null` for either field
+  # (`CanonicalJson`'s `maybe_put_scalar/3`), so an explicit `null` is a
+  # byte the encoder would never produce, and accepting it would silently
+  # rewrite it away on the next encode with no error to say so - this is
+  # decision 2's round-trip rule again, this time over a value rather
+  # than a key. `Map.has_key?/2` + `Map.fetch!/2`, not `Map.get/2`, is
+  # what makes "present and null" distinguishable from "absent" here.
+  @spec decode_datamodel_entry(term(), non_neg_integer()) ::
+          {:ok, DatamodelEntry.t() | term()} | {:error, Validation.error()}
+  defp decode_datamodel_entry(%{} = map, index) when not is_struct(map) do
+    case Enum.find(Map.keys(map), &(&1 not in @entry_keys)) do
+      nil ->
+        with :ok <- reject_explicit_null(map, "expr", :expr, index),
+             :ok <- reject_explicit_null(map, "description", :description, index) do
+          {:ok,
+           %DatamodelEntry{
+             id: Map.get(map, "id"),
+             expr: Map.get(map, "expr"),
+             description: Map.get(map, "description")
+           }}
+        end
+
+      key ->
+        {:error, {:malformed_envelope, {:datamodel, {:entry, index, {:unexpected_key, key}}}}}
+    end
+  end
+
+  defp decode_datamodel_entry(other, _index), do: {:ok, other}
+
+  # `key` present with an explicit JSON `null` value is refused; `key`
+  # absent, or present with any other value, is left to the struct build
+  # and `Validation` as usual. `field` is a literal atom at every call
+  # site, never derived from `key` (decision 6: no `String.to_atom/1` or
+  # `String.to_existing_atom/1` over decoded input).
+  @spec reject_explicit_null(map(), String.t(), atom(), non_neg_integer()) ::
+          :ok | {:error, Validation.error()}
+  defp reject_explicit_null(map, key, field, index) do
+    if Map.has_key?(map, key) and is_nil(Map.fetch!(map, key)) do
+      {:error, {:malformed_envelope, {:datamodel, {:entry, index, {field, :explicit_null}}}}}
+    else
+      :ok
     end
   end
 end
