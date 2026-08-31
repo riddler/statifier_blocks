@@ -11,6 +11,7 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
 
   use ExUnit.Case, async: true
 
+  alias StatifierBlocks.BlockType
   alias StatifierBlocks.Core
   alias StatifierBlocks.Palette
 
@@ -158,6 +159,36 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
                Core.OnEvent.validate_config(%{"event" => "ok", "outcome" => "explode"})
 
       assert {:error, [{"event", _}, {"outcome", _}]} = Core.OnEvent.validate_config(%{})
+    end
+
+    # sabotage: had `check_cond/2` reject a blank string - the blank assert
+    # goes red, which is the whole point of the key being additive over
+    # documents that never carried it and over a field the author cleared
+    # (verified; the same mutation takes the emit test's blank case red)
+    test "takes an optional cond and only asks that it be a string" do
+      guarded = %{"event" => "review.resolved", "outcome" => "resume"}
+
+      assert Core.OnEvent.validate_config(guarded) == :ok
+      assert Core.OnEvent.validate_config(Map.put(guarded, "cond", "")) == :ok
+      assert Core.OnEvent.validate_config(Map.put(guarded, "cond", "review.parked")) == :ok
+
+      # Nonsense as an expression, a string all the same: predicator
+      # answers that at compile, not this callback (ADR-0004 decision 9).
+      assert Core.OnEvent.validate_config(Map.put(guarded, "cond", "&&&")) == :ok
+
+      assert {:error, [{"cond", _}]} = Core.OnEvent.validate_config(Map.put(guarded, "cond", 7))
+    end
+
+    # sabotage: declared the field `key: "guard"` rather than `key: "cond"`
+    # - the default value_path stops addressing the stored bytes and this
+    # goes red (verified). Marking it `required?: true` takes it red too.
+    test "declares cond as an optional :expression field reading config[\"cond\"]" do
+      schema = Core.OnEvent.config_schema(%{})
+
+      assert [%{key: "event"}, %{key: "cond"} = field, %{key: "outcome"}] = schema
+      assert field.type == :expression
+      assert field.required? == false
+      assert BlockType.value_path(field) == ["cond"]
     end
 
     # Sabotage: added `:step` to its kinds - red, and the placement property

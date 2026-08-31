@@ -3,8 +3,9 @@ defmodule StatifierBlocks.Core.OnEvent do
   `core.on_event`: an interrupt handler, valid inside an `interrupts` slot
   and nowhere else (ADR-0002 decision 10).
 
-  A leaf with two config fields: the `event` that fires it, and the
-  `outcome` that decides what happens to the group it interrupts.
+  A leaf with three config fields: the `event` that fires it, an optional
+  `cond` that decides whether it fires at all, and the `outcome` that
+  decides what happens to the group it interrupts.
 
   ## Placement, in both directions, from one tag
 
@@ -44,6 +45,37 @@ defmodule StatifierBlocks.Core.OnEvent do
   deciding where a `"resume"` re-enters. A third value is a
   `config_schema/1` change plus a `current_version/0` bump, not a document
   schema change.
+
+  ## The optional `cond` guard
+
+  `cond` is an optional `:expression` field, and when it is set it becomes
+  the `cond` on the watcher's transition: the handler fires only when the
+  event arrives **and** the condition holds. A handler with no `cond` -
+  the key absent, or blank - emits exactly the bytes it emitted before the
+  key existed, which is what keeps it an additive key rather than a
+  document schema change.
+
+  The guard belongs here rather than on a `core.branch` after the handler,
+  which is the shape it would otherwise be spelled as. A `core.on_event`
+  decides whether to leave the in-flight body at all, and by the time a
+  branch inside the handler could read a condition the body has already
+  been abandoned - so the two spellings do not express the same thing, and
+  only this one expresses a guarded interrupt. See ADR-0002's 2026-08-31
+  note.
+
+  The condition is the author's bytes passed through into predicator's
+  datamodel verbatim. This package ships no expression checking of its own
+  (ADR-0004 decision 9), so `validate_config/1` only asks whether the
+  stored value is a string; a typo inside it surfaces as an upstream
+  compile error routed back to the `"cond"` field by the `cond_key` this
+  type passes to `StatifierBlocks.Core.Emit.transition/2`.
+
+  Unlike `core.branch`, this type declares no `value_path`: its condition
+  is stored at `config["cond"]`, so ADR-0002 decision 7's default path -
+  `[key]` - already addresses it. And `summary/1` is untouched. ADR-0002
+  amendment H6 fixes this type's card as the outcome word then the event
+  name, and the reason `core.branch` counts its arms rather than listing
+  their conditions holds here too: an expression is not a chip.
   """
 
   @behaviour StatifierBlocks.BlockType
@@ -72,6 +104,13 @@ defmodule StatifierBlocks.Core.OnEvent do
         default: ""
       },
       %{
+        key: "cond",
+        type: :expression,
+        label: "Only when",
+        required?: false,
+        default: ""
+      },
+      %{
         key: "outcome",
         type:
           {:select,
@@ -86,6 +125,7 @@ defmodule StatifierBlocks.Core.OnEvent do
   def validate_config(config) do
     []
     |> check_event(config)
+    |> check_cond(config)
     |> check_outcome(config)
     |> Config.verdict()
   end
@@ -95,6 +135,19 @@ defmodule StatifierBlocks.Core.OnEvent do
       findings
     else
       [{"event", "must be an event name, like order.cancelled"} | findings]
+    end
+  end
+
+  # The guard is optional, so only a stored value that is not a string at
+  # all is a finding. Whether the expression *means* anything is
+  # predicator's answer at compile, not this function's (ADR-0004
+  # decision 9), and an empty string is the editor's spelling of "no
+  # guard" - it is the field's own default.
+  defp check_cond(findings, config) do
+    case Map.get(config, "cond") do
+      nil -> findings
+      condition when is_binary(condition) -> findings
+      _other -> [{"cond", "must be a condition expression, or left blank"} | findings]
     end
   end
 
@@ -202,6 +255,32 @@ defmodule StatifierBlocks.Core.OnEvent do
   the queue is holding, and a nested group's handler is selected over an
   outer group's because SCXML prefers the transition whose source is the
   deepest active state.
+
+  ## A guarded handler
+
+  A `cond` in config becomes the `cond` on that one transition, and
+  nothing else about the shape moves:
+
+      <state id="s_INT__armed">
+        <transition cond="review.parked" event="review.resolved" target="s_INT__done">
+          <raise event="statifier_blocks.interrupt.resume"/>
+        </transition>
+      </state>
+
+  So the event arriving while the condition is false leaves the handler
+  armed and the body running - the interrupt simply does not happen, and
+  the same event arriving later, once the condition holds, still fires it.
+  A handler with no `cond` writes no `cond` attribute at all
+  (`StatifierBlocks.Core.Emit.transition/2` drops an absent one), which is
+  why an unguarded handler's bytes are unchanged by this key existing.
+
+  The `cond_key` passed alongside is `"cond"`, the config key the author
+  typed into, so an upstream expression error lands on that field rather
+  than reading as a bug in this type (ADR-0004 decision 9). It is passed
+  unconditionally, guard or no guard:
+  `StatifierBlocks.Emission.attribute_from_config/3` records an owner only
+  for an attribute the element actually carries, so an unguarded handler
+  records none without this call site testing for it twice.
   """
   @impl true
   def emit(%Block{config: config}, context) do
@@ -212,12 +291,33 @@ defmodule StatifierBlocks.Core.OnEvent do
          {:ok, event} <- event_name(Map.get(config, "event")) do
       watcher =
         Emit.state(armed, nil, [
-          Emit.transition([event: event, target: done], [
-            Emission.element("raise", [{"event", outcome}])
-          ])
+          Emit.transition(
+            [event: event, cond: guard(config), cond_key: "cond", target: done],
+            [Emission.element("raise", [{"event", outcome}])]
+          )
         ])
 
       {:ok, Emit.state(context.state_id, armed, [watcher, Emit.final(done)])}
+    end
+  end
+
+  # The stored condition, or `nil` for a handler that carries none.
+  # Blank counts as none: `""` is the schema's default and what the editor
+  # leaves behind when an author clears the field, and writing
+  # `cond=""` would be an expression predicator has to reject rather than
+  # the absence of a guard.
+  #
+  # Read with the same tolerance `validate_config/1` shows, because
+  # `emit/2` runs on config the Config stage has already passed and a
+  # non-string here cannot reach it - but a total function is what every
+  # other reader of config in this module is.
+  defp guard(config) do
+    case Map.get(config, "cond") do
+      condition when is_binary(condition) ->
+        if String.trim(condition) == "", do: nil, else: condition
+
+      _absent_or_malformed ->
+        nil
     end
   end
 
