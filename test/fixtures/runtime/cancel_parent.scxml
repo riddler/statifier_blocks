@@ -1,0 +1,25 @@
+<!--
+  Hand-written (sb-6edf Phase 3), not compiled from a block document: the
+  compiled `core.subchart` block leaves its `__running` state only on
+  `done.invoke`/`error.communication.invoke` (see
+  `StatifierBlocks.Core.Subchart`'s moduledoc), so nothing an in-flight
+  test can send ever cancels it. This fixture adds an ordinary external
+  transition that exits the invoking state directly, which is what lets a
+  test drive `StatifierBlocks.Runtime.Subchart.cancel/2`. Do not "fix"
+  this into a block document - there is no block-authored shape that
+  exits an invoking state on an arbitrary external event.
+
+  The invoked document id (`bdoc_CANCEL_CHILD`) still resolves through the
+  real handler and the real resolver seam; only this driving chart is
+  hand-written. This fixture also drives the cancel-of-a-never-started
+  invocation case: the same `cancel.now` transition exits the invoking
+  state whether the resolver started a real child or refused it, which is
+  exactly what that test needs.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="s_invoking">
+    <state id="s_invoking">
+        <invoke id="inv_sub" type="statifier_blocks:subchart" src="bdoc_CANCEL_CHILD"/>
+        <transition event="cancel.now" target="s_cancelled"/>
+    </state>
+    <state id="s_cancelled"/>
+</scxml>
