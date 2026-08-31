@@ -70,10 +70,59 @@ defmodule StatifierBlocks.RuntimeFixtures do
     end
   end
 
+  defmodule WaitForEvent do
+    @moduledoc """
+    Test-only `StatifierBlocks.BlockType` (Phase 3, sb-6edf): a leaf that
+    waits for `config["event"]`, then finishes at `config["outcome"]`.
+    This is what the lifecycle tests need and `FixedOutcome` above cannot
+    give them: a child that has **not** finished by the time a test wants
+    to observe it mid-flight - a still-running invocation to cancel, or
+    one that only finishes once autoforward has actually delivered the
+    parent's event into it.
+    """
+
+    @behaviour StatifierBlocks.BlockType
+
+    alias StatifierBlocks.Compiler.Context
+    alias StatifierBlocks.Core.Emit
+
+    @impl true
+    def current_version, do: 1
+
+    @impl true
+    def slots(_config), do: []
+
+    @impl true
+    def config_schema(_config), do: []
+
+    @impl true
+    def validate_config(_config), do: :ok
+
+    @impl true
+    def outcomes(%{"outcome" => name}) when is_binary(name), do: [{name, name}]
+    def outcomes(_config), do: [{"done", "Done"}]
+
+    @impl true
+    def emit(%Block{config: config}, context) do
+      event = Map.fetch!(config, "event")
+      name = Map.get(config, "outcome", "done")
+      {:ok, final_id} = Context.outcome_id(context, name)
+      {:ok, waiting_id} = Context.role_id(context, "waiting")
+
+      waiting = Emit.state(waiting_id, nil, [Emit.transition(event: event, target: final_id)])
+
+      {:ok, Emit.state(context.state_id, waiting_id, [waiting, Emit.final(final_id)])}
+    end
+  end
+
   @fixed_outcome_type "runtime_fixture.fixed_outcome"
+  @wait_for_event_type "runtime_fixture.wait_for_event"
 
   @session_palette Palette.new(
-                     Map.merge(Palette.core_types(), %{@fixed_outcome_type => FixedOutcome})
+                     Map.merge(Palette.core_types(), %{
+                       @fixed_outcome_type => FixedOutcome,
+                       @wait_for_event_type => WaitForEvent
+                     })
                    )
 
   @doc "The palette session-level tests compile against: the core vocabulary plus `FixedOutcome`."
@@ -220,6 +269,25 @@ defmodule StatifierBlocks.RuntimeFixtures do
   @spec child_document(String.t(), String.t()) :: Document.t()
   def child_document(outcome, id \\ "bdoc_CHILD") do
     root = Block.new(@fixed_outcome_type, id: "blk_CHILD_ROOT", config: %{"outcome" => outcome})
+    Document.new(root, id: id)
+  end
+
+  @doc """
+  A child document whose root waits for `event`, then finishes at
+  `outcome` (Phase 3, sb-6edf): unlike `child_document/2`'s
+  `FixedOutcome`, this root has not finished by the time a lifecycle test
+  wants to observe it mid-flight - a live invocation to cancel, or one
+  that only reaches its outcome once autoforward has actually delivered
+  the parent's event into it.
+  """
+  @spec waiting_child_document(String.t(), String.t(), String.t()) :: Document.t()
+  def waiting_child_document(event, outcome, id) do
+    root =
+      Block.new(@wait_for_event_type,
+        id: "blk_WAIT_ROOT",
+        config: %{"event" => event, "outcome" => outcome}
+      )
+
     Document.new(root, id: id)
   end
 

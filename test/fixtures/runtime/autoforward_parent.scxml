@@ -1,0 +1,21 @@
+<!--
+  Hand-written (sb-6edf Phase 3), not compiled from a block document: the
+  compiled `core.subchart` `<invoke>` carries no `autoforward` attribute
+  (see `StatifierBlocks.Core.Subchart`'s moduledoc), so no block document
+  can ever produce an autoforwarding subchart. This fixture exists solely
+  to drive `StatifierBlocks.Runtime.Subchart.forward/3`, the one callback
+  a compiled block document has no path to reach. Do not "fix" this into a
+  block document - there is no block-authored shape that would exercise
+  the same code path.
+
+  The invoked document id (`bdoc_AUTOFORWARD_CHILD`) still resolves through
+  the real handler and the real resolver seam; only this driving chart is
+  hand-written.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="s_invoking">
+    <state id="s_invoking">
+        <invoke id="inv_sub" type="statifier_blocks:subchart" src="bdoc_AUTOFORWARD_CHILD" autoforward="true"/>
+        <transition event="done.invoke.inv_sub" target="s_arrived"/>
+    </state>
+    <state id="s_arrived"/>
+</scxml>
