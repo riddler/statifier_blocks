@@ -10,6 +10,33 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.11.0] 2026-08-31
+
+0.11.0 is the release where declaring a block type stops being boilerplate.
+`use StatifierBlocks.BlockType` fills in every callback but `emit/2`, and
+`use StatifierBlocks.InvokeStep` goes further for the shape that keeps
+recurring - a leaf step naming one host invoke type - so such a block type
+is a handful of options rather than a module of callbacks. Beside it, the
+`statifier_blocks:subchart` invoke type gains a canonical handler: `use
+StatifierBlocks.Runtime.Subchart` generates the in-memory
+`Statifier.Session` implementation a host would otherwise write by hand,
+leaving the document resolver as the host's seam and putting a stated
+reason on every refusal.
+
+### Added
+
+- `use StatifierBlocks.BlockType` declares the behaviour and injects an overridable default for every callback but `emit/2`.
+- `use StatifierBlocks.InvokeStep` declares a leaf step that names one host invoke type, filling in every callback from an invoke type, an optional produced type, extra config fields, and palette keys.
+- `use StatifierBlocks.Runtime.Subchart` declares the canonical
+  `statifier_blocks:subchart` invoke handler for the in-memory
+  `Statifier.Session` case: the host supplies a document resolver and a
+  palette, and the generated module resolves the chart a `core.subchart`
+  names, compiles it as a child, and starts it as a child session. Refusals
+  surface on `error.communication.invoke` with a stated reason -
+  `unknown_document`, `child_compile_findings`, or `cycle_refused`.
+- `StatifierBlocks.Runtime.Subchart.handlers/1` builds the `:invoke_handlers`
+  map for `Statifier.Session.start_link/2`.
+
 ## [0.10.0] 2026-08-31
 
 0.10.0 is the release where a document declares its own data. A block
@@ -1327,6 +1354,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.11.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.11.0
 [0.10.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.10.0
 [0.9.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.9.0
 [0.8.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.8.0
