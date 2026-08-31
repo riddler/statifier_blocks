@@ -117,6 +117,8 @@
  *
  *     2  --sb-drop-ok-border
  *     2  --sb-drop-ok-bg
+ *     2  --sb-run-done
+ *     2  --sb-run-done-bg
  *     2  --sb-gap-height
  *     2  --sb-gap-drag-height
  *     2  --sb-gap-hover-bg
@@ -306,6 +308,37 @@
    * audit rather than by looking at it, which is the point of the audit. */
   --sb-drop-ok-border: #2c945a;
   --sb-drop-ok-bg: rgba(44, 148, 90, 0.08);
+
+  /* The done outcome of an invoke mark (sb-ht2e). Tier 2 for the same reason
+   * the drop affordance is: it is ONE specific mark a host may want to
+   * disagree with, not a colour the whole editor is built out of, and it is
+   * the drop affordance's exact shape - a border that carries information and
+   * a translucent fill under it.
+   *
+   * Its own hue rather than `--sb-info`, which is what it was until this
+   * token existed. In the light palette `--sb-info` IS `--sb-accent`, so an
+   * ACTIVE mark and a DONE mark came out of the same blue and differed by
+   * treatment alone - a halo outside the border against a border-and-fill.
+   * That is a difference an author reads by looking closely, and the two
+   * marks answer questions ("where is the run" against "what came back")
+   * that should not need looking closely at.
+   *
+   * Green because "came back" against "came back badly" is the pair the mark
+   * carries, and green against `--sb-error`'s red is how that pair reads
+   * without a legend. It is deliberately a colder green than
+   * `--sb-drop-ok-border`'s: the two never appear together - one is a drag
+   * affordance and the other is a run mark - but a host reading the token
+   * list should not have to wonder whether they are the same idea.
+   *
+   * A new token was the thing the run marks (below) declined to invent, on
+   * the grounds that a token no theme overrides is right in the light theme
+   * and wrong in every other. That objection is answered by overriding it,
+   * not by avoiding it: `docs/theming.md`'s example and the spike's
+   * host-brand theme both restate it, and the audit fails the build if a
+   * theme leaves it at this default. */
+  --sb-run-done: #0e7a5f;
+  --sb-run-done-bg: rgba(14, 122, 95, 0.1);
+
   --sb-gap-height: var(--sb-space);
   --sb-gap-drag-height: var(--sb-space-3);
   --sb-gap-hover-bg: var(--sb-accent);
@@ -945,16 +978,27 @@
  * still waiting on an answer wears all three, and none of them cancels
  * another.
  *
- * No new colour token, which is a constraint rather than a preference. A token
- * declared only in this file's `:root` is a token no host theme overrides, so
- * it would be right in the light theme and wrong in every other one - the trap
- * `--sb-block-accent-mix` exists to name. So the marks are drawn in token
- * families every theme already retunes: `--sb-accent` for the active mark,
- * which is this editor's own "here" colour, and the finding severities for the
- * outcomes. `done` takes `--sb-info` because the package declares no success
- * colour and inventing one is precisely the token above; what the pair has to
- * carry is "came back" against "came back badly", and info against error
- * carries it in all three themes.
+ * The active mark is drawn in a token family every theme already retunes -
+ * `--sb-accent`, which is this editor's own "here" colour - and the error
+ * outcome in `--sb-error`, which is the severity it actually is.
+ *
+ * `done` is the one that needed a name of its own, and it got one late
+ * (`--sb-run-done`, sb-ht2e). It was `--sb-info` first, on the argument that
+ * a new colour token is a token no host theme overrides, so it would be right
+ * in the light theme and wrong in every other one - the trap
+ * `--sb-block-accent-mix` exists to name. The argument was sound about the
+ * risk and wrong about the remedy. In the light palette `--sb-info` and
+ * `--sb-accent` are the same blue, so the two marks a host is asking about at
+ * once - where the run IS, and what came BACK - were one hue apart by nothing
+ * but their treatment. The remedy for a token no theme overrides is to
+ * override it: the token declaration above carries the hue, `docs/theming.md`
+ * carries a dark restatement, the spike's host-brand theme carries a third,
+ * and the theme audit fails the build on a colour token any of them leaves at
+ * the default.
+ *
+ * It is named for the mark's OUTCOME and not as a fourth severity. `done` is
+ * not a finding, nothing else in the editor is coloured by it, and a
+ * `--sb-success` would have invited exactly that.
  *
  * An outcome named here gets its tint and every other outcome keeps the
  * neutral one. Which outcomes a call can have is the block TYPE's vocabulary -
@@ -976,8 +1020,8 @@
 .sb-node[data-run-invoking="true"][data-invoke-outcome="done"][data-container="false"],
 .sb-node[data-run-invoking="true"][data-invoke-outcome="done"][data-container="true"]
   > .sb-node__chrome {
-  border-color: var(--sb-info);
-  background: var(--sb-info-bg);
+  border-color: var(--sb-run-done);
+  background: var(--sb-run-done-bg);
 }
 
 .sb-node[data-run-invoking="true"][data-invoke-outcome="error"][data-container="false"],

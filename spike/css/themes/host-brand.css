@@ -65,6 +65,18 @@
    * and a brand is not a reason to relearn it. */
   --sb-drop-ok-border: #3a7335;
   --sb-drop-ok-bg: rgba(58, 115, 53, 0.09);
+  /* The invoke mark's done outcome (sb-ht2e). The shipped hue already clears
+   * its 3:1 on this theme's surfaces (4.19:1 on the sunken one), so this is
+   * not a contrast fix - it is the same correction the drop affordance makes
+   * one line up in the other direction. On warm paper the shipped cool green
+   * reads as a stray, and a mark whose whole job is to be recognised at a
+   * glance cannot look imported. And the shipped hue is a COLD green, which
+   * is the one thing it cannot be here: this brand's own accent is teal, so
+   * the mark that means "came back" would read as the editor's own chrome.
+   * The same fix `--sb-accent-invoke` makes below, for the same reason. A
+   * warm olive instead, 4.94:1 on the worst of this theme's four surfaces. */
+  --sb-run-done: #446b1a;
+  --sb-run-done-bg: rgba(68, 107, 26, 0.1);
   /* The armed seam, on the other hand, IS brand chrome: it is a bar the
    * author is aiming at, not a status. This is the token existing to be
    * used - before W4 the bar could only be the drop colour. */
