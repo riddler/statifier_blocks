@@ -103,6 +103,9 @@ defmodule StatifierBlocks.Runtime.SubchartTest do
   end
 
   describe "start/2 with :error" do
+    # Sabotage: changed the :error branch's reason string to a literal
+    # other than "unknown_document" -> the reason assertion below went
+    # red (verified).
     test "refuses unknown_document, with no attempts key" do
       MapResolver.put("bdoc_MISSING", :error)
 
@@ -120,6 +123,9 @@ defmodule StatifierBlocks.Runtime.SubchartTest do
   end
 
   describe "start/2 with {:cycle, path}" do
+    # Sabotage: changed the {:cycle, path} branch's reason string to a
+    # literal other than "cycle_refused" -> the reason assertion below
+    # went red (verified).
     test "refuses cycle_refused, with the path in detail" do
       invoke = HandlerCase.build_invoke(@type_string, src: "bdoc_ANY")
       ctx = HandlerCase.build_ctx(@type_string, CycleResolver)
@@ -155,6 +161,10 @@ defmodule StatifierBlocks.Runtime.SubchartTest do
   end
 
   describe "start/2 with a non-binary src" do
+    # Sabotage: deleted the non-binary-`src` short-circuit clause of
+    # resolve/3 -> the call fell through to the resolver, which is
+    # `RaisesIfCalledResolver` and raises by design, and the test went
+    # red on that raise instead of asserting the refusal (verified).
     test "refuses unknown_document without ever calling the resolver" do
       invoke = HandlerCase.build_invoke(@type_string, src: nil)
       ctx = HandlerCase.build_ctx(@type_string, RaisesIfCalledResolver)
@@ -167,6 +177,10 @@ defmodule StatifierBlocks.Runtime.SubchartTest do
   end
 
   describe "start/2 with a non-conforming resolver return" do
+    # Sabotage: made the catch-all clause of resolve/3 swallow a
+    # non-conforming return into a refusal instead of calling
+    # raise_non_conforming/2 -> `assert_raise ArgumentError` failed with
+    # "Expected exception ArgumentError but nothing was raised" (verified).
     test "raises ArgumentError naming the module" do
       invoke = HandlerCase.build_invoke(@type_string, src: "bdoc_ANY")
       ctx = HandlerCase.build_ctx(@type_string, NonConformingResolver)
