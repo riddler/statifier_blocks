@@ -222,3 +222,27 @@ legitimate case of a host deriving names from one place.
 shape the first embedder proved, and a second shape, if a second embedder
 proves one, is another module beside this one under the same decision 1 layer.
 This record deliberately ships exactly the one shape there is evidence for.
+
+## Note (2026-08-31): `StatifierBlocks.Runtime.*` is where a canonical runtime helper lives
+
+Recorded for `sb-4ptg` under campaign-024 ruling R-d. Decision 3 above keeps
+the two-registry seam: a block type **names** an invoke type and a separately
+registered handler **runs** it, so everything this record decides sits on the
+authoring side of that line. `StatifierBlocks.Runtime.Subchart` (PR 197,
+merged 2026-08-31 at `487cebf`) is the first thing this package has shipped on
+the other side of it - the canonical `statifier_blocks:subchart` handler,
+written once here because every host embedding `core.subchart` would otherwise
+write the same one - and the namespace it chose is the precedent for every
+runtime helper after it: **canonical host-side runtime helpers live under
+`StatifierBlocks.Runtime.*`**, set against the authoring half that is
+everything else under `lib/`. The alternative considered and rejected was
+`StatifierBlocks.Invoke.*`, and the reason it was rejected belongs in the
+record rather than only in a moduledoc, because it is about names this record
+owns: `StatifierBlocks.InvokeStep` (decision 2) and `StatifierBlocks.Core.Invoke`
+both *name* invoke types and run nothing, so a third `Invoke`-prefixed
+namespace that did the opposite would read the same as those two and mean
+their inverse. Nothing about decision 3 moves: a module under `Runtime.*` is a
+handler a host registers with `statifier` per session (st-ADR-0051), it
+resolves no block type, it appears in no palette, and no block type reaches
+for one. The convention is where a later handler goes, not permission for one
+to exist; whether this package ships a second is that handler's own bead.
