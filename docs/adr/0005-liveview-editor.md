@@ -3840,7 +3840,7 @@ the author's attention.
 
 ## Amendment (2026-08-31): decision 10, `slot_style: :tray`, and a shelf that draws no connectors
 
-**Status: proposed (2026-08-31), drafted for `sb-5h6q` under the operator campaign-024 grant and its direction-agent gate.** Additive; decisions 10 and
+**Status: accepted (2026-09-01), drafted for `sb-5h6q` under the operator campaign-024 grant; accepted on the gate's unqualified direction-agent verdict.** Additive; decisions 10 and
 11 stand as accepted and no text above this line is edited by this section. It
 is the editor half of ADR-0002's amendment of this date, which adds
 `core.drafts` and `core.placeholder` to that record's decision 10 under
