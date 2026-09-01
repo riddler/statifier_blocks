@@ -124,6 +124,22 @@ defmodule StatifierBlocks.Datamodel do
   question about something outside the block entirely. This is the
   document-level pass it names.
 
+  ## The same set, offered forwards (sb-0vt)
+
+  `candidates/3` and `candidates_under/2` read these very surfaces to
+  answer the other question an author has about them: not "is the path I
+  wrote declared?" but "what is there to write?". They are deliberately in
+  this module and not in a new one, because the alternative is two readers
+  of three surfaces that would drift - an editor could then offer a path it
+  would immediately flag, or flag one it had just offered.
+
+  Offering is not evaluating and it is not editing. ADR-0005 decision 9
+  still keeps rich expression editing in statifier-ui behind the
+  `expression_component` seam; what changed is that the seam, and the plain
+  input the package ships beside it, are now handed the declared paths
+  instead of each caller re-deriving them. See `candidates/3` for what is
+  deliberately absent from the list.
+
   ## The uncommitted-draft gap, stated rather than discovered
 
   The check reads the **document**, so an advisory follows a config that
@@ -272,6 +288,99 @@ defmodule StatifierBlocks.Datamodel do
       []
     else
       undeclared_findings(document, palette, declared || MapSet.new(), roots)
+    end
+  end
+
+  @doc """
+  The declared datamodel paths an expression control offers as candidates,
+  sorted and deduplicated - the data half of sb-0vt, and nothing else.
+
+  This reads the same three declaring surfaces `findings/4` does, by the
+  same normalizers, so the set an author is offered and the set that
+  decides whether they get an advisory cannot drift apart: the host's
+  datamodel through `declared_paths/1`, the compile call's roots through
+  `declared_roots/1`, and the document's own `datamodel` key read straight
+  off `document`, which is why that surface takes no argument here either.
+
+  Absence collapses to `[]` rather than to `nil`. That is a deliberate
+  difference from the advisory above, and it is not a rescue-to-default:
+  `nil` is load-bearing for `findings/4` because "nobody described
+  anything" and "somebody described nothing" are different claims about a
+  *path the author already wrote*. A candidate list makes no claim about
+  anything - it either has something to offer or it does not - so both
+  cases are one empty list, and the caller renders no control for it.
+
+  A root and a path are both offered whole. A declared root means storage
+  exists at a name and says nothing about what is under it (11l), so
+  `signup` is the only candidate it can contribute; the datamodel document
+  is what contributes `signup.email`.
+
+  ## What this is not
+
+  It is not the completion feature. ADR-0005 decision 9 keeps rich
+  expression editing - completion against the datamodel as an affordance,
+  inline evaluation against a dataset - in statifier-ui behind the
+  `expression_component` seam, and this function does not move it. It
+  supplies the one part of that affordance this package owns the data for,
+  so the seam's implementer does not have to re-derive it and the shipped
+  plain input can offer a `<datalist>` in the meantime.
+
+  Operators, keywords and literals are **not** here and cannot be yet.
+  Predicator exposes no public enumeration of its grammar - operator and
+  keyword tokens live inside `Predicator.Lexer` - and copying that
+  vocabulary into this package would be a second, silently drifting copy
+  of a contract predicator owns. That half is px-15q's.
+
+      iex> alias StatifierBlocks.{Block, Datamodel, Document}
+      iex> document = Document.new(Block.new("core.sequence", id: "blk_root"), id: "doc_x")
+      iex> Datamodel.candidates(document, ["card.brand", "card"], ["signup"])
+      ["card", "card.brand", "signup"]
+
+      iex> alias StatifierBlocks.{Block, Datamodel, Document}
+      iex> document = Document.new(Block.new("core.sequence", id: "blk_root"), id: "doc_x")
+      iex> Datamodel.candidates(document, nil, [])
+      []
+  """
+  @spec candidates(Document.t(), term(), term()) :: [String.t()]
+  def candidates(%Document{} = document, datamodel, declare \\ []) do
+    (declared_paths(datamodel) || MapSet.new())
+    |> MapSet.union(declared_roots(declare))
+    |> MapSet.union(document_roots(document))
+    |> Enum.sort()
+  end
+
+  @doc """
+  The candidates strictly under `prefix`, in the datamodel document's own
+  order - ADR-0006 decision 6's completion query, reached through
+  `StatifierBlocks.Predicates.Datamodel.under/2` rather than restated here.
+
+  This is the narrowing query the `expression_component` seam needs and the
+  shipped `<datalist>` does not: a datalist is handed the whole set once and
+  the browser filters it, while a component that re-renders per keystroke
+  wants only the branch the author is inside. Both read the same document,
+  through the same one implementation of the projection.
+
+  `prefix` itself is not among the results, matching `under/2`; a datamodel
+  that is not an ADR-0006 document has no order to query and returns `[]`,
+  which is the same total-normalizer discipline `declared_paths/1` applies
+  to the same input.
+
+      iex> alias StatifierBlocks.Datamodel
+      iex> Datamodel.candidates_under(
+      ...>   %{"scopes" => [%{"scope" => "local", "entries" => [
+      ...>     %{"path" => "card", "type" => "object", "fields" => [
+      ...>       %{"path" => "card.brand"}, %{"path" => "card.last4"}]}]}]},
+      ...>   "card")
+      ["card.brand", "card.last4"]
+
+      iex> StatifierBlocks.Datamodel.candidates_under(["card.brand"], "card")
+      []
+  """
+  @spec candidates_under(term(), term()) :: [String.t()]
+  def candidates_under(datamodel, prefix) do
+    case Predicates.Datamodel.index(datamodel) do
+      nil -> []
+      index -> index |> Predicates.Datamodel.under(prefix) |> Enum.map(& &1.path)
     end
   end
 

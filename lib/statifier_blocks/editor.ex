@@ -551,6 +551,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assigns
         |> assign(:drawer, drawer_view(assigns))
         |> assign(:declarations, declaration_entries(assigns))
+        |> assign(:path_candidates, path_candidates(assigns))
         |> assign(:declaration_refusal, declaration_refusal(assigns))
         |> assign(:marks, marks(assigns))
         |> assign(:depth, Shell.depth(assigns.view_model.root))
@@ -637,6 +638,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             pending={@pending_fields}
             expression_component={@expression_component}
             invoke_types={@invoke_types}
+            path_candidates={@path_candidates}
             target={@myself}
           />
 
@@ -1339,6 +1341,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # `drawer_view/1` above is given `assigns.document.datamodel` and not this
     # - because 2A's count is a statement about the document, and a strip that
     # counted a refused draft would report a document that does not exist.
+    # The declared datamodel paths an `:expression` control offers (sb-0vt).
+    # Read off the ALREADY-NORMALIZED assigns rather than the raw host input:
+    # `declared_paths` and `host_roots` are computed once per update above,
+    # and `Datamodel.candidates/3` normalizes idempotently, so passing them
+    # here reuses that work instead of re-deriving a set per render. The
+    # document is passed whole because its own `datamodel` key is the third
+    # declaring surface and reading it there is what stops a caller
+    # forgetting it.
+    @spec path_candidates(map()) :: [String.t()]
+    defp path_candidates(assigns) do
+      Datamodel.candidates(assigns.document, assigns.declared_paths, assigns.host_roots)
+    end
+
     @spec declaration_entries(map()) :: [DatamodelEntry.t()]
     defp declaration_entries(%{declaration_draft: %{entries: entries}}), do: entries
     defp declaration_entries(assigns), do: assigns.document.datamodel

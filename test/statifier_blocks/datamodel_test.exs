@@ -285,4 +285,151 @@ defmodule StatifierBlocks.DatamodelTest do
                Datamodel.findings(document, palette(), nil)
     end
   end
+
+  describe "candidates/3 (sb-0vt)" do
+    # sabotage: the `|| MapSet.new()` after `declared_paths/1` dropped, so a
+    # `nil` datamodel reached `MapSet.union/2` and raised instead of
+    # collapsing to `[]` - this goes red with a FunctionClauseError rather
+    # than a diff (verified).
+    test "no declaring surface offers nothing" do
+      assert Datamodel.candidates(document([]), nil) == []
+      assert Datamodel.candidates(document([]), nil, []) == []
+    end
+
+    # sabotage: `MapSet.union(declared_roots(declare))` dropped from
+    # `candidates/3` - `ambient` leaves the list and this goes red (verified).
+    # Deduplication is the other half: `card` is named by both the datamodel
+    # and the declare roots and appears once.
+    test "unions the three surfaces and deduplicates" do
+      document = document([], [entry("signup")])
+
+      assert Datamodel.candidates(document, ["card.brand", "card"], ["ambient", "card"]) ==
+               ["ambient", "card", "card.brand", "signup"]
+    end
+
+    # sabotage: `Enum.sort/1` -> `Enum.to_list/1` in `candidates/3` - this
+    # goes red while the 4-path assertion above stays GREEN (both verified).
+    #
+    # Sorted output is what keeps a rendered list stable across renders rather
+    # than reshuffling under the author mid-read.
+    #
+    # This needs MORE THAN 32 paths to assert anything, which is why it is its
+    # own test and carries this note. Erlang stores a small map with its keys
+    # in term order, so for a handful of strings `Enum.to_list/1` on the
+    # MapSet is already sorted and the mutation below survives; above 32 the
+    # set becomes a hashmap and the order is the hash's. The sabotage was run
+    # both ways: `Enum.sort/1` -> `Enum.to_list/1` leaves a 4-path assertion
+    # GREEN and turns this one red (verified), which is the whole reason the
+    # small case is not trusted to carry this property.
+    test "sorts, on a set large enough for MapSet order to be hash order" do
+      paths = for i <- 1..40, do: "scope.field_#{i}"
+
+      assert Datamodel.candidates(document([]), Enum.shuffle(paths)) == Enum.sort(paths)
+    end
+
+    # sabotage: `document_roots/1` dropped from the union - the document is
+    # the surface a caller cannot pass and cannot forget, and this goes red
+    # while the other two tests stay green (verified).
+    test "reads the document's own datamodel key with no argument" do
+      assert Datamodel.candidates(document([], [entry("signup"), entry("ambient")]), nil) ==
+               ["ambient", "signup"]
+    end
+
+    # A root is offered whole and contributes nothing beneath itself (11l):
+    # a root says storage exists at a name, and the datamodel document is
+    # what enumerates paths under it.
+    #
+    # sabotage: `declared_roots/1` swapped for `declared_paths/1` on the
+    # `declare` argument - a plain list of roots normalizes identically, so
+    # this stays green. Recorded so the next reader does not take this test
+    # for a stronger one than it is; the union test above is the guard.
+    test "a declared root is offered as itself, not expanded" do
+      assert Datamodel.candidates(document([]), nil, ["signup"]) == ["signup"]
+    end
+
+    # sabotage: the ADR-0006 document arm removed from `declared_paths/1` -
+    # the document normalizes to `nil` and this returns `[]` (verified).
+    test "projects an ADR-0006 datamodel document to its declared paths" do
+      datamodel = %{
+        "version" => 1,
+        "scopes" => [
+          %{
+            "scope" => "local",
+            "entries" => [
+              %{
+                "path" => "card",
+                "type" => "object",
+                "fields" => [%{"path" => "card.brand"}, %{"path" => "card.last4"}]
+              }
+            ]
+          }
+        ]
+      }
+
+      assert Datamodel.candidates(document([]), datamodel) ==
+               ["card", "card.brand", "card.last4"]
+    end
+
+    # The set an author is OFFERED and the set that decides whether they get
+    # an advisory are one set. This is the property the module claims, and it
+    # is why `candidates/3` lives beside `findings/4` rather than in a module
+    # of its own: two readers of three surfaces would drift, and the editor
+    # would offer a path it then flagged.
+    #
+    # sabotage: `candidates/3` reading only `declared_paths/1` and skipping
+    # both root surfaces - `signup` is then offered by nothing while still
+    # drawing no advisory, and the first assertion goes red (verified).
+    test "every offered candidate is one findings/4 would not flag" do
+      candidates =
+        Datamodel.candidates(document([], [entry("signup")]), ["card.brand"], ["ambient"])
+
+      assert candidates == ["ambient", "card.brand", "signup"]
+
+      for candidate <- candidates do
+        assert Datamodel.findings(
+                 document([assign("blk_probe", candidate)], [entry("signup")]),
+                 palette(),
+                 ["card.brand"],
+                 ["ambient"]
+               ) == []
+      end
+    end
+  end
+
+  describe "candidates_under/2 (sb-0vt)" do
+    @datamodel_document %{
+      "version" => 1,
+      "scopes" => [
+        %{
+          "scope" => "local",
+          "entries" => [
+            %{
+              "path" => "card",
+              "type" => "object",
+              "fields" => [%{"path" => "card.brand"}, %{"path" => "card.last4"}]
+            },
+            %{"path" => "cardholder", "type" => "string"}
+          ]
+        }
+      ]
+    }
+
+    # sabotage: `under/2` swapped for a `String.starts_with?(&1.path, prefix)`
+    # filter without the dot - `cardholder` joins the result and this goes
+    # red (verified). That dot is the whole difference between a path
+    # segment and a string prefix.
+    test "narrows to entries strictly under the prefix, in document order" do
+      assert Datamodel.candidates_under(@datamodel_document, "card") ==
+               ["card.brand", "card.last4"]
+    end
+
+    # sabotage: the `nil ->` arm calling `Predicates.Datamodel.under(nil, prefix)`
+    # instead of returning `[]` - a flat list has no order to query and this
+    # raises rather than returning empty (verified).
+    test "a datamodel that is not an ADR-0006 document has no order to query" do
+      assert Datamodel.candidates_under(["card.brand"], "card") == []
+      assert Datamodel.candidates_under(nil, "card") == []
+      assert Datamodel.candidates_under(@datamodel_document, "") == []
+    end
+  end
 end
