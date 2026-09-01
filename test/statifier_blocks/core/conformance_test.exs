@@ -153,7 +153,7 @@ defmodule StatifierBlocks.Core.ConformanceTest do
 
         for {slot, style} <- Map.get(entry, :slot_style, %{}) do
           assert MapSet.member?(declared, slot)
-          assert style in [:primary, :secondary, :failure]
+          assert style in [:primary, :secondary, :failure, :tray]
         end
 
         # d10's 10f declaration is under the same rule as `slot_style`: it

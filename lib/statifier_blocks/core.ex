@@ -24,6 +24,8 @@ defmodule StatifierBlocks.Core do
   | `core.send` | `#{inspect(__MODULE__)}.Send` | none |
   | `core.subchart` | `#{inspect(__MODULE__)}.Subchart` | one per declared outcome, `on_error` last |
   | `core.foreach` | `#{inspect(__MODULE__)}.Foreach` | `body` |
+  | `core.drafts` | `#{inspect(__MODULE__)}.Drafts` | `body` |
+  | `core.placeholder` | `#{inspect(__MODULE__)}.Placeholder` | none |
 
   ## Structure, not domain
 
@@ -37,6 +39,14 @@ defmodule StatifierBlocks.Core do
   core type that has slots declares `slot_accepts` for them, and no core
   type declares `consumes` at all - inbound type is the host's business,
   and ADR-0003 decision 5's permissive default is the honest answer.
+
+  `core.placeholder` is the one type that declares no `io/1` at all, and
+  ADR-0003's amendment of 2026-08-31, section A3, is why: a gap goes
+  wherever a step goes and constrains neither neighbour, so decision 5's
+  permissive default taken in full - `kinds: [:step]`, `consumes` and
+  `produces` both `:unknown` - is the honest answer, and declaring anything
+  narrower would be this package deciding what an author's unwritten step
+  was going to do.
 
   `produces` is declared by five of the core types. `core.sequence` declares
   `{:passthrough, "body"}`: it is transparent to type flow, so whatever its
@@ -61,6 +71,15 @@ defmodule StatifierBlocks.Core do
   acceptance; a host group type with an `interrupts` slot gets the same
   constraint by declaring the same thing, and `core.on_event` never has to
   enumerate the groups it is allowed inside.
+
+  `core.drafts` is the same mechanism reaching its limit rather than an
+  exception to it. Its `kinds: [:draft_shelf]` is refused by every slot in
+  this vocabulary through the same intersection, with no new rule. The two
+  things kinds cannot say - that the root's `body` admits a shelf anyway,
+  and that a document carries at most one - are a depth constraint and a
+  cardinality constraint, and `StatifierBlocks.Shelf` carries those two and
+  only those two, as Structure-stage findings (ADR-0002's amendment of
+  2026-08-31, section G12, campaign-024 ruling R-b).
 
   ## What they compile to
 
