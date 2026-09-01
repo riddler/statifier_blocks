@@ -44,6 +44,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
     )
 
+    attr(:path_candidates, :list,
+      default: [],
+      doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
+    )
+
     attr(:pending, :list,
       default: [],
       doc: """
@@ -87,6 +92,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           target={@target}
           expression_component={@expression_component}
           invoke_types={@invoke_types}
+          path_candidates={@path_candidates}
         />
       </form>
       """

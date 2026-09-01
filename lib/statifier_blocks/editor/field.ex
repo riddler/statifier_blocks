@@ -62,6 +62,34 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     richer affordance as a deferral, so this component accepts an
     `expression_component` override for exactly that seam.
 
+    ## The `:expression` path suggestions (sb-0vt)
+
+    That plain input gains a `<datalist>` of the declared datamodel paths
+    when `path_candidates` is non-empty, on exactly the `invoke_type` terms
+    below: it suggests and does not constrain, free text stays valid, an
+    undeclared path stays the `:info` advisory `StatifierBlocks.Datamodel`
+    already produced rather than becoming a refusal, and an empty list
+    renders the input the package has always rendered. The same list reaches
+    the `expression_component` override as `:candidates`, so a host that
+    fills the seam is handed the paths rather than re-deriving them.
+
+    **This is the data, not the feature.** Decision 9's deferral of rich
+    expression editing to statifier-ui is untouched, and one property of a
+    `<datalist>` is why that matters rather than being a formality: the
+    browser matches options against the input's **whole value**, so the list
+    is live while the author is typing the leading path and goes quiet the
+    moment the expression grows an operator. That is genuinely useful for
+    the bare-path condition and for the first token of any other, and it is
+    not completion. Mid-expression completion needs to know where the caret
+    is inside the source, which needs either a hook this package may not add
+    (decision 7's two-hook limit) or the richer component decision 9 defers -
+    and it needs predicator's operator vocabulary, which px-15q tracks.
+
+    Ordering follows the same reasoning as the clause order below: the
+    override wins over the datalist, because a host that supplied a
+    component asked for its own control and getting the package's suggestion
+    markup stapled beside it would be the package overriding the override.
+
     This module is a renderer, not a gate. Nothing here decides whether a
     value is acceptable: `validate_config/1` does, through
     `StatifierBlocks.Edit.check_config/3`, which is why an unparseable
@@ -132,6 +160,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:path_candidates, :list,
+      default: [],
+      doc: """
+      The declared datamodel paths, from `StatifierBlocks.Datamodel.candidates/3`.
+      Suggestions on an `:expression` field and passed to
+      `expression_component` as `:candidates`; empty renders the plain input.
+      """
+    )
+
     @doc "One field: its label, its control, and its own findings (decision 11)."
     def field(assigns) do
       ~H"""
@@ -145,6 +182,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           target={@target}
           expression_component={@expression_component}
           invoke_types={@invoke_types}
+          path_candidates={@path_candidates}
         />
         <p :for={finding <- @field.findings} class={["sb-finding", severity_class(finding)]}>
           {finding.message}
@@ -157,6 +195,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:target, :any, required: true)
     attr(:expression_component, :any, default: nil)
     attr(:invoke_types, :list, default: [])
+    attr(:path_candidates, :list, default: [])
 
     defp control(%{field: %ViewModel.Field{type: :boolean}} = assigns) do
       ~H"""
@@ -200,6 +239,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp control(
+           %{
+             field: %ViewModel.Field{type: :expression},
+             expression_component: nil,
+             path_candidates: [_first | _rest]
+           } = assigns
+         ) do
+      assigns = assign(assigns, :list_id, input_id(assigns.field) <> "-paths")
+
+      ~H"""
+      <input
+        class="sb-field__input sb-field__input--expression"
+        type="text"
+        id={input_id(@field)}
+        name={input_name(@field)}
+        value={to_text(@field.value)}
+        list={@list_id}
+        placeholder="an expression"
+        spellcheck="false"
+        autocomplete="off"
+      />
+      <datalist id={@list_id} data-path-candidates={length(@path_candidates)}>
+        <option :for={path <- @path_candidates} value={path}></option>
+      </datalist>
+      """
+    end
+
+    defp control(
            %{field: %ViewModel.Field{type: :expression}, expression_component: nil} = assigns
          ) do
       ~H"""
@@ -222,12 +288,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # would have used. HEEx has no dynamic-component tag, and inventing a
       # module-and-behaviour indirection for one override would be more
       # machinery than the deferral is worth.
+      #
+      # `candidates` is additive to that map (sb-0vt). An override written
+      # before it existed takes a map and ignores a key it does not read, so
+      # nothing that worked stops working; an override written after it can
+      # offer the declared paths without re-deriving them from assigns this
+      # component is not handed.
       ~H"""
       {@expression_component.(%{
         field: @field,
         id: input_id(@field),
         name: input_name(@field),
-        value: to_text(@field.value)
+        value: to_text(@field.value),
+        candidates: @path_candidates
       })}
       """
     end
