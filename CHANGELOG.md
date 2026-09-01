@@ -10,6 +10,58 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.14.0] 2026-09-01
+
+0.14.0 is about a document declaring its own data, and about a subchart
+that outlives the process running it. `core.subchart` gains a durable
+runtime: the child runs as its own persisted run and re-enters the parent
+through the driver's own door when it finishes. The editor's drawer gains
+a third tab, Declarations, so the `datamodel` roots a document depends on
+are authored in the document rather than supplied only by the host, and
+every `:expression` field offers the declared paths as suggestions without
+constraining what an author may type.
+
+### Added
+
+- `StatifierBlocks.Runtime.DurableSubchart` runs a `core.subchart` child as
+  its own persisted `statifier_persistence` run: `dispatch_fun/1` builds the
+  fun the driver's `:dispatch` option takes, and the child's completion
+  re-enters the parent through the driver's own door.
+- The editor's drawer carries a third tab, Declarations, where an author
+  adds, edits, reorders and removes the document's own `datamodel` roots
+  (ADR-0001 decision 11's entries: `id`, `expr`, `description`).
+- `StatifierBlocks.Edit` gains a fifth command,
+  `{:set_datamodel, entries}`, which replaces the document's whole
+  declaration list and whose inverse is the list that was there before, so
+  a declaration edit undoes and redoes like any other. It refuses a list
+  `StatifierBlocks.Document.validate/1` would refuse, in the same
+  `{:malformed_envelope, {:datamodel, reason}}` family.
+- `StatifierBlocks.Declarations`, the pure list-to-list arithmetic behind
+  the panel: `add/1`, `remove/2`, `move/3`, `put/4`, `change/3`,
+  `count/1` and `refusal/1`.
+- `StatifierBlocks.Datamodel.candidates/3` returns the declared datamodel
+  paths, unioned from the host's datamodel, the compile call's `:declare`
+  roots and the document's own `datamodel` key, sorted and deduplicated.
+- `StatifierBlocks.Datamodel.candidates_under/2` narrows those candidates to
+  a prefix, in the datamodel document's own order.
+- An `:expression` config field offers the declared paths as a `<datalist>`,
+  suggesting without constraining; supplying no datamodel renders the plain
+  input unchanged.
+
+### Changed
+
+- The `expression_component` override now receives a `:candidates` key
+  alongside `:field`, `:id`, `:name` and `:value`. Existing overrides read
+  the keys they know and are unaffected.
+
+### Fixed
+
+- An arranged container whose slot ends in a drafts shelf drew its rejoin
+  edge from the shelf's own outlet, asserting flow out of the one card
+  nothing enters and nothing leaves. The rejoin now leaves the last step in
+  the slot, and a slot holding nothing but a shelf rejoins from its header,
+  the same as an empty one.
+
 ## [0.13.0] 2026-09-01
 
 0.13.0 is a small release about what an editor shows first. The drafts
@@ -1409,6 +1461,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.14.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.14.0
 [0.13.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.13.0
 [0.12.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.12.0
 [0.11.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.11.0
