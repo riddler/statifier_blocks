@@ -784,6 +784,24 @@ const coreSubchart = {
  * vocabulary, a wait being a delayed send rather than a sleep. Whether that
  * earns an ADR-0002/0004 amendment is a Phase-B finding, and so is what the
  * timer does when a `resume` outcome re-enters the group it just left.
+ *
+ * ## ANSWERED 2026-09-01: the proposal was NOT taken (ADR-0010, bead sb-j2o)
+ *
+ * `docs/adr/0010-clock-interrupt-spelling.md` decides that no `core.timeout`
+ * joins the `core.*` vocabulary. A clock interrupt is spelled with the two
+ * SHIPPED types instead: a `core.send` carrying the deadline event and a
+ * `delay`, placed first in a group's `body`, caught by a `core.on_event` on
+ * that group's `interrupts` rail. That pair emits exactly what the compile
+ * sketch above describes, and `StatifierBlocks.Compiler.Cancels` already
+ * cancels the armed send when the body region is exited - so the lifetime a
+ * rail rule wants comes free, and the `resume` question this sketch leaves
+ * open is answered structurally: re-entering the body re-arms a fresh
+ * deadline.
+ *
+ * This descriptor is kept, not deleted, because it is now the evidence for a
+ * refused proposal and because `dev/selftest.html` and
+ * `fixtures/documents/card-processing.json` still read it. Removing it is a
+ * fixture rewrite, and the record says a later tidy may do it.
  */
 
 /* Verbatim `palette.js`'s spelling, for the reason `EVENT_NAME` above is
