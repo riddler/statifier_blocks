@@ -113,7 +113,7 @@ defmodule StatifierBlocks.ViewModel do
   schema is a function of config (ADR-0002 decision 7), not a cache of one.
   """
 
-  alias StatifierBlocks.{Block, BlockType, CanonicalJson, Document, Finding, Palette}
+  alias StatifierBlocks.{Block, BlockType, CanonicalJson, Document, Finding, Palette, Shelf}
 
   defmodule Field do
     @moduledoc """
@@ -186,7 +186,7 @@ defmodule StatifierBlocks.ViewModel do
             name: Block.slot_name(),
             label: String.t(),
             arity: BlockType.slot_arity() | nil,
-            style: :primary | :secondary | :failure,
+            style: :primary | :secondary | :failure | :tray,
             declared?: boolean(),
             outcome_key: String.t() | nil,
             children: [StatifierBlocks.ViewModel.Node.t()],
@@ -387,7 +387,7 @@ defmodule StatifierBlocks.ViewModel do
   # here: 10i makes the closed set load-bearing - anything outside it is a
   # declaration this editor cannot read - and a second copy is how the
   # partition and the vocabulary drift apart.
-  @slot_styles [:primary, :secondary, :failure]
+  @slot_styles [:primary, :secondary, :failure, :tray]
   @rail_styles [:secondary, :failure]
 
   @doc """
@@ -583,6 +583,54 @@ defmodule StatifierBlocks.ViewModel do
   def rail?(%Slot{style: style}), do: style in @rail_styles
 
   @doc """
+  Whether one slot is a detached shelf rather than either a body slot or an
+  attached rail (ADR-0005's amendment of 2026-08-31, section 10s).
+
+  `:tray` is deliberately **not** in the rail partition. 10h made "is this
+  container a boundary box" a question asked of that partition, on 10c's
+  grounds that an attached rule is about a *region* and a region needs a
+  visible edge. A tray is not attached to a region; it is beside the
+  document. Folding it in would put a boundary box around the root block of
+  every document that has a shelf - a frame drawn around the entire
+  workflow to say something about a shelf beside it (10t).
+
+  It is not in the body partition either, which is what `body_slots/1`
+  spells: a tray is not one of the things a container fans into, and its
+  contents take no entry edge.
+  """
+  @spec tray?(Slot.t()) :: boolean()
+  def tray?(%Slot{style: :tray}), do: true
+  def tray?(%Slot{}), do: false
+
+  @doc """
+  Whether this node is the drafts shelf itself.
+
+  A shelf is a child of the root's `body` like any other block, so the slot
+  holding it is an ordinary `:primary` one and `tray?/1` says nothing about
+  it. What has to be true of the *node* is 10u's other half: no connector
+  enters the shelf and none leaves it, so it is not in its own parent's
+  chain either. `flow_children/1` and `shelf_children/1` are that partition,
+  and they are the rendering counterpart of ADR-0002's G9a - the sibling
+  before the shelf is adjacent to the sibling after it, on the canvas for
+  the same reason it is in the compiler.
+  """
+  @spec shelf?(Node.t()) :: boolean()
+  def shelf?(%Node{type: type}), do: Shelf.shelf_type?(type)
+
+  @doc """
+  A slot's children that are in the flow: everything but a shelf.
+  """
+  @spec flow_children(Slot.t()) :: [Node.t()]
+  def flow_children(%Slot{children: children}), do: Enum.reject(children, &shelf?/1)
+
+  @doc """
+  A slot's children that are shelves - at most one, by ADR-0002 G12b, and
+  drawn after the flow children so the shelf sits at the foot of the canvas.
+  """
+  @spec shelf_children(Slot.t()) :: [Node.t()]
+  def shelf_children(%Slot{children: children}), do: Enum.filter(children, &shelf?/1)
+
+  @doc """
   Which edge vocabulary a slot's exit is drawn in (amendment 10h's exit-edge
   row, as ruled on `sb-67s`, 2026-08-29).
 
@@ -646,7 +694,7 @@ defmodule StatifierBlocks.ViewModel do
   Every slot placed in the body flow, in order: the arrangement's columns.
   """
   @spec body_slots(Node.t()) :: [Slot.t()]
-  def body_slots(%Node{slots: slots}), do: Enum.reject(slots, &rail?/1)
+  def body_slots(%Node{slots: slots}), do: Enum.reject(slots, &(rail?(&1) or tray?(&1)))
 
   @doc """
   The words on the pill drawn on the edge below an arranged container, or
@@ -909,7 +957,7 @@ defmodule StatifierBlocks.ViewModel do
   rather than as two arguments because `build_slot/8` is already at the
   arity the style guide allows, and because the two are read together.
   """
-  @type slot_presentation :: {:primary | :secondary | :failure, String.t() | nil}
+  @type slot_presentation :: {:primary | :secondary | :failure | :tray, String.t() | nil}
 
   @spec build_slot(
           Block.slot_name(),
@@ -1160,7 +1208,7 @@ defmodule StatifierBlocks.ViewModel do
   # A `slot_style` that is not a map at all is the same defect one level up -
   # a declaration this editor cannot read - and it degrades the same way
   # rather than raising `BadMapError` out of a render.
-  @spec slot_style(map(), Block.slot_name()) :: :primary | :secondary | :failure
+  @spec slot_style(map(), Block.slot_name()) :: :primary | :secondary | :failure | :tray
   defp slot_style(entry, name) do
     styles = Map.get(entry, :slot_style)
 

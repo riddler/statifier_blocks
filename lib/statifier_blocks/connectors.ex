@@ -421,11 +421,25 @@ defmodule StatifierBlocks.Connectors do
 
   # Flow between adjacent children of one slot. Read off adjacency and
   # nothing else, which is the whole of decision 10a on this edge.
+  #
+  # Two exclusions, both ADR-0005's amendment of 2026-08-31, section 10u,
+  # and both the same rule seen from two sides. A `:tray` slot draws no edge
+  # between one fragment and the next: their order is shelf order, and an
+  # edge between two cards is this editor's whole vocabulary for "this
+  # happens and then that happens", so drawing one would assert a sequencing
+  # relationship no compiler stage reads and no runtime can produce. And in
+  # every other slot the chain is read off `flow_children/1` rather than
+  # `children`, so a shelf sitting among the root's steps is skipped over
+  # and the sibling before it is adjacent to the sibling after it - the
+  # rendering counterpart of ADR-0002's G9a, which is what makes "none
+  # entering the tray, none leaving it" true of the shelf's own card as well
+  # as of its contents.
   @spec adjacency_edges(Node.t(), measurement()) :: [Edge.t()]
   defp adjacency_edges(%Node{slots: slots}, m) do
     for slot <- slots,
+        not ViewModel.tray?(slot),
         [%Node{block_id: from}, %Node{block_id: to}] <-
-          Enum.chunk_every(slot.children, 2, 1, :discard),
+          Enum.chunk_every(ViewModel.flow_children(slot), 2, 1, :discard),
         edge = flow_edge(:flow, outlet_anchor(from), card_anchor(to), m),
         do: edge
   end
@@ -442,10 +456,14 @@ defmodule StatifierBlocks.Connectors do
   end
 
   @spec single_entry(Node.t(), Slot.t(), measurement()) :: Edge.t() | nil
-  defp single_entry(%Node{}, %Slot{children: []}, _m), do: nil
-
-  defp single_entry(%Node{} = node, %Slot{} = slot, m),
-    do: flow_edge(:flow, card_anchor(node.block_id), first_card(slot), m)
+  # A slot whose only child is a shelf has no flow to enter, which is the
+  # same case as an empty one once 10u has removed the shelf from the chain.
+  defp single_entry(%Node{} = node, %Slot{} = slot, m) do
+    case first_card(slot) do
+      nil -> nil
+      card -> flow_edge(:flow, card_anchor(node.block_id), card, m)
+    end
+  end
 
   # The side-by-side arrangement's edges. `ViewModel.arrangement/1` is what
   # decided the columns exist - the same function the renderer read to put
@@ -507,8 +525,15 @@ defmodule StatifierBlocks.Connectors do
   end
 
   @spec first_card(Slot.t()) :: String.t() | nil
-  defp first_card(%Slot{children: [%Node{block_id: id} | _rest]}), do: card_anchor(id)
-  defp first_card(%Slot{}), do: nil
+  # `flow_children/1` rather than `children`: a shelf standing first in the
+  # root's `body` must not be what the container's entry edge points at
+  # (10u). A slot holding nothing but a shelf has no first card at all.
+  defp first_card(%Slot{} = slot) do
+    case ViewModel.flow_children(slot) do
+      [%Node{block_id: id} | _rest] -> card_anchor(id)
+      [] -> nil
+    end
+  end
 
   # Rail exits. The walk is per SLOT rather than over the whole rail, because
   # the slot is what carries the style and one container can attach both

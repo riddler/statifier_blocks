@@ -239,6 +239,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           ViewModel.rail?(@slot) && "sb-slot--rail",
           @slot.style == :secondary && "sb-slot--secondary",
           @slot.style == :failure && "sb-slot--failure",
+          ViewModel.tray?(@slot) && "sb-slot--tray",
           not @slot.declared? && "sb-slot--undeclared",
           @class
         ]}
@@ -273,11 +274,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           target={@target}
         />
         <.child
-          :for={{child, index} <- Enum.with_index(@slot.children)}
+          :for={{child, index} <- shelf_last(@slot.children)}
           node={child}
           parent_id={@parent_id}
           slot={@slot.name}
           index={index}
+          gap?={not ViewModel.shelf?(child)}
           depth={@depth}
           drag={@drag}
           selected_id={@selected_id}
@@ -306,6 +308,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:depth, :integer, default: 0)
+    attr(:gap?, :boolean, default: true)
 
     defp child(assigns) do
       ~H"""
@@ -321,6 +324,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         icon={@icon}
       />
       <.gap
+        :if={@gap?}
         parent_id={@parent_id}
         slot={@slot}
         index={@index + 1}
@@ -328,6 +332,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         target={@target}
       />
       """
+    end
+
+    # Where the tray is drawn, which ADR-0005's amendment of 2026-08-31 left
+    # to this bead: the shelf renders last among its slot's children, and
+    # ADR-0002's G12a admits it only as a direct child of the root's `body`,
+    # so "last in the root's body" is a strip at the foot of the canvas. It
+    # costs one stable sort and no new component - which is what decided it
+    # against a drawer tab, since the drawer's own 1A test is "tabular and
+    # document-level" and a shelf is neither, and against a bespoke strip,
+    # which decision 13 and this module's own rule forbid.
+    #
+    # The index carried alongside each child stays the DOCUMENT index, so
+    # drop targets and gaps keep naming real positions while the drawing
+    # order changes. The shelf's own trailing gap is suppressed by `gap?`
+    # above: it would name a mid-flow insertion point under a card drawn at
+    # the end, and nothing sequences after the shelf anyway.
+    defp shelf_last(children) do
+      children
+      |> Enum.with_index()
+      |> Enum.sort_by(fn {child, _index} -> ViewModel.shelf?(child) end)
     end
 
     attr(:parent_id, :string, required: true)

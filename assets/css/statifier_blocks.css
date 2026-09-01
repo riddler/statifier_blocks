@@ -1615,6 +1615,41 @@
   background: var(--sb-error-bg);
 }
 
+/* 10t's fourth column: the detached shelf (ADR-0005's amendment of
+ * 2026-08-31, sections 10s and 10t).
+ *
+ * A tray is not in the rail partition, so it never picks up `.sb-slot--rail`
+ * and its container never becomes a boundary box - that is decided in
+ * `ViewModel`, not here, and this rule adds no edge that would say otherwise.
+ * What is left for the stylesheet is the row 10t calls a "muted neutral shelf
+ * edge" and the flat card, and both are spelled with tokens the audit already
+ * carries: `--sb-border` is the neutral line, and flat is the ABSENCE of a
+ * shadow rather than a new one. No `--sb-*` token is added by the tray, which
+ * is the question 10j's no-new-token finding explicitly did not settle for
+ * this style and this is the answer to it.
+ *
+ * The edge runs along the TOP rather than the left. Every other slot's left
+ * border is the depth band that says "this is inside that"; a shelf is not
+ * inside the flow, so borrowing the band would say the one thing about it
+ * that is false. A rule above it says "beside", which is what a shelf is. */
+.sb-slot--tray {
+  border-left: none;
+  border-top: var(--sb-border-width) solid var(--sb-border);
+  padding-left: 0;
+  padding-top: var(--sb-space);
+  margin-top: var(--sb-space);
+  color: var(--sb-fg-muted);
+}
+
+/* Flat, per 10t's card-shadow row. The fragments are cards like any other -
+ * a tray holding one notify block and a tray holding a nested group are the
+ * same declaration - so nothing here changes what a fragment IS, only that it
+ * does not sit proud of a surface it is not on. */
+.sb-slot--tray > .sb-node {
+  box-shadow: none;
+  background: var(--sb-bg-muted);
+}
+
 /* The exit edge (10h's last row, per the 2026-08-29 `sb-67s` ruling) is DRAWN
  * now, and the stub tick that stood in for it is RETIRED (`sb-rx1`, ruled on
  * `sb-otg`, campaign 016).
