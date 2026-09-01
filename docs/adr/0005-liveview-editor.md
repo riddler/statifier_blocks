@@ -4343,3 +4343,64 @@ forecloses it.
   `<data expr="...">` attribute, and whether it is well-formed is predicator's
   question and the compiler's - not one this panel can answer. The field is a
   text input, and a future section may say otherwise.
+
+---
+
+## Note (2026-09-01): decision 11, R26-8 ratifies 11k source 3
+
+Recorded because the operator's campaign-026 ruling **R26-8** - *document-
+declared roots count as declared for 11e's undeclared-path advisory; union
+them into the declared-path set; advisory-never-a-gate unchanged* - was taken
+against ADR-0001 11g's open question, and a reader who arrives at that
+question from ADR-0001 needs this record to say where the answer already is.
+
+**It is a note and not an amendment because it moves nothing.** The record's
+own rule for the choice is the one the 2026-08-31 amendment states about
+itself: a note records what accepted text already means, and an amendment is
+for text a reader of the clause alone would read the other way. R26-8's
+substance is already accepted text here. The amendment of 2026-08-31,
+*decision 11, what feeds the declared set 11e reads* (accepted, UNQUALIFIED
+direction-agent verdict, PR 189, implementing bead `sb-y4oa`), decides it in
+its 11k:
+
+> **11k. The declared set is the union of three declarations, not one.** [...]
+> 3. the roots the document's own `datamodel` key names (ADR-0001 decision
+>    11).
+
+That is R26-8, clause for clause: the third source is the document's own
+declaration, it reaches the set 11e reads by union, and 11l gives it
+root-segment matching while leaving source 1 exact. That amendment's
+consequences already say **"ADR-0001's 11g open question is discharged"**, on
+the record 11g named, which is what ADR-0001 11g asked for and what R26-8
+confirms. So the ruling and the record agree, and the ruling is the later of
+the two - it ratifies a decision this record had already taken rather than
+directing a new one.
+
+**Advisory-never-a-gate is unchanged, and was never in question.** 11c's rule
+that these findings change no verdict, 11f's `nil`-suppression as 11m widens
+it, ADR-0006 decision 9's advisory-only datamodel document, and ADR-0001 11h's
+"it produces no finding about an undeclared path, ever" about the key itself
+all stand exactly as written. R26-8 changes no input, no precondition, no
+anchor, no severity and no source, because 11k-11m already changed the only
+input there was.
+
+**Verified in the shipped code and its tests**, so the agreement is between
+the ruling and the artifact and not only between two prose sections:
+
+- `StatifierBlocks.Datamodel.findings/4`
+  (`lib/statifier_blocks/datamodel.ex`) unions `document_roots/1` - read off
+  the `Document` struct's `datamodel` entries, so no caller can pass the wrong
+  one or forget it - with `declared_roots/1` over the `:declare` option, and
+  runs the check when either the datamodel is non-`nil` or that union is
+  non-empty, which is 11m's widened precondition exactly. Landed 2026-08-31 in
+  `15138cc`.
+- `test/statifier_blocks/datamodel_test.exs` pins the behaviour in both
+  directions under `describe "a declared root (11k, 11l)"` and
+  `describe "nothing declared anywhere (11m)"`: a document-declared root
+  covers every path beneath it, an undeclared root beside it is still flagged
+  in the same call, the datamodel's own paths stay matched whole, a blank
+  declared root declares nothing, and a document that declares roots lints its
+  own paths with no host involved at all.
+
+No decision moves, no clause is edited, and no text above this line changes.
+Filed with `sb-sj79`, campaign-026's Lane A2.
