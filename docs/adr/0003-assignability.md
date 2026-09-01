@@ -750,11 +750,12 @@ the same box. A shelf belongs in exactly one box and a step belongs in
 approximately all of them, so they are not the same kind.
 
 The mechanism then does the work with no new rule. Every slot in the shipped
-`core.*` vocabulary accepts `[:step]`, `[:interrupt_handler]` or `:any`, so a
-block declaring only `:draft_shelf` is refused by every one of them, in both
-directions, by the same intersection every other placement question runs
-through. A host's own container declaring `slot_accepts: [:step]` refuses it
-too, without that host knowing the type exists - which is the coupling
+`core.*` vocabulary accepts `[:step]` or `[:interrupt_handler]` and none
+accepts `:any`, so a block declaring only `:draft_shelf` is refused by every
+one of them, in both directions, by the same intersection every other
+placement question runs through. A host's own container declaring
+`slot_accepts: [:step]` refuses it too, without that host knowing the type
+exists - which is the coupling
 decision 3's subsumption argument was written to avoid, arriving here
 unchanged.
 
