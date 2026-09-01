@@ -509,16 +509,20 @@ defmodule StatifierBlocks.Connectors do
   defp marker_or(marker, fallback, m),
     do: if(Map.has_key?(m, marker), do: marker, else: fallback)
 
-  # A slot's exit anchor: the last block's outlet, or the slot's own header
-  # when it is empty. An empty arm is a real arm of the branch, and a fan
-  # that silently skipped it would tell an author their empty arm does not
-  # exist.
+  # A slot's exit anchor: the last FLOW block's outlet, or the slot's own
+  # header when the slot holds no flow at all. An empty arm is a real arm of
+  # the branch, and a fan that silently skipped it would tell an author their
+  # empty arm does not exist.
+  #
+  # `flow_children/1` rather than `children`, for 10u and for the same reason
+  # `first_card/1` reads it: a shelf standing last in the slot must not be
+  # what the arm rejoins FROM, or the join edge leaves the shelf's outlet and
+  # the canvas asserts flow out of the one card 10u says nothing enters and
+  # nothing leaves. A slot holding nothing but a shelf has no exit card at
+  # all, which is the empty-arm case once the shelf is out of the chain.
   @spec slot_exit(Node.t(), Slot.t()) :: String.t()
-  defp slot_exit(%Node{block_id: parent_id}, %Slot{children: []} = slot),
-    do: slot_anchor(parent_id, slot.name)
-
   defp slot_exit(%Node{block_id: parent_id}, %Slot{} = slot) do
-    case List.last(slot.children) do
+    case slot |> ViewModel.flow_children() |> List.last() do
       %Node{block_id: id} -> outlet_anchor(id)
       _other -> slot_anchor(parent_id, slot.name)
     end

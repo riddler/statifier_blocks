@@ -288,6 +288,35 @@ defmodule StatifierBlocks.ConnectorsTest do
       assert Enum.count(edges, &(&1.kind == :join)) == 2
     end
 
+    # `sb-d4cr`, found by campaign-025 `sb-e2zy`: `slot_exit/2` read
+    # `slot.children`, so an arm ending in a shelf rejoined FROM the shelf's
+    # outlet - flow leaving the one card 10u says nothing enters and nothing
+    # leaves.
+    #
+    # Sabotage: reading `slot.children` in `slot_exit/2` again - the join
+    # leaves "M 95 190", the shelf's outlet, instead of the last step's.
+    test "an arm ending in a shelf rejoins from the last step, not the shelf" do
+      edges = Connectors.edges(shelved_branch(), shelved_branch_measurement())
+      joins = Enum.filter(edges, &(&1.kind == :join))
+
+      # `outlet:blk_a` is (95, 120) and `outlet:blk_drafts` is (95, 190).
+      assert Enum.count(joins, &String.starts_with?(&1.d, "M 95 120")) == 1
+      refute Enum.any?(joins, &String.starts_with?(&1.d, "M 95 190"))
+    end
+
+    # Sabotage: as above - the arm rejoins from "M 305 120", the shelf's own
+    # outlet, rather than from the header an armful of drafts leaves it with.
+    test "an arm holding nothing but a shelf rejoins from its header" do
+      edges = Connectors.edges(shelved_branch(), shelved_branch_measurement())
+      joins = Enum.filter(edges, &(&1.kind == :join))
+
+      # `slot:blk_branch/arm_b` is (305, 70); `outlet:blk_only_drafts` is
+      # (305, 120), which is the anchor the bug picked.
+      assert length(joins) == 2
+      assert Enum.count(joins, &String.starts_with?(&1.d, "M 305 70")) == 1
+      refute Enum.any?(joins, &String.starts_with?(&1.d, "M 305 120"))
+    end
+
     # The `sb-67s` ruling, at the layer it was made about: a failure rail
     # leaves by the ORDINARY flow edge and takes no vocabulary of its own, so
     # it can never pick up the dashes or the hue that mark a way out of band.
@@ -541,6 +570,36 @@ defmodule StatifierBlocks.ConnectorsTest do
       type: "core.branch",
       slots: [slot("arm_a", [block("blk_a")]), slot("arm_b", [])]
     )
+  end
+
+  # The `sb-d4cr` repro. The shelf sits in an arm literally named `body`,
+  # which is the slot name `Shelf.validate/1` admits one in, so this is a
+  # document the compiler accepts and not a shape only the view model can
+  # hold: one arm ends in a shelf, the other holds nothing else.
+  defp shelved_branch do
+    block("blk_branch",
+      type: "core.branch",
+      slots: [
+        slot("body", [block("blk_a"), block("blk_drafts", type: "core.drafts")]),
+        slot("arm_b", [block("blk_only_drafts", type: "core.drafts")])
+      ]
+    )
+  end
+
+  defp shelved_branch_measurement do
+    measured(%{
+      "stage" => {0, 0, 400, 400},
+      "card:blk_branch" => {0, 0, 400, 30},
+      "outlet:blk_branch" => {0, 300, 400, 0},
+      "slot:blk_branch/body" => {0, 50, 190, 20},
+      "slot:blk_branch/arm_b" => {210, 50, 190, 20},
+      "card:blk_a" => {0, 80, 190, 30},
+      "outlet:blk_a" => {0, 120, 190, 0},
+      "card:blk_drafts" => {0, 150, 190, 30},
+      "outlet:blk_drafts" => {0, 190, 190, 0},
+      "card:blk_only_drafts" => {210, 80, 190, 30},
+      "outlet:blk_only_drafts" => {210, 120, 190, 0}
+    })
   end
 
   defp railed(style) do
