@@ -1,6 +1,7 @@
 # ADR-0009: Durable fan-out is a new block type, `core.map`, compiling to one invocation whose handler starts N children
 
-Status: proposed (2026-09-01, campaign-026 Lane F1)
+Status: accepted (2026-09-01, campaign-026; unqualified direction-agent
+verdict on the second review, after one cure)
 
 ## Context
 
