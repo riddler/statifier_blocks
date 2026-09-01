@@ -2048,7 +2048,7 @@ its conditions and a handler does not.
 
 ## Amendment (2026-08-31): decision 10, the `core.drafts` and `core.placeholder` rows
 
-**Status: proposed (2026-08-31), drafted for `sb-5h6q` under the operator campaign-024 grant and its direction-agent gate.** Additive; decision 10's original
+**Status: accepted (2026-09-01), drafted for `sb-5h6q` under the operator campaign-024 grant; accepted on the gate's unqualified direction-agent verdict.** Additive; decision 10's original
 seven-row table stands, the 2026-08-28 amendment's section D stands, sections
 G through G8 stand, and no text above this line is edited by this section.
 

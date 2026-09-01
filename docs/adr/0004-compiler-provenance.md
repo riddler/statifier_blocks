@@ -2245,7 +2245,7 @@ non-block surfaces, two roles, one namespace; a consumer that switched on
 
 ## Amendment (2026-08-31): `core.drafts` emits nothing, `core.placeholder` emits a step, and four findings
 
-**Status: proposed (2026-08-31), drafted for `sb-5h6q` under the operator campaign-024 grant and its direction-agent gate.** Additive; decisions 1
+**Status: accepted (2026-09-01), drafted for `sb-5h6q` under the operator campaign-024 grant; accepted on the gate's unqualified direction-agent verdict.** Additive; decisions 1
 through 11 stand as accepted and no text above this line is edited by this
 section. It is the compiler half of ADR-0002's amendment of this date, which
 adds `core.drafts` and `core.placeholder` to decision 10's vocabulary
