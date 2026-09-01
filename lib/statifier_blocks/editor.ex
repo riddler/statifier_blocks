@@ -349,6 +349,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Edit,
       Finding,
       Palette,
+      Shelf,
       ViewModel
     }
 
@@ -1107,31 +1108,81 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # next render, which is precisely the host re-render that must not re-fit.
     @spec switch_document(Phoenix.LiveView.Socket.t(), Document.t() | nil) ::
             {Phoenix.LiveView.Socket.t(), boolean()}
-    defp switch_document(socket, nil), do: {socket, false}
+    # No previous document is the FIRST one, which is an opening like any
+    # other and takes the same folds the reset below takes.
+    defp switch_document(socket, nil),
+      do:
+        {assign(socket, :collapsed_ids, opening_folds(Map.get(socket.assigns, :document))), false}
 
     defp switch_document(socket, %Document{id: id}) do
       if socket.assigns.document.id == id do
         {socket, false}
       else
-        {assign(socket,
-           drawer_open: false,
-           drawer_tab_id: nil,
-           selected_id: nil,
-           collapsed_ids: MapSet.new(),
-           drafts: %{},
-           palette_position: nil,
-           palette_allowed: nil,
-           palette_unarmed_pick: false,
-           palette_sheet: false,
-           # A mark addresses one block, so it stops being true when that
-           # block is gone. The amendment's exemption from this reset is the
-           # pane folds', and for the reason that does not reach a mark: a
-           # fold addresses no block at all.
-           active_ids: MapSet.new(),
-           invoking: nil
-         ), true}
+        socket =
+          assign(socket,
+            drawer_open: false,
+            drawer_tab_id: nil,
+            selected_id: nil,
+            drafts: %{},
+            palette_position: nil,
+            palette_allowed: nil,
+            palette_unarmed_pick: false,
+            palette_sheet: false,
+            # A mark addresses one block, so it stops being true when that
+            # block is gone. The amendment's exemption from this reset is the
+            # pane folds', and for the reason that does not reach a mark: a
+            # fold addresses no block at all.
+            active_ids: MapSet.new(),
+            invoking: nil
+          )
+
+        # The collapsed set resets to the new document's opening folds rather
+        # than to the empty set, so a document the host swaps in opens the way
+        # that same document opens when it is the first one.
+        #
+        # Assigned on its own rather than as another key in the list above,
+        # and that is load-bearing: every value in that list is a literal, and
+        # a computed `MapSet` among them costs Dialyzer its read of what this
+        # clause returns - it stops seeing the `true`, and reports `arm_fit/4`'s
+        # swapped-document clause as unreachable.
+        {assign(socket, :collapsed_ids, opening_folds(socket.assigns.document)), true}
       end
     end
+
+    # The one fold this component starts with, rather than the empty set the
+    # 2026-08-30 amendment's decision 2 section left it at: a NON-EMPTY drafts
+    # shelf opens folded (`sb-e2zy`, the campaign-024 wrap ruling).
+    #
+    # It changes the INITIAL value and nothing else. `collapse-toggle` above
+    # is untouched, the set is still per-session editor state that is neither
+    # in the document nor on the undo stack, and it is still reset by the
+    # document swap below - this function is what the reset resets *to*, so
+    # opening a document and swapping one in behave the same way, which is
+    # the sentence the fit note already had to write for its own opening.
+    #
+    # Non-empty only. A shelf holding nothing has nothing to hide, and its
+    # tray IS the drop target an author parks the first fragment onto: an
+    # editor that folded it shut would have folded away the affordance. The
+    # ruling says an empty tray may stay as it is, and this is that.
+    #
+    # `Shelf.shelves/1` rather than a walk of the view model: the fold is
+    # keyed on a block id and the document is what holds those, so this needs
+    # no rebuild to have happened first. More than one shelf is a Structure
+    # finding rather than this function's business (ADR-0002 G12b), so it
+    # folds every one it finds instead of assuming the document is valid.
+    @spec opening_folds(Document.t() | nil) :: MapSet.t(String.t())
+    defp opening_folds(%Document{} = document) do
+      document
+      |> Shelf.shelves()
+      |> Enum.filter(&stocked?/1)
+      |> MapSet.new(& &1.id)
+    end
+
+    defp opening_folds(_none), do: MapSet.new()
+
+    @spec stocked?(Block.t()) :: boolean()
+    defp stocked?(%Block{slots: slots}),
+      do: Enum.any?(slots, fn {_name, children} -> children != [] end)
 
     # Total, like every other host-input normalizer here, and for a reason
     # this one has more of than most: a host holding a run's state is holding

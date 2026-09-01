@@ -4034,3 +4034,72 @@ a move is a Move.
   draws with no edges; what it compiles to a step, the renderer draws in the
   flow. A reader who can see the picture can predict the chart, and that
   remains true with a shelf in the document.
+
+---
+
+## Note (2026-09-01): decision 10, where the tray is drawn, and how it opens
+
+A dated note rather than an amendment. The 2026-08-31 amendment above stands
+in every particular: `:tray` is still the fourth `slot_style`, it is still
+outside the rail partition, and 10u still says no connector enters the tray,
+leaves it, or runs between two fragments. What this records is *where* the
+tray is drawn and *how it opens* - the same shape as this record's Note of
+2026-08-30 on decision 12's read-only config, which changed no decision and
+recorded which surface one of its bullets renders on.
+
+It answers the first item that amendment's *Deferred, named rather than
+guessed* section left open, and carries two adjustments the operator ruled at
+the campaign-024 wrap walk after reading the shipped surface (`sb-e2zy`;
+captures in the fleet journal at `024-screens/se-ihm-*`).
+
+**Where: the foot of the canvas, last in the root's `body`.** Not a drawer
+tab. The shelf renders after its slot's flow children, and ADR-0002's G12a
+admits it only as a direct child of the root's `body`, so "last in the root's
+body" *is* a strip at the foot of the canvas - the two descriptions name one
+position, which is why this needs no new component and no new anchor. The
+grounds are in the placement comment on `shelf_last/1` in
+`lib/statifier_blocks/editor/slot.ex`, and they are worth restating here
+because the alternative was live: the drawer's own admission test is
+"tabular and document-level" and a shelf is neither, and a bespoke strip is
+what decision 13 forbids. The cost of the answer is one stable sort. The
+index carried alongside each child stays the DOCUMENT index, so drop targets
+and gaps keep naming real positions while the drawing order changes.
+
+**A non-empty tray opens folded.** Decision 2's amendment of 2026-08-30 owns
+the fold and is unchanged by this note: the control is the same one, the
+collapsed set is still per-session editor state that is neither in the
+document nor on the undo stack, and it is still cleared when the host swaps a
+document in. What changes is the value it starts at - a shelf holding
+anything opens collapsed, and the author unfolds it on demand. Section 11n
+already assumed this shape when it wrote that "a tray is a container that will
+usually be folded", and the count badge that section relies on is what keeps
+a finding inside a folded tray visible. The reason is the surface: at default
+zoom a shelf holding two or three parked fragments is taller than the flow
+above it, so a document opened to be read opens showing the parked work.
+
+An **empty** tray opens as it always did. It has nothing to hide, and its
+tray is the drop target the first fragment is parked onto - an editor that
+folded it shut would have folded away the affordance rather than the clutter.
+
+The reset and the opening are the same value, deliberately: a document the
+host swaps in opens the way it opens when it is the first document, which is
+the sentence the 2026-08-30 note on a swapped document had to write for the
+fit and is written here for the fold.
+
+**No inbound connector on the anchor card.** 10u's "none entering the tray"
+is read at both ends: no edge starts at the shelf's card, and no edge *ends*
+there either. The anchor card sits in the root's steps chain and an arrowhead
+landing on it is exactly the misreading 10u exists to prevent - at default
+zoom it makes the shelf read as a trailing step, which is the one thing a
+shelf is not. Stated as its own sentence because the two exclusions that hold
+it up in `Connectors` are both written from the *source* side (a tray slot
+draws no adjacency, and every other slot's chain is read off `flow_children/1`),
+so a reader checking the guarantee from the target side had to re-derive it.
+The shipped build was already drawing no such edge; this note fixes the
+guarantee rather than reporting a repair, and the assertion in the inbound
+direction now exists beside the ones in the outbound.
+
+Unchanged by this note: 10s, 10t, 10u, 10v and 11n in every particular; the
+edit algebra, which parks and places a fragment with the ordinary Move
+commands; and decision 2's four-command closed set, which the fold was
+already outside of.
