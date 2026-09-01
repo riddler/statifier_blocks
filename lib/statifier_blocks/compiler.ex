@@ -304,11 +304,18 @@ defmodule StatifierBlocks.Compiler do
          {:ok, node} <- resolve_stage(document, palette),
          :ok <- config_stage(node),
          :ok <- structure_stage(document, palette, opts),
+         {node, shelf_warnings} = elide_shelf(node),
          :ok <- chart_use_stage(node, opts),
          {:ok, {emission, emit_warnings}} <- emit_stage(node, document, opts),
          :ok <- self_reference_stage(emission, document.id),
          :ok <- sensitive_stage(emission, opts) do
-      chart_stage(document, node, emission, emit_warnings, opts)
+      chart_stage(
+        document,
+        node,
+        emission,
+        shelf_warnings ++ marker_warnings(node) ++ emit_warnings,
+        opts
+      )
     end
     |> in_document_order(document)
   end
@@ -577,6 +584,110 @@ defmodule StatifierBlocks.Compiler do
   defp arity_phrase(:at_least_one), do: "as holding at least one"
   defp arity_phrase(:exactly_one), do: "as holding exactly one"
   defp arity_phrase(:zero_or_one), do: "as optional"
+
+  # -- Between Structure and Chart-use: the shelf leaves the tree ------------
+
+  # ADR-0002's amendment of 2026-08-31, section G9a: the shelf is removed
+  # from the root's child list before anything reads sequencing. ADR-0004's
+  # amendment of the same date, section D1, is what that buys - the Emit
+  # stage does not call `emit/2` on the shelf or on anything under it, so a
+  # shelved block type is never asked rather than emitting-and-discarded,
+  # `StateId` mints no id for any of them and the provenance map carries no
+  # entry (D2).
+  #
+  # It runs after Structure and before everything downstream of it. Order
+  # against Structure is the load-bearing half: that stage walks the
+  # *document* rather than this tree, so a parked fragment's own internal
+  # seams, arity and kind admission are all still checked while it is
+  # parked (ADR-0003's amendment of this date, A2). Order against Chart-use
+  # is not load-bearing today - that stage reads only the compile options -
+  # and it sits before it anyway, because D1's claim is about the contents
+  # contributing nothing to anything, not to the emitter specifically.
+  #
+  # Structure has already run and stopped the pipeline on a misplaced or
+  # duplicated shelf, so any shelf still standing here is a direct child of
+  # the root's `body` and there is at most one.
+  #
+  # The Config stage has already run over the whole document, including
+  # every block on the shelf, which is G9c: an author who parks a
+  # half-configured fragment is still told so.
+  @spec elide_shelf(Resolved.t()) :: {Resolved.t(), [Finding.t()]}
+  defp elide_shelf(%Resolved{slots: slots} = node) do
+    {kept, shelves} =
+      Enum.map_reduce(slots, [], fn {name, children}, found ->
+        {shelved, flow} = Enum.split_with(children, &shelf_node?/1)
+        {{name, flow}, found ++ shelved}
+      end)
+
+    {%{node | slots: kept}, Enum.flat_map(shelves, &drafts_warning/1)}
+  end
+
+  @spec shelf_node?(Resolved.t()) :: boolean()
+  defp shelf_node?(%Resolved{block: block}), do: Shelf.shelf?(block)
+
+  # D4: one finding per document, on the shelf, when the shelf's `body` is
+  # non-empty. One per fragment would make the warning's loudness a function
+  # of how much the author had parked, which is backwards - a well-used
+  # shelf is not a worse document than a lightly-used one. An empty shelf
+  # mints nothing, which with D1's byte identity makes it completely
+  # invisible to every consumer of a compile.
+  #
+  # `fault: :author` is passed rather than left to the stage default, and
+  # both new warnings do the same. Decision 9's split reads an `:emit`
+  # finding with no `config_key` as `:package`, which is right for
+  # `shadowed_finding/2` - no document edit fixes a compile call. It is
+  # wrong for these two: emptying the shelf and filling the gap are both
+  # document edits, and D4's table says `:author` for exactly that reason.
+  @spec drafts_warning(Resolved.t()) :: [Finding.t()]
+  defp drafts_warning(%Resolved{block: %Block{id: id}, slots: slots}) do
+    if Enum.any?(slots, fn {_name, children} -> children != [] end) do
+      [
+        Finding.new(
+          :emit,
+          {:draft_blocks_present, id},
+          "this document has parked work in it: the drafts shelf holds fragments that " <>
+            "are not in the flow, and nothing in it is compiled",
+          block_id: id,
+          severity: :warning,
+          fault: :author
+        )
+      ]
+    else
+      []
+    end
+  end
+
+  # D4's mirror image: one per marker, because each one is a distinct gap at
+  # a distinct place in the flow and an author fixing them needs to be told
+  # about each. Walked over the *pruned* tree, so a `core.placeholder`
+  # parked on the shelf warns about nothing - it is not a gap in the flow,
+  # it is a fragment that is not in the flow at all.
+  @spec marker_warnings(Resolved.t()) :: [Finding.t()]
+  defp marker_warnings(%Resolved{block: block, slots: slots}) do
+    own = if Shelf.marker?(block), do: [marker_warning(block)], else: []
+
+    own ++
+      Enum.flat_map(slots, fn {_name, children} -> Enum.flat_map(children, &marker_warnings/1) end)
+  end
+
+  # G10b fixes that this package never otherwise reads `note`; carrying it
+  # here is the one thing it is for, so the panel says what the author said
+  # the gap was for.
+  @spec marker_warning(Block.t()) :: Finding.t()
+  defp marker_warning(%Block{id: id, config: config}) do
+    Finding.new(
+      :emit,
+      {:placeholder_block, id},
+      "a placeholder marks a step left unwritten here" <> note_phrase(Map.get(config, "note")),
+      block_id: id,
+      severity: :warning,
+      fault: :author
+    )
+  end
+
+  @spec note_phrase(term()) :: String.t()
+  defp note_phrase(note) when is_binary(note) and note != "", do: ~s(: "#{note}")
+  defp note_phrase(_note), do: ""
 
   # -- Stage 5: emit ---------------------------------------------------------
 

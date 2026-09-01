@@ -436,10 +436,53 @@ defmodule StatifierBlocks.Assignability do
   (through `own_inbound_type/4` and back) relies on - every step here moves
   to a strictly earlier pre-order position too: a previous sibling or a
   parent, both earlier than `target` itself.
+
+  Inside a `core.drafts` body the answer is `:unknown` at every index, and
+  this record's amendment of 2026-08-31, section A2, is why. Between two
+  parked fragments there is no seam: their order is shelf order, and
+  ADR-0002's amendment of the same date, section G9a, fixes that the
+  compiler never reads it as sequencing, so deriving one fragment's inbound
+  type from the fragment above it would make rearranging a shelf produce and
+  clear findings. At `index == 0` the recursion would reach the shelf's own
+  inbound, and the shelf has none - it declares no `consumes`, it is not in
+  the flow, and nothing reaches it. Under decision 5 `:unknown` is
+  assignable to any `consumes`, so no fragment is ever refused for the
+  position it holds on the shelf.
+
+  The walk *inside* each fragment is untouched. A parked fragment is a
+  subtree, its own internal seams are real sequencing, and they are checked
+  exactly as they would be anywhere else - which is the property that makes
+  the shelf worth having rather than a hole in the checker.
   """
   @spec inbound_type(Palette.t(), Document.t(), target(), context()) :: type_expr() | :unknown
-  def inbound_type(%Palette{} = palette, %Document{} = document, {parent_id, slot, index}, ctx)
-      when index > 0 do
+  def inbound_type(%Palette{} = palette, %Document{} = document, target, ctx) do
+    if on_the_shelf?(document, target) do
+      :unknown
+    else
+      seam_inbound_type(palette, document, target, ctx)
+    end
+  end
+
+  # A2: a position whose parent is the shelf is at entry, whatever its
+  # index. Asked of the parent block rather than of the slot name, because
+  # what makes the position exempt is the container it sits in.
+  @spec on_the_shelf?(Document.t(), target()) :: boolean()
+  defp on_the_shelf?(document, {parent_id, _slot, _index}) do
+    case find_block(document, parent_id) do
+      nil -> false
+      parent -> Shelf.shelf?(parent)
+    end
+  end
+
+  @spec seam_inbound_type(Palette.t(), Document.t(), target(), context()) ::
+          type_expr() | :unknown
+  defp seam_inbound_type(
+         %Palette{} = palette,
+         %Document{} = document,
+         {parent_id, slot, index},
+         ctx
+       )
+       when index > 0 do
     with parent when not is_nil(parent) <- find_block(document, parent_id),
          sibling when not is_nil(sibling) <- Enum.at(Map.get(parent.slots, slot, []), index - 1) do
       produces(palette, document, sibling, ctx)
@@ -448,7 +491,7 @@ defmodule StatifierBlocks.Assignability do
     end
   end
 
-  def inbound_type(%Palette{} = palette, %Document{} = document, {parent_id, _slot, 0}, ctx) do
+  defp seam_inbound_type(%Palette{} = palette, %Document{} = document, {parent_id, _slot, 0}, ctx) do
     case Document.fetch_path(document, parent_id) do
       {:ok, []} -> Map.get(ctx, :entry_type, :unknown)
       {:ok, path} -> inbound_type(palette, document, List.last(path), ctx)
