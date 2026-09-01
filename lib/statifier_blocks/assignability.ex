@@ -78,7 +78,7 @@ defmodule StatifierBlocks.Assignability do
   absent `:slot_accepts` entry for a given slot is `:any`.
   """
 
-  alias StatifierBlocks.{Block, Document, Palette}
+  alias StatifierBlocks.{Block, Document, Palette, Shelf}
 
   @typedoc "Opaque to this package. Never parsed, split, or normalized."
   @type type_expr :: String.t()
@@ -558,7 +558,8 @@ defmodule StatifierBlocks.Assignability do
     parent_mc = resolve_parent(palette, document, parent_id)
     candidate_mc = resolve_module_config(palette, candidate)
 
-    if admits?(parent_mc, slot, candidate_mc) do
+    if shelf_at_root_body?(document, parent_id, slot, candidate) or
+         admits?(parent_mc, slot, candidate_mc) do
       nil
     else
       {parent_module, parent_config} = parent_mc
@@ -568,6 +569,25 @@ defmodule StatifierBlocks.Assignability do
       {:kind_not_admitted, candidate.id, parent_id, slot, candidate_kinds, accepts}
     end
   end
+
+  # The one position kinds cannot decide (ADR-0002's amendment of
+  # 2026-08-31, section G12a, as this record's amendment of the same date,
+  # section A1, hands it over). The root block declares `slot_accepts`
+  # `[:step]` for its `body` like every other container, so decision 3's
+  # intersection refuses a `:draft_shelf` there along with everywhere else.
+  # G12a says the root's `body` admits one anyway - a constraint on depth,
+  # which is a property of the document rather than of either block, and so
+  # not something either declaration can carry. `StatifierBlocks.Shelf`
+  # owns the rule; this is the one place that consults it, so `check/5`,
+  # `valid_targets/4` and `validate/3` all get the same answer.
+  #
+  # A shelf anywhere else is refused here exactly as before, and is
+  # *additionally* named by `:drafts_block_misplaced` - the two are
+  # siblings from different rules, which is decision 10's own reading of
+  # what one stage reports.
+  @spec shelf_at_root_body?(Document.t(), Block.id(), Block.slot_name(), Block.t()) :: boolean()
+  defp shelf_at_root_body?(document, parent_id, slot, candidate),
+    do: Shelf.shelf?(candidate) and Shelf.root_body?(document, parent_id, slot)
 
   # The block, or `:slot_entry` when there is none, at the seam upstream of
   # `target` - the sibling at `index - 1`, or the slot's own inbound

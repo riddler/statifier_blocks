@@ -10,8 +10,18 @@ defmodule StatifierBlocks.Core.EmitTest do
     # sabotage: drop the <final> child from Core.Emit.ordered/2 -> the
     # block's state stops being compound-with-a-final and this goes red for
     # every core type (verified)
+    # `core.drafts` is the one core type the convention does not reach, and
+    # not because it breaks it. A shelf cannot be a document root at all
+    # (ADR-0002's amendment of 2026-08-31, G12a - it goes in the root's
+    # `body` and nowhere else), and even placed correctly it compiles to
+    # nothing whatever: ADR-0004's amendment of the same date, D1, says the
+    # Emit stage never asks it. A convention about the state a block emits
+    # has nothing to say about a block that emits none, so it is named here
+    # rather than folded in, and what it compiles to instead is asserted
+    # directly in `test/statifier_blocks/compiler/drafts_test.exs`.
     test "every core type compiles to one compound state carrying a <final>" do
-      for {type_name, module} <- CoreFixtures.core_modules() do
+      for {type_name, module} <- CoreFixtures.core_modules(),
+          type_name != "core.drafts" do
         config = CoreFixtures.valid_config(module)
         block = Block.new(type_name, id: "blk_ONE", config: config, slots: filled(module, config))
 
