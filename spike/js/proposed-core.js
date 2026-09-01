@@ -791,12 +791,22 @@ const coreSubchart = {
  * joins the `core.*` vocabulary. A clock interrupt is spelled with the two
  * SHIPPED types instead: a `core.send` carrying the deadline event and a
  * `delay`, placed first in a group's `body`, caught by a `core.on_event` on
- * that group's `interrupts` rail. That pair emits exactly what the compile
- * sketch above describes, and `StatifierBlocks.Compiler.Cancels` already
- * cancels the armed send when the body region is exited - so the lifetime a
- * rail rule wants comes free, and the `resume` question this sketch leaves
- * open is answered structurally: re-entering the body re-arms a fresh
- * deadline.
+ * that group's `interrupts` rail. On the ABANDON path that pair emits what the
+ * compile sketch above describes, and `StatifierBlocks.Compiler.Cancels`
+ * already cancels the armed send when the body region is exited, so the
+ * lifetime a rail rule wants costs nothing to author.
+ *
+ * On the RESUME path the two spellings genuinely differ, and the record says
+ * so rather than claiming the sketch's question away. A resume handler is an
+ * internal transition on the group state targeting `history_id || run`
+ * (`lib/statifier_blocks/core/emit.ex:256-259`), so the body region is exited
+ * and re-entered while the group state is not. That gives three behaviours:
+ * a `core.group` cancels and re-arms, so its clock restarts; a
+ * `core.resumable_group` cancels but re-enters at the history rather than at
+ * the head send, so it has NO deadline after the first resume; and this
+ * sketch's own type, arming on the group state's `<onentry>`, would keep its
+ * original deadline running across the resume. ADR-0010 decision 3 records
+ * the first as intended and defers the second; the third is nobody's.
  *
  * This descriptor is kept, not deleted, because it is now the evidence for a
  * refused proposal and because `dev/selftest.html` and
