@@ -4404,3 +4404,72 @@ the ruling and the artifact and not only between two prose sections:
 
 No decision moves, no clause is edited, and no text above this line changes.
 Filed with `sb-sj79`, campaign-026's Lane A2.
+
+---
+
+## Note (2026-09-01): decision 9, what a path candidates feed is and is not
+
+A dated note rather than an amendment, because decision 9 is unchanged in
+every clause. `:expression` still renders as a plain source input in this
+package; rich expression editing - a richer affordance, inline evaluation
+against a dataset - is still statifier-ui's, still deferred by decision 15's
+"Rich expression editing is statifier-ui's (sui-bob)" bullet, and the
+`expression_component` override is still the seam it is deferred through.
+The `:update_config` gate is untouched.
+
+The note exists because decision 9 names **"completion against the
+datamodel"** as one example of the affordance it defers, and sb-0vt landed a
+`<datalist>` of declared datamodel paths on that very input. A reader
+holding those two side by side is owed the sentence that separates them, and
+without it the code and the record read as disagreeing - which, by this
+repo's own rule that the record is the contract, would make the code the bug.
+
+**The distinction the record draws.** Decision 9 defers the *affordance*: a
+control that understands predicator source. What landed is *data* - the set
+of paths the document's own declaring surfaces already name, offered through
+the plainest control HTML has. Three things follow, and each is checkable
+rather than asserted:
+
+- **It suggests and never constrains.** A `<datalist>` is the control the
+  `invoke_type` list already uses for the same reason (see decision 9's
+  neighbours and ADR-0004 decision 8): free text stays valid, and an
+  undeclared path stays 11e's `:info` advisory rather than becoming a
+  refusal. `validate_config/1` remains the only gate.
+- **It adds no JavaScript.** Decision 7's two-hook limit is untouched and
+  still mechanically enforced by `test/statifier_blocks/assets_test.exs`.
+- **It is not completion, and cannot become it here.** A browser matches a
+  datalist against the input's *whole value*, so the list is live while the
+  author types a leading path and goes quiet once the expression grows an
+  operator. Completion mid-expression needs the caret position inside the
+  source - which needs either a hook decision 7 forbids or the richer
+  component decision 9 defers - and it needs predicator's operator and
+  keyword vocabulary, which predicator exposes no public enumeration of
+  (`Predicator.Lexer` holds those tokens privately; `Functions.Provider`
+  covers function names alone). Copying that vocabulary into this package
+  would be a second, silently drifting copy of a contract predicator owns.
+
+**Where the seam moved, additively.** `expression_component` is now called
+with a `:candidates` key beside `:field`, `:id`, `:name` and `:value`. An
+override written before this note takes a map and reads the keys it knows,
+so nothing that worked stops working; an override written after it is handed
+the declared paths rather than re-deriving them from assigns the field
+component is not given. That is the seam being supplied, not narrowed.
+
+**Where it renders.** `StatifierBlocks.Datamodel.candidates/3` reads the
+same three declaring surfaces `findings/4` does - the host's datamodel, the
+compile call's `:declare` roots, and the document's own `datamodel` key -
+through the same normalizers, so the set an author is offered and the set
+that decides whether they get an advisory cannot drift apart. It lives in
+that module for that reason. `candidates_under/2` is the narrowing query for
+a component that re-renders per keystroke, and it reaches ADR-0006 decision
+6's projection through `Predicates.Datamodel.under/2` rather than restating
+it. Absence collapses to `[]` and renders no `<datalist>` at all, which is
+the same "an empty list is markup that suggests nothing" rule the
+`invoke_type` control follows.
+
+What stays open is unchanged and is tracked elsewhere: the richer component
+is sui-wqr's, predicator's grammar vocabulary is px-15q's, and decision 15's
+per-palette-entry fixtures pane is still undecided.
+
+No decision moves, no clause is edited, and no text above this line changes.
+Filed with `sb-0vt`, campaign-026's Lane A3, under ruling RQ-026-5.
