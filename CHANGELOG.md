@@ -10,6 +10,20 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.13.0] 2026-09-01
+
+0.13.0 is a small release about what an editor shows first. The drafts
+shelf 0.12.0 introduced opened expanded, so a document with parked work
+opened showing its shelf rather than its flow; now a stocked shelf opens
+folded and the flow is what the author sees. Nothing about the shelf's
+placement rules, its compile output or the fold control itself moves.
+
+### Changed
+
+- The editor opens a non-empty drafts shelf folded, so a document with parked
+  work opens showing its flow rather than its shelf. An empty shelf opens as
+  before, the fold control is unchanged, and unfolding lasts for the session.
+
 ## [0.12.0] 2026-09-01
 
 0.12.0 is the release where a document can hold work that is not finished
@@ -1395,6 +1409,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.13.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.13.0
 [0.12.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.12.0
 [0.11.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.11.0
 [0.10.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.10.0
