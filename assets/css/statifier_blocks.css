@@ -3555,6 +3555,112 @@ button.sb-inspector__group-row:hover {
   font-weight: var(--sb-weight-strong);
 }
 
+/* -------------------------------------------------------- declarations */
+
+/* The document's own `datamodel` roots, as the drawer's third tab (ADR-0005's
+ * 2026-09-01 amendment, 2i). Every token here is one the surface already
+ * declares - the panel introduces none, so 14e's both-directions audit has
+ * nothing new to account for. */
+
+.sb-declarations__scroll {
+  overflow-x: auto;
+}
+
+.sb-declarations__scroll table {
+  border-collapse: collapse;
+  font-size: var(--sb-text-sm);
+  width: 100%;
+}
+
+.sb-declarations__scroll th,
+.sb-declarations__scroll td {
+  border: var(--sb-border-width) solid var(--sb-border);
+  padding: var(--sb-space-half) var(--sb-space);
+  text-align: left;
+  vertical-align: top;
+}
+
+.sb-declarations__scroll thead th {
+  background: var(--sb-bg-muted);
+  font-weight: var(--sb-weight-medium);
+}
+
+/* Three inputs across the row, so a name and its initial value are read
+ * together the way they are emitted together. */
+.sb-declarations__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sb-space);
+}
+
+.sb-declarations__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+  flex: 1 1 12ch;
+  min-width: 0;
+}
+
+/* The column heading already names the field; the per-input label is for a
+ * reader who has scrolled the row out from under the heading, and for the
+ * accessible name when it has not. */
+.sb-declarations__label {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+}
+
+.sb-declarations__field input {
+  font: inherit;
+  min-width: 0;
+  color: inherit;
+  background: var(--sb-bg);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius);
+  padding: var(--sb-space-half);
+}
+
+.sb-declarations__actions {
+  white-space: nowrap;
+}
+
+.sb-declarations__actions-head {
+  font-size: var(--sb-text-xs);
+}
+
+.sb-declarations__add,
+.sb-declarations__move,
+.sb-declarations__remove {
+  font: inherit;
+  cursor: pointer;
+  color: inherit;
+  background: var(--sb-bg-muted);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius);
+  padding: var(--sb-space-half) var(--sb-space);
+}
+
+/* A move off either end is a no-op, and the control says so rather than
+ * looking live and doing nothing. */
+.sb-declarations__move[disabled] {
+  cursor: default;
+  color: var(--sb-fg-subtle);
+}
+
+.sb-declarations__add {
+  margin-top: var(--sb-space);
+}
+
+/* A refusal is about the panel and never about a block, so it renders here
+ * and never as a finding - decision 11's anchors cannot name a declaration. */
+.sb-declarations__refusal {
+  color: var(--sb-error);
+  background: var(--sb-error-bg);
+  border-radius: var(--sb-radius);
+  padding: var(--sb-space-half) var(--sb-space);
+  font-size: var(--sb-text-sm);
+  margin: 0 0 var(--sb-space);
+}
+
 /* ------------------------------------------------- palette strip / sheet */
 
 /* Above 780 the palette is a column and the strip does not exist. The rule is

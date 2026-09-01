@@ -109,6 +109,15 @@ defmodule StatifierBlocks.Validation do
 
   @identifier ~r/\A[a-z][a-z0-9_]*\z/
 
+  # Public because the `datamodel` key has a second writer: ADR-0005's
+  # `{:set_datamodel, entries}` command, whose refusal has to be the same
+  # refusal a stored document would get. `StatifierBlocks.Edit` calls this
+  # rather than re-deriving the grammar, so 11b and 11c have exactly one
+  # implementation and the panel cannot admit a list `from_json/1` would
+  # later reject.
+  @spec datamodel(term()) :: :ok | {:error, error()}
+  def datamodel(entries), do: check_datamodel(entries)
+
   # Every entry's own shape is checked before any id is compared against
   # another, so a malformed entry is reported as malformed rather than
   # mistaken for a duplicate of whatever id it failed to have.

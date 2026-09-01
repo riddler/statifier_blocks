@@ -345,6 +345,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       BlockType,
       Connectors,
       Datamodel,
+      Declarations,
       Document,
       Edit,
       Finding,
@@ -353,6 +354,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       ViewModel
     }
 
+    alias StatifierBlocks.Document.DatamodelEntry
     alias StatifierBlocks.Edit.{History, Targets}
 
     alias StatifierBlocks.Editor.{
@@ -391,6 +393,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          invoking: nil,
          drag: nil,
          drafts: %{},
+         declaration_draft: nil,
          pending_fields: [],
          palette_position: nil,
          palette_allowed: nil,
@@ -547,6 +550,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       assigns =
         assigns
         |> assign(:drawer, drawer_view(assigns))
+        |> assign(:declarations, declaration_entries(assigns))
+        |> assign(:declaration_refusal, declaration_refusal(assigns))
         |> assign(:marks, marks(assigns))
         |> assign(:depth, Shell.depth(assigns.view_model.root))
         |> assign(:block_count, Shell.block_count(assigns.view_model.root))
@@ -640,6 +645,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             height={@drawer_height}
             root={@view_model.root}
             host_tabs={Shell.host_tabs(@drawer_tabs)}
+            declarations={@declarations}
+            declaration_refusal={@declaration_refusal}
             target={@myself}
           />
         </div>
@@ -957,6 +964,27 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:noreply, update_list(socket, key, &List.delete_at(&1, to_index(index)))}
     end
 
+    # The declarations panel (the 2026-09-01 amendment, 2i-2m). Four gestures,
+    # one command: each builds a candidate list with
+    # `StatifierBlocks.Declarations` and hands it to `{:set_datamodel, list}`,
+    # which is the only thing that writes the key.
+    def handle_event("declaration-add", _params, socket) do
+      {:noreply, set_declarations(socket, &Declarations.add/1)}
+    end
+
+    def handle_event("declaration-remove", %{"index" => index}, socket) do
+      {:noreply, set_declarations(socket, &Declarations.remove(&1, declaration_index(index)))}
+    end
+
+    def handle_event("declaration-move", %{"index" => index, "dir" => dir}, socket) do
+      {:noreply, set_declarations(socket, &Declarations.move(&1, declaration_index(index), dir))}
+    end
+
+    def handle_event("declaration-change", %{"index" => index} = params, socket) do
+      {:noreply,
+       set_declarations(socket, &Declarations.change(&1, declaration_index(index), params))}
+    end
+
     # ------------------------------------------------------------ commands
 
     # The one place a command reaches the document. Every gesture funnels
@@ -975,6 +1003,63 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         {:error, reason} ->
           socket |> assign(:last_error, reason) |> rebuild()
+      end
+    end
+
+    # The declarations panel's own funnel (2l). It differs from `commit/2` in
+    # one way and only one: a refusal is held as a DRAFT of the list the
+    # author typed, with the sentence saying why, instead of landing in
+    # `last_error`. That is decision 9's draft treatment applied to the second
+    # surface that has the same problem - a value the document refuses is
+    # still the value the author is holding, and blanking it back to the
+    # document's would delete their keystrokes to punish a typo.
+    @spec set_declarations(
+            Phoenix.LiveView.Socket.t(),
+            ([DatamodelEntry.t()] -> [DatamodelEntry.t()])
+          ) :: Phoenix.LiveView.Socket.t()
+    defp set_declarations(socket, fun) do
+      %{document: document} = socket.assigns
+      candidate = fun.(declaration_entries(socket.assigns))
+
+      if candidate == document.datamodel do
+        # A gesture that lands on what the document already holds commits
+        # nothing (2k). Every function in `StatifierBlocks.Declarations`
+        # answers an out-of-range index with the list unchanged, and the ends
+        # of the list answer a move the same way, so without this the first
+        # row's Up would push an undo entry that undoes nothing and notify the
+        # host of a document that did not move. A draft is still cleared:
+        # typing back to the document's own value is exactly the author
+        # resolving the refusal that produced it.
+        socket |> assign(:declaration_draft, nil) |> rebuild()
+      else
+        commit_declarations(socket, candidate)
+      end
+    end
+
+    @spec commit_declarations(Phoenix.LiveView.Socket.t(), [DatamodelEntry.t()]) ::
+            Phoenix.LiveView.Socket.t()
+    defp commit_declarations(socket, candidate) do
+      %{history: history, palette: palette, document: document} = socket.assigns
+
+      case History.commit(history, palette, document, {:set_datamodel, candidate}) do
+        {:ok, new_history, new_document} ->
+          socket
+          |> assign(
+            history: new_history,
+            document: new_document,
+            declaration_draft: nil,
+            last_error: nil
+          )
+          |> notify_change(new_document)
+          |> rebuild()
+
+        {:error, reason} ->
+          socket
+          |> assign(
+            :declaration_draft,
+            %{entries: candidate, refusal: Declarations.refusal(reason)}
+          )
+          |> rebuild()
       end
     end
 
@@ -1124,6 +1209,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             drawer_tab_id: nil,
             selected_id: nil,
             drafts: %{},
+            declaration_draft: nil,
             palette_position: nil,
             palette_allowed: nil,
             palette_unarmed_pick: false,
@@ -1243,9 +1329,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         findings: assigns.view_model.findings,
         orphan_findings: assigns.view_model.orphan_findings,
         host_tabs: assigns.drawer_tabs,
+        declarations: assigns.document.datamodel,
         selected_id: assigns.selected_id
       })
     end
+
+    # What the panel draws: the author's refused list while one is held, and
+    # the document's otherwise. The COUNT on the strip stays the document's -
+    # `drawer_view/1` above is given `assigns.document.datamodel` and not this
+    # - because 2A's count is a statement about the document, and a strip that
+    # counted a refused draft would report a document that does not exist.
+    @spec declaration_entries(map()) :: [DatamodelEntry.t()]
+    defp declaration_entries(%{declaration_draft: %{entries: entries}}), do: entries
+    defp declaration_entries(assigns), do: assigns.document.datamodel
+
+    @spec declaration_refusal(map()) :: String.t() | nil
+    defp declaration_refusal(%{declaration_draft: %{refusal: refusal}}), do: refusal
+    defp declaration_refusal(_assigns), do: nil
 
     # The ids the strip is actually carrying, which is what a `phx-value-tab`
     # payload is answered against. `Shell.host_tabs/1` is applied first for
@@ -1652,5 +1752,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp to_index(_index), do: 0
+
+    # Strict, where `to_index/1` is forgiving, and the difference matters:
+    # `to_index/1` answers 0 for anything it cannot read, and 0 is a real row
+    # here. A crafted `phx-value-index` would then remove or move the FIRST
+    # declaration rather than none, which is a payload editing a document.
+    # An index this cannot read comes back as `:none`, which every
+    # `StatifierBlocks.Declarations` function treats as out of range and
+    # answers with the list unchanged.
+    @spec declaration_index(term()) :: non_neg_integer() | :none
+    defp declaration_index(index) when is_integer(index) and index >= 0, do: index
+
+    defp declaration_index(index) when is_binary(index) do
+      case Integer.parse(index) do
+        {int, ""} when int >= 0 -> int
+        _other -> :none
+      end
+    end
+
+    defp declaration_index(_index), do: :none
   end
 end
