@@ -339,11 +339,28 @@ this package has answered, inside the parent's serialized step, so the module
 has no way to observe the failure and does not pretend to. The driver's
 `{:start_child, ...}` arm is the one site that turns a `{:refused, detail}`
 from `start_child/3` into `{:failed, reason: "child_run_creation_failed",
-detail: detail}`, and `sp-ADR-0008` funnels every one of its own refusal
-causes - an adapter that cannot enumerate children, a
-`Statifier.Invoke.Source.resolve/2` reason, an unidentified chart, an
-existing run - back through that single return, so the fourth string is
-emitted in exactly one place on that side.
+detail: detail}`, and that side funnels every one of its own refusal causes
+back through that single return, so the fourth string is emitted in exactly
+one place there. The causes themselves - an adapter that cannot enumerate
+children, a `Statifier.Invoke.Source.resolve/2` reason, an unidentified
+chart, an existing run - are enumerated in the comment on `start_child/3`
+in `statifier_persistence`'s `lib/statifier_persistence/driver.ex`, and in
+that repo's `sp-21o` note; `sp-ADR-0008` decision 4 states the
+three-plus-one set rather than the causes, so the code comment is what this
+sentence cites.
+
+**Decision 7's third bullet reads as the durable variant, not the module.**
+That bullet says the fourth reason "is the durable module's and cannot be
+raised by the in-memory one", and beside this table a reader can take "the
+durable module" for `StatifierBlocks.Runtime.DurableSubchart` - which would
+have the record disagreeing with itself and with the code. Read it as the
+durable **variant**: the handler here plus the executor `sp-ADR-0008`
+describes, which decision 4 and the consequence on reading the two records
+together already treat as one design in two halves. The contrast the bullet
+draws is with the in-memory variant, which has no child run to fail to
+create, and that contrast is exactly as true of the variant as the bullet
+reads it of a module. No clause is edited, and the move is the same one the
+ADR-0005 note of this date makes for its amendment 2b's "clears it".
 
 Both halves of the split are visible in the shipped code: the same table
 stands in `StatifierBlocks.Runtime.DurableSubchart`'s moduledoc under "The
