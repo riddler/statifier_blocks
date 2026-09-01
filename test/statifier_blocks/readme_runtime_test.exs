@@ -3,11 +3,13 @@ defmodule StatifierBlocks.ReadmeRuntimeTest do
   The README's runtime-handler example is executed, not trusted.
 
   `readme_registration_test.exs` makes this argument for the registration
-  section; the same applies here. The section under "## The one handler
-  this package does ship" defines a host resolver module with `use
-  StatifierBlocks.Runtime.Subchart` and calls `handlers/1` on it, so a
-  callback that gains an argument or a builder that changes shape breaks
-  the snippet a host copies first. The section is evaluated once - it
+  section; the same applies here. The section under "## The handlers this
+  package does ship" defines a host resolver module with `use
+  StatifierBlocks.Runtime.Subchart`, calls `handlers/1` on it, and then
+  wires the same module into the durable variant with
+  `StatifierBlocks.Runtime.DurableSubchart.dispatch_fun/1`, so a callback
+  that gains an argument or a builder that changes shape breaks the
+  snippet a host copies first. The section is evaluated once - it
   defines a module, and evaluating it twice would redefine it - and every
   value it claims in a `#=>` comment is asserted against what the
   evaluation produced.
@@ -19,7 +21,7 @@ defmodule StatifierBlocks.ReadmeRuntimeTest do
 
   @readme Path.join([__DIR__, "..", "..", "README.md"]) |> Path.expand()
   @external_resource @readme
-  @heading "The one handler this package does ship"
+  @heading "The handlers this package does ship"
 
   setup_all do
     readme = File.read!(@readme)
@@ -76,6 +78,18 @@ defmodule StatifierBlocks.ReadmeRuntimeTest do
     handlers = StatifierBlocks.Runtime.Subchart.handlers(host)
 
     assert Map.keys(handlers) == [StatifierBlocks.Core.Subchart.invoke_type()]
+  end
+
+  # Sabotage: had `dispatch_fun/1` in
+  # lib/statifier_blocks/runtime/durable_subchart.ex return a two-arity fun
+  # - red here (`is_function(dispatch, 3)` came back `false`), restored,
+  # re-ran green (verified). The README tells a host to hand this value
+  # straight to `StatifierPersistence.Driver`'s `:dispatch` option, and
+  # that option takes a three-arity fun.
+  test "the durable snippet builds the fun the driver's :dispatch option takes", ctx do
+    dispatch = Keyword.fetch!(ctx.binding, :dispatch)
+
+    assert is_function(dispatch, 3)
   end
 
   # Sabotage: edited the README's `#=>` line to claim `MyApp.Charts.Wrong`
