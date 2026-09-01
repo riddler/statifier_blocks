@@ -8,9 +8,9 @@ The editor spike carries a proposed core type that does not exist in the
 package: `core.timeout`, "an interrupt rule that fires once a duration has
 elapsed", declared with an `after` duration, an `outcome` of `abandon` or
 `resume`, an optional `cond`, and `kinds: ["interrupt_handler"]` and nothing
-else (`spike/js/proposed-core.js:736-866`). Its own header states the case for
+else (`spike/js/proposed-core.js:736-884`). Its own header states the case for
 it in one sentence: "`core.on_event` catches an event; nothing caught the
-clock" (`spike/README.md:845-866`).
+clock" (`spike/README.md:845-848`).
 
 The proposal has a history. ADR-0002's 2026-08-28 amendment, section D3,
 already refused the same shape once, when it was spelled as the demo host type
@@ -20,12 +20,14 @@ are `core.on_event` and `core.wait` inside a group's `interrupts` slot, with
 the guard as a condition, and promoting them would put two types into the core
 vocabulary whose whole content is a spelling of an arrangement the vocabulary
 already expresses" (`docs/adr/0002-block-type-behaviour.md:952-961`). Half of
-D3 has since been overturned on its merits and recorded: the guard did not stay
-a host concern, and `core.on_event` grew an optional `cond` of its own
-(ADR-0002's 2026-08-31 note, `docs/adr/0002-block-type-behaviour.md:1954-2048`).
-The clock half was never revisited, and `spike/js/proposed-core.js` reopened it
-from the other side under bead `sb-0o4`, which is why this question is still
-open and why D3 alone does not close it.
+D3 has since been made concrete rather than overturned: the 2026-08-31 note gave
+`core.on_event` the optional `cond` D3's sentence had already assumed, and says
+so about itself - "this note makes D3's sentence true rather than aspirational"
+(`docs/adr/0002-block-type-behaviour.md:2009-2017`). D3's refusal of
+`myapp.guarded_on_event` stands; what changed is that the arrangement it pointed
+at now exists in the shipped types. The clock half was never revisited, and
+`spike/js/proposed-core.js` reopened it from the other side under bead `sb-0o4`,
+which is why this question is still open and why D3 alone does not close it.
 
 Two things happened after D3 that change the evidence rather than repeat it.
 
@@ -74,12 +76,18 @@ A clock interrupt on a `core.group` or a `core.resumable_group` is written as
 - a `core.on_event` on that same group's `interrupts` slot, naming the same
   event, with the `outcome` and the optional `cond` the author wants.
 
+Both group types carry the pair, but they do not behave identically once a
+`resume` handler is involved: decision 3 works out the difference, and the
+`core.resumable_group` case has an edge sharp enough that this record defers it
+rather than blessing it.
+
 No row is added to ADR-0002 decision 10's vocabulary table. That table records
 fifteen types (G11), `StatifierBlocks.Palette.core_types/0` registers the same
 fifteen (`lib/statifier_blocks/palette.ex:87-104`), and this record leaves both
 counts where they are.
 
-The admission criterion is decision 10's own and D3 states it plainly: a type
+The admission criterion is D3's - decision 10 proper states none, and section
+D's D3 is where the vocabulary's own test is written down: a type
 whose whole content is a spelling of an arrangement the vocabulary already
 expresses does not join the vocabulary. The test is not whether the author
 would enjoy one card more than two; it is whether the type expresses something
@@ -92,12 +100,23 @@ expressed it - it needed one invocation whose handler starts N children, a
 mechanism that exists nowhere in the vocabulary. A clock interrupt needs no
 mechanism at all beyond the two types already shipped.
 
-### 2. The two spellings compile to the same SCXML
+### 2. The two spellings compile to the same SCXML on the abandon path, and differ on resume
 
 The spike descriptor's own compile sketch says what `core.timeout` would emit:
 "a delayed send on entry to the group plus a transition on its arrival"
-(`spike/js/proposed-core.js:780-787`). That is what the pair already emits,
-element for element.
+(`spike/js/proposed-core.js:782-784`). On the abandon path - a deadline that
+fires, or a group that completes or is abandoned before it does - that is what
+the pair already emits, element for element.
+
+**The equivalence is narrower than "element for element" everywhere, and the
+difference is worth stating rather than glossing.** The sketch arms its send on
+the *group state's* `<onentry>`; the pair arms it in the `<onentry>` of the
+body region's first step. Those two are the same until a `resume` handler
+fires, and decision 3 works out what happens then - three behaviours, not one.
+So this decision claims equivalence on the abandon path and claims nothing on
+the resume path. That is enough for decision 1, because D3's criterion asks
+whether the arrangement expresses the thing, not whether a hypothetical type
+would have expressed it identically.
 
 The send block's emission is a compound state whose `<onentry>` holds
 `<send delay="15m" event="card.authz_timed_out" id="s_blk_..._send"/>` and whose
@@ -115,10 +134,10 @@ with the first. Under ADR-0004 decision 2 - one block, one state - it would
 also be a single block emitting a construct that spans two scopes, which is
 the shape decision 4 keeps out of a block type's reach.
 
-### 3. The timer's lifetime is already correct, and it is correct for free
+### 3. The timer's lifetime on the abandon path is correct for free; on resume it is per-type and one case is sharp
 
-This is the strongest evidence and it is the part a taste argument would miss.
-`StatifierBlocks.Compiler.Cancels` emits `<cancel sendid="..."/>` in the
+The abandon path is the strongest evidence and it is the part a taste argument
+would miss. `StatifierBlocks.Compiler.Cancels` emits `<cancel sendid="..."/>` in the
 `<onexit>` of the **nearest enclosing scope state** of whichever block armed the
 send, reading the send id back through `StateId.unstate_id/1`
 (`lib/statifier_blocks/compiler/cancels.ex:1-63`). For an interruptible group
@@ -127,8 +146,8 @@ why - "abandoning the group takes an *internal* transition to the group's own
 final, which exits the body region without exiting the group"
 (`lib/statifier_blocks/compiler/cancels.ex:21-27`).
 
-So the pair already has the lifetime a rail rule wants, with nothing authored
-and nothing special-cased:
+So on every path that leaves the body, the pair already has the lifetime a rail
+rule wants, with nothing authored and nothing special-cased:
 
 - the group completes normally: the body region is exited, the deadline send is
   cancelled, no stale timer fires;
@@ -137,16 +156,55 @@ and nothing special-cased:
 - the deadline itself fires: the handler's transition abandons or resumes the
   group per its `outcome`.
 
-The `resume` case is the one the spike descriptor left open - "what the timer
-does when a `resume` outcome re-enters the group it just left" is flagged there
-as a Phase-B question (`spike/js/proposed-core.js:785-787`). The pair answers it
-structurally rather than by ruling: a `resume` re-enters the body region, which
-re-enters the head `core.send` state, which arms a fresh deadline; the previous
-one was cancelled on the way out. Whether re-arming is the *desired* semantics
-in a given chart is the author's call, and under `core.resumable_group`'s
-history mode it is a question the author can already see the answer to. A
-first-class `core.timeout` would have had to decide this in the record, for
-everyone, before anyone had asked.
+**The `resume` path is where the free answer runs out.** The spike descriptor
+flags "what the timer does when a `resume` outcome re-enters the group it just
+left" as a Phase-B question (`spike/js/proposed-core.js:785-787`), and the pair
+does not answer it with one behaviour. It has two, decided by which group type
+the rail sits on, and the sketch's own type would have had a third. An earlier
+draft of this record claimed the pair "answers it structurally"; it does not,
+and the three behaviours are these.
+
+`Emit.guarded/4` wires a resume handler as an **internal** transition on the
+group's own state, targeting `history_id || run` - the `<parallel>` holding the
+body and rail regions when there is no history, the `<history>` inside the body
+region when there is
+(`lib/statifier_blocks/core/emit.ex:256-259`, `:244`, `:274-279`). The target is
+a descendant of the group state in both cases, so the transition's domain is the
+group state: the **body region is exited and re-entered**, and the group state
+itself never is.
+
+1. **`core.group` (no history): the clock restarts.** The body region is exited,
+   so `Cancels` fires and the armed deadline is cancelled; re-entry is at the
+   region's `initial`, which is the head `core.send` state, so a fresh deadline
+   is armed. Each resume gives the group another full `delay`.
+2. **`core.resumable_group`: the clock is gone.** The body region is exited, so
+   the deadline is cancelled exactly as above - but the history restores the
+   step that was interrupted rather than the region's initial
+   (`lib/statifier_blocks/core/resumable_group.ex:95-99`: "the body re-enters
+   where it left off instead of restarting"), and the head `core.send` state is
+   not among the states history recorded. Nothing re-arms it. **After the first
+   resume, a resumable group with a deadline pair has no deadline at all.** That
+   is the sharp edge in this decision, and it is stated rather than discovered.
+3. **The sketch's `core.timeout`: the clock keeps running.** Armed on the group
+   state's `<onentry>` and cancelled from the group state's `<onexit>`, and an
+   internal resume exits neither, so the original deadline survives the resume
+   untouched and fires at its original moment. (That is also the exact bug
+   `Cancels` records having fixed for the group case - "a cancel on the group's
+   `<onexit>` never fired for it", `lib/statifier_blocks/compiler/cancels.ex:21-27`.)
+
+**What this record decides about the three.** Behaviour 1 is recorded as the
+intended semantics of a deadline pair: a resume that re-runs the body from the
+top gets a fresh deadline, which is the reading an author of a restarting group
+would expect. Behaviour 2 is **not** blessed here - "the deadline is gone after
+a resume" is a semantics an operator should rule on rather than a record should
+adopt by describing it, so it goes to the deferred list below, with this
+paragraph as the statement of what the code does today. Behaviour 3 is nobody's
+until a `core.timeout` exists, and decision 1 means it will not.
+
+None of this disturbs the refusal. If anything it sharpens the criterion: a
+first-class `core.timeout` would have had to decide all three of these in a
+record, for everyone, before anyone had asked - and its sketch silently picks
+the one the compiler already treats as a defect.
 
 ### 4. Durability is upstream's and is unaffected either way
 
@@ -248,8 +306,14 @@ consistent with this record and needs no amendment to it.
 - D3's clock half is now decided on current evidence rather than standing on a
   2026-08-28 argument whose named alternative (`core.wait`) has since been
   superseded by a better one (`core.send` with a `delay`). D3's event half was
-  already overturned by the 2026-08-31 `cond` note; this record does not
-  disturb that.
+  already made true rather than aspirational by the 2026-08-31 `cond` note, and
+  D3's refusal of `myapp.guarded_on_event` stands; this record does not disturb
+  either.
+- **A resumable group with a deadline pair loses its deadline on the first
+  resume**, per decision 3's behaviour 2. That is a real behavioural fact this
+  record surfaces rather than creates, it is deferred rather than blessed, and
+  a reader who takes decision 1 as "the pair covers every group" without
+  reading decision 3 will get it wrong.
 - An author still has to place the send first. The convention is written down
   here and nothing enforces it until the advisory in decision 6 exists, which
   is the one place this decision is worse for an author than a first-class type
@@ -257,6 +321,18 @@ consistent with this record and needs no amendment to it.
 
 ## Deferred questions, named rather than guessed
 
+- **What a deadline should mean on a `core.resumable_group` after a resume.**
+  Decision 3's behaviour 2: the code cancels the armed send when the body region
+  is exited and history re-enters the interrupted step rather than the head
+  `core.send`, so the group runs on with no deadline. Three answers are
+  available - accept it as intended, have the author arm the deadline outside
+  the group so the resume never touches it, or make it an advisory finding when
+  a deadline pair and a `resume` handler share a resumable group. This record
+  states what happens and does not pick. **No shipped document exercises the
+  case**: the examples host's `blk_cp_authz` is a plain `core.group` whose rail
+  carries only `abandon` handlers
+  (`priv/fixtures/card_processing.json:331-342`), so nothing would have caught
+  this at runtime either.
 - **The deadline-pair advisory** (decision 6): its findings, their severity,
   and whether "the send is not the head of the body" is a warning or silence.
   ADR-0005's findings layer and the declaration-advisory work own it.

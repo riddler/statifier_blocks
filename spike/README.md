@@ -869,7 +869,10 @@ naming question, flagged and not decided.
 carrying the deadline event and a `delay`, first in a group's `body`, caught
 by a `core.on_event` on that group's rail. The descriptor stays here as the
 record of a refused proposal, and the duration-spelling question above is moot
-for this case because the pair uses `core.send`'s `delay`.
+for this case because the pair uses `core.send`'s `delay`. The one thing the
+record does **not** claim is that the two spellings are equivalent on a
+`resume`: they are not, and neither is the shipped pair equivalent to itself
+across the two group types. ADR-0010 decision 3 has the three behaviours.
 
 ### `core.subchart`, and a reference rather than an embedding
 
