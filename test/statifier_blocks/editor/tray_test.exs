@@ -41,13 +41,30 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp mount_tray(conn, doc \\ nil),
       do: mount_editor(conn, document: doc || with_shelf(), palette: Palette.core())
 
+    # A non-empty tray opens FOLDED (`sb-e2zy`), so a test about what is
+    # drawn inside it opens it first, through the same fold control an
+    # author uses. Written as one helper rather than a line per test so the
+    # tests below assert the tray's contents and not the fold.
+    defp unfold(view) do
+      view
+      |> element(~s(.sb-node__fold[phx-value-block-id="blk_SHELF"]))
+      |> render_click()
+
+      view
+    end
+
+    defp mount_unfolded(conn, doc \\ nil) do
+      {:ok, view, _html} = mount_tray(conn, doc)
+      unfold(view)
+    end
+
     describe "10s and 10t: the style, and the partition it is not in" do
       # Sabotage: dropped `:tray` from `ViewModel`'s `@slot_styles` - red
       # here, because 10i then degrades it to `:primary` and the shelf
       # renders as an ordinary body flow, connectors and all. That is the
       # one bad rendering 10v says the ordinary route cannot reach.
       test "the shelf's body carries the tray style and its own class", %{conn: conn} do
-        {:ok, view, _html} = mount_tray(conn)
+        view = mount_unfolded(conn)
 
         assert has_element?(view, ~s([data-parent-id="blk_SHELF"][data-slot-style="tray"]))
         assert has_element?(view, ~s([data-parent-id="blk_SHELF"].sb-slot--tray))
@@ -58,7 +75,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # document that has a shelf: a frame around the entire workflow, to
       # say something about a shelf beside it (10t).
       test "a tray is no rail, and contributes no boundary", %{conn: conn} do
-        {:ok, view, _html} = mount_tray(conn)
+        view = mount_unfolded(conn)
 
         refute has_element?(view, ~s([data-parent-id="blk_SHELF"].sb-slot--rail))
         refute has_element?(view, ~s([data-parent-id="blk_SHELF"][data-exit-edge]))
@@ -98,6 +115,27 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         refute MapSet.member?(starts, outlet_point("blk_SHELF")), "an edge leaves the tray"
         refute MapSet.member?(starts, card_point("blk_SHELF")), "an edge enters the tray"
+      end
+
+      # The same rule read from the other end, and the reason it is worth its
+      # own assertion (`sb-e2zy`): every refute above names a point an edge
+      # STARTS from, and an edge entering the shelf does not start there - it
+      # ends there, at the anchor card's inlet. The campaign-024 wrap ruling
+      # is that this card takes no inbound arrow at any zoom, because an
+      # arrow into it is what makes the shelf read as a trailing step.
+      #
+      # Sabotage: read `slot.children` instead of `ViewModel.flow_children/1`
+      # in `adjacency_edges/2` - red here, on an edge from the step before
+      # the shelf into the shelf's own card.
+      test "no edge ends on the shelf's anchor card" do
+        ends = edge_ends(with_shelf())
+
+        refute MapSet.member?(ends, card_inlet("blk_SHELF")),
+               "an edge lands on the drafts anchor card"
+
+        # The flow's own inbound edges are untouched, so the refute above is
+        # about the shelf and not about the assertion finding nothing.
+        assert MapSet.member?(ends, card_inlet("blk_B"))
       end
 
       # Sabotage: read `slot.children` instead of `ViewModel.flow_children/1`
@@ -152,12 +190,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # fragment because of.
       test "a config finding on a parked block reaches its card and the panel", %{conn: conn} do
         broken = document([step("blk_A"), shelf([step("blk_PARKED", "not a duration")])])
-        {:ok, view, html} = mount_tray(conn, broken)
+        {:ok, view, _html} = mount_tray(conn, broken)
 
-        # The anchor names a block id, the block is in the document, and where
-        # its findings are drawn is where the block is drawn: the card counts
-        # it, so a folded tray cannot hide it.
-        assert html =~ ~s(data-block-id="blk_PARKED")
+        # A folded tray cannot hide it, which since `sb-e2zy` is the case an
+        # author sees FIRST: the shelf opens folded and 11n's count badge on
+        # the collapsed subtree is what says there is something in there to
+        # look at.
+        assert has_element?(view, ~s([data-block-id="blk_SHELF"] .sb-badge))
+
+        # And unfolded, the anchor names a block id, the block is in the
+        # document, and where its findings are drawn is where the block is
+        # drawn.
+        view = unfold(view)
         assert has_element?(view, ~s([data-block-id="blk_PARKED"][data-findings-count="1"]))
 
         # And it is in the document-level panel's source rather than filtered
@@ -190,8 +234,82 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {:ok, view, _html} =
           mount_editor(conn, document: with_shelf(), palette: Palette.core(), findings: findings)
 
+        # Unfolded, so the refute is about where the finding landed and not
+        # about the fragment being inside something folded shut.
+        view = unfold(view)
+
         assert has_element?(view, ~s([data-block-id="blk_SHELF"][data-findings-count="1"]))
         refute has_element?(view, ~s([data-block-id="blk_F1"][data-findings-count="1"]))
+      end
+    end
+
+    describe "sb-e2zy: a non-empty tray opens folded" do
+      # Sabotage: had `Editor.opening_folds/1` answer `MapSet.new()` - red
+      # here. At default zoom a shelf holding a couple of fragments is taller
+      # than the flow above it, and an author who opened the document to read
+      # the workflow got the parked work instead.
+      test "the shelf is collapsed on mount, and its tray is not drawn", %{conn: conn} do
+        {:ok, view, _html} = mount_tray(conn)
+
+        assert has_element?(view, ~s([data-block-id="blk_SHELF"][data-collapsed="true"]))
+        refute has_element?(view, ~s([data-parent-id="blk_SHELF"][data-slot-style="tray"]))
+        refute has_element?(view, ~s([data-block-id="blk_F1"]))
+      end
+
+      # Sabotage: dropped the `stocked?/1` filter - red here. The tray of an
+      # empty shelf IS the drop target the first fragment is parked onto, so
+      # folding it shut folds away the affordance.
+      test "an empty shelf opens as it always did", %{conn: conn} do
+        {:ok, view, _html} = mount_tray(conn, document([step("blk_A"), shelf([])]))
+
+        assert has_element?(view, ~s([data-block-id="blk_SHELF"][data-collapsed="false"]))
+        assert has_element?(view, ~s([data-parent-id="blk_SHELF"][data-slot-style="tray"]))
+      end
+
+      # The fold is the INITIAL value and nothing else: decision 2's
+      # amendment of 2026-08-30 keeps owning the control, the set stays out
+      # of the document and off the undo stack, and an author who opens the
+      # tray keeps it open for the rest of the session.
+      #
+      # Sabotage: recomputed the folds in `rebuild/1` rather than only on the
+      # opening - red here on the second assertion, and the tray would slam
+      # shut under the author on the next edit.
+      test "unfolding sticks across an edit", %{conn: conn} do
+        view = mount_unfolded(conn)
+
+        assert has_element?(view, ~s([data-block-id="blk_SHELF"][data-collapsed="false"]))
+
+        view
+        |> element(~s(.sb-node__remove[phx-value-block-id="blk_A"]))
+        |> render_click()
+
+        assert has_element?(view, ~s([data-block-id="blk_SHELF"][data-collapsed="false"]))
+      end
+
+      # The reset in `switch_document/2` resets TO the opening folds, so a
+      # document the host swaps in opens the way the same document opens when
+      # it is the first one - the sentence the fit note had to write for its
+      # own opening, applied to this fold.
+      #
+      # Sabotage: left `collapsed_ids: MapSet.new()` in `switch_document/2` -
+      # red here, and the same document would look different depending on
+      # whether it was opened or swapped in.
+      test "a document swapped in opens folded too", %{conn: conn} do
+        view = mount_unfolded(conn, document([step("blk_A"), shelf([])]))
+
+        swapped =
+          Document.new(
+            Block.new("core.sequence",
+              id: "blk_ROOT",
+              slots: %{"body" => [step("blk_A"), shelf(fragments())]}
+            ),
+            id: "bdoc_OTHER"
+          )
+
+        send(view.pid, {:swap_document, swapped})
+        render(view)
+
+        assert has_element?(view, ~s([data-block-id="blk_SHELF"][data-collapsed="true"]))
       end
     end
 
@@ -274,6 +392,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # outlet is a zero-height box and is its own point.
     defp card_point(id), do: "M 100 #{position(id) + 30}"
     defp outlet_point(id), do: "M 100 #{position(id) + 40}"
+    # And the TARGET of one is the card's top edge, which is where the
+    # arrowhead is drawn.
+    defp card_inlet(id), do: "L 100 #{position(id)}"
 
     defp edges(doc) do
       doc
@@ -288,6 +409,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc
       |> edges()
       |> Enum.map(fn edge -> edge.d |> String.split(" ") |> Enum.take(3) |> Enum.join(" ") end)
+      |> MapSet.new()
+    end
+
+    defp edge_ends(doc) do
+      doc
+      |> edges()
+      |> Enum.map(fn edge -> edge.d |> String.split(" ") |> Enum.take(-3) |> Enum.join(" ") end)
       |> MapSet.new()
     end
 
