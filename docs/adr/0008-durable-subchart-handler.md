@@ -310,3 +310,50 @@ deliberately so that each half goes through its own repository's review.
 
 **Nothing here is implemented.** This is the design record; the implementation
 is `sb-2i04`, mirrored with `sp-nt8`, and the two halves close together.
+
+---
+
+## Note (2026-09-01): decision 5, the four-reason table is satisfied jointly
+
+A dated note rather than an amendment. Decision 5 is unchanged in every
+clause: the refusal set is the campaign-023 three plus exactly one
+durable-only reason, `child_run_creation_failed`, and it is closed at four.
+What this records is *which package raises which of the four*, which the
+table above deliberately did not say and which the implementation
+(`sb-2i04`, mirrored with `sp-nt8`) has now fixed on both sides.
+
+**The set is satisfied jointly by the two packages, not by this one alone.**
+
+| Reason | Raised by |
+|---|---|
+| `unknown_document` | `StatifierBlocks.Runtime.DurableSubchart` |
+| `child_compile_findings` | `StatifierBlocks.Runtime.DurableSubchart` |
+| `cycle_refused` | `StatifierBlocks.Runtime.DurableSubchart` |
+| `child_run_creation_failed` | `StatifierPersistence.Driver`, from its own `start_child/3` refusals |
+
+This module's handler surface is therefore the **three inherited reasons**,
+carried on the `{:error, reason: reason, detail: detail}` answer its dispatch
+fun returns, and nothing it can do produces the fourth. That follows from
+decision 4 rather than adding to it: creating the child run happens *after*
+this package has answered, inside the parent's serialized step, so the module
+has no way to observe the failure and does not pretend to. The driver's
+`{:start_child, ...}` arm is the one site that turns a `{:refused, detail}`
+from `start_child/3` into `{:failed, reason: "child_run_creation_failed",
+detail: detail}`, and `sp-ADR-0008` funnels every one of its own refusal
+causes - an adapter that cannot enumerate children, a
+`Statifier.Invoke.Source.resolve/2` reason, an unidentified chart, an
+existing run - back through that single return, so the fourth string is
+emitted in exactly one place on that side.
+
+Both halves of the split are visible in the shipped code: the same table
+stands in `StatifierBlocks.Runtime.DurableSubchart`'s moduledoc under "The
+refusal set, and which half raises which reason", and the driver's clause is
+the one that spells the string.
+
+Nothing about the closure changes. The set is still four, this package can
+still not emit a fifth, and `StatifierBlocks.Runtime.Subchart` still has
+three - it has no child run to fail to create. The record's closing bullet
+above was written before the implementation landed; the design it describes
+is what landed, and the mirrored pair stays open for the operator to close.
+
+Filed with `sb-8fsb`, campaign-026.

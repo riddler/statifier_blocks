@@ -4473,3 +4473,39 @@ per-palette-entry fixtures pane is still undecided.
 
 No decision moves, no clause is edited, and no text above this line changes.
 Filed with `sb-0vt`, campaign-026's Lane A3, under ruling RQ-026-5.
+
+---
+
+## Note (2026-09-01): decision 2, what amendment 2b's "clears it" means
+
+A dated note rather than an amendment, and a one-line reconciliation of two
+sentences of this record that a reader can read as disagreeing.
+
+The 2026-08-30 amendment's clause 2b says `switch_document/2` "clears it,
+exactly as it clears the selection", and it was literally true when it was
+written: the collapsed set went to the empty set on a document identity
+change. The 2026-09-01 note on decision 10 then gave the fold an opening
+value - a non-empty tray opens folded - and said "the reset and the opening
+are the same value, deliberately". The shipped shell does the second: both
+clauses of `switch_document/2` in `lib/statifier_blocks/editor.ex` assign
+`collapsed_ids` from `opening_folds/1`, not from `MapSet.new/0`.
+
+**The two say the same thing, and 2b's guarantee is untouched.** What 2b
+promises is that no fold carried from the old document survives the swap -
+"a block id from the old document names nothing in the new one" - and
+resetting to the new document's opening folds is exactly that: every id in
+the resulting set is a stocked shelf in the document being opened, and no id
+from the old one can be in it. Where the document has no stocked shelf,
+`opening_folds/1` returns the empty set and the behaviour is literally the
+one 2b describes.
+
+Read 2b as *clears the author's folds*, not as *assigns the empty set*. The
+rest of the clause stands unedited: the reset still fires only on a document
+identity change, the palette's own fold (and, per the 2026-08-30 fullscreen
+amendment, the pane folds) is still the deliberate exception because it
+addresses no block, the set is still per-session editor state that is neither
+in the document nor on the undo stack, and it is still not persisted in
+either direction.
+
+No decision moves and no clause is edited. Filed with `sb-8fsb`,
+campaign-026.
