@@ -863,6 +863,14 @@ anywhere and there is not supposed to be one. Whether the vocabulary should
 insist on one spelling of "duration" across a step and a rule is a Phase-B
 naming question, flagged and not decided.
 
+**Answered 2026-09-01, and not the way this section proposes.** ADR-0010
+(`docs/adr/0010-clock-interrupt-spelling.md`, bead `sb-j2o`) decides that no
+`core.timeout` joins the vocabulary: a clock interrupt is a `core.send`
+carrying the deadline event and a `delay`, first in a group's `body`, caught
+by a `core.on_event` on that group's rail. The descriptor stays here as the
+record of a refused proposal, and the duration-spelling question above is moot
+for this case because the pair uses `core.send`'s `delay`.
+
 ### `core.subchart`, and a reference rather than an embedding
 
 A step that runs another chart and waits for it, with `core.invoke`'s

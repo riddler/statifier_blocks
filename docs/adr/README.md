@@ -11,6 +11,7 @@
 | [0007](0007-block-type-defaults.md) | A block type declares its defaults with `use`, and the leaf invoke step is one declaration | accepted |
 | [0008](0008-durable-subchart-handler.md) | The durable subchart handler answers at dispatch time, not from a pure `start/2`, and its refusal set gains exactly one reason | accepted |
 | [0009](0009-fan-out-block-type.md) | Durable fan-out is a new block type, `core.map`, compiling to one invocation whose handler starts N children | accepted |
+| [0010](0010-clock-interrupt-spelling.md) | A clock interrupt is a delayed `core.send` at the head of a group's body caught by a `core.on_event` on its rail, and there is no `core.timeout` | proposed |
 
 New ADRs: next number, same three-section format (Context, Decision,
 Consequences). Pick the number against a freshly fetched remote.
