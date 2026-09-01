@@ -52,8 +52,11 @@ discipline the accumulated payload is under when N is large.
 **What this record does not do is build any of it.** Campaign 026's ruling
 `R26-1` defers the implementation to a later campaign. There are no `lib/`
 changes here and no row is added to ADR-0002 decision 10's vocabulary table -
-that table and `StatifierBlocks.Palette.core_types/0` agree at thirteen (G8),
-and they should go on agreeing until the code lands.
+that table records fifteen types (G11, which supersedes G8's count) and
+`StatifierBlocks.Palette.core_types/0` now registers the same fifteen
+(`lib/statifier_blocks/palette.ex:87-104`, since `sb-uag7` landed the two
+modules G11 was still waiting on), and they should go on agreeing until the
+code lands.
 
 ## Decision
 
@@ -499,11 +502,15 @@ subchart child) are cited as they stand.
 * **The effect vocabulary and chart identity.** Both are `statifier-ex`'s. This
   record mints no instruction, no event name and no identity rule, and cites
   `st-ADR-0051`, `st-ADR-0052` and `st-ADR-0068` rather than restating them.
-* **ADR-0002 decision 10's table.** No row is added. The table records thirteen
-  types, `StatifierBlocks.Palette.core_types/0` registers thirteen (G8), and
-  they should still agree the day after this record is accepted. The fourteenth
-  row is an ADR-0002 amendment that lands with the implementation, and it is
-  the implementation bead's to write.
+* **ADR-0002 decision 10's table.** No row is added. The table records fifteen
+  types (G11, which supersedes G8's thirteen), and
+  `StatifierBlocks.Palette.core_types/0` registers the same fifteen
+  (`lib/statifier_blocks/palette.ex:87-104`) now that `sb-uag7` has landed the
+  `core.drafts` and `core.placeholder` modules G11 recorded the table as
+  running ahead of. They should still agree the day after this record is
+  accepted. `core.map`'s row would be the **sixteenth**, and it is an ADR-0002
+  amendment that lands with the implementation - the implementation bead's to
+  write, not this record's.
 * **ADR-0006 and ADR-0005 11e.** `core.map`'s `items` carries
   `datamodel_path?: true` and is subject to the declared-path advisory on
   exactly the terms every other datamodel path is. This record neither widens
