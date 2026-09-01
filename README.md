@@ -494,7 +494,7 @@ it is a pure function of its argument and it is called inside a rescue - a
 type with a bug in it gets an ordinary join marker rather than taking the
 canvas down.
 
-## The one handler this package does ship
+## The handlers this package does ship
 
 The seam above is unchanged: a block type still only **names** an invoke
 type, and the host still registers the handler that runs it, per session.
@@ -552,12 +552,39 @@ supervision tree, then passes `handlers/1`'s map as the `:invoke_handlers`
 option on every `Statifier.Session.start_link/2` call that should run
 subcharts.
 
-What this handler does not do: run the child as its own durably persisted
-run with parent linkage recorded in run metadata, composing with
-`statifier_persistence`/`statifier_oban`. That durable variant is a
-deliberate, named follow-up, not a gap in this one - `start/2` staying a
-pure planning callback is what scopes this handler to the in-memory
-`Statifier.Session` case in the first place.
+### The durable variant
+
+`start/2` staying a pure planning callback is what scopes the handler
+above to the in-memory `Statifier.Session` case: a child that is its own
+durably persisted run has to record its parent linkage as part of
+starting, and a planning callback performs nothing.
+
+So the durable variant is a **second module**,
+`StatifierBlocks.Runtime.DurableSubchart` (ADR-0008). It takes the same
+two callbacks, refuses for the same reasons, and answers at dispatch time
+instead - `dispatch_fun/1` builds the fun
+`StatifierPersistence.Driver`'s `:dispatch` option takes:
+
+```elixir
+dispatch = StatifierBlocks.Runtime.DurableSubchart.dispatch_fun(MyApp.Charts)
+```
+
+The child then runs as its own persisted run, linked to the parent's run
+and invocation with a chart-identity pin, and its completion re-enters the
+parent through the driver's own `done.invoke` door long after the process
+that started it is gone. A durable start has one refusal reason the
+in-memory handler cannot have - `child_run_creation_failed` - and the
+driver raises it, since creating the run happens after this package has
+answered. Nesting works with no extra wiring; fan-out (one invocation, N
+children) is named by the record and not built.
+
+Which variant runs is the host's session wiring, never the document: the
+same block document compiles to the same bytes either way. A host that
+wires the in-memory module into a durable run gets a child that does not
+survive the restart the parent was made durable to survive.
+
+Nothing in this package depends on `statifier_persistence`; the durable
+module names no module from it and answers in plain tuples.
 
 ## Embedding the editor
 

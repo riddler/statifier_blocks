@@ -119,10 +119,17 @@ defmodule StatifierBlocks.Runtime.Subchart do
   `Statifier.Session`'s in-memory case: an in-memory resolver reading a
   document out of the host's own process is pure, but a durable variant -
   the child as its own persisted run, with parent linkage carried in run
-  metadata, composing with `statifier_persistence`/`statifier_oban` - would
-  need to durably record that linkage as part of starting, which is not a
-  planning-time operation. That variant is the deliberate follow-up
-  (campaign-023 ruling R-e); nothing for it is implemented here.
+  metadata, composing with `statifier_persistence`/`statifier_oban` - has
+  to durably record that linkage as part of starting, which is not a
+  planning-time operation.
+
+  That variant is `StatifierBlocks.Runtime.DurableSubchart`, a **second
+  module beside this one** (ADR-0008 decision 1), and nothing about this
+  one changes when a host wires it: same resolver contract, same three
+  reasons, same `{:start_child, ...}` instruction, same purity. What the
+  two share - resolving the document id and compiling the child - is
+  `StatifierBlocks.Runtime.Subchart.Resolution`, one implementation used
+  by both rather than a second copy (ADR-0008 decision 2).
 
   ## Why the palette arrives as a callback
 
@@ -143,16 +150,16 @@ defmodule StatifierBlocks.Runtime.Subchart do
   alias Statifier.Effect.Invoke
   alias Statifier.Event
   alias Statifier.Invoke.Handler
-  alias StatifierBlocks.{Compiled, Compiler, Document, Palette}
-  alias StatifierBlocks.Compiler.Finding
+  alias StatifierBlocks.{Compiled, Document, Palette}
   alias StatifierBlocks.Core.Subchart
+  alias StatifierBlocks.Runtime.Subchart.Resolution
 
   @callback resolve_chart(document_id :: String.t(), ctx :: Handler.ctx()) ::
               {:ok, Document.t()} | {:ok, Compiled.t()} | {:cycle, [String.t()]} | :error
   @callback palette() :: Palette.t()
 
   @typedoc "The reason a start refused, always one of the closed R-b set."
-  @type reason :: String.t()
+  @type reason :: Resolution.reason()
 
   defmacro __using__(_opts) do
     quote do
@@ -186,7 +193,7 @@ defmodule StatifierBlocks.Runtime.Subchart do
   @doc false
   @spec start(Invoke.t(), Handler.ctx(), module()) :: {:ok, [Handler.instruction()]}
   def start(%Invoke{} = invoke, ctx, host) do
-    case resolve(invoke, ctx, host) do
+    case Resolution.resolve(invoke, ctx, host) do
       {:ok, scxml} -> {:ok, [{:start_child, %{invoke | content: scxml}, {:invoke, invoke}}]}
       {:refuse, reason, detail} -> {:ok, [refusal(invoke, reason, detail)]}
     end
@@ -201,55 +208,6 @@ defmodule StatifierBlocks.Runtime.Subchart do
   def forward(invoke_id, %Event{} = event, _ctx) when is_binary(invoke_id),
     do: {:ok, [{:forward, invoke_id, event}]}
 
-  # The non-binary-`src` totality rule: `core.subchart` only ever emits a
-  # literal document id, so a chart arriving with anything else (nil, or a
-  # `srcexpr` result) did not come from this package. Refused directly,
-  # without ever calling the resolver.
-  @spec resolve(Invoke.t(), Handler.ctx(), module()) ::
-          {:ok, String.t()} | {:refuse, reason(), map()}
-  defp resolve(%Invoke{src: src}, _ctx, _host) when not is_binary(src) do
-    {:refuse, "unknown_document", %{"chart" => inspect(src)}}
-  end
-
-  defp resolve(%Invoke{src: src}, ctx, host) do
-    case host.resolve_chart(src, ctx) do
-      {:ok, %Document{} = document} ->
-        compile_child(document, ctx, host, src)
-
-      {:ok, %Compiled{scxml: scxml}} ->
-        {:ok, scxml}
-
-      {:cycle, path} when is_list(path) ->
-        {:refuse, "cycle_refused", %{"chart" => src, "cycle" => path}}
-
-      :error ->
-        {:refuse, "unknown_document", %{"chart" => src}}
-
-      other ->
-        raise_non_conforming(host, other)
-    end
-  end
-
-  @spec compile_child(Document.t(), Handler.ctx(), module(), String.t()) ::
-          {:ok, String.t()} | {:refuse, reason(), map()}
-  defp compile_child(document, ctx, host, src) do
-    opts = [child_use: true, known_invoke_types: Map.keys(ctx.invoke_handlers)]
-
-    case Compiler.compile(document, host.palette(), opts) do
-      {:ok, %Compiled{scxml: scxml}} ->
-        {:ok, scxml}
-
-      {:error, findings} ->
-        {:refuse, "child_compile_findings",
-         %{"chart" => src, "findings" => Enum.map(findings, &finding_detail/1)}}
-    end
-  end
-
-  @spec finding_detail(Finding.t()) :: %{String.t() => term()}
-  defp finding_detail(%Finding{code: code, message: message, block_id: block_id}) do
-    %{"code" => Atom.to_string(code), "message" => message, "block_id" => block_id}
-  end
-
   @spec refusal(Invoke.t(), reason(), map()) :: Handler.instruction()
   defp refusal(
          %Invoke{invoke_id: invoke_id, state_index: state_index, invoke_index: invoke_index},
@@ -258,13 +216,5 @@ defmodule StatifierBlocks.Runtime.Subchart do
        ) do
     {:raise, :platform, "error.communication.invoke." <> invoke_id,
      {:invoke, state_index, invoke_index}, [data: %{"reason" => reason, "detail" => detail}]}
-  end
-
-  @spec raise_non_conforming(module(), term()) :: no_return()
-  defp raise_non_conforming(host, other) do
-    raise ArgumentError,
-          "#{inspect(host)}.resolve_chart/2 returned #{inspect(other)}, which is not " <>
-            "one of {:ok, %StatifierBlocks.Document{}}, {:ok, %StatifierBlocks.Compiled{}}, " <>
-            "{:cycle, path} or :error"
   end
 end
