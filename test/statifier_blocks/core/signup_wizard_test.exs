@@ -53,11 +53,20 @@ defmodule StatifierBlocks.Core.SignupWizardTest do
     # than dropped from the comparison, so a core type falling out of the
     # worked examples has to be admitted deliberately, and the list shrinks
     # the day an example that uses one of them lands.
+    # `core.drafts` and `core.placeholder` are uncovered on different terms
+    # from the six above, and permanently rather than until an example lands.
+    # Both are facts about a workflow *under construction* (ADR-0002's
+    # amendment of 2026-08-31, section G13), and a worked example is a
+    # finished workflow: an example carrying a parked fragment or a
+    # deliberate gap would be demonstrating an unfinished document as though
+    # it were the reference one.
     uncovered =
       MapSet.new([
         "core.assign",
+        "core.drafts",
         "core.foreach",
         "core.invoke",
+        "core.placeholder",
         "core.raise",
         "core.send",
         "core.subchart"

@@ -98,7 +98,9 @@ defmodule StatifierBlocks.Palette do
       "core.assign" => Core.Assign,
       "core.send" => Core.Send,
       "core.subchart" => Core.Subchart,
-      "core.foreach" => Core.Foreach
+      "core.foreach" => Core.Foreach,
+      "core.drafts" => Core.Drafts,
+      "core.placeholder" => Core.Placeholder
     }
   end
 

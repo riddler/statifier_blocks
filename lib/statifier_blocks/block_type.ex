@@ -375,7 +375,9 @@ defmodule StatifierBlocks.BlockType do
           optional(:keywords) => [String.t()],
           optional(:order) => integer(),
           optional(:layout) => :stack | :columns,
-          optional(:slot_style) => %{optional(String.t()) => :primary | :secondary | :failure},
+          optional(:slot_style) => %{
+            optional(String.t()) => :primary | :secondary | :failure | :tray
+          },
           optional(:slot_outcome_key) => %{optional(String.t()) => String.t()},
           optional(:accent_token) => String.t(),
           optional(:badge) => String.t(),
