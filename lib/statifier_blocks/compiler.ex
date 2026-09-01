@@ -46,7 +46,11 @@ defmodule StatifierBlocks.Compiler do
   ### The Structure stage is whole
 
   Decision 10's table names three things in this stage: slot **arity**,
-  `:undeclared_slot`, and assignability. All three run here, and their
+  `:undeclared_slot`, and assignability. ADR-0004's amendment of
+  2026-08-31, section D3, adds two more to the same row under campaign-024
+  ruling R-b - `:drafts_block_misplaced` and `:duplicate_drafts_block`,
+  the two placement facts a block type's `io/1` cannot carry, owned by
+  `StatifierBlocks.Shelf`. All of them run here, and their
   findings are reported together rather than either short-circuiting the
   other: an undeclared slot key does not induce an assignability finding
   (a slot with no declaration gets `slot_accepts` `:any`, which admits
@@ -197,6 +201,7 @@ defmodule StatifierBlocks.Compiler do
     Emission,
     Palette,
     Provenance,
+    Shelf,
     SlotValidation
   }
 
@@ -453,12 +458,14 @@ defmodule StatifierBlocks.Compiler do
 
   # -- Stage 4: structure ----------------------------------------------------
 
-  # Slot arity, `:undeclared_slot`, and assignability - decision 10's full
-  # table for this stage. Both sources are collected and concatenated
-  # rather than either short-circuiting the other: decision 10 says every
-  # finding within a stage is reported, because those findings are
-  # siblings rather than consequences, and neither of these two is a
-  # consequence of the other (see the moduledoc). This stage runs over
+  # Slot arity, `:undeclared_slot`, assignability, and the shelf's two
+  # placement facts - decision 10's full table for this stage, plus the two
+  # codes ADR-0004's amendment of 2026-08-31, section D3, adds to its
+  # Structure row under campaign-024 ruling R-b. Every source is collected
+  # and concatenated rather than any of them short-circuiting the others:
+  # decision 10 says every finding within a stage is reported, because those
+  # findings are siblings rather than consequences, and none of these three
+  # is a consequence of another (see the moduledoc). This stage runs over
   # the *document* rather than the resolved tree because both
   # `SlotValidation.validate/2` and `Assignability.validate/3` are the one
   # implementation the editor and the compiler consult (ADR-0002 decision
@@ -477,10 +484,42 @@ defmodule StatifierBlocks.Compiler do
         {:error, findings} -> Enum.map(findings, &structure_finding/1)
       end
 
-    case slot_findings ++ assignability_findings do
+    shelf_findings =
+      case Shelf.validate(document) do
+        :ok -> []
+        {:error, findings} -> Enum.map(findings, &shelf_finding/1)
+      end
+
+    case slot_findings ++ assignability_findings ++ shelf_findings do
       [] -> :ok
       findings -> {:error, findings}
     end
+  end
+
+  # Both carry `severity: :error` and `fault: :author` by `Finding.new/4`'s
+  # own defaults for this stage, and neither carries a `config_key`, because
+  # neither is about a value in a form (ADR-0004's amendment of
+  # 2026-08-31, section D3). Their anchor is the block, which is decision
+  # 5's totality doing its ordinary work: an unplaceable block is still a
+  # block and still names itself.
+  @spec shelf_finding(Shelf.finding()) :: Finding.t()
+  defp shelf_finding({:drafts_block_misplaced, id} = reason) do
+    Finding.new(
+      :structure,
+      reason,
+      ~s(a drafts block goes directly in the root block's "body" slot and nowhere else),
+      block_id: id
+    )
+  end
+
+  defp shelf_finding({:duplicate_drafts_block, id} = reason) do
+    Finding.new(
+      :structure,
+      reason,
+      "the document already carries a drafts block, and it carries at most one; " <>
+        "the first one in document order is the one kept",
+      block_id: id
+    )
   end
 
   @spec assignability_context(keyword()) :: Assignability.context()
