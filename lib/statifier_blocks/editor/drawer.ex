@@ -8,12 +8,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     **document-level**. Content that is a grid of rows about the whole document
     goes in the drawer; content about one block does not, whatever its shape.
 
-    Two tabs ship. Truth tables were first. The document-level findings list
+    Three tabs ship. Truth tables were first. The document-level findings list
     joined them under operator ruling R4 (2026-08-29), which retired the text
     block that used to sit under the canvas: a list of findings is a grid of
     rows about the whole document, so 1A's test admits it and the canvas gets
-    its height back. Fixture runs and the datamodel view have reserved places
-    and are not drafted here.
+    its height back. Declarations joined them under the 2026-09-01 amendment
+    (clause 2i), which took ADR-0001 11i's named door: the document's own
+    `datamodel` roots are a grid of rows about the envelope, which is 1A's
+    test again. Fixture runs still have a reserved place and so does the
+    read-only declared-path view, and neither is drafted here.
 
     The measurable reason the drawer exists at all: a truth table for a branch
     in a credit-card processing document is one row per case and one column per
@@ -107,7 +110,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
-    alias StatifierBlocks.Editor.Findings
+    alias StatifierBlocks.Editor.{Declarations, Findings}
     alias StatifierBlocks.Predicates.TruthTable
     alias StatifierBlocks.{Shell, ViewModel}
 
@@ -116,6 +119,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:root, ViewModel.Node, required: true)
     attr(:target, :any, required: true)
     attr(:class, :string, default: nil)
+
+    attr(:declarations, :list,
+      default: [],
+      doc: "the entries the Declarations tab draws - the document's, or an author's draft"
+    )
+
+    attr(:declaration_refusal, :string,
+      default: nil,
+      doc: "the sentence for a refused declaration edit, or `nil`"
+    )
 
     attr(:host_tabs, :list,
       default: [],
@@ -234,6 +247,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                   findings={@view.findings}
                   orphans={@view.orphans}
                   root={@root}
+                  target={@target}
+                />
+              <% @view.tab == :declarations -> %>
+                <Declarations.declarations
+                  entries={@declarations}
+                  refusal={@declaration_refusal}
                   target={@target}
                 />
               <% true -> %>

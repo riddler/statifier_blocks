@@ -218,9 +218,17 @@ defmodule StatifierBlocks.ShellTest do
           host_tabs: [host_tab("runs", "Runs", 3), host_tab("jobs", "Jobs", 0)]
         })
 
-      assert Enum.map(view.tabs, & &1.id) == [:tables, :findings, "runs", "jobs"]
-      assert Enum.map(view.tabs, & &1.title) == ["Truth tables", "Findings", "Runs", "Jobs"]
-      assert Enum.map(view.tabs, & &1.count) == [0, 0, 3, 0]
+      assert Enum.map(view.tabs, & &1.id) == [:tables, :findings, :declarations, "runs", "jobs"]
+
+      assert Enum.map(view.tabs, & &1.title) == [
+               "Truth tables",
+               "Findings",
+               "Declarations",
+               "Runs",
+               "Jobs"
+             ]
+
+      assert Enum.map(view.tabs, & &1.count) == [0, 0, 0, 3, 0]
     end
 
     # Sabotage: keeping `resolve_tab/2`'s old `when tab in @drawer_tabs` guard
@@ -266,7 +274,7 @@ defmodule StatifierBlocks.ShellTest do
           host_tabs: [host_tab("findings", "Mine", 9), host_tab("tables", "Also mine", 9)]
         })
 
-      assert Enum.map(view.tabs, & &1.id) == [:tables, :findings]
+      assert Enum.map(view.tabs, & &1.id) == [:tables, :findings, :declarations]
       assert Shell.host_tabs([host_tab("findings", "Mine", 9)]) == []
     end
 

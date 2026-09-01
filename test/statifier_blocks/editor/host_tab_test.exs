@@ -52,9 +52,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # upgrade.
       #
       # Sabotage: `Shell.host_tabs/1` answering an empty list with a
-      # placeholder entry - a third, nameless tab appears and the ordering
+      # placeholder entry - a fourth, nameless tab appears and the ordering
       # assertion goes red.
-      test "carries the two package tabs and nothing else", %{conn: conn} do
+      test "carries the three package tabs and nothing else", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn)
         open(view)
 
@@ -62,7 +62,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert has_element?(view, "#sb-drawer-tab-tables")
         assert has_element?(view, "#sb-drawer-tab-findings")
-        assert tabs(html) == ["sb-drawer-tab-tables", "sb-drawer-tab-findings"]
+        assert has_element?(view, "#sb-drawer-tab-declarations")
+
+        assert tabs(html) == [
+                 "sb-drawer-tab-tables",
+                 "sb-drawer-tab-findings",
+                 "sb-drawer-tab-declarations"
+               ]
       end
     end
 
@@ -77,6 +83,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert tabs(render(view)) == [
                  "sb-drawer-tab-tables",
                  "sb-drawer-tab-findings",
+                 "sb-drawer-tab-declarations",
                  "sb-drawer-tab-jobs"
                ]
 
@@ -203,7 +210,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         html = render(view)
 
-        assert tabs(html) == ["sb-drawer-tab-tables", "sb-drawer-tab-findings"]
+        assert tabs(html) == [
+                 "sb-drawer-tab-tables",
+                 "sb-drawer-tab-findings",
+                 "sb-drawer-tab-declarations"
+               ]
+
         assert view |> element("#sb-drawer-tab-findings") |> render() =~ "Findings"
         refute view |> element("#sb-drawer-tab-findings") |> render() =~ "Mine"
       end
@@ -218,6 +230,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert tabs(render(view)) == [
                  "sb-drawer-tab-tables",
                  "sb-drawer-tab-findings",
+                 "sb-drawer-tab-declarations",
                  "sb-drawer-tab-runs"
                ]
       end

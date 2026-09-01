@@ -4103,3 +4103,241 @@ Unchanged by this note: 10s, 10t, 10u, 10v and 11n in every particular; the
 edit algebra, which parks and places a fragment with the ordinary Move
 commands; and decision 2's four-command closed set, which the fold was
 already outside of.
+
+---
+
+## Amendment (2026-09-01): decision 2, a fifth command, and the declarations panel
+
+**Status: proposed (2026-09-01), implementing bead `sb-d0nv`, campaign-026's
+Lane A1.** Additive; decisions 2, 3, 7, 8, 9 and 11 stand as written and no
+text above this line is edited by this section, which supersedes decision 2's
+"four, not seven" count rather than rewriting it in place - the convention
+every amendment on this record follows.
+
+An amendment rather than a note, and this one could not have been anything
+else. A note records what accepted text already meant; decision 2 says its
+command set is closed at four, and this section makes it five. It also takes a
+door another record opened and left for this one.
+
+### Context
+
+ADR-0001's amendment of 2026-08-31 gave the block document a top-level
+`datamodel` key: an ordered list of `{id, expr, description}` entries naming
+the `<data>` roots the document's own guards and assigns need. Its 11i names
+the surface this section builds and declines to build it, in the sentence this
+section exists to answer:
+
+> A host may now carry roots in the tree the author edits rather than in the
+> publish call, which is what makes an editor able to show and edit them one
+> day. **No editor surface is proposed here**; that is ADR-0005's, when taken.
+
+This is ADR-0005 taking it. Two clauses of that record are untouched by this
+section and are named so that nobody has to check. Its 11b's entry shape is
+exactly three fields and this section adds no fourth; its 11g's split between
+the two artifacts stands, so an ADR-0006 datamodel document still describes a
+vocabulary and this key still only declares that a root exists.
+
+The reason to take it now rather than leave it named is that the key is
+already load-bearing and already unreachable. The compiler emits its roots,
+`content_hash/1` covers them (11d), and this record's own 11k reads them as
+the third of the three sources feeding the 11e advisory - so a document
+without them lints its paths differently from one with them. Every one of
+those consequences is available to a host that hand-edits JSON and to nobody
+else. An authoring package whose author cannot author a key its own compiler
+compiles is the gap this section closes.
+
+### Decision
+
+**2g. Decision 2's closed set grows by one:
+`{:set_datamodel, [%Document.DatamodelEntry{}]}`.** It replaces the
+document's whole `datamodel` list. The four structural rules the algebra
+applies are about the tree and none of them reaches it: an entry is not a
+block, the list is not a slot, and there is no `target()` for an index to be
+read against.
+
+The set opens here and did not open for the fold, and the two cases are
+decided by the same test rather than by different ones. 2a kept the set at
+four because a collapsed container is "editor state ... neither in the
+document nor on the undo stack". A declaration is the opposite on both counts.
+It is in the document by 11a and in the canonical bytes by 11d, which puts it
+in the hash; and an author who deletes a declaration and cannot undo it has
+lost document content, which is the loss the undo stack exists to prevent. The
+question 2a asked - is this thing part of the document? - has the other answer
+here, so it gets the other outcome.
+
+**Five, and not eight.** No per-entry insert, remove or move. Decision 2's own
+argument for collapsing seven commands into four is the argument for
+collapsing four gestures into one here: it means there is one code path that
+writes the key, so the grammar check, the ordering and the inverse have one
+implementation each rather than four that drift. Add, edit, remove and reorder
+are the same command carrying a different list.
+
+Three further reasons, none of which decision 2 could have anticipated because
+none of them is about a tree. The entry list has no `target()` and no slot, so
+per-entry commands would need a second index vocabulary beside decision 4's,
+applied to a different kind of container and tested separately. The list is
+small and wholly serializable - a document's roots, not a subtree - so
+carrying it entire costs a command log nothing that matters. And the inverse
+is the list that was there before, which makes the command its own kind of
+inverse and makes decision 3's law hold by construction: no new inverse rule
+is written, and the property test gains a command rather than a case.
+
+**2h. The command is where the grammar is enforced, and `check_config/3` is
+not.** `Edit.apply/2` refuses any list ADR-0001 11b and 11c refuse, in 11c's
+own error family - `{:malformed_envelope, {:datamodel, reason}}` - by calling
+the one implementation of that grammar rather than restating it.
+`StatifierBlocks.Validation` is that implementation; the function it already
+had becomes public and nothing about what it checks changes.
+
+Not `check_config/3`, because that is decision 9's block-type gate: it
+resolves a block through the palette and asks its type. A declaration has no
+block type and no palette to ask. What it has is a grammar, and a grammar is
+the same kind of question the four structural rules answer for the tree, so it
+is answered where they are. `check_config/3` gains a clause that says `:ok`
+and says why.
+
+One consequence is worth stating rather than leaving to be discovered: a list
+this command accepts is a list `Document.validate/1` accepts, so `to_json/1`
+can never raise on a document this command produced. `Edit.History` needs no
+change at all - `commit/4`, `undo/3` and `redo/3` route through the funnel
+they already have, and the refusal reaches all three.
+
+**2i. The panel is a drawer tab, and it fills the place 1A reserved.** 1A's
+admission test is two words and a declaration list passes both: it is a grid
+of rows - a name, an initial value, a description - and it is about the
+envelope, which is the whole document rather than any block in it. 3A keeps it
+out of the inspector for the reason 3A already gave about Datamodel and
+Fixtures: they were never about the selected block.
+
+It is the third tab, after Truth tables and Findings, so 2A's unchosen-tab
+rule reaches it unchanged and a document with tables in it opens where it
+always did. The strip's count is the number of declarations the **document**
+holds, never the number in a draft (2l), because 2A's count is a statement
+about the document.
+
+**The tab is called Declarations, not Datamodel.** The place 1A reserved was
+described as "the datamodel declared-path view", and this is not that view.
+That sentence described a read-only report, which under 11k's union would be a
+report over three sources at once - the host's datamodel, the compile call's
+`:declare` roots, and this key. What ships here is the one source an author
+can change. The report stays unbuilt and this section reserves nothing for it;
+if it is taken later it is admitted by 1A on its own merits, here, like any
+other tab. The name follows ADR-0001 11g's split for the same reason that
+record draws it: a tab called Datamodel beside an ADR-0006 datamodel document
+names the wrong artifact.
+
+**2j. Reorder is buttons, and that is the gesture rather than the fallback.**
+Decision 7 ships exactly one JavaScript hook, on the canvas's cards, and a
+second drag surface would be a second hook or a widening of the first. A list
+of three rows buys neither. Up and Down are native buttons, one command each.
+
+Decision 8 is satisfied by construction rather than by a parallel path. Its
+rule is that every drop target is reachable without dragging, written for a
+canvas that has gaps, slots and geometry; this panel has none of the three, so
+there is no dragging path for the keyboard path to be an alternative to. A
+control at either end of the list is disabled rather than live-and-inert, and
+the server refuses the same move anyway - the ends are a no-op on both sides,
+because a wrapping reorder would make one press of a repeated gesture do the
+opposite of the press before it.
+
+Order stays load-bearing. It is the emission order of the document's `<data>`
+elements (11a), which is why moving a row is a document edit on the undo stack
+and not a display preference, and it is the authoring act ADR-0001's
+alternatives section refused to make inexpressible.
+
+**2k. A gesture that lands on what the document already holds commits
+nothing.** An index off the end, a move off either end, and a form change that
+retypes the value already there all produce the list the document has. None of
+them reaches the command: no history entry, no notification, no revision move.
+Without this the first row's Up would push an undo entry that undoes nothing,
+and an author's next undo would appear to be broken.
+
+**2l. A refused edit is held as a draft, and its refusal is not a finding.**
+This is decision 9's draft treatment applied to the second surface with the
+same problem. A value the document refuses is still the value the author is
+holding, and redrawing the document's own value over it deletes their
+keystrokes to punish a typo. The panel therefore draws the refused list, and
+the sentence saying why is drawn above it. The draft is cleared by a change
+the document accepts, and by a document the host swaps in - the same reset
+`switch_document/2` already applies to the config drafts, for the same reason.
+
+The refusal is **not** a `%Finding{}` and never enters the findings pipeline.
+Decision 11 makes the anchor the whole routing mechanism and its anchors name
+a block, a slot or a config key; none of the three can name a declaration
+entry. Inventing a fourth anchor shape would be a change to decision 11 that
+this section does not need and has no second consumer for: a refusal here is
+about the panel that produced it, it is transient, and it is already on the
+author's screen. 11g's no-second-channel rule is untouched, because nothing
+here is a channel.
+
+**2m. The panel produces no advisories, and changes none of 11e's rules.**
+ADR-0001 11h - "It produces no finding about an undeclared path, ever" - is a
+statement about the key and is unchanged by there being an editor for it. 11e
+is still the only producer, still anchored `{:config, block_id, key}`, still
+`:info` from `:lint`, and it already reads the document's own roots as 11k's
+third source. Editing a declaration therefore changes which advisories 11e
+produces, through an input that already exists and with no new rule anywhere.
+That is 11k working, not a widening of it.
+
+`sb-sj79` carries campaign-026's R26-8 confirmation of the same point on this
+record. Nothing in this section waits on it and nothing in this section
+forecloses it.
+
+### Consequences
+
+- **The document's declaration surface becomes reachable.** Everything 11i
+  said the key made possible - roots carried in the tree the author edits
+  rather than in the publish call - is now something an author can do without
+  hand-editing JSON.
+- **The command set is five and the reason it is closed is unchanged.** What
+  2a defended was not the number; it was the rule that a presentation state
+  does not become a command. That rule is intact, and this section is the
+  case on the other side of it.
+- **The property test gains a command rather than a case.** Because the
+  inverse of `{:set_datamodel, entries}` is `{:set_datamodel, previous}`,
+  decision 3's law needs no new arm: the generator emits the command, valid
+  and refusable, and the existing law covers it.
+- **`StatifierBlocks.Validation`'s datamodel check acquires a second caller**
+  and becomes public for it. The `datamodel` key now has two writers - a
+  stored document and this command - and one refusal, which is the property
+  ADR-0001 11c wanted when it put the check in structural validation rather
+  than in the compile pipeline.
+- **The drawer's tab set is three and the bullet that governs it is
+  unweakened.** 1A's test admitted this tab; fixture runs and the read-only
+  declared-path view keep their reserved places; a host tab is still the
+  host's obligation under the 2026-08-30 seam amendment.
+- **A host that renders the editor gets the panel with no change of its own.**
+  No new assign, no new event, no new slot. The document reaches the host
+  through `on_change` exactly as every other edit does.
+
+### Alternatives considered
+
+- **Declaration edits outside the undo stack, as editor state.** Rejected by
+  2a's own test: the key is in the document and in the hash, so an edit to it
+  is not editor state, and a deleted declaration would be document content
+  with no way back.
+- **Per-entry `:insert_declaration` / `:remove_declaration` /
+  `:move_declaration` commands.** Rejected: three commands where one does, a
+  second index vocabulary beside decision 4's applied to a container that is
+  not a slot, and three inverses to write and test where the whole-list
+  command's inverse is the previous list.
+- **A general `{:update_envelope, key, value}` command.** Rejected as too
+  wide for what is being asked. It would put `id` and `revision` inside the
+  algebra, and 8A gives both to the host; a command able to rewrite the
+  document's identity is not one this record wants written by an author
+  gesture. If `metadata` ever needs a surface it gets its own decision, on
+  the same terms this one took.
+- **Drag-to-reorder, reusing the canvas hook.** Rejected: decision 7's hook is
+  about cards on a measured canvas and would have to grow a second mode for a
+  table with no geometry, which is a widening of the one hook this record
+  deliberately has - for a gesture two buttons already express.
+- **Rendering a refusal as an `:info` finding.** Rejected: decision 11's
+  anchors cannot name a declaration entry, so it would need a fourth anchor
+  shape, and 11c's rule that findings are claims about the document does not
+  fit a message about a form the document never accepted.
+- **An expression editor for `expr`, through decision 9's
+  `expression_component` seam.** Rejected here, not forever. That seam is for
+  conditions on blocks, `expr` is written verbatim into the emitted
+  `<data expr="...">` attribute, and whether it is well-formed is predicator's
+  question and the compiler's - not one this panel can answer. The field is a
+  text input, and a future section may say otherwise.

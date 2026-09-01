@@ -2,6 +2,7 @@ defmodule StatifierBlocks.EditTest do
   use ExUnit.Case, async: true
 
   alias StatifierBlocks.{Block, Document, Edit}
+  alias StatifierBlocks.Document.DatamodelEntry
 
   # A signup wizard with an A/B-tested confirmation step and two parallel
   # conversion-event lanes, built entirely from `Palette.core()` types
@@ -463,6 +464,90 @@ defmodule StatifierBlocks.EditTest do
 
       assert Edit.apply(document, {:update_config, "blk_GHOST", %{}}) ==
                {:error, {:no_such_block, "blk_GHOST"}}
+    end
+  end
+
+  # ADR-0005's 2026-09-01 amendment, 2g and 2h: the fifth command, and the
+  # one command whose content is checked here rather than by a palette.
+  describe "{:set_datamodel, entries}" do
+    defp signup(expr \\ nil), do: %DatamodelEntry{id: "signup", expr: expr}
+
+    # Sabotage: returning `{:set_datamodel, entries}` as the inverse instead
+    # of `{:set_datamodel, document.datamodel}` - the "inverse" re-applies the
+    # change, so undo becomes a second do and the round-trip law goes red
+    # here and across the generated sequences in `EditPropertyTest`.
+    test "replaces the whole list, and its inverse is the list that was there" do
+      document = signup_wizard()
+
+      assert {:ok, updated, inverse} = Edit.apply(document, {:set_datamodel, [signup()]})
+
+      assert updated.datamodel == [signup()]
+      assert inverse == {:set_datamodel, []}
+      assert {:ok, ^document, _forward_again} = Edit.apply(updated, inverse)
+    end
+
+    # Sabotage: `apply/2` writing `datamodel` before `Validation.datamodel/1`
+    # runs - the document then holds a list `Document.validate/1` refuses, so
+    # `to_json/1` raises on a document the editor produced.
+    test "refuses a list ADR-0001 11c would refuse, in 11c's own error family" do
+      document = signup_wizard()
+      twice = [signup(), signup()]
+
+      assert Edit.apply(document, {:set_datamodel, twice}) ==
+               {:error, {:malformed_envelope, {:datamodel, {:duplicate_id, "signup"}}}}
+
+      assert Edit.apply(document, {:set_datamodel, [%DatamodelEntry{id: "Signup"}]}) ==
+               {:error,
+                {:malformed_envelope, {:datamodel, {:entry, 0, {:id, :not_an_identifier}}}}}
+
+      assert Edit.apply(document, {:set_datamodel, [%DatamodelEntry{id: "a", expr: ""}]}) ==
+               {:error,
+                {:malformed_envelope, {:datamodel, {:entry, 0, {:expr, :not_an_expression}}}}}
+
+      assert Edit.apply(document, {:set_datamodel, "not a list"}) ==
+               {:error, {:malformed_envelope, {:datamodel, :not_a_list}}}
+    end
+
+    test "a refused command leaves the document exactly as it was" do
+      document = %{signup_wizard() | datamodel: [signup("1")]}
+
+      assert {:error, _reason} = Edit.apply(document, {:set_datamodel, [signup(), signup()]})
+      assert document.datamodel == [signup("1")]
+    end
+
+    # Sabotage: `apply/2` sorting the list, or `CanonicalJson` doing it - the
+    # order an author reordered into stops being the order emitted, and the
+    # authoring act ADR-0001 11a made expressible stops being expressible.
+    test "keeps the order it is given, because order is emission order" do
+      document = signup_wizard()
+      ordered = [%DatamodelEntry{id: "zulu"}, %DatamodelEntry{id: "alpha"}]
+
+      assert {:ok, updated, _inverse} = Edit.apply(document, {:set_datamodel, ordered})
+      assert Enum.map(updated.datamodel, & &1.id) == ["zulu", "alpha"]
+    end
+
+    test "produces a document that validates and encodes" do
+      document = signup_wizard()
+
+      assert {:ok, updated, _inverse} =
+               Edit.apply(document, {:set_datamodel, [signup("'a'")]})
+
+      assert Document.validate(updated) == :ok
+      assert Document.to_json(updated) =~ ~s("datamodel")
+    end
+  end
+
+  describe "check_config/3 and the fifth command" do
+    # Sabotage: dropping the `:set_datamodel` clause from `check_config/3` -
+    # the `{:update_config, id, config}` clause below it does not match a
+    # two-element tuple, so every declaration edit raises FunctionClauseError
+    # inside `Edit.History`'s funnel instead of committing.
+    test "has nothing for a block type to validate, so it passes the gate" do
+      document = signup_wizard()
+      palette = StatifierBlocks.Palette.core()
+
+      assert Edit.check_config(palette, document, {:set_datamodel, [signup()]}) == :ok
+      assert Edit.check_config(palette, document, {:set_datamodel, "nonsense"}) == :ok
     end
   end
 end

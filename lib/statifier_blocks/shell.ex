@@ -41,7 +41,8 @@ defmodule StatifierBlocks.Shell do
   host already built with `StatifierBlocks.Predicates.TruthTable.build/2`.
   """
 
-  alias StatifierBlocks.{Block, BlockType, Finding, ViewModel}
+  alias StatifierBlocks.{Block, BlockType, Declarations, Finding, ViewModel}
+  alias StatifierBlocks.Document.DatamodelEntry
   alias StatifierBlocks.Predicates.TruthTable
 
   @typedoc "Truth tables a host supplies, keyed by the block they describe."
@@ -65,7 +66,7 @@ defmodule StatifierBlocks.Shell do
   incoming tab name into an atom, so a crafted `phx-value-tab` reaches at
   worst a host tab the host itself declared.
   """
-  @type drawer_tab :: :tables | :findings
+  @type drawer_tab :: :tables | :findings | :declarations
 
   @typedoc "A host tab's id: its own name for it, and the DOM id it is stamped into."
   @type host_tab_id :: String.t()
@@ -153,10 +154,21 @@ defmodule StatifierBlocks.Shell do
 
   # Tab order, and it is also the order the strip resolves an unchosen tab in
   # (see `drawer_view/1`). Truth tables first because they are what 2A shipped
-  # the drawer for; findings second because R4 moved them here.
-  @drawer_tabs [:tables, :findings]
+  # the drawer for; findings second because R4 moved them here; declarations
+  # third because they are the newest and the resolution order is arrival
+  # order, so a document with tables in it opens where it always did.
+  @drawer_tabs [:tables, :findings, :declarations]
 
-  @drawer_titles %{tables: "Truth tables", findings: "Findings"}
+  # "Declarations" and not "Datamodel", which is the name the reserved place
+  # was described under. ADR-0001 11g and 11h split the two artifacts and the
+  # words follow the split: an ADR-0006 datamodel document describes a
+  # vocabulary, and this key declares that a root exists. A tab called
+  # Datamodel would name the other one.
+  @drawer_titles %{
+    tables: "Truth tables",
+    findings: "Findings",
+    declarations: "Declarations"
+  }
 
   # The heading over the findings whose anchor names no block in the document.
   # A word rather than a block id, because there is no block to name.
@@ -822,6 +834,7 @@ defmodule StatifierBlocks.Shell do
           optional(:findings) => [Finding.t()],
           optional(:orphan_findings) => [Finding.t()],
           optional(:host_tabs) => [host_tab()],
+          optional(:declarations) => [DatamodelEntry.t()],
           optional(:selected_id) => Block.id() | nil
         }) :: drawer()
   def drawer_view(state) do
@@ -836,6 +849,13 @@ defmodule StatifierBlocks.Shell do
 
         :findings ->
           %{id: :findings, title: drawer_title(:findings), count: findings_count(findings)}
+
+        :declarations ->
+          %{
+            id: :declarations,
+            title: drawer_title(:declarations),
+            count: Declarations.count(Map.get(state, :declarations))
+          }
       end)
 
     contributed =

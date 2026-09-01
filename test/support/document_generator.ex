@@ -26,6 +26,7 @@ defmodule StatifierBlocks.DocumentGenerator do
   """
 
   alias StatifierBlocks.{Block, Document, Edit}
+  alias StatifierBlocks.Document.DatamodelEntry
 
   @max_depth 4
   @escape_strings [
@@ -114,11 +115,48 @@ defmodule StatifierBlocks.DocumentGenerator do
   defp gen_command(document) do
     blocks = Document.blocks(document)
 
-    case Enum.random(1..4) do
+    case Enum.random(1..5) do
       1 -> gen_insert(document, blocks)
       2 -> gen_remove(document, blocks)
       3 -> gen_move(document, blocks)
       4 -> gen_update_config(blocks)
+      5 -> gen_set_datamodel(document)
+    end
+  end
+
+  # The fifth command (ADR-0005's 2026-09-01 amendment, 2g). It is generated
+  # here rather than exercised only by examples because decision 3's law is
+  # what this file holds and the new command joins that law: its inverse is
+  # the list that was there before, so a generated sequence that adds, drops
+  # and reorders declarations has to unwind to the document it started from
+  # like every other.
+  #
+  # One roll in three is refusable, which is the same deliberate minority the
+  # other generators carry: a refused command must leave the document
+  # untouched and contribute no inverse, and a generator that only ever
+  # produced valid lists would never check that.
+  @spec gen_set_datamodel(Document.t()) :: Edit.t()
+  defp gen_set_datamodel(%Document{datamodel: entries}) do
+    case Enum.random(1..6) do
+      1 ->
+        {:set_datamodel, entries ++ [%DatamodelEntry{id: gen_word()}]}
+
+      2 ->
+        {:set_datamodel, entries ++ [%DatamodelEntry{id: gen_word(), expr: gen_word()}]}
+
+      3 when entries != [] ->
+        {:set_datamodel, Enum.reverse(entries)}
+
+      4 when entries != [] ->
+        {:set_datamodel, tl(entries)}
+
+      5 when entries != [] ->
+        # Refusable: 11c's structural id uniqueness.
+        {:set_datamodel, entries ++ [hd(entries)]}
+
+      _refusable ->
+        # Refusable: 11b's id grammar - a leading digit is not an identifier.
+        {:set_datamodel, entries ++ [%DatamodelEntry{id: "9" <> gen_word()}]}
     end
   end
 

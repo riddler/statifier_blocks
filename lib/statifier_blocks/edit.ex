@@ -31,7 +31,7 @@ defmodule StatifierBlocks.Edit do
      re-inserting at `i` in the shortened list is the identity, and that
      is true whether or not `P == Q and s == t`.
 
-  ## The four inverses
+  ## The five inverses
 
   | Command | Inverse |
   |---|---|
@@ -39,6 +39,34 @@ defmodule StatifierBlocks.Edit do
   | `{:remove, id}` | `{:insert, original_target, detached_subtree}` |
   | `{:move, id, target}` | `{:move, id, original_target}` |
   | `{:update_config, id, config}` | `{:update_config, id, previous_config}` |
+  | `{:set_datamodel, entries}` | `{:set_datamodel, previous_entries}` |
+
+  ## The fifth command (ADR-0005's 2026-09-01 amendment, 2g-2h)
+
+  `{:set_datamodel, entries}` replaces the document's whole `datamodel`
+  list - ADR-0001 decision 11's ordered declaration entries - in one
+  command. The four structural rules above are about the tree and none of
+  them reaches it: an entry is not a block, the list is not a slot, and
+  there is no `target()` to read an index against.
+
+  Whole-list replacement rather than per-entry insert, remove and move, for
+  decision 2's own reason for collapsing seven commands into four: one code
+  path that writes the key means the grammar check, the ordering and the
+  inverse each have one implementation. Add, edit, remove and reorder are
+  all the same command carrying a different list, the inverse is the list
+  that was there before, and the round-trip law of decision 3 holds by
+  construction because the command is its own kind of inverse.
+
+  This is the one command whose *content* is checked here rather than in
+  `check_config/3`. `check_config/3` is decision 9's block-type gate and it
+  asks a palette; a declaration has no block type and no palette to ask.
+  What a declaration has is a grammar - ADR-0001 11b's `{id, expr,
+  description}` and 11c's structural id uniqueness - and that is the same
+  kind of question rules 1 to 4 answer for the tree, so it is answered
+  here. `StatifierBlocks.Validation.datamodel/1` is the one implementation
+  of it, so a list this command accepts is a list `Document.validate/1`
+  accepts, and `to_json/1` can never raise on a document this command
+  produced.
 
   ## The deliberate widening
 
@@ -65,7 +93,8 @@ defmodule StatifierBlocks.Edit do
   this is a real arm, not a dead one.
   """
 
-  alias StatifierBlocks.{Block, BlockType, Document, Palette}
+  alias StatifierBlocks.{Block, BlockType, Document, Palette, Validation}
+  alias StatifierBlocks.Document.DatamodelEntry
 
   @typedoc "A position, not a block. ADR-0001 decision 5's path element."
   @type target :: {Block.id(), Block.slot_name(), non_neg_integer()}
@@ -79,11 +108,12 @@ defmodule StatifierBlocks.Edit do
           | {:remove, Block.id()}
           | {:move, Block.id(), target()}
           | {:update_config, Block.id(), Block.config()}
+          | {:set_datamodel, [DatamodelEntry.t()]}
 
   @doc """
   Applies one command, returning the new document and the command that
   undoes it. Total: refuses rather than raises. See the moduledoc's four
-  structural rules and four inverses.
+  structural rules and five inverses.
   """
   @spec apply(Document.t(), t()) ::
           {:ok, Document.t(), t()}
@@ -93,6 +123,7 @@ defmodule StatifierBlocks.Edit do
           | {:error, {:would_cycle, Block.id()}}
           | {:error, {:duplicate_block_id, Block.id()}}
           | {:error, {:cannot_remove_root, Block.id()}}
+          | {:error, {:malformed_envelope, term()}}
   def apply(%Document{} = document, {:insert, {parent_id, slot_name, index}, %Block{} = block}) do
     target = {parent_id, slot_name, index}
 
@@ -138,6 +169,12 @@ defmodule StatifierBlocks.Edit do
     end
   end
 
+  def apply(%Document{} = document, {:set_datamodel, entries}) do
+    with :ok <- Validation.datamodel(entries) do
+      {:ok, %{document | datamodel: entries}, {:set_datamodel, document.datamodel}}
+    end
+  end
+
   @doc """
   ADR-0005 decision 9's config gate. `apply/2` above is purely structural
   and cannot ask a block type whether a config is valid; this is where that
@@ -170,6 +207,12 @@ defmodule StatifierBlocks.Edit do
   end
 
   def check_config(%Palette{}, %Document{}, {:remove, _id}), do: :ok
+
+  # A declaration has no block type, so there is no `validate_config/1` to
+  # run and no palette to resolve it through. Its own grammar is checked in
+  # `apply/2`, which is where the moduledoc's fifth-command section says it
+  # belongs and why.
+  def check_config(%Palette{}, %Document{}, {:set_datamodel, _entries}), do: :ok
 
   def check_config(%Palette{} = palette, %Document{} = document, {:update_config, id, config}) do
     with {:ok, block} <- find_block(document, id),
