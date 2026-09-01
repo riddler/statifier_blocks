@@ -1,7 +1,7 @@
 # ADR-0008: The durable subchart handler answers at dispatch time, not from a pure `start/2`, and its refusal set gains exactly one reason
 
-Status: proposed (2026-09-01, campaign-025; the flip is the direction-agent
-gate's, not this record's)
+Status: accepted (2026-09-01, campaign-025; unqualified direction-agent
+verdict)
 
 ## Context
 
