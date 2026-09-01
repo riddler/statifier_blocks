@@ -2045,3 +2045,233 @@ its conditions and a handler does not.
   stays at `1`. An optional key inside a block's `config` object is a block-type
   contract, which is this record's, and the stored spelling of the guarded
   handler in `card_processing` is unchanged by being read at last.
+
+## Amendment (2026-08-31): decision 10, the `core.drafts` and `core.placeholder` rows
+
+**Status: proposed (2026-08-31), drafted for `sb-5h6q` under the operator campaign-024 grant and its direction-agent gate.** Additive; decision 10's original
+seven-row table stands, the 2026-08-28 amendment's section D stands, sections
+G through G8 stand, and no text above this line is edited by this section.
+
+### Context
+
+Every block in a document is in the flow. That is what makes a document
+compile: ADR-0001 decision 1 fixes one root, ADR-0004 decision 5's totality
+makes every emitted byte some block's, and there is nowhere in the tree for a
+fragment an author has built but has not placed. An author who knows the sink
+of a workflow before its sources therefore cannot build backwards toward it.
+The half-built tail has to be either wired into the flow, where it compiles as
+though the author meant it there, or deleted and rebuilt later.
+
+Two different things are missing. The first is a **shelf**: somewhere in the
+document to hold a fragment that is not in the flow and is not pretending to
+be. The second is a **marker**: a way to say, inside the flow, that a step is
+deliberately missing here.
+
+Neither is a document-schema change. ADR-0001 decision 1's single root stands,
+no second root is introduced, no envelope key is added, and `schema_version`
+stays at `1`. These are two block types and nothing else, and
+campaign-024 ruling R-a is what puts the second in the same record as the
+first: they are one authoring story and one review. What the two mean to the
+compiler is ADR-0004's amendment of this date; how they render is ADR-0005's;
+where they may sit is section G12 below together with ADR-0003's amendment of
+this date.
+
+These two rows are written **ahead of the modules that will answer them**,
+which reverses the discipline G5 through G8 kept. That is deliberate and it is
+what `sb-5h6q` is: the shape was agreed before the code existed, and the
+implementing bead `sb-uag7` builds to this record rather than this record being
+read off the build. G11 says what the counts are while that is true.
+
+### G9. `core.drafts` joins the core vocabulary
+
+| Block type | `slots(config)` | Config schema | `outcomes(config)` | Notes |
+|---|---|---|---|---|
+| `core.drafts` | `[{"body", :any, "Drafts"}]` | empty | not declared; nothing reads one | the document's shelf: a container whose children are held out of the flow, admitted only as a direct child of the root and only once per document (G12) |
+
+In full, so a reader need not hold the rest of this section in their head:
+`slots/1` returns that one slot for every config, `config_schema/1` returns
+`[]`, `validate_config/1` is `:ok`, `current_version/0` is `1`, and `io/1` is
+`%{kinds: [:draft_shelf], slot_accepts: %{"body" => :any}}`. There is no
+`outcomes/1`: section A's default would give the type the single outcome
+`done`, and no consumer ever asks, because a drafts block is not a step and is
+never sequenced into or out of. The type declares no `produces` and no
+`consumes` for the same reason - see G10a.
+
+**G9a. A drafts block is elided from the flow before anything reads
+sequencing.** ADR-0001 decision 5 makes a slot's child list ordered, and two
+passes read that order as a flow: the Structure stage's data-flow walk
+(ADR-0003 decision 4) and the Emit stage's sequencing (ADR-0004 decision 2).
+`core.drafts` is removed from the root's child list before either of them
+runs. The sibling before it is therefore adjacent to the sibling after it, no
+other block's inbound type moves, and no state is emitted for it or for
+anything inside it.
+
+That single rule is what the rest of this design falls out of. It is why the
+type declares no data-flow direction at all: a block that is never at either
+end of a seam has nothing to say about one. It is why ADR-0004's amendment of
+this date can say the compile is byte-identical with the shelf occupied and
+with it empty. And it is why ADR-0005's amendment of this date can say the
+renderer must draw no connectors between the shelf's children: an order the
+compiler is defined never to read must not be drawn as though it meant
+something.
+
+**G9b. `:draft_shelf` is a new kind, and it is the whole placement mechanism
+except for two facts.** ADR-0003 decision 3 admits a block into a slot by
+intersecting the parent's `slot_accepts` with the child's `kinds`. Every slot
+in the shipped `core.*` vocabulary accepts `[:step]` or `[:interrupt_handler]`
+and none accepts `:any`, so a block declaring `kinds: [:draft_shelf]` and
+nothing else is refused by every one of them through the mechanism that
+already exists, with no new rule and no per-type list. A host container that
+declares no `io/1` is the exception, since ADR-0003 decision 5 gives it
+`slot_accepts` `:any` for every slot and `:any` admits everything; G12's
+Structure rule is what catches a shelf there. The two facts the mechanism
+cannot express - that the root's `body` admits it anyway, and that it admits
+at most one - are G12's.
+
+Minting a kind rather than declaring `kinds: [:step, :draft_shelf]` is the
+point of G9a restated at the placement layer. A shelf that were also a step
+would be admitted by every `[:step]` slot in every host palette, and the only
+thing standing between a document and a drafts block nested four levels deep
+inside a branch arm would be G12's structure rule catching it afterwards.
+Under the kind, the ordinary mechanism refuses it at drag time everywhere in
+the shipped vocabulary, and G12's rule is left carrying only the two cases it
+alone can decide - the root's own admission, and the untyped host container of
+the paragraph above.
+
+**G9c. `body` accepts everything, and what is inside it is still checked.**
+`slot_accepts: %{"body" => :any}` is the maximally permissive declaration
+ADR-0003 decision 5 already describes, and this record makes it deliberately:
+a shelf that refused the fragment an author most needed to put down would be
+worse than no shelf. What that permissiveness does **not** buy is a suspension
+of the Config stage. `validate_config/1` runs on every block in the document
+including every block inside the shelf, because the Config stage walks the
+document rather than the flow, and an author who parks a half-configured
+fragment still wants the form to say so. ADR-0004's amendment of this date
+records the same fact from the compiler's side, including which stages a
+shelved fragment is and is not seen by.
+
+**G9d. `drafts` in this record means the block type, never the editor's edit
+state.** ADR-0005 decision 9's uncommitted config-form value is also called a
+draft and is held in an editor assign of that name. The two share a word and
+nothing else: a config draft is per-field, lives for as long as a form is
+open, and never reaches the document; a *draft fragment* is a block subtree
+stored in the document, in the canonical bytes, in the hash and on the undo
+stack. Where either record needs to be unambiguous it says *the drafts tray*
+and *a draft fragment*, and ADR-0005's amendment of this date says the same
+thing on its own surface.
+
+### G10. `core.placeholder` joins the core vocabulary
+
+| Block type | `slots(config)` | Config schema | `outcomes(config)` | Notes |
+|---|---|---|---|---|
+| `core.placeholder` | `[]` | `note`: `:string`, optional | default (`done`) | an in-flow leaf marking a gap the author has left on purpose; it compiles to a step that does nothing and warns |
+
+In full: `slots/1` returns `[]`, `config_schema/1` returns one field
+declaration - `note` (label "What goes here", `:string`, `required?: false`,
+default `""`) - `validate_config/1` refuses a `note` that is not a string and
+refuses nothing else, `current_version/0` is `1`, and `io/1` is not declared
+at all. An absent `io/1` is ADR-0003 decision 5's permissive default, which is
+exactly right here: `kinds: [:step]` puts the marker wherever a step goes,
+`consumes: :unknown` and `produces: :unknown` let it sit anywhere in a seam
+without narrowing either side, and a gap that constrained its neighbours would
+be a worse gap than one that does not.
+
+**G10a. The two types are opposites and that is why they are one record.**
+A `core.drafts` block holds work that is **not** in the flow and says nothing
+about it; a `core.placeholder` block **is** in the flow and says something is
+missing from it. An author moving a fragment from the shelf into the flow is
+filling a gap; an author who has not built the fragment yet marks the gap
+instead. Both are the same authoring fact - a workflow under construction -
+and shipping only the first would leave an author no way to say *where* the
+parked fragment is eventually going.
+
+**G10a-i. `placeholder` in this record means the block type, never the
+compiler's child placeholder.** The compiler already uses the word: an
+`Emission` carries `{:child, block_id}` markers that decision 10's Emit stage
+splices each child's own emission into, and both the code and ADR-0004 call
+those **child placeholders**. They are an internal step of one compile, exist
+only between a child's `emit/2` and the splice, and are never stored, never
+rendered and never seen by an author. A `core.placeholder` block is the
+opposite in every one of those respects. This is the same collision G9d
+records for `drafts`, and it is resolved the same way: where either could be
+meant, this record says *a placeholder block* or *a child placeholder* and
+never the bare word.
+
+**G10b. The note is prose and this package never reads it.** `note` exists so
+that a gap can carry the author's own words into the editor's card and into
+the compile warning ADR-0004's amendment of this date mints. Nothing parses
+it, nothing routes on it, and an empty one is not a finding: an unexplained
+gap is still a gap, and refusing one would make the marker more expensive to
+place than leaving the hole unmarked, which inverts the whole point.
+
+### G11. The counts, while these two rows run ahead of the code
+
+With G9 and G10 the table records **fifteen** types: the thirteen G8 counted
+and these two. `StatifierBlocks.Palette.core_types/0` registers **thirteen**
+(`lib/statifier_blocks/palette.ex:87-103`) and will register fifteen when
+`sb-uag7` lands the modules.
+
+G8's sentence - "The table and the palette now agree, and no type is owed a
+row" - was true when it was accepted and is not now. It is not edited, per
+this record's amendment convention; it is **superseded by this section**, and
+the disagreement runs the opposite way from every previous one in this record:
+here the record is ahead of the palette rather than behind it. A reader who
+finds a fifteen-row table and a thirteen-entry palette is looking at that gap
+and not at drift.
+
+### G12. Two placement facts `io/1` cannot carry, and the Structure-stage rule that does
+
+ADR-0003 decision 3 withdrew ADR-0002's one special-cased placement rule and
+said why: a constraint on a block's parent is expressible as an intersection
+of kinds, so it should be one. Neither fact below is that shape, and this
+section says so rather than bending them into it.
+
+**G12a. `core.drafts` is admitted as a direct child of the root block's `body`
+slot, and nowhere else.** This is a constraint on *depth*, not on the parent's
+type: a `core.sequence` is the conventional root (decision 10) and is also the
+most common block in any document, so a rule expressed as "inside a
+`core.sequence`" would admit the shelf at every level of every document. What
+distinguishes the one admissible position is that its parent is the document's
+root, which is a property of the document rather than of either block, and
+`slot_accepts` has no way to say it.
+
+**G12b. A document carries at most one `core.drafts` block.** Cardinality
+across a document is not a placement question at all. It is closest in shape
+to ADR-0001 decision 3's document-unique ids, and like that rule it is checked
+by walking the document rather than by asking a block type anything.
+
+Both are enforced as **Structure-stage findings** (ADR-0004 decision 10),
+which is campaign-024 ruling R-b. The stage is right on its own terms: the
+Structure stage is where arity, undeclared slots and assignability already
+live, it runs after Config so a document with a malformed form does not first
+hear about its shelf, and it runs before Emit so nothing has been generated
+for a block that should not be there. ADR-0004's amendment of this date names
+the two codes and their fault.
+
+**G12c. Relaxing either fact later is additive.** Both rules refuse documents
+that would otherwise be admitted; neither changes the meaning of a document
+that is already valid. A later record that lets a shelf sit inside a group, or
+that admits a second one, widens the admitted set and leaves every existing
+document compiling to the bytes it compiles to today. That is why this record
+takes the narrow position now rather than guessing at the general one:
+campaign-024 ruling R-b, and the reason behind it.
+
+### G13. What these two rows do not change
+
+- **The document schema.** ADR-0001 owns the stored bytes. Two new type names
+  in the reserved `core.` namespace are what decision 4 of that record already
+  provides for, and `schema_version` stays at `1`.
+- **The behaviour contract.** Decision 5's nine callbacks are unchanged. Both
+  types answer the callbacks that already exist; neither needs one that does
+  not.
+- **The edit algebra.** Putting a fragment on the shelf and taking it off are
+  ordinary Move commands over ADR-0001's tree, with ADR-0005 decision 3's
+  inverses, so undo and redo work on them because nothing about them is
+  special. No command is added by this record and none is amended.
+- **The `core.*` count as a claim about structure.** ADR-0007's context says
+  decision 10's vocabulary is structural and a host's domain step is not. Both
+  types here are structural in exactly that sense - a shelf and a gap are
+  facts about a document under construction, not about anybody's domain - and
+  neither is a reason to widen the vocabulary further.
+- **Two registries.** Neither type names an invoke type, so neither touches
+  the seam ADR-0007 decision 3 states.
