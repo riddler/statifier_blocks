@@ -10,6 +10,47 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.12.0] 2026-09-01
+
+0.12.0 is the release where a document can hold work that is not finished
+yet. `core.drafts` is the document's shelf - one per document, a direct
+child of the root, holding fragments an author has built but not placed -
+and it compiles to nothing, so shelving work never moves a byte of the
+emitted SCXML. `core.placeholder` is the other half: an in-flow marker for
+a step left unwritten on purpose, compiling to a state that completes on
+entry so a preview walks straight through the gap. Both are visible to a
+host rather than silent - misplacement and duplication are Structure
+errors, and a non-empty shelf or a placeholder raises an Emit warning on a
+compile that still succeeds. The editor draws the shelf as a tray: a
+detached row at the foot of the canvas with no boundary box and no
+connectors, because parked work is not part of the flow.
+
+### Added
+
+- `core.drafts`, the document's shelf: a container whose one `body` slot
+  holds fragments an author has built but not placed. It is admitted as a
+  direct child of the root block's `body` and nowhere else, a document
+  carries at most one, and it compiles to nothing at all - a document with
+  work on its shelf, the same document with the shelf emptied, and the same
+  document with no shelf produce byte-identical SCXML.
+- `core.placeholder`, an in-flow leaf marking a step left unwritten on
+  purpose. One optional `note` field, and it compiles to a state that
+  completes on entry, so a preview of a half-built workflow walks straight
+  through the gap.
+- Two Structure-stage errors: `:drafts_block_misplaced` and
+  `:duplicate_drafts_block`, the second naming the second and every later
+  shelf in document order rather than the first.
+- Two Emit-stage warnings on a compile that succeeds:
+  `:draft_blocks_present`, once per document on a non-empty shelf, and
+  `:placeholder_block`, once per marker, carrying the author's note. What a
+  host does with either - a publish gate, say - is the host's.
+- `slot_style: :tray`, a fourth value for `palette_entry/0`'s `slot_style`
+  map. A tray is a detached shelf: no boundary box, and no connector into
+  it, out of it, or between one fragment and the next. `StatifierBlocks.ViewModel`
+  gains `tray?/1`, `shelf?/1`, `flow_children/1` and `shelf_children/1`.
+- `StatifierBlocks.Shelf`, the module owning the shelf's placement rules and
+  the type-name predicates other layers ask about it.
+
 ## [0.11.0] 2026-08-31
 
 0.11.0 is the release where declaring a block type stops being boilerplate.
@@ -1354,6 +1395,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.12.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.12.0
 [0.11.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.11.0
 [0.10.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.10.0
 [0.9.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.9.0
