@@ -2275,3 +2275,105 @@ campaign-024 ruling R-b, and the reason behind it.
   neither is a reason to widen the vocabulary further.
 - **Two registries.** Neither type names an invoke type, so neither touches
   the seam ADR-0007 decision 3 states.
+
+## Note (2026-09-01): reading G9b, and the duplicated G-labels
+
+A dated precision note rather than an amendment, recorded for `sb-9ln1` under
+the campaign-024 wrap walk (ruling 4). It decides nothing. No section above is
+edited, no label is renumbered, no row is added or removed, no Status changes,
+and every rule this record states means after this note exactly what it meant
+before it. What is written down is three places a reader trips over, corrected
+by reference in the same form G8 used for G3's count sentence.
+
+### Reading G9b's "none accepts `:any`"
+
+G9b says:
+
+> Every slot in the shipped `core.*` vocabulary accepts `[:step]` or
+> `[:interrupt_handler]` and none accepts `:any`
+
+Read literally that is false, and G9c three paragraphs below it is what makes
+it false: `core.drafts` declares `slot_accepts: %{"body" => :any}`, and
+`core.drafts` is in the shipped `core.*` vocabulary because G9 above put it
+there. A reader who reaches G9b should carry the sentence with its qualifying
+clause attached:
+
+> ... and none accepts `:any` **except `core.drafts`'s own `body`**, which
+> G9c declares `:any` deliberately.
+
+**The refusal argument G9b is making survives the clause**, which is why this
+is a note and not an amendment. What that argument needs is that a block
+declaring `kinds: [:draft_shelf]` and nothing else is refused by ADR-0003
+decision 3's ordinary intersection everywhere an author could drop it, and the
+one slot the clause exempts is a shelf's own `body` - so the only document the
+exception admits is a shelf nested inside another shelf. Such a document
+carries two `core.drafts` blocks, and G12b refuses it: ADR-0004's D3 mints
+`:duplicate_drafts_block` against the second in document order, and
+`:drafts_block_misplaced` against the one that is not a direct child of the
+root's `body`. The exception therefore lands inside the case G9b already hands
+to G12 rather than escaping it. The untyped host container of G9b's own
+paragraph is the other one, and it is unchanged.
+
+### Reading G9b's "only the two cases it alone can decide" against ADR-0004's D3
+
+G9b closes by saying the ordinary mechanism refuses a shelf at drag time
+everywhere in the shipped vocabulary, and that G12's rule is "left carrying
+only the two cases it alone can decide". ADR-0004's D3 states
+`:drafts_block_misplaced` unconditionally - *a `core.drafts` block appears
+somewhere other than as a direct child of the root block's `body` slot* - with
+no carve-out for a placement assignability has already refused. The two
+sentences read as though they disagree. They do not, and the campaign-024 wrap
+ruling that filed this note settles which way to read them: **the D3
+double-naming stands.**
+
+The two sentences quantify over different things.
+
+- G9b's is about **which cases G12's rule is the only thing deciding**. A
+  shelf dragged at a `[:step]` slot is refused by assignability, so for that
+  case G12's rule is not the only decider; the root's own admission and the
+  untyped host container are the two where it is.
+- D3's is about **which documents the Structure stage names**. That stage
+  walks the document it is handed and does not ask whether an editor would
+  have allowed the document to be built. A `core.drafts` block sitting in a
+  `[:step]` slot is therefore named twice - `:kind_not_admitted` by ADR-0003
+  decision 3 and `:drafts_block_misplaced` by D3 - and the redundancy is the
+  contract rather than a defect in either record. A document can arrive from
+  an importer, a fixture, a hand-edited file or a host that never ran the
+  editor, and the compiler is the last place that can refuse it.
+
+So G9b's "only" is scoped to G12's rule *being the sole decider*, never to
+when D3's code fires. Neither sentence is edited and both stand as accepted.
+
+### The G-labels collide four times, and how to cite one unambiguously
+
+Section G (`core.assign` joins the core vocabulary, the 2026-08-29 amendment)
+numbers its five paragraphs **G1** through **G5** in bold. Later amendments
+number their own `###` sections **G2** through **G13**. Four labels therefore
+name two different things in this record:
+
+| Label | The bold paragraph inside section G | The later `###` section |
+|---|---|---|
+| G2 | `value` is `:string` in the shipped type | `core.send` joins the core vocabulary |
+| G3 | `path` and decision 7's `datamodel_path?` key | The count, and what is still owed a row |
+| G4 | What it compiles to | The moduledoc admonition goes |
+| G5 | What stays open | `core.subchart` joins the core vocabulary |
+
+G1 is section G's alone, and G6 through G13 are the `###` series' alone.
+
+**Nothing is renumbered, and that is the point.** Both series sit in accepted
+text that other records and this record's own Status line already cite by
+label. Renumbering either would break every existing citation in order to fix
+a citation problem.
+
+**Every bare `G2`-`G5` citation written before this note means the `###`
+section**, checked against each occurrence: the Status line's "section G2" and
+"G5-G8", G3's own text, the 2026-08-29 subchart amendment's Status paragraph,
+G8's count corrections, and the 2026-08-31 amendment's "the discipline G5
+through G8 kept". Section G's bold paragraphs are never cited from outside
+section G; the single citation of `G1` (in G2b) is unambiguous because G1 does
+not collide.
+
+**From this note forward**, cite a bold paragraph inside section G as **G.G1**
+through **G.G5**, and a `###` section by its bare label, **G2** through
+**G13**. A reader meeting a bare `G3` in text older than this note reads the
+`###` section, per the paragraph above.
