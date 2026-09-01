@@ -719,3 +719,141 @@ position-level answer in every case.
   declaring block, which is a second walk and therefore a second answer; the
   day a host demonstrates it needs one, that is a new record, not a patch to
   this section.
+
+## Amendment (2026-08-31): the `:draft_shelf` kind, and a slot the data-flow walk does not enter
+
+**Status: proposed (2026-08-31), drafted for `sb-5h6q` under the operator campaign-024 grant and its direction-agent gate.** Additive; decisions 1
+through 9 stand as accepted and no text above this line is edited by this
+section. It is the assignability half of ADR-0002's amendment of this date,
+which adds `core.drafts` and `core.placeholder` to that record's decision 10
+under campaign-024 rulings R-a and R-b.
+
+### What forces the amendment
+
+Decision 3 says a kind names what a block *is* for placement purposes, and
+decision 4 says adjacency within a slot is sequencing, so a position's inbound
+type comes from the sibling before it. The drafts container is the first block
+type for which the second sentence is false: its children are not adjacent to
+each other in any sense the compiler reads, because ADR-0002's amendment of
+this date, section G9a, removes the whole block from the flow before the
+data-flow walk runs.
+
+Two things follow and neither is derivable from the accepted text. What the
+shelf declares (A1) and what happens inside it (A2).
+
+### A1. `core.drafts` declares `kinds: [:draft_shelf]` and `slot_accepts: %{"body" => :any}`
+
+`:draft_shelf` is the third kind this package defines, beside `:step` and
+`:interrupt_handler`, and it is minted for the reason decision 3 gives for
+having kinds at all: the structural question is whether two things belong in
+the same box. A shelf belongs in exactly one box and a step belongs in
+approximately all of them, so they are not the same kind.
+
+The mechanism then does the work with no new rule. Every slot in the shipped
+`core.*` vocabulary accepts `[:step]`, `[:interrupt_handler]` or `:any`, so a
+block declaring only `:draft_shelf` is refused by every one of them, in both
+directions, by the same intersection every other placement question runs
+through. A host's own container declaring `slot_accepts: [:step]` refuses it
+too, without that host knowing the type exists - which is the coupling
+decision 3's subsumption argument was written to avoid, arriving here
+unchanged.
+
+The mechanism reaches exactly as far as a declaration does, and no further. A
+host container that declares no `io/1` at all takes decision 5's default,
+which is `slot_accepts` `:any` for every slot, and `:any` admits everything -
+including a shelf. That is not a gap in this section but the boundary of what
+kinds can decide, and it is the second of the two cases ADR-0002's amendment
+of this date, section G12, keeps as a Structure-stage rule.
+
+`slot_accepts: %{"body" => :any}` is the other half and it is deliberately the
+most permissive declaration this record admits. A shelf exists to hold a
+fragment an author has not decided about yet. Refusing a fragment on the
+grounds that it would not fit where it is not being placed would be this
+record answering a question nobody asked, and it would refuse hardest exactly
+the interrupt handlers and half-built containers an author most wants to park.
+Decision 5's permissive reading of `:unknown` is the same argument at the
+data-flow layer; this is it at the structural one.
+
+**What the kind cannot say is G12's, not this record's.** That the root
+block's `body` admits a `:draft_shelf` anyway, and that it admits at most one,
+are a depth constraint and a cardinality constraint. Neither is an
+intersection of a parent's `slot_accepts` with a child's `kinds`, so neither
+is expressible here, and ADR-0002's amendment of this date puts both in the
+Structure stage as findings under campaign-024 ruling R-b. Decision 3's claim
+to subsume ADR-0002's placement special case is unaffected: it subsumed a
+parent-type constraint, which these are not.
+
+### A2. The data-flow walk does not enter the shelf, and every fragment starts from `:unknown`
+
+Decision 4 defines a position's inbound type as the `produces` of the sibling
+at `index - 1`, or the slot inbound at `index == 0`. Inside a `core.drafts`
+body, that definition would answer, and its answer would be wrong in both
+positions:
+
+- Between two shelved fragments there is no seam. Their order is shelf order -
+  what the author dropped where - and G9a fixes that the compiler never reads
+  it as sequencing. Deriving one fragment's inbound type from the fragment
+  above it on the shelf would make rearranging a shelf produce and clear
+  findings, which is exactly the sequencing meaning the shelf is defined not
+  to have.
+- At `index == 0` the slot inbound would be the shelf's own inbound type, and
+  the shelf has none: it declares no `consumes`, it is not in the flow, and
+  nothing reaches it.
+
+So: **the data-flow walk treats every direct child of a `core.drafts` body as
+being at entry, with inbound type `:unknown`.** Under decision 5 `:unknown` is
+assignable to any `consumes`, so no fragment is ever refused for the position
+it holds on the shelf, and no fragment's position on the shelf ever produces a
+finding.
+
+**The walk still runs inside each fragment.** A parked fragment is a subtree,
+its own internal seams are real sequencing, and they are checked exactly as
+they would be anywhere else - starting from `:unknown` at the fragment's root,
+which is what decision 4 already specifies for the entry position when the
+caller supplies no entry type. That is the property that makes the shelf worth
+having rather than a hole in the checker: an author who parks a three-block
+fragment is told about a broken seam *inside* it while it is parked, and is
+not told a second, meaningless thing about where on the shelf it sits.
+
+**Structural checking is not suspended either.** Kind admission, slot arity
+and `:undeclared_slot` run over shelved fragments as over everything else,
+because `slot_accepts: :any` is a claim about what the shelf's own `body`
+admits and says nothing about what a fragment's own slots admit. A parked
+`core.group` still refuses an ordinary step in its `interrupts` slot.
+
+### A3. `core.placeholder` declares no `io/1` at all
+
+The marker type takes decision 5's permissive default in full: `kinds:
+[:step]`, `consumes: :unknown`, `produces: :unknown`, and `slot_accepts` `:any`
+for every slot, of which it has none. A gap goes wherever a step goes and
+constrains neither neighbour.
+
+Declaring anything narrower would be this record deciding what an author's
+unwritten step was going to do, and the `{:fixable_by, _}` machinery the
+2026-08-29 amendment added under 8a would then explain a refusal in terms of a
+claim nobody made. `:unknown`
+is the honest answer to "what does the step you have not written yet produce",
+and decision 5's adoption-curve argument for `:unknown` being permissive rather
+than a bottom is the same argument here: a marker that refused its own
+neighbours would be a marker nobody placed.
+
+### Consequences
+
+- The shelf's admission rule costs one kind and no new mechanism. Every
+  existing container, core and host alike, refuses a shelf today, on
+  declarations that were already written for other reasons.
+- The 2026-08-29 amendment's reason vocabulary is unchanged, and it is
+  untouched here in the strongest sense: a `:draft_shelf` refused by a
+  `[:step]` slot is a `{:kind_not_admitted, ...}` refusal, and section 8c
+  states that those get no reason from the vocabulary at all - the structural
+  gate's own finding code, naming both kind sets, is the whole explanation.
+  Nothing is added to the vocabulary and no arm is amended.
+- A host that wants its own shelf mints its own kind, its own container, and
+  its own structure rule - or asks for this one to be widened, which
+  ADR-0002's amendment of this date, section G12c, records is additive.
+- The `:any` slot means a fragment can be parked in a state that could never
+  be placed anywhere. That is the intended cost and it is bounded: the
+  fragment is checked internally while parked, and the moment an author moves
+  it into the flow the ordinary seam and kind rules decide it, with the same
+  findings and the same reasons they would have given if it had been dropped
+  there directly.

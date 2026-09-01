@@ -3835,3 +3835,202 @@ the author's attention.
 - **ADR-0006 decision 9 is untouched.** The datamodel document is still
   advisory and still never a gate; this section adds two more advisory inputs
   beside it and gates on none of them.
+
+---
+
+## Amendment (2026-08-31): decision 10, `slot_style: :tray`, and a shelf that draws no connectors
+
+**Status: proposed (2026-08-31), drafted for `sb-5h6q` under the operator campaign-024 grant and its direction-agent gate.** Additive; decisions 10 and
+11 stand as accepted and no text above this line is edited by this section. It
+is the editor half of ADR-0002's amendment of this date, which adds
+`core.drafts` and `core.placeholder` to that record's decision 10 under
+campaign-024 rulings R-a and R-b, and of ADR-0004's amendment of the same
+date, which is what makes 10u a contract rather than a preference.
+
+### The word "draft", which this record already uses for something else
+
+Decision 9's uncommitted config-form value is a **config draft**: a per-field
+value that lives while a form is open, is held in the editor's own assign, and
+never reaches the document. What ADR-0002's amendment of this date adds is a
+**draft fragment**: a block subtree stored *in* the document, inside a
+`core.drafts` block's `body` slot, in the canonical bytes, in the document
+hash and on the undo stack. They share a word and nothing else.
+
+This section therefore says **the drafts tray** for the surface and **a draft
+fragment** for what sits on it, and never "a draft" unqualified. The verb needs
+the same care for a different reason: parking in this family already means
+invoke run-parking (`StatifierBlocks.Core.Invoke`), which is a runtime state a
+session sits in and has nothing to do with this. The rule these sections keep
+is that **the thing parked is always named** - a fragment is parked in the
+drafts tray, and a fragment is never an invoke run - so "a parked fragment"
+reads unambiguously while a bare "parked" would not.
+
+### 10s. `slot_style` admits a fourth value, `:tray`
+
+The `slot_style` row of decision 10's table reads `statically-named slot to
+:primary, :secondary or :failure` after the accepted 2026-08-29 amendment; it
+would read `statically-named slot to :primary, :secondary, :failure or
+:tray`. Nothing else in the table changes, the key stays optional with a `%{}`
+default, and every block type that declares no `slot_style` renders exactly as
+it does today. `core.drafts` declares `slot_style: %{"body" => :tray}`.
+
+`:tray` means: **a shelf of children that are not in the flow at all.** It is
+not a claim about what the children are - a tray holding one notify block and
+a tray holding a nested group are the same declaration - it is a claim about
+whether the slot's contents participate in sequencing. They do not, and
+ADR-0002's amendment of this date, section G9a, is what makes that a compiler
+fact rather than a rendering one.
+
+This is a value added to a key that already exists, which is the cheapest
+shape a rendering change can take and the same argument the `:failure`
+amendment made for itself. No component is added and `palette_entry/0`'s key
+set does not grow.
+
+### 10t. What the renderer derives, and the partition `:tray` is not in
+
+Amendment 10h fixed that the styles partition into two questions and that
+keeping them two is what stops a fourth value from becoming a fourth code path
+per component. Its table gains a column:
+
+| Derived property | `:primary` | `:secondary` | `:failure` | `:tray` |
+|---|---|---|---|---|
+| Placement | in the body flow | attached rail | attached rail | detached shelf |
+| Container is a boundary (10c) | no | yes | yes | no |
+| Slot edge treatment | none | dashed, warning family | solid, error family | muted neutral shelf edge |
+| Slot card shadow | ordinary | flat | ordinary | flat |
+| Empty slot | ordinary empty affordance | dashed warning edge | solid error edge | ordinary empty affordance |
+| Exit edge kind | flow | interrupt | flow | none |
+
+Two rows carry the section.
+
+**`:tray` is not in the rail partition, so it contributes no boundary.** 10h
+made "is this container a boundary box" a question asked of the rail partition
+- any slot declaring `:secondary` or `:failure` makes its container one - on
+10c's stated grounds that an attached rule is about a *region* and a region
+needs a visible edge. A tray is not attached to a region; it is beside the
+document. Folding it into the rail partition would put a boundary box around
+the root block of every document that has a shelf, which would draw a frame
+around the entire workflow to say something about a shelf beside it. The
+partition stays two-valued and `:tray` joins `:primary` outside it.
+
+**The exit edge kind is `none`, and so is the entry edge, and so is every
+edge between the children.** That is 10u.
+
+### 10u. The tray draws no connectors, in or out or between
+
+A drafts tray's children are drawn as separate cards with **no connector of
+any kind**: none entering the tray, none leaving it, and - the one that
+matters - **none between one fragment and the next**. The renderer must not
+draw the tray as a chain.
+
+This is a contract, not a visual preference, and the grounding is ADR-0002's
+amendment of this date, section G9a. A slot's child order is ordered in the
+stored bytes because ADR-0001 decision 5 makes every slot's children an
+ordered list, and the tray's order is therefore stable, undoable and hashed
+like any other. But G9a fixes that the compiler removes the shelf from the
+flow before anything reads that order as sequencing, and ADR-0004's amendment
+of this date fixes that no state, no transition and no provenance entry is
+emitted for any of it. So the order in a tray is **shelf order** - where the
+author put things down - and nothing downstream reads it as anything else.
+
+An edge between two cards is this editor's whole vocabulary for "this happens
+and then that happens" (decision 13, and the 2026-08-28 amendment on rendering
+the tree and its connectors). Drawing one between two parked fragments would
+assert a sequencing relationship that no compiler stage reads and no runtime
+can ever produce, on a surface whose entire value is that the canvas and the
+compiled chart agree - which is the property the `:failure` amendment's
+consequences named and this section is protecting in the same words.
+
+The same reasoning is why a fragment's own internal connectors are drawn
+normally. Inside a parked fragment the child order *is* sequencing: it is a
+subtree that means what it will mean once it is placed, ADR-0003's amendment
+of this date keeps checking its internal seams while it is parked, and
+drawing it as anything other than the flow it is would hide the thing the
+author parked it to keep working on.
+
+### 10v. `:tray` inherits 10i, and an older editor never reaches it anyway
+
+An editor that does not know `:tray` resolves it to `:primary` under 10i and
+renders the shelf's contents as an ordinary body flow, connectors and all -
+the failure 10u exists to prevent. In practice it will not arrive there: an
+editor old enough not to know the style is old enough not to resolve
+`core.drafts` at all, and ADR-0002 decision 3's total resolution puts the
+whole block behind the unresolvable-block presentation decision 12 of this
+record owns, where its children are not laid out as a flow because they are
+not laid out at all.
+
+Recorded rather than relied on. 10i's posture is unchanged and is still the
+right default for a style an editor does not know; this is a note that the
+one bad rendering it could produce is unreachable by the ordinary route, not
+an argument for a second mechanism.
+
+### 11n. Findings inside the tray render on the fragment, by decision 11 unchanged
+
+Decision 11 makes the anchor the whole routing mechanism, and it needs no
+amendment here: a `:config` finding against a field of a parked block renders
+inline beneath that field, a `:slot` finding on that slot's header, a
+`:block` finding on that block's chrome. The anchor names a block id, the
+block is in the document, and where it is drawn is where its findings are
+drawn. Nothing about a fragment being parked in the drafts tray changes that.
+
+Three consequences of leaving it unchanged are worth stating, because a reader
+could reasonably expect each of them to need a rule and none of them does.
+
+**The tray is inside the document-level panel.** Decision 11's panel lists
+every finding and selecting one selects and reveals its anchor; a finding on a
+parked fragment behaves the same way, and revealing it opens the tray. The
+alternative - filtering parked findings out of the panel - would mean an
+author could not find the problem they parked the fragment because of.
+
+**A folded tray carries a count badge**, by decision 11's existing rule that a
+collapsed subtree does, so a finding can never hide inside something folded
+shut. That rule was written against exactly this failure mode and a tray is a
+container that will usually be folded.
+
+**`:draft_blocks_present` renders on the tray itself.** ADR-0004's amendment
+of this date anchors that warning on the `core.drafts` block and mints it once
+per document, so it lands on the tray's own chrome rather than on any
+fragment, and it says something about the document rather than about anybody's
+work. `:placeholder_block` lands on each marker's card, in the flow, where the
+gap is.
+
+### Deferred, named rather than guessed
+
+**Where the tray is drawn.** This section fixes that the tray is out of the
+flow, contributes no boundary and draws no connectors. It deliberately does
+not fix *where* on the editor's surface it appears - a strip at the foot of
+the canvas, or a tab in the drawer whose tab strip the 2026-08-30 amendment
+made a host seam. Both satisfy everything above, the choice is answerable from
+a built surface and not from this record, and it is `sb-uag7`'s to make and to
+bring back here if it needs a rule.
+
+**A palette-to-tray drop.** Whether an author may drop a new block from the
+palette straight onto the tray, or must place it and then move it, is an edit
+affordance rather than a rendering one. Nothing here forbids either; decision
+2's four-command closed set already covers both, since a drop is an Insert and
+a move is a Move.
+
+### Consequences
+
+- The editor gains a fourth slot style and no new component, no new anchor, no
+  new severity and no new finding source. Whether it also needs no new theme
+  token is left to the implementing bead rather than asserted here: 10j's
+  no-new-token finding was about the error family specifically and does not
+  carry over on its own, and amendment 14e's two-way token coverage will fail
+  the build if the tray's edge and card turn out to need one that is not
+  declared.
+- **The edit algebra is untouched.** Parking a fragment in the drafts tray and
+  placing it back into the flow are ordinary Move commands over ADR-0001's
+  tree, with decision 3's inverses, so undo and redo work on them for the same
+  reason they work on every other move. No command is added and none is
+  amended - which is the strongest evidence available that this is a container
+  and not a second document.
+- `slot_style` now has four values and 10i matters more than it did, exactly
+  as the `:failure` amendment predicted when it said a third value means a
+  fourth is possible. This is that fourth, and it is this package's rather
+  than a host's, which was not the case that amendment had in mind.
+- **The canvas and the compiled chart still agree**, which is the property
+  10u is written to protect. What ADR-0004 compiles to nothing, the renderer
+  draws with no edges; what it compiles to a step, the renderer draws in the
+  flow. A reader who can see the picture can predict the chart, and that
+  remains true with a shelf in the document.
