@@ -4108,8 +4108,10 @@ already outside of.
 
 ## Amendment (2026-09-01): decision 2, a fifth command, and the declarations panel
 
-**Status: proposed (2026-09-01), implementing bead `sb-d0nv`, campaign-026's
-Lane A1.** Additive; decisions 2, 3, 7, 8, 9 and 11 stand as written and no
+**Status: accepted (2026-09-01, UNQUALIFIED direction-agent verdict under the
+operator campaign-026 grant, PR 211), implementing bead `sb-d0nv`,
+campaign-026's Lane A1.** Drafted 2026-09-01 as a proposed amendment.
+Additive; decisions 2, 3, 7, 8, 9 and 11 stand as written and no
 text above this line is edited by this section, which supersedes decision 2's
 "four, not seven" count rather than rewriting it in place - the convention
 every amendment on this record follows.
