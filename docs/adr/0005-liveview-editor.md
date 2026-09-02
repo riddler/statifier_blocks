@@ -4663,8 +4663,8 @@ Filed with `sb-4yze`, campaign-027's Lane E, under ruling R27-9.
 
 ## Note (2026-09-02): decision 1A, the last reserved place, filled
 
-**Status: a dated note, not an amendment.** No decision moves, no clause is
-edited, no text above this line changes, and nothing here widens 1A's
+A dated note rather than an amendment, because no decision moves, no clause
+is edited, no text above this line changes, and nothing here widens 1A's
 admission test. What it records is which content took the place 1A reserved,
 because the place was named repeatedly and never described - and a reserved
 name that outlives its own reservation reads, to the next reader, as a tab
