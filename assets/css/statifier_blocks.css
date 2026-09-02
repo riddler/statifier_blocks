@@ -3547,6 +3547,18 @@ button.sb-inspector__group-row:hover {
   overflow-x: auto;
 }
 
+/* The scroller is a Tab stop (drawer.ex makes it one, because it is the only
+ * way to reach a column past the right edge without a pointer), so it needs a
+ * ring of its own. The subtree's focus treatment draws 2px OUTSIDE the box,
+ * and the panel around this one is itself `overflow: auto` under a remembered
+ * max-height - a table sitting at the panel's scroll edge loses the outer
+ * half of that ring to the clip. Same tokens, drawn inside the region
+ * instead, so the whole ring survives wherever in the panel the table lands. */
+.sb-table__scroll:focus-visible {
+  outline: var(--sb-focus-width) solid var(--sb-focus-ring);
+  outline-offset: calc(-1 * var(--sb-focus-width));
+}
+
 .sb-table__scroll table {
   border-collapse: collapse;
   font-size: var(--sb-text-sm);

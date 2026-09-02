@@ -341,6 +341,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     # One row per case, one column per bound path and then one per arm - the
     # conventional order, which is the order the drawer's width buys back.
+    #
+    # The scroller is a labelled region and a Tab stop. A table with more arms
+    # than the drawer is wide scrolls horizontally, and nothing inside it is
+    # focusable - every cell is text - so without a `tabindex` here the
+    # columns past the right edge are reachable by pointer and by nothing
+    # else. Making the scroller itself focusable is what hands a keyboard the
+    # arrow keys, Home and End over the table; `role="region"` with the
+    # table's own name is what stops that stop from announcing as an unnamed
+    # group, since a focusable scroll container with no accessible name is a
+    # stop a screen reader cannot tell its user the purpose of.
     defp table(assigns) do
       ~H"""
       <figure class="sb-table" data-table={@table.name}>
@@ -349,7 +359,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <span :if={@table.description} class="sb-table__description">{@table.description}</span>
         </figcaption>
 
-        <div class="sb-table__scroll">
+        <div class="sb-table__scroll" tabindex="0" role="region" aria-label={@table.name}>
           <table>
             <thead>
               <tr>
