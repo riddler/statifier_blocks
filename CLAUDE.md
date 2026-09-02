@@ -226,6 +226,20 @@ Inherited from statifier-ex unless this project records otherwise:
 - Sabotage every new test that asserts `lib/` behavior: break the code it
   covers, confirm it goes red, revert, and note the mutation in one line above
   the test.
+- Process artifacts - bead ids, plan phase and step numbers, plan filenames,
+  workflow jargon - stay out of shipped `lib/` prose, per statifier-ex
+  ADR-0018; `test/statifier_blocks/block_type_test.exs` enforces it over the
+  files it names. **Dated correction and note blocks are exempt.** A
+  `[Correction <date>, <bead id>: this paragraph read "..."]` or
+  `[Note <date>, <bead id>: ...]` block inside a moduledoc is a dated record
+  of an edit rather than a live claim, so it may cite the bead id that
+  occasioned the change: the id is the only trace of why the paragraph moved,
+  and rewording a verbatim quotation inside such a block would falsify the
+  correction. That is ADR-0018 point 4's own test - the id *is* the entry
+  rather than a trace left on something else - reaching a record that happens
+  to live in the code, and the ban still binds every live sentence around it.
+  The form is set by `lib/statifier_blocks/datamodel.ex:65-76` and `:78-81`.
+  (Operator ruling, 2026-08-29.)
 - Commit messages: title < 50 chars, simple present tense ("Adds ...",
   "Fixes ..."), body wrapped at ~72 chars. No AI attribution trailers.
 
