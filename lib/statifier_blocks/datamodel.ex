@@ -160,6 +160,35 @@ defmodule StatifierBlocks.Datamodel do
   """
   @type declared :: MapSet.t(String.t()) | nil
 
+  @typedoc """
+  Which of the three declaring surfaces 11k names contributed a path.
+
+    * `:datamodel` - the host's datamodel, a set or an ADR-0006 document;
+    * `:declare` - the compile call's declared roots;
+    * `:document` - the document's own `datamodel` key.
+  """
+  @type source :: :datamodel | :declare | :document
+
+  @typedoc """
+  One row of the read-only declared-path view: a path, every surface that
+  declared it, and whatever shape the ADR-0006 projection carries for it.
+
+  `type`, `item_type`, `scope`, `label` and `sensitive?` come from the
+  document entry at that path and are `nil` (`false` for the flag) when no
+  entry describes it. A bare declared root is exactly that case, and 11l is
+  why it is a row with no shape rather than no row: a root says storage
+  exists at a name and says nothing about what is under it.
+  """
+  @type declared_row :: %{
+          path: String.t(),
+          sources: [source()],
+          type: Predicates.Datamodel.type() | nil,
+          item_type: Predicates.Datamodel.type() | nil,
+          scope: Predicates.Datamodel.scope() | nil,
+          label: String.t() | nil,
+          sensitive?: boolean()
+        }
+
   @doc """
   Normalizes a host-supplied datamodel to a declared-path set, or `nil`.
 
@@ -381,6 +410,90 @@ defmodule StatifierBlocks.Datamodel do
     case Predicates.Datamodel.index(datamodel) do
       nil -> []
       index -> index |> Predicates.Datamodel.under(prefix) |> Enum.map(& &1.path)
+    end
+  end
+
+  @doc """
+  Every declared path, with the surfaces that declared it and the shape the
+  ADR-0006 projection carries for it - the read-only view of what the 11e
+  advisory reads.
+
+  The rows are `candidates/3`'s set, in `candidates/3`'s order, and that is
+  the point rather than a convenience: the advisory decides "is the path
+  this author wrote declared?" against the union of 11k's three surfaces,
+  so a view that showed only one of them would answer a different question
+  than the one the author is looking at a finding about. Reading the three
+  through the same normalizers here is the same anti-drift rule
+  `candidates/3` is written under.
+
+  `sources` is a list because the surfaces overlap legitimately: a host
+  that declares a root and also enumerates it in its datamodel document has
+  said the same thing twice, and a row that named only the first would hide
+  the second.
+
+  Shape comes from the ADR-0006 document alone, through
+  `StatifierBlocks.Predicates.Datamodel.fetch/2`, and is absent for
+  everything else. A set of paths carries no types, and a declared root
+  carries none by 11l, so those rows are shapeless rather than guessed at.
+
+      iex> alias StatifierBlocks.{Block, Datamodel, Document}
+      iex> document = Document.new(Block.new("core.sequence", id: "blk_root"), id: "doc_x")
+      iex> datamodel = %{"scopes" => [%{"scope" => "local", "entries" => [
+      ...>   %{"path" => "card.brand", "type" => "string", "label" => "Brand"}]}]}
+      iex> Datamodel.declared_view(document, datamodel, ["signup"])
+      [
+        %{path: "card.brand", sources: [:datamodel], type: :string, item_type: nil,
+          scope: :local, label: "Brand", sensitive?: false},
+        %{path: "signup", sources: [:declare], type: nil, item_type: nil,
+          scope: nil, label: nil, sensitive?: false}
+      ]
+
+      iex> alias StatifierBlocks.{Block, Datamodel, Document}
+      iex> document = Document.new(Block.new("core.sequence", id: "blk_root"), id: "doc_x")
+      iex> Datamodel.declared_view(document, nil, [])
+      []
+  """
+  @spec declared_view(Document.t(), term(), term()) :: [declared_row()]
+  def declared_view(%Document{} = document, datamodel, declare \\ []) do
+    index = Predicates.Datamodel.index(datamodel)
+
+    surfaces = [
+      datamodel: declared_paths(datamodel) || MapSet.new(),
+      declare: declared_roots(declare),
+      document: document_roots(document)
+    ]
+
+    surfaces
+    |> Enum.reduce(MapSet.new(), fn {_name, set}, acc -> MapSet.union(acc, set) end)
+    |> Enum.sort()
+    |> Enum.map(&row(&1, surfaces, index))
+  end
+
+  @spec row(String.t(), keyword(MapSet.t(String.t())), Predicates.Datamodel.t() | nil) ::
+          declared_row()
+  defp row(path, surfaces, index) do
+    entry = entry_at(index, path)
+
+    %{
+      path: path,
+      sources: for({name, set} <- surfaces, MapSet.member?(set, path), do: name),
+      type: Map.get(entry, :type),
+      item_type: Map.get(entry, :item_type),
+      scope: Map.get(entry, :scope),
+      label: Map.get(entry, :label),
+      sensitive?: Map.get(entry, :sensitive?) == true
+    }
+  end
+
+  # An empty map rather than `nil`, so the row above reads every field the
+  # same way whether an entry describes the path or nothing does.
+  @spec entry_at(Predicates.Datamodel.t() | nil, String.t()) :: map()
+  defp entry_at(nil, _path), do: %{}
+
+  defp entry_at(index, path) do
+    case Predicates.Datamodel.fetch(index, path) do
+      {:ok, entry} -> entry
+      :error -> %{}
     end
   end
 

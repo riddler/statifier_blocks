@@ -4660,3 +4660,74 @@ Verified with `git show --stat cea57f1`.
 
 No decision moves, no clause is edited, and no text above this line changes.
 Filed with `sb-4yze`, campaign-027's Lane E, under ruling R27-9.
+
+## Note (2026-09-02): decision 1A, the last reserved place, filled
+
+**Status: a dated note, not an amendment.** No decision moves, no clause is
+edited, no text above this line changes, and nothing here widens 1A's
+admission test. What it records is which content took the place 1A reserved,
+because the place was named repeatedly and never described - and a reserved
+name that outlives its own reservation reads, to the next reader, as a tab
+that is still owed.
+
+### What the place was
+
+1A reserved two: "fixture runs and the datamodel view". The
+`## Amendment (2026-09-02): the drawer's fourth tab, fixture runs against the
+compiled chart` above took the first, and ended by saying of the second that
+"the read-only declared-path view is `sb-ouly`'s and is the one that remains".
+It remains no longer, and this note is what its Consequences bullet - "the
+read-only declared-path view keeps its reserved place" - is superseded by. The
+bullet is left standing as written, dated where it is; this note is where the
+current state is read off.
+
+### What the tab renders
+
+A fifth package tab, `:datamodel`, titled **Datamodel** - the name 1A's
+reservation used, and the name the 2026-09-01 declarations amendment
+deliberately did not take for the third tab ("The tab is called Declarations,
+not Datamodel"). The two names now sit beside each other and mean what that
+amendment said they mean: Declarations is the editable list of roots the
+document's own envelope declares, and Datamodel is the read-only view over the
+whole declared vocabulary.
+
+One row per declared path, sorted, carrying:
+
+| Column | Source |
+|---|---|
+| Path | the path itself |
+| Declared by | which of 11k's three surfaces declared it - the host's datamodel, the compile call's roots, the document's own envelope - all of them when more than one did |
+| Type | the ADR-0006 entry's `type`, with a `list`'s `item_type` spelled out, and `unspecified` where no entry describes the path |
+| Scope | the ADR-0006 entry's scope |
+| Label | the ADR-0006 entry's label |
+
+The row set is `StatifierBlocks.Datamodel.candidates/3`'s set, path for path,
+and a test asserts that rather than assuming it. That is the whole reason the
+tab shows three surfaces where the reservation's words say "declared-path
+view": the 11e advisory an author is looking at is decided against the union
+of the three, so a view that showed only the host's datamodel would answer a
+different question than the finding beside it asked. Shape comes from the
+ADR-0006 document alone, because a bare declared root has none by 11l and a
+path set carries none at all.
+
+Read-only, and not as an omission. Two of the three surfaces are the host's
+and the compile call's, which the package cannot write to; the third is the
+Declarations tab's, one tab away. An empty view is distinguished in prose
+rather than by an empty table: with nothing declared anywhere, no
+undeclared-path advisory is produced either (11m), and the panel says so.
+
+### What it does not change
+
+No new command (decision 2), no new hook - it is server-rendered and edits
+neither of decision 7's two hook files - no new anchor (decision 11), and no
+new host assign: the rows are derived in `render/1` from the `datamodel`,
+`declare` and `document` the editor already holds. The strip's unchosen-tab
+resolution is unchanged and the tab is placed last under 2A's arrival-order
+rule, which matters more here than it did for fixtures: a datamodel is the
+thing most likely to be non-empty on a document that holds nothing else, so
+ahead of the others it would capture the resolution for nearly every host that
+supplies one.
+
+The drawer's package tab set is five, and 1A's test governs it unweakened. No
+reserved place remains behind it; anything later is admitted by 1A on its own
+merits or not at all.
