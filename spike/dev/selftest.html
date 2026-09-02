@@ -5010,23 +5010,26 @@
       /*
        * The mirror divergence, checked as a divergence.
        *
-       * `core.on_event` is a SHIPPED type carrying a PROPOSED key, which is
-       * the `core.parallel`/`complete` situation exactly (sb-dxs). The whole
-       * risk of that shape is a stored document that used to decode and
-       * validate and now does not, so that is what this suite is about: the
-       * key is additive, absence is silent, and the shipped keys did not move.
+       * `core.on_event` carried this key as a proposal when the suite was
+       * written; sb-d65 shipped it, so what is checked here is no longer a
+       * proposal but the mirror's fidelity to a shipped key - with one known
+       * divergence, the field ORDER, flagged at the descriptor in
+       * `palette.js`. The risk the suite exists for is unchanged: a stored
+       * document that used to decode and validate and now does not. So that
+       * is what it asserts - the key is additive, absence is silent, and the
+       * keys that predate it did not move.
        *
        * Sabotage: dropping the `"cond" in config` test from the descriptor's
        * validateConfig - so an absent key falls through to the non-empty
        * check - turns "an absent guard is silent" and both back-compat
        * assertions red. Reverted.
        */
-      suite("palette: core.on_event's proposed cond is additive (sb-0o4)", () => {
+      suite("palette: core.on_event's cond is additive (sb-0o4, shipped sb-d65)", () => {
         const onEvent = coreTypes["core.on_event"];
         const schema = onEvent.configSchema({});
 
         equal(
-          "the shipped keys keep their indices, and cond is appended",
+          "the keys that predate cond keep their indices, and cond is appended",
           schema.map((field) => field.key),
           ["event", "outcome", "cond"]
         );

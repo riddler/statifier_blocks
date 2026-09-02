@@ -131,9 +131,9 @@ function step({
  * removed rather than left standing:
  *
  *   - `myapp.guarded_on_event` was `core.on_event` plus a `cond`. `core.on_event`
- *     now declares that optional `cond` itself - a PROPOSED key on a SHIPPED
- *     type, flagged as a mirror divergence at the descriptor in `palette.js`,
- *     the way `core.parallel`'s `complete` is;
+ *     now declares that optional `cond` itself, proposed in sb-0o4 and shipped
+ *     by sb-d65 under ADR-0002's 2026-08-31 note, so the crutch is not only
+ *     retired but replaced by a key the package actually carries;
  *   - `myapp.timeout_rule` was an `after` duration plus the same guard.
  *     `core.timeout` in `proposed-core.js` is that type, proposed as core
  *     because nothing about "interrupt this group after a duration" is
