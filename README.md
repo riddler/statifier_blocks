@@ -599,14 +599,43 @@ A host that wants the editor already has LiveView, since there is nowhere else
 to put the editor, so it adds nothing to `mix.exs`. It does three things:
 
 **1. Import the hooks.** The package's entire client-side surface is two hooks,
-and the default export carries both, so registering them is one line. Add the
-package to `assets/package.json`:
+and the default export carries both, so registering them is one line. There
+are two ways to make the specifier resolve, and which one you want depends on
+whether your app runs `npm install` at all.
+
+*If it does*, declare the dependency in `assets/package.json`. Point it at the
+package's `assets/` directory, which is where the `package.json` lives - the
+package ships no manifest at its root, so `file:../deps/statifier_blocks`
+names a directory npm cannot read:
 
 ```json
-{ "dependencies": { "statifier_blocks": "file:../deps/statifier_blocks" } }
+{ "dependencies": { "statifier_blocks": "file:../deps/statifier_blocks/assets" } }
 ```
 
-and register them in `app.js`:
+*If it does not* - the default for an app from the Phoenix generator, which
+has no `assets/package.json` and no npm step - let esbuild resolve it the same
+way it already resolves `phoenix` and `phoenix_live_view`, through `NODE_PATH`
+pointed at `deps`:
+
+```elixir
+config :esbuild,
+  my_app: [
+    args: ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js),
+    cd: Path.expand("../assets", __DIR__),
+    env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
+  ]
+```
+
+On this route the specifier is the path into the package rather than the bare
+name, because `NODE_PATH` resolution walks `deps/` as a module directory and
+does not read `assets/package.json`:
+
+```javascript
+import StatifierBlocks from "statifier_blocks/assets/js/statifier_blocks.js";
+```
+
+Registration is the same on either route - only the specifier differs, and
+the bare name below is the npm one:
 
 ```javascript
 import StatifierBlocks from "statifier_blocks";
@@ -621,8 +650,10 @@ and `StatifierBlocksMeasure` reports the laid-out geometry the server draws the
 connectors from - without it nothing measures the browser's boxes, so no
 connectors are drawn and the editor renders as stacked rows with no flow lines.
 Both are still available as named exports, and a host that wants measurement
-alone can import it from `statifier_blocks/measure` (ADR-0005 decision 7 and
-its 2026-08-29 amendment, "a second hook that only measures").
+alone can import it from `statifier_blocks/measure` on the npm route, or from
+`statifier_blocks/assets/js/statifier_blocks_measure.js` on the `NODE_PATH`
+one (ADR-0005 decision 7 and its 2026-08-29 amendment, "a second hook that
+only measures").
 
 **2. Import the stylesheet.** It is structural CSS only - the column layout,
 the drag affordances, the finding treatments - with no visual opinion and no
