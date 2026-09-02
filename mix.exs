@@ -1,7 +1,7 @@
 defmodule StatifierBlocks.MixProject do
   use Mix.Project
 
-  @version "0.14.0"
+  @version "0.15.0"
   @source_url "https://github.com/riddler/statifier_blocks"
 
   # ADR-0005 decision 1's acceptance property: the package must compile clean
