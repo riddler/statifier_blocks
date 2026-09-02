@@ -205,6 +205,8 @@ defmodule StatifierBlocks.Compiler do
     SlotValidation
   }
 
+  alias StatifierBlocks.Core.{OnEvent, ResumableGroup, Send}
+
   alias StatifierBlocks.Compiler.{
     Attribution,
     Cancels,
@@ -313,7 +315,7 @@ defmodule StatifierBlocks.Compiler do
         document,
         node,
         emission,
-        shelf_warnings ++ marker_warnings(node) ++ emit_warnings,
+        shelf_warnings ++ marker_warnings(node) ++ deadline_warnings(node) ++ emit_warnings,
         opts
       )
     end
@@ -688,6 +690,123 @@ defmodule StatifierBlocks.Compiler do
   @spec note_phrase(term()) :: String.t()
   defp note_phrase(note) when is_binary(note) and note != "", do: ~s(: "#{note}")
   defp note_phrase(_note), do: ""
+
+  # ADR-0010's Note of 2026-09-02, the operator's RQ-026-6 ruling, option
+  # (c): the one advisory this record asks for, and the whole of what the
+  # ruling changes. The compiled bytes are untouched - decision 1's "first
+  # block of the group's `body` slot" convention stands for both group
+  # types and no block type gains a key - so this pass is a read of the
+  # resolved tree and nothing else.
+  #
+  # ## The shape, and why exactly this one
+  #
+  # A delayed `core.send` at the **head** of a `core.resumable_group`'s
+  # `body`, and a `core.on_event` on that same group's `interrupts` rail
+  # whose `outcome` is `resume`. Decision 3's behaviour 2 is the
+  # consequence: the resume handler's transition exits the body region,
+  # which fires the `<cancel>` `StatifierBlocks.Compiler.Cancels` emitted
+  # in that region's `<onexit>`, and the history re-entry restores the
+  # step the group was interrupted in rather than the head that armed the
+  # deadline. Nothing re-arms, so the group runs on with no deadline at
+  # all.
+  #
+  # A plain `core.group` is silent because it has no history to re-enter
+  # through - decision 3's behaviour 1, where the deadline survives the
+  # resume because an internal resume exits neither the group nor its
+  # body region. A rail with no `resume` handler is silent because the
+  # abandon path's lifetime is correct for free (decision 3 again). Both
+  # silences are the ruling's own words, not an optimization.
+  #
+  # ## One warning per group
+  #
+  # D4's reasoning for the shelf applies unchanged: a group with two
+  # resume handlers is not a worse document than one with a single
+  # handler, and a finding whose loudness tracks the rail's length is
+  # noise. The anchor is the **group**, not the send: the group is the
+  # block that owns both halves of the shape, and it is the block one of
+  # the two escapes asks the author to change.
+  #
+  # `severity: :warning` with no `config_key` maps to the `:lint` source
+  # under ADR-0005 decision 11's rule 2 (see
+  # `StatifierBlocks.Finding.from_compiler/2`), which is where an advisory
+  # belongs and what renders it in the neutral chrome rather than the
+  # error family. `fault: :author` for `drafts_warning/1`'s reason: both
+  # escapes are document edits.
+  #
+  # It is deliberately **not** added to `StatifierBlocks.Compiler.Finding`'s
+  # stage table, whose column is "Errors it produces" - the three warning
+  # codes the `:emit` stage already raises are absent from that row for the
+  # same reason. `sb-1m2`'s complaint about that row is about a missing
+  # *error* code and is not touched here.
+  @spec deadline_warnings(Resolved.t()) :: [Finding.t()]
+  defp deadline_warnings(%Resolved{module: module, block: block, slots: slots}) do
+    own =
+      if module == ResumableGroup and deadline_lost_on_resume?(slots),
+        do: [deadline_warning(block)],
+        else: []
+
+    own ++
+      Enum.flat_map(slots, fn {_name, children} ->
+        Enum.flat_map(children, &deadline_warnings/1)
+      end)
+  end
+
+  @spec deadline_lost_on_resume?([{Block.slot_name(), [Resolved.t()]}]) :: boolean()
+  defp deadline_lost_on_resume?(slots) do
+    armed_head?(slot_children(slots, "body")) and
+      resumes?(slot_children(slots, "interrupts"))
+  end
+
+  @spec slot_children([{Block.slot_name(), [Resolved.t()]}], Block.slot_name()) :: [Resolved.t()]
+  defp slot_children(slots, name) do
+    case List.keyfind(slots, name, 0) do
+      {^name, children} -> children
+      nil -> []
+    end
+  end
+
+  # "Delayed" is "the key holds a non-empty string", not "the string parses
+  # as a duration": the Config stage has already run over the whole
+  # document and stops the pipeline on a `delay` that is neither empty nor
+  # a duration (`StatifierBlocks.Core.Send.validate_config/1`), so any
+  # delay still standing here is one the compile accepted. Re-parsing it
+  # would be a second opinion on a question already answered.
+  @spec armed_head?([Resolved.t()]) :: boolean()
+  defp armed_head?([%Resolved{module: Send, block: %Block{config: config}} | _rest]),
+    do: delayed?(Map.get(config, "delay"))
+
+  defp armed_head?(_children), do: false
+
+  @spec delayed?(term()) :: boolean()
+  defp delayed?(delay) when is_binary(delay), do: String.trim(delay) != ""
+  defp delayed?(_delay), do: false
+
+  @spec resumes?([Resolved.t()]) :: boolean()
+  defp resumes?(children) do
+    Enum.any?(children, fn
+      %Resolved{module: OnEvent, block: %Block{config: config}} ->
+        Map.get(config, "outcome") == "resume"
+
+      %Resolved{} ->
+        false
+    end)
+  end
+
+  @spec deadline_warning(Block.t()) :: Finding.t()
+  defp deadline_warning(%Block{id: id}) do
+    Finding.new(
+      :emit,
+      {:deadline_lost_on_resume, id},
+      "the deadline at the head of this group's body is armed once only: a resume " <>
+        "interrupt exits the body region, which cancels the delayed send, and the " <>
+        "history re-entry restores the interrupted step rather than the head that " <>
+        "armed it, so after the first resume the group runs on with no deadline. Arm " <>
+        "the deadline outside the group, or use a core.group.",
+      block_id: id,
+      severity: :warning,
+      fault: :author
+    )
+  end
 
   # -- Stage 5: emit ---------------------------------------------------------
 
