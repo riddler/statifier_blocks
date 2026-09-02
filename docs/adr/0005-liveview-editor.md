@@ -4509,3 +4509,154 @@ either direction.
 
 No decision moves and no clause is edited. Filed with `sb-8fsb`,
 campaign-026.
+
+---
+
+## Amendment (2026-09-02): the drawer's fourth tab, fixture runs against the compiled chart
+
+**Status: proposed (2026-09-02), drafted with the implementation it records,
+implementing bead `sb-4yze`, campaign-027's Lane E.** Additive; decisions 1, 7,
+14 and 15 stand as written and no text above this line is edited by this
+section.
+
+### Context
+
+The drawer's third reserved place - "fixture runs" - was named twice without
+being drafted: in `drawer.ex`'s moduledoc and in `editor.ex:758-765`'s comment
+on the tab-pick handler, both of which listed "fixture runs, the datamodel
+view" as what remained after the 2026-09-01 declarations amendment took the
+first door ADR-0001 11i opened. This section takes the second. Both call
+sites now read as the implementation left them - the moduledoc names fixture
+runs as landed and the declared-path view as what remains, and the handler
+comment names `sb-ouly` for it - which this section records rather than
+re-derives.
+
+The tab passes 1A's admission test the same way tables, findings and
+declarations did before it: it is tabular - one row per fixture row - and it
+is about the whole document, never about the block currently selected. 3A's
+reason for keeping tables and findings out of the inspector applies here
+unchanged: fixture runs were never about the selected block either.
+
+### Proposed decision
+
+**A fourth drawer tab, `:fixtures`,** listing every fixture row attached to
+the document's blocks with a per-row verdict. It joins `:tables`, `:findings`
+and `:declarations` in `Shell.drawer_tabs/0`, last, so a document that already
+has tables open still opens where it always did (2A's unchosen-tab rule
+resolves to the first tab with a non-zero count, and the order of the list is
+what "first" means).
+
+**The data path, named end to end.** The `fixtures` assign
+(`%{block_id => [TruthTable.t()]} | nil`, unchanged) is read by
+`StatifierBlocks.Runtime.FixtureRuns.run/4`, which calls
+`StatifierBlocks.Compiler.compile/3` once against the document and palette,
+then `Statifier.compile/2` on the emitted SCXML bytes, then
+`Statifier.initialize/2` once per fixture row with `datamodel: row.context`.
+Each call's `%MachineState{}.entered_states` is mapped through
+`Statifier.Machine.id/2` to state ids, and those ids are resolved to owning
+blocks through `StatifierBlocks.Provenance.owners_of_states/2`. The fixture's
+own block is walked in slot-declaration order for the first slot holding an
+entered descendant, and comparing that slot against the row's expected slot
+(the cell whose `expected` is `true`) produces the verdict.
+
+**Why `initialize/2` alone, and why `entered_states` rather than the final
+configuration.** A `core.branch` arm is transient - `Core.Branch.emit/2`
+compiles it to a compound state whose `initial` is a transient pick state,
+so the arm can be entered and left inside the same macrostep `initialize/2`
+runs, and the chart can reach its `<final>` during initialization. The final
+configuration can therefore miss the very arm the row took. `entered_states`
+accumulates across the whole session and misses nothing; reading it is the
+same inspection `Statifier.Testing.Case` performs on
+`MachineState.active_leaf_states/1`, applied to a wider field, and it is not
+a fifth driving function - no `Statifier.send_event/2` call is made, because
+a `%TruthTable.Row{}` carries bindings and a context, never an event.
+
+**Why the driving code calls `Statifier`'s four functions directly.**
+`Statifier.Testing.Case` is an ExUnit case template - `use`-able only in a
+test - and its own moduledoc forbids any module in `lib/` outside
+`Statifier.Testing.*` from referencing it. `compile/2`, `initialize/2`,
+`send_event/2` and `active_leaf_states/1` **are** the closed ADR-0053 /
+ADR-0006 surface it names; calling them directly from `lib/` is that surface,
+not a way around it, and the test suite is free to `use` the template where
+it helps.
+
+**Where the runner lives, and why.**
+`StatifierBlocks.Runtime.FixtureRuns`, outside the
+`Code.ensure_loaded?(Phoenix.LiveView)` guard, on the rule `Shell`'s own
+moduledoc already states: what is worth testing goes in
+`lib/statifier_blocks/`, unguarded. Decision 1's headless CI job is what
+makes that guard trustworthy, and the part worth testing belongs where the
+headless tree can reach it. The `Runtime.*` namespace is
+`runtime/subchart.ex`'s precedent - the half that runs, set against the
+authoring half that is everything else in `lib/`.
+
+**What counts in the strip: rows.** `Shell.fixture_row_count/1` counts the
+rows the fixtures source holds, not the failures a run against them
+produces - the same convention `:tables` and `:findings` follow, counting
+content rather than problems. `drawer_view/1` runs on every render, and
+counting failures would put a compile plus N chart runs inside every
+keystroke; the run itself is driven only while the drawer is open on this
+tab and its memo key has changed, through `refresh_fixture_runs/1`.
+
+**The drawer's `status` field is not overloaded.** `status`, `tables` and
+`jumps` on `drawer()` describe the truth-tables tab and keep their present
+meanings. The fixtures tab's own state - a `StatifierBlocks.Runtime.FixtureRuns.t()`,
+carrying its own `:no_fixtures | :compile_error | :ready` status and, on
+`:ready`, a `Run.t()` per row with verdict `:pass | :fail | :row_error |
+:no_expectation | :not_comparable | :unreached` - is a separate editor
+assign, because it is neither pure nor cheap and `drawer_view/1` is both.
+
+**Decision 7's two-hook limit, restated as acceptance.** The package ships
+exactly two hooks, `StatifierBlocksDrag` and `StatifierBlocksMeasure`; this
+tab is server-rendered, adds no JavaScript, and edits neither hook file.
+`test/statifier_blocks/assets_test.exs` holds the limit against the files
+rather than against reviewer memory, and it is unchanged by this section.
+
+**Decision 15 is narrowed, not contradicted.** Decision 15's bullet on this
+exact question - "**Per-palette-entry fixtures** - the 'test this step' panel
+ADR-0002 decision 9 sketched - wait on sui-13q, unchanged and still
+provisional" - names a different surface than this one. This tab is not that
+panel: it is document-level and tabular, over every fixture row already
+attached to the document's blocks, not per-palette-entry; it invents no
+fixture-bundle format of its own; and the deferred per-entry pane stays
+exactly as deferred as decision 15 left it. The convention this tab consumes
+rather than competes with is sui-13q's, recorded in statifier-ui's
+`docs/fixture-bundles.md` (`StatifierUI.Fixtures` / `StatifierUI.Fixtures.Bundle`).
+
+**The last reserved place.** `drawer.ex`'s moduledoc and `editor.ex`'s
+tab-pick handler comment named two reserved places, "fixture runs, the
+datamodel view". This section takes the first. The read-only declared-path
+view is `sb-ouly`'s and is the one that remains.
+
+**The precedent for landing a proposed amendment with its implementation.**
+`## Amendment (2026-09-01): decision 2, a fifth command, and the declarations
+panel`, Status line "PR 211", bead `sb-d0nv`, landed as commit `cea57f1`,
+which carried `docs/adr/0005-liveview-editor.md` together with
+`lib/statifier_blocks/shell.ex`, `lib/statifier_blocks/editor/drawer.ex`,
+`assets/css/statifier_blocks.css`, `changelog.d/sb-d0nv.md` and five test
+files in one commit, and was flipped to accepted afterwards in `ecf182b`.
+Verified with `git show --stat cea57f1`.
+
+### Consequences
+
+- **The drawer's tab set is four and the bullet that governs it is
+  unweakened.** 1A's test admitted this tab the way it admitted the three
+  before it; the read-only declared-path view keeps its reserved place; a
+  host tab is still the host's obligation under the 2026-08-30 seam
+  amendment.
+- **A document's fixture rows become inspectable without a separate
+  harness.** An author sees, per row, the slot the row expected against the
+  slot the compiled chart actually took, in the same surface as the tables
+  that produced the rows.
+- **No new command, no new hook, no new anchor.** The tab reads
+  `StatifierBlocks.Runtime.FixtureRuns.run/4`'s result and draws it; nothing
+  here touches decision 2's command set, decision 7's hook count, or decision
+  11's finding anchors. A compile failure surfaces through the same
+  `%Finding{}` list the findings tab already draws, carried on the fixture
+  run's own `:compile_error` status.
+- **A host that renders the editor gets the tab with no change of its own.**
+  No new assign beyond the existing `fixtures` one, no new event beyond the
+  existing `drawer-open` / `drawer-tab` pair.
+
+No decision moves, no clause is edited, and no text above this line changes.
+Filed with `sb-4yze`, campaign-027's Lane E, under ruling R27-9.
