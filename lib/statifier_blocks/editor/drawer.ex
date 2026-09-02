@@ -361,7 +361,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             </thead>
             <tbody>
               <tr :for={row <- @table.rows} data-row={row.name}>
-                <th scope="row">{row.name}</th>
+                <th scope="row">
+                  {row.name}
+                  <span :if={row.note} class="sb-table__row-note">{row.note}</span>
+                </th>
                 <td :for={path <- @table.paths} data-path={path}>
                   {Map.get(row.bindings || %{}, path, "")}
                 </td>
@@ -374,12 +377,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                   {row_error_sentence(row.error)}
                 </td>
                 <td
-                  :for={cell <- if(row.error, do: [], else: row.cells)}
+                  :for={{cell, detail} <- annotated_cells(row)}
                   data-column={cell.column_key}
                   data-status={cell.status}
                   data-selected={to_string(cell.selected?)}
+                  title={detail}
                 >
-                  {Shell.cell_word(cell)}
+                  {Shell.cell_word(cell)}<span :if={detail} class="sb-table__cell-detail">{detail}</span>
                 </td>
               </tr>
             </tbody>
@@ -388,6 +392,40 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       </figure>
       """
     end
+
+    # A row that never built a context has no cells to draw: the row-error
+    # cell above spans the columns in their place.
+    #
+    # The status word alone says a cell disagreed with its row, not what the
+    # disagreement was, and the two mismatches read identically - an author
+    # cannot tell "this arm was expected to win and did not" from "this arm
+    # was expected to lose and won". Both readings are already on the cell:
+    # `expected` is what the row declared, `selected?` is what one ordered
+    # first-match-wins pass actually chose. So the detail is paired with its
+    # cell here and drawn beside the word, rather than staying in the struct
+    # where only the code can see it.
+    defp annotated_cells(%TruthTable.Row{error: error}) when not is_nil(error), do: []
+
+    defp annotated_cells(%TruthTable.Row{cells: cells}),
+      do: Enum.map(cells, &{&1, mismatch_detail(&1)})
+
+    # Only `:mismatch` carries a detail. `:match` would say the same thing
+    # twice, `:unchecked` has no `expected` to report, and `:error` and
+    # `:undecidable` have no boolean `selected?` a sentence could name.
+    defp mismatch_detail(%TruthTable.Cell{
+           status: :mismatch,
+           expected: expected,
+           selected?: selected
+         }),
+         do: "expected #{yes_no(expected)}, selected #{yes_no(selected)}"
+
+    defp mismatch_detail(%TruthTable.Cell{}), do: nil
+
+    # "yes" and "no" rather than "true" and "false": the column is an arm and
+    # the question the cell answers is whether that arm was taken, which is
+    # not a value the author wrote anywhere.
+    defp yes_no(true), do: "yes"
+    defp yes_no(false), do: "no"
 
     # A row whose bindings never built a context carries a
     # `StatifierBlocks.Predicates.reason()` - a tagged tuple from this

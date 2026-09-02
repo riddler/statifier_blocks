@@ -3577,6 +3577,24 @@ button.sb-inspector__group-row:hover {
   font-weight: var(--sb-weight-strong);
 }
 
+/* The mismatch detail and the row's note are second lines under the thing
+ * they qualify, not sentences trailing it: the cells are `nowrap`, so an
+ * inline note would widen the column by its whole length and push the
+ * verdicts off screen, which is the readability defect the drawer exists to
+ * undo. Both are smaller than the row they sit under, and the note is lighter
+ * than the row name it explains. */
+.sb-table__cell-detail {
+  display: block;
+  font-size: var(--sb-text-xs);
+}
+
+.sb-table__row-note {
+  display: block;
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-medium);
+}
+
 /* -------------------------------------------------------- declarations */
 
 /* The document's own `datamodel` roots, as the drawer's third tab (ADR-0005's
