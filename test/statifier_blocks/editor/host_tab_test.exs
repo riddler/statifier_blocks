@@ -54,7 +54,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # Sabotage: `Shell.host_tabs/1` answering an empty list with a
       # placeholder entry - a fourth, nameless tab appears and the ordering
       # assertion goes red.
-      test "carries the three package tabs and nothing else", %{conn: conn} do
+      test "carries the four package tabs and nothing else", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn)
         open(view)
 
@@ -63,11 +63,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert has_element?(view, "#sb-drawer-tab-tables")
         assert has_element?(view, "#sb-drawer-tab-findings")
         assert has_element?(view, "#sb-drawer-tab-declarations")
+        assert has_element?(view, "#sb-drawer-tab-fixtures")
 
         assert tabs(html) == [
                  "sb-drawer-tab-tables",
                  "sb-drawer-tab-findings",
-                 "sb-drawer-tab-declarations"
+                 "sb-drawer-tab-declarations",
+                 "sb-drawer-tab-fixtures"
                ]
       end
     end
@@ -84,6 +86,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  "sb-drawer-tab-tables",
                  "sb-drawer-tab-findings",
                  "sb-drawer-tab-declarations",
+                 "sb-drawer-tab-fixtures",
                  "sb-drawer-tab-jobs"
                ]
 
@@ -213,7 +216,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert tabs(html) == [
                  "sb-drawer-tab-tables",
                  "sb-drawer-tab-findings",
-                 "sb-drawer-tab-declarations"
+                 "sb-drawer-tab-declarations",
+                 "sb-drawer-tab-fixtures"
                ]
 
         assert view |> element("#sb-drawer-tab-findings") |> render() =~ "Findings"
@@ -231,6 +235,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  "sb-drawer-tab-tables",
                  "sb-drawer-tab-findings",
                  "sb-drawer-tab-declarations",
+                 "sb-drawer-tab-fixtures",
                  "sb-drawer-tab-runs"
                ]
       end

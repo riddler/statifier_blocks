@@ -437,7 +437,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       test "an unknown drawer tab falls back to the first one", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn)
 
-        view |> with_target("#editor") |> render_click("drawer-tab", %{"tab" => "fixtures"})
+        view |> with_target("#editor") |> render_click("drawer-tab", %{"tab" => "not_a_real_tab"})
 
         assert has_element?(view, ~s(.sb-drawer[data-tab="tables"]))
       end

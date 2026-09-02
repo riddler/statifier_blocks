@@ -66,7 +66,7 @@ defmodule StatifierBlocks.Shell do
   incoming tab name into an atom, so a crafted `phx-value-tab` reaches at
   worst a host tab the host itself declared.
   """
-  @type drawer_tab :: :tables | :findings | :declarations
+  @type drawer_tab :: :tables | :findings | :declarations | :fixtures
 
   @typedoc "A host tab's id: its own name for it, and the DOM id it is stamped into."
   @type host_tab_id :: String.t()
@@ -156,8 +156,12 @@ defmodule StatifierBlocks.Shell do
   # (see `drawer_view/1`). Truth tables first because they are what 2A shipped
   # the drawer for; findings second because R4 moved them here; declarations
   # third because they are the newest and the resolution order is arrival
-  # order, so a document with tables in it opens where it always did.
-  @drawer_tabs [:tables, :findings, :declarations]
+  # order, so a document with tables in it opens where it always did. Fixtures
+  # goes last for the same reason: it is the newest tab of all, and putting it
+  # ahead of the other three would move a document that already has tables in
+  # it off `:tables` and onto the fixtures tab the moment it also carried a
+  # fixtures source - a resolution the arrival-order rule exists to prevent.
+  @drawer_tabs [:tables, :findings, :declarations, :fixtures]
 
   # "Declarations" and not "Datamodel", which is the name the reserved place
   # was described under. ADR-0001 11g and 11h split the two artifacts and the
@@ -167,7 +171,8 @@ defmodule StatifierBlocks.Shell do
   @drawer_titles %{
     tables: "Truth tables",
     findings: "Findings",
-    declarations: "Declarations"
+    declarations: "Declarations",
+    fixtures: "Fixtures"
   }
 
   # The heading over the findings whose anchor names no block in the document.
@@ -492,6 +497,9 @@ defmodule StatifierBlocks.Shell do
   Nothing else is filtered. Which content belongs in the drawer is 1A's test -
   tabular, and about the whole document - and the host applies it to its own
   content the same way this package applies it to its own.
+
+  The reserved names now include `"fixtures"` (`sb-4yze`): a host tab with
+  that id is dropped the same way one named `"declarations"` already is.
   """
   @spec host_tabs([host_tab()]) :: [host_tab()]
   def host_tabs(tabs) do
@@ -671,6 +679,26 @@ defmodule StatifierBlocks.Shell do
 
   def table_count(fixtures),
     do: Enum.reduce(fixtures, 0, fn {_id, tables}, acc -> acc + length(tables) end)
+
+  @doc """
+  How many fixture rows the whole source holds - the number the Fixtures
+  tab's strip carries.
+
+  Rows and not failures, and the reason is both editorial and mechanical. The
+  strip counts CONTENT, the way the tables tab counts tables and the findings
+  tab counts findings; a chip reading `Fixtures 0` over forty passing rows
+  says the opposite of what 2A's strip is for. And `drawer_view/1` runs on
+  every render: a row count is a sum over the assign, while a failure count
+  would put a compile plus one chart run per row inside every keystroke.
+  """
+  @spec fixture_row_count(fixtures()) :: non_neg_integer()
+  def fixture_row_count(nil), do: 0
+
+  def fixture_row_count(fixtures) do
+    Enum.reduce(fixtures, 0, fn {_id, tables}, acc ->
+      acc + Enum.reduce(tables, 0, fn %TruthTable{rows: rows}, inner -> inner + length(rows) end)
+    end)
+  end
 
   @doc """
   How many findings the document has - the number the Findings tab reports,
@@ -856,6 +884,9 @@ defmodule StatifierBlocks.Shell do
             title: drawer_title(:declarations),
             count: Declarations.count(Map.get(state, :declarations))
           }
+
+        :fixtures ->
+          %{id: :fixtures, title: drawer_title(:fixtures), count: fixture_row_count(fixtures)}
       end)
 
     contributed =

@@ -330,7 +330,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `invoke_mark` | no | the block a run is calling out to and how the call came back - `{block_id, outcome}`, a bare `block_id` for no answer yet, or `nil` for no call at all |
     | `theme` | no | `--sb-*` custom properties for the canvas root |
     | `fit` | no | the fit the editor **opens** in: `:manual` (the default), `:width` or `:active`; the first measurement performs it once, and an unknown value is refused into `:manual` |
-    | `fixtures` | no | `%{block_id => [TruthTable.t()]}` the drawer's truth-table tab reads; `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
+    | `fixtures` | no | `%{block_id => [TruthTable.t()]}`, read by both the drawer's truth-table tab and, as of `sb-4yze`, its Fixtures tab (`refresh_fixture_runs/1` drives each row through the compiled chart); `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
     | `drawer_tabs` | no | tabs the host contributes to the drawer, each `%{id:, title:, content:}` with an optional `count:`; drawn beside the package's own and rendered by calling `content` |
     | `drawer_height` | no | the drawer's height in rem, remembered **by the host** per viewer (2A); bounded on the way in |
     | `on_drawer_resize` | no | one-argument function called with each new drawer height, which is how the host comes to have one to remember |
@@ -356,6 +356,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     alias StatifierBlocks.Document.DatamodelEntry
     alias StatifierBlocks.Edit.{History, Targets}
+    alias StatifierBlocks.Runtime.FixtureRuns
 
     alias StatifierBlocks.Editor.{
       Canvas,
@@ -403,6 +404,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          palette_unarmed_pick: false,
          inspector_collapsed: false,
          fixtures: nil,
+         fixture_runs: nil,
+         fixture_runs_key: nil,
          inspector_tab: :config,
          drawer_open: false,
          drawer_tabs: [],
@@ -649,6 +652,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             host_tabs={Shell.host_tabs(@drawer_tabs)}
             declarations={@declarations}
             declaration_refusal={@declaration_refusal}
+            fixture_runs={@fixture_runs}
             target={@myself}
           />
         </div>
@@ -750,21 +754,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       do: {:noreply, assign(socket, :inspector_tab, Shell.inspector_tab(tab))}
 
     def handle_event("drawer-open", _params, socket),
-      do: {:noreply, assign(socket, :drawer_open, true)}
+      do: {:noreply, socket |> assign(:drawer_open, true) |> refresh_fixture_runs()}
 
     def handle_event("drawer-close", _params, socket),
       do: {:noreply, assign(socket, :drawer_open, false)}
 
-    # Two tabs since R4, and the pick is remembered as `nil` until it is made:
+    # Tabs since R4, and the pick is remembered as `nil` until it is made:
     # `Shell.drawer_view/1` resolves an unchosen tab to whichever one actually
-    # holds something, and a pick that lands here stops it resolving. The
-    # remaining reserved places (fixture runs, the datamodel view) arrive as
-    # entries in `Shell.drawer_tabs/0` and need no second handler. Neither
-    # does a host's tab: it is resolved against the ids the host is currently
-    # contributing, and a pick is stored the same way whichever side named it.
+    # holds something, and a pick that lands here stops it resolving. Fixture
+    # runs are consumed as of `sb-4yze` (`refresh_fixture_runs/1` below); the
+    # datamodel view is `sb-ouly`'s and still arrives as a reserved entry in
+    # `Shell.drawer_tabs/0` needing no second handler. Neither does a host's
+    # tab: it is resolved against the ids the host is currently contributing,
+    # and a pick is stored the same way whichever side named it.
     def handle_event("drawer-tab", %{"tab" => tab}, socket) do
       picked = Shell.drawer_tab(tab, host_tab_ids(socket.assigns))
-      {:noreply, assign(socket, :drawer_tab_id, picked)}
+      {:noreply, socket |> assign(:drawer_tab_id, picked) |> refresh_fixture_runs()}
     end
 
     # 2A's resize, in one round trip. The height is bounded here and handed to
@@ -1397,6 +1402,49 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       |> assign(:selected_node, selected)
       |> assign(:selected_slot, Shell.slot_label(view_model.root, socket.assigns.selected_id))
       |> assign(:pending_fields, pending_fields(socket, selected))
+      |> refresh_fixture_runs()
+    end
+
+    # The runs are not on `drawer()` and not in `drawer_view/1`, deliberately.
+    # That function is pure, cheap and called on every render; a compile plus
+    # one chart run per fixture row is none of those. So the runs are their
+    # own assign, recomputed only when the drawer is OPEN on the fixtures tab
+    # and the inputs actually moved.
+    #
+    # The key is compared with `==` rather than hashed: a phash2 collision
+    # would render a stale verdict with nothing on screen to say so, and a
+    # structural comparison is still far cheaper than the work it is
+    # guarding.
+    @spec refresh_fixture_runs(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
+    defp refresh_fixture_runs(socket) do
+      assigns = socket.assigns
+      # The host's RAW `{id, expr}` list, which is what `Compiler.compile/3`'s
+      # `:declare` takes. NOT `host_roots`, which is the derived MapSet of
+      # root ids the advisories read - the compiler refuses it.
+      declare = Map.get(assigns, :declare, [])
+      key = {assigns.document, assigns.palette, assigns.fixtures, declare}
+
+      cond do
+        not assigns.drawer_open ->
+          socket
+
+        drawer_view(assigns).tab != :fixtures ->
+          socket
+
+        key == assigns.fixture_runs_key ->
+          socket
+
+        true ->
+          runs =
+            FixtureRuns.run(assigns.document, assigns.palette, assigns.fixtures,
+              declare: declare,
+              view_model: assigns.view_model
+            )
+
+          socket
+          |> assign(:fixture_runs, runs)
+          |> assign(:fixture_runs_key, key)
+      end
     end
 
     # The one composition of a view model in this component, called by
