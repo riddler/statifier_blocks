@@ -3565,6 +3565,21 @@ button.sb-inspector__group-row:hover {
   font-weight: var(--sb-weight-medium);
 }
 
+/* The case column is the row's name, and a status word with its name scrolled
+ * off the left edge says nothing at all: the whole table is `nowrap`, so any
+ * document with more arms than the drawer is wide reaches that state on the
+ * first drag of the scrollbar. Pinning the row header to the scroller's left
+ * edge keeps the name - and the row note under it - beside every verdict in
+ * its row. The header column takes the same muted fill the column headers
+ * already take, which is both what it is and what makes it opaque enough to
+ * pass cells under. */
+.sb-table__scroll tbody th,
+.sb-table__scroll thead th:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--sb-bg-muted);
+}
+
 /* Five statuses, not a severity ramp. The word is in the cell; the colour
  * only agrees with it, so a reader who cannot tell two hues apart reads the
  * same table. */
