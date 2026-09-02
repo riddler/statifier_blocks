@@ -371,7 +371,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                   colspan={length(@table.columns)}
                   data-status="error"
                 >
-                  {inspect(row.error)}
+                  {row_error_sentence(row.error)}
                 </td>
                 <td
                   :for={cell <- if(row.error, do: [], else: row.cells)}
@@ -388,6 +388,51 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       </figure>
       """
     end
+
+    # A row whose bindings never built a context carries a
+    # `StatifierBlocks.Predicates.reason()` - a tagged tuple from this
+    # package's error vocabulary, and a term rather than a sentence. An author
+    # reading the drawer wrote the fixture, not the vocabulary, so each tag
+    # `Predicates.context/1` can hand a row is read out here instead. The
+    # inspected term stays the fallback for anything unrecognised: a reason
+    # the seam adds later reads oddly, which is a bug someone can see, rather
+    # than vanishing into an empty cell, which is one nobody can.
+    defp row_error_sentence({:binding, path, reason}),
+      do: ~s(The binding for "#{path}" failed: #{clause(reason) || inspect(reason)}.)
+
+    defp row_error_sentence({:binding_conflict, path}),
+      do:
+        ~s(The binding for "#{path}" conflicts with another bound path: ) <>
+          "two paths cannot both nest."
+
+    defp row_error_sentence(reason) do
+      case clause(reason) do
+        nil -> inspect(reason)
+        clause -> "This case's bindings failed: #{clause}."
+      end
+    end
+
+    # The five `evaluate/2`-level tags, as lowercase fragments, so they read
+    # the same nested inside a `{:binding, path, reason}` and standing alone.
+    # The predicator struct's own message is deliberately not quoted into
+    # them: it is parser vocabulary rather than anything the author wrote, and
+    # a single one of them runs past 130 characters, which a `nowrap` table
+    # cell turns into a horizontal scroll on a table that otherwise fits. The
+    # source that failed is already in the row's own binding column.
+    defp clause({:undefined_result, source}),
+      do: "the source #{inspect(source)} evaluated to undefined"
+
+    defp clause({:non_boolean, value}),
+      do: "the source produced #{inspect(value)}, which is not true or false"
+
+    defp clause({:parse_error, _error}), do: "the source could not be parsed"
+
+    defp clause({:undefined_variable, variable, _error}),
+      do: ~s(nothing binds the variable "#{variable}")
+
+    defp clause({:evaluation_error, _error}), do: "the source could not be evaluated"
+
+    defp clause(_other), do: nil
 
     attr(:runs, :any, default: nil)
 
