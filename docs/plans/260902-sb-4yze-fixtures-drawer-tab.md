@@ -469,6 +469,16 @@ above it, and each is actually sabotaged during the phase.
 - [ ] The empty-`otherwise`-by-elimination inference is judged sound rather than
       clever.
 
+**Machine-checked (unattended, 2026-09-02):** the inference's factual premise
+holds. `Core.Branch.emit/2` builds
+`[Emit.state(pick, nil, picks)] ++ transitions ++ refs ++ [Emit.final(done)]`
+(`lib/statifier_blocks/core/branch.ex`), so an arm with no children
+contributes no entry to `refs` and mints no state of its own; its transition
+targets the block's final directly. An empty arm is therefore genuinely
+unobservable in `entered_states`, which is what the by-elimination step
+relies on. Whether the inference is *sound rather than clever* as a design
+call is a judgement and stays deferred for a human.
+
 **Implementation Note**: Use `mix quality --profile loop` between edits; the
 full `mix quality` is the phase gate. In interactive execution, pause here for
 the human to confirm the manual items. Under `--loop`, the Automated
@@ -677,12 +687,40 @@ Sabotage notes on every one of them.
       which the campaign freeze holds - with captures written to
       `/Users/johnnyt/Dev/github/statifier/.claude/fleet/journal/027-screens/`.
       **Deferred: no human is available in this session.**
+
+**Machine-checked (unattended, 2026-09-02): NOT TAKEN - still deferred.** The
+capture was attempted and abandoned deliberately, not skipped. A scratch
+`statifier_examples` worktree was stood up at
+`/Users/johnnyt/Dev/github/statifier/statifier_examples-worktrees/sb-4yze-capture`
+with `STATIFIER_BLOCKS_PATH` pointed at this worktree, its `config/dev.exs`
+re-pointed off the frozen 8645 to **8650**, and a throwaway harness added to
+`editor_live.ex` supplying three truth-table rows against
+`blk_cp_risk_branch` (pass / fail / unbound-binding). The host compiled and
+served `/editor` with HTTP 200 on 8650. The browser step was then abandoned
+because the fleet's `chrome` resource lock is held by another agent
+(`campaign=027 bead=W0 pid=27793 at=2026-09-02T13:03Z`), and contending for
+a held lock is not permitted. The server was stopped and 8650 released;
+8645/8643/8642/4002 were never touched. The harness is left on disk so the
+capture is a two-command job once `chrome` frees:
+`env STATIFIER_BLOCKS_PATH=... mix phx.server` in that worktree, then
+capture to `027-screens/sb-4yze-*`. **Still owed to the operator/conductor.**
 - [ ] The fixtures table stays readable at the drawer's minimum height (6 rem)
       without the horizontal scroll the drawer exists to avoid.
 - [ ] The compile-error copy reads as a normal mid-edit state and not as an
       error the author caused.
 - [ ] Typing in the config form with the tab open does not feel laggy on a
       document with many fixture rows (the memo doing its job).
+
+**Machine-checked (unattended, 2026-09-02):** the memo is present and
+correct. `refresh_fixture_runs/1` (`lib/statifier_blocks/editor.ex`)
+short-circuits before any compile on three conditions - the drawer is
+closed, the active tab is not `:fixtures`, or the key
+`{document, palette, fixtures, declare}` is unchanged - so an unrelated
+re-render performs no compile and no chart run. The
+`re-runs the rows when a config-form edit moves the condition` test proves
+the other half, that a real document change does invalidate the key.
+Whether typing *feels* laggy on a large document is a human perception
+check and stays deferred.
 
 **Implementation Note**: Loop gate between edits, full `mix quality` as the
 phase gate. Manual items deferred under `--loop`.
@@ -799,15 +837,15 @@ Content, all of it required by the bead:
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `git diff origin/main -- docs/adr/ | grep -c '^-[^-]'` returns `0`
+- [x] `git diff origin/main -- docs/adr/ | grep -c '^-[^-]'` returns `0`
       (zero removed lines under `docs/adr/`).
-- [ ] `git diff origin/main -- docs/adr/` shows added lines only, all of them
+- [x] `git diff origin/main -- docs/adr/` shows added lines only, all of them
       after the file's previous last line.
-- [ ] The new section's Status line contains `proposed` and does not contain
+- [x] The new section's Status line contains `proposed` and does not contain
       `accepted`.
-- [ ] The section cites `sui-13q` / `docs/fixture-bundles.md`, ADR-0005
+- [x] The section cites `sui-13q` / `docs/fixture-bundles.md`, ADR-0005
       decision 15, and commit `cea57f1` / PR 211 / bead `sb-d0nv`.
-- [ ] No Elixir file is touched by this commit, so per this repo's `CLAUDE.md`
+- [x] No Elixir file is touched by this commit, so per this repo's `CLAUDE.md`
       there is no gate to run; the diff is the review. Running `mix quality`
       anyway costs only time and is not forbidden.
 
@@ -816,6 +854,16 @@ Content, all of it required by the bead:
       is the direction gate the bead names, and nothing in this plan may
       self-confirm it or flip the Status to accepted.**
 - [ ] The section's prose matches the file's house voice, not this plan's.
+
+**Machine-checked (unattended, 2026-09-02):** the mechanical half conforms.
+The section is appended at the end of the file, opens with the same
+`## Amendment (YYYY-MM-DD): ...` heading form as its neighbours, carries a
+bold `**Status: proposed (2026-09-02) ...**` line in the established
+convention, uses the file's em-dash punctuation rather than this plan's
+hyphens, and closes with the file's customary "No decision moves, no clause
+is edited" sentence plus the filing line. `git diff origin/main --
+docs/adr/` reports **0** removed lines. Whether the *voice* matches is a
+judgement and stays deferred for the direction agent.
 
 **Implementation Note**: Docs-only. Ordered last so it records what shipped
 rather than a shape guessed ahead of the code - the same order precedent
@@ -867,6 +915,16 @@ All seven are **deferred**: no human is available in this session, and the
 capture step is the bead's own acceptance item.
 
 ## Open questions
+
+**Machine-checked (unattended, 2026-09-02):** no question below is *settled* -
+settling one is a human's call and none carries a `**Settled**` marker. What
+an unattended pass could do was re-verify each decision's load-bearing factual
+premise against the tree, and all of them hold: the strip count is
+`Shell.fixture_row_count/1` and `drawer_view/1` calls it per render (so a
+failure count really would put a compile in every keystroke); an empty arm
+mints no state in `Core.Branch.emit/2` (the by-elimination premise); and
+`:datamodel` takes `row.context` unchanged. The decisions themselves remain
+for the direction gate.
 
 Every one of these was **decided** so the plan is actionable without a human.
 They are recorded because no human was available to rule on them, and each is a
@@ -963,5 +1021,19 @@ Verification block gates advancement and the manual items are deferred.
 
 **Implementation Note**: Loop gate between edits, full `mix quality` as the
 phase gate. Manual items deferred under `--loop`.
+
+---
+
+### Phase 3
+
+- [ ] The direction agent's review of the proposed amendment. **Deferred: this
+      is the direction gate the bead names, and nothing in this plan may
+      self-confirm it or flip the Status to accepted.**
+- [ ] The section's prose matches the file's house voice, not this plan's.
+
+**Implementation Note**: Docs-only. Ordered last so it records what shipped
+rather than a shape guessed ahead of the code - the same order precedent
+`cea57f1` used. All three phases land in one pull request, which is what ruling
+R27-9 asks for.
 
 ---
