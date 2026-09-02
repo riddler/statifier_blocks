@@ -806,7 +806,9 @@ const coreSubchart = {
  * the head send, so it has NO deadline after the first resume; and this
  * sketch's own type, arming on the group state's `<onentry>`, would keep its
  * original deadline running across the resume. ADR-0010 decision 3 records
- * the first as intended and defers the second; the third is nobody's.
+ * the first as intended; the second is answered by the record's 2026-09-02
+ * note as an ADVISORY finding rather than a new arming convention (operator
+ * ruling RQ-026-6, bead sb-dj1p); the third is nobody's.
  *
  * This descriptor is kept, not deleted, because it is now the evidence for a
  * refused proposal and because `dev/selftest.html` and

@@ -1,6 +1,8 @@
 # ADR-0010: A clock interrupt is a delayed `core.send` at the head of a group's body caught by a `core.on_event` on its rail, and there is no `core.timeout`
 
-Status: proposed (2026-09-01, campaign-026, bead `sb-j2o`)
+Status: accepted (2026-09-02, campaign-026; direction-agent verdict on the
+second review, after one cure, with the `RQ-026-6` ruling recorded in the
+note below)
 
 ## Context
 
@@ -8,7 +10,7 @@ The editor spike carries a proposed core type that does not exist in the
 package: `core.timeout`, "an interrupt rule that fires once a duration has
 elapsed", declared with an `after` duration, an `outcome` of `abandon` or
 `resume`, an optional `cond`, and `kinds: ["interrupt_handler"]` and nothing
-else (`spike/js/proposed-core.js:736-884`). Its own header states the case for
+else (`spike/js/proposed-core.js:736-894`). Its own header states the case for
 it in one sentence: "`core.on_event` catches an event; nothing caught the
 clock" (`spike/README.md:845-848`).
 
@@ -123,10 +125,17 @@ The send block's emission is a compound state whose `<onentry>` holds
 `initial` points straight at its `<final>`, because arming is instantaneous
 (`lib/statifier_blocks/core/send.ex:215-231`). As the first child of the group's
 `body`, that state is entered when the body region is entered, so the deadline
-starts when the group starts. The handler's emission is a transition on the
-group's state, guarded by the `cond` when one is set, taking the group to its
-final for `abandon` or re-entering it for `resume`
-(`lib/statifier_blocks/core/on_event.ex:33-66`).
+starts when the group starts. The handler's emission is a **watcher state**
+whose transition fires on the author's event, guarded by the `cond` when one is
+set, and whose executable content raises an interrupt-protocol event -
+`statifier_blocks.interrupt.abandon` or `...resume`, per the handler's `outcome`
+(`lib/statifier_blocks/core/on_event.ex:286-300`, `:324-326`;
+`lib/statifier_blocks/core/emit.ex:68-69`). The **group's own state** is what
+carries the transitions on those protocol events: to its `<final>` for
+`abandon`, and to `history_id || run` for `resume`
+(`lib/statifier_blocks/core/emit.ex:256-259`). The handler names what should
+happen; the group is where it happens. That split is why decision 3's three
+resume behaviours belong to the group type rather than to the handler.
 
 A new type that emits the bytes an existing arrangement already emits buys the
 author one card and buys the compiler a second code path to keep in agreement
@@ -351,3 +360,44 @@ consistent with this record and needs no amendment to it.
   (`lib/statifier_blocks/compiler/cancels.ex:27-35`); whether the resulting
   chart is what an author expects has not been walked and no document
   exercises it.
+---
+
+## Note (2026-09-02): `RQ-026-6` answers the resumable-group deadline, and it is an advisory
+
+A dated note rather than an amendment: it does not change what this record
+decides, it records the operator's answer to the one question the record
+deliberately left open.
+
+The deferred list's first entry asked what a deadline should mean on a
+`core.resumable_group` after a resume - decision 3's behaviour 2, where the body
+region's exit cancels the armed head `core.send` and the history re-entry
+restores the interrupted step rather than the region's initial, so nothing
+re-arms and the group runs on with no deadline. The record named three possible
+answers and picked none.
+
+**The ruling is option (c): an advisory finding, not a new arming convention.**
+Where a document places a delayed `core.send` at the head of a
+`core.resumable_group`'s `body` **and** that group's `interrupts` rail carries a
+`core.on_event` whose `outcome` is `resume`, the ADR-0005 findings layer raises
+an **advisory** - a warning, not a refusal - stating the consequence and the two
+escapes available to the author: arm the deadline outside the group, or use a
+plain `core.group`. The finding stays silent for a `core.group` and for a rail
+with no resume handler.
+
+What the ruling deliberately does *not* do is change the compiled bytes or the
+authoring convention. Decision 1's "first block of the group's `body` slot"
+stands unaltered for both group types, decision 3's behaviours 1 and 2 stay
+exactly as described, and no block type gains a key. The sharp edge is surfaced
+where an author will see it rather than designed away, which keeps the SCXML the
+pair emits the SCXML the vocabulary already emitted.
+
+`sb-dj1p` carries the work, filed 2026-09-02 as a campaign-027 candidate and
+not scheduled here. Its acceptance criteria are that the finding fires on
+exactly that shape and is sabotage-tested, that it stays silent for `core.group`
+and for rails without a resume handler, and that this note names it - which it
+now does.
+
+**The deferred-list entry this answers is left in place rather than deleted**,
+and this note supersedes it. A deferred question that vanishes from a record
+reads as one that was never asked; the entry is the question, and this is the
+answer to it.
