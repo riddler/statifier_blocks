@@ -1148,6 +1148,31 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # The space scale in `--sb-space` units, which is what lets a geometry
+    # assertion below compare two rules written in different combinations of
+    # the same tokens.
+    @space_units %{
+      "--sb-space" => 1.0,
+      "--sb-space-half" => 0.5,
+      "--sb-space-2" => 2.0,
+      "--sb-space-3" => 3.0
+    }
+
+    defp rule_body!(css, regex) do
+      match = Regex.run(regex, css)
+      assert match, "the scan actually found #{inspect(regex.source)}"
+      Enum.at(match, 1)
+    end
+
+    defp space_units(body, property) do
+      [_, value] = Regex.run(~r/^\s*#{property}:\s*(.*?);/m, body)
+
+      ~r/var\((--sb-space(?:-half|-2|-3)?)\)/
+      |> Regex.scan(value)
+      |> Enum.map(fn [_, token] -> Map.fetch!(@space_units, token) end)
+      |> Enum.sum()
+    end
+
     describe "the fold's stylesheet (ADR-0005's amendment to decision 2)" do
       # The rest state is opacity, not `display: none` and not
       # `visibility: hidden`: both of those take a button out of the tab
@@ -1209,6 +1234,40 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         rule reaches all three.
 
         Unscoped: #{inspect(unscoped)}
+        """
+      end
+
+      # The fold and the findings badge are the same corner of the chrome and
+      # only one of them is in the flow: the fold is absolutely placed inside
+      # the reserved right padding, so that reservation is the only thing
+      # keeping the count out from under the `+`. Measured in `--sb-space`
+      # units off both rules rather than asserted as a literal, so moving
+      # either control has to be answered here instead of quietly putting the
+      # two back on top of each other (screen `e6-11-drafts-folded-1280`,
+      # campaign 027).
+      # Sabotage: dropping the badged-card rule - the badge's grid column ends
+      # at the 3-unit content edge, the fold's square reaches 4.5, and this
+      # goes red by the 1.5 units the two would share.
+      test "a card that draws a badge reserves the padding the fold occupies" do
+        css = File.read!(@stylesheet)
+
+        fold = rule_body!(css, ~r/^\.sb-node__fold\s*\{(.*?)\n\}/ms)
+
+        badged =
+          rule_body!(
+            css,
+            ~r/^\.sb-node\[data-collapsed="true"\]:not\(\[data-findings-count="0"\]\) > \.sb-node__chrome\s*\{(.*?)\n\}/ms
+          )
+
+        needed = space_units(fold, "right") + space_units(fold, "width")
+        reserved = space_units(badged, "padding-right")
+
+        assert reserved >= needed, """
+        The fold reaches #{needed} `--sb-space` units in from the chrome's
+        right border, and the badge's grid column ends at the content edge, so
+        a card carrying both reserves at least that much on the right.
+
+        Reserved: #{reserved}
         """
       end
     end

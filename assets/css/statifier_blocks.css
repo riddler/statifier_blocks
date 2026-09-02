@@ -1348,6 +1348,28 @@
   margin-bottom: 0;
 }
 
+/* The badge's column and the fold's square are the same corner, and only one
+ * of them is in the flow. The fold is absolutely placed in the chrome's
+ * reserved right padding, starting `--sb-space-2 + --sb-space-half` in from
+ * the border box and running `--sb-space-2` wide; the badge is the grid's
+ * third column, so it ends where the content box does - at
+ * `--sb-space-3`. Three space units of reservation is less than the four and
+ * a half the fold needs, so on the one face that draws both the count slid
+ * under the `+`.
+ *
+ * Widening the reservation rather than moving either control: the fold's
+ * offset is shared with the `x` it lines up beside, and the badge is a grid
+ * cell whose whole point is that the chrome already expects it. What was
+ * wrong was the padding, on the cards that carry a badge and on no others.
+ *
+ * The two attributes are the badge's own render condition - collapsed, and a
+ * subtree rollup above zero - read off what the node already stamps.
+ * `data-*` rather than `:has(> .sb-badge)`, for the reason the container
+ * rule gives above: the state is declared, not inferred from the markup. */
+.sb-node[data-collapsed="true"]:not([data-findings-count="0"]) > .sb-node__chrome {
+  padding-right: calc(var(--sb-space-2) + var(--sb-space-3));
+}
+
 /* D4: the whole of an unresolvable card's face below its chrome - one line,
  * in the editor's own words. Muted rather than in the error family: the
  * dashed chrome and the count badge already say the card is broken, and a
