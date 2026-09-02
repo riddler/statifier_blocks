@@ -2377,3 +2377,91 @@ not collide.
 through **G.G5**, and a `###` section by its bare label, **G2** through
 **G13**. A reader meeting a bare `G3` in text older than this note reads the
 `###` section, per the paragraph above.
+
+## Note (2026-09-02): `core.wait` arms a delayed send too, so the send-id amendment's section C is stale in one clause
+
+A dated precision note rather than an amendment, recorded for `sb-4m2` under
+the campaign-015b queue-walk ruling (item 10), which filed it after the PR 132
+direction-agent review surfaced the sentence as pre-existing staleness. It
+decides nothing. No section above is edited, no row is added or removed, no
+Status changes, and every rule this record states means after this note exactly
+what it meant before it.
+
+### The clause, and why it was never accurate
+
+The send-id amendment of 2026-08-29 closes with section C, "What this amendment
+does not change" (:1414). Its third bullet reads:
+
+> - Any other block type's declarations. Nothing but `core.send` arms a delayed
+>   send, so nothing but `core.send` is touched.
+
+The middle clause was inaccurate on the day it was accepted. `core.wait`
+compiled to a `<send>` carrying a `delay` before that amendment, minting the
+id under a `"timer"` role of its own, and it is inaccurate for a second reason
+now: `sb-cqg` (PR 132) moved the wait's id onto the **same reserved send role**
+`core.send` mints under, so the two types are no longer even distinguishable by
+the role their armed send carries.
+
+### What is accurate at `main`
+
+Two types in the shipped `core.*` vocabulary arm a delayed send, and they mint
+the id through the same reserved role.
+
+| Type | `emit/2` at `main` | Where the id is minted | Is the send always delayed? |
+|---|---|---|---|
+| `core.send` | `lib/statifier_blocks/core/send.ex:264-279` | `:267` | no - `delay` is optional, and an absent one emits no `delay` attribute |
+| `core.wait` | `lib/statifier_blocks/core/wait.ex:171-190` | `:175` | yes - `duration` is required |
+
+The two emit sites, quoted:
+
+```elixir
+# lib/statifier_blocks/core/send.ex:267
+with {:ok, id} <- Context.role_id(context, Cancels.armed_role()),
+
+# lib/statifier_blocks/core/wait.ex:175
+     {:ok, send_id} <- Context.role_id(context, Cancels.armed_role()),
+```
+
+and each hands that id straight to the `<send>` it builds - `send.ex:270-273`,
+and `wait.ex:180`:
+
+```elixir
+# lib/statifier_blocks/core/wait.ex:180
+Emission.element("send", [{"delay", delay}, {"event", event}, {"id", send_id}])
+```
+
+`Cancels.armed_role/0` is the one place that string lives
+(`lib/statifier_blocks/compiler/cancels.ex:139-140`), and `Cancels` reads it
+back to emit one `<cancel sendid="..."/>` per armed send in the arming scope's
+`<onexit>` (`:218-220`). A `core.wait` left before its delay elapses is
+therefore cancelled by exactly the mechanism a `core.send`'s delayed send is,
+because it is the same mechanism reaching the same role. ADR-0004's Note of
+2026-08-29, "`core.wait`'s timer rides the reserved send role", is the record
+that decided this; this note only carries it across to the record whose
+sentence a reader would otherwise trust.
+
+### The deadline spelling arms one as well, through `core.send`
+
+ADR-0010 decision 1 spells a clock interrupt as a `core.send` carrying the
+deadline event and a `delay` at the head of a group's `body`, paired with a
+`core.on_event` on its rail, and its decision 3 turns on this same scope
+cancel: the body region exiting fires `Cancels`, and the armed deadline goes
+with it. That adds no third arming type - a deadline **is** a `core.send` - but
+it is where a reader most often meets an armed delayed send that is not written
+as "a send block", so it is named here rather than left for them to infer.
+
+### What section C still gets right, and what this note does not do
+
+C's third bullet is about **declarations**, and on that it is correct and
+stands: no other block type's declared shape is changed by the send-id
+amendment, `core.wait`'s included - its `duration` field, its outcome and its
+slot declarations are what they were before that amendment and what they are
+after it. Read the bullet as the declaration claim it makes, and read its
+middle clause as corrected by this note in the same by-reference form G8 used
+for G3's count sentence and the 2026-09-01 note used for G9b.
+
+Section C is not rewritten and nothing above this line is edited. Decision 10's
+vocabulary table does not grow, no config schema changes, and the send-id
+amendment's two rulings stand exactly as accepted. `core.wait` arming a delayed
+send is not new behaviour blessed here - it is behaviour ADR-0004 and
+`core.wait`'s own moduledoc already carry.
