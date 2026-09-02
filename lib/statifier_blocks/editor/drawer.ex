@@ -8,15 +8,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     **document-level**. Content that is a grid of rows about the whole document
     goes in the drawer; content about one block does not, whatever its shape.
 
-    Three tabs ship. Truth tables were first. The document-level findings list
+    Four tabs ship. Truth tables were first. The document-level findings list
     joined them under operator ruling R4 (2026-08-29), which retired the text
     block that used to sit under the canvas: a list of findings is a grid of
     rows about the whole document, so 1A's test admits it and the canvas gets
     its height back. Declarations joined them under the 2026-09-01 amendment
     (clause 2i), which took ADR-0001 11i's named door: the document's own
     `datamodel` roots are a grid of rows about the envelope, which is 1A's
-    test again. Fixture runs still have a reserved place and so does the
-    read-only declared-path view, and neither is drafted here.
+    test again. Fixture runs joined under `sb-4yze`: one row per fixture row
+    in the document, each carrying the outcome slot it expected against the
+    one the compiled chart actually took (`StatifierBlocks.Runtime.FixtureRuns`
+    does the driving; this module only draws the table). The read-only
+    declared-path view still has a reserved place and is not drafted here.
 
     The measurable reason the drawer exists at all: a truth table for a branch
     in a credit-card processing document is one row per case and one column per
@@ -128,6 +131,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:declaration_refusal, :string,
       default: nil,
       doc: "the sentence for a refused declaration edit, or `nil`"
+    )
+
+    attr(:fixture_runs, :any,
+      default: nil,
+      doc: "`StatifierBlocks.Runtime.FixtureRuns.t()` for the Fixtures tab, or `nil`"
     )
 
     attr(:host_tabs, :list,
@@ -255,6 +263,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                   refusal={@declaration_refusal}
                   target={@target}
                 />
+              <% @view.tab == :fixtures -> %>
+                <.fixture_runs runs={@fixture_runs} />
               <% true -> %>
                 <p :if={@view.status == :no_fixtures} class="sb-drawer__empty">
                   No fixtures source is attached to this editor, so there are no recorded
@@ -363,6 +373,59 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </table>
         </div>
       </figure>
+      """
+    end
+
+    attr(:runs, :any, default: nil)
+
+    # `@runs` is `StatifierBlocks.Runtime.FixtureRuns.t()` or `nil` (before the
+    # first `refresh_fixture_runs/1` call the editor ever makes, which is
+    # before the drawer has been opened once). `nil` and `:no_fixtures` read
+    # alike: neither has a run to show, and the copy says why.
+    #
+    # `:compile_error` reads as a normal mid-edit state on purpose - an editor
+    # mid-edit reaches it constantly, and it is not a failure of the
+    # fixtures - followed by the findings that say what does not compile.
+    defp fixture_runs(assigns) do
+      ~H"""
+      <p :if={@runs == nil or @runs.status == :no_fixtures} class="sb-drawer__empty">
+        No fixtures source is attached to this editor, so there are no recorded
+        cases to run. A host supplies them alongside the document.
+      </p>
+
+      <div :if={@runs != nil and @runs.status == :compile_error}>
+        <p class="sb-drawer__empty">
+          This document does not currently compile, so no case can be run.
+        </p>
+        <ul class="sb-fixtures__findings">
+          <li :for={finding <- @runs.findings}>{finding.message}</li>
+        </ul>
+      </div>
+
+      <div :if={@runs != nil and @runs.status == :ready} class="sb-fixtures__scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Block</th>
+              <th scope="col">Table</th>
+              <th scope="col">Case</th>
+              <th scope="col">Expected</th>
+              <th scope="col">Taken</th>
+              <th scope="col">Verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr :for={run <- @runs.runs} data-block={run.block_id} data-row={run.row_name}>
+              <td>{run.block_id}</td>
+              <td>{run.table_name}</td>
+              <td>{run.row_name}</td>
+              <td>{run.expected_slot}</td>
+              <td>{run.taken_slot}</td>
+              <td data-verdict={run.verdict}>{run.verdict}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       """
     end
   end

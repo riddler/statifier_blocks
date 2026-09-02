@@ -201,6 +201,64 @@ defmodule StatifierBlocks.ShellTest do
     end
   end
 
+  # `sb-4yze`: the fourth drawer tab. `Shell.fixture_row_count/1` is the
+  # number the strip carries, and `drawer_tabs/0`'s new last entry is what
+  # makes the strip reach it at all.
+  describe "the fixtures tab (sb-4yze)" do
+    # Sabotage: dropped `:fixtures` from `@drawer_tabs`, leaving the
+    # three-tab list. This went red.
+    test "drawer_tabs/0 lists the four package tabs, fixtures last" do
+      assert Shell.drawer_tabs() == [:tables, :findings, :declarations, :fixtures]
+    end
+
+    # Sabotage: changed `@drawer_titles`' `fixtures:` entry to
+    # `"Fixture Runs"`. This went red.
+    test "drawer_title/1 names it Fixtures" do
+      assert Shell.drawer_title(:fixtures) == "Fixtures"
+    end
+
+    # Sabotage: made `fixture_row_count/1` count TABLES instead of ROWS
+    # (`Enum.reduce(fixtures, 0, fn {_id, tables}, acc -> acc + length(tables) end)`,
+    # `table_count/1`'s own body) - this went red, reading 1 instead of 4,
+    # because `credit_card_tables/0` is one table holding four rows.
+    test "fixture_row_count/1 counts rows, not tables", %{fixtures: fixtures} do
+      assert Shell.fixture_row_count(fixtures) == 4
+      assert Shell.fixture_row_count(nil) == 0
+      assert Shell.fixture_row_count(%{"a" => []}) == 0
+    end
+
+    # Sabotage: put `:fixtures` ahead of `:tables` in `@drawer_tabs` - a
+    # document holding both truth tables and fixture rows opened on the
+    # Fixtures tab instead of Truth tables, which is the arrival-order defect
+    # the tab's placement exists to avoid. This went red.
+    test "an unchosen tab still resolves to :tables first when both tables and fixtures hold rows",
+         %{fixtures: fixtures} do
+      view = Shell.drawer_view(%{open?: true, fixtures: fixtures})
+
+      assert view.tab == :tables
+    end
+
+    # Sabotage: dropped `fixtures` from the `own` list built in `drawer_view/1`
+    # - the strip never grew a fourth entry and this went red reading 0 for a
+    # document with four fixture rows.
+    test "drawer_view/1's own list carries the fixtures tab with the row count", %{
+      fixtures: fixtures
+    } do
+      view = Shell.drawer_view(%{open?: true, fixtures: fixtures})
+
+      assert %{id: :fixtures, title: "Fixtures", count: 4} =
+               Enum.find(view.tabs, &(&1.id == :fixtures))
+    end
+
+    # Sabotage: dropped `"fixtures"` from `host_tabs/1`'s reserved-names list
+    # (left only the four names `@drawer_tabs` produced before this bead) -
+    # a host tab named "fixtures" survived the filter and this went red.
+    test "host_tabs/1 drops a host tab whose id is \"fixtures\"" do
+      shadow = %{id: "fixtures", title: "Mine", count: 3}
+      assert Shell.host_tabs([shadow]) == []
+    end
+  end
+
   # The descriptor half of the drawer's host-tab seam (8A: slots for markup,
   # events for actions). What a host tab's body renders is
   # `StatifierBlocks.Editor.HostTabTest`'s claim, because it needs a host
@@ -218,17 +276,25 @@ defmodule StatifierBlocks.ShellTest do
           host_tabs: [host_tab("runs", "Runs", 3), host_tab("jobs", "Jobs", 0)]
         })
 
-      assert Enum.map(view.tabs, & &1.id) == [:tables, :findings, :declarations, "runs", "jobs"]
+      assert Enum.map(view.tabs, & &1.id) == [
+               :tables,
+               :findings,
+               :declarations,
+               :fixtures,
+               "runs",
+               "jobs"
+             ]
 
       assert Enum.map(view.tabs, & &1.title) == [
                "Truth tables",
                "Findings",
                "Declarations",
+               "Fixtures",
                "Runs",
                "Jobs"
              ]
 
-      assert Enum.map(view.tabs, & &1.count) == [0, 0, 0, 3, 0]
+      assert Enum.map(view.tabs, & &1.count) == [0, 0, 0, 0, 3, 0]
     end
 
     # Sabotage: keeping `resolve_tab/2`'s old `when tab in @drawer_tabs` guard
@@ -274,7 +340,7 @@ defmodule StatifierBlocks.ShellTest do
           host_tabs: [host_tab("findings", "Mine", 9), host_tab("tables", "Also mine", 9)]
         })
 
-      assert Enum.map(view.tabs, & &1.id) == [:tables, :findings, :declarations]
+      assert Enum.map(view.tabs, & &1.id) == [:tables, :findings, :declarations, :fixtures]
       assert Shell.host_tabs([host_tab("findings", "Mine", 9)]) == []
     end
 

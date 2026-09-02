@@ -3661,6 +3661,56 @@ button.sb-inspector__group-row:hover {
   margin: 0 0 var(--sb-space);
 }
 
+/* ----------------------------------------------------------- fixtures */
+
+/* One row per fixture row in the document, driven through the compiled
+ * chart (`sb-4yze`). Modelled directly on `.sb-declarations__*` above; every
+ * token here is one the surface already declares, so 14e's both-directions
+ * audit has nothing new to account for. No `--sb-success` token exists on
+ * purpose (see the run-mark comment above) - a passing verdict stays in the
+ * table's own neutral text colour, and only `fail` is tinted, in the same
+ * `--sb-error` family a finding already wears. */
+
+.sb-fixtures__scroll {
+  overflow-x: auto;
+}
+
+.sb-fixtures__scroll table {
+  border-collapse: collapse;
+  font-size: var(--sb-text-sm);
+  width: 100%;
+}
+
+.sb-fixtures__scroll th,
+.sb-fixtures__scroll td {
+  border: var(--sb-border-width) solid var(--sb-border);
+  padding: var(--sb-space-half) var(--sb-space);
+  text-align: left;
+  vertical-align: top;
+}
+
+.sb-fixtures__scroll thead th {
+  background: var(--sb-bg-muted);
+  font-weight: var(--sb-weight-medium);
+}
+
+.sb-fixtures__scroll td[data-verdict="fail"] {
+  color: var(--sb-error);
+  background: var(--sb-error-bg);
+  font-weight: var(--sb-weight-strong);
+}
+
+.sb-fixtures__scroll td[data-verdict="pass"] {
+  color: var(--sb-fg-subtle);
+}
+
+.sb-fixtures__findings {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-sm);
+  margin: 0;
+  padding-left: var(--sb-space);
+}
+
 /* ------------------------------------------------- palette strip / sheet */
 
 /* Above 780 the palette is a column and the strip does not exist. The rule is
