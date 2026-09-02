@@ -29,16 +29,20 @@ defmodule StatifierBlocks.ReadmeTest do
   @external_resource @readme
 
   setup_all do
-    %{readme: File.read!(@readme)}
+    readme = File.read!(@readme)
+
+    # Evaluated once for the whole module: the section defines modules, and
+    # evaluating it per test would redefine them.
+    {_result, worked} = eval_section(readme, "A worked example")
+
+    %{readme: readme, worked: worked}
   end
 
   # Sabotage: changed the README's `Palette.core_types()` merge to
   # `Palette.new(%{...})` (dropping the core vocabulary) - red, because the
   # compile then fails to resolve `core.sequence`.
   test "the worked example compiles the card-processing document it claims to", ctx do
-    {_result, binding} = eval_section(ctx.readme, "A worked example")
-
-    compiled = Keyword.fetch!(binding, :compiled)
+    compiled = Keyword.fetch!(ctx.worked, :compiled)
 
     assert compiled.invoke_types == ["myapp:authorize", "myapp:capture"]
     assert compiled.warnings == []
@@ -48,8 +52,26 @@ defmodule StatifierBlocks.ReadmeTest do
     assert compiled.scxml =~ ~s(<invoke id="s_blk_authorize__invocation" type="myapp:authorize"/>)
     assert compiled.scxml =~ ~s(<invoke id="s_blk_capture__invocation" type="myapp:capture"/>)
 
-    assert Keyword.fetch!(binding, :blocks_in_play) ==
+    assert Keyword.fetch!(ctx.worked, :blocks_in_play) ==
              ["blk_approved", "blk_authorize", "blk_capture", "blk_root"]
+  end
+
+  # Sabotage: emptied the `datamodel:` list in the README's `Document.new/2`
+  # call - red on all three asserts, which is the point: the example's branch
+  # condition reads two roots, and an example that reads what nothing declares
+  # is the one this test exists to keep the README out of.
+  test "the worked example declares the roots its branch condition reads", ctx do
+    document = Keyword.fetch!(ctx.worked, :document)
+    palette = Keyword.fetch!(ctx.worked, :palette)
+    compiled = Keyword.fetch!(ctx.worked, :compiled)
+
+    assert StatifierBlocks.Datamodel.candidates(document, nil) ==
+             ["amount", "budget_remaining"]
+
+    assert StatifierBlocks.Datamodel.findings(document, palette, nil) == []
+
+    assert compiled.scxml =~
+             ~s(<datamodel><data id="budget_remaining"/><data id="amount"/></datamodel>)
   end
 
   # Sabotage: dropped the `value_path:` key from `Core.Branch.config_schema/1`

@@ -196,9 +196,25 @@ document =
         ]
       }
     ),
-    id: "bdoc_card_capture"
+    id: "bdoc_card_capture",
+    datamodel: [
+      %Document.DatamodelEntry{
+        id: "budget_remaining",
+        description: "What the card's budget has left before this authorization."
+      },
+      %Document.DatamodelEntry{id: "amount", description: "The amount being authorized."}
+    ]
   )
 ```
+
+The branch's condition reads `budget_remaining` and `amount`, so the document
+declares both. A declaration names a **root** - storage exists at that name,
+and everything beneath it is declared too (ADR-0001 decision 11). The
+document's `datamodel` key is one of three surfaces that declare: a host's own
+datamodel, the compile call's `:declare` roots, and this one. A document that
+declares nothing and whose siblings declare nothing gets no undeclared-path
+advisories at all - not because everything checked out, but because nobody
+made a claim to check against, which is the case this example used to be in.
 
 **3. Build a palette and compile.** A palette is a plain value - a
 `type_name => module` map you build for one operation and pass explicitly.
@@ -233,6 +249,10 @@ block, completion signalled by `done.state`:
 
 ```xml
 <scxml initial="s_blk_root" name="bdoc_card_capture" version="1.0" xmlns="...">
+  <datamodel>
+    <data id="budget_remaining"/>
+    <data id="amount"/>
+  </datamodel>
   <state id="s_blk_root" initial="s_blk_authorize">
     <transition event="done.state.s_blk_authorize" target="s_blk_approved" type="internal"/>
     <transition event="done.state.s_blk_approved" target="s_blk_root__o_done" type="internal"/>
