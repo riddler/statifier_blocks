@@ -4514,10 +4514,10 @@ campaign-026.
 
 ## Amendment (2026-09-02): the drawer's fourth tab, fixture runs against the compiled chart
 
-**Status: proposed (2026-09-02), drafted with the implementation it records,
-implementing bead `sb-4yze`, campaign-027's Lane E.** Additive; decisions 1, 7,
-14 and 15 stand as written and no text above this line is edited by this
-section.
+**Status: accepted (2026-09-02, UNQUALIFIED direction-agent verdict, PR 225),
+drafted with the implementation it records, implementing bead `sb-4yze`,
+campaign-027's Lane E.** Additive; decisions 1, 7, 14 and 15 stand as written
+and no text above this line is edited by this section.
 
 ### Context
 
