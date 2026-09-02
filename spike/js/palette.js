@@ -525,16 +525,23 @@ const coreWait = {
  * `["interrupt_handler"]`. There is no placement check in this descriptor and
  * there is not supposed to be one.
  *
- * ## sb-0o4: `cond`, and a MIRROR DIVERGENCE flagged in the open
+ * ## sb-0o4, then sb-d65: `cond` SHIPPED, and what is left of the divergence
  *
- * The `cond` field below is PROPOSED. `core.on_event` is a SHIPPED `core.*`
- * type and `lib/statifier_blocks/core/on_event.ex` declares no such key, so
- * this descriptor is no longer a verbatim transcription: it is the shipped
- * type plus one proposed config field. Same standing as `core.parallel`'s
+ * The `cond` field below was proposed here first (sb-0o4) and has since
+ * landed in the package. `lib/statifier_blocks/core/on_event.ex` declares an
+ * optional `cond` of declared type `expression`, labelled "Only when",
+ * exactly as this descriptor spells it, so the field itself is a verbatim
+ * transcription again rather than a proposal - unlike `core.parallel`'s
  * `complete` (sb-dxs), `core.wait`'s badge (sb-p0k) and `core.invoke`
- * (sb-nt3), and flagged the same way - in the open, at the point of
- * divergence, so nobody reads this mirror as evidence of what the package
- * ships.
+ * (sb-nt3), which are still proposals and still flagged as such at their own
+ * descriptors.
+ *
+ * ONE divergence survives, and it is ORDER: the shipped type spells its
+ * schema `event`, `cond`, `outcome`, and this descriptor spells it `event`,
+ * `outcome`, `cond`, because the key was appended here while it was proposed
+ * and a proposed key does not renumber a shipped one. Reordering it is a
+ * change to the config form's control order, not a comment fix, so it is
+ * flagged here in the open rather than made in passing.
  *
  * What it means: an interrupt rule that fires only when a predicate holds.
  * `core.on_event` could previously only ask "did this event arrive"; a rule
@@ -548,11 +555,14 @@ const coreWait = {
  * type name (`conditionFields` filters on the declared type, never on a list
  * of types).
  *
+ * The compiled form is no longer open here. ADR-0002's 2026-08-31 note
+ * decides it: a non-blank guard becomes the `cond` attribute on the watcher's
+ * own transition, and a guard that is absent, empty or whitespace writes no
+ * attribute at all. Nothing in this spike compiles anything, so that is
+ * recorded rather than exercised.
+ *
  * What is still open, for Phase B rather than for this descriptor:
  *
- *   - the compiled form. A guard on an interrupt rule is a `cond` on the
- *     transition the rail emits, which is the obvious reading, but ADR-0004
- *     has not said so and nothing here compiles anything;
  *   - whether an interrupt rule with a guard that never holds deserves a
  *     document-level finding. `run_cp_three_ds_timeout` in `fixtures/runs.json`
  *     is exactly that case written down, and it is recorded as a fixture
@@ -561,10 +571,8 @@ const coreWait = {
  * Backward compatibility is load-bearing and asserted in the selftest: every
  * stored `core.on_event` that predates this key must decode and validate
  * exactly as it did before, so an ABSENT `cond` is silent and only a PRESENT
- * one is checked. `event` and `outcome` keep their indices - a proposed key
- * does not renumber a shipped one (the `core.parallel` precedent above), which
- * is why `cond` is appended rather than slotted between them where it would
- * read better.
+ * one is checked. `event` and `outcome` keep their indices here - see the
+ * order divergence above.
  */
 const ON_EVENT_OUTCOMES = ["abandon", "resume"];
 
@@ -593,10 +601,11 @@ const coreOnEvent = {
       default: "abandon",
     },
     {
-      // PROPOSED (sb-0o4) - see the divergence note above this descriptor.
-      // Appended, not inserted: `event` is fields[0] and `outcome` is
-      // fields[1] in the shipped type, and a proposed key does not renumber
-      // a shipped one.
+      // SHIPPED since sb-d65 - see the note above this descriptor. Still
+      // appended rather than inserted, which is the one place this mirror
+      // diverges from the shipped type: `cond` sits between `event` and
+      // `outcome` there, and reordering it here would move the form's
+      // controls.
       key: "cond",
       type: "expression",
       label: "Only when",

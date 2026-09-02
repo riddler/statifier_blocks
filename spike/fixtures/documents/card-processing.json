@@ -290,7 +290,7 @@
                   ],
                   "interrupts": [
                     {
-                      "_comment": "The guarded interrupt rule, authored on the CORE form since 2026-08-28 (sb-0o4, umbrella D12). It used to be myapp.guarded_on_event - a demo type that existed only because core.on_event carried no condition - and the spike proved the affordance was worth it, so core.on_event grew an optional 'cond' (PROPOSED, flagged at the descriptor in spike/js/palette.js) and the crutch was retired. The stored config did not move: event, cond and outcome are spelled exactly as they were, and only the type name changed. Whether the key earns an ADR-0002 amendment is still a Phase-B finding, not something this fixture decides.",
+                      "_comment": "The guarded interrupt rule, authored on the CORE form since 2026-08-28 (sb-0o4, umbrella D12). It used to be myapp.guarded_on_event - a demo type that existed only because core.on_event carried no condition - and the spike proved the affordance was worth it, so core.on_event grew an optional 'cond' and the crutch was retired. That key is SHIPPED now: sb-d65 landed it on core.on_event, recorded as ADR-0002's 2026-08-31 note rather than as an amendment, and the note also fixes what it compiles to - a cond attribute on the watcher's transition, and no attribute at all when the guard is blank. The stored config did not move: event, cond and outcome are spelled exactly as they were, and only the type name changed.",
                       "type": "core.on_event",
                       "id": "blk_cp_cancelled",
                       "type_version": 1,
