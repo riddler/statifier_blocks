@@ -365,6 +365,10 @@ with sorted keys and no whitespace, and the ids are abbreviated:
 
 ```json
 {
+  "datamodel": [
+    {"description": "What the card's budget has left before this authorization.", "id": "budget_remaining"},
+    {"description": "The amount being authorized.", "id": "amount"}
+  ],
   "id": "bdoc_01JDOC",
   "metadata": {"name": "Card authorization"},
   "revision": 17,
@@ -452,6 +456,20 @@ with sorted keys and no whitespace, and the ids are abbreviated:
   "schema_version": 1
 }
 ```
+
+[Correction 2026-09-02, sb-12qm: the listing above is re-printed from the
+shipped fixture, `test/fixtures/documents/worked_example.json`, which is the
+document `StatifierBlocks.DocumentFixtures.worked_example/0` builds and the
+encoder and decoder are checked against. It previously carried no
+`datamodel` key. The fixture gained one on 2026-08-31 (`sb-vjeg`, PR 191) -
+`budget_remaining` and `amount`, the two roots this example's own branch
+guard reads, declared through decision 11's document `datamodel` key - and
+this listing did not follow. Nothing else in the printed document moves:
+every other byte is the fixture's, `revision` is still 17 and
+`schema_version` still 1, and the decisions the example is chosen to
+demonstrate, listed below, are unchanged. The drift was illustrative only -
+no test compares this listing with the fixture, and the document printed
+here was valid either way - which is why it is corrected in place.]
 
 What this example is chosen to demonstrate:
 
