@@ -10,7 +10,7 @@ The editor spike carries a proposed core type that does not exist in the
 package: `core.timeout`, "an interrupt rule that fires once a duration has
 elapsed", declared with an `after` duration, an `outcome` of `abandon` or
 `resume`, an optional `cond`, and `kinds: ["interrupt_handler"]` and nothing
-else (`spike/js/proposed-core.js:736-894`). Its own header states the case for
+else (`spike/js/proposed-core.js:736-896`). Its own header states the case for
 it in one sentence: "`core.on_event` catches an event; nothing caught the
 clock" (`spike/README.md:845-848`).
 
@@ -401,3 +401,44 @@ now does.
 and this note supersedes it. A deferred question that vanishes from a record
 reads as one that was never asked; the entry is the question, and this is the
 answer to it.
+
+---
+
+## Note (2026-09-02): the deadline spelling's duration is `core.send`'s `delay`, and the cross-type spelling question stays deferred
+
+The same shape as the `RQ-026-6` note above - a dated note, not an amendment.
+It does not change what this record decides; it says which of the deferred
+list's questions the record already answered in passing, and why the rest of
+that entry stays open.
+
+The deferred entry is "One spelling of 'duration' across a step and a rule",
+which carried the spike's flag that `after` and `duration` were two names for
+one field type (`spike/js/proposed-core.js:763-768`). Two of its three parts
+are settled by what is already shipped and by decision 1, and nothing new is
+decided here:
+
+- **The shipped vocabulary spells a duration two ways, and the two mean
+  different things.** `core.wait` takes `duration`
+  (`lib/statifier_blocks/core/wait.ex:48`) - how long the step itself takes.
+  `core.send` takes `delay` (`lib/statifier_blocks/core/send.ex:125`), "the
+  vocabulary's first optional duration" (`lib/statifier_blocks/core/send.ex:77`)
+  - when the event fires. That is the same step-versus-rule distinction the
+  spike drew when it argued for `after`, answered by keys that already exist
+  rather than by a third one.
+- **The deadline spelling therefore names its duration `delay`.** Decision 1
+  makes a clock interrupt a delayed `core.send` at the head of the group's
+  `body`, so the deadline's duration is that send's `delay`, in either of the
+  stored forms `core.send` already accepts. No block type gains a key, and
+  `after` does not enter the vocabulary, because the type that would have
+  carried it does not.
+
+**What stays deferred is the third part**: whether a future type that names a
+duration must reuse one of the two shipped spellings rather than coin its own.
+The reason it stays deferred is that no such type is proposed. Picking a
+spelling for a type nobody has asked for would be a decision, and this note is
+a prose rider (`sb-xhw8`) whose scope stops short of moving one; the record
+that proposes the type is where the question belongs.
+
+No bead owns that remaining half. Filing one is outside this rider's scope, so
+the deferred-list entry above is left in place and is the standing owner of the
+question, the way the `RQ-026-6` note left its own entry standing.
