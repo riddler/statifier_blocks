@@ -209,6 +209,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 ]}
                 aria-selected={to_string(entry.id == @view.tab)}
                 aria-controls={"sb-drawer-panel-#{entry.id}"}
+                tabindex={if entry.id == @view.tab, do: "0", else: "-1"}
                 phx-click="drawer-tab"
                 phx-value-tab={entry.id}
                 phx-target={@target}
