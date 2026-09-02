@@ -16,7 +16,7 @@ defmodule StatifierBlocks.Compiler.Finding do
   | `:resolve` | `:unknown_block_type`, `:block_type_too_new`, `:migration_failed` |
   | `:config` | `validate_config/1` findings, one per `{key, message}` pair |
   | `:structure` | `:slot_arity_violated`, `:undeclared_slot` (ADR-0002 decision 6); assignability (ADR-0003) |
-  | `:emit` | `emit/2` findings, `:invalid_role`, `:reserved_role`, `:invalid_outcome`, `:duplicate_binding` (ADR-0004's foreach amendment, F6), `:unspliced_child`, `:unknown_attribution`, `:conflicting_chart_use`, `:invalid_declaration`, `:duplicate_declaration` (ADR-0004's host-declared-roots note), `:self_reference` (ADR-0004's subchart-src amendment) |
+  | `:emit` | `emit/2` findings, `:invalid_role`, `:reserved_role`, `:invalid_outcome`, `:duplicate_binding` (ADR-0004's foreach amendment, F6), `:unspliced_child`, `:unknown_attribution`, `:conflicting_chart_use`, `:invalid_declaration`, `:duplicate_declaration` (ADR-0004's host-declared-roots note), `:self_reference` (ADR-0004's subchart-src amendment), `:sensitive_path_read` (ADR-0002's secrets-rule amendment) |
   | `:chart` | mapped statifier findings, both faults (decision 9) |
 
   The pipeline stops at the first stage that produces errors and reports
@@ -57,10 +57,25 @@ defmodule StatifierBlocks.Compiler.Finding do
   ## `severity`
 
   `:error` fails the compile; `:warning` rides on
-  `StatifierBlocks.Compiled`'s `warnings` and does not. Upstream warnings
+  `StatifierBlocks.Compiled`'s `warnings` and does not. Warnings come from
+  three places:
+
+    * **Upstream**: every warning `Machine.warnings/1` surfaces
+      (st-ADR-0033), mapped at the `:chart` stage.
+    * **Decision 8's optional invoke-type lint**, also `:chart`. Decision 8
+      is explicit that the lint is never an error.
+    * **The `:emit` stage's own advisories**: `:draft_blocks_present` and
+      `:placeholder_block` (ADR-0004's drafts amendment, D4),
+      `:shadowed_document_root` (ADR-0001 decision 11f) and
+      `:deadline_lost_on_resume` (ADR-0010's Note of 2026-09-02).
+
+  The emit advisories are deliberately absent from the stage table above,
+  whose column is "Errors it produces".
+
+  [Correction 2026-09-02, sb-mg8v: this paragraph read "Upstream warnings
   (st-ADR-0033) and decision 8's optional invoke-type lint are the two
-  sources of warnings, and decision 8 is explicit that the lint is never
-  an error.
+  sources of warnings". The `:emit` stage has raised advisories of its own
+  since then, so the count was wrong rather than the reasoning.]
 
   ## `config_value_span`
 
