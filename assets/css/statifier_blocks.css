@@ -3281,9 +3281,18 @@ button.sb-inspector__group-row:hover {
   font-size: var(--sb-text-xs);
 }
 
+/* The bar and the tab strip wrap; a tab does not. A tab's label and its count
+ * are one thing to read - "Truth tables (3)" - and the default `white-space:
+ * normal` let the count fall under the label the moment the bar ran out of
+ * room. At 640 that turned every tab into a three-line stack and the bar from
+ * 30px to 72px, which is the tallest the bar has ever been on the narrowest
+ * viewport it supports. Wrapping is the right response to a narrow bar; it
+ * just belongs to the row of tabs and not to the words inside one, so the
+ * overflow moves outward - a second row of whole tabs - instead of inward. */
 .sb-drawer__bar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--sb-space);
   border-bottom: var(--sb-border-width) solid var(--sb-border);
   padding: var(--sb-space-half) var(--sb-space);
@@ -3291,6 +3300,7 @@ button.sb-inspector__group-row:hover {
 
 .sb-drawer__tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--sb-space);
 }
 
@@ -3306,6 +3316,7 @@ button.sb-inspector__group-row:hover {
   border: none;
   color: var(--sb-fg-muted);
   padding: 0;
+  white-space: nowrap;
 }
 
 .sb-drawer__tab--selected {
