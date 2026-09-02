@@ -10,6 +10,34 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.15.0] 2026-09-02
+
+0.15.0 is about seeing what a document actually declares and what its
+fixtures actually do. The editor's drawer gains two more tabs: Fixtures,
+which drives every attached fixture row through the compiled chart and
+reports the outcome it took against the one it expected, and Datamodel, a
+read-only grid of every declared path with the surfaces that declared it.
+Compiling a `core.resumable_group` whose body opens with a delayed send now
+warns that no deadline is re-armed after the first resume. The rest is
+polish on the drawer and the truth table: keyboard reach, wrapping, pinned
+case names, and refusals that read as sentences.
+
+### Added
+
+- The editor's drawer gains a fourth tab, Fixtures, that drives every attached fixture row through the compiled chart and reports each one's expected outcome against the one actually taken.
+- Compiling a `core.resumable_group` whose `body` opens with a delayed `core.send` and whose `interrupts` rail carries a `resume` handler now produces an advisory warning: no deadline is re-armed after the first resume, and the two escapes are arming the deadline outside the group or using a `core.group`.
+- The editor's drawer gains a fifth tab, Datamodel: a read-only grid of every declared datamodel path, with the surfaces that declared it and the type, scope and label the ADR-0006 projection carries. It shows exactly the vocabulary the undeclared-path advisories are decided against, and `StatifierBlocks.Datamodel.declared_view/3` is that projection on its own.
+
+### Fixed
+
+- The drawer's tab strip is now a single Tab stop instead of one per tab, matching the inspector's strip: Tab moves from the canvas to the active drawer tab and then on to the height slider, rather than stepping through all six tabs on the way.
+- A drawer tab keeps its label and its count on one line at every width; a bar too narrow for all six tabs now wraps whole tabs onto a second row instead of breaking each tab into a three-line stack.
+- A folded container carrying findings no longer draws its findings count underneath the fold control: the card reserves the corner the fold occupies whenever it renders a badge.
+- A truth table wider than the drawer can now be scrolled from the keyboard. The table's scroll region is a Tab stop and a labelled `region` named for the table, so the arrow keys, Home and End reach the columns past the right edge; previously every cell in it was text and nothing in the panel was focusable, which left those columns reachable by pointer alone.
+- A mismatched truth-table cell now says what the disagreement was - "expected yes, selected no" beside the status word and on the cell's tooltip - instead of only the word `mismatch`, and a row's `note` renders under the row name instead of being dropped.
+- A truth table's case column stays pinned to the left edge while the table is scrolled sideways, so a status word keeps the row name (and its note) beside it instead of losing its row on any table wider than the drawer.
+- A truth-table row whose bindings fail to build a context now reads as a sentence naming the binding and what went wrong, instead of the inspected error tuple; an unrecognised reason still shows its term.
+
 ## [0.14.0] 2026-09-01
 
 0.14.0 is about a document declaring its own data, and about a subchart
@@ -1461,6 +1489,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.15.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.15.0
 [0.14.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.14.0
 [0.13.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.13.0
 [0.12.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.12.0
