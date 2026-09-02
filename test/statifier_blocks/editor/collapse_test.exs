@@ -241,6 +241,32 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                )
       end
 
+      # The stylesheet reserves the corner's padding on exactly the cards that
+      # draw a badge, and it recognises them by the badge's own render
+      # condition read off the node: folded, with a subtree rollup above zero.
+      # This is the DOM half of that contract - `presentation_test` measures
+      # the reservation, and neither is worth anything without the other
+      # (sb-l9bx, campaign 027).
+      # Sabotage: dropping `data-findings-count` from the node, or stamping it
+      # only when the card is expanded - the selector matches nothing, the
+      # badge slides back under the `+`, and this goes red.
+      test "a badged card is selectable by the attributes the stylesheet reads",
+           %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, findings: findings())
+
+        fold(view, "blk_wizard")
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-node[data-block-id="blk_wizard"][data-collapsed="true"][data-findings-count="3"] > .sb-node__chrome > .sb-badge)
+               )
+
+        refute has_element?(
+                 view,
+                 ~s(.sb-node[data-block-id="blk_wizard"][data-findings-count="0"])
+               )
+      end
+
       # Sabotage: dropping the `> 0` guard - an empty badge ring appears on
       # every folded container in a clean document and this goes red.
       test "a collapsed container with nothing wrong carries no badge", %{conn: conn} do
