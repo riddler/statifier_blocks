@@ -8,7 +8,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     **document-level**. Content that is a grid of rows about the whole document
     goes in the drawer; content about one block does not, whatever its shape.
 
-    Four tabs ship. Truth tables were first. The document-level findings list
+    Five tabs ship. Truth tables were first. The document-level findings list
     joined them under operator ruling R4 (2026-08-29), which retired the text
     block that used to sit under the canvas: a list of findings is a grid of
     rows about the whole document, so 1A's test admits it and the canvas gets
@@ -19,7 +19,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     in the document, each carrying the outcome slot it expected against the
     one the compiled chart actually took (`StatifierBlocks.Runtime.FixtureRuns`
     does the driving; this module only draws the table). The read-only
-    declared-path view still has a reserved place and is not drafted here.
+    declared-path view took the last reserved place: one row per path the
+    three declaring surfaces name, with the surfaces that named it and the
+    shape the ADR-0006 projection carries, which is a grid of rows about the
+    whole document and admitted by 1A for the same reason the four before it
+    were. It is read-only on purpose - the editable half is the Declarations
+    tab beside it, over the document's own roots - and no reserved place
+    remains behind it.
 
     The measurable reason the drawer exists at all: a truth table for a branch
     in a credit-card processing document is one row per case and one column per
@@ -136,6 +142,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:fixture_runs, :any,
       default: nil,
       doc: "`StatifierBlocks.Runtime.FixtureRuns.t()` for the Fixtures tab, or `nil`"
+    )
+
+    attr(:declared_view, :list,
+      default: [],
+      doc: "`StatifierBlocks.Datamodel.declared_view/3`'s rows for the Datamodel tab"
     )
 
     attr(:host_tabs, :list,
@@ -265,6 +276,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 />
               <% @view.tab == :fixtures -> %>
                 <.fixture_runs runs={@fixture_runs} />
+              <% @view.tab == :datamodel -> %>
+                <.declared_paths rows={@declared_view} />
               <% true -> %>
                 <p :if={@view.status == :no_fixtures} class="sb-drawer__empty">
                   No fixtures source is attached to this editor, so there are no recorded
@@ -422,6 +435,57 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               <td>{run.expected_slot}</td>
               <td>{run.taken_slot}</td>
               <td data-verdict={run.verdict}>{run.verdict}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      """
+    end
+
+    attr(:rows, :list, default: [])
+
+    # One row per declared path, and nothing an author can change: the
+    # editable surface is the Declarations tab, over the document's own roots,
+    # and this one is the whole vocabulary an advisory is decided against -
+    # including the two surfaces the author does not own. A grid that offered
+    # to edit a host's datamodel would be offering an edit the package cannot
+    # make.
+    #
+    # The empty state distinguishes nothing at all from a surface that
+    # declared nothing, in the same words `StatifierBlocks.Datamodel`'s
+    # "absence is not unknown-ness" section uses: with nothing declared
+    # anywhere, no advisory is produced either, and the panel says that rather
+    # than leaving an author to infer it from an empty table.
+    defp declared_paths(assigns) do
+      ~H"""
+      <p :if={@rows == []} class="sb-drawer__empty">
+        Nothing declares a datamodel path for this document - not the host, not
+        the compile call's roots, and not the document's own envelope. No
+        undeclared-path advisory is produced while that is true.
+      </p>
+
+      <div :if={@rows != []} class="sb-datamodel__scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Path</th>
+              <th scope="col">Declared by</th>
+              <th scope="col">Type</th>
+              <th scope="col">Scope</th>
+              <th scope="col">Label</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              :for={row <- @rows}
+              data-path={row.path}
+              data-sensitive={to_string(row.sensitive?)}
+            >
+              <th scope="row">{row.path}</th>
+              <td>{Shell.declared_by(row)}</td>
+              <td>{Shell.declared_shape(row)}</td>
+              <td>{row.scope}</td>
+              <td>{row.label}</td>
             </tr>
           </tbody>
         </table>

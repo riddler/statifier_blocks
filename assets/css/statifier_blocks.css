@@ -3733,6 +3733,46 @@ button.sb-inspector__group-row:hover {
   padding-left: var(--sb-space);
 }
 
+/* ---------------------------------------------------------- datamodel */
+
+/* The read-only declared-path view: one row per path the three declaring
+ * surfaces name. Modelled on `.sb-fixtures__*` above, which was itself
+ * modelled on `.sb-declarations__*`, and for the same reason - three tables
+ * in one drawer that do not agree on their own borders read as three
+ * unrelated widgets. Every token here is already declared, so 14e's
+ * both-directions audit has nothing new to account for. Nothing is tinted:
+ * no cell in this table carries a verdict, and a read-only fact does not
+ * earn a colour. */
+
+.sb-datamodel__scroll {
+  overflow-x: auto;
+}
+
+.sb-datamodel__scroll table {
+  border-collapse: collapse;
+  font-size: var(--sb-text-sm);
+  width: 100%;
+}
+
+.sb-datamodel__scroll th,
+.sb-datamodel__scroll td {
+  border: var(--sb-border-width) solid var(--sb-border);
+  padding: var(--sb-space-half) var(--sb-space);
+  text-align: left;
+  vertical-align: top;
+}
+
+.sb-datamodel__scroll thead th {
+  background: var(--sb-bg-muted);
+  font-weight: var(--sb-weight-medium);
+}
+
+/* The path is the row's own heading, so it is a `th` and reads as the key
+ * rather than as another value beside the four that describe it. */
+.sb-datamodel__scroll tbody th {
+  font-weight: var(--sb-weight-medium);
+}
+
 /* ------------------------------------------------- palette strip / sheet */
 
 /* Above 780 the palette is a column and the strip does not exist. The rule is

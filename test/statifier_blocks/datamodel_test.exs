@@ -432,4 +432,92 @@ defmodule StatifierBlocks.DatamodelTest do
       assert Datamodel.candidates_under(@datamodel_document, "") == []
     end
   end
+
+  # The read-only declared-path view's rows. The arithmetic lives here, with
+  # `phoenix_live_view` absent, for the reason the rest of this module does:
+  # the projection is pure, and the drawer tab over it asserts only that the
+  # rows reach the markup.
+  describe "declared_view/3" do
+    @view_document %{
+      "version" => 1,
+      "scopes" => [
+        %{
+          "scope" => "local",
+          "entries" => [
+            %{
+              "path" => "card",
+              "type" => "object",
+              "label" => "Card",
+              "fields" => [
+                %{"path" => "card.brand", "type" => "string", "label" => "Brand"},
+                %{"path" => "card.number", "type" => "string", "sensitive?" => true}
+              ]
+            },
+            %{"path" => "risk_reasons", "type" => "list", "item_type" => "string"}
+          ]
+        }
+      ]
+    }
+
+    # sabotage: dropped `document_roots(document)` from the union - the
+    # `signup` row vanished and this went red. That surface is the one a
+    # caller cannot pass, so nothing else would have caught it.
+    test "carries every path all three surfaces declare, sorted" do
+      rows = Datamodel.declared_view(document([], [entry("signup")]), @view_document, ["host"])
+
+      assert Enum.map(rows, & &1.path) == [
+               "card",
+               "card.brand",
+               "card.number",
+               "host",
+               "risk_reasons",
+               "signup"
+             ]
+    end
+
+    # sabotage: `sources` built as the FIRST matching surface rather than
+    # every matching one - the row for a path both the document and the
+    # compile call declare read `[:declare]` and this went red.
+    test "names every surface that declared a path, not just the first" do
+      rows = Datamodel.declared_view(document([], [entry("signup")]), ["signup"], ["signup"])
+
+      assert [%{path: "signup", sources: [:datamodel, :declare, :document]}] = rows
+    end
+
+    # sabotage: `entry_at/2` reading the index by `Map.get(index.entries, path)`
+    # with no `{:ok, entry}` unwrapping - every shape came back `nil` and this
+    # went red on the first assertion.
+    test "carries the shape the ADR-0006 projection holds, and nothing for a root" do
+      rows = Datamodel.declared_view(document([]), @view_document, ["host"])
+      by_path = Map.new(rows, &{&1.path, &1})
+
+      assert %{type: :object, scope: :local, label: "Card", sensitive?: false} = by_path["card"]
+      assert %{type: :string, label: "Brand"} = by_path["card.brand"]
+      assert %{type: :string, sensitive?: true} = by_path["card.number"]
+      assert %{type: :list, item_type: :string} = by_path["risk_reasons"]
+
+      assert %{type: nil, item_type: nil, scope: nil, label: nil, sensitive?: false} =
+               by_path["host"]
+    end
+
+    # 11m's precondition, read forwards: with nothing declared anywhere there
+    # is no advisory, and the view says the same thing by being empty.
+    # sabotage: `declared_paths(datamodel) || MapSet.new()` replaced by a
+    # `MapSet.new([nil])` fallback - an empty document grew a phantom row.
+    test "is empty when nothing declares anything" do
+      assert Datamodel.declared_view(document([]), nil, []) == []
+    end
+
+    # sabotage: the union built from `candidates/3` (a plain list) rather than
+    # from the three sets - `MapSet.member?/2` raised and this went red. The
+    # two must agree, which is why the agreement is asserted rather than
+    # assumed.
+    test "is candidates/3's set, path for path" do
+      document = document([], [entry("signup")])
+
+      assert document
+             |> Datamodel.declared_view(@view_document, ["host"])
+             |> Enum.map(& &1.path) == Datamodel.candidates(document, @view_document, ["host"])
+    end
+  end
 end

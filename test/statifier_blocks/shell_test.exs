@@ -207,8 +207,8 @@ defmodule StatifierBlocks.ShellTest do
   describe "the fixtures tab (sb-4yze)" do
     # Sabotage: dropped `:fixtures` from `@drawer_tabs`, leaving the
     # three-tab list. This went red.
-    test "drawer_tabs/0 lists the four package tabs, fixtures last" do
-      assert Shell.drawer_tabs() == [:tables, :findings, :declarations, :fixtures]
+    test "drawer_tabs/0 lists fixtures fourth" do
+      assert Enum.take(Shell.drawer_tabs(), 4) == [:tables, :findings, :declarations, :fixtures]
     end
 
     # Sabotage: changed `@drawer_titles`' `fixtures:` entry to
@@ -259,6 +259,84 @@ defmodule StatifierBlocks.ShellTest do
     end
   end
 
+  # The fifth drawer tab: the read-only view over every declared datamodel
+  # path. The rows are `StatifierBlocks.Datamodel.declared_view/3`'s and are
+  # asserted there; what belongs here is where the tab lands, what the strip
+  # counts, and the two cell words.
+  describe "the datamodel tab" do
+    # Sabotage: dropped `:datamodel` from `@drawer_tabs`, leaving the four-tab
+    # list. This went red, and so did every other test in this describe.
+    test "drawer_tabs/0 lists it last, after fixtures" do
+      assert Shell.drawer_tabs() == [:tables, :findings, :declarations, :fixtures, :datamodel]
+      assert Shell.drawer_title(:datamodel) == "Datamodel"
+    end
+
+    # Sabotage: dropped `datamodel` from the `own` list built in
+    # `drawer_view/1` - the strip never grew a fifth entry and this went red
+    # with `nil` where the entry should be.
+    test "drawer_view/1's own list carries it with the row count" do
+      view = Shell.drawer_view(%{open?: true, declared_view: [row("a"), row("b")]})
+
+      assert %{id: :datamodel, title: "Datamodel", count: 2} =
+               Enum.find(view.tabs, &(&1.id == :datamodel))
+    end
+
+    # Sabotage: `Map.get(state, :declared_view) || []` replaced by
+    # `Map.fetch!(state, :declared_view)` - every existing caller that does
+    # not pass the key raised, which is what the fallback is for.
+    test "counts zero when no rows were supplied" do
+      view = Shell.drawer_view(%{open?: true})
+
+      assert %{id: :datamodel, count: 0} = Enum.find(view.tabs, &(&1.id == :datamodel))
+    end
+
+    # 2A's resolution rule, reaching the newest tab: an unchosen drawer over a
+    # document with nothing else in it opens where the content actually is.
+    # Sabotage: put `:datamodel` ahead of `:tables` in `@drawer_tabs` - the
+    # second assertion went red, opening on Datamodel for a document that has
+    # truth tables in it, which is the arrival-order defect the placement
+    # exists to avoid.
+    test "an unchosen tab resolves to it only when nothing before it holds anything", %{
+      fixtures: fixtures
+    } do
+      assert Shell.drawer_view(%{open?: true, declared_view: [row("a")]}).tab == :datamodel
+
+      assert Shell.drawer_view(%{
+               open?: true,
+               fixtures: fixtures,
+               declared_view: [row("a")]
+             }).tab == :tables
+    end
+
+    # Sabotage: dropped `"datamodel"` from `host_tabs/1`'s reserved names by
+    # reverting `@drawer_tabs` - a host tab named "datamodel" survived the
+    # filter and this went red.
+    test "host_tabs/1 drops a host tab whose id is \"datamodel\"" do
+      assert Shell.host_tabs([%{id: "datamodel", title: "Mine", count: 3}]) == []
+    end
+
+    # Sabotage: `declared_by/1` returning only the first source - the
+    # two-surface row read "Datamodel" and this went red.
+    test "declared_by/1 names every surface in order" do
+      assert Shell.declared_by(row("a", sources: [:datamodel])) == "Datamodel"
+      assert Shell.declared_by(row("a", sources: [:declare])) == "Host"
+      assert Shell.declared_by(row("a", sources: [:document])) == "Document"
+
+      assert Shell.declared_by(row("a", sources: [:datamodel, :declare, :document])) ==
+               "Datamodel, Host, Document"
+    end
+
+    # Sabotage: `declared_shape/1`'s `%{type: nil}` clause returning `""` -
+    # the shapeless row rendered a blank cell, which reads as a rendering gap
+    # rather than as a fact about the declaration.
+    test "declared_shape/1 spells the type, the element type, and the absence" do
+      assert Shell.declared_shape(row("a", type: :integer)) == "integer"
+      assert Shell.declared_shape(row("a", type: :list, item_type: :string)) == "list of string"
+      assert Shell.declared_shape(row("a", type: :list)) == "list"
+      assert Shell.declared_shape(row("a")) == "unspecified"
+    end
+  end
+
   # The descriptor half of the drawer's host-tab seam (8A: slots for markup,
   # events for actions). What a host tab's body renders is
   # `StatifierBlocks.Editor.HostTabTest`'s claim, because it needs a host
@@ -281,6 +359,7 @@ defmodule StatifierBlocks.ShellTest do
                :findings,
                :declarations,
                :fixtures,
+               :datamodel,
                "runs",
                "jobs"
              ]
@@ -290,11 +369,12 @@ defmodule StatifierBlocks.ShellTest do
                "Findings",
                "Declarations",
                "Fixtures",
+               "Datamodel",
                "Runs",
                "Jobs"
              ]
 
-      assert Enum.map(view.tabs, & &1.count) == [0, 0, 0, 0, 3, 0]
+      assert Enum.map(view.tabs, & &1.count) == [0, 0, 0, 0, 0, 3, 0]
     end
 
     # Sabotage: keeping `resolve_tab/2`'s old `when tab in @drawer_tabs` guard
@@ -340,7 +420,14 @@ defmodule StatifierBlocks.ShellTest do
           host_tabs: [host_tab("findings", "Mine", 9), host_tab("tables", "Also mine", 9)]
         })
 
-      assert Enum.map(view.tabs, & &1.id) == [:tables, :findings, :declarations, :fixtures]
+      assert Enum.map(view.tabs, & &1.id) == [
+               :tables,
+               :findings,
+               :declarations,
+               :fixtures,
+               :datamodel
+             ]
+
       assert Shell.host_tabs([host_tab("findings", "Mine", 9)]) == []
     end
 
@@ -665,6 +752,20 @@ defmodule StatifierBlocks.ShellTest do
   # One host tab descriptor, in the shape the editor derives from a
   # `:drawer_tab` slot entry.
   defp host_tab(id, title, count), do: %{id: id, title: title, count: count}
+
+  # One row of `StatifierBlocks.Datamodel.declared_view/3`'s shape, built by
+  # hand so the strip's arithmetic is asserted without a document behind it.
+  defp row(path, opts \\ []) do
+    %{
+      path: path,
+      sources: Keyword.get(opts, :sources, [:datamodel]),
+      type: Keyword.get(opts, :type),
+      item_type: Keyword.get(opts, :item_type),
+      scope: Keyword.get(opts, :scope),
+      label: Keyword.get(opts, :label),
+      sensitive?: false
+    }
+  end
 
   defp find(%ViewModel.Node{block_id: id} = node, id), do: node
 

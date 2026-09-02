@@ -550,6 +550,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     @impl Phoenix.LiveComponent
     def render(assigns) do
+      # `declared_view` is derived before `drawer` and read back out of the
+      # assigns by it, rather than derived twice: the strip's count for that
+      # tab is the number of rows the panel draws, and two derivations of one
+      # projection is the drift the count is supposed to report on. Its
+      # `Map.get_lazy/3` there is for the other caller - `handle_event/3`'s
+      # tab resolution runs against the socket's assigns, which is a render
+      # earlier than this line.
+      assigns = assign(assigns, :declared_view, declared_view(assigns))
+
       assigns =
         assigns
         |> assign(:drawer, drawer_view(assigns))
@@ -653,6 +662,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             declarations={@declarations}
             declaration_refusal={@declaration_refusal}
             fixture_runs={@fixture_runs}
+            declared_view={@declared_view}
             target={@myself}
           />
         </div>
@@ -763,8 +773,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # `Shell.drawer_view/1` resolves an unchosen tab to whichever one actually
     # holds something, and a pick that lands here stops it resolving. Fixture
     # runs are consumed as of `sb-4yze` (`refresh_fixture_runs/1` below); the
-    # datamodel view is `sb-ouly`'s and still arrives as a reserved entry in
-    # `Shell.drawer_tabs/0` needing no second handler. Neither does a host's
+    # datamodel view is the last reserved entry filled, and like the tabs
+    # before it, it needs no second handler here - it is derived in `render/1`
+    # from assigns this module already holds. Neither does a host's
     # tab: it is resolved against the ids the host is currently contributing,
     # and a pick is stored the same way whichever side named it.
     def handle_event("drawer-tab", %{"tab" => tab}, socket) do
@@ -1337,8 +1348,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         orphan_findings: assigns.view_model.orphan_findings,
         host_tabs: assigns.drawer_tabs,
         declarations: assigns.document.datamodel,
+        declared_view: Map.get_lazy(assigns, :declared_view, fn -> declared_view(assigns) end),
         selected_id: assigns.selected_id
       })
+    end
+
+    # The read-only declared-path view's rows. The RAW `datamodel` assign and
+    # not the normalized `declared_paths` set beside it: the set has already
+    # thrown the types away, and this panel is the one place the ADR-0006
+    # document's shape is drawn. The roots go in normalized, because
+    # `declared_roots/1` is idempotent and the assign is where that work has
+    # already been done.
+    @spec declared_view(map()) :: [Datamodel.declared_row()]
+    defp declared_view(assigns) do
+      Datamodel.declared_view(assigns.document, assigns.datamodel, assigns.host_roots)
     end
 
     # What the panel draws: the author's refused list while one is held, and

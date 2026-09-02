@@ -41,7 +41,7 @@ defmodule StatifierBlocks.Shell do
   host already built with `StatifierBlocks.Predicates.TruthTable.build/2`.
   """
 
-  alias StatifierBlocks.{Block, BlockType, Declarations, Finding, ViewModel}
+  alias StatifierBlocks.{Block, BlockType, Datamodel, Declarations, Finding, ViewModel}
   alias StatifierBlocks.Document.DatamodelEntry
   alias StatifierBlocks.Predicates.TruthTable
 
@@ -66,7 +66,7 @@ defmodule StatifierBlocks.Shell do
   incoming tab name into an atom, so a crafted `phx-value-tab` reaches at
   worst a host tab the host itself declared.
   """
-  @type drawer_tab :: :tables | :findings | :declarations | :fixtures
+  @type drawer_tab :: :tables | :findings | :declarations | :fixtures | :datamodel
 
   @typedoc "A host tab's id: its own name for it, and the DOM id it is stamped into."
   @type host_tab_id :: String.t()
@@ -161,19 +161,42 @@ defmodule StatifierBlocks.Shell do
   # ahead of the other three would move a document that already has tables in
   # it off `:tables` and onto the fixtures tab the moment it also carried a
   # fixtures source - a resolution the arrival-order rule exists to prevent.
-  @drawer_tabs [:tables, :findings, :declarations, :fixtures]
+  # The datamodel view goes after fixtures on the same rule: it is newer
+  # still, and it is the tab most likely to be non-empty on a document that
+  # has nothing else in it, so ahead of the others it would capture the
+  # unchosen resolution for almost every document a host supplies a
+  # datamodel to.
+  @drawer_tabs [:tables, :findings, :declarations, :fixtures, :datamodel]
 
-  # "Declarations" and not "Datamodel", which is the name the reserved place
-  # was described under. ADR-0001 11g and 11h split the two artifacts and the
-  # words follow the split: an ADR-0006 datamodel document describes a
-  # vocabulary, and this key declares that a root exists. A tab called
-  # Datamodel would name the other one.
+  # "Declarations" and not "Datamodel" for the third tab, which is the name
+  # the reserved place was described under. ADR-0001 11g and 11h split the
+  # two artifacts and the words follow the split: an ADR-0006 datamodel
+  # document describes a vocabulary, and the document's own `datamodel` key
+  # declares that a root exists. The reserved place is now filled and the
+  # name went where it belonged: `:datamodel` is the read-only view over the
+  # vocabulary, and `:declarations` stays the editable list of roots.
   @drawer_titles %{
     tables: "Truth tables",
     findings: "Findings",
     declarations: "Declarations",
-    fixtures: "Fixtures"
+    fixtures: "Fixtures",
+    datamodel: "Datamodel"
   }
+
+  # The three declaring surfaces, in the words the read-only view puts in its
+  # "Declared by" column. `StatifierBlocks.Datamodel`'s own names for them are
+  # about where a path came from; these are about what an author would call
+  # the thing that said so.
+  @source_words %{
+    datamodel: "Datamodel",
+    declare: "Host",
+    document: "Document"
+  }
+
+  # What a row with no ADR-0006 entry behind it says under "Type". A declared
+  # root has no shape by 11l and a path set carries none at all, so the column
+  # says nothing was specified rather than inventing a type for it.
+  @unspecified_shape "unspecified"
 
   # The heading over the findings whose anchor names no block in the document.
   # A word rather than a block id, because there is no block to name.
@@ -513,6 +536,44 @@ defmodule StatifierBlocks.Shell do
   @doc "The title a drawer tab carries, on the strip and on the tab itself."
   @spec drawer_title(drawer_tab()) :: String.t()
   def drawer_title(tab) when tab in @drawer_tabs, do: Map.fetch!(@drawer_titles, tab)
+
+  @doc """
+  The "Declared by" cell for one row of the read-only declared-path view:
+  every surface that declared the path, in `Datamodel.declared_view/3`'s
+  order, in one string.
+
+      iex> StatifierBlocks.Shell.declared_by(%{sources: [:datamodel, :document]})
+      "Datamodel, Document"
+  """
+  @spec declared_by(%{sources: [atom()]}) :: String.t()
+  def declared_by(%{sources: sources}) do
+    Enum.map_join(sources, ", ", &Map.get(@source_words, &1, to_string(&1)))
+  end
+
+  @doc """
+  The "Type" cell for one row of the same view, as the ADR-0006 projection
+  carries it.
+
+  A `list` says what it holds when the entry named an `item_type`, because
+  "list" alone is the one type in decision 4's set that does not describe a
+  value on its own. Everything else is its own name, and a path no entry
+  describes is `unspecified` rather than blank - a blank cell reads as a
+  rendering gap, and this is a fact about the declaration.
+
+      iex> StatifierBlocks.Shell.declared_shape(%{type: :integer, item_type: nil})
+      "integer"
+
+      iex> StatifierBlocks.Shell.declared_shape(%{type: :list, item_type: :string})
+      "list of string"
+
+      iex> StatifierBlocks.Shell.declared_shape(%{type: nil, item_type: nil})
+      "unspecified"
+  """
+  @spec declared_shape(%{type: atom() | nil, item_type: atom() | nil}) :: String.t()
+  def declared_shape(%{type: nil}), do: @unspecified_shape
+  def declared_shape(%{type: :list, item_type: nil}), do: "list"
+  def declared_shape(%{type: :list, item_type: item}), do: "list of #{item}"
+  def declared_shape(%{type: type}), do: to_string(type)
 
   @doc """
   Every finding about the selected block, in one list (3A).
@@ -863,12 +924,14 @@ defmodule StatifierBlocks.Shell do
           optional(:orphan_findings) => [Finding.t()],
           optional(:host_tabs) => [host_tab()],
           optional(:declarations) => [DatamodelEntry.t()],
+          optional(:declared_view) => [Datamodel.declared_row()],
           optional(:selected_id) => Block.id() | nil
         }) :: drawer()
   def drawer_view(state) do
     fixtures = Map.get(state, :fixtures)
     selected_id = Map.get(state, :selected_id)
     findings = Map.get(state, :findings) || []
+    declared_view = Map.get(state, :declared_view) || []
 
     own =
       Enum.map(@drawer_tabs, fn
@@ -887,6 +950,13 @@ defmodule StatifierBlocks.Shell do
 
         :fixtures ->
           %{id: :fixtures, title: drawer_title(:fixtures), count: fixture_row_count(fixtures)}
+
+        :datamodel ->
+          %{
+            id: :datamodel,
+            title: drawer_title(:datamodel),
+            count: length(declared_view)
+          }
       end)
 
     contributed =

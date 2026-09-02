@@ -52,9 +52,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # upgrade.
       #
       # Sabotage: `Shell.host_tabs/1` answering an empty list with a
-      # placeholder entry - a fourth, nameless tab appears and the ordering
+      # placeholder entry - an extra, nameless tab appears and the ordering
       # assertion goes red.
-      test "carries the four package tabs and nothing else", %{conn: conn} do
+      test "carries the five package tabs and nothing else", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn)
         open(view)
 
@@ -64,12 +64,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert has_element?(view, "#sb-drawer-tab-findings")
         assert has_element?(view, "#sb-drawer-tab-declarations")
         assert has_element?(view, "#sb-drawer-tab-fixtures")
+        assert has_element?(view, "#sb-drawer-tab-datamodel")
 
         assert tabs(html) == [
                  "sb-drawer-tab-tables",
                  "sb-drawer-tab-findings",
                  "sb-drawer-tab-declarations",
-                 "sb-drawer-tab-fixtures"
+                 "sb-drawer-tab-fixtures",
+                 "sb-drawer-tab-datamodel"
                ]
       end
     end
@@ -87,6 +89,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  "sb-drawer-tab-findings",
                  "sb-drawer-tab-declarations",
                  "sb-drawer-tab-fixtures",
+                 "sb-drawer-tab-datamodel",
                  "sb-drawer-tab-jobs"
                ]
 
@@ -217,7 +220,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  "sb-drawer-tab-tables",
                  "sb-drawer-tab-findings",
                  "sb-drawer-tab-declarations",
-                 "sb-drawer-tab-fixtures"
+                 "sb-drawer-tab-fixtures",
+                 "sb-drawer-tab-datamodel"
                ]
 
         assert view |> element("#sb-drawer-tab-findings") |> render() =~ "Findings"
@@ -236,6 +240,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  "sb-drawer-tab-findings",
                  "sb-drawer-tab-declarations",
                  "sb-drawer-tab-fixtures",
+                 "sb-drawer-tab-datamodel",
                  "sb-drawer-tab-runs"
                ]
       end
