@@ -121,21 +121,20 @@ defmodule StatifierBlocks.MixProject do
       [
         # Direct because `StatifierBlocks.Core.Duration` calls
         # `Predicator.Duration.parse/1` to read a stored predicator duration
-        # string, so naming it here records the call rather than leaving it
-        # to arrive through statifier.
+        # string. It already resolves through statifier, so naming it here
+        # records the call rather than moving the lock.
         #
-        # INTERIM git pin, and an `override:` rather than a requirement,
-        # because statifier-ui pins predicator the same way and a hex
-        # requirement here diverges from it at resolution. The upstream
-        # reason is `Predicator.Simple` - the module naming the
-        # picklist-renderable subset - which is on predicator's main and not
-        # in a release. Both pins return to hex requirements once 9.2.0
-        # publishes; until then `mix hex.build` refuses this package, which
-        # is the same state statifier-ui is in and for the same reason.
-        {:predicator,
-         github: "riddler/predicator-ex",
-         ref: "7ff1d0c5e0d2e2cc0865380edd7cb04e8ba10bde",
-         override: true},
+        # The floor is 9.0 and not 9.2 deliberately. Every predicator module
+        # this package names - `Predicator.Duration`, `Predicator.evaluate/2`,
+        # `Predicator.Errors.*`, `Predicator.Lexer` - shipped in 9.0.0. The
+        # 9.2 module is `Predicator.Simple`, and nothing here calls it:
+        # statifier-ui does, statifier-ui requires `~> 9.2` itself, and
+        # statifier-ui is *optional* here. So a host that takes this package
+        # without the expression editor needs only 9.0, and a host that takes
+        # the editor is driven to 9.2 by statifier-ui's own requirement,
+        # which is how a transitive requirement is supposed to work. Raising
+        # the floor here would overstate what this package needs.
+        {:predicator, "~> 9.0"},
         # Dev / test
         {:ex_quality, "~> 0.14", only: :dev, runtime: false},
         {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -174,14 +173,7 @@ defmodule StatifierBlocks.MixProject do
         # dependencies because its only consumer is a LiveView component:
         # the headless tree has no editor to render, so pulling it there
         # would resolve a package nothing in that tree can call.
-        #
-        # INTERIM git pin, for the same reason and with the same expiry as
-        # predicator's above - `StatifierUI.Live.ExpressionInput` is on
-        # statifier-ui's main and not in a release.
-        {:statifier_ui,
-         github: "riddler/statifier-ui",
-         ref: "3128076a4d593f22187c9c4ea55a2621c2d8e43f",
-         optional: true},
+        {:statifier_ui, "~> 0.4", optional: true},
         {:lazy_html, ">= 0.1.0", only: :test}
       ]
     end
