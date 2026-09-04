@@ -169,6 +169,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
     )
 
+    attr(:value_candidates, :map,
+      default: %{},
+      doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
+    )
+
     attr(:target, :any, required: true)
     attr(:class, :string, default: nil)
 
@@ -267,6 +272,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               expression_component={@expression_component}
               invoke_types={@invoke_types}
               path_candidates={@path_candidates}
+              value_candidates={@value_candidates}
               target={@target}
             />
           </section>
@@ -334,6 +340,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:expression_component, :any, required: true)
     attr(:invoke_types, :list, required: true)
     attr(:path_candidates, :list, required: true)
+    attr(:value_candidates, :map, required: true)
     attr(:target, :any, required: true)
 
     # Decision 12's read-only case reaches here as `form: nil`, and it is the
@@ -350,6 +357,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         expression_component={@expression_component}
         invoke_types={@invoke_types}
         path_candidates={@path_candidates}
+        value_candidates={@value_candidates}
       />
       <p :if={@node.form == nil} class="sb-inspector__empty">
         This block's type is not registered here, so nothing declares which of its

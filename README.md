@@ -45,6 +45,11 @@ def deps do
 end
 ```
 
+Two dependencies are **optional** and neither is added for you:
+`phoenix_live_view`, without which no editor module compiles at all, and
+`statifier_ui`, which an `:expression` field uses for its expression editor
+when it resolves. See [Embedding the editor](#embedding-the-editor).
+
 ## A worked example
 
 A card-processing flow: place a hold, and settle it when the account has the
@@ -697,8 +702,19 @@ framework:
 
 Optional assigns: `findings` (yours, merged with the ones the view model
 derives), `icon` (a function component that turns an icon *name* into markup),
-`expression_component` (an override for `:expression` fields), `theme`, and
+`expression_component` (an override for `:expression` fields),
+`value_candidates` (the values you offer per datamodel path), `theme`, and
 `class`.
+
+**Expression fields.** With `statifier_ui` on your load path an `:expression`
+renders that package's own expression editor: picklists of field, operator and
+value while the source is inside the subset predicator can round-trip, and a
+text input over everything else. It never refuses what an author typed and
+never rewrites it, and every control it draws writes a complete expression
+source string into the same input - the document still stores your author's
+text. Without `statifier_ui` the same field is the plain source input this
+package has always rendered, so the dependency is genuinely optional. Pass
+`expression_component` to override both.
 
 **Icons.** You do not have to pass `icon`. The package ships
 `StatifierBlocks.Editor.Icons`, a small set of inline SVGs for the names the
@@ -790,6 +806,8 @@ the theme - rather than a callback the editor calls back into:
 | `--sb-*` tokens | the `theme` assign, or your own CSS | every colour, space, radius and drag treatment - see [`docs/theming.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/theming.md) |
 | compile findings | `findings` assign | `StatifierBlocks.Finding.from_compiler/2` adapts a compiler finding into the shape the editor renders, so a compile result routes back to the field somebody typed it into |
 | `datamodel` | the `datamodel` assign | the datamodel paths the host declares; drives the undeclared-path advisory of ADR-0005 `11e`-`11g`, and `nil` (the default) turns it off entirely |
+| `expression_component` | the `expression_component` assign | the control an `:expression` field renders. Unset, it resolves to statifier-ui's expression editor when `statifier_ui` is present and to the package's plain source input when it is not; set, the host's own function component wins over both |
+| `value_candidates` | the `value_candidates` assign | the values the host offers per datamodel path, `%{path => [%{label:, value:} \| binary]}`. Read by whatever fills the `expression_component` seam - a path with no entry gets a free-text value control, because only a host knows which of its own paths have a value set |
 
 The metadata readers are total and refuse rather than repair: a badge that is
 blank, carries a newline, or runs past 24 characters is dropped rather than

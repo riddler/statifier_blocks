@@ -121,9 +121,21 @@ defmodule StatifierBlocks.MixProject do
       [
         # Direct because `StatifierBlocks.Core.Duration` calls
         # `Predicator.Duration.parse/1` to read a stored predicator duration
-        # string. It already resolves at 9.0.1 through statifier, so naming
-        # it here records the call rather than moving the lock.
-        {:predicator, "~> 9.0"},
+        # string, so naming it here records the call rather than leaving it
+        # to arrive through statifier.
+        #
+        # INTERIM git pin, and an `override:` rather than a requirement,
+        # because statifier-ui pins predicator the same way and a hex
+        # requirement here diverges from it at resolution. The upstream
+        # reason is `Predicator.Simple` - the module naming the
+        # picklist-renderable subset - which is on predicator's main and not
+        # in a release. Both pins return to hex requirements once 9.2.0
+        # publishes; until then `mix hex.build` refuses this package, which
+        # is the same state statifier-ui is in and for the same reason.
+        {:predicator,
+         github: "riddler/predicator-ex",
+         ref: "7ff1d0c5e0d2e2cc0865380edd7cb04e8ba10bde",
+         override: true},
         # Dev / test
         {:ex_quality, "~> 0.14", only: :dev, runtime: false},
         {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -153,6 +165,23 @@ defmodule StatifierBlocks.MixProject do
     else
       [
         {:phoenix_live_view, "~> 1.0", optional: true},
+        # sb-m6e0: an `:expression` field renders statifier-ui's expression
+        # editor when this resolves, and the plain source input when it does
+        # not, so the dependency is optional in the same sense LiveView is
+        # and `StatifierBlocks.Editor.Field` guards on it the same way.
+        #
+        # It belongs in this list rather than beside the unconditional
+        # dependencies because its only consumer is a LiveView component:
+        # the headless tree has no editor to render, so pulling it there
+        # would resolve a package nothing in that tree can call.
+        #
+        # INTERIM git pin, for the same reason and with the same expiry as
+        # predicator's above - `StatifierUI.Live.ExpressionInput` is on
+        # statifier-ui's main and not in a release.
+        {:statifier_ui,
+         github: "riddler/statifier-ui",
+         ref: "3128076a4d593f22187c9c4ea55a2621c2d8e43f",
+         optional: true},
         {:lazy_html, ">= 0.1.0", only: :test}
       ]
     end

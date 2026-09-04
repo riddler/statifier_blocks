@@ -13,7 +13,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `:integer` | number input, step 1 |
     | `:boolean` | checkbox |
     | `{:select, choices}` | select, choices in declared order |
-    | `:expression` | single-line source input |
+    | `:expression` | statifier-ui's expression editor when that package is present, else a single-line source input |
     | `:duration` | one text control; predicator duration strings primary, with on-screen examples |
     | `{:list, t}` | repeatable rows of `t`'s renderer, with add and remove |
 
@@ -57,10 +57,50 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     closes the field TYPE set, not the keys of a field record, so admitting
     one is a widening of that record and belongs to whoever amends it.
 
-    `:expression` renders as a plain source input here. Predicator source is
-    statifier-ui's subject (sui-bob, sui-ADR-0006), and decision 9 records a
-    richer affordance as a deferral, so this component accepts an
-    `expression_component` override for exactly that seam.
+    `:expression` renders through the `expression_component` seam. Predicator
+    source is statifier-ui's subject (sui-bob, sui-ADR-0006), and decision 9
+    records a richer affordance as a deferral, so this component accepts an
+    override for exactly that seam - and, since sb-m6e0, fills the seam
+    itself when the package the deferral names is on the load path.
+
+    ## Which control an `:expression` gets
+
+    Three answers, in this order, and the order is the whole rule:
+
+      1. an `expression_component` the host passed - the host asked for its
+         own control and gets it, whatever else is available;
+      2. `StatifierUI.Live.ExpressionInput`, when `statifier_ui` resolves -
+         value picklists over the subset predicator can round-trip, a text
+         input over everything else, and the author's own source string
+         either way;
+      3. the plain source input this package has always rendered, with the
+         `<datalist>` of declared paths described below.
+
+    `statifier_ui` is an **optional** dependency, resolved the way
+    `phoenix_live_view` is: absent, clause 3 is what an `:expression`
+    renders, nothing raises, and nothing warns at compile time. The
+    resolution is a runtime `Code.ensure_loaded?/1` against a module read
+    from `:statifier_blocks, :expression_component_module`, which is the
+    same indirection statifier-ui itself uses for `Predicator.Simple` - it
+    is what makes clause 3 assertable on a machine where clause 2 resolves.
+
+    Two properties of clause 2 are load-bearing and neither is this module's
+    to weaken. The component **never refuses a source string and never
+    rewrites one**: source it cannot draw as rows is drawn as text. And
+    every control it draws writes a *complete expression source string* into
+    the same named input the text mode edits, so the document still stores
+    the author's text and this package still holds no structured expression
+    model of its own.
+
+    ## `value_candidates`
+
+    The values a host offers per datamodel path, `%{path => [candidate]}`,
+    where a candidate is `%{label: , value: }` or a bare string. It reaches
+    the `expression_component` beside `candidates` and is read by whatever
+    is behind the seam; nothing in this package interprets it, because only
+    a host knows which of its own paths have a value set at all. A path with
+    no entry gets a free-text value control, which is the same "suggests,
+    never constrains" posture the path `<datalist>` takes.
 
     ## The `:expression` path suggestions (sb-0vt)
 
@@ -169,6 +209,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:value_candidates, :map,
+      default: %{},
+      doc: """
+      The values a host offers per datamodel path, `%{path => [candidate]}`.
+      Passed to `expression_component` as `:value_candidates` and read only
+      there; `%{}` offers none and a path with no entry gets free text.
+      """
+    )
+
     @doc "One field: its label, its control, and its own findings (decision 11)."
     def field(assigns) do
       ~H"""
@@ -180,9 +229,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <.control
           field={@field}
           target={@target}
-          expression_component={@expression_component}
+          expression_component={resolve_expression_component(@expression_component)}
           invoke_types={@invoke_types}
           path_candidates={@path_candidates}
+          value_candidates={@value_candidates}
         />
         <p :for={finding <- @field.findings} class={["sb-finding", severity_class(finding)]}>
           {finding.message}
@@ -196,6 +246,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:expression_component, :any, default: nil)
     attr(:invoke_types, :list, default: [])
     attr(:path_candidates, :list, default: [])
+    attr(:value_candidates, :map, default: %{})
 
     defp control(%{field: %ViewModel.Field{type: :boolean}} = assigns) do
       ~H"""
@@ -289,18 +340,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # module-and-behaviour indirection for one override would be more
       # machinery than the deferral is worth.
       #
-      # `candidates` is additive to that map (sb-0vt). An override written
-      # before it existed takes a map and ignores a key it does not read, so
-      # nothing that worked stops working; an override written after it can
-      # offer the declared paths without re-deriving them from assigns this
-      # component is not handed.
+      # `candidates` is additive to that map (sb-0vt), and
+      # `value_candidates` is additive in exactly the same way (sb-m6e0). An
+      # override written before either existed takes a map and ignores a key
+      # it does not read, so nothing that worked stops working; an override
+      # written after can offer the declared paths, and the host's own value
+      # sets for them, without re-deriving either from assigns this component
+      # is not handed.
       ~H"""
       {@expression_component.(%{
         field: @field,
         id: input_id(@field),
         name: input_name(@field),
         value: to_text(@field.value),
-        candidates: @path_candidates
+        candidates: @path_candidates,
+        value_candidates: @value_candidates
       })}
       """
     end
@@ -495,6 +549,34 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # (ADR-0005 decision 11, amended 2026-08-29 for `:info`).
     @spec severity_class(StatifierBlocks.Finding.t()) :: String.t()
     defp severity_class(finding), do: StatifierBlocks.Finding.severity_class(finding)
+
+    # Clause 2 of the moduledoc's ordering: with no override supplied, an
+    # `:expression` renders statifier-ui's editor when statifier-ui resolves.
+    #
+    # `statifier_ui` is optional, so the module is never named as a call
+    # target - it is read from application config and captured dynamically.
+    # That keeps the compiler quiet in a tree without the package, and it is
+    # what lets a test assert the absent branch on a machine where the
+    # package is present: point the key at a module that does not exist and
+    # the plain input is what renders. statifier-ui reaches `Predicator.Simple`
+    # the same way, for the same reason.
+    @spec resolve_expression_component((map() -> term()) | nil) :: (map() -> term()) | nil
+    defp resolve_expression_component(nil), do: statifier_ui_component()
+    defp resolve_expression_component(component), do: component
+
+    @spec statifier_ui_component() :: (map() -> term()) | nil
+    defp statifier_ui_component do
+      module =
+        Application.get_env(
+          :statifier_blocks,
+          :expression_component_module,
+          StatifierUI.Live.ExpressionInput
+        )
+
+      if Code.ensure_loaded?(module) and function_exported?(module, :expression_input, 1) do
+        &module.expression_input/1
+      end
+    end
 
     @spec type_tag(StatifierBlocks.BlockType.field_type()) :: String.t()
     defp type_tag({tag, _inner}), do: Atom.to_string(tag)

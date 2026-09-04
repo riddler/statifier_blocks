@@ -46,6 +46,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          fit: session["fit"],
          fixtures: session["fixtures"],
          invoke_types: session["invoke_types"] || [],
+         value_candidates: session["value_candidates"] || %{},
          drawer_height: session["drawer_height"],
          header: session["header"],
          host_tabs: session["host_tabs"] || [],
@@ -71,6 +72,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         icon={@icon}
         fixtures={@fixtures}
         invoke_types={@invoke_types}
+        value_candidates={@value_candidates}
         drawer_height={@drawer_height}
         drawer_tabs={drawer_tabs(@host_tabs, @feed)}
         on_change={notifier(@test_pid)}
@@ -198,7 +200,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     Mounts the editor over a document, connected, and returns the live view.
 
     Options: `:document`, `:palette`, `:findings`, `:datamodel`, `:declare`, `:theme`,
-    `:fit`, `:fixtures`, `:invoke_types`, `:drawer_height`, `:header`, `:icon`,
+    `:fit`, `:fixtures`, `:invoke_types`, `:value_candidates`, `:drawer_height`,
+    `:header`, `:icon`,
     `:host_tabs` and `:feed` - the last five being the
     shell amendment's host seam (8A), a truth-table source, the height the host
     remembered, markup for the header slot, and the drawer tabs the host
@@ -239,6 +242,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "fit" => Keyword.get(opts, :fit),
         "fixtures" => Keyword.get(opts, :fixtures),
         "invoke_types" => Keyword.get(opts, :invoke_types, []),
+        "value_candidates" => Keyword.get(opts, :value_candidates, %{}),
         "drawer_height" => Keyword.get(opts, :drawer_height),
         "header" => Keyword.get(opts, :header),
         "host_tabs" => Keyword.get(opts, :host_tabs, []),
