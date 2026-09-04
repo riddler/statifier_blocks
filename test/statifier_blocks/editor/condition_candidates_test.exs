@@ -56,6 +56,28 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     describe "the :expression path suggestion list" do
+      # sb-m6e0 made statifier-ui's expression editor the DEFAULT control for
+      # an `:expression`, so the plain input with its `<datalist>` is now what
+      # renders when that package is absent. These tests are about that
+      # control, so they name the tree they are about rather than depending on
+      # which packages happen to be resolvable on the machine running them.
+      # Pointing the key at a module that does not exist is the supported way
+      # to spell "statifier-ui is not here"; see `Field`'s moduledoc.
+      setup do
+        previous = Application.get_env(:statifier_blocks, :expression_component_module)
+        Application.put_env(:statifier_blocks, :expression_component_module, NoSuchModule)
+
+        on_exit(fn ->
+          if previous do
+            Application.put_env(:statifier_blocks, :expression_component_module, previous)
+          else
+            Application.delete_env(:statifier_blocks, :expression_component_module)
+          end
+        end)
+
+        :ok
+      end
+
       # Sabotage: dropped `list={@list_id}` from the expression input -> 1
       # failure, on the binding assertion alone. The datalist can exist and be
       # attached to nothing, which is the defect worth catching and the one a

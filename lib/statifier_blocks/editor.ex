@@ -324,7 +324,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `declare` | no | the `{id, expr}` roots the host will pass the compiler as `:declare`; declared roots count as declared for the advisories (11k), and `[]` (the default) declares none |
     | `on_change` | no | one-argument function called with each new document |
     | `icon` | no | function component resolving an icon *name* to markup |
-    | `expression_component` | no | override for `:expression` fields (sui-bob's seam) |
+    | `expression_component` | no | override for `:expression` fields (sui-bob's seam); with it unset, an `:expression` renders statifier-ui's own expression editor when that package is on the host's load path, and the package's plain source input when it is not |
+    | `value_candidates` | no | the values the host offers per datamodel path, `%{path => [%{label:, value:} \| binary]}`; read only by an expression editor that draws value pickers, and `%{}` (the default) offers none |
     | `invoke_types` | no | the invoke types the host is prepared to answer; suggestions on an `invoke_type` field, never a constraint, and `[]` (the default) means *no list supplied* |
     | `active_marks` | no | the block ids a run has activated; held as editor state, and cleared when the host opens a different document |
     | `invoke_mark` | no | the block a run is calling out to and how the call came back - `{block_id, outcome}`, a bare `block_id` for no answer yet, or `nil` for no call at all |
@@ -382,6 +383,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          icon: nil,
          expression_component: nil,
          invoke_types: [],
+         value_candidates: %{},
          theme: %{},
          class: nil,
          history_limit: :infinity,
@@ -651,6 +653,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             expression_component={@expression_component}
             invoke_types={@invoke_types}
             path_candidates={@path_candidates}
+            value_candidates={@value_candidates}
             target={@myself}
           />
 
