@@ -4731,3 +4731,162 @@ supplies one.
 The drawer's package tab set is five, and 1A's test governs it unweakened. No
 reserved place remains behind it; anything later is admitted by 1A on its own
 merits or not at all.
+
+## Note (2026-09-04): decision 9, the expression seam is filled, and in what order
+
+A dated note rather than an amendment, because nothing decision 9 *decided*
+moves. `:expression` still renders through the `expression_component` seam
+decision 9 put there; a host override still wins over everything; the
+`:update_config` gate is untouched; the document still stores the author's own
+source string and this package still holds no structured expression model of
+its own. Decision 15's deferral is not reversed either - it is honored in the
+way it was written to be honored, by *consuming* statifier-ui's component
+rather than reimplementing predicator source here.
+
+What moves is narrower and entirely factual: the seam now has a default
+filling, because the package the deferral names has shipped the component.
+Three sentences in this record describe the old default as a present-tense
+fact, and a reader holding them beside the code would find the code in the
+wrong - which, by this repo's rule that the record is the contract, is exactly
+backwards. So they are named here rather than left to be discovered.
+
+### The sentences this supersedes
+
+Decision 9's table row:
+
+> | `:expression` | single-line source input (see below) |
+
+and the sentence beneath it that opens the `:expression` paragraph:
+
+> `:expression` renders as a plain source input in this package.
+
+and, in decision 15, the second sentence of the rich-expression-editing
+bullet:
+
+> Decision 9 ships a plain input and an override seam.
+
+and, in the note of 2026-09-01 above, its restatement of the same fact:
+
+> `:expression` still renders as a plain source input in this package
+
+All four stay where they are as the record of what was true until sb-m6e0.
+From here on the order below is what an `:expression` field renders. Every
+other clause of each of those passages is unchanged - decision 15's first
+sentence in particular ("Rich expression editing is statifier-ui's (sui-bob)")
+is not superseded but satisfied, and the whole of the 2026-09-01 note's
+distinction between a path *feed* and a completion *affordance* still holds,
+because what fills the seam is the affordance and it arrived from the package
+that owns it.
+
+### The order
+
+Three answers, tried in this order, and the order is the whole rule:
+
+1. **An `expression_component` the host passed.** The host asked for its own
+   control and gets it, whatever else is available. This is decision 9's
+   original seam, unnarrowed.
+2. **`StatifierUI.Live.ExpressionInput`, when `statifier_ui` resolves.**
+   Picklists of field, operator and value over the source predicator can
+   round-trip, and a text input over everything else.
+3. **The plain source input this package has always rendered**, with the
+   `<datalist>` of declared paths the 2026-09-01 note records.
+
+Two properties of clause 2 are load-bearing, and neither is this package's to
+weaken, because both are what let clause 2 replace clause 3 without the record
+having to decide anything new. The component **never refuses a source string
+and never rewrites one**: source it cannot draw as rows - anything outside the
+subset `StatifierUI.Expression.simple/2` answers for - is drawn as text, and
+an author who typed something the picklists cannot represent keeps their text
+exactly as typed. And **every control it draws writes a complete expression
+source string into the same named input the text mode edits**, so what reaches
+`:update_config` is a source string either way and the gate sees no new shape.
+
+Clause 3 is not a degraded mode being tolerated; it is a supported
+configuration, and CI holds it that way (below).
+
+### How clause 2 is resolved, and why a tree without the package is quiet
+
+`statifier_ui` is an **optional** dependency, resolved the way
+`phoenix_live_view` is under decision 1. The module is never named as a call
+target: it is read at runtime from `:statifier_blocks,
+:expression_component_module` (defaulting to `StatifierUI.Live.ExpressionInput`)
+and captured through `Code.ensure_loaded?/1` plus
+`function_exported?(module, :expression_input, 1)`. A tree without the package
+therefore produces no compile warning and nothing raises - it simply lands on
+clause 3.
+
+The indirection earns its keep twice over. It is the same shape statifier-ui
+itself uses to reach `Predicator.Simple`, so the family has one pattern rather
+than two; and it is what makes clause 3 *assertable on a machine where clause
+2 resolves*, by pointing the key at a module that does not exist. Without it,
+the absent branch could only ever be tested by removing a dependency, which is
+to say it would not be tested. `test/statifier_blocks/editor/expression_component_test.exs`
+covers all three clauses on one machine for exactly that reason.
+
+### Decision 1's property was checked, not assumed
+
+`statifier_ui` was added inside `live_view_dep()` rather than beside the
+unconditional dependencies, and the placement is the argument: its only
+consumer is a LiveView component, so pulling it into the headless tree would
+resolve a package nothing in that tree can call. Decision 1's acceptance
+property is therefore untouched and was verified rather than reasoned about -
+under `STATIFIER_BLOCKS_HEADLESS=1` the package resolves, compiles and passes
+its full suite (1,444 tests), and the "Headless (phoenix_live_view absent)" CI
+job passed on sb-m6e0's request. A second optional dependency is the case that
+would have broken that property quietly if it had been declared in the wrong
+list, which is why the check is recorded here and not left implied.
+
+### Decision 7 is untouched, and this is the case that could have moved it
+
+No JavaScript was added, no hook file was edited, and no third hook arrived.
+The picklist affordance carries its own client behaviour, but that hook is
+**statifier-ui's, shipped from statifier-ui's package**, so this package's
+client surface is still the two hooks decision 7 admits and
+`test/statifier_blocks/assets_test.exs` still enforces the count against the
+files in `assets/js/`. Recorded explicitly because a rich in-place editor is
+exactly the shape of feature that would otherwise justify a third hook, and
+decision 7 sets a deliberately high bar for one: consuming a component from
+the package that owns the subject is how the bar was cleared rather than
+argued down.
+
+### `value_candidates`
+
+The seam gained a second additive key alongside `candidates`:
+`value_candidates`, a `%{path => [candidate]}` map where a candidate is
+`%{label: , value: }` or a bare string. It is threaded as a new editor assign
+along the same chain `path_candidates` already takes - editor, inspector,
+config form, field, and the field's control - and reaches the component behind
+the seam untouched. Nothing in this package interprets it, and that is the point:
+only a host knows which of its own declared paths have a bounded set of values
+at all. A path with no entry gets a free-text value control rather than an
+empty dropdown, which is the same "suggests, never constrains" posture the
+path `<datalist>` takes and the same posture 11e's advisory takes on an
+undeclared path.
+
+Additivity is the compatibility argument and it is the same one the
+2026-09-01 note made for `candidates`: an override written before either key
+existed takes a map and reads the keys it knows, so nothing that worked stops
+working.
+
+### What is not decided here
+
+The dependency arrangement clause 2 currently rests on is **interim and is not
+a decision of this record**. `statifier_ui` and `predicator` are both pinned by
+git ref in `mix.exs` at the moment, the second with `override: true` and only
+because statifier-ui pins predicator the same way and Mix refuses the
+divergence. Both pins come out at the post-publish re-pin, when predicator
+9.2.0 and statifier_ui 0.4.0 are on Hex. It is named here in one paragraph
+only so that a reader who opens `mix.exs` beside this note is not left to
+wonder whether a git pin is something the record intends; the arrangement,
+its consequences and its removal are tracked in the campaign's linkage ledger,
+not here. Nothing in the order above depends on how the two packages are
+pinned.
+
+Also unchanged and tracked elsewhere: predicator's grammar vocabulary is
+px-15q's, and decision 15's per-palette-entry fixtures pane is still
+undecided.
+
+No decision moves, no clause is edited, and no text above this line changes -
+the four superseded sentences stay where they are, as the record of what was
+true before.
+Filed with `sb-mzah`, campaign-028's Lane B2, recording what `sb-m6e0` landed.
