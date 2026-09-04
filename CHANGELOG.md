@@ -10,6 +10,26 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.16.0] 2026-09-04
+
+0.16.0 fills the expression seam. A condition's `:expression` field now
+renders statifier-ui's expression editor - picklists of field, operator and
+value over the source it can round-trip, and the plain source input over the
+rest - so a signup-wizard condition like `step in ['payment', 'review']` is
+composed rather than typed, and a host can offer the values each datamodel
+path accepts through a new `value_candidates` assign. `statifier_ui` joins
+`phoenix_live_view` as an optional dependency: with it absent, nothing raises
+and an `:expression` renders exactly what it rendered before.
+
+### Added
+
+- An `:expression` field renders statifier-ui's expression editor - picklists of field, operator and value over the source it can round-trip, a text input over the rest - when `statifier_ui` is on the load path, and the plain source input when it is not.
+- A `value_candidates` editor assign, `%{path => [%{label:, value:} | binary]}`, carrying the values a host offers per datamodel path through to the expression control.
+
+### Changed
+
+- `statifier_ui` is a new optional dependency, resolved the way `phoenix_live_view` already is: absent, nothing raises and an `:expression` renders exactly what it rendered before.
+
 ## [0.15.0] 2026-09-02
 
 0.15.0 is about seeing what a document actually declares and what its
@@ -1489,6 +1509,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.16.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.16.0
 [0.15.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.15.0
 [0.14.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.14.0
 [0.13.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.13.0
