@@ -22,7 +22,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use StatifierBlocks.EditorLiveCase
 
-    alias StatifierBlocks.Shell
+    alias StatifierBlocks.{Editor, Shell}
 
     @card_id "blk_email_step"
 
@@ -179,6 +179,82 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         measure(view)
 
         refute html =~ "data-sb-reveal"
+
+        view |> with_target("#editor") |> render_click("fit", %{"fit" => "active"})
+
+        assert has_element?(view, ~s(.sb-editor[data-fit="manual"][data-zoom="100"]))
+        refute render(view) =~ "data-sb-reveal"
+      end
+    end
+
+    describe "Fit active with nothing selected" do
+      # An observer watching a run selects nothing, so the marks are the only
+      # answer the editor has to which block matters. Painted the way a host
+      # paints them - `send_update/3` into the mounted component - because
+      # that is the seam, and reaching into assigns would prove nothing about
+      # it.
+      defp mark(view, ids) do
+        Phoenix.LiveView.send_update(view.pid, Editor, id: "editor", active_marks: ids)
+        render(view)
+        view
+      end
+
+      defp fit_active_disabled?(view),
+        do: has_element?(view, ~s(button[phx-value-fit="active"][disabled]))
+
+      # Sabotage: leaving the toolbar call site at `@selected_id != nil` - the
+      # marks land, the canvas draws them, and the control over them is dead.
+      test "a run mark enables the control that nothing was selecting", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+        measure(view)
+
+        assert fit_active_disabled?(view)
+
+        mark(view, [@card_id])
+
+        refute fit_active_disabled?(view)
+      end
+
+      # Sabotage: dropping the `active_marks` clause from `fit_target/1` - the
+      # button is enabled by the mark and then answers nothing when it is
+      # pressed, which is worse than the disabled control it replaced.
+      test "it fits and reveals the first marked block", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+        measure(view)
+        mark(view, [@card_id, "blk_wizard"])
+
+        view |> element(~s(button[phx-value-fit="active"])) |> render_click()
+
+        # The marked card is the 300-wide anchor, so it fits at the top of the
+        # ladder where the 1000-wide tree only fitted at 80%.
+        assert has_element?(view, ~s(.sb-editor[data-fit="active"][data-zoom="200"]))
+        assert has_element?(view, ~s(#sb-canvas[data-sb-reveal="1:#{@card_id}"]))
+      end
+
+      # Sabotage: putting the marks clause of `fit_target/1` first - an author
+      # who selects a block during a run is thrown to whatever the run is
+      # marking instead of to the block they just picked.
+      test "a selection still wins over the marks", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+        measure(view)
+        mark(view, ["blk_wizard"])
+        select(view)
+
+        view |> element(~s(button[phx-value-fit="active"])) |> render_click()
+
+        assert has_element?(view, ~s(#sb-canvas[data-sb-reveal="1:#{@card_id}"]))
+      end
+
+      # Sabotage: enabling the control on the assign's presence rather than on
+      # its contents - a host that clears its marks at the end of a run is
+      # left with a live button and nothing behind it.
+      test "cleared marks and no selection leave it disabled and inert", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+        measure(view)
+        mark(view, [@card_id])
+        mark(view, [])
+
+        assert fit_active_disabled?(view)
 
         view |> with_target("#editor") |> render_click("fit", %{"fit" => "active"})
 

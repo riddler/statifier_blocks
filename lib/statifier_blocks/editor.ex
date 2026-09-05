@@ -142,6 +142,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     the new one in the same update is not fighting that reset: the reset runs
     first and the marks it passed are applied after.
 
+    The active marks are also what the toolbar's `Fit active` falls back on.
+    An observer watching a run is not selecting anything - the marks are the
+    run's own answer to "which block matters right now" - so the control is
+    enabled whenever there is a selection *or* a mark, and with nothing
+    selected it fits and reveals the first marked block. The order is the
+    host's: the marks are kept as the list the host passed, deduplicated only
+    where the canvas asks the question as a set. With no selection and no
+    marks there is nothing to fit, and the control stays disabled.
+
     What reaches the markup is `data-run-active`, `data-run-invoking` and -
     only for a call that has come back - `data-invoke-outcome`, on the block's
     `.sb-node`. The outcome is passed through rather than checked against a
@@ -525,7 +534,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # document and marks it in one update gets the marks it just passed.
       socket =
         if Map.has_key?(assigns, :active_marks) do
-          assign(socket, :active_ids, active_ids(assigns.active_marks))
+          marks = active_list(assigns.active_marks)
+
+          socket |> assign(:active_marks, marks) |> assign(:active_ids, MapSet.new(marks))
         else
           socket
         end
@@ -608,6 +619,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:offered_values, offered_values(assigns))
         |> assign(:declaration_refusal, declaration_refusal(assigns))
         |> assign(:marks, marks(assigns))
+        |> assign(:fit_target, fit_target(assigns))
         |> assign(:depth, Shell.depth(assigns.view_model.root))
         |> assign(:block_count, Shell.block_count(assigns.view_model.root))
         |> assign(:edges, Connectors.edges(assigns.view_model.root, assigns.measurement))
@@ -659,7 +671,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               count={@block_count}
               can_undo?={History.can_undo?(@history)}
               can_redo?={History.can_redo?(@history)}
-              selected?={@selected_id != nil}
+              fittable?={@fit_target != nil}
               target={@myself}
             />
 
@@ -781,13 +793,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
        |> assign(:zoom, fit_zoom(socket, Connectors.stage(socket.assigns.measurement)))}
     end
 
-    # `Fit active` fits the selected card and then brings it into view, and
-    # the second half is the one the server cannot do: a scroll position is
-    # not a document value and no stylesheet sets one. So the canvas is
-    # stamped with the block to reveal and a counter that makes the stamp
-    # change, and the drag hook carries it out once per press.
+    # `Fit active` fits the card `fit_target/1` names - the selection, or the
+    # first run mark when there is no selection - and then brings it into
+    # view, and the second half is the one the server cannot do: a scroll
+    # position is not a document value and no stylesheet sets one. So the
+    # canvas is stamped with the block to reveal and a counter that makes the
+    # stamp change, and the drag hook carries it out once per press.
     def handle_event("fit", %{"fit" => "active"}, socket) do
-      case socket.assigns.selected_id do
+      case fit_target(socket.assigns) do
         nil ->
           {:noreply, socket}
 
@@ -1287,6 +1300,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             # block is gone. The amendment's exemption from this reset is the
             # pane folds', and for the reason that does not reach a mark: a
             # fold addresses no block at all.
+            active_marks: [],
             active_ids: MapSet.new(),
             invoking: nil
           )
@@ -1344,13 +1358,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # it in whatever shape its own runtime produced. The editor's answer to a
     # shape it does not recognise is to mark nothing, never to raise inside
     # somebody's render.
-    @spec active_ids(term()) :: MapSet.t(String.t())
-    defp active_ids(%MapSet{} = ids), do: ids
+    #
+    # The order is kept rather than normalized away, because `Fit active` with
+    # nothing selected fits the first mark, and "first" has to mean the first
+    # one the host named. The set the canvas asks its membership question
+    # against is derived from this list at the same moment.
+    @spec active_list(term()) :: [String.t()]
+    defp active_list(%MapSet{} = ids), do: MapSet.to_list(ids)
 
-    defp active_ids(ids) when is_list(ids),
-      do: ids |> Enum.filter(&(is_binary(&1) and &1 != "")) |> MapSet.new()
+    defp active_list(ids) when is_list(ids),
+      do: Enum.filter(ids, &(is_binary(&1) and &1 != ""))
 
-    defp active_ids(_other), do: MapSet.new()
+    defp active_list(_other), do: []
 
     # `{block_id, outcome}` is what the mark is: which block, and how the call
     # came back. A bare id is the same mark with no answer yet - the state a
@@ -1388,6 +1407,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         %{active: active, invoke: invoking}
       end
     end
+
+    # What `Fit active` acts on, resolved in one place so the button's enabled
+    # state and the handler's answer cannot disagree: a control that is
+    # enabled and then does nothing is the defect that pairing them prevents.
+    # The selection wins when there is one - it is the author's own answer to
+    # which block matters - and the first mark stands in when there is not,
+    # which is the whole of what an observer watching a run ever has.
+    @spec fit_target(map()) :: String.t() | nil
+    defp fit_target(%{selected_id: id}) when is_binary(id), do: id
+    defp fit_target(%{active_marks: marks}), do: List.first(marks)
 
     @spec drawer_view(map()) :: Shell.drawer()
     defp drawer_view(assigns) do
