@@ -585,6 +585,55 @@ defmodule StatifierBlocks.AssetsTest do
     end
   end
 
+  describe "the drawer's tab bar is one row at every width" do
+    # The bar labels the panel under it, so its height is chrome the panel
+    # pays for: a bar that grows a row when a host contributes a tab takes
+    # that row out of the content the drawer exists to show. Measured at a
+    # 640-wide editor with six tabs, wrapping put the bar at 65px against 36px
+    # at 1280; scrolling holds it at 36px at both.
+    #
+    # Asserted against the stylesheet because the alternative is a browser,
+    # and the three declarations below are the whole mechanism - `nowrap` on
+    # the bar so nothing moves downward, `min-width: 0` so the strip is the
+    # flex item that gives, and `overflow-x` so what does not fit is reachable
+    # rather than gone. Any one of them removed restores the second row.
+    #
+    # Sabotage: putting `flex-wrap: wrap` back on `.sb-drawer__bar` - the bar
+    # wraps again at 640 and this goes red naming the declaration that did it.
+    test "the bar does not wrap and the strip scrolls instead" do
+      bar = declarations_of(".sb-drawer__bar")
+      strip = declarations_of(".sb-drawer__tabs")
+
+      assert Map.get(bar, "flex-wrap") == "nowrap"
+      assert Map.get(strip, "flex-wrap") == "nowrap"
+      assert Map.get(strip, "min-width") == "0"
+      assert Map.get(strip, "overflow-x") == "auto"
+    end
+
+    # The other half of the earlier fix, which this one must not undo: the
+    # overflow moves sideways and never inward, so a tab's label and its count
+    # stay one line however narrow the bar gets.
+    #
+    # Sabotage: dropping `white-space: nowrap` from `.sb-drawer__tab` - the
+    # count falls under the label inside a clipped tab, which is the defect
+    # the strip's own scroll would otherwise hide.
+    test "a tab still keeps its label and its count on one line" do
+      assert declarations_of(".sb-drawer__tab") |> Map.get("white-space") == "nowrap"
+    end
+
+    # The controls at the end of the bar are the strip's counterweight: if
+    # they shrink too, the slider narrows before the strip has scrolled at
+    # all, and the overflow lands on the wrong item.
+    #
+    # Sabotage: removing `flex: none` from `.sb-drawer__resize` - the slider
+    # compresses at 640 while the strip still shows every tab, so nothing
+    # above goes red and the bar quietly stops being measurable.
+    test "the height slider and the collapse control hold their size" do
+      assert declarations_of(".sb-drawer__resize") |> Map.get("flex") == "none"
+      assert declarations_of(".sb-drawer__close") |> Map.get("flex") == "none"
+    end
+  end
+
   # The classes that appear beside `sb-button` on the same element.
   defp vocabulary_wearers do
     for {class, _source} <- button_classes(),
