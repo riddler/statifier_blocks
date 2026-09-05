@@ -2526,10 +2526,9 @@ ADR-0005's amendment of 2026-09-05 to its decision 9 - proposed, and merging
 at proposed - reverses the clause that kept an older, calendar-style duration
 spelling accepted beside the expression language's. It reverses it on a fact
 rather than a preference: the operative argument for keeping that spelling was
-that documents already written hold it,
-and a sweep found no such document - the spelling survives only in this
-package's own records, moduledocs and fixtures, all of which this package
-migrates itself.
+that documents already written hold it, and a sweep found no such document -
+the spelling survives only in this package's own records, moduledocs and
+fixtures, all of which this package migrates itself.
 
 ### The two passages here that clause reaches
 
@@ -2570,12 +2569,11 @@ the 2026-09-01 note used for G9b. Neither is rewritten.
   never attributed verbatim.
 - It does not change decision 10's vocabulary table, any config schema, any
   `io/1`, or any other block type's declared shape. The one other declared
-  `:duration` field, `core.wait`'s `duration`, is reached by that same proposed
-  amendment for the same reason and by the same record, not by any decision
-  taken here.
-  There is no third such field to reach: ADR-0010 decision 1, accepted
-  2026-09-02, settles that a clock interrupt is the `core.send` +
-  `core.on_event` pair and that no `core.timeout` exists.
+  `:duration` field, `core.wait`'s `duration`, is reached by that same
+  proposed amendment for the same reason and by the same record, not by any
+  decision taken here. There is no third such field to reach: ADR-0010
+  decision 1, accepted 2026-09-02, settles that a clock interrupt is the
+  `core.send` + `core.on_event` pair and that no `core.timeout` exists.
 - It does not itself carry the wording rule that comes with the pivot. No
   refusal message, example or documentation line in this package names the
   retired spelling; that rule is ADR-0005's amendment clause 9d, and it binds
