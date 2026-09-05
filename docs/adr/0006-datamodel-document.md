@@ -449,3 +449,132 @@ advisory - which is ADR-0005's to answer, not this record's.
 Nothing in this record changes: the shape, the projection, decision 9's
 "advisory, never a gate", and every open question above stand exactly as
 written.
+
+## Amendment (2026-09-05): decision 4, a `duration` value is an expression-language duration string
+
+**Status: proposed (2026-09-05, drafted under campaign 029 lane A).** Accepting
+it is a separate change on its own gate. Additive: decision 4 stands as
+accepted, and no text above this line is edited by this section. It also
+discharges this record's first open question, below.
+
+### Context
+
+Decision 4 types a datamodel entry as one of eight things, and for the two
+non-native types it also directed how the value is written down, following
+ADR-0001 decision 6's config spelling of the day.
+
+The editor's side of the family has since moved. ADR-0005's decision-9
+amendment of 2026-08-29 made expression-language duration strings the primary
+form an author types into a `:duration` field, and ADR-0002's decision-10
+`core.send` row reads a `delay` in the same terms. A companion amendment on
+ADR-0005 is in flight in the same campaign, under its own bead, carrying the
+editor-side half further; what it settles is that record's to state, and this
+section neither depends on its text nor speaks for it.
+
+What this record can fix is its own half. It describes a value an author fills
+in against a `:duration` field, and it describes it in a different spelling
+from the field itself - which is exactly the divergence its own open question
+warned about. Two descriptions of one span, one in a datamodel entry and one in
+the control an author types into, is a difference a reader has to hold in their
+head for no gain.
+
+The premise decision 4 rested on is untouched. ADR-0001 decision 6 forbids
+floats in config so that decision 8's byte-identical canonical form stays
+achievable, which is why a duration is carried as a *string* and not a number.
+That reason survives this amendment intact; only the shape of the string
+changes.
+
+### Decision
+
+**4a. A `duration`-typed value is an expression-language duration string.** A
+duration like `30s`, `15m`, `1h30m`, `2d` or `3d8h`. The form decision 4
+originally directed for this type is no longer the one this record admits, and
+the sentence carrying it above is superseded by this clause rather than
+rewritten, per the append-only convention these records follow.
+
+**4b. Predicator owns the grammar, and this record cites it.** Which strings
+parse, how a repeated unit accumulates, how a sub-second or fractional
+component is handled, what the coarser units approximate: all of that is
+`Predicator.Duration`'s to define, on the same reasoning ADR-0005's decision-9
+amendment gives. A grammar restated here would be a second opinion that drifts.
+
+**4c. The eight types and the closed set are unchanged.** This is a spelling
+amendment inside one existing type, not a widening: there is no ninth type,
+`duration` is still one of the eight and still holds a string, and `datetime`'s
+spelling is not this section's subject and is untouched. `decimal` stays a
+string for the same no-floats reason it always did.
+
+**4d. `example` values for a `duration` follow 4a.** The Worked shape above is
+not edited by this section; its `limits.authorization_window` entry predates the
+amendment, and the amended reading of that entry is:
+
+```json
+{"name": "authorization_window", "path": "limits.authorization_window",
+ "type": "duration", "label": "Authorization window", "example": "15m"}
+```
+
+**4e. Nothing about decision 6's projection changes.** `declared_paths/1`
+contributes paths and nothing else, so no type and no `example` reaches the set.
+A consumer that wants a duration reads the document, which is decision 7's rule
+already. `sb-oiq`'s index is the consumer that gains: the type it stores now
+names a string an author could have typed into the field beside it.
+
+### The open question "How `example` values spell the non-native types", discharged
+
+That question named a real divergence and left it undecided because half of it
+belonged to another package. It is discharged here, in two parts, and it is the
+substantive half of this section.
+
+**This record's half is decided: 4a and 4d above.** A datamodel `example` for a
+duration is an expression-language duration string, the same string the author
+types into the `:duration` field this record's paths feed. The question asked
+that the family not carry two spellings for one duration "without saying so on
+purpose"; this record now carries one.
+
+**The rendering package's wire form is unchanged, and remains that package's
+decision to make.** `sui-ADR-0006` encodes an expected value with the reserved
+`$`-prefixed shapes it inherits from `sui-ADR-0005`'s wire format, and a
+duration's shape there is `{"$duration": ...}`. **This amendment does not touch
+it, and nothing in this record proposes touching it.** The wire format is
+statifier-ui's contract, owned there under this record's own decision 2
+("statifier-ui owns datasets, the fixtures contract, and the wire format"), and
+whether that encoding ever changes is a claim for a statifier-ui record to make,
+argued on its own consumers. The campaign that drafted this section made no
+record change in that package at all, deliberately.
+
+**So the family keeps two encodings, and now on purpose.** They are not two
+spellings of one thing in one place; they are two things. An `example` is
+documentation - a string a person reads in a pane and could paste into a field -
+and its spelling is chosen for a human author. A wire value is data a loader
+parses out of a fixture bundle, and its shape is chosen for a machine reading a
+typed envelope. The original question's own aside said as much ("`example` is
+documentation, not a wire value"); what it lacked was a decision saying the
+divergence was intended. This is that decision.
+
+**What would reopen it.** Statifier-ui amending its own wire format, on its own
+record, for its own reasons. Nothing here obliges it to, and nothing here would
+break if it did: this record's `example` spelling does not read the wire form
+and the wire form does not read this document.
+
+### Consequences
+
+- This record and ADR-0005 now name the same primary shape for one value. A
+  host that declares `limits.authorization_window` as a `duration` and an
+  author who fills in a `:duration` field against that path are looking at the
+  same string shape, which is the property the divergence cost. What else that
+  field may accept is ADR-0005's to say, then and now.
+- The Worked shape's one duration `example` above keeps the older spelling in
+  the file, because these records amend by appending. 4d is the amended
+  reading, and a consumer that ever executed an `example` - none does today,
+  `example` being documentation - would read this section rather than the
+  block above.
+- `sui-ADR-0006`'s datasets are unaffected in every direction. The seam the
+  cross-check section opened and declined to take (validating a dataset against
+  this document) is still open, still statifier-ui's, and no closer to or
+  further from being taken by this section.
+- Decision 9 stands: an undeclared path is unknown, not wrong, and nothing here
+  adds a check, a verdict, or a refusal. A malformed `example` is not a finding,
+  because no consumer parses one.
+- The record still reaches no engine. This is an authoring-time declaration of
+  how a duration is written down for a reader, and the compiler does not read
+  this document at all.
