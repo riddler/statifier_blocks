@@ -10,6 +10,101 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.17.0] 2026-09-05
+
+0.17.0 makes a stored duration mean one thing. A `:duration` field reads the
+duration strings `Predicator.Duration` parses - `30s`, `1h30m`, `2d`, `3d8h` -
+and refuses every other spelling, which is what finally lets `500ms` and
+`1.5s` through: the intermediate canonical form that stood between them and
+the engine is gone, and with it two public functions. The editor surfaces
+grow alongside it - a Fixtures tab on the inspector, a fixture-derived hint
+beside a condition field, datamodel-derived value candidates, done-event
+chips drawn as the block they name, and an `on_select` callback for a host
+panel that follows the canvas.
+
+### Added
+
+- The inspector carries a fourth tab, **Fixtures**, about the selected block:
+  one row per fixture row the block owns, with the slot the row expects, the
+  slot the compiled chart took, and the verdict. It carries a count chip in
+  the Findings tab's style, reading the selected block's row count.
+  `StatifierBlocks.Shell.inspector_tabs/0` now answers four tabs, with
+  `:fixtures` last, and `StatifierBlocks.Shell.inspector_tab/1` resolves the
+  new name.
+
+  The rows are the same `StatifierBlocks.Runtime.FixtureRuns` result the
+  drawer's Fixtures tab renders - no second execution path - filtered to the
+  selected block. Runs now refresh when the inspector's tab is picked and when
+  the selection moves, as well as on the drawer's own tab, so switching blocks
+  cannot leave the previous block's verdicts on screen.
+
+  The drawer's Fixtures tab is unchanged: same rows, same verdicts, same
+  count, same place in the tab order. With no selection, no fixtures source,
+  or no rows for the block, the new tab reads its own empty state for that
+  case; a document mid-edit reads as mid-edit rather than as a fixture
+  failure.
+- The editor accepts an `on_select` function and calls it with a
+  `%{id:, type:, label:}` descriptor for each new selection, or `nil` when
+  nothing is selected, so a host panel can follow the canvas.
+- Sub-second and fractional durations are expressible in a `:duration` field
+  for the first time: `500ms` and `1.5s` both validate and both compile to a
+  `delay` the engine resolves. The recogniser that stood between them and the
+  engine is gone.
+- A condition's value picker now offers what the datamodel declares. A path
+  whose ADR-0006 entry carries `one_of` gets those values by default, with no
+  `value_candidates` map supplied; a host entry for a path replaces the
+  derived list for that path and leaves every other path's default in place.
+  `StatifierBlocks.Datamodel.value_candidates/2` is the derivation, and
+  nothing validates against the list - `one_of` stays a hint.
+- `StatifierBlocks.ViewModel.summary_chip_titles/1` gives the raw text behind
+  each summary chip, `nil` where the chip is drawn as its type declared it.
+- `StatifierBlocks.Compiler.StateId.undone_event/1` inverts a generated
+  `done.state` or `done.outcome` event name back to the block it names, or
+  answers `:error` for a name that does not invert unambiguously.
+- A condition field now draws a hint beside its control, derived from the
+  selected block's fixture rows. The exemplar is what the block's first
+  fixture row in declaration order binds to the path the condition names, and
+  every distinct value that path takes across the block's rows is listed on
+  the hint's `title`. `StatifierBlocks.Shell.fixture_hint/3` is the
+  derivation, over the `fixtures` the editor already holds.
+
+  It is a hint and never an option: nothing reaches a picker, nothing is
+  merged with `one_of` or with a host's `value_candidates`, and no value it
+  shows can be selected. A block with no fixture rows, or a document with no
+  fixtures source, renders exactly as it did before.
+
+### Changed
+
+- **Breaking.** A `:duration` field reads one grammar: the duration strings
+  `Predicator.Duration` parses, such as `30s`, `1h30m`, `2d` and `3d8h`. Any
+  other spelling is a format finding.
+
+  *Migration: a `core.wait` `duration` or a `core.send` `delay` stored in
+  ISO-8601 - `PT30S`, `PT1H30M`, `P1D` - no longer validates. Rewrite the
+  value in the unit spelling above; `PT1H30M` becomes `1h30m`, `P1DT6H`
+  becomes `1d6h`, and the compiled chart is byte-identical either way.*
+
+- `StatifierBlocks.Core.Duration.to_delay/1` now takes the normalised
+  duration `parse/1` returns rather than a canonical string.
+- A summary chip whose text has the shape of a generated done-event name is
+  drawn as the named block's label and the outcome, with the raw name on the
+  chip's `title` attribute, so a card no longer shows the compiler's spelling
+  of a fact the author stated (ADR-0005 decision 10w).
+- The presentation cap measures the drawn chip rather than the generated one,
+  so the cap lint no longer names a string the author cannot shorten. A
+  translated chip that is still over the cap is refused exactly as before.
+- `summary/2`, `summary_refusals/2` and `summary_refusal_message/3` take an
+  optional trailing map of block labels. A call that passes none behaves
+  exactly as it did: without labels nothing is translated.
+
+### Removed
+
+- `StatifierBlocks.Core.Duration.to_iso/1` and
+  `StatifierBlocks.Core.Duration.predicator?/1`. With one grammar in and one
+  attribute out there is no intermediate form to canonicalise to, and no
+  narrower predicate to hold beside `duration?/1`. Callers that compiled a
+  stored value should use `parse/1` and then `to_delay/1`.
+
 ## [0.16.0] 2026-09-04
 
 0.16.0 fills the expression seam. A condition's `:expression` field now
@@ -1509,6 +1604,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.17.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.17.0
 [0.16.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.16.0
 [0.15.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.15.0
 [0.14.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.14.0
