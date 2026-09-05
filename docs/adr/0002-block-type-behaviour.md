@@ -2997,6 +2997,51 @@ Note here. Neither answer changes any other claim in this section.
 
 Filed with `sb-5v3i`, campaign-031's lane H. `sb-m0t1` implements.
 
+*[Note added 2026-09-05, with `sb-m0t1` under campaign-031 ruling D31-2, and
+the answer G14d above leaves to it: **`outcomes/1` returns both outcomes for
+every config**, including one with no `timeout`. The first of G14d's two
+options, and the compiler is what picks it.
+
+The cost G14d puts against that option - "a `timed_out` seam on an await that
+can never take it, which ADR-0004's totality then has to emit something for" -
+turns out to be already discharged, and by a type that ships. ADR-0004's
+outcome amendment, 2c, states it as the third of its three consequences: "an
+outcome a block never reaches costs a parent nothing", because the wiring is
+an event and not a target, so a parent may transition on an outcome whose
+`<final>` was never emitted, the transition simply never fires, and no
+`{:unresolved_target, _}` finding results. That sentence names the case it was
+written for - it "is what lets `core.invoke` omit the error path entirely when
+its `on_error` slot is empty" - and `core.invoke` does exactly that today:
+`StatifierBlocks.InvokeStep.outcomes/0`
+(`lib/statifier_blocks/invoke_step.ex:212`) declares `done` and `error`
+unconditionally while `emit/2` writes the `error` final only when the slot is
+filled. Nothing in the compiler checks a declared outcome against an emitted
+final: `Compiler.validate_outcomes/2`
+(`lib/statifier_blocks/compiler.ex:981`) checks the role shape and
+duplication of the names, and nothing else. So "totality has to emit something
+for it" is not a cost this option actually carries; provenance stays total
+over the bytes that *are* emitted, which is the direction decision 5 states.
+
+The second option's cost is not discharged by anything. Clearing the `timeout`
+field would remove a declared seam an author may already have wired, which is
+the failure decision 6's `slots/1` stability rule exists to avoid on the slot
+side and which amendment A1 extends to `outcomes/1` in the same words. A2 also
+says outright that "a type could declare a second outcome reached from no slot
+at all", so a declared outcome with no reachable final is a shape this record
+already admits rather than a novelty this row would introduce.
+
+(The palette count the Note beside G11 tracks moves with this module rather
+than against it: `StatifierBlocks.Palette.core_types/0` registers **sixteen**
+once it lands, which is that Note's gap closing exactly as it describes.)
+
+What `sb-m0t1` emits follows `core.invoke` rather than declaring dead bytes: an
+await with a `timeout` emits the `<onentry>` send, the timer transition and the
+`timed_out` final together; an await without one emits none of the three, so
+its compiled bytes are the awaited transition and the `received` final and
+nothing else. The declaration and the emission disagree on purpose, and 2c is
+where that is allowed. Neither this Note nor that choice changes any other
+claim in this section.]*
+
 ## Note (2026-09-05): `core.on_event` takes an optional `capture`
 
 A dated Note rather than an amendment, recorded for `sb-5v3i` under
