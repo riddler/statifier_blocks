@@ -523,3 +523,39 @@ way ADR-0005's clause 9 says its own earlier prose is superseded.
   9e leaves them.
 
 Filed with `sb-pctm`, campaign-030's fill lane D.
+
+---
+
+## Note (2026-09-05): the Note above, `sb-dj1p` is closed and its advisory has shipped
+
+A dated Note correcting the dated Note above it rather than this record. No
+decision moves, no text above this line is changed by this section, and the
+correction is one of tense rather than of substance. It was raised in review
+against the request that added the Note above and routed to a follow-up
+rather than cured in place, so the merged artifact stayed the artifact its
+review read. Recorded under campaign 031's fill lane D.
+
+**Read "`sb-dj1p` still owns its advisory" as provenance, not as open work.**
+The Note above closes its third bullet by saying that it does not reach the
+`RQ-026-6` note, because that note "says nothing about how a duration is
+spelled; `sb-dj1p` still owns its advisory". The ownership is real and the
+sentence is right about it: the advisory the `RQ-026-6` note ruled is
+`sb-dj1p`'s, and that bead is where it was decided and built. What "still"
+can be misread as is a bead that is still open. It is not. `sb-dj1p` closed
+on 2026-09-02, merged as PR 219 in campaign 027, and the advisory it carries
+has shipped: the `:emit`-stage finding `{:deadline_lost_on_resume, group_id}`
+raised from `lib/statifier_blocks/compiler.ex`, listed among the reasons
+`Compiler.Finding` documents. Read the sentence as "the advisory is
+`sb-dj1p`'s, landed in PR 219".
+
+**The same reading applies one Note further up.** The `RQ-026-6` note of
+2026-09-02 says "`sb-dj1p` carries the work, filed 2026-09-02 as a
+campaign-027 candidate and not scheduled here". That sentence was true on the
+day it was written and is now a record of what was true then: the bead was
+scheduled, in the campaign that sentence names it a candidate for, and it
+landed. Nothing in either note's argument depends on the bead being open, and
+neither sentence's bytes are edited - a record's history is not edited, and
+this section supersedes from below, in the form the Note above states for its
+own supersession.
+
+Filed with `sb-bkek`, campaign-031's fill lane D.
