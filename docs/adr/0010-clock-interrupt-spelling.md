@@ -442,3 +442,84 @@ that proposes the type is where the question belongs.
 No bead owns that remaining half. Filing one is outside this rider's scope, so
 the deferred-list entry above is left in place and is the standing owner of the
 question, the way the `RQ-026-6` note left its own entry standing.
+
+---
+
+## Note (2026-09-05): the deadline's `delay` is stored in one grammar, and "either of the stored forms" is scoped to its date
+
+A dated Note, the same shape as the two above it. Nothing this record decides
+moves: decision 1's pair stands, a clock interrupt is still a delayed
+`core.send` at the head of the group's `body`, the deadline's duration is still
+that send's `delay`, no block type gains a key, and no line above this one is
+edited.
+
+The sentence this Note scopes is in the 2026-09-02 note immediately above, in
+its second bullet: the deadline's duration is that send's `delay`, "in either
+of the stored forms `core.send` already accepts". That described the shipped
+vocabulary on the day it was written. It no longer describes what a
+`:duration` field accepts, and the reason is a decision taken in another
+record rather than anything this one changed.
+
+### What moved, and where it was decided
+
+ADR-0005's amendment of 2026-09-05 to its decision 9 - clauses 9a through 9e,
+merged at **proposed**, under bead `sb-8acm` - reverses the clause that kept an
+older, calendar-style duration spelling accepted beside the expression
+language's. It reverses it on a fact rather than a preference: the operative
+argument for keeping that spelling was that documents already written hold it,
+and the sweep found no author-written document that does. Clause 9a is the
+operative one here - a `:duration` field reads one grammar, the expression
+language's, and a value that grammar does not parse is a format finding.
+Clause 9c is why there is no second stored form left to name: the intermediate
+canonical spelling the 2026-08-29 arrangement compiled through has no reader
+any more, so the stored string is parsed and rendered straight to the
+attribute the engine reads.
+
+ADR-0002 carries the reach into the `core.send` row. Its dated Note of
+2026-09-05 supersedes **G2a**'s middle clause by reference, so a present
+`delay` is accepted in one spelling and a value in any other is refused like
+any other unparseable string. Decision 7's closed field-type set is untouched
+by that, and `delay` is still an optional `:duration` field holding a string.
+
+**The code has landed.** `sb-4r1p` implemented the pivot and 0.17.0 shipped
+it: a `:duration` field is validated against that one grammar and every other
+spelling is a format finding, and the module both `:duration` fields go
+through - `lib/statifier_blocks/core/duration.ex` - says as much in its own
+moduledoc. So the earlier sentence is not waiting on an acceptance to go
+stale; it is stale as of that release, which is why this Note is dated rather
+than conditional.
+
+### How to read the sentence
+
+Read "in either of the stored forms `core.send` already accepts" as a
+statement about 2026-09-02, and read the rule from this date as: the
+deadline's `delay` is stored in the one form `core.send` accepts, a duration
+string in the expression language's grammar. Everything else in that bullet
+stands exactly as written - `core.wait`'s `duration` and `core.send`'s `delay`
+are still two keys drawing the step-versus-rule distinction, the deadline's
+duration is still the head send's `delay`, no block type gains a key, and
+`after` does not enter the vocabulary. The bullet's bytes are not edited: a
+record's history is not edited, and this section supersedes from below, the
+way ADR-0005's clause 9 says its own earlier prose is superseded.
+
+### What this Note does not do
+
+- It does not touch **decision 1**, or any other decision in this record.
+  Which grammar a stored duration is written in was never something this
+  record decided. It decided that the deadline *is* a `delay`, and it still
+  is.
+- It does not reopen **the third part of the deferred entry** the 2026-09-02
+  note left standing - whether a future type that names a duration must reuse
+  one of the two shipped spellings rather than coin its own. That question is
+  about which *key* a new type names, not which grammar a value is written in,
+  and no such type is proposed. The deferred-list entry above stays its
+  standing owner, exactly as that note left it.
+- It does not reach the **`RQ-026-6` note** above it. That note answers what a
+  deadline means on a `core.resumable_group` after a resume, and it says
+  nothing about how a duration is spelled; `sb-dj1p` still owns its advisory.
+- It does not restate the grammar. Which strings parse, how a fraction
+  expands, how a repeated unit accumulates and what the calendar-approximating
+  units mean are `Predicator.Duration`'s to define, exactly as ADR-0005 clause
+  9e leaves them.
+
+Filed with `sb-pctm`, campaign-030's fill lane D.
