@@ -1030,6 +1030,26 @@ What that sentence deliberately is not:
   those - stays closed. A datamodel-path field is a `:string` that carries one
   more claim about itself; adding a `:path` type would give the editor a second
   control to render for what is textually identical input.
+
+  *[Note added 2026-09-05, with `sb-5v3i` under campaign-031 ruling D31-4.
+  This bullet is reversed, and only this bullet: decision 7's set gains
+  `{:path, opts}` by the amendment of this date at the end of this record.
+  The sentence above is true of the input's bytes and not of what an author
+  can do with them. A `:string` carrying `datamodel_path?: true` gets
+  ADR-0005 clause 11e's undeclared-path advisory and no candidate list; a
+  host block type that never learns the key gets neither, because `:string`
+  is the whole answer the field-type set gives it, and its declaration says
+  nothing is missing. The package's own vocabulary already shows the gap -
+  `core.subchart`'s `assign_to` holds a path as a bare `:string`
+  (`lib/statifier_blocks/core/subchart.ex:197-203`) while `core.assign`'s
+  `path` carries the key (`lib/statifier_blocks/core/assign.ex:73-79`). And the
+  candidates
+  now exist to render: `StatifierBlocks.Datamodel.candidates/3`
+  (`lib/statifier_blocks/datamodel.ex:380-387`) computes them, and what the
+  editor's control table is keyed on is the field type. The `path_kind`
+  bullet below is **not** reversed, and neither is this key withdrawn; the
+  amendment says what the two spellings mean to one another.
+  `core.subchart`'s `assign_to` migrates on `sb-2ym4`.]*
 - **Not a `path_kind` enum.** A boolean is what the ruling admits. There is one
   kind of path today, and an enum would be a vocabulary invented ahead of its
   second member.
@@ -2219,6 +2239,24 @@ here the record is ahead of the palette rather than behind it. A reader who
 finds a fifteen-row table and a thirteen-entry palette is looking at that gap
 and not at drift.
 
+*[Note added 2026-09-05, with `sb-5v3i` under campaign-031 ruling D31-2. Both
+counts moved after this section was written, and neither move is edited into
+it. The palette caught up first: `StatifierBlocks.Palette.core_types/0`
+registers **fifteen** today, not thirteen, because `sb-uag7` landed the two
+modules this section was waiting on - and it registers them at
+`lib/statifier_blocks/palette.ex:117-133`, not at the `:87-103` cited above,
+which the file has since moved past. (ADR-0009's consequences repeat the same
+stale citation, `docs/adr/0009-fan-out-block-type.md:509`; the count there is
+right and only the line range is old.) Then the table ran ahead again: the
+`core.await` row that G14 of this date adds makes the table **sixteen** while
+the palette stays at fifteen until `sb-m0t1` lands that module, which is the
+same kind of gap this section describes and not drift. ADR-0009's
+"`core.map`'s row would be the **sixteenth**"
+(`docs/adr/0009-fan-out-block-type.md:512`) is an ordinal counted from the
+fifteen rows it saw - it names the next row after those - rather than a
+reservation of the sixteenth position against this one, and `core.map` still
+has no row in this table.]*
+
 ### G12. Two placement facts `io/1` cannot carry, and the Structure-stage rule that does
 
 ADR-0003 decision 3 withdrew ADR-0002's one special-cased placement rule and
@@ -2692,3 +2730,385 @@ exports the callback and refuses. The paragraph above that bullet, in the
 same Note, has this exactly right; only the shorthand is loose.
 
 Filed with `sb-a9r8`, campaign-030's fill lane D.
+
+## Amendment (2026-09-05): decision 7, the `{:path, opts}` field type
+
+**Status: proposed (2026-09-05).** Drafted for `sb-5v3i` under the operator
+campaign-031 grant, and merging at proposed under that campaign's invariant
+like every other section filed with it; flipping it to accepted is a separate
+gated request. Additive; decision 7, its 2026-08-27 `value_path` amendment,
+its 2026-08-29 `datamodel_path?` amendment and its 2026-08-29 `sensitive?`
+amendment all stand exactly as written, and no text above this line is edited
+by this section. A dated Note beside the `datamodel_path?` amendment's first
+bullet records that this section reverses it.
+
+### Context
+
+That 2026-08-29 bullet refused a `:path` type on one argument: the input is
+textually identical to a `:string`'s, so a second control would render the
+same box twice. The argument was about bytes, and what has since become
+visible is that identical bytes are not identically authorable.
+
+Two shipped facts make it visible. The first is that the claim rides a key a
+host has to know exists. A host block type whose config holds a datamodel
+path writes `type: :string` and stops, because `:string` is the whole answer
+the field-type set gives it; it then gets no candidate list and no
+undeclared-path advisory, and nothing in its declaration says anything is
+missing. This package's own vocabulary already has that gap in it. Of the
+core fields that hold a path, `core.assign`'s `path`
+(`lib/statifier_blocks/core/assign.ex:73-79`) and `core.foreach`'s `items`
+(`lib/statifier_blocks/core/foreach.ex:174-185`) carry `datamodel_path?:
+true`, and `core.subchart`'s `assign_to`
+(`lib/statifier_blocks/core/subchart.ex:197-203`) is a bare `:string` that
+does not.
+
+The second is that there is now something for a control to offer.
+`StatifierBlocks.Datamodel.candidates/3`
+(`lib/statifier_blocks/datamodel.ex:380-387`) computes the declared paths,
+and ADR-0005 clause 11e fixes what an undeclared one produces. Both hang off
+a field, and the thing the editor's control table is keyed on is the field
+type.
+
+### Decision
+
+**Decision 7's closed field-type set gains an eighth member, `{:path,
+opts}`.** The set is `:string`, `:integer`, `:boolean`, `{:select, choices}`,
+`:expression`, `:duration`, `{:list, field_type}`, and now `{:path, opts}`.
+It is still closed, and this is a widening by one named member rather than an
+opening: the property the closed set exists for is that the editor can draw
+every member, and `{:path, opts}` is the member it can draw best.
+
+A `{:path, opts}` field holds a path into the host's datamodel - exactly the
+claim `datamodel_path?: true` makes about a `:string`. What the type adds is
+that the editor reaches the right control by the field type alone:
+
+- **Candidates.** The control offers `StatifierBlocks.Datamodel.candidates/3`'s
+  result for the document and the host-supplied datamodel. With no datamodel
+  supplied there are no candidates and the control is a plain text input,
+  which is what a `:string` was.
+- **The advisory.** ADR-0005 clause 11e's `:info` finding for an undeclared
+  path stays anchored on the field's `key`, as it already is. This section
+  changes which fields the advisory reaches, not what it says or what it
+  costs.
+
+**`opts` carries no defined key today.** It is the second element of a tuple
+for the reason `{:select, choices}` and `{:list, inner}` have one: so that
+what a control needs can arrive without widening the set a second time. The
+`path_kind` enum the 2026-08-29 amendment refused stays refused, on its own
+argument and unamended - there is still one kind of path, and an enum still
+wants a second member before it is written. Read/write direction, which
+`core.foreach`'s source comment names as inexpressible with a boolean
+(`lib/statifier_blocks/core/foreach.ex:180-183`, quoted in G6), is the first
+candidate for a key on the day a consumer needs one. Until then a declaration
+writes `type: {:path, %{}}`.
+
+**The `datamodel_path?` key is not withdrawn, and the two spellings mean one
+thing.** A field declaring `{:path, opts}` makes the claim the key makes; a
+field declaring `:string` with `datamodel_path?: true` keeps making it, keeps
+its control and keeps its advisory, so every declaration written before this
+section behaves exactly as it did. `StatifierBlocks.BlockType.datamodel_path?/1`
+(`lib/statifier_blocks/block_type.ex:580-582`) is the single reader the
+2026-08-29 amendment put between the claim and its consumers, and reading the
+claim off either spelling is that function's business rather than every
+caller's - which is the reason that amendment gave for having the function at
+all. A declaration carrying both says the same thing twice; it is not a
+finding and not a contradiction.
+
+### What this section does not decide
+
+- **Which fields migrate, and when.** Nothing migrates by this section being
+  accepted. `core.subchart`'s `assign_to` is the one core field that holds a
+  path and declares nothing about it, and it migrates on `sb-2ym4` together
+  with whatever the other path fields do there.
+- **The control's markup.** Whether a candidate list is drawn as a
+  `<datalist>`, through ADR-0005 decision 9's `expression_component` seam, or
+  as something else is ADR-0005's question. `candidates/3`'s own moduledoc
+  already says the shipped answer is a datalist in the meantime, and this
+  section does not move it.
+- **Validation.** `validate_config/1` is still the authority per decision 7,
+  and the schema is still not a validation language. A `{:path, opts}` field
+  whose value is not a declared path produces ADR-0005 clause 11e's advisory
+  and no verdict, which is unchanged.
+- **The record's own typespec appendix is not edited, and neither is the
+  code, yet.** Decision 7's list is written out in three other places. Two are
+  code - `field_type/0` (`lib/statifier_blocks/block_type.ex:146-153`) and the
+  "seven closed `field_type/0` values" sentence in `config_schema/1`'s doc
+  (`:210-212`) - and the code follows the record, so `sb-2ym4` moves both. The
+  third is *The contract as typespecs* above, whose `field_type` union lists
+  the same seven (`:448-455`). That block is this record's snapshot at
+  acceptance and no amendment has edited it since: the `field_decl` map beside
+  it (`:457-463`) still shows neither `value_path` (2026-08-27) nor
+  `datamodel_path?` and `sensitive?` (both 2026-08-29). This section is read
+  into it the same way, by reference, and adds `{:path, opts}` to the union in
+  the reading rather than in the bytes. A reader who finds seven values in
+  either place and eight here is looking at that convention, not at drift.
+
+Filed with `sb-5v3i`, campaign-031's lane H. `sb-2ym4` implements.
+
+## Amendment (2026-09-05): decision 10, the `core.await` row
+
+**Status: proposed (2026-09-05).** Drafted for `sb-5v3i` under the operator
+campaign-031 grant, and merging at proposed under that campaign's invariant;
+flipping it to accepted is a separate gated request. Additive; decision 10's
+original seven-row table stands, the 2026-08-28 amendment's section D stands,
+sections G through G13 stand, and no text above this line is edited by this
+section. Like G9 and G10, this row is written **ahead of the module that will
+answer it**: `sb-m0t1` builds to this record rather than this record being
+read off the build, and the dated Note beside G11 says what the counts are
+while that is true.
+
+### Context
+
+A workflow that has to hold at a step until something outside it happens has
+one spelling in the shipped vocabulary, and it is a `core.group` whose
+`interrupts` slot carries a `core.on_event`. That arrangement is built for an
+interrupt - an event arriving *while* the group's body does other work - and
+a wait is the case where the arriving event is the only thing the step is
+for. The two read differently to an author, and, as G14b works out, they are
+not the same shape to the compiler either.
+
+### G14. `core.await` joins the core vocabulary
+
+| Block type | `slots(config)` | Config schema | `outcomes(config)` | Notes |
+|---|---|---|---|---|
+| `core.await` | `[]` | `event`: `:string`, required, default `""`; `timeout`: `:duration`, optional, default `""` | `received`, `timed_out` | an in-flow leaf that holds until a named event arrives, with an optional deadline; the two outcomes are the two ways it can end |
+
+In full, so a reader need not hold the rest of this section in their head.
+`slots/1` returns `[]` for every config. `config_schema/1` returns the two
+declarations above, in that order, with labels the palette entry's wording
+settles. `validate_config/1` refuses an `event` that is not an event name -
+the same `StatifierBlocks.Core.Config.event_name?/1` check
+(`lib/statifier_blocks/core/config.ex:46`) that `core.on_event` and
+`core.send` already apply - and refuses a present, non-blank `timeout` that
+the duration grammar does not parse; it refuses nothing else. An absent or
+blank `timeout` is "no deadline" and is not a finding, exactly as an absent
+`core.send` `delay` is not one (G2b). `current_version/0` is `1`. `io/1` is
+`%{kinds: [:step]}`, which is `core.wait`'s declaration byte for byte
+(`lib/statifier_blocks/core/wait.ex:100`), leaving `consumes` and `produces`
+to ADR-0003 decision 5's permissive default because awaiting transforms no
+data - and that identity is what "valid wherever `core.wait` is" means.
+
+`timeout` is a `:duration`, so it reads the one grammar the 2026-09-05 Note
+on decision 7 and G2a describes, through the same
+`StatifierBlocks.Core.Duration` pair `core.wait` and `core.send` call. It is
+the **third** declared `:duration` field in the vocabulary, and the two Notes
+of this date above - the one on decision 7 and G2a, and the one on
+decision 8 - each say there is no third. Both are right about the vocabulary
+they were counting, the fifteen rows that existed when they were written, and
+both give the same ground for it: ADR-0010 decision 1 refuses a
+`core.timeout`. That ground is untouched (G14b), and this row is a third
+field they could not have counted rather than a contradiction of either. The
+consequence they draw from the count - that `core.wait`'s `duration` and
+`core.send`'s `delay` are the whole of what the grammar change and the
+`migrate_config/2` work have to reach - stands as written: `core.await` has
+no shipped documents to migrate, and it is authored in the one grammar from
+its first day.
+
+**G14a. What it compiles to, and why its timer cannot outlive it.** A
+compiled `core.await` is a compound state with one waiting child and one
+`<final>` per outcome. The waiting child carries a transition on the
+configured `event` to the `received` outcome's final. When `timeout` holds a
+non-blank duration it also carries an `<onentry>` `<send>` with that delay
+and a generated event name carrying the block id - the shape `core.wait`
+emits (`lib/statifier_blocks/core/wait.ex:194-206`) - and a second transition
+on that generated event to the `timed_out` outcome's final. The exact bytes,
+the state ids and the outcome finals' names are ADR-0004's and `sb-m0t1`'s;
+what this row records is that the type declares the callbacks above.
+
+The send id is minted with `Context.role_id/2` under
+`StatifierBlocks.Compiler.Cancels.armed_role/0`
+(`lib/statifier_blocks/compiler/cancels.ex:140`), which is exactly how
+`core.wait` mints its own (`lib/statifier_blocks/core/wait.ex:195`). That is
+the whole of the timer's lifetime story, and it is inherited rather than
+built: `Compiler.Cancels.arm/2` (`:153`) already reaches every armed send a
+scope's direct children minted and cancels it in the scope's `<onexit>`, so
+an await left before its deadline - because the awaited event arrived,
+because an interrupt fired, because a losing `complete: first` lane exited,
+because a group was abandoned - leaves no timer behind. An await with no
+`timeout` arms nothing, and there is nothing to cancel. Nothing in
+`Compiler.Cancels` changes for this row.
+
+**G14b. Why this is a row and not an arrangement.** ADR-0010 decision 1
+states the vocabulary's admission test in its sharpest form: a type whose
+whole content is a spelling of an arrangement the vocabulary already
+expresses does not join the vocabulary. A clock interrupt failed that test,
+because the `core.send` and `core.on_event` pair already expresses it. This
+row passes it, on the mechanism-shaped reading ADR-0009 used for `core.map`.
+
+The nearest arrangement is a `core.group` whose `interrupts` rail carries a
+`core.on_event` for the awaited event with `outcome: "abandon"`, plus - for
+the deadline - the deadline recipe's head-of-body `core.send` and a second
+`core.on_event` for the timer event. It does not express the row above, and
+the reason is one fact about what a handler compiles to: a handler's outcome
+word becomes one of exactly two package-owned events,
+`statifier_blocks.interrupt.abandon` and `statifier_blocks.interrupt.resume`
+(`StatifierBlocks.Core.Emit.interrupt_events/0`,
+`lib/statifier_blocks/core/emit.ex:77-78`), and the enclosing group
+transitions on those. Neither `core.group` nor `core.resumable_group`
+declares `outcomes/1` at all, so both take section A's default and finish
+with the single outcome `done`. Two `abandon` handlers on one rail are
+therefore indistinguishable to everything downstream of the group: the seam
+an author would wire `received` and `timed_out` into does not exist there,
+and no quantity of additional blocks produces it. `core.await` declares the
+two outcomes directly, which is the mechanism the arrangement is missing -
+the same test `core.map` passed when no arrangement of the fifteen could
+start N children.
+
+This does not reopen `core.timeout`, and ADR-0010's decision 1 is untouched.
+A clock interrupt is a deadline on *other work* running inside a group, and
+the pair is still its spelling; an await's `timeout` is a deadline on the
+await itself, which has no other work to interrupt. ADR-0010's "no row is
+added to ADR-0002 decision 10's vocabulary table" is that record's statement
+about its own case, not a freeze on the table, and the counts it quotes are
+reached by the Note beside G11.
+
+**G14c. `core.await` and `core.wait` are one word apart, and this section
+says which is which rather than renaming either.** A `core.wait` holds for a
+duration and ends one way; a `core.await` holds for an event and ends one of
+two ways, one of which may be a duration elapsing. The names are close
+because the things are close, and the record's own convention where two names
+could be confused is G10a-i's: say which is meant rather than avoid the word.
+Where either could be read, this record says *a wait* for the duration leaf
+and *an await* for this row, and never lets an unqualified verb carry the
+difference. Renaming `core.wait` is not on the table: it is a
+shipped type in shipped documents, and ADR-0001 decision 4 makes a type name
+part of the stored bytes.
+
+**G14d. One thing this row deliberately leaves to `sb-m0t1`: the outcome list
+when no `timeout` is stored.** The row declares `received` and `timed_out`,
+which is what the ruling says. `outcomes/1` takes `config` for exactly this
+kind of question - `core.subchart`'s outcome list is config-derived already
+(G5) - so two answers are available and this section picks neither, because
+the ruling did not.
+
+- Return both outcomes always. Simplest, and an author's wiring survives
+  toggling the deadline off and on; the cost is a `timed_out` seam on an
+  await that can never take it, which ADR-0004's totality then has to emit
+  something for.
+- Return `["received"]` when `timeout` is blank and both when it is not. No
+  unreachable seam; the cost is that clearing the `timeout` field silently
+  removes a seam an author had already wired, which is the failure decision
+  6's `slots/1` stability rule exists to avoid on the slot side.
+
+`sb-m0t1` decides it against the compiler and records the answer as a dated
+Note here. Neither answer changes any other claim in this section.
+
+Filed with `sb-5v3i`, campaign-031's lane H. `sb-m0t1` implements.
+
+## Note (2026-09-05): `core.on_event` takes an optional `capture`
+
+A dated Note rather than an amendment, recorded for `sb-5v3i` under
+campaign-031 ruling D31-3 and in the same form the 2026-08-31 Note above used
+for `cond`: one optional field on a type this record already ships, and the
+reason it belongs on the interrupt transition rather than on a `core.assign`
+after it. The record's Status is untouched, no document authored without the
+key compiles differently, and the vocabulary does not grow. Recorded ahead of
+the code; it merges at proposed under the campaign invariant, `sb-0q0z`
+implements, and no section above this line is edited.
+
+### What the type carries now
+
+Decision 10's table gives `core.on_event` two config fields, `event` and
+`outcome`; the 2026-08-31 Note above declared a third, `cond`. It now
+declares a fourth:
+
+| Field | Type | Required? | Means |
+|---|---|---|---|
+| `capture` | a map, and not one of decision 7's field types - see below | no, default `%{}` | each pair writes one value out of the firing event's payload into the datamodel: the key is the datamodel path written, the value is the `_event.data` path read |
+
+The direction is worth stating twice because a path-to-path map reads either
+way: **the key is the destination** (a datamodel path, the thing the
+2026-09-05 `{:path, opts}` amendment above is about) and **the value is the
+source** (a path inside `_event.data`). A `capture` of
+`%{"order.cancel_reason" => "reason"}` on a handler for `order.cancelled`
+writes that event's `reason` into `order.cancel_reason`.
+
+What is emitted is one `<assign>` per pair, on the transition the handler
+already emits, **before** the `<raise>` that carries the outcome:
+
+    <transition event="order.cancelled" target="s_INT__done">
+      <assign expr="_event.data.reason" location="order.cancel_reason"/>
+      <raise event="statifier_blocks.interrupt.abandon"/>
+    </transition>
+
+The pairs are emitted in their datamodel paths' sorted order. A map has no
+order of its own and a compile has to be deterministic, so the record fixes
+one rather than leaving the bytes to a map's iteration.
+
+A handler whose `capture` is absent or empty writes no `<assign>` at all,
+which is what makes this key additive in the way `cond` was: every document
+authored before it existed compiles to the bytes it compiled to before.
+
+### Why the assigns are on the transition and before the raise
+
+The 2026-08-31 Note put `cond` on this transition for a reason about *when* a
+condition is read, and the same fact places these assigns. The `<raise>` is
+what tells the enclosing group to abandon or resume; by the time control is
+anywhere else, that has happened. On `abandon` the group's body is gone and
+the handler's own body may never run; on `resume` the body is re-entered and,
+on a `core.resumable_group`, history decides where - so neither outcome
+leaves a place after the raise where the payload is reliably still in hand.
+
+`_event.data` is only in scope for the transition the event selected, which
+is the other half of it. A `core.assign` placed after the handler is a
+separate microstep with a different `_event`, so the payload is not merely
+awkward to reach there, it is gone. That is why this is a key on the handler
+and not an arrangement of two blocks, and it is the same argument the `cond`
+Note made against a `core.branch` after the fact.
+
+### The two failure shapes, and the one that is dormant
+
+Neither an unwritten path nor a missing payload key is allowed to become a
+silent `nil` in the datamodel - a captured value that quietly is not there is
+the failure this Note exists to prevent, because everything downstream reads
+it as an authored absence.
+
+- **At run, an undeclared source path raises `error.execution`.** An
+  `<assign>` whose `expr` does not resolve is an execution error in the
+  interpreter, on the platform's own error event, and nothing about this
+  Note's compiled form suppresses it.
+- **At compile, a declared payload that lacks a named source path is a
+  `:config` finding**, anchored on the `capture` key, naming the pair.
+
+The second is **dormant today, and this Note says so rather than implying a
+surface that exists.** Nothing in this package declares an event payload's
+shape. The `:declare` compile option and `StatifierBlocks.Declarations`
+declare the document's datamodel `<data>` roots, not event payloads, and
+`fixtures/0`'s example payload is not a declaration either: it is one sample
+per event name for a palette panel, its own doc calls the event name "an
+example, not this block's configured `event`", and decision 9 marks the whole
+callback PROVISIONAL (`lib/statifier_blocks/core/on_event.ex:208-232`). So
+the `:config` branch is written here for the day a payload declaration
+exists, and until then the run-time branch is the one that fires. What
+`fixtures/0` **is** good for is the panel: it is where a `capture` control
+gets its candidate source keys, which is a rendering affordance and not a
+verdict.
+
+### What this Note does not change, and what it leaves open
+
+- **Decision 7's field-type set is untouched by this Note.** It grows by one
+  member on this date, but by the amendment above and for `{:path, opts}`;
+  `capture` is a map, no member of the set describes a map, and this Note
+  does not add one. `core.on_event`'s `config_schema/1` therefore declares no
+  field for `capture` yet, and how an author writes the pairs - a repeated
+  two-control row, something else - is ADR-0005's question and `sb-0q0z`'s.
+  Named here rather than guessed, in decision 11 and section F's habit.
+- **The interpreter's behaviour on an unresolvable `expr` is statifier-ex's
+  contract, not this record's.** This Note states what the compiled form must
+  produce - an error, never a silent write - and `sb-0q0z` confirms the
+  interpreter already produces it before relying on it. If it does not, that
+  is an upstream question and not a licence to write `nil`.
+- **The outcome words.** Still `"abandon"` and `"resume"`, still the pair
+  ratified 2026-08-27, and a third still costs a `current_version/0` bump.
+  `capture` is orthogonal to both: it runs before the raise whichever word
+  the raise carries.
+- **`cond`.** A guarded handler that does not fire captures nothing, because
+  the assigns are on the transition the guard is on. No ordering question
+  arises between the two keys.
+- **The size of the core vocabulary.** No type is added by this Note; the row
+  added on this date is `core.await`'s, in the amendment above.
+- **The document schema.** ADR-0001 owns the stored bytes and
+  `schema_version` stays at `1`. An optional key inside a block's `config`
+  object is a block-type contract, which is this record's.
+
+Filed with `sb-5v3i`, campaign-031's lane H. `sb-0q0z` implements.
