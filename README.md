@@ -781,6 +781,78 @@ Underneath the component is a pure command algebra - `StatifierBlocks.Edit`
 that wants to drive document edits from something other than this editor uses
 those directly.
 
+### With statifier_ui
+
+[statifier_ui](https://github.com/riddler/statifier-ui) is an **optional**
+dependency of this package, declared `{:statifier_ui, "~> 0.4", optional: true}`
+beside `phoenix_live_view` and optional in the same sense: its only consumer is
+a LiveView component, so a tree with no editor in it would be resolving a
+package nothing there can call. Nothing adds it for you, nothing warns at
+compile time when it is absent, and the resolution is a runtime
+`Code.ensure_loaded?/1` plus `function_exported?/3` against the module named by
+`:statifier_blocks, :expression_component_module`, which defaults to
+`StatifierUI.Live.ExpressionInput`.
+
+What it buys is one surface: the control an `:expression` config field renders.
+If you want that control, there are two steps, and each is a *second* one
+beside a step you have already taken above.
+
+**1. A second `file:` entry.** statifier-ui ships its JavaScript as source too
+(statifier-ui `docs/adr/0009-javascript-ships-as-source.md`), so on the npm
+route its dependency sits beside this package's, and both point at the
+package's `assets/` directory:
+
+```json
+{
+  "dependencies": {
+    "statifier_blocks": "file:../deps/statifier_blocks/assets",
+    "statifier_ui": "file:../deps/statifier_ui/assets"
+  }
+}
+```
+
+That record documents this route and no other; statifier-ui's
+`assets/package.json` names `js/index.js` as the entry point, which is the file
+any other specifier would have to reach.
+
+**2. A second hook registration.** The two packages' hooks are separate
+objects, and registering one does not register the other. Spread both:
+
+```javascript
+import StatifierBlocks from "statifier_blocks";
+import { StatifierUIHooks } from "statifier_ui";
+
+let liveSocket = new LiveSocket("/live", Socket, {
+  hooks: { ...StatifierBlocks, ...StatifierUIHooks },
+});
+```
+
+`StatifierUIHooks` is `StatifierUIExpressionInput` and
+`StatifierUIExpressionPicklist`, keyed by the names statifier-ui's component
+renders; a host that wants one of them imports it by name instead. Hook names
+and export names are public API under ADR-0009, the same as an exported
+function.
+
+**What degrades without them.** Only the `:expression` field moves. The three
+states, in order:
+
+| State | An `:expression` field renders |
+|---|---|
+| no `statifier_ui` on the load path | the plain source input this package has always rendered, with a `<datalist>` of the declared datamodel paths - clause 3 of the ordering `StatifierBlocks.Editor.Field` documents |
+| `statifier_ui` resolves, hooks not registered | statifier-ui's own component, since this package passes it no `hook` assign and its attributes take their shipped defaults - but the JavaScript those `phx-hook` names refer to is not in your bundle, so nothing upgrades the field: no caret-aware completion list, and the picklist controls have nothing to write the expression source with |
+| `statifier_ui` resolves and its hooks are registered | picklists of field, operator and value while the source is inside the subset predicator can round-trip, a text input over everything else, and caret-aware completion over the declared paths |
+
+Nothing else in the editor changes across those three rows. The canvas, the
+palette, the drawer and its tabs, findings, the undo history, the compiler and
+this package's own two hooks call no function from statifier-ui: across `lib/`
+a `StatifierUI` module is reached in exactly one place, as the default value of
+the config key above. Without `phoenix_live_view` the question does not arise at all, because
+no editor module compiles.
+
+An `expression_component` you pass still wins over every row: the host's own
+control is clause 1, and it is the answer whether or not `statifier_ui` is
+present.
+
 ### What the mounted component holds
 
 The `document` you pass in, an undo history over it, the current selection,
