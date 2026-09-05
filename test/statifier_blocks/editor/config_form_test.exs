@@ -19,6 +19,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use StatifierBlocks.EditorLiveCase
 
+    alias StatifierBlocks.CoreFixtures
     alias StatifierBlocks.Editor.ConfigForm
     alias StatifierBlocks.ViewModel
 
@@ -309,10 +310,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         html =
           view
-          |> form(~s(#sb-form-blk_email_step), %{"config" => %{"duration" => "PT45M"}})
+          |> form(~s(#sb-form-blk_email_step), %{"config" => %{"duration" => "45m"}})
           |> render_change()
 
-        assert config(latest_document(), "blk_email_step") == %{"duration" => "PT45M"}
+        assert config(latest_document(), "blk_email_step") == %{"duration" => "45m"}
         refute html =~ "must be a duration"
       end
 
@@ -325,7 +326,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         view
         |> form(~s(#sb-form-blk_email_step), %{
-          "config" => %{"duration" => "PT45M"}
+          "config" => %{"duration" => "45m"}
         })
         |> render_change()
 
@@ -406,7 +407,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 ]
               },
               slots: %{
-                "arm_second" => [EditorFixtures.wait("blk_second_step", "PT5M")],
+                "arm_second" => [EditorFixtures.wait("blk_second_step", "5m")],
                 "otherwise" => []
               }
             ),
@@ -423,17 +424,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     describe "a :duration control" do
       # The amendment's "the stored form is the author's string verbatim".
-      # `core.send` is the block type that reads both spellings today, so it
-      # is what a predicator string can be committed through.
+      # `3h2h` is the witness: it normalises to `5h` at emit time, so a
+      # control that canonicalised on the way in would store the wrong
+      # bytes.
       #
-      # Sabotage: canonicalised the typed value through `Core.Duration.to_iso/1`
-      # in `Field.decode/2` -> `1h30m` was stored as `PT1H30M` and the second
-      # assertion went red (verified).
-      test "stores the author's string verbatim, in either spelling", %{conn: conn} do
+      # Sabotage: normalised the typed value through `Core.Duration` in
+      # `Field.decode/2` -> `3h2h` was stored as `5h` and the assertion
+      # went red (verified).
+      test "stores the author's string verbatim, whatever it normalises to", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn, document: sending_document())
         view = select(view, "blk_abandon")
 
-        for typed <- ["1h30m", "PT2H", "3d8h"] do
+        for typed <- ["1h30m", "2h", "3d8h", "3h2h", "1.5s"] do
           view
           |> form(~s(#sb-form-blk_abandon), %{"config" => %{"delay" => typed}})
           |> render_change()
@@ -455,52 +457,70 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> render_change()
 
         assert config(latest_document(), "blk_abandon") == %{"event" => "signup.abandoned"},
-               "a cleared duration is an absent key, not PT0S and not an empty string"
+               "a cleared duration is an absent key, not a zero and not an empty string"
 
         assert has_element?(view, ~s(input[name="config[delay]"][value=""])),
                "and a never-set field renders exactly as the cleared one does"
       end
 
       # The inline check is EARLIER than decision 9's gate, not a second one:
-      # it says which spelling the author is failing while they are still
-      # typing, and the gate still decides what reaches the document.
+      # it tells the author the text is not a duration while they are still
+      # typing, and the gate still decides what reaches the document. Clause
+      # 9d is why there is one sentence rather than a family of them: with
+      # one grammar there is one thing to be wrong about, and the sentence
+      # names what is accepted rather than what was retired.
       #
       # Sabotage: dropped the refusal paragraph from `Field.control/1` -> the
       # sentence never rendered, this test went red on its first case, and the
       # gate's own refusal stayed green beside it (verified).
-      test "refuses a bad format inline, with the limit that was hit", %{conn: conn} do
+      test "refuses a bad format inline, naming only what is accepted", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn, document: sending_document())
         view = select(view, "blk_abandon")
 
-        for {typed, sentence} <- [
-              {"soon", "Not a duration. Try 30s, 15m, 1h30m, 2d, 3d8h"},
-              {"500ms", "Milliseconds are not stored here"},
-              {"1.5s", "leaves milliseconds"}
-            ] do
+        for typed <- ["soon", "2dx", "60"] ++ CoreFixtures.retired_durations() do
           html =
             view
             |> form(~s(#sb-form-blk_abandon), %{"config" => %{"delay" => typed}})
             |> render_change()
 
-          assert html =~ sentence, typed
+          assert html =~ "Not a duration. Try 30s, 15m, 1h30m, 2d, 3d8h.", typed
           assert html =~ ~s(data-duration-refusal), typed
         end
       end
 
-      # Sabotage: hard-coded the control's `value` to `""` -> the stored `P1Y`
+      # The two spellings the retired intermediate form could not express
+      # are accepted now, and the control shows no refusal for either.
+      #
+      # Sabotage: reinstated the sub-second refusal in `DurationInput` ->
+      # both values below grew a refusal paragraph (verified).
+      test "a sub-second or fractional duration is accepted inline", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: sending_document())
+        view = select(view, "blk_abandon")
+
+        for typed <- ["500ms", "1.5s"] do
+          html =
+            view
+            |> form(~s(#sb-form-blk_abandon), %{"config" => %{"delay" => typed}})
+            |> render_change()
+
+          refute html =~ ~s(data-duration-refusal), typed
+        end
+      end
+
+      # Sabotage: hard-coded the control's `value` to `""` -> the stored `1y`
       # vanished from the form rather than being shown, and 3 tests went red
       # including this one (verified).
       test "a stored duration the control did not author is still shown", %{conn: conn} do
         document =
           Document.new(
-            Block.new("core.wait", id: "blk_odd", config: %{"duration" => "P1Y"}),
+            Block.new("core.wait", id: "blk_odd", config: %{"duration" => "1y"}),
             id: "doc_odd"
           )
 
         {:ok, view, _html} = mount_editor(conn, document: document)
         view = select(view, "blk_odd")
 
-        assert has_element?(view, ~s(input[name="config[duration]"][value="P1Y"]))
+        assert has_element?(view, ~s(input[name="config[duration]"][value="1y"]))
         refute has_element?(view, ~s(input[name="config[duration][value]"]))
       end
     end
@@ -509,37 +529,37 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # Sabotage: `decode/2` keying off the params rather than the schema - the
       # injected key would land in the config.
       test "carries the base config forward, so an unschema'd key is not deleted" do
-        fields = [field("duration", :duration, "PT1H")]
-        base = %{"duration" => "PT1H", "arms" => [%{"slot" => "arm_b", "cond" => "x"}]}
-        params = %{"config" => %{"duration" => "PT5M"}}
+        fields = [field("duration", :duration, "1h")]
+        base = %{"duration" => "1h", "arms" => [%{"slot" => "arm_b", "cond" => "x"}]}
+        params = %{"config" => %{"duration" => "5m"}}
 
         assert ConfigForm.decode(fields, params, base) == %{
-                 "duration" => "PT5M",
+                 "duration" => "5m",
                  "arms" => [%{"slot" => "arm_b", "cond" => "x"}]
                }
       end
 
       test "is keyed off the schema, so a param the schema does not name cannot land" do
-        fields = [field("duration", :duration, "PT1H")]
+        fields = [field("duration", :duration, "1h")]
 
         params = %{
           "config" => %{
-            "duration" => "PT5M",
+            "duration" => "5m",
             "injected" => "not a field"
           }
         }
 
-        assert ConfigForm.decode(fields, params, %{}) == %{"duration" => "PT5M"}
+        assert ConfigForm.decode(fields, params, %{}) == %{"duration" => "5m"}
       end
 
       # Sabotage: `decode/2`'s `:error` arm falling back to the field's default
       # rather than its current value - a control that did not post would reset.
       test "a field whose control did not post keeps the value it already had" do
-        fields = [field("duration", :duration, "PT2H"), field("label", :string, "Welcome")]
-        params = %{"config" => %{"duration" => "PT5M"}}
+        fields = [field("duration", :duration, "2h"), field("label", :string, "Welcome")]
+        params = %{"config" => %{"duration" => "5m"}}
 
         assert ConfigForm.decode(fields, params, %{}) == %{
-                 "duration" => "PT5M",
+                 "duration" => "5m",
                  "label" => "Welcome"
                }
       end
@@ -609,8 +629,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # duration landed as `""` and 4 tests went red, this file's two other
       # omission cases among them (verified).
       test "an empty duration deletes its key rather than storing an emptiness" do
-        fields = [field("delay", :duration, "PT1H")]
-        base = %{"event" => "signup.abandoned", "delay" => "PT1H"}
+        fields = [field("delay", :duration, "1h")]
+        base = %{"event" => "signup.abandoned", "delay" => "1h"}
 
         assert ConfigForm.decode(fields, %{"config" => %{"delay" => ""}}, base) ==
                  %{"event" => "signup.abandoned"}
@@ -627,15 +647,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # top-level key of the same name would be silent data loss beside the
       # value the author actually cleared.
       test "a nested duration deletes only its own key at its own path" do
-        fields = [field("arm_wait", :duration, "PT1H", ["arms", 0, "delay"])]
-        base = %{"delay" => "PT9H", "arms" => [%{"slot" => "arm_b", "delay" => "PT1H"}]}
+        fields = [field("arm_wait", :duration, "1h", ["arms", 0, "delay"])]
+        base = %{"delay" => "9h", "arms" => [%{"slot" => "arm_b", "delay" => "1h"}]}
 
         assert ConfigForm.decode(fields, %{"config" => %{"arm_wait" => ""}}, base) ==
-                 %{"delay" => "PT9H", "arms" => [%{"slot" => "arm_b"}]}
+                 %{"delay" => "9h", "arms" => [%{"slot" => "arm_b"}]}
       end
 
       test "a path naming something that is not there leaves the config alone" do
-        fields = [field("arm_wait", :duration, "PT1H", ["arms", 3, "delay"])]
+        fields = [field("arm_wait", :duration, "1h", ["arms", 3, "delay"])]
 
         assert ConfigForm.decode(fields, %{"config" => %{"arm_wait" => ""}}, %{"other" => 1}) ==
                  %{"other" => 1}

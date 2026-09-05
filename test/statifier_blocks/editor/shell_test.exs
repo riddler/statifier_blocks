@@ -624,7 +624,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # from it. The signup wizard cannot serve here: its unresolvable block
     # always derives a `:resolution` finding, which is decision 12 working.
     defp unremarkable_document do
-      Document.new(EditorFixtures.wait("blk_only", "PT1H"), id: "doc_one_step")
+      Document.new(EditorFixtures.wait("blk_only", "1h"), id: "doc_one_step")
     end
   end
 end

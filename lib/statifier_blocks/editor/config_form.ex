@@ -151,7 +151,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     An empty `:duration` **omits its key** rather than storing `""`
     (ADR-0005 decision 9, amended 2026-08-29). A cleared field and a
-    never-set field are the same value - there is no `PT0S` and no third
+    never-set field are the same value - there is no zero-duration
+    stand-in and no third
     state for "the author touched this and then did not finish" - so the
     two have to produce the same config, and the only config an absent key
     can produce is one without the key.

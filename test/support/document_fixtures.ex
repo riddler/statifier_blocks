@@ -51,7 +51,7 @@ defmodule StatifierBlocks.DocumentFixtures do
     wait =
       Block.new("core.wait",
         id: "blk_WAI",
-        config: %{"duration" => "PT48H"}
+        config: %{"duration" => "48h"}
       )
 
     notify_receipt =
@@ -113,7 +113,7 @@ defmodule StatifierBlocks.DocumentFixtures do
         id: "blk_AUTH",
         type_version: 2,
         # Reverse-sorted vs. the canonical `invoke_type, timeout` output.
-        config: %{"timeout" => "PT30S", "invoke_type" => "myapp:authorize"}
+        config: %{"timeout" => "30s", "invoke_type" => "myapp:authorize"}
       )
 
     root =

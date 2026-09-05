@@ -273,7 +273,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       test "a document with nothing wrong with it says so", %{conn: conn} do
         # Not the wizard: its unresolvable block always derives a `:resolution`
         # finding, which is decision 12 working rather than a defect.
-        document = Document.new(EditorFixtures.wait("blk_only", "PT1H"), id: "doc_one_step")
+        document = Document.new(EditorFixtures.wait("blk_only", "1h"), id: "doc_one_step")
         {:ok, view, _html} = mount_editor(conn, document: document)
         html = open_findings(view)
 

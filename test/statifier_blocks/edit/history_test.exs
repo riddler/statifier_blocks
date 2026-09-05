@@ -18,8 +18,8 @@ defmodule StatifierBlocks.Edit.HistoryTest do
   #     arm_variant_a: [blk_CTA_A]
   #     otherwise:      [blk_CTA_B]
   defp signup_wizard do
-    cta_a = Block.new("core.wait", id: "blk_CTA_A", config: %{"duration" => "PT1S"})
-    cta_b = Block.new("core.wait", id: "blk_CTA_B", config: %{"duration" => "PT1S"})
+    cta_a = Block.new("core.wait", id: "blk_CTA_A", config: %{"duration" => "1s"})
+    cta_b = Block.new("core.wait", id: "blk_CTA_B", config: %{"duration" => "1s"})
 
     variant =
       Block.new("core.branch",
@@ -28,8 +28,8 @@ defmodule StatifierBlocks.Edit.HistoryTest do
         slots: %{"arm_variant_a" => [cta_a], "otherwise" => [cta_b]}
       )
 
-    landing = Block.new("core.wait", id: "blk_LANDING", config: %{"duration" => "PT1S"})
-    welcome = Block.new("core.wait", id: "blk_WELCOME", config: %{"duration" => "PT1S"})
+    landing = Block.new("core.wait", id: "blk_LANDING", config: %{"duration" => "1s"})
+    welcome = Block.new("core.wait", id: "blk_WELCOME", config: %{"duration" => "1s"})
 
     root =
       Block.new("core.sequence",
@@ -63,7 +63,7 @@ defmodule StatifierBlocks.Edit.HistoryTest do
     test "applies the command, pushes its inverse, clears redo" do
       document = signup_wizard()
       history = History.new()
-      new_step = Block.new("core.wait", id: "blk_NEW", config: %{"duration" => "PT1S"})
+      new_step = Block.new("core.wait", id: "blk_NEW", config: %{"duration" => "1s"})
       command = {:insert, {"blk_ROOT", "body", 0}, new_step}
 
       assert {:ok, history, updated} = History.commit(history, palette(), document, command)
@@ -81,8 +81,8 @@ defmodule StatifierBlocks.Edit.HistoryTest do
     test "a fresh commit clears whatever redo/3 would have replayed" do
       document = signup_wizard()
       history = History.new()
-      command1 = {:update_config, "blk_LANDING", %{"duration" => "PT9S"}}
-      command2 = {:update_config, "blk_WELCOME", %{"duration" => "PT8S"}}
+      command1 = {:update_config, "blk_LANDING", %{"duration" => "9s"}}
+      command2 = {:update_config, "blk_WELCOME", %{"duration" => "8s"}}
 
       assert {:ok, history, doc1} = History.commit(history, palette(), document, command1)
       assert {:ok, history, _doc1_undone} = History.undo(history, palette(), doc1)
@@ -184,7 +184,7 @@ defmodule StatifierBlocks.Edit.HistoryTest do
       history = History.new()
 
       commands = [
-        {:update_config, "blk_LANDING", %{"duration" => "PT2S"}},
+        {:update_config, "blk_LANDING", %{"duration" => "2s"}},
         {:move, "blk_WELCOME", {"blk_ROOT", "body", 0}},
         {:remove, "blk_CTA_B"}
       ]
@@ -285,9 +285,9 @@ defmodule StatifierBlocks.Edit.HistoryTest do
       history = History.new(limit: 2)
 
       commands = [
-        {:update_config, "blk_LANDING", %{"duration" => "PT2S"}},
-        {:update_config, "blk_WELCOME", %{"duration" => "PT3S"}},
-        {:update_config, "blk_CTA_A", %{"duration" => "PT4S"}}
+        {:update_config, "blk_LANDING", %{"duration" => "2s"}},
+        {:update_config, "blk_WELCOME", %{"duration" => "3s"}},
+        {:update_config, "blk_CTA_A", %{"duration" => "4s"}}
       ]
 
       {history, _final} =
@@ -299,8 +299,8 @@ defmodule StatifierBlocks.Edit.HistoryTest do
       assert length(history.undo) == 2
 
       assert history.undo == [
-               {:update_config, "blk_CTA_A", %{"duration" => "PT1S"}},
-               {:update_config, "blk_WELCOME", %{"duration" => "PT1S"}}
+               {:update_config, "blk_CTA_A", %{"duration" => "1s"}},
+               {:update_config, "blk_WELCOME", %{"duration" => "1s"}}
              ]
     end
   end
@@ -316,7 +316,7 @@ defmodule StatifierBlocks.Edit.HistoryTest do
       refute History.can_undo?(history)
       refute History.can_redo?(history)
 
-      command = {:update_config, "blk_LANDING", %{"duration" => "PT2S"}}
+      command = {:update_config, "blk_LANDING", %{"duration" => "2s"}}
       assert {:ok, history, updated} = History.commit(history, palette(), document, command)
       assert History.can_undo?(history)
       refute History.can_redo?(history)

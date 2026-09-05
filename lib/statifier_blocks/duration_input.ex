@@ -2,12 +2,12 @@ defmodule StatifierBlocks.DurationInput do
   @moduledoc """
   The `:duration` control's reading of the text an author typed.
 
-  ADR-0005 decision 9, as amended 2026-08-29 (the `:duration` control,
-  predicator strings primary), renders `:duration` as **one text control**:
+  ADR-0005 decision 9, as amended 2026-08-29 and again 2026-09-05 (clause
+  9a, one grammar), renders `:duration` as **one text control**:
 
   | Field type | Rendering |
   |---|---|
-  | `:duration` | one text control; predicator duration strings primary, with on-screen examples |
+  | `:duration` | one text control; duration strings the expression language reads, with on-screen examples |
 
   The amendment's terms are the whole of this module's job. Each one is a
   function of the typed text and nothing else, which is why the reading
@@ -16,47 +16,41 @@ defmodule StatifierBlocks.DurationInput do
   `StatifierBlocks.Finding.severity_class/1`, and ADR-0005 decision 1's
   namespace boundary is what makes that a property rather than a habit.
 
-  ## The four readings, and what each one means to the form
+  ## The three readings, and what each one means to the form
 
     * `:empty` - the key is **omitted**. A cleared field and a never-set
-      field are the same value: there is no `PT0S` and no third state for
-      "the author touched this and then did not finish", so both read
-      `:empty` and both leave the key out of config. `StatifierBlocks.Editor.ConfigForm`
-      is where the omission is performed, because that is the module that
-      decides where a decoded value is written.
-    * `:predicator` - a duration string a person types (`1h30m`, `3d8h`),
-      which the amendment makes the primary input.
-    * `:iso` - ISO-8601 (`PT1H30M`), still accepted because it is the
-      spelling ADR-0001 decision 6 already admits into config and the one
-      existing documents hold. A field that refused it would refuse values
-      already written.
+      field are the same value: there is no zero-duration stand-in and no
+      third state for "the author touched this and then did not finish",
+      so both read `:empty` and both leave the key out of config.
+      `StatifierBlocks.Editor.ConfigForm` is where the omission is
+      performed, because that is the module that decides where a decoded
+      value is written.
+    * `:duration` - a duration string a person types (`30s`, `1h30m`,
+      `3d8h`), which is the only form a `:duration` field accepts.
     * `:invalid` - carries the sentence the field shows instead of
       offering an edit at all.
 
-  The two valid readings differ only in what the author typed. **The
-  stored form is the author's string verbatim** - nothing here
-  canonicalises on the way in, and `iso` is a projection for the caller
-  that wants one, not a value to write back.
+  **The stored form is the author's string verbatim** - nothing here
+  canonicalises on the way in, and `duration` is a projection for the
+  caller that wants the normalised value, not something to write back.
 
   ## Acceptance is `StatifierBlocks.Core.Duration`, exactly
 
   This module decides nothing about which strings are durations. It asks
-  `StatifierBlocks.Core.Duration.to_iso/1`, which asks
+  `StatifierBlocks.Core.Duration.parse/1`, which asks
   `Predicator.Duration.parse/1`, which owns the grammar. The amendment is
   explicit about why: "A grammar restated here would be a second opinion
   that drifts."
 
   That is a deliberate difference from the spike control this graduates
-  (`sb-709`, `spike/js/panes.js`), which refused a strict subset -
-  milliseconds, fractional components and repeated units alike. Two of
-  those three refusals do not survive the amendment. A fraction that
-  normalises into whole ISO components (`1.5h` is `PT1H30M`) and a
-  repeated unit that accumulates (`3h2h` is `PT5H`) are both things the
-  amendment names as predicator's to define, and `Core.Duration` compiles
-  both, so refusing them here would be the second opinion. Milliseconds
-  are the one refusal that stays, because it is a fact about the ISO
-  pivot rather than a reading of the grammar: ISO-8601 has no millisecond
-  component, so `500ms` and `1.5s` have no canonical form to compile to.
+  (`sb-709`, `spike/js/panes.js`), which refused a strict subset - a
+  sub-second unit, fractional components and repeated units alike. None
+  of those three refusals survives. A fraction that normalises into whole
+  components (`1.5h` is an hour and a half), a repeated unit that
+  accumulates (`3h2h` is five hours) and a sub-second value (`500ms`) are
+  all things the amendment names as the grammar's to define, and
+  `Core.Duration` compiles all three, so refusing any of them here would
+  be the second opinion.
 
   ## Nothing is trimmed
 
@@ -66,14 +60,15 @@ defmodule StatifierBlocks.DurationInput do
   same bytes - the inline check would pass a value the gate then refuses,
   which is the one failure a per-field check exists to prevent.
 
-  ## Why the refusal is three sentences and not one
+  ## The refusal says what is accepted, and stops there
 
-  "Not a duration" is true of `soon` and of `500ms` alike, and the second
-  is a person who knows the grammar hitting the pivot's limit. Telling
-  them which of the two they hit is the difference between a form that
-  teaches and a form that sulks. The three messages are this module's;
-  the type-level messages that `StatifierBlocks.Core.Send` and
-  `StatifierBlocks.Core.Wait` attach to a stored value are theirs.
+  One grammar means one thing can be wrong: the text is not a duration.
+  The message names the shape a duration takes and offers the examples the
+  form already shows, which is the difference between a form that teaches
+  and a form that sulks. It is clause 9d that makes that wording part of
+  the decision rather than a matter of style. The type-level messages that
+  `StatifierBlocks.Core.Send` and `StatifierBlocks.Core.Wait` attach to a
+  stored value are theirs.
   """
 
   alias StatifierBlocks.Core.Duration
@@ -81,19 +76,17 @@ defmodule StatifierBlocks.DurationInput do
   @examples ["30s", "15m", "1h30m", "2d", "3d8h"]
   @placeholder "1h30m"
 
-  @milliseconds_message "Milliseconds are not stored here - the smallest unit is a second."
-  @fraction_message "A part-unit that leaves milliseconds is not stored here - say 1h30m rather than 1.5s."
-  @refusal_message "Not a duration. Try #{Enum.join(@examples, ", ")}, or ISO-8601 like PT1H30M."
+  @refusal_message "Not a duration. Try #{Enum.join(@examples, ", ")}."
 
   @typedoc """
-  One typed duration, read. `form` is the whole decision; `iso` is the
-  canonical projection of a valid reading and `""` otherwise; `message` is
-  the sentence the field shows and is `""` for every reading but
-  `:invalid`.
+  One typed duration, read. `form` is the whole decision; `duration` is
+  the normalised projection of a valid reading and `nil` otherwise;
+  `message` is the sentence the field shows and is `""` for every reading
+  but `:invalid`.
   """
   @type reading :: %{
-          form: :empty | :predicator | :iso | :invalid,
-          iso: String.t(),
+          form: :empty | :duration | :invalid,
+          duration: map() | nil,
           message: String.t()
         }
 
@@ -112,8 +105,8 @@ defmodule StatifierBlocks.DurationInput do
   def examples, do: @examples
 
   @doc """
-  The placeholder the empty control carries - one example, in the primary
-  spelling.
+  The placeholder the empty control carries - one example, in the spelling
+  the field stores.
 
       iex> StatifierBlocks.DurationInput.placeholder()
       "1h30m"
@@ -121,6 +114,16 @@ defmodule StatifierBlocks.DurationInput do
   """
   @spec placeholder() :: String.t()
   def placeholder, do: @placeholder
+
+  @doc """
+  The sentence the field shows beneath a refused value.
+
+      iex> StatifierBlocks.DurationInput.refusal_message()
+      "Not a duration. Try 30s, 15m, 1h30m, 2d, 3d8h."
+
+  """
+  @spec refusal_message() :: String.t()
+  def refusal_message, do: @refusal_message
 
   @doc """
   Reads one stored or typed duration.
@@ -131,26 +134,26 @@ defmodule StatifierBlocks.DurationInput do
   on the same principle as ADR-0005 decision 12.
 
       iex> StatifierBlocks.DurationInput.read("")
-      %{form: :empty, iso: "", message: ""}
+      %{form: :empty, duration: nil, message: ""}
 
-      iex> StatifierBlocks.DurationInput.read("1h30m")
-      %{form: :predicator, iso: "PT1H30M", message: ""}
+      iex> StatifierBlocks.DurationInput.read("1h30m").form
+      :duration
 
-      iex> StatifierBlocks.DurationInput.read("PT1H30M")
-      %{form: :iso, iso: "PT1H30M", message: ""}
+      iex> StatifierBlocks.DurationInput.read("500ms").form
+      :duration
 
-      iex> StatifierBlocks.DurationInput.read("500ms").message
-      "Milliseconds are not stored here - the smallest unit is a second."
+      iex> StatifierBlocks.DurationInput.read("soon").message
+      "Not a duration. Try 30s, 15m, 1h30m, 2d, 3d8h."
 
   """
   @spec read(term()) :: reading()
-  def read(nil), do: %{form: :empty, iso: "", message: ""}
-  def read(""), do: %{form: :empty, iso: "", message: ""}
+  def read(nil), do: %{form: :empty, duration: nil, message: ""}
+  def read(""), do: %{form: :empty, duration: nil, message: ""}
 
   def read(text) when is_binary(text) do
-    case Duration.to_iso(text) do
-      {:ok, iso} -> %{form: form_of(text), iso: iso, message: ""}
-      :error -> %{form: :invalid, iso: "", message: refusal(text)}
+    case Duration.parse(text) do
+      {:ok, duration} -> %{form: :duration, duration: duration, message: ""}
+      :error -> %{form: :invalid, duration: nil, message: @refusal_message}
     end
   end
 
@@ -169,26 +172,4 @@ defmodule StatifierBlocks.DurationInput do
   """
   @spec set?(term()) :: boolean()
   def set?(value), do: read(value).form != :empty
-
-  # The two grammars cannot collide - an ISO duration starts with `P` and a
-  # predicator one starts with a digit - so which spelling was typed is a
-  # property of the first byte rather than of a parse.
-  @spec form_of(String.t()) :: :predicator | :iso
-  defp form_of("P" <> _rest), do: :iso
-  defp form_of(_text), do: :predicator
-
-  # Why this string is not a duration, said as specifically as the text
-  # allows. A refusal that predicator itself parsed can only be the
-  # millisecond gap - see the moduledoc - and the author's own text says
-  # whether they spelled it `ms` or reached it through a fraction.
-  @spec refusal(String.t()) :: String.t()
-  defp refusal(text) do
-    case Predicator.Duration.parse(text) do
-      {:ok, %{milliseconds: ms}} when ms != 0 ->
-        if String.contains?(text, "."), do: @fraction_message, else: @milliseconds_message
-
-      _other ->
-        @refusal_message
-    end
-  end
 end

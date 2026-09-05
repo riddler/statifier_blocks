@@ -32,7 +32,7 @@ defmodule StatifierBlocks.Compiler.ResumableDeadlineTest do
   defp send_block(id, delay),
     do: Block.new("core.send", id: id, config: %{"event" => "order.expired", "delay" => delay})
 
-  defp step(id), do: Block.new("core.wait", id: id, config: %{"duration" => "PT1H"})
+  defp step(id), do: Block.new("core.wait", id: id, config: %{"duration" => "1h"})
 
   defp handler(id, outcome),
     do:

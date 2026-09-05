@@ -85,7 +85,7 @@ defmodule StatifierBlocks.Core.RaiseTest do
         Block.new("core.raise", id: "blk_RAI", config: %{"event" => "signup.abandoned"})
 
       waiting =
-        Block.new("core.wait", id: "blk_WAI", config: %{"duration" => "PT48H"})
+        Block.new("core.wait", id: "blk_WAI", config: %{"duration" => "48h"})
 
       body =
         Block.new("core.sequence", id: "blk_SEQ", slots: %{"body" => [raise_block, waiting]})

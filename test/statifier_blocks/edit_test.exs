@@ -24,8 +24,8 @@ defmodule StatifierBlocks.EditTest do
   # `body` carries exactly five children, which is what the d4 edge cases
   # ("1 -> 3 of five", "3 -> 1") are stated against.
   defp signup_wizard do
-    cta_a = Block.new("core.wait", id: "blk_CTA_A", config: %{"duration" => "PT1S"})
-    cta_b = Block.new("core.wait", id: "blk_CTA_B", config: %{"duration" => "PT1S"})
+    cta_a = Block.new("core.wait", id: "blk_CTA_A", config: %{"duration" => "1s"})
+    cta_b = Block.new("core.wait", id: "blk_CTA_B", config: %{"duration" => "1s"})
 
     variant =
       Block.new("core.branch",
@@ -34,8 +34,8 @@ defmodule StatifierBlocks.EditTest do
         slots: %{"variant_a" => [cta_a], "otherwise" => [cta_b]}
       )
 
-    evt_start = Block.new("core.wait", id: "blk_EVT_START", config: %{"duration" => "PT1S"})
-    evt_done = Block.new("core.wait", id: "blk_EVT_DONE", config: %{"duration" => "PT1S"})
+    evt_start = Block.new("core.wait", id: "blk_EVT_START", config: %{"duration" => "1s"})
+    evt_done = Block.new("core.wait", id: "blk_EVT_DONE", config: %{"duration" => "1s"})
 
     events =
       Block.new("core.parallel",
@@ -44,9 +44,9 @@ defmodule StatifierBlocks.EditTest do
         slots: %{"lane_started" => [evt_start], "lane_completed" => [evt_done]}
       )
 
-    landing = Block.new("core.wait", id: "blk_LANDING", config: %{"duration" => "PT1S"})
-    signup = Block.new("core.wait", id: "blk_SIGNUP", config: %{"duration" => "PT1S"})
-    welcome = Block.new("core.wait", id: "blk_WELCOME", config: %{"duration" => "PT1S"})
+    landing = Block.new("core.wait", id: "blk_LANDING", config: %{"duration" => "1s"})
+    signup = Block.new("core.wait", id: "blk_SIGNUP", config: %{"duration" => "1s"})
+    welcome = Block.new("core.wait", id: "blk_WELCOME", config: %{"duration" => "1s"})
 
     root =
       Block.new("core.sequence",
@@ -69,7 +69,7 @@ defmodule StatifierBlocks.EditTest do
     # `blk_NEW` landed last instead of at index 2.
     test "inserts into an existing slot at the given index" do
       document = signup_wizard()
-      new_step = Block.new("core.wait", id: "blk_NEW", config: %{"duration" => "PT1S"})
+      new_step = Block.new("core.wait", id: "blk_NEW", config: %{"duration" => "1s"})
 
       assert {:ok, updated, inverse} =
                Edit.apply(document, {:insert, {"blk_ROOT", "body", 2}, new_step})
@@ -92,7 +92,7 @@ defmodule StatifierBlocks.EditTest do
     # `[nil]` -> red, `Enum.split/2` blows up on the fabricated `nil`.
     test "creates a slot key the parent doesn't carry yet (rule 2)" do
       document = signup_wizard()
-      confirmation = Block.new("core.wait", id: "blk_CONFIRM", config: %{"duration" => "PT1S"})
+      confirmation = Block.new("core.wait", id: "blk_CONFIRM", config: %{"duration" => "1s"})
 
       assert {:ok, updated, {:remove, "blk_CONFIRM"}} =
                Edit.apply(document, {:insert, {"blk_WELCOME", "confirmation", 0}, confirmation})
@@ -106,7 +106,7 @@ defmodule StatifierBlocks.EditTest do
     # duplicate insert silently succeeded instead of erroring.
     test "refuses an id already present in the document" do
       document = signup_wizard()
-      dup = Block.new("core.wait", id: "blk_LANDING", config: %{"duration" => "PT2S"})
+      dup = Block.new("core.wait", id: "blk_LANDING", config: %{"duration" => "2s"})
 
       assert Edit.apply(document, {:insert, {"blk_ROOT", "body", 0}, dup}) ==
                {:error, {:duplicate_block_id, "blk_LANDING"}}
@@ -118,7 +118,7 @@ defmodule StatifierBlocks.EditTest do
     test "refuses a duplicate id nested inside the inserted subtree" do
       document = signup_wizard()
 
-      nested = Block.new("core.wait", id: "blk_EVT_START", config: %{"duration" => "PT1S"})
+      nested = Block.new("core.wait", id: "blk_EVT_START", config: %{"duration" => "1s"})
       wrapper = Block.new("core.group", id: "blk_WRAP", slots: %{"body" => [nested]})
 
       assert Edit.apply(document, {:insert, {"blk_ROOT", "body", 0}, wrapper}) ==
@@ -130,7 +130,7 @@ defmodule StatifierBlocks.EditTest do
     # commonest drop, appending) was refused.
     test "accepts an index equal to the slot's current length (append)" do
       document = signup_wizard()
-      last = Block.new("core.wait", id: "blk_LAST", config: %{"duration" => "PT1S"})
+      last = Block.new("core.wait", id: "blk_LAST", config: %{"duration" => "1s"})
 
       assert {:ok, updated, _inverse} =
                Edit.apply(document, {:insert, {"blk_ROOT", "body", 5}, last})
@@ -428,14 +428,14 @@ defmodule StatifierBlocks.EditTest do
     # config instead of restoring the old one.
     test "replaces a nested block's config and inverts to the previous one" do
       document = signup_wizard()
-      new_config = %{"duration" => "PT99S"}
+      new_config = %{"duration" => "99s"}
 
       assert {:ok, updated, inverse} =
                Edit.apply(document, {:update_config, "blk_LANDING", new_config})
 
       landing = Enum.find(updated.root.slots["body"], &(&1.id == "blk_LANDING"))
       assert landing.config == new_config
-      assert inverse == {:update_config, "blk_LANDING", %{"duration" => "PT1S"}}
+      assert inverse == {:update_config, "blk_LANDING", %{"duration" => "1s"}}
       assert {:ok, ^document, _} = Edit.apply(updated, inverse)
     end
 

@@ -8,15 +8,14 @@ defmodule StatifierBlocks.Core.Wait do
   `config`, and a bare integer would have to carry its unit somewhere
   else.
 
-  Either stored spelling is accepted: a predicator duration string
-  (`"1h30m"`, `"2d"`, `"3d8h"`), which is the primary form and the one the
-  author types, or ISO-8601 with integer components (`"PT30S"`, `"PT48H"`,
-  `"P1D"`). Whichever was typed is what `config` holds, verbatim;
-  `StatifierBlocks.Core.Duration` is where the two meet and the ISO pivot
-  is taken at emit time. That is ADR-0005's 2026-08-29 `:duration`
-  amendment, under which this type "comes to accept both spellings the way
-  `core.send` already does" - and it is the whole of why a `"48h"` this
-  type once refused is now a duration.
+  One spelling is accepted: the duration string the expression language
+  reads (`"30s"`, `"1h30m"`, `"2d"`, `"3d8h"`), which is the form the
+  author types. What was typed is what `config` holds, verbatim;
+  `StatifierBlocks.Core.Duration` parses it and renders the `delay`
+  attribute at emit time. That is ADR-0005 decision 9 as amended
+  2026-09-05 (clause 9a, one grammar), and it is the whole of why a
+  `"48h"` this type once refused is a duration and why a `"500ms"` it
+  could not express now is one too.
 
   This type validates the *string*; it does not resolve it to a number of
   milliseconds, mint a timer, or know that durable timers exist. Turning it
@@ -30,10 +29,11 @@ defmodule StatifierBlocks.Core.Wait do
   alias StatifierBlocks.Core.{Duration, Emit}
   alias StatifierBlocks.Emission
 
-  # Both spellings, in one sentence, at both refusal sites. `core.send`'s
-  # own message reads the same way and adds its "or empty to send now" -
-  # the shapes differ because a wait's duration is required.
-  @duration_message "must be a duration - 1h30m, 2d or PT2H"
+  # One sentence at both refusal sites, naming what is accepted and
+  # nothing else (ADR-0005 clause 9d). `core.send`'s own message reads the
+  # same way and adds its "or empty to send now" - the shapes differ
+  # because a wait's duration is required.
+  @duration_message "must be a duration like 30s or 1h30m"
 
   @impl true
   def current_version, do: 1
@@ -92,8 +92,8 @@ defmodule StatifierBlocks.Core.Wait do
   `timer <duration>` for the stored duration, or `nil` (ADR-0002
   amendment H6).
 
-  The stored bytes rather than the compiled ones: `1h30m` and `PT1H30M`
-  both emit `1h30m`, and the card shows the author their own spelling,
+  The stored bytes rather than the compiled ones: a `3h2h` emits as `5h`
+  but the card reads `timer 3h2h`, showing the author their own spelling,
   which is what the inspector field beside it holds.
 
   Read with no default, exactly as `emit/2` reads it. A wait with no
@@ -152,20 +152,18 @@ defmodule StatifierBlocks.Core.Wait do
   ## The duration is compiled, not read out
 
   The stored value is the author's own spelling, so the emitted `delay`
-  attribute is never simply those bytes: a predicator string is
-  canonicalised to the ISO pivot and rendered back out as the shorthand
-  `Statifier.Duration` reads, and a stored ISO value is already at the
-  pivot and only rendered. Both steps live in
-  `StatifierBlocks.Core.Duration` - `to_iso/1` then `to_delay/1`, exactly
-  the pair `core.send` calls - which is why the component-to-unit table
-  that used to sit here is now in that module's moduledoc and nowhere
-  else. Two duration tables would be two grammars the day one of them was
-  edited.
+  attribute is not simply those bytes: the string is parsed to the
+  expression language's normalised duration and rendered from it. Both
+  steps live in `StatifierBlocks.Core.Duration` - `parse/1` then
+  `to_delay/1`, exactly the pair `core.send` calls - which is why the
+  component-to-unit table that used to sit here is now in that module's
+  moduledoc and nowhere else. Two duration tables would be two grammars
+  the day one of them was edited.
 
   The attribute is left unannotated for the reason `core.send`'s emit
   writes out: ADR-0004 decision 9 annotates an attribute whose value is
-  the author's verbatim, and these bytes are not - `1h30m` and `PT1H30M`
-  both emit `1h30m`.
+  the author's verbatim, and these bytes are not - a repeated unit
+  accumulates and a fraction expands, so `3h2h` emits `5h`.
   """
   @impl true
   def emit(%Block{id: block_id, config: config}, context) do
@@ -189,14 +187,14 @@ defmodule StatifierBlocks.Core.Wait do
     end
   end
 
-  # `PT48H` -> `48h`, and `1h30m` -> `PT1H30M` -> `1h30m`. Returns an
+  # `1h30m` -> `1h30m`, `3h2h` -> `5h`, `1.5s` -> `1s500ms`. Returns an
   # ordinary Emit finding rather than raising for a duration
   # `validate_config/1` would have rejected, since `emit/2` has to answer
   # for the config it was handed.
   @spec delay(term()) :: {:ok, String.t()} | {:error, [{String.t(), String.t()}]}
   defp delay(duration) do
-    case Duration.to_iso(duration) do
-      {:ok, iso} -> {:ok, Duration.to_delay(iso)}
+    case Duration.parse(duration) do
+      {:ok, parsed} -> {:ok, Duration.to_delay(parsed)}
       :error -> {:error, [{"duration", @duration_message}]}
     end
   end

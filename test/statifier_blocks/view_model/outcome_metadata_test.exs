@@ -57,7 +57,7 @@ defmodule StatifierBlocks.ViewModel.OutcomeMetadataTest do
   end
 
   defp step(id) do
-    Block.new("core.wait", id: id, config: %{"duration" => "PT1S"})
+    Block.new("core.wait", id: id, config: %{"duration" => "1s"})
   end
 
   # A card-processing group: one step in `body`, one interrupt rule in

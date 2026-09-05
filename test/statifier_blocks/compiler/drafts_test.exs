@@ -13,7 +13,7 @@ defmodule StatifierBlocks.Compiler.DraftsTest do
 
   alias StatifierBlocks.{Assignability, Block, Compiler, CoreFixtures, Document, Palette}
 
-  defp step(id, duration \\ "PT1H"),
+  defp step(id, duration \\ "1h"),
     do: Block.new("core.wait", id: id, config: %{"duration" => duration})
 
   defp marker(id, note \\ ""),
@@ -36,10 +36,10 @@ defmodule StatifierBlocks.Compiler.DraftsTest do
   # the byte comparison below would move.
   defp fragments do
     [
-      Block.new("core.sequence", id: "blk_F1", slots: %{"body" => [step("blk_F1A", "PT9H")]}),
+      Block.new("core.sequence", id: "blk_F1", slots: %{"body" => [step("blk_F1A", "9h")]}),
       Block.new("core.assign", id: "blk_F2", config: %{"path" => "parked", "value" => "true"}),
       marker("blk_F3", "the refund arm"),
-      Block.new("core.group", id: "blk_F4", slots: %{"body" => [step("blk_F4A", "PT7H")]})
+      Block.new("core.group", id: "blk_F4", slots: %{"body" => [step("blk_F4A", "7h")]})
     ]
   end
 

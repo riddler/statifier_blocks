@@ -256,38 +256,32 @@ defmodule StatifierBlocks.Core.EmitTest do
   end
 
   describe "core.wait" do
-    # sabotage: translate the ISO `M` before `T` as minutes -> the delay
-    # reads `1m` instead of `1mo` and this goes red (verified)
-    test "translates every ISO component into the unit statifier's delay parser reads" do
-      for {duration, delay} <- [
-            {"PT30S", "30s"},
-            {"PT48H", "48h"},
-            {"P1D", "1d"},
-            {"P1W", "1w"},
-            {"P1M", "1mo"},
-            {"P1Y", "1y"},
-            {"P1Y2M3DT4H5M6S", "1y2mo3d4h5m6s"}
-          ] do
-        root = Block.new("core.wait", id: "blk_WAI", config: %{"duration" => duration})
-
-        assert compile!(root, Palette.core()).scxml =~ ~s(delay="#{delay}"), duration
-      end
-    end
-
-    # A stored predicator string mostly round-trips, which is the point of
-    # the pivot rather than an argument against it: `1.5h` is the witness
-    # that the value is compiled and not copied.
+    # The table is stored shorthand -> emitted attribute. A duration whose
+    # stored spelling is already normalised emits its own bytes; one that
+    # is not - a fraction, a repeated unit, an out-of-order run - emits the
+    # normalisation, which is the witness that the value is compiled and
+    # not copied. `500ms` and `1.5s` are the two spellings the retired
+    # arrangement could not express at all.
     #
-    # sabotage: have Core.Wait.delay/1 return the stored bytes instead of
-    # compiling through Core.Duration -> the `1.5h` row goes red, the
-    # attribute reading `1.5h` rather than the pivot's `1h30m` (verified)
-    test "a stored predicator string compiles through the pivot" do
+    # sabotage: emit `:months` as `m` rather than `mo` -> the `1mo` row
+    # reads `1m` and this goes red (verified)
+    test "renders every component as the unit statifier's delay parser reads" do
       for {duration, delay} <- [
+            {"30s", "30s"},
+            {"48h", "48h"},
+            {"1d", "1d"},
+            {"1w", "1w"},
+            {"1mo", "1mo"},
+            {"1y", "1y"},
+            {"1y2mo3d4h5m6s", "1y2mo3d4h5m6s"},
             {"1h30m", "1h30m"},
             {"2d", "2d"},
             {"3d8h", "3d8h"},
-            {"48h", "48h"},
-            {"1.5h", "1h30m"}
+            {"500ms", "500ms"},
+            {"1.5s", "1s500ms"},
+            {"1.5h", "1h30m"},
+            {"3h2h", "5h"},
+            {"8h3d", "3d8h"}
           ] do
         root = Block.new("core.wait", id: "blk_WAI", config: %{"duration" => duration})
 
@@ -304,8 +298,8 @@ defmodule StatifierBlocks.Core.EmitTest do
           id: "blk_SEQ",
           slots: %{
             "body" => [
-              Block.new("core.wait", id: "blk_W1", config: %{"duration" => "PT1S"}),
-              Block.new("core.wait", id: "blk_W2", config: %{"duration" => "PT1S"})
+              Block.new("core.wait", id: "blk_W1", config: %{"duration" => "1s"}),
+              Block.new("core.wait", id: "blk_W2", config: %{"duration" => "1s"})
             ]
           }
         )
@@ -456,7 +450,7 @@ defmodule StatifierBlocks.Core.EmitTest do
                    config: %{"arms" => [%{"slot" => "arm_a", "cond" => bad}]},
                    slots: %{
                      "arm_a" => [
-                       Block.new("core.wait", id: "blk_W", config: %{"duration" => "PT1S"})
+                       Block.new("core.wait", id: "blk_W", config: %{"duration" => "1s"})
                      ]
                    }
                  )
@@ -518,7 +512,7 @@ defmodule StatifierBlocks.Core.EmitTest do
 
   # The opposite of `container/1`: a block that stays put until something
   # external happens, so an interrupt has a body to interrupt.
-  defp waiting(id), do: Block.new("core.wait", id: id, config: %{"duration" => "PT48H"})
+  defp waiting(id), do: Block.new("core.wait", id: id, config: %{"duration" => "48h"})
 
   defp handler(id, event),
     do: Block.new("core.on_event", id: id, config: %{"event" => event, "outcome" => "abandon"})
@@ -544,7 +538,7 @@ defmodule StatifierBlocks.Core.EmitTest do
     Block.new("core.group",
       id: "blk_GRP",
       slots: %{
-        "body" => [Block.new("core.wait", id: "blk_STEP", config: %{"duration" => "PT48H"})],
+        "body" => [Block.new("core.wait", id: "blk_STEP", config: %{"duration" => "48h"})],
         "interrupts" => [
           Block.new("core.on_event",
             id: "blk_INT",

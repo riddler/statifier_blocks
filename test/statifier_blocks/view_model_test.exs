@@ -88,7 +88,7 @@ defmodule StatifierBlocks.ViewModelTest do
     # verbatim instead of merging it over the defaults - this test fails
     # because `core.parallel`'s entry would carry no `label`/`group`/etc.
     test "a type with a real palette_entry/0 keeps its own values over the defaults" do
-      child = Block.new("core.wait", id: "blk_W", config: %{"duration" => "PT1S"})
+      child = Block.new("core.wait", id: "blk_W", config: %{"duration" => "1s"})
       vm = build(document_with(child))
       node = find_node(vm, "blk_W")
 
@@ -103,7 +103,7 @@ defmodule StatifierBlocks.ViewModelTest do
     # the `%Node{}` it returns - this test fails because `layout` reverts to
     # the default `:stack`.
     test "core.parallel's layout: :columns reaches the node" do
-      lane = Block.new("core.wait", id: "blk_LANE", config: %{"duration" => "PT1S"})
+      lane = Block.new("core.wait", id: "blk_LANE", config: %{"duration" => "1s"})
 
       parallel =
         Block.new("core.parallel",
@@ -220,7 +220,7 @@ defmodule StatifierBlocks.ViewModelTest do
     # `finding` into `unrouted_acc` instead of `block_acc` - this test
     # fails because the finding never reaches `node.findings`.
     test "a :block anchor routes to that node's findings" do
-      child = Block.new("core.wait", id: "blk_W", config: %{"duration" => "PT1S"})
+      child = Block.new("core.wait", id: "blk_W", config: %{"duration" => "1s"})
       finding = Finding.new({:block, "blk_W"}, :lint, "no runtime handler registered")
 
       vm = build(document_with(child), [finding])
@@ -236,7 +236,7 @@ defmodule StatifierBlocks.ViewModelTest do
     # the node) - this test fails because `body`'s slot never carries the
     # finding.
     test "a :slot anchor naming a slot the node carries routes to that slot's findings" do
-      child = Block.new("core.wait", id: "blk_W", config: %{"duration" => "PT1S"})
+      child = Block.new("core.wait", id: "blk_W", config: %{"duration" => "1s"})
 
       finding =
         Finding.new({:slot, "blk_ROOT", "body"}, :assignability, "needs at least one step")
@@ -255,7 +255,7 @@ defmodule StatifierBlocks.ViewModelTest do
     # would vanish (never surfacing on `root_node.findings`, and never
     # matching a real slot to render it under either).
     test "a :slot anchor naming a slot the node does not carry falls back to the node's findings" do
-      child = Block.new("core.wait", id: "blk_W", config: %{"duration" => "PT1S"})
+      child = Block.new("core.wait", id: "blk_W", config: %{"duration" => "1s"})
       finding = Finding.new({:slot, "blk_ROOT", "no_such_slot"}, :assignability, "ghost slot")
 
       vm = build(document_with(child), [finding])
@@ -285,7 +285,7 @@ defmodule StatifierBlocks.ViewModelTest do
     # `vm.orphan_findings` (and it is also silently dropped from the tree
     # entirely, since `build_node/2` only ever walks real document blocks).
     test "an anchor naming a block id not in the document lands in orphan_findings" do
-      child = Block.new("core.wait", id: "blk_W", config: %{"duration" => "PT1S"})
+      child = Block.new("core.wait", id: "blk_W", config: %{"duration" => "1s"})
       finding = Finding.new({:block, "blk_GHOST"}, :lint, "names nothing in this document")
 
       vm = build(document_with(child), [finding])
@@ -359,7 +359,7 @@ defmodule StatifierBlocks.ViewModelTest do
     # `slots_count`'s reduction - this test fails because the root's count
     # would be `0` instead of `1`, since the finding lives two levels down.
     test "covers a subtree, not only the node's own findings" do
-      grandchild = Block.new("core.wait", id: "blk_GC", config: %{"duration" => "PT1S"})
+      grandchild = Block.new("core.wait", id: "blk_GC", config: %{"duration" => "1s"})
       finding = Finding.new({:block, "blk_GC"}, :lint, "deep finding")
 
       vm = build(document_with(grandchild), [finding])
@@ -375,7 +375,7 @@ defmodule StatifierBlocks.ViewModelTest do
     # this test fails because the decoded JSON would be `%{}` instead of
     # carrying `"note"`.
     test "renders status, no form, canonical config JSON, a finding, and its children" do
-      grandchild = Block.new("core.wait", id: "blk_GC", config: %{"duration" => "PT1S"})
+      grandchild = Block.new("core.wait", id: "blk_GC", config: %{"duration" => "1s"})
 
       legacy =
         Block.new("signup.legacy_step",

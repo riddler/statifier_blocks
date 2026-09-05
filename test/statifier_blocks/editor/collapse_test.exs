@@ -274,7 +274,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           Document.new(
             Block.new("core.sequence",
               id: "blk_clean",
-              slots: %{"body" => [EditorFixtures.wait("blk_clean_step", "PT1H")]}
+              slots: %{"body" => [EditorFixtures.wait("blk_clean_step", "1h")]}
             ),
             id: "doc_clean"
           )
