@@ -362,7 +362,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `on_select` | no | one-argument function called with each new selection: a `%{id:, type:, label:}` descriptor, or `nil` for no selection |
     | `icon` | no | function component resolving an icon *name* to markup |
     | `expression_component` | no | override for `:expression` fields (sui-bob's seam); with it unset, an `:expression` renders statifier-ui's own expression editor when that package is on the host's load path, and the package's plain source input when it is not |
-    | `value_candidates` | no | the values the host offers per datamodel path, `%{path => [%{label:, value:} \| binary]}`; read only by an expression editor that draws value pickers, and `%{}` (the default) offers none |
+    | `value_candidates` | no | the values offered per datamodel path, `%{path => [%{label:, value:} \| binary]}`; **merged over the datamodel's own `one_of` enumerations, per path**, so a path this map names uses this map's list and a path it does not name keeps what the datamodel declares. Read only by an expression editor that draws value pickers; `%{}` (the default) now means *nothing beyond what the datamodel declares* rather than nothing at all |
     | `invoke_types` | no | the invoke types the host is prepared to answer; suggestions on an `invoke_type` field, never a constraint, and `[]` (the default) means *no list supplied* |
     | `active_marks` | no | the block ids a run has activated; held as editor state, and cleared when the host opens a different document |
     | `invoke_mark` | no | the block a run is calling out to and how the call came back - `{block_id, outcome}`, a bare `block_id` for no answer yet, or `nil` for no call at all |
@@ -605,6 +605,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:drawer, drawer_view(assigns))
         |> assign(:declarations, declaration_entries(assigns))
         |> assign(:path_candidates, path_candidates(assigns))
+        |> assign(:offered_values, offered_values(assigns))
         |> assign(:declaration_refusal, declaration_refusal(assigns))
         |> assign(:marks, marks(assigns))
         |> assign(:depth, Shell.depth(assigns.view_model.root))
@@ -692,7 +693,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             expression_component={@expression_component}
             invoke_types={@invoke_types}
             path_candidates={@path_candidates}
-            value_candidates={@value_candidates}
+            value_candidates={@offered_values}
             target={@myself}
           />
 
@@ -1422,6 +1423,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec path_candidates(map()) :: [String.t()]
     defp path_candidates(assigns) do
       Datamodel.candidates(assigns.document, assigns.declared_paths, assigns.host_roots)
+    end
+
+    # The value half of the same question, and the reason it reads
+    # `datamodel` rather than `declared_paths`: the normalized set above is a
+    # `MapSet` of paths and carries no per-path shape, while the `one_of`
+    # enumerations live on the ADR-0006 index the raw document builds. The
+    # host's own map is merged over the derived defaults per path, which is
+    # replacement at a path and not a union - see
+    # `StatifierBlocks.Datamodel.value_candidates/2` and ADR-0005's
+    # 2026-09-05 note.
+    @spec offered_values(map()) :: %{optional(String.t()) => [Datamodel.candidate()]}
+    defp offered_values(assigns) do
+      Datamodel.value_candidates(assigns.datamodel, assigns.value_candidates)
     end
 
     @spec declaration_entries(map()) :: [DatamodelEntry.t()]

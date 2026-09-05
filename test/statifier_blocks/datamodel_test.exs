@@ -520,4 +520,162 @@ defmodule StatifierBlocks.DatamodelTest do
              |> Enum.map(& &1.path) == Datamodel.candidates(document, @view_document, ["host"])
     end
   end
+
+  describe "value_candidates/2" do
+    defp value_datamodel(entries) do
+      %{"version" => 1, "scopes" => [%{"scope" => "local", "entries" => entries}]}
+    end
+
+    defp step_and_brand do
+      value_datamodel([
+        %{
+          "path" => "signup.step",
+          "type" => "string",
+          "one_of" => ["details", "payment", "review"]
+        },
+        %{"path" => "card.brand", "type" => "string", "one_of" => ["visa", "amex"]},
+        %{"path" => "signup.email", "type" => "string"}
+      ])
+    end
+
+    # Sabotage: `declared_values/1` answering `%{}` for an index it has ->
+    # every assertion here goes red. The derivation is the whole of the
+    # "with no host map supplied" criterion.
+    test "a path with declared values offers them, in declaration order" do
+      assert Datamodel.value_candidates(step_and_brand()) == %{
+               "signup.step" => ["details", "payment", "review"],
+               "card.brand" => ["visa", "amex"]
+             }
+    end
+
+    # Sabotage: mapping an empty option list to `[]` instead of leaving the
+    # entry out -> this goes red. An absent key is a free-text control and an
+    # empty list is an empty picker, which is the difference the "behaves
+    # exactly as it does today" criterion turns on.
+    test "a path with no declared values is absent, not present and empty" do
+      refute Map.has_key?(Datamodel.value_candidates(step_and_brand()), "signup.email")
+    end
+
+    # Sabotage: dropping the number and boolean clauses of `option/1` -> both
+    # paths vanish from the map and this goes red.
+    test "numbers and booleans are offered as their printed form" do
+      candidates =
+        Datamodel.value_candidates(
+          value_datamodel([
+            %{"path" => "signup.attempts", "type" => "integer", "one_of" => [1, 2, 3]},
+            %{"path" => "signup.consented", "type" => "boolean", "one_of" => [true, false]}
+          ])
+        )
+
+      assert candidates == %{
+               "signup.attempts" => ["1", "2", "3"],
+               "signup.consented" => ["true", "false"]
+             }
+    end
+
+    # Sabotage: `option/1` falling through to `inspect/1` instead of dropping
+    # -> `["a"]` and `%{"b" => 1}` reach the picker as their inspect forms and
+    # this goes red. A value that cannot be drawn as an option is not one.
+    test "values with no drawable form are dropped, and a path left with none is absent" do
+      candidates =
+        Datamodel.value_candidates(
+          value_datamodel([
+            %{"path" => "signup.mixed", "one_of" => ["ok", ["a"], %{"b" => 1}, nil]},
+            %{"path" => "signup.undrawable", "one_of" => [%{"b" => 1}, nil]}
+          ])
+        )
+
+      assert candidates == %{"signup.mixed" => ["ok"]}
+    end
+
+    # Sabotage: `declared_values/1` raising rather than answering `%{}` on a
+    # shape `index/1` declines -> these go red. Same total-normalizer
+    # discipline `declared_paths/1` is written under.
+    test "a datamodel that is not an ADR-0006 document declares no enumerations" do
+      assert Datamodel.value_candidates(nil) == %{}
+      assert Datamodel.value_candidates(["signup.step", "card.brand"]) == %{}
+      assert Datamodel.value_candidates(MapSet.new(["signup.step"])) == %{}
+      assert Datamodel.value_candidates(%{"scopes" => "not a list"}) == %{}
+    end
+  end
+
+  # The precedence the 2026-09-05 note rules on, pinned in both directions:
+  # replacement at a path the host names, and the datamodel's own list
+  # everywhere else. A union would show a set nobody declared.
+  describe "value_candidates/2, where the host's map and the datamodel meet" do
+    # Sabotage: `Map.merge(host, derived)` instead of
+    # `Map.merge(derived, host)` -> the host's entry loses to the datamodel's
+    # and this goes red.
+    test "a host entry replaces the derived list for its path" do
+      candidates = Datamodel.value_candidates(step_and_brand(), %{"signup.step" => ["payment"]})
+
+      assert candidates["signup.step"] == ["payment"]
+    end
+
+    # Sabotage: deriving nothing when a host map is supplied at all - the
+    # "host wins outright" reading of the merge -> this goes red while the
+    # test above stays green, which is the direction that reading breaks.
+    test "and leaves every other path's default intact" do
+      candidates = Datamodel.value_candidates(step_and_brand(), %{"signup.step" => ["payment"]})
+
+      assert candidates["card.brand"] == ["visa", "amex"]
+    end
+
+    # Sabotage: unioning the two lists per path -> the values the host left
+    # out come back and this goes red. This is the union the record refuses.
+    test "the values the host left out are not offered" do
+      candidates = Datamodel.value_candidates(step_and_brand(), %{"signup.step" => ["payment"]})
+
+      refute "review" in candidates["signup.step"]
+      refute "details" in candidates["signup.step"]
+    end
+
+    # Sabotage: treating an empty host list as "no entry" and falling back to
+    # the derived list -> this goes red. Suppressing a path is something a
+    # host can say, and replacement is what lets it say it.
+    test "an empty host list is a suppression, and is carried through as one" do
+      assert Datamodel.value_candidates(step_and_brand(), %{"signup.step" => []})["signup.step"] ==
+               []
+    end
+
+    # Sabotage: intersecting the host's map with the declared paths -> the
+    # undeclared path's entry disappears and this goes red. The host's map
+    # was never bounded by the datamodel and still is not.
+    test "a host entry for an undeclared path is offered as written" do
+      candidates = Datamodel.value_candidates(step_and_brand(), %{"signup.variant" => ["a", "b"]})
+
+      assert candidates["signup.variant"] == ["a", "b"]
+      assert candidates["signup.step"] == ["details", "payment", "review"]
+    end
+
+    # Sabotage: normalizing the host's entries through `option/1` too -> the
+    # `%{label:, value:}` candidates the seam documents are dropped and this
+    # goes red. Nothing in this package interprets what a host wrote.
+    test "the host's own candidate shapes pass through untouched" do
+      host = %{"signup.step" => [%{label: "Pay now", value: "payment"}]}
+
+      assert Datamodel.value_candidates(step_and_brand(), host)["signup.step"] ==
+               [%{label: "Pay now", value: "payment"}]
+    end
+
+    # Sabotage: dropping the `datamodel` argument's `nil` arm -> this goes
+    # red. It is the behaviour every host that supplies no datamodel had
+    # before this function existed.
+    test "with no datamodel the host's map is the whole answer, as it was before" do
+      assert Datamodel.value_candidates(nil, %{"signup.step" => ["payment"]}) == %{
+               "signup.step" => ["payment"]
+             }
+    end
+
+    # Sabotage: `host_values/1` guarding on `is_map/1` alone -> a `MapSet`
+    # merges its own internal shape over the derived map and this goes red.
+    test "a host map that is not a plain map supplies no entries" do
+      assert Datamodel.value_candidates(step_and_brand(), nil)["signup.step"] ==
+               ["details", "payment", "review"]
+
+      assert Datamodel.value_candidates(step_and_brand(), MapSet.new(["signup.step"]))[
+               "signup.step"
+             ] == ["details", "payment", "review"]
+    end
+  end
 end
