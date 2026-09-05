@@ -148,6 +148,14 @@ when the two disagree the record is the contract and the code is the bug. A
 bead that needs an answer no accepted ADR gives is a stop-and-report, not a
 guess encoded in code.
 
+Changing the record is itself gated. Any PR that touches `docs/adr/` is
+reviewed by one fresh cold direction agent, and nothing else satisfies that
+gate; its verdict tuple - the verdict word, the finding count, and which
+pass it was - is recorded on the bead. Only an unqualified verdict merges,
+or the operator's own substance ruling on a qualified one. A decision
+record merges at **proposed**; flipping it to **accepted** is a separate PR
+through the same gate.
+
 The contracts this package consumes live in the siblings, not here:
 
 - statifier-ex `docs/adr/0052-chart-identity-and-position-serialization.md` -
