@@ -5469,8 +5469,6 @@ untouched.
 
 Filed with `sb-1hqt`, campaign-029's Lane G.
 
----
-
 ## Amendment (2026-09-05): decision 9, the `:duration` control reads one grammar
 
 **Status: proposed (2026-09-05, campaign 029 Lane A, bead `sb-8acm`).**
