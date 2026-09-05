@@ -4889,4 +4889,582 @@ undecided.
 No decision moves, no clause is edited, and no text above this line changes -
 the four superseded sentences stay where they are, as the record of what was
 true before.
+
 Filed with `sb-mzah`, campaign-028's Lane B2, recording what `sb-m6e0` landed.
+
+## Amendment (2026-09-05): decision 10, a summary chip that is a generated event name draws as a name
+
+**Status: proposed (2026-09-05, campaign 029 Lane G, bead `sb-1hqt`).** A
+decision record merges at proposed under campaign 029's invariant; flipping it
+to accepted is a separate gated request. Additive; decision 10 stands exactly
+as written, **10n and 10o are unchanged in every particular**, and no text
+above this line is edited by this section. Nothing here is built yet - this
+section is the record ahead of the code.
+
+### Context
+
+ADR-0004 decision 2 fixes that a block signals completion with
+`done.state.<state id>`, and that record's outcome amendment 2c adds
+`done.outcome.<state id>.<outcome>` for each declared outcome.
+`StatifierBlocks.Compiler.StateId` is where both are spelled - `done_event/1`
+and `outcome_event/2` - over a state id that is `"s_" <> block_id`
+(`state_id/1`).
+
+A block type whose `summary/1` describes its config in terms of one of those
+events puts the whole generated string on the card. The chip-row amendment
+above already quotes the neighbouring case, `core.on_event`'s
+`Abandon, fraud.aborted`, and a chip naming a generated done event reads worse
+than that one, because it is not a name anyone chose:
+`done.outcome.s_blk_AUTH.error` is twenty-nine characters of which the author
+wrote five.
+
+The five characters are the whole point. `s_blk_AUTH` is the state id of a
+block whose card, on the same canvas, says **Authorize**. Getting from one to
+the other requires knowing ADR-0004 decision 3's derivation, and the card is
+precisely the surface that should not require it. What the author declared
+was an outcome called `error` on a block they named; what the card shows is
+the compiler's spelling of that fact.
+
+### Decision
+
+**10w. A chip whose text has the shape of a generated done-event name is
+drawn as `<block label> · <outcome>`, and the raw name is kept on the chip's
+`title` attribute.** Two shapes are recognised, and each draws one way:
+
+| Chip text | Drawn as | Where the parts come from |
+|---|---|---|
+| `done.outcome.<state id>.<outcome>` | `<block label> · <outcome>` | the state id inverts to a block id; the outcome is the segment after it |
+| `done.state.<state id>` | `<block label> · done` | the state id inverts to a block id; `done` is the role `Core.Emit` mints the completion `<final>` under |
+
+`<block label>` is the label the named block's own card draws - the author's
+title where they gave one, and the type's label otherwise. That is
+`StatifierBlocks.ViewModel.title/1`, read rather than re-derived here. The
+second row draws the literal word `done` rather than inventing a name, because
+`done.state` carries none: ADR-0004 decision 2 makes it the block's completion
+signal and nothing more, and `StatifierBlocks.Core.Emit` reaches it through a
+`<final>` under the role `"done"`. Spelling that role is honest; spelling
+something friendlier would be this record naming a concept ADR-0004 does not
+have.
+
+The raw event name goes on `title`, verbatim and untruncated. That is the
+half that keeps the translation lossless: an author debugging a chart against
+generated SCXML, or a support engineer reading a screenshot beside a trace,
+needs the exact string, and a translation that destroys it would trade one
+unreadable card for one unanswerable question. `title` is where this record
+already puts the exact form of a thing whose drawn form is shorter, and the
+chip element is `.sb-node__chip` - the class the chip-row amendment above
+introduced, unchanged, gaining an attribute rather than a sibling.
+
+**10x. The translation is applied where the chip is built, ahead of the cap.**
+`StatifierBlocks.BlockType.summary/2` is where refusal already happens, and
+the translated text is what the cap measures, not the generated one.
+
+The order is load-bearing and it is the reason this section can leave 10n and
+10o alone. `done.outcome.s_blk_AUTH.error` is over the cap; measured before
+translation it is refused, drawing nothing and raising the `:lint` finding the
+2026-08-30 Note added - a warning telling the author that "summary chip 2 is
+29 characters; the cap is 24, so it is not drawn" about a string they cannot
+shorten, because they did not write it. That is the one failure mode this
+section exists to prevent, and translating after the cap would install it.
+Translating first, `Authorize · error` is seventeen characters, draws, and needs
+no exemption from anything.
+
+The ordering has a cost the implementing bead should see coming, named here
+rather than discovered there. `summary/2` and `summary_refusals/2` both
+derive from the declared chips of **one** block and its config; translating
+needs the labels of other blocks, which neither can currently see. So this
+clause requires widening what the summary pass is given, or moving the
+measurement to where the document already is. Which of the two is the
+implementing bead's call - this section decides the order, not the seam - but
+the seam is real and no clause above provides it.
+
+**10y. A name that does not invert unambiguously leaves the chip exactly as it
+is.** No translation, no `title`, no finding, no refusal that would not
+otherwise have happened - the chip goes through the existing path untouched
+and the cap measures the string as written. This is the failure mode's
+direction, chosen deliberately: a chip drawn as its raw event name is ugly,
+and a chip drawn as the wrong block's label is a lie. The first is a
+presentation defect an author reports; the second is a card that says a
+different block completed.
+
+"Unambiguously" is doing real work in that sentence, and the next section says
+why.
+
+### 10n and 10o are unchanged, and what "unchanged" means here
+
+Neither clause moves, and neither is weakened.
+
+**10n keeps its number**, and the cap keeps its one home: this section states
+no length, sets no second threshold, and adds no opinion about how long a chip
+may be. It changes what string the cap is applied to, in one enumerated case,
+and 10x is the whole of that change.
+
+**10o keeps refuse-never-truncate.** A translated chip that is still over the
+cap - a block whose author-given label is long - is refused exactly as any
+other over-long chip is refused, and it raises exactly the same `:lint`
+warning at exactly the same severity. That case is the one the lint was built
+for: the author gave the block its label and can shorten it, so the sentence
+the Note builds names a fix the reader can act on.
+
+**The cap lint therefore keeps firing for every chip an author can actually
+fix**, which is every chip an author wrote. What this section exempts is the
+narrow complement: chips no author wrote, whose text the compiler generated
+from a derivation the author never sees. Those are not exempted from the cap
+either, strictly - they are shortened before it, which is a different and
+smaller claim than an exemption, and it is the claim 10x makes.
+
+### What the implementing bead has to build, and what it must not assume
+
+Three facts about the code as it stands today, recorded because a bead that
+assumed otherwise would be building on something that is not there.
+
+**No event-name parser exists.** `StatifierBlocks.Compiler.StateId` ships the
+constructors - `done_event/1`, `outcome_event/2` - and inverts *state ids*
+through `unstate_id/1` and `unoutcome_id/1`. Nothing inverts an *event name*.
+The implementing bead adds that function, and it belongs in `StateId` for the
+reason `unoutcome_id/1`'s own `@doc` gives about itself: the inversion belongs
+beside the derivation it inverts, not inside a caller that would have to
+rediscover why it is exact.
+
+**Block-id opacity is a convention, not an enforced grammar.**
+`StateId`'s moduledoc argues invertibility from ADR-0001 decision 3 - a block
+id is "stable, document-unique, opaque and never reused", and "a `blk_`-prefixed
+UXID contains no `__`". That is true of every id this package *mints*. It is
+not true of every id this package *admits*:
+`StatifierBlocks.Validation`'s block-id check accepts any non-empty UTF-8
+string, so a document arriving through `from_json/1` may legitimately carry a
+block id containing `__`, or `.`, or the literal text `done.state.`.
+
+**The state-id inversions already rest on that convention too**, and this
+record should not claim otherwise on the way to making a point about event
+names. `unstate_id/1` splits on the *first* `__` and performs no role-shape
+check of its own, so a block id carrying `__` misinverts there as well:
+`unstate_id("s_a__b")` answers `{:ok, {"a", "b"}}`, which is a block id
+nothing minted and a role nobody declared, where the honest answer for a
+block whose id is `a__b` would have been `{"a__b", nil}`. That is checked
+against the code, not reasoned about. It is invisible today only because
+every id this package mints is a `blk_`-prefixed UXID, which is exactly the
+convention this subsection is naming.
+
+An event-name inversion is worse in degree rather than different in kind:
+`done.outcome.s_A.B.C` has two readings when a block id may contain a dot,
+and a dot is not even a character the derivation reserves. The point of
+recording both is that the new parser inherits a hazard the existing
+inversions have, rather than introducing one they are immune to.
+
+Recording this is not a call to tighten the validator. That would be an
+ADR-0001 amendment, it would refuse documents that are valid today, and it is
+not this record's to make. It is a call to make the parser total and honest
+about it, which is what 10y already requires.
+
+**The fail-safe is therefore required, not advisory.** The implementing bead
+returns "not a generated name" for every string it cannot invert to exactly
+one `{block id, outcome}` pair, including a string that inverts to a block id
+no block in this document carries - a chip may name a block that was deleted,
+and a label looked up for a block that is gone is not a label. In every such
+case 10y applies and the chip is drawn as written.
+
+### What is not decided here
+
+- **The badge and the join marker.** They share the chip pipeline and could
+  carry the same translation. The 2026-08-30 Note declined to widen itself to
+  them for the same reason and this section declines identically: widening is
+  a bead and a Note, not something a reader should assume from this one.
+- **Whether a translated chip is clickable.** A chip naming a block that is on
+  the canvas is an obvious candidate for a jump, and decision 11's findings
+  rows already have that affordance. It is not decided here, and 10w draws a
+  span, not a control.
+- **Any change to what a block type declares.** `summary/1`'s contract is
+  ADR-0002 amendment H's and is untouched: a type keeps returning the strings
+  it returns today, and no type is asked to spell an event differently because
+  of this section.
+
+### Consequences
+
+- **A card can say less than the string behind it, and that is new.** Every
+  other chip on the card is drawn as the type declared it. This one is drawn
+  as a function of it, and `title` is what keeps that reversible. A test that
+  asserts on chip text for a `done.*` summary changes; a test that asserts on
+  a type's declared summary does not.
+- **The view model gains a reader dependency it did not have.** Translating
+  needs the labels of blocks *other than* the one whose card is being built,
+  so the chip pass reads across the document rather than down one block. That
+  is a real coupling and it is named here so the implementing bead does not
+  discover it as a surprise.
+- **`ViewModel.summary_chips/1` stays the public reader.** The 2026-08-30 Note
+  named it as the function a host calls, and a host calling it gets translated
+  chips - which is the point, since a host drawing its own card should not
+  have to redo this.
+- **No new token, no new class, no new hook, no new command.** Decision 14's
+  markup/styling line, decision 7's two-hook count and decision 2's command
+  set are all untouched.
+- **Nothing serializes and nothing is stored.** The translation is derived at
+  build time from a document that is already stored, exactly as the summary
+  and the refusals are.
+
+Filed with `sb-1hqt`, campaign-029's Lane G.
+
+## Amendment (2026-09-05): the host seams, `on_select` and a selection descriptor
+
+**Status: proposed (2026-09-05, campaign 029 Lane G, bead `sb-1hqt`).** A
+decision record merges at proposed under campaign 029's invariant; flipping it
+to accepted is a separate gated request. Additive; decisions 2, 8A and 15
+stand as written and no text above this line is edited by this section. This
+section is the record for bead `sb-0mwg`, and nothing here is built yet.
+
+### Context
+
+The editor keeps the selected block id as component state and offers the host
+no way to observe it. `on_change` is the only callback the assigns table
+carries that reports anything back, and it reports documents.
+
+8A already decided that the package ships the editing surface and the host
+ships the document chrome, and that the host's half attaches through "slots
+for markup, events for actions". A host panel that wants to follow the canvas
+selection - a per-block detail pane in the host's own chrome, a preview, a
+side-by-side of the block's data - is exactly the case 8A's split anticipates,
+and it is the case the split currently cannot serve: the editor is a
+`LiveComponent`, so the host has no handle on its socket, and there is no
+event carrying the one fact the panel needs.
+
+The workaround a consumer actually reached for is worth recording, because it
+is the cost. Building a per-block panel on 0.15, the consumer listed every
+candidate block in the document in its own panel and made the operator pick
+the block a second time, next to a canvas where they had just picked it. Two
+selections that must agree, with nothing keeping them in agreement, is the
+shape of defect 8A's seam exists to prevent.
+
+The same argument the findings count made applies in the other direction and
+is why this is a callback rather than a reader. `findings_count/3` is a pure
+function of the assigns the host already holds, so the host can compute it
+without asking the component anything. A *selection* is not: it is editor
+state that only the component knows, produced by a gesture on the canvas, and
+there is no pure function of the host's assigns that answers it. What cannot
+be read has to be pushed.
+
+### Decision
+
+**An `on_select` assign, a one-argument function, called with each new
+selection.** It sits beside `on_change` in the assigns table and has the same
+shape and the same optionality: absent by default, ignored unless it is a
+function of arity one, invoked for its effect and never for its return value.
+`on_change`'s existing handling (`notify_change/2`) is the pattern, and
+`on_select` gets its own sibling rather than overloading it, because a
+document and a selection are different subjects and a host that wants one
+should not have to receive the other.
+
+**What it is called with is a selection descriptor, not a block.** A map:
+
+| Key | Value |
+|---|---|
+| `id` | the selected block's id |
+| `type` | the block's type name, as the document stores it |
+| `label` | what the block's card draws as its first line - the author's title where they gave one, the type's label otherwise |
+
+and `nil` for no selection.
+
+Three keys and not the block, deliberately. The host already holds the
+document - it passed it in - so shipping the block's config back through a
+callback would make `on_select` a second channel for something the host can
+already read, and a channel that goes stale the moment the two disagree. What
+the host cannot derive is which id is selected; `type` and `label` come along
+because a panel that has to render a heading before it looks anything up is
+the common case, and because `label` is the view model's answer rather than a
+rule a host would have to reimplement from H5.
+
+**`nil` is a selection and is delivered like one.** Deselection calls
+`on_select` with `nil`; a host panel that follows the canvas has to be able to
+empty itself, and a callback that only ever fires on a *new* block leaves the
+panel showing the last one forever. This is the same reading 3A's precision
+takes of the Findings tab: a surface whose subject is missing says so, rather
+than saying nothing.
+
+**It fires when the selection changes, and not otherwise.** Not on every
+render, not on an edit to the selected block, not on the component's first
+render when nothing is selected. Selecting the already-selected block is not a
+change and does not fire. The rule is the same round-trip discipline decision
+6 sets for the drag: one message per thing that happened.
+
+**No new command, and `on_change` is untouched.** Decision 2's command set
+stays four plus the fifth the 2026-09-01 amendment added; selection is editor
+state and not a document edit, so there is no `:select` command to add and
+nothing about selection is serialized, stored, undone or redone. `on_change`
+keeps reporting documents and only documents.
+
+### Consequences
+
+- **A host panel can follow the canvas, and the double-pick goes away.** That
+  is the whole of what this buys, and it is 8A's split working as written: the
+  package owns the canvas and the selection gesture, the host owns its own
+  chrome, and one documented event crosses between them.
+- **The host acquires no obligation.** `on_select` is optional and a host that
+  does not pass it sees no change of any kind - no new assign it must supply,
+  no new event it must handle.
+- **The inspector is unaffected.** The package's own inspector reads the
+  selection from component state as it does today; `on_select` is a seam out,
+  not a rewiring of what is already inside.
+- **A future descriptor key is additive.** The value is a map, so a host reads
+  the keys it knows, which is the same compatibility argument the 2026-09-01
+  note made for `candidates` and the 2026-09-04 note made for
+  `value_candidates`.
+- **This is not the per-palette-entry pane.** Decision 15's deferral of a
+  "test this step" panel is not touched by a callback that reports which block
+  is selected.
+
+Filed with `sb-1hqt`, campaign-029's Lane G.
+
+## Note (2026-09-05): decision 9, where a value picker's candidates come from, and the hint beside them
+
+A dated note rather than an amendment: decision 9 is unchanged in every
+particular, the `expression_component` seam and the three-clause order the
+2026-09-04 note records stand exactly as written, and no text above this line
+is edited by this section. Drafted 2026-09-05 as the record ahead of the code,
+bead `sb-1hqt`, campaign 029 Lane G. It merges at proposed under the campaign
+invariant like every other section filed with it.
+
+What is recorded here is where a value picker's candidates come from when the
+host supplies none, and a second, weaker thing drawn beside the field that is
+deliberately not a candidate at all.
+
+### The default feed: what the datamodel already declares
+
+The 2026-09-04 note added `value_candidates` and said of it that "nothing in
+this package interprets it, and that is the point: only a host knows which of
+its own declared paths have a bounded set of values at all". That sentence is
+right about the host and wrong about *only*. A datamodel document declares
+one, per path, and this package already reads it.
+
+**A path's value candidates default from the datamodel index's declared
+enumeration - ADR-0006's `one_of` - and a host-supplied entry is merged over
+them, per path.** `one_of` is ADR-0006's optional entry key, "a completion
+hint listing the values a host expects", and it is carried through to the
+index this package builds: `StatifierBlocks.Predicates.Datamodel`'s entry type
+declares `one_of: [term()] | nil` and its decoder reads it. Nothing consumes
+it today.
+
+**Merged over, per path, means replacement at the path.** A path the host's
+`value_candidates` map names uses the host's list and only the host's list; a
+path it does not name keeps the declared enumeration; a path with neither gets
+a free-text value control. Not a union, and the reason is that a union has no
+author: if a host lists three values for a path whose datamodel declares five,
+the host is correcting the datamodel for this editor, and a control that
+answered eight would be showing a set nobody declared. Replacement makes the
+host's entry mean what a host writing it plainly intends.
+
+**This does not reopen ADR-0006's open question.** That record asks "whether
+`one_of` is a hint or a claim" and carries it as a hint with no contract.
+Defaulting a picker from a hint is a *use* of the hint, not a promotion of it:
+nothing here validates a value against the list, nothing refuses a value
+outside it, and a value control fed from `one_of` still admits anything the
+author types. That is the same suggests-never-constrains posture the path
+`<datalist>` takes and that 11e's advisory takes on an undeclared path, and it
+is the posture this section keeps.
+
+**One thing the implementing bead should not assume.** Neither of the two
+functions a reader is likely to reach for hands the enumeration over.
+`StatifierBlocks.Datamodel.candidates/3` answers a sorted list of path
+strings and carries no per-path shape at all; `declared_view/3`, which is
+what the Datamodel drawer tab draws, answers rows carrying `type`,
+`item_type`, `scope`, `label` and `sensitive?`, and does **not** carry
+`one_of`. The default feed reads the index entry through
+`StatifierBlocks.Predicates.Datamodel`, not either of those. Whether the row
+should also carry it is the Datamodel drawer tab's question and not this one.
+
+### The hint: a fixture value, drawn beside the field, never an option
+
+The second surface is weaker and is not a candidate feed at all.
+
+**Beside the value field, this package draws a hint derived from the selected
+block's fixture rows.** Its rule, in two halves:
+
+- **The exemplar** is the value the selected block's **first fixture row in
+  declaration order** binds to the path being edited. First, not most common
+  and not most recent: an author reading their own fixtures reads them in the
+  order they wrote them, and "the first one" is the only choice that needs no
+  explanation and no tie-break.
+- **The whole set** goes on the hint's `title` attribute: every distinct value
+  the path takes across that block's rows, in first-appearance order. One
+  glance for the shape of a value, one hover for the range of them.
+
+The rows are the ones the `fixtures` assign already holds for the selected
+block - `%{block_id => [TruthTable.t()]}`, keyed by block, read through
+`Shell.tables_for/2` - and the values are `%TruthTable.Row{}`'s `bindings`,
+which are keyed by path. Nothing new is stored, nothing new is passed in, and
+a document with no fixtures source draws no hint.
+
+**A hint is never an option.** It does not enter the picker, it is not merged
+with `one_of` or with the host's map, and it cannot be picked. A fixture value
+is an *example* - ADR-0006 draws exactly this line, quoting sui-ADR-0006 on
+its own datasets: "datasets are examples, expectations are values, and a
+schema layer stays optional-later". An example promoted into a dropdown
+becomes a declaration the author never made, and the next author reads the
+list as the set of legal values. The whole reason the hint is worth having is
+that it costs nothing to be wrong about; putting it in the picker would make
+being wrong about it expensive.
+
+**And it adds no assign to the rendering package.** The value control an
+`:expression` draws is statifier-ui's, reached through the seam clause 2 of
+the 2026-09-04 note describes. The hint is not passed through that seam and
+that component gains no key: this package draws the hint itself, as an element
+beside the control, out of the `fixtures` it already holds. The seam's shape is
+what makes clause 2 replaceable and clause 3 assertable, and a package-specific
+hint threaded through it would be this record widening another package's API
+to draw its own decoration.
+
+**It is a hint, not a `placeholder`.** `StatifierBlocks.Editor.Field`'s rule
+that exactly two control types carry a placeholder, and that neither is chosen
+by key or by type name, is untouched: the hint is a sibling element with its
+own text, not a third placeholder source, and that rule stays closed for
+whoever amends ADR-0002 decision 7's field record.
+
+### Consequences
+
+- **A host that declares a datamodel gets value pickers it did not configure**,
+  on exactly the paths whose entries carry `one_of`. A host that declares none,
+  or whose entries carry none, sees what it sees today.
+- **`value_candidates` narrows in meaning and not in shape.** It stays the
+  same key with the same value; what changes is that supplying nothing is no
+  longer the same as there being nothing.
+- **The hint is per-block and follows the selection**, because fixtures are
+  attached per block. A path edited on a block with no rows has no hint, and
+  that is silence rather than an empty affordance.
+- **Nothing validates and nothing refuses.** No finding is added, no severity
+  is used, and decision 11's source enum is untouched.
+- **No new command, no new hook, no new anchor, no new host assign.**
+
+Filed with `sb-1hqt`, campaign-029's Lane G.
+
+## Amendment (2026-09-05): 3A admits a Fixtures tab in the inspector
+
+**Status: proposed (2026-09-05, campaign 029 Lane G, bead `sb-1hqt`).** A
+decision record merges at proposed under campaign 029's invariant; flipping it
+to accepted is a separate gated request. Additive; 1A, 2A and the drawer's own
+Fixtures tab stand exactly as written and no text above this line is edited by
+this section. Nothing here is built yet.
+
+### The sentence this amends
+
+3A, in full:
+
+> **3A. The inspector is about the selected block, and carries exactly Config,
+> Findings, Condition.** Anything about the document goes to the drawer. That
+> is the whole rule, and it is worth stating as a rule rather than as a list
+> because the list will grow and the rule will not. The document-level findings
+> panel decision 13 names stays a document-level panel; the inspector's Findings
+> tab is the selected block's findings, which is the distinction `sb-3l1` item a
+> turns on.
+
+and the paragraph under it:
+
+> Datamodel and Fixtures, which the spike had as inspector tabs, are drawer
+> tabs under this rule. They were never about the selected block.
+
+The first sentence's own second half is what this amendment turns on: 3A says
+of itself that the list will grow and the rule will not. This section grows
+the list by one and leaves the rule exactly where it is.
+
+### Why a fixture row is about a block
+
+The rule's test is "about the selected block", and a fixture row passes it as
+a matter of how fixtures are shaped rather than as an argument about them.
+
+**A fixture row attaches to one block.** The `fixtures` assign is
+`%{block_id => [TruthTable.t()]}` - keyed by block id, one bucket per block,
+no document-level bucket and no row that belongs to two blocks. A row's
+bindings build a context and its expectation names a slot *of that block*; the
+drawer's own Fixtures tab compares the row's expected slot against the slot
+the compiled chart took, which is a statement about the block that owns the
+slots. There is no reading of a fixture row under which its subject is
+something other than the block it is attached to.
+
+So the selected block's rows are about the selected block, and a pane showing
+exactly those rows is a pane about one subject - which is the whole of what 3A
+requires of an inspector tab.
+
+**And the 2026-08-30 precision already reads 3A as a rule rather than a closed
+list.** It says so in as many words - "3A reads narrower than it is" - and
+resolves a question the literal list could not answer, about what the Findings
+tab does with no selection, by going to the rule instead: "What 3A forbids is
+a pane that is about two subjects at once; what it does not require is a pane
+that says nothing when its subject is missing." A record that has already been
+read as a rule once, to admit behaviour its list did not mention, is read the
+same way here.
+
+### What the paragraph under 3A meant, and still means
+
+"Datamodel and Fixtures, which the spike had as inspector tabs, are drawer
+tabs under this rule. They were never about the selected block."
+
+That sentence stays true of the surfaces it was about. The spike's Fixtures
+tab, and the drawer's Fixtures tab that eventually shipped as
+`sb-4yze`, are document-level: the 2026-09-02 amendment admits the drawer tab
+under 1A precisely because it is "tabular - one row per fixture row - and it
+is about the whole document, never about the block currently selected", and
+repeats 3A's reason for keeping it out of the inspector. None of that moves.
+The tab this section admits is a different pane with a different row set: the
+selected block's rows, and nothing else, drawn where the selection already is.
+
+### Decision
+
+**The inspector's tab set becomes Config, Findings, Condition, Fixtures**, and
+the rule stays "about the selected block; anything about the document goes to
+the drawer".
+
+**The tab is titled Fixtures, and the two Fixtures tabs coexist by pane.**
+That is not a collision this section is tolerating - it is the arrangement the
+inspector and the drawer already have. **Findings** is an inspector tab and a
+drawer tab today, and the inspector's own module records why that is fine:
+"The Findings tab is **not** the document-level findings panel". The
+distinction that carries Findings carries Fixtures unchanged, and inventing a
+second name for the same subject to avoid a repetition the record already
+lives with would make the inspector harder to read, not easier. 3A's own
+closing sentence is where that distinction is set - "the inspector's Findings
+tab is the selected block's findings" against the document-level panel - so
+the precedent is inside the clause being amended and not only in the module
+that implements it.
+
+**It shows the selected block's rows and no others**, and with no selection it
+has no subject - the empty state the 2026-08-30 precision describes, not a
+fourth surface and not a copy of the drawer's list.
+
+**It is last in `Shell.inspector_tabs/0`.** Config keeps the first position
+and therefore keeps the unchosen-tab resolution, which matters more in the
+inspector than in the drawer: Config is what an author selecting a block is
+almost always going to.
+
+**It adds no assign, no command, no hook and no anchor.** The rows are the
+`fixtures` the editor already holds, read through the same
+`Shell.tables_for/2` the drawer's truth-table tab uses; decision 2's command
+set, decision 7's two-hook limit and decision 11's finding anchors are all
+untouched.
+
+### What this does not decide
+
+- **Whether the tab runs anything.** The drawer's Fixtures tab drives each row
+  through the compiled chart via `Runtime.FixtureRuns.run/4`, which is a
+  compile plus one chart run per row. Whether the inspector's tab shows
+  verdicts or only the rows and their bindings is the implementing bead's
+  question against 2A's own reasoning about what may sit inside a render, and
+  this section deliberately does not answer it.
+- **Whether fixtures become editable here.** They are not editable anywhere
+  today, and admitting a pane is not admitting an editor.
+- **Decision 15's per-palette-entry fixtures pane**, which stays exactly as
+  deferred as decision 15 and the 2026-09-02 amendment left it. That pane is
+  about a palette entry; this tab is about a block in a document.
+
+### Consequences
+
+- **The inspector's tab set is four and 3A governs it unweakened.** The rule
+  is the same sentence it has been since 2026-08-29, and a future pane is
+  admitted by it or it is not.
+- **An author sees a block's fixtures where they selected the block**, without
+  opening the drawer and finding their rows among every other block's.
+- **The drawer's Fixtures tab is unchanged in every particular** - same rows,
+  same verdicts, same count, same place in the tab order.
+- **Two tabs read the same source and cannot disagree**, because they read the
+  same `fixtures` assign through the same reader rather than each deriving its
+  own.
+- **A host contributing its own inspector content is unaffected**; the
+  inspector has no host-tab seam and this section does not add one.
+
+Filed with `sb-1hqt`, campaign-029's Lane G.
