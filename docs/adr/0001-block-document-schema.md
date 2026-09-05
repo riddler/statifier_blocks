@@ -935,3 +935,49 @@ won, and the artifact says so.
   names the boundary; nothing crosses it.
 - ADR-0002 decision 7's `sensitive?` rule and the sensitive-path refusal.
 - The engine's run-creation-wins behaviour over `expr` (SCXML 5.3.2).
+
+## Note (2026-09-05): decision 6, how the worked example spells a duration
+
+A dated Note. No decision in this record moves, and the worked example's bytes
+are not edited.
+
+The change it reads against is **in flight**: ADR-0005's decision-9 amendment
+of this date is proposed, on its own gate and under its own bead. What it
+settles is that record's to state, and this Note neither depends on its text
+nor speaks for it; it records how to read one sentence of the worked example
+once that amendment is accepted.
+
+Decision 6 says config is opaque to this layer, and forbids floats in it. Both
+are unchanged. So is the point the worked example's decision-6 bullet is chosen
+to demonstrate, and so is its reason: 48 hours is written as a string and not
+as `48.0` precisely because of the no-floats rule, and that sentence is as true
+today as when it was written.
+
+What is superseded is narrower - the *illustrative* claim the same bullet makes
+about how a duration is spelled. ADR-0005's proposed amendment of 2026-09-05
+to its decision 9 reverses the clause that kept an older, calendar-style
+spelling accepted in a `:duration` field, on the finding that no
+author-written document holds one. Once it is accepted, a duration in block
+config is written in the expression language's duration grammar: a duration
+like `30s` or `1h30m`, and the example's 48 hours as something like `48h`.
+
+Read the bullet's duration sentence, then, for the property it is there to
+demonstrate. That property is opacity: this layer sees two strings, and which
+grammar wrote either of them is not the schema's business. Read the spelling
+inside it as the spelling of the day the example was written. The same holds
+for the `timeout` value in the worked example's JSON above, and for the
+duration shown in the tree diagram. Those bytes are this record's own and stay
+exactly as they are. What they render is the document this package ships as
+`test/fixtures/documents/worked_example.json`, and it is that fixture which
+migrates on `sb-4r1p`; neither this schema nor decision 6 changes when it does,
+and the example above it is not edited when it does either. The round-trip
+acceptance property beneath the example is indifferent to the spelling: it is
+about bytes surviving a decode and re-encode, whatever the bytes say.
+
+Nothing else in decision 6, in the worked example, or anywhere above this line
+is affected or edited. The 2026-08-31 amendment - the `datamodel` key and
+decision 11 - is untouched here; what a declared entry of duration type means
+is ADR-0006's subject, and `sb-b05e` recorded it there, on a request of its
+own that has landed.
+
+Filed with `sb-8acm`, campaign-029's Lane A.

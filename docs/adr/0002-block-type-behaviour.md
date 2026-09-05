@@ -2465,3 +2465,85 @@ vocabulary table does not grow, no config schema changes, and the send-id
 amendment's two rulings stand exactly as accepted. `core.wait` arming a delayed
 send is not new behaviour blessed here - it is behaviour ADR-0004 and
 `core.wait`'s own moduledoc already carry.
+
+## Note (2026-09-05): decision 7 and G2a, a `:duration` reads one grammar
+
+A dated Note rather than an amendment, because nothing this record decides
+moves. Decision 7's closed field-type set is untouched: `:duration` is still
+one of the seven types, still holds a string, and `core.send`'s `delay` is
+still an optional `:duration` field with a `""` default. What moves is which
+strings that string may be, and that is ADR-0005 decision 9's to decide.
+
+**That amendment is in flight, not settled.** ADR-0005's decision-9 amendment
+of this date is **proposed**, on its own gate and under its own bead; what it
+settles is that record's to state, and this Note neither depends on its text
+nor speaks for it. What follows records which passages here that amendment
+reaches, and how they are to be read once it is accepted. Until then both
+passages stand exactly as they were written on 2026-08-29.
+
+### What the record that owns it proposes
+
+ADR-0005's amendment of 2026-09-05 to its decision 9 - proposed, and merging
+at proposed - reverses the clause that kept an older, calendar-style duration
+spelling accepted beside the expression language's. It reverses it on a fact
+rather than a preference: the operative argument for keeping that spelling was
+that documents already written hold it,
+and a sweep found no such document - the spelling survives only in this
+package's own records, moduledocs and fixtures, all of which this package
+migrates itself.
+
+### The two passages here that clause reaches
+
+- **The dated cross-reference beside decision 7**, added 2026-08-29. It tells a
+  reader to take decision 7's parenthetical for `:duration` as naming a pivot
+  rather than the only spelling `config` may hold. Once that amendment is
+  accepted there is no pivot and no second spelling: a `:duration` holds a
+  string the expression language's duration grammar parses, and a compile
+  renders the emitted attribute straight from it. Decision 7's own sentence is
+  unchanged, and so is the reading that its parenthetical names a
+  representative spelling rather than a grammar - the representative spelling is
+  simply a different one now.
+- **G2a**, in the `core.send` row of the 2026-08-29 amendment, whose middle
+  clause accepts a present `delay` in either spelling through
+  `StatifierBlocks.Core.Duration`. On that amendment's acceptance a present
+  `delay` is accepted in one spelling, the expression language's, and a value in
+  the other is refused like any other unparseable string. G2a's other claims
+  stand exactly as written: an absent `delay` key and the field's own `""`
+  default are both "no delay" and neither is a finding, and decision 7's field
+  type is untouched by the row.
+
+Read both by reference, in the same form G8 used for G3's count sentence and
+the 2026-09-01 note used for G9b. Neither is rewritten.
+
+### What this Note does not do
+
+- It does not change **G2b**'s rule, though it does narrow what one of G2b's
+  words denotes. `validate_config/1` still checks shape only: it refuses an
+  `event` that is not an event name and a stored `delay` that is, in G2b's own
+  phrase, "neither spelling", and it refuses nothing else. What the pivot
+  changes is the count that phrase presupposes - after it there is one
+  spelling rather than two, so the same sentence is read as "not a duration in
+  the expression language's grammar". The rule, and what a config callback is
+  for, are untouched.
+- It does not change **G2c**, or anything about what a compiled `core.send`
+  emits beyond which bytes can have been stored to produce the `delay`
+  attribute. The attribute is still written only when there is one, and still
+  never attributed verbatim.
+- It does not change decision 10's vocabulary table, any config schema, any
+  `io/1`, or any other block type's declared shape. The one other declared
+  `:duration` field, `core.wait`'s `duration`, is reached by that same proposed
+  amendment for the same reason and by the same record, not by any decision
+  taken here.
+  There is no third such field to reach: ADR-0010 decision 1, accepted
+  2026-09-02, settles that a clock interrupt is the `core.send` +
+  `core.on_event` pair and that no `core.timeout` exists.
+- It does not itself carry the wording rule that comes with the pivot. No
+  refusal message, example or documentation line in this package names the
+  retired spelling; that rule is ADR-0005's amendment clause 9d, and it binds
+  the messages the rows above describe.
+
+The code follows the records rather than preceding them: the recogniser, the
+refusal wording and the fixture migration land on `sb-4r1p`. Nothing above this
+line is edited.
+
+Filed with `sb-8acm`, campaign-029's Lane A.

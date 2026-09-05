@@ -5468,3 +5468,141 @@ untouched.
   inspector has no host-tab seam and this section does not add one.
 
 Filed with `sb-1hqt`, campaign-029's Lane G.
+
+---
+
+## Amendment (2026-09-05): decision 9, the `:duration` control reads one grammar
+
+**Status: proposed (2026-09-05, campaign 029 Lane A, bead `sb-8acm`).**
+Additive; no text above this line is edited by this section. It reverses one
+clause of the 2026-08-29 amendment to decision 9 above, and it reverses it
+because the premise that clause rests on turned out to be false.
+
+### Context
+
+The 2026-08-29 amendment settled `:duration` on one text control, with the
+expression language's duration strings primary and the on-screen examples
+`30s`, `15m`, `1h30m`, `2d`, `3d8h`. It kept a second, older calendar-style
+spelling accepted beside them - the one this record's earlier prose uses in its
+examples - and the third bullet of its Decision list is where the argument for
+keeping it sits. That bullet gives two grounds: that the older spelling is one
+ADR-0001 decision 6 already admits into `config`, and - the ground carrying
+the "so" - that it is what documents already written hold, so a field refusing
+it would refuse values that exist.
+
+The second of those is not a design preference. It is a factual claim about
+documents in the world, and it is the operative reason the field carries two
+grammars rather than one: the first ground says only that `config` permits the
+older spelling, never that the editor must offer it. Campaign 029 checked the
+factual one before building anything further on it.
+
+**The premise is false.** Every place the sweep found the older spelling is a
+place this package owns: the prose of these records, the moduledocs and
+refusal messages of the modules that implement the control, a plan document,
+and this package's own test corpus throughout - the `test/fixtures/`
+documents, the support modules that build them, and inline literals across the
+suite alike. It found no author-written document holding one. There are no
+values already written for a stricter field to refuse - there is only this
+package's own corpus, which this package migrates itself, in this campaign.
+
+A clause that exists to protect documents which do not exist protects nothing,
+and what it costs is paid on every field: two grammars in one input, two ways
+for a value to be wrong, a canonicalisation step between them, and an author
+who has to be told which of two spellings the field is failing.
+
+### Proposed decision
+
+**9a. The `:duration` control reads one grammar, the expression language's.**
+The 2026-08-29 amendment's table row stands as written - one text control, the
+expression language's duration strings, the examples on screen. What changes is
+a bullet beneath it: the older spelling is **no longer accepted** in a
+`:duration` field. A value that grammar does not parse is a format finding,
+whatever else it might once have meant.
+
+**9b. The falsified premise, named.** The clause 9a reverses is the third
+bullet of the 2026-08-29 Decision list, the one whose operative ground is that
+existing documents hold the older spelling and a field refusing it would refuse
+values already written. It is reversed on the fact, not on a change of taste:
+the documents it names were looked for and are not there. That bullet's other
+ground - that ADR-0001 decision 6 already admits the spelling into `config` -
+is answered on the merits by 9e below: decision 6 permits the spelling, and
+permitting is not requiring. Every other bullet of that amendment stands,
+including that empty means the key is omitted, that the stored form is the
+author's string verbatim, and that format is validated inline before the
+document gate.
+
+**9c. There is no pivot any more, because there is nothing to pivot from.** The
+2026-08-29 amendment described a compile that reads the author's string and
+canonicalises it through the older spelling before emitting. With one grammar
+in and one rendering out, that middle form has no reader left: the stored
+string is parsed to the expression language's normalised duration and rendered
+straight to the attribute the engine reads. Two things follow that the older
+arrangement could not give. Sub-second and fractional-second spellings become
+expressible - and the reason is narrower than "the older spelling could not
+hold them", because it could: that grammar admits a decimal fraction on its
+smallest component. What blocked them was this package's own renderer of it.
+`StatifierBlocks.Core.Duration`'s private `render/1` answers `:error` for any
+normalised duration still carrying milliseconds, and the component writer
+beneath it emits every field as an integer, so a value with a millisecond
+left in it had no form that renderer could write and therefore no canonical
+form on that path. Remove the middle form and that renderer goes with it. And
+the verbatim-storage property gets cheaper rather than dearer: one grammar in
+means the stored bytes and the compiled value can disagree in fewer ways.
+
+**9d. Wording is part of this decision, not a matter of style.** No refusal
+message, on-screen example, field hint, test name or line of documentation in
+this package names the retired spelling. A message that names it teaches it,
+and a grammar taught in a refusal is a grammar an author will reach for next.
+The refusals say what is accepted - "must be a duration like `30s` or
+`1h30m`" - and stop there. There is exactly one exception in the whole
+package: a single migration line in the release changelog, so that a reader
+holding an old value can find out what became of it. That line is written
+once, by the bead that cuts the release, and nowhere else.
+
+**9e. What ADR-0001 decision 6 still supplies.** Decision 6's no-floats rule is
+why a duration is a string in `config` at all, and 9a does not touch it. What
+changes is only which strings the editor will put there. The document schema
+still sees an opaque string, and this record still does not restate the
+grammar: which strings parse, how a fraction expands, how a repeated unit
+accumulates, and what the calendar-approximating units mean are all
+`Predicator.Duration`'s to define, exactly as the 2026-08-29 amendment set it.
+
+### Consequences
+
+- **This record now disagrees with itself in prose, deliberately.** Sentences
+  above this line use the retired spelling as a live example, and they stay
+  exactly as written: a record's history is not edited, and 9a is applied the
+  way every amendment in this file is applied, by superseding from below. A
+  reader who meets one of those sentences and this section together should read
+  this section as the rule and that sentence as what was true before it. The
+  prose that does get brought into line is the *code's* - moduledocs, refusal
+  messages and on-screen hints - because those are read as instructions rather
+  than as history.
+- **The code follows this record and does not precede it.** The recogniser
+  change, the refusal wording and the fixture migration land on `sb-4r1p`.
+  Until they do, the shipped control is what the 2026-08-29 amendment
+  describes.
+- **It is a breaking change, and the release says so.** A document holding the
+  older spelling stops validating, and a public function whose only job was to
+  produce that spelling goes. The sweep is the argument that the blast radius
+  is this package's own corpus; the release carries its migration line
+  regardless, because a sweep can only see what it can reach.
+- **ADR-0002 decision 7's closed field-type set is untouched, again.**
+  `:duration` is still one of the seven field types and still holds a string.
+  Its cross-reference beside decision 7, and the `core.send` row's G2a, are
+  superseded in one clause each by a dated Note of this date in that record
+  rather than rewritten here.
+- **ADR-0001 decision 6's worked example is spelled in the older grammar**, and
+  a dated Note of this date in that record says so. The example demonstrates
+  opacity and no-floats, and it demonstrates both just as well once its
+  fixture migrates.
+- **The datamodel half is ADR-0006's, and `sb-b05e` has recorded it.** That
+  bead ran on this same lane and amended that record on its own; its amendment
+  has landed, and nothing here reaches into it either way. This section is
+  about the `:duration` control and the block config it writes; what a
+  declared datamodel entry of duration type means is that record's subject,
+  and this one decides nothing about it.
+
+Filed with `sb-8acm`, campaign-029's Lane A. The lane's other record change is
+`sb-b05e`, against ADR-0006; it landed as a request of its own, and this
+section neither depends on it nor touches what it recorded.
