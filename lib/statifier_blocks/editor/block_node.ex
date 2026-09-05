@@ -341,7 +341,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             {ViewModel.subtitle(@node)}
           </span>
           <div :if={ViewModel.summary_chips(@node) != []} class="sb-node__summary">
-            <span :for={chip <- ViewModel.summary_chips(@node)} class="sb-node__chip">
+            <span
+              :for={{chip, raw} <- summary_row(@node)}
+              class="sb-node__chip"
+              title={raw}
+            >
               {chip}
             </span>
           </div>
@@ -428,6 +432,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         </div>
       </div>
       """
+    end
+
+    # One chip and the raw text behind it, per ADR-0005 decision 10w. The
+    # pair is zipped here rather than read as two `:for` sources because a
+    # chip and its `title` are one chip, and the view model guarantees the
+    # two lists are the same length.
+    @spec summary_row(ViewModel.Node.t()) :: [{String.t(), String.t() | nil}]
+    defp summary_row(%ViewModel.Node{} = node) do
+      Enum.zip(ViewModel.summary_chips(node), ViewModel.summary_chip_titles(node))
     end
 
     # A container is a node with at least one declared slot, which is exactly

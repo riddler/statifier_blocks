@@ -213,6 +213,66 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       })
     end
 
+    defmodule Watching do
+      @moduledoc """
+      A host type whose card describes its config in terms of the completion
+      event another block raises - the shape ADR-0005 decision 10w exists
+      for, and the only one that can draw a translated chip.
+      """
+
+      @behaviour StatifierBlocks.BlockType
+
+      @impl true
+      def current_version, do: 1
+
+      @impl true
+      def slots(_config), do: []
+
+      @impl true
+      def config_schema(_config), do: []
+
+      @impl true
+      def validate_config(_config), do: :ok
+
+      @impl true
+      def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+
+      @impl true
+      def palette_entry, do: %{label: "Watch", group: "Structure", icon: "bolt"}
+
+      @impl true
+      def summary(config), do: Map.get(config, "summary")
+    end
+
+    # One card citing another block's generated completion event, beside the
+    # block it cites. Shared with the capture script, so the page a reviewer
+    # looks at and the page this test asserts on are the same page.
+    def watched_document do
+      Document.new(
+        Block.new("core.sequence",
+          id: "blk_watched_root",
+          slots: %{
+            "body" => [
+              Block.new("host.named", id: "blk_AUTH", config: %{"label" => "Authorize"}),
+              Block.new("host.watching",
+                id: "blk_WATCH",
+                config: %{"summary" => ["done.outcome.s_blk_AUTH.error"]}
+              )
+            ]
+          }
+        ),
+        id: "doc_watched"
+      )
+    end
+
+    def watched_palette do
+      Palette.new(%{
+        "core.sequence" => StatifierBlocks.Core.Sequence,
+        "host.named" => NamedStep,
+        "host.watching" => Watching
+      })
+    end
+
     defp lanes_document do
       Document.new(
         Block.new("core.parallel",
@@ -637,6 +697,36 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           |> Enum.map(&Enum.at(&1, 1))
 
         assert chips == ["signup", "email"]
+      end
+
+      # ADR-0005 decision 10w, placement only: the chip element gains an
+      # ATTRIBUTE rather than a sibling, and the attribute carries the raw
+      # generated name the drawn text no longer says. Which chip is
+      # translated is `view_model/done_event_chip_test`'s, and it runs with
+      # LiveView absent.
+      # Sabotage: rendering `title={chip}` instead of the raw name - the
+      # attribute is there and says nothing the card does not already say,
+      # so the translation stops being reversible.
+      test "a translated chip carries the raw event name on its title", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: watched_document(), palette: watched_palette())
+
+        chip =
+          view
+          |> element(
+            ~s([data-block-id="blk_WATCH"] > .sb-node__chrome > ) <>
+              ~s(.sb-node__summary > .sb-node__chip)
+          )
+          |> render()
+
+        assert chip =~ ~s(title="done.outcome.s_blk_AUTH.error")
+
+        text =
+          ~r|<span[^>]*class="sb-node__chip"[^>]*>\s*([^<]*?)\s*</span>|
+          |> Regex.run(chip)
+          |> Enum.at(1)
+
+        assert text == "Authorize · error"
       end
 
       # The two degenerate cases 10q states: a string summary is one chip,

@@ -201,4 +201,81 @@ defmodule StatifierBlocks.Compiler.StateId do
   @spec outcome_event(t(), role()) :: String.t()
   def outcome_event(state_id, outcome) when is_binary(state_id) and is_binary(outcome),
     do: "done.outcome." <> state_id <> "." <> outcome
+
+  @doc ~S"""
+  Inverts `done_event/1` and `outcome_event/2` back to the **block** whose
+  completion the event names, and the outcome it names, or `:error` for a
+  string that is not unambiguously one of them.
+
+  It lives here for the reason `unoutcome_id/1`'s own `@doc` gives about
+  itself: the inversion belongs beside the derivation it inverts, not
+  inside a caller that would have to rediscover why it is exact. The
+  caller this exists for is ADR-0005 decision 10w - a summary chip whose
+  text has the shape of a generated done-event name is drawn as the
+  block's label rather than as the compiler's spelling of it.
+
+  `nil` comes back for the `done.state` form because that event carries no
+  outcome name: ADR-0004 decision 2 makes it the block's completion signal
+  and nothing more. Naming one here would invent a concept ADR-0004 does
+  not have, so what to draw in its place is the caller's word, not this
+  function's.
+
+  ## Why this is total rather than best-effort
+
+  `StatifierBlocks.Validation` admits any non-empty UTF-8 string as a block
+  id, so the opacity this module's moduledoc argues from is a property of
+  every id this package *mints* and not of every id it *admits*. A document
+  arriving through `from_json/1` may carry a block id containing `"__"`, or
+  a `"."`, and either gives a generated event name a second reading:
+  `done.outcome.s_a__b.error` reads as block `a__b` and as block `a` under
+  role `b`, and `done.outcome.s_A.B.C` reads as outcome `B.C` and as
+  outcome `C`.
+
+  Every such string answers `:error`, which is the fail-safe ADR-0005
+  decision 10y requires: a chip drawn as its raw event name is a
+  presentation defect, and a chip drawn as the wrong block's label is a
+  card that says a different block completed.
+
+      iex> StatifierBlocks.Compiler.StateId.undone_event("done.outcome.s_blk_AUTH.error")
+      {:ok, {"blk_AUTH", "error"}}
+
+      iex> StatifierBlocks.Compiler.StateId.undone_event("done.state.s_blk_SEQ")
+      {:ok, {"blk_SEQ", nil}}
+
+      iex> StatifierBlocks.Compiler.StateId.undone_event("done.outcome.s_a__b.error")
+      :error
+
+      iex> StatifierBlocks.Compiler.StateId.undone_event("done.outcome.s_A.B.C")
+      :error
+
+      iex> StatifierBlocks.Compiler.StateId.undone_event("order.paid")
+      :error
+  """
+  @spec undone_event(term()) :: {:ok, {Block.id(), role() | nil}} | :error
+  def undone_event("done.outcome." <> rest) do
+    case String.split(rest, ".") do
+      [state_id, outcome] -> block_of(state_id, outcome)
+      _no_reading_or_two -> :error
+    end
+  end
+
+  def undone_event("done.state." <> state_id), do: block_of(state_id, nil)
+
+  def undone_event(_not_a_generated_name), do: :error
+
+  # The block's OWN state id and nothing else: a state id carrying a role
+  # is an auxiliary state a block mints inside itself, whose completion is
+  # not the block's, and - because a block id may itself contain the
+  # separator - is not even reliably that block's. Both cases are the same
+  # refusal.
+  @spec block_of(String.t(), role() | nil) :: {:ok, {Block.id(), role() | nil}} | :error
+  defp block_of(state_id, outcome) do
+    case unstate_id(state_id) do
+      {:ok, {block_id, nil}} ->
+        if outcome == nil or role?(outcome), do: {:ok, {block_id, outcome}}, else: :error
+
+      _not_a_blocks_own_state ->
+        :error
+    end
+  end
 end

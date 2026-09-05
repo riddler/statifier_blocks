@@ -20,7 +20,7 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
   alias StatifierBlocks.Core.{Branch, OnEvent, Parallel, Send, Wait}
 
   doctest StatifierBlocks.BlockType,
-    only: [summary: 2, summary_refusals: 2, summary_refusal_message: 3]
+    only: [summary: 3, summary_titles: 3, summary_refusals: 3, summary_refusal_message: 4]
 
   doctest StatifierBlocks.Core.Parallel, only: [summary: 1]
   doctest StatifierBlocks.Core.Wait, only: [summary: 1]
@@ -389,6 +389,171 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
           ] do
         assert BlockType.summary(module, %{}) == []
       end
+    end
+  end
+
+  describe "the generated done-event chip (ADR-0005 decision 10w, 10x, 10y)" do
+    @labels %{"blk_AUTH" => "Authorize", "blk_SEQ" => "Collect"}
+
+    defp chips(summary, labels \\ @labels),
+      do: BlockType.summary(Declaring, %{"summary" => summary}, labels)
+
+    defp titles(summary, labels \\ @labels),
+      do: BlockType.summary_titles(Declaring, %{"summary" => summary}, labels)
+
+    defp refusals(summary, labels \\ @labels),
+      do: BlockType.summary_refusals(Declaring, %{"summary" => summary}, labels)
+
+    defp refusal_message(summary, refusal, labels \\ @labels),
+      do: BlockType.summary_refusal_message(Declaring, %{"summary" => summary}, refusal, labels)
+
+    # 10w's first row. The author wrote five characters of the twenty-nine.
+    #
+    # sabotage: draw the outcome first - `error · Authorize` reads as a
+    # block called error, and the card stops matching 10w's table
+    test "an outcome event draws the block's label and the outcome" do
+      assert chips(["done.outcome.s_blk_AUTH.error"]) == ["Authorize · error"]
+    end
+
+    # 10w's second row. `done.state` carries no outcome name at all
+    # (ADR-0004 decision 2), so the literal role the completion final is
+    # minted under is what is honest to draw.
+    #
+    # sabotage: invent a friendlier word than `done` -> the card names a
+    # concept ADR-0004 does not have
+    test "a plain done-state event draws the literal role" do
+      assert chips(["done.state.s_blk_SEQ"]) == ["Collect · done"]
+    end
+
+    # 10x, and the whole reason this section exists. The generated name is
+    # 29 characters against a cap of 24: measured BEFORE translation it is
+    # refused, drawing nothing and raising a lint that names a string the
+    # author cannot shorten because they did not write it.
+    #
+    # sabotage: translate AFTER the cap (move `translate_chip/2` out of
+    # `translated_chips/3` and into `drawn_chips/3`, past the filter) ->
+    # this goes red on both assertions at once, which is the failure mode
+    # 10w exists to prevent arriving exactly as recorded
+    test "the cap measures the translated text, not the generated one" do
+      assert String.length("done.outcome.s_blk_AUTH.error") == 29
+      assert chips(["done.outcome.s_blk_AUTH.error"]) == ["Authorize · error"]
+      assert refusals(["done.outcome.s_blk_AUTH.error"]) == []
+    end
+
+    # 10o, unchanged and unweakened: a translated chip that is STILL over
+    # the cap is refused exactly as any other over-long chip is, and the
+    # sentence names a length the author can act on, because the length is
+    # their own label's.
+    #
+    # sabotage: exempt a translated chip from the cap instead of shortening
+    # it before the cap -> 10o loses its one home and an author who named a
+    # block a paragraph gets no warning
+    test "a translated chip over the cap is refused like any other" do
+      long = %{"blk_AUTH" => "Authorize the payment card"}
+      summary = ["done.outcome.s_blk_AUTH.error"]
+
+      assert chips(summary, long) == []
+      assert refusals(summary, long) == [{0, :too_long}]
+
+      assert refusal_message(summary, {0, :too_long}, long) ==
+               "summary chip 1 is 34 characters; the cap is 24, so it is not drawn"
+    end
+
+    # 10w's other half: the translation is lossless because the raw name
+    # survives on `title`, verbatim and untruncated.
+    #
+    # sabotage: return the DRAWN text as the title -> a screenshot beside a
+    # trace answers nothing, and the chip is no longer reversible
+    test "the raw event name is kept, aligned with the drawn chips" do
+      summary = ["capture", "done.outcome.s_blk_AUTH.error", "done.state.s_blk_SEQ"]
+
+      assert chips(summary) == ["capture", "Authorize · error", "Collect · done"]
+      assert titles(summary) == [nil, "done.outcome.s_blk_AUTH.error", "done.state.s_blk_SEQ"]
+    end
+
+    # sabotage: keep the refused chip in `summary_titles/3` -> the two lists
+    # fall out of step by one and every chip after a refusal carries the
+    # wrong block's event name
+    test "a refused chip drops out of both lists together" do
+      summary = [@over_cap, "done.outcome.s_blk_AUTH.error"]
+
+      assert chips(summary) == ["Authorize · error"]
+      assert titles(summary) == ["done.outcome.s_blk_AUTH.error"]
+    end
+
+    # 10y. A chip may name a block that was deleted, and a label looked up
+    # for a block that is gone is not a label.
+    #
+    # sabotage: fall back to the block id when the lookup misses -> the card
+    # draws `blk_AUTH · error`, which is the derivation the author never
+    # sees, dressed up as a label
+    test "a name that inverts to a block this document does not carry is left alone" do
+      assert chips(["done.state.s_blk_GONE"]) == ["done.state.s_blk_GONE"]
+      assert titles(["done.state.s_blk_GONE"]) == [nil]
+
+      # And the cap still measures the string as written, which is exactly
+      # what an untranslated chip has always been held to.
+      assert chips(["done.outcome.s_blk_GONE.error"]) == []
+      assert refusals(["done.outcome.s_blk_GONE.error"]) == [{0, :too_long}]
+    end
+
+    # 10y again, at the two hazards `StatifierBlocks.Validation` leaves open
+    # by admitting any non-empty UTF-8 block id. `state_id_test.exs` pins
+    # the inversion itself; this pins that the chip pass takes its answer.
+    #
+    # sabotage: guess the longest prefix that names a known block -> the
+    # first assertion draws `Authorize · error` for a block called
+    # `blk_AUTH__retry`, which is a card that says a different block
+    # completed
+    test "an authored block id that breaks the inversion leaves the chip as written" do
+      labels = %{"a__b" => "Retry", "a.b" => "Authorize"}
+
+      assert chips(["done.state.s_a__b"], labels) == ["done.state.s_a__b"]
+      assert titles(["done.state.s_a__b"], labels) == [nil]
+      assert chips(["done.outcome.s_a.b.error"], labels) == ["done.outcome.s_a.b.error"]
+      assert titles(["done.outcome.s_a.b.error"], labels) == [nil]
+    end
+
+    # The default arity is what every caller that has only one block's
+    # config keeps using, and no labels is the same absence as a missing
+    # block: draw the chip as written.
+    #
+    # sabotage: default `labels` to something other than an empty map ->
+    # a consumer on `summary/2` starts translating against a map it never
+    # supplied
+    test "with no labels supplied nothing is translated" do
+      assert BlockType.summary(Declaring, %{"summary" => ["done.state.s_blk_SEQ"]}) ==
+               ["done.state.s_blk_SEQ"]
+
+      assert BlockType.summary_titles(Declaring, %{"summary" => ["done.state.s_blk_SEQ"]}) ==
+               [nil]
+    end
+
+    # sabotage: translate before the `is_binary` guard -> a type that
+    # declares a non-string chip takes the layout pass down instead of
+    # having its chip refused
+    test "a chip that is not a string is refused as it always was" do
+      assert chips([7, "done.state.s_blk_SEQ"]) == ["Collect · done"]
+      assert refusals([7, "done.state.s_blk_SEQ"]) == [{0, :not_a_string}]
+
+      assert refusal_message([7, "done.state.s_blk_SEQ"], {0, :not_a_string}) ==
+               "summary chip 1 is not a string, so it is not drawn"
+    end
+
+    # `core.on_event`'s event chip is the other producer of a chip naming an
+    # event, and it reaches the card through this same pass - so wiring an
+    # interrupt onto a generated completion event gets the translation
+    # without that type knowing anything about it.
+    #
+    # sabotage: translate inside a block type instead of in the shared pass
+    # -> this goes red, and every producer needs its own copy
+    test "the interrupt handler's event chip is translated by the same pass" do
+      config = %{"outcome" => "abandon", "event" => "done.outcome.s_blk_AUTH.error"}
+
+      assert BlockType.summary(OnEvent, config, @labels) == ["Abandon", "Authorize · error"]
+
+      assert BlockType.summary_titles(OnEvent, config, @labels) ==
+               [nil, "done.outcome.s_blk_AUTH.error"]
     end
   end
 end

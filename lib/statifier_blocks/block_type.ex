@@ -91,6 +91,7 @@ defmodule StatifierBlocks.BlockType do
   """
 
   alias StatifierBlocks.Block
+  alias StatifierBlocks.Compiler.StateId
 
   @doc """
   Declares the behaviour and injects the overridable defaults ADR-0007
@@ -697,6 +698,15 @@ defmodule StatifierBlocks.BlockType do
   # value proposed to that record rather than a second opinion about it.
   @presentation_cap 24
 
+  # ADR-0005 decision 10w draws a translated chip as `<block label> · <outcome>`.
+  @chip_separator " · "
+
+  # The role `StatifierBlocks.Compiler.Context.done_id/1` mints a block's
+  # completion `<final>` under, which is what a bare `done.state` event
+  # names. 10w draws that literal word rather than inventing a friendlier
+  # one, because ADR-0004 decision 2 gives that event no outcome name.
+  @done_role "done"
+
   @doc """
   The chip a palette entry declares for its block type's card header, or
   `nil` when it declared none or declared one this package will not draw
@@ -809,12 +819,44 @@ defmodule StatifierBlocks.BlockType do
       iex> StatifierBlocks.BlockType.summary(NoSuchModule, %{})
       []
   """
-  @spec summary(module(), Block.config()) :: [String.t()]
-  def summary(module, config) do
-    module
-    |> declared_chips(config)
-    |> Enum.map(&chip/1)
-    |> Enum.reject(&is_nil/1)
+  @spec summary(module(), Block.config(), chip_labels()) :: [String.t()]
+  def summary(module, config, labels \\ %{}) do
+    module |> drawn_chips(config, labels) |> Enum.map(fn {drawn, _raw} -> drawn end)
+  end
+
+  @typedoc """
+  The label each block on the card's document draws, by block id, as
+  ADR-0005 decision 10w's translation reads it.
+
+  A map rather than a document because the pass that needs it - one chip
+  of one block - has no business walking a document, and because "the
+  label of a block that is not here" and "no labels were supplied" are
+  then the same absence with the same answer (10y: draw the chip as
+  written). `StatifierBlocks.ViewModel` builds it once per document and
+  every consumer that only has one block's config keeps the arity it had.
+  """
+  @type chip_labels :: %{optional(Block.id()) => String.t()}
+
+  @doc """
+  The raw text behind each chip `summary/3` drew, or `nil` where the chip
+  is drawn as declared. Index-aligned with `summary/3` by construction.
+
+  ADR-0005 decision 10w's other half: a translated chip says less than the
+  string behind it, and this is what keeps that reversible. The editor
+  puts it on the chip's `title` attribute, so an author debugging a chart
+  against generated SCXML still has the exact event name. `nil` for every
+  chip that was not translated, which is every chip an author wrote.
+
+  Alignment is not maintained, it is derived: this and `summary/3` read
+  the same one pass and apply the same refusal filter, so a chip cannot be
+  drawn by one and dropped by the other.
+
+      iex> StatifierBlocks.BlockType.summary_titles(StatifierBlocks.Core.Send, %{"event" => "order.paid"})
+      [nil]
+  """
+  @spec summary_titles(module(), Block.config(), chip_labels()) :: [String.t() | nil]
+  def summary_titles(module, config, labels \\ %{}) do
+    module |> drawn_chips(config, labels) |> Enum.map(fn {_drawn, raw} -> raw end)
   end
 
   @typedoc """
@@ -857,14 +899,14 @@ defmodule StatifierBlocks.BlockType do
       iex> StatifierBlocks.BlockType.summary_refusals(NoSuchModule, %{})
       []
   """
-  @spec summary_refusals(module(), Block.config()) ::
+  @spec summary_refusals(module(), Block.config(), chip_labels()) ::
           [{non_neg_integer(), summary_refusal_reason()}]
-  def summary_refusals(module, config) do
+  def summary_refusals(module, config, labels \\ %{}) do
     module
-    |> declared_chips(config)
+    |> translated_chips(config, labels)
     |> Enum.with_index()
-    |> Enum.flat_map(fn {declared, index} ->
-      case chip_refusal(declared) do
+    |> Enum.flat_map(fn {{drawn, _raw}, index} ->
+      case chip_refusal(drawn) do
         nil -> []
         reason -> [{index, reason}]
       end
@@ -893,12 +935,17 @@ defmodule StatifierBlocks.BlockType do
   @spec summary_refusal_message(
           module(),
           Block.config(),
-          {non_neg_integer(), summary_refusal_reason()}
+          {non_neg_integer(), summary_refusal_reason()},
+          chip_labels()
         ) :: String.t()
-  def summary_refusal_message(module, config, {index, reason}) do
+  def summary_refusal_message(module, config, {index, reason}, labels \\ %{}) do
     module
-    |> declared_chips(config)
+    |> translated_chips(config, labels)
     |> Enum.at(index)
+    |> then(fn
+      {drawn, _raw} -> drawn
+      nil -> nil
+    end)
     |> refusal_message(index, reason)
   end
 
@@ -922,9 +969,50 @@ defmodule StatifierBlocks.BlockType do
   defp refusal_message(_declared, index, :not_a_string),
     do: "summary chip #{index + 1} is not a string, so it is not drawn"
 
-  # The one declaration pass `summary/2` and `summary_refusals/2` share, so
-  # the chips that are drawn and the chips that are refused can never be
-  # computed from two different readings of the same callback.
+  # The chips that survive the cap, each with the raw text behind it.
+  # `summary/3` and `summary_titles/3` are both this list read one way, so
+  # the drawn chip and its `title` are the same chip by construction.
+  @spec drawn_chips(module(), Block.config(), chip_labels()) :: [{String.t(), String.t() | nil}]
+  defp drawn_chips(module, config, labels) do
+    module
+    |> translated_chips(config, labels)
+    |> Enum.filter(fn {drawn, _raw} -> chip_refusal(drawn) == nil end)
+  end
+
+  # ADR-0005 decision 10x: the translation runs where the chip is BUILT,
+  # ahead of the cap, and the translated text is what the cap measures.
+  # The order is load-bearing rather than incidental - measured first, a
+  # generated name is refused before it can be shortened, and the lint
+  # names a string the author cannot fix because they did not write it,
+  # which is the one failure 10w exists to prevent.
+  @spec translated_chips(module(), Block.config(), chip_labels()) :: [{term(), String.t() | nil}]
+  defp translated_chips(module, config, labels) do
+    module
+    |> declared_chips(config)
+    |> Enum.map(&translate_chip(&1, labels))
+  end
+
+  # 10w's two rows, and 10y's fail-safe for everything else. A name that
+  # does not invert, and a name that inverts to a block this document does
+  # not carry - a chip may name a block that was deleted - both leave the
+  # chip exactly as it is. Never guess a block: an ugly chip is a
+  # presentation defect, a mislabelled one is a card that says a different
+  # block completed.
+  @spec translate_chip(term(), chip_labels()) :: {term(), String.t() | nil}
+  defp translate_chip(declared, labels) when is_binary(declared) do
+    with {:ok, {block_id, outcome}} <- StateId.undone_event(declared),
+         {:ok, label} when is_binary(label) <- Map.fetch(labels, block_id) do
+      {label <> @chip_separator <> (outcome || @done_role), declared}
+    else
+      _not_a_translatable_name -> {declared, nil}
+    end
+  end
+
+  defp translate_chip(declared, _labels), do: {declared, nil}
+
+  # The one declaration pass every reader above shares, so the chips that
+  # are drawn and the chips that are refused can never be computed from two
+  # different readings of the same callback.
   @spec declared_chips(module(), Block.config()) :: [term()]
   defp declared_chips(module, config) do
     if Code.ensure_loaded?(module) and function_exported?(module, :summary, 1) do
