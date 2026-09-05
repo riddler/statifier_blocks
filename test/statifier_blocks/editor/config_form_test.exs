@@ -138,6 +138,125 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "the fixture hint (ADR-0005's 2026-09-05 note)" do
+      defp decision_view(conn, opts) do
+        {:ok, view, _html} =
+          mount_editor(conn, [document: EditorFixtures.credit_card()] ++ opts)
+
+        select(view, "blk_cc_decision")
+      end
+
+      defp hint(view, key) do
+        element(view, ~s([data-field="#{key}"] .sb-field__fixture-hint))
+      end
+
+      # `credit_card_tables/0`'s four rows bind `amount` as 120, 900, 900 and
+      # 120. The first row in declaration order is the small one, so the
+      # exemplar is 120 - not the most common value, which is a tie, and not
+      # the most recent, which is the fourth row's.
+      #
+      # Sabotage: passed `fixtures={nil}` from `Inspector.config_panel/1`
+      # instead of `@fixtures` - this test and the title one below both went
+      # red, which is what makes this the threading test as well as the
+      # exemplar one: the two positive assertions in this describe are the
+      # two that can tell a broken thread from an absent hint.
+      test "the exemplar is the first fixture row's value for the path the source names",
+           %{conn: conn} do
+        view = decision_view(conn, fixtures: EditorFixtures.credit_card_tables())
+
+        assert has_element?(view, ~s([data-field="arm_review"] [data-fixture-hint="amount"]))
+        assert render(hint(view, "arm_review")) =~ "120"
+
+        assert has_element?(view, ~s([data-field="arm_declined"] [data-fixture-hint="risk_band"]))
+        assert render(hint(view, "arm_declined")) =~ "&#39;low&#39;"
+      end
+
+      # The whole set, de-duplicated: `amount` takes 120 twice and 900 twice
+      # across the four rows and the title lists two values, and `risk_band`
+      # is bound by three of the four rows and lists two.
+      #
+      # Sabotage: dropped `Enum.uniq/1` from `Shell.hint_values/2`, so the
+      # title joined the raw row values and read "120, 900, 900, 120" - four
+      # entries for two values, which is the summary the `title` exists to be
+      # instead of. This went red.
+      test "the title lists every distinct value, once each", %{conn: conn} do
+        view = decision_view(conn, fixtures: EditorFixtures.credit_card_tables())
+
+        assert has_element?(
+                 view,
+                 ~s([data-field="arm_review"] .sb-field__fixture-hint[title="120, 900"])
+               )
+
+        assert has_element?(
+                 view,
+                 ~s([data-field="arm_declined"] .sb-field__fixture-hint[title="'low', 'high'"])
+               )
+      end
+
+      # The record's silence rather than an empty affordance: no element at
+      # all, so there is no empty title and no empty text for a reader or a
+      # screen reader to trip over.
+      #
+      # Sabotage: `Shell.fixture_hint/3` answering `%{path: "", value: "",
+      # values: []}` instead of nil for a block with no rows - the element was
+      # drawn with an empty `title` and no value, which is precisely the empty
+      # affordance the record calls silence instead. This went red.
+      test "a block with no fixture rows draws no hint at all", %{conn: conn} do
+        no_source = decision_view(conn, [])
+        refute has_element?(no_source, ".sb-field__fixture-hint")
+        refute render(no_source) =~ "title=\"\""
+
+        empty_source = decision_view(conn, fixtures: %{"blk_cc_decision" => []})
+        refute has_element?(empty_source, ".sb-field__fixture-hint")
+
+        other_block = decision_view(conn, fixtures: %{"blk_other" => []})
+        refute has_element?(other_block, ".sb-field__fixture-hint")
+      end
+
+      # A hint is never an option. The values reach the page as text and as a
+      # `title`, and nowhere else: not as an `<option>` in the field's own
+      # `<datalist>`, not as a `<select>` choice, not merged into the
+      # `value_candidates` the expression seam is handed.
+      # Sabotage: drew the hint's values as a `<datalist>` of options beside
+      # the element as well - the shortest possible route from hint to option,
+      # and the one an author reading only the bead title might take. This
+      # went red, which is what makes the refutation load-bearing rather than
+      # a restatement of the implementation.
+      test "no fixture value is selectable anywhere on the form", %{conn: conn} do
+        view = decision_view(conn, fixtures: EditorFixtures.credit_card_tables())
+
+        html = render(view)
+
+        refute html =~ ~s(<option value="120")
+        refute html =~ ~s(<option value="900")
+        refute html =~ ~s(<option value="&#39;low&#39;")
+        refute html =~ ~s(<option value="&#39;high&#39;")
+      end
+
+      # The hint is an `:expression` field's alone. `blk_cc_capture_pause` is
+      # a wait, so its `:duration` control keeps the placeholder rule the
+      # `Field` moduledoc closes and gains nothing beside it.
+      #
+      # Sabotage: dropped the `type: :expression` guard from `ConfigForm`'s
+      # own `fixture_hint/3`, so every field type got one - the wait's
+      # duration control grew a hint about a path it does not read. This went
+      # red.
+      test "a field that is not an :expression draws no hint", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn,
+            document: EditorFixtures.credit_card(),
+            fixtures: %{
+              "blk_cc_capture_pause" => EditorFixtures.credit_card_tables()["blk_cc_decision"]
+            }
+          )
+
+        view = select(view, "blk_cc_capture_pause")
+
+        assert has_element?(view, ~s([data-field="duration"][data-field-type="duration"]))
+        refute has_element?(view, ".sb-field__fixture-hint")
+      end
+    end
+
     describe "the d9 gate" do
       # Sabotage: `Editor.change_config/3` committing on the `:invalid_config`
       # arm - the unparseable duration reaches the document and this goes red.

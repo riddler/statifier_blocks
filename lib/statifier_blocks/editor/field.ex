@@ -102,6 +102,35 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     no entry gets a free-text value control, which is the same "suggests,
     never constrains" posture the path `<datalist>` takes.
 
+    ## The fixture hint (sb-e30x)
+
+    `fixture_hint` is `StatifierBlocks.Shell.fixture_hint/3`'s answer for
+    this field, and it is drawn as a sibling element after the control: the
+    exemplar the selected block's first fixture row in declaration order
+    binds to the path the source names, with every distinct value that path
+    takes across the block's rows on the element's `title`. ADR-0005's
+    2026-09-05 note records it, and three of its properties are the reason
+    it is here rather than anywhere else.
+
+      * **It is a hint, not a `placeholder`.** The rule above - exactly two
+        control types carry a placeholder, and neither is chosen by key or
+        by type name - is untouched. The hint is a third element with its
+        own text, not a third placeholder source.
+      * **It is never an option.** Nothing about it reaches a picker, it is
+        not merged with `one_of` or with a host's `value_candidates`, and it
+        cannot be selected. A fixture value is an *example*, and an example
+        promoted into a dropdown becomes a declaration the author never made.
+      * **It adds no assign to the rendering package.** The hint is not
+        passed through the `expression_component` seam and that component
+        gains no key; this package draws it out of the `fixtures` the editor
+        already holds. Widening another package's API to draw this package's
+        own decoration is what the seam's shape exists to prevent.
+
+    `nil` - a block with no fixture rows, or no fixtures source at all -
+    draws no element, so such a block renders exactly as it did before. That
+    is silence rather than an empty affordance, which is the same thing the
+    empty `<datalist>` cases below do.
+
     ## The `:expression` path suggestions (sb-0vt)
 
     That plain input gains a `<datalist>` of the declared datamodel paths
@@ -218,6 +247,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:fixture_hint, :any,
+      default: nil,
+      doc: """
+      `StatifierBlocks.Shell.fixture_hint/3`'s answer for this field, or
+      `nil`. Drawn as an element beside the control, never passed through the
+      `expression_component` seam and never an option.
+      """
+    )
+
     @doc "One field: its label, its control, and its own findings (decision 11)."
     def field(assigns) do
       ~H"""
@@ -234,6 +272,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           path_candidates={@path_candidates}
           value_candidates={@value_candidates}
         />
+        <p
+          :if={@fixture_hint}
+          class="sb-field__fixture-hint"
+          data-fixture-hint={@fixture_hint.path}
+          title={hint_title(@fixture_hint)}
+        >
+          From fixtures, {@fixture_hint.path} is {@fixture_hint.value}
+        </p>
         <p :for={finding <- @field.findings} class={["sb-finding", severity_class(finding)]}>
           {finding.message}
         </p>
@@ -543,6 +589,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @doc "The form param name a field's control posts under."
     @spec input_name(ViewModel.Field.t()) :: String.t()
     def input_name(%ViewModel.Field{key: key}), do: "config[" <> key <> "]"
+
+    # The whole set, on `title`: one glance for the shape of a value, one
+    # hover for the range of them. `Shell.fixture_hint/3` has already made
+    # them distinct and put them in first-appearance order, so this only
+    # spells the separator.
+    @spec hint_title(StatifierBlocks.Shell.fixture_hint()) :: String.t()
+    defp hint_title(%{values: values}), do: Enum.join(values, ", ")
 
     # One place spells the severity modifiers, and it is outside
     # `StatifierBlocks.Editor.*` so it is asserted with LiveView absent

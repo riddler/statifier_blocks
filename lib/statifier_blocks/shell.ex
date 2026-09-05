@@ -715,6 +715,92 @@ defmodule StatifierBlocks.Shell do
   def tables_for(_fixtures, nil), do: []
   def tables_for(fixtures, block_id), do: Map.get(fixtures, block_id, [])
 
+  @typedoc """
+  One fixture-derived hint: the path it is about, the exemplar value drawn
+  beside the control, and every distinct value that path takes across the
+  block's rows in first-appearance order.
+  """
+  @type fixture_hint :: %{path: String.t(), value: String.t(), values: [String.t()]}
+
+  @doc """
+  The fixture-derived hint for one block's condition source, or `nil`.
+
+  ADR-0005's 2026-09-05 note, "The hint: a fixture value, drawn beside the
+  field, never an option". The exemplar is what the block's **first fixture
+  row in declaration order** binds to the path being edited; the whole set is
+  every distinct value that path takes across the block's rows, in
+  first-appearance order. Both halves come out of `tables_for/2` - the same
+  reader the drawer's truth-table tab uses - so nothing is stored and nothing
+  new crosses the `fixtures` seam.
+
+  **Which path is "the path being edited"** is the one thing the record left
+  to the implementing bead, because this package draws the hint beside the
+  control and never sees inside it. The answer here is the path the source
+  currently names, longest first so `user.age_group` is not answered by
+  `user.age`, falling back to the first declared path when the source names
+  none - a block whose condition is still empty gets the hint for the path its
+  fixtures lead with rather than no hint at all.
+
+  A path's declaration order is the fixture source's own `paths` list where it
+  declares one; `TruthTable` derives and sorts one only when it does not.
+  A row that does not bind the path contributes nothing, and a block with no
+  rows - or no fixtures source at all - answers `nil`, which is what makes the
+  hint absent rather than empty.
+
+  This is a hint and never an option: nothing here reaches a picker, nothing
+  is merged with `one_of` or with a host's `value_candidates`, and no value it
+  answers can be selected.
+  """
+  @spec fixture_hint(fixtures(), Block.id() | nil, String.t() | nil) :: fixture_hint() | nil
+  def fixture_hint(fixtures, block_id, source) do
+    tables = tables_for(fixtures, block_id)
+    rows = Enum.flat_map(tables, & &1.rows)
+    paths = tables |> Enum.flat_map(&(&1.paths || [])) |> Enum.uniq()
+
+    with path when is_binary(path) <- hint_path(paths, source),
+         [exemplar | _rest] = values <- hint_values(rows, path) do
+      %{path: path, value: exemplar, values: values}
+    else
+      _no_path_or_no_values -> nil
+    end
+  end
+
+  # Longest first, so a path that is a prefix of another cannot answer for it.
+  @spec hint_path([String.t()], String.t() | nil) :: String.t() | nil
+  defp hint_path([], _source), do: nil
+
+  defp hint_path([first | _rest] = paths, source) when is_binary(source) do
+    named =
+      paths
+      |> Enum.sort_by(&(-String.length(&1)))
+      |> Enum.find(&String.contains?(source, &1))
+
+    named || first
+  end
+
+  defp hint_path([first | _rest], _source), do: first
+
+  # Row order is declaration order - `TruthTable` keeps the rows as the source
+  # wrote them - so the first value out is the first row's, and `Enum.uniq/1`
+  # keeps first appearance for the rest.
+  @spec hint_values([TruthTable.Row.t()], String.t()) :: [String.t()]
+  defp hint_values(rows, path) do
+    rows
+    |> Enum.flat_map(fn %TruthTable.Row{bindings: bindings} ->
+      case Map.fetch(bindings || %{}, path) do
+        {:ok, value} -> [to_hint_text(value)]
+        :error -> []
+      end
+    end)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.uniq()
+  end
+
+  @spec to_hint_text(term()) :: String.t()
+  defp to_hint_text(value) when is_binary(value), do: String.trim(value)
+  defp to_hint_text(value) when is_integer(value), do: Integer.to_string(value)
+  defp to_hint_text(value), do: inspect(value)
+
   @doc "Every block id the fixtures source has a table for, sorted."
   @spec table_block_ids(fixtures()) :: [Block.id()]
   def table_block_ids(nil), do: []

@@ -749,6 +749,133 @@ defmodule StatifierBlocks.ShellTest do
     end
   end
 
+  describe "the fixture hint (ADR-0005's 2026-09-05 note)" do
+    # A table built here rather than reused, so row order is this test's own
+    # subject: `paths` declares `band` after `amount`, and the rows bind
+    # values that are neither alphabetical nor unique.
+    defp hint_tables(rows) do
+      {:ok, table} =
+        TruthTable.build(
+          %{
+            name: "Routing",
+            paths: ["amount", "band"],
+            columns: [%{key: "yes", label: "Yes", source: "amount > 500"}]
+          },
+          rows
+        )
+
+      %{"blk" => [table]}
+    end
+
+    @rows [
+      %{name: "first", bindings: %{"amount" => "120", "band" => "'low'"}},
+      %{name: "second", bindings: %{"amount" => "900", "band" => "'high'"}},
+      %{name: "third", bindings: %{"amount" => "120", "band" => "'mid'"}}
+    ]
+
+    # Sabotage: took `List.last/1` of the distinct values as the exemplar
+    # rather than the first - this read 900, and the reordered call read it
+    # too. Worth knowing what this test alone does NOT catch: reversing the
+    # ROW list leaves it green, because `amount` happens to be 120 at both
+    # ends. The test below is the discriminating one, and the two are drawn
+    # together for that reason.
+    test "the exemplar is the first row's value in declaration order" do
+      assert %{value: "120"} = Shell.fixture_hint(hint_tables(@rows), "blk", "amount > 500")
+
+      reordered = Enum.reverse(@rows)
+      assert %{value: "120"} = Shell.fixture_hint(hint_tables(reordered), "blk", "amount > 500")
+    end
+
+    # The reordering above is the real assertion of "declaration order": the
+    # same three rows in the opposite order answer the OTHER end, which no
+    # alphabetical or most-common rule would do.
+    #
+    # Sabotage: `Enum.reverse/1` in front of `hint_values/2`'s pipeline, which
+    # is the "most recent" rule the record rules out - this test went red, and
+    # it is the only one of the three that could not be satisfied by a
+    # coincidence of the values chosen.
+    test "reordering the rows moves the exemplar with them" do
+      reordered = Enum.reverse(@rows)
+
+      assert %{value: "'mid'"} = Shell.fixture_hint(hint_tables(reordered), "blk", "band == 'x'")
+      assert %{value: "'low'"} = Shell.fixture_hint(hint_tables(@rows), "blk", "band == 'x'")
+    end
+
+    # Sabotage: dropped `Enum.uniq/1` from `hint_values/2` - the list came
+    # back as ["120", "900", "120"], which is the duplicate the `title` is
+    # there to summarise away. This went red.
+    test "the whole set is distinct, in first-appearance order" do
+      assert %{values: ["120", "900"]} =
+               Shell.fixture_hint(hint_tables(@rows), "blk", "amount > 500")
+
+      assert %{values: ["'low'", "'high'", "'mid'"]} =
+               Shell.fixture_hint(hint_tables(@rows), "blk", "band == 'x'")
+    end
+
+    # A row that binds nothing for the path contributes nothing rather than
+    # an empty entry - `credit_card_tables/0`'s fourth row leaves `risk_band`
+    # unbound on purpose, which is why it is the subject here.
+    #
+    # Sabotage: `Map.get/3` in place of the `Map.fetch/2` case, so an unbound
+    # path yields `to_hint_text(nil)` - the title grew a third value reading
+    # "nil", which is a value no fixture row declares. This went red.
+    test "a row that does not bind the path contributes no value", %{fixtures: fixtures} do
+      assert %{values: values} =
+               Shell.fixture_hint(fixtures, "blk_cc_decision", "risk_band == 'high'")
+
+      assert values == ["'low'", "'high'"]
+    end
+
+    # Sabotage: made `hint_path/2` take the first match in declared order
+    # rather than longest-first - "user.age" answered for "user.age_group",
+    # and the hint named a path the source does not read. This went red.
+    test "a path that is a prefix of another does not answer for it" do
+      {:ok, table} =
+        TruthTable.build(
+          %{
+            name: "Ages",
+            paths: ["user.age", "user.age_group"],
+            columns: [%{key: "yes", label: "Yes", source: "user.age > 18"}]
+          },
+          [%{name: "one", bindings: %{"user.age" => "21", "user.age_group" => "'adult'"}}]
+        )
+
+      fixtures = %{"blk" => [table]}
+
+      assert %{path: "user.age_group", value: "'adult'"} =
+               Shell.fixture_hint(fixtures, "blk", "user.age_group == 'adult'")
+
+      assert %{path: "user.age", value: "21"} =
+               Shell.fixture_hint(fixtures, "blk", "user.age > 18")
+    end
+
+    # A condition still empty is the common case on a block just dropped, and
+    # the record's hint is worth having exactly then. The first declared path
+    # is what it falls back to.
+    #
+    # Sabotage: dropped the `|| first` fallback from `hint_path/2` - a block
+    # whose condition names nothing yet got no hint at all, which is the case
+    # the hint is most useful in. This went red.
+    test "a source naming no path falls back to the first declared path" do
+      assert %{path: "amount", value: "120"} =
+               Shell.fixture_hint(hint_tables(@rows), "blk", "")
+
+      assert %{path: "amount"} = Shell.fixture_hint(hint_tables(@rows), "blk", nil)
+    end
+
+    # Sabotage: answered `%{path: nil, value: "", values: []}` instead of nil
+    # for a block with no rows - `Field.field/1` then drew an empty element
+    # with an empty `title`, which is precisely the empty affordance the
+    # record calls silence instead. This went red on the `nil` assertions.
+    test "no rows, no source and no such block all answer nil", %{fixtures: fixtures} do
+      assert Shell.fixture_hint(nil, "blk_cc_decision", "amount > 500") == nil
+      assert Shell.fixture_hint(fixtures, nil, "amount > 500") == nil
+      assert Shell.fixture_hint(fixtures, "blk_cc_capture_pause", "amount > 500") == nil
+      assert Shell.fixture_hint(%{"blk" => []}, "blk", "amount > 500") == nil
+      assert Shell.fixture_hint(hint_tables([]), "blk", "amount > 500") == nil
+    end
+  end
+
   # One host tab descriptor, in the shape the editor derives from a
   # `:drawer_tab` slot entry.
   defp host_tab(id, title, count), do: %{id: id, title: title, count: count}
