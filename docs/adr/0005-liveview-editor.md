@@ -6274,6 +6274,10 @@ same reason:
   (`lib/statifier_blocks/datamodel.ex:655`). That Note claims no exclusivity
   and nothing it says is wrong; this bullet exists so a reader does not infer
   one.
+  - [Note 2026-09-05, `sb-5omq`: the enumeration after "seven files:" lists
+    the ten `lib/` call sites, not the seven `test/` files - the colon
+    attaches to the `lib/` clause above it, and the `test/` occurrences are
+    counted here rather than named.]
 - **"Walks the document once more" is the same walk, not an extra one.**
   Clause 11o says `build/3` "walks the document once more, counting blocks
   per `type_name`" (`:5909`), and a Consequences bullet below it says "No
