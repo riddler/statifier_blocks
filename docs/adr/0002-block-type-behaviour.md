@@ -2245,9 +2245,10 @@ it. The palette caught up first: `StatifierBlocks.Palette.core_types/0`
 registers **fifteen** today, not thirteen, because `sb-uag7` landed the two
 modules this section was waiting on - and it registers them at
 `lib/statifier_blocks/palette.ex:117-133`, not at the `:87-103` cited above,
-which the file has since moved past. (ADR-0009's consequences repeat the same
-stale citation, `docs/adr/0009-fan-out-block-type.md:509`; the count there is
-right and only the line range is old.) Then the table ran ahead again: the
+which the file has since moved past. (ADR-0009's consequences carry a stale
+citation of their own for the same map, `:87-104` at
+`docs/adr/0009-fan-out-block-type.md:509`; the count there is right and only
+the line range is old.) Then the table ran ahead again: the
 `core.await` row that G14 of this date adds makes the table **sixteen** while
 the palette stays at fifteen until `sb-m0t1` lands that module, which is the
 same kind of gap this section describes and not drift. ADR-0009's
@@ -2806,13 +2807,16 @@ writes `type: {:path, %{}}`.
 thing.** A field declaring `{:path, opts}` makes the claim the key makes; a
 field declaring `:string` with `datamodel_path?: true` keeps making it, keeps
 its control and keeps its advisory, so every declaration written before this
-section behaves exactly as it did. `StatifierBlocks.BlockType.datamodel_path?/1`
-(`lib/statifier_blocks/block_type.ex:580-582`) is the single reader the
-2026-08-29 amendment put between the claim and its consumers, and reading the
-claim off either spelling is that function's business rather than every
-caller's - which is the reason that amendment gave for having the function at
-all. A declaration carrying both says the same thing twice; it is not a
-finding and not a contradiction.
+section behaves exactly as it did. There is one place a consumer asks the
+question today - `StatifierBlocks.BlockType.datamodel_path?/1`
+(`lib/statifier_blocks/block_type.ex:580-582`), whose own doc says to read
+the claim through it and never by matching the key (`:245-246`) - and that
+function is the code's, not the 2026-08-29 amendment's: that section adds one
+optional key to decision 7 and names no reader. This section relies on it
+only for what follows from its existing there, which is that reading the
+claim off either spelling can be its business rather than every caller's.
+A declaration carrying both says the same thing twice; it is not a finding
+and not a contradiction.
 
 ### What this section does not decide
 
