@@ -160,15 +160,22 @@ yet. The editor stamps a refused slot's reason beside its validity as
 `data-drop-reason`.
 
 **2. Compose the document.** Your two types, arranged by the `core.*`
-vocabulary this package ships. Twelve types: the containers that arrange
+vocabulary this package ships. Sixteen types: the containers that arrange
 other blocks (`core.sequence`, `core.group`, `core.branch`, `core.parallel`,
-`core.resumable_group`), and the leaves that do a structural thing on their
-own (`core.wait`, `core.on_event`, `core.invoke`, `core.subchart`,
-`core.send`, `core.raise`,
-`core.assign`). None of them knows a domain - `core.invoke` *names* an invoke
-type for the host to run and never runs one, and `core.subchart` names
+`core.resumable_group`, `core.foreach`, `core.drafts`), and the leaves that
+do a structural thing on their own (`core.wait`, `core.await`,
+`core.on_event`, `core.invoke`, `core.subchart`, `core.send`, `core.raise`,
+`core.assign`, `core.placeholder`). `core.await` is the author's "Wait for
+event": it holds until a named event arrives, with an optional deadline, and
+ends one of two declared ways - `received` or `timed_out` - where `core.wait`
+holds for a duration and ends one way. `core.on_event`, the interrupt
+handler, carries an optional `capture` map that writes values out of the
+firing event's payload into the datamodel, and its `event` field offers the
+completion events the blocks in the enclosing body raise as candidates on the
+field an author types. None of them knows a domain - `core.invoke` *names* an
+invoke type for the host to run and never runs one, and `core.subchart` names
 another chart the same way. `StatifierBlocks.Core` carries
-the table of all twelve with their slots. In a running system an editor
+the table of all sixteen with their slots. In a running system an editor
 writes this tree; it is ordinary data either way.
 
 ```elixir
@@ -890,9 +897,11 @@ the theme - rather than a callback the editor calls back into:
 | `--sb-*` tokens | the `theme` assign, or your own CSS | every colour, space, radius and drag treatment - see [`docs/theming.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/theming.md) |
 | compile findings | `findings` assign | `StatifierBlocks.Finding.from_compiler/2` adapts a compiler finding into the shape the editor renders, so a compile result routes back to the field somebody typed it into |
 | `datamodel` | the `datamodel` assign | the datamodel paths the host declares; drives the undeclared-path advisory of ADR-0005 `11e`-`11g`, and `nil` (the default) turns it off entirely |
+| `{:path, opts}` field type | `config_schema/1` on your own block type | says a config field holds a datamodel path - the eighth member of ADR-0002 decision 7's closed field-type set, and the spelling `datamodel_path?: true` already had. `StatifierBlocks.BlockType.datamodel_path?/1` answers `true` for it by construction, so the field carries the same undeclared-path advisory, and the editor renders it as a text input backed by a `<datalist>` of the paths `StatifierBlocks.Datamodel.candidates/3` derives from what the host declared. It suggests and never constrains: free text stays valid, `validate_config/1` stays the only authority, and with no `datamodel` handed in the list is empty and the plain input renders |
 | `expression_component` | the `expression_component` assign | the control an `:expression` field renders. Unset, it resolves to statifier-ui's expression editor when `statifier_ui` is present and to the package's plain source input when it is not; set, the host's own function component wins over both |
 | `value_candidates` | the `value_candidates` assign | the values the host offers per datamodel path, `%{path => [%{label:, value:} \| binary]}`. Read by whatever fills the `expression_component` seam - a path with no entry gets a free-text value control, because only a host knows which of its own paths have a value set |
 | `chart_outcomes` | the `chart_outcomes` assign | what the host says each of its stored documents finishes with, `%{document id => [outcome]}`. A `core.subchart` names a chart by document id and declares its outcomes by hand, because a block type cannot read the document it references; only the host knows which of its documents it compiles with `:child_use` - those are the ones a subchart may name - and what finals each of those emits. The editor offers that list on the `outcomes` field and reports a disagreement between it and what the block declares. A document the map does not name is *unknown*, which is not disagreement: `%{}`, the default, reports nothing about anything |
+| `capture` | `core.on_event` config, in the document | a map that writes values out of the firing event's payload into the datamodel: the key is the destination (a datamodel path) and the value is the source (a path inside `_event.data`). One `<assign>` per pair is emitted on the handler's own transition, in the destinations' sorted order, before the `<raise>` that carries the outcome. `config_schema/1` declares no field for it - the field-type set has no member that describes a map - so it is authored through the document rather than through the editor today. At run time a source whose root is bound but whose named member is missing writes the interpreter's explicit unbound marker and raises nothing (ADR-0002's capture Note, as corrected 2026-09-05), so a reader of a captured path tests for that marker rather than assuming an authored absence |
 
 The metadata readers are total and refuse rather than repair: a badge that is
 blank, carries a newline, or runs past 24 characters is dropped rather than
