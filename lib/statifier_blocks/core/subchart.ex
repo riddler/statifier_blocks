@@ -56,6 +56,36 @@ defmodule StatifierBlocks.Core.Subchart do
   an outcome it calls `error`, and then the two are one outcome with one
   final and one slot rather than two spellings of the same thing.
 
+  ## What the host knows that this type cannot (sb-r4w7)
+
+  The paragraph above is a statement about what a *compile of one
+  document* can see. A **host** sees more: it holds every stored document,
+  so it knows which of them it compiles with `:child_use` and what finals
+  each of those emits. Two things follow, and both are the editor's rather
+  than this type's.
+
+    * The editor offers those finals as candidates on the `outcomes`
+      field, keyed on the document id in `chart`, from the host's
+      `chart_outcomes` assign. It is a `<datalist>` on a field that is
+      still a `:string`: a free-typed name validates exactly as it did.
+    * `StatifierBlocks.ViewModel.outcome_findings/3` reports a
+      **disagreement** between what the author declared here and what the
+      host says that chart finishes with, anchored on this key.
+
+  The comparison is against `child_outcomes/1` - the author's own list -
+  and not `outcome_names/1`, because the appended failure outcome is
+  ADR-0068's event rather than a `<final>` the child reports, and a child
+  chart is not expected to have one. A ref the host said nothing about
+  produces nothing: *unknown is not disagreement*, which is ADR-0005
+  amendment `11f`'s posture for the datamodel repeated here for the same
+  reason.
+
+  None of it constrains. The disagreement is a `:warning`, not an error:
+  the document compiles either way, and what a mismatch actually costs is
+  a conditioned transition that can never match - a routing arm that is
+  dead rather than wrong. `validate_config/1` is untouched, because this
+  type still cannot read the chart it names.
+
   ## Every outcome gets a slot, `on_error` included
 
   An outcome path is a **slot**, never a port (D13, ADR-0002's amendment

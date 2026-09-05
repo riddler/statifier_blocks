@@ -106,6 +106,68 @@ defmodule StatifierBlocks.Core.SubchartTest do
     end
   end
 
+  describe "the outcomes field, with a host offering candidates (sb-r4w7)" do
+    # The key SET, not a subset match: the whole claim is that the field
+    # declaration gained nothing, and a subset match is satisfied by a
+    # declaration that grew a key. The candidate list is the editor's lookup
+    # into its own assign, exactly as `core.on_event`'s `event` list is.
+    #
+    # sabotage: added a `candidates: []` key to the `outcomes` declaration ->
+    # 1 failure, here (verified). The same mutation passes a subset match,
+    # which is why this assertion is written the way it is.
+    test "config_schema/1 declares it as it always did" do
+      declaration =
+        @eligibility |> Subchart.config_schema() |> Enum.find(&(&1.key == "outcomes"))
+
+      assert Enum.sort(Map.keys(declaration)) == [:default, :key, :label, :required?, :type]
+      assert %{type: :string, required?: false, default: ""} = declaration
+    end
+
+    # sabotage: made `check_outcomes/2` compare against a chart's finals -
+    # impossible without a document, which is the point; the nearest real
+    # mutation, rejecting a name no chart is known to emit, gives 1 failure,
+    # here, on the third assertion (verified).
+    test "validate_config/1 still judges the field on its own shape" do
+      assert Subchart.validate_config(%{"chart" => "bdoc_CHILD", "outcomes" => "approved"}) == :ok
+
+      assert Subchart.validate_config(%{
+               "chart" => "bdoc_CHILD",
+               "outcomes" => "approved\ndeclined"
+             }) == :ok
+
+      assert Subchart.validate_config(%{"chart" => "bdoc_CHILD", "outcomes" => "never_emitted"}) ==
+               :ok
+
+      assert {:error, [{"outcomes", _message}]} =
+               Subchart.validate_config(%{"chart" => "bdoc_CHILD", "outcomes" => "Approved"})
+    end
+
+    # The reading the disagreement pass compares against, and the reason it
+    # is this one: the appended failure outcome is ADR-0068's event, not a
+    # `<final>` the child reports, so a chart that never finishes `error` is
+    # not in disagreement with a block that routes one.
+    #
+    # sabotage: made `child_outcomes/1` append `error` the way
+    # `outcome_names/1` does -> 5 failures across this file, this one among
+    # them (verified).
+    test "child_outcomes/1 is the author's list, without the appended error" do
+      assert Subchart.child_outcomes(%{"outcomes" => "approved\ndeclined"}) ==
+               ["approved", "declined"]
+
+      assert Subchart.outcome_names(%{"outcomes" => "approved\ndeclined"}) ==
+               ["approved", "declined", "error"]
+    end
+
+    # sabotage: made the blank field read as `[]` rather than `["done"]` ->
+    # 2 failures, this one among them (verified). A subchart that declares
+    # nothing has the one outcome an ordinary block has, so a host reporting
+    # `["done"]` for its chart is in agreement with it.
+    test "child_outcomes/1 defaults to the one outcome an ordinary block has" do
+      assert Subchart.child_outcomes(%{}) == ["done"]
+      assert Subchart.child_outcomes(%{"outcomes" => ""}) == ["done"]
+    end
+  end
+
   describe "outcomes/1 and slots/1" do
     # sabotage: appended `error` unconditionally -> a child that finishes
     # `error` gets two finals and two slots for one outcome, and this goes

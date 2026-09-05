@@ -373,6 +373,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `expression_component` | no | override for `:expression` fields (sui-bob's seam); with it unset, an `:expression` renders statifier-ui's own expression editor when that package is on the host's load path, and the package's plain source input when it is not |
     | `value_candidates` | no | the values offered per datamodel path, `%{path => [%{label:, value:} \| binary]}`; **merged over the datamodel's own `one_of` enumerations, per path**, so a path this map names uses this map's list and a path it does not name keeps what the datamodel declares. Read only by an expression editor that draws value pickers; `%{}` (the default) now means *nothing beyond what the datamodel declares* rather than nothing at all |
     | `invoke_types` | no | the invoke types the host is prepared to answer; suggestions on an `invoke_type` field, never a constraint, and `[]` (the default) means *no list supplied* |
+    | `chart_outcomes` | no | what the host says each of its stored documents finishes with, `%{document id => [outcome]}`; offered as candidates on a `core.subchart`'s `outcomes` field and compared against what that block declares (`StatifierBlocks.ViewModel.outcome_findings/3`). `%{}` (the default) says nothing about any chart, and a chart the map does not name is *unknown*, which is not disagreement |
     | `active_marks` | no | the block ids a run has activated; held as editor state, and cleared when the host opens a different document |
     | `invoke_mark` | no | the block a run is calling out to and how the call came back - `{block_id, outcome}`, a bare `block_id` for no answer yet, or `nil` for no call at all |
     | `theme` | no | `--sb-*` custom properties for the canvas root |
@@ -424,6 +425,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # one the summary chips use for `<label> <sep> <outcome>`, so a candidate
     # and the chip it will become read alike.
     @on_event_type "core.on_event"
+
+    # The one type whose `outcomes` field is offered the finals a host says
+    # the referenced chart emits (sb-r4w7).
+    @subchart_type "core.subchart"
     @candidate_separator " · "
 
     @impl Phoenix.LiveComponent
@@ -440,6 +445,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          icon: nil,
          expression_component: nil,
          invoke_types: [],
+         chart_outcomes: %{},
          value_candidates: %{},
          theme: %{},
          class: nil,
@@ -587,6 +593,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       * `:declare` - the roots the host will pass the compiler, `[]` by
         default, which per amendment 11m declares none. The document's own
         roots need no option: they are read off `document`.
+      * `:chart_outcomes` - what the host says its stored documents finish
+        with, `%{}` by default, which says nothing about any chart and so
+        reports no subchart disagreement (sb-r4w7).
     """
     @spec findings_count(Document.t(), Palette.t(), keyword()) :: non_neg_integer()
     def findings_count(%Document{} = document, %Palette{} = palette, opts \\ []) do
@@ -596,7 +605,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           palette,
           Keyword.get(opts, :findings, []),
           Keyword.get(opts, :datamodel),
-          Keyword.get(opts, :declare, [])
+          Keyword.get(opts, :declare, []),
+          Keyword.get(opts, :chart_outcomes, %{})
         )
 
       Shell.findings_count(findings)
@@ -629,6 +639,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:path_candidates, path_candidates(assigns))
         |> assign(:offered_values, offered_values(assigns))
         |> assign(:event_candidates, event_candidates(assigns))
+        |> assign(:outcome_candidates, chart_outcome_candidates(assigns))
         |> assign(:declaration_refusal, declaration_refusal(assigns))
         |> assign(:marks, marks(assigns))
         |> assign(:fit_target, fit_target(assigns))
@@ -719,6 +730,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             path_candidates={@path_candidates}
             value_candidates={@offered_values}
             event_candidates={@event_candidates}
+            outcome_candidates={@outcome_candidates}
             fixtures={@fixtures}
             fixture_runs={@fixture_runs}
             target={@myself}
@@ -1620,6 +1632,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp event_candidates(_not_an_on_event), do: []
 
+    # The finals a `core.subchart`'s `outcomes` field offers (sb-r4w7): what
+    # the host said the chart named in `chart` finishes with, and nothing
+    # derived. A block type cannot read the document it references - see
+    # `StatifierBlocks.Core.Subchart`'s moduledoc - so this is the one
+    # candidate list in the component that is a lookup rather than a
+    # derivation, and the assign is the whole of it.
+    #
+    # Derived here for `event_candidates/1`'s reason: it is a question about
+    # the SELECTION, and the view model is a projection of the document that
+    # knows nothing about which card is open. Empty for every other selection,
+    # so the control in `StatifierBlocks.Editor.Field` tests no block type -
+    # and `core.subchart` is the only core type with an `outcomes` key anyway.
+    @spec chart_outcome_candidates(map()) :: [String.t()]
+    defp chart_outcome_candidates(
+           %{selected_node: %ViewModel.Node{type: @subchart_type} = node} = assigns
+         ) do
+      with %Block{config: config} <- block_by_id(assigns.document, node.block_id),
+           chart when is_binary(chart) <- Map.get(config, "chart"),
+           names when is_list(names) <- Map.get(assigns.chart_outcomes, chart) do
+        Enum.filter(names, &is_binary/1)
+      else
+        _nothing_said_about_this_chart -> []
+      end
+    end
+
+    defp chart_outcome_candidates(_not_a_subchart), do: []
+
     # What "the enclosing body" means, asked of the declaration rather than
     # of a slot name: a slot that admits ADR-0003's `:step` kind. That is
     # `body` on `core.group` and `core.resumable_group`, and whatever a host
@@ -1735,10 +1774,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         palette: palette,
         findings: findings,
         declared_paths: declared_paths,
-        host_roots: host_roots
+        host_roots: host_roots,
+        chart_outcomes: chart_outcomes
       } = socket.assigns
 
-      view_model = view_model(document, palette, findings, declared_paths, host_roots)
+      view_model =
+        view_model(document, palette, findings, declared_paths, host_roots, chart_outcomes)
 
       selected = selected_node(socket, view_model)
 
@@ -1820,12 +1861,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # datamodel and the routing is the one already tested. `datamodel` is
     # whatever the host handed over or the already-normalized set the
     # component keeps - `Datamodel.findings/3` normalizes either.
-    @spec view_model(Document.t(), Palette.t(), [Finding.t()], term(), term()) ::
+    @spec view_model(Document.t(), Palette.t(), [Finding.t()], term(), term(), term()) ::
             ViewModel.t()
-    defp view_model(document, palette, findings, datamodel, declare) do
+    defp view_model(document, palette, findings, datamodel, declare, chart_outcomes) do
       advisories = Datamodel.findings(document, palette, datamodel, declare)
+      disagreements = ViewModel.outcome_findings(document, palette, chart_outcomes)
 
-      ViewModel.build(document, palette, findings ++ advisories)
+      ViewModel.build(document, palette, findings ++ advisories ++ disagreements)
     end
 
     # The fields the author has typed that the document does not hold.

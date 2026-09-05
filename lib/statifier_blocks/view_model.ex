@@ -148,6 +148,7 @@ defmodule StatifierBlocks.ViewModel do
   """
 
   alias StatifierBlocks.{Block, BlockType, CanonicalJson, Document, Finding, Palette, Shelf}
+  alias StatifierBlocks.Core.Subchart
 
   defmodule Field do
     @moduledoc """
@@ -1020,6 +1021,123 @@ defmodule StatifierBlocks.ViewModel do
         block.type
     end
   end
+
+  @typedoc """
+  What a host says each of its stored documents finishes with: the finals a
+  compile with `StatifierBlocks.Compiler`'s `:child_use` option emits for
+  that document, keyed by the document id an author types into a
+  `core.subchart`'s `chart` field.
+  """
+  @type chart_outcomes :: %{optional(String.t()) => [String.t()]}
+
+  @doc """
+  The disagreements between what a `core.subchart` declares in `outcomes`
+  and what the host says the chart it names actually finishes with
+  (sb-r4w7).
+
+  It is a **separate pass** rather than part of `build/3` for the reason
+  `StatifierBlocks.Datamodel.findings/4` is: `chart_outcomes` is the
+  host's input, not the document's, and the projection stays a function of
+  the document plus the palette. The result goes in through the same
+  caller-findings seam every other supplied finding uses, so there is one
+  routing path and one place it is tested.
+
+  Three rules, and the first is the one that keeps it quiet:
+
+    * **Unknown is not disagreement.** A `chart` the map says nothing
+      about produces nothing, and so does an entry holding an empty list -
+      an empty list is the absence of knowledge about a chart's finals,
+      not the claim that it has none. ADR-0005 amendment `11f` takes the
+      same posture for a `nil` datamodel, for the same reason: a host that
+      has not answered has not disagreed.
+    * **The author's own list is what is compared.** `child_outcomes/1`,
+      not `outcome_names/1`: the appended `error` is ADR-0068's failure
+      event rather than a `<final>` the child reports.
+    * **It is a `:warning`, never an error.** The document compiles either
+      way. What a mismatch costs is a conditioned `done.invoke` transition
+      that can never match - a dead routing arm - which is exactly the
+      "compiles, and may not behave as intended" `:warning` names. The
+      source is `:lint` for the reason `summary_findings/4` above is one:
+      the rule is this package's reading of a host value, not the block
+      type's `validate_config/1`, which cannot read the chart at all.
+
+  Anchored `{:config, block_id, "outcomes"}`, so it renders under the
+  field the author would fix it in.
+  """
+  @spec outcome_findings(Document.t(), Palette.t(), chart_outcomes()) :: [Finding.t()]
+  def outcome_findings(%Document{} = document, %Palette{} = palette, chart_outcomes)
+      when is_map(chart_outcomes) and map_size(chart_outcomes) > 0 do
+    document
+    |> Document.blocks()
+    |> Enum.flat_map(&subchart_outcome_findings(&1, palette, chart_outcomes))
+  end
+
+  def outcome_findings(_document, _palette, _chart_outcomes), do: []
+
+  # Gated on the module rather than on the type name: a host palette maps
+  # whatever name it likes onto this module, and it is this module's reading
+  # of the field - `child_outcomes/1` - that the comparison is made with.
+  @spec subchart_outcome_findings(Block.t(), Palette.t(), chart_outcomes()) :: [Finding.t()]
+  defp subchart_outcome_findings(%Block{id: id} = block, palette, chart_outcomes) do
+    with {:ok, Subchart, %Block{config: config}} <- resolve_subchart(palette, block),
+         chart when is_binary(chart) <- Map.get(config, "chart"),
+         [_first | _rest] = finals <- chart_finals(chart_outcomes, chart) do
+      disagreement(id, chart, Subchart.child_outcomes(config), finals)
+    else
+      _no_answer_about_this_chart -> []
+    end
+  end
+
+  @spec resolve_subchart(Palette.t(), Block.t()) :: {:ok, module(), Block.t()} | :error
+  defp resolve_subchart(palette, block) do
+    case Palette.resolve(palette, block) do
+      {:ok, module, resolved} -> {:ok, module, resolved}
+      {:error, _reason} -> :error
+    end
+  end
+
+  # Total in the value as well as the key: a host that hands over something
+  # other than a list of names has said nothing this pass can read, and
+  # raising on it would take the whole editor down over a seam value.
+  @spec chart_finals(chart_outcomes(), String.t()) :: [String.t()] | nil
+  defp chart_finals(chart_outcomes, chart) do
+    case Map.get(chart_outcomes, chart) do
+      names when is_list(names) -> Enum.filter(names, &is_binary/1)
+      _not_a_list -> nil
+    end
+  end
+
+  @spec disagreement(Block.id(), String.t(), [String.t()], [String.t()]) :: [Finding.t()]
+  defp disagreement(block_id, chart, declared, finals) do
+    unmatched = declared -- finals
+    undeclared = finals -- declared
+
+    case disagreement_message(chart, unmatched, undeclared) do
+      nil ->
+        []
+
+      message ->
+        [Finding.new({:config, block_id, "outcomes"}, :lint, message, severity: :warning)]
+    end
+  end
+
+  # Both directions, in one finding rather than one per name: they are one
+  # observation about one field, and an author reading four findings under
+  # one input is reading the same sentence four times.
+  @spec disagreement_message(String.t(), [String.t()], [String.t()]) :: String.t() | nil
+  defp disagreement_message(_chart, [], []), do: nil
+
+  defp disagreement_message(chart, unmatched, undeclared) do
+    [
+      unmatched != [] && "#{chart} does not finish with #{names(unmatched)}",
+      undeclared != [] && "#{chart} also finishes with #{names(undeclared)}"
+    ]
+    |> Enum.filter(&is_binary/1)
+    |> Enum.join("; ")
+  end
+
+  @spec names([String.t()]) :: String.t()
+  defp names(list), do: Enum.map_join(list, ", ", &inspect/1)
 
   @spec config_findings(Block.id(), module(), Block.config()) :: [Finding.t()]
   defp config_findings(block_id, module, config) do
