@@ -67,5 +67,14 @@ Rules:
 
 Assemble the fragments into a new version section in `CHANGELOG.md`, grouped by
 heading and ordered `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`,
-`Security`. Delete the fragments in the same commit that cuts the release, and
-tag it.
+`Security`. Within one heading, when more than one fragment contributed bullets
+to it, the fragments go in fragment-name order - `sb-0l36.md` before
+`sb-4r1p.md` - and each fragment's own bullets keep the order they have in
+their file. Delete the promoted fragments in the same commit; this `README.md`
+stays.
+
+That commit is a release **prep**: the version bump and this promotion, and
+nothing else. It does not tag, push, publish, or cut a GitHub release - those
+are the operator's, in every campaign and outside every campaign, as
+`CLAUDE.md`'s authority table says. `.claude/wurk/release.md` is the full
+recipe and it says the same.

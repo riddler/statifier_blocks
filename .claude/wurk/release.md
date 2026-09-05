@@ -8,6 +8,30 @@ override, and nothing below rewrites a step the skill already performs.
 Read this together with `.claude/wurk.json`'s `release` block. Between them
 they name every file a release commit here touches, and no others.
 
+The reference for every shape below is **the most recent release-prep commit
+on `main`**, resolved when you read this rather than named here. Find it with:
+
+```bash
+git log --oneline --no-patch -L '/@version/,+1:mix.exs'
+```
+
+The first line is the last commit that moved `@version`, and the last commit
+that moved `@version` is the last release prep by definition. Where this file
+and that commit disagree, the commit is the evidence and this file is the
+defect.
+
+**This file names no SHA for that reference, on purpose, and it carries no
+version string anywhere.** A hard-coded reference stops being the most recent
+the moment the next release lands: the sentence that used to sit in step B
+named the 0.11.0 prep commit and asserted it was the shape to copy, and the
+0.17.0 prep found it five releases stale (`sb-0id2`). Nothing below needs
+editing at a release, and a release commit does not touch this file - the
+table at the end lists every file it does touch, and this is not one of them.
+
+Commits cited further down are historical evidence for a claim about the past
+("this happened once, in that commit"). They are not the reference, and they
+stay correct as releases accumulate.
+
 ## Why the recipe names no changelog
 
 `kind: "hex"`'s changelog step renames a `## [Unreleased]` heading in one file
@@ -37,11 +61,14 @@ as `@compiler_version`. It is the compiler's third determinism input and it is
 stamped into every compiled record, so it has to move with `mix.exs` on every
 release. Bump it to the same `X.Y.Z`.
 
-`test/statifier_blocks/compiler_test.exs:272` asserts
+The test named `"compiler_version is this package's version"` in
+`test/statifier_blocks/compiler_test.exs` asserts
 `Compiler.compiler_version() == Mix.Project.config()[:version]`, so the two
 cannot drift silently: a `mix.exs` bump on its own takes the gate red rather
-than shipping a record stamped with the previous version. That assertion is
-the check, not a substitute for doing this step.
+than shipping a record stamped with the previous version. Find it with
+`grep -n 'compiler_version is this package' test/statifier_blocks/compiler_test.exs`
+rather than by a line number, which rots on the next edit above it. That
+assertion is the check, not a substitute for doing this step.
 
 Nothing else in `compiler.ex` changes. The comment above the attribute already
 explains why it exists; the release moves the string.
@@ -49,7 +76,7 @@ explains why it exists; the release moves the string.
 ## Step B: promote the changelog fragments
 
 Placed where the skill's changelog step would have been, and modeled on the
-0.11.0 prep commit `2677063`, which is the reference for the shape.
+reference prep commit above.
 
 1. Read every `changelog.d/*.md` fragment except `README.md`. Each is a Keep a
    Changelog section heading followed by its bullets.
@@ -60,6 +87,16 @@ Placed where the skill's changelog step would have been, and modeled on the
 3. Under the heading, write a short lead paragraph saying what the release is,
    then the fragments' bullets grouped by heading and ordered `Added`,
    `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
+
+   Within one heading, when more than one fragment contributed bullets to it,
+   the fragments go in **fragment-name order** - `changelog.d/sb-0l36.md`
+   before `changelog.d/sb-4r1p.md` - and each fragment's own bullets keep the
+   order they have in their file. That is an arbitrary but stable rule, and
+   stable is the point: it is not a judgement about which change matters
+   most, so no release worker has to make one. The 0.17.0 prep is the first
+   one that had to choose (six fragments, three headings) and it chose this;
+   `changelog.d/README.md` states the same rule from the other side.
+
    **Carry every bullet over byte for byte.** The lead paragraph and the link
    reference are the only prose written at release time; reordering,
    consolidating or rewording a fragment's bullet is an editorial pass a human
@@ -74,12 +111,25 @@ judgement, not a rule that computes it.
 
 ## The README install pin needs no step here
 
-`release.readme_pin` is `true`, and the skill's own step covers this repo's pin
-without help: `README.md` carries `{:statifier_blocks, "~> 0.11"}` in its
-`def deps` snippet, which is exactly the major/minor form with the patch
-component dropped that the skill bumps, and `2677063` shows the previous
-release moving it that way (`~> 0.10` to `~> 0.11`). It is named here only so
-that the carriers a release moves are all listed in one place.
+`release.readme_pin` is `true`, and the skill's own step covers this repo's
+pin without help: `README.md` carries a `{:statifier_blocks, "~> X.Y"}` pin in
+its `def deps` snippet - exactly the major/minor form with the patch component
+dropped that the skill bumps. It is named here only so that the carriers a
+release moves are all listed in one place.
+
+The pin's current value is not written down here, for the same reason no
+version is written down anywhere else in this file. Read it and check it
+against the version file instead:
+
+```bash
+grep 'statifier_blocks, "~>' README.md   # the pin
+grep '@version "' mix.exs                # the version it should track
+```
+
+They should agree on major and minor. If they ever do not, the pin edit
+repairs the drift in one move rather than stepping one release at a time: it
+goes straight to the current major/minor, and that is the recipe working, not
+a mistake to correct back.
 
 ## The files a release commit touches
 
