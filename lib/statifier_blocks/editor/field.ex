@@ -5,7 +5,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     decision 9, ADR-0002 decision 7).
 
     The set is closed precisely so this renderer can be total, and the
-    mapping is the record's, unchanged:
+    mapping is the record's rather than this module's:
 
     | Field type | Rendering |
     |---|---|
@@ -16,6 +16,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `:expression` | statifier-ui's expression editor when that package is present, else a single-line source input |
     | `:duration` | one text control; duration strings the expression language reads, with on-screen examples |
     | `{:list, t}` | repeatable rows of `t`'s renderer, with add and remove |
+    | `{:path, opts}` | single-line text input bound to a `<datalist>` of the declared datamodel paths; the plain input when there are none |
 
     `:duration`'s row is decision 9 as amended 2026-08-29 and again
     2026-09-05 (clause 9a, one grammar). One text control, not a value/unit
@@ -167,6 +168,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     integer reaches the draft config as the string the author typed rather
     than being silently coerced or dropped.
 
+    ## The `{:path, opts}` control
+
+    Decision 7's eighth field type holds a path into the host's datamodel,
+    and it reaches its control by **type**, which is the whole reason the
+    type exists beside the `datamodel_path?: true` key: a host that never
+    learned the key wrote `type: :string` and got neither a candidate list
+    nor an advisory, and nothing in its declaration said anything was
+    missing.
+
+    The control is the same `<datalist>` of `path_candidates` the
+    `:expression` input carries, on the same terms - it suggests and does
+    not constrain, free text stays valid, and an empty list renders the
+    plain text input a `:string` rendered, which is what "no datamodel
+    supplied" looks like on screen. It is not a `{:select, choices}`,
+    because the declared paths are what a host happens to have declared and
+    not the set of values a field may hold: `validate_config/1` is still
+    the only authority on that, and an undeclared path is still ADR-0005
+    clause 11e's `:info` advisory anchored on this field's `key`, never a
+    refusal.
+
+    `opts` is read by nothing here. ADR-0002's 2026-09-05 amendment defines
+    no key in it and says so; the tuple's second element is there so that
+    what a control needs can arrive later without widening the type set a
+    second time. A `{:path, opts}` inside a `{:list, t}` renders as the row
+    fallback text input, since a list row draws no suggestion markup for
+    any type.
+
     ## The `invoke_type` suggestion list
 
     `invoke_types` is the one control this module chooses **by key**, and
@@ -235,8 +263,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       default: [],
       doc: """
       The declared datamodel paths, from `StatifierBlocks.Datamodel.candidates/3`.
-      Suggestions on an `:expression` field and passed to
-      `expression_component` as `:candidates`; empty renders the plain input.
+      Suggestions on an `:expression` field and on a `{:path, opts}` one, and
+      passed to `expression_component` as `:candidates`; empty renders the
+      plain input.
       """
     )
 
@@ -404,6 +433,46 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         candidates: @path_candidates,
         value_candidates: @value_candidates
       })}
+      """
+    end
+
+    defp control(
+           %{
+             field: %ViewModel.Field{type: {:path, _opts}},
+             path_candidates: [_first | _rest]
+           } = assigns
+         ) do
+      assigns = assign(assigns, :list_id, input_id(assigns.field) <> "-paths")
+
+      ~H"""
+      <input
+        class="sb-field__input"
+        type="text"
+        id={input_id(@field)}
+        name={input_name(@field)}
+        value={to_text(@field.value)}
+        list={@list_id}
+        spellcheck="false"
+        autocomplete="off"
+      />
+      <datalist id={@list_id} data-path-candidates={length(@path_candidates)}>
+        <option :for={path <- @path_candidates} value={path}></option>
+      </datalist>
+      """
+    end
+
+    # No datamodel supplied is no candidates, and no candidates is the plain
+    # text input a `:string` was - the same "empty list is no list" rule the
+    # `:expression` datalist and the `invoke_type` one are under.
+    defp control(%{field: %ViewModel.Field{type: {:path, _opts}}} = assigns) do
+      ~H"""
+      <input
+        class="sb-field__input"
+        type="text"
+        id={input_id(@field)}
+        name={input_name(@field)}
+        value={to_text(@field.value)}
+      />
       """
     end
 

@@ -144,6 +144,53 @@ defmodule StatifierBlocks.DatamodelTest do
     end
   end
 
+  describe "a {:path, opts} field is annotated by construction" do
+    defp subchart(id, assign_to) do
+      Block.new("core.subchart",
+        id: id,
+        config: %{
+          "chart" => "bdoc_eligibility",
+          "outcomes" => "approved",
+          "assign_to" => assign_to
+        }
+      )
+    end
+
+    # sabotage: dropped `datamodel_path?(%{type: {:path, _opts}})`'s clause
+    # from `BlockType` - the filter in `block_findings/5` stops reaching a
+    # field that carries no key and this goes red (verified).
+    test "an undeclared value on a typed field gets 11e's advisory" do
+      document = document([subchart("blk_eligibility", "eligibility")])
+
+      assert [%Finding{} = finding] = Datamodel.findings(document, palette(), ["signup.step"])
+      assert finding.anchor == {:config, "blk_eligibility", "assign_to"}
+      assert finding.severity == :info
+      assert finding.source == :lint
+      assert finding.message =~ "eligibility"
+    end
+
+    # sabotage: the same dropped clause - this test stays green while the
+    # one above goes red, which is the split that makes the pair worth
+    # having: an advisory that never fires looks exactly like a value that
+    # was declared (verified).
+    test "a declared value on a typed field produces nothing" do
+      document = document([subchart("blk_eligibility", "eligibility")])
+
+      assert Datamodel.findings(document, palette(), ["eligibility"]) == []
+    end
+
+    # sabotage: dropped `block_findings/5`'s `Enum.filter` - the subchart's
+    # `chart` and `outcomes` are plain `:string` fields with values, and
+    # each gains an advisory, so the single-finding match goes red
+    # (verified).
+    test "the block's other string fields are not annotated by association" do
+      document = document([subchart("blk_eligibility", "eligibility")])
+
+      assert [%Finding{anchor: {:config, _id, "assign_to"}}] =
+               Datamodel.findings(document, palette(), [])
+    end
+  end
+
   describe "no datamodel (11f): absence is not unknown-ness" do
     # sabotage: `findings/3`'s `nil` arm falling through to
     # `undeclared_findings/3` with an empty set - every annotated path in a

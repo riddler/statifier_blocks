@@ -90,7 +90,7 @@ defmodule StatifierBlocks.Core.ConformanceTest do
           assert is_binary(key) and key != ""
           assert is_binary(label) and label != ""
           assert is_boolean(required)
-          assert field_type?(type), "#{inspect(type)} is not one of the seven field types"
+          assert field_type?(type), "#{inspect(type)} is not one of the eight field types"
         end
 
         keys = Enum.map(fields, & &1.key)
@@ -229,6 +229,7 @@ defmodule StatifierBlocks.Core.ConformanceTest do
     do: Enum.all?(options, fn {value, label} -> is_binary(value) and is_binary(label) end)
 
   defp field_type?({:list, inner}), do: field_type?(inner)
+  defp field_type?({:path, opts}), do: is_map(opts)
   defp field_type?(_type), do: false
 
   defp type_expr?(:unknown), do: true
