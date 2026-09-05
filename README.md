@@ -703,8 +703,19 @@ framework:
 Optional assigns: `findings` (yours, merged with the ones the view model
 derives), `icon` (a function component that turns an icon *name* into markup),
 `expression_component` (an override for `:expression` fields),
-`value_candidates` (the values you offer per datamodel path), `theme`, and
-`class`.
+`value_candidates` (the values you offer per datamodel path), `on_select` (a
+panel of yours that follows the canvas selection), `theme`, and `class`.
+
+**Following the selection.** `on_select` is `on_change`'s sibling for the
+other subject a host may want: a one-argument function called with each new
+selection, so a drawer tab, a preview or a detail pane of your own can follow
+the canvas instead of making the operator pick the same block twice. What
+arrives is a descriptor - `%{id:, type:, label:}`, where `label` is the line
+the card draws - and `nil` when nothing is selected, which is how a panel
+knows to empty itself. It fires when the selection changes and not otherwise,
+it is optional, and a host that passes nothing sees no difference of any kind.
+The block's config is deliberately not in it: you already hold the document
+you passed in.
 
 **Expression fields.** With `statifier_ui` on your load path an `:expression`
 renders that package's own expression editor: picklists of field, operator and

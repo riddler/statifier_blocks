@@ -28,7 +28,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     `on_change` is built here rather than passed through the session: a
     session is signed with `:erlang.term_to_binary/1`, which carries pids
     happily and functions not at all. So the test's pid crosses the boundary
-    and the closure is made on this side.
+    and the closure is made on this side. `on_select` rides the same route,
+    and `"on_select" => false` is how a test mounts the editor the way a host
+    that does not want the seam does - the assign absent, not a function that
+    sends nothing.
     """
 
     use Phoenix.LiveView
@@ -52,6 +55,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          host_tabs: session["host_tabs"] || [],
          feed: session["feed"] || [],
          icon: session["icon"] && (&host_icon/1),
+         on_select?: session["on_select"] != false,
          test_pid: session["test_pid"]
        )}
     end
@@ -76,6 +80,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         drawer_height={@drawer_height}
         drawer_tabs={drawer_tabs(@host_tabs, @feed)}
         on_change={notifier(@test_pid)}
+        on_select={if @on_select?, do: selection_notifier(@test_pid)}
         on_drawer_resize={height_notifier(@test_pid)}
       >
         <:header :if={@header}>
@@ -154,6 +159,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp notifier(nil), do: nil
     defp notifier(pid), do: fn document -> send(pid, {:document, document}) end
 
+    # The selection seam's host half. Every message goes to the mailbox,
+    # including the `nil` a deselection carries, because "the editor said
+    # nothing" and "the editor said nothing is selected" are the two answers a
+    # panel following the canvas has to tell apart.
+    defp selection_notifier(nil), do: nil
+    defp selection_notifier(pid), do: fn selection -> send(pid, {:selection, selection}) end
+
     # 8A's other half of the host seam: the height arrives as an event and the
     # host is what remembers it. Here the "host" is a test process.
     defp height_notifier(nil), do: nil
@@ -200,6 +212,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     Mounts the editor over a document, connected, and returns the live view.
 
     Options: `:document`, `:palette`, `:findings`, `:datamodel`, `:declare`, `:theme`,
+    `:on_select` (`false` mounts without the selection seam; the default passes
+    it),
     `:fit`, `:fixtures`, `:invoke_types`, `:value_candidates`, `:drawer_height`,
     `:header`, `:icon`,
     `:host_tabs` and `:feed` - the last five being the
@@ -248,8 +262,28 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "host_tabs" => Keyword.get(opts, :host_tabs, []),
         "feed" => Keyword.get(opts, :feed, []),
         "icon" => Keyword.get(opts, :icon),
+        "on_select" => Keyword.get(opts, :on_select, true),
         "test_pid" => test_pid
       }
+    end
+
+    @doc """
+    Every selection the editor has pushed since the last call, oldest first.
+
+    A list rather than the latest one: what most of these tests assert is how
+    MANY times the seam fired - once per selection and not once per render -
+    and a helper that drained to the last message would answer every one of
+    them the same way whether the rule held or not.
+    """
+    @spec selections() :: [map() | nil]
+    def selections, do: Enum.reverse(collect_selections([]))
+
+    defp collect_selections(acc) do
+      receive do
+        {:selection, selection} -> collect_selections([selection | acc])
+      after
+        0 -> acc
+      end
     end
 
     @doc """
