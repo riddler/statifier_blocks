@@ -26,7 +26,7 @@ defmodule StatifierBlocks.Core.Wait do
 
   alias StatifierBlocks.Block
   alias StatifierBlocks.Compiler.{Cancels, Context}
-  alias StatifierBlocks.Core.{Duration, Emit}
+  alias StatifierBlocks.Core.{Duration, DurationMigration, Emit}
   alias StatifierBlocks.Emission
 
   # One sentence at both refusal sites, naming what is accepted and
@@ -36,7 +36,29 @@ defmodule StatifierBlocks.Core.Wait do
   @duration_message "must be a duration like 30s or 1h30m"
 
   @impl true
-  def current_version, do: 1
+  def current_version, do: 2
+
+  # Version 2 is ADR-0005 decision 9's 2026-09-05 Note. A `duration` a
+  # document stored in the spelling clause 9a retired is rewritten into the
+  # accepted one as the block resolves, in memory only and never written
+  # back (ADR-0002 decision 8); every other key, and every value the
+  # rewrite cannot read, is passed through untouched. A value the rewrite
+  # cannot read is one `validate_config/1`'s own refusal is the right
+  # answer for, and a failing migration would leave the block unopenable
+  # rather than fixable.
+  #
+  # The bump is what makes this reachable at all: at version 1 no block of
+  # this type could be behind, so `Palette.resolve/2` never had a migration
+  # arm to take here.
+  #
+  # What an author sees is the open path, but nothing about it is exclusive
+  # to the editor: `Palette.resolve/2` is also how the compiler,
+  # `SlotValidation`, `Assignability`, `Datamodel` and `Edit.check_config/3`
+  # reach a block, so each of them sees the migrated config too. One
+  # resolution path, one migration, wherever resolution happens.
+  @impl true
+  def migrate_config(1, config), do: {:ok, DurationMigration.migrate_field(config, "duration")}
+  def migrate_config(from, _config), do: {:error, {:no_migration_from, from}}
 
   @impl true
   def slots(_config), do: []

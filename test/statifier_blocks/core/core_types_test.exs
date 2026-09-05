@@ -11,6 +11,7 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
 
   use ExUnit.Case, async: true
 
+  alias StatifierBlocks.Block
   alias StatifierBlocks.BlockType
   alias StatifierBlocks.Core
   alias StatifierBlocks.CoreFixtures
@@ -144,6 +145,61 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
     test "is a leaf that constrains nothing but its own kind" do
       assert Core.Wait.slots(%{"duration" => "1h"}) == []
       assert Core.Wait.io(%{}) == %{kinds: [:step]}
+    end
+
+    # ADR-0005 decision 9's 2026-09-05 Note. The bump is what makes the
+    # migration reachable: at version 1 nothing of this type could be
+    # behind, so `Palette.resolve/2` had no migration arm to take here.
+    #
+    # sabotage: left `current_version/0` at 1 -> the first assert goes red
+    # and the resolved config keeps the stored spelling, taking the
+    # validate assert red with it.
+    test "is at version 2 and migrates a behind-version duration at resolution" do
+      assert Core.Wait.current_version() == 2
+
+      for retired <- CoreFixtures.retired_durations() do
+        block =
+          Block.new("core.wait",
+            id: "blk_OLD",
+            type_version: 1,
+            config: %{"duration" => retired}
+          )
+
+        assert {:ok, Core.Wait, migrated} = Palette.resolve(Palette.core(), block)
+        assert Core.Wait.validate_config(migrated.config) == :ok, retired
+        assert migrated.type_version == 1
+      end
+    end
+
+    # The migration is for what a document already holds, never a way back
+    # in. A block at the current version is handed back untouched and its
+    # refusal is the one clause 9d fixes, word for word.
+    #
+    # sabotage: had `migrate_config/2` match on any `from` rather than on
+    # 1 -> `Palette.resolve/2` still takes the equal-version arm, so this
+    # stays green; the mutation that takes it red is running the migration
+    # from the equal arm, which erases the refusal entirely.
+    test "a current-version duration in the retired spelling still refuses, unchanged" do
+      for retired <- CoreFixtures.retired_durations() do
+        block =
+          Block.new("core.wait",
+            id: "blk_NEW",
+            type_version: 2,
+            config: %{"duration" => retired}
+          )
+
+        assert {:ok, Core.Wait, ^block} = Palette.resolve(Palette.core(), block)
+
+        assert {:error, [{"duration", message}]} = Core.Wait.validate_config(block.config)
+        assert message == "must be a duration like 30s or 1h30m"
+      end
+    end
+
+    # sabotage: gave `migrate_config/2` a `{:ok, config}` catch-all -> a
+    # block from a version this type has never had resolved as though it
+    # were understood, red here.
+    test "refuses to migrate from a version this type has never had" do
+      assert Core.Wait.migrate_config(7, %{}) == {:error, {:no_migration_from, 7}}
     end
   end
 

@@ -72,8 +72,8 @@ defmodule StatifierBlocks.Core.WorkedExampleTest do
     assert Map.keys(parallel.slots) |> Enum.sort() == ["lane_capture", "lane_receipt"]
   end
 
-  # Sabotage: changed `Core.Wait`'s duration regex to reject `PT48H` - red
-  # on the wait block's config finding.
+  # Sabotage: had `Core.Wait`'s `validate_config/1` reject `48h` - red on
+  # the wait block's config finding.
   test "the example's core configs are accepted by the real validators", ctx do
     assert Core.Wait.validate_config(block(ctx.document, "blk_WAI").config) == :ok
     assert Core.ResumableGroup.validate_config(block(ctx.document, "blk_GRP").config) == :ok
