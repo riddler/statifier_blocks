@@ -5606,3 +5606,529 @@ accumulates, and what the calendar-approximating units mean are all
 Filed with `sb-8acm`, campaign-029's Lane A. The lane's other record change is
 `sb-b05e`, against ADR-0006; it landed as a request of its own, and this
 section neither depends on it nor touches what it recorded.
+
+## Amendment (2026-09-05): decision 2, a compound command, and a palette entry that names a recipe
+
+**Status: proposed (2026-09-05, campaign 030 Lane S0, bead `sb-8vkc`).** A
+decision record merges at proposed under campaign 030's invariant; flipping it
+to accepted is a separate gated request. Additive; decision 2's table of edits
+stands exactly as written, decision 3's round-trip law is unchanged, and no
+text above this line is edited by this section. Nothing here is built yet -
+`sb-qfl1` implements.
+
+### Context
+
+ADR-0010 decision 1, accepted 2026-09-02, settles that a clock interrupt is not
+a block type but an arrangement of two: a `core.send` carrying the deadline
+event and a `delay`, placed as the first block of a group's `body` slot, and a
+`core.on_event` naming the same event on that group's `interrupts` slot
+(`docs/adr/0010-clock-interrupt-spelling.md`, decision 1, "No `core.timeout`.
+The pair is the spelling"). It makes the case on the vocabulary's own admission
+test - a type whose whole content is a spelling of an arrangement the
+vocabulary already expresses does not join the vocabulary - and it names what
+that costs: the author writes two blocks rather than one, into two different
+slots of the same group, in a fixed order, naming one event string twice.
+
+The palette does not carry that arrangement, and the reason is structural
+rather than an oversight. A palette entry today is one block type and one
+insert: `StatifierBlocks.Palette` is a map from `type_name` to module
+(`lib/statifier_blocks/palette.ex:38-43`), the browser draws an entry per
+resolvable name, and arming one produces a single `{:insert, target, block}`
+for the position the author armed. There is no entry that puts down two blocks,
+and none that puts a block anywhere except where the author aimed.
+
+Two things follow, and they are the whole of this section's context. First, the
+knowledge is nowhere: which slot each half belongs in, that the send goes first
+in `body`, and that the two halves must name the same event are facts an author
+has to hold in their head, and a record they will not have read is where those
+facts live. Second, a half-built arrangement is not one undo away. Two picks
+are two commits, so undoing "the deadline" is two gestures with a state between
+them in which the deadline event is armed and nothing on the rail catches it -
+a document that compiles, and compiles to a chart that abandons on an event no
+handler answers.
+
+Both are the same shape of problem: an arrangement the vocabulary expresses but
+the authoring surface cannot name. This section names it, in two parts - a
+composition in the algebra, and an entry in the palette that produces one.
+
+### Decision
+
+**2n. `Edit.t()` admits a composition, and the set of edits stays five.**
+The algebra grows one constructor:
+
+    {:compound, [t()]}
+
+carrying a non-empty list of commands. `Edit.apply/2` applies them left to
+right against the intermediate documents; the inverse it returns is the
+compound of each step's inverse **in reverse order**. A member that refuses
+refuses the whole compound - `apply/2` answers `{:error, term()}` and no
+document at all, so there is no partially applied document for a caller to
+mistake for a result - and the refusal is the
+member's own error term, unchanged, so a caller reads why rather than that
+something in a list failed.
+
+Two properties are the reason for the constructor rather than a loop in the
+shell. `Edit.History` pushes one inverse per commit, so a compound is **one
+undo entry**: one gesture in, one gesture out, and no state between the halves
+that the author can stop in. And `check_config/3` runs on the compound's leaves
+through the same funnel every other command goes through
+(`lib/statifier_blocks/edit/history.ex`), so "invalid config never reaches the
+document" holds for a composed edit exactly as it holds for a single one.
+
+**A compound is not a sixth edit, and decision 2's closure argument is
+unrevised.** Decision 2 says every author gesture produces exactly one of a
+named set, and defends the size of that set by showing the obvious extras are
+not primitive: reordering is a `:move`, duplication is an `:insert`,
+"inserting from the palette is an `:insert`". A `:compound` adds no meaning to
+that set. Its leaves are drawn from it and nothing else - a compound whose list
+is empty, or contains a `:compound`, is refused rather than flattened - so
+every edit a document can undergo is still one of the five, and the sentence
+decision 2 is defending stays true word for word. What is new is a rule beside
+it: **a gesture may produce a composition of those edits, and the composition
+is what the history remembers.**
+
+This revises one bullet of the 2026-09-01 amendment's Consequences, the one
+reading "The command set is five and the reason it is closed is unchanged."
+The count is unchanged and so is the reason. What that bullet did not have to
+distinguish, because nothing then composed, is the set of edits from the set of
+`Edit.t()` constructors: after this clause those are five and six. Read the
+bullet as the claim about edits it was making, and read this clause as saying
+where the sixth constructor sits - above the five, never beside them. 2a's own
+test is untouched either way: a presentation state still does not become a
+command, and a compound is not a presentation state.
+
+**1C. A palette may name recipes as well as types.** `StatifierBlocks.Palette`
+gains a second map beside `types`:
+
+    recipes: %{optional(String.t()) => module()}
+
+registered as a value exactly as types are, and by the same functions: the
+`recipes:` option on `new/2`, and `{name, module}` registrations in
+`from_modules/2`'s ordered list, where **later entries win**. The collision
+rule is therefore the one that already governs types - a host that registers
+its own recipe under a core recipe's name reads its own, because it wrote it
+later (`lib/statifier_blocks/palette.ex:143-147`). Everything the `Palette`
+moduledoc says about what a palette *is* applies to the second map unchanged:
+it is a caller-supplied value built once per operation, there is no global
+registry, and two hosts in one runtime resolve independently.
+
+The names live in one namespace per map, not one across both. A recipe named
+`"deadline"` and a type named `"deadline"` do not collide, because nothing
+resolves a name without knowing which map it is asking - a document's
+`type_name` is looked up in `types` and only there, and a palette browser entry
+carries which of the two it came from. ADR-0002 decision 2's map from
+`type_name` to module is untouched by this clause, and decision 10's core
+vocabulary table does not grow: a recipe is not a block type, has no
+`type_name`, and can appear in no document.
+
+**2C. A recipe is a module implementing two callbacks.**
+
+    @callback insert(target :: Edit.target(), document :: Document.t()) ::
+                {:ok, [Edit.t()]} | {:error, term()}
+    @callback palette_entry() :: BlockType.palette_entry()
+
+`palette_entry/0` is decision 10's map, in every particular: the same optional
+keys, the same total normalizers, the same fallback to the entry's name when
+it is absent. A recipe draws in the palette browser the way a type draws, and
+that is deliberate - the author picking a deadline is not doing a different
+kind of thing from the author picking a send, and an entry that announced
+itself as a special kind of entry would be teaching a distinction the author
+does not have to make.
+
+`insert/2` is where a recipe differs from a type. It is handed the armed
+position and the document, and it answers with the commands that build the
+arrangement - a list the caller wraps in a single `{:compound, commands}` and
+commits. It is pure: it mints no ids of its own beyond what decision 2 already
+requires of an `:insert` (ids are minted at gesture time and baked into the
+command), it reads the document rather than writing it, and it may refuse.
+A refusal is the ordinary case where the arrangement does not fit - see 3C -
+and it is an error term, never an exception.
+
+**3C. A recipe reaches the armed position and the enclosing group, and nothing
+above it.** The commands `insert/2` returns may target:
+
+- the armed position itself, exactly as a type's insert does; and
+- **any slot of the block that encloses the armed position** - its parent -
+  including slots other than the one armed.
+
+They may target nothing else. A command naming a block above the enclosing
+group, a sibling's interior, or the document root when the root is not the
+enclosing group, is refused by the caller before it is applied, and the whole
+compound goes with it.
+
+The bound is the deadline's own shape rather than a round number.
+ADR-0010 decision 1 puts the `core.send` in the group's `body` and the
+`core.on_event` on that same group's `interrupts` rail: an author who arms the
+head of a group's `body` and picks "deadline" is reaching exactly one level
+out, to the rail of the group they are already inside. That is the widest reach
+any arrangement in the accepted vocabulary asks for, and it is a reach the
+author can see - the enclosing group is on screen, drawn around the position
+they armed. A recipe that could write two levels up would move blocks into a
+region the author is not looking at, and no accepted record asks for one.
+
+`insert/2` refuses rather than reaching further. A "deadline" armed at a
+position whose enclosing block declares no `interrupts` slot - a
+`core.sequence`, say, whose moduledoc says so in terms
+(`lib/statifier_blocks/core/sequence.ex:14`) - has nowhere to put its handler,
+and
+answers `{:error, ...}` naming that. The refusal is a refused gesture, not a
+finding: nothing is written, so there is nothing for the view model to say
+anything about.
+
+**4C. Core registers one recipe, `"deadline"`.** `Palette.core/0` carries it in
+`recipes`, built from the pair ADR-0010 decision 1 spells: a `core.send` at
+index 0 of the enclosing group's `body` carrying a `delay` and a generated
+deadline event name, and a `core.on_event` on that group's `interrupts` slot
+naming the same event. Both halves are ordinary blocks of ordinary core types;
+the recipe is the knowledge of how they go together and nothing more.
+
+It sits in `Palette.core_recipes/0` beside `Palette.core_types/0`
+(`lib/statifier_blocks/palette.ex:87`), and a host composes the two
+maps the same way - `Palette.new/2` with both, or `from_modules/2` with
+`core: true`. A palette built without it is as valid as a palette with it,
+which is the property `core_types/0` already has and which this clause does not
+weaken: nothing in this package has a privileged path to a recipe either.
+
+### What this does not decide
+
+- **Whether a recipe can edit an existing arrangement.** `insert/2` builds; it
+  is not a refactoring seam, and there is no `remove/2` beside it. Deleting a
+  deadline is deleting two blocks, and it is two gestures until some record
+  says otherwise.
+- **Whether the palette browser groups recipes apart from types.** 2C says a
+  recipe draws as an entry; where entries sit relative to one another is
+  decision 10's `group` and `order` keys doing what they already do, and a
+  layout ruling is not taken here.
+- **Anything about the compound outside the editor.** The compiler never sees
+  an `Edit.t()`, the wire format carries documents rather than commands, and
+  no transport question is opened by the constructor.
+
+### Consequences
+
+- **The deadline becomes one gesture and one undo.** An author picks
+  "deadline" at the head of a group's body and gets both halves, correctly
+  slotted, with one event name written twice by the recipe rather than twice
+  by them. Undo removes the arrangement, not half of it.
+- **Decision 3's round-trip law gains a case rather than an arm.** The inverse
+  of a compound is the compound of inverses reversed, so
+  `apply(apply(d, e), inverse) == d` follows from the law holding of each
+  member. The property test generates a compound of generated commands; it does
+  not need a law of its own.
+- **`Edit.apply/2`'s error surface does not grow.** A compound answers with a
+  member's error term verbatim, so nothing that reads those terms - the
+  history, the shell, a test - learns a new shape.
+- **A host gets recipes without a new mount seam.** `Palette` is already the
+  value a host builds and hands in (decision 15's single-session editor); the
+  second map rides the same value, so no assign, no option and no callback is
+  added to the editor's host surface.
+- **ADR-0002 is untouched, and this section says which parts on purpose.**
+  Decision 2's `type_name`-to-module resolution, decision 10's vocabulary
+  table and its count, every `config_schema/1`, and the block-type behaviour's
+  callback list all stand exactly as they are. A recipe implements a callback
+  pair of its own, not `StatifierBlocks.BlockType`, and `palette_entry/0` is
+  the only name the two share.
+- **`sb-qfl1` builds it, and this record precedes the code.** Until it lands
+  the palette holds types only, and the deadline is the two picks ADR-0010
+  describes.
+
+Filed with `sb-8vkc`, campaign-030's Lane S0.
+
+## Amendment (2026-09-05): decisions 10 and 11, a palette entry may declare how many of it a document holds
+
+**Status: proposed (2026-09-05, campaign 030 Lane S0, bead `sb-8vkc`).** A
+decision record merges at proposed under campaign 030's invariant; flipping it
+to accepted is a separate gated request. Additive; decision 10's existing keys
+stand exactly as written, decision 11's anchor enum and routing table are
+unchanged, and no text above this line is edited by this section. Nothing here
+is built yet - `sb-vl93` implements.
+
+### Context
+
+Every rule that reaches an author as a **finding** is local. `validate_config/1`
+is handed one block's config and answers about that config
+(`lib/statifier_blocks/block_type.ex`). `SlotValidation` is handed a parent and
+its children. Assignability is a relation between one block's outputs and its
+neighbour's inputs. The view model's two derived sources are both per-block:
+`:resolution` on a block that does not resolve, `:config` on a resolved block's
+config, one finding per `{key, message}` pair
+(`lib/statifier_blocks/view_model.ex:15-28`).
+
+The package does hold two whole-document rules already, and naming them is what
+makes the gap legible rather than contradicting it.
+`StatifierBlocks.Validation.validate/1` refuses a document whose block ids are
+not unique across the whole tree, and one whose datamodel entry ids are not
+unique (`lib/statifier_blocks/validation.ex:49-52` and `:120-127`). Both are
+**structural refusals**: conditions a document may not be in at all, answered
+before anything renders, and neither is a thing an author is shown beside a
+block and asked to fix. What this section is about is the other kind - a rule a
+host declares, that a document may sit in violation of while the author works,
+and that therefore has to be *shown* rather than refused.
+
+There is a class of rule a host wants that none of those can express, because
+its subject is the document rather than any block in it: **how many of this
+block type the document may hold, and where.** A host whose vocabulary carries
+a "start here" block wants exactly one of it, at the top. A host with a
+settlement step wants at most one. Today the only way to say either is for the
+host to check the document itself, after the editor has handed it back through
+`on_change`, and to render the answer somewhere the editor is not - which is to
+say, not beside the block the author would have to move.
+
+Decision 11 already has the surface such an answer belongs on. What it does not
+have is a producer that can see the whole document, and decision 10 has no key
+a host can use to ask for one. This section adds the smallest thing that closes
+that: a declaration, and one rule that reads it.
+
+### Decision
+
+**10z. `palette_entry/0` gains an optional `singleton` key.**
+
+    optional(:singleton) => :head | :anywhere
+
+Absent means unconstrained, and that is the default every entry has today: an
+entry that does not carry the key is read exactly as it is read now, and no
+existing entry changes meaning. The two values say how many and where:
+
+| Value | What the document must hold |
+|---|---|
+| `:anywhere` | exactly one block of this type, at any position |
+| `:head` | exactly one block of this type, and it is the first child of the root's first slot |
+
+`:head` is `:anywhere` plus a position, not a different kind of claim - both
+say "exactly one", and only `:head` says where. There is no `:at_most_one` and
+no `:at_least_one`: an entry either constrains the count to one or does not
+constrain it, and a host that wants a looser rule has the callback 11o's last
+paragraph defers rather than a third value here.
+
+The key is presentation metadata in the same sense every other decision-10 key
+is - inert data a host declares and this package reads - and it is read through
+the same discipline: an entry carrying a value that is neither atom is read as
+absent, never as an error, because a palette entry is a host's data and
+decision 10's normalizers refuse rather than raise.
+
+**11o. `ViewModel` derives a third source, and it is a `:config` finding
+anchored at the root.** `build/3` walks the document once more, counting blocks
+per `type_name` whose resolved entry carries `singleton`, and emits a finding
+when the count is wrong:
+
+| Declared | Document holds | Finding |
+|---|---|---|
+| `:anywhere` or `:head` | no block of that type | one finding, "this document needs a ..." |
+| `:anywhere` or `:head` | two or more | one finding naming the count |
+| `:head` | exactly one, not at the root's first position | one finding naming where it is |
+
+One finding per violating type, not one per surplus block: the author's problem
+is the arrangement, and a document holding four of something would otherwise
+draw four findings saying the same sentence.
+
+Its `source` is `:config` - the enum member
+(`lib/statifier_blocks/finding.ex:63`) that already means "a declared shape
+says so", which is what a `singleton` declaration is. Its severity is `:error`,
+like the other two derived sources.
+
+Its **anchor is `{:block, root_id}`**, and that needs saying plainly because
+decision 11's anchor enum has three members and none of them is a document
+(`lib/statifier_blocks/finding.ex:39-42`). This section does not widen the
+enum. A document-scoped finding needs an anchor that exists, the root block is
+the one block every document has
+(`lib/statifier_blocks/document.ex:47-55`, where `root` is typed `Block.t()`
+rather than optional), and the root is the document's own representative on
+screen - so the finding routes by the existing table's `{:block, id}` row, onto
+the root node's chrome, and into the document-level panel that reads the whole
+findings list. No route is added and no route changes.
+
+**A finding, never a fix-up.** Nothing here inserts a missing block, removes a
+surplus one, or moves one to the head. The editor says what is wrong and the
+author acts, which is decision 11's whole posture: findings are what the editor
+knows, and edits are what the author does. An automatic repair would also be
+unsound at the only moment it would fire - a document is briefly wrong in the
+middle of every arrangement an author builds by hand, and a rule that repaired
+it would fight them.
+
+**What this seam defers, named rather than left open.** A `singleton`
+declaration is a count, and a host will want rules a count cannot state: two of
+these only if that one is absent, this block must precede that one, no more
+than three. Those are a **host `validate_document/1` callback** - a seam by
+which a host supplies its own whole-document rule and gets its findings routed
+like these - and that callback is **not decided here and not in campaign 030**.
+This section deliberately ships the narrow case rather than the general one,
+because the narrow case is expressible as data a host declares and the general
+one needs a callback, an anchor vocabulary wide enough for a host's own rules,
+and an answer to what happens when a host's rule and a declared `singleton`
+disagree. Naming the follow-up is the point of the paragraph: `singleton` is
+not a first instalment of that callback, and a host reading it as one will
+build against a seam that does not exist yet.
+
+### Consequences
+
+- **Decision 10's key set grows by one and its posture does not.** Every key
+  there is optional, host-declared, and inert; `singleton` is all three. An
+  entry that omits it is the entry it is today.
+- **Decision 11's enum, anchors and routing table are untouched.** The new
+  finding uses an existing source, an existing anchor shape and an existing
+  row of the routing table. This section adds a producer, not a mechanism.
+- **`ViewModel` gains its third derived source, and the moduledoc's "exactly
+  two" sentence is superseded by this clause** - by reference, in the form this
+  file uses for a superseded count: the 2026-09-01 amendment supersedes decision
+  2's "four, not seven" rather than rewriting it in place (`:4114-4118`). The sentence is not rewritten
+  here; `sb-vl93` brings the moduledoc into line with this record, because
+  moduledocs are read as instructions rather than as history.
+- **The count is one document walk, and it is the walk `build/3` already
+  makes.** No second traversal, and nothing here depends on the compiler
+  having run.
+- **A host that declares nothing pays nothing.** With no entry carrying the
+  key, the counting arm has no types to count and emits no finding, so a
+  palette that has never heard of this key produces a view model identical to
+  today's.
+- **`sb-vl93` builds it, and this record precedes the code.**
+
+Filed with `sb-8vkc`, campaign-030's Lane S0.
+
+## Note (2026-09-05): decision 9, clause 9d has a second exception, and it is a migration
+
+A dated Note rather than an amendment: the 2026-09-05 amendment to decision 9
+above stands in every particular, `9a` still admits one grammar and `9d` still
+governs what the package's prose may name. No text above this line is edited by
+this section. Drafted 2026-09-05 as the record ahead of the code, bead
+`sb-8vkc`, campaign 030 Lane S0; it merges at proposed under the campaign
+invariant like every other section filed with it, and flipping it to accepted
+is a separate gated request. `sb-me4u` implements.
+
+### What 9d left the older documents with, and why that is a gap
+
+9d is a wording rule, and it is a good one: a message that names a retired
+spelling teaches it. But the amendment it belongs to also made a document
+holding the retired spelling **stop validating**, and its own Consequences say
+so - "a document holding the older spelling stops validating", named there as
+the breaking half of the change. The sweep behind `9b` is the argument that the
+blast radius is this package's own corpus, and that corpus has migrated. What
+the sweep could see is not everything there is: it reached this repository, and
+a document a host stored is somewhere else.
+
+So the position 9d leaves is that such a document, if one exists, opens in the
+editor as a `:duration` field carrying a value the field refuses, with a
+refusal that - correctly, per 9d - will not tell the author what the value used
+to mean. The author is handed an unreadable string and a message that names
+only what is accepted.
+
+This Note records the answer, which is not a wording change: **the value is
+migrated rather than refused**, through the mechanism ADR-0002 decision 8
+already provides for exactly this.
+
+### The decision
+
+**A `type_version` bump on the two types that declare a `:duration` field.**
+`core.wait` and `core.send` each go to `current_version/0` of 2 and each
+implements `migrate_config/2`, which rewrites a stored `:duration` value in
+the retired spelling into the equivalent value in the accepted one and leaves
+every other config key alone. A stored value that is already in the accepted
+spelling, or that is empty, or that is in neither spelling, is passed through
+untouched - migration answers `{:ok, config}` there, because a value the
+migration cannot read is a value the field's own refusal is the right answer
+for, and a failed migration is a resolution error that would render the block
+unopenable rather than fixable.
+
+The two types, and nothing else:
+
+| Type | `current_version/0` today | after | Config key migrated | Field declaration |
+|---|---|---|---|---|
+| `core.wait` | 1 (`lib/statifier_blocks/core/wait.ex:39`) | 2 | `"duration"` | `:duration`, required, default `"1h"` (`:45-54`) |
+| `core.send` | 1 (`lib/statifier_blocks/core/send.ex:102`) | 2 | `"delay"` | `:duration`, optional, default `""` (`:115-131`) |
+
+Neither implements `migrate_config/2` today, and neither reaches the
+behaviour's `__using__` default either: both declare `@behaviour
+StatifierBlocks.BlockType` rather than `use` it
+(`lib/statifier_blocks/core/wait.ex:25`, `lib/statifier_blocks/core/send.ex:91`),
+so the default arm at `lib/statifier_blocks/block_type.ex:124-130` is never
+injected into them and the callback is simply not exported. The path a
+behind-version block of either type takes today is the no-callback arm ADR-0002
+decision 8's 2026-08-27 amendment already fixed: `Palette.resolve/2` finds no
+exported `migrate_config/2` and answers
+`{:error, {:migration_failed, block_id, :no_migration_available}}`
+(`lib/statifier_blocks/palette.ex:262-269`). Nothing reaches that arm while
+`current_version/0` is 1, because no block can be behind - and it is exactly
+the arm that starts firing the moment it becomes 2, which is why implementing
+the callback is not optional on this bump. They are the package's first two
+users of that callback; the callback itself
+is unchanged and has existed since the behaviour was written
+(`lib/statifier_blocks/block_type.ex:304-310`). There is no third `:duration`
+field in the shipped vocabulary to reach, which the 2026-09-05 Note in ADR-0002
+already establishes and this section does not re-derive.
+
+**It runs at open, and writes nothing back.** ADR-0002 decision 8 fixes all of
+this and none of it is new here: migration runs at resolution time, is a single
+hop from the stored version straight to `current_version/0`, is applied to the
+in-memory block only, and leaves the stored `type_version` as stored. A host
+that wants the migrated bytes persisted saves the document, which is a host
+decision on the host's own `revision` axis. What an author sees is a field
+holding a readable value, and what the store holds is unchanged. What a
+subsequent save writes is not decided here - the last bullet under "What this
+Note does not do" says why, and where it is deferred to.
+
+**The recogniser is private, and it is reachable from nowhere else.** The
+retired spelling is read by one module, `StatifierBlocks.Core.DurationMigration`
+(`lib/statifier_blocks/core/duration_migration.ex`), which is `@moduledoc
+false` and called by exactly two functions: the two `migrate_config/2`
+implementations named above. It is **not** consulted by `validate_config/1`, by
+`Core.Config`, by `DurationInput`, or by any other reader, and nothing it
+returns reaches a message. A `:duration` field still reads one grammar, which
+is `9a` unweakened: the migration runs before the field ever sees the value,
+and by the time the field sees it there is one spelling in play.
+
+**What 9d's exception becomes.** Of the retired spelling 9d says: "There is
+exactly one exception in the whole package: a single migration line in the
+release changelog". That count is revised, and this is the single sentence of
+9d this Note touches. The exceptions are now:
+
+1. the changelog's migration line, as 9d has it; and
+2. `duration_migration.ex` and its own test file - the recogniser has to
+   recognise the thing, and the test has to hold a whole retired-spelling
+   string to pin that it does.
+
+Everything else 9d says is unrevised and binding: no refusal message, no
+on-screen example, no field hint, no test name and no line of documentation
+outside those two files names the retired spelling. The corresponding
+acceptance line on the campaign-029 code bead `sb-4r1p` - "No refusal message,
+on-screen example, test name or doc line names the retired spelling; the only
+repo-wide mention is the changelog fragment's single migration line" - is
+revised in the same one place and no other: *the only repo-wide mentions are
+that changelog line, the migration module, and the migration module's test.*
+That bead is closed and its work landed; nothing here reopens it, and this
+sentence records which of its criteria a later reader should read against this
+Note rather than as written.
+
+**It is compatible with the wording rule it revises, and deliberately so.** The
+grammar a `:duration` field parses names nothing retired. Every refusal, hint
+and on-screen example names nothing retired. What names it is a private module
+no author, message or document can reach, and a test that exists to keep that
+module honest. The rule 9d is defending - a grammar taught in a refusal is a
+grammar an author will reach for next - is untouched, because nothing here is
+taught to anyone.
+
+### What this Note does not do
+
+- **It does not revise `9a`, `9b`, `9c` or `9e`.** One grammar in, one
+  rendering out, the falsified premise, and what ADR-0001 decision 6 supplies
+  all stand exactly as written.
+- **It does not make the retired spelling storable again, and it does not
+  claim opening a document rewrites it.** The field refuses the retired
+  spelling the moment an author types it, which is `9a` unweakened. But the
+  migration runs inside `ViewModel.build/3`, through `Palette.resolve/2` on
+  each block as the view model is derived
+  (`lib/statifier_blocks/view_model.ex:772`, `:826`, `:879`), and the document
+  the editor holds - the one it hands back through `on_change` - is the
+  document it was given. So a block the author never touches round-trips its
+  stored bytes, retired spelling included. Whether the editor should adopt the
+  migrated config into its held document at open is a real question and this
+  Note deliberately does not answer it: it is **deferred to `sb-me4u`**, which
+  either decides it or records it as still open. What this section relies on is
+  only what decision 8 guarantees - that this package does not write migrated
+  bytes back on its own.
+- **It does not change `validate_config/1` on either type**, or either type's
+  `config_schema/1`, `slots/1`, outcomes or emitted SCXML. The bump is to
+  `current_version/0` and the addition is `migrate_config/2`; the shipped
+  shape of both types is otherwise what it is at `main`.
+- **It does not decide what a host does with a migrated document.** Persisting
+  is the host's, per ADR-0002 decision 8, and this section adds no hint, no
+  option and no callback about it.
+
+Filed with `sb-8vkc`, campaign-030's Lane S0.

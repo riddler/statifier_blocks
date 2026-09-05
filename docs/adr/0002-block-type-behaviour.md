@@ -2547,3 +2547,73 @@ refusal wording and the fixture migration land on `sb-4r1p`. Nothing above this
 line is edited.
 
 Filed with `sb-8acm`, campaign-029's Lane A.
+
+## Note (2026-09-05): decision 8, `core.wait` and `core.send` become its first users
+
+A dated Note rather than an amendment, because nothing this record decides
+moves. Decision 8's rules on `type_version` migration are unchanged in every
+particular, no row is added to decision 10's vocabulary table, no
+`config_schema/1` changes, no callback is added to or removed from the
+behaviour, and no Status changes. No section above this line is edited.
+Recorded ahead of the code, bead `sb-8vkc`, campaign 030 Lane S0; it merges at
+proposed under the campaign invariant like every other section filed with it,
+and flipping it to accepted is a separate gated request. `sb-me4u` implements.
+
+### What is about to be true, and why it is worth a line
+
+Decision 8 gave this package a migration mechanism in its founding record and
+nothing has used it since. `migrate_config/2` has been an optional callback on
+the behaviour from the beginning (`lib/statifier_blocks/block_type.ex:304-310`),
+every shipped `core.*` type is still at `current_version/0` of 1, and so no
+block has ever been behind its module and the callback has never been called.
+
+How a type would answer if one were is worth stating precisely, because the
+obvious reading is wrong. Fourteen of the fifteen declare `@behaviour
+StatifierBlocks.BlockType` rather than `use` it, so they do not carry the
+`__using__` default at `lib/statifier_blocks/block_type.ex:124-130` at all -
+`core.placeholder` is the only one that does
+(`lib/statifier_blocks/core/placeholder.ex:56`). For the other fourteen the
+callback is simply not exported, and a behind-version block of one of them
+takes `Palette.resolve/2`'s no-callback arm,
+`{:error, {:migration_failed, block_id, :no_migration_available}}`
+(`lib/statifier_blocks/palette.ex:262-269`). Decision 8's 2026-08-27 amendment settled the
+three semantics an implementation would need - the typed error for a failed or
+absent migration, the single hop rather than a version ladder, and the stored
+`type_version` left as stored - against no implementation at all.
+
+That changes on `sb-me4u`. ADR-0005's decision-9 amendment of 2026-09-05
+retired a duration spelling, and its Note of this date settles that a document
+holding the retired spelling is **migrated at open** rather than refused. The
+mechanism it reaches for is this record's, unmodified:
+
+| Type | `current_version/0` today | after `sb-me4u` | Config key the migration rewrites |
+|---|---|---|---|
+| `core.wait` | 1 (`lib/statifier_blocks/core/wait.ex:39`) | 2 | `"duration"`, its one `:duration` field |
+| `core.send` | 1 (`lib/statifier_blocks/core/send.ex:102`) | 2 | `"delay"`, its optional `:duration` field |
+
+These are the first two `migrate_config/2` implementations in the package, and
+they exercise decision 8 exactly as written: the migration runs at resolution
+time, is a single hop from 1 straight to 2, is applied to the in-memory block,
+and leaves the stored `type_version` alone, so a host that never saves the
+document never has its bytes rewritten. Which strings the migration reads and
+what it writes are ADR-0005's, not this record's; what this Note fixes is that
+the two rows above are the whole of the change to this record's subject matter.
+
+There is no third `:duration` field in the shipped vocabulary for the same
+migration to reach. The 2026-09-05 Note above already establishes that, and
+ADR-0010 decision 1's refusal of a `core.timeout` is why it stays true.
+
+### What this Note does not do
+
+- It does not change decision 7's closed field-type set, or the type of either
+  field named above. Both are still `:duration` and both still hold a string.
+- It does not change either type's `validate_config/1`, `slots/1`, outcomes, or
+  what its `emit/2` writes. A `core.send` still emits a `delay` attribute only
+  when there is one, and a `core.wait` still requires its `duration`.
+- It does not make migration mandatory, general, or a pattern other types are
+  expected to follow. Decision 8's "absent means the type has never changed its
+  config shape" is unchanged, and the other thirteen shipped types stay absent.
+- It does not decide persistence. Whether a migrated document is written back
+  is the host's, on the host's own `revision` axis, exactly as decision 8 says.
+
+Filed with `sb-8vkc`, campaign-030's Lane S0.
