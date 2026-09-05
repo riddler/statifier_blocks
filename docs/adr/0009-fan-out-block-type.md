@@ -228,6 +228,61 @@ wants to branch on the answers reads the accumulated list with a `core.branch`
 after the block, which is the same shape any other datamodel-driven decision
 has.
 
+*[Note added 2026-09-05, with `sb-7haw` under campaign-031, after `sb-kqno`
+landed `StatifierBlocks.Core.Map` (PR 281, `a852429`). The shipped
+`config_schema/1` is **four fields**, not the eight this table declares, and
+two of the four are spelled differently. This Note records the shipped
+surface and what became of the rest; the table above is not edited, per this
+record family's amendment convention, and it remains the reading of what was
+proposed on 2026-09-01.
+
+**What ships, in declaration order:** `items` (`{:path, %{}}`, required),
+`chart` (`:string`, required), `collect` (`{:path, %{}}`, optional), `on`
+(`{:select, ...}` over `all` and `first_error`, optional, default `"all"`).
+ADR-0002's G15 of this date is the row, read off the module.
+
+**`collect` is this table's `assign_to`, and `on` is its `aggregate`.** The
+ideas are decision 5's and decision 6's unchanged - one author-named
+accumulation location, and the two-word policy with `quorum` reserved - and
+only the spellings moved. Two things moved them. `assign_to` was chosen here
+as `core.subchart`'s word, but this field is now declared with the `{:path,
+opts}` field type ADR-0002's 2026-09-05 amendment on decision 7 added, which
+did not exist when this table was written; `collect` says what the block does
+with the answers rather than borrowing a name whose grammar it now only
+partly shares, and it keeps the same finding text so an author meets one
+complaint and not two. And `on` is the operator's campaign-031 amendment
+`RQ-031-4`, option (b): the scheduler that fans out **reads the policy off
+the `on` param verbatim**, so the authored word and the param name are the
+one word the runtime keys on, with no translation step between the record's
+vocabulary and the wire. Decision 6's permitted set is untouched by either
+move, and refusing everything outside it is still what reserves `quorum`.
+
+**Four declared fields are DEFERRED, not dropped.** `item_as`, `index_as`,
+`max_concurrency` and `params` are not in the shipped surface. Deferring them
+is what this Note records; **dropping** any of them would be a decision about
+this record's declaration surface, and this Note does not make it. Each is
+still live, and each has somewhere it would be decided:
+
+- `item_as` and `index_as` are the names a child sees its item and its
+  position under. Nothing in the shipped emission carries them, so a child
+  chart today reads whatever the fan-out handler passes it, which is the
+  handler's contract rather than this one's.
+- `max_concurrency` is decision 9's hint. Campaign 031's ruling `D31-9` puts
+  the bound itself in the fan-out runtime as a configuration key, refused at
+  runtime on the ordinary error route, and says a block-level hint is clamped
+  rather than honoured below the queue limit - so a field here would be a
+  hint to a runtime that already has the number, and the shape it should take
+  is worth deciding beside that runtime rather than ahead of it.
+- `params` is `core.subchart`'s field unchanged, and its absence here is the
+  narrowest of the four: it is literal params sent to every child, and the
+  shipped `<param>` list carries only the four fields above.
+
+A later bead decides each, on this record, against the runtime as it then
+stands. Until one does, the table above declares them and the module does not,
+and a reader who finds that gap is looking at this Note and not at drift.
+
+Filed with `sb-7haw`, campaign-031, from `sb-kqno`'s two recorded residues.]*
+
 ### 5. Answers accumulate in one author-named location, ordered by item index
 
 `assign_to` names **one** datamodel location, and the whole result of the block
