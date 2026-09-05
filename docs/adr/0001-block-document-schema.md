@@ -981,3 +981,37 @@ is ADR-0006's subject, and `sb-b05e` recorded it there, on a request of its
 own that has landed.
 
 Filed with `sb-8acm`, campaign-029's Lane A.
+
+## Note (2026-09-05): the Note above, two corrections to what it cites
+
+A dated Note correcting the dated Note above it rather than this record. No
+decision moves, the worked example's bytes are not edited, and no text above
+this line is changed by this section. Both corrections were raised in review
+against the request that added the Note above and routed to a follow-up
+rather than cured in place, so the merged artifact stayed the artifact its
+review read. Recorded under campaign 030's fill lane D.
+
+**The list of places the older spelling appears is short by one.** The Note
+above tells a reader to read the spelling inside decision 6's bullet as the
+spelling of the day the example was written, and adds that the same holds
+"for the `timeout` value in the worked example's JSON above, and for the
+duration shown in the tree diagram". The JSON holds a second such value that
+sentence does not name: the `core.wait` block's own `duration`, at `:409`.
+The full set in this record is four - the tree diagram at `:355`, the
+`timeout` at `:380`, the `core.wait` `duration` at `:409`, and the `duration`
+value quoted again in decision 6's bullet at `:491`, beside a `cond` that is
+an expression rather than a duration - and the same reading applies to each.
+What the reading says is unchanged; what changes is that it is now stated
+over the whole set rather than over three quarters of it.
+
+**`sb-b05e`'s request landed; the amendment it carries is proposed.** The
+Note above closes by saying that what a declared datamodel entry of duration
+type means "is ADR-0006's subject, and `sb-b05e` recorded it there, on a
+request of its own that has landed". Both halves are true and the second is
+easy to over-read. The request merged; the section it merged is that record's
+amendment of 2026-09-05 to its decision 4, whose status line reads
+**proposed** (`docs/adr/0006-datamodel-document.md:455`), and accepting it is
+a separate change on its own gate. Read "has landed" as "has merged, at
+proposed" - the reading every 2026-09-05 section in this family gets.
+
+Filed with `sb-a9r8`, campaign-030's fill lane D.
