@@ -79,7 +79,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     describe "the count line" do
       # The two kinds are counted apart, because a recipe is not a block type
       # (ADR-0005 clause 1C) and the line said it was: the core palette's
-      # sixteen types plus the "deadline" recipe read as "17 block types".
+      # seventeen types plus the "deadline" recipe read as "18 block types".
       #
       # Sabotage: deleting the `<p class="sb-palette__count">` from
       # `PaletteBrowser` - `count_text/1`'s match fails and every test in this
@@ -87,24 +87,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       #
       # Sabotage: `count_line/3`'s last arm reading `entry_count(groups)` again
       # instead of `kind_count(groups, :type)` - the line goes back to
-      # "17 block types" and this test names the conflation.
+      # "18 block types" and this test names the conflation.
       test "unfiltered, it is the size of the palette, by kind" do
-        assert total() == 17, "the scan actually saw the core palette"
-        assert total_of(:type) == 16
+        assert total() == 18, "the scan actually saw the core palette"
+        assert total_of(:type) == 17
         assert total_of(:recipe) == 1
 
-        assert count_text(palette_html()) == "16 block types, 1 recipe"
+        assert count_text(palette_html()) == "17 block types, 1 recipe"
       end
 
       # Sabotage: `count_line/3`'s first arm reading `"#{total} of #{shown}"` -
-      # the numbers swap and this goes red naming "17 of 4", which is the
+      # the numbers swap and this goes red naming "18 of 4", which is the
       # transposition that reads as plausible in a screenshot.
       test "a query says how much of the palette is left, and what was typed" do
         html = palette_html(query: "wait")
 
         # The quotes come back escaped because the query is author input and
-        # HEEx escapes it; a browser reads the line as `4 of 17 match "wait"`.
-        assert count_text(html) == "4 of 17 match &quot;wait&quot;"
+        # HEEx escapes it; a browser reads the line as `4 of 18 match "wait"`.
+        assert count_text(html) == "4 of 18 match &quot;wait&quot;"
       end
 
       # The acceptance set is the filter the author did not type, so it is the
@@ -114,7 +114,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # unfiltered case is in the same test.
       #
       # Sabotage: `count_line/3` dropping its `shown < total` arm - the
-      # filtered palette claims "17 block types" over a list of two.
+      # filtered palette claims "18 block types" over a list of two.
       #
       # Two rows survive the set, not one: the acceptance set is a set of
       # BLOCK TYPES, and the `"deadline"` recipe is not one (ADR-0005 clause
@@ -129,13 +129,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       #
       # Sabotage: `count_line/3`'s second arm comparing `shown < total` over
       # entries again - the recipe joins the numerator and this reads
-      # "2 of 16 block types fit here", which is the count of a row the slot
+      # "2 of 17 block types fit here", which is the count of a row the slot
       # never accepted.
       test "a slot's acceptance set narrows the line too, without a query" do
         filtered = palette_html(allowed: MapSet.new(["core.wait"]))
 
-        assert count_text(filtered) == "1 of 16 block types fit here; 1 recipe also listed"
-        assert count_text(palette_html(allowed: nil)) == "16 block types, 1 recipe"
+        assert count_text(filtered) == "1 of 17 block types fit here; 1 recipe also listed"
+        assert count_text(palette_html(allowed: nil)) == "17 block types, 1 recipe"
       end
 
       # A host registers the recipes it wants, so both ends of the range are
@@ -148,10 +148,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       test "with no recipes registered, the line says nothing about them" do
         types_only = groups_for(Palette.new(Palette.core_types()))
 
-        assert count_text(palette_html(groups: types_only)) == "16 block types"
+        assert count_text(palette_html(groups: types_only)) == "17 block types"
 
         assert count_text(palette_html(groups: types_only, allowed: MapSet.new(["core.wait"]))) ==
-                 "1 of 16 block types fit here"
+                 "1 of 17 block types fit here"
       end
 
       # Sabotage: `recipe_clause/1`'s catch-all reading `"#{count} recipe"` -
@@ -165,10 +165,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             )
           )
 
-        assert count_text(palette_html(groups: two)) == "16 block types, 2 recipes"
+        assert count_text(palette_html(groups: two)) == "17 block types, 2 recipes"
 
         assert count_text(palette_html(groups: two, allowed: MapSet.new(["core.wait"]))) ==
-                 "1 of 16 block types fit here; 2 recipes also listed"
+                 "1 of 17 block types fit here; 2 recipes also listed"
       end
 
       # Sabotage: `count_line/3`'s `total_types == 1` arm deleted - a
@@ -198,15 +198,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert html =~ ~s(<h3 class="sb-palette__group-name">)
         assert html =~ "<span>Structure</span>"
-        assert html =~ ~s(<span class="sb-palette__group-count">17</span>)
+        assert html =~ ~s(<span class="sb-palette__group-count">18</span>)
       end
 
       # The count is of what is under the header NOW. A header that kept
-      # reporting the registry's count would say 17 over a list of four, which
+      # reporting the registry's count would say 18 over a list of four, which
       # is worse than no count at all.
       #
       # Sabotage: `length(group.entries)` reading from `@groups` instead of the
-      # filtered group - the unfiltered case passes and this goes red on 17.
+      # filtered group - the unfiltered case passes and this goes red on 18.
       test "counts the filtered rows, not the registry's" do
         assert palette_html(query: "wait") =~
                  ~s(<span class="sb-palette__group-count">4</span>)

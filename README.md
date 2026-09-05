@@ -160,10 +160,10 @@ yet. The editor stamps a refused slot's reason beside its validity as
 `data-drop-reason`.
 
 **2. Compose the document.** Your two types, arranged by the `core.*`
-vocabulary this package ships. Sixteen types: the containers that arrange
+vocabulary this package ships. Seventeen types: the containers that arrange
 other blocks (`core.sequence`, `core.group`, `core.branch`, `core.parallel`,
-`core.resumable_group`, `core.foreach`, `core.drafts`), and the leaves that
-do a structural thing on their own (`core.wait`, `core.await`,
+`core.resumable_group`, `core.foreach`, `core.map`, `core.drafts`), and the
+leaves that do a structural thing on their own (`core.wait`, `core.await`,
 `core.on_event`, `core.invoke`, `core.subchart`, `core.send`, `core.raise`,
 `core.assign`, `core.placeholder`). `core.await` is the author's "Wait for
 event": it holds until a named event arrives, with an optional deadline, and
@@ -174,8 +174,13 @@ firing event's payload into the datamodel, and its `event` field offers the
 completion events the blocks in the enclosing body raise as candidates on the
 field an author types. None of them knows a domain - `core.invoke` *names* an
 invoke type for the host to run and never runs one, and `core.subchart` names
-another chart the same way. `StatifierBlocks.Core` carries
-the table of all sixteen with their slots. In a running system an editor
+another chart the same way. `core.map` and `core.foreach` are the two that
+run something per item and they are not variations on each other:
+`core.foreach` runs the blocks inside it, one item at a time, in the parent
+chart; `core.map` runs *another chart* for every item, all at once, as one
+invocation whose host handler starts the runs and collects their answers into
+one datamodel location, in item order. `StatifierBlocks.Core` carries
+the table of all seventeen with their slots. In a running system an editor
 writes this tree; it is ordinary data either way.
 
 ```elixir
