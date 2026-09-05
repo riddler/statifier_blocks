@@ -180,6 +180,46 @@ To co-develop a change that spans this package and the engine, export
 override never lands in a commit by accident; a commit that hard-codes a
 `path:` dependency is a bug.
 
+### The headless compile guard for test files
+
+CI runs a second job, `Headless (phoenix_live_view absent)`, with
+`STATIFIER_BLOCKS_HEADLESS=1`. That flag drops `phoenix_live_view` from
+`mix.exs` and redirects the deps, build and lockfile paths, so the job
+resolves a genuinely Phoenix-free tree and then runs
+`mix compile --warnings-as-errors` followed by `mix test`.
+
+The `:liveview` exclusion `test/test_helper.exs` applies in that tree keeps a
+test out of the headless **run**, not out of the headless **compile**. Every
+file under `test/` is still compiled there, so a file naming a LiveView module
+at compile time breaks the job however it is tagged. The guard is a whole-file
+wrapper, the shape the existing editor tests use:
+
+```elixir
+if Code.ensure_loaded?(Phoenix.LiveView) do
+  defmodule StatifierBlocks.Editor.DropReasonTest do
+    use StatifierBlocks.EditorLiveCase
+    # ...
+  end
+end
+```
+
+Precedent: `test/statifier_blocks/editor/drop_reason_test.exs`.
+
+- **Required** whenever the file names LiveView at compile time - `use
+  StatifierBlocks.EditorLiveCase`, `import Phoenix.LiveViewTest`, `~H`, an
+  alias or module attribute naming a `Phoenix.*` or `StatifierBlocks.Editor.*`
+  module. Those modules do not exist in the headless tree, so the wrapper is
+  what keeps the file from being compiled there at all.
+- **Forbidden** for a pure test - one that exercises only code that compiles
+  without LiveView, as
+  `test/statifier_blocks/assignability/host_relation_test.exs` does. Wrapping a
+  pure test hides it from the headless job, which is the one run that proves
+  its behavior with LiveView off the path.
+
+(Recorded 2026-09-05 by the operator's campaign consent, after a
+LiveView-cased test file that carried the tag but not the wrapper cost a CI
+cure.)
+
 <!-- usage-rules-start -->
 ## ExQuality (`mix quality`)
 
