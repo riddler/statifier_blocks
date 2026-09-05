@@ -10,6 +10,91 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.18.0] 2026-09-05
+
+0.18.0 lets a palette put down more than one block at a time. A palette may
+name **recipes** beside block types - the core palette ships one,
+`"deadline"`, whose single pick writes the `core.send` / `core.on_event`
+pair that spells a clock interrupt - and the edit vocabulary grows a
+compound, so an arrangement like that undoes in one gesture. Alongside it a
+palette entry may declare how many blocks of its type a document holds, the
+two core timer types rewrite a stored duration written in the retired
+spelling as the block resolves, and the editor toolbar's `Fit active`
+follows the run marks a host paints.
+
+### Added
+
+- A palette may name **recipes** beside block types: arrangements an author
+  picks the way they pick a type. A recipe is a module implementing
+  `StatifierBlocks.Recipe` - `insert/2`, handed the armed position and the
+  document, answering with the commands that build the arrangement, and
+  `palette_entry/0`, which draws it in the palette browser exactly as a type
+  draws. Register recipes with the new `:recipes` option on
+  `StatifierBlocks.Palette.new/2` (a `name => module` map) or on
+  `from_modules/2` (an ordered list, later entries winning), and resolve one
+  with `fetch_recipe/2`. Recipe names and type names are two namespaces, not
+  one: a recipe named `"deadline"` and a block type named `"deadline"` do not
+  collide. A recipe may target the armed position and any slot of the block
+  enclosing it, and nothing above that.
+
+- The core palette registers one recipe, `"deadline"`
+  (`StatifierBlocks.Palette.core_recipes/0`). One pick puts down the pair that
+  spells a clock interrupt: a `core.send` carrying a generated deadline event
+  and a delay, at the head of the enclosing group's `body`, and a
+  `core.on_event` naming the same event on that group's `interrupts` rail. The
+  pair compiles clean before the author types anything. Picked at a position
+  whose enclosing block has no interrupts rail, the gesture is refused and
+  nothing is written.
+
+- `StatifierBlocks.Edit.t()` admits a composition, `{:compound, [t()]}`,
+  carrying a non-empty list of the five commands. `Edit.apply/2` applies its
+  members left to right and returns the compound of their inverses in reverse
+  order, so `StatifierBlocks.Edit.History` remembers it as **one undo entry**:
+  one gesture in, one gesture out. A member that refuses refuses the whole
+  compound, with that member's own error term and no document at all. The set
+  of edits is still five - a compound's leaves are drawn from it, and a list
+  that is empty or holds a compound of its own is refused rather than
+  flattened.
+
+- A palette entry may declare `singleton: :head | :anywhere`, saying how many
+  blocks of its type a document may hold and, for `:head`, that the one it
+  holds is first in the root's first declared slot. A document that does not
+  comply draws one `:config` finding per violating type, anchored on the root
+  block, so a host gets "exactly one of this, at the top" without writing a
+  validator of its own. Read it with `StatifierBlocks.BlockType.singleton/1`.
+  Nothing is inserted, removed or moved on the author's behalf - the editor
+  says what is wrong and the author acts. An entry that omits the key, or
+  declares a value this package cannot read, is unconstrained exactly as it
+  is today.
+
+### Changed
+
+- `StatifierBlocks.Editor.Toolbar.toolbar/1`'s `:selected?` attribute is now
+  `:fittable?`, because a selection is no longer the only thing that gives
+  `Fit active` something to fit. Rename the attribute at any direct call
+  site; hosts rendering the editor pass nothing here.
+
+- A `StatifierBlocks.ViewModel.PaletteGroup` entry now carries `:kind`
+  (`:type` or `:recipe`) and `:name`, the name in whichever of the palette's
+  two maps it came from. `:type_name` is unchanged on a type entry and absent
+  on a recipe entry, which has no type name at all.
+
+### Fixed
+
+- The editor toolbar's `Fit active` follows the run marks a host paints: it
+  is enabled whenever there is a selection or an active mark, and with
+  nothing selected it fits and reveals the first marked block.
+
+- A document saved before the duration pivot opens clean instead of showing a
+  refusal on every timer: `core.wait` and `core.send` are at `type_version` 2
+  and rewrite a stored duration written in the older spelling into the one the
+  field reads. The rewrite happens in memory as the block resolves and nothing
+  is written back, so persisting it stays the host's decision.
+
+- The drawer's tab strip scrolls sideways at the narrow breakpoint instead of
+  wrapping to a second row, so the bar stays one row tall however many tabs a
+  host adds, and a fade marks the end the strip is clipped at.
+
 ## [0.17.0] 2026-09-05
 
 0.17.0 makes a stored duration mean one thing. A `:duration` field reads the
@@ -1604,6 +1689,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.18.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.18.0
 [0.17.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.17.0
 [0.16.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.16.0
 [0.15.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.15.0
