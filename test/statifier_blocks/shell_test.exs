@@ -91,11 +91,13 @@ defmodule StatifierBlocks.ShellTest do
   end
 
   describe "the inspector's tabs (3A)" do
-    # Sabotage: adding a fourth tab to `@inspector_tabs` - 3A says exactly
-    # three and that the list will grow only through the record, so this goes
-    # red on the addition rather than after it has shipped.
-    test "there are exactly three, in the order the ruling lists them" do
-      assert Shell.inspector_tabs() == [:config, :findings, :condition]
+    # Sabotage: adding a fifth tab to `@inspector_tabs` - 3A says the list
+    # grows only through the record, so this goes red on the addition rather
+    # than after it has shipped. It is four as of ADR-0005's 2026-09-05
+    # amendment, "3A admits a Fixtures tab in the inspector", which puts the
+    # new tab last and leaves the rule it grew under untouched.
+    test "there are exactly four, in the order the ruling lists them" do
+      assert Shell.inspector_tabs() == [:config, :findings, :condition, :fixtures]
     end
 
     # Sabotage: making `inspector_tab/1` return the raw value - a crafted
@@ -103,6 +105,7 @@ defmodule StatifierBlocks.ShellTest do
     test "an unknown tab resolves to the first one" do
       assert Shell.inspector_tab("condition") == :condition
       assert Shell.inspector_tab(:findings) == :findings
+      assert Shell.inspector_tab("fixtures") == :fixtures
       assert Shell.inspector_tab("datamodel") == :config
       assert Shell.inspector_tab(nil) == :config
     end

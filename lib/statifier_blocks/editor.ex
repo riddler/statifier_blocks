@@ -368,7 +368,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `invoke_mark` | no | the block a run is calling out to and how the call came back - `{block_id, outcome}`, a bare `block_id` for no answer yet, or `nil` for no call at all |
     | `theme` | no | `--sb-*` custom properties for the canvas root |
     | `fit` | no | the fit the editor **opens** in: `:manual` (the default), `:width` or `:active`; the first measurement performs it once, and an unknown value is refused into `:manual` |
-    | `fixtures` | no | `%{block_id => [TruthTable.t()]}`, read by both the drawer's truth-table tab and, as of `sb-4yze`, its Fixtures tab (`refresh_fixture_runs/1` drives each row through the compiled chart), and, as of `sb-e30x`, by the inspector's config form for the fixture hint beside an `:expression` control; `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
+    | `fixtures` | no | `%{block_id => [TruthTable.t()]}`, read by both the drawer's truth-table tab and, as of `sb-4yze`, its Fixtures tab (`refresh_fixture_runs/1` drives each row through the compiled chart), and, as of `sb-e30x`, by the inspector's config form for the fixture hint beside an `:expression` control, and, as of `sb-0l36`, by the inspector's own Fixtures tab, which shows the selected block's runs out of the same result; `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
     | `drawer_tabs` | no | tabs the host contributes to the drawer, each `%{id:, title:, content:}` with an optional `count:`; drawn beside the package's own and rendered by calling `content` |
     | `drawer_height` | no | the drawer's height in rem, remembered **by the host** per viewer (2A); bounded on the way in |
     | `on_drawer_resize` | no | one-argument function called with each new drawer height, which is how the host comes to have one to remember |
@@ -695,6 +695,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             path_candidates={@path_candidates}
             value_candidates={@offered_values}
             fixtures={@fixtures}
+            fixture_runs={@fixture_runs}
             target={@myself}
           />
 
@@ -804,8 +805,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     def handle_event("fit", _params, socket), do: {:noreply, socket}
 
+    # The refresh is here for the same reason it is on `drawer-tab`: picking
+    # the Fixtures tab is the moment its rows are first wanted, and without it
+    # the tab would draw its empty state until something else moved the
+    # document.
     def handle_event("inspector-tab", %{"tab" => tab}, socket),
-      do: {:noreply, assign(socket, :inspector_tab, Shell.inspector_tab(tab))}
+      do:
+        {:noreply,
+         socket |> assign(:inspector_tab, Shell.inspector_tab(tab)) |> refresh_fixture_runs()}
 
     def handle_event("drawer-open", _params, socket),
       do: {:noreply, socket |> assign(:drawer_open, true) |> refresh_fixture_runs()}
@@ -1489,8 +1496,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # The runs are not on `drawer()` and not in `drawer_view/1`, deliberately.
     # That function is pure, cheap and called on every render; a compile plus
     # one chart run per fixture row is none of those. So the runs are their
-    # own assign, recomputed only when the drawer is OPEN on the fixtures tab
-    # and the inputs actually moved.
+    # own assign, recomputed only when a surface is actually showing them -
+    # see `wants_fixture_runs?/1` below - and the inputs actually moved.
     #
     # The key is compared with `==` rather than hashed: a phash2 collision
     # would render a stale verdict with nothing on screen to say so, and a
@@ -1506,10 +1513,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       key = {assigns.document, assigns.palette, assigns.fixtures, declare}
 
       cond do
-        not assigns.drawer_open ->
-          socket
-
-        drawer_view(assigns).tab != :fixtures ->
+        not wants_fixture_runs?(assigns) ->
           socket
 
         key == assigns.fixture_runs_key ->
@@ -1526,6 +1530,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           |> assign(:fixture_runs, runs)
           |> assign(:fixture_runs_key, key)
       end
+    end
+
+    # Two surfaces read the runs as of `sb-0l36`, and either one asking is
+    # enough: the drawer's Fixtures tab when the drawer is open on it, and the
+    # inspector's Fixtures tab when it has a block to be about. With no
+    # selection the inspector's tab has no subject and draws its empty state,
+    # so a compile plus a run per row would be work nothing shows.
+    #
+    # The key deliberately does NOT carry the selection. One run covers every
+    # block - `FixtureRuns.run/4` drives the whole source - and the inspector
+    # picks its own block's rows out of it at render. So changing the selection
+    # changes what is on screen without re-running anything, and cannot leave
+    # the previous block's verdicts up: they were never this block's rows to
+    # begin with.
+    @spec wants_fixture_runs?(map()) :: boolean()
+    defp wants_fixture_runs?(assigns) do
+      (assigns.drawer_open and drawer_view(assigns).tab == :fixtures) or
+        (assigns.inspector_tab == :fixtures and assigns.selected_id != nil)
     end
 
     # The one composition of a view model in this component, called by

@@ -54,8 +54,8 @@ defmodule StatifierBlocks.Shell do
   """
   @type fit_mode :: :manual | :width | :active
 
-  @typedoc "Which of the inspector's three tabs is showing (3A)."
-  @type inspector_tab :: :config | :findings | :condition
+  @typedoc "Which of the inspector's four tabs is showing (3A)."
+  @type inspector_tab :: :config | :findings | :condition | :fixtures
 
   @typedoc """
   Which of the drawer's own tabs is showing (1A, and the R4 ruling of
@@ -148,7 +148,13 @@ defmodule StatifierBlocks.Shell do
   # same reason - see `viewport_anchor/0`.
   @viewport_anchor "viewport"
 
-  @inspector_tabs [:config, :findings, :condition]
+  # Tab order, and it is also the order `inspector_tab/1` resolves an unknown
+  # name in: Config keeps the first position, so the tab an author selecting a
+  # block almost always wants is the one an unknown name lands on. Fixtures is
+  # last because it is the newest - ADR-0005's 2026-09-05 amendment
+  # ("3A admits a Fixtures tab in the inspector") says so in as many words,
+  # and it is the same arrival-order rule `@drawer_tabs` below follows.
+  @inspector_tabs [:config, :findings, :condition, :fixtures]
 
   @fit_modes [:manual, :width, :active]
 
@@ -449,7 +455,7 @@ defmodule StatifierBlocks.Shell do
   @spec height_band() :: {float(), float(), float()}
   def height_band, do: {@min_height, @max_height, @default_height}
 
-  @doc "The inspector's three tabs, in the order 3A lists them."
+  @doc "The inspector's four tabs, in the order 3A and its amendment list them."
   @spec inspector_tabs() :: [inspector_tab()]
   def inspector_tabs, do: @inspector_tabs
 

@@ -283,20 +283,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     describe "the tabbed inspector (3A)" do
-      # Sabotage: adding a fourth tab to the strip - 3A is exactly three, and
-      # the reason it is a rule rather than a list is that the list will be
-      # tempting to grow.
-      test "carries exactly Config, Findings and Condition", %{conn: conn} do
+      # Sabotage: adding a fifth tab to the strip - the reason 3A is a rule
+      # rather than a list is that the list will be tempting to grow, and it
+      # grows only where the record says so. It is four as of ADR-0005's
+      # 2026-09-05 amendment, which admits the Fixtures tab and puts it last.
+      test "carries exactly Config, Findings, Condition and Fixtures", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn)
 
         assert view |> element(".sb-inspector__tabs") |> render() =~ "Config"
         assert has_element?(view, ~s(.sb-inspector__tab[phx-value-tab="findings"]))
         assert has_element?(view, ~s(.sb-inspector__tab[phx-value-tab="condition"]))
+        assert has_element?(view, ~s(.sb-inspector__tab[phx-value-tab="fixtures"]))
 
         assert view
                |> render()
                |> then(&Regex.scan(~r/class="sb-inspector__tab[ "]/, &1))
-               |> length() == 3
+               |> length() == 4
       end
 
       # Sabotage: rendering every panel at once - the tabs stop meaning
