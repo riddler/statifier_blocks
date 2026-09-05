@@ -249,6 +249,14 @@ defmodule StatifierBlocks.ViewModel do
     rendering side reads a string and never learns which key an author's
     name lives under.
 
+    `summary_titles` is the raw text behind each chip in `summary`, `nil`
+    where the chip is drawn as its type declared it (ADR-0005 decision
+    10w). It is index-aligned with `summary` by construction rather than
+    by maintenance - `StatifierBlocks.BlockType` derives both from one
+    pass over one callback - and it is read through
+    `ViewModel.summary_chip_titles/1`, which realigns it against
+    `summary_chips/1` for a node built by hand.
+
     `invoke_type` is what this block's config carries under `invoke_type`,
     when that is a non-empty string. It is a config key rather than a type
     name, so a host type that calls out to a handler gets the same third
@@ -269,6 +277,7 @@ defmodule StatifierBlocks.ViewModel do
             entry: BlockType.palette_entry(),
             title: String.t() | nil,
             summary: [String.t()],
+            summary_titles: [String.t() | nil],
             invoke_type: String.t() | nil,
             outcome: String.t() | nil,
             join_label: String.t() | nil,
@@ -288,6 +297,7 @@ defmodule StatifierBlocks.ViewModel do
       entry: %{},
       title: nil,
       summary: [],
+      summary_titles: [],
       invoke_type: nil,
       outcome: nil,
       join_label: nil,
@@ -360,7 +370,8 @@ defmodule StatifierBlocks.ViewModel do
   """
   @spec build(Document.t(), Palette.t(), [Finding.t()]) :: t()
   def build(%Document{} = document, %Palette{} = palette, findings) when is_list(findings) do
-    all_findings = derived_findings(document, palette) ++ findings
+    labels = chip_labels(document, palette)
+    all_findings = derived_findings(document, palette, labels) ++ findings
     block_ids = document |> Document.blocks() |> MapSet.new(& &1.id)
 
     {routed, orphan} =
@@ -371,7 +382,7 @@ defmodule StatifierBlocks.ViewModel do
     %__MODULE__{
       document_id: document.id,
       revision: document.revision,
-      root: build_node(document.root, {palette, by_block}),
+      root: build_node(document.root, {palette, by_block, labels}),
       palette_groups: palette_groups(palette),
       findings: all_findings,
       orphan_findings: orphan
@@ -552,6 +563,37 @@ defmodule StatifierBlocks.ViewModel do
   def summary_chips(%Node{summary: summary}), do: summary
 
   @doc """
+  The raw text behind each chip `summary_chips/1` draws, `nil` where the
+  chip is drawn as its type declared it, and always exactly as long as
+  `summary_chips/1`.
+
+  ADR-0005 decision 10w's other half. A chip whose text has the shape of a
+  generated done-event name is drawn as `<block label>` and the outcome,
+  and the raw name goes on the chip's `title` attribute - verbatim and
+  untruncated, because that is what keeps the translation lossless for an
+  author reading a screenshot beside generated SCXML.
+
+  The length is realigned against `summary_chips/1` rather than trusted,
+  so a `Node` built by hand - a doctest, a host's fixture - answers one
+  `nil` per chip instead of an empty list the caller would zip away.
+
+      iex> ViewModel.summary_chip_titles(%ViewModel.Node{
+      ...>   block_id: "blk_ON", type: "core.on_event", type_version: 1, status: :ok,
+      ...>   entry: %{label: "On event"}, summary: ["Abandon", "fraud.aborted"]
+      ...> })
+      [nil, nil]
+  """
+  @spec summary_chip_titles(Node.t()) :: [String.t() | nil]
+  def summary_chip_titles(%Node{} = node) do
+    titles = node.summary_titles
+
+    node
+    |> summary_chips()
+    |> Enum.with_index()
+    |> Enum.map(fn {_chip, index} -> Enum.at(titles, index) end)
+  end
+
+  @doc """
   Whether a container draws as a boundary box: true when ANY of its slots
   declares a rail style (ADR-0005 amendment 10c, as amended by 10h).
 
@@ -722,15 +764,15 @@ defmodule StatifierBlocks.ViewModel do
     end
   end
 
-  @spec derived_findings(Document.t(), Palette.t()) :: [Finding.t()]
-  defp derived_findings(%Document{} = document, %Palette{} = palette) do
+  @spec derived_findings(Document.t(), Palette.t(), BlockType.chip_labels()) :: [Finding.t()]
+  defp derived_findings(%Document{} = document, %Palette{} = palette, labels) do
     document
     |> Document.blocks()
     |> Enum.flat_map(fn block ->
       case Palette.resolve(palette, block) do
         {:ok, module, resolved} ->
           config_findings(block.id, module, resolved.config) ++
-            summary_findings(block.id, module, resolved.config)
+            summary_findings(block.id, module, resolved.config, labels)
 
         {:error, reason} ->
           [Finding.new({:block, block.id}, :resolution, resolution_message(reason))]
@@ -746,18 +788,54 @@ defmodule StatifierBlocks.ViewModel do
   # decision 11 reserves every non-error severity to `:lint`, and the
   # document compiles either way, so this changes no verdict and only says
   # that something declared is not being drawn.
-  @spec summary_findings(Block.id(), module(), Block.config()) :: [Finding.t()]
-  defp summary_findings(block_id, module, config) do
+  @spec summary_findings(Block.id(), module(), Block.config(), BlockType.chip_labels()) ::
+          [Finding.t()]
+  defp summary_findings(block_id, module, config, labels) do
     module
-    |> BlockType.summary_refusals(config)
+    |> BlockType.summary_refusals(config, labels)
     |> Enum.map(fn refusal ->
       Finding.new(
         {:block, block_id},
         :lint,
-        BlockType.summary_refusal_message(module, config, refusal),
+        BlockType.summary_refusal_message(module, config, refusal, labels),
         severity: :warning
       )
     end)
+  end
+
+  # ADR-0005 decision 10w's `<block label>`: the label the named block's
+  # own card draws, for every block in the document. Read from the same
+  # three sources `title/1` reads, in the same order, because the chip has
+  # to name the block the way the canvas names it - a chip citing a label
+  # nothing on the canvas carries would be worse than the raw event name.
+  #
+  # It is a pre-pass rather than something the recursive walk accumulates
+  # because a chip may name a block that is drawn LATER, or that is not on
+  # this card's branch at all. This is the reader dependency ADR-0005's
+  # Consequences names: the chip pass reads across the document rather
+  # than down one block.
+  @spec chip_labels(Document.t(), Palette.t()) :: BlockType.chip_labels()
+  defp chip_labels(%Document{} = document, %Palette{} = palette) do
+    document
+    |> Document.blocks()
+    |> Map.new(fn block -> {block.id, chip_label(block, palette)} end)
+  end
+
+  @spec chip_label(Block.t(), Palette.t()) :: String.t()
+  defp chip_label(%Block{} = block, %Palette{} = palette) do
+    case Palette.resolve(palette, block) do
+      {:ok, module, resolved} ->
+        entry = palette_entry_with_defaults(module, block.type)
+
+        title_override(module.config_schema(resolved.config), resolved.config) ||
+          Map.get(entry, :label) || block.type
+
+      # An unresolvable block draws its type name and nothing else
+      # (`build_unresolvable_node/3` has no schema to read a title out of),
+      # so that is its label here too.
+      {:error, _reason} ->
+        block.type
+    end
   end
 
   @spec config_findings(Block.id(), module(), Block.config()) :: [Finding.t()]
@@ -793,10 +871,11 @@ defmodule StatifierBlocks.ViewModel do
   defp finding_block_id(%Finding{anchor: {:block, id}}), do: id
 
   @typedoc "Threaded through the recursive walk instead of two positional arguments."
-  @type ctx :: {Palette.t(), %{optional(Block.id()) => [Finding.t()]}}
+  @type ctx ::
+          {Palette.t(), %{optional(Block.id()) => [Finding.t()]}, BlockType.chip_labels()}
 
   @spec build_node(Block.t(), ctx()) :: Node.t()
-  defp build_node(%Block{} = block, {palette, _by_block} = ctx) do
+  defp build_node(%Block{} = block, {palette, _by_block, _labels} = ctx) do
     case Palette.resolve(palette, block) do
       {:ok, module, resolved} -> build_resolved_node(block, module, resolved, ctx)
       {:error, reason} -> build_unresolvable_node(block, reason, ctx)
@@ -808,7 +887,7 @@ defmodule StatifierBlocks.ViewModel do
          %Block{} = block,
          module,
          %Block{config: config},
-         {_palette, by_block} = ctx
+         {_palette, by_block, labels} = ctx
        ) do
     own_findings = Map.get(by_block, block.id, [])
     declared = module.slots(config)
@@ -872,7 +951,8 @@ defmodule StatifierBlocks.ViewModel do
       status: :ok,
       entry: entry,
       title: title_override(schema, config),
-      summary: BlockType.summary(module, config),
+      summary: BlockType.summary(module, config, labels),
+      summary_titles: BlockType.summary_titles(module, config, labels),
       invoke_type: invoke_type(config),
       join_label: BlockType.join_label(entry, config),
       slots: slots,
@@ -896,7 +976,7 @@ defmodule StatifierBlocks.ViewModel do
           ctx()
         ) ::
           map()
-  defp build_unresolvable_node(%Block{} = block, reason, {_palette, by_block} = ctx) do
+  defp build_unresolvable_node(%Block{} = block, reason, {_palette, by_block, _labels} = ctx) do
     own_findings = Map.get(by_block, block.id, [])
     slot_names = block.slots |> Map.keys() |> MapSet.new()
 

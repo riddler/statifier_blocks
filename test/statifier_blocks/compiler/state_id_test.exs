@@ -120,4 +120,79 @@ defmodule StatifierBlocks.Compiler.StateIdTest do
       assert StateId.done_event("s_blk_ABC") == "done.state.s_blk_ABC"
     end
   end
+
+  describe "undone_event/1" do
+    # sabotage: invert only the `done.outcome` form and answer :error for
+    # `done.state` -> the second row of ADR-0005 decision 10w's table never
+    # draws, and every block that declares no outcomes keeps the raw name
+    test "round-trips both forms of a generated completion event" do
+      assert StateId.undone_event(StateId.done_event(StateId.state_id("blk_SEQ"))) ==
+               {:ok, {"blk_SEQ", nil}}
+
+      for outcome <- ["done", "error", "abandoned"] do
+        event = StateId.outcome_event(StateId.state_id("blk_AUTH"), outcome)
+
+        assert StateId.undone_event(event) == {:ok, {"blk_AUTH", outcome}}
+      end
+    end
+
+    # sabotage: drop the `nil` role requirement in `block_of/2` -> a role
+    # state's completion is reported as the BLOCK's, so a card claims a
+    # block finished when only one lane inside it did
+    test "an auxiliary state's completion is not the block's" do
+      {:ok, lane} = StateId.state_id("blk_PAR", "lane_capture")
+
+      assert StateId.undone_event(StateId.done_event(lane)) == :error
+      assert StateId.undone_event(StateId.outcome_event(lane, "error")) == :error
+    end
+
+    # ADR-0005 decision 10y, hazard one. `StatifierBlocks.Validation` admits
+    # any non-empty UTF-8 block id, so an id carrying the role separator is
+    # a document this package must read - and its generated event name has
+    # two readings, block `a__b` and block `a` under role `b`.
+    #
+    # sabotage: answer `{:ok, {"a", "b"}}` here (which is what `unstate_id/1`
+    # alone says) -> the chip draws a DIFFERENT block's label, which is the
+    # one outcome 10y refuses
+    test "an authored block id carrying the role separator does not invert" do
+      assert StateId.undone_event("done.state.s_a__b") == :error
+      assert StateId.undone_event("done.outcome.s_a__b.error") == :error
+
+      assert StateId.undone_event(StateId.outcome_event(StateId.state_id("a__b"), "error")) ==
+               :error
+    end
+
+    # ADR-0005 decision 10y, hazard two. A dot is not a character the
+    # derivation reserves at all, so an authored id containing one gives
+    # `done.outcome.s_A.B.C` two readings - outcome `B.C` and outcome `C`.
+    #
+    # sabotage: split on the LAST dot instead of refusing -> the chip names
+    # outcome `C` on a block called `A.B`, which nothing declared
+    test "an authored block id carrying a dot does not invert an outcome event" do
+      assert StateId.undone_event("done.outcome.s_A.B.C") == :error
+
+      assert StateId.undone_event(StateId.outcome_event(StateId.state_id("a.b"), "error")) ==
+               :error
+    end
+
+    # sabotage: drop the `role?/1` check on the outcome -> a segment no
+    # `outcome_id/2` could ever have minted reads as an outcome name
+    test "refuses everything that is not a generated completion event" do
+      for name <- [
+            "order.paid",
+            "done.state.blk_SEQ",
+            "done.state.s_",
+            "done.outcome.s_blk_AUTH",
+            "done.outcome.s_blk_AUTH.",
+            "done.outcome.s_blk_AUTH.Error",
+            "done.outcome.s_blk_AUTH.a__b",
+            "done.outcomes.s_blk_AUTH.error",
+            "",
+            :done,
+            nil
+          ] do
+        assert StateId.undone_event(name) == :error, "expected #{inspect(name)} to be refused"
+      end
+    end
+  end
 end
