@@ -6262,12 +6262,12 @@ same reading every 2026-09-05 section in this family gets, this one included.
 Raised against the request that filed them and left unedited there for the
 same reason:
 
-- **"It runs at open" names the occasion, not an exclusive one.** The
-  closing Note's title and its heading sentence (`:6057`) say "at open"
-  because that is the occasion an author meets. The migration runs wherever
+- **"It runs at open" names the occasion, not an exclusive one.** The closing
+  Note's title and its heading sentence (`:6057`) say "at open" because that
+  is the occasion an author meets. The migration runs wherever
   `Palette.resolve/2` runs, which in `lib/` is ten call sites across seven
-modules, and in `test/` is nineteen more across seven files: the
-  compiler (`lib/statifier_blocks/compiler.ex:361`), the view model
+  modules, and in `test/` is nineteen more across seven files: the compiler
+  (`lib/statifier_blocks/compiler.ex:361`), the view model
   (`lib/statifier_blocks/view_model.ex:772`, `:826`, `:879`), slot validation
   (`lib/statifier_blocks/slot_validation.ex:78`), assignability
   (`lib/statifier_blocks/assignability.ex:384`, `:566`), the edit path
