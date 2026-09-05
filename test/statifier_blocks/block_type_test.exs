@@ -230,6 +230,7 @@ defmodule StatifierBlocks.BlockTypeTest do
     defp closed_field_type?(type) when type in @closed_field_types, do: true
     defp closed_field_type?({:select, options}) when is_list(options), do: true
     defp closed_field_type?({:list, inner}), do: closed_field_type?(inner)
+    defp closed_field_type?({:path, opts}), do: is_map(opts)
     defp closed_field_type?(_type), do: false
 
     # sabotage: change the review_above field's `type: :integer` to an
@@ -359,6 +360,36 @@ defmodule StatifierBlocks.BlockTypeTest do
 
       assert BlockType.put_value(config, ["arms", 1], "z") ==
                %{"arms" => [%{"cond" => "x"}, "z"]}
+    end
+  end
+
+  describe "decision 7's two spellings of one datamodel-path claim" do
+    # sabotage: drop `datamodel_path?/1`'s `%{type: {:path, _opts}}` clause -
+    # a typed field falls through to the catch-all and answers false, so the
+    # first two assertions go red (verified).
+    test "a {:path, opts} field is a datamodel path by construction" do
+      assert BlockType.datamodel_path?(%{key: "assign_to", type: {:path, %{}}})
+      assert BlockType.datamodel_path?(%{key: "assign_to", type: {:path, %{later: 1}}})
+
+      refute BlockType.datamodel_path?(%{key: "chart", type: :string})
+      refute BlockType.datamodel_path?(%{key: "items", type: {:list, :string}})
+    end
+
+    # sabotage: replace the `datamodel_path?: true` clause with the type
+    # clause rather than adding beside it - every declaration written under
+    # the key stops making its claim and this goes red (verified).
+    test "the key is not withdrawn, and carrying both is not a contradiction" do
+      assert BlockType.datamodel_path?(%{key: "path", type: :string, datamodel_path?: true})
+      assert BlockType.datamodel_path?(%{key: "path", type: {:path, %{}}, datamodel_path?: true})
+    end
+
+    # sabotage: admitted a truthy value for the key rather than the literal
+    # `true` - a host's typo starts meaning true and this goes red
+    # (verified). The bare atom `:path` is not the type either: the type is
+    # the tuple, so a declaration halfway to it claims nothing.
+    test "neither spelling reads a typo as truthiness" do
+      refute BlockType.datamodel_path?(%{key: "path", datamodel_path?: "yes"})
+      refute BlockType.datamodel_path?(%{key: "path", type: :path})
     end
   end
 

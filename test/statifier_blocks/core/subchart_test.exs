@@ -68,6 +68,44 @@ defmodule StatifierBlocks.Core.SubchartTest do
     end
   end
 
+  describe "assign_to is a {:path, opts} field" do
+    # sabotage: reverted `assign_to`'s declaration to `type: :string` - the
+    # editor reaches the plain control by type and the field carries no
+    # claim about its value at all, so this goes red (verified).
+    test "config_schema/1 declares it by type, with no opts key defined yet" do
+      assert %{type: {:path, opts}} =
+               Subchart.config_schema(@eligibility)
+               |> Enum.find(&(&1.key == "assign_to"))
+
+      assert opts == %{}
+    end
+
+    # sabotage: same revert - `datamodel_path?/1` answers false, the field
+    # is filtered out of `block_findings/5`, and this goes red (verified).
+    test "the claim reads back through BlockType.datamodel_path?/1" do
+      for field <- Subchart.config_schema(@eligibility) do
+        assert StatifierBlocks.BlockType.datamodel_path?(field) == (field.key == "assign_to")
+      end
+    end
+
+    # sabotage: loosened `check_assign_to/2` to accept any non-empty string
+    # - the dotted value validates and the refusal assertion goes red
+    # (verified). The type is a claim about what the value means, never a
+    # widening of what `validate_config/1` accepts.
+    test "it accepts exactly what it accepted before" do
+      assert Subchart.validate_config(%{"chart" => "bdoc_CHILD", "assign_to" => "eligibility"}) ==
+               :ok
+
+      assert Subchart.validate_config(%{"chart" => "bdoc_CHILD", "assign_to" => ""}) == :ok
+      assert Subchart.validate_config(%{"chart" => "bdoc_CHILD"}) == :ok
+
+      assert {:error, [{"assign_to", message}]} =
+               Subchart.validate_config(%{"chart" => "bdoc_CHILD", "assign_to" => "signup.step"})
+
+      assert message =~ "bare lowercase identifier"
+    end
+  end
+
   describe "outcomes/1 and slots/1" do
     # sabotage: appended `error` unconditionally -> a child that finishes
     # `error` gets two finals and two slots for one outcome, and this goes

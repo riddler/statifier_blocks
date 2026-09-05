@@ -151,6 +151,16 @@ defmodule StatifierBlocks.BlockType do
           | :expression
           | :duration
           | {:list, field_type()}
+          | {:path, path_opts()}
+
+  @typedoc """
+  The second element of a `{:path, opts}` field type. No key is defined
+  today (ADR-0002 decision 7, amended 2026-09-05): the map is there so a
+  control's needs can arrive without widening the closed type set a second
+  time, exactly as `{:select, choices}` and `{:list, inner}` carry theirs.
+  A declaration writes `type: {:path, %{}}`.
+  """
+  @type path_opts :: map()
 
   @typedoc """
   Keys and list indexes from the config root down to one value, as
@@ -207,9 +217,9 @@ defmodule StatifierBlocks.BlockType do
   config-parameterized the same way slots are.
 
   This is a rendering hint, not the authority - `validate_config/1` is.
-  The seven closed `field_type/0` values are `:string`, `:integer`,
-  `:boolean`, `{:select, options}`, `:expression`, `:duration`, and
-  `{:list, field_type()}`.
+  The eight closed `field_type/0` values are `:string`, `:integer`,
+  `:boolean`, `{:select, options}`, `:expression`, `:duration`,
+  `{:list, field_type()}`, and `{:path, opts}`.
 
   ## Where a field's value lives
 
@@ -233,6 +243,16 @@ defmodule StatifierBlocks.BlockType do
   (ADR-0002 decision 7, amended 2026-08-29). It is orthogonal to
   `value_path`: one says where the value lives, the other says what the
   value means, and a field may carry both, either, or neither.
+
+  A field typed `{:path, opts}` makes the same claim by its type (decision
+  7, amended 2026-09-05), and the two spellings mean one thing: the key is
+  not withdrawn, a declaration written before the type behaves exactly as
+  it did, and a declaration carrying both says the same thing twice rather
+  than contradicting itself. What the type adds is that the editor reaches
+  the right control by the field type alone - a candidate list of the
+  declared paths - which a key beside `:string` cannot buy, because
+  `:string` is the whole answer the type set gave a host that never learned
+  the key existed.
 
   It is a claim, not a rule. `validate_config/1` remains the authority on
   validity, and the annotation buys exactly one thing: the editor checks
@@ -557,27 +577,42 @@ defmodule StatifierBlocks.BlockType do
   def value_path(%{key: key}), do: [key]
 
   @doc """
-  Whether a field declaration says its value is a datamodel path
-  (ADR-0002 decision 7's optional `datamodel_path?` key, amended
-  2026-08-29).
+  Whether a field declaration says its value is a datamodel path - the two
+  spellings decision 7 admits, read in one place.
 
-  Total, and true only for the literal `true` that the amendment admits.
-  Absence means what it meant before the key existed, and any other value
-  - a string, `nil`, a map - reads as absence rather than as truthiness,
-  on the same normalizer discipline `value_path/1` and
-  `StatifierBlocks.ViewModel.accent_token/1` are under: a typo in a host's
-  registry degrades to the behaviour that predates the key.
+  A `{:path, opts}` field is a datamodel path **by construction** (amended
+  2026-09-05), and the optional `datamodel_path?: true` key beside a
+  `:string` says the same thing (amended 2026-08-29). This function is why
+  the second amendment did not have to withdraw the first: it is the one
+  place a consumer asks the question, so reading the claim off either
+  spelling is its business rather than every caller's, and a declaration
+  carrying both is not a contradiction.
+
+  Total, and true for the literal `true` that the key's amendment admits
+  and for nothing else. Absence means what it meant before the key
+  existed, and any other value - a string, `nil`, a map - reads as absence
+  rather than as truthiness, on the same normalizer discipline
+  `value_path/1` and `StatifierBlocks.ViewModel.accent_token/1` are under:
+  a typo in a host's registry degrades to the behaviour that predates the
+  key.
 
       iex> StatifierBlocks.BlockType.datamodel_path?(%{key: "path", datamodel_path?: true})
       true
 
+      iex> StatifierBlocks.BlockType.datamodel_path?(%{key: "assign_to", type: {:path, %{}}})
+      true
+
       iex> StatifierBlocks.BlockType.datamodel_path?(%{key: "path"})
+      false
+
+      iex> StatifierBlocks.BlockType.datamodel_path?(%{key: "path", type: :string})
       false
 
       iex> StatifierBlocks.BlockType.datamodel_path?(%{key: "path", datamodel_path?: "yes"})
       false
   """
   @spec datamodel_path?(field_decl()) :: boolean()
+  def datamodel_path?(%{type: {:path, _opts}}), do: true
   def datamodel_path?(%{datamodel_path?: true}), do: true
   def datamodel_path?(_decl), do: false
 

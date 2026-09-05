@@ -95,6 +95,29 @@ defmodule StatifierBlocks.Core.Subchart do
   safe for `core.invoke`'s reason: they sit on the inner state, active only
   while this block's own call is outstanding.
 
+  ## Where the outcome is written
+
+  `assign_to` names a location in the host's datamodel, so it is declared
+  a `{:path, %{}}` field - ADR-0002 decision 7's eighth field type, added
+  by its 2026-09-05 amendment, which names this field as the one core
+  field that held a path and declared nothing about it. Two things follow
+  and a third deliberately does not:
+
+    * the editor offers the declared datamodel paths as candidates, drawn
+      from `StatifierBlocks.Datamodel.candidates/3`; and
+    * a value the datamodel does not declare gets ADR-0005 clause 11e's
+      `:info` advisory anchored on the `assign_to` key, which is a remark
+      and not a refusal.
+
+  What does not change is **what the field accepts**. `validate_config/1`
+  still requires a bare lowercase identifier here and `emit/2` still
+  writes exactly that string into the `<assign>`'s `location`, so every
+  document written before this type existed keeps validating and keeps
+  compiling to the same bytes. A bare identifier is a one-segment path, so
+  the claim the type makes was already true of every value this field ever
+  held; admitting a dotted location is a separate question about what an
+  `<assign>` may target and is not this one's to answer.
+
   ## What `src` names, and what it does not
 
   The emitted `src` is the **document id** the author typed into `chart`,
@@ -196,7 +219,7 @@ defmodule StatifierBlocks.Core.Subchart do
       },
       %{
         key: "assign_to",
-        type: :string,
+        type: {:path, %{}},
         label: "Write the outcome to",
         required?: false,
         default: ""
