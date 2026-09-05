@@ -24,9 +24,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     records (`sb-k7r`); until then a mode is the honest half, and it is the
     half a server can test.
 
-    `Fit active` is disabled with nothing selected, because "fit the active
-    block" with no active block is a control whose only outcome is nothing
-    happening.
+    `Fit active` is disabled when there is no block for it to fit, because
+    "fit the active block" with no active block is a control whose only
+    outcome is nothing happening. What counts as one is `fittable?`, and it is
+    two things rather than one: the author's selection, and the run marks a
+    host is painting. An observer watching a run selects nothing - the marks
+    are the run's own answer to which block matters - so a toolbar that asked
+    only about the selection left that reader with a control disabled over a
+    canvas with marks on it.
 
     ## It is the canvas panel's header row (parity item 1.2)
 
@@ -66,7 +71,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:count, :integer, required: true)
     attr(:can_undo?, :boolean, required: true)
     attr(:can_redo?, :boolean, required: true)
-    attr(:selected?, :boolean, default: false)
+    attr(:fittable?, :boolean, default: false, doc: "whether `Fit active` has a block to fit")
     attr(:target, :any, required: true)
     attr(:class, :string, default: nil)
 
@@ -139,7 +144,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             phx-click="fit"
             phx-value-fit="active"
             phx-target={@target}
-            disabled={not @selected?}
+            disabled={not @fittable?}
             aria-pressed={to_string(@fit == :active)}
           >
             Fit active
