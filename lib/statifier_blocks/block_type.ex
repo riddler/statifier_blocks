@@ -358,6 +358,26 @@ defmodule StatifierBlocks.BlockType do
   @type join_label :: (Block.config() -> String.t())
 
   @typedoc """
+  How many of this block type a document may hold, and where (ADR-0005's
+  2026-09-05 amendment, clause 10z).
+
+  | Value | What the document must hold |
+  |---|---|
+  | `:anywhere` | exactly one block of this type, at any position |
+  | `:head` | exactly one block of this type, and it is the first child of the root's first slot |
+
+  Both values say "exactly one"; only `:head` says where. There is no
+  `:at_most_one` and no `:at_least_one` - an entry either constrains the
+  count to one or does not constrain it. Absent is unconstrained, and that
+  is what every entry that has never heard of the key means.
+
+  It is inert data, like every other decision-10 key: this module reads it
+  through `singleton/1` and `StatifierBlocks.ViewModel` turns a document
+  that violates it into a finding. Nothing anywhere repairs the document.
+  """
+  @type singleton :: :head | :anywhere
+
+  @typedoc """
   All keys optional. `icon` is a name resolved by a host-supplied
   component, never markup (ADR-0005 decision 10).
 
@@ -367,6 +387,11 @@ defmodule StatifierBlocks.BlockType do
   through a total normalizer with refuse-never-truncate semantics (B3) -
   `badge/1` and `join_label/2` here, `StatifierBlocks.ViewModel.accent_token/1`
   for the one whose value is interpolated into a style attribute.
+
+  `singleton` is ADR-0005 clause 10z's cardinality declaration - `t:singleton/0`
+  for the two values and `singleton/1` for the reader. It is the one key whose
+  subject is the document rather than the card, and the only thing that reads
+  it is the document finding `StatifierBlocks.ViewModel` derives from it.
   """
   @type palette_entry :: %{
           optional(:label) => String.t(),
@@ -382,7 +407,8 @@ defmodule StatifierBlocks.BlockType do
           optional(:slot_outcome_key) => %{optional(String.t()) => String.t()},
           optional(:accent_token) => String.t(),
           optional(:badge) => String.t(),
-          optional(:join_label) => join_label()
+          optional(:join_label) => join_label(),
+          optional(:singleton) => singleton()
         }
 
   @doc """
@@ -737,6 +763,44 @@ defmodule StatifierBlocks.BlockType do
   @spec badge(palette_entry() | map()) :: String.t() | nil
   def badge(entry) when is_map(entry), do: chip(Map.get(entry, :badge))
   def badge(_entry), do: nil
+
+  # ADR-0005 clause 10z's closed set, spelled once. Anything else an entry
+  # declares is read as absent, never as an error - a palette entry is a
+  # host's data and decision 10's normalizers refuse rather than raise.
+  @singletons [:head, :anywhere]
+
+  @doc """
+  How many of this block type the document may hold, as its palette entry
+  declares it, or `nil` when it declares nothing this package can read
+  (ADR-0005 clause 10z).
+
+  Total, under the same refuse-never-raise discipline `badge/1` carries. A
+  value outside `#{inspect(@singletons)}` - a string, a count, an atom this
+  package has never heard of - is read as absent, so a host that declares
+  something malformed gets the unconstrained document it had before rather
+  than a finding it cannot act on.
+
+  `nil` is the default every entry has, and it is what
+  `StatifierBlocks.ViewModel` reads to decide it has no type to count.
+
+      iex> StatifierBlocks.BlockType.singleton(%{singleton: :head})
+      :head
+
+      iex> StatifierBlocks.BlockType.singleton(%{singleton: "head"})
+      nil
+
+      iex> StatifierBlocks.BlockType.singleton(%{})
+      nil
+  """
+  @spec singleton(palette_entry() | map()) :: singleton() | nil
+  def singleton(entry) when is_map(entry) do
+    case Map.get(entry, :singleton) do
+      declared when declared in @singletons -> declared
+      _refused -> nil
+    end
+  end
+
+  def singleton(_entry), do: nil
 
   @doc """
   What the join marker under this block type's side-by-side arrangement
