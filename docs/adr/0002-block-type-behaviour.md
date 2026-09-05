@@ -3147,11 +3147,12 @@ exists, and until then the run-time branch is the one that fires. What
 gets its candidate source keys, which is a rendering affordance and not a
 verdict.
 
-#### Note (2026-09-05, corrected against the engine): what the run-time branch actually does
+### Note (2026-09-05): what the run-time branch actually does
 
 The bullet above states the run-time branch as one rule. `sb-0q0z`, which
-that bullet's own section names as the bead that confirms it before relying
-on it, measured the engine and found two rules rather than one. This Note
+this Note's closing section names as the bead that confirms the interpreter's
+behaviour before relying on it, measured the engine and found two rules
+rather than one. This Note
 records what was measured, because the paragraph above was written ahead of
 the measurement and a record that keeps the unmeasured version would have
 this package relying on a guarantee it does not have.
@@ -3170,8 +3171,8 @@ whether the whole path resolves:
 Measured with a hand-written chart carrying a single `<assign>` and an
 `error.execution` transition on the enclosing parent state, so a raised
 error is observable whichever target the machine reaches. Identical results
-on the locked engine version and on the newer one the fleet is moving to, so
-the finding does not turn on a stale lock.
+on `2.2.0`, the version this package locks, and on `2.5.0`, the newest
+published one, so the finding does not turn on a stale lock.
 
 Every `expr` a `capture` compiles to is rooted at `_event`, which is always
 bound. So the row that governs this key is the second, not the last: **a
