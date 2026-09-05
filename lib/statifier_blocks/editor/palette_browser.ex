@@ -264,17 +264,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               <span class="sb-palette__group-count">{length(group.entries)}</span>
             </h3>
             <ul class="sb-palette__entries">
-              <li :for={entry <- group.entries} data-type={entry.type_name}>
+              <li
+                :for={entry <- group.entries}
+                data-type={entry[:type_name]}
+                data-recipe={if entry.kind == :recipe, do: entry.name}
+              >
                 <button
                   type="button"
                   class="sb-palette__pick"
-                  draggable="true"
-                  data-sb-drag-type={entry.type_name}
+                  draggable={to_string(entry.kind == :type)}
+                  data-sb-drag-type={entry[:type_name]}
                   data-sb-block-accent={ViewModel.accent_token(entry.entry)}
                   style={accent_style(entry.entry)}
                   phx-click="palette-pick"
                   phx-target={@target}
-                  phx-value-type={entry.type_name}
+                  phx-value-type={entry[:type_name]}
+                  phx-value-recipe={if entry.kind == :recipe, do: entry.name}
                 >
                   <span class="sb-palette__icon">
                     <Icons.glyph icon={@icon} name={entry.entry.icon} class="sb-palette__glyph" />
@@ -363,15 +368,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       accepted?(entry, allowed) and matches?(entry, needle)
     end
 
+    # The acceptance set is the SLOT's, and a slot accepts block types. A
+    # recipe is not one, so no set of type names can answer for it: whether
+    # a "deadline" fits where the author armed is the recipe's own question,
+    # and `insert/2` answers it by refusing (ADR-0005 clause 3C). A recipe
+    # therefore stays visible under the acceptance filter and is refused at
+    # the pick, which is the honest order - the alternative hides the entry
+    # and tells the author nothing about why.
     @spec accepted?(ViewModel.PaletteGroup.entry(), MapSet.t(String.t()) | nil) :: boolean()
     defp accepted?(_entry, nil), do: true
+    defp accepted?(%{kind: :recipe}, _allowed), do: true
     defp accepted?(%{type_name: type_name}, allowed), do: MapSet.member?(allowed, type_name)
 
     @spec matches?(ViewModel.PaletteGroup.entry(), String.t()) :: boolean()
     defp matches?(_entry, ""), do: true
 
-    defp matches?(%{type_name: type_name, entry: entry}, needle) do
-      haystack = [type_name, entry.label, entry.description | entry.keywords]
+    defp matches?(%{name: name, entry: entry}, needle) do
+      haystack = [name, entry.label, entry.description | entry.keywords]
       Enum.any?(haystack, &String.contains?(String.downcase(&1), needle))
     end
   end

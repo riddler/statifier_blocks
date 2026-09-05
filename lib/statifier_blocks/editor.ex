@@ -397,6 +397,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Edit,
       Finding,
       Palette,
+      Recipe,
       Shelf,
       ViewModel
     }
@@ -1021,6 +1022,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:noreply, assign(socket, :palette_query, query)}
     end
 
+    # A recipe pick and a type pick are the same gesture on the same event;
+    # what differs is which of the palette's two maps the name is looked up
+    # in (ADR-0005 clause 1C), so the row sends `recipe` rather than `type`
+    # and this clause sits above the type one.
+    def handle_event("palette-pick", %{"recipe" => name}, socket) do
+      socket = assign(socket, :palette_sheet, false)
+      {:noreply, insert_from_recipe(socket, name, socket.assigns.palette_position)}
+    end
+
     def handle_event("palette-pick", %{"type" => type}, socket) do
       socket = assign(socket, :palette_sheet, false)
       {:noreply, insert_from_palette(socket, type, socket.assigns.palette_position)}
@@ -1192,6 +1202,53 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         :error ->
           assign(socket, :last_error, {:unknown_block_type, type})
       end
+    end
+
+    # A recipe pick (clause 2C). The recipe is handed the armed position and
+    # the document and answers with the commands that build the arrangement;
+    # they go in as ONE `{:compound, commands}`, which is what makes the
+    # arrangement one undo entry rather than one per block (clause 2n).
+    #
+    # Two refusals, and they are different in kind. `insert/2` refusing -
+    # a deadline armed where the enclosing block has no interrupts rail -
+    # is the ordinary case clause 3C names, and nothing is written. A list
+    # that reaches outside clause 3C's bound is a recipe module's bug, and
+    # it is refused HERE, before it is applied, rather than trusted.
+    @spec insert_from_recipe(
+            Phoenix.LiveView.Socket.t(),
+            Palette.recipe_name(),
+            Edit.target() | nil
+          ) :: Phoenix.LiveView.Socket.t()
+    defp insert_from_recipe(socket, _name, nil),
+      do: assign(socket, :palette_unarmed_pick, true)
+
+    defp insert_from_recipe(socket, name, position) do
+      with {:ok, module} <- Palette.fetch_recipe(socket.assigns.palette, name),
+           {:ok, commands} <- module.insert(position, socket.assigns.document),
+           true <- Recipe.within_reach?(position, commands) do
+        socket
+        |> assign(
+          palette_position: nil,
+          palette_allowed: nil,
+          palette_unarmed_pick: false,
+          selected_id: first_inserted_id(commands) || socket.assigns.selected_id
+        )
+        |> commit({:compound, commands})
+      else
+        false -> refused(socket, {:recipe_out_of_reach, name})
+        {:error, reason} -> refused(socket, reason)
+      end
+    end
+
+    @spec refused(Phoenix.LiveView.Socket.t(), term()) :: Phoenix.LiveView.Socket.t()
+    defp refused(socket, reason), do: socket |> assign(:last_error, reason) |> rebuild()
+
+    @spec first_inserted_id([Edit.t()]) :: Block.id() | nil
+    defp first_inserted_id(commands) do
+      Enum.find_value(commands, fn
+        {:insert, _target, %Block{id: id}} -> id
+        _other_command -> nil
+      end)
     end
 
     @spec new_block(Palette.t(), Block.type_name()) :: {:ok, Block.t()} | :error

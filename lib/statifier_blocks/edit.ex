@@ -91,6 +91,31 @@ defmodule StatifierBlocks.Edit do
   whose slot name is not a usable slot key - not a binary, or empty.
   Commands are serializable values that can arrive from a replayed log, so
   this is a real arm, not a dead one.
+
+  ## The composition (ADR-0005 clause 2n)
+
+  `{:compound, [t()]}` carries a non-empty list of commands. `apply/2`
+  applies them left to right against the intermediate documents, and the
+  inverse it returns is the compound of each step's inverse **in reverse
+  order**. A member that refuses refuses the whole compound: `apply/2`
+  answers `{:error, term()}` with the member's own error term, unchanged,
+  and no document at all, so there is no partially applied document for a
+  caller to mistake for a result.
+
+  **A compound is not a sixth edit.** Its leaves are drawn from the five and
+  nothing else - a list that is empty, or that holds a `:compound` of its
+  own, is refused rather than flattened - so every edit a document can
+  undergo is still one of the five. What the constructor buys is that
+  `Edit.History` pushes one inverse per commit, which makes a compound
+  **one undo entry**: one gesture in, one gesture out, and no state between
+  the halves that an author can stop in.
+
+  The two refusals a malformed compound produces reuse the
+  `{:malformed_envelope, term()}` arm above rather than minting an arm of
+  their own. An empty or nested list is a value claiming to be a shape it is
+  not, which is what that arm already means everywhere else in this package,
+  and clause 2n's consequence that nothing reading these terms learns a new
+  shape is why it is not a new one here.
   """
 
   alias StatifierBlocks.{Block, BlockType, Document, Palette, Validation}
@@ -109,6 +134,7 @@ defmodule StatifierBlocks.Edit do
           | {:move, Block.id(), target()}
           | {:update_config, Block.id(), Block.config()}
           | {:set_datamodel, [DatamodelEntry.t()]}
+          | {:compound, [t()]}
 
   @doc """
   Applies one command, returning the new document and the command that
@@ -175,6 +201,12 @@ defmodule StatifierBlocks.Edit do
     end
   end
 
+  def apply(%Document{} = document, {:compound, commands}) do
+    with :ok <- check_compound(commands) do
+      apply_compound(document, commands, [])
+    end
+  end
+
   @doc """
   ADR-0005 decision 9's config gate. `apply/2` above is purely structural
   and cannot ask a block type whether a config is valid; this is where that
@@ -208,6 +240,25 @@ defmodule StatifierBlocks.Edit do
 
   def check_config(%Palette{}, %Document{}, {:remove, _id}), do: :ok
 
+  # Clause 2n: the gate runs on the compound's LEAVES, each against the
+  # document the leaves before it produced - the same document `apply/2`
+  # will hand that leaf a moment later, so the two never disagree about
+  # which block a `:update_config` names.
+  #
+  # A leaf `apply/2` will itself refuse ends the walk with `:ok`. This
+  # function is not the one that reports a structural refusal, and
+  # continuing past it would ask later leaves about a document that will
+  # never exist.
+  def check_config(%Palette{} = palette, %Document{} = document, {:compound, commands})
+      when is_list(commands) do
+    commands
+    |> Enum.reduce_while({:ok, document}, &check_leaf(palette, &1, &2))
+    |> case do
+      {:ok, %Document{}} -> :ok
+      {:error, _reason} = error -> error
+    end
+  end
+
   # A declaration has no block type, so there is no `validate_config/1` to
   # run and no palette to resolve it through. Its own grammar is checked in
   # `apply/2`, which is where the moduledoc's fifth-command section says it
@@ -223,6 +274,52 @@ defmodule StatifierBlocks.Edit do
       end
     else
       _error -> :ok
+    end
+  end
+
+  @spec check_leaf(Palette.t(), t(), {:ok, Document.t()}) ::
+          {:cont, {:ok, Document.t()}}
+          | {:halt, {:ok, Document.t()}}
+          | {:halt, {:error, {:invalid_config, Block.id(), [BlockType.finding()]}}}
+  defp check_leaf(palette, command, {:ok, document}) do
+    case check_config(palette, document, command) do
+      :ok -> advanced(document, command)
+      {:error, _reason} = error -> {:halt, error}
+    end
+  end
+
+  @spec advanced(Document.t(), t()) :: {:cont, {:ok, Document.t()}} | {:halt, {:ok, Document.t()}}
+  defp advanced(document, command) do
+    case __MODULE__.apply(document, command) do
+      {:ok, next, _inverse} -> {:cont, {:ok, next}}
+      {:error, _reason} -> {:halt, {:ok, document}}
+    end
+  end
+
+  # Clause 2n's two malformed shapes, refused rather than flattened. A
+  # non-list reaches the third arm for the same reason a command can arrive
+  # from a replayed log at all: these are serializable values.
+  @spec check_compound(term()) :: :ok | {:error, {:malformed_envelope, term()}}
+  defp check_compound([]), do: {:error, {:malformed_envelope, {:compound, :empty}}}
+
+  defp check_compound(commands) when is_list(commands) do
+    if Enum.any?(commands, &match?({:compound, _nested}, &1)) do
+      {:error, {:malformed_envelope, {:compound, :nested}}}
+    else
+      :ok
+    end
+  end
+
+  defp check_compound(_other), do: {:error, {:malformed_envelope, {:compound, :not_a_list}}}
+
+  # Left to right, accumulating each inverse head-first, which is what makes
+  # the returned list the reversed one clause 2n asks for.
+  @spec apply_compound(Document.t(), [t()], [t()]) :: {:ok, Document.t(), t()} | {:error, term()}
+  defp apply_compound(document, [], inverses), do: {:ok, document, {:compound, inverses}}
+
+  defp apply_compound(document, [command | rest], inverses) do
+    with {:ok, next, inverse} <- __MODULE__.apply(document, command) do
+      apply_compound(next, rest, [inverse | inverses])
     end
   end
 
