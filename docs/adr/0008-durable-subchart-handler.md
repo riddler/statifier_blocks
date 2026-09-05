@@ -437,9 +437,9 @@ ADR-0009 built it afterwards.
 **For a fan-out the write under the parent's exclusion is the fan-out job's
 enqueue.** ADR-0009 decision 3 compiles `core.map` to exactly **one**
 `<invoke>`, so the parent's serialized step has exactly one invocation to
-answer, and what that step durably records is the same pair decision 4 requires
-- the linkage, and the parent's position - with the linkage widened to the
-ordered set of children ADR-0009 decision 10 names (`sp-ADR-0008`'s
+answer, and what that step durably records is the same pair decision 4
+requires - the linkage, and the parent's position - with the linkage widened
+to the ordered set of children ADR-0009 decision 10 names (`sp-ADR-0008`'s
 amendment, bead `sp-3n2`). The step does not create N child runs. It records
 the set and enqueues the work that will create them, and that enqueue is the
 write that happens under the exclusion.
@@ -455,8 +455,9 @@ section calls out - a persisted parent that believes it has a child, and a
 child run that was never created - does not open here, because the set is
 already durable before any start runs: a position with no run is created on the
 next attempt rather than being unrecoverable, and a position that already has
-one is not created twice. How those starts are batched, bounded and retried is
-`sob-djz`'s record, as ADR-0009 decision 9 already says; this note fixes only
+one is not created twice. How those starts are batched, bounded and
+carried across a restart is `sob-djz`'s record, as ADR-0009 decision 9
+already says; this note fixes only
 where the exclusion boundary falls.
 
 **Nothing about the single-child case changes.** Where one child is started the
