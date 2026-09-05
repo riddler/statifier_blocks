@@ -1,20 +1,22 @@
 if Code.ensure_loaded?(Phoenix.LiveView) do
   defmodule StatifierBlocks.Editor.Inspector do
     @moduledoc """
-    The tabbed inspector: Config, Findings, Condition (ADR-0005, the 2026-08-29
-    shell amendment, ruling 3A).
+    The tabbed inspector: Config, Findings, Condition, Fixtures (ADR-0005, the
+    2026-08-29 shell amendment, ruling 3A, and its 2026-09-05 amendment).
 
     3A is one rule and a list, and the rule is the part that matters: **the
     inspector is about the selected block, and anything about the document goes
-    to the drawer.** The list of three tabs follows from it rather than the
-    other way round, which is why Datamodel and Fixtures - inspector tabs in
-    the spike - are drawer tabs here. They were never about the selected block.
+    to the drawer.** The list of tabs follows from it rather than the other way
+    round, which is why the Datamodel - an inspector tab in the spike - is a
+    drawer tab here. It was never about the selected block.
 
-    Two things a reader will look for and not find:
+    One thing a reader will look for and not find:
 
-      * There is no fourth tab and no `:if` that would add one. A pane that is
-        about the document has one place to go, and 3A exists so that "which
-        inspector tab does this become" stops being asked.
+      * There is no tab here that is about the document. A pane that is about
+        the document has one place to go, and 3A exists so that "which
+        inspector tab does this become" stops being asked. The Fixtures tab
+        below is admitted by that rule, not in spite of it: a fixture row is
+        attached to exactly one block.
       * The Findings tab is **not** the document-level findings panel decision
         13 names. That panel still exists, still lists every finding in the
         document, and still lives beside the canvas. This tab is the selected
@@ -56,6 +58,40 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     Editing a condition stays on the Config tab, where every other field is
     edited, so there is exactly one form in the editor and one place a draft
     can live (decision 9).
+
+    ## The Fixtures tab is the selected block's rows (sb-0l36)
+
+    ADR-0005's 2026-09-05 amendment, "3A admits a Fixtures tab in the
+    inspector". A fixture row attaches to one block - the `fixtures` assign is
+    `%{block_id => [TruthTable.t()]}`, with no document-level bucket and no row
+    belonging to two blocks - so the selected block's rows are about the
+    selected block, which is the whole of what 3A asks of an inspector tab.
+
+    **The drawer's own Fixtures tab is unchanged in every particular.** The two
+    coexist by pane, exactly as Findings already does: the drawer's tab is
+    every row in the document with the block named in a column, and this one is
+    one block's rows with the block named by the pane. Nothing here filters a
+    different list or derives a second number - both read the runs the editor
+    already holds.
+
+    **It adds no execution path.** The rows come from the same
+    `StatifierBlocks.Runtime.FixtureRuns` result the drawer's tab renders,
+    which the editor recomputes in `refresh_fixture_runs/1`; this tab selects
+    the runs whose `block_id` is the pane's subject and renders them. What that
+    costs is one comparison per run, on a struct the editor computed for the
+    drawer's sake anyway.
+
+    **Its count is the selected block's row count**, in the Findings tab's chip
+    and style. It counts rows and not failures for the reason the drawer's
+    strip does: the number beside a tab says how much is in it, and a count
+    that vanished when everything passed would read as "no fixtures" on the
+    document an author most wants to see the number for.
+
+    Its empty states are three, and they are different questions: no selection
+    (the pane has no subject), no fixtures source at all, and a source that
+    holds nothing for this block. The mid-edit compile failure is a fourth, and
+    it reads as mid-edit rather than as a failure of the fixtures - the same
+    words the drawer's panel uses, for the same reason.
 
     ## The pane header, and what its status says (parity item 1.1)
 
@@ -179,6 +215,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "Passed through to `StatifierBlocks.Editor.ConfigForm`; see its moduledoc."
     )
 
+    attr(:fixture_runs, :any,
+      default: nil,
+      doc:
+        "`StatifierBlocks.Runtime.FixtureRuns.t()` for the Fixtures tab, or `nil` - " <>
+          "the same struct the drawer's Fixtures tab reads, filtered here to the " <>
+          "selected block's runs"
+    )
+
     attr(:target, :any, required: true)
     attr(:class, :string, default: nil)
 
@@ -197,13 +241,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "the view model's root `ViewModel.Node`, read only for group labels"
     )
 
-    @doc "The three tabs and the panel of whichever one is showing."
+    @doc "The four tabs and the panel of whichever one is showing."
     def inspector(assigns) do
       findings = Shell.block_findings(assigns.node)
+      block_runs = block_runs(assigns.fixture_runs, assigns.node)
 
       assigns =
         assigns
         |> assign(:findings, findings)
+        |> assign(:block_runs, block_runs)
+        |> assign(:fixture_count, length(block_runs))
         |> assign(:tab_count, tab_count(assigns.node, findings, assigns.document_findings))
         |> assign(:groups, document_groups(assigns))
         |> assign(:counts, Shell.severity_counts(document_counted(assigns)))
@@ -250,6 +297,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             <span :if={tab == :findings and @tab_count > 0} class="sb-inspector__tab-count">
               {@tab_count}
             </span>
+            <span :if={tab == :fixtures and @fixture_count > 0} class="sb-inspector__tab-count">
+              {@fixture_count}
+            </span>
           </button>
         </div>
 
@@ -294,6 +344,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             :if={@node != nil and @tab == :condition}
             node={@node}
             conditions={@conditions}
+          />
+          <.fixtures_panel
+            :if={@tab == :fixtures}
+            node={@node}
+            runs={@fixture_runs}
+            block_runs={@block_runs}
           />
         </div>
       </section>
@@ -483,6 +539,106 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
+    attr(:node, :any, required: true)
+    attr(:runs, :any, required: true)
+    attr(:block_runs, :list, required: true)
+
+    # The selected block's fixture rows. One state at a time, resolved in
+    # `fixtures_state/3` rather than by four `:if`s that could all be true at
+    # once: a pane that renders "no fixtures source" above a table of runs is
+    # exactly the defect a computed state cannot have.
+    #
+    # A row carries the same three facts per row the drawer's tab does -
+    # expected slot, taken slot, verdict - minus the block column, because the
+    # block is the pane's own subject and a column repeating it on every line
+    # is the column the inspector has room for least.
+    #
+    # `data-verdict` is what the stylesheet tints and what a test reads, and it
+    # is the `.sb-fixtures__scroll` rules the drawer's table already declares:
+    # the same verdicts in the same words should not be two colours in two
+    # panes.
+    defp fixtures_panel(assigns) do
+      assigns =
+        assign(assigns, :state, fixtures_state(assigns.node, assigns.runs, assigns.block_runs))
+
+      ~H"""
+      <p :if={@state == :no_selection} class="sb-inspector__empty">
+        Select a block on the canvas to see its fixtures.
+      </p>
+
+      <p :if={@state == :no_fixtures} class="sb-inspector__empty">
+        No fixtures source is attached to this editor, so this block has no
+        recorded cases to run. A host supplies them alongside the document.
+      </p>
+
+      <div :if={@state == :compile_error}>
+        <p class="sb-inspector__empty">
+          This document does not currently compile, so no case can be run.
+        </p>
+        <ul class="sb-fixtures__findings">
+          <li :for={finding <- @runs.findings}>{finding.message}</li>
+        </ul>
+      </div>
+
+      <p :if={@state == :none_for_block} class="sb-inspector__empty">
+        No fixture rows are recorded for this block.
+      </p>
+
+      <div :if={@state == :ready} class="sb-fixtures__scroll sb-inspector__fixtures">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Table</th>
+              <th scope="col">Case</th>
+              <th scope="col">Expected</th>
+              <th scope="col">Taken</th>
+              <th scope="col">Verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr :for={run <- @block_runs} data-block={run.block_id} data-row={run.row_name}>
+              <td>{run.table_name}</td>
+              <td>{run.row_name}</td>
+              <td>{run.expected_slot}</td>
+              <td>{run.taken_slot}</td>
+              <td data-verdict={run.verdict}>{run.verdict}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      """
+    end
+
+    # The runs whose subject is the pane's, in the order the run list holds
+    # them - which is the fixture source's own order, so reading down this
+    # table is reading the block's cases as they were written.
+    #
+    # `nil` runs are the editor before it has ever computed any, and they read
+    # as "none": there is nothing to filter and nothing to say beyond what the
+    # panel's own state says.
+    @spec block_runs(term(), ViewModel.Node.t() | nil) :: list()
+    defp block_runs(nil, _node), do: []
+    defp block_runs(_runs, nil), do: []
+
+    defp block_runs(runs, %ViewModel.Node{block_id: block_id}),
+      do: Enum.filter(runs.runs, &(&1.block_id == block_id))
+
+    # Four states, and the order they are resolved in is the order the
+    # questions are asked: has the pane a subject, is there a source at all,
+    # does the document compile, and does this block have rows.
+    @spec fixtures_state(ViewModel.Node.t() | nil, term(), list()) :: atom()
+    defp fixtures_state(nil, _runs, _block_runs), do: :no_selection
+    defp fixtures_state(_node, nil, _block_runs), do: :no_fixtures
+
+    defp fixtures_state(_node, runs, block_runs) do
+      case runs.status do
+        :no_fixtures -> :no_fixtures
+        :compile_error -> :compile_error
+        :ready when block_runs == [] -> :none_for_block
+        :ready -> :ready
+      end
+    end
+
     # The chip's number, and the whole of what the selection changes about it.
     # With a block selected it is that block's findings, as it always was; with
     # none it is `Shell.findings_count/1` over the document's, which is the one
@@ -529,5 +685,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp label(:config), do: "Config"
     defp label(:findings), do: "Findings"
     defp label(:condition), do: "Condition"
+    defp label(:fixtures), do: "Fixtures"
   end
 end
