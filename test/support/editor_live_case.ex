@@ -50,6 +50,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          fixtures: session["fixtures"],
          invoke_types: session["invoke_types"] || [],
          value_candidates: session["value_candidates"] || %{},
+         # `Map.get/3` rather than the `||` its neighbours use: `session/2`
+         # below fills every key with its own default, so the fallback here is
+         # only for a session built by hand - and one more `||` in this
+         # function crosses Credo's complexity bound for the whole of it.
+         chart_outcomes: Map.get(session, "chart_outcomes", %{}),
          drawer_height: session["drawer_height"],
          header: session["header"],
          host_tabs: session["host_tabs"] || [],
@@ -77,6 +82,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         fixtures={@fixtures}
         invoke_types={@invoke_types}
         value_candidates={@value_candidates}
+        chart_outcomes={@chart_outcomes}
         drawer_height={@drawer_height}
         drawer_tabs={drawer_tabs(@host_tabs, @feed)}
         on_change={notifier(@test_pid)}
@@ -257,6 +263,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "fixtures" => Keyword.get(opts, :fixtures),
         "invoke_types" => Keyword.get(opts, :invoke_types, []),
         "value_candidates" => Keyword.get(opts, :value_candidates, %{}),
+        "chart_outcomes" => Keyword.get(opts, :chart_outcomes, %{}),
         "drawer_height" => Keyword.get(opts, :drawer_height),
         "header" => Keyword.get(opts, :header),
         "host_tabs" => Keyword.get(opts, :host_tabs, []),

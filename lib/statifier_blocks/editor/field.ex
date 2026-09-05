@@ -121,6 +121,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     other core types that declare an `event` key are unaffected. Nothing in
     this module tests for a block type to decide it.
 
+    ## `outcome_candidates` (sb-r4w7)
+
+    The outcomes a host says the chart a `core.subchart` names actually
+    finishes with, as plain names. They are drawn as a `<datalist>` on the
+    `outcomes` field on exactly the `invoke_type` list's terms: the field
+    stays a `:string`, a free-typed name is validated as it always was, and
+    an empty list draws the plain input rather than an empty picker.
+
+    The list is looked up by `StatifierBlocks.Editor` from its
+    `chart_outcomes` assign for a selected `core.subchart`, and is empty for
+    every other selection. Nothing in this module tests for a block type.
+
     ## The fixture hint (sb-e30x)
 
     `fixture_hint` is `StatifierBlocks.Shell.fixture_hint/3`'s answer for
@@ -304,6 +316,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:outcome_candidates, :list,
+      default: [],
+      doc: """
+      The outcomes the host says the referenced chart finishes with, as plain
+      names. Suggestions for a `core.subchart` `outcomes` field, never a
+      constraint on it; empty is *no list supplied* and renders the plain
+      input.
+      """
+    )
+
     attr(:fixture_hint, :any,
       default: nil,
       doc: """
@@ -329,6 +351,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           path_candidates={@path_candidates}
           value_candidates={@value_candidates}
           event_candidates={@event_candidates}
+          outcome_candidates={@outcome_candidates}
         />
         <p
           :if={@fixture_hint}
@@ -352,6 +375,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:path_candidates, :list, default: [])
     attr(:value_candidates, :map, default: %{})
     attr(:event_candidates, :list, default: [])
+    attr(:outcome_candidates, :list, default: [])
 
     defp control(%{field: %ViewModel.Field{type: :boolean}} = assigns) do
       ~H"""
@@ -636,6 +660,39 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           label={candidate.label}
         >
         </option>
+      </datalist>
+      """
+    end
+
+    # sb-r4w7: a `core.subchart` `outcomes` field, offered the finals the host
+    # says the referenced chart emits. Keyed by field key and by a non-empty
+    # list, exactly as `invoke_type` and `event` above are, and for the same
+    # reasons: the field stays a plain `:string` in `config_schema/1`, and an
+    # empty list falls through to the plain input rather than drawing a
+    # `<datalist>` that suggests nothing.
+    #
+    # No block type is tested here. `core.subchart` is the only core type
+    # declaring an `outcomes` key, and the list is looked up for a selected
+    # one and empty otherwise, which is where the question belongs.
+    defp control(
+           %{field: %ViewModel.Field{key: "outcomes"}, outcome_candidates: [_first | _rest]} =
+             assigns
+         ) do
+      assigns = assign(assigns, :list_id, input_id(assigns.field) <> "-finals")
+
+      ~H"""
+      <input
+        class="sb-field__input"
+        type="text"
+        id={input_id(@field)}
+        name={input_name(@field)}
+        value={to_text(@field.value)}
+        list={@list_id}
+        spellcheck="false"
+        autocomplete="off"
+      />
+      <datalist id={@list_id} data-outcome-candidates={length(@outcome_candidates)}>
+        <option :for={outcome <- @outcome_candidates} value={outcome}></option>
       </datalist>
       """
     end

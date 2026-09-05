@@ -215,6 +215,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
     )
 
+    attr(:outcome_candidates, :list,
+      default: [],
+      doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
+    )
+
     attr(:fixtures, :any,
       default: nil,
       doc: "Passed through to `StatifierBlocks.Editor.ConfigForm`; see its moduledoc."
@@ -334,6 +339,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               path_candidates={@path_candidates}
               value_candidates={@value_candidates}
               event_candidates={@event_candidates}
+              outcome_candidates={@outcome_candidates}
               fixtures={@fixtures}
               target={@target}
             />
@@ -410,6 +416,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:path_candidates, :list, required: true)
     attr(:value_candidates, :map, required: true)
     attr(:event_candidates, :list, required: true)
+    attr(:outcome_candidates, :list, required: true)
     attr(:fixtures, :any, required: true)
     attr(:target, :any, required: true)
 
@@ -429,6 +436,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         path_candidates={@path_candidates}
         value_candidates={@value_candidates}
         event_candidates={@event_candidates}
+        outcome_candidates={@outcome_candidates}
         fixtures={@fixtures}
       />
       <p :if={@node.form == nil} class="sb-inspector__empty">
