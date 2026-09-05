@@ -3016,21 +3016,27 @@ stage cross-checks a declaration against an emitted final. Nor does totality
 reach one: ADR-0004 decision 5 makes provenance total over the bytes that
 **are** emitted, and a final that was never written is not bytes.
 
-What the vocabulary does not yet contain is a type in exactly this position,
-and this Note says so rather than borrowing one. `core.invoke` is the type 2c
-names, and it is the **inverse** case: it exports no `outcomes/1` at all, so
-under amendment A1 it declares the single default outcome `done`, while
-`emit/2` writes an `error` final only when its `on_error` slot is filled
-(`error_parts/1`, `lib/statifier_blocks/core/invoke.ex:261-271`) - an outcome
-emitted but never declared. `StatifierBlocks.InvokeStep`, the ADR-0007 host
-base, is the other shape again: it declares both `done` and `error`
-(`lib/statifier_blocks/invoke_step.ex:212`) and emits both finals
-unconditionally (`:405-421`), with no `on_error` slot to make either
-conditional. So `core.await` is the **first** type in this package to declare
-an outcome it may not emit. That is a new position for the vocabulary rather
-than a precedent to point at - and it is the position 2c's third consequence
-describes and permits, which is what makes it a shape this record admits
-rather than a gap nobody examined.
+The vocabulary already contains a type in exactly this position, and it is
+`core.subchart` rather than the `core.invoke` 2c names. `core.subchart`
+declares `error` whether or not the author listed it - `outcome_names/1`
+(`lib/statifier_blocks/core/subchart.ex:463-467`) appends it, so
+`BlockType.outcome_names(Core.Subchart, %{})` is `["done", "error"]` - while
+`finals/1` (`:448-453`) emits a `<final>` only for a route that is routed or
+slotted, and its own comment beside that function draws the conclusion from
+2c: "an outcome the block can never reach emits no `<final>`". A declared
+outcome with no final is therefore a shipped shape, not a new one, and
+`core.await` joins it.
+
+The two neighbouring shapes are worth naming so this Note is not read as
+claiming all three are one. `core.invoke` is the **inverse** case: it exports
+no `outcomes/1` at all, so under amendment A1 it declares the single default
+outcome `done`, while `emit/2` writes an `error` final only when its
+`on_error` slot is filled (`error_parts/1`,
+`lib/statifier_blocks/core/invoke.ex:261-271`) - emitted but never declared.
+`StatifierBlocks.InvokeStep`, the ADR-0007 host base, is the third shape: it
+declares both `done` and `error` (`lib/statifier_blocks/invoke_step.ex:212`)
+and emits both finals unconditionally (`:405-421`), with no `on_error` slot to
+make either conditional.
 
 The second option's cost is not discharged by anything. Clearing the `timeout`
 field would remove a declared seam an author may already have wired, which is
