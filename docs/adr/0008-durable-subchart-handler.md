@@ -374,3 +374,47 @@ above was written before the implementation landed; the design it describes
 is what landed, and the mirrored pair stays open for the operator to close.
 
 Filed with `sb-8fsb`, campaign-026.
+
+---
+
+## Note (2026-09-04): the closing bullet is superseded - both halves have landed
+
+A dated note rather than an edit. The Consequences section closes with
+**"Nothing here is implemented."** That sentence was true when this record
+was written and is false now; it stays where it is, and this note supersedes
+it.
+
+**Both halves of the design landed on 2026-09-01, and the mirrored pair has
+since been closed.**
+
+| Half | Where it landed | Merged |
+|---|---|---|
+| The handler this record specifies - `StatifierBlocks.Runtime.DurableSubchart` in `lib/statifier_blocks/runtime/durable_subchart.ex` | this repository, PR 210, "Adds the durable subchart handler"; landed on `main` at `05f0a4a` | 2026-09-01 |
+| The executor half `sp-ADR-0008` specifies - the `{:start_child, ...}` arm and `start_child/3` in `StatifierPersistence.Driver` | `statifier_persistence` PR 39, "Implements durable subchart child runs (ADR-0008)"; landed on `main` at `8f46a9c` | 2026-09-01 |
+
+The implementation bead the bullet names, `sb-2i04`, and its mirror `sp-nt8`
+were closed together by the operator on 2026-09-02, which is the event the
+2026-09-01 note above was still waiting on when it wrote that "the mirrored
+pair stays open for the operator to close". That clause of that note is
+superseded here too; nothing else in it is.
+
+What is *not* superseded is anything the bullet's second sentence says about
+where the design is recorded. This is still the design record, `sp-ADR-0008`
+is still its other half, and the two are still read together. The only claim
+retired is that no code answers to them.
+
+Two questions this record deliberately left to the implementation bead are
+worth naming as still open rather than as answered by the landings. Whether
+the durable stack can *detect and refuse* a host that wires the in-memory
+module into a durable run - stated in Consequences as the implementation
+bead's question, with this record explicitly not assuming it can - is not
+something either merge settled. And the reference embedder's honest refusal,
+`{:error, {:durable_subchart_unsupported, type}}`, is `statifier_examples`'
+own bead by that same section and is not in either PR above. A reader should
+not take "both halves landed" for "everything Consequences anticipated is
+done".
+
+No decision clause is edited and no status changes: this record's status
+line stands as it was.
+
+Filed with `sb-143s`, campaign-029.
