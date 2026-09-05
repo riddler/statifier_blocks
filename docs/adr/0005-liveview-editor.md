@@ -6285,3 +6285,315 @@ modules, and in `test/` is nineteen more across seven files: the
   as it walks", not as a second pass.
 
 Filed with `sb-a9r8`, campaign-030's fill lane D.
+
+## Amendment (2026-09-05): decision 11, the host's own whole-document rule, and what a lone deadline half is not
+
+**Status: proposed (2026-09-05, campaign 031 lane H, bead `sb-w2m1`).** A
+decision record merges at proposed under campaign 031's invariant; flipping it
+to accepted is a separate gated request. Additive; decision 11's source enum,
+severity enum, anchor enum and routing table are unchanged, clause `10z`'s
+`singleton` key stands exactly as written, and no text above this line is
+edited by this section. **Nothing here is built in campaign 031.** Clauses
+`11p` to `11t` are a record ahead of their code, and the bead that implements
+them is campaign 032's, filed beside the host's first rule; clause `11u`
+decides that a case produces no finding, so it has no code to wait for.
+
+### Context
+
+The 2026-09-05 amendment above shipped the narrow whole-document rule - a
+count, declared as data on a palette entry - and named the general one as its
+follow-up rather than leaving it open: a **host `validate_document/1`
+callback**, "not decided here and not in campaign 030" (`:5950-5960`). That
+paragraph also named the three things such a callback needs before it can be
+built: a seam by which a host supplies its own whole-document rule, an anchor
+vocabulary wide enough for a host's own rules, and an answer to what happens
+when a host's rule and a declared `singleton` disagree. This section answers
+all three, and nothing else about it.
+
+It answers a second question in the same breath, because the two turn out to
+be one question read from opposite ends. `sb-5ju0` asks whether a group holding
+only the deadline's `core.send`, or only its `core.on_event`, produces a
+finding. ADR-0010 decision 6 anticipated an advisory of that shape and
+deliberately did not decide it, filing "when either half stands alone"
+(`docs/adr/0010-clock-interrupt-spelling.md:269-273`) with the two arms beside
+it, and its deferred list routes the whole item here in terms: "its findings,
+their severity, and whether 'the send is not the head of the body' is a warning
+or silence. ADR-0005's findings layer and the declaration-advisory work own it"
+(`docs/adr/0010-clock-interrupt-spelling.md:345-347`). Deciding the seam without deciding the case it was cited for
+would leave the case where it has been since 2026-09-02, and deciding the case
+without the seam would leave the answer with nowhere to live.
+
+The two are one question because a lone half is not a fact about a block. It is
+a fact about a document, and it is order-sensitive and cross-block - the same
+class as "a model step needs a decision before an act", which is the class
+`validate_document/1` exists for.
+
+### Decision
+
+**11p. `Palette` gains `validators`, and a host's whole-document rule is a
+module on it.** The struct grows a fourth field
+(`lib/statifier_blocks/palette.ex:56-62`):
+
+    validators: [module()]
+
+defaulting to `[]`, supplied through a `:validators` option on `new/2` beside
+`:recipes` and `:assignability` (`lib/statifier_blocks/palette.ex:80-86`), each module implementing
+
+    @callback validate_document(document :: Document.t()) :: [finding_spec()]
+
+as `StatifierBlocks.DocumentValidator`.
+
+It rides the palette because the palette is already the value a host builds and
+hands in, and because two host-supplied modules already ride it: the
+`assignability` relation of ADR-0003 decision 6 (`lib/statifier_blocks/palette.ex:69-73`) and clause `1C`'s
+`recipes`. A host that declares a rule adds a module to the value it was
+building anyway - no assign, no mount option and no editor callback is added,
+which is the property `1C` established for recipes and this clause does not
+weaken.
+
+It is a **list rather than a map**, and ordered. There is no name to key on,
+nothing resolves a validator by name, and nothing collides: every module in the
+list runs, in list order, and a later entry does not replace an earlier one.
+That is deliberately not the `types`/`recipes` rule - those are lookups, where
+last-wins is what a host overriding a core entry needs, and this is not a
+lookup.
+
+**A validator is not a block type and not a recipe.** It implements one
+callback of its own, it appears in no palette browser, it has no
+`palette_entry/0`, and it can appear in no document. `StatifierBlocks.BlockType`
+and `StatifierBlocks.Recipe` are untouched by this clause.
+
+**11q. The argument is the `Document.t()`, and that is the whole view.** The
+callback is arity one, and what it is handed is the document as authored.
+
+It is not handed the `Palette`, because the host built the palette and handing
+it back would be handing a caller its own value. It is not handed the
+`ViewModel`, because the view model is what is being built when the callback
+runs - a rule that could read it would be reading a half-built value, and one
+that could read a finished one would need a second pass this section does not
+buy. And it is not handed a compiled chart, because the compiler has not run
+and must not have to: a document is briefly wrong in the middle of every
+arrangement an author builds by hand, and a rule that only spoke after a
+successful compile would be silent at exactly the moments the author needs it.
+This is `11o`'s posture and not a new one - "nothing here depends on the
+compiler having run" (`:5975-5977`).
+
+What a `Document.t()` carries is what a whole-document rule needs: every
+block, its `type`, its config and its position in its parent's slots. "A model
+step needs a decision before an act" is a statement about type names and order,
+and both are there.
+
+**11r. A validator says where and what; the package says which source.** A
+member of the returned list is
+
+    {anchor, message} | {anchor, message, opts}
+
+where `anchor` is decision 11's existing anchor (`lib/statifier_blocks/finding.ex:39-42`), `message`
+is a string, and `opts` is a keyword list carrying `:severity`.
+
+This is `validate_config/1`'s division of labour, one level up. That callback
+answers `{key, message}` pairs and the package builds the anchor and stamps the
+source (`lib/statifier_blocks/view_model.ex:1026`); a document rule needs to
+name its own anchor, because its subject is not the one block whose config was
+handed to it, but it does not get to name its own source.
+
+**The source the package stamps is `:lint`.** It is the enum member
+(`lib/statifier_blocks/finding.ex:63`) that already means "the editor applied a rule" rather than "a
+declared shape says so", which is `11o`'s reason for `:config` and is exactly
+what a `singleton` declaration is and a host's rule is not. It is also the only
+member with the full severity range: `11b` reserves `:info` to `:lint`, and
+`11i` admits `:error` on it, so a host rule can say all three things a rule
+wants to say. A host cannot claim `:compile` or `:resolution` for its own rule,
+which is the point of stamping rather than accepting.
+
+**Severity defaults to `:warning`, not to `:error`.** That is a departure from
+`Finding.new/4`'s own default (`lib/statifier_blocks/finding.ex:90`, `:100` of that file) and the reason is
+decision 11's definition of the words: `:error` says the document does not
+compile, and a host rule cannot make a document not compile - the compiler
+never sees a validator. A host may still pass `severity: :error`, and it means
+what a host means by it: *my* gate refuses this document. A consumer gating on
+`:error` is then told so, which is the point of allowing it.
+
+**Total, never raising, on its own data.** A returned term that is not a list,
+and a member that is neither of the two shapes above, is read as **no
+finding** - decision 10's normalizer discipline, applied to a host's return
+value. An exception raised inside the callback is not caught, exactly as
+`validate_config/1`'s is not (`lib/statifier_blocks/view_model.ex:1026`): a host's code raising is
+that host's bug, and swallowing it would hide it at the only moment it is
+visible.
+
+**11s. The anchor vocabulary is the one that exists, and the root carries a
+document-scoped rule.** The enum keeps its three members and no fourth is
+added. A rule whose subject is a particular block anchors at that block, by
+whichever of the three rows fits, and renders where that row already sends it.
+A rule whose subject is the document anchors at `{:block, root_id}` and reaches
+the drawer's document-level findings list - which is `11o`'s route, taken for
+`11o`'s reason: the root is the one block every document has
+(`lib/statifier_blocks/document.ex:47-55`), and "anything about the document
+goes to the drawer" is decision `1A`/`3A`'s arrangement doing what it already
+does. No route is added and no route changes.
+
+**An anchor naming an id the document does not hold is already handled, and it
+is the existing safety net rather than a new refusal.** `ViewModel.build/3`
+splits every finding on whether its block id is in the document and puts the
+misses in `orphan_findings` (`lib/statifier_blocks/view_model.ex:423-424` and `:434` of that file), unrendered. A
+host rule that names a stale id lands there with everything else that does. So
+this clause adds no validation of a host's anchors, no error term and no
+refusal path: the mechanism that catches the case predates the seam.
+
+**`orphan_findings` is that and only that.** The name means "a finding whose
+anchor names a block id this document does not hold" in the view model, and in
+the compiler it names a second thing already - the findings gathered from the
+children of a block whose own type did not resolve
+(`lib/statifier_blocks/compiler.ex:405-410`). Two meanings is one more than a
+name should carry, and clause `11u` below is deliberately not given a third.
+
+**11t. It runs inside the one walk, after the derived sources, and a
+disagreement with `singleton` is shown rather than reconciled.** The validators
+run in `ViewModel.build/3`, in the palette's list order, after the three
+derived sources and before the `findings` argument the compiler's findings
+arrive in. The resulting order is fixed by the palette rather than by a map's
+iteration, for the reason `singleton_findings` sorts (`lib/statifier_blocks/view_model.ex:841-853`):
+a findings list whose order moved between builds would be a rendering that
+moved for no reason the author can see.
+
+A host rule may contradict a declared `singleton` - the palette says a document
+needs exactly one settlement step, the host's rule says two are fine when a
+third block is absent - and **both findings are emitted, unreconciled**. The
+package cannot reconcile them: reconciling would mean understanding the host's
+rule, which is the thing this seam exists because it cannot do. Suppressing
+either one would make one of the host's two declarations a lie, and the host
+made both. The two are distinguishable where it matters - the derived one is
+`:config` and the host's is `:lint` - and a host that does not want both stops
+declaring `singleton` for that type, which is a one-line change to a value it
+owns.
+
+**A finding, never a fix-up**, unchanged from `11o`: a validator returns
+findings and returns nothing else. It cannot edit the document, and no
+`Edit.t()` is reachable from it.
+
+**11u. A lone deadline half is not a finding, and it is not an orphan.** A
+group holding only the deadline's `core.send`, or only its `core.on_event`,
+produces **no finding** from any source this package derives. This is the
+answer to `sb-5ju0` and to the third arm of ADR-0010 decision 6.
+
+| The group holds | What it is on its own terms | Finding |
+|---|---|---|
+| only the delayed `core.send` | a delayed send: a step that arms an event to arrive later and completes in the same macrostep (`lib/statifier_blocks/core/send.ex:24-30`) | none |
+| only the `core.on_event` on the rail | an event handler: a rail catch for an event sent elsewhere in the chart, or by the host at runtime | none |
+
+Three reasons, and the first is the one that decides it.
+
+**The pair has no representation in the document.** Clause `4C` says it in
+terms: both halves are ordinary blocks of ordinary core types, and "the recipe
+is the knowledge of how they go together and nothing more". That knowledge
+lives at gesture time and is not written down. Nothing marks a `core.send` as a
+deadline's send, so there is no such thing as *the* deadline half to find
+missing - there is a send, and a question about whether some author once
+intended a partner for it.
+
+**Both shapes are the ordinary case, not a degraded one.** A delayed
+`core.send` with no rail handler is a fire-and-forget timer, and a `core.on_event`
+with no local sender is the ordinary rail catch: `core.raise` and `core.on_event`
+have been coupled across a document since the vocabulary had a rail
+(`docs/adr/0010-clock-interrupt-spelling.md:245-249`), and the sender may be
+another subtree, or the host. A finding here would fire on documents that are
+right, which is the failure mode a findings layer can least afford - decision
+11's advisory arm is worth nothing to an author who has learned to ignore it.
+
+**What is left is a whole-document question, and it now has a seam.** The
+residue of `sb-5ju0` is real and worth naming: "is this event ever sent?" and
+"is this event ever caught?". Both are cross-block, both are about the document
+rather than any block in it, and neither is answerable by this package, which
+does not know the set of events a host sends at runtime. A **host** does know,
+and a host that wants the rule writes it as a `validate_document/1` validator
+under `11p` - in its own vocabulary, where "this send is a deadline" is
+something it can actually tell. That is the routing this section exists to make
+available, and it is the reason the two decisions are one record.
+
+**The one deadline finding this package does emit needs both halves, and that
+is not incidental.** ADR-0010's `RQ-026-6` Note ruled a resumable-group
+advisory, and it shipped on `sb-dj1p` as the compiler's `:emit`-stage
+`deadline_lost_on_resume` finding
+(`lib/statifier_blocks/compiler.ex:741-758` and `:795-809` of that file). It
+fires only where a delayed `core.send` heads a `core.resumable_group`'s `body`
+**and** that same group's `interrupts` rail carries a `core.on_event` whose
+`outcome` is `resume`: `armed_head?/1` and `resumes?/1` are conjoined
+(`:756-757` of that file). A group holding one half satisfies one conjunct and
+never the other, so the one deadline-shaped finding the package has is already
+silent on exactly the case this clause decides. What lets that finding speak is
+a **recognised pair** - two blocks whose relationship the compiler can read off
+the document it is handed. A lone half offers it nothing to read, and this
+clause declines to invent a substitute.
+
+**The name, if the rule is ever written, is "a lone deadline half."** It is not
+an orphan. `orphan` already means an anchor naming a block this document does
+not hold (`11s` above), and a lone half is the opposite case in every
+particular: the block is present, resolves, compiles, and is exactly where the
+author put it.
+
+### What this does not decide
+
+- **The other two arms of ADR-0010 decision 6.** A delayed `core.send` and a
+  rail `core.on_event` on the same group whose event names do **not** match,
+  and a deadline send that is not the head of the body, are recognisable shapes
+  in a way a lone half is not, and they stay exactly where that record's
+  deferred list left them (`docs/adr/0010-clock-interrupt-spelling.md:345-347`).
+  This section answers the standalone arm and touches neither of the others.
+  `sb-dj1p`'s resumable-group advisory is untouched too: it closed in campaign
+  027 and clause `11u` above says why it is silent on a lone half rather than
+  changing anything about it.
+- **Whether any validator ships in this package.** `Palette.core/0` gains
+  nothing here. Core declares types and one recipe; it declares no rules about
+  documents, and a palette built without validators is as valid as one with
+  them - the property `core_types/0` and `core_recipes/0` already have.
+- **Ordering or priority among validators.** They run in list order and every
+  one of them runs. Nothing lets one validator suppress another's finding, and
+  no record asks for it.
+- **A validator in the compiler.** The compiler never calls one. Everything
+  here is the view model's, which is to say the editor's, and a document that
+  compiles with a host's rule violated still compiles.
+- **Whether a host rule can reach outside the document.** `validate_document/1`
+  is pure and is handed one value. A rule needing the datamodel, a fixture or a
+  network call is a host's own concern, evaluated before it builds the palette
+  or after it reads `on_change`, and this seam neither helps nor hinders it.
+
+### Consequences
+
+- **`10z`'s named follow-up is answered, and `singleton` is not retroactively
+  an instalment of it.** That paragraph warned that a host reading `singleton`
+  as a first instalment "will build against a seam that does not exist yet".
+  The seam exists as a record now and as code in campaign 032; the warning
+  stands unedited, because the two remain different things - a declared count
+  and a written rule.
+- **Decision 11's four enums and its routing table are still untouched.** This
+  section adds a fourth producer, on an existing source, through existing
+  anchors, onto existing routes. Every amendment to decision 11 since
+  2026-08-30 has been able to say some version of that sentence, and it is not
+  an accident: the mechanism was built to take producers.
+- **`ViewModel` gains a fourth source of findings and no fourth traversal.**
+  The validators are called once each per build, on the document they are handed
+  whole; nothing walks it again for them.
+- **A palette that declares nothing pays nothing.** With `validators: []` -
+  every palette today - the arm has no modules to call and the view model is
+  identical to today's.
+- **`sb-5ju0` is answered in the negative and needs no code.** Its acceptance
+  criterion asked for a record decision saying whether a lone half is a finding,
+  its class and its anchor; the answer is that it is not one, so there is no
+  class and no anchor to state, and the tests and the sabotage case its "if yes"
+  arm named are not written. The behaviour the package has today - a send-only
+  group and an on_event-only group each compiling with zero findings, which is
+  what campaign 030 machine-checked on `sb-qfl1`'s branch - is the behaviour
+  this record blesses rather than a gap in it.
+- **`sb-qfl1`'s retired criterion is retired by a decision, not by silence.**
+  That criterion read "removing one half yields the finding the compiler already
+  emits for an orphan", and it rested on behaviour the package never had and on
+  a name that means something else. It is answered here: there is no such
+  finding, and there was never an orphan.
+- **This record precedes the code for `11p` to `11t`, and a campaign 032 bead
+  builds them beside the host's first rule.** Until then a palette holds types,
+  recipes and a relation, and a host with a whole-document rule checks the
+  document itself after `on_change`, which is where clause `10z`'s Context
+  found it.
+
+Filed with `sb-w2m1`, campaign-031's lane H.
