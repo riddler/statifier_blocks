@@ -40,13 +40,13 @@ defmodule StatifierBlocks.Core.Await do
   including one with no `timeout`. An outcome's wiring is an event rather
   than a target (ADR-0004's outcome amendment, 2c), so a parent may
   transition on an outcome whose `<final>` was never emitted and the
-  transition simply never fires - which is what lets `core.invoke` omit
-  its error path entirely when `on_error` is empty. Deriving the list
-  from `timeout` instead would take a declared seam away from an author
-  who cleared the field, which is the failure ADR-0002 decision 6's
-  `slots/1` stability rule exists to avoid on the slot side. The emitted
-  bytes stay honest either way: with no `timeout`, no timer is armed and
-  no `timed_out` final is written.
+  transition simply never fires; nothing in the compiler cross-checks a
+  declaration against an emitted final either. Deriving the list from
+  `timeout` instead would take a declared seam away from an author who
+  cleared the field, which is the failure ADR-0002 decision 6's `slots/1`
+  stability rule exists to avoid on the slot side. The emitted bytes stay
+  honest either way: with no `timeout`, no timer is armed and no
+  `timed_out` final is written.
 
   ## The deadline's timer cannot outlive the await
 
