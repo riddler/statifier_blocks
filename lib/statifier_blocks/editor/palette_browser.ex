@@ -49,6 +49,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     that only ever explained queries would leave the more confusing of the two
     cases unexplained.
 
+    Wherever that line says "block type" or "fit" it is counting **types
+    only**, with the recipes named in a clause of their own. A recipe is not a
+    block type (ADR-0005 clause 1C) and no acceptance set can answer for its
+    fit, so a single number over both kinds said two untrue things at once: it
+    called a recipe a type, and it counted a recipe among the entries the slot
+    had accepted.
+
     The per-group count is the same idea one level down, and it is the count
     of what is *under that header now*, not of the group in the registry.
 
@@ -307,20 +314,61 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # filter: the palette opened from a gap is narrowed by the slot rather than
     # by anything the author typed, and a bare total there would claim the
     # author can reach types this gap will not take.
+    #
+    # Types and recipes are counted apart wherever the line says "block type"
+    # or "fit", because a recipe is not a block type (ADR-0005 clause 1C) and
+    # its fit is not the slot's question: `accepted?/2` above leaves every
+    # recipe visible and clause 3C has the pick refuse. A single number over
+    # both therefore made two false claims at once - it called a recipe a type,
+    # and it counted a recipe among the entries the slot had accepted. The
+    # recipes get their own clause rather than disappearing from the line: they
+    # are on screen, so a line that did not mention them would be arithmetic an
+    # author cannot reconcile with what they are looking at.
+    #
+    # The query arm keeps one number over both kinds, and that one is true as
+    # it stands: matching a search is something a recipe row does exactly as a
+    # type row does, and "match" claims nothing about either kind.
     @spec count_line([ViewModel.PaletteGroup.t()], [ViewModel.PaletteGroup.t()], String.t()) ::
             String.t()
     defp count_line(groups, visible, query) do
       total = entry_count(groups)
       shown = entry_count(visible)
+      total_types = kind_count(groups, :type)
+      shown_types = kind_count(visible, :type)
+      recipes = recipe_clause(kind_count(visible, :recipe))
       needle = query |> to_string() |> String.trim()
 
       cond do
         needle != "" -> ~s(#{shown} of #{total} match "#{needle}")
-        shown < total -> "#{shown} of #{total} fit here"
-        total == 1 -> "1 block type"
-        true -> "#{total} block types"
+        shown_types < total_types -> fit_line(shown_types, total_types, recipes)
+        total_types == 1 -> "1 block type" <> comma(recipes)
+        true -> "#{total_types} block types" <> comma(recipes)
       end
     end
+
+    # The slot-narrowed line. It names "block types" even where the palette
+    # registers no recipe at all, because the two numbers are a count of types
+    # either way and a line whose subject changed with the host's registry is
+    # one an author cannot learn to read. The recipes hang off it behind a
+    # semicolon and the word "listed" rather than a comma, so that the sentence
+    # about what fits ends before the recipes are named: "2 of 16 block types
+    # fit here, and 1 recipe" would read as the recipe fitting too, which is
+    # the claim this whole change exists to stop making.
+    @spec fit_line(non_neg_integer(), non_neg_integer(), String.t()) :: String.t()
+    defp fit_line(shown_types, total_types, ""),
+      do: "#{shown_types} of #{total_types} block types fit here"
+
+    defp fit_line(shown_types, total_types, recipes),
+      do: "#{shown_types} of #{total_types} block types fit here; #{recipes} also listed"
+
+    @spec comma(String.t()) :: String.t()
+    defp comma(""), do: ""
+    defp comma(recipes), do: ", " <> recipes
+
+    @spec recipe_clause(non_neg_integer()) :: String.t()
+    defp recipe_clause(0), do: ""
+    defp recipe_clause(1), do: "1 recipe"
+    defp recipe_clause(count), do: "#{count} recipes"
 
     # Whether anything is narrowing the list, by either of the two filters.
     # The attribute is what lets the stylesheet lift the line out of the
@@ -333,6 +381,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     @spec entry_count([ViewModel.PaletteGroup.t()]) :: non_neg_integer()
     defp entry_count(groups), do: Enum.reduce(groups, 0, &(length(&1.entries) + &2))
+
+    # The same arithmetic over one of the two kinds an entry can be. The kind
+    # is on the entry already (`ViewModel.PaletteGroup`), so nothing here has
+    # to know which of the palette's two maps a row came out of.
+    @spec kind_count([ViewModel.PaletteGroup.t()], ViewModel.PaletteGroup.kind()) ::
+            non_neg_integer()
+    defp kind_count(groups, kind) do
+      Enum.reduce(groups, 0, fn group, count ->
+        count + Enum.count(group.entries, &(&1.kind == kind))
+      end)
+    end
 
     # The palette row carries the same accent as the card the pick produces,
     # so a block type's identity is the same before and after it is in the

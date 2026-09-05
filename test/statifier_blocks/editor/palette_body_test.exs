@@ -25,15 +25,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     use StatifierBlocks.EditorLiveCase
 
     alias StatifierBlocks.Editor.PaletteBrowser
+    alias StatifierBlocks.Palette
     alias StatifierBlocks.ViewModel
 
-    defp groups do
+    defp groups, do: groups_for(EditorFixtures.palette())
+
+    defp groups_for(%Palette{} = palette) do
       EditorFixtures.signup_wizard()
-      |> ViewModel.build(EditorFixtures.palette(), [])
+      |> ViewModel.build(palette, [])
       |> Map.fetch!(:palette_groups)
     end
 
     defp total, do: groups() |> Enum.map(&length(&1.entries)) |> Enum.sum()
+
+    defp total_of(kind) do
+      groups() |> Enum.map(&Enum.count(&1.entries, fn e -> e.kind == kind end)) |> Enum.sum()
+    end
 
     defp palette_html(opts \\ []) do
       render_component(
@@ -70,13 +77,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     describe "the count line" do
+      # The two kinds are counted apart, because a recipe is not a block type
+      # (ADR-0005 clause 1C) and the line said it was: the core palette's
+      # sixteen types plus the "deadline" recipe read as "17 block types".
+      #
       # Sabotage: deleting the `<p class="sb-palette__count">` from
       # `PaletteBrowser` - `count_text/1`'s match fails and every test in this
       # describe goes red on the missing line rather than on its wording.
-      test "unfiltered, it is the size of the palette" do
+      #
+      # Sabotage: `count_line/3`'s last arm reading `entry_count(groups)` again
+      # instead of `kind_count(groups, :type)` - the line goes back to
+      # "17 block types" and this test names the conflation.
+      test "unfiltered, it is the size of the palette, by kind" do
         assert total() == 17, "the scan actually saw the core palette"
+        assert total_of(:type) == 16
+        assert total_of(:recipe) == 1
 
-        assert count_text(palette_html()) == "17 block types"
+        assert count_text(palette_html()) == "16 block types, 1 recipe"
       end
 
       # Sabotage: `count_line/3`'s first arm reading `"#{total} of #{shown}"` -
@@ -104,11 +121,62 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # 1C), so no set of type names can answer for it. Whether a deadline
       # fits where the author armed is the recipe's own question, and clause
       # 3C has `insert/2` answer it by refusing the pick.
+      #
+      # Which is exactly why the fit count is over types alone and the recipe
+      # is named beside it rather than inside it: the recipe is on screen, so
+      # the line has to account for it, and it did not fit, so the line must
+      # not count it as having.
+      #
+      # Sabotage: `count_line/3`'s second arm comparing `shown < total` over
+      # entries again - the recipe joins the numerator and this reads
+      # "2 of 16 block types fit here", which is the count of a row the slot
+      # never accepted.
       test "a slot's acceptance set narrows the line too, without a query" do
         filtered = palette_html(allowed: MapSet.new(["core.wait"]))
 
-        assert count_text(filtered) == "2 of 17 fit here"
-        assert count_text(palette_html(allowed: nil)) == "17 block types"
+        assert count_text(filtered) == "1 of 16 block types fit here; 1 recipe also listed"
+        assert count_text(palette_html(allowed: nil)) == "16 block types, 1 recipe"
+      end
+
+      # A host registers the recipes it wants, so both ends of the range are
+      # cases the line has to read correctly: none at all, and more than one.
+      # The core palette can only prove the middle of it.
+      #
+      # Sabotage: `recipe_clause/1` losing its `0` clause and returning
+      # `"0 recipes"` - the no-recipe palette's line grows a trailing clause
+      # about nothing and both assertions here go red.
+      test "with no recipes registered, the line says nothing about them" do
+        types_only = groups_for(Palette.new(Palette.core_types()))
+
+        assert count_text(palette_html(groups: types_only)) == "16 block types"
+
+        assert count_text(palette_html(groups: types_only, allowed: MapSet.new(["core.wait"]))) ==
+                 "1 of 16 block types fit here"
+      end
+
+      # Sabotage: `recipe_clause/1`'s catch-all reading `"#{count} recipe"` -
+      # the plural goes and this reads "2 recipe".
+      test "more than one recipe is counted in the plural" do
+        two =
+          groups_for(
+            Palette.new(Palette.core_types(),
+              recipes:
+                Map.put(Palette.core_recipes(), "cutoff", StatifierBlocks.Core.DeadlineRecipe)
+            )
+          )
+
+        assert count_text(palette_html(groups: two)) == "16 block types, 2 recipes"
+
+        assert count_text(palette_html(groups: two, allowed: MapSet.new(["core.wait"]))) ==
+                 "1 of 16 block types fit here; 2 recipes also listed"
+      end
+
+      # Sabotage: `count_line/3`'s `total_types == 1` arm deleted - a
+      # one-type palette reads "1 block types".
+      test "one block type is singular" do
+        one = groups_for(Palette.new(Map.take(Palette.core_types(), ["core.wait"])))
+
+        assert count_text(palette_html(groups: one)) == "1 block type"
       end
 
       # Sabotage: hard-coding `data-filtering="false"` - the unfiltered case
