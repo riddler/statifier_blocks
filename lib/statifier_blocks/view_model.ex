@@ -345,15 +345,27 @@ defmodule StatifierBlocks.ViewModel do
 
   defmodule PaletteGroup do
     @moduledoc """
-    One palette section: types sharing `entry.group`, sorted by
+    One palette section: palette entries sharing `entry.group`, sorted by
     `entry.order` then `entry.label` (ADR-0005 decision 10's grouping
     rule).
+
+    An entry is a block type or a **recipe** (ADR-0005 clause 1C), and it
+    says which in `:kind`. `:name` is the name in whichever of the
+    palette's two maps it came from - the two are separate namespaces, so
+    the pair `{kind, name}` is what identifies an entry and `:name` alone
+    is not. A type entry also carries `:type_name`, unchanged, because a
+    type's name IS its `type_name`; a recipe carries no such key, having no
+    `type_name` at all.
     """
 
+    @type kind :: :type | :recipe
+
     @type entry :: %{
-            type_name: Block.type_name(),
-            module: module(),
-            entry: BlockType.palette_entry()
+            required(:kind) => kind(),
+            required(:name) => String.t(),
+            required(:module) => module(),
+            required(:entry) => BlockType.palette_entry(),
+            optional(:type_name) => Block.type_name()
           }
 
     @type t :: %__MODULE__{name: String.t(), entries: [entry()]}
@@ -1493,26 +1505,42 @@ defmodule StatifierBlocks.ViewModel do
   @spec default_entry(Block.type_name()) :: map()
   defp default_entry(type_name), do: Map.put(@default_entry, :label, type_name)
 
-  # `palette.types`, each carrying its own defaulted `palette_entry/0`,
-  # grouped by `entry.group` and sorted group name -> `order` -> `label`
-  # (ADR-0005 decision 10's grouping rule).
+  # `palette.types` AND `palette.recipes`, each carrying its own defaulted
+  # `palette_entry/0`, grouped by `entry.group` and sorted group name ->
+  # `order` -> `label` (ADR-0005 decision 10's grouping rule).
+  #
+  # Recipes are grouped and sorted with types rather than apart from them:
+  # clause 2C says a recipe draws as an entry, and where entries sit
+  # relative to one another is decision 10's `group` and `order` keys doing
+  # what they already do.
   @spec palette_groups(Palette.t()) :: [PaletteGroup.t()]
-  defp palette_groups(%Palette{types: types}) do
-    types
-    |> Enum.map(fn {type_name, module} ->
-      {type_name, module, palette_entry_with_defaults(module, type_name)}
-    end)
-    |> Enum.group_by(fn {_type_name, _module, entry} -> entry.group end)
+  defp palette_groups(%Palette{types: types, recipes: recipes}) do
+    entries =
+      Enum.map(types, fn {type_name, module} ->
+        %{
+          kind: :type,
+          name: type_name,
+          type_name: type_name,
+          module: module,
+          entry: palette_entry_with_defaults(module, type_name)
+        }
+      end) ++
+        Enum.map(recipes, fn {name, module} ->
+          %{
+            kind: :recipe,
+            name: name,
+            module: module,
+            entry: palette_entry_with_defaults(module, name)
+          }
+        end)
+
+    entries
+    |> Enum.group_by(& &1.entry.group)
     |> Enum.sort_by(fn {group, _entries} -> group end)
-    |> Enum.map(fn {group, entries} ->
+    |> Enum.map(fn {group, grouped} ->
       %PaletteGroup{
         name: group,
-        entries:
-          entries
-          |> Enum.sort_by(fn {_type_name, _module, entry} -> {entry.order, entry.label} end)
-          |> Enum.map(fn {type_name, module, entry} ->
-            %{type_name: type_name, module: module, entry: entry}
-          end)
+        entries: Enum.sort_by(grouped, &{&1.entry.order, &1.entry.label})
       }
     end)
   end

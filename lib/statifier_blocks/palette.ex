@@ -31,29 +31,58 @@ defmodule StatifierBlocks.Palette do
   palette carries the case where a block's `type_name` has no entry as an
   ordinary pattern-matched arm, not as an exception - `fetch/2` never
   raises, so there is nothing to rescue.
+
+  ## Recipes, the second map
+
+  A palette also names **recipes** (ADR-0005 clause 1C): arrangements an
+  author picks the way they pick a block type, implemented by modules
+  behind `StatifierBlocks.Recipe`. Everything above about what a palette
+  *is* applies to the second map unchanged - it is a caller-supplied value,
+  there is no global registry, and two hosts in one runtime resolve
+  independently.
+
+  The names live in one namespace **per map**, not one across both. A
+  recipe named `"deadline"` and a block type named `"deadline"` do not
+  collide, because nothing resolves a name without knowing which map it is
+  asking: a document's `type_name` is looked up in `types` and only there,
+  and a palette browser entry carries which of the two it came from.
   """
 
   alias StatifierBlocks.{Block, Core}
 
+  @typedoc "A recipe's name, as the palette browser and a pick name it."
+  @type recipe_name :: String.t()
+
   @type t :: %__MODULE__{
           types: %{optional(Block.type_name()) => module()},
+          recipes: %{optional(recipe_name()) => module()},
           assignability: module() | nil
         }
 
-  defstruct types: %{}, assignability: nil
+  defstruct types: %{}, recipes: %{}, assignability: nil
 
   @doc """
   Builds a palette from a `type_name => module` map. Defaults to an empty
   palette.
 
-  Options: `:assignability`, a module implementing
-  `StatifierBlocks.Assignability.Relation` (ADR-0003 decision 6). Defaults
-  to `nil`, meaning the palette declares no widening relation - `new(types)`
-  and `new(types, assignability: nil)` are the same palette.
+  Options:
+
+    * `:assignability` - a module implementing
+      `StatifierBlocks.Assignability.Relation` (ADR-0003 decision 6).
+      Defaults to `nil`, meaning the palette declares no widening relation -
+      `new(types)` and `new(types, assignability: nil)` are the same palette.
+    * `:recipes` - a `name => module` map of `StatifierBlocks.Recipe`
+      implementations (clause 1C). Defaults to `%{}`. It is a second map
+      rather than a second kind of entry in the first, because the two names
+      are two namespaces.
   """
   @spec new(%{optional(Block.type_name()) => module()}, keyword()) :: t()
   def new(types \\ %{}, opts \\ []) when is_map(types) do
-    %__MODULE__{types: types, assignability: Keyword.get(opts, :assignability)}
+    %__MODULE__{
+      types: types,
+      recipes: Keyword.get(opts, :recipes, %{}),
+      assignability: Keyword.get(opts, :assignability)
+    }
   end
 
   @doc """
@@ -70,7 +99,7 @@ defmodule StatifierBlocks.Palette do
 
   """
   @spec core() :: t()
-  def core, do: new(core_types())
+  def core, do: new(core_types(), recipes: core_recipes())
 
   @doc """
   The `type_name => module` map behind `core/0`, for a host merging the
@@ -102,6 +131,25 @@ defmodule StatifierBlocks.Palette do
       "core.drafts" => Core.Drafts,
       "core.placeholder" => Core.Placeholder
     }
+  end
+
+  @doc """
+  The `name => module` map of core recipes, beside `core_types/0`
+  (ADR-0005 clause 4C).
+
+  One entry, `"deadline"`: the `core.send` and `core.on_event` pair
+  ADR-0010 decision 1 spells, as one palette pick. A palette built without
+  it is as valid as a palette with it, which is the property `core_types/0`
+  already has - nothing in this package has a privileged path to a recipe
+  either.
+
+      iex> Map.keys(StatifierBlocks.Palette.core_recipes())
+      ["deadline"]
+
+  """
+  @spec core_recipes() :: %{optional(recipe_name()) => module()}
+  def core_recipes do
+    %{"deadline" => Core.DeadlineRecipe}
   end
 
   @typedoc """
@@ -136,8 +184,13 @@ defmodule StatifierBlocks.Palette do
   Options:
 
     * `:core` - when `true`, the registrations sit on top of
-      `core_types/0` rather than on an empty map. Defaults to `false`, so
+      `core_types/0` rather than on an empty map, and the recipe
+      registrations sit on top of `core_recipes/0`. Defaults to `false`, so
       `from_modules([])` is the empty palette.
+    * `:recipes` - an ordered list of `{name, module}` recipe registrations
+      (clause 1C), read the same way and with the same "later entries win"
+      rule. A host registering its own recipe under a core recipe's name
+      reads its own, because it wrote it later.
     * `:assignability` - passed through to `new/2`.
 
   The list is ordered and **later entries win**, which is what makes it a
@@ -170,11 +223,14 @@ defmodule StatifierBlocks.Palette do
   """
   @spec from_modules([registration()], keyword()) :: t()
   def from_modules(registrations, opts \\ []) when is_list(registrations) do
-    base = if Keyword.get(opts, :core, false), do: core_types(), else: %{}
+    core? = Keyword.get(opts, :core, false)
+    base = if core?, do: core_types(), else: %{}
+    recipe_base = if core?, do: core_recipes(), else: %{}
+    recipes = Enum.reduce(Keyword.get(opts, :recipes, []), recipe_base, &register_recipe/2)
 
     registrations
     |> Enum.reduce(base, &register/2)
-    |> new(opts)
+    |> new(Keyword.put(opts, :recipes, recipes))
   end
 
   @spec register(registration(), %{optional(Block.type_name()) => module()}) ::
@@ -187,6 +243,18 @@ defmodule StatifierBlocks.Palette do
   defp register(entry, _types) do
     raise ArgumentError,
           "expected a {type_name, module} registration, got: #{inspect(entry)}"
+  end
+
+  @spec register_recipe({recipe_name(), module()}, %{optional(recipe_name()) => module()}) ::
+          %{optional(recipe_name()) => module()}
+  defp register_recipe({name, module}, recipes)
+       when is_binary(name) and name != "" and is_atom(module) do
+    Map.put(recipes, name, module)
+  end
+
+  defp register_recipe(entry, _recipes) do
+    raise ArgumentError,
+          "expected a {recipe_name, module} registration, got: #{inspect(entry)}"
   end
 
   @doc """
@@ -202,6 +270,30 @@ defmodule StatifierBlocks.Palette do
     case Map.fetch(types, type_name) do
       {:ok, module} -> {:ok, module}
       :error -> {:error, {:unknown_block_type, type_name}}
+    end
+  end
+
+  @doc """
+  Resolves a recipe name to its module. Total; never raises, for `fetch/2`'s
+  reason.
+
+  The second map only. A name that is a block type and not a recipe answers
+  `{:error, {:unknown_recipe, name}}`, which is clause 1C's two-namespace
+  rule as a function: nothing resolves a name without knowing which map it
+  is asking.
+
+      iex> StatifierBlocks.Palette.fetch_recipe(StatifierBlocks.Palette.core(), "deadline")
+      {:ok, StatifierBlocks.Core.DeadlineRecipe}
+
+      iex> StatifierBlocks.Palette.fetch_recipe(StatifierBlocks.Palette.core(), "core.send")
+      {:error, {:unknown_recipe, "core.send"}}
+  """
+  @spec fetch_recipe(t(), recipe_name()) ::
+          {:ok, module()} | {:error, {:unknown_recipe, recipe_name()}}
+  def fetch_recipe(%__MODULE__{recipes: recipes}, name) do
+    case Map.fetch(recipes, name) do
+      {:ok, module} -> {:ok, module}
+      :error -> {:error, {:unknown_recipe, name}}
     end
   end
 
