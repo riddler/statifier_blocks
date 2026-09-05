@@ -562,3 +562,94 @@ palette registration. What it produces is a design that a later campaign can
 build from without another rulings walk, and a set of decisions that are
 answerable against working single-child machinery - which is the condition
 ADR-0008 decision 6 set for having this walk at all.
+
+---
+
+## Note (2026-09-05): decision 7 above Tier A - the batch is the unit
+
+A dated note rather than an amendment. Decision 7 is unchanged in every clause:
+the five-step discipline stands in the order it gives, clause 4 still puts a
+cap at the runtime rather than in the document, and "no compression, no
+truncation, no spill" still holds. What this records is the direction taken by
+the 2026-09-05 scale walk (campaign-031 ruling `D31-9`) for the range decision
+7 does not reach - what an author does when N is large enough that a chart run
+per item is the wrong unit of work.
+
+**Two tiers, and this record specifies the first of them.** Call the design
+this record specifies **Tier A**: one chart run per item, one element per item
+in the accumulated list, up to a bound the runtime enforces. It is the right
+shape for exactly as long as a per-item run earns its cost - the item waits on
+something, branches on an answer, or has to be separately observable and
+resumable. **Tier B** is what happens above that bound, and the direction taken
+is that it is not a bigger Tier A.
+
+**Above Tier A the batch is the unit.** Tier B is expressed in the vocabulary
+this record already has, not in a second block type: the author writes
+`core.map` over **chunk descriptors** - one item per chunk rather than one per
+row - and each child invokes a single bulk data-plane handler for its whole
+chunk. Everything this record decides applies to that document unchanged; N is
+the number of chunks, and the accumulated list decision 5 orders by item index
+is one element per chunk. A row inside a chunk that turns out to need what Tier
+A gives - it waits, or it branches - is **promoted**: that row becomes a run of
+its own on Tier A's terms, and the rest of its chunk stays in the bulk path.
+Promotion is the exception the shape pays for, not the default; a design in
+which most rows promote has chosen the wrong tier rather than found a defect in
+this one.
+
+**The boundary rule, in one sentence: the chart orchestrates batches, the data
+plane processes rows.** A row that only needs computing does not need a run,
+because a run buys durability, observability and resumability at the per-step
+serialization cost this section opens on, and computing a row needs none of the
+three. A
+chart earns its place where the work has to *wait*, be *resumed*, or be
+*branched on*, and that is a property of batches at Tier B and of items at Tier
+A. The rule is what decides which tier a workload belongs in, and it is
+deliberately about the shape of the work rather than about a number.
+
+**Tier A's bound is enforced at runtime only, and the compiler validates
+nothing about N.** Clause 4 says a cap, if measurement forces one, belongs at
+the runtime; the scale walk fixes it there and nowhere else. It is a
+configuration key of the fan-out runtime, whose batching record is `sob-djz`,
+with a default of 1,000, and exceeding it fails the invocation on the ordinary
+error route - the `error.communication.invoke.<block id>` route decision 3
+names - rather than producing a compile finding or a validation finding. This
+package's side is unchanged and validates nothing about N, because it cannot
+see N: decision 3 has the compiled `<param>` list carry the `items` datamodel
+path **once** rather than the list, and decision 4's `config_schema/1` declares
+`items` as a `:string` with `datamodel_path?: true`, so the value a bound would
+apply to exists only at runtime, where the handler evaluates the path. That is
+the same reason clause 4 gives for setting no numeric limit in this record, and
+the scale walk does not change it - it only says where the number that clause 4
+declined to write now lives.
+
+Filed with `sb-uxko`, campaign-031 ruling `D31-9`.
+
+---
+
+## Note (2026-09-05): decision 7's discipline - `items` are descriptors
+
+A dated note rather than an amendment. Decision 7's five clauses are unchanged
+and stand in the order given. This adds one sentence to the discipline, from
+the same 2026-09-05 scale walk (campaign-031 ruling `D31-9`).
+
+**`items` are descriptors - ids, ranges, chunk handles - never row payloads.**
+
+It is this section's opening cost argument - "the cost is per-step, not
+per-run" - applied to the question rather than to the answer. The list `items`
+resolves to is read out of the parent's datamodel, and the parent's datamodel
+is serialized on every persisted step for the rest of the run, so a fan-out
+over ten thousand order ids costs what ids cost and a fan-out over ten thousand
+order records costs what records cost - for the whole life of the parent, not
+for the duration of the map block. A child that is handed an id
+resolves it to the row it needs at the point of use, where the cost is per
+child and transient; a child that is handed the row saves that lookup and
+charges the parent for it forever. The discipline is the same one clause 1
+states for the outcome payload, and it belongs on both ends of the block for
+the same reason.
+
+It is also what makes the Tier B reading in the note above expressible in this
+record's existing fields rather than in a new one: a chunk handle is a
+descriptor, so "`core.map` over chunk descriptors" needs nothing from decision
+4's declaration surface that a descriptor list does not already satisfy.
+
+Filed with `sb-uxko`, campaign-031 ruling `D31-9`.

@@ -418,3 +418,55 @@ No decision clause is edited and no status changes: this record's status
 line stands as it was.
 
 Filed with `sb-143s`, campaign-029.
+
+---
+
+## Note (2026-09-05): decision 4 read for a fan-out - the write is the enqueue
+
+A dated note rather than an amendment. Decision 4 is unchanged in every clause.
+For the single-child durable subchart this record specifies, the child run is
+created inside the parent's serialized step, and a pure `start/2` still cannot
+be the answer for the three reasons the section gives, in the order it gives
+them. What this records is how the *first* of those three reasons - "a durable
+start is a write, and it has to happen under the parent's exclusion" - reads
+when the invocation being answered is a **fan-out** rather than a single child.
+That case did not exist when this record was written: decision 6 above named
+one invocation mapping to N children as a seam and refused to build it, and
+ADR-0009 built it afterwards.
+
+**For a fan-out the write under the parent's exclusion is the fan-out job's
+enqueue.** ADR-0009 decision 3 compiles `core.map` to exactly **one**
+`<invoke>`, so the parent's serialized step has exactly one invocation to
+answer, and what that step durably records is the same pair decision 4 requires
+- the linkage, and the parent's position - with the linkage widened to the
+ordered set of children ADR-0009 decision 10 names (`sp-ADR-0008`'s
+amendment, bead `sp-3n2`). The step does not create N child runs. It records
+the set and enqueues the work that will create them, and that enqueue is the
+write that happens under the exclusion.
+
+**The N children are created later, idempotently, from the linkage set.** Each
+start reads the recorded linkage, creates the run for its position if no run
+for that position exists yet, and is safe to run again when it is retried or
+replayed - each one going through the starter seam the durable host wires,
+which is decision 4's own answer to "which seam starts a child", applied N
+times instead of once. Per-position idempotency is what carries the property
+decision 4 bought by putting the write inside the exclusion. The window that
+section calls out - a persisted parent that believes it has a child, and a
+child run that was never created - does not open here, because the set is
+already durable before any start runs: a position with no run is created on the
+next attempt rather than being unrecoverable, and a position that already has
+one is not created twice. How those starts are batched, bounded and retried is
+`sob-djz`'s record, as ADR-0009 decision 9 already says; this note fixes only
+where the exclusion boundary falls.
+
+**Nothing about the single-child case changes.** Where one child is started the
+run creation *is* the write, it happens in the parent's serialized step, and
+every sentence of decision 4 applies as written - which is what the shipped
+`StatifierPersistence.Driver` `{:start_child, ...}` arm does, per the
+2026-09-04 note above. The fan-out reading is a second case beside it, not a
+replacement for it, and the handler this record specifies,
+`StatifierBlocks.Runtime.DurableSubchart`, is untouched by it: fan-out is a
+different handler with a different invoke type (ADR-0009 decision 3), and
+this record's refusal set stays four and closed.
+
+Filed with `sb-uxko`, campaign-031 ruling `D31-9` (the 2026-09-05 scale walk).
