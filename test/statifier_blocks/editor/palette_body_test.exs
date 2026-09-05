@@ -74,20 +74,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # `PaletteBrowser` - `count_text/1`'s match fails and every test in this
       # describe goes red on the missing line rather than on its wording.
       test "unfiltered, it is the size of the palette" do
-        assert total() == 16, "the scan actually saw the core palette"
+        assert total() == 17, "the scan actually saw the core palette"
 
-        assert count_text(palette_html()) == "16 block types"
+        assert count_text(palette_html()) == "17 block types"
       end
 
       # Sabotage: `count_line/3`'s first arm reading `"#{total} of #{shown}"` -
-      # the numbers swap and this goes red naming "16 of 3", which is the
+      # the numbers swap and this goes red naming "17 of 4", which is the
       # transposition that reads as plausible in a screenshot.
       test "a query says how much of the palette is left, and what was typed" do
         html = palette_html(query: "wait")
 
         # The quotes come back escaped because the query is author input and
-        # HEEx escapes it; a browser reads the line as `3 of 16 match "wait"`.
-        assert count_text(html) == "3 of 16 match &quot;wait&quot;"
+        # HEEx escapes it; a browser reads the line as `4 of 17 match "wait"`.
+        assert count_text(html) == "4 of 17 match &quot;wait&quot;"
       end
 
       # The acceptance set is the filter the author did not type, so it is the
@@ -97,7 +97,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # unfiltered case is in the same test.
       #
       # Sabotage: `count_line/3` dropping its `shown < total` arm - the
-      # filtered palette claims "16 block types" over a list of two.
+      # filtered palette claims "17 block types" over a list of two.
       #
       # Two rows survive the set, not one: the acceptance set is a set of
       # BLOCK TYPES, and the `"deadline"` recipe is not one (ADR-0005 clause
@@ -107,8 +107,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       test "a slot's acceptance set narrows the line too, without a query" do
         filtered = palette_html(allowed: MapSet.new(["core.wait"]))
 
-        assert count_text(filtered) == "2 of 16 fit here"
-        assert count_text(palette_html(allowed: nil)) == "16 block types"
+        assert count_text(filtered) == "2 of 17 fit here"
+        assert count_text(palette_html(allowed: nil)) == "17 block types"
       end
 
       # Sabotage: hard-coding `data-filtering="false"` - the unfiltered case
@@ -130,18 +130,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert html =~ ~s(<h3 class="sb-palette__group-name">)
         assert html =~ "<span>Structure</span>"
-        assert html =~ ~s(<span class="sb-palette__group-count">16</span>)
+        assert html =~ ~s(<span class="sb-palette__group-count">17</span>)
       end
 
       # The count is of what is under the header NOW. A header that kept
-      # reporting the registry's count would say 16 over a list of three, which
+      # reporting the registry's count would say 17 over a list of four, which
       # is worse than no count at all.
       #
       # Sabotage: `length(group.entries)` reading from `@groups` instead of the
-      # filtered group - the unfiltered case passes and this goes red on 16.
+      # filtered group - the unfiltered case passes and this goes red on 17.
       test "counts the filtered rows, not the registry's" do
         assert palette_html(query: "wait") =~
-                 ~s(<span class="sb-palette__group-count">3</span>)
+                 ~s(<span class="sb-palette__group-count">4</span>)
       end
     end
 

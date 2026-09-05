@@ -446,7 +446,8 @@ defmodule StatifierBlocks.ViewModelTest do
                "Subchart",
                "For each",
                "Placeholder",
-               "Drafts"
+               "Drafts",
+               "Wait for event"
              ]
     end
   end
