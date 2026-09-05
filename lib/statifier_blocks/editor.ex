@@ -470,6 +470,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          drawer_open: false,
          drawer_tabs: [],
          drawer_tab_id: nil,
+         drawer_tab_focus: nil,
          drawer_height: Shell.clamp_height(nil),
          on_drawer_resize: nil,
          zoom: Shell.default_zoom(),
@@ -732,6 +733,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             declaration_refusal={@declaration_refusal}
             fixture_runs={@fixture_runs}
             declared_view={@declared_view}
+            focus_tab={@drawer_tab_focus}
             target={@myself}
           />
         </div>
@@ -839,11 +841,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {:noreply,
          socket |> assign(:inspector_tab, Shell.inspector_tab(tab)) |> refresh_fixture_runs()}
 
+    # `drawer_tab_focus` is cleared here and on every other route into the
+    # drawer for the reason `StatifierBlocks.Editor.Drawer`'s moduledoc gives:
+    # it is a one-shot instruction to move DOM focus, and a drawer that
+    # re-opened with it still set would take focus off whatever the author was
+    # on.
     def handle_event("drawer-open", _params, socket),
-      do: {:noreply, socket |> assign(:drawer_open, true) |> refresh_fixture_runs()}
+      do:
+        {:noreply,
+         socket |> assign(drawer_open: true, drawer_tab_focus: nil) |> refresh_fixture_runs()}
 
     def handle_event("drawer-close", _params, socket),
-      do: {:noreply, assign(socket, :drawer_open, false)}
+      do: {:noreply, assign(socket, drawer_open: false, drawer_tab_focus: nil)}
 
     # Tabs since R4, and the pick is remembered as `nil` until it is made:
     # `Shell.drawer_view/1` resolves an unchosen tab to whichever one actually
@@ -856,7 +865,39 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # and a pick is stored the same way whichever side named it.
     def handle_event("drawer-tab", %{"tab" => tab}, socket) do
       picked = Shell.drawer_tab(tab, host_tab_ids(socket.assigns))
-      {:noreply, socket |> assign(:drawer_tab_id, picked) |> refresh_fixture_runs()}
+
+      {:noreply,
+       socket
+       |> assign(drawer_tab_id: picked, drawer_tab_focus: nil)
+       |> refresh_fixture_runs()}
+    end
+
+    # WAI-ARIA's tablist arrow keys, server-side. The drawer's moduledoc
+    # carries the reasoning - why there is no hook, why activation is
+    # automatic, and how focus follows - and this is the whole of the
+    # mechanism: the strip reports the key and the tab it is on, and the pick
+    # lands in the same assign a click lands in, beside the one-shot focus
+    # instruction the strip reads back.
+    #
+    # A key that moves nothing answers `:noreply` with no assign at all rather
+    # than re-assigning the tab it is already on: every keystroke inside the
+    # strip arrives here, including the Enter and Space that activate the
+    # focused button, and a handler that touched state on each of them would
+    # make a diff out of typing.
+    def handle_event("drawer-tab-key", %{"key" => key, "tab" => tab}, socket) do
+      host_ids = host_tab_ids(socket.assigns)
+      ids = Shell.drawer_tabs() ++ host_ids
+
+      case drawer_tab_step(key, Shell.drawer_tab(tab, host_ids), ids) do
+        nil ->
+          {:noreply, socket}
+
+        picked ->
+          {:noreply,
+           socket
+           |> assign(drawer_tab_id: picked, drawer_tab_focus: picked)
+           |> refresh_fixture_runs()}
+      end
     end
 
     # 2A's resize, in one round trip. The height is bounded here and handed to
@@ -1357,6 +1398,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           assign(socket,
             drawer_open: false,
             drawer_tab_id: nil,
+            drawer_tab_focus: nil,
             selected_id: nil,
             drafts: %{},
             declaration_draft: nil,
@@ -1651,6 +1693,30 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # the same reason it is applied to the strip: a host tab shadowing a
     # package tab, or repeating an id, never became a tab, so it cannot be
     # picked.
+    # The neighbour an arrow key names, or `nil` for a key the strip does not
+    # answer. Left and Right wrap, which is what WAI-ARIA's own tablist
+    # example does and what a six-tab strip wants: the tab furthest from the
+    # active one is one press away in the other direction rather than five in
+    # this one.
+    #
+    # `ids` is the strip's order - the package's tabs then the host's, which
+    # is how `Shell.drawer_view/1` assembles the strip - so the keys walk what
+    # the author sees. An unrecognised current tab is treated as the first,
+    # which is `Shell.drawer_tab/2`'s own answer to one.
+    @spec drawer_tab_step(term(), Shell.tab_id(), [Shell.tab_id()]) :: Shell.tab_id() | nil
+    defp drawer_tab_step(key, from, ids) do
+      at = Enum.find_index(ids, &(&1 == from)) || 0
+      count = length(ids)
+
+      case key do
+        "ArrowRight" -> Enum.at(ids, rem(at + 1, count))
+        "ArrowLeft" -> Enum.at(ids, rem(at + count - 1, count))
+        "Home" -> List.first(ids)
+        "End" -> List.last(ids)
+        _unanswered -> nil
+      end
+    end
+
     @spec host_tab_ids(map()) :: [Shell.host_tab_id()]
     defp host_tab_ids(assigns) do
       assigns.drawer_tabs |> Shell.host_tabs() |> Enum.map(& &1.id)

@@ -115,10 +115,49 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     matters lives where state already lives. 2A is explicit that the height is
     remembered **per viewer** and that the package has no viewer, so nothing
     here persists anything.
+
+    ## The arrow keys are the server's
+
+    The strip is a `role="tablist"` with a roving `tabindex`, so the six tabs
+    are one stop on the Tab sequence and the other five are reached with the
+    arrow keys or not at all - and once `sb-mtak` made the strip scroll at the
+    narrow breakpoint with its scrollbar hidden, "not at all" also meant not
+    visible. WAI-ARIA's pattern closes that: Left and Right move one tab and
+    wrap, Home and End go to the ends.
+
+    **The server owns the movement, and nothing here is a JavaScript hook.**
+    Decision 7 caps the package at two hooks and says in as many words that
+    adding another requires amending that record, which is a deliberately high
+    bar and the wrong bar to clear for a keystroke that already has a
+    server-side route: `phx-keydown` on the tablist carries the key, the
+    editor's `"drawer-tab-key"` handler picks the neighbour out of the same
+    ordered tab list the strip draws from, and the pick is stored in the same
+    assign a click stores. So the tab order lives in one place, the arrow keys
+    and the pointer reach it the same way, and `ExUnit` can drive the whole
+    behaviour.
+
+    Activation is **automatic** - moving focus picks the tab - which is what
+    lets the server know which tab is focused without being told: under a
+    roving `tabindex` the focused tab is the active one, so `phx-value-tab`
+    on the tablist is enough and no per-tab binding is needed. WAI-ARIA
+    recommends automatic activation when showing a panel is cheap, and these
+    panels are already re-rendered on every document change.
+
+    Moving DOM focus is the one part a re-render cannot do by itself, and it
+    is done without a hook either. The `@focus_tab` span carries the newly
+    active tab in its **id**, so a pick that moves the tab replaces the
+    element rather than patching it, and the `phx-mounted` on the replacement
+    runs `JS.focus/1` at the new tab. `focus()` scrolls its element into view,
+    which is what makes a tab past the clipped edge reachable at the narrow
+    breakpoint. The editor clears `focus_tab` on every other route into the
+    drawer - a click, an open, a close, a document switch - so the span is
+    absent unless a key press just asked for the focus to move, and opening
+    the drawer never steals it.
     """
 
     use Phoenix.Component
 
+    alias Phoenix.LiveView.JS
     alias StatifierBlocks.Editor.{Declarations, Findings}
     alias StatifierBlocks.Predicates.TruthTable
     alias StatifierBlocks.{Shell, ViewModel}
@@ -128,6 +167,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:root, ViewModel.Node, required: true)
     attr(:target, :any, required: true)
     attr(:class, :string, default: nil)
+
+    attr(:focus_tab, :any,
+      default: nil,
+      doc: """
+      The tab the strip must put DOM focus on, or `nil` for "leave focus
+      alone". The editor sets it when an arrow key moved the active tab and
+      clears it on every other route into the drawer - see the moduledoc's
+      "The arrow keys are the server's".
+      """
+    )
 
     attr(:declarations, :list,
       default: [],
@@ -197,7 +246,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         <div :if={@view.open?} class="sb-drawer__frame">
           <div class="sb-drawer__bar">
-            <div class="sb-drawer__tabs" role="tablist" aria-label="Drawer">
+            <div
+              class="sb-drawer__tabs"
+              role="tablist"
+              aria-label="Drawer"
+              phx-keydown="drawer-tab-key"
+              phx-value-tab={@view.tab}
+              phx-target={@target}
+            >
               <button
                 :for={entry <- @view.tabs}
                 type="button"
@@ -248,6 +304,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               Collapse
             </button>
           </div>
+
+          <span
+            :if={@focus_tab}
+            id={"sb-drawer-tab-focus-#{@focus_tab}"}
+            class="sb-drawer__tab-focus"
+            hidden
+            phx-mounted={JS.focus(to: "#sb-drawer-tab-#{@focus_tab}")}
+          ></span>
 
           <div
             class="sb-drawer__panel"
