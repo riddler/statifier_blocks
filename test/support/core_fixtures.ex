@@ -376,6 +376,14 @@ defmodule StatifierBlocks.CoreFixtures do
   def valid_config(Core.Foreach),
     do: %{"items" => "signup.invitees", "item_as" => "invitee", "index_as" => "position"}
 
+  def valid_config(Core.Map),
+    do: %{
+      "items" => "signup.invitees",
+      "chart" => "bdoc_01JWIZ",
+      "collect" => "answers",
+      "on" => "all"
+    }
+
   def valid_config(Core.Invoke),
     do: %{
       "invoke_type" => "myapp:authorize",

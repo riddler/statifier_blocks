@@ -67,6 +67,7 @@ defmodule StatifierBlocks.Core.SignupWizardTest do
         "core.drafts",
         "core.foreach",
         "core.invoke",
+        "core.map",
         "core.placeholder",
         "core.raise",
         "core.send",

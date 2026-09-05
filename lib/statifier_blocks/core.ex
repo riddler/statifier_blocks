@@ -25,6 +25,7 @@ defmodule StatifierBlocks.Core do
   | `core.send` | `#{inspect(__MODULE__)}.Send` | none |
   | `core.subchart` | `#{inspect(__MODULE__)}.Subchart` | one per declared outcome, `on_error` last |
   | `core.foreach` | `#{inspect(__MODULE__)}.Foreach` | `body` |
+  | `core.map` | `#{inspect(__MODULE__)}.Map` | `on_done`, `on_error` |
   | `core.drafts` | `#{inspect(__MODULE__)}.Drafts` | `body` |
   | `core.placeholder` | `#{inspect(__MODULE__)}.Placeholder` | none |
 
@@ -36,7 +37,9 @@ defmodule StatifierBlocks.Core do
   same sense - it *names* an invoke type and never runs one, which is
   ADR-0002 decision 2's two-registry seam rather than domain knowledge, and
   `core.subchart` is that seam again: it names another chart and the
-  host-registered invoke type that runs one. So every core `io/1` declares `kinds`, every
+  host-registered invoke type that runs one, and `core.map` is that same
+  seam over a list - it names a chart, a datamodel path and a fan-out
+  invoke type, and the host's handler is what starts one run per item. So every core `io/1` declares `kinds`, every
   core type that has slots declares `slot_accepts` for them, and no core
   type declares `consumes` at all - inbound type is the host's business,
   and ADR-0003 decision 5's permissive default is the honest answer.
@@ -49,11 +52,11 @@ defmodule StatifierBlocks.Core do
   narrower would be this package deciding what an author's unwritten step
   was going to do.
 
-  `produces` is declared by five of the core types. `core.sequence` declares
+  `produces` is declared by six of the core types. `core.sequence` declares
   `{:passthrough, "body"}`: it is transparent to type flow, so whatever its
   last step produces is what the sequence produces, computed by ADR-0003
   decision 4 rather than by anything here. `core.branch`, `core.parallel`,
-  `core.invoke` and `core.subchart` declare `:unknown` outright rather than combining their
+  `core.invoke`, `core.subchart` and `core.map` declare `:unknown` outright rather than combining their
   arms', lanes' or outcomes' outputs, because combining them is the type lattice
   ADR-0003 decision 4 refuses to build - and spelling the default out is
   how that refusal stays visible to a reader. The rest leave it absent.
