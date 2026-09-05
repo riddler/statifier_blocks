@@ -55,6 +55,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
     )
 
+    attr(:event_candidates, :list,
+      default: [],
+      doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
+    )
+
     attr(:fixtures, :any,
       default: nil,
       doc: """
@@ -110,6 +115,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           invoke_types={@invoke_types}
           path_candidates={@path_candidates}
           value_candidates={@value_candidates}
+          event_candidates={@event_candidates}
           fixture_hint={fixture_hint(@fixtures, @node.block_id, field)}
         />
       </form>

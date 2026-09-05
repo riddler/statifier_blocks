@@ -388,6 +388,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     use Phoenix.LiveComponent
 
     alias StatifierBlocks.{
+      Assignability,
       Block,
       BlockType,
       Connectors,
@@ -402,6 +403,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       ViewModel
     }
 
+    alias StatifierBlocks.Compiler.StateId
     alias StatifierBlocks.Document.DatamodelEntry
     alias StatifierBlocks.Edit.{History, Targets}
     alias StatifierBlocks.Runtime.FixtureRuns
@@ -416,6 +418,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     }
 
     alias StatifierBlocks.Shell
+
+    # The one type whose `event` field is offered generated completion-event
+    # names (sb-82mu), and the separator the candidate labels use - the same
+    # one the summary chips use for `<label> <sep> <outcome>`, so a candidate
+    # and the chip it will become read alike.
+    @on_event_type "core.on_event"
+    @candidate_separator " · "
 
     @impl Phoenix.LiveComponent
     def mount(socket) do
@@ -618,6 +627,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:declarations, declaration_entries(assigns))
         |> assign(:path_candidates, path_candidates(assigns))
         |> assign(:offered_values, offered_values(assigns))
+        |> assign(:event_candidates, event_candidates(assigns))
         |> assign(:declaration_refusal, declaration_refusal(assigns))
         |> assign(:marks, marks(assigns))
         |> assign(:fit_target, fit_target(assigns))
@@ -707,6 +717,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             invoke_types={@invoke_types}
             path_candidates={@path_candidates}
             value_candidates={@offered_values}
+            event_candidates={@event_candidates}
             fixtures={@fixtures}
             fixture_runs={@fixture_runs}
             target={@myself}
@@ -1530,6 +1541,101 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec offered_values(map()) :: %{optional(String.t()) => [Datamodel.candidate()]}
     defp offered_values(assigns) do
       Datamodel.value_candidates(assigns.datamodel, assigns.value_candidates)
+    end
+
+    # The completion events a `core.on_event`'s `event` field offers
+    # (sb-82mu): every block in the enclosing body that declares outcomes,
+    # crossed with those outcomes, written the way the compiler writes them.
+    # It is derived here rather than in `StatifierBlocks.ViewModel` for the
+    # reason `path_candidates/1` above is: it is a question about the
+    # SELECTION, and the view model is a projection of the document that
+    # knows nothing about which card is open.
+    #
+    # Offered for `core.on_event` and for nothing else. `core.send`,
+    # `core.raise` and `core.await` each declare an `event` key too, and each
+    # names events this list is not about, so the gate is here and the
+    # control in `StatifierBlocks.Editor.Field` tests no block type at all.
+    #
+    # The list suggests and never constrains: `event` stays a `:string` in
+    # `config_schema/1`, and a free-typed name validates exactly as it did.
+    @spec event_candidates(map()) :: [%{label: String.t(), value: String.t()}]
+    defp event_candidates(
+           %{selected_node: %ViewModel.Node{type: @on_event_type} = node} = assigns
+         ) do
+      with {:ok, [_ | _] = path} <- Document.fetch_path(assigns.document, node.block_id),
+           {parent_id, _slot, _index} <- List.last(path),
+           %Block{} = parent <- block_by_id(assigns.document, parent_id),
+           {:ok, module, resolved} <- Palette.resolve(assigns.palette, parent) do
+        parent.slots
+        |> Enum.sort_by(&elem(&1, 0))
+        |> Enum.filter(fn {slot, _children} -> body_slot?(module, resolved.config, slot) end)
+        |> Enum.flat_map(fn {_slot, children} -> children end)
+        |> Enum.flat_map(&outcome_candidates(&1, assigns))
+      else
+        _no_enclosing_body -> []
+      end
+    end
+
+    defp event_candidates(_not_an_on_event), do: []
+
+    # What "the enclosing body" means, asked of the declaration rather than
+    # of a slot name: a slot that admits ADR-0003's `:step` kind. That is
+    # `body` on `core.group` and `core.resumable_group`, and whatever a host
+    # group calls the slot it declares the same way. The handler's own
+    # `interrupts` slot declares `[:interrupt_handler]`, so it is excluded by
+    # construction rather than by name, and a slot declaring `:any` is not a
+    # body declaration - it is the absence of one.
+    @spec body_slot?(module(), Block.config(), Block.slot_name()) :: boolean()
+    defp body_slot?(module, config, slot) do
+      case Assignability.slot_accepts(module, config, slot) do
+        kinds when is_list(kinds) -> :step in kinds
+        _any_or_other -> false
+      end
+    end
+
+    # One body block's contribution. A type that does not IMPLEMENT
+    # `outcomes/1` contributes nothing: ADR-0002 amendment A1 gives such a
+    # type the default single `done`, and offering an author a generated name
+    # for an outcome the type never declared is offering them a wire that is
+    # not there.
+    @spec outcome_candidates(Block.t(), map()) :: [%{label: String.t(), value: String.t()}]
+    defp outcome_candidates(%Block{} = block, assigns) do
+      with {:ok, module, resolved} <- Palette.resolve(assigns.palette, block),
+           true <- declares_outcomes?(module) do
+        state_id = StateId.state_id(block.id)
+        label = candidate_label(assigns, block)
+
+        for outcome <- BlockType.outcome_names(module, resolved.config) do
+          %{
+            label: label <> @candidate_separator <> outcome,
+            value: StateId.outcome_event(state_id, outcome)
+          }
+        end
+      else
+        _no_declared_outcomes -> []
+      end
+    end
+
+    @spec declares_outcomes?(module()) :: boolean()
+    defp declares_outcomes?(module) do
+      Code.ensure_loaded?(module) and function_exported?(module, :outcomes, 1)
+    end
+
+    # The card's own name, read off the view model through the public
+    # `ViewModel.title/1` rather than re-derived from the schema here: the
+    # label an author sees on the candidate has to be the label they see on
+    # the card, and two derivations of one name is how those drift apart.
+    @spec candidate_label(map(), Block.t()) :: String.t()
+    defp candidate_label(assigns, %Block{} = block) do
+      case find_node(assigns.view_model.root, block.id) do
+        %ViewModel.Node{} = node -> ViewModel.title(node)
+        nil -> block.type
+      end
+    end
+
+    @spec block_by_id(Document.t(), Block.id()) :: Block.t() | nil
+    defp block_by_id(%Document{} = document, id) do
+      document |> Document.blocks() |> Enum.find(&(&1.id == id))
     end
 
     @spec declaration_entries(map()) :: [DatamodelEntry.t()]

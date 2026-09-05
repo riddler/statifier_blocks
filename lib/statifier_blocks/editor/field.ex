@@ -105,6 +105,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     no entry gets a free-text value control, which is the same "suggests,
     never constrains" posture the path `<datalist>` takes.
 
+    ## `event_candidates` (sb-82mu)
+
+    The completion events the blocks in a `core.on_event`'s enclosing body
+    raise, each `%{label: , value: }`, where the value is the generated
+    `done.outcome.<state id>.<outcome>` name and the label is the sibling
+    block's own label and that outcome's name. They are drawn as a
+    `<datalist>` on the `event` field, on exactly the terms the
+    `invoke_type` list is drawn on: the field stays a `:string`, a
+    free-typed name is validated as it always was, and an empty list draws
+    the plain input rather than an empty picker.
+
+    The list is derived by `StatifierBlocks.Editor` for a selected
+    `core.on_event` and is empty for every other selection, so the three
+    other core types that declare an `event` key are unaffected. Nothing in
+    this module tests for a block type to decide it.
+
     ## The fixture hint (sb-e30x)
 
     `fixture_hint` is `StatifierBlocks.Shell.fixture_hint/3`'s answer for
@@ -278,6 +294,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:event_candidates, :list,
+      default: [],
+      doc: """
+      The completion events the enclosing body's blocks raise, each
+      `%{label: , value: }`. Suggestions for a `core.on_event` `event` field,
+      never a constraint on it; empty is *no list supplied* and renders the
+      plain input.
+      """
+    )
+
     attr(:fixture_hint, :any,
       default: nil,
       doc: """
@@ -302,6 +328,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           invoke_types={@invoke_types}
           path_candidates={@path_candidates}
           value_candidates={@value_candidates}
+          event_candidates={@event_candidates}
         />
         <p
           :if={@fixture_hint}
@@ -324,6 +351,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:invoke_types, :list, default: [])
     attr(:path_candidates, :list, default: [])
     attr(:value_candidates, :map, default: %{})
+    attr(:event_candidates, :list, default: [])
 
     defp control(%{field: %ViewModel.Field{type: :boolean}} = assigns) do
       ~H"""
@@ -567,6 +595,47 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       />
       <datalist id={@list_id} data-invoke-types={length(@invoke_types)}>
         <option :for={type <- @invoke_types} value={type}></option>
+      </datalist>
+      """
+    end
+
+    # sb-82mu: a `core.on_event` `event` field, offered the completion events
+    # its enclosing body's blocks raise. Keyed by field key and by a non-empty
+    # list, exactly as `invoke_type` above is, and for the same two reasons:
+    # the field stays a plain `:string` in `config_schema/1`, and an empty
+    # list falls through to the plain input below rather than drawing a
+    # `<datalist>` that suggests nothing.
+    #
+    # Three other core types declare an `event` key - `core.send`,
+    # `core.raise` and `core.await` - and they name events this list is not
+    # about. Nothing here tests for that: the list is derived for a selected
+    # `core.on_event` and is empty for every other selection, which is where
+    # the question belongs. A caller of this component that hands an `event`
+    # field a list anyway gets that list, on the same "suggests, never
+    # constrains" terms.
+    defp control(
+           %{field: %ViewModel.Field{key: "event"}, event_candidates: [_first | _rest]} = assigns
+         ) do
+      assigns = assign(assigns, :list_id, input_id(assigns.field) <> "-events")
+
+      ~H"""
+      <input
+        class="sb-field__input"
+        type="text"
+        id={input_id(@field)}
+        name={input_name(@field)}
+        value={to_text(@field.value)}
+        list={@list_id}
+        spellcheck="false"
+        autocomplete="off"
+      />
+      <datalist id={@list_id} data-event-candidates={length(@event_candidates)}>
+        <option
+          :for={candidate <- @event_candidates}
+          value={candidate.value}
+          label={candidate.label}
+        >
+        </option>
       </datalist>
       """
     end
