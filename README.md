@@ -813,6 +813,7 @@ the theme - rather than a callback the editor calls back into:
 | `accent_token` | palette entry | the NAME of a `--sb-*` property, stamped on that type's cards and palette rows |
 | `badge` | palette entry | a short chip for the card header |
 | `join_label` | palette entry | a one-argument function of config, phrasing the join marker under a side-by-side arrangement |
+| `singleton` | palette entry | `:anywhere` or `:head` - how many blocks of this type the document may hold, and (for `:head`) that the one it holds is first in the root's first declared slot. A document that does not comply draws one `:config` finding on the root, one per violating type; nothing is ever inserted, removed or moved for you (ADR-0005 `10z`/`11o`) |
 | `slot_outcome_key` | palette entry | names the config key the blocks in one slot carry their outcome under, so a renderer routes an interrupt rule's escape without branching on a type name; it reaches the view model as `Slot.outcome_key` and the resolved value as `Node.outcome` |
 | `--sb-*` tokens | the `theme` assign, or your own CSS | every colour, space, radius and drag treatment - see [`docs/theming.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/theming.md) |
 | compile findings | `findings` assign | `StatifierBlocks.Finding.from_compiler/2` adapts a compiler finding into the shape the editor renders, so a compile result routes back to the field somebody typed it into |

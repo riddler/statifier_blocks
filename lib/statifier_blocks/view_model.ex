@@ -13,12 +13,13 @@ defmodule StatifierBlocks.ViewModel do
   mechanical, reading a view model and emitting markup with no palette
   lookups and no callback invocations of their own.
 
-  ## Two derived finding sources, and the compiler adapter
+  ## The derived finding sources, and the compiler adapter
 
   `build/3`'s third argument is a caller-supplied `[StatifierBlocks.Finding.t()]`.
-  This module derives exactly two sources of its own, because decision 13
+  This module derives sources of its own, because decision 13
   puts resolution, migration and validation inside `ViewModel` rather than
-  upstream of it:
+  upstream of it. The count grew with ADR-0005 clause 11o, which supersedes
+  the "exactly two" this moduledoc used to say:
 
     * `:resolution` - `Palette.resolve/2` failing on a block
       (`:unknown_block_type`, `:block_type_too_new`, `:migration_failed`),
@@ -26,6 +27,12 @@ defmodule StatifierBlocks.ViewModel do
     * `:config` - `validate_config/1` on a resolved block, one per
       `{key, message}` pair, anchored `{:config, id, key}`, severity
       `:error`.
+    * `:config` again, this time about the whole document - a palette entry
+      declaring `singleton` (ADR-0005 clause 10z) that the document does not
+      satisfy, anchored `{:block, root_id}`, severity `:error`. See "d10's
+      cardinality declaration" below.
+    * `:lint` - a summary chip the presentation cap refused, anchored
+      `{:block, id}`, severity `:warning`.
 
   `:assignability` and `:lint` findings are never produced here; their
   producers live elsewhere - `StatifierBlocks.SlotValidation`
@@ -92,6 +99,33 @@ defmodule StatifierBlocks.ViewModel do
   declaration, or a child whose config holds no well-formed outcome name,
   is `nil` in both places - the uniform rendering, never a broken one
   (ADR-0002 amendment B3).
+
+  ## d10's cardinality declaration
+
+  A palette entry may declare `singleton: :head | :anywhere` (ADR-0005
+  clause 10z), and `build/3` answers it with one `:config` finding per
+  violating type - never with a repair. Both values mean "the document
+  holds exactly one block of this type"; `:head` additionally means it is
+  the first child of the root's first slot.
+
+  **What "the root's first slot" is**, because a root type declaring more
+  than one slot leaves the phrase undefined otherwise: it is the **first
+  slot the root's type declares** - `slots/1`'s list is ordered and that
+  order is load-bearing everywhere else here, so the head is index 0 of
+  that slot's children. A root whose type declares no slots, or does not
+  resolve at all, falls back to the alphabetically first slot name the root
+  block actually carries, which is the order `build_resolved_node/4`
+  already puts undeclared slots in. Every `:head` finding names the slot it
+  measured against, so an author with a multi-slot root is never left
+  guessing which one the rule meant.
+
+  The count is over the document's blocks by `type` and the declarations
+  come from the palette, which is what lets the **zero** case exist at all:
+  a type nothing in the document uses still draws its finding, because the
+  palette is where the host said the document needs one. One finding per
+  violating type, not one per surplus block. The anchor is `{:block,
+  root_id}` - decision 11's anchor enum has no document member, this clause
+  does not widen it, and the root is the one block every document has.
 
   ## d12: unresolvable nodes
 
@@ -766,18 +800,155 @@ defmodule StatifierBlocks.ViewModel do
 
   @spec derived_findings(Document.t(), Palette.t(), BlockType.chip_labels()) :: [Finding.t()]
   defp derived_findings(%Document{} = document, %Palette{} = palette, labels) do
-    document
-    |> Document.blocks()
-    |> Enum.flat_map(fn block ->
-      case Palette.resolve(palette, block) do
-        {:ok, module, resolved} ->
-          config_findings(block.id, module, resolved.config) ++
-            summary_findings(block.id, module, resolved.config, labels)
+    per_block =
+      document
+      |> Document.blocks()
+      |> Enum.flat_map(fn block ->
+        case Palette.resolve(palette, block) do
+          {:ok, module, resolved} ->
+            config_findings(block.id, module, resolved.config) ++
+              summary_findings(block.id, module, resolved.config, labels)
 
-        {:error, reason} ->
-          [Finding.new({:block, block.id}, :resolution, resolution_message(reason))]
+          {:error, reason} ->
+            [Finding.new({:block, block.id}, :resolution, resolution_message(reason))]
+        end
+      end)
+
+    per_block ++ singleton_findings(document, palette)
+  end
+
+  # ADR-0005 clause 11o. The declarations come from the palette rather than
+  # from the document, which is what makes the zero case expressible: a type
+  # no block in the document names still draws its finding, because the
+  # palette is where the host said the document needs one. Sorted by
+  # `type_name` so two palettes with the same entries derive the same list
+  # in the same order - `palette.types` is a map, and a finding list whose
+  # order depended on map iteration would be a rendering that moved for no
+  # reason the author can see.
+  @spec singleton_findings(Document.t(), Palette.t()) :: [Finding.t()]
+  defp singleton_findings(%Document{} = document, %Palette{types: types} = palette) do
+    blocks = Document.blocks(document)
+    head = head_of_root(document, palette)
+
+    types
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.flat_map(fn {type_name, module} ->
+      case BlockType.singleton(palette_entry_with_defaults(module, type_name)) do
+        nil -> []
+        declared -> singleton_finding(document, blocks, type_name, module, declared, head)
       end
     end)
+  end
+
+  @spec singleton_finding(
+          Document.t(),
+          [Block.t()],
+          Block.type_name(),
+          module(),
+          BlockType.singleton(),
+          {Block.slot_name() | nil, Block.t() | nil}
+        ) :: [Finding.t()]
+  defp singleton_finding(document, blocks, type_name, module, declared, head) do
+    label = singleton_label(module, type_name)
+    anchor = {:block, document.root.id}
+
+    case Enum.filter(blocks, &(&1.type == type_name)) do
+      [] ->
+        [Finding.new(anchor, :config, "this document needs a #{label}, and holds none")]
+
+      [only] ->
+        misplaced_finding(document, anchor, label, declared, head, only)
+
+      many ->
+        [
+          Finding.new(
+            anchor,
+            :config,
+            "this document holds #{length(many)} #{label} blocks, and may hold exactly one"
+          )
+        ]
+    end
+  end
+
+  # `:anywhere` is satisfied by the count alone; only `:head` reads a
+  # position. The message names the slot it measured against, because a root
+  # type declaring more than one slot leaves "the root's first slot"
+  # ambiguous to everyone but this function.
+  @spec misplaced_finding(
+          Document.t(),
+          Finding.anchor(),
+          String.t(),
+          BlockType.singleton(),
+          {Block.slot_name() | nil, Block.t() | nil},
+          Block.t()
+        ) :: [Finding.t()]
+  defp misplaced_finding(_document, _anchor, _label, :anywhere, _head, _only), do: []
+
+  defp misplaced_finding(document, anchor, label, :head, {slot_name, head_block}, only) do
+    if head_block && head_block.id == only.id do
+      []
+    else
+      [
+        Finding.new(
+          anchor,
+          :config,
+          "a #{label} belongs first in #{slot_label(slot_name)}, " <>
+            "and this document's is #{where_is(document, only)}"
+        )
+      ]
+    end
+  end
+
+  # The head position clause 10z names: index 0 of the root's first slot.
+  # "First" is the root type's own declaration order (`slots/1`), and a root
+  # that declares nothing - or does not resolve - falls back to the
+  # alphabetically first slot name it carries, the order
+  # `build_resolved_node/4` already puts undeclared slots in.
+  @spec head_of_root(Document.t(), Palette.t()) ::
+          {Block.slot_name() | nil, Block.t() | nil}
+  defp head_of_root(%Document{root: root}, %Palette{} = palette) do
+    declared =
+      case Palette.resolve(palette, root) do
+        {:ok, module, resolved} -> Enum.map(module.slots(resolved.config), &elem(&1, 0))
+        {:error, _reason} -> []
+      end
+
+    slot_name = List.first(declared) || first_carried_slot(root)
+
+    {slot_name, slot_name && root.slots |> Map.get(slot_name, []) |> List.first()}
+  end
+
+  @spec first_carried_slot(Block.t()) :: Block.slot_name() | nil
+  defp first_carried_slot(%Block{slots: slots}) do
+    slots |> Map.keys() |> Enum.sort() |> List.first()
+  end
+
+  @spec slot_label(Block.slot_name() | nil) :: String.t()
+  defp slot_label(nil), do: "the root's first slot, which this root declares and carries none of"
+  defp slot_label(name), do: ~s(the root's "#{name}" slot)
+
+  @spec where_is(Document.t(), Block.t()) :: String.t()
+  defp where_is(%Document{root: root} = document, %Block{} = block) do
+    case Document.fetch_path(document, block.id) do
+      {:ok, []} ->
+        "the root itself"
+
+      {:ok, path} ->
+        {parent_id, slot_name, index} = List.last(path)
+        whose = if parent_id == root.id, do: "the root's", else: "another block's"
+        ~s(at position #{index + 1} of #{whose} "#{slot_name}" slot)
+
+      :error ->
+        "elsewhere in the document"
+    end
+  end
+
+  # The name the finding calls the type by: the palette entry's label, or
+  # the raw `type_name` when it declares none - the same fallback every
+  # other reader of a palette entry uses.
+  @spec singleton_label(module(), Block.type_name()) :: String.t()
+  defp singleton_label(module, type_name) do
+    module |> palette_entry_with_defaults(type_name) |> Map.get(:label) || type_name
   end
 
   # ADR-0005 decision 10's 2026-08-30 Note, "the cap signals". The
