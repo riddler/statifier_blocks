@@ -2258,6 +2258,34 @@ fifteen rows it saw - it names the next row after those - rather than a
 reservation of the sixteenth position against this one, and `core.map` still
 has no row in this table.]*
 
+*[Note added 2026-09-05, with `sb-7haw` under campaign-031, after `sb-kqno`
+landed `core.map` (PR 281, `a852429`). The table and the palette both read
+**seventeen** now, and they agree. The amendment of this date below adds
+`core.map`'s row as G15, which takes the table from the sixteen the Note
+above records to seventeen; `StatifierBlocks.Palette.core_types/0`
+(`lib/statifier_blocks/palette.ex:116-136`) registers the same seventeen,
+because `sb-m0t1` landed `core.await` and `sb-kqno` landed `core.map`. So
+both gaps the Note above describes - the table ahead of the palette by
+`core.await`'s row, and `core.map` owed a row it did not have - are closed,
+and by the two moves closing in opposite directions rather than by one.
+
+Three count sentences above are superseded rather than edited, per this
+record's amendment convention. G11's "the table records **fifteen** types"
+and its "`StatifierBlocks.Palette.core_types/0` registers **thirteen**" were
+true when G11 was accepted. The Note above them reads fifteen and sixteen,
+which were true when it was written. G14's parenthetical - "registers
+**sixteen** once it lands" - was true of the module it was written beside.
+A reader wanting today's number reads this Note: **seventeen rows, seventeen
+palette entries**, and no type owed a row.
+
+One line citation the Note above carries has moved, by this bead's own edit
+and not by anyone else's. That Note cites ADR-0009 at `:509` and `:512`; the
+`core.map` Note this bead adds beneath ADR-0009's decision 4 is inserted above
+both, so the palette citation it flags as stale now reads at
+`docs/adr/0009-fan-out-block-type.md:564` and the "sixteenth" ordinal at
+`:567`. Neither claim changes - only where in that file it sits - and neither
+Note is edited to say so.]*
+
 ### G12. Two placement facts `io/1` cannot carry, and the Structure-stage rule that does
 
 ADR-0003 decision 3 withdrew ADR-0002's one special-cased placement rule and
@@ -3234,3 +3262,164 @@ against. Correcting the run-time branch does not wake it.
   object is a block-type contract, which is this record's.
 
 Filed with `sb-5v3i`, campaign-031's lane H. `sb-0q0z` implements.
+
+## Amendment (2026-09-05): decision 10, the `core.map` row
+
+**Status: proposed (2026-09-05).** Drafted for `sb-7haw` under the operator
+campaign-031 grant, and merging at proposed under that campaign's invariant;
+flipping it to accepted is a separate gated request. Additive: decision 10's
+original seven-row table stands, the 2026-08-28 amendment's section D stands,
+sections G through G14 stand, and no text above this line is edited by this
+section.
+
+### Context
+
+ADR-0009 decision 11 assigned this row and named who owed it: "`core.map`'s
+row would be the **sixteenth**, and it is an ADR-0002 amendment that lands
+with the implementation - the implementation bead's to write, not this
+record's" (`docs/adr/0009-fan-out-block-type.md:567-569`, decision 11's
+ADR-0002 bullet). The implementation
+bead is `sb-kqno`, which landed `StatifierBlocks.Core.Map` in PR 281
+(`a852429`) under a campaign instruction that it touch no `docs/adr/` file.
+The row it owed is therefore written here, by the bead the conductor filed
+for the residue, rather than beside the code.
+
+Unlike G9, G10 and G14, this row is read **off the shipped module** rather
+than written ahead of it, in the habit G, G2 and G5 set: every callback below
+is quoted from `lib/statifier_blocks/core/map.ex` at `main`, with its line, so
+a reader can diff the record against the source.
+
+**The ordinal has moved, and the row is not the sixteenth.** `core.await`'s
+row (G14, this date) took that position between decision 11 being written and
+this section being written. The dated Note beside G11 already reads decision
+11's "sixteenth" as an ordinal counted from the fifteen rows that record saw -
+it names the next row after those - rather than a reservation of a position.
+This row is the **seventeenth**, and the Note added beside G11 on this date
+records what the counts are once it lands.
+
+### G15. `core.map` joins the core vocabulary
+
+| Block type | `slots(config)` | Config schema | `outcomes(config)` | Notes |
+|---|---|---|---|---|
+| `core.map` | two `zero_or_one` slots, `on_done` then `on_error`, with `slot_style: %{"on_error" => :failure}` | `items`: `{:path, %{}}`, required, label "Over these items"; `chart`: `:string`, required, label "Run this chart for each"; `collect`: `{:path, %{}}`, optional, label "Collect the answers into"; `on`: `{:select, ...}` over `all` and `first_error`, optional, default `"all"`, label "Finish" | `done`, `error` - fixed, not config-derived | a step that runs another chart once per item of a datamodel list, all at once, as **one** invocation of a constant fan-out invoke type, and waits for the whole batch |
+
+In full, so a reader need not hold the rest of this section in their head.
+
+`current_version/0` is `1` (`:192`). `slots/1` returns the two slots above for
+every config (`:215`) - `zero_or_one` for `core.invoke`'s reason, that an
+outcome path is one continuation rather than a list of them. `outcomes/1`
+returns `[{"done", "Done"}, {"error", "Error"}]` for every config (`:227`),
+fixed rather than derived from the named chart; ADR-0009 decision 4 is why,
+and its argument is that N children report N outcomes and joining them into
+one branch target has no meaning, so the per-child answers go where data goes
+and the block's own outcome says only whether the batch succeeded.
+
+`config_schema/1` (`:230`) declares the four fields above, in the order
+`items`, `chart`, `collect`, `on`. `items` and `collect` are the eighth field
+type, `{:path, opts}`, from the 2026-09-05 amendment on decision 7, so the
+editor offers the host's declared datamodel paths on both and a value the
+datamodel does not declare draws ADR-0005 clause 11e's `:info` advisory rather
+than a refusal. `on` carries the default `"all"`.
+
+`validate_config/1` (`:275`) refuses an `items` or a `chart` that is not a
+bare reference - blank, containing a space, or containing a single quote - a
+`collect` that is present and not a bare lowercase identifier, refused in the
+same words `core.invoke` and `core.subchart` produce for `assign_to`, and an
+`on` outside the two permitted words. **It refuses nothing else, and in
+particular nothing about N**; G15c says why. `on` is read *through* its
+default in `core.parallel`'s G7a shape, so a block whose config never carried
+the key validates and compiles exactly as it did before the key existed; a
+stored `null` is not an absent key and is refused (ADR-0001 decision 6).
+Refusing every word outside the two is also what reserves `quorum` for its own
+walk, which ADR-0009 decision 6 asks for.
+
+`io/1` (`:329`) is `%{kinds: [:step], produces: :unknown, slot_accepts:
+%{"on_done" => [:step], "on_error" => [:step]}}`. `produces` is `:unknown` for
+`core.invoke`'s reason - joining what the call produces with what the
+`on_error` subtree produces is the lattice ADR-0003 decision 4 refuses to
+build - and `consumes` is absent because a fan-out reads its input out of the
+datamodel through `items` rather than through the type flow.
+
+`invoke_type/0` (`:204`) returns the constant `"statifier_blocks:map"`, one
+definition site and never a config field, in the shape `core.subchart`'s
+constant has: which handler starts children is deployment state rather than
+authoring state (`st-ADR-0051`). It is deliberately a **different** string
+from `"statifier_blocks:subchart"`, which is ADR-0009 decision 3's
+requirement - a host that wired a single-child subchart handler has not
+thereby wired a fan-out handler, and a document that reached such a host
+should fail to find a handler rather than quietly start one child. Nothing had
+to be added to `StatifierBlocks.Compiler.InvokeTypes` for the lint to reach
+it: that pass reads emitted `<invoke type>` strings out of the emission rather
+than a list of known types.
+
+`palette_entry/0` (`:337`) takes order 16 in the `Structure` group, with the
+label "For every item, run a chart" - ADR-0009 decision 2's split between the
+engineer-facing type name and the author-facing label - and the description
+"Runs another chart for every item in a datamodel list, all at once."
+
+**G15a. What it compiles to.** A compound state with one inner running state
+holding the invocation, plus the slot subtrees and one `<final>` per reachable
+outcome. The inner state carries exactly **one** `<invoke>`, with the block's
+own id (ADR-0004 C3), `type` the constant above, and `src` the `chart` value
+verbatim. Its four `<param>` elements carry `items`, `chart`, `collect` and
+`on`, each as a **quoted literal** rather than an expression, because the
+handler is what evaluates them and the parent is not (`params/4`, `:430`;
+`literal_param/3`, `:447`). `collect` is omitted from the params entirely when
+the author declared none, which is ADR-0009 decision 7 clause 3's supported
+shape rather than an empty string a handler would have to read as absence.
+
+Two facts about those bytes are worth stating at row level rather than leaving
+to ADR-0004.
+
+`chart` is emitted **twice**: as the `<invoke src>` and as a `<param>`. The
+`src` is ADR-0009 decision 3's requirement and is what a reading host sees;
+the param is what the handler reads beside the other three, so a handler has
+one place to look rather than two. They are the same verbatim string. Carrying
+`src` also puts a `core.map` under `StatifierBlocks.Compiler.SelfReference`
+with no edit there, because that pass classifies by SCXML's own semantics
+rather than by block type - so a map naming the document it sits in is refused
+for free.
+
+The `collect` write is one `<assign expr="_event.data">` on the **success
+transition** (`assign/1`, `:499`), not in a `<finalize>`. That is ADR-0009
+decision 5's "the write happens once, at the invocation's completion" and it
+is the shape ADR-0007 decision 2 describes for a leaf step and `core.subchart`
+already emits: the answers are only answers when the batch answered.
+
+**G15b. The field names in this row are the shipped ones, and ADR-0009
+decision 4's table spells two of them differently.** That record's declaration
+table names `assign_to` and `aggregate` for the two ideas that ship as
+`collect` and `on`, and declares four further fields - `item_as`, `index_as`,
+`max_concurrency`, `params` - that the shipped surface does not carry. The row
+above is read off the module, per this record's rule that a row is read off
+the shipped type; the reconciliation, and the record of what became of the
+four, is a dated Note beneath ADR-0009 decision 4 added on this date by this
+same bead. Nothing in this section decides anything about those four: they are
+that Note's to hold open.
+
+**G15c. This row validates nothing about N, and that is a decision.** Campaign
+031's ruling `D31-9` puts the bound on a fan-out batch in the *runtime* that
+starts the children: a configuration key with a runtime refusal on the
+ordinary `error.communication.invoke` route, carrying N and the cap in its
+detail. It is never a compile finding here, and the reason is not division of
+labour but arithmetic: the compiled bytes do not scale with N and cannot, since
+the `<param>` carries the list's *path* and a compile of one document never
+sees the list. The same document compiles to the same bytes over three items
+and over three thousand, which is what keeps ADR-0004 decision 6's byte
+determinism intact. This package imports nothing from the durable runtime
+packages and takes no position on how child starts are batched or bounded.
+
+**G15d. What this row does not change.** `core.foreach` is untouched, in every
+sense ADR-0009 decision 1 and decision 11 mean: `core.map` is a sibling of
+`core.subchart` and not a mode of it, and it is not `core.foreach` with a
+flag. `core.subchart`'s row (G5) stands unedited, its outcome set still
+config-derived and its own invoke type constant still its own. ADR-0002
+decision 2's two-registry seam holds exactly as it does for `core.invoke` and
+`core.subchart`: this type **names** an invoke type and runs nothing. The
+effect vocabulary, the event names and chart identity remain `statifier-ex`'s.
+And the document schema is untouched - ADR-0001 owns the stored bytes and
+`schema_version` stays at `1`, because a new block type is a new value of an
+existing field.
+
+Filed with `sb-7haw`, campaign-031. `sb-kqno` (PR 281, `a852429`) is the
+implementation this row is read off.
