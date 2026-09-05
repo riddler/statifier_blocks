@@ -312,6 +312,42 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     is that sentence, and it renders in the same region the armed case uses for
     its instruction.
 
+    ## The selection a host can follow (`on_select`)
+
+    The selection is editor state: it is produced by a gesture on the canvas
+    and only the component knows it, so - unlike the findings number above -
+    there is no pure function of the host's own assigns that answers it. What
+    cannot be read has to be pushed, and `on_select` is the push.
+
+    It is a one-argument function, called with each new selection and never
+    for its return value, and it sits beside `on_change` rather than inside
+    it: a document and a selection are different subjects, and a host that
+    wants one should not have to receive the other. What arrives is a
+    descriptor rather than a block -
+
+    | Key | Value |
+    |---|---|
+    | `id` | the selected block's id |
+    | `type` | the block's type name, as the document stores it |
+    | `label` | the card's first line: the author's title where they gave one, the type's label otherwise |
+
+    - because the host already holds the document it passed in, so returning
+    the block's config would be a second channel for something the host can
+    already read, and one that goes stale the moment the two disagree.
+
+    Deselection calls `on_select` with `nil`, because a panel that follows the
+    canvas has to be able to empty itself; a callback that only ever fired on
+    a *new* block would leave the panel showing the last one forever. It fires
+    when the selection changes and not otherwise - not on every render, not on
+    an edit to the selected block, not on a mount with nothing selected, and
+    not on re-selecting the block that is already selected.
+
+    Nothing about it is a document edit. There is no `:select` command, and
+    nothing here is serialized, stored, undone or redone. The package's own
+    inspector still reads the selection out of component state: this is a seam
+    out, not a rewiring of what is already inside. See ADR-0005's 2026-09-05
+    amendment, *the host seams, `on_select` and a selection descriptor*.
+
     ## Assigns
 
     | Assign | Required | Meaning |
@@ -323,6 +359,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `datamodel` | no | the paths the host declares; drives the undeclared-path advisories, and `nil` (the default) turns them off entirely |
     | `declare` | no | the `{id, expr}` roots the host will pass the compiler as `:declare`; declared roots count as declared for the advisories (11k), and `[]` (the default) declares none |
     | `on_change` | no | one-argument function called with each new document |
+    | `on_select` | no | one-argument function called with each new selection: a `%{id:, type:, label:}` descriptor, or `nil` for no selection |
     | `icon` | no | function component resolving an icon *name* to markup |
     | `expression_component` | no | override for `:expression` fields (sui-bob's seam); with it unset, an `:expression` renders statifier-ui's own expression editor when that package is on the host's load path, and the package's plain source input when it is not |
     | `value_candidates` | no | the values the host offers per datamodel path, `%{path => [%{label:, value:} \| binary]}`; read only by an expression editor that draws value pickers, and `%{}` (the default) offers none |
@@ -380,6 +417,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          declare: [],
          host_roots: MapSet.new(),
          on_change: nil,
+         on_select: nil,
          icon: nil,
          expression_component: nil,
          invoke_types: [],
@@ -389,6 +427,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          history_limit: :infinity,
          history: History.new(),
          selected_id: nil,
+         notified_id: nil,
          collapsed_ids: MapSet.new(),
          active_marks: [],
          invoke_mark: nil,
@@ -1428,6 +1467,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       |> assign(:selected_node, selected)
       |> assign(:selected_slot, Shell.slot_label(view_model.root, socket.assigns.selected_id))
       |> assign(:pending_fields, pending_fields(socket, selected))
+      |> notify_select(selected)
       |> refresh_fixture_runs()
     end
 
@@ -1724,6 +1764,47 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       socket
     end
+
+    # `notify_change/2`'s sibling for the other subject a host may follow.
+    #
+    # It hangs off `rebuild/1` rather than off the handlers, because there is
+    # more than one way to stop selecting a block - picking another card,
+    # deleting the selected one, the host swapping the document out - and a
+    # callback wired handler by handler would fire from three of them and be
+    # forgotten by the fourth. `rebuild/1` runs after every one of those, and
+    # the last id notified is what makes that safe: a rebuild the selection
+    # did not move through - a render, an edit to the selected block,
+    # re-selecting the block already selected - compares equal and says
+    # nothing. A mount compares `nil` against `nil` for the same reason, so an
+    # editor nobody has touched calls nothing.
+    #
+    # The descriptor is built from the node the view model just resolved, so
+    # `label` is the line the card actually draws rather than a rule read off
+    # the document a second time. A selected id the view model cannot resolve
+    # descends to `nil`: the honest answer to "which block" when there is no
+    # block is none, and the alternative is a descriptor whose `label` is a
+    # guess.
+    @spec notify_select(Phoenix.LiveView.Socket.t(), ViewModel.Node.t() | nil) ::
+            Phoenix.LiveView.Socket.t()
+    defp notify_select(socket, selected) do
+      if socket.assigns.selected_id == socket.assigns.notified_id do
+        socket
+      else
+        case socket.assigns.on_select do
+          fun when is_function(fun, 1) -> fun.(selection(selected))
+          _none -> :ok
+        end
+
+        assign(socket, :notified_id, socket.assigns.selected_id)
+      end
+    end
+
+    @spec selection(ViewModel.Node.t() | nil) ::
+            %{id: Block.id(), type: Block.type_name(), label: String.t()} | nil
+    defp selection(nil), do: nil
+
+    defp selection(%ViewModel.Node{block_id: id, type: type} = node),
+      do: %{id: id, type: type, label: ViewModel.title(node)}
 
     # A DOM value, so it is a string; `to_index/1` is total because the DOM
     # is not a trusted source. A non-numeric index becomes 0, which
