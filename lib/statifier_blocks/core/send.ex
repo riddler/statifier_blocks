@@ -92,14 +92,25 @@ defmodule StatifierBlocks.Core.Send do
 
   alias StatifierBlocks.Block
   alias StatifierBlocks.Compiler.{Cancels, Context}
-  alias StatifierBlocks.Core.{Config, Duration, Emit}
+  alias StatifierBlocks.Core.{Config, Duration, DurationMigration, Emit}
   alias StatifierBlocks.Emission
 
   @event_message "must be an event name, like signup.abandoned"
   @delay_message "must be a duration like 30s or 1h30m - or empty to send now"
 
   @impl true
-  def current_version, do: 1
+  def current_version, do: 2
+
+  # `core.wait`'s bump, on this type's own key, and for the same reason:
+  # ADR-0005 decision 9's 2026-09-05 Note migrates a stored duration in the
+  # retired spelling rather than refusing it. An absent `delay`, the empty
+  # default, and a value the rewrite cannot read are all pass-through, so
+  # "no delay" stays no delay. The longer note on where this fires - every
+  # caller of `Palette.resolve/2`, not the editor alone - is above
+  # `core.wait`'s implementation and is not repeated here.
+  @impl true
+  def migrate_config(1, config), do: {:ok, DurationMigration.migrate_field(config, "delay")}
+  def migrate_config(from, _config), do: {:error, {:no_migration_from, from}}
 
   @impl true
   def slots(_config), do: []

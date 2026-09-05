@@ -97,6 +97,77 @@ defmodule StatifierBlocks.Core.SendTest do
     end
   end
 
+  describe "type_version 2 and the duration migration" do
+    # ADR-0005 decision 9's 2026-09-05 Note, on this type's own key. The
+    # bump is what makes the migration reachable: at version 1 nothing of
+    # this type could be behind.
+    #
+    # Sabotage: left `current_version/0` at 1 -> the first assert goes red
+    # and the resolved delay keeps the stored spelling, taking the validate
+    # assert red with it.
+    test "is at version 2 and migrates a behind-version delay at resolution" do
+      assert Send.current_version() == 2
+
+      for retired <- CoreFixtures.retired_durations() do
+        block =
+          Block.new("core.send",
+            id: "blk_OLD",
+            type_version: 1,
+            config: %{"event" => "signup.abandoned", "delay" => retired}
+          )
+
+        assert {:ok, Send, migrated} = Palette.resolve(Palette.core(), block)
+        assert Send.validate_config(migrated.config) == :ok, retired
+        assert migrated.config["event"] == "signup.abandoned"
+        assert migrated.type_version == 1
+      end
+    end
+
+    # Sabotage: had `migrate_field/2` write the key back unconditionally ->
+    # the absent-delay block gained a `nil` delay and its validate went red.
+    test "leaves a block with no delay, and one already readable, alone" do
+      for config <- [
+            %{"event" => "signup.abandoned"},
+            %{"event" => "signup.abandoned", "delay" => ""},
+            %{"event" => "signup.abandoned", "delay" => "1h30m"}
+          ] do
+        block = Block.new("core.send", id: "blk_OK", type_version: 1, config: config)
+
+        assert {:ok, Send, migrated} = Palette.resolve(Palette.core(), block)
+        assert migrated.config == config
+      end
+    end
+
+    # The migration is for what a document already holds, never a way back
+    # in: a block at the current version is handed back untouched and its
+    # refusal is the one clause 9d fixes, word for word.
+    #
+    # Sabotage: running the migration from `Palette.migrate/3`'s
+    # equal-version arm erases the refusal entirely, red here.
+    test "a current-version delay in the retired spelling still refuses, unchanged" do
+      for retired <- CoreFixtures.retired_durations() do
+        block =
+          Block.new("core.send",
+            id: "blk_NEW",
+            type_version: 2,
+            config: %{"event" => "signup.abandoned", "delay" => retired}
+          )
+
+        assert {:ok, Send, ^block} = Palette.resolve(Palette.core(), block)
+
+        assert {:error, [{"delay", message}]} = Send.validate_config(block.config)
+        assert message == "must be a duration like 30s or 1h30m - or empty to send now"
+      end
+    end
+
+    # Sabotage: gave `migrate_config/2` a `{:ok, config}` catch-all -> a
+    # block from a version this type has never had resolved as though it
+    # were understood, red here.
+    test "refuses to migrate from a version this type has never had" do
+      assert Send.migrate_config(7, %{}) == {:error, {:no_migration_from, 7}}
+    end
+  end
+
   describe "leaf-ness" do
     # Sabotage: gave `slots/1` a `body` slot -> red, since a send is a
     # leaf with nothing to sequence (verified).
@@ -141,8 +212,8 @@ defmodule StatifierBlocks.Core.SendTest do
 
     # Sabotage: returned `{:ok, "0s"}` from both of `delay/1`'s "no delay"
     # arms -> the send grew a zero delay, which puts it on a later
-    # macrostep and is exactly the "no delay is not PT0S" distinction,
-    # taking this red (verified).
+    # macrostep and is exactly the "no delay is not a delay of no time"
+    # distinction, taking this red (verified).
     test "no delay means no delay attribute at all" do
       for config <- [
             %{"event" => "signup.abandoned"},
