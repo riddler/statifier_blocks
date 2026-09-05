@@ -32,6 +32,35 @@ defmodule StatifierBlocks.Core.OnEvent do
   different notion of interrupt handler mints its own kind and its own
   group without touching this package.
 
+  ## Candidates for `event` (sb-82mu)
+
+  `event` is a plain `:string` and this type validates it the way it always
+  has - the event-name shape rule, and nothing else. What the editor adds is
+  a list of *suggestions*: the completion events the blocks in the handler's
+  enclosing body raise, each written as the
+  `done.outcome.<state id>.<outcome>` name
+  `StatifierBlocks.Compiler.StateId.outcome_event/2` mints, and labelled by
+  the block's own card label and that outcome. Wiring a handler onto a
+  sibling's outcome is then a pick rather than a transcription of a generated
+  name.
+
+  Three properties of the list are this record's, not the control's.
+
+    * **The body is read through the declaration.** "The enclosing body" is
+      every slot of the enclosing block that admits ADR-0003's `:step` kind,
+      which is `body` on `core.group` and `core.resumable_group` and whatever
+      a host group calls the slot it declares the same way. The handler's own
+      `interrupts` slot declares `[:interrupt_handler]`, so it is excluded by
+      construction rather than by name.
+    * **Only a type that declares outcomes contributes.** ADR-0002 amendment
+      A1 gives a type that implements no `outcomes/1` a single default
+      `done`, and offering an author a generated name for an outcome a type
+      never declared would be offering them a wire that is not there.
+    * **`config_schema/1` is untouched.** The field declaration gains no
+      candidate key; the derivation is the editor's and is keyed on this
+      type. `core.send`, `core.raise` and `core.await` each declare an
+      `event` key too, and each names events this list is not about.
+
   ## The `outcome` values
 
   ADR-0002 decision 10 fixes `outcome` as a `:select` and names no values.

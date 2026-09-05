@@ -71,6 +71,54 @@ defmodule StatifierBlocks.Core.OnEventTest do
     end
   end
 
+  describe "the event field, with candidates offered for it (sb-82mu)" do
+    # The editor offers the enclosing body's generated
+    # `done.outcome.<state id>.<outcome>` names on this field. The field is
+    # still a `:string` and this type still validates a name it has never
+    # heard of - the event-name shape rule is the only gate, exactly as it
+    # was - which is the half of that claim that has to hold with LiveView
+    # off the load path.
+    #
+    # sabotage: narrowed `check_event/2` to accept only names matching the
+    # generated shape -> the free-typed rows below went red and the
+    # generated one stayed green (verified)
+    test "accepts a free-typed event name and a generated one alike" do
+      for event <- [
+            "order.cancelled",
+            "done.outcome.s_blk_CREDIT.approved",
+            "vendor.webhook.received"
+          ] do
+        assert OnEvent.validate_config(%{"event" => event, "outcome" => "abandon"}) == :ok
+      end
+    end
+
+    # The candidates are advisory, so the one thing this field refuses is
+    # what it refused before them: nothing written at all.
+    #
+    # sabotage: dropped `check_event/2` from the pipeline -> this went red
+    # and nothing else moved (verified)
+    test "still refuses an empty event" do
+      assert {:error, [{"event", _} | _rest]} =
+               OnEvent.validate_config(%{"event" => "", "outcome" => "abandon"})
+    end
+
+    # `config_schema/1` is where a candidate key would have gone if the
+    # field declaration had grown one. It did not: the derivation is the
+    # editor's, keyed on this type, and the declaration is untouched.
+    #
+    # sabotage: added a `candidates:` key to the `event` declaration -> this
+    # went red, which is the guard on that surface (verified)
+    test "declares event as a plain required string, with no candidate key" do
+      assert Enum.find(OnEvent.config_schema(%{}), &(&1.key == "event")) == %{
+               key: "event",
+               type: :string,
+               label: "When this event arrives",
+               required?: true,
+               default: ""
+             }
+    end
+  end
+
   describe "emit/2 and the compiled assigns" do
     # sabotage: emitted the assigns after the raise rather than before ->
     # the index comparison went red (verified)
