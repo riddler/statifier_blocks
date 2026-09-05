@@ -16,6 +16,7 @@ defmodule StatifierBlocks.Core do
   | `core.branch` | `#{inspect(__MODULE__)}.Branch` | one per arm, then `otherwise` |
   | `core.parallel` | `#{inspect(__MODULE__)}.Parallel` | one per lane |
   | `core.wait` | `#{inspect(__MODULE__)}.Wait` | none |
+  | `core.await` | `#{inspect(__MODULE__)}.Await` | none |
   | `core.resumable_group` | `#{inspect(__MODULE__)}.ResumableGroup` | `body`, `interrupts` |
   | `core.on_event` | `#{inspect(__MODULE__)}.OnEvent` | none |
   | `core.invoke` | `#{inspect(__MODULE__)}.Invoke` | `on_error` |

@@ -63,6 +63,7 @@ defmodule StatifierBlocks.Core.SignupWizardTest do
     uncovered =
       MapSet.new([
         "core.assign",
+        "core.await",
         "core.drafts",
         "core.foreach",
         "core.invoke",

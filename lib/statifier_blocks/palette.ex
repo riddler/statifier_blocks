@@ -120,6 +120,7 @@ defmodule StatifierBlocks.Palette do
       "core.branch" => Core.Branch,
       "core.parallel" => Core.Parallel,
       "core.wait" => Core.Wait,
+      "core.await" => Core.Await,
       "core.resumable_group" => Core.ResumableGroup,
       "core.on_event" => Core.OnEvent,
       "core.invoke" => Core.Invoke,

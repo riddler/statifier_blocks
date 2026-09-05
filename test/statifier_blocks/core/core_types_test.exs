@@ -22,7 +22,7 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
     # entry-count assert and on the fetch below.
     test "hand a host every core type, by the name a document stores" do
       assert %Palette{} = palette = Palette.core()
-      assert map_size(Palette.core_types()) == 15
+      assert map_size(Palette.core_types()) == 16
       assert palette.types == Palette.core_types()
 
       assert {:ok, Core.Sequence} = Palette.fetch(palette, "core.sequence")
@@ -30,6 +30,7 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
       assert {:ok, Core.Branch} = Palette.fetch(palette, "core.branch")
       assert {:ok, Core.Parallel} = Palette.fetch(palette, "core.parallel")
       assert {:ok, Core.Wait} = Palette.fetch(palette, "core.wait")
+      assert {:ok, Core.Await} = Palette.fetch(palette, "core.await")
       assert {:ok, Core.ResumableGroup} = Palette.fetch(palette, "core.resumable_group")
       assert {:ok, Core.OnEvent} = Palette.fetch(palette, "core.on_event")
       assert {:ok, Core.Invoke} = Palette.fetch(palette, "core.invoke")
