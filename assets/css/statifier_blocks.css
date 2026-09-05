@@ -2137,6 +2137,12 @@
   color: var(--sb-fg-muted);
 }
 
+.sb-field__fixture-hint {
+  font-size: var(--sb-text-sm);
+  color: var(--sb-fg-muted);
+  font-style: italic;
+}
+
 .sb-field__refusal {
   font-size: var(--sb-text-sm);
   border-radius: var(--sb-radius-sm);

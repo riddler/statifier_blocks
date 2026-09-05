@@ -32,6 +32,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     alias StatifierBlocks.{BlockType, DurationInput}
     alias StatifierBlocks.Editor.Field
+    alias StatifierBlocks.Shell
     alias StatifierBlocks.ViewModel
 
     attr(:node, ViewModel.Node, required: true)
@@ -52,6 +53,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:value_candidates, :map,
       default: %{},
       doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
+    )
+
+    attr(:fixtures, :any,
+      default: nil,
+      doc: """
+      The `fixtures` the editor holds, `%{block_id => [TruthTable.t()]}` or
+      `nil`. Read here through `StatifierBlocks.Shell.tables_for/2` for the
+      selected block's rows and passed to `StatifierBlocks.Editor.Field` as
+      the fixture hint; nothing else is derived from it.
+      """
     )
 
     attr(:pending, :list,
@@ -99,6 +110,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           invoke_types={@invoke_types}
           path_candidates={@path_candidates}
           value_candidates={@value_candidates}
+          fixture_hint={fixture_hint(@fixtures, @node.block_id, field)}
         />
       </form>
       """
@@ -218,6 +230,30 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       "This block's config is committed as a unit, and #{labels} " <>
         "#{if length(fields) == 1, do: "is", else: "are"} not accepted yet."
     end
+
+    # The hint is an `:expression` field's alone. Every other field type is
+    # about something a fixture row does not bind - a duration, a flag, an
+    # invoke type - so there is no path for a row's value to be an example
+    # of, and dispatching on the type is what keeps this from becoming a
+    # guess about what a key means (the rule the moduledoc of
+    # `StatifierBlocks.Editor.Field` keeps for `placeholder`).
+    #
+    # The rows are the selected block's, read through `Shell.tables_for/2` -
+    # the same reader the drawer's truth-table tab uses - so the two surfaces
+    # cannot disagree about what a block's fixtures are.
+    @spec fixture_hint(Shell.fixtures(), StatifierBlocks.Block.id(), ViewModel.Field.t()) ::
+            Shell.fixture_hint() | nil
+    defp fixture_hint(fixtures, block_id, %ViewModel.Field{type: :expression, value: value}),
+      do: Shell.fixture_hint(fixtures, block_id, source_text(value))
+
+    defp fixture_hint(_fixtures, _block_id, %ViewModel.Field{}), do: nil
+
+    # An expression's stored value is the author's own source string, but a
+    # field whose value has never been set carries `nil`, and a `:branch`
+    # arm can carry whatever the document stored. Only a string names a path.
+    @spec source_text(term()) :: String.t() | nil
+    defp source_text(value) when is_binary(value), do: value
+    defp source_text(_value), do: nil
 
     @spec severity_class(StatifierBlocks.Finding.t()) :: String.t()
     defp severity_class(finding), do: StatifierBlocks.Finding.severity_class(finding)

@@ -368,7 +368,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `invoke_mark` | no | the block a run is calling out to and how the call came back - `{block_id, outcome}`, a bare `block_id` for no answer yet, or `nil` for no call at all |
     | `theme` | no | `--sb-*` custom properties for the canvas root |
     | `fit` | no | the fit the editor **opens** in: `:manual` (the default), `:width` or `:active`; the first measurement performs it once, and an unknown value is refused into `:manual` |
-    | `fixtures` | no | `%{block_id => [TruthTable.t()]}`, read by both the drawer's truth-table tab and, as of `sb-4yze`, its Fixtures tab (`refresh_fixture_runs/1` drives each row through the compiled chart); `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
+    | `fixtures` | no | `%{block_id => [TruthTable.t()]}`, read by both the drawer's truth-table tab and, as of `sb-4yze`, its Fixtures tab (`refresh_fixture_runs/1` drives each row through the compiled chart), and, as of `sb-e30x`, by the inspector's config form for the fixture hint beside an `:expression` control; `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
     | `drawer_tabs` | no | tabs the host contributes to the drawer, each `%{id:, title:, content:}` with an optional `count:`; drawn beside the package's own and rendered by calling `content` |
     | `drawer_height` | no | the drawer's height in rem, remembered **by the host** per viewer (2A); bounded on the way in |
     | `on_drawer_resize` | no | one-argument function called with each new drawer height, which is how the host comes to have one to remember |
@@ -694,6 +694,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             invoke_types={@invoke_types}
             path_candidates={@path_candidates}
             value_candidates={@offered_values}
+            fixtures={@fixtures}
             target={@myself}
           />
 
