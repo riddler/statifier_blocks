@@ -235,5 +235,120 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert render_expression(@declared, component) =~ "<i>signup.step == 2</i>"
       end
     end
+
+    # ADR-0005's 2026-09-05 note: a path's value candidates default from the
+    # datamodel's declared `one_of`, and the host's map is merged over them
+    # per path. The merge itself is pure and is asserted in
+    # `StatifierBlocks.DatamodelTest`; what only exists once there is markup
+    # is the claim here - that the merged map, and not the host's raw assign,
+    # is what the control was handed.
+    #
+    # The condition these drive is written against a string value, because
+    # statifier-ui builds an option only for a candidate it can write at the
+    # clause's own value kind: a string candidate offered against `== 2` is
+    # not a value that clause could hold, and it is dropped there rather than
+    # here. What this file is about is which candidates arrive, so the clause
+    # is one that can hold them.
+    describe "a condition's value picker" do
+      @one_of %{
+        "version" => 1,
+        "scopes" => [
+          %{
+            "scope" => "local",
+            "entries" => [
+              %{
+                "path" => "signup.step",
+                "type" => "string",
+                "one_of" => ["details", "payment", "review"]
+              }
+            ]
+          }
+        ]
+      }
+
+      @no_one_of %{
+        "version" => 1,
+        "scopes" => [
+          %{
+            "scope" => "local",
+            "entries" => [%{"path" => "signup.step", "type" => "string"}]
+          }
+        ]
+      }
+
+      defp value_branch_view(conn, opts) do
+        document =
+          Document.new(
+            Block.new("core.branch",
+              id: "blk_route",
+              config: %{"arms" => [%{"slot" => "arm_beta", "cond" => "signup.step == 'details'"}]},
+              slots: %{
+                "arm_beta" => [EditorFixtures.wait("blk_beta_step", "PT5M")],
+                "otherwise" => []
+              }
+            ),
+            id: "doc_route"
+          )
+
+        {:ok, view, _html} = mount_editor(conn, [document: document] ++ opts)
+
+        select(view, "blk_route")
+      end
+
+      defp option(value),
+        do: ~s(select[data-role="value"] option[value="signup.step == '#{value}'"])
+
+      # Sabotage: the inspector call in `Editor.render/1` passing the host's
+      # raw `@value_candidates` again instead of `@offered_values` -> the map
+      # is empty, the control falls back to free text, and this is the test
+      # that goes red. It is the one hop the pure suite cannot see.
+      test "offers the declared values with no host map supplied", %{conn: conn} do
+        view = value_branch_view(conn, datamodel: @one_of)
+
+        assert has_element?(view, ~s(select[data-role="value"][data-value-kind="select"]))
+
+        for value <- ~w(details payment review) do
+          assert has_element?(view, option(value))
+        end
+      end
+
+      # The precedence, at the control: replacement at the path, so a value
+      # the host left out is gone rather than merged back in. The author's own
+      # value stays whatever the host says, which is statifier-ui's rule and
+      # not this package's - hence the refutation on `payment` rather than on
+      # the `details` the clause currently holds.
+      #
+      # Sabotage: `Datamodel.value_candidates/2` unioning the two lists
+      # instead of merging the host's over the derived -> the refutation goes
+      # red while the assertion above it stays green, which is the split this
+      # test is drawn to make.
+      test "a host entry for that path replaces the declared values", %{conn: conn} do
+        view =
+          value_branch_view(conn,
+            datamodel: @one_of,
+            value_candidates: %{"signup.step" => ["review"]}
+          )
+
+        assert has_element?(view, option("review"))
+        refute has_element?(view, option("payment"))
+      end
+
+      # The third criterion, and the one that says nothing changed for anyone
+      # who declares no enumeration: an entry with no `one_of` contributes
+      # nothing at all, so the value control is the free-text one it was.
+      #
+      # Sabotage: `options/1` answering a value for an entry that declares
+      # none -> the path acquires a candidate it never declared, the control
+      # becomes a picker, and both assertions here go red. Mapping the empty
+      # case to `[]` instead of leaving the path out does NOT reach here:
+      # statifier-ui reads an empty candidate list as no candidates and draws
+      # the same text control, so the pure suite is what guards that one.
+      test "a path with no declared values keeps its free-text control", %{conn: conn} do
+        view = value_branch_view(conn, datamodel: @no_one_of)
+
+        assert has_element?(view, ~s(input[data-role="value"][data-value-kind="text"]))
+        refute has_element?(view, ~s(select[data-role="value"][data-value-kind="select"]))
+      end
+    end
   end
 end

@@ -161,6 +161,13 @@ defmodule StatifierBlocks.Datamodel do
   @type declared :: MapSet.t(String.t()) | nil
 
   @typedoc """
+  One value a picker offers for a path: a bare string, or the
+  `%{label:, value:}` shape a host may write in its own `value_candidates`
+  map. Values derived from a datamodel's `one_of` are always bare strings.
+  """
+  @type candidate :: String.t() | %{optional(atom()) => term()}
+
+  @typedoc """
   Which of the three declaring surfaces 11k names contributed a path.
 
     * `:datamodel` - the host's datamodel, a set or an ADR-0006 document;
@@ -414,6 +421,82 @@ defmodule StatifierBlocks.Datamodel do
   end
 
   @doc """
+  The value candidates a picker offers per datamodel path: the ADR-0006
+  `one_of` enumerations the datamodel declares, with the host's own map
+  merged over them per path.
+
+  ADR-0005's 2026-09-05 note is the record for this, and its own summary is
+  that `value_candidates` "narrows in meaning and not in shape": it is still
+  the same `%{path => [candidate]}` a host has always been able to supply,
+  and what changed is that supplying nothing is no longer the same as there
+  being nothing.
+
+  **Merged over, per path, means replacement at the path.** A path the
+  host's map names uses the host's list and only the host's list; a path it
+  does not name keeps the declared enumeration; a path with neither is
+  absent from the result entirely and gets a free-text value control. Not a
+  union, and the reason is that a union has no author: if a host lists three
+  values for a path whose datamodel declares five, the host is correcting
+  the datamodel for this editor, and a control answering eight would be
+  showing a set nobody declared. An empty list is therefore a suppression a
+  host can write, and it is carried through as one.
+
+  The enumeration is read off the ADR-0006 index through
+  `StatifierBlocks.Predicates.Datamodel`, which is the only reader that has
+  it: `candidates/3` answers path strings and carries no per-path shape at
+  all, and `declared_view/3`'s rows carry `type`, `item_type`, `scope`,
+  `label` and `sensitive?` and not `one_of`.
+
+  A declared value is offered when it can be drawn as an option - a string
+  as itself, a number or a boolean as its printed form. Anything else, a
+  list or an object or a `null`, is dropped, and a path whose whole
+  enumeration drops out is absent rather than present and empty.
+
+  ## This does not promote the hint
+
+  Nothing here validates and nothing refuses. ADR-0006 carries `one_of` as
+  "a completion hint listing the values a host expects" and leaves whether
+  it is a hint or a claim as an open question; defaulting a picker from it
+  is a *use* of the hint rather than an answer to that question, and a value
+  control fed from it still admits anything the author types. That is the
+  same suggests-never-constrains posture the path `<datalist>` takes and
+  that the 11e advisory takes on an undeclared path.
+
+  Both arguments are read totally, like every other normalizer here: a
+  datamodel that is not an ADR-0006 document declares no enumerations, and a
+  host map that is not a plain map supplies no entries.
+
+      iex> alias StatifierBlocks.Datamodel
+      iex> datamodel = %{"scopes" => [%{"scope" => "local", "entries" => [
+      ...>   %{"path" => "signup.step", "type" => "string",
+      ...>     "one_of" => ["details", "payment", "review"]},
+      ...>   %{"path" => "signup.email", "type" => "string"}]}]}
+      iex> Datamodel.value_candidates(datamodel)
+      %{"signup.step" => ["details", "payment", "review"]}
+
+      iex> alias StatifierBlocks.Datamodel
+      iex> datamodel = %{"scopes" => [%{"scope" => "local", "entries" => [
+      ...>   %{"path" => "signup.step", "one_of" => ["details", "payment"]},
+      ...>   %{"path" => "card.brand", "one_of" => ["visa", "amex"]}]}]}
+      iex> datamodel
+      ...> |> Datamodel.value_candidates(%{"signup.step" => ["payment"]})
+      ...> |> Enum.sort()
+      [{"card.brand", ["visa", "amex"]}, {"signup.step", ["payment"]}]
+
+      iex> StatifierBlocks.Datamodel.value_candidates(nil, %{"card.brand" => ["visa"]})
+      %{"card.brand" => ["visa"]}
+
+      iex> StatifierBlocks.Datamodel.value_candidates(["card.brand"])
+      %{}
+  """
+  @spec value_candidates(term(), term()) :: %{optional(String.t()) => [candidate()]}
+  def value_candidates(datamodel, host \\ %{}) do
+    datamodel
+    |> declared_values()
+    |> Map.merge(host_values(host))
+  end
+
+  @doc """
   Every declared path, with the surfaces that declared it and the shape the
   ADR-0006 projection carries for it - the read-only view of what the 11e
   advisory reads.
@@ -496,6 +579,49 @@ defmodule StatifierBlocks.Datamodel do
       :error -> %{}
     end
   end
+
+  # The derived half: every indexed entry whose `one_of` yields at least one
+  # drawable option. An entry that yields none is left out rather than
+  # mapped to `[]`, because `[]` is the host's spelling of "offer nothing
+  # here" and a derivation must not be able to write it by accident.
+  @spec declared_values(term()) :: %{optional(String.t()) => [String.t()]}
+  defp declared_values(datamodel) do
+    case Predicates.Datamodel.index(datamodel) do
+      nil ->
+        %{}
+
+      index ->
+        index
+        |> Predicates.Datamodel.entries()
+        |> Enum.reduce(%{}, &declared_value/2)
+    end
+  end
+
+  @spec declared_value(Predicates.Datamodel.entry(), map()) :: map()
+  defp declared_value(entry, acc) do
+    case options(Map.get(entry, :one_of)) do
+      [] -> acc
+      values -> Map.put(acc, entry.path, values)
+    end
+  end
+
+  @spec options(term()) :: [String.t()]
+  defp options(one_of) when is_list(one_of), do: Enum.flat_map(one_of, &option/1)
+  defp options(_absent), do: []
+
+  @spec option(term()) :: [String.t()]
+  defp option(value) when is_binary(value), do: [value]
+  defp option(value) when is_boolean(value), do: [to_string(value)]
+  defp option(value) when is_integer(value) or is_float(value), do: [to_string(value)]
+  defp option(_undrawable), do: []
+
+  # A struct is a map and is not a candidate map, so the shape check is
+  # narrower than `is_map/1`. Same total-normalizer discipline as
+  # `declared_paths/1`: an unrecognized shape behaves as though nothing was
+  # passed.
+  @spec host_values(term()) :: %{optional(String.t()) => [candidate()]}
+  defp host_values(host) when is_map(host) and not is_struct(host), do: host
+  defp host_values(_unrecognized), do: %{}
 
   # The document declares its own roots, and this module is handed the
   # document, so 11k source 3 needs no argument: a caller cannot pass the
