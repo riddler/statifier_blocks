@@ -3147,6 +3147,64 @@ exists, and until then the run-time branch is the one that fires. What
 gets its candidate source keys, which is a rendering affordance and not a
 verdict.
 
+#### Note (2026-09-05, corrected against the engine): what the run-time branch actually does
+
+The bullet above states the run-time branch as one rule. `sb-0q0z`, which
+that bullet's own section names as the bead that confirms it before relying
+on it, measured the engine and found two rules rather than one. This Note
+records what was measured, because the paragraph above was written ahead of
+the measurement and a record that keeps the unmeasured version would have
+this package relying on a guarantee it does not have.
+
+The engine splits on whether the expression's **root** is bound, not on
+whether the whole path resolves:
+
+| The `expr` | What the engine does |
+|---|---|
+| `_event.data.reason`, payload has `reason` | writes the value |
+| `_event.data.reason`, payload lacks `reason` | writes the explicit unbound marker; raises nothing |
+| `_event.data.reason`, event carries no data | writes the explicit unbound marker; raises nothing |
+| `_event.data.a.b.c`, nothing at `a` | writes the explicit unbound marker; raises nothing |
+| `nosuchroot.reason`, no such root | writes nothing; raises `error.execution` |
+
+Measured with a hand-written chart carrying a single `<assign>` and an
+`error.execution` transition on the enclosing parent state, so a raised
+error is observable whichever target the machine reaches. Identical results
+on the locked engine version and on the newer one the fleet is moving to, so
+the finding does not turn on a stale lock.
+
+Every `expr` a `capture` compiles to is rooted at `_event`, which is always
+bound. So the row that governs this key is the second, not the last: **a
+missing payload key is written as the marker, and no `error.execution` is
+raised today.** The cites, in the engine's own tree:
+`lib/statifier/machine/content/assign.ex:80` (`execute/2`) and `:120`
+(`evaluate_value/2`), `lib/statifier/evaluator.ex:276-289` (`evaluate/2`,
+built with the `on_unbound: :error` policy that produces the last row), and
+`lib/statifier/interpreter/content.ex:296` (the single site that names
+`error.execution` for executable content).
+
+Two consequences for the red line this section opens with, and they pull in
+opposite directions, so both are stated:
+
+- **The `nil` clause holds, and is read as written.** The value the engine
+  writes is its explicit unbound marker, which is not `nil` and is not
+  `nil`'s spelling: the engine distinguishes unbound from null deliberately.
+  So the failure this section exists to prevent - a captured value that
+  quietly is not there, read downstream as an authored absence - does not
+  occur, provided the consumer checks for the marker. That proviso is the
+  whole of the correction: "no silent `nil`" is satisfied by the marker
+  being a value a reader can test for, not by an error being raised.
+- **The `error.execution` clause does not hold yet.** It is written above as
+  present tense and it describes a future. It is carried upstream as
+  `st-fwsh`, and it follows here when that lands; until then the bullet above
+  is read as the target rather than the guarantee, and nothing in this
+  package may be built on the error arriving.
+
+The compile-time branch is unaffected and stays dormant for the reason the
+paragraph above gives: nothing in this package declares an event payload's
+shape, so there is no declaration for a `:config` finding to be checked
+against. Correcting the run-time branch does not wake it.
+
 ### What this Note does not change, and what it leaves open
 
 - **Decision 7's field-type set is untouched by this Note.** It grows by one

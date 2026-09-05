@@ -3,9 +3,11 @@ defmodule StatifierBlocks.Core.OnEvent do
   `core.on_event`: an interrupt handler, valid inside an `interrupts` slot
   and nowhere else (ADR-0002 decision 10).
 
-  A leaf with three config fields: the `event` that fires it, an optional
-  `cond` that decides whether it fires at all, and the `outcome` that
-  decides what happens to the group it interrupts.
+  A leaf with four config fields: the `event` that fires it, an optional
+  `cond` that decides whether it fires at all, the `outcome` that decides
+  what happens to the group it interrupts, and an optional `capture` that
+  writes values out of the firing event's payload into the datamodel
+  before the outcome is raised.
 
   ## Placement, in both directions, from one tag
 
@@ -76,6 +78,75 @@ defmodule StatifierBlocks.Core.OnEvent do
   amendment H6 fixes this type's card as the outcome word then the event
   name, and the reason `core.branch` counts its arms rather than listing
   their conditions holds here too: an expression is not a chip.
+
+  ## The optional `capture` map
+
+  `capture` writes values out of the firing event's payload into the
+  datamodel. It is a map, and the direction is worth stating twice
+  because a path-to-path map reads either way: **the key is the
+  destination** - a datamodel path - and **the value is the source**, a
+  path inside `_event.data`. A `capture` of
+  `%{"order.cancel_reason" => "reason"}` on a handler for
+  `order.cancelled` writes that event's `reason` into
+  `order.cancel_reason`.
+
+  One `<assign>` is emitted per pair, on the transition the handler
+  already emits and **before** the `<raise>` that carries the outcome.
+  The pairs are emitted in their datamodel paths' sorted order: a map has
+  no order of its own and a compile has to be deterministic, so the
+  record fixes one rather than leaving the bytes to a map's iteration.
+  A handler whose `capture` is absent or empty writes no `<assign>` at
+  all, which keeps the key additive in exactly the way `cond` is.
+
+  The assigns belong on the transition, and before the raise, for the
+  reason the guard belongs here: the `<raise>` is what tells the
+  enclosing group to abandon or resume, and by the time control is
+  anywhere else that has happened - on `abandon` the body is gone, on
+  `resume` the body is re-entered and history decides where. `_event.data`
+  is in scope only for the transition the event selected, so a
+  `core.assign` placed after the handler is a separate microstep with a
+  different `_event` and the payload is not merely awkward to reach
+  there, it is gone. See ADR-0002's 2026-09-05 note.
+
+  A captured value that quietly is not there is the failure this key has
+  to avoid, because everything downstream would read it as an authored
+  absence. What the interpreter does about that splits on whether the
+  expression's **root** is bound, not on whether the whole path resolves:
+
+    * `_event` is always bound, so a `capture` whose source path is not in
+      the payload writes the interpreter's explicit **unbound marker** and
+      raises nothing. The marker is not `nil` and is not `nil`'s spelling -
+      unbound and null are deliberately different values there - so the
+      absence is one a reader can test for rather than a silent hole. A
+      consumer of a captured path has to make that test; that obligation is
+      the whole of what this key promises today.
+    * A wholly unbound root raises `error.execution` and writes nothing.
+      That is predicator's `on_unbound: :error` policy reaching
+      `Statifier.Interpreter.Content`'s one raise site, and no `capture`
+      compiles to such an expression.
+
+  [Note 2026-09-05, sb-0q0z: this paragraph read "an `<assign>` whose
+  `expr` does not resolve is an execution error", following ADR-0002's
+  capture Note, which was written ahead of the measurement. Measured on
+  two engine versions, the error is raised for an unbound root only, never
+  for a missing member of a bound one. ADR-0002 carries the correction and
+  the cites; the error arriving for this shape too is upstream work, and
+  nothing here may be built on it until that lands.]
+
+  The compile-time half - a `:config` finding for a declared payload that
+  lacks a named source path - is dormant, because nothing in this package
+  declares an event payload's shape; `fixtures/0` below is one sample per
+  event name for a palette panel, not a declaration.
+
+  `config_schema/1` declares **no field** for `capture`. ADR-0002
+  decision 7's field-type set has no member that describes a map, the
+  2026-09-05 note declines to add one, and how an author writes the pairs
+  is ADR-0005's question rather than this module's. So the key is
+  authored through the document today and not through the editor, and the
+  two `<assign>` attributes carry no config attribution for the same
+  reason `core.subchart`'s composed conditions carry none: `expr` is
+  composed here rather than the author's bytes verbatim, and `location`
+  has no declared field for a finding to land on.
   """
 
   @behaviour StatifierBlocks.BlockType
@@ -86,6 +157,20 @@ defmodule StatifierBlocks.Core.OnEvent do
   alias StatifierBlocks.Emission
 
   @outcomes ["abandon", "resume"]
+
+  # A path's shape, in both directions of a `capture` pair: non-empty and
+  # carrying no whitespace, and deliberately NOT a dotted-identifier
+  # grammar. `core.assign` reads the destination side with exactly this
+  # rule and for exactly its reason - this package does not own the
+  # datamodel path grammar, and a regex here that accepted `review.parked`
+  # and refused something a host's datamodel legitimately declares would
+  # be a second, quieter proposal riding along with this one. The source
+  # side is a path inside `_event.data`, which this package owns no more
+  # of than it owns the other.
+  #
+  # Any whitespace, not just the space/tab/newline trio: a carriage
+  # return or a vertical tab is whitespace too.
+  @whitespace ~r/\s/
 
   @impl true
   def current_version, do: 1
@@ -127,6 +212,7 @@ defmodule StatifierBlocks.Core.OnEvent do
     |> check_event(config)
     |> check_cond(config)
     |> check_outcome(config)
+    |> check_capture(config)
     |> Config.verdict()
   end
 
@@ -157,6 +243,41 @@ defmodule StatifierBlocks.Core.OnEvent do
     else
       [{"outcome", ~s(pick "abandon" or "resume")} | findings]
     end
+  end
+
+  # The map is optional, and an empty one is the same as none - it is what
+  # a document that once carried pairs and no longer does looks like.
+  # A single finding is reported for the whole key rather than one per bad
+  # pair, because `capture` has no field in `config_schema/1` to render a
+  # per-pair finding against (see the moduledoc), so the anchor an editor
+  # could use is the key itself.
+  defp check_capture(findings, config) do
+    case Map.get(config, "capture") do
+      nil ->
+        findings
+
+      capture when is_map(capture) ->
+        if Enum.all?(capture, &pair?/1) do
+          findings
+        else
+          [{"capture", capture_message()} | findings]
+        end
+
+      _other ->
+        [{"capture", capture_message()} | findings]
+    end
+  end
+
+  defp pair?({destination, source}), do: path?(destination) and path?(source)
+  defp pair?(_other), do: false
+
+  defp path?(value) do
+    Config.non_empty_string?(value) and not Regex.match?(@whitespace, value)
+  end
+
+  defp capture_message do
+    "must map each datamodel path written, like order.cancel_reason, " <>
+      "to the path inside _event.data it is read from, like reason"
   end
 
   @impl true
@@ -281,6 +402,23 @@ defmodule StatifierBlocks.Core.OnEvent do
   `StatifierBlocks.Emission.attribute_from_config/3` records an owner only
   for an attribute the element actually carries, so an unguarded handler
   records none without this call site testing for it twice.
+
+  ## A capturing handler
+
+  Each `capture` pair becomes one `<assign>` on that same transition,
+  ahead of the `<raise>`:
+
+      <state id="s_INT__armed">
+        <transition event="order.cancelled" target="s_INT__done">
+          <assign expr="_event.data.reason" location="order.cancel_reason"/>
+          <raise event="statifier_blocks.interrupt.abandon"/>
+        </transition>
+      </state>
+
+  The pairs are ordered by their datamodel paths, sorted, so two
+  compiles of one document write one byte sequence. A handler with no
+  `capture` - the key absent, or an empty map - emits the bytes above
+  this section unchanged.
   """
   @impl true
   def emit(%Block{config: config}, context) do
@@ -288,12 +426,13 @@ defmodule StatifierBlocks.Core.OnEvent do
 
     with {:ok, armed} <- Context.role_id(context, "armed"),
          {:ok, outcome} <- outcome_event(Map.get(config, "outcome")),
-         {:ok, event} <- event_name(Map.get(config, "event")) do
+         {:ok, event} <- event_name(Map.get(config, "event")),
+         {:ok, assigns} <- captures(Map.get(config, "capture")) do
       watcher =
         Emit.state(armed, nil, [
           Emit.transition(
             [event: event, cond: guard(config), cond_key: "cond", target: done],
-            [Emission.element("raise", [{"event", outcome}])]
+            assigns ++ [Emission.element("raise", [{"event", outcome}])]
           )
         ])
 
@@ -320,6 +459,37 @@ defmodule StatifierBlocks.Core.OnEvent do
         nil
     end
   end
+
+  # The `<assign>` elements a `capture` map compiles to, in their
+  # datamodel paths' sorted order, or `[]` for a handler that captures
+  # nothing.
+  #
+  # A malformed map answers with a finding rather than dropping the pair.
+  # The Config stage makes that arm unreachable in practice, never
+  # impossible, and a capture silently not emitted is the failure this key
+  # exists to prevent: everything downstream reads an unwritten path as an
+  # authored absence.
+  defp captures(nil), do: {:ok, []}
+
+  defp captures(capture) when is_map(capture) do
+    if Enum.all?(capture, &pair?/1) do
+      assigns =
+        capture
+        |> Enum.sort_by(fn {destination, _source} -> destination end)
+        |> Enum.map(fn {destination, source} ->
+          Emission.element(
+            "assign",
+            [{"expr", "_event.data." <> source}, {"location", destination}]
+          )
+        end)
+
+      {:ok, assigns}
+    else
+      {:error, [{"capture", capture_message()}]}
+    end
+  end
+
+  defp captures(_other), do: {:error, [{"capture", capture_message()}]}
 
   defp outcome_event("abandon"), do: {:ok, Emit.interrupt_events().abandon}
   defp outcome_event("resume"), do: {:ok, Emit.interrupt_events().resume}
