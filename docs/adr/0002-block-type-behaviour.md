@@ -2617,3 +2617,78 @@ ADR-0010 decision 1's refusal of a `core.timeout` is why it stays true.
   is the host's, on the host's own `revision` axis, exactly as decision 8 says.
 
 Filed with `sb-8vkc`, campaign-030's Lane S0.
+
+## Note (2026-09-05): the two Notes above, five corrections to how they read
+
+A dated Note about the two dated Notes above it, not about this record. No
+decision moves: decision 7's closed field-type set, decision 8's migration
+rules, decision 10's vocabulary table and the 2026-08-29 send-id amendment
+are all exactly as they were, no `config_schema/1` changes, no callback is
+added to or removed from the behaviour, and no Status changes. No text above
+this line is edited by this section. Every correction below was raised in
+review against the request that added the Note it concerns and routed to a
+follow-up rather than cured in place, so each merged artifact stayed the
+artifact its review read. Recorded under campaign 030's fill lane D.
+
+**1. Where a proposed rule is written in the flat indicative, read it as
+proposed.** The last bullet of the 2026-09-05 Note on decision 7 and G2a
+reads "No refusal message, example or documentation line in this package
+names the retired spelling" (`:2540-2542`). That is the shape of a rule
+already in force, and it is not one: the rule is ADR-0005's amendment clause
+9d, which is proposed and merged at proposed, and the code bringing the
+package into line with it is its own bead. Read the sentence as what clause
+9d requires once accepted. The bullet's next clause says as much - "that rule
+is ADR-0005's amendment clause 9d" - so this corrects the mood of one
+sentence and nothing else.
+
+**2. The same, for the sentence about decision 7's parenthetical.** The first
+bullet under "The two passages here that clause reaches" ends "and so is the
+reading that its parenthetical names a representative spelling rather than a
+grammar - the representative spelling is simply a different one now"
+(`:2503-2505`). "Now" asserts an effect the amendment that produces it has
+not yet taken. That Note's own opening is the governing sentence - "Until
+then both passages stand exactly as they were written on 2026-08-29"
+(`:2482`) - so read the clause as "the representative spelling is a different
+one once that amendment is accepted". ADR-0005's matching "superseded in one
+clause each" is to be read the same way, and a Note of this date in that
+record says so on its own side.
+
+**3. "Pivot" carries two senses, forty lines apart.** In the first bullet
+under "The two passages here that clause reaches" a pivot is the older
+intermediate form a compile canonicalised through before emitting - the thing
+ADR-0005 clause 9c abolishes (`:2498-2500`). Under "What this Note does not
+do" the same word names the reversal itself: "What the pivot changes is the
+count that phrase presupposes" (`:2523-2524`), and "the wording rule that
+comes with the pivot" (`:2540`). Read the first as the intermediate form and
+the other two as the 2026-09-05 change of grammar. No claim in either
+sentence is affected; the word is doing two jobs and a reader should not have
+to notice that unaided.
+
+**4. G2c's "verbatim" belongs to `event`, not to `delay`.** The restatement
+under "What this Note does not do" says a compiled `core.send`'s `delay`
+attribute "is still written only when there is one, and still never
+attributed verbatim" (`:2528-2531`). G2c itself is stricter: `event` is
+"attributed as the author's verbatim", while `delay` is "written only when
+there is one and never attributed (its bytes are canonicalised)"
+(`:1471-1474`). `delay` is never the stored string at all, verbatim or
+otherwise, so the trailing qualifier reads as though some non-verbatim
+attribution of the stored string were the thing left standing. Read the
+restatement as "still never the stored string". G2c's own sentence is
+unchanged, and what ADR-0005 clause 9c moves is only the mechanism between
+the stored string and the attribute - the middle canonical form goes and the
+normalised duration renders straight - which leaves G2c's claim true on both
+sides of it.
+
+**5. "The other thirteen shipped types stay absent" is shorthand.** The Note
+on decision 8 above says decision 8's "absent means the type has never
+changed its config shape" is unchanged, "and the other thirteen shipped types
+stay absent" (`:2615`). Read "absent" there as "has no migration of its own",
+which is what the sentence is about. Read literally as "exports no
+`migrate_config/2`" it is untrue of one of the thirteen: `core.placeholder`
+is the single shipped type that `use`s the behaviour
+(`lib/statifier_blocks/core/placeholder.ex:56`) and so carries the
+`__using__` default (`lib/statifier_blocks/block_type.ex:124-130`), which
+exports the callback and refuses. The paragraph above that bullet, in the
+same Note, has this exactly right; only the shorthand is loose.
+
+Filed with `sb-a9r8`, campaign-030's fill lane D.

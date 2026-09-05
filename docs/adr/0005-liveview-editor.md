@@ -6132,3 +6132,156 @@ taught to anyone.
   option and no callback about it.
 
 Filed with `sb-8vkc`, campaign-030's Lane S0.
+
+## Note (2026-09-05): the 2026-09-05 decision-9 amendment, seven corrections to its record apparatus
+
+A dated Note about the 2026-09-05 amendment to decision 9 above and about the
+2026-09-05 Note at the end of this record. Nothing either decides moves: `9a`
+still admits one grammar, `9b`'s falsified premise is still falsified, `9c`
+still abolishes the middle form, `9d` still governs what this package's prose
+may name, `9e` still leaves the grammar to `Predicator.Duration`, and the
+second exception the closing Note adds is unrevised. No text above this line
+is edited by this section. Every correction was raised in review against the
+request that added the section it concerns and routed to a follow-up rather
+than cured in place, so each merged artifact stayed the artifact its review
+read. Recorded under campaign 030's fill lane D; it merges at proposed under
+the campaign invariant, and flipping it to accepted is a separate gated
+request.
+
+### 1. The amendment's own status line, completed
+
+That amendment's status line reads "**Status: proposed (2026-09-05, campaign
+029 Lane A, bead `sb-8acm`).**" (`:5476`). Every 2026-09-05 section around it
+carries a second sentence it omits - that a decision record merges at proposed
+under the campaign invariant, and that flipping it to accepted is a separate
+gated request. The three nearest are the campaign-029 Lane G sections above
+it, which name that same campaign's invariant (`:4897-4899`, `:5109-5111`,
+`:5339-5341`); the three campaign-030 sections below it say the same of
+campaign 030's (`:5612-5614`, `:5838-5840`, `:5992-5994`). The omission is in
+the line, not in the fact: that amendment merged at proposed like every one of
+them, and accepting it is a separate gated request. Read the missing sentence
+into it.
+
+### 2. Where the older spelling actually survives
+
+Two passages under-count, in two different ways, and both are worth a line
+because the sweep is the whole argument for `9b`.
+
+**The sweep paragraph's stated shape.** It lists "the prose of these records,
+the moduledocs and refusal messages of the modules that implement the
+control, a plan document, and this package's own test corpus throughout"
+(`:5499-5506`). Two places the sweep reached are not in that list:
+`CHANGELOG.md`, and the `spike/` tree. In the spike the older spelling is
+named in `spike/README.md`, in five files under `spike/js/`, in a comment in
+`spike/css/editor.css`, in `spike/dev/selftest.html`, and in one prose line
+inside `spike/fixtures/documents/card-processing.json:15`. It is worth being
+exact about that last one: the spelling is named there in a comment string,
+and no spike fixture *authors* a duration in it - `card-processing.json`
+writes its deadline as `15m`. Neither omission weakens the finding, because
+what the sweep concludes is that no *author-written* document holds the
+spelling, and a changelog entry and a laboratory are as much this package's
+own as a fixture is. What a stated shape omitting two of the places searched
+costs is a later reader's confidence that they were counted rather than
+missed.
+
+**Clause 9d's exception count, and what "the whole package" denotes.** `9d`
+as written says there is "exactly one exception in the whole package: a
+single migration line in the release changelog" (`:5557-5560`). The
+2026-09-05 Note at the end of this record already revises that count, from one
+exception to two - the changelog's migration line, and the private recogniser
+together with its own test file, which is two exceptions spanning three files
+(`:6077-6094`). What no section has yet said is that the revised count is
+still short, and by how much.
+
+`CHANGELOG.md` names the older spelling in more than the migration line.
+Three bullets of the accepted `0.3.0` entry name it as shipped behaviour of
+that day (`CHANGELOG.md:1143-1146`, `:1147-1151`, `:1152-1154`). They are
+history rather than instruction, they stay exactly as written, and no bead
+migrates them. The `spike/` tree names it in the places listed above, and
+nothing migrates those either. That directory opens "Status: exploratory. This
+is a laboratory, not the product" and rules that where it and an accepted
+record disagree the record is the contract (`spike/README.md:1-26`), which is
+why no bead has been filed to bring it into line. Whether that makes the spike
+an exception to `9d` or text `9d` was never written to reach is a question this
+Note leaves open, exactly as it leaves the changelog bullets open below.
+
+**This corrects a count and declines to re-scope the rule.** `9d`'s own words
+bind what this package's prose *names*: no refusal message, on-screen example,
+field hint, test name or line of documentation, with the exceptions the record
+and its closing Note enumerate. Nothing here narrows that: the whole
+repository is still in scope, `test/` and `docs/` emphatically included - the
+closing Note's own second exception covers a test file, which would be
+incoherent otherwise. What is corrected is the arithmetic of the phrase
+"exactly one exception in the whole package", which was already false when it
+was written and is corrected here rather than defended. Whether the released
+changelog bullets and the spike are best recorded as further exceptions, or as
+text the rule was never written to reach, is a question for whoever next amends
+`9d`; this Note deliberately does not answer it, because answering it would be
+a decision and this is a correction. No message, hint or example gains
+permission here either way.
+
+### 3. `9b`'s "every other bullet" is wider than it means
+
+`9b` closes: "Every other bullet of that amendment stands, including that
+empty means the key is omitted, that the stored form is the author's string
+verbatim, and that format is validated inline before the document gate."
+(`:5529-5532`). The 2026-08-29 amendment's Decision is five bullets
+(`:1864-1882`) followed by three standalone bold paragraphs (`:1884`,
+`:1887`, `:1892`). Two of the three things `9b` names are bullets; the
+stored-form clause is one of the standalone paragraphs. Read the sentence
+with the wider referent it needs - every other clause of that amendment's
+Decision - and then with the one exclusion that wider referent forces: the
+emit-time paragraph at `:1887-1890`, which has a compile canonicalise through
+the middle form before emitting, does **not** stand, because `9c` is exactly
+its reversal. The three clauses `9b` names are unaffected, and so is every
+clause not named here.
+
+### 4. One fact, two tenses
+
+The amendment's Consequences say ADR-0002 decision 7's cross-reference and
+the `core.send` row's G2a "are superseded in one clause each by a dated Note
+of this date in that record" (`:5590-5594`), while that Note says both
+passages "stand exactly as they were written on 2026-08-29" until this
+amendment is accepted. The two sentences describe one fact from opposite
+sides of the same acceptance. The Note's is the governing one, because the
+supersession is by reference and a reference to a proposed section does not
+take effect before that section does. Read the Consequences bullet as "are
+superseded, on this amendment's acceptance, in one clause each".
+
+### 5. `sb-b05e`'s request landed; its amendment is proposed
+
+The last Consequences bullet says "`sb-b05e` has recorded it" and that "its
+amendment has landed" (`:5599-5601`). The request merged; the section it
+merged carries **Status: proposed**
+(`docs/adr/0006-datamodel-document.md:455`), and accepting it is a separate
+change on its own gate. Read "has landed" as "has merged, at proposed" - the
+same reading every 2026-09-05 section in this family gets, this one included.
+
+### Two readings the sections below ask for
+
+Raised against the request that filed them and left unedited there for the
+same reason:
+
+- **"It runs at open" names the occasion, not an exclusive one.** The
+  closing Note's title and its heading sentence (`:6057`) say "at open"
+  because that is the occasion an author meets. The migration runs wherever
+  `Palette.resolve/2` runs, which in `lib/` is ten call sites across seven
+modules, and in `test/` is nineteen more across seven files: the
+  compiler (`lib/statifier_blocks/compiler.ex:361`), the view model
+  (`lib/statifier_blocks/view_model.ex:772`, `:826`, `:879`), slot validation
+  (`lib/statifier_blocks/slot_validation.ex:78`), assignability
+  (`lib/statifier_blocks/assignability.ex:384`, `:566`), the edit path
+  (`lib/statifier_blocks/edit.ex:219`,
+  `lib/statifier_blocks/edit/targets.ex:267`) and the datamodel walk
+  (`lib/statifier_blocks/datamodel.ex:655`). That Note claims no exclusivity
+  and nothing it says is wrong; this bullet exists so a reader does not infer
+  one.
+- **"Walks the document once more" is the same walk, not an extra one.**
+  Clause 11o says `build/3` "walks the document once more, counting blocks
+  per `type_name`" (`:5909`), and a Consequences bullet below it says "No
+  second traversal, and nothing here depends on the compiler having run"
+  (`:5975-5977`). The bullet is the operative one: the counting happens
+  inside the traversal `build/3` already makes. Read 11o's phrase as "counts
+  as it walks", not as a second pass.
+
+Filed with `sb-a9r8`, campaign-030's fill lane D.
