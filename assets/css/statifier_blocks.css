@@ -3287,27 +3287,85 @@ button.sb-inspector__group-row:hover {
   font-size: var(--sb-text-xs);
 }
 
-/* The bar and the tab strip wrap; a tab does not. A tab's label and its count
- * are one thing to read - "Truth tables (3)" - and the default `white-space:
- * normal` let the count fall under the label the moment the bar ran out of
- * room. At 640 that turned every tab into a three-line stack and the bar from
- * 30px to 72px, which is the tallest the bar has ever been on the narrowest
- * viewport it supports. Wrapping is the right response to a narrow bar; it
- * just belongs to the row of tabs and not to the words inside one, so the
- * overflow moves outward - a second row of whole tabs - instead of inward. */
+/* Nothing in the bar wraps: not the bar, not the strip, and not a tab. A
+ * tab's label and its count are one thing to read - "Truth tables (3)" - and
+ * the default `white-space: normal` used to let the count fall under the
+ * label the moment the bar ran out of room, which is what `nowrap` on the tab
+ * below fixes and what has to keep holding.
+ *
+ * Wrapping the row of tabs instead was the obvious next answer and it is the
+ * wrong one, because the bar is a fixed row of chrome above a panel rather
+ * than a paragraph: six tabs plus the height slider and the collapse control
+ * want 802px, a 640-wide editor gives the bar 590px, and a second row of
+ * whole tabs took it from 30px to 59px. A bar that grows a row when a tab is
+ * added is a bar that eats the panel it labels.
+ *
+ * So the overflow moves sideways instead of downward: the strip is the one
+ * item in the bar that may shrink (`min-width: 0` is what lets a flex item go
+ * under its content), and what does not fit scrolls. The height stops
+ * depending on how many tabs there are, which is the whole point - one row at
+ * every width, six tabs or two.
+ *
+ * The scrollbar is hidden on purpose. A classic (non-overlay) horizontal
+ * scrollbar is around 15px of chrome inside the strip, which would put the
+ * height right back where wrapping had it on exactly the platforms that have
+ * one - the height would then depend on whose machine the editor is open on,
+ * which is worse than depending on the tab count. The fade below is what
+ * carries the affordance in its place, and a wheel or a trackpad scrolls the
+ * strip either way.
+ *
+ * A keyboard reaches a tab the strip is not showing exactly as well as it did
+ * before, which is to say through the panel rather than through the strip:
+ * the tablist is one roving Tab stop and this package listens for no keys, so
+ * the tabs past the active one were never focusable, wrapped or scrolled.
+ * Nothing here narrows that and nothing here widens it. */
 .sb-drawer__bar {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--sb-space);
   border-bottom: var(--sb-border-width) solid var(--sb-border);
   padding: var(--sb-space-half) var(--sb-space);
 }
 
+/* The fade says the strip is clipped, and says it only where it is clipped -
+ * with no JavaScript, because decision 7 ships exactly one hook and this is
+ * not it.
+ *
+ * Four background layers, in two pairs. The outer pair is a hard edge in the
+ * drawer's own ground, positioned at the two ends of the SCROLLED CONTENT
+ * (`local`); the inner pair is the fade, positioned at the two ends of the
+ * VISIBLE BOX (`scroll`). At rest the content's left end sits on the box's
+ * left end, so the ground layer covers the fade exactly and there is nothing
+ * to see; scroll right and the content's cover travels out of the box, which
+ * uncovers the fade it was hiding. The affordance appears and disappears with
+ * the clipping itself, in both directions, and no rule had to measure
+ * anything to decide that.
+ *
+ * The layers paint behind the tabs rather than over them, so this softens the
+ * edge without ever dimming a label - a selected tab at the end of the strip
+ * stays as legible as one in the middle. */
 .sb-drawer__tabs {
   display: flex;
-  flex-wrap: wrap;
+  min-width: 0;
+  flex-wrap: nowrap;
   gap: var(--sb-space);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  background:
+    linear-gradient(to right, var(--sb-bg), transparent) left center / var(--sb-space-3) 100%
+      no-repeat local,
+    linear-gradient(to left, var(--sb-bg), transparent) right center / var(--sb-space-3) 100%
+      no-repeat local,
+    linear-gradient(to right, var(--sb-border), transparent) left center / var(--sb-space-2) 100%
+      no-repeat scroll,
+    linear-gradient(to left, var(--sb-border), transparent) right center / var(--sb-space-2) 100%
+      no-repeat scroll;
+}
+
+.sb-drawer__tabs::-webkit-scrollbar {
+  display: none;
 }
 
 /* Two tabs since R4, so which one is selected has to be legible rather than
@@ -3330,8 +3388,14 @@ button.sb-inspector__group-row:hover {
   font-weight: var(--sb-weight-medium);
 }
 
+/* The two controls at the end of the bar hold their size while the strip
+ * beside them gives. Flex shrinks every item that will, in proportion to what
+ * it asked for, so without this the slider narrows a little before the strip
+ * has scrolled a single pixel - and the strip is the item the overflow is
+ * supposed to land on. */
 .sb-drawer__resize {
   margin-left: auto;
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--sb-space-half);
@@ -3345,6 +3409,7 @@ button.sb-inspector__group-row:hover {
 .sb-drawer__close {
   font: inherit;
   cursor: pointer;
+  flex: none;
 }
 
 /* The remembered height, rebound inline per drawer by the resize command. */
