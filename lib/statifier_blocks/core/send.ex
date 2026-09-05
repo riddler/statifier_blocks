@@ -75,17 +75,17 @@ defmodule StatifierBlocks.Core.Send do
   ## The delay's stored form
 
   `delay` is the vocabulary's first optional duration, and "no delay" is
-  neither `PT0S` nor an unfinished field - an absent or empty `delay` emits
-  no `delay` attribute at all, so the event goes out now.
+  neither a zero duration nor an unfinished field - an absent or empty
+  `delay` emits no `delay` attribute at all, so the event goes out now.
 
-  A present `delay` may be stored in **either** spelling: ISO-8601
-  (`PT2H`), or a predicator duration string (`1h30m`, `2d`, `3d8h`). That
-  two-spelling stored form is campaign 014's D4 proposal, filed as
-  `sb-709` and implemented in the spike's duration control; it is a
-  **recorded proposal**, not a ruling, and ADR-0002 decision 7's
-  `:duration` field type is unchanged. `StatifierBlocks.Core.Duration` is
-  where the compile lives and where the grammar's one home - predicator's
-  own lexer - is read rather than mirrored.
+  A present `delay` is stored in one spelling: the duration string the
+  expression language reads (`30s`, `1h30m`, `2d`, `3d8h`). That is
+  ADR-0005 decision 9 as amended 2026-09-05 (clause 9a, one grammar), and
+  ADR-0002 decision 7's `:duration` field type is unchanged - it still
+  holds a string, and what changed is which strings.
+  `StatifierBlocks.Core.Duration` is where the compile lives and where the
+  grammar's one home - predicator's own lexer - is read rather than
+  mirrored.
   """
 
   @behaviour StatifierBlocks.BlockType
@@ -96,7 +96,7 @@ defmodule StatifierBlocks.Core.Send do
   alias StatifierBlocks.Emission
 
   @event_message "must be an event name, like signup.abandoned"
-  @delay_message "must be a duration - 1h30m, 2d or PT2H - or empty to send now"
+  @delay_message "must be a duration like 30s or 1h30m - or empty to send now"
 
   @impl true
   def current_version, do: 1
@@ -238,11 +238,11 @@ defmodule StatifierBlocks.Core.Send do
 
   ADR-0004 decision 9's annotation is for an attribute whose value is the
   author's **verbatim**. `event` is: those bytes came out of the config
-  unchanged. The `delay` attribute's bytes did not - a stored `PT2H`
-  emits as `2h`, and a stored `1h30m` is canonicalised through ISO-8601
-  before it is rendered - so annotating it would point a runtime finding
-  at a span the author never typed. `core.wait` leaves its own `delay`
-  unannotated for the same reason.
+  unchanged. The `delay` attribute's bytes did not - the stored string is
+  parsed and rendered from the normalised value, so a stored `3h2h` emits
+  as `5h` - and annotating it would point a runtime finding at a span the
+  author never typed. `core.wait` leaves its own `delay` unannotated for
+  the same reason.
 
   ## The `id`, and the half of the cancel that is not here
 
@@ -290,9 +290,9 @@ defmodule StatifierBlocks.Core.Send do
   end
 
   # `nil` here means "write no attribute", which is what an absent or
-  # empty `delay` compiles to. Anything else is canonicalised to ISO-8601
-  # (D4's compile step, an identity for a value already stored that way)
-  # and then rendered as the shorthand `Statifier.Duration` reads.
+  # empty `delay` compiles to. Anything else is parsed to the expression
+  # language's normalised duration and rendered from it as the attribute
+  # `Statifier.Duration` reads.
   @spec delay(Block.config()) :: {:ok, String.t() | nil} | {:error, [{String.t(), String.t()}]}
   defp delay(config) do
     case Map.fetch(config, "delay") do
@@ -303,8 +303,8 @@ defmodule StatifierBlocks.Core.Send do
   end
 
   defp compiled(value) do
-    case Duration.to_iso(value) do
-      {:ok, iso} -> {:ok, Duration.to_delay(iso)}
+    case Duration.parse(value) do
+      {:ok, parsed} -> {:ok, Duration.to_delay(parsed)}
       :error -> {:error, [{"delay", @delay_message}]}
     end
   end

@@ -502,17 +502,17 @@ defmodule StatifierBlocks.Compiler.FindingsTest do
     end
 
     # Sabotage: annotated `delay` with `attribute_from_config/3` in
-    # `Core.Wait.emit/2` - red, because the canonicalised delay then
-    # claims to be the author's own bytes, and an offset into it would be
-    # an offset into a duration this package rewrote.
-    test "an attribute whose bytes were canonicalised is not annotated at all" do
+    # `Core.Wait.emit/2` - red, because the normalised delay then claims
+    # to be the author's own bytes, and an offset into it would be an
+    # offset into a duration this package rewrote.
+    test "an attribute whose bytes were normalised is not annotated at all" do
       waiting =
         Document.new(
           Block.new("core.sequence",
             id: "blk_ROOT",
             slots: %{
               "body" => [
-                Block.new("core.wait", id: "blk_WAIT", config: %{"duration" => "PT1H30M"})
+                Block.new("core.wait", id: "blk_WAIT", config: %{"duration" => "30m1h"})
               ]
             }
           ),
@@ -521,13 +521,13 @@ defmodule StatifierBlocks.Compiler.FindingsTest do
 
       assert {:ok, compiled} = Compiler.compile(waiting, palette())
 
-      # The author stored `PT1H30M`; the document carries the shorthand
-      # `Statifier.Duration` reads, which is the whole reason decision 9
-      # attributes only verbatim attributes.
+      # The author stored `30m1h`; the document carries the normalised
+      # `1h30m`, which is the whole reason decision 9 attributes only
+      # verbatim attributes.
       assert {delay_start, _length} = :binary.match(compiled.scxml, ~s(delay="))
       value_offset = delay_start + byte_size(~s(delay="))
 
-      refute compiled.scxml =~ "PT1H30M"
+      refute compiled.scxml =~ "30m1h"
       assert {:ok, owner} = Provenance.owner_at(compiled.provenance, value_offset)
       assert owner.block_id == "blk_WAIT"
       assert owner.config_key == nil

@@ -14,15 +14,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `:boolean` | checkbox |
     | `{:select, choices}` | select, choices in declared order |
     | `:expression` | statifier-ui's expression editor when that package is present, else a single-line source input |
-    | `:duration` | one text control; predicator duration strings primary, with on-screen examples |
+    | `:duration` | one text control; duration strings the expression language reads, with on-screen examples |
     | `{:list, t}` | repeatable rows of `t`'s renderer, with add and remove |
 
-    `:duration`'s row is decision 9 as amended 2026-08-29. One text control,
-    not a value/unit pair and not a pair with an escape hatch beside it: the
-    compound control could not spell `PT1H30M` at all, and a control plus an
-    escape hatch is two ways to say one thing with a rule about which wins.
-    Predicator duration strings are primary with the examples on screen,
-    ISO-8601 stays accepted, and an empty field omits the key.
+    `:duration`'s row is decision 9 as amended 2026-08-29 and again
+    2026-09-05 (clause 9a, one grammar). One text control, not a value/unit
+    pair and not a pair with an escape hatch beside it: the compound control
+    could not spell a compound duration at all, and a control plus an escape
+    hatch is two ways to say one thing with a rule about which wins. The
+    field reads one grammar, the examples are on screen, and an empty field
+    omits the key.
 
     What the typed text means is `StatifierBlocks.DurationInput`'s, not this
     module's - it is a function of the text alone, so it is asserted with
@@ -33,8 +34,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     The refusal shown beneath a `:duration` is the **inline** check, and it
     is earlier than decision 9's gate rather than a second one: the gate
     still decides what reaches the document, and the inline sentence tells
-    the author which spelling they are failing while they are still typing
-    it. Nothing here is stored - the stored form is the author's string
+    the author the text is not a duration while they are still typing it.
+    The sentence names what is accepted and nothing else, which is clause
+    9d. Nothing here is stored - the stored form is the author's string
     verbatim, byte for byte.
 
     A required field is marked with the **word**, not with an asterisk
@@ -423,7 +425,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         aria-describedby={@examples_id}
       />
       <p class="sb-field__examples" id={@examples_id}>
-        Try {Enum.join(DurationInput.examples(), ", ")}, or ISO-8601 like PT1H30M.
+        Try {Enum.join(DurationInput.examples(), ", ")}.
       </p>
       <p :if={@reading.form == :invalid} class="sb-field__refusal" data-duration-refusal>
         {@reading.message}

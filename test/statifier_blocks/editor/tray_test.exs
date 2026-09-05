@@ -19,7 +19,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     alias StatifierBlocks.{Assignability, Block, Document, Palette, ViewModel}
 
-    defp step(id, duration \\ "PT1H"),
+    defp step(id, duration \\ "1h"),
       do: Block.new("core.wait", id: id, config: %{"duration" => duration})
 
     defp shelf(children),
@@ -28,7 +28,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # Two leaf fragments, so a shelf document and a shelf-free one produce
     # exactly the same edge set under the same measurement. A container
     # fragment is the subject of its own test below.
-    defp fragments, do: [step("blk_F1", "PT9H"), step("blk_F2", "PT3H")]
+    defp fragments, do: [step("blk_F1", "9h"), step("blk_F2", "3h")]
 
     defp document(body) do
       Document.new(Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => body}),

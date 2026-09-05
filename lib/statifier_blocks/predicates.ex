@@ -34,18 +34,17 @@ defmodule StatifierBlocks.Predicates do
   | `{:binding, path, reason}` | a binding's source text did not produce a value; `reason` is one of the tags above |
   | `{:binding_conflict, path}` | two dotted paths cannot both be nested - `"transaction"` and `"transaction.amount"` bound together, or a duplicate |
 
-  ## Durations are `15m`, not `PT15M`
+  ## Durations are spelled one way here, and it is the same way as in config
 
-  Block *config* stores whichever spelling the author typed, and the
-  primary one is the predicator string (`"15m"`, see
-  `StatifierBlocks.Core.Wait`); ISO-8601 stays accepted there. A binding's
-  source text here is predicator source, not config, and predicator's
-  duration literal is `15m` / `1h30m` - its own lexer grammar, unrelated to
-  ISO-8601. So the two agree on the spelling an author reaches for, but
-  only one of them accepts the other: writing `"PT15M"` as a binding does
-  not raise; it parses as a bare identifier and fails with
-  `{:undefined_variable, "PT15M", _}`, which reads like a bug if this is
-  not known going in.
+  Block *config* stores the duration string the author typed (`"15m"`, see
+  `StatifierBlocks.Core.Wait`), and a binding's source text here is
+  predicator source rather than config - but the duration literal in that
+  source is `15m` / `1h30m` too, out of the same lexer grammar. So a value
+  a `:duration` field would accept is a value a binding reads the same
+  way, and there is no second spelling either side has to be taught. What
+  is *not* a duration in either place fails in the ordinary way: a bare
+  token that names nothing parses as an identifier and fails with
+  `{:undefined_variable, _, _}`.
 
   See `StatifierBlocks.Predicates.TruthTable` for the truth-table builder
   that composes `evaluate/2` and `context/1` over an ordered set of branch

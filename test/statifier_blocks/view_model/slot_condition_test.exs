@@ -198,7 +198,7 @@ defmodule StatifierBlocks.ViewModel.SlotConditionTest do
           Block.new("toy.absent",
             id: "blk_absent",
             slots: %{
-              "after" => [Block.new("core.wait", id: "blk_w", config: %{"duration" => "PT1S"})]
+              "after" => [Block.new("core.wait", id: "blk_w", config: %{"duration" => "1s"})]
             }
           )
         )

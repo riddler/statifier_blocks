@@ -13,7 +13,7 @@ defmodule StatifierBlocks.ShelfTest do
   defp shelf(id, children \\ []),
     do: Block.new("core.drafts", id: id, slots: %{"body" => children})
 
-  defp step(id), do: Block.new("core.wait", id: id, config: %{"duration" => "PT1H"})
+  defp step(id), do: Block.new("core.wait", id: id, config: %{"duration" => "1h"})
 
   defp document(body) do
     Document.new(Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => body}),

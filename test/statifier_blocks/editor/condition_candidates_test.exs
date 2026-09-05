@@ -31,7 +31,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           id: "blk_route",
           config: %{"arms" => [%{"slot" => "arm_beta", "cond" => "signup.step == 2"}]},
           slots: %{
-            "arm_beta" => [EditorFixtures.wait("blk_beta_step", "PT5M")],
+            "arm_beta" => [EditorFixtures.wait("blk_beta_step", "5m")],
             "otherwise" => []
           }
         ),
@@ -283,7 +283,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               id: "blk_route",
               config: %{"arms" => [%{"slot" => "arm_beta", "cond" => "signup.step == 'details'"}]},
               slots: %{
-                "arm_beta" => [EditorFixtures.wait("blk_beta_step", "PT5M")],
+                "arm_beta" => [EditorFixtures.wait("blk_beta_step", "5m")],
                 "otherwise" => []
               }
             ),

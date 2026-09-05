@@ -121,6 +121,13 @@ defmodule StatifierBlocks.Predicates.Datamodel do
   ADR-0006 decision 4's closed type set. No floats anywhere: money is
   integer minor units, and a `decimal`, a `datetime` and a `duration` are
   all carried as strings (ADR-0001 decision 6).
+
+  A `duration` value - and the `example` beside it - is a duration string
+  the expression language reads, `30s` or `1h30m`, the same string an
+  author types into the `:duration` field this record's paths feed. That
+  is decision 4 as amended 2026-09-05 (clauses 4a and 4d). Which strings
+  parse is `Predicator.Duration`'s to define; this module stores whatever
+  the document holds and parses none of it.
   """
   @type type ::
           :string | :integer | :decimal | :boolean | :datetime | :duration | :object | :list

@@ -82,7 +82,7 @@ defmodule StatifierBlocks.EditorFixtures do
     )
   end
 
-  @doc "A `core.wait` with a valid ISO-8601 duration."
+  @doc "A `core.wait` with a valid duration."
   @spec wait(Block.id(), String.t()) :: Block.t()
   def wait(id, duration) do
     Block.new("core.wait", id: id, config: %{"duration" => duration})

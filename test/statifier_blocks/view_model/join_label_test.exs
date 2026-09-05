@@ -44,7 +44,7 @@ defmodule StatifierBlocks.ViewModel.JoinLabelTest do
   end
 
   defp parallel(id, config) do
-    lane = Block.new("core.wait", id: id <> "_L", config: %{"duration" => "PT1S"})
+    lane = Block.new("core.wait", id: id <> "_L", config: %{"duration" => "1s"})
     Block.new("core.parallel", id: id, config: config, slots: %{"lane_started" => [lane]})
   end
 
@@ -80,7 +80,7 @@ defmodule StatifierBlocks.ViewModel.JoinLabelTest do
     # entry that declares nothing - every block in every document grows a
     # marker, which is this package inventing semantics it does not own.
     test "a core type with no join_label declaration is nil" do
-      node = node_for(Block.new("core.wait", id: "blk_W", config: %{"duration" => "PT1S"}))
+      node = node_for(Block.new("core.wait", id: "blk_W", config: %{"duration" => "1s"}))
 
       assert node.join_label == nil
     end

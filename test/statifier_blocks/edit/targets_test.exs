@@ -148,14 +148,14 @@ defmodule StatifierBlocks.Edit.TargetsTest do
     test "an undeclared slot key present in the document is not offered" do
       palette = core_palette()
 
-      bogus_child = signup_step("core.wait", "blk_BOGUS_CHILD", config: %{"duration" => "PT1S"})
+      bogus_child = signup_step("core.wait", "blk_BOGUS_CHILD", config: %{"duration" => "1s"})
 
       # `core.wait` declares no slots (`slots/1` returns `[]`), but the
       # document is free to carry a stray `"bogus"` key anyway - decoding
       # never consults the registry (ADR-0001 decision 9).
       wait_with_bogus_slot =
         signup_step("core.wait", "blk_WAI",
-          config: %{"duration" => "PT1S"},
+          config: %{"duration" => "1s"},
           slots: %{"bogus" => [bogus_child]}
         )
 
@@ -164,7 +164,7 @@ defmodule StatifierBlocks.Edit.TargetsTest do
 
       document = Document.new(root, id: "bdoc_R1_UNDECLARED")
 
-      candidate = signup_step("core.wait", "blk_NEW", config: %{"duration" => "PT1S"})
+      candidate = signup_step("core.wait", "blk_NEW", config: %{"duration" => "1s"})
 
       result = Targets.droppable_slots_for(document, palette, candidate)
 
@@ -181,7 +181,7 @@ defmodule StatifierBlocks.Edit.TargetsTest do
       root = Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [unresolvable]})
       document = Document.new(root, id: "bdoc_R1_UNRESOLVABLE")
 
-      candidate = signup_step("core.wait", "blk_NEW", config: %{"duration" => "PT1S"})
+      candidate = signup_step("core.wait", "blk_NEW", config: %{"duration" => "1s"})
 
       result = Targets.droppable_slots_for(document, palette, candidate)
 
@@ -212,7 +212,7 @@ defmodule StatifierBlocks.Edit.TargetsTest do
           config: %{"event" => "custom_interrupt", "outcome" => "abandon"}
         )
 
-      step = signup_step("core.wait", "blk_STEP", config: %{"duration" => "PT1S"})
+      step = signup_step("core.wait", "blk_STEP", config: %{"duration" => "1s"})
 
       handler_targets = Targets.droppable_slots_for(document, palette, handler)
       step_targets = Targets.droppable_slots_for(document, palette, step)
@@ -237,7 +237,7 @@ defmodule StatifierBlocks.Edit.TargetsTest do
     test "an occupied exactly_one slot is not offered; an empty one is" do
       palette = Palette.new(Map.merge(Palette.core_types(), %{"signup.spotlight" => Spotlight}))
 
-      occupant = signup_step("core.wait", "blk_OCCUPANT", config: %{"duration" => "PT1S"})
+      occupant = signup_step("core.wait", "blk_OCCUPANT", config: %{"duration" => "1s"})
 
       gate_full =
         Block.new("signup.spotlight", id: "blk_GATE_FULL", slots: %{"highlight" => [occupant]})
@@ -249,7 +249,7 @@ defmodule StatifierBlocks.Edit.TargetsTest do
 
       document = Document.new(root, id: "bdoc_R3")
 
-      candidate = signup_step("core.wait", "blk_NEW", config: %{"duration" => "PT1S"})
+      candidate = signup_step("core.wait", "blk_NEW", config: %{"duration" => "1s"})
 
       result = Targets.droppable_slots_for(document, palette, candidate)
 
@@ -270,7 +270,7 @@ defmodule StatifierBlocks.Edit.TargetsTest do
     test "dragging a group with children offers no slot on it or any descendant" do
       palette = core_palette()
 
-      leaf = signup_step("core.wait", "blk_LEAF", config: %{"duration" => "PT1S"})
+      leaf = signup_step("core.wait", "blk_LEAF", config: %{"duration" => "1s"})
       mid = Block.new("core.group", id: "blk_MID", slots: %{"body" => [leaf]})
       outer = Block.new("core.group", id: "blk_OUTER", slots: %{"body" => [mid]})
       root = Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [outer]})
@@ -352,13 +352,13 @@ defmodule StatifierBlocks.Edit.TargetsTest do
     test "on a fresh palette block returns the same slots as the id form does for an equivalent block already in the tree" do
       palette = core_palette()
 
-      in_tree = signup_step("core.wait", "blk_X", config: %{"duration" => "PT1S"})
+      in_tree = signup_step("core.wait", "blk_X", config: %{"duration" => "1s"})
       root = Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [in_tree]})
       document = Document.new(root, id: "bdoc_EQUIV")
 
       by_id = Targets.droppable_slots(document, palette, "blk_X")
 
-      fresh = signup_step("core.wait", "blk_FRESH", config: %{"duration" => "PT1S"})
+      fresh = signup_step("core.wait", "blk_FRESH", config: %{"duration" => "1s"})
       by_fresh = Targets.droppable_slots_for(document, palette, fresh)
 
       assert MapSet.new(by_id) == MapSet.new(by_fresh)
@@ -374,7 +374,7 @@ defmodule StatifierBlocks.Edit.TargetsTest do
     test "the document root is answerable and offers no slot" do
       palette = core_palette()
 
-      leaf = signup_step("core.wait", "blk_LEAF", config: %{"duration" => "PT1S"})
+      leaf = signup_step("core.wait", "blk_LEAF", config: %{"duration" => "1s"})
       root = Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [leaf]})
       document = Document.new(root, id: "bdoc_ROOT_DRAG")
 

@@ -410,7 +410,7 @@ defmodule StatifierBlocks.Core.SubchartTest do
       slots: %{
         "body" => [
           subchart(nudge: true, park: true),
-          Block.new("core.wait", id: "blk_CNV", config: %{"duration" => "PT48H"})
+          Block.new("core.wait", id: "blk_CNV", config: %{"duration" => "48h"})
         ]
       }
     )

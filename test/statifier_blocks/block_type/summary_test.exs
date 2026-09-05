@@ -331,7 +331,7 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
     # beside it says the key is required.
     test "core.wait says timer and the stored duration" do
       assert Wait.summary(%{"duration" => "30s"}) == "timer 30s"
-      assert Wait.summary(%{"duration" => "PT1H30M"}) == "timer PT1H30M"
+      assert Wait.summary(%{"duration" => "30m1h"}) == "timer 30m1h"
       assert Wait.summary(%{}) == nil
       assert Wait.summary(%{"duration" => "  "}) == nil
       assert Wait.summary(%{"duration" => 30}) == nil

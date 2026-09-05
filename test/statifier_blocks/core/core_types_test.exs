@@ -13,6 +13,7 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
 
   alias StatifierBlocks.BlockType
   alias StatifierBlocks.Core
+  alias StatifierBlocks.CoreFixtures
   alias StatifierBlocks.Palette
 
   describe "Palette.core/0 and core_types/0" do
@@ -106,41 +107,42 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
 
   describe "core.wait" do
     # `"48h"` was pinned as INVALID here until ADR-0005's 2026-08-29
-    # `:duration` amendment; the assertion is reversed deliberately, not
-    # relaxed - see `sb-ag6`. Everything the amendment does not name is
-    # refused exactly as before.
+    # `:duration` amendment, and the calendar spelling was accepted here
+    # until that decision's 2026-09-05 amendment (clause 9a, one grammar)
+    # retired it. Both assertions are reversed deliberately, not relaxed -
+    # see `sb-ag6` and `sb-4r1p`. A sub-second value is now accepted for
+    # the same reason: it is what the one grammar reads.
     #
-    # sabotage: had `validate_config/1` call `Config.duration?/1` again
-    # instead of `Duration.duration?/1` - red on every predicator string.
-    test "accepts both stored spellings and rejects everything else" do
-      for good <- ["1h30m", "2d", "3d8h", "48h", "PT30S", "PT48H", "P1D", "P1Y2M3DT4H5M6S", "P2W"] do
+    # sabotage: gave `validate_config/1` a second recogniser for the
+    # retired spelling - red on the whole second list.
+    test "accepts the one stored spelling and rejects everything else" do
+      for good <- ["1h30m", "2d", "3d8h", "48h", "30s", "500ms", "1.5s", "0s"] do
         assert Core.Wait.validate_config(%{"duration" => good}) == :ok, good
       end
 
-      for bad <- ["", "P", "PT", "PT1.5S", "PT48H later", "soon", "500ms", 30, nil] do
+      for bad <- ["", "P", "PT", "soon", "48h later", 30, nil] ++ CoreFixtures.retired_durations() do
         assert {:error, [{"duration", _}]} = Core.Wait.validate_config(%{"duration" => bad})
       end
 
       assert {:error, [{"duration", "required"}]} = Core.Wait.validate_config(%{})
     end
 
-    # The message is the author-facing half of the amendment: a field that
-    # accepts two spellings and names one of them tells the author their
-    # own is wrong.
+    # Clause 9d: the message names what is accepted and stops there. A
+    # message that named the retired spelling would teach it.
     #
-    # sabotage: put the old ISO-only text back on `@duration_message` -
-    # red on the `1h30m` assertion.
-    test "the refusal names both spellings" do
+    # sabotage: put a second spelling back on `@duration_message` - red on
+    # the refute.
+    test "the refusal names what is accepted, and only that" do
       assert {:error, [{"duration", message}]} =
                Core.Wait.validate_config(%{"duration" => "soon"})
 
-      assert message =~ "1h30m"
-      assert message =~ "PT2H"
+      assert message == "must be a duration like 30s or 1h30m"
+      refute message =~ ~r/\bP[T0-9]/
     end
 
     # Sabotage: gave `core.wait` a `body` slot - red, since a wait is a leaf.
     test "is a leaf that constrains nothing but its own kind" do
-      assert Core.Wait.slots(%{"duration" => "PT1H"}) == []
+      assert Core.Wait.slots(%{"duration" => "1h"}) == []
       assert Core.Wait.io(%{}) == %{kinds: [:step]}
     end
   end

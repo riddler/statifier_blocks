@@ -93,8 +93,8 @@ defmodule StatifierBlocks.PredicatesTest do
       assert Predicates.evaluate_value("true") == {:ok, true}
     end
 
-    # Duration literals are `15m`, not the ISO-8601 `PT15M` block config uses
-    # (see the moduledoc caution).
+    # A duration literal is `15m` here and `15m` in block config too - one
+    # grammar, both sides (see the moduledoc).
     # sabotage: the same passthrough-clause mutation noted above - red, reverted.
     test "evaluates a duration literal" do
       assert {:ok, %{minutes: 15}} = Predicates.evaluate_value("15m")

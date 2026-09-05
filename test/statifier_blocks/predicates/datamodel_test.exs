@@ -16,6 +16,9 @@ defmodule StatifierBlocks.Predicates.DatamodelTest do
   alias StatifierBlocks.Compiler.SensitivePaths
   alias StatifierBlocks.Predicates.Datamodel, as: Index
 
+  # The `duration` example is spelled per decision 4's 2026-09-05
+  # amendment (clause 4d), not as the block above it in the record.
+  #
   # ADR-0006's "Worked shape", transcribed - credit-card processing, one
   # entry per kind.
   @worked_document %{
@@ -37,7 +40,7 @@ defmodule StatifierBlocks.Predicates.DatamodelTest do
                 "path" => "limits.authorization_window",
                 "type" => "duration",
                 "label" => "Authorization window",
-                "example" => "PT15M"
+                "example" => "15m"
               }
             ]
           }
@@ -296,7 +299,7 @@ defmodule StatifierBlocks.Predicates.DatamodelTest do
       assert entry.path == "limits.authorization_window"
       assert entry.type == :duration
       assert entry.label == "Authorization window"
-      assert entry.example == "PT15M"
+      assert entry.example == "15m"
       assert entry.scope == :global
       assert entry.depth == 1
       assert entry.sensitive? == false

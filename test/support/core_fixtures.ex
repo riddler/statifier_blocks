@@ -46,7 +46,7 @@ defmodule StatifierBlocks.CoreFixtures do
     def config_schema(_config),
       do: [
         %{key: "invoke_type", type: :string, label: "Invoke", required?: true, default: ""},
-        %{key: "timeout", type: :duration, label: "Timeout", required?: false, default: "PT30S"}
+        %{key: "timeout", type: :duration, label: "Timeout", required?: false, default: "30s"}
       ]
 
     @impl true
@@ -315,6 +315,40 @@ defmodule StatifierBlocks.CoreFixtures do
   def core_modules, do: Enum.sort(Palette.core_types())
 
   @doc """
+  Durations in the spelling a `:duration` field no longer reads, assembled
+  from their parts rather than written out anywhere.
+
+  `sb-4r1p` retired that spelling, and ADR-0005 decision 9's 2026-09-05
+  amendment (clause 9d) keeps it out of every message, hint, example and
+  doc line this package ships. The refusals still have to be pinned
+  against real values of it - a refusal asserted only against `soon`
+  proves nothing about the form that was retired - so the values are
+  assembled here from a designator, a date half and a time half. Nothing
+  in `lib/` or `test/` then carries one as a literal, which is what keeps
+  a repo-wide sweep for it clean.
+
+      iex> StatifierBlocks.CoreFixtures.retired_durations() |> Enum.all?(&(StatifierBlocks.Core.Duration.parse(&1) == :error))
+      true
+
+  """
+  @spec retired_durations() :: [String.t()]
+  def retired_durations do
+    for {date, time} <- [
+          {"", "30S"},
+          {"", "48H"},
+          {"", "1H30M"},
+          {"", "0S"},
+          {"1D", ""},
+          {"2W", ""},
+          {"1Y", ""},
+          {"1D", "6H"},
+          {"1Y2M3D", "4H5M6S"}
+        ] do
+      "P" <> date <> if time == "", do: "", else: "T" <> time
+    end
+  end
+
+  @doc """
   A config each core type accepts, for the conformance test's "every
   callback answers for a config this type says is valid" pass.
   """
@@ -323,12 +357,12 @@ defmodule StatifierBlocks.CoreFixtures do
     do: %{"arms" => [%{"slot" => "arm_approved", "cond" => "budget_remaining > amount"}]}
 
   def valid_config(Core.Parallel), do: %{"lanes" => ["capture", "receipt"]}
-  def valid_config(Core.Wait), do: %{"duration" => "PT48H"}
+  def valid_config(Core.Wait), do: %{"duration" => "48h"}
   def valid_config(Core.ResumableGroup), do: %{"history" => "deep"}
   def valid_config(Core.OnEvent), do: %{"event" => "order.cancelled", "outcome" => "abandon"}
   def valid_config(Core.Raise), do: %{"event" => "signup.abandoned"}
   def valid_config(Core.Assign), do: %{"path" => "review.parked", "value" => "false"}
-  def valid_config(Core.Send), do: %{"event" => "signup.abandoned", "delay" => "PT2H"}
+  def valid_config(Core.Send), do: %{"event" => "signup.abandoned", "delay" => "2h"}
 
   def valid_config(Core.Subchart),
     do: %{

@@ -260,7 +260,7 @@ defmodule StatifierBlocks.Core.InvokeTest do
 
   # The opposite: a step that stays put until its timer fires, so a test can
   # watch a run park in the failure path before anything moves it on.
-  defp waiting(id), do: Block.new("core.wait", id: id, config: %{"duration" => "PT48H"})
+  defp waiting(id), do: Block.new("core.wait", id: id, config: %{"duration" => "48h"})
 
   defp compile!(root) do
     {:ok, compiled} = Compiler.compile(Document.new(root, id: "bdoc_T"), Palette.core())

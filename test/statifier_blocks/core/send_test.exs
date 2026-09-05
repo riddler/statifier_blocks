@@ -6,7 +6,7 @@ defmodule StatifierBlocks.Core.SendTest do
 
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{Block, Compiler, Document, Palette, Provenance}
+  alias StatifierBlocks.{Block, Compiler, CoreFixtures, Document, Palette, Provenance}
   alias StatifierBlocks.Compiler.{Cancels, Context}
   alias StatifierBlocks.Core.{Raise, Send}
 
@@ -15,8 +15,9 @@ defmodule StatifierBlocks.Core.SendTest do
     # was rejected, taking this red (verified).
     test "accepts an event name with or without a delay" do
       assert Send.validate_config(%{"event" => "signup.abandoned"}) == :ok
-      assert Send.validate_config(%{"event" => "signup.abandoned", "delay" => "PT2H"}) == :ok
+      assert Send.validate_config(%{"event" => "signup.abandoned", "delay" => "2h"}) == :ok
       assert Send.validate_config(%{"event" => "signup.abandoned", "delay" => "1h30m"}) == :ok
+      assert Send.validate_config(%{"event" => "signup.abandoned", "delay" => "500ms"}) == :ok
     end
 
     # Sabotage: dropped the `check_event/2` clause from the `|>` pipeline
@@ -78,8 +79,8 @@ defmodule StatifierBlocks.Core.SendTest do
 
     # Sabotage: dropped the `check_delay/2` clause from the pipeline ->
     # every bad delay below went green, taking this red (verified).
-    test "rejects a present delay that is not a duration in either spelling" do
-      for bad <- ["soon", "7200", "P", "PT", "1.5s", "500ms", 90, nil] do
+    test "rejects a present delay the one grammar does not read" do
+      for bad <- ["soon", "7200", "P", "PT", "2 h", 90, nil] ++ CoreFixtures.retired_durations() do
         assert {:error, [{"delay", _}]} =
                  Send.validate_config(%{"event" => "signup.abandoned", "delay" => bad})
       end
@@ -154,20 +155,11 @@ defmodule StatifierBlocks.Core.SendTest do
       end
     end
 
-    # Sabotage: emitted the ISO value in the `delay` attribute rather than
-    # `Duration.to_delay/1`'s shorthand -> `delay="PT2H"`, which
-    # `Statifier.Duration` does not read, taking this red (verified).
-    test "an ISO delay is emitted as the shorthand the engine reads" do
-      scxml = compile!(send_block(%{"event" => "signup.abandoned", "delay" => "PT2H"})).scxml
-
-      assert scxml =~ ~s(<send delay="2h" event="signup.abandoned" id="s_blk_SND__send"/>)
-    end
-
     # Sabotage: had `delay/1` answer `{:ok, value}` with the stored bytes
     # instead of calling `compiled/1` -> a stored `1h30m` still happened
-    # to emit `1h30m`, but `8h3d` emitted `8h3d` rather than the canonical
-    # `3d8h`, taking this red on the second case (verified).
-    test "a predicator delay compiles through the ISO pivot and back" do
+    # to emit `1h30m`, but `8h3d` emitted `8h3d` rather than the
+    # normalised `3d8h`, taking this red on the second case (verified).
+    test "a stored delay is compiled to its normalisation, not copied" do
       scxml = compile!(send_block(%{"event" => "signup.abandoned", "delay" => "1h30m"})).scxml
 
       assert scxml =~
@@ -186,7 +178,7 @@ defmodule StatifierBlocks.Core.SendTest do
     # `done.state` is never raised, and the block's own state stays active
     # instead, taking this red (verified).
     test "the chart compiles, and the block completes when the send is armed" do
-      compiled = compile!(send_block(%{"event" => "signup.abandoned", "delay" => "PT2H"}))
+      compiled = compile!(send_block(%{"event" => "signup.abandoned", "delay" => "2h"}))
 
       {:ok, machine} = Statifier.compile(compiled.scxml)
       {machine_state, _effects} = Statifier.initialize(machine)
@@ -194,17 +186,15 @@ defmodule StatifierBlocks.Core.SendTest do
       assert MapSet.member?(Statifier.active_leaf_states(machine_state), "s_blk_SND__o_done")
     end
 
-    # The check that makes the shorthand a contract rather than a habit:
+    # The check that makes the emitted form a contract rather than a habit:
     # `Statifier.Duration.to_ms/1` is what resolves a `delay` attribute at
-    # runtime, and it reads the predicator unit grammar only - it answers
-    # `{:error, {:invalid_delay, "PT2H"}}` for the ISO spelling. So a chart
-    # that carries ISO in `delay` compiles and then fails to arm.
+    # runtime, and it reads the one unit grammar. A chart carrying anything
+    # else in `delay` compiles and then fails to arm.
     #
-    # Sabotage: had `compiled/1` answer the ISO value instead of
-    # `Duration.to_delay/1`'s shorthand -> `to_ms/1` refused every emitted
-    # delay, taking this red (verified).
+    # Sabotage: had `to_delay/1` emit `:months` as `M` -> `to_ms/1` refused
+    # the emitted delay, taking this red (verified).
     test "every delay this type emits is one the engine can resolve" do
-      for stored <- ["PT2H", "1h30m", "8h3d", "P1Y2M3DT4H5M6S", "PT0S"] do
+      for stored <- ["2h", "1h30m", "8h3d", "1y2mo3d4h5m6s", "0s", "500ms", "1.5s"] do
         scxml = compile!(send_block(%{"event" => "signup.abandoned", "delay" => stored})).scxml
 
         [_whole, delay] = Regex.run(~r/<send delay="([^"]+)"/, scxml)
@@ -268,7 +258,7 @@ defmodule StatifierBlocks.Core.SendTest do
     # send element -> the event value's span carried no config key, taking
     # this red (verified).
     test "the sent event's value is attributed to the block and the event field" do
-      compiled = compile!(send_block(%{"event" => "signup.abandoned", "delay" => "PT2H"}))
+      compiled = compile!(send_block(%{"event" => "signup.abandoned", "delay" => "2h"}))
 
       {offset, _length} = :binary.match(compiled.scxml, "signup.abandoned")
 
@@ -276,15 +266,16 @@ defmodule StatifierBlocks.Core.SendTest do
                Provenance.owner_at(compiled.provenance, offset)
     end
 
-    # The delay's emitted bytes are not the author's - `PT2H` was stored
-    # and `2h` was written - so annotating them would point a finding at a
-    # span nobody typed. `core.wait` leaves its own delay unannotated too.
+    # The delay's emitted bytes are not always the author's - a stored
+    # `3h2h` is written as `5h` - so annotating them would point a finding
+    # at a span nobody typed. `core.wait` leaves its own delay unannotated
+    # too.
     #
     # Sabotage: added `attribute_from_config("delay", "delay")` to the
     # send element -> the derived span claimed the author's config key,
     # taking this red (verified).
     test "the delay attribute is not attributed, because it is derived" do
-      compiled = compile!(send_block(%{"event" => "signup.abandoned", "delay" => "PT2H"}))
+      compiled = compile!(send_block(%{"event" => "signup.abandoned", "delay" => "2h"}))
 
       {offset, _length} = :binary.match(compiled.scxml, ~s(delay="2h"))
       {offset, _length} = :binary.match(compiled.scxml, "2h", scope: {offset, 10})

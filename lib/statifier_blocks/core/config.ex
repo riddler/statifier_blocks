@@ -23,11 +23,6 @@ defmodule StatifierBlocks.Core.Config do
   # because an event name with a space in it never matches anything.
   @event_name ~r/\A[A-Za-z_][A-Za-z0-9_.\-]*\z/
 
-  # ISO-8601 duration, integer components only - ADR-0001 decision 6 forbids
-  # floats in `config`, so `PT1.5S` is not expressible here either. `P` on
-  # its own, and a `T` with nothing after it, are both rejected.
-  @duration ~r/\AP(?!\z)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?!\z)(\d+H)?(\d+M)?(\d+S)?)?\z/
-
   # An invoke type: `namespace:name`, both halves bare lowercase
   # identifiers. `core.invoke` and `StatifierBlocks.InvokeStep` read the
   # same grammar out of here so a host meeting the field on a core block
@@ -49,9 +44,6 @@ defmodule StatifierBlocks.Core.Config do
 
   @spec event_name?(term()) :: boolean()
   def event_name?(value), do: non_empty_string?(value) and Regex.match?(@event_name, value)
-
-  @spec duration?(term()) :: boolean()
-  def duration?(value), do: non_empty_string?(value) and Regex.match?(@duration, value)
 
   @doc """
   Turns an accumulated finding list into `validate_config/1`'s return.

@@ -425,7 +425,7 @@ defmodule StatifierBlocks.Core.ParallelCompleteTest do
             id: "blk_AUTH",
             slots: %{
               "body" => [
-                Block.new("core.wait", id: "blk_AUTHW", config: %{"duration" => "PT48H"})
+                Block.new("core.wait", id: "blk_AUTHW", config: %{"duration" => "48h"})
               ],
               "interrupts" => [
                 Block.new("core.on_event",
@@ -461,7 +461,7 @@ defmodule StatifierBlocks.Core.ParallelCompleteTest do
             id: "blk_SND",
             config: %{"event" => "payment.review_due", "delay" => "2h"}
           ),
-          Block.new("core.wait", id: "blk_HOLD", config: %{"duration" => "PT48H"})
+          Block.new("core.wait", id: "blk_HOLD", config: %{"duration" => "48h"})
         ],
         "interrupts" => [
           Block.new("core.on_event",
