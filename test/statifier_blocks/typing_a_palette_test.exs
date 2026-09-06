@@ -160,6 +160,7 @@ defmodule StatifierBlocks.TypingAPaletteTest do
     assert headings == [
              "Before you start",
              "Declare the records and shapes your paths hold",
+             "Type an entry by a declaration",
              "Name the document's subject",
              "Declare what each field reads and writes",
              "Check what the walk knows at a position",
@@ -183,7 +184,7 @@ defmodule StatifierBlocks.TypingAPaletteTest do
     # Named rather than derived: the counts are the module's contract with the
     # guide, so a fence added on either side of the split is a red test and a
     # deliberate decision rather than a silent change of what runs.
-    assert length(executed) == 6
+    assert length(executed) == 7
     assert [fence] = excluded
 
     {{name, requirement}, []} = Code.eval_string(fence, [], file: @how_to)

@@ -19,12 +19,15 @@ The types themselves live in the datamodel document, which
 read check. This package takes it as a dependency and calls it; it defines no
 second read check and no compatibility or coverage module of its own.
 
-The dependency resolves from Hex, at a floor of the package's first release:
+The dependency resolves from Hex, at a floor of 0.3:
 
 ```elixir
 # mix.exs
-{:statifier_datamodel, "~> 0.1"}
+{:statifier_datamodel, "~> 0.3"}
 ```
+
+0.3.0 is the release in which an entry's `type` may name a declaration, which
+the section below uses.
 
 ## Declare the records and shapes your paths hold
 
@@ -107,10 +110,39 @@ txn_label = StatifierBlocks.Environment.type_label(declarations, "cards.credit_t
 #=> "Credit card transaction"
 ```
 
-A declared name is not a path, and a declaration's field is not a path: the
-`types` key contributes nothing to the declared-path set the undeclared-path
-advisory reads. The `scopes` entry is what says a path **exists**; `types` is
-what says what a path may hold.
+A declared name is not a path: the `types` key on its own contributes nothing
+to the declared-path set the undeclared-path advisory reads. The `scopes` entry
+is what says a path **exists**; `types` is what says what a path may hold.
+
+## Type an entry by a declaration
+
+An entry's `type` - and a `list` entry's `item_type` - may name one of the
+declarations instead of one of the nine types (`sd-ADR-0001`'s amendment of
+2026-09-06, in `statifier_datamodel` 0.3.0). The declaration's fields are then
+declared paths beneath the entry's own path, exactly as an inlined `object`
+entry's `fields` are:
+
+```elixir
+%{
+  "name" => "current_txn",
+  "path" => "cards.current_txn",
+  "type" => "cards.credit_txn",
+  "label" => "Current transaction"
+}
+```
+
+With that entry in `scopes`, `cards.current_txn.amount_minor` is a declared
+path: it is offered as an expression candidate, it draws the control its
+declared type asks for, and a block that writes there gets no undeclared-path
+advisory. Nothing about it is a special case here - this package reads the
+projection off `StatifierDatamodel.Index` and never asks whether the fields
+beneath a path were written inline or reached through a name. The Datamodel
+tab's Type cell for the entry itself reads `cards.credit_txn`, the name the
+author wrote.
+
+Write the declaration out inline instead when the shape is one path's alone;
+name it when the same record sits at more than one path, or when a step's
+`expects` already names it and the two ought not to drift.
 
 ## Name the document's subject
 

@@ -125,13 +125,22 @@ defmodule StatifierBlocks.MixProject do
         # `StatifierBlocks.Datamodel` reads that package rather than a second
         # copy of the same projection.
         #
-        # The floor is 0.1 because every module this package names -
+        # The floor is 0.3 and not 0.1. Every module this package names -
         # `StatifierDatamodel.Index`, `StatifierDatamodel.Document`,
         # `StatifierDatamodel.Types` and `StatifierDatamodel.Declarations` -
-        # shipped in 0.1.0, that package's first release. Below 1.0 a `~>`
-        # requirement admits only the 0.1.x line, so a breaking 0.2 does not
-        # resolve here without a deliberate bump.
-        {:statifier_datamodel, "~> 0.1"},
+        # shipped in 0.1.0, that package's first release, but 0.3.0 is where
+        # an entry's `type`, and a `list` entry's `item_type`, may name a
+        # declaration the document's `types` key declares (`sd-ADR-0001`'s
+        # amendment of 2026-09-06): the entry carries `{:declared, name}` and
+        # the declaration's fields are indexed beneath its own path, exactly
+        # as an inlined `object` entry contributes its `fields`.
+        # `StatifierBlocks.Datamodel` reads both through that index and
+        # `StatifierBlocks.Shell.declared_shape/1` renders the new
+        # inhabitant, so 0.1 or 0.2 would resolve here and then answer a
+        # narrower set of declared paths than this package now says it reads.
+        # Below 1.0 a `~>` requirement admits only the 0.3.x line, so a
+        # breaking 0.4 does not resolve here without a deliberate bump.
+        {:statifier_datamodel, "~> 0.3"},
         # Direct because `StatifierBlocks.Core.Duration` calls
         # `Predicator.Duration.parse/1` to read a stored predicator duration
         # string. It already resolves through statifier, so naming it here

@@ -583,20 +583,45 @@ defmodule StatifierBlocks.Shell do
   describes is `unspecified` rather than blank - a blank cell reads as a
   rendering gap, and this is a fact about the declaration.
 
+  An entry whose `type` names a declaration carries `{:declared, name}`
+  (`sd-ADR-0001`'s amendment of 2026-09-06, in `statifier_datamodel` 0.3.0),
+  and the cell is that name. It reads as one of the nine does on purpose:
+  what the author wrote in the `type` key is what the column says, and the
+  declaration's own fields are rows of their own beneath it, because the
+  index projects them there exactly as it projects an inlined `object`'s
+  `fields`.
+
       iex> StatifierBlocks.Shell.declared_shape(%{type: :integer, item_type: nil})
       "integer"
 
       iex> StatifierBlocks.Shell.declared_shape(%{type: :list, item_type: :string})
       "list of string"
 
+      iex> StatifierBlocks.Shell.declared_shape(%{type: {:declared, "authorization"}, item_type: nil})
+      "authorization"
+
+      iex> StatifierBlocks.Shell.declared_shape(%{type: :list, item_type: {:declared, "authorization"}})
+      "list of authorization"
+
       iex> StatifierBlocks.Shell.declared_shape(%{type: nil, item_type: nil})
       "unspecified"
   """
-  @spec declared_shape(%{type: atom() | nil, item_type: atom() | nil}) :: String.t()
+  @spec declared_shape(%{
+          type: StatifierDatamodel.Index.entry_type() | nil,
+          item_type: StatifierDatamodel.Index.entry_type() | nil
+        }) :: String.t()
   def declared_shape(%{type: nil}), do: @unspecified_shape
   def declared_shape(%{type: :list, item_type: nil}), do: "list"
-  def declared_shape(%{type: :list, item_type: item}), do: "list of #{item}"
-  def declared_shape(%{type: type}), do: to_string(type)
+  def declared_shape(%{type: :list, item_type: item}), do: "list of " <> type_word(item)
+  def declared_shape(%{type: type}), do: type_word(type)
+
+  # A declared name is the name; everything else is its own atom. Kept
+  # beside the cell rather than pushed into `StatifierBlocks.Datamodel`,
+  # because it is a rendering decision about a column and not a second
+  # reading of the document.
+  @spec type_word(StatifierDatamodel.Index.entry_type()) :: String.t()
+  defp type_word({:declared, name}) when is_binary(name), do: name
+  defp type_word(type), do: to_string(type)
 
   @doc """
   Every finding about the selected block, in one list (3A).

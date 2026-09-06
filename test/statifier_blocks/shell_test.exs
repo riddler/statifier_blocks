@@ -347,6 +347,20 @@ defmodule StatifierBlocks.ShellTest do
       assert Shell.declared_shape(row("a", type: :list)) == "list"
       assert Shell.declared_shape(row("a")) == "unspecified"
     end
+
+    # Sabotage: `declared_shape/1`'s last clause calling `to_string/1`
+    # directly again - a declaration-typed entry raises `Protocol.
+    # UndefinedError` instead of rendering its name, which is what the
+    # Datamodel tab did before `statifier_datamodel` 0.3.0's entry types
+    # reached this cell.
+    test "declared_shape/1 spells a declaration-typed entry as the name it names" do
+      assert Shell.declared_shape(row("a", type: {:declared, "cards.credit_txn"})) ==
+               "cards.credit_txn"
+
+      assert Shell.declared_shape(
+               row("a", type: :list, item_type: {:declared, "cards.credit_txn"})
+             ) == "list of cards.credit_txn"
+    end
   end
 
   # The descriptor half of the drawer's host-tab seam (8A: slots for markup,

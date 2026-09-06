@@ -631,6 +631,144 @@ defmodule StatifierBlocks.DatamodelTest do
     end
   end
 
+  # sd-ADR-0001's amendment of 2026-09-06 (`statifier_datamodel` 0.3.0): an
+  # entry's `type` may name a declaration, and the index carries the
+  # declaration's fields beneath the entry's own path. Every reader in this
+  # module reaches the document through that index, so the whole claim this
+  # package makes is that it cannot tell the two apart - which is why every
+  # test below asserts the projected document against its inlined twin
+  # rather than against a hand-written expectation.
+  describe "an entry typed by a declaration" do
+    @inlined %{
+      "version" => 1,
+      "scopes" => [
+        %{
+          "scope" => "local",
+          "entries" => [
+            %{
+              "path" => "cards.authorization",
+              "type" => "object",
+              "label" => "Authorization",
+              "fields" => [
+                %{"path" => "cards.authorization.amount_minor", "type" => "integer"},
+                %{"path" => "cards.authorization.currency", "type" => "string"}
+              ]
+            }
+          ]
+        }
+      ]
+    }
+
+    @projected %{
+      "version" => 1,
+      "scopes" => [
+        %{
+          "scope" => "local",
+          "entries" => [
+            %{
+              "path" => "cards.authorization",
+              "type" => "cards.credit_txn",
+              "label" => "Authorization"
+            }
+          ]
+        }
+      ],
+      "types" => [
+        %{
+          "name" => "cards.credit_txn",
+          "kind" => "record",
+          "label" => "Credit card transaction",
+          "fields" => [
+            %{"name" => "amount_minor", "type" => "integer", "required?" => true},
+            %{"name" => "currency", "type" => "string", "required?" => true}
+          ]
+        }
+      ]
+    }
+
+    # sabotage: floor `mix.exs` back to `{:statifier_datamodel, "~> 0.1"}` -
+    # the projection is not in the index, the member paths are undeclared,
+    # and this goes red on the first assertion.
+    test "the declaration's fields are declared paths beneath the entry's own" do
+      assert Datamodel.declared_paths(@projected) ==
+               MapSet.new([
+                 "cards.authorization",
+                 "cards.authorization.amount_minor",
+                 "cards.authorization.currency"
+               ])
+
+      assert Datamodel.declared_paths(@projected) == Datamodel.declared_paths(@inlined)
+    end
+
+    # The read check the advisory is: a write through the projection is a
+    # write to a declared path, so it produces nothing, exactly as the same
+    # write against the inlined twin does.
+    # sabotage: same as above - the write becomes undeclared and one `:info`
+    # finding appears where the assertion expects none.
+    test "an assignment through the projection produces no undeclared-path advisory" do
+      document = document([assign("blk_amount", "cards.authorization.amount_minor")])
+
+      assert Datamodel.findings(document, palette(), @projected) == []
+      assert Datamodel.findings(document, palette(), @inlined) == []
+    end
+
+    # The other direction, so the test above is not passing for the trivial
+    # reason that nothing is ever flagged: a member the declaration does not
+    # carry is undeclared through the projection too.
+    # sabotage: `expand/3` in the index returning the whole declared-path set
+    # rather than the declaration's own fields - the stray path stops being
+    # flagged and this goes red.
+    test "a member the declaration does not carry is still undeclared" do
+      document = document([assign("blk_stray", "cards.authorization.acquirer")])
+
+      assert [%Finding{severity: :info}] = Datamodel.findings(document, palette(), @projected)
+    end
+
+    # sabotage: `row/1` reading `type` off the entry's declaration rather
+    # than off the entry - the entry's own cell answers `:object` and this
+    # goes red on the first assertion.
+    test "the entry carries the declared name and its members carry their own types" do
+      by_path =
+        document([])
+        |> Datamodel.declared_view(@projected, [])
+        |> Map.new(&{&1.path, &1})
+
+      assert %{type: {:declared, "cards.credit_txn"}, scope: :local, label: "Authorization"} =
+               by_path["cards.authorization"]
+
+      assert %{type: :integer} = by_path["cards.authorization.amount_minor"]
+      assert %{type: :string} = by_path["cards.authorization.currency"]
+    end
+
+    # sabotage: same as above - the member rows differ from the inlined
+    # twin's and this goes red. The entry row is dropped from the comparison
+    # on purpose: `{:declared, name}` is what the author wrote there and it
+    # is the one cell the two documents do differ in.
+    test "the member rows are the inlined twin's, cell for cell" do
+      members = fn datamodel ->
+        document([])
+        |> Datamodel.declared_view(datamodel, [])
+        |> Enum.reject(&(&1.path == "cards.authorization"))
+      end
+
+      assert members.(@projected) == members.(@inlined)
+    end
+
+    # sabotage: same as above - the projected members carry no kinds and the
+    # expression control offers no type for them.
+    test "the members project to value kinds, and to the twin's candidates" do
+      assert Datamodel.path_types(@projected) == %{
+               "cards.authorization.amount_minor" => :number,
+               "cards.authorization.currency" => :string
+             }
+
+      assert Datamodel.path_types(@projected) == Datamodel.path_types(@inlined)
+
+      assert Datamodel.candidates(document([]), @projected, []) ==
+               Datamodel.candidates(document([]), @inlined, [])
+    end
+  end
+
   describe "value_candidates/2" do
     defp value_datamodel(entries) do
       %{"version" => 1, "scopes" => [%{"scope" => "local", "entries" => entries}]}
