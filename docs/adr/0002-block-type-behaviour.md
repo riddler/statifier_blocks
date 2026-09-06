@@ -3901,6 +3901,13 @@ campaign-033 ruling `RQ-033-3`.
 
 ## Amendment (2026-09-06): decision 10's `core.branch` row and the environment table row, now that `slots/1` returns `undecided`
 
+**Status: proposed (2026-09-06).** Drafted for `sb-uewa` under the operator
+campaign-034 grant, and merging at proposed under that campaign's invariant
+like every other section filed with it; flipping it to accepted is a separate
+gated request. Additive; decision 10's original seven-row table stands, every
+amendment and Note above this line stands, and no text above this line is
+edited by this section.
+
 This is the amendment `ADR-0012`'s closing section reserved for its
 acceptance. That record is accepted, `sb-2hoh` has built its decision 2, and
 the Note of 2026-09-06 above ("`core.branch` declares a third slot on `main`")
