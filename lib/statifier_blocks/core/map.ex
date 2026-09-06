@@ -115,16 +115,19 @@ defmodule StatifierBlocks.Core.Map do
   7's eighth field type - so the editor offers the host's declared
   datamodel paths as candidates on both and gives a value the datamodel
   does not declare ADR-0005 clause 11e's `:info` advisory, which is a
-  remark and not a refusal. `collect` is refused unless it is a bare
-  lowercase identifier, which is the one grammar ADR-0009 decision 4 gives
-  it in as many words. The other three fields this package writes an
+  remark and not a refusal. `collect` is refused unless it is a datamodel
+  path, the grammar ADR-0009 decision 4's Amendment of 2026-09-06 widened
+  it to. The other three fields this package writes an
   `<assign location="...">` from - `core.invoke`'s and
   `StatifierBlocks.InvokeStep`'s `assign_to`, and `core.subchart`'s -
-  admit any datamodel path since ADR-0011 decision 13 and `sb-r313`, so
-  `collect` is now the narrow one of the four. Whether it should stay
-  narrow is ADR-0009's amendment to make, not this module's: the shape of
-  all four refusals is shared in `StatifierBlocks.Core.AssignLocation`,
-  and only the rule differs.
+  read the same `StatifierBlocks.Core.Config.datamodel_path?/1` since
+  ADR-0011 decision 13 and `sb-r313`, so all four now agree: the same
+  `<assign>` element writes the same datamodel, so there is one location
+  rule to have. The shape of all four refusals is shared in
+  `StatifierBlocks.Core.AssignLocation`, and now the rule is shared too. A
+  bare lowercase identifier is still a valid `collect` - every one of them
+  is already a datamodel path - so the widening refuses nothing the field
+  accepted before.
 
   `collect` carries the `writes` key ADR-0002's Note of 2026-09-06
   records, and what it writes is `{:list, :unknown}` (ADR-0011 decision
@@ -250,7 +253,7 @@ defmodule StatifierBlocks.Core.Map do
 
   @chart_message ~s(names the document to run for each item, like bdoc_01JWIZ)
   @items_message "names the datamodel list to run over, like signup.invitees"
-  @collect_message "must be a bare lowercase identifier, like answers"
+  @collect_message "must be a datamodel path, like cards.answers"
   @on_message ~s(must be "all" or "first_error")
   @item_as_message "must be a bare lowercase identifier, like invitee"
   @index_as_message "must be a bare lowercase identifier, like position"
@@ -450,7 +453,13 @@ defmodule StatifierBlocks.Core.Map do
   end
 
   defp check_collect(findings, config) do
-    AssignLocation.check(findings, config, "collect", &Config.identifier?/1, @collect_message)
+    AssignLocation.check(
+      findings,
+      config,
+      "collect",
+      &Config.datamodel_path?/1,
+      @collect_message
+    )
   end
 
   defp check_on(findings, config) do
@@ -670,7 +679,7 @@ defmodule StatifierBlocks.Core.Map do
 
   @spec collect(term()) :: {:ok, String.t() | nil} | {:error, [{String.t(), String.t()}]}
   defp collect(value) do
-    AssignLocation.location(value, "collect", &Config.identifier?/1, @collect_message)
+    AssignLocation.location(value, "collect", &Config.datamodel_path?/1, @collect_message)
   end
 
   @spec item_as_value(Block.config()) :: {:ok, String.t()} | {:error, [{String.t(), String.t()}]}

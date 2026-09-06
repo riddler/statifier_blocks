@@ -55,9 +55,9 @@ defmodule StatifierBlocks.Core.AssignLocationTest do
   end
 
   describe "the four sites it is shared across" do
-    # sabotage: pointed `core.invoke` at `Config.identifier?/1` -> the three
+    # sabotage: pointed `core.invoke` at `Config.identifier?/1` -> the four
     # datamodel-path sites stop agreeing and this goes red (verified)
-    test "three of the four take a dotted path, and core.map's collect does not" do
+    test "all four take a dotted path, and say so in one wording" do
       assert Invoke.validate_config(%{
                "invoke_type" => "myapp:authorize",
                "assign_to" => "cards.authorization"
@@ -68,16 +68,24 @@ defmodule StatifierBlocks.Core.AssignLocationTest do
 
       assert InvokeStep.check_assign_to([], %{"assign_to" => "cards.authorization"}) == []
 
-      # ADR-0009 decision 4 gives `collect` a bare-identifier grammar in as
-      # many words, so widening it is that record's amendment to make.
+      # ADR-0009 decision 4's Amendment of 2026-09-06 widened this last one:
+      # the same `<assign>` element writes the same datamodel, so one rule.
+      assert Map.validate_config(%{
+               "items" => "signup.invitees",
+               "chart" => "bdoc_C",
+               "collect" => "signup.answers"
+             }) == :ok
+
+      # An author meets one complaint and not two, which is why the wording
+      # moved with the rule rather than staying behind it.
       assert {:error, [{"collect", message}]} =
                Map.validate_config(%{
                  "items" => "signup.invitees",
                  "chart" => "bdoc_C",
-                 "collect" => "signup.answers"
+                 "collect" => "signup answers"
                })
 
-      assert message =~ "bare lowercase identifier"
+      assert message =~ "must be a datamodel path"
     end
 
     # sabotage: widened the rule to `non_empty_string?/1` at any one site ->
