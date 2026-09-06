@@ -51,10 +51,26 @@ defmodule StatifierBlocks.Edit.Targets do
   an assignability finding. That is the documented cost of decision 5's
   per-slot granularity, not a defect introduced here.
 
-  `droppable_slots/3`'s signature carries no `Assignability.context()`, so
-  this module calls `valid_targets/4` with `%{}` - `entry_type` absent,
-  which resolves to `:unknown`, which ADR-0003 decision 5 makes the
-  permissive default.
+  ## The context, and why it is carried rather than assumed empty
+
+  Every entry point here takes an `Assignability.context()` and defaults it
+  to `%{}`. The default is ADR-0003 decision 5's permissive one - no
+  `entry_type`, no `:datamodel`, so an undeclared spelling resolves to
+  `:unknown` and is admitted - and it is what a caller with nothing to say
+  gets.
+
+  A caller that *does* have the datamodel document passes it, and this is
+  the seam `sb-sy0q` closed rather than a widening it introduced. The
+  editor holds the document the compiler's `:datamodel` option carries; the
+  check the editor runs and the check the compiler runs are one
+  implementation by ADR-0002 decision 6 and ADR-0003 decision 6, and a call
+  that hard-coded `%{}` here made that one implementation answer two
+  different questions - the compiler's coverage step (`sd-ADR-0001`
+  decision 8: a record satisfying a shape by covering its required set)
+  simply could not run in the editor, so a drop the compiled document
+  accepts was drawn as refused. Passing the context does not change the
+  check; it stops the editor asking it with a document it has and did not
+  hand over.
 
   ## Rules 3 and 4, which are this bead's alone
 
@@ -88,7 +104,7 @@ defmodule StatifierBlocks.Edit.Targets do
   module carries, alongside the two argued above.
   """
 
-  alias StatifierBlocks.{Assignability, Block, Document, Palette}
+  alias StatifierBlocks.{Assignability, Block, Document, Environment, Palette}
 
   @doc """
   Slots that would accept `id`'s block: declared, kind-admitted (rule 1 and
@@ -99,12 +115,12 @@ defmodule StatifierBlocks.Edit.Targets do
   `id` naming no block in `document` yields `[]`: there is no block to drag,
   so there is nothing to ask `droppable_slots_for/3` about.
   """
-  @spec droppable_slots(Document.t(), Palette.t(), Block.id()) ::
+  @spec droppable_slots(Document.t(), Palette.t(), Block.id(), Assignability.context()) ::
           [{Block.id(), Block.slot_name()}]
-  def droppable_slots(%Document{} = document, %Palette{} = palette, id) do
+  def droppable_slots(%Document{} = document, %Palette{} = palette, id, ctx \\ %{}) do
     case find_block(document, id) do
       nil -> []
-      block -> droppable_slots_for(document, palette, block)
+      block -> droppable_slots_for(document, palette, block, ctx)
     end
   end
 
@@ -114,10 +130,15 @@ defmodule StatifierBlocks.Edit.Targets do
   decision 8 - can be asked the same question. `droppable_slots/3` is a
   lookup followed by a call to this function.
   """
-  @spec droppable_slots_for(Document.t(), Palette.t(), Block.t()) ::
+  @spec droppable_slots_for(Document.t(), Palette.t(), Block.t(), Assignability.context()) ::
           [{Block.id(), Block.slot_name()}]
-  def droppable_slots_for(%Document{} = document, %Palette{} = palette, %Block{} = block) do
-    for {slot_ref, :ok} <- slot_verdicts(document, palette, block), do: slot_ref
+  def droppable_slots_for(
+        %Document{} = document,
+        %Palette{} = palette,
+        %Block{} = block,
+        ctx \\ %{}
+      ) do
+    for {slot_ref, :ok} <- slot_verdicts(document, palette, block, ctx), do: slot_ref
   end
 
   @typedoc """
@@ -187,20 +208,21 @@ defmodule StatifierBlocks.Edit.Targets do
   per-slot attribute does not pretend to an answer the granularity cannot
   support.
   """
-  @spec slot_verdicts(Document.t(), Palette.t(), Block.t()) ::
+  @spec slot_verdicts(Document.t(), Palette.t(), Block.t(), Assignability.context()) ::
           [{{Block.id(), Block.slot_name()}, slot_verdict()}]
-  def slot_verdicts(%Document{} = document, %Palette{} = palette, %Block{} = block) do
+  def slot_verdicts(%Document{} = document, %Palette{} = palette, %Block{} = block, ctx \\ %{}) do
     excluded = subtree_ids(block)
+    declarations = Environment.declarations(ctx)
 
     palette
-    |> Assignability.target_verdicts(document, block, %{})
+    |> Assignability.target_verdicts(document, block, ctx)
     |> group_by_slot()
     |> Enum.map(fn {{parent_id, slot} = slot_ref, verdicts} ->
       cond do
         MapSet.member?(excluded, parent_id) -> {slot_ref, {:refused, nil}}
         full?(document, palette, parent_id, slot) -> {slot_ref, {:refused, nil}}
         Enum.any?(verdicts, &(&1 == :ok)) -> {slot_ref, :ok}
-        true -> {slot_ref, {:refused, agreed_reason(palette, verdicts)}}
+        true -> {slot_ref, {:refused, agreed_reason(palette, verdicts, declarations)}}
       end
     end)
   end
@@ -226,10 +248,13 @@ defmodule StatifierBlocks.Edit.Targets do
 
   # The one reason every gap agreed on, or `nil` when they did not agree or
   # when any of them had none to give.
-  @spec agreed_reason(Palette.t(), [:ok | {:error, [Assignability.finding()]}]) ::
-          Assignability.reason() | nil
-  defp agreed_reason(palette, verdicts) do
-    case verdicts |> Enum.map(&gap_reason(palette, &1)) |> Enum.uniq() do
+  @spec agreed_reason(
+          Palette.t(),
+          [:ok | {:error, [Assignability.finding()]}],
+          StatifierDatamodel.Declarations.t()
+        ) :: Assignability.reason() | nil
+  defp agreed_reason(palette, verdicts, declarations) do
+    case verdicts |> Enum.map(&gap_reason(palette, &1, declarations)) |> Enum.uniq() do
       [single] -> single
       _disagreed_or_empty -> nil
     end
@@ -249,13 +274,16 @@ defmodule StatifierBlocks.Edit.Targets do
   # priority beside it, so `:kind_not_admitted` yields `nil` (that gate
   # names both kind sets in its own finding) and the seam reason surfaces
   # exactly when the structural gate had nothing to say.
-  @spec gap_reason(Palette.t(), :ok | {:error, [Assignability.finding()]}) ::
-          Assignability.reason() | nil
-  defp gap_reason(_palette, :ok), do: nil
-  defp gap_reason(_palette, {:error, []}), do: nil
+  @spec gap_reason(
+          Palette.t(),
+          :ok | {:error, [Assignability.finding()]},
+          StatifierDatamodel.Declarations.t()
+        ) :: Assignability.reason() | nil
+  defp gap_reason(_palette, :ok, _declarations), do: nil
+  defp gap_reason(_palette, {:error, []}, _declarations), do: nil
 
-  defp gap_reason(palette, {:error, [first | _rest]}),
-    do: Assignability.finding_reason(palette, first)
+  defp gap_reason(palette, {:error, [first | _rest]}, declarations),
+    do: Assignability.finding_reason(palette, first, declarations)
 
   # Rule 3: true when `slot` on `parent_id` is `:exactly_one` or
   # `:zero_or_one` and already carries a child. `parent_id` always resolves

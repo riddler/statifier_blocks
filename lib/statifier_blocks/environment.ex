@@ -337,6 +337,48 @@ defmodule StatifierBlocks.Environment do
   def type_of(declarations, spelling), do: Types.parse(declarations, spelling)
 
   @doc """
+  How a type expression is written for a human (ADR-0011 decision 9).
+
+  A spelling that names a declaration in `declarations` renders that
+  declaration's **label**, which is the human-readable name the record asks a
+  finding and the Datamodel tab to carry so an author reads "Credit card
+  transaction" instead of a nominal name they have to go and look up. Every
+  other spelling renders exactly as it did before there were declarations:
+  one of the nine scalars as its own word, an opaque string a host carries as
+  itself, `:unknown` as `unknown`, and a list as what it holds.
+
+  It is a **rendering** and nothing else. No verdict reads it, nothing
+  branches on it, and a declaration whose `label` is absent renders its name
+  - so a document that declares types without labelling them shows exactly
+  what it showed before, rather than a blank where a name used to be.
+
+      iex> alias StatifierBlocks.Environment
+      iex> declarations = StatifierDatamodel.Declarations.from_document(%{"types" => [
+      ...>   %{"name" => "cards.credit_txn", "kind" => "record",
+      ...>     "label" => "Credit card transaction", "fields" => []}]})
+      iex> Environment.type_label(declarations, "cards.credit_txn")
+      "Credit card transaction"
+      iex> Environment.type_label(declarations, "myapp.card_txn")
+      "myapp.card_txn"
+      iex> Environment.type_label(declarations, :unknown)
+      "unknown"
+      iex> Environment.type_label(declarations, {:list, "cards.credit_txn"})
+      "list of Credit card transaction"
+  """
+  @spec type_label(Declarations.t(), term()) :: String.t()
+  def type_label(_declarations, :unknown), do: "unknown"
+  def type_label(declarations, {:list, item}), do: "list of " <> type_label(declarations, item)
+
+  def type_label(declarations, spelling) when is_binary(spelling) do
+    case Declarations.fetch(declarations, spelling) do
+      {:ok, %{label: label}} when is_binary(label) and label != "" -> label
+      _undeclared_or_unlabelled -> spelling
+    end
+  end
+
+  def type_label(_declarations, other), do: inspect(other)
+
+  @doc """
   The read check: `StatifierDatamodel.Types.satisfies/3` over the two
   spellings, and nothing else (ADR-0011 decision 3).
 

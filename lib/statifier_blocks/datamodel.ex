@@ -153,7 +153,7 @@ defmodule StatifierBlocks.Datamodel do
   module does not answer it either.
   """
 
-  alias StatifierBlocks.{Block, BlockType, Document, Finding, Palette}
+  alias StatifierBlocks.{Block, BlockType, Document, Environment, Finding, Palette}
   alias StatifierBlocks.Document.DatamodelEntry
 
   # `StatifierDatamodel.Index` is the datamodel document's reader. It is
@@ -161,12 +161,20 @@ defmodule StatifierBlocks.Datamodel do
   # is already this package's own block document above, and two modules of
   # that name in one file is exactly the confusion an alias is supposed to
   # remove. The document-level reads below are spelled out in full.
-  alias StatifierDatamodel.Index
+  alias StatifierDatamodel.{Declarations, Index, Types}
 
   # The config key a block type stores its capture pairs under. It carries
   # no field declaration, so this module and `StatifierBlocks.Environment`
   # both read it off the config directly, and both spell the key once.
   @capture_key "capture"
+
+  # The word a cell carrying no type shows. `StatifierBlocks.Shell` spells the
+  # same word for the same reason on a declared PATH with no entry describing
+  # it (`declared_shape/1`); this one is about a declared FIELD whose type
+  # spelling names neither a scalar nor a declaration. They are two facts, and
+  # a reader seeing one word for both is reading the truth: nothing in the
+  # document says what is there.
+  @unspecified_type "unspecified"
 
   @typedoc """
   The normalized datamodel: the set of paths the host declares, or `nil`
@@ -505,6 +513,104 @@ defmodule StatifierBlocks.Datamodel do
     |> StatifierDatamodel.Document.declared_values()
     |> Map.merge(host_values(host))
   end
+
+  @typedoc """
+  One field of a declared record or shape, as the Datamodel tab draws it:
+  the field's own name, the type rendered for a reader (ADR-0011 decision
+  9), and whether the declaration marks it required.
+  """
+  @type declared_field :: %{
+          name: String.t(),
+          type: String.t(),
+          required?: boolean(),
+          label: String.t() | nil
+        }
+
+  @typedoc "One `record` or `shape` the datamodel document declares."
+  @type declared_type :: %{
+          name: String.t(),
+          kind: :record | :shape,
+          label: String.t() | nil,
+          fields: [declared_field()]
+        }
+
+  @doc """
+  The `record` and `shape` declarations the datamodel document carries, by
+  name, with their fields and required marks (ADR-0011 decision 9).
+
+  This is the other half of what the Datamodel tab answers. `declared_view/3`
+  says which **paths** are declared; this says which **types** are, which is
+  the vocabulary a `{:path, %{expects: T}}` field's `T` is drawn from and the
+  vocabulary a `:type_mismatch` names. An author looking at a finding that
+  says a record does not cover a shape has to be able to see what the shape
+  requires, and before this there was nowhere in the editor that said.
+
+  The rows are `StatifierDatamodel.Declarations.from_document/1`'s, sorted by
+  name, with each field's type rendered rather than left as a parsed tuple: a
+  field whose type names another declaration reads as that declaration's
+  label, a list says what it holds, and a spelling naming neither a scalar
+  nor a declaration reads as `unspecified` - the same word `declared_shape/1`
+  uses for a path no entry describes, because it is the same fact.
+
+  Total, like every other reader here: a datamodel that is not a document, or
+  one written before the `types` key existed, declares nothing.
+
+      iex> alias StatifierBlocks.Datamodel
+      iex> datamodel = %{"types" => [
+      ...>   %{"name" => "cards.settlement", "kind" => "record", "label" => "Settlement",
+      ...>     "fields" => [%{"name" => "amount_minor", "type" => "integer",
+      ...>                    "required?" => true}]}]}
+      iex> Datamodel.declared_types(datamodel)
+      [
+        %{name: "cards.settlement", kind: :record, label: "Settlement",
+          fields: [%{name: "amount_minor", type: "integer", required?: true, label: nil}]}
+      ]
+
+      iex> StatifierBlocks.Datamodel.declared_types(nil)
+      []
+  """
+  @spec declared_types(term()) :: [declared_type()]
+  def declared_types(datamodel) do
+    declarations = Declarations.from_document(datamodel)
+
+    declarations
+    |> Map.values()
+    |> Enum.sort_by(& &1.name)
+    |> Enum.map(fn declaration ->
+      %{
+        name: declaration.name,
+        kind: declaration.kind,
+        label: declaration.label,
+        fields: Enum.map(declaration.fields, &declared_field(&1, declarations))
+      }
+    end)
+  end
+
+  @spec declared_field(Declarations.field(), Declarations.t()) :: declared_field()
+  defp declared_field(field, declarations) do
+    %{
+      name: field.name,
+      type: field_type_text(field, declarations),
+      required?: field.required? == true,
+      label: field.label
+    }
+  end
+
+  # A list says what it holds for the reason `declared_shape/1` gives - "list"
+  # alone is the one type in the closed set that does not describe a value -
+  # and a spelling the document could not read at all is `unspecified` rather
+  # than blank, because a blank cell reads as a rendering gap.
+  @spec field_type_text(Declarations.field(), Declarations.t()) :: String.t()
+  defp field_type_text(%{type: nil}, _declarations), do: @unspecified_type
+
+  defp field_type_text(%{type: :list, item_type: item}, declarations) when not is_nil(item),
+    do: "list of " <> type_text(item, declarations)
+
+  defp field_type_text(%{type: type}, declarations), do: type_text(type, declarations)
+
+  @spec type_text(Types.t(), Declarations.t()) :: String.t()
+  defp type_text(type, declarations),
+    do: Environment.type_label(declarations, Types.to_string(type))
 
   @doc """
   Every declared path, with the surfaces that declared it and the shape the

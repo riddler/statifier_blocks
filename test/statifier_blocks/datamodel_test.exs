@@ -788,4 +788,59 @@ defmodule StatifierBlocks.DatamodelTest do
              ] == ["details", "payment", "review"]
     end
   end
+
+  describe "declared_types/1" do
+    # ADR-0011 decision 9: a field whose type names another declaration reads
+    # as that declaration's label, which is the same rendering a finding
+    # applies to a type it names. One renderer, two surfaces.
+    #
+    # Sabotage: `field_type_text/2` answering `Types.to_string/1` directly -
+    # the nested declaration reads as its nominal name and this goes red.
+    test "renders a field whose type names a declaration as that declaration's label" do
+      datamodel = %{
+        "types" => [
+          %{
+            "name" => "cards.card",
+            "kind" => "record",
+            "label" => "Card",
+            "fields" => [%{"name" => "last4", "type" => "string", "required?" => true}]
+          },
+          %{
+            "name" => "cards.credit_txn",
+            "kind" => "record",
+            "label" => "Credit card transaction",
+            "fields" => [
+              %{"name" => "card", "type" => "cards.card", "required?" => true},
+              %{"name" => "tags", "type" => "list", "item_type" => "string"},
+              %{"name" => "provenance", "type" => "whatever the host means"}
+            ]
+          }
+        ]
+      }
+
+      assert [card, txn] = Datamodel.declared_types(datamodel)
+      assert card.name == "cards.card"
+
+      assert txn.fields == [
+               %{name: "card", type: "Card", required?: true, label: nil},
+               %{name: "tags", type: "list of string", required?: false, label: nil},
+               %{name: "provenance", type: "unspecified", required?: false, label: nil}
+             ]
+    end
+
+    # Sabotage: sorting by `label` rather than by `name` - two declarations
+    # whose labels order the other way round come back swapped.
+    test "is by declared name, and a document with no types declares none" do
+      datamodel = %{
+        "types" => [
+          %{"name" => "b.two", "kind" => "shape", "label" => "A label", "fields" => []},
+          %{"name" => "a.one", "kind" => "record", "label" => "Z label", "fields" => []}
+        ]
+      }
+
+      assert Enum.map(Datamodel.declared_types(datamodel), & &1.name) == ["a.one", "b.two"]
+      assert Datamodel.declared_types(%{"scopes" => []}) == []
+      assert Datamodel.declared_types(["a.one"]) == []
+    end
+  end
 end

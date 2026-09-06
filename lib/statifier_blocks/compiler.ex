@@ -206,6 +206,7 @@ defmodule StatifierBlocks.Compiler do
     Compiled,
     Document,
     Emission,
+    Environment,
     Palette,
     Provenance,
     Shelf,
@@ -497,10 +498,13 @@ defmodule StatifierBlocks.Compiler do
         {:error, findings} -> Enum.map(findings, &slot_finding/1)
       end
 
+    ctx = assignability_context(opts)
+    declarations = Environment.declarations(ctx)
+
     assignability_findings =
-      case Assignability.validate(palette, document, assignability_context(opts)) do
+      case Assignability.validate(palette, document, ctx) do
         :ok -> []
-        {:error, findings} -> Enum.map(findings, &structure_finding/1)
+        {:error, findings} -> Enum.map(findings, &structure_finding(&1, declarations))
       end
 
     shelf_findings =
@@ -557,8 +561,20 @@ defmodule StatifierBlocks.Compiler do
     end)
   end
 
-  @spec structure_finding(Assignability.finding()) :: Finding.t()
-  defp structure_finding({:kind_not_admitted, id, parent_id, slot, kinds, accepts} = reason) do
+  # `declarations` is what turns a nominal type name into the label ADR-0011
+  # decision 9 asks a finding to carry. It is read from the same `:datamodel`
+  # the check itself ran against - one document, read once in
+  # `structure_stage/3` - so the sentence an author reads and the verdict it
+  # explains cannot come from two different documents. With no datamodel to
+  # hand the declarations are empty, every spelling renders as itself, and the
+  # message is word for word the one this stage produced before the labels
+  # existed.
+  @spec structure_finding(Assignability.finding(), StatifierDatamodel.Declarations.t()) ::
+          Finding.t()
+  defp structure_finding(
+         {:kind_not_admitted, id, parent_id, slot, kinds, accepts} = reason,
+         _declarations
+       ) do
     Finding.new(
       :structure,
       reason,
@@ -568,15 +584,29 @@ defmodule StatifierBlocks.Compiler do
     )
   end
 
-  defp structure_finding({:type_mismatch, id, source, held, expected, path} = reason) do
+  defp structure_finding(
+         {:type_mismatch, id, source, held, expected, path} = reason,
+         declarations
+       ) do
     Finding.new(
       :structure,
       reason,
-      "this block reads #{inspect(expected)} at #{path}, where #{inspect(source)} " <>
-        "left #{inspect(held)}",
+      "this block reads #{named(declarations, expected)} at #{path}, " <>
+        "where #{inspect(source)} left #{named(declarations, held)}",
       block_id: id
     )
   end
+
+  # A declared type reads as its label and everything else reads as it always
+  # did, quoted the way `inspect/1` quoted it - so an opaque string a host
+  # carries and `:unknown` are unchanged, and only a name the datamodel
+  # document actually declares is rewritten.
+  @spec named(StatifierDatamodel.Declarations.t(), Environment.type_expr() | :unknown) ::
+          String.t()
+  defp named(_declarations, :unknown), do: inspect(:unknown)
+
+  defp named(declarations, spelling),
+    do: inspect(Environment.type_label(declarations, spelling))
 
   @spec slot_finding(SlotValidation.finding()) :: Finding.t()
   defp slot_finding({:slot_arity_violated, id, slot, arity, count} = reason) do

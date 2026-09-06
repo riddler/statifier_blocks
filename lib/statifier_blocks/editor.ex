@@ -398,6 +398,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Declarations,
       Document,
       Edit,
+      Environment,
       Finding,
       Palette,
       Recipe,
@@ -636,6 +637,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       assigns =
         assigns
+        |> assign(:declared_types, Datamodel.declared_types(assigns.datamodel))
+        |> assign(:environment_view, environment_view(assigns))
+
+      assigns =
+        assigns
         |> assign(:drawer, drawer_view(assigns))
         |> assign(:declarations, declaration_entries(assigns))
         |> assign(:path_candidates, path_candidates(assigns))
@@ -752,6 +758,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             declaration_refusal={@declaration_refusal}
             fixture_runs={@fixture_runs}
             declared_view={@declared_view}
+            declared_types={@declared_types}
+            environment_view={@environment_view}
             focus_tab={@drawer_tab_focus}
             target={@myself}
           />
@@ -1573,6 +1581,48 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Datamodel.declared_view(assigns.document, assigns.datamodel, assigns.host_roots)
     end
 
+    # "What is known here" (ADR-0011 decision 9): the environment at the
+    # SELECTED block's position, as rows the Datamodel tab draws. Nothing
+    # selected means there is no position to answer for, and the panel says so
+    # rather than showing the seed and calling it the answer.
+    #
+    # The position is the last step of the path from the root to the block,
+    # which is the same `{parent, slot, index}` triple
+    # `Assignability.seam_reasons/3` asks the walk with - the block's own
+    # position, so what it shows is what that block reads against, before its
+    # own writes land.
+    @spec environment_view(map()) :: [%{path: String.t(), type: String.t()}] | nil
+    defp environment_view(%{selected_id: id} = assigns) when is_binary(id) do
+      %{document: document, palette: palette} = assigns
+      ctx = assignability_context(assigns)
+      declarations = Environment.declarations(ctx)
+
+      case Document.fetch_path(document, id) do
+        {:ok, [_first | _rest] = path} ->
+          palette
+          |> Environment.at(document, List.last(path), ctx)
+          |> Enum.sort()
+          |> Enum.map(fn {read_path, type} ->
+            %{path: read_path, type: Environment.type_label(declarations, type)}
+          end)
+
+        _root_or_missing ->
+          []
+      end
+    end
+
+    defp environment_view(_nothing_selected), do: nil
+
+    # The context every data-flow question in this component is asked with: the
+    # host's datamodel document and nothing else. `:entry_type` is deliberately
+    # absent - the editor is not told what enters the document, and ADR-0011
+    # decision 2 seeds empty in that case - so this is one key, named once, and
+    # the drop check, the walk and the Datamodel tab cannot drift apart by
+    # being handed different ones.
+    @spec assignability_context(map()) :: Assignability.context()
+    defp assignability_context(%{datamodel: nil}), do: %{}
+    defp assignability_context(%{datamodel: datamodel}), do: %{datamodel: datamodel}
+
     # What the panel draws: the author's refused list while one is held, and
     # the document's otherwise. The COUNT on the strip stays the document's -
     # `drawer_view/1` above is given `assigns.document.datamodel` and not this
@@ -2122,13 +2172,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             MapSet.t(Block.type_name())
     defp accepted_types(socket, parent_id, slot) do
       %{document: document, palette: palette} = socket.assigns
+      ctx = assignability_context(socket.assigns)
 
       palette.types
       |> Map.keys()
       |> Enum.filter(fn type ->
         case new_block(palette, type) do
           {:ok, probe} ->
-            {parent_id, slot} in Targets.droppable_slots_for(document, palette, probe)
+            {parent_id, slot} in Targets.droppable_slots_for(document, palette, probe, ctx)
 
           :error ->
             false
@@ -2167,7 +2218,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       case new_block(palette, type) do
         {:ok, probe} ->
           document
-          |> Targets.slot_verdicts(palette, probe)
+          |> Targets.slot_verdicts(palette, probe, assignability_context(socket.assigns))
           |> session(%{block_id: nil, type: type})
 
         :error ->
@@ -2195,7 +2246,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       with false <- id == view_model.root.block_id,
            block when not is_nil(block) <- find_document_block(document, id) do
-        Targets.slot_verdicts(document, palette, block)
+        Targets.slot_verdicts(document, palette, block, assignability_context(socket.assigns))
       else
         _root_or_missing -> []
       end
