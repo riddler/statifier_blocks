@@ -3617,3 +3617,71 @@ against a file that moves. The durable half of each cite is the function
 name, which is why the ranges above are given beside `finals/1` and
 `outcome_names/1` rather than instead of them, and why a reader who finds a
 range that no longer lands should read the name and not the number.
+
+## Note (2026-09-06): the seventeen rows of the decision 10 Note's rationale sit in ten tables, seven of them in decision 10's
+
+A dated Note rather than an amendment, recorded for `sb-ae12` under
+campaign-033. Nothing above this line is edited and no decision moves: this is
+a cite errata for one clause in the Note added earlier this date under
+"decision 10, the read and the write signature of each core row". The form is
+the one the Note added beside G14 on this date uses for a fact that moved after
+a record merged: say what the record says, say what is true now, and add rather
+than rewrite.
+
+That Note gives its reason for building a new table beside decision 10's rather
+than adding a fifth column to it:
+
+> decision 10's table is four columns wide and every row of it is a merged
+> line, so a fifth column cannot arrive without rewriting seventeen rows that
+> this Note does not reopen.
+
+Seventeen is the right count of the vocabulary and the wrong count of that
+table. Decision 10's table carries **seven** rows. The other ten core types
+joined one and two at a time in later sections, each in a table of its own, and
+those nine tables are **five** columns wide - they carry `outcomes(config)`,
+which section A added after decision 10's four columns were written.
+
+### The ten tables, counted against this file today
+
+Read at `854a745`. The durable half of each cite is the section label and the
+type names beside it; the line number is the half that ages.
+
+| Table | Section | Columns | Rows | The types it declares |
+|---|---|---|---|---|
+| `:338` | decision 10 | 4 | 7 | `core.sequence`, `core.branch`, `core.parallel`, `core.wait`, `core.resumable_group`, `core.on_event`, `core.group` |
+| `:905` | D | 5 | 2 | `core.invoke`, `core.raise` |
+| `:1105` | G | 5 | 1 | `core.assign` |
+| `:1463` | G2 | 5 | 1 | `core.send` |
+| `:1541` | G5 | 5 | 1 | `core.subchart` |
+| `:1610` | G6 | 5 | 1 | `core.foreach` |
+| `:2107` | G9 | 5 | 1 | `core.drafts` |
+| `:2185` | G10 | 5 | 1 | `core.placeholder` |
+| `:2902` | G14 | 5 | 1 | `core.await` |
+| `:3331` | G15 | 5 | 1 | `core.map` |
+
+Seven plus ten is seventeen, which is the count the Note added 2026-09-05
+beneath G11 gives (**seventeen rows, seventeen palette entries**) and the
+number of entries `StatifierBlocks.Palette.core_types/0` returns
+(`lib/statifier_blocks/palette.ex:116-136`, seventeen `"core.*" => module`
+pairs). Nothing about that count moves here; only where its rows physically
+sit is corrected.
+
+### Why the conclusion the clause supports is stronger under the accurate count
+
+A fifth column added to decision 10's table would rewrite seven rows, not
+seventeen - a smaller edit than the clause claims. But a read/write column
+carried **uniformly across the vocabulary** would have to reach ten tables in
+two different shapes, and in nine of them it would be a sixth column rather
+than a fifth, because `outcomes(config)` already holds their fifth. The choice
+that Note actually made - one new table beside decision 10's, projecting what
+`config_schema/1` declares - is therefore the cheaper and the more legible of
+the two by a wider margin than its own rationale claimed, and the Note's
+conclusion stands unchanged.
+
+One usage is worth naming so this errata is not read as correcting more than
+one clause. The Note added 2026-09-05 beside G11 says "the table" for the
+vocabulary's rows taken together, across all ten, and G15's "the ordinal has
+moved" paragraph counts that same single sequence by ordinal rather than by
+table. Neither reading is disturbed here: this Note corrects only the
+decision 10 Note's clause, which says "decision 10's table" and then counts
+all seventeen.
