@@ -4324,9 +4324,20 @@ reads as written.
 
 ## Amendment (2026-09-06): `core.invoke` declares and classes `error`, a failure-classed final is unconditional, and an unhandled failure below the root reaches the root
 
-**Status: proposed (2026-09-06), on the operator's campaign-034 rulings
+**Status: accepted (2026-09-06), on the operator's campaign-034 rulings
 `RQ-034-1` and `RQ-034-13`.** Drafted for `sb-ii2k`; it merges at proposed and
 flips to accepted in a separate change once `sb-hxs5` has the code on main.
+
+[Note 2026-09-06, `sb-ju4d`: the paragraph above is this section as it was
+drafted, and it is left standing rather than rewritten. The status word is now
+`accepted`. This is the separate change that sentence points at, opened after
+`sb-hxs5` put the code on `main` (PR 328, `0f9f2cd`) on top of the section
+itself (PR 320, `757ff3f`); the Note at the foot of this section carries what
+the flip verified against `main`. The record's head `Status:` line at `:3` is
+not extended by this flip, on the reason `sb-kkd7` gave beneath the amendment
+of this date at `:4021`: that line lists the amendments accepted up to
+2026-08-30, no accepted section since has been added to it, and extending it
+here would start a convention rather than follow one.]
 
 An amendment rather than a Note, because it changes what a shipped type
 declares and what the compiler emits, rather than only recording a callback
@@ -4489,6 +4500,12 @@ all outside it:
    with the value `failed`, spelled exactly as the Note of this date spells it;
    under `child_use: true` it carries the `outcome` param beside it, with the
    value `error`.
+
+   [Note 2026-09-06, `sb-ju4d`: `sb-hxs5` mints that id as the root block's id
+   under the role `<prefix>failed`, and a **root** block declaring an outcome
+   literally named `failed` would mint the same id for its own completion
+   final. Open, filed as `sb-k0dy`; whether the answer is a fallback role or a
+   compile refusal is a decision this flip does not take.]
 4. And emit, **on the root block's own state**, one `<transition>` per
    collected pair in walk order: `event="done.outcome.<state id>.<outcome>"`,
    `target` the single final from step 3, external. External because the point
@@ -4635,3 +4652,93 @@ is `sb-hxs5`; this section merges at proposed and the record's own acceptance
 is the operator's, through `sb-ju4d`. The reference embedder's host-side
 translation comes out with `se-cqr`, against `statifier_persistence`'s ADR-0008
 amendment of 2026-09-06, decision 6.
+
+### Note (2026-09-06): what the flip checked, section by section
+
+The flip request `sb-ju4d` read sections 1 through 6 and the per-container
+table against `main` at `0f9f2cd` - the tree `sb-hxs5` left (PR 328) - rather
+than against the tree this section was drafted over. Every decision holds, and
+the closing paragraph above, which says this section merges at proposed and
+leaves its acceptance to `sb-ju4d`, is left standing rather than rewritten:
+this Note is that acceptance. Nothing above this Note is edited by it.
+
+**Section 1 holds.** `StatifierBlocks.Core.Invoke.outcomes/1` returns
+`[{"done", "Done"}, {"error", "Error"}]`, fixed rather than config-derived
+(`lib/statifier_blocks/core/invoke.ex:114`), which is the pair
+`StatifierBlocks.InvokeStep.outcomes/0` already returned
+(`lib/statifier_blocks/invoke_step.ex:217`). The `on_error` slot is one
+`zero_or_one` slot still.
+
+**Section 3 holds, in both halves.**
+`StatifierBlocks.Core.Invoke.failure_outcomes/1` returns `["error"]`
+(`:127`). The `use` macro defines `failure_outcomes/1` from
+`StatifierBlocks.InvokeStep.failure_outcomes/0`
+(`lib/statifier_blocks/invoke_step.ex:172`, `:237`) and `failure_outcomes: 1`
+is in the `defoverridable` list beside `outcomes: 1` (`:186`), so a host type
+built on the macro is classed by inheritance and overrides in one line.
+
+**Section 2 holds in all three types, and the unconditional final is the
+same id in each.** `core.invoke`'s `failure_transition/1` targets the final
+directly when the slot is empty and the child when it is occupied, and
+`error_final/1` emits the final in both branches
+(`lib/statifier_blocks/core/invoke.ex:327-344`); `core.map` has the same
+three clauses on the same shape (`lib/statifier_blocks/core/map.ex:623-631`);
+`core.subchart` keeps `error` past the `routed? or child` filter whatever the
+author declared and whatever the slot holds
+(`lib/statifier_blocks/core/subchart.ex:495-526`). All three mint the final
+through `Compiler.Context.outcome_id/2`, which is the id the occupied case
+already used.
+
+**Section 4 holds, step for step.** `Compiler.propagation/3` runs only from
+the `completion_finals/4` clause the `:child_use` / `:terminate` `cond`
+selects (`lib/statifier_blocks/compiler.ex:1363-1394`); `unhandled_failures/1`
+starts at the root's slots rather than the root
+(`:1523`); `node_failures/1` walks the block then its slots in declaration
+order and keeps only an outcome that is both classed and declared
+(`:1536-1546`); `unhandled?/2` reads a declared `on_<outcome>` slot with a
+child as handled and an undeclared or empty one as unhandled (`:1549-1555`);
+the empty set emits nothing (`:1501-1503`); the one shared final is minted
+under `prefix <> "failed"` from the root block's id and stamped to the root
+block (`:1506-1510`, `:271`), its `<donedata>` carries
+`statifier_persistence:run_status` with `'failed'` (`:263-264`, `:1443-1449`)
+and, under `:child_use`, the `outcome` param with `'error'` (`:279`,
+`:1424`); and one transition per pair is emitted on the root block's state
+with no `type` attribute, which is external (`:1561-1570`).
+
+**Section 5's table holds.** `Emit.final/1` is the only place that raises
+`done.outcome.<state id>.<outcome>` (`lib/statifier_blocks/core/emit.ex:120`),
+and no core container emits a transition selected by one: the only other
+`outcome_event` in `lib/statifier_blocks/core/` is `core.on_event`'s own
+config reader for `abandon` and `resume`
+(`lib/statifier_blocks/core/on_event.ex:646`, `:712-714`), which is the
+interrupt protocol the table's `core.on_event` row names and not an outcome
+route.
+
+**Section 6's five classes hold, and the corpus pins the sixth case.**
+`StatifierBlocks.ByteCorpus` carries five documents - the two worked examples
+and one each of `core.invoke`, `core.map` and `core.subchart` with the
+failure slot **occupied** - each pinned under `plain`, `terminate: true` and
+`child_use: true`, which is the fifteen golden files under
+`test/fixtures/corpus/` (`test/support/byte_corpus.ex:28-43`). That is where
+"an occupied slot compiles to the bytes it compiled to" and "a document with
+no unhandled failure below its root is byte-identical under the gate as well
+as outside it" are cashed.
+
+**Two cites that were forward-looking when the section was written now
+resolve.** The reading of the added bytes as a root shape is Noted on
+`ADR-0004` by `sb-hxs5`, as this section's "Where the emission is recorded"
+paragraph said it would be, and that Note also supersedes `ADR-0004`'s
+earlier sentence that the three routing types emit their failure route only
+when the slot is occupied. And `ADR-0009`'s Note of this date, which this
+amendment's section 2 and section 4 are cited by, reads the `collect`
+envelope off `statifier_persistence`'s `Driver`: a failed child's entry is
+`"status" => "failed"` with a `"failure"` map, a completed child's is
+`"status" => "completed"` with its donedata, and a cancelled one's is
+`"status" => "cancelled"` alone
+(`statifier_persistence/lib/statifier_persistence/driver.ex:1157`, `:1160`,
+`:1172`). That Note carries no `Status:` line of its own - Notes in this
+family do not - so there is nothing on it for this flip to turn, and it is
+left untouched.
+
+Filed with `sb-ju4d`; the section it accepts was filed with `sb-ii2k` (PR
+320, `757ff3f`) and built by `sb-hxs5` (PR 328, `0f9f2cd`).
