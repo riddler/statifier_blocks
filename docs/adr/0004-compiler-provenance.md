@@ -2691,11 +2691,23 @@ both found.
 ### Why this record and not another
 
 The `sb-c9b6` brief named `ADR-0002` for this Note. That is a mis-cite and it
-is worth saying so here rather than leaving the correction to be re-derived:
-`ADR-0002` decision 10 is the outcome-name vocabulary, and `ADR-0002` decides
-what a block type declares rather than when the compiler consults it. The
-"first failing stage" rule is this record's decision 10, so this is where the
-amendment belongs.
+is worth saying so here rather than leaving the correction to be re-derived.
+`ADR-0002` decides what a block type **declares** rather than when the
+compiler consults it, and its decision 10 is a different thing again: "The
+core vocabulary, as answers to these callbacks", the table of what each
+shipped block type answers to `slots/1` and `config_schema/1`. Neither that
+decision nor any other in `ADR-0002` states a rule about stage sequencing.
+The "first failing stage" rule is **this** record's decision 10, so this is
+where the amendment belongs.
+
+[Cure 2026-09-06, `sb-c9b6`, pass 1 of the direction review: the paragraph
+above first described `ADR-0002` decision 10 as the outcome-name vocabulary.
+It is not - outcome names entered `ADR-0002` through its separate outcomes
+amendment of 2026-08-29, and decision 10 is the callback-answer table quoted
+here. The correction is to this Note's own explanatory prose; the conclusion
+it supports, that the amended sentence is `ADR-0004`'s and not `ADR-0002`'s,
+is unchanged and independently evidenced - `ADR-0002` carries no "first
+failing stage" sentence at all.]
 
 ### What is amended, and what is not
 
