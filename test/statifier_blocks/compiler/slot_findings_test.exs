@@ -81,7 +81,7 @@ defmodule StatifierBlocks.Compiler.SlotFindingsTest do
     end
   end
 
-  # Sabotage: made `structure_stage/3` return `:ok` when `slot_findings` is
+  # Sabotage: made `structure_stage/4` return `:ok` when `slot_findings` is
   # non-empty but `assignability_findings` is empty - red, because a
   # document with only a slot finding then compiled clean.
   test "an empty :at_least_one arm fails the compile with a slot_arity_violated finding" do
@@ -156,7 +156,7 @@ defmodule StatifierBlocks.Compiler.SlotFindingsTest do
     assert finding.message =~ "stray"
   end
 
-  # Sabotage: made `structure_stage/3` return early on `slot_findings`
+  # Sabotage: made `structure_stage/4` return early on `slot_findings`
   # instead of concatenating with `assignability_findings` - red, because
   # the type mismatch below then never reached the report.
   test "a slot finding and an assignability finding on the same block are both reported, slot first" do
@@ -190,16 +190,22 @@ defmodule StatifierBlocks.Compiler.SlotFindingsTest do
            ]
   end
 
-  # Not redundant with `compiler/findings_test.exs`'s first-failing-stage
-  # test: that one pins Structure against Chart. This one pins the
-  # Config-before-Structure edge, which is where SlotValidation's
-  # `slots/1` stability precondition is bought (only accepted config ever
-  # reaches Structure).
+  # SlotValidation's `slots/1` stability precondition - it counts a block's
+  # children against the slot set the block's own config declares - used to
+  # be bought by sequencing: Config ran first and stopped the pipeline, so
+  # only accepted config ever reached this stage. RQ-SF035-2 retired that
+  # sequencing (Config and Structure now report together, see the compiler
+  # moduledoc), so the precondition is bought by the skip set instead: a
+  # block Config refused is passed over by every source in this stage,
+  # arity included. What changed is what happens to the *other* blocks -
+  # they are checked now, where before they were not; what did not change
+  # is this, that no arity is counted against a refused config.
   #
-  # Sabotage: swapped `config_stage/1` and `structure_stage/3` in
-  # `compile/3`'s `with` - red, because Structure then saw the rejected
-  # config first and the finding's stage came back `:structure`.
-  test "Structure still runs only after Config, so a rejected config reports only :config findings" do
+  # Sabotage: dropped the `Enum.reject(slot_findings, ...)` in
+  # `structure_stage/4` - red, because the arity of a slot set this config
+  # does not really declare is then reported beside the config finding that
+  # says so.
+  test "a block whose config Config refused reports no arity finding of its own" do
     document =
       Document.new(
         Block.new("core.sequence",
@@ -217,12 +223,13 @@ defmodule StatifierBlocks.Compiler.SlotFindingsTest do
       )
 
     assert {:error, findings} = Compiler.compile(document, CoreFixtures.palette())
-    assert Enum.map(findings, & &1.stage) |> Enum.uniq() == [:config]
+
+    assert Enum.map(findings, &{&1.stage, &1.block_id}) == [{:config, "blk_BRANCH"}]
   end
 
-  # Sabotage: made `structure_stage/3` return `{:error, []}` instead of
-  # `:ok` whenever the concatenated finding list was empty - red on both
-  # fixtures, since neither compiles at all once Structure always fails.
+  # Sabotage: made `structure_stage/4` return a one-element list whenever
+  # its concatenated finding list was empty - red on both fixtures, since
+  # neither compiles at all once Structure always fails.
   test "the worked example and the signup wizard still compile" do
     assert {:ok, _compiled} =
              Compiler.compile(DocumentFixtures.worked_example(), CoreFixtures.palette())

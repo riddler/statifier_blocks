@@ -116,7 +116,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # the point of naming the key at all. Selecting the block is therefore
       # part of the route now, not scenery.
       #
-      # Sabotage: `structure_stage/3` reading `Environment.declarations(%{})` -
+      # Sabotage: `structure_stage/4` reading `Environment.declarations(%{})` -
       # the nominal names reach the page and both assertions go red.
       # Sabotage: `structure_finding/3` dropping `config_key:` - the anchor
       # assert goes red on `{:block, "blk_STL"}`.

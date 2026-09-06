@@ -187,7 +187,7 @@ defmodule StatifierBlocks.ShelfTest do
     # reports both.
     #
     # Sabotage: dropped `shelf_findings` from the concatenation in
-    # `structure_stage/3` - red here on the missing two codes, which is the
+    # `structure_stage/4` - red here on the missing two codes, which is the
     # wiring rather than the rule.
     test "both codes arrive as author-faulted structure errors on the block" do
       both =

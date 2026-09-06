@@ -43,6 +43,47 @@ defmodule StatifierBlocks.Compiler do
   `StatifierBlocks.Document.blocks/1`'s pre-order - which is how upstream's
   own document-order sort survives the trip.
 
+  ### Config and Structure are reported together
+
+  Every other stage in decision 10's table stops the pipeline the moment it
+  fails, and the errors a caller gets back come from that one stage. Config
+  and Structure are the one pair that does not: when Config finds something,
+  Structure still runs, and the refusal carries the **union** of what both
+  found (RQ-SF035-2, and the dated Notes of 2026-09-06 on ADR-0011 and
+  ADR-0002).
+
+  The reason is that they are not in a consequence relation the way the
+  later stages are. Emit reads the tree Structure has already agreed is
+  well-formed, so its findings on a document Structure refused would be
+  artefacts. Structure reads the *document*, not the config values Config
+  checks, so a mis-typed field on one card and an unsatisfied read on
+  another are two independent statements about the same document - and an
+  author who can only see the first has to fix it, recompile, and discover
+  the second, one round trip per stage. Decision 10's "every finding within
+  a stage is reported, because they are siblings" is the same argument; this
+  extends it across exactly the one stage boundary where it holds.
+
+  What a block whose config Config refused contributes to Structure is
+  nothing at all - it is skipped by id, and every other block is checked
+  exactly as it would have been. That is what the old sequencing bought and
+  what has to be bought again some other way: *every* source in the
+  Structure stage reads the refused config. A write signature comes off a
+  config, so an entry derived from one would make the next block's read
+  disagree with a type nobody declared; `slots/1` takes a config too, so
+  slot arity and `:undeclared_slot` on a refused block would be counted
+  against a slot set that config does not really declare; and
+  `StatifierBlocks.Shelf` places a block the config named. So the refused
+  ids reach the environment walk as `:skip_blocks` - the block declares no
+  read and writes no entry - and the two document-shape sources drop the
+  findings they anchored on those same ids.
+
+  The walk itself continues past a skipped block: its siblings and its
+  children are checked as they always were, and a child's config is its own.
+  This is an absence of one block's answers, not a shortened stage.
+
+  Refusal semantics are unchanged. A document with a Config finding still
+  does not compile; it now says more about why.
+
   ### The Structure stage is whole
 
   Decision 10's table names three things in this stage: slot **arity**,
@@ -338,15 +379,17 @@ defmodule StatifierBlocks.Compiler do
   Total: `{:ok, %StatifierBlocks.Compiled{}}` or
   `{:error, [%StatifierBlocks.Compiler.Finding{}]}`, never a raise and
   never a partial success. Errors come from the first failing stage only
-  (decision 10); warnings ride on the artifact when the compile succeeds.
+  (decision 10), with one exception the moduledoc's "Config and Structure
+  are reported together" section states: those two stages run as a pair, and
+  a refusal carries the union of their findings. Warnings ride on the
+  artifact when the compile succeeds.
   """
   @spec compile(Document.t(), Palette.t(), [option()]) ::
           {:ok, Compiled.t()} | {:error, [Finding.t()]}
   def compile(%Document{} = document, %Palette{} = palette, opts \\ []) when is_list(opts) do
     with :ok <- document_stage(document),
          {:ok, node} <- resolve_stage(document, palette),
-         :ok <- config_stage(node, opts),
-         :ok <- structure_stage(document, palette, opts),
+         :ok <- config_and_structure_stages(document, palette, node, opts),
          {node, shelf_warnings} = elide_shelf(node),
          :ok <- chart_use_stage(node, opts),
          {:ok, {emission, emit_warnings}} <- emit_stage(node, document, opts),
@@ -484,14 +527,40 @@ defmodule StatifierBlocks.Compiler do
   # amendment of 2026-09-06, P5 - the anchor is a config key and the fault is
   # the author's), and `validate_config/1` is the callback that cannot be
   # given one.
-  @spec config_stage(Resolved.t(), keyword()) :: :ok | {:error, [Finding.t()]}
+  @spec config_stage(Resolved.t(), keyword()) :: [Finding.t()]
   defp config_stage(node, opts) do
     declarations = opts |> assignability_context() |> Environment.declarations()
+    config_findings(node, declarations)
+  end
 
-    case config_findings(node, declarations) do
+  # Decision 10's two stages that run as a pair rather than in sequence. See
+  # the moduledoc's "Config and Structure are reported together": Structure
+  # reads the document while Config reads config values, so neither stage's
+  # findings are artefacts of the other's, and an author gets both in one
+  # refusal instead of one per round trip.
+  #
+  # The coupling between them runs one way and is exactly the skip set: a
+  # block Config refused declares nothing Structure will believe, so its id
+  # is passed down and `StatifierBlocks.Environment` leaves its writes out
+  # while `StatifierBlocks.Assignability.validate/3` passes over the block
+  # itself. A block with no `block_id` on its finding - there is no such
+  # config finding today, since every one of them anchors on a card, but the
+  # struct allows it - skips nothing, which is the permissive answer.
+  @spec config_and_structure_stages(Document.t(), Palette.t(), Resolved.t(), keyword()) ::
+          :ok | {:error, [Finding.t()]}
+  defp config_and_structure_stages(document, palette, node, opts) do
+    config = config_stage(node, opts)
+    structure = structure_stage(document, palette, opts, refused_block_ids(config))
+
+    case config ++ structure do
       [] -> :ok
       findings -> {:error, findings}
     end
+  end
+
+  @spec refused_block_ids([Finding.t()]) :: MapSet.t(Block.id())
+  defp refused_block_ids(findings) do
+    for %Finding{block_id: id} <- findings, id != nil, into: MapSet.new(), do: id
   end
 
   @spec config_findings(Resolved.t(), StatifierDatamodel.Declarations.t()) :: [Finding.t()]
@@ -591,15 +660,26 @@ defmodule StatifierBlocks.Compiler do
   # `SlotValidation.validate/2` and `Assignability.validate/3` are the one
   # implementation the editor and the compiler consult (ADR-0002 decision
   # 6, ADR-0003 decision 6), and the editor has no resolved tree.
-  @spec structure_stage(Document.t(), Palette.t(), keyword()) :: :ok | {:error, [Finding.t()]}
-  defp structure_stage(document, palette, opts) do
+  #
+  # `skip` is the ids Config already refused (see the moduledoc's "Config and
+  # Structure are reported together"). Every source here reads the config
+  # that was refused, so every source has to pass over those blocks, and each
+  # does it the way that suits what it computes: assignability takes the set
+  # through the context, because the *environment* must not carry a write
+  # derived from a refused config even for the blocks that are checked, while
+  # `SlotValidation` and `Shelf` compute per block and are filtered on the way
+  # out. Both are the same rule - a refused block contributes nothing to this
+  # stage - and neither shortens the walk for anybody else.
+  @spec structure_stage(Document.t(), Palette.t(), keyword(), MapSet.t(Block.id())) ::
+          [Finding.t()]
+  defp structure_stage(document, palette, opts, skip) do
     slot_findings =
       case SlotValidation.validate(palette, document) do
         :ok -> []
         {:error, findings} -> Enum.map(findings, &slot_finding/1)
       end
 
-    ctx = assignability_context(opts)
+    ctx = opts |> assignability_context() |> Map.put(:skip_blocks, skip)
     declarations = Environment.declarations(ctx)
 
     assignability_findings =
@@ -618,11 +698,13 @@ defmodule StatifierBlocks.Compiler do
         {:error, findings} -> Enum.map(findings, &shelf_finding/1)
       end
 
-    case slot_findings ++ assignability_findings ++ shelf_findings do
-      [] -> :ok
-      findings -> {:error, findings}
-    end
+    Enum.reject(slot_findings, &refused?(&1, skip)) ++
+      assignability_findings ++ Enum.reject(shelf_findings, &refused?(&1, skip))
   end
+
+  @spec refused?(Finding.t(), MapSet.t(Block.id())) :: boolean()
+  defp refused?(%Finding{block_id: nil}, _skip), do: false
+  defp refused?(%Finding{block_id: id}, skip), do: MapSet.member?(skip, id)
 
   # Both carry `severity: :error` and `fault: :author` by `Finding.new/4`'s
   # own defaults for this stage, and neither carries a `config_key`, because
@@ -669,7 +751,7 @@ defmodule StatifierBlocks.Compiler do
   # `declarations` is what turns a nominal type name into the label ADR-0011
   # decision 9 asks a finding to carry. It is read from the same `:datamodel`
   # the check itself ran against - one document, read once in
-  # `structure_stage/3` - so the sentence an author reads and the verdict it
+  # `structure_stage/4` - so the sentence an author reads and the verdict it
   # explains cannot come from two different documents. With no datamodel to
   # hand the declarations are empty, every spelling renders as itself, and the
   # message is word for word the one this stage produced before the labels

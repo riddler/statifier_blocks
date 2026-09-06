@@ -791,6 +791,15 @@ defmodule StatifierBlocks.Assignability do
   `:ok` when the document has no findings; otherwise `{:error, findings}`
   with every block's findings concatenated, in `Document.blocks/1`'s
   pre-order.
+
+  A block named in `ctx[:skip_blocks]` is passed over: it produces no
+  finding of its own and its declared writes leave no entry in the
+  environment (`StatifierBlocks.Environment`'s context documents why). The
+  walk continues past it - its siblings and its children are checked exactly
+  as they would have been - so this is an absence of one block's answers
+  rather than a shortened walk. `check/5` reads the same key through the
+  environment it builds, and no caller that has not refused a config sets
+  one.
   """
   @spec validate(Palette.t(), Document.t(), context()) :: :ok | {:error, [finding()]}
   def validate(%Palette{} = palette, %Document{} = document, ctx) do
@@ -810,6 +819,22 @@ defmodule StatifierBlocks.Assignability do
   @spec block_findings(Palette.t(), Document.t(), Block.t(), context(), Declarations.t()) ::
           [finding()]
   defp block_findings(palette, document, %Block{} = block, ctx, declarations) do
+    if skipped?(block, ctx),
+      do: [],
+      else: own_findings(palette, document, block, ctx, declarations)
+  end
+
+  @spec skipped?(Block.t(), context()) :: boolean()
+  defp skipped?(%Block{id: id}, ctx) do
+    case Map.fetch(ctx, :skip_blocks) do
+      {:ok, skip} -> MapSet.member?(skip, id)
+      :error -> false
+    end
+  end
+
+  @spec own_findings(Palette.t(), Document.t(), Block.t(), context(), Declarations.t()) ::
+          [finding()]
+  defp own_findings(palette, document, %Block{} = block, ctx, declarations) do
     case Document.fetch_path(document, block.id) do
       {:ok, [_first | _rest] = path} ->
         {parent_id, slot, _index} = target = List.last(path)
