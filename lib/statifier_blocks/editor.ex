@@ -489,6 +489,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          drawer_tabs: [],
          drawer_tab_id: nil,
          drawer_tab_focus: nil,
+         config_field_focus: nil,
          drawer_height: Shell.clamp_height(nil),
          on_drawer_resize: nil,
          zoom: Shell.default_zoom(),
@@ -761,6 +762,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             capture_sources={@capture_sources}
             fixtures={@fixtures}
             fixture_runs={@fixture_runs}
+            field_focus={@config_field_focus}
             target={@myself}
           />
 
@@ -788,12 +790,39 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     # -------------------------------------------------------------- events
 
+    # A config-emitted source span (`sb-rd29`) carries its field's key on the
+    # click: the author did not just ask "which block wrote this byte", they
+    # asked "where in that block's form". So this clause does three things the
+    # plain one below does not - it puts the inspector on the Config tab,
+    # since a field cannot be focused on a tab that is not showing it, and it
+    # stores the key one-shot in `config_field_focus` for
+    # `StatifierBlocks.Editor.ConfigForm` to resolve into an input id and
+    # focus. It is one-shot for the reason `drawer_tab_focus` is: a re-render
+    # that found the assign still set would refocus the field for a click
+    # nobody made. Cleared here on the very next plain selection, on a manual
+    # pick of another inspector tab, and on a document switch - see those
+    # handlers below.
     @impl Phoenix.LiveComponent
+    def handle_event("select", %{"block-id" => id, "config-key" => key}, socket) do
+      {:noreply,
+       socket
+       |> assign(
+         selected_id: id,
+         palette_sheet: false,
+         inspector_tab: :config,
+         config_field_focus: key
+       )
+       |> rebuild()}
+    end
+
     def handle_event("select", %{"block-id" => id}, socket) do
       # The sheet is an overlay over the canvas below 780 (7A), so a selection
       # made from inside it has to put it away - otherwise the block the author
       # just chose is behind the thing they chose it from.
-      {:noreply, socket |> assign(selected_id: id, palette_sheet: false) |> rebuild()}
+      {:noreply,
+       socket
+       |> assign(selected_id: id, palette_sheet: false, config_field_focus: nil)
+       |> rebuild()}
     end
 
     # ------------------------------------------------------------ measurement
@@ -917,10 +946,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # the Fixtures tab is the moment its rows are first wanted, and without it
     # the tab would draw its empty state until something else moved the
     # document.
+    # `config_field_focus` is cleared here for the same one-shot reason
+    # `drawer_tab_focus` is cleared on its own manual routes: an author
+    # picking a tab by hand did not just ask for a field, and a stale key
+    # left standing would refocus one on the next unrelated visit to Config.
     def handle_event("inspector-tab", %{"tab" => tab}, socket),
       do:
         {:noreply,
-         socket |> assign(:inspector_tab, Shell.inspector_tab(tab)) |> refresh_fixture_runs()}
+         socket
+         |> assign(inspector_tab: Shell.inspector_tab(tab), config_field_focus: nil)
+         |> refresh_fixture_runs()}
 
     # `drawer_tab_focus` is cleared here and on every other route into the
     # drawer for the reason `StatifierBlocks.Editor.Drawer`'s moduledoc gives:
@@ -1485,6 +1520,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             drawer_open: false,
             drawer_tab_id: nil,
             drawer_tab_focus: nil,
+            config_field_focus: nil,
             selected_id: nil,
             drafts: %{},
             declaration_draft: nil,
