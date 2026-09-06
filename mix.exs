@@ -186,7 +186,7 @@ defmodule StatifierBlocks.MixProject do
         # dependencies because its only consumer is a LiveView component:
         # the headless tree has no editor to render, so pulling it there
         # would resolve a package nothing in that tree can call.
-        {:statifier_ui, "~> 0.8", optional: true},
+        {:statifier_ui, "~> 0.9", optional: true},
         {:lazy_html, ">= 0.1.0", only: :test}
       ]
     end
