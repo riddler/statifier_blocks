@@ -75,10 +75,10 @@ defmodule StatifierBlocks.Core.Map do
   |---|---|---|
   | `items` | `{:path, %{}}` | the datamodel path holding the descriptor list |
   | `chart` | `:string` | the document id of the chart run once per item |
-  | `collect` | `{:path, %{}}` | where the assembled answer is written |
+  | `collect` | `{:path, %{writes: {:list, :unknown}}}` | where the assembled answer is written |
   | `on` | `{:select, ...}` | the aggregation policy, `all` or `first_error` |
 
-  `items` and `collect` are declared `{:path, %{}}` - ADR-0002 decision
+  `items` and `collect` are declared `{:path, opts}` - ADR-0002 decision
   7's eighth field type - so the editor offers the host's declared
   datamodel paths as candidates on both and gives a value the datamodel
   does not declare ADR-0005 clause 11e's `:info` advisory, which is a
@@ -86,6 +86,17 @@ defmodule StatifierBlocks.Core.Map do
   `assign_to` accepts, refused with the same wording: a bare lowercase
   identifier. Two spellings of the same complaint would suggest an author
   had met two fields.
+
+  `collect` carries the `writes` key ADR-0002's Note of 2026-09-06
+  records, and what it writes is `{:list, :unknown}` (ADR-0011 decision
+  12): the assembled answer is a list, dense and in item-index order per
+  ADR-0009 decision 5, and this block says nothing about what one element of
+  it holds, because the shipped child recipe emits the outcome name and
+  nothing else. A block after a `core.map` therefore knows it is looking
+  at a list - which is more than it knew before - and knows nothing about
+  an element, which is exactly true. `items` carries neither key, so
+  ADR-0011 decision 2 reads it as writing `:unknown` at the path it names:
+  known without becoming typed.
 
   `on` is read **through its default**, in `core.parallel`'s G7a shape: an
   absent key reads as `"all"` everywhere, so a block an author never
@@ -245,7 +256,7 @@ defmodule StatifierBlocks.Core.Map do
       },
       %{
         key: "collect",
-        type: {:path, %{}},
+        type: {:path, %{writes: {:list, :unknown}}},
         label: "Collect the answers into",
         required?: false,
         default: ""
