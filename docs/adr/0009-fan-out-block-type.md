@@ -755,3 +755,47 @@ and `sb-pg91` carries it. And `collect`'s bare-lowercase-identifier refusal is
 deliberately **not** reached by `ADR-0011` decision 13, which resolves only
 `core.subchart`'s `assign_to`; whether the two fields should agree is named
 there as a deferred question rather than answered.
+
+---
+
+## Note (2026-09-06): decision 8 stands - the empty fan-out succeeds over nothing
+
+A dated Note rather than an amendment. Decision 8 is unchanged in every clause:
+the refusal set for this handler is still closed at five, `items_not_a_list` is
+still the one reason that is this handler's own, and the paragraph above that
+opens "Which is why an empty list is not a refusal" keeps every word. What this
+Note records is that the question of whether that paragraph was right was
+asked, and answered in its favour.
+
+**The question.** `sb-kha0` asked, on 2026-09-05, whether `items` resolving to
+`[]` is answered or refused, and by whom - because the shipped fan-out
+invocation in `statifier_oban` refuses it on the invocation's error route while
+this decision says it succeeds. The two layers disagreed, and an accepted record
+disagreeing with shipped code is a defect in one of them rather than a matter of
+taste.
+
+**The answer, taken by the operator on 2026-09-06 as campaign-033 ruling
+`RQ-033-4`: this decision wins.** `items` resolving to `[]` is a successful
+fan-out over nothing, exactly as the paragraph above has it - zero children
+start, the accumulated list is written as `[]`, and the block takes `done`
+immediately. There is no refusal reason for an empty list, and the refusal set
+stays the five this decision closes it at. The reasoning is the paragraph's own
+and is not restated here.
+
+**The runtime half is `sob-as0` in `statifier_oban`**, which drops the refusal
+arm, updates the handler's documentation of what it refuses, and adds a case
+for an empty `items` that assembles the empty list and completes. This
+package's side needs no change, and this Note carries no `lib/` change: nothing
+here declares anything about the length of `items`, because the compiled
+invocation carries the `items` datamodel path once rather than the list
+(decision 3, as the 2026-09-05 Tier A Note below restates), so the length
+exists only at runtime where the handler evaluates the path.
+
+**One thing this Note does not decide.** Decision 4 fixes this block's outcome
+set at two, `done` and `error`, not config-derived, and the campaign-033 bead
+`sb-napt` proposes a failure-classed outcome that would reach that decision.
+Whether it does, and what it would change here, is that bead's record to write
+and not this one's.
+
+Answers `sb-kha0`. Filed with `sb-xwhj`, campaign-033 ruling `RQ-033-4`; the
+runtime half is `sob-as0`.
