@@ -417,6 +417,210 @@ defmodule StatifierBlocks.EnvironmentTest do
     end
   end
 
+  describe "the core vocabulary's signatures" do
+    # sabotage: made `sugar_write/4` answer `[]` -> the entry block stops
+    # seeding the subject path, every read below becomes a read of a path the
+    # environment does not hold, and the refusal stops happening (verified)
+    test "entry -> assign -> settle checks the settle step's read against the seed" do
+      steps = fn expects ->
+        document([
+          open(),
+          assign("blk_ASG", "cards.current_txn.authorized_at"),
+          settle("blk_STL", %{"expects" => expects})
+        ])
+      end
+
+      # The assign wrote a path beside the subject, so the settle step's read
+      # is still checked against what the entry block seeded.
+      assert Assignability.validate(palette(), steps.("Settleable"), ctx()) == :ok
+
+      assert {:error,
+              [{:type_mismatch, "blk_STL", "blk_OPEN", "cards.credit_txn", "Settled", @subject}]} =
+               Assignability.validate(palette(), steps.("Settled"), ctx())
+    end
+
+    # sabotage: made `field_writes/2` test the field type
+    # (`match?({:path, _}, ...)`) instead of `BlockType.datamodel_path?/1`, so
+    # a `:string` field carrying the key stops writing -> red (verified)
+    test "core.assign writes its path, known without becoming typed" do
+      block = assign("blk_ASG", "cards.current_txn.authorized_at")
+      document = document([open(), block, settle("blk_STL")])
+
+      assert Environment.write_signatures(palette(), document, block) ==
+               [{"path", "cards.current_txn.authorized_at", :unknown}]
+
+      assert Environment.read_signatures(palette(), document, block) == []
+    end
+
+    # sabotage: dropped the `BlockType.datamodel_path?/1` filter from
+    # `field_writes/2` -> `core.wait`'s `duration` becomes a write and the
+    # untouched-environment assertion goes red (verified)
+    test "core.wait, core.send, core.raise and core.await write nothing and read nothing" do
+      leaves = [
+        Block.new("core.wait", id: "blk_WAIT", config: %{"duration" => "PT5S"}),
+        Block.new("core.send",
+          id: "blk_SEND",
+          config: %{"event" => "cards.receipt_requested", "delay" => "PT1S"}
+        ),
+        Block.new("core.raise", id: "blk_RAISE", config: %{"event" => "cards.retry"}),
+        Block.new("core.await",
+          id: "blk_AWAIT",
+          config: %{"event" => "cards.receipt_arrived", "timeout" => "PT1M"}
+        )
+      ]
+
+      document = document([open()] ++ leaves ++ [settle("blk_STL")])
+
+      for block <- leaves do
+        assert Environment.write_signatures(palette(), document, block) == []
+        assert Environment.read_signatures(palette(), document, block) == []
+      end
+
+      # Four blocks later the environment is the seed, untouched.
+      assert Environment.at(palette(), document, {"blk_ROOT", "body", 5}, ctx()) == %{
+               @subject => "cards.credit_txn"
+             }
+    end
+
+    # sabotage: reverted `core.subchart`'s `assign_to` to a plain `:string`
+    # -> the outcome path stops being written and both assertions go red
+    # (verified)
+    test "core.subchart writes assign_to" do
+      block =
+        Block.new("core.subchart",
+          id: "blk_SUB",
+          config: %{"chart" => "bdoc_settle", "outcomes" => "done", "assign_to" => "settlement"}
+        )
+
+      document = document([open(), block, settle("blk_STL")])
+
+      assert Environment.write_signatures(palette(), document, block) ==
+               [{"assign_to", "settlement", :unknown}]
+
+      env = Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx())
+      assert Map.get(env, "settlement") == :unknown
+    end
+
+    # sabotage: dropped the `writes` key off `core.map`'s `collect`
+    # (`{:path, %{}}`) -> the block after the fan-out sees `:unknown` instead
+    # of a list and this goes red (verified)
+    test "the block after a core.map sees collect as a list" do
+      block =
+        Block.new("core.map",
+          id: "blk_MAP",
+          config: %{"items" => "cards.lines", "chart" => "bdoc_child", "collect" => "results"}
+        )
+
+      document = document([open(), block, settle("blk_STL")])
+
+      # `items` says where without saying what; `collect` says both.
+      assert Environment.write_signatures(palette(), document, block) == [
+               {"items", "cards.lines", :unknown},
+               {"collect", "results", {:list, :unknown}}
+             ]
+
+      env = Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx())
+
+      assert Map.get(env, "results") == {:list, :unknown}
+      assert Environment.type_of(%{}, Map.get(env, "results")) == :list
+    end
+
+    # sabotage: made `capture_writes/1` fall through its `is_map` clause and
+    # answer `[]` -> the captured path is invisible to everything after the
+    # handler and this goes red (verified)
+    test "a captured path is known after the handler" do
+      handler =
+        Block.new("core.on_event",
+          id: "blk_ON",
+          config: %{
+            "event" => "cards.receipt_arrived",
+            "outcome" => "resume",
+            "capture" => %{"cards.receipt" => "receipt"}
+          }
+        )
+
+      group =
+        Block.new("core.group",
+          id: "blk_GRP",
+          slots: %{
+            "body" => [assign("blk_STEP", "cards.tally")],
+            "interrupts" => [handler]
+          }
+        )
+
+      document = document([open(), group, settle("blk_STL")])
+
+      assert Environment.write_signatures(palette(), document, handler) ==
+               [{"capture", "cards.receipt", :unknown}]
+
+      # On the interrupt path, immediately after the handler.
+      after_handler = Environment.at(palette(), document, {"blk_GRP", "interrupts", 1}, ctx())
+      assert Map.has_key?(after_handler, "cards.receipt")
+
+      # And after the group: the handler fired or it did not, so decision 4
+      # leaves the path known and untyped rather than absent.
+      after_group = Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx())
+      assert Map.get(after_group, "cards.receipt") == :unknown
+    end
+
+    # sabotage: dropped the `arms/5` step from `through/5` -> a container
+    # stops handing its children's writes out and the settlement assertion
+    # goes red (verified)
+    test "a one-slot container hands its children's writes out through the merge" do
+      for container <- [
+            Block.new("core.sequence", id: "blk_C", slots: %{"body" => [settle("blk_IN")]}),
+            Block.new("core.group", id: "blk_C", slots: %{"body" => [settle("blk_IN")]}),
+            Block.new("core.resumable_group",
+              id: "blk_C",
+              config: %{"history" => "shallow"},
+              slots: %{"body" => [settle("blk_IN")]}
+            ),
+            Block.new("core.foreach",
+              id: "blk_C",
+              config: %{"items" => "cards.lines"},
+              slots: %{"body" => [settle("blk_IN")]}
+            )
+          ] do
+        document = document([open(), container, settle("blk_STL")])
+        env = Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx())
+
+        assert Map.get(env, "cards.settlement") == "cards.settlement"
+        assert Map.get(env, @subject) == "cards.credit_txn"
+      end
+    end
+
+    # sabotage: made `merged_disagreement/1` answer `{:unknown, :slot_entry}`
+    # for a single agreed type -> two lanes writing the same type at the same
+    # path stop agreeing and this goes red (verified)
+    test "core.parallel's lanes merge per path, and lanes that agree keep the type" do
+      parallel =
+        Block.new("core.parallel",
+          id: "blk_PAR",
+          config: %{"lanes" => ["a", "b"]},
+          slots: %{"lane_a" => [settle("blk_A")], "lane_b" => [settle("blk_B")]}
+        )
+
+      document = document([open(), parallel, settle("blk_STL")])
+      env = Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx())
+
+      assert Map.get(env, "cards.settlement") == "cards.settlement"
+      assert Map.get(env, @subject) == "cards.credit_txn"
+    end
+
+    # sabotage: gave `core.wait` a `{:path, %{}}` field -> the census below
+    # names a fifth writer and this goes red (verified)
+    test "the vocabulary's path-field writers are exactly the four the record names" do
+      writers =
+        for {name, module} <- Palette.core_types(),
+            Code.ensure_loaded?(module),
+            function_exported?(module, :config_schema, 1),
+            Enum.any?(module.config_schema(%{}), &StatifierBlocks.BlockType.datamodel_path?/1),
+            do: name
+
+      assert Enum.sort(writers) == ["core.assign", "core.foreach", "core.map", "core.subchart"]
+    end
+  end
+
   describe "totality and termination" do
     # sabotage: n/a for a wrong answer - this test exists to catch a *hang*.
     # Confirmed by making `entering/4` recurse on the block's own position

@@ -3500,3 +3500,66 @@ decision widens two call sites in `core/subchart.ex` and changes nothing in
 G5 or G5a.
 
 `sb-xk1h` implements both keys and the feed.
+
+## Note (2026-09-06): decision 10, the read and the write signature of each core row
+
+A dated Note rather than an amendment, and a **new table beside** decision
+10's rather than a column added to it: decision 10's table is four columns
+wide and every row of it is a merged line, so a fifth column cannot arrive
+without rewriting seventeen rows that this Note does not reopen. Nothing above
+this line is edited, and no row here contradicts one there - the table below
+is a projection of what `config_schema/1` already declares, read through the
+two `{:path, opts}` keys the Note of 2026-09-06 records.
+
+`ADR-0011` decision 2 fixes the reading, and it is the whole of it:
+
+- a `{:path, %{writes: T}}` field writes `T` at the path its value names;
+- a `{:path, opts}` field with no `writes` key, and a `:string` field carrying
+  `datamodel_path?: true`, write `:unknown` there - the path becomes known
+  without becoming typed;
+- `core.on_event`'s `capture` writes `:unknown` at each pair's key;
+- a `{:path, %{expects: T}}` field reads `T` there.
+
+| Block type | Reads | Writes | How it reaches the environment |
+|---|---|---|---|
+| `core.sequence` | none | none | one slot, so what its `body` wrote leaves it unchanged by the merge |
+| `core.group` | none | none | `body` and `interrupts` merge per path; a path only the handler wrote leaves at `:unknown` |
+| `core.resumable_group` | none | none | as `core.group`; the history mode changes nothing here |
+| `core.branch` | none | none | one arm slot per declared arm, then `otherwise`, merged per path |
+| `core.parallel` | none | none | one slot per lane, merged per path; no ordering between lanes is modelled |
+| `core.foreach` | none | `items`, `:unknown` | `items` is a `:string` carrying `datamodel_path?: true`; the body additionally sees `item_as` and `index_as` bound, and those two names do not leave it |
+| `core.map` | none | `items`, `:unknown`; `collect`, `{:list, :unknown}` | `collect` is the vocabulary's only typed write - `ADR-0011` decision 12 says a list and says nothing about an element |
+| `core.subchart` | none | `assign_to`, `:unknown` | a `{:path, opts}` field since `sb-2ym4`; what the outcome holds is the child chart's, not this record's |
+| `core.assign` | none | `path`, `:unknown` | the worked shape's step 1: known without becoming typed |
+| `core.on_event` | none | one per `capture` pair, at the pair's key, `:unknown` | no field declaration - the Note of 2026-09-05 records why - so the walk reads the config map directly |
+| `core.invoke` | none | none | its `<assign>` location is emitted rather than declared, so nothing here sees it |
+| `core.wait` | none | none | a leaf whose whole meaning is config |
+| `core.send` | none | none | |
+| `core.raise` | none | none | |
+| `core.await` | none | none | |
+| `core.drafts` | none | none | the shelf is not entered, and each parked fragment is walked from an empty environment |
+| `core.placeholder` | none | none | the one type declaring no `io/1` at all |
+
+Three readings the table makes and a reader would otherwise have to derive.
+
+**No core type declares a read.** The `expects` key exists and nothing in this
+vocabulary uses it, which is not an oversight: a `core.*` block is structural,
+and the blocks that need a value of a particular shape at a particular path are
+the host's. A document built of nothing but core types therefore refuses
+nothing on data-flow grounds, exactly as it did before `ADR-0011`.
+
+**The `consumes` and `produces` sugar is inert across the vocabulary.**
+`ADR-0011` decision 6 desugars a binary `produces` into a write at the
+document's subject path. `core.sequence` declares `{:passthrough, "body"}`,
+five types declare `:unknown`, and the rest declare neither, so no core row
+contributes a sugared signature. The passthrough is answered by the walk
+carrying the slot's own writes out through the merge, which is the same answer
+by a mechanism that does not need the subject path to exist.
+
+**A container's row says "none" about the container, not about the block.**
+Every write in a container's slots reaches the block after the container
+through the merge, which is `ADR-0011` decision 4 and not a property of any
+row above. The rows say what the type itself declares.
+
+`sb-u7zt` declares these across `lib/statifier_blocks/core/` and pins each row
+by test; `sb-xk1h` is where a `core.*` row would first gain an `expects`.

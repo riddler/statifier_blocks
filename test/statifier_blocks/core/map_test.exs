@@ -146,16 +146,20 @@ defmodule StatifierBlocks.Core.MapTest do
       assert Enum.map(Map.config_schema(@lines), & &1.key) == ["items", "chart", "collect", "on"]
     end
 
-    # sabotage: declared `items` as a plain `:string` - the editor reaches
-    # the plain control by type and the field carries no claim about its
-    # value, so this goes red (verified)
-    test "items and collect are {:path, opts} fields, with no opts key defined yet" do
-      for key <- ["items", "collect"] do
-        assert %{type: {:path, opts}} =
-                 Map.config_schema(@lines) |> Enum.find(&(&1.key == key))
-
-        assert opts == %{}
+    # sabotage: dropped the `writes` key back off `collect` (`{:path, %{}}`)
+    # - the block after a `core.map` stops seeing a list and this goes red
+    # (verified)
+    test "items and collect are {:path, opts} fields, and collect declares what it writes" do
+      opts = fn key ->
+        %{type: {:path, opts}} = Map.config_schema(@lines) |> Enum.find(&(&1.key == key))
+        opts
       end
+
+      # `items` says where without saying what, which ADR-0011 decision 2
+      # reads as writing `:unknown` there; `collect` carries decision 12's
+      # type, and says nothing about an element of the list.
+      assert opts.("items") == %{}
+      assert opts.("collect") == %{writes: {:list, :unknown}}
     end
 
     # sabotage: same revert - `datamodel_path?/1` answers false for the
