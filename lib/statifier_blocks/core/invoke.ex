@@ -77,6 +77,10 @@ defmodule StatifierBlocks.Core.Invoke do
   @error_event "error.communication.invoke"
   @done_event "done.invoke"
 
+  # The one outcome this type classes as a failure, named once so the
+  # declaration, the class and the emission cannot drift apart.
+  @error_outcome "error"
+
   @impl true
   def current_version, do: 1
 
@@ -90,6 +94,37 @@ defmodule StatifierBlocks.Core.Invoke do
   """
   @impl true
   def slots(_config), do: [{"on_error", :zero_or_one, "If it fails"}]
+
+  @doc """
+  `done` and `error`, in that order - the pair this type has always
+  emitted (ADR-0002's amendment of 2026-09-06, section 1).
+
+  Fixed rather than config-derived, and the same pair
+  `StatifierBlocks.InvokeStep.outcomes/0` returns for every host type
+  built on it. Until that amendment this type exported no `outcomes/1` at
+  all, so `StatifierBlocks.BlockType.outcomes/2` answered the default
+  single `done` while `emit/2` minted an `error` outcome final beside it -
+  a raised event in no summary, which ADR-0004's outcome amendment forbids
+  in its clause 2e.
+
+  Declaration order is read by ADR-0004 decision 6's byte determinism, so
+  this list is never sorted.
+  """
+  @impl true
+  def outcomes(_config), do: [{"done", "Done"}, {@error_outcome, "Error"}]
+
+  @doc """
+  `error` is failure-classed: a call that came back on the error path did
+  not succeed (ADR-0002's amendment of 2026-09-06, section 3).
+
+  That is what the outcome has always meant and what the `:failure`
+  `slot_style` on `on_error` has always drawn. The `on_error` slot is
+  unchanged by the class - amendment section A2's refusal to marry an
+  outcome to a slot stands, and the slot and the outcome share a word here
+  the way `core.subchart` and `core.map` have had both for longer.
+  """
+  @impl true
+  def failure_outcomes(_config), do: [@error_outcome]
 
   @impl true
   def config_schema(_config),
@@ -217,14 +252,20 @@ defmodule StatifierBlocks.Core.Invoke do
   makes the prefix match here and a host chart's existing
   `error.communication` handler both correct at once.
 
-  ## An absent `on_error` emits no failure transition at all
+  ## An absent `on_error` still ends the block on `error`
 
-  With the slot empty there is nothing to transition to, so neither the
-  failure transition nor the `error` outcome's `<final>` is emitted and the
-  error propagates as it does today. That costs a parent nothing: outcome
-  wiring is an event rather than a target, so a parent may transition on an
-  outcome whose final was never emitted and the transition simply never
-  fires (ADR-0004's amendment, 2c).
+  ADR-0002's amendment of 2026-09-06, section 2: the failure final is
+  emitted whether or not the slot is occupied, because a class is read off
+  a final - the only thing that raises
+  `done.outcome.<state id>.error` is that final's own `onentry`, and an
+  outcome whose final is sometimes absent cannot be classed. With the slot
+  empty the failure transition targets the final directly; with it
+  occupied every byte is what it was, the transition targeting the child
+  and the child's own `done_event` carrying it into the final.
+
+  An author who wants the old silence for a particular call has the slot:
+  an occupied `on_error` is the amendment's section 4 definition of
+  handling, and a handled failure reaches nothing above the block.
 
   ## Who owns what
 
@@ -265,34 +306,31 @@ defmodule StatifierBlocks.Core.Invoke do
     end
   end
 
-  # The error half is emitted only when the `on_error` slot is occupied,
-  # and it is all of one piece: the transition out of the call, the
-  # child's subtree, the transition into the final, and the final itself.
-  # The completion event each outcome final raises is no longer carried
-  # here: `StatifierBlocks.Core.Emit.final/1` derives it from the id, so
-  # there is one implementation of an outcome final rather than this
-  # type's and the shared vocabulary's.
+  # The error half in the two shapes ADR-0002's amendment of 2026-09-06
+  # section 2 leaves it in. The final is always minted and always emitted;
+  # what the slot decides is only what the failure transition points at
+  # and whether a child subtree sits between the two.
+  #
+  # The completion event each outcome final raises is not carried here:
+  # `StatifierBlocks.Core.Emit.final/1` derives it from the id, so there is
+  # one implementation of an outcome final rather than this type's and the
+  # shared vocabulary's.
   @spec error_parts(Context.t()) ::
-          {:ok, nil | {Context.child_summary(), String.t()}}
+          {:ok, {Context.child_summary() | nil, String.t()}}
           | {:error, {:invalid_outcome, Block.id(), String.t()}}
   defp error_parts(context) do
-    case Context.children(context, "on_error") do
-      [] ->
-        {:ok, nil}
-
-      [child | _rest] ->
-        with {:ok, final} <- Context.outcome_id(context, "error") do
-          {:ok, {child, final}}
-        end
+    with {:ok, final} <- Context.outcome_id(context, @error_outcome) do
+      {:ok, {context |> Context.children("on_error") |> List.first(), final}}
     end
   end
 
-  defp failure_transition(nil), do: []
+  defp failure_transition({nil, final}),
+    do: [Emit.transition(event: @error_event, target: final)]
 
   defp failure_transition({child, _final}),
     do: [Emit.transition(event: @error_event, target: child.state_id)]
 
-  defp error_children(nil), do: []
+  defp error_children({nil, _final}), do: []
 
   defp error_children({child, final}) do
     [
@@ -303,7 +341,6 @@ defmodule StatifierBlocks.Core.Invoke do
     ]
   end
 
-  defp error_final(nil), do: []
   defp error_final({_child, final}), do: [Emit.final(final)]
 
   # `assign_to` is written on the success transition rather than in a

@@ -341,12 +341,25 @@ defmodule StatifierBlocks.Core.SubchartTest do
       %{scxml: compile!(subchart(nudge: false, park: false)).scxml}
     end
 
-    # sabotage: emitted the failure transition unconditionally -> it
-    # targets a state that was never emitted, the engine refuses the
+    # ADR-0002's amendment of 2026-09-06, section 2, extended to this type
+    # by the operator's ruling `RQ-034-13`: the `error` final is emitted
+    # whatever the referenced chart's own declared outcomes say and
+    # whatever the slot holds, and with the slot empty the failure
+    # transition targets it directly. This replaces the assertion that
+    # neither was emitted. `error` is not in this fixture's declared
+    # outcome list, so the `routed? or child` filter would drop it.
+    #
+    # sabotage: restored `finals/1`'s `routed? or child` filter -> the
+    # transition targets a state nothing emitted, the engine refuses the
     # compile, and this goes red (verified)
-    test "emits no failure transition and no error final", %{scxml: scxml} do
-      refute scxml =~ "error.communication.invoke"
-      refute scxml =~ "s_blk_ELIG__o_error"
+    test "the failure transition targets the error final directly", %{scxml: scxml} do
+      assert scxml =~
+               ~s(<transition event="error.communication.invoke" target="s_blk_ELIG__o_error"/>)
+
+      assert scxml =~
+               ~s(<final id="s_blk_ELIG__o_error"><onentry>) <>
+                 ~s(<raise event="done.outcome.s_blk_ELIG.error"/></onentry></final>)
+
       assert {:ok, _machine} = Statifier.compile(scxml)
     end
 

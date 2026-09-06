@@ -28,7 +28,6 @@ defmodule StatifierBlocks.Runtime.SubchartSessionTest do
   @root MapSet.new(["s_blk_ROOT"])
 
   defp settled(outcome), do: MapSet.union(@root, MapSet.new(["s_blk_ROOT__o_#{outcome}"]))
-  defp running, do: MapSet.union(@root, MapSet.new(["s_blk_ROOT__running"]))
 
   describe "outcome routing" do
     # Sabotage: asserted the settle target as `settled("approved")` (the
@@ -99,27 +98,25 @@ defmodule StatifierBlocks.Runtime.SubchartSessionTest do
       end
     end
 
-    # This is `core.subchart`'s own documented other half, not a defect:
-    # with `on_error` empty the block emits no `error.communication.invoke`
-    # transition at all, so the refusal has nowhere to route and the
-    # session stays in the block's inner running state indefinitely.
+    # `core.subchart`'s other half, as ADR-0002's amendment of 2026-09-06
+    # section 2 (the operator's ruling `RQ-034-13`) now leaves it: with
+    # `on_error` empty the block still emits the
+    # `error.communication.invoke` transition and the `error` final, so
+    # the refusal has somewhere to route and the block ends on `error`
+    # rather than parking in its inner running state forever. Before that
+    # amendment this test asserted the session stayed in `running()`.
     #
-    # Sabotage: asserted the settle target as `settled("error")` (the
-    # occupied-slot case's target) instead of `running()` -> with the
-    # slot empty there genuinely is no error final to reach, the poll
-    # runs out its bounded attempts, and this went red on the `flunk`
-    # naming the observed `running` configuration instead (verified).
-    test "with on_error empty, the failure propagates as it does today: the session stays running" do
+    # Sabotage: restored `finals/1`'s `routed? or child` filter -> the
+    # transition targets a state nothing emitted, the compile is refused,
+    # and this goes red on the fixture's own compile (verified).
+    test "with on_error empty, the block still ends on its error outcome" do
       parent = RuntimeFixtures.parent_document(chart: "bdoc_MISSING_EMPTY", outcomes: [])
 
       session = RuntimeFixtures.run(parent, MapResolver)
 
       try do
-        # Bounded, but short: there is no event left to arrive, so a
-        # session still in `running` after a handful of 5ms polls is not
-        # going anywhere - this is the propagation being pinned, not a
-        # slow settle.
-        assert RuntimeFixtures.await_configuration(session, running(), 20) == running()
+        assert RuntimeFixtures.await_configuration(session, settled("error")) ==
+                 settled("error")
       after
         Session.stop(session)
       end

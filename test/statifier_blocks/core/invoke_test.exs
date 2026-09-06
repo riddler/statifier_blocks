@@ -204,12 +204,26 @@ defmodule StatifierBlocks.Core.InvokeTest do
       %{scxml: compile!(invoke(nil)).scxml}
     end
 
-    # sabotage: emitted the failure transition unconditionally -> it
-    # targets a state that was never emitted, the engine refuses the
-    # compile, and this goes red (verified)
-    test "emits no failure transition and no error final", %{scxml: scxml} do
-      refute scxml =~ "error.communication.invoke"
-      refute scxml =~ "s_blk_INV__o_error"
+    # ADR-0002's amendment of 2026-09-06, section 2: the failure final is
+    # emitted whether or not the slot is occupied, and with the slot empty
+    # the failure transition targets it directly. This replaces the
+    # assertion that neither was emitted, which that section supersedes.
+    #
+    # sabotage: restored the `nil` clauses on `failure_transition/1` and
+    # `error_final/1` -> the class has no final to be read off and this
+    # goes red (verified)
+    test "the failure transition targets the error final directly", %{scxml: scxml} do
+      assert scxml =~
+               ~s(<transition event="error.communication.invoke" target="s_blk_INV__o_error"/>)
+
+      assert scxml =~
+               ~s(<final id="s_blk_INV__o_error"><onentry>) <>
+                 ~s(<raise event="done.outcome.s_blk_INV.error"/></onentry></final>)
+
+      # The slot is what an author still has: with it empty nothing runs
+      # on the failure path, because there is nothing in it to run.
+      refute scxml =~ "s_blk_PARK"
+
       assert {:ok, _machine} = Statifier.compile(scxml)
     end
 

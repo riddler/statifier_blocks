@@ -514,8 +514,11 @@ MyApp.Blocks.Capture.io(%{})
 That is the whole type. It compiles to an `<invoke>` in an inner state with
 one transition and one `<final>` per outcome - `core.invoke`'s emission with
 the `on_error` slot taken out, since a leaf step has no children and its
-failure path is an outcome a parent may wire. `:fields` adds config fields
-after `label` and `invoke_type`, and every injected callback is
+failure path is an outcome a parent may wire. That `error` outcome is
+**failure-classed** by default, so a step that comes back on it is a step
+that failed; a host whose `error` is routine overrides `failure_outcomes/1`
+with `[]` in the same place it would override `outcomes/1`. `:fields` adds
+config fields after `label` and `invoke_type`, and every injected callback is
 overridable: a step with extra `<param>` children calls
 `StatifierBlocks.InvokeStep.emit/4` itself, and one with a tighter rule
 composes its own `validate_config/1` out of the checks the module exports.

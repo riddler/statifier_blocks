@@ -44,6 +44,20 @@ defmodule StatifierBlocks.InvokeStepTest.Authorize do
   end
 end
 
+defmodule StatifierBlocks.InvokeStepTest.Probe do
+  @moduledoc """
+  A leaf step whose `error` is routine, so it overrides the class the
+  `use` layer gives it (ADR-0002's amendment of 2026-09-06, section 3):
+  "a host type whose `error` is routine - a probe that reports 'not found'
+  through it, say - overrides it with `[]`".
+  """
+
+  use StatifierBlocks.InvokeStep, invoke_type: "myapp:probe"
+
+  @impl true
+  def failure_outcomes(_config), do: []
+end
+
 defmodule StatifierBlocks.InvokeStepTest do
   @moduledoc """
   ADR-0007 decision 2: `use StatifierBlocks.InvokeStep` is the leaf step
@@ -57,7 +71,7 @@ defmodule StatifierBlocks.InvokeStepTest do
   use ExUnit.Case, async: true
 
   alias StatifierBlocks.{Block, BlockType, Compiler, Document, InvokeStep, Palette, Provenance}
-  alias StatifierBlocks.InvokeStepTest.{Authorize, Receipt}
+  alias StatifierBlocks.InvokeStepTest.{Authorize, Probe, Receipt}
 
   describe "what use declares (ADR-0007 decision 2)" do
     # Sabotage: renamed the injected `invoke_type/0` - the declaration is
@@ -95,6 +109,35 @@ defmodule StatifierBlocks.InvokeStepTest do
     test "two outcomes, done before error, never sorted" do
       assert Receipt.outcomes(%{}) == [{"done", "Done"}, {"error", "Error"}]
       assert BlockType.outcomes(Receipt, %{}) == [{"done", "Done"}, {"error", "Error"}]
+    end
+
+    # ADR-0002's amendment of 2026-09-06, section 3: a step that calls out
+    # to the world and comes back on `error` failed, and a host that
+    # disagrees says so in one line. The default arrives by inheritance,
+    # which is the half the amendment counts as a cost to a host.
+    #
+    # Sabotage: dropped `failure_outcomes/1` from the `use` quote - a host
+    # step stops classing its `error` and this goes red on the first two
+    # asserts (verified).
+    test "error is failure-classed by default, and a host may override it" do
+      assert Receipt.failure_outcomes(%{}) == ["error"]
+      assert BlockType.failure_outcomes(Receipt, %{}) == ["error"]
+      assert BlockType.failure_outcomes(Authorize, %{}) == ["error"]
+
+      assert Probe.failure_outcomes(%{}) == []
+      assert BlockType.failure_outcomes(Probe, %{}) == []
+    end
+
+    # `defoverridable` is what makes the override above legal rather than
+    # a compile error, and it is easy to add the definition and forget the
+    # list.
+    #
+    # Sabotage: removed `failure_outcomes: 1` from `defoverridable` -
+    # `Probe`'s own definition no longer replaces the injected one, so the
+    # probe classes `error` after all and the override test above goes red
+    # (verified).
+    test "the class is in the overridable list beside the outcomes" do
+      assert Probe.__info__(:functions)[:failure_outcomes] == 1
     end
 
     # Sabotage: reversed the merge in `palette_entry/1` so the defaults win

@@ -23,7 +23,7 @@ defmodule StatifierBlocks.Compiler.FailureOutcomeTest do
   use ExUnit.Case, async: true
 
   alias StatifierBlocks.{Block, BlockType, Compiler, Document, Palette, Provenance}
-  alias StatifierBlocks.Core.{Map, Subchart}
+  alias StatifierBlocks.Core.{Invoke, Map, Subchart}
 
   @tag_param ~s(<param expr="'failed'" name="statifier_persistence:run_status"/>)
 
@@ -125,6 +125,21 @@ defmodule StatifierBlocks.Compiler.FailureOutcomeTest do
     test "core.map and core.subchart class their error outcome, and nothing else" do
       assert BlockType.failure_outcomes(Map, @map_config) == ["error"]
       assert BlockType.failure_outcomes(Subchart, %{"chart" => "bdoc_CHILD"}) == ["error"]
+    end
+
+    # ADR-0002's amendment of 2026-09-06, section 1: `core.invoke` had
+    # been minting an `error` outcome final while declaring no `outcomes/1`
+    # at all, so the resolver answered the default single `done` and one of
+    # the two events it raised was in no summary.
+    #
+    # sabotage: deleted `core.invoke`'s `outcomes/1` -> the resolver falls
+    # back to the default `[{"done", "Done"}]` and this goes red (verified)
+    test "core.invoke declares the pair it has always emitted, and classes error" do
+      config = %{"invoke_type" => "myapp:authorize"}
+
+      assert BlockType.outcomes(Invoke, config) == [{"done", "Done"}, {"error", "Error"}]
+      assert BlockType.outcome_names(Invoke, config) == ["done", "error"]
+      assert BlockType.failure_outcomes(Invoke, config) == ["error"]
     end
 
     # The class is a second axis, not a third outcome: ADR-0009 decision 4
@@ -311,12 +326,298 @@ defmodule StatifierBlocks.Compiler.FailureOutcomeTest do
     end
   end
 
-  # `on_error` is occupied on purpose. `core.map` emits the
-  # `error.communication.invoke` route and the `o_error` outcome final
-  # only when that slot holds something (`core.invoke`'s rule, unchanged
-  # by this bead), so an author who wants a failure-classed root final to
-  # be reachable has to wire the slot - and this file asserts a reachable
-  # one, not a final nothing can enter.
+  describe "a failure-classed final with its slot empty (section 2)" do
+    # Section 2, the three types at once. The final is emitted whether or
+    # not the slot is occupied, because the class is read off the final:
+    # the only thing that raises `done.outcome.<state id>.<outcome>` - the
+    # event the root catch selects - is that final's own `onentry`.
+    #
+    # sabotage: restored the `nil` clauses on `core.invoke`'s
+    # `failure_transition/1` and `error_final/1` -> the invoke row goes
+    # red and the class has no final to be read off (verified)
+    test "each of the three emits it, and routes the failure straight into it", ctx do
+      for {id, block} <- [
+            {"blk_INV",
+             Block.new("core.invoke",
+               id: "blk_INV",
+               config: %{"invoke_type" => "myapp:authorize"}
+             )},
+            {"blk_MAP", Block.new("core.map", id: "blk_MAP", config: @map_config)},
+            {"blk_SUB",
+             Block.new("core.subchart",
+               id: "blk_SUB",
+               config: %{"chart" => "bdoc_CHILD", "outcomes" => "approved"}
+             )}
+          ] do
+        {:ok, compiled} =
+          Compiler.compile(Document.new(block, id: "bdoc_ROOT"), ctx.palette, [])
+
+        assert compiled.scxml =~
+                 ~s(<transition event="error.communication.invoke" target="s_#{id}__o_error"/>),
+               "#{id} did not route its failure into its own error final"
+
+        assert compiled.scxml =~
+                 ~s(<final id="s_#{id}__o_error"><onentry>) <>
+                   ~s(<raise event="done.outcome.s_#{id}.error"/></onentry></final>),
+               "#{id} did not emit its error final with the slot empty"
+
+        assert {:ok, _machine} = Statifier.compile(compiled.scxml)
+      end
+    end
+  end
+
+  describe "the nested-to-root propagation rule (section 4)" do
+    # The chunk shape the amendment is written for: a `core.sequence`
+    # around one `core.invoke`, `on_error` empty. Before this bead the
+    # chart could not reach a failure-classed final by any authoring.
+    #
+    # The transition and the final are asserted byte for byte, and the
+    # reserved key and value are spelled out rather than read off this
+    # package's own attribute, for this file's moduledoc reason.
+    # sabotage: skipped the propagation when the collected set was
+    # non-empty -> the chunk chart compiles as it did at 0.21.0 and this
+    # goes red (verified)
+    test "under terminate, one catch transition and one shared failed final", ctx do
+      compiled = compile_chunk!(ctx, terminate: true)
+
+      assert compiled.scxml =~
+               ~s(<transition event="done.outcome.s_blk_INV.error" target="s_blk_SEQ__root_failed"/>)
+
+      assert compiled.scxml =~
+               ~s(<final id="s_blk_SEQ__root_failed"><donedata>) <>
+                 @tag_param <> ~s(</donedata></final>)
+    end
+
+    # Section 4 step 3: under `:child_use` the `outcome` param rides
+    # beside the reserved one, valued `error` rather than the nested
+    # block's own outcome name, because `error` is the one word a parent
+    # reading through `core.subchart` is guaranteed to have a route for.
+    #
+    # sabotage: reported the collected outcome name instead of `error` ->
+    # a name from inside the child chart enters the parent's branch
+    # vocabulary and this goes red (verified)
+    test "under child_use, the outcome param says error", ctx do
+      compiled = compile_chunk!(ctx, child_use: true)
+
+      assert compiled.scxml =~
+               ~s(<final id="s_blk_SEQ__child_failed"><donedata>) <>
+                 ~s(<param expr="'error'" name="outcome"/>) <>
+                 @tag_param <> ~s(</donedata></final>)
+    end
+
+    # Attribution splits: the transition is a fact about the failing
+    # block, the shared final about the root (ADR-0004 decision 5 and
+    # `Emit.chain/2`'s rule). The provenance map stays total over both.
+    #
+    # sabotage: stamped the catch transition to the root block -> "what
+    # happens after the authorize step fails" stops pointing at the
+    # authorize step and this goes red on the first assert (verified)
+    test "the transition belongs to the failing block, the final to the root", ctx do
+      compiled = compile_chunk!(ctx, terminate: true)
+
+      {offset, _length} =
+        :binary.match(
+          compiled.scxml,
+          ~s(<transition event="done.outcome.s_blk_INV.error" target="s_blk_SEQ__root_failed"/>)
+        )
+
+      assert {:ok, transition_owner} = Provenance.owner_at(compiled.provenance, offset)
+      assert transition_owner.block_id == "blk_INV"
+
+      assert {:ok, final_owner} =
+               Provenance.owner_of_state(compiled.provenance, "s_blk_SEQ__root_failed")
+
+      assert final_owner.block_id == "blk_SEQ"
+      assert final_owner.role == "root_failed"
+    end
+
+    # The whole mechanism, run: entering the invoke's error final raises
+    # the outcome event, the internal queue is FIFO so it is selected
+    # before `done.state.s_blk_INV`, the root's transition exits the root
+    # state, and the sequence never takes its step.
+    #
+    # sabotage: emitted the catch transition as internal -> the root state
+    # is not left, the sibling final is never entered, and this goes red
+    # on the status assert (verified)
+    test "a failed call ends the run in the failed final, carrying the reserved key", ctx do
+      compiled = compile_chunk!(ctx, terminate: true)
+
+      assert {:ok, machine} = Statifier.compile(compiled.scxml)
+      {machine_state, _effects} = Statifier.initialize(machine)
+
+      {:ok, finished, effects} =
+        Statifier.send_event(machine_state, "error.communication.invoke.blk_INV")
+
+      assert finished.status == :done
+      assert [done: %Statifier.Effect.Done{donedata: donedata}] = effects
+      assert donedata == %{"statifier_persistence:run_status" => "failed"}
+    end
+
+    # Section 4's definition of handling is a property of the failing
+    # block, not of the container above it: an occupied `on_error` is the
+    # author saying what going on means, and nothing reaches the root.
+    #
+    # sabotage: read the slot off the container instead of the failing
+    # block -> the handled document gains a catch transition and this goes
+    # red (verified)
+    test "an occupied on_error handles it, and nothing reaches the root", ctx do
+      root =
+        Block.new("core.sequence",
+          id: "blk_SEQ",
+          slots: %{
+            "body" => [
+              Block.new("core.invoke",
+                id: "blk_INV",
+                config: %{"invoke_type" => "myapp:authorize"},
+                slots: %{"on_error" => [Block.new("core.sequence", id: "blk_ERR")]}
+              )
+            ]
+          }
+        )
+
+      {:ok, compiled} =
+        Compiler.compile(Document.new(root, id: "bdoc_CHUNK"), ctx.palette, terminate: true)
+
+      refute compiled.scxml =~ "root_failed"
+      refute compiled.scxml =~ "statifier_persistence"
+    end
+
+    # Step 2: a document with no unhandled failure-classed outcome below
+    # its root compiles to the bytes it compiled to today. The corpus test
+    # pins that over five documents; this pins the reason.
+    #
+    # sabotage: emitted the shared final for an empty collected set -> a
+    # document with no failure at all gains a final it can never enter and
+    # this goes red (verified)
+    test "a document with no classed outcome below the root emits nothing", ctx do
+      root =
+        Block.new("core.sequence",
+          id: "blk_SEQ",
+          slots: %{
+            "body" => [Block.new("core.wait", id: "blk_WAIT", config: %{"duration" => "1s"})]
+          }
+        )
+
+      {:ok, compiled} =
+        Compiler.compile(Document.new(root, id: "bdoc_PLAIN"), ctx.palette, terminate: true)
+
+      refute compiled.scxml =~ "failed"
+    end
+
+    # The bead's own criterion for the other two types, and the ADR-0009
+    # Note's sentence about where a nested `core.map`'s `error` now goes:
+    # neither half alone reaches a nested batch or a nested child chart -
+    # section 2 makes the block raise the outcome event in the empty case
+    # at all, and section 4 catches it on the root.
+    #
+    # sabotage: filtered the collected set to `core.invoke` -> the batch
+    # and the child chart stop reaching the document's ending and this
+    # goes red on both rows (verified)
+    test "a nested core.map and core.subchart with an empty on_error reach the root too", ctx do
+      for {id, block} <- [
+            {"blk_MAP", Block.new("core.map", id: "blk_MAP", config: @map_config)},
+            {"blk_SUB",
+             Block.new("core.subchart",
+               id: "blk_SUB",
+               config: %{"chart" => "bdoc_CHILD", "outcomes" => "approved"}
+             )}
+          ] do
+        root = Block.new("core.sequence", id: "blk_SEQ", slots: %{"body" => [block]})
+
+        {:ok, compiled} =
+          Compiler.compile(Document.new(root, id: "bdoc_NESTED"), ctx.palette, terminate: true)
+
+        assert compiled.scxml =~
+                 ~s(<transition event="done.outcome.s_#{id}.error" ) <>
+                   ~s(target="s_blk_SEQ__root_failed"/>),
+               "#{id} below the root did not reach the shared failed final"
+
+        assert compiled.scxml =~
+                 ~s(<final id="s_blk_SEQ__root_failed"><donedata>) <>
+                   @tag_param <> ~s(</donedata></final>)
+
+        assert {:ok, _machine} = Statifier.compile(compiled.scxml)
+      end
+    end
+
+    # "The root block itself is untouched": the walk starts below it, and
+    # the completion finals it already emits for its own outcomes are
+    # unchanged, including when its own `on_<outcome>` slot is occupied.
+    # At the root the outcome *is* the document's answer.
+    #
+    # sabotage: started the walk at the root instead of below it -> a root
+    # `core.invoke` with an empty `on_error` is caught twice, once by its
+    # own `root_error` completion final and once by the shared one, and
+    # this goes red (verified)
+    test "the root block's own failure-classed outcome is not caught again", ctx do
+      root =
+        Block.new("core.invoke", id: "blk_INV", config: %{"invoke_type" => "myapp:authorize"})
+
+      {:ok, compiled} =
+        Compiler.compile(Document.new(root, id: "bdoc_ROOT"), ctx.palette, terminate: true)
+
+      refute compiled.scxml =~ "root_failed"
+
+      assert compiled.scxml =~
+               ~s(<final id="s_blk_INV__root_error"><donedata>) <>
+                 @tag_param <> ~s(</donedata></final>)
+    end
+
+    # Nothing at all outside the two options: the rule is gated exactly
+    # where the root completion finals are.
+    #
+    # sabotage: ran the propagation outside the `cond` -> a plain compile
+    # grows top-level bytes and this goes red (verified)
+    test "a plain compile is untouched", ctx do
+      compiled = compile_chunk!(ctx, [])
+
+      refute compiled.scxml =~ "failed"
+      refute compiled.scxml =~ "statifier_persistence"
+    end
+
+    # One shared final however many pairs there are, and one transition
+    # per pair in document pre-order - which is what keeps the added bytes
+    # proportional to "does this document have any unhandled failure at
+    # all" rather than to the number of blocks in it.
+    #
+    # sabotage: minted one final per pair -> two `root_failed` ids collide
+    # in the emitted bytes and this goes red on the count (verified)
+    test "two unhandled failures share one final and keep document order", ctx do
+      root =
+        Block.new("core.sequence",
+          id: "blk_SEQ",
+          slots: %{
+            "body" => [
+              Block.new("core.invoke", id: "blk_A", config: %{"invoke_type" => "myapp:authorize"}),
+              Block.new("core.invoke", id: "blk_B", config: %{"invoke_type" => "myapp:capture"})
+            ]
+          }
+        )
+
+      {:ok, compiled} =
+        Compiler.compile(Document.new(root, id: "bdoc_TWO"), ctx.palette, terminate: true)
+
+      assert compiled.scxml
+             |> String.split(~s(<final id="s_blk_SEQ__root_failed">))
+             |> length() == 2
+
+      first =
+        :binary.match(compiled.scxml, ~s(<transition event="done.outcome.s_blk_A.error"))
+        |> elem(0)
+
+      second =
+        :binary.match(compiled.scxml, ~s(<transition event="done.outcome.s_blk_B.error"))
+        |> elem(0)
+
+      assert first < second
+    end
+  end
+
+  # `on_error` is occupied here so the root-level assertions above read
+  # the occupied shape, whose bytes ADR-0002's amendment of 2026-09-06
+  # section 2 leaves exactly as they were. The empty-slot shape that
+  # amendment adds is asserted in its own describe block above, and the
+  # chunk-shaped document below reaches it below the root.
   defp compile_map!(ctx, opts) do
     root =
       Block.new("core.map",
@@ -326,6 +627,26 @@ defmodule StatifierBlocks.Compiler.FailureOutcomeTest do
       )
 
     {:ok, compiled} = Compiler.compile(Document.new(root, id: "bdoc_ROOT"), ctx.palette, opts)
+
+    compiled
+  end
+
+  # The reference embedder's chunk shape: a `core.sequence` around one
+  # `core.invoke` whose `on_error` is empty. The amendment's whole
+  # motivation is that this document could not reach a failure-classed
+  # final by any authoring before this bead.
+  defp compile_chunk!(ctx, opts) do
+    root =
+      Block.new("core.sequence",
+        id: "blk_SEQ",
+        slots: %{
+          "body" => [
+            Block.new("core.invoke", id: "blk_INV", config: %{"invoke_type" => "myapp:authorize"})
+          ]
+        }
+      )
+
+    {:ok, compiled} = Compiler.compile(Document.new(root, id: "bdoc_CHUNK"), ctx.palette, opts)
 
     compiled
   end

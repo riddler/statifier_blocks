@@ -449,12 +449,23 @@ defmodule StatifierBlocks.Core.MapTest do
       %{scxml: compile!(order()).scxml}
     end
 
-    # sabotage: emitted the failure transition unconditionally - it targets
-    # a state that was never emitted, the engine refuses the compile, and
+    # ADR-0002's amendment of 2026-09-06, section 2, extended to this type
+    # by the operator's ruling `RQ-034-13`: the failure final is emitted
+    # whether or not `on_error` is occupied, and with it empty the failure
+    # transition targets that final directly. This replaces the assertion
+    # that neither was emitted.
+    #
+    # sabotage: restored the `nil` clauses on `failure_transition/1` and
+    # `error_final/1` -> a failed batch is selected by nothing again and
     # this goes red (verified)
-    test "emits no failure transition and no error final", %{scxml: scxml} do
-      refute scxml =~ "error.communication.invoke"
-      refute scxml =~ "s_blk_LINES__o_error"
+    test "the failure transition targets the error final directly", %{scxml: scxml} do
+      assert scxml =~
+               ~s(<transition event="error.communication.invoke" target="s_blk_LINES__o_error"/>)
+
+      assert scxml =~
+               ~s(<final id="s_blk_LINES__o_error"><onentry>) <>
+                 ~s(<raise event="done.outcome.s_blk_LINES.error"/></onentry></final>)
+
       assert {:ok, _machine} = Statifier.compile(scxml)
     end
 

@@ -169,6 +169,9 @@ defmodule StatifierBlocks.InvokeStep do
       def outcomes(_config), do: StatifierBlocks.InvokeStep.outcomes()
 
       @impl StatifierBlocks.BlockType
+      def failure_outcomes(_config), do: StatifierBlocks.InvokeStep.failure_outcomes()
+
+      @impl StatifierBlocks.BlockType
       def palette_entry, do: StatifierBlocks.InvokeStep.palette_entry(unquote(palette))
 
       @impl StatifierBlocks.BlockType
@@ -180,6 +183,7 @@ defmodule StatifierBlocks.InvokeStep do
                      validate_config: 1,
                      io: 1,
                      outcomes: 1,
+                     failure_outcomes: 1,
                      palette_entry: 0,
                      emit: 2
     end
@@ -211,6 +215,26 @@ defmodule StatifierBlocks.InvokeStep do
   """
   @spec outcomes() :: [BlockType.outcome_decl()]
   def outcomes, do: [{"done", "Done"}, {"error", "Error"}]
+
+  @doc """
+  `error`, the outcome a step reaches when the call did not succeed
+  (ADR-0002's amendment of 2026-09-06, section 3).
+
+  The `use` macro defines `failure_outcomes/1` from this for every host
+  type built on it, so a step that calls out to the world and comes back
+  on `error` is classed as having failed without its author writing
+  anything. It is in `defoverridable`: a host whose `error` is routine - a
+  probe that reports "not found" through it, say - defines its own
+  `failure_outcomes/1` returning `[]` or its own list, in the same place it
+  would override `outcomes/1`.
+
+  This narrows one sentence of `StatifierBlocks.BlockType.failure_outcomes/1`'s
+  own Note: a type built on this module now exports the callback by
+  inheritance, so it is classed even though it was written before the
+  callback existed. The amendment counts that as a cost and takes it.
+  """
+  @spec failure_outcomes() :: [String.t()]
+  def failure_outcomes, do: ["error"]
 
   @doc """
   The optional `label` field: the name this particular step goes by on the

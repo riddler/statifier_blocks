@@ -2518,3 +2518,71 @@ an outcome that matters to a stepper.
 
 Filed with `sb-napt`, mirrored with `sp-n8g` in `statifier_persistence`;
 campaign-033 ruling `RQ-033-3`.
+
+## Note (2026-09-06): the root shape gains one shared `<final>` for an unhandled failure below the root
+
+A dated Note, not an amendment. Decision 5's totality rule, decision 6's byte
+determinism, decision 3's role namespace and the root shape the 2026-08-29
+root-termination Note and C1 fix are all unchanged; nothing above this line
+loses a word. What is recorded here is the reading of one more span the
+compiler emits under the same two options, because ADR-0002's amendment of
+2026-09-06 says what those bytes *are* and why, and leaves their reading as a
+root shape to this record - exactly as the reserved failure param's was, in
+the Note above this one.
+
+**The span.** Under `child_use: true` or `terminate: true`, and nowhere else,
+a document with at least one unhandled failure-classed outcome below its root
+block emits **one** additional top-level `<final>`, sibling of the completion
+finals, plus one `<transition>` on the root block's own state per unhandled
+pair. The final's id is minted from the root block's id under the role
+`child_failed` or `root_failed` - the same two prefixes the completion finals
+use, so a reader can tell which compile option produced it, and both are
+ordinary roles in decision 3's sense that `unstate_id/1` inverts. Its
+`<donedata>` carries the reserved `statifier_persistence:run_status` param
+that the Note above fixes, and under `child_use: true` the `outcome` param
+valued `'error'` ahead of it. Which outcomes count as unhandled, and why the
+answer is a property of the failing block rather than of the container above
+it, is ADR-0002's amendment of this date, section 4.
+
+**Attribution splits, and decision 5 stays total.** The shared final is
+stamped to the **root block**, in its `child_failed` or `root_failed` role,
+because the document's own ending is a fact about the root and about nothing
+else. Each catch transition is stamped to **the failing block**, following
+decision 5's own rule and `Emit.chain/2`'s reading of it: "what happens after
+the authorize step fails" is a fact about the authorize step. Both go through
+the same `Attribution.stamp/3` every emitted span goes through, so the
+provenance map stays total over the added bytes; a finding landing in a catch
+transition points the reader at the block that failed rather than at the root
+or at this package.
+
+**Determinism is untouched (decision 6).** The walk is document pre-order over
+the resolved tree, the collected set is read off `outcomes/1` and
+`failure_outcomes/1` - both pure functions of config - and one shared final is
+emitted whatever the size of the set. A document with no unhandled
+failure-classed outcome below its root emits nothing at all and compiles to
+the bytes it compiled to at 0.21.0, which `sb-hxs5` pins over a corpus of five
+documents in three compile modes each. A document that gains the span moves
+its content hash, and is a new chart revision under statifier-ex ADR-0052 -
+the one-time cost the Note above already described for a root `core.map` or
+`core.subchart`, met here by every chunk-shaped document.
+
+**The transitions are external**, like the completion transitions beside them
+and for the same reason: the point is to leave the root state for a sibling
+final. A `<transition>` with no `type` attribute is external in SCXML, so the
+attribute is absent here rather than spelled out, which is also what keeps the
+added bytes comparable to the completion transitions a reader is already
+holding.
+
+**What this narrows in the Note above.** That Note closes on "one thing a
+chart author has to do for the final to be reachable": `core.map` and
+`core.subchart` emitted the route to their `error` outcome only when the
+matching `on_error` slot was occupied, so a root document classing `error`
+with the slot empty compiled a failure-classed final nothing could enter.
+ADR-0002's amendment of this date, section 2, removes that condition for
+`core.invoke`, `core.map` and `core.subchart` alike: the failure final is
+emitted always and, with the slot empty, the failure transition targets it
+directly. The paragraph's sentence held when it was written and is superseded
+for the empty-slot case from this date; nothing else in it moves.
+
+Filed with `sb-hxs5`, against ADR-0002's amendment of 2026-09-06;
+campaign-034 rulings `RQ-034-1` and `RQ-034-13`.

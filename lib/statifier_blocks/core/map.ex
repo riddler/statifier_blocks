@@ -303,12 +303,15 @@ defmodule StatifierBlocks.Core.Map do
   on `error` rather than a third outcome. Nor does it change what decision
   5's `collect` holds: the per-child answers are still data, one element
   per item in index order, and an author still branches on them with a
-  `core.branch` after the block. What the class changes is one thing only,
-  and only for a document whose **root** block is a `core.map`: the
-  top-level `<final>` for `error` carries the reserved `<donedata>`
+  `core.branch` after the block. What the class changes is the
+  top-level `<final>` for `error`: it carries the reserved `<donedata>`
   `<param>` that tells a durable stepper the run failed, so a fan-out that
   ended badly settles its parent's invocation instead of completing
-  quietly.
+  quietly. For a document whose **root** block is a `core.map` that is the
+  root's own outcome final; from ADR-0002's amendment of 2026-09-06
+  (sections 2 and 4) a `core.map` **below** the root whose `on_error` slot
+  is empty reaches the document's shared failed final too, and one whose
+  slot is occupied is handled and reaches nothing above the block.
   """
   @impl true
   def failure_outcomes(_config), do: [@error_outcome]
@@ -507,12 +510,13 @@ defmodule StatifierBlocks.Core.Map do
   running two fan-outs at once can tell their completions apart by a value
   it knows at compile time.
 
-  An absent `on_error` slot emits no failure transition and no `error`
-  `<final>`, exactly as `core.invoke` has it: outcome wiring is an event
-  rather than a target, so a parent may transition on an outcome whose
-  final was never emitted and the transition simply never fires (ADR-0004
-  2c). An absent `on_done` slot is the ordinary case and routes straight
-  to the `done` final.
+  An absent `on_error` slot still ends the block on `error`, exactly as
+  `core.invoke` has it: ADR-0002's amendment of 2026-09-06 section 2 emits
+  a failure-classed outcome's `<final>` whether or not its slot is
+  occupied, because the class is read off the final, and with the slot
+  empty the failure transition targets that final directly. An absent
+  `on_done` slot is the ordinary case and routes straight to the `done`
+  final.
 
   ## Who owns what
 
@@ -603,30 +607,27 @@ defmodule StatifierBlocks.Core.Map do
     |> Emission.from_config(config_key)
   end
 
+  # ADR-0002's amendment of 2026-09-06 section 2: the `error` final is
+  # always minted and always emitted; the slot decides only what the
+  # failure transition points at and whether a child subtree sits between
+  # the transition and the final.
   @spec error_parts(Context.t()) ::
-          {:ok, nil | {Context.child_summary(), String.t()}}
+          {:ok, {Context.child_summary() | nil, String.t()}}
           | {:error, {:invalid_outcome, Block.id(), String.t()}}
   defp error_parts(context) do
-    case Context.children(context, @error_slot) do
-      [] ->
-        {:ok, nil}
-
-      [child | _rest] ->
-        with {:ok, final} <- Context.outcome_id(context, "error") do
-          {:ok, {child, final}}
-        end
+    with {:ok, final} <- Context.outcome_id(context, @error_outcome) do
+      {:ok, {context |> Context.children(@error_slot) |> List.first(), final}}
     end
   end
 
-  defp failure_transition(nil), do: []
+  defp failure_transition({nil, final}),
+    do: [Emit.transition(event: @error_event, target: final)]
 
   defp failure_transition({child, _final}),
     do: [Emit.transition(event: @error_event, target: child.state_id)]
 
-  defp error_children(nil), do: []
   defp error_children({child, final}), do: chain(child, final)
 
-  defp error_final(nil), do: []
   defp error_final({_child, final}), do: [Emit.final(final)]
 
   # The slot child's subtree, and the transition out of it into that

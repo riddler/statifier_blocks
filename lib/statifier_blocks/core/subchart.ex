@@ -361,9 +361,12 @@ defmodule StatifierBlocks.Core.Subchart do
   declared only one has, so a subchart that declares nothing behaves
   exactly like a `core.invoke`.
 
-  `error.communication.invoke` routing is `core.invoke`'s, unchanged: it is
-  emitted only when the `on_error` slot is occupied, and with the slot
-  empty the failure propagates as it does today.
+  `error.communication.invoke` routing is `core.invoke`'s, unchanged: the
+  transition is always emitted, targeting the `on_error` child when the
+  slot holds one and the `error` final directly when it does not
+  (ADR-0002's amendment of 2026-09-06, section 2). That final is emitted
+  in both cases, whatever the referenced chart's own declared outcomes
+  say, because a class is read off a final.
 
   ## Who owns what
 
@@ -484,11 +487,15 @@ defmodule StatifierBlocks.Core.Subchart do
   @spec default_target([route()]) :: String.t()
   defp default_target([first | _rest]), do: first.target
 
+  # ADR-0002's amendment of 2026-09-06 section 2: the failure route's
+  # transition is emitted whether or not its slot is occupied. With a
+  # child it points at the child, without one it points straight at the
+  # final - `route.target` is already that distinction.
   @spec failure_transition([route()]) :: [Emission.t()]
   defp failure_transition(routes) do
-    case Enum.find(routes, &(&1.name == @error_outcome and &1.child)) do
+    case Enum.find(routes, &(&1.name == @error_outcome)) do
       nil -> []
-      route -> [Emit.transition(event: @error_event, target: route.child.state_id)]
+      route -> [Emit.transition(event: @error_event, target: route.target)]
     end
   end
 
@@ -506,15 +513,17 @@ defmodule StatifierBlocks.Core.Subchart do
     end)
   end
 
-  # An outcome the block can never reach emits no `<final>`, which is
-  # `core.invoke`'s rule for its empty `on_error` slot: the failure
-  # outcome is reachable only through ADR-0068's event, so with that slot
-  # empty and the author not having declared `error` themselves, there is
-  # nothing to emit and nothing for a parent to lose (ADR-0004 2c).
+  # An outcome the block can never reach emits no `<final>` - with one
+  # exception, ADR-0002's amendment of 2026-09-06 section 2: the
+  # failure-classed outcome's final is emitted always, because the class
+  # is read off the final and an outcome whose final is sometimes absent
+  # cannot be classed. So `error` is kept here whatever the author
+  # declared and whatever the slot holds, and every other outcome keeps
+  # the `routed? or child` rule it had.
   @spec finals([route()]) :: [Emission.t()]
   defp finals(routes) do
     routes
-    |> Enum.filter(&(&1.routed? or &1.child))
+    |> Enum.filter(&(&1.routed? or &1.name == @error_outcome or &1.child != nil))
     |> Enum.map(&Emit.final(&1.final))
   end
 
