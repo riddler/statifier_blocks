@@ -8,7 +8,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     **document-level**. Content that is a grid of rows about the whole document
     goes in the drawer; content about one block does not, whatever its shape.
 
-    Five tabs ship. Truth tables were first. The document-level findings list
+    Six tabs ship. Truth tables were first. The document-level findings list
     joined them under operator ruling R4 (2026-08-29), which retired the text
     block that used to sit under the canvas: a list of findings is a grid of
     rows about the whole document, so 1A's test admits it and the canvas gets
@@ -118,9 +118,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     ## The arrow keys are the server's
 
-    The strip is a `role="tablist"` with a roving `tabindex`, so the six tabs
-    are one stop on the Tab sequence and the other five are reached with the
-    arrow keys or not at all - and once `sb-mtak` made the strip scroll at the
+    The strip is a `role="tablist"` with a roving `tabindex`, so the tabs
+    are one stop on the Tab sequence and all but the active one are reached
+    with the arrow keys or not at all - and once `sb-mtak` made the strip scroll at the
     narrow breakpoint with its scrollbar hidden, "not at all" also meant not
     visible. WAI-ARIA's pattern closes that: Left and Right move one tab and
     wrap, Home and End go to the ends.
@@ -160,7 +160,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     alias Phoenix.LiveView.JS
     alias StatifierBlocks.Editor.{Declarations, Findings}
     alias StatifierBlocks.Predicates.TruthTable
-    alias StatifierBlocks.{Shell, ViewModel}
+    alias StatifierBlocks.{Shell, SourceView, ViewModel}
 
     attr(:view, :map, required: true, doc: "`StatifierBlocks.Shell.drawer_view/1`'s value")
     attr(:height, :float, required: true)
@@ -211,6 +211,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       decision 9's "what is known here". `nil` and `[]` say different things:
       nothing selected, and nothing known there.
       """
+    )
+
+    attr(:source_view, :any,
+      default: nil,
+      doc: """
+      `StatifierBlocks.SourceView.t()` for the Source tab, or `nil` before
+      the editor has compiled anything. The editor refreshes it only while
+      the drawer is open on that tab.
+      """
+    )
+
+    attr(:selected_id, :any,
+      default: nil,
+      doc: "the selected block's id, which is what the Source tab highlights by"
     )
 
     attr(:host_tabs, :list,
@@ -356,6 +370,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 />
               <% @view.tab == :fixtures -> %>
                 <.fixture_runs runs={@fixture_runs} />
+              <% @view.tab == :source -> %>
+                <.source view={@source_view} selected_id={@selected_id} target={@target} />
               <% @view.tab == :datamodel -> %>
                 <.known_here rows={@environment_view} />
                 <.declared_paths rows={@declared_view} />
@@ -614,6 +630,103 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </tbody>
         </table>
       </div>
+      """
+    end
+
+    attr(:view, :any, default: nil)
+    attr(:selected_id, :any, default: nil)
+    attr(:target, :any, required: true)
+
+    # The compiled chart, one numbered row per element, each run of bytes
+    # carrying the block that emitted it.
+    #
+    # The three states are the three `StatifierBlocks.SourceView` reports,
+    # and they say different things on purpose. `:pending` is *nothing has
+    # been compiled*, which is only ever seen by a caller that drew this
+    # panel without asking for a listing first. `:compile_error` is a normal
+    # mid-edit document with no earlier chart to fall back on. `:ready` with
+    # `stale?` is the last chart the document produced, still readable, with
+    # a line saying it is not the current one - which is what the editor
+    # shows instead of recompiling on every keystroke.
+    defp source(assigns) do
+      assigns = assign(assigns, :view, assigns.view || %SourceView{})
+
+      ~H"""
+      <div class="sb-source" data-status={@view.status} data-stale={to_string(@view.stale?)}>
+        <p :if={@view.status == :pending} class="sb-drawer__empty">
+          Nothing has been compiled yet.
+        </p>
+
+        <p :if={@view.status == :compile_error} class="sb-drawer__empty">
+          This document does not currently compile, so there is no chart to show.
+        </p>
+
+        <p :if={@view.stale?} class="sb-source__stale">
+          Compiled from an earlier document. This document does not currently
+          compile, so what follows is the last chart it produced.
+        </p>
+
+        <ul :if={@view.findings != []} class="sb-source__findings">
+          <li :for={finding <- @view.findings}>{finding.message}</li>
+        </ul>
+
+        <ol :if={@view.status == :ready} class="sb-source__lines">
+          <li
+            :for={line <- @view.lines}
+            class="sb-source__line"
+            value={line.number}
+            data-line={line.number}
+            data-indent={line.indent}
+          >
+            <span class="sb-source__number" aria-hidden="true">{line.number}</span>
+            <code
+              class="sb-source__text"
+              style={"padding-left: calc(var(--sb-space) * #{line.indent})"}
+              phx-no-format
+            ><.source_span :for={span <- line.spans} span={span} selected_id={@selected_id} target={@target} /></code>
+          </li>
+        </ol>
+      </div>
+      """
+    end
+
+    attr(:span, SourceView.Span, required: true)
+    attr(:selected_id, :any, default: nil)
+    attr(:target, :any, required: true)
+
+    # One run of bytes. A run with an owner is a button carrying that block's
+    # id straight to the editor's existing `select` event: the byte offset was
+    # already resolved through `StatifierBlocks.Provenance.owner_at/2` when
+    # the listing was built, so the click needs no second resolution and the
+    # panel adds no handler of its own.
+    #
+    # `config_key` is the field an author typed the value into, and it is the
+    # title because that is the whole of what the span is: not "somewhere in
+    # this block" but "this field of it".
+    #
+    # A run with no owner is plain text. It is drawn rather than dropped
+    # because the listing is the generated bytes and a listing that omitted
+    # some of them would not be.
+    #
+    # The markup is deliberately unbroken - `phx-no-format` on the `<code>`
+    # above, and no whitespace between the two elements here - because every
+    # space inside the listing is a byte of the chart.
+    defp source_span(assigns) do
+      ~H"""
+      <button
+        :if={@span.block_id}
+        type="button"
+        class="sb-source__span"
+        data-block={@span.block_id}
+        data-role={@span.role}
+        data-config-key={@span.config_key}
+        data-offset={@span.offset}
+        data-selected={to_string(@span.block_id == @selected_id)}
+        title={@span.config_key}
+        phx-click="select"
+        phx-value-block-id={@span.block_id}
+        phx-target={@target}
+      >{@span.text}</button><span :if={is_nil(@span.block_id)} class="sb-source__plain">{@span.text}</span>
       """
     end
 

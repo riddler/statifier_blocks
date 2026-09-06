@@ -41,7 +41,16 @@ defmodule StatifierBlocks.Shell do
   host already built with `StatifierBlocks.Predicates.TruthTable.build/2`.
   """
 
-  alias StatifierBlocks.{Block, BlockType, Datamodel, Declarations, Finding, ViewModel}
+  alias StatifierBlocks.{
+    Block,
+    BlockType,
+    Datamodel,
+    Declarations,
+    Finding,
+    SourceView,
+    ViewModel
+  }
+
   alias StatifierBlocks.Document.DatamodelEntry
   alias StatifierBlocks.Predicates.TruthTable
 
@@ -66,7 +75,7 @@ defmodule StatifierBlocks.Shell do
   incoming tab name into an atom, so a crafted `phx-value-tab` reaches at
   worst a host tab the host itself declared.
   """
-  @type drawer_tab :: :tables | :findings | :declarations | :fixtures | :datamodel
+  @type drawer_tab :: :tables | :findings | :declarations | :fixtures | :datamodel | :source
 
   @typedoc "A host tab's id: its own name for it, and the DOM id it is stamped into."
   @type host_tab_id :: String.t()
@@ -172,7 +181,14 @@ defmodule StatifierBlocks.Shell do
   # has nothing else in it, so ahead of the others it would capture the
   # unchosen resolution for almost every document a host supplies a
   # datamodel to.
-  @drawer_tabs [:tables, :findings, :declarations, :fixtures, :datamodel]
+  # datamodel to.
+  #
+  # The Source listing goes last of all, on the arrival-order rule and on its
+  # own count: it is the newest, and its count is the number of lines the
+  # chart was last compiled to, which is zero until something has asked for
+  # a compile. So it never captures the unchosen resolution from a tab that
+  # holds something, which is what the rule is for.
+  @drawer_tabs [:tables, :findings, :declarations, :fixtures, :datamodel, :source]
 
   # "Declarations" and not "Datamodel" for the third tab, which is the name
   # the reserved place was described under. ADR-0001 11g and 11h split the
@@ -186,7 +202,8 @@ defmodule StatifierBlocks.Shell do
     findings: "Findings",
     declarations: "Declarations",
     fixtures: "Fixtures",
-    datamodel: "Datamodel"
+    datamodel: "Datamodel",
+    source: "Source"
   }
 
   # The three declaring surfaces, in the words the read-only view puts in its
@@ -1017,6 +1034,7 @@ defmodule StatifierBlocks.Shell do
           optional(:host_tabs) => [host_tab()],
           optional(:declarations) => [DatamodelEntry.t()],
           optional(:declared_view) => [Datamodel.declared_row()],
+          optional(:source_view) => SourceView.t() | nil,
           optional(:selected_id) => Block.id() | nil
         }) :: drawer()
   def drawer_view(state) do
@@ -1049,6 +1067,13 @@ defmodule StatifierBlocks.Shell do
             title: drawer_title(:datamodel),
             count: length(declared_view)
           }
+
+        :source ->
+          %{
+            id: :source,
+            title: drawer_title(:source),
+            count: source_count(Map.get(state, :source_view))
+          }
       end)
 
     contributed =
@@ -1079,6 +1104,15 @@ defmodule StatifierBlocks.Shell do
 
     if base.open?, do: opened(base, fixtures, selected_id), else: %{base | jumps: []}
   end
+
+  # The Source tab's count is the number of lines the chart was last compiled
+  # to. It is a count of what the panel draws, like every other tab's, and it
+  # is zero before the first compile because nothing here compiles anything:
+  # the listing is the editor's assign, refreshed only while a surface is
+  # showing it, and this function reports whatever that assign holds.
+  @spec source_count(SourceView.t() | nil) :: non_neg_integer()
+  defp source_count(%SourceView{line_count: count}), do: count
+  defp source_count(_none), do: 0
 
   # An explicit pick stands, empty or not. An unchosen tab is resolved rather
   # than defaulted, so the strip carries something to open the drawer for.

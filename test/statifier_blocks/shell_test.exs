@@ -269,9 +269,18 @@ defmodule StatifierBlocks.ShellTest do
   describe "the datamodel tab" do
     # Sabotage: dropped `:datamodel` from `@drawer_tabs`, leaving the four-tab
     # list. This went red, and so did every other test in this describe.
-    test "drawer_tabs/0 lists it last, after fixtures" do
-      assert Shell.drawer_tabs() == [:tables, :findings, :declarations, :fixtures, :datamodel]
+    test "drawer_tabs/0 lists it after fixtures" do
+      assert Shell.drawer_tabs() == [
+               :tables,
+               :findings,
+               :declarations,
+               :fixtures,
+               :datamodel,
+               :source
+             ]
+
       assert Shell.drawer_title(:datamodel) == "Datamodel"
+      assert Shell.drawer_title(:source) == "Source"
     end
 
     # Sabotage: dropped `datamodel` from the `own` list built in
@@ -363,6 +372,7 @@ defmodule StatifierBlocks.ShellTest do
                :declarations,
                :fixtures,
                :datamodel,
+               :source,
                "runs",
                "jobs"
              ]
@@ -373,11 +383,12 @@ defmodule StatifierBlocks.ShellTest do
                "Declarations",
                "Fixtures",
                "Datamodel",
+               "Source",
                "Runs",
                "Jobs"
              ]
 
-      assert Enum.map(view.tabs, & &1.count) == [0, 0, 0, 0, 0, 3, 0]
+      assert Enum.map(view.tabs, & &1.count) == [0, 0, 0, 0, 0, 0, 3, 0]
     end
 
     # Sabotage: keeping `resolve_tab/2`'s old `when tab in @drawer_tabs` guard
@@ -428,7 +439,8 @@ defmodule StatifierBlocks.ShellTest do
                :findings,
                :declarations,
                :fixtures,
-               :datamodel
+               :datamodel,
+               :source
              ]
 
       assert Shell.host_tabs([host_tab("findings", "Mine", 9)]) == []

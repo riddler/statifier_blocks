@@ -54,7 +54,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # Sabotage: `Shell.host_tabs/1` answering an empty list with a
       # placeholder entry - an extra, nameless tab appears and the ordering
       # assertion goes red.
-      test "carries the five package tabs and nothing else", %{conn: conn} do
+      test "carries the package's own tabs and nothing else", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn)
         open(view)
 
@@ -65,13 +65,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert has_element?(view, "#sb-drawer-tab-declarations")
         assert has_element?(view, "#sb-drawer-tab-fixtures")
         assert has_element?(view, "#sb-drawer-tab-datamodel")
+        assert has_element?(view, "#sb-drawer-tab-source")
 
         assert tabs(html) == [
                  "sb-drawer-tab-tables",
                  "sb-drawer-tab-findings",
                  "sb-drawer-tab-declarations",
                  "sb-drawer-tab-fixtures",
-                 "sb-drawer-tab-datamodel"
+                 "sb-drawer-tab-datamodel",
+                 "sb-drawer-tab-source"
                ]
       end
     end
@@ -90,6 +92,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  "sb-drawer-tab-declarations",
                  "sb-drawer-tab-fixtures",
                  "sb-drawer-tab-datamodel",
+                 "sb-drawer-tab-source",
                  "sb-drawer-tab-jobs"
                ]
 
@@ -221,7 +224,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  "sb-drawer-tab-findings",
                  "sb-drawer-tab-declarations",
                  "sb-drawer-tab-fixtures",
-                 "sb-drawer-tab-datamodel"
+                 "sb-drawer-tab-datamodel",
+                 "sb-drawer-tab-source"
                ]
 
         assert view |> element("#sb-drawer-tab-findings") |> render() =~ "Findings"
@@ -241,6 +245,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  "sb-drawer-tab-declarations",
                  "sb-drawer-tab-fixtures",
                  "sb-drawer-tab-datamodel",
+                 "sb-drawer-tab-source",
                  "sb-drawer-tab-runs"
                ]
       end
