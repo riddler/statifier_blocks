@@ -4742,3 +4742,115 @@ left untouched.
 
 Filed with `sb-ju4d`; the section it accepts was filed with `sb-ii2k` (PR
 320, `757ff3f`) and built by `sb-hxs5` (PR 328, `0f9f2cd`).
+
+## Note (2026-09-06): three corrections the payload amendment takes, and the two lines it does not re-wrap
+
+Residue from the pass-2 reviewer of the amendment of this date that begins at
+`:4010` (`sb-i0cc`, PR 324, merged at `6975e91`). The reviewer raised these as
+non-qualifying NOTES rather than as findings, so that amendment merged on an
+UNQUALIFIED verdict without them and curing them then would have invalidated
+the reviewed head. They are recorded here rather than edited in, which is the
+posture every Note above this line takes. **Nothing above this Note is edited
+by it**, and no decision moves: `P1` through `P5` decide exactly what they
+decided at `6975e91`.
+
+### 1. `P3`'s "either side of it" is a chronology slip: both key amendments are earlier
+
+`P3` says, of the `{:path, opts}` amendment of 2026-09-05 at `:2761`, that
+"the two amendments either side of it took an optional **key** instead
+(`datamodel_path?` at `:1004`, `sensitive?` at `:1187`)" (`:4117-4120`). Both
+of those amendments are dated **2026-08-29** and both sit above `:2761`, so
+neither of them is on the later side of it. Decision 7 has taken exactly three
+amendments, in this order:
+
+| Line | Date | What it added |
+|---|---|---|
+| `:1004` | 2026-08-29 | the optional `datamodel_path?` key |
+| `:1187` | 2026-08-29 | the optional `sensitive?` key |
+| `:2761` | 2026-09-05 | the `{:path, opts}` field type, the set's eighth member |
+
+Nothing has amended decision 7 since. The Note of this date at `:3456` gives
+`{:path, opts}` its first two `opts` keys, but it is a Note and not an
+amendment and it adds no member either, so the sentence has no later neighbour
+to have meant. Read it as **"the two earlier amendments"**.
+
+What the slip does not touch: the attribution is right - `:1004` and `:1187`
+are the key-only pair, and each does say in its own words that the type set
+stays closed (`:1028-1032`, `:1235-1238`) - and the argument `P3` rests on
+them, that an optional key is the cheap change and a ninth field type is not,
+holds whichever side of `:2761` they sit on. Two words of chronology, not a
+false cite.
+
+### 2. `P5`'s `check_capture/2` cite began one comment block short, and where it stands today
+
+`P5`'s first bullet cites `lib/statifier_blocks/core/on_event.ex:283-296` for
+the reason `check_capture/2` "already gives in the module" (`:4188`). At
+`6975e91`, `:283` was the `defp check_capture(findings, config) do` line; the
+reason itself - that "`capture` has no field in `config_schema/1` to render a
+per-pair finding against ... so the anchor an editor could use is the key
+itself" - is in the comment block directly above the function, at `:277-282`,
+and the cited range starts one line past its end. The cite named the function
+and stopped short of the sentence it was offered for.
+
+The range a reader follows **today** does carry the reason, by where the code
+moved rather than by design. The Note at `:4272` re-points that cite to
+`on_event.ex:352-373` (`:4320`), and on `main` at `f3e737f` `:352` is the first
+line of that same six-line comment block and `:358` is the `defp`. So the
+original cite was one block short and the moved cite is not; the two are
+recorded here together so a reader who compares them does not read the
+difference as a drift in the code. Neither range is edited.
+
+### 3. Two lines left over-long in the payload amendment, and why they stay
+
+`:4120` (140 characters) and `:4221` (145 characters) are unwrapped where the
+body prose around them stays near 79: inside the amendment that begins at
+`:4010` the widest of their neighbours are `:4040` at 83 and `:4217` at 80,
+and everything else over 79 in that span is a heading or a table row.
+
+They did not arrive together, and the reviewer NOTE that named them said they
+did. Only `:4120` came from `sb-i0cc`'s pass-1 cure: it is absent at `b093ca0`,
+the pre-cure head, and first appears at the cure commit `bcd2bce`. `:4221` is
+older than the cure - it stands verbatim at `b093ca0`, where it is the one
+body line past `:4000` over 100 characters - so it came in with the amendment's
+first draft. The correction is recorded here rather than carried forward.
+
+They are **not** re-wrapped, for the reason the second of them states about
+itself at `:4218-4221`: wrapping a line adds a line, and every line below it
+shifts, and the lines below are cited by number. The precedent at `:4218-4221`
+names five such lines (`:3329`, `:3331`, `:3418`, `:3528`, `:3814`), each cited
+by another section of this record, so an insert there would have falsified the
+record for every reader.
+
+This case is the same case, and it acquired its clearest instance while this
+Note was being written. `ADR-0013` cites **this record by line number**, and at
+the place it does so three of the four lines it names sit below `:4120`:
+`docs/adr/0002-block-type-behaviour.md:4108`, `:4121-4122`, `:4126` and
+`:4133`, quoted there for `P3`'s two decided arms and its closing "**No ninth
+field type is added by it**"
+(`docs/adr/0013-typed-fan-out-child-summary.md:143-144`). Wrapping `:4120`
+would move every one of them by a line and leave another record on `main`
+pointing at the wrong text. This Note's own cites go the same way - `:4188`,
+`:4214`, `:4218-4221`, `:4272`, `:4318-4320`, `:4325`, `:4656` and
+`:4739-4740` all sit below `:4120` - but they are no longer the only ones at
+stake, and they were never the reason.
+
+Closing two long lines buys a reader nothing to weigh against that.
+`sb-nhw0`'s own terms settle it independently: amend-by-addition, zero removed
+lines. Both lines read correctly as they stand; they are recorded here as
+known, and left.
+
+### The reviewer's fourth item, and why nothing here answers it
+
+The fourth NOTES item was a serial hazard for the conductor rather than a
+correction to this record: PR 320 (`sb-ii2k`), open at the time and appending
+to this same file, would need a rebase over PR 324 once 324 landed. It landed -
+the amendment that begins at `:4325` is its work, and the Note at `:4656` is
+its acceptance - so the hazard is spent and there is nothing in the record to
+correct for it.
+
+This Note carries no `Status:` line. That is this file's convention for a Note,
+as the Note at `:3456` shows (its heading is followed by prose at `:3458`, not
+by a status line) and as the Note at `:4656` states in as many words at
+`:4739-4740`: Notes in this family do not carry one.
+
+Filed with `sb-nhw0`, from `sb-i0cc`'s pass-2 reviewer NOTES.
