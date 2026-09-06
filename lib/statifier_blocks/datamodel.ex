@@ -163,6 +163,11 @@ defmodule StatifierBlocks.Datamodel do
   # remove. The document-level reads below are spelled out in full.
   alias StatifierDatamodel.Index
 
+  # The config key a block type stores its capture pairs under. It carries
+  # no field declaration, so this module and `StatifierBlocks.Environment`
+  # both read it off the config directly, and both spell the key once.
+  @capture_key "capture"
+
   @typedoc """
   The normalized datamodel: the set of paths the host declares, or `nil`
   when the host supplied none.
@@ -640,15 +645,49 @@ defmodule StatifierBlocks.Datamodel do
           MapSet.t(String.t())
         ) :: [Finding.t()]
   defp block_findings(%Block{id: id}, module, config, declared, roots) do
-    config
-    |> module.config_schema()
-    |> Enum.filter(&BlockType.datamodel_path?/1)
-    |> Enum.flat_map(fn decl ->
-      case BlockType.fetch_value(config, BlockType.value_path(decl)) do
-        {:ok, path} -> advisory(id, decl.key, path, declared, roots)
-        :error -> []
-      end
-    end)
+    declared_findings =
+      config
+      |> module.config_schema()
+      |> Enum.filter(&BlockType.datamodel_path?/1)
+      |> Enum.flat_map(fn decl ->
+        case BlockType.fetch_value(config, BlockType.value_path(decl)) do
+          {:ok, path} -> advisory(id, decl.key, path, declared, roots)
+          :error -> []
+        end
+      end)
+
+    declared_findings ++ capture_findings(id, config, declared, roots)
+  end
+
+  # A capture's target paths, which no field declaration names. A `capture`
+  # map's keys are datamodel paths written on the firing transition - the
+  # third write-signature form ADR-0011 decision 2 lists, and decision 10's
+  # third consequence is that they reach this advisory through the same
+  # mechanism as every other datamodel path rather than being invisible to
+  # the pass that covers all the others.
+  #
+  # Read off the config by key rather than from a block type, exactly as
+  # `StatifierBlocks.Environment` reads them: the key has no field to hang
+  # a declaration on, so the config is the only place the pairs exist. The
+  # finding anchors on `capture`, which is the key `validate_config/1`
+  # already anchors this map's own findings to.
+  @spec capture_findings(
+          Block.id(),
+          Block.config(),
+          MapSet.t(String.t()),
+          MapSet.t(String.t())
+        ) :: [Finding.t()]
+  defp capture_findings(id, config, declared, roots) do
+    case Map.get(config, @capture_key) do
+      pairs when is_map(pairs) ->
+        pairs
+        |> Map.keys()
+        |> Enum.sort()
+        |> Enum.flat_map(&advisory(id, @capture_key, &1, declared, roots))
+
+      _absent_or_not_a_map ->
+        []
+    end
   end
 
   @spec advisory(

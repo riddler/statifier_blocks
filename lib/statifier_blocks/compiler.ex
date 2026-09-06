@@ -69,6 +69,13 @@ defmodule StatifierBlocks.Compiler do
       invoke types the caller believes will be registered; every emitted
       type absent from it becomes a **warning**, never an error. See
       `StatifierBlocks.Compiler.InvokeTypes`.
+    * `:field_candidates` - the values a host offers per field, keyed
+      `{type_name, field_key}`, the same map the editor's own
+      `field_candidates` assign takes. A **closed** list - `[{value,
+      label}]` - turns a value it does not offer into a **warning**, never
+      an error; an open list - `{:open, choices}` - reports nothing, and a
+      field the map does not name is not looked at. Absent, the lint does
+      not run.
     * `:entry_type` - ADR-0003 decision 4's caller-supplied context: the
       type flowing into the document's root. Defaults to absent, which
       `StatifierBlocks.Assignability` reads as `:unknown`. ADR-0004's own
@@ -278,6 +285,8 @@ defmodule StatifierBlocks.Compiler do
 
   @typedoc """
   `:known_invoke_types` enables decision 8's optional two-registry lint;
+  `:field_candidates` enables the opt-in warning for a value outside a
+  host's own closed candidate list;
   `:entry_type` is ADR-0003 decision 4's caller-supplied context;
   `:datamodel` is the host's declared datamodel, read only by the
   sensitive-path refusal; `:declare` is the `<data>` roots the host
@@ -285,6 +294,7 @@ defmodule StatifierBlocks.Compiler do
   """
   @type option ::
           {:known_invoke_types, Enumerable.t()}
+          | {:field_candidates, %{optional({String.t(), String.t()}) => term()}}
           | {:entry_type, Assignability.type_expr() | :unknown}
           | {:datamodel, term()}
           | {:child_use, boolean()}
@@ -1404,7 +1414,7 @@ defmodule StatifierBlocks.Compiler do
          provenance: provenance,
          record: record(document, node, scxml),
          invoke_types: InvokeTypes.types(emitted),
-         warnings: emit_warnings ++ warnings ++ lint(emitted, opts)
+         warnings: emit_warnings ++ warnings ++ lint(emitted, opts) ++ candidate_lint(node, opts)
        }}
     end
   end
@@ -1414,6 +1424,61 @@ defmodule StatifierBlocks.Compiler do
     case Keyword.fetch(opts, :known_invoke_types) do
       {:ok, known} -> InvokeTypes.lint(emitted, known)
       :error -> []
+    end
+  end
+
+  # The `:field_candidates` lint, on exactly `:known_invoke_types`' terms:
+  # opt-in, and a **warning** for every value a host's own closed list does
+  # not offer. Never an error, for the reason that one is never an error -
+  # which values exist is a property of the deployment the document runs in,
+  # so any list handed to a compile is one deployment's belief rather than a
+  # rule about the document, and `validate_config/1` is the only authority on
+  # a value (ADR-0002 decision 7).
+  #
+  # An open list - `{:open, choices}` - reports nothing at all. Its whole
+  # claim is that these are values and not the values, so a value outside it
+  # is not even a remark.
+  @spec candidate_lint(Resolved.t(), keyword()) :: [Finding.t()]
+  defp candidate_lint(node, opts) do
+    case Keyword.fetch(opts, :field_candidates) do
+      {:ok, offered} when is_map(offered) and offered != %{} -> candidate_findings(node, offered)
+      _no_lists_supplied -> []
+    end
+  end
+
+  @spec candidate_findings(Resolved.t(), map()) :: [Finding.t()]
+  defp candidate_findings(%Resolved{block: block, module: module, slots: slots}, offered) do
+    own =
+      block.config
+      |> module.config_schema()
+      |> Enum.flat_map(&candidate_finding(block, &1, offered))
+
+    children =
+      Enum.flat_map(slots, fn {_slot, nodes} ->
+        Enum.flat_map(nodes, &candidate_findings(&1, offered))
+      end)
+
+    own ++ children
+  end
+
+  @spec candidate_finding(Block.t(), BlockType.field_decl(), map()) :: [Finding.t()]
+  defp candidate_finding(%Block{} = block, decl, offered) do
+    with choices when is_list(choices) <- Map.get(offered, {block.type, decl.key}),
+         {:ok, value} when is_binary(value) and value != "" <-
+           BlockType.fetch_value(block.config, BlockType.value_path(decl)),
+         false <- Enum.any?(choices, fn {choice, _label} -> choice == value end) do
+      [
+        Finding.new(
+          :config,
+          {:value_not_offered, decl.key, value},
+          ~s(#{value} is not one of the values offered for #{decl.label}),
+          block_id: block.id,
+          config_key: decl.key,
+          severity: :warning
+        )
+      ]
+    else
+      _offered_or_open_or_unset -> []
     end
   end
 

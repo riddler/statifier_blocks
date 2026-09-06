@@ -9,7 +9,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     | Field type | Rendering |
     |---|---|
-    | `:string` | single-line text input |
+    | `:string` | single-line text input; a `<select>` over a host's closed candidate list, or a `<datalist>` over an open one, when it supplied either |
     | `:integer` | number input, step 1 |
     | `:boolean` | checkbox |
     | `{:select, choices}` | select, choices in declared order |
@@ -104,6 +104,43 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     a host knows which of its own paths have a value set at all. A path with
     no entry gets a free-text value control, which is the same "suggests,
     never constrains" posture the path `<datalist>` takes.
+
+    ## `candidates`
+
+    The values a host says belong in THIS field, supplied per
+    `{type_name, field_key}` through the editor's `field_candidates`
+    assign and handed down one field at a time. Two spellings, and the
+    difference between them is the whole feature:
+
+      * `[{value, label}]` - a **closed** list. The control is a
+        `<select>`, because a host that named the values is saying these
+        are the values.
+      * `{:open, [{value, label}]}` - an **open** list. The control is the
+        text input with a `<datalist>`, on the terms every other
+        suggestion list here is on: it suggests, it does not constrain,
+        and free text stays valid.
+
+    `[]` is *no list supplied* and renders whatever the field type already
+    rendered, so a host that supplies nothing loses nothing.
+
+    Three properties, and none of them is this component's choice to make:
+
+      * **It never decides validity.** `validate_config/1` is the
+        authority (ADR-0002 decision 7), so a closed list is a control and
+        not a rule. A stored value the list does not offer is drawn as its
+        own selected option rather than silently rewritten to the first
+        one, which is what a `<select>` would otherwise do to a document
+        the moment its form was opened.
+      * **It is a `:string` field's affordance.** A typed control -
+        a `{:select, choices}`, a `:duration`, a `{:path, opts}` - already
+        knows what to draw, and a second source of options on top of one
+        would be two answers to one question.
+      * **It is host state, not authoring state.** Which values exist is a
+        property of the deployment the document runs in, so it arrives as
+        an assign and is never stored in a block.
+
+    It is read ahead of the three key-chosen lists below, because a list
+    keyed on this field is the narrower claim.
 
     ## `event_candidates` (sb-82mu)
 
@@ -216,12 +253,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     clause 11e's `:info` advisory anchored on this field's `key`, never a
     refusal.
 
-    `opts` is read by nothing here. ADR-0002's 2026-09-05 amendment defines
-    no key in it and says so; the tuple's second element is there so that
-    what a control needs can arrive later without widening the type set a
-    second time. A `{:path, opts}` inside a `{:list, t}` renders as the row
-    fallback text input, since a list row draws no suggestion markup for
-    any type.
+    `opts` is read by nothing here, and its two keys are why that is worth
+    saying rather than obvious. `expects` and `writes` (ADR-0011 decision
+    2) are claims about the document's data flow at the path, read by
+    `StatifierBlocks.Environment` and reported by
+    `StatifierBlocks.Assignability` as a finding on this field's own key.
+    They are not claims about the bytes this control edits, so the control
+    is the same one either way and an author sees the difference in the
+    findings beneath it. A `{:path, opts}` inside a `{:list, t}` renders as
+    the row fallback text input, since a list row draws no suggestion
+    markup for any type.
 
     ## The `invoke_type` suggestion list
 
@@ -326,6 +367,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:candidates, :any,
+      default: [],
+      doc: """
+      The values a host offers for this field, `[{value, label}]` for a
+      closed list or `{:open, [{value, label}]}` for an open one. `[]` is
+      *no list supplied* and renders the control the field type already
+      rendered.
+      """
+    )
+
     attr(:fixture_hint, :any,
       default: nil,
       doc: """
@@ -352,6 +403,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           value_candidates={@value_candidates}
           event_candidates={@event_candidates}
           outcome_candidates={@outcome_candidates}
+          candidates={@candidates}
         />
         <p
           :if={@fixture_hint}
@@ -376,6 +428,65 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:value_candidates, :map, default: %{})
     attr(:event_candidates, :list, default: [])
     attr(:outcome_candidates, :list, default: [])
+    attr(:candidates, :any, default: [])
+
+    # A host's candidate list for THIS field, ahead of every clause that
+    # chooses a control by key: a list keyed on `{type_name, key}` is the
+    # narrower claim, and a host that named this field's values asked for
+    # them rather than for the package's own suggestion list.
+    #
+    # A closed list is a `<select>` and an `{:open, list}` is a text input
+    # with a `<datalist>`, which is the whole difference between the two:
+    # the first says these are the values, the second says these are values.
+    # Neither decides anything - `validate_config/1` is still the only
+    # authority on what the field may hold, and a stored value that is not
+    # on a closed list is rendered as its own selected option rather than
+    # being silently rewritten to the first one on the next change event.
+    defp control(
+           %{field: %ViewModel.Field{type: :string}, candidates: {:open, [_ | _]}} = assigns
+         ) do
+      assigns =
+        assigns
+        |> assign(:list_id, input_id(assigns.field) <> "-candidates")
+        |> assign(:offered, elem(assigns.candidates, 1))
+
+      ~H"""
+      <input
+        class="sb-field__input"
+        type="text"
+        id={input_id(@field)}
+        name={input_name(@field)}
+        value={to_text(@field.value)}
+        list={@list_id}
+        spellcheck="false"
+        autocomplete="off"
+      />
+      <datalist id={@list_id} data-field-candidates={length(@offered)}>
+        <option :for={{value, label} <- @offered} value={value} label={label}></option>
+      </datalist>
+      """
+    end
+
+    defp control(%{field: %ViewModel.Field{type: :string}, candidates: [_ | _]} = assigns) do
+      assigns =
+        assigns
+        |> assign(:offered, assigns.candidates)
+        |> assign(:unoffered, unoffered_value(assigns.field, assigns.candidates))
+
+      ~H"""
+      <select
+        class="sb-field__input"
+        id={input_id(@field)}
+        name={input_name(@field)}
+        data-field-candidates={length(@offered)}
+      >
+        <option :if={@unoffered != nil} value={@unoffered} selected>{@unoffered}</option>
+        <option :for={{value, label} <- @offered} value={value} selected={@field.value == value}>
+          {label}
+        </option>
+      </select>
+      """
+    end
 
     defp control(%{field: %ViewModel.Field{type: :boolean}} = assigns) do
       ~H"""
@@ -826,6 +937,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       if Code.ensure_loaded?(module) and function_exported?(module, :expression_input, 1) do
         &module.expression_input/1
       end
+    end
+
+    # The value a closed list does not offer, which a `<select>` has to draw
+    # as an option of its own or lose: a control whose stored value is not
+    # among its options posts the FIRST option on the next change, which
+    # would make opening a form rewrite a value nobody touched. An empty
+    # string is such a value - a field nothing has been picked for yet
+    # draws an empty row and stays empty.
+    @spec unoffered_value(ViewModel.Field.t(), [{String.t(), String.t()}]) :: String.t() | nil
+    defp unoffered_value(%ViewModel.Field{value: value}, candidates) do
+      text = to_text(value)
+
+      if Enum.any?(candidates, fn {offered, _label} -> offered == value end), do: nil, else: text
     end
 
     @spec type_tag(StatifierBlocks.BlockType.field_type()) :: String.t()

@@ -88,21 +88,48 @@ defmodule StatifierBlocks.Core.SubchartTest do
       end
     end
 
-    # sabotage: loosened `check_assign_to/2` to accept any non-empty string
-    # - the dotted value validates and the refusal assertion goes red
-    # (verified). The type is a claim about what the value means, never a
-    # widening of what `validate_config/1` accepts.
-    test "it accepts exactly what it accepted before" do
+    # sabotage: narrowed `check_assign_to/2` back to `Config.identifier?/1`
+    # - the dotted value is refused and the first assertion goes red
+    # (verified). ADR-0011 decision 13 admits the dotted path: the field
+    # offers dotted candidates, and a control that offers what its own
+    # validation refuses is a defect either way round.
+    test "it admits a dotted datamodel path, and everything it admitted before" do
+      assert Subchart.validate_config(%{"chart" => "bdoc_CHILD", "assign_to" => "signup.step"}) ==
+               :ok
+
       assert Subchart.validate_config(%{"chart" => "bdoc_CHILD", "assign_to" => "eligibility"}) ==
                :ok
 
       assert Subchart.validate_config(%{"chart" => "bdoc_CHILD", "assign_to" => ""}) == :ok
       assert Subchart.validate_config(%{"chart" => "bdoc_CHILD"}) == :ok
+    end
 
+    # sabotage: as above - the whitespace value validates and this goes red
+    # (verified). The widening is to `core.assign`'s rule and no further:
+    # a location with whitespace in it is still not a datamodel path.
+    test "a value with whitespace in it is still refused" do
       assert {:error, [{"assign_to", message}]} =
-               Subchart.validate_config(%{"chart" => "bdoc_CHILD", "assign_to" => "signup.step"})
+               Subchart.validate_config(%{"chart" => "bdoc_CHILD", "assign_to" => "signup step"})
 
-      assert message =~ "bare lowercase identifier"
+      assert message =~ "datamodel path"
+    end
+
+    # The emission has to answer for a config `validate_config/1` would have
+    # rejected, so the two rules move together - a widened validation over a
+    # narrow emission would refuse at compile time what it accepted at
+    # authoring time.
+    #
+    # sabotage: narrowed the emission's `assign/1` back to
+    # `Config.identifier?/1` -> the compile fails on the dotted location and
+    # this goes red (verified).
+    test "a dotted location compiles to the <assign> it names" do
+      block =
+        Block.new("core.subchart",
+          id: "blk_ELIG",
+          config: Map.put(@eligibility, "assign_to", "signup.step")
+        )
+
+      assert compile!(block).scxml =~ ~s(<assign expr="_event.data" location="signup.step"/>)
     end
   end
 

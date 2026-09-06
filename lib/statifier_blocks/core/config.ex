@@ -29,12 +29,30 @@ defmodule StatifierBlocks.Core.Config do
   # and on its own step is meeting one rule.
   @invoke_type ~r/\A[a-z][a-z0-9_]*:[a-z][a-z0-9_]*\z/
 
+  # Whitespace anywhere, for `datamodel_path?/1` below.
+  @whitespace ~r/\s/
+
   @spec non_empty_string?(term()) :: boolean()
   def non_empty_string?(value) when is_binary(value) and value != "", do: String.valid?(value)
   def non_empty_string?(_value), do: false
 
   @spec identifier?(term()) :: boolean()
   def identifier?(value), do: non_empty_string?(value) and Regex.match?(@identifier, value)
+
+  # A datamodel path, in the one shape every `core.*` type that writes one
+  # reads: non-empty and carrying no whitespace, and deliberately NOT a
+  # dotted-identifier grammar. This package does not own the datamodel path
+  # grammar, and a regex here that accepted `review.parked` and refused
+  # something a host's datamodel legitimately declares would be a second,
+  # quieter proposal riding along with the rule it spells.
+  #
+  # Any whitespace, not just the space/tab/newline trio: a carriage return,
+  # a vertical tab, or a non-breaking space is whitespace too, and a check
+  # that only named three characters would let the rest through a rule
+  # whose stated shape is "no whitespace".
+  @spec datamodel_path?(term()) :: boolean()
+  def datamodel_path?(value),
+    do: non_empty_string?(value) and not Regex.match?(@whitespace, value)
 
   @spec invoke_type?(term()) :: boolean()
   def invoke_type?(value), do: non_empty_string?(value) and Regex.match?(@invoke_type, value)

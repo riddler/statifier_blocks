@@ -204,6 +204,55 @@ defmodule StatifierBlocks.DatamodelTest do
     end
   end
 
+  describe "a capture's targets reach the advisory (ADR-0011 decision 10)" do
+    defp handler(id, capture) do
+      Block.new("core.on_event",
+        id: id,
+        config: %{"event" => "order.cancelled", "outcome" => "abandon", "capture" => capture}
+      )
+    end
+
+    # The third gap the capture Note named: a capture's keys are datamodel
+    # paths that reach the advisory through no field declaration, so the one
+    # pass that covers every other datamodel path could not see them.
+    #
+    # sabotage: dropped the `capture_findings/4` call from
+    # `block_findings/5` -> no finding is produced and this goes red
+    # (verified).
+    test "an undeclared target is the same :info every other path gets" do
+      document = document([handler("blk_cancel", %{"order.cancel_reason" => "reason"})])
+
+      assert [%Finding{} = finding] =
+               Datamodel.findings(document, palette(), ["order.state"])
+
+      assert finding.anchor == {:config, "blk_cancel", "capture"}
+      assert finding.severity == :info
+      assert finding.source == :lint
+      assert finding.message =~ "order.cancel_reason"
+    end
+
+    # sabotage: read the pairs the other way round (the value as the path)
+    # -> the declared target is flagged and the source is not, so both
+    # assertions invert (verified). The key is the destination.
+    test "a declared target produces nothing, and the source side is not a path here" do
+      document = document([handler("blk_cancel", %{"order.cancel_reason" => "reason"})])
+
+      assert Datamodel.findings(document, palette(), ["order.cancel_reason"]) == []
+    end
+
+    # sabotage: dropped the `is_map(pairs)` guard -> a handler with no
+    # capture raises rather than producing nothing (verified).
+    test "no capture, or a malformed one, produces nothing" do
+      assert Datamodel.findings(
+               document([Block.new("core.on_event", id: "blk_bare", config: %{})]),
+               palette(),
+               []
+             ) == []
+
+      assert Datamodel.findings(document([handler("blk_odd", "not a map")]), palette(), []) == []
+    end
+  end
+
   describe "no datamodel (11f): absence is not unknown-ness" do
     # sabotage: `findings/3`'s `nil` arm falling through to
     # `undeclared_findings/3` with an empty set - every annotated path in a
