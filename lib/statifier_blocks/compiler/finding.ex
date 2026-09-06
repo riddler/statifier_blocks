@@ -14,7 +14,7 @@ defmodule StatifierBlocks.Compiler.Finding do
   |---|---|
   | `:document` | `:invalid_document` - `Document.validate/1`'s reason |
   | `:resolve` | `:unknown_block_type`, `:block_type_too_new`, `:migration_failed` |
-  | `:config` | `validate_config/1` findings, one per `{key, message}` pair |
+  | `:config` | `validate_config/1` findings, one per `{key, message}` pair, and the one config check that reads the datamodel document: `core.on_event`'s declared-payload refusal (ADR-0002's amendment of 2026-09-06), reported in the same shape |
   | `:structure` | `:slot_arity_violated`, `:undeclared_slot` (ADR-0002 decision 6); assignability (ADR-0003) |
   | `:emit` | `emit/2` findings, `:invalid_role`, `:reserved_role`, `:invalid_outcome`, `:duplicate_binding` (ADR-0004's foreach amendment, F6), `:unspliced_child`, `:unknown_attribution`, `:conflicting_chart_use`, `:invalid_declaration`, `:duplicate_declaration` (ADR-0004's host-declared-roots note), `:self_reference` (ADR-0004's subchart-src amendment), `:sensitive_path_read` (ADR-0002's secrets-rule amendment) |
   | `:chart` | mapped statifier findings, both faults (decision 9) |

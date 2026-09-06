@@ -3,11 +3,13 @@ defmodule StatifierBlocks.Core.OnEvent do
   `core.on_event`: an interrupt handler, valid inside an `interrupts` slot
   and nowhere else (ADR-0002 decision 10).
 
-  A leaf with four config fields: the `event` that fires it, an optional
+  A leaf with five config fields: the `event` that fires it, an optional
   `cond` that decides whether it fires at all, the `outcome` that decides
-  what happens to the group it interrupts, and an optional `capture` that
+  what happens to the group it interrupts, an optional `capture` that
   writes values out of the firing event's payload into the datamodel
-  before the outcome is raised.
+  before the outcome is raised, and an optional `payload` that declares
+  what that event carries - which is what makes a `capture` reading past
+  it a refusal at compile rather than an unbound marker at run time.
 
   ## Placement, in both directions, from one tag
 
@@ -162,10 +164,70 @@ defmodule StatifierBlocks.Core.OnEvent do
   the cites; the error arriving for this shape too is upstream work, and
   nothing here may be built on it until that lands.]
 
-  The compile-time half - a `:config` finding for a declared payload that
-  lacks a named source path - is dormant, because nothing in this package
-  declares an event payload's shape; `fixtures/0` below is one sample per
-  event name for a palette panel, not a declaration.
+  The compile-time half is the optional `payload` declaration below, and
+  it is what the paragraph above stops being the whole story for: on a
+  document that declares its payload the marker write never happens,
+  because the document does not compile.
+
+  ## The optional `payload` declaration
+
+  `payload` declares what `_event.data` carries **for the event this
+  handler names** (ADR-0002's amendment of 2026-09-06, P1). It is not a
+  fact about the event name anywhere else in the document and it is not
+  the datamodel, which the `:declare` and `:datamodel` compile options
+  already own: two handlers for the same event may declare different
+  payloads and neither is thereby wrong, because each governs its own
+  `capture`.
+
+  The value is the **name of a type the datamodel document declares** - a
+  `record` or a `shape` in its `types` key, read through
+  `StatifierDatamodel.Declarations`. P2 of that amendment names a second
+  arm, an inline shape written where the payload is declared, and P3
+  defers it: no member of ADR-0002 decision 7's field-type set describes a
+  shape, and inventing one to spell it would be a second proposal riding
+  along with this one. So the field is a `:string` carrying a name, which
+  is the only spelling of a declaration this package has anywhere today
+  (`StatifierBlocks.Environment`'s `type_expr/0`), and no ninth field type
+  is added.
+
+  `payload` is a **declaration, not an emission**. Nothing about it
+  reaches the compiled SCXML: a handler that gains one compiles to the
+  bytes it compiled to without it, and a handler that has none is
+  unchanged in every respect - no new finding of any kind, at any
+  severity. A `payload` naming a type the datamodel does not declare, and
+  a compile with no `:datamodel` at all, are that same unchanged case
+  reached by a second route (P4): the name resolves to nothing, and
+  nothing is refused against nothing.
+
+  ## The refusal `payload` buys: `payload_capture_findings/2`
+
+  With a payload declared, a `capture` pair whose **source** path reads a
+  member the payload does not carry is a `:config` refusal at compile
+  (P5). The other reading - a declared member no pair reads - is not a
+  finding: a payload may legitimately carry more than one handler wants.
+
+  The check needs the datamodel document, which `validate_config/1` does
+  not get, so it is a function of its own that the compiler's config stage
+  calls with the declarations it has already indexed. One finding is
+  reported for the whole `capture` key rather than one per pair, for the
+  same reason `check_capture/2` gives: the key is the only anchor an
+  editor can use. The message names the offending pairs and the declared
+  payload, because the anchor cannot.
+
+  How deep it goes is P5's rule, kept literally. The **first** segment of
+  a source path is checked against the payload's field names. A deeper
+  segment is checked only where the field's own type resolves, through the
+  same declarations, to a declaration whose fields are in hand; a field
+  whose type is a scalar, an opaque string, a list or `:unknown` **stops
+  the walk and refuses nothing beyond it**. That adds no structural rule
+  `statifier_datamodel` does not already have - its read check is nominal,
+  permissive on the unknown, and descends into no list's element type.
+
+  The destination side of a pair is untouched by all of this:
+  `StatifierBlocks.Environment.capture_writes/1` still writes `:unknown`
+  there. This types the source side at compile, and typing the
+  destination from the payload is a widening of ADR-0011 that no ruling
+  has asked for.
 
   `config_schema/1` declares **no field** for `capture`. ADR-0002
   decision 7's field-type set has no member that describes a map, the
@@ -184,8 +246,13 @@ defmodule StatifierBlocks.Core.OnEvent do
   alias StatifierBlocks.Compiler.Context
   alias StatifierBlocks.Core.{Config, Emit}
   alias StatifierBlocks.Emission
+  alias StatifierDatamodel.Declarations
 
   @outcomes ["abandon", "resume"]
+
+  # The one spelling of the key, shared by the map's own validation and by
+  # the payload refusal that reads the same pairs.
+  @capture_key "capture"
 
   # A path's shape, in both directions of a `capture` pair: non-empty and
   # carrying no whitespace, and deliberately NOT a dotted-identifier
@@ -218,6 +285,13 @@ defmodule StatifierBlocks.Core.OnEvent do
         default: ""
       },
       %{
+        key: "payload",
+        type: :string,
+        label: "Its payload is",
+        required?: false,
+        default: ""
+      },
+      %{
         key: "cond",
         type: :expression,
         label: "Only when",
@@ -241,6 +315,7 @@ defmodule StatifierBlocks.Core.OnEvent do
     |> check_event(config)
     |> check_cond(config)
     |> check_outcome(config)
+    |> check_payload(config)
     |> check_capture(config)
     |> Config.verdict()
   end
@@ -307,6 +382,120 @@ defmodule StatifierBlocks.Core.OnEvent do
   defp capture_message do
     "must map each datamodel path written, like order.cancel_reason, " <>
       "to the path inside _event.data it is read from, like reason"
+  end
+
+  # The declaration is optional, so only a stored value that is not a
+  # string at all is a finding here. Whether the name *resolves* is not
+  # this function's question: a name the datamodel does not declare is
+  # ADR-0002's P4 case - the undeclared payload, unchanged behaviour - and
+  # a blank string is the field's own default, which is the editor's
+  # spelling of "not declared".
+  defp check_payload(findings, config) do
+    case Map.get(config, "payload") do
+      nil -> findings
+      payload when is_binary(payload) -> findings
+      _other -> [{"payload", "must name a declared type, or be left blank"} | findings]
+    end
+  end
+
+  @doc """
+  The `capture` pairs this handler's declared `payload` refuses
+  (ADR-0002's amendment of 2026-09-06, P5).
+
+  Returns `validate_config/1`'s own `{key, message}` shape, so the
+  compiler's config stage renders it exactly as it renders that
+  function's findings: at most one finding, on the `"capture"` key.
+
+  It is a separate function rather than another clause of
+  `validate_config/1` because it needs something that callback is not
+  given - the datamodel document's declarations, indexed by
+  `StatifierDatamodel.Declarations.from_document/1` - and the compiler
+  reads that document once and hands it here.
+
+  Total, and empty in every case the amendment says is not a finding: no
+  `payload`, a blank one, a name the declarations do not carry, no
+  `capture`, a malformed one (`check_capture/2` owns that verdict), and a
+  source path whose walk stops at a field this package cannot see into.
+
+      iex> alias StatifierBlocks.Core.OnEvent
+      iex> declarations = StatifierDatamodel.Declarations.from_document(%{"types" => [
+      ...>   %{"name" => "cards.declined", "kind" => "record", "label" => "Declined",
+      ...>     "fields" => [%{"name" => "reason", "type" => "string"}]}]})
+      iex> config = %{"event" => "cards.declined", "outcome" => "abandon",
+      ...>   "payload" => "cards.declined", "capture" => %{"card.why" => "reason"}}
+      iex> OnEvent.payload_capture_findings(config, declarations)
+      []
+      iex> OnEvent.payload_capture_findings(%{config | "capture" => %{"card.why" => "code"}},
+      ...>   declarations) |> Enum.map(&elem(&1, 0))
+      ["capture"]
+  """
+  @spec payload_capture_findings(Block.config(), StatifierDatamodel.Declarations.t()) :: [
+          {String.t(), String.t()}
+        ]
+  def payload_capture_findings(config, declarations) when is_map(declarations) do
+    with payload when is_binary(payload) and payload != "" <- Map.get(config, "payload"),
+         {:ok, declaration} <- Declarations.fetch(declarations, payload),
+         pairs when is_map(pairs) <- Map.get(config, @capture_key),
+         [_first | _rest] = offenders <- unread_pairs(pairs, declarations, declaration) do
+      [{@capture_key, payload_message(payload, offenders)}]
+    else
+      _no_declaration_or_nothing_refused -> []
+    end
+  end
+
+  # The pairs whose source path reads a member the payload does not carry,
+  # in the destinations' sorted order - the same order the assigns are
+  # emitted in, so a message that names several reads in the order the
+  # bytes do. A pair `check_capture/2` has already refused is skipped:
+  # one malformed pair is one finding, not two.
+  @spec unread_pairs(map(), Declarations.t(), Declarations.declaration()) ::
+          [{String.t(), String.t()}]
+  defp unread_pairs(pairs, declarations, declaration) do
+    for {destination, source} = pair <- Enum.sort(pairs),
+        path?(destination) and path?(source),
+        not carries?(declarations, declaration, String.split(source, ".")),
+        do: pair
+  end
+
+  # P5's depth rule. The first segment is checked against the declaration's
+  # field names; a deeper one is checked only where the field's own type
+  # resolves to another declaration. A field typed as a scalar, an opaque
+  # string, a list or nothing at all stops the walk and refuses nothing
+  # beyond it, which is the stance `StatifierDatamodel.Types`' own read
+  # check takes.
+  @spec carries?(Declarations.t(), Declarations.declaration(), [String.t()]) :: boolean()
+  defp carries?(declarations, declaration, [segment | rest]) do
+    case field(declaration, segment) do
+      nil -> false
+      _field when rest == [] -> true
+      field -> descend(declarations, field, rest)
+    end
+  end
+
+  @spec descend(Declarations.t(), Declarations.field(), [String.t()]) :: boolean()
+  defp descend(declarations, %{type: {:declared, name}}, rest) do
+    case Declarations.fetch(declarations, name) do
+      {:ok, declaration} -> carries?(declarations, declaration, rest)
+      :error -> true
+    end
+  end
+
+  defp descend(_declarations, _opaque_to_this_walk, _rest), do: true
+
+  @spec field(Declarations.declaration(), String.t()) :: Declarations.field() | nil
+  defp field(%{fields: fields}, name),
+    do: Enum.find(fields, &(Map.get(&1, :name) == name))
+
+  @spec payload_message(String.t(), [{String.t(), String.t()}]) :: String.t()
+  defp payload_message(payload, offenders) do
+    read =
+      Enum.map_join(offenders, ", ", fn {destination, source} ->
+        ~s("#{destination}" reads #{source})
+      end)
+
+    "reads past the declared payload: #{read}, and #{payload} carries no such member. " <>
+      "Declare the member on #{payload}, correct the source path, or drop the payload " <>
+      "declaration to leave the read unchecked"
   end
 
   @impl true

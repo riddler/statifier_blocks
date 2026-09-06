@@ -93,6 +93,14 @@ defmodule StatifierBlocks.Compiler do
       not unknown-ness (ADR-0005 `11f`). See
       `StatifierBlocks.Compiler.SensitivePaths.datamodel/1` for the shapes
       it accepts, and that module for the criterion the refusal applies.
+
+      The same document is read by two other checks, and it is read once:
+      the structure stage's typed-environment read check (ADR-0011
+      decisions 2 and 3), and the config stage's declared-payload refusal,
+      where a `core.on_event` that declares its `payload` refuses a
+      `capture` pair reading a member that payload does not carry
+      (ADR-0002's amendment of 2026-09-06). A compile with no `:datamodel`
+      runs neither, and refuses nothing.
     * `:child_use` - compile this document **for use as a child** of
       another chart (ADR-0004's 2026-08-29 amendment, C1). The emission
       gains one top-level `<final>` per outcome the root block declares,
@@ -295,9 +303,10 @@ defmodule StatifierBlocks.Compiler do
   `:field_candidates` enables the opt-in warning for a value outside a
   host's own closed candidate list;
   `:entry_type` is ADR-0003 decision 4's caller-supplied context;
-  `:datamodel` is the host's declared datamodel, read only by the
-  sensitive-path refusal; `:declare` is the `<data>` roots the host
-  declares for this document. See the moduledoc.
+  `:datamodel` is the host's declared datamodel, read by the sensitive-path
+  refusal, the typed-environment read check and the declared-payload
+  refusal; `:declare` is the `<data>` roots the host declares for this
+  document. See the moduledoc.
   """
   @type option ::
           {:known_invoke_types, Enumerable.t()}
@@ -321,7 +330,7 @@ defmodule StatifierBlocks.Compiler do
   def compile(%Document{} = document, %Palette{} = palette, opts \\ []) when is_list(opts) do
     with :ok <- document_stage(document),
          {:ok, node} <- resolve_stage(document, palette),
-         :ok <- config_stage(node),
+         :ok <- config_stage(node, opts),
          :ok <- structure_stage(document, palette, opts),
          {node, shelf_warnings} = elide_shelf(node),
          :ok <- chart_use_stage(node, opts),
@@ -454,33 +463,57 @@ defmodule StatifierBlocks.Compiler do
 
   # -- Stage 3: config -------------------------------------------------------
 
-  @spec config_stage(Resolved.t()) :: :ok | {:error, [Finding.t()]}
-  defp config_stage(node) do
-    case config_findings(node) do
+  # The declarations are indexed once for the whole document, from the same
+  # `:datamodel` option every other stage reads, and threaded down the tree:
+  # a check that needs the datamodel is still a config check (ADR-0002's
+  # amendment of 2026-09-06, P5 - the anchor is a config key and the fault is
+  # the author's), and `validate_config/1` is the callback that cannot be
+  # given one.
+  @spec config_stage(Resolved.t(), keyword()) :: :ok | {:error, [Finding.t()]}
+  defp config_stage(node, opts) do
+    declarations = opts |> assignability_context() |> Environment.declarations()
+
+    case config_findings(node, declarations) do
       [] -> :ok
       findings -> {:error, findings}
     end
   end
 
-  @spec config_findings(Resolved.t()) :: [Finding.t()]
-  defp config_findings(%Resolved{block: block, module: module, slots: slots}) do
+  @spec config_findings(Resolved.t(), StatifierDatamodel.Declarations.t()) :: [Finding.t()]
+  defp config_findings(
+         %Resolved{block: block, module: module, slots: slots} = node,
+         declarations
+       ) do
     own =
       case module.validate_config(block.config) do
-        :ok ->
-          []
-
-        {:error, findings} ->
-          Enum.map(findings, fn {key, message} ->
-            Finding.new(:config, {:invalid_config, key}, message,
-              block_id: block.id,
-              config_key: key
-            )
-          end)
+        :ok -> []
+        {:error, findings} -> findings
       end
 
-    own ++
-      Enum.flat_map(slots, fn {_name, children} -> Enum.flat_map(children, &config_findings/1) end)
+    typed = declared_payload_findings(node, declarations)
+
+    Enum.map(own ++ typed, fn {key, message} ->
+      Finding.new(:config, {:invalid_config, key}, message,
+        block_id: block.id,
+        config_key: key
+      )
+    end) ++
+      Enum.flat_map(slots, fn {_name, children} ->
+        Enum.flat_map(children, &config_findings(&1, declarations))
+      end)
   end
+
+  # The one config check in this package that reads the datamodel document.
+  # `core.on_event` owns both halves of it - what a `payload` declares and
+  # what a `capture` pair reads out of it - so the rule lives in that module
+  # and this stage only hands it the declarations, in the same shape
+  # `validate_config/1` returns.
+  @spec declared_payload_findings(Resolved.t(), StatifierDatamodel.Declarations.t()) ::
+          [{String.t(), String.t()}]
+  defp declared_payload_findings(%Resolved{module: OnEvent, block: block}, declarations),
+    do: OnEvent.payload_capture_findings(block.config, declarations)
+
+  defp declared_payload_findings(%Resolved{}, _declarations), do: []
 
   # -- Stage 4: structure ----------------------------------------------------
 

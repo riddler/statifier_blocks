@@ -247,7 +247,9 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
     test "declares cond as an optional :expression field reading config[\"cond\"]" do
       schema = Core.OnEvent.config_schema(%{})
 
-      assert [%{key: "event"}, %{key: "cond"} = field, %{key: "outcome"}] = schema
+      assert [%{key: "event"}, %{key: "payload"}, %{key: "cond"} = field, %{key: "outcome"}] =
+               schema
+
       assert field.type == :expression
       assert field.required? == false
       assert BlockType.value_path(field) == ["cond"]
