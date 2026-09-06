@@ -2888,8 +2888,10 @@
   min-width: 0;
 
   /* The flex-item half of the bounded mode (sb-ceb). `.sb-editor__main` is a
-   * flex column of the toolbar and this panel; when the grid clamps it, the
-   * shrink has to land HERE and not on the toolbar. It does, and the toolbar
+   * flex column of the toolbar and this panel - with a run seated the run pane
+   * sits between them, and both of its wrappers are flex columns carrying
+   * `min-height: 0` so the chain still reaches here. When the grid clamps the
+   * column, the shrink has to land HERE and not on the toolbar. It does, and the toolbar
    * needs no rule of its own: a flex item's automatic minimum size stops the
    * toolbar at its own content height, and this `0` is what lets the panel go
    * below its content instead - which is the only way an `overflow` on it ever

@@ -6850,9 +6850,12 @@ for exactly this.
 The 2026-08-29 shell amendment's 1A names three columns plus one full-width
 drawer row, and 7A tabulates that arrangement at four container widths. This
 pane adds to none of it. `.sb-editor__main` - the element that occupies the
-`canvas` grid area, and has since the shell graduation - is a flex column
-holding the canvas toolbar and the canvas panel; the pane is a third child of
-that element. `grid-template-areas`, `grid-template-columns` and
+`canvas` grid area, and has since the shell graduation - is a flex column, and
+the pane goes inside it rather than beside it. With a run seated that column
+holds the canvas toolbar and the pane, and the canvas panel is inside the pane;
+with no run there is no pane element at all and the column holds the toolbar and
+the canvas panel, as it always has. Either way the element in the `canvas` grid
+area is the same one. `grid-template-areas`, `grid-template-columns` and
 `grid-template-rows` are byte-identical in the base rule and in all four of
 7A's breakpoints; no `grid-area` was added or moved.
 
@@ -6890,8 +6893,9 @@ run adds no tab, and the one drawer surface it does reach is described below.
   is seated.** `ADR-0011` decision 9's two surfaces - the surfaces that record
   names, and the ones this record already cites in that qualified form above -
   are unchanged in what they are for, and this one is still read-only, still
-  produces no finding, and still tints nothing: the added cell says what the run was holding at that path at the
-  point the scrubber is on, beside the type the position declares. A declared
+  produces no finding, and still tints nothing: the added cell says what the run
+  was holding at that path at the point the scrubber is on, beside the type the
+  position declares. A declared
   type and a held value side by side is how a read that should not have worked
   becomes visible without this package ruling on it. With no run the column is
   absent rather than empty, because an empty cell would be a claim that
