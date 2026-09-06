@@ -106,13 +106,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     describe "a labelled finding on the page" do
       # The whole route, not the renderer alone: the compiler builds the
       # message against the datamodel it checked with, `Finding.from_compiler/2`
-      # carries it across, and the editor draws it on the block's chrome. A
-      # test that asserted the message in isolation would pass with the
+      # carries it across, and the editor draws it where the anchor sends it.
+      # A test that asserted the message in isolation would pass with the
       # declarations never reaching the stage.
+      #
+      # The settle step declares its read on the `subject` field, so the
+      # compiler finding names that key and the anchor is the field rather
+      # than the card: the message is drawn in the block's own form, which is
+      # the point of naming the key at all. Selecting the block is therefore
+      # part of the route now, not scenery.
       #
       # Sabotage: `structure_stage/3` reading `Environment.declarations(%{})` -
       # the nominal names reach the page and both assertions go red.
-      test "carries the declaration's label onto the block", %{conn: conn} do
+      # Sabotage: `structure_finding/3` dropping `config_key:` - the anchor
+      # assert goes red on `{:block, "blk_STL"}`.
+      test "carries the declaration's label onto the field it was read on", %{conn: conn} do
         document =
           Cards.document([Cards.open(), Cards.settle("blk_STL", %{"expects" => "Settled"})])
 
@@ -123,13 +131,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         {findings, []} = StatifierBlocks.Finding.from_compiler_all(compiler_findings)
 
-        {:ok, _view, html} =
+        assert [%StatifierBlocks.Finding{anchor: {:config, "blk_STL", "subject"}}] = findings
+
+        {:ok, view, _html} =
           mount_editor(conn,
             document: document,
             palette: Cards.palette(),
             datamodel: Cards.datamodel(),
             findings: findings
           )
+
+        html =
+          view
+          |> element(~s([phx-click="select"][phx-value-block-id="blk_STL"]))
+          |> render_click()
 
         assert html =~ "left &quot;Credit card transaction&quot;"
         refute html =~ "left &quot;cards.credit_txn&quot;"
