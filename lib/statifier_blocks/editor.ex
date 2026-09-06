@@ -101,6 +101,34 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     concatenation the datamodel gets - `[]` is the default and declares
     nothing, so a host that never passes it sees exactly what it saw before.
 
+    ## The rest of the host's compile call
+
+    `declare` is not the only option a host compiles with, and the ones it
+    leaves out change the chart. A host that runs a document to completion
+    compiles it with `terminate: true`; one that lints its invoke types
+    passes `known_invoke_types`; one with declared-sensitive paths passes
+    `datamodel`. Each of those changes the emitted SCXML, so each changes
+    the provenance map that emission carries - `terminate: true` alone adds
+    a top-level `<final>` per root-block outcome, owned by the root block in
+    its `root_<outcome>` role.
+
+    The editor recompiles the open document itself to resolve a run's state
+    ids to blocks (`refresh_run_provenance/1`). Recompiling *without* the
+    host's options resolves against a different chart than the one the run
+    is a run of: a configuration sitting on a state only the host's compile
+    emits resolves to nothing, and the Run pane marks nothing where it
+    should mark the root block. That is the whole of `compile_options` - the
+    host hands over the option list it compiled with, and the recompile uses
+    it. `:declare` is not read from it: the `declare` assign above is where
+    that list already lives, and it is put on top of whatever this one
+    carries so the two can never disagree.
+
+    `[]` is the default, which is today's behaviour exactly: the recompile
+    passes `declare:` and nothing else, and a host that never sets the
+    assign sees what it saw before. Nothing here validates the list - the
+    compiler is the authority on its own options, and an option this
+    component does not know about is one it must not swallow.
+
     ## The run marks a host paints
 
     A host replaying or executing a document has two different things to say
@@ -421,6 +449,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `findings` | no | caller-supplied findings, merged with the two `ViewModel` derives |
     | `datamodel` | no | the paths the host declares; drives the undeclared-path advisories, and `nil` (the default) turns them off entirely |
     | `declare` | no | the `{id, expr}` roots the host will pass the compiler as `:declare`; declared roots count as declared for the advisories (11k), and `[]` (the default) declares none |
+    | `compile_options` | no | the rest of the option list the host compiles this document with - `terminate:`, `known_invoke_types:`, `datamodel:` - forwarded to the provenance recompile so the Run pane resolves the run's state ids against the same chart the host ran; `:declare` is taken from the `declare` assign whatever this list says, and `[]` (the default) recompiles exactly as it did before |
     | `on_change` | no | one-argument function called with each new document |
     | `on_select` | no | one-argument function called with each new selection: a `%{id:, type:, label:}` descriptor, or `nil` for no selection |
     | `icon` | no | function component resolving an icon *name* to markup |
@@ -500,6 +529,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          datamodel: nil,
          declared_paths: nil,
          declare: [],
+         compile_options: [],
          host_roots: MapSet.new(),
          on_change: nil,
          on_select: nil,
@@ -2457,9 +2487,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # The provenance map a run's state ids resolve through, on
     # `refresh_source_view/1`'s discipline: the compile is the expensive half
     # and it depends on the document, not on where the scrubber is, so it is
-    # keyed on the three inputs the compiler takes and recomputed only when
-    # one of them moves. Only while a run is seated - an editor nobody is
+    # keyed on the inputs the compiler takes - the document, the palette, and
+    # the whole option list, `compile_options` included - and recomputed only
+    # when one of them moves. Only while a run is seated - an editor nobody is
     # watching a run in compiles nothing extra.
+    #
+    # The options are the host's, not this component's: a host that
+    # compiled with `terminate: true` ran a chart carrying top-level finals,
+    # and a recompile without them resolves the run's last configuration to
+    # nothing. See the moduledoc's *the rest of the host's compile call*.
     #
     # A document that does not compile leaves the previous map in place rather
     # than clearing it, which is the same choice the source listing makes: the
@@ -2468,8 +2504,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec refresh_run_provenance(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
     defp refresh_run_provenance(socket) do
       assigns = socket.assigns
-      declare = Map.get(assigns, :declare, [])
-      key = {assigns.document, assigns.palette, declare}
+      options = compile_options(assigns)
+      key = {assigns.document, assigns.palette, options}
 
       cond do
         assigns.run == nil ->
@@ -2479,7 +2515,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           socket
 
         true ->
-          case Compiler.compile(assigns.document, assigns.palette, declare: declare) do
+          case Compiler.compile(assigns.document, assigns.palette, options) do
             {:ok, %Compiled{provenance: provenance}} ->
               socket
               |> assign(:run_provenance, provenance)
@@ -2489,6 +2525,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               socket
           end
       end
+    end
+
+    # The option list the provenance recompile passes, which is the host's own
+    # with `:declare` put on top of it: the `declare` assign is where that list
+    # already lives, so a host that passes it in both places cannot make the
+    # two disagree. `Keyword.put/3` rather than a merge, because the assign is
+    # the authority on that one key and nothing else here is.
+    #
+    # Every other option is forwarded verbatim and unvalidated - the compiler
+    # is the authority on what it accepts, and a key this component filtered
+    # would be a key a host could not pass.
+    @spec compile_options(map()) :: keyword()
+    defp compile_options(assigns) do
+      assigns
+      |> Map.get(:compile_options, [])
+      |> Keyword.put(:declare, Map.get(assigns, :declare, []))
     end
 
     # The one composition of a view model in this component, called by

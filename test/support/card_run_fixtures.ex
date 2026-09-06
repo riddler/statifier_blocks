@@ -78,7 +78,7 @@ if Code.ensure_loaded?(StatifierUI.Live.State) do
                 id: "blk_card_amount",
                 config: %{"path" => written_path(), "value" => "'settled'"}
               ),
-              Block.new("core.await", id: settle_block(), config: %{"event" => "card.settled"})
+              Block.new("core.await", id: settle_block(), config: %{"event" => settle_event()})
             ]
           }
         ),
@@ -102,6 +102,47 @@ if Code.ensure_loaded?(StatifierUI.Live.State) do
     end
 
     @doc """
+    The event that finishes the run: the money moved, so the settle block
+    completes and the sequence with it.
+    """
+    @spec settle_event() :: String.t()
+    def settle_event, do: "card.settled"
+
+    @doc """
+    The option list a host that runs this document *to completion* compiles
+    with: ADR-0004's root-termination note, so the chart carries a top-level
+    `<final>` and the session reaches `:done` rather than staying active
+    forever.
+
+    It is what the editor's `compile_options` assign takes, and the reason
+    that assign exists: the emission it produces owns states `compiled/0`'s
+    does not.
+    """
+    @spec terminate_options() :: keyword()
+    def terminate_options, do: [declare: @declare, terminate: true]
+
+    @doc "The chart a host that runs this document to completion compiles."
+    @spec terminating_compiled() :: Compiled.t()
+    def terminating_compiled do
+      {:ok, %Compiled{} = compiled} =
+        Compiler.compile(document(), palette(), terminate_options())
+
+      compiled
+    end
+
+    @doc """
+    The state the run ends on when the host compiled with `terminate: true`:
+    the top-level final ADR-0004's root-termination note adds, owned by the
+    root block in its `root_done` role.
+    """
+    @spec terminal_state_id() :: String.t()
+    def terminal_state_id, do: "s_blk_card_flow__root_done"
+
+    @doc "The root block, which is what a finished run's configuration marks."
+    @spec root_block() :: String.t()
+    def root_block, do: "blk_card_flow"
+
+    @doc """
     The run: the compiled machine, the provenance map, and the recorded
     stream, having been sent one capture event.
 
@@ -117,8 +158,37 @@ if Code.ensure_loaded?(StatifierUI.Live.State) do
             messages: [term()],
             state: State.t()
           }
-    def run do
-      %Compiled{scxml: scxml, provenance: provenance} = compiled()
+    def run, do: record(compiled(), [capture_event()])
+
+    @doc """
+    The same run, compiled the way a host that finishes documents compiles it
+    and driven all the way to `:done`.
+
+    Both events go in, so the sequence completes and the configuration ends on
+    the top-level final `terminate: true` added - a state that exists in this
+    chart and in no compile of the same document without the option. That is
+    what a run pane recompiling with the host's options resolves and one
+    recompiling without them does not.
+    """
+    @spec finished_run() :: %{
+            machine: Statifier.Machine.t(),
+            provenance: StatifierBlocks.Provenance.t(),
+            messages: [term()],
+            state: State.t()
+          }
+    def finished_run, do: record(terminating_compiled(), [capture_event(), settle_event()])
+
+    # One recorded session, however many events it takes: the subscriber is
+    # attached before the first step and every event waits for its own
+    # macrostep to stabilize, so the stream is the same shape whether one
+    # event went in or two.
+    @spec record(Compiled.t(), [String.t()]) :: %{
+            machine: Statifier.Machine.t(),
+            provenance: StatifierBlocks.Provenance.t(),
+            messages: [term()],
+            state: State.t()
+          }
+    defp record(%Compiled{scxml: scxml, provenance: provenance}, events) do
       {:ok, machine} = Statifier.compile(scxml)
       {:ok, subscriber} = Subscriber.start_link(machine: machine)
 
@@ -131,8 +201,13 @@ if Code.ensure_loaded?(StatifierUI.Live.State) do
 
       :ok = Subscriber.attach(subscriber, session, subscribe: false)
       await_macrostep(subscriber, 1)
-      Statifier.Session.send_event(session, capture_event())
-      await_macrostep(subscriber, 2)
+
+      events
+      |> Enum.with_index(2)
+      |> Enum.each(fn {event, macrostep} ->
+        Statifier.Session.send_event(session, event)
+        await_macrostep(subscriber, macrostep)
+      end)
 
       messages = Subscriber.messages(subscriber)
       Statifier.Session.stop(session)
@@ -149,11 +224,17 @@ if Code.ensure_loaded?(StatifierUI.Live.State) do
     # `StatifierBlocks.RuntimeFixtures.await_configuration/3` already sets: a
     # sleep long enough to be reliable on a loaded machine is long enough to be
     # felt in every run of the suite.
+    #
+    # A macrostep that finishes the chart stamps `trace.done` and no
+    # `trace.macrostep_stable`: the session is over rather than settled, so
+    # waiting only for the stable message would poll until the bound and then
+    # raise on a run that did exactly what it was asked to.
     @spec await_macrostep(pid(), non_neg_integer(), non_neg_integer()) :: :ok
     defp await_macrostep(subscriber, macrostep, attempts \\ 200) do
       stable? =
         Enum.any?(Subscriber.messages(subscriber), fn message ->
-          message.type == "trace.macrostep_stable" and message.macrostep == macrostep
+          message.type in ["trace.macrostep_stable", "trace.done"] and
+            message.macrostep == macrostep
         end)
 
       cond do
