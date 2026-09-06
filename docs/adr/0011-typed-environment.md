@@ -279,6 +279,16 @@ downstream, and a branch where one arm rewrites the subject drops that one
 path and keeps the rest. That improvement is the practical reason this record
 exists at all, and it is bought with no lattice.
 
+[Note 2026-09-06, `sb-qrcn`: `ADR-0012` gives `core.branch` a third slot,
+`undecided`, taken when an arm's condition produces predicator's `:undefined`
+sentinel rather than `true` or `false`. That slot is one of the arms this
+section speaks of, and this paragraph already answers what its environment is:
+it starts from the environment that reached the container, and it leaves
+through the per-path merge like every other arm. A condition that did not
+decide says nothing about what any path holds, so nothing is added at the arm
+and nothing here changes. A dated note rather than an amendment: no decision
+above moves, and `ADR-0012` is proposed rather than accepted.]
+
 Ordering inside a `core.parallel` is deliberately not modelled. Lanes are
 concurrent; two lanes writing the same path is a document the author should
 not have written, and the merge's answer for it - `:unknown` when they
