@@ -4001,6 +4001,147 @@ button.sb-inspector__group-row:hover {
   margin: 0;
 }
 
+/* ----------------------------------------------------------- run pane */
+
+/* The canvas, seated in a run: statifier-ui's status and scrubber above it and
+ * its event log below, with the document's own blocks where an ops view draws
+ * a Mermaid diagram.
+ *
+ * The pane is a child of `.sb-editor__main`, which is already a flex column
+ * holding the toolbar and the canvas panel, so nothing about the shell's grid
+ * moves: no new area, no new template, no change at any of the four
+ * breakpoints. The pane is itself a flex column for one reason - the stage has
+ * to be the part that shrinks when the editor is bounded, exactly as the
+ * canvas panel is the part that shrinks inside `.sb-editor__main`.
+ *
+ * statifier-ui ships no stylesheet and says so: every element it draws carries
+ * a `statifier-ui-*` class for a host to style with its own system. That is
+ * what the descendant rules at the bottom of this section are, and they are
+ * deliberately layout and type only - a package that themed another package's
+ * markup in depth would be claiming a surface it does not own. Every token
+ * here is already declared, so amendment 14e's both-directions audit has
+ * nothing new to account for. */
+
+.sb-run {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space);
+  min-height: 0;
+}
+
+.sb-run__header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sb-space);
+  flex-wrap: wrap;
+}
+
+.sb-run__title {
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-medium);
+  letter-spacing: 0.04em;
+  margin: 0;
+  text-transform: uppercase;
+  color: var(--sb-fg-subtle);
+}
+
+.sb-run__status {
+  min-width: 0;
+}
+
+.sb-run__unavailable {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-sm);
+  margin: 0;
+}
+
+/* The seat the diagram would have had. `min-height: 0` for the reason
+ * `.sb-canvas-panel` carries one: without it a flex item refuses to go below
+ * its content and the canvas inside can never scroll. */
+.sb-run__stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sb-run__log {
+  border-top: var(--sb-border-width) solid var(--sb-border);
+  font-size: var(--sb-text-sm);
+  max-height: 16rem;
+  overflow: auto;
+  padding-top: var(--sb-space-half);
+}
+
+.sb-run .statifier-ui-status,
+.sb-run .statifier-ui-scrubber {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--sb-space-half);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-run .statifier-ui-status p,
+.sb-run .statifier-ui-selection-note {
+  margin: 0;
+  color: var(--sb-fg-subtle);
+}
+
+/* The status line is a row of bare `<span>`s with no separator between them -
+ * statifier-ui leaves the spacing to the host, and with none the session id
+ * and the stream's kind read as one word. */
+.sb-run .statifier-ui-status-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--sb-space-half);
+}
+
+.sb-run .statifier-ui-macrosteps,
+.sb-run .statifier-ui-rounds,
+.sb-run .statifier-ui-effects,
+.sb-run .statifier-ui-round-fields {
+  margin: 0;
+  padding-left: var(--sb-space);
+}
+
+.sb-run .statifier-ui-round-header,
+.sb-run .statifier-ui-log-session {
+  color: var(--sb-fg-subtle);
+  margin: 0;
+}
+
+.sb-run .statifier-ui-round-fields dt {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sb-run .statifier-ui-round-fields dd {
+  margin: 0 0 var(--sb-space-half);
+}
+
+.sb-run .statifier-ui-scrub-button {
+  background: var(--sb-bg-muted);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  cursor: pointer;
+  font: inherit;
+  padding: 0 var(--sb-space-half);
+}
+
+.sb-run .statifier-ui-macrostep-summary {
+  cursor: pointer;
+}
+
+/* The one place a run does draw a verdict-free emphasis: the step the scrubber
+ * is on. It is a weight rather than a colour, for the reason the Datamodel
+ * tab's own comment gives - a read-only fact does not earn one. */
+.sb-run [data-selected="true"] > .statifier-ui-macrostep-summary {
+  font-weight: var(--sb-weight-medium);
+}
+
 /* -------------------------------------------------------------- source */
 
 /* The compiled chart, one numbered row per element. The serializer emits no

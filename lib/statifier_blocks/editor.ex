@@ -377,6 +377,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `chart_outcomes` | no | what the host says each of its stored documents finishes with, `%{document id => [outcome]}`; offered as candidates on a `core.subchart`'s `outcomes` field and compared against what that block declares (`StatifierBlocks.ViewModel.outcome_findings/3`). `%{}` (the default) says nothing about any chart, and a chart the map does not name is *unknown*, which is not disagreement |
     | `active_marks` | no | the block ids a run has activated; held as editor state, and cleared when the host opens a different document |
     | `invoke_mark` | no | the block a run is calling out to and how the call came back - `{block_id, outcome}`, a bare `block_id` for no answer yet, or `nil` for no call at all |
+    | `run` | no | a run to watch over this document: statifier-ui's `StatifierUI.Live.State`, live or persisted, or `nil` (the default) for no run. It seats the canvas in a run pane, decides the marks outright while it is there, and puts the run's held values beside the declared ones in the Datamodel tab. Held as editor state behind the same guard the marks use, and cleared when the host opens a different document |
     | `theme` | no | `--sb-*` custom properties for the canvas root |
     | `fit` | no | the fit the editor **opens** in: `:manual` (the default), `:width` or `:active`; the first measurement performs it once, and an unknown value is refused into `:manual` |
     | `fixtures` | no | `%{block_id => [TruthTable.t()]}`, read by both the drawer's truth-table tab and, as of `sb-4yze`, its Fixtures tab (`refresh_fixture_runs/1` drives each row through the compiled chart), and, as of `sb-e30x`, by the inspector's config form for the fixture hint beside an `:expression` control, and, as of `sb-0l36`, by the inspector's own Fixtures tab, which shows the selected block's runs out of the same result; `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
@@ -407,10 +408,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       ViewModel
     }
 
+    alias StatifierBlocks.{Compiled, Compiler}
     alias StatifierBlocks.Compiler.StateId
     alias StatifierBlocks.Document.DatamodelEntry
     alias StatifierBlocks.Edit.{History, Targets}
-    alias StatifierBlocks.Runtime.FixtureRuns
+    alias StatifierBlocks.Runtime.{FixtureRuns, Handled, Marks, RunValues, Selection}
 
     alias StatifierBlocks.Editor.{
       Canvas,
@@ -418,6 +420,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Drawer,
       Inspector,
       PaletteBrowser,
+      RunPane,
       Toolbar
     }
 
@@ -462,6 +465,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          invoke_mark: nil,
          active_ids: MapSet.new(),
          invoking: nil,
+         run: nil,
+         run_provenance: nil,
+         run_provenance_key: nil,
          drag: nil,
          drafts: %{},
          declaration_draft: nil,
@@ -570,6 +576,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         else
           socket
         end
+
+      socket = put_run(socket, assigns)
 
       socket =
         if Map.has_key?(assigns, :history_limit) and socket.assigns.history.undo == [] do
@@ -712,22 +720,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               target={@myself}
             />
 
-            <Canvas.canvas
-              root={@view_model.root}
-              drag={@drag}
-              selected_id={@selected_id}
-              collapsed={@collapsed_ids}
-              marks={@marks}
-              armed={@palette_position}
-              target={@myself}
-              icon={@icon}
-              theme={@theme}
-              edges={@edges}
-              stage={@stage}
-              zoom={@zoom}
-              viewport={@viewport}
-              reveal={@reveal}
-            />
+            <RunPane.run_pane id={"#{@id}-run"} state={@run} target={@myself}>
+              <Canvas.canvas
+                root={@view_model.root}
+                drag={@drag}
+                selected_id={@selected_id}
+                collapsed={@collapsed_ids}
+                marks={@marks}
+                armed={@palette_position}
+                target={@myself}
+                icon={@icon}
+                theme={@theme}
+                edges={@edges}
+                stage={@stage}
+                zoom={@zoom}
+                viewport={@viewport}
+                reveal={@reveal}
+              />
+            </RunPane.run_pane>
           </div>
 
           <Inspector.inspector
@@ -765,6 +775,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             declared_view={@declared_view}
             declared_types={@declared_types}
             environment_view={@environment_view}
+            run?={@run != nil}
             source_view={@source_view}
             selected_id={@selected_id}
             focus_tab={@drawer_tab_focus}
@@ -805,6 +816,42 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # routed from, and the scroller's own box is what the two fits are
     # computed against. Neither is a command and neither is stored anywhere
     # but here.
+    # The two events the run pane's statifier-ui components push, renamed into
+    # this package's namespace at the call site. The four scrubber words are
+    # matched literally rather than turned into atoms: `String.to_atom/1` on a
+    # value that reached the server from a browser is how an atom table grows
+    # without bound, and `String.to_existing_atom/1` answers the same question
+    # less precisely than four clauses do.
+    def handle_event("run-scrub", %{"move" => "first"}, socket),
+      do: {:noreply, scrub_run(socket, :first)}
+
+    def handle_event("run-scrub", %{"move" => "prev"}, socket),
+      do: {:noreply, scrub_run(socket, :prev)}
+
+    def handle_event("run-scrub", %{"move" => "next"}, socket),
+      do: {:noreply, scrub_run(socket, :next)}
+
+    def handle_event("run-scrub", %{"move" => "live"}, socket),
+      do: {:noreply, scrub_run(socket, :live)}
+
+    def handle_event("run-scrub", _params, socket), do: {:noreply, socket}
+
+    # Selecting a macrostep does two things, and they are two because they
+    # answer two questions an author asked with one click: the run moves to
+    # that point, and the editor selects the block whose state handled it.
+    # A macrostep no round of which selected a transition - the initialize
+    # step - moves the run and leaves the selection alone, because there is
+    # no block it can honestly point at.
+    def handle_event("run-select", %{"macrostep" => macrostep}, socket) do
+      case Integer.parse(to_string(macrostep)) do
+        {n, ""} when n >= 0 ->
+          {:noreply, socket |> select_macrostep(n) |> select_handling_block(n)}
+
+        _not_a_macrostep ->
+          {:noreply, socket}
+      end
+    end
+
     def handle_event("measure", params, socket) do
       {:noreply,
        socket
@@ -1451,7 +1498,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             # fold addresses no block at all.
             active_marks: [],
             active_ids: MapSet.new(),
-            invoking: nil
+            invoking: nil,
+            # A run is about one document for the same reason a mark is about
+            # one block: the provenance map it resolves through was produced
+            # by the document that is being swapped out, so the marks it
+            # yields would name blocks the new document does not have.
+            run: nil,
+            run_provenance: nil,
+            run_provenance_key: nil
           )
 
         # The collapsed set resets to the new document's opening folds rather
@@ -1547,8 +1601,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # Nothing at all when nothing is marked, which is the ordinary case: a
     # document with no run over it threads `nil` down the tree, and every node
     # below skips the question instead of asking a set it knows is empty.
+    # A run decides the marks outright, and does not merge with the host's.
+    # The two answer the same question from different places - `active_marks`
+    # is a host naming blocks itself, a seated run is a stream this component
+    # resolves - and a union of them would draw a configuration no point in
+    # the run was ever at. The scrubber is what moves this: the selection
+    # lives in the read model, so re-resolving here on every render is the
+    # whole of "scrubbing moves the marks".
     @spec marks(map()) ::
             %{active: MapSet.t(String.t()), invoke: {String.t(), String.t() | nil} | nil} | nil
+    defp marks(%{run: run, run_provenance: provenance})
+         when run != nil and provenance != nil do
+      Marks.from_trace(run, provenance)
+    end
+
     defp marks(%{active_ids: active, invoking: invoking}) do
       if MapSet.size(active) == 0 and invoking == nil do
         nil
@@ -1610,13 +1676,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       ctx = assignability_context(assigns)
       declarations = Environment.declarations(ctx)
 
+      held = held_values(assigns)
+
       case Document.fetch_path(document, id) do
         {:ok, [_first | _rest] = path} ->
           palette
           |> Environment.at(document, List.last(path), ctx)
           |> Enum.sort()
           |> Enum.map(fn {read_path, type} ->
-            %{path: read_path, type: Environment.type_label(declarations, type)}
+            %{
+              path: read_path,
+              type: Environment.type_label(declarations, type),
+              held: Map.get(held, read_path)
+            }
           end)
 
         _root_or_missing ->
@@ -1625,6 +1697,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp environment_view(_nothing_selected), do: nil
+
+    # What the run is holding at each path, or nothing at all when no run is
+    # seated. It is looked up per row rather than joined the other way round
+    # because the rows are the *declared* set: a path a run wrote that this
+    # position does not read is not something the author can read here, and
+    # listing it beside what they can would answer a question they did not
+    # ask. The whole-run view is the tab's own declared-paths table.
+    @spec held_values(map()) :: RunValues.t()
+    defp held_values(%{run: nil}), do: %{}
+    defp held_values(%{run: run}), do: RunValues.at(run)
 
     # The context every data-flow question in this component is asked with: the
     # host's datamodel document and nothing else. `:entry_type` is deliberately
@@ -2010,6 +2092,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       |> notify_select(selected)
       |> refresh_fixture_runs()
       |> refresh_source_view()
+      |> refresh_run_provenance()
     end
 
     # The runs are not on `drawer()` and not in `drawer_view/1`, deliberately.
@@ -2110,6 +2193,92 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec wants_source_view?(map()) :: boolean()
     defp wants_source_view?(assigns) do
       assigns.drawer_open and drawer_view(assigns).tab == :source
+    end
+
+    # The run is the host's input too, and it arrives the same way the marks do
+    # and for the same reason: a host watching a live session pushes each new
+    # message into its own read model and sends the result in, and a re-render
+    # it makes for an unrelated reason must not put the run away. It is a
+    # function rather than another `if` inline in `update/2` because that
+    # function is at its complexity budget.
+    @spec put_run(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
+    defp put_run(socket, assigns) do
+      if Map.has_key?(assigns, :run) do
+        assign(socket, :run, assigns.run)
+      else
+        socket
+      end
+    end
+
+    # The three halves of the two run events. Each is a no-op with no run
+    # seated, because a stray event from a pane that is no longer drawn should
+    # move nothing rather than raise.
+    @spec scrub_run(Phoenix.LiveView.Socket.t(), atom()) :: Phoenix.LiveView.Socket.t()
+    defp scrub_run(%{assigns: %{run: nil}} = socket, _move), do: socket
+
+    defp scrub_run(socket, move),
+      do: assign(socket, :run, Selection.scrub(socket.assigns.run, move))
+
+    @spec select_macrostep(Phoenix.LiveView.Socket.t(), non_neg_integer()) ::
+            Phoenix.LiveView.Socket.t()
+    defp select_macrostep(%{assigns: %{run: nil}} = socket, _n), do: socket
+
+    defp select_macrostep(socket, n),
+      do: assign(socket, :run, Selection.select(socket.assigns.run, n))
+
+    # The click's second answer: the block whose state took the transition
+    # that macrostep selected. It goes through `rebuild/1` rather than a bare
+    # `assign/3` because that is what every other route to a selection does -
+    # the host's `on_select` callback, the drafts, and the inspector's subject
+    # all hang off it.
+    @spec select_handling_block(Phoenix.LiveView.Socket.t(), non_neg_integer()) ::
+            Phoenix.LiveView.Socket.t()
+    defp select_handling_block(%{assigns: %{run_provenance: nil}} = socket, _n), do: socket
+
+    defp select_handling_block(socket, n) do
+      %{run: run, run_provenance: provenance} = socket.assigns
+
+      case Handled.block(run, n, provenance) do
+        {:ok, block_id} -> socket |> assign(:selected_id, block_id) |> rebuild()
+        :error -> socket
+      end
+    end
+
+    # The provenance map a run's state ids resolve through, on
+    # `refresh_source_view/1`'s discipline: the compile is the expensive half
+    # and it depends on the document, not on where the scrubber is, so it is
+    # keyed on the three inputs the compiler takes and recomputed only when
+    # one of them moves. Only while a run is seated - an editor nobody is
+    # watching a run in compiles nothing extra.
+    #
+    # A document that does not compile leaves the previous map in place rather
+    # than clearing it, which is the same choice the source listing makes: the
+    # marks an author is looking at came from a chart, and dropping them
+    # mid-edit would read as the run having ended.
+    @spec refresh_run_provenance(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
+    defp refresh_run_provenance(socket) do
+      assigns = socket.assigns
+      declare = Map.get(assigns, :declare, [])
+      key = {assigns.document, assigns.palette, declare}
+
+      cond do
+        assigns.run == nil ->
+          socket
+
+        key == assigns.run_provenance_key ->
+          socket
+
+        true ->
+          case Compiler.compile(assigns.document, assigns.palette, declare: declare) do
+            {:ok, %Compiled{provenance: provenance}} ->
+              socket
+              |> assign(:run_provenance, provenance)
+              |> assign(:run_provenance_key, key)
+
+            _no_chart ->
+              socket
+          end
+      end
     end
 
     # The one composition of a view model in this component, called by
