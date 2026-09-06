@@ -28,6 +28,8 @@ defmodule StatifierBlocks.Core.MapTest do
   @lines %{
     "items" => "order.line_ids",
     "chart" => "bdoc_LINE",
+    "item_as" => "line",
+    "index_as" => "position",
     "collect" => "line_results",
     "on" => "all"
   }
@@ -137,13 +139,93 @@ defmodule StatifierBlocks.Core.MapTest do
       assert {:error, findings} = Map.validate_config(%{@lines | "on" => nil})
       assert List.keyfind(findings, "on", 0)
     end
+
+    # ADR-0011 decision 11's two names, on `on`'s read-through-default
+    # shape rather than `core.foreach`'s required-key one: a `core.map`
+    # stored before either key existed reads as `item` and validates
+    # exactly as it did, so nothing has an older shape to migrate from.
+    #
+    # sabotage: read `item_as` with `Map.get(config, "item_as")` - an
+    # absent key becomes `nil`, every map authored before this field
+    # existed stops validating, and the first assertion goes red
+    # (verified)
+    test "an absent item_as reads as item; an empty or null one does not" do
+      assert Map.validate_config(%{"items" => "order.line_ids", "chart" => "bdoc_LINE"}) == :ok
+
+      for value <- ["", nil, "Invitee", "line id"] do
+        assert {:error, findings} = Map.validate_config(Elixir.Map.put(@lines, "item_as", value))
+        assert {"item_as", message} = List.keyfind(findings, "item_as", 0)
+        assert message =~ "bare lowercase identifier"
+      end
+    end
+
+    # `core.foreach`'s optional-field idiom for the same key, and the one
+    # cross-field check that survives the move: there is no root to
+    # collide with here, but the handler binding the position over the
+    # item is still two bindings and one name.
+    #
+    # sabotage: dropped `check_distinct/2` - a map naming both the same
+    # validates, the child sees its position where its item should be,
+    # and the last assertion goes red (verified)
+    test "index_as is optional, an identifier when present, and never the item's name" do
+      assert Map.validate_config(Elixir.Map.put(@lines, "index_as", "")) == :ok
+      assert Map.validate_config(Elixir.Map.put(@lines, "index_as", "position")) == :ok
+
+      assert {:error, findings} = Map.validate_config(Elixir.Map.put(@lines, "index_as", "P 1"))
+      assert {"index_as", message} = List.keyfind(findings, "index_as", 0)
+      assert message =~ "bare lowercase identifier"
+
+      assert {:error, findings} =
+               Map.validate_config(%{@lines | "item_as" => "line", "index_as" => "line"})
+
+      assert {"index_as", collision} = List.keyfind(findings, "index_as", 0)
+      assert collision =~ "cannot share one name"
+    end
   end
 
   describe "the declaration surface (ADR-0009 decision 4)" do
     # sabotage: reordered the fields - the form an author reads no longer
     # opens on what the block runs over, and this goes red (verified)
-    test "config_schema/1 declares exactly the four fields, in order" do
-      assert Enum.map(Map.config_schema(@lines), & &1.key) == ["items", "chart", "collect", "on"]
+    test "config_schema/1 declares exactly the six fields, in order" do
+      assert Enum.map(Map.config_schema(@lines), & &1.key) ==
+               ["items", "chart", "item_as", "index_as", "collect", "on"]
+    end
+
+    # ADR-0011 decision 11 keeps the two names with the defaults `item`
+    # and `index`. The `item` half is this schema's, applied by
+    # `validate_config/1` and `emit/2` when the config carries no name;
+    # the `index` half is the *walk's*, applied inside a body, and a
+    # `core.map` has no body (ADR-0009 decision 3), so the field's own
+    # default is the empty string that means "the author named none".
+    #
+    # sabotage: gave `index_as` the default "index" - every map emits a
+    # position name its author never asked for, and this goes red
+    # (verified)
+    test "item_as and index_as are plain identifier fields, not datamodel paths" do
+      names = Enum.filter(Map.config_schema(@lines), &(&1.key in ["item_as", "index_as"]))
+
+      assert [
+               %{
+                 key: "item_as",
+                 type: :string,
+                 label: "Call the item",
+                 required?: true,
+                 default: "item"
+               },
+               %{
+                 key: "index_as",
+                 type: :string,
+                 label: "Call the position (optional)",
+                 required?: false,
+                 default: ""
+               }
+             ] = names
+
+      # The editor generates both controls from these declarations alone -
+      # one text control each, the first badged Required - and neither is
+      # offered path candidates, because neither names a path in this
+      # document.
+      for field <- names, do: refute(StatifierBlocks.BlockType.datamodel_path?(field))
     end
 
     # sabotage: dropped the `writes` key back off `collect` (`{:path, %{}}`)
@@ -264,12 +346,32 @@ defmodule StatifierBlocks.Core.MapTest do
     # sabotage: emitted `items` as a bare expression rather than a quoted
     # literal - the parent evaluates the path and hands the handler a list
     # it was supposed to resolve itself, and this goes red (verified)
-    test "the four params carry literals: the path, the chart, the location, the policy",
+    test "the six params carry literals: the path, the chart, the names, the location, the policy",
          %{scxml: scxml} do
       assert scxml =~ ~s(<param expr="'order.line_ids'" name="items"/>)
       assert scxml =~ ~s(<param expr="'bdoc_LINE'" name="chart"/>)
+      assert scxml =~ ~s(<param expr="'line'" name="item_as"/>)
+      assert scxml =~ ~s(<param expr="'position'" name="index_as"/>)
       assert scxml =~ ~s(<param expr="'line_results'" name="collect"/>)
       assert scxml =~ ~s(<param expr="'all'" name="on"/>)
+    end
+
+    # ADR-0009 decision 3: what the child sees its item and its position
+    # under travels in the param list, because the handler is what binds
+    # them - one document away from anything this compile can check. So
+    # the names are emitted, and nothing here declares a `<data>` root for
+    # either, the way `core.foreach` does for the names it binds itself.
+    #
+    # sabotage: dropped the default from `emit/2`'s read of the key
+    # (`Map.get(config, "item_as")`) - a map whose author never opened the
+    # field reaches the handler with no name at all, and the first
+    # assertion goes red (verified)
+    test "an absent item_as still reaches the handler, as the default name" do
+      scxml = compile!(order(names: %{})).scxml
+
+      assert scxml =~ ~s(<param expr="'item'" name="item_as"/>)
+      refute scxml =~ ~s(name="index_as")
+      refute scxml =~ "<datamodel"
     end
 
     # RQ-031-4: the fan-out scheduler reads the aggregation policy off this
@@ -402,13 +504,22 @@ defmodule StatifierBlocks.Core.MapTest do
   # so a test can watch a completion travel from the slot child to its
   # outcome without a second event.
   defp order(opts \\ []) do
+    named =
+      case Keyword.fetch(opts, :names) do
+        {:ok, names} ->
+          @lines |> Elixir.Map.drop(["item_as", "index_as"]) |> Elixir.Map.merge(names)
+
+        :error ->
+          @lines
+      end
+
     config =
       case Keyword.fetch(opts, :collect) do
         {:ok, nil} ->
-          %{@lines | "on" => Keyword.get(opts, :on, "all")} |> Elixir.Map.delete("collect")
+          %{named | "on" => Keyword.get(opts, :on, "all")} |> Elixir.Map.delete("collect")
 
         _otherwise ->
-          %{@lines | "on" => Keyword.get(opts, :on, "all")}
+          %{named | "on" => Keyword.get(opts, :on, "all")}
       end
 
     slots =

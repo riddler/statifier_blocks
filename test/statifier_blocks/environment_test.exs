@@ -286,6 +286,43 @@ defmodule StatifierBlocks.EnvironmentTest do
       refute Map.has_key?(after_it, "line")
       refute Map.has_key?(after_it, "index")
     end
+
+    # `sb-otpv`, on ADR-0011 decision 11 and ADR-0009 decision 3: a
+    # `core.map` declares the same two names, and they are the *child's*
+    # vocabulary. It runs a chart rather than a body, so there is no slot
+    # here for the binding to live in, and the walk holds neither name
+    # anywhere around the block. What the map contributes stays its
+    # `collect` write.
+    #
+    # sabotage: keyed `fan_out_bindings/4` on the declared `items` field
+    # alone rather than on the `body` slot -> a map binds `item` into
+    # whichever slot is walked next, `on_done`'s subtree reads a name the
+    # child owns, and the first two assertions go red (verified)
+    test "a core.map binds neither name: it runs a chart, not a body" do
+      map =
+        Block.new("core.map",
+          id: "blk_MAP",
+          config: %{
+            "items" => "cards.lines",
+            "chart" => "bdoc_child",
+            "item_as" => "line",
+            "index_as" => "position",
+            "collect" => "results"
+          },
+          slots: %{"on_done" => [assign("blk_AFTER", "cards.tally")]}
+        )
+
+      document = document([open(), map, settle("blk_STL")])
+
+      inside = Environment.at(palette(), document, {"blk_MAP", "on_done", 0}, ctx())
+      refute Map.has_key?(inside, "line")
+      refute Map.has_key?(inside, "position")
+      refute Map.has_key?(inside, "item")
+
+      after_it = Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx())
+      refute Map.has_key?(after_it, "line")
+      assert Map.get(after_it, "results") == {:list, :unknown}
+    end
   end
 
   describe "the core vocabulary's signatures" do
