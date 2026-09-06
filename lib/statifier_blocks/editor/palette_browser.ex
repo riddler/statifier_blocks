@@ -24,13 +24,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       * **Search** is the author's, over label, description, type name and
         `keywords`. Purely presentational.
-      * **Acceptance** is the slot's. When the palette was opened from a
-        specific gap, `allowed` carries the type names that slot will take,
-        computed by `StatifierBlocks.Editor` with the *same* predicate a drag
-        uses - `Edit.Targets.droppable_slots_for/3` against a probe block of
-        each candidate type. Decision 8 is explicit that the filter uses the
-        same predicate as decision 5, not a parallel implementation, and this
-        component deliberately computes none of it: it is handed a set.
+      * **Acceptance** is the slot's, and it is two sets because the palette
+        has two kinds of row. `allowed` carries the type names that slot will
+        take, computed by `StatifierBlocks.Editor` with the *same* predicate a
+        drag uses - `Edit.Targets.droppable_slots_for/3` against a probe block
+        of each candidate type, whose config since sb-1c7g is the entry's
+        `default_config`, so a type refused for a READ rather than for its
+        kind is filtered here too. `allowed_recipes` carries the recipe names
+        whose arrangement lands at the armed position, which is the recipe's
+        own question and not a set of type names (ADR-0005 clause 1C):
+        `insert/2` at that position, and `Recipe.within_reach?/2` over what it
+        answers with. Decision 8 is explicit that the filter uses the same
+        predicate as decision 5, not a parallel implementation, and this
+        component deliberately computes neither of them: it is handed the sets.
 
     ## What a row says, and what the count line says (parity item 1.3)
 
@@ -127,6 +133,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "MapSet of accepted type names, or nil for unfiltered."
     )
 
+    attr(:allowed_recipes, :any,
+      default: nil,
+      doc: """
+      MapSet of the recipe names whose arrangement lands at the armed
+      position, or nil for unfiltered. Independent of `allowed`: a recipe is
+      not a block type, so the two sets are two namespaces (ADR-0005 clause
+      1C) and neither answers for the other's kind.
+      """
+    )
+
     attr(:target, :any, required: true)
 
     attr(:icon, :any,
@@ -176,7 +192,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     `entry.group`.
     """
     def palette_browser(assigns) do
-      visible = filter(assigns.groups, assigns.query, assigns.allowed)
+      visible = filter(assigns.groups, assigns.query, assigns.allowed, assigns.allowed_recipes)
 
       assigns =
         assigns
@@ -317,13 +333,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     #
     # Types and recipes are counted apart wherever the line says "block type"
     # or "fit", because a recipe is not a block type (ADR-0005 clause 1C) and
-    # its fit is not the slot's question: `accepted?/2` above leaves every
-    # recipe visible and clause 3C has the pick refuse. A single number over
-    # both therefore made two false claims at once - it called a recipe a type,
-    # and it counted a recipe among the entries the slot had accepted. The
-    # recipes get their own clause rather than disappearing from the line: they
-    # are on screen, so a line that did not mention them would be arithmetic an
-    # author cannot reconcile with what they are looking at.
+    # its fit is not the slot's question but its own. A single number over both
+    # therefore made two false claims at once - it called a recipe a type, and
+    # it counted a recipe among the entries the slot had accepted. The recipes
+    # get their own clause rather than disappearing from the line: they are on
+    # screen, so a line that did not mention them would be arithmetic an author
+    # cannot reconcile with what they are looking at.
+    #
+    # The fit numbers count what the ARMED SLOT will take, which is the whole
+    # of the verdict and not the structural half of it: `allowed` is
+    # `Edit.Targets.droppable_slots_for/3` against the insert probe, and since
+    # sb-1c7g that probe carries the entry's `default_config`, so a type
+    # refused for a read it declares on a config field is outside the
+    # numerator exactly as one refused for its kind is. The alternative was to
+    # split the line into a structural count and a typed one, and it is the
+    # wrong trade for this audience: "fit here" is a promise about what will
+    # land when the row is clicked, and one number that keeps that promise
+    # beats two numbers that make the author work out which of them did.
     #
     # The query arm keeps one number over both kinds, and that one is true as
     # it stands: matching a search is something a recipe row does exactly as a
@@ -352,10 +378,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # one an author cannot learn to read. The recipes hang off it behind a
     # semicolon and the word "listed" rather than a comma, so that the sentence
     # about what fits ends before the recipes are named: "N of M block types
-    # fit here, and 1 recipe" would read as the recipe fitting too, which is
-    # the claim this whole change exists to stop making. N and M stand for the
-    # two counts this clause computes; no literal total is written here,
-    # because the palette's type count moves as the host registers types.
+    # fit here, and 1 recipe" would read as the recipe fitting too, and at the
+    # time it was written a listed recipe had not been asked. It has been since
+    # (sb-ym2w): a recipe on screen at an armed slot is one whose arrangement
+    # lands there. The wording stays as it is, because "also listed" is still
+    # true of such a row and understating what has been checked costs an author
+    # nothing, where the old comma overstated it. N and M stand for the two
+    # counts this clause computes; no literal total is written here, because
+    # the palette's type count moves as the host registers types.
     @spec fit_line(non_neg_integer(), non_neg_integer(), String.t()) :: String.t()
     defp fit_line(shown_types, total_types, ""),
       do: "#{shown_types} of #{total_types} block types fit here"
@@ -407,39 +437,74 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     @doc """
-    The groups a query and an acceptance set leave visible, with empty groups
-    dropped. Pure, so the palette's filtering is asserted directly rather than
-    through markup.
+    The groups a query and the two acceptance sets leave visible, with empty
+    groups dropped. Pure, so the palette's filtering is asserted directly
+    rather than through markup.
+
+    `allowed_recipes` defaults to `nil` - unfiltered - so a caller that has
+    only the type set, and every existing one did, is unchanged.
     """
-    @spec filter([ViewModel.PaletteGroup.t()], String.t(), MapSet.t(String.t()) | nil) ::
-            [ViewModel.PaletteGroup.t()]
-    def filter(groups, query, allowed) do
+    @spec filter(
+            [ViewModel.PaletteGroup.t()],
+            String.t(),
+            MapSet.t(String.t()) | nil,
+            MapSet.t(String.t()) | nil
+          ) :: [ViewModel.PaletteGroup.t()]
+    def filter(groups, query, allowed, allowed_recipes \\ nil) do
       needle = query |> to_string() |> String.trim() |> String.downcase()
 
       groups
       |> Enum.map(fn %ViewModel.PaletteGroup{} = group ->
-        %{group | entries: Enum.filter(group.entries, &visible?(&1, needle, allowed))}
+        %{
+          group
+          | entries: Enum.filter(group.entries, &visible?(&1, needle, allowed, allowed_recipes))
+        }
       end)
       |> Enum.reject(&(&1.entries == []))
     end
 
-    @spec visible?(ViewModel.PaletteGroup.entry(), String.t(), MapSet.t(String.t()) | nil) ::
-            boolean()
-    defp visible?(entry, needle, allowed) do
-      accepted?(entry, allowed) and matches?(entry, needle)
+    @spec visible?(
+            ViewModel.PaletteGroup.entry(),
+            String.t(),
+            MapSet.t(String.t()) | nil,
+            MapSet.t(String.t()) | nil
+          ) :: boolean()
+    defp visible?(entry, needle, allowed, allowed_recipes) do
+      accepted?(entry, allowed, allowed_recipes) and matches?(entry, needle)
     end
 
-    # The acceptance set is the SLOT's, and a slot accepts block types. A
-    # recipe is not one, so no set of type names can answer for it: whether
-    # a "deadline" fits where the author armed is the recipe's own question,
-    # and `insert/2` answers it by refusing (ADR-0005 clause 3C). A recipe
-    # therefore stays visible under the acceptance filter and is refused at
-    # the pick, which is the honest order - the alternative hides the entry
-    # and tells the author nothing about why.
-    @spec accepted?(ViewModel.PaletteGroup.entry(), MapSet.t(String.t()) | nil) :: boolean()
-    defp accepted?(_entry, nil), do: true
-    defp accepted?(%{kind: :recipe}, _allowed), do: true
-    defp accepted?(%{type_name: type_name}, allowed), do: MapSet.member?(allowed, type_name)
+    # Acceptance is the SLOT's, and the two kinds are asked apart because
+    # they are asked different questions. A block type is asked of the set of
+    # type names the slot takes. A recipe has no type name for such a set to
+    # hold (ADR-0005 clause 1C), and whether a "deadline" lands where the
+    # author armed is the recipe's own question - `insert/2` answers it, and
+    # clause 3C bounds what it may answer with - so `Editor` asks each recipe
+    # that question at the position the author armed and hands the answers
+    # down as a second set.
+    #
+    # A recipe used to stay visible everywhere and be refused at the pick,
+    # which read as honest and was not: the refusal wrote nothing and said
+    # nothing, so a row that could never land looked exactly like one that
+    # could until it was clicked, and then still did (sb-ym2w). The same
+    # answer given before the click is the one an author can act on.
+    #
+    # Either set may be `nil`, and `nil` is "nothing is armed" rather than
+    # "nothing is accepted" - the unarmed palette shows everything of both
+    # kinds.
+    @spec accepted?(
+            ViewModel.PaletteGroup.entry(),
+            MapSet.t(String.t()) | nil,
+            MapSet.t(String.t()) | nil
+          ) :: boolean()
+    defp accepted?(%{kind: :recipe}, _allowed, nil), do: true
+
+    defp accepted?(%{kind: :recipe, name: name}, _allowed, allowed_recipes),
+      do: MapSet.member?(allowed_recipes, name)
+
+    defp accepted?(_entry, nil, _allowed_recipes), do: true
+
+    defp accepted?(%{type_name: type_name}, allowed, _allowed_recipes),
+      do: MapSet.member?(allowed, type_name)
 
     @spec matches?(ViewModel.PaletteGroup.entry(), String.t()) :: boolean()
     defp matches?(_entry, ""), do: true
