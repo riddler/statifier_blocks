@@ -6931,3 +6931,74 @@ run adds no tab, and the one drawer surface it does reach is described below.
 
 Filed with `sb-xbyt`, campaign 033's editor-as-debugger lane, alongside
 `sb-grc1`, which built the marks resolution this pane hangs on.
+
+## Note (2026-09-06): the `11p`-`11u` amendment's Status casing, and where `11r`'s "decision 10's normalizer discipline" resolves
+
+A dated Note rather than an amendment. It corrects two pieces of the
+2026-09-05 `11p`-`11u` amendment's apparatus - one typographic, one a cite
+target - and it changes nothing that amendment decides. No line above this one
+is edited, and both clauses read exactly as they did.
+
+### The Status line writes `lane` where this record writes `Lane`
+
+The amendment's Status line (`:6293`) opens **"Status: proposed (2026-09-05,
+campaign 031 lane H, bead `sb-w2m1`)"**, and its closing attribution (`:6601`)
+reads "Filed with `sb-w2m1`, campaign-031's lane H." Everywhere else this
+record names a lane by its letter it capitalises the word: `Lane G` (`:4897`,
+`:5109`, `:5222`, `:5339`, and the attributions at `:5105`, `:5214`, `:5335`,
+`:5470`), `Lane A` (`:5474`, `:5604`), `Lane S0` (`:5610`, `:5836`, `:5832`,
+`:5982`, `:6132`), `Lane A2` (`:4406`), `Lane A3` (`:4475`), `Lane E`
+(`:4662`), `Lane B2` (`:4893`). The 2026-09-05 amendment is the only section
+that lowercases a lettered lane, and it does so in both of the places it names
+one.
+
+The lowercase `lane` elsewhere in this record is a different construction and
+is not at issue: in `campaign-030's fill lane D` (`:6289`) and in
+`campaign 033's second-pass code lane` (`:6814`) the word is a common noun
+inside a descriptive phrase rather than half of a lane's name.
+
+The deviation is typographic and nothing turns on it: both lines name campaign
+031's lane H, which is the lane `sb-w2m1` was worked in, and they name it
+unambiguously either way. It is corrected here rather than in place because a
+change of case is a change to a word, which puts it outside the formatting-only
+exemption this record's edits run under; correcting `:6293` and `:6601`
+directly would remove two lines from a merged amendment, and amendments here
+are additive. **Read `:6293` and `:6601` as `Lane H`.**
+
+### `11r`'s "decision 10's normalizer discipline" names the `slot_outcome_key` amendment
+
+Clause `11r` says that a host `validate_document/1` return which is not a list,
+and a member of it which is neither of the two accepted shapes, is read as no
+finding - "**decision 10's normalizer discipline**, applied to a host's return
+value" (`:6421`). The phrase is exact about the discipline and loose about
+where it is written down.
+
+Decision 10 as originally taken (`:389-:405`) is a table of eight presentation
+keys and their defaults. It says every default is specified so a type omitting
+`palette_entry/0` still renders, and it says nothing at all about normalizing a
+declaration: the word does not appear in the decision, and no reader following
+the cite to `:389` finds the discipline `11r` is invoking.
+
+The discipline reaches decision 10 through the **2026-08-29 amendment,
+`slot_outcome_key`** (`:1490`), whose table row is `:1521` and whose statement
+of it is the paragraph at `:1527-:1531`: the declaration "is read through a
+total normalizer under ADR-0002 amendment B3: a non-map declaration, a
+non-string key, and a key or value outside the outcome-name alphabet all read
+as no declared outcome, which is the uniform rendering every consumer had
+before the declaration existed." Clause `10o` (`:2489`) then says in as many
+words that the normalizer semantics "stay ADR-0002 B3's, unchanged", and
+`ADR-0002` amendment `B3` (`docs/adr/0002-block-type-behaviour.md:831`) is
+where the semantics themselves are owned - refuse, do not truncate; a throw
+degrades.
+
+So the chain is `11r` -> the `slot_outcome_key` amendment -> `ADR-0002` B3, and
+"decision 10's" is a fair name for the middle link because that is the decision
+the amendment amends. **A reader following `11r`'s cite goes to `:1490` and its
+`:1527-:1531` paragraph, not to `:389`.**
+
+Nothing `11r` claims depends on which of the three is read. All three say the
+same thing about a total reader - a shape it does not recognise is absent, not
+an error - and `11r` applies it one level up, to a host's return value rather
+than to a host's declaration. The clause stands as written.
+
+Filed with `sb-wkg9`, campaign 034's docs fill.
