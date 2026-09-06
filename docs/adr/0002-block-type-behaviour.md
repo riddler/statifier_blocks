@@ -4006,3 +4006,254 @@ Note of 2026-09-06 gives each; the `assign_to`/`collect` and `aggregate`/`on`
 spelling reconciliation that is the rest of G15b is untouched by this.
 
 Filed with `sb-uewa`, folding `sb-z4vz`; campaign-034 ruling `RQ-034-6`.
+
+## Amendment (2026-09-06): `core.on_event` declares its event payload, and a `capture` that reads past it is refused at compile
+
+**Status: proposed (2026-09-06).** Drafted for `sb-i0cc` under the operator
+campaign-034 grant, and merging at proposed under that campaign's invariant
+like every other section filed with it; flipping it to accepted is a separate
+gated request. Additive, by this record's convention: **no line above this one
+is edited**. Decision 7's field-type set is not widened, decision 10's table is
+untouched, the Note of 2026-09-05 that introduced `capture` (`:3118`) stands
+word for word, and where this amendment corrects a bullet of that Note it
+restates the bullet in full below rather than editing it in place.
+
+Records campaign-034 ruling `RQ-034-7`, taken with the operator on 2026-09-06.
+
+### Context
+
+The Note of 2026-09-05 gave `core.on_event` an optional `capture` map and named
+**two** failure shapes for it (`:3179`). The run-time one fires today. The
+compile-time one - a `:config` finding when a declared payload and a capture's
+source path disagree - was written for a day that had not arrived, and the Note
+says so plainly at `:3193-3195`: *dormant, because nothing in this package declares
+an event payload's shape*.
+
+Two things have happened since. `sb-0q0z` measured the interpreter and found
+that a missing member of a **bound** root writes the engine's unbound marker
+and raises nothing, so the run-time branch is a marker rather than an error
+(the Note of 2026-09-05 at `:3207` carries the measurement and its cites).
+And the upstream question that would have made it an error was settled the
+other way: the engine keeps writing the marker.
+
+So the guarantee `capture` was reaching for - that a captured value which is
+not there cannot be mistaken downstream for an authored absence - has to be
+bought at **this package's compile**, or not at all. Buying it needs one thing
+this package does not have: a statement of what the event's payload carries.
+This amendment adds that statement, and wakes the dormant branch against it.
+
+### P1. `core.on_event` takes an optional `payload` key, and it declares what `_event.data` carries
+
+A `core.on_event` block's `config` gains an optional `"payload"` key. It
+declares the shape of `_event.data` **for the event this handler names** - not
+the datamodel, which the `:declare` and `:datamodel` compile options already
+own (`lib/statifier_blocks/compiler.ex:87`, `:127`), and not a fact about the
+event name anywhere else in the document. Two handlers for the same event may
+declare different payloads and neither is thereby wrong; each governs its own
+`capture`.
+
+The key is **optional and additive in exactly the way `cond` and `capture`
+are**. Absent, the block compiles to the bytes it compiled to before this
+date, and P4 says what that means for findings. ADR-0001 owns the stored bytes
+and `schema_version` stays at `1`: an optional key inside a block's `config`
+object is a block-type contract, which is this record's, and that is the same
+argument the Note of 2026-09-05 made for `capture` itself.
+
+`payload` is a **declaration, not an emission**. Nothing about it reaches the
+compiled SCXML. It is read at compile, by P5, and by nothing else.
+
+### P2. The value vocabulary is `statifier_datamodel`'s, and this package mints none of it
+
+The value of `payload` is a type expression in the datamodel document's own
+spelling. `StatifierDatamodel.Types` admits four and no fifth: a name the
+document's `types` key declares (`{:declared, name}`), one of the nine types
+its set is closed at, an opaque string a consumer carries, and `:unknown`.
+This package reads that vocabulary and adds nothing to it - the same stance
+`StatifierBlocks.Environment` already takes, whose `type_expr/0` is *"one of
+`t:StatifierDatamodel.Types.t/0`'s inhabitants as a document spells it"*
+(`lib/statifier_blocks/environment.ex:93`).
+
+Two arms are useful for a payload, and the record names both:
+
+- **a declared name** - the name of a `record` or a `shape` the datamodel
+  document declares, resolved with `StatifierDatamodel.Declarations.fetch/2`
+  (public);
+- **an inline shape** - the fields written where the payload is declared,
+  because an event payload is frequently a one-off that no host wants in its
+  datamodel's `types` key.
+
+A `payload` spelling that resolves to a scalar, to an opaque string, or to
+`:unknown` is read exactly as `Types` reads it and is **not** an error here.
+Unknown is permissive both ways in that package by design, and this amendment
+does not narrow it: a payload the document says nothing useful about is a
+payload P5 refuses nothing against, which is P4's case reached by a second
+route.
+
+The declaration is resolved against the **same** `:datamodel` compile option
+the typed environment already reads - one document, supplied once, read once
+(`lib/statifier_blocks/compiler.ex:556-568`). A compile with no `:datamodel`
+resolves no declared name, and P4 governs.
+
+### P3. The `config_schema/1` spelling: the declared-name arm on an existing field type, and the inline shape deferred
+
+Decision 7's field-type set is **closed**, and this amendment does not widen
+it. Eight members are declared today
+(`lib/statifier_blocks/block_type.ex:149-157`). The set has grown exactly
+once since decision 7 was accepted - the Amendment of 2026-09-05 at `:2761`
+added `{:path, opts}` as the eighth member, which the capture Note records at
+`:3268-3269` - and it grew there on an argument about the editor: the control
+table is keyed on the field type, so a path left as a bare `:string` gets no
+candidate list and no undeclared-path advisory (`:2774-2798`). The two
+amendments either side of it took an optional **key** instead
+(`datamodel_path?` at `:1004`, `sensitive?` at `:1187`), and each says in its
+own words that the type set stays closed (`:1028-1032`, `:1235-1238`). So the set is not sealed, and it is not widened casually either; this
+section is the second kind of change and not the first. **No ninth field type
+is added by it.**
+
+What this section decides:
+
+- **The declared-name arm gets a field, and its type is `:string`.** A
+  `config_schema/1` may declare `payload` as a `:string` whose stored text is a
+  declared type name. That is the arm the surrounding machinery can already
+  carry: `Environment.type_expr/0` is `String.t() | :unknown | {:list,
+  type_expr()}` (`environment.ex:93`), so a **name** is the only spelling of a
+  declaration in hand anywhere in this package today. A `:string` carrying a
+  name is a spelling, not a new kind of thing.
+- **The inline-shape arm gets no field type here, and none is invented for
+  it.** An inline shape is authored **through the document** and not through
+  the editor, which is exactly the route `capture` itself takes today and for
+  the same reason the Note of 2026-09-05 gives at `:3268-3274`: no member of
+  decision 7's set describes the shape, that Note declined to add one, and how
+  an author writes it is `ADR-0005`'s question rather than this section's.
+  Left there rather than answered in passing. What this costs is the editor
+  affordance for one arm; what it does not cost is the refusal, because P5
+  reads `config` and a document-authored `payload` is as readable to the
+  compiler as a field-authored one.
+
+Deciding the first arm and declining the second is deliberate. A field type is
+a member of a set every block type in this package renders against, and adding
+one to spell a shape that no block stores yet would be a second proposal
+riding along with this one - the objection the Note of 2026-09-05 raises
+against a member for `capture`'s map, reaching the same answer here.
+
+### P4. An undeclared payload keeps today's behaviour, exactly
+
+A `core.on_event` whose `config` carries no `payload` - which is every block in
+every document authored before this date - is unchanged in every respect:
+
+- no new finding of any kind, at any severity;
+- the compiled bytes are identical, because P1 emits nothing;
+- the run-time branch of the Note of 2026-09-05 stands as measured: a `capture`
+  whose source path is not in the payload writes the interpreter's explicit
+  **unbound marker** and raises nothing, and a consumer of a captured path
+  makes the test for it. That obligation is unchanged and is still the whole of
+  what the key promises on an untyped document.
+
+`statifier-ex` is **unchanged by this amendment**, and nothing in it is asked
+for. The engine's marker write is the behaviour this package now builds around
+rather than the behaviour it waits to have replaced.
+
+The same rule reaches one more case, named so it is not read as a gap: a
+`payload` whose declared name the datamodel document does not declare resolves
+to nothing, and is the undeclared case. It is not a refusal of its own. This
+amendment decides no finding for it; whether a name that resolves to nothing
+deserves an advisory is `ADR-0005` clause 11e's kind of question and is left
+to it.
+
+### P5. The refusal: a `capture` pair reading a member the declared payload does not carry is a `:config` finding on the `capture` key
+
+This is the dormant branch of `:3190-3191` waking. Its bullet reads *"a
+declared payload that lacks a named source path"*, which admits two readings;
+`RQ-034-7` fixes which, and it is this one: **the pair's source path names a
+member the declared payload does not carry.** The other reading - a declared
+member no `capture` reads - is not a finding, then or now: a payload may
+legitimately carry more than one handler wants.
+
+- **The anchor is `{:config, block_id, "capture"}`** - `Finding.anchor/0`'s
+  config form (`lib/statifier_blocks/finding.ex:39-40`). One finding for the
+  whole key, not one per pair, for the reason `check_capture/2` already gives
+  in the module: `capture` has no field in `config_schema/1` for a per-pair
+  finding to render against, so the key itself is the only anchor an editor
+  can use (`lib/statifier_blocks/core/on_event.ex:283-296`). **The message
+  names the offending pair** - both sides of it, and the declared payload -
+  because the anchor cannot.
+- **The source is `:config` and the severity is `:error`**
+  (`lib/statifier_blocks/finding.ex:63`, `:80`). A refusal, not an
+  `ADR-0005` clause 11e advisory. The reason is that both halves are the
+  author's own bytes inside **one block's config**: the payload is what they
+  said the event carries and the pair is what they said to read out of it, so
+  a disagreement between them is a contradiction rather than a guess about a
+  document the compiler cannot see. An advisory is right where the compiler is
+  reasoning across documents; this is not that case.
+- **How deep the check goes.** The **first** segment of the source path is
+  checked against the declared payload's field names. A deeper segment is
+  checked only where the field's own type resolves, through the same
+  `Declarations.fetch/2`, to a declaration whose fields are in hand; a field
+  whose type is a scalar, an opaque string or `:unknown` **stops the walk and
+  refuses nothing beyond it**. This adds no structural rule
+  `statifier_datamodel` does not already have - its read check is nominal,
+  permissive on `:unknown`, and descends into no `list` element type - and a
+  compile that invented one here would be a second proposal riding along with
+  this one.
+- **What it buys.** On a document that declares its payload, the marker write
+  never happens, because the document does not compile. That is the guarantee
+  the Note of 2026-09-05 opens with - no captured value that quietly is not
+  there - now bought at compile rather than waited for from the engine.
+
+### Note (2026-09-06): the correction the `error.execution` bullet of the Note of 2026-09-05 takes (`:3255`)
+
+This is the dated correction `RQ-034-7` calls for, and it is placed here rather
+than under the bullet it corrects. Amendment by addition is this record family's
+convention, and here it is also the only safe shape: an insert at `:3259` would
+shift every line below it, and sections already on `main` cite five distinct
+lines below it by number - `:3329`, `:3331`, `:3418`, `:3528` and `:3814`.
+Correcting one bullet by falsifying five cites is not a trade this record makes. So the bullet at `:3255` is **not edited**; it is restated below
+in full as it now reads, and the restated bullet is the one a reader follows.
+
+> - **The `error.execution` clause does not hold yet, and this package no
+>   longer waits on it.** It is written in that Note as present tense and it
+>   described a future. That future is not arriving: the engine keeps writing
+>   the unbound marker for a missing member of a bound root, and the upstream
+>   bead the bullet named as carrying it closed with the measurement rather
+>   than a change. The guarantee this package offers is therefore
+>   **compile-time on a typed document, not an engine raise**: with a `payload`
+>   declared under P1, P5 refuses the document and the marker write never
+>   happens; with no `payload`, the marker write stands and nothing in this
+>   package is built on the error arriving. Nothing above this line depended on
+>   the error either - the corrected bullet says so itself at `:3258-3259` - so
+>   the correction removes a debt rather than an argument.
+
+The paragraph immediately after that bullet (`:3261-3264`), which says the
+compile-time branch *"stays dormant"* and that *"correcting the run-time branch
+does not wake it"*, was accurate on its date and for its cause: correcting the
+run-time branch did not wake it. **P1 does.** That paragraph keeps its words
+and is read as the dated entry it is.
+
+### What this amendment does not change
+
+- **Decision 7's field-type set.** Eight members, closed, unwidened. P3 takes
+  an existing type for the arm it decides and defers the arm it does not.
+- **`config_schema/1` still declares no field for `capture`.** The map's own
+  authoring question is `ADR-0005`'s and is untouched here; only `payload`
+  gains a field, and only in P3's `:string` arm.
+- **`Environment.capture_writes/1`.** A capture pair still writes
+  `:unknown` at its destination path
+  (`lib/statifier_blocks/environment.ex:662-`). This amendment types the
+  **source** side of a pair at compile; typing the destination from the
+  payload is a widening of `ADR-0011` decision 2's third write form that no
+  ruling has asked for, and it is not taken here.
+- **The compiled bytes.** One `<assign>` per pair, on the transition, before
+  the `<raise>`, in the pairs' destination-sorted order. `payload` emits
+  nothing and reorders nothing.
+- **`cond`, and the outcome words.** Unchanged, and orthogonal: a guarded
+  handler that does not fire captures nothing, and a refusal at compile is
+  reached before either matters.
+- **The size of the core vocabulary, and decision 10's table.** No row is
+  added, no row is edited. `core.on_event` gains a config key, not a type.
+- **`statifier-ex`.** Nothing is asked of the engine by this amendment, and
+  nothing in it changes.
+- **The document schema.** `ADR-0001` owns the stored bytes and
+  `schema_version` stays at `1`.
+
+Filed with `sb-i0cc`; campaign-034 ruling `RQ-034-7`. `sb-0na2` builds P5's
+check; `sb-kkd7` is the request that flips this section.
