@@ -13,9 +13,13 @@ defmodule StatifierBlocks.TypingAPaletteTest do
 
   Three consequences worth naming, because all three are deliberate:
 
-    * **Every fence runs.** `elixir_blocks/1` takes them all rather than a
-      named section's, so a snippet added to the how-to without a claim
-      beside it still has to compile.
+    * **Every fence is checked, and all but one of them runs.**
+      `elixir_blocks/1` takes them all rather than a named section's, so a
+      snippet added to the how-to without a claim beside it still has to
+      compile. The single exception is the `# mix.exs` fence, which is a
+      dependency entry rather than a step in the program: running it inside
+      the guide's binding would prove nothing, so it is checked against the
+      requirement this package's own `mix.exs` declares instead.
     * **The claimed outputs are asserted twice** - once as a value, once as
       the literal text of the `#=>` line - which is what catches an output
       that drifted while the code kept working.
@@ -50,7 +54,7 @@ defmodule StatifierBlocks.TypingAPaletteTest do
     # evaluating it per test would redefine them.
     {_result, how_to_binding} =
       how_to_blocks
-      |> Enum.reject(&String.contains?(&1, "# mix.exs"))
+      |> Enum.reject(&dependency_fence?/1)
       |> Enum.join("\n\n")
       |> Code.eval_string([], file: @how_to)
 
@@ -164,6 +168,41 @@ defmodule StatifierBlocks.TypingAPaletteTest do
              "Read the result in the editor"
            ]
   end
+
+  # Sabotage: changed the how-to's fence to `{:statifier_datamodel, "~> 0.2"}`
+  # - red here (`left: "~> 0.1", right: "~> 0.2"`), restored from a copy taken
+  # first, re-ran green (verified). This is the assert that closes the one
+  # hole the rest of the module leaves: the fence the program excludes was
+  # hand-evaluated until now, so a floor raised in `mix.exs` and not in the
+  # guide - or the reverse - shipped a reader an install line that does not
+  # resolve the version the package actually requires.
+  test "the how-to's mix.exs fence names the requirement this package declares", ctx do
+    fences = elixir_blocks(ctx.how_to)
+    {excluded, executed} = Enum.split_with(fences, &dependency_fence?/1)
+
+    # Named rather than derived: the counts are the module's contract with the
+    # guide, so a fence added on either side of the split is a red test and a
+    # deliberate decision rather than a silent change of what runs.
+    assert length(executed) == 6
+    assert [fence] = excluded
+
+    {{name, requirement}, []} = Code.eval_string(fence, [], file: @how_to)
+
+    declared =
+      Mix.Project.config()
+      |> Keyword.fetch!(:deps)
+      |> Enum.find(&(elem(&1, 0) == name))
+
+    refute declared == nil, "#{inspect(name)} is not a dependency of this package"
+    assert elem(declared, 1) == requirement
+  end
+
+  # The `# mix.exs` marker is what makes a fence non-executable: it is an
+  # entry for the reader's own project file, not a step in the guide's
+  # program. One predicate serves both the exclusion and the assert above, so
+  # the two can never disagree about which fence that is.
+  @spec dependency_fence?(binary()) :: boolean()
+  defp dependency_fence?(fence), do: String.contains?(fence, "# mix.exs")
 
   @spec claims(binary()) :: [binary()]
   defp claims(markdown) do
