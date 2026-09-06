@@ -966,10 +966,21 @@ rule is stated.
 
 ## Amendment (2026-09-06): decision 4, `collect` admits a dotted datamodel path through the shared location helper
 
-**Status: proposed (2026-09-06, campaign 034, bead `sb-pxkf`).** A decision
+**Status: accepted (2026-09-06, campaign 034, bead `sb-pxkf`).** A decision
 record merges at proposed under campaign 034's invariant; flipping it to
 accepted is a separate gated request. Additive: decision 4 stands as accepted,
 and no text above this line is edited by this section.
+
+[Note 2026-09-06, `sb-rp6h`: the paragraph above is this section as it was
+drafted, and it is left standing rather than rewritten. The status word is now
+`accepted`. This is the separate gated request that sentence points at, opened
+after `sb-cjou` moved both of this field's sites (PR 331, `802043e`) on top of
+the section itself (PR 329, `0a106e1`); the Note at the foot of this section
+carries what the flip verified against `main`. The record's head `Status:` line
+at `:3` is not extended by this flip: that line carries one accepted status and
+no amendment list at all - none of this record's dated sections, of 2026-09-05
+or of 2026-09-06, appears in it - so extending it here would start a convention
+rather than follow one.]
 
 An amendment rather than a Note, because decision 4 decides this field's
 grammar in as many words and this record now decides it differently. Nothing
@@ -1046,6 +1057,49 @@ here.
 Filed with `sb-pxkf`, campaign-034 ruling `RQ-034-5`, split from `sb-jvz3` by
 ruling `RQ-034-15`; it folds `sb-h6qt`'s half of the question. The code is
 `sb-cjou`.
+
+### Note (2026-09-06): what the flip checked against `main` at `802043e`
+
+The flip request `sb-rp6h` read this section's claims against `main` at
+`802043e` - the tree `sb-cjou` left - rather than against the tree the section
+was drafted over. Every claim holds. This Note records that reading; it decides
+nothing and edits nothing above it.
+
+**Both of the field's sites moved, and they moved to the one rule.**
+`check_collect/2` calls `AssignLocation.check/5` with
+`&Config.datamodel_path?/1` (`lib/statifier_blocks/core/map.ex:455-463`), and
+the emission's own `collect/1` calls `AssignLocation.location/4` with the same
+predicate (`map.ex:680-683`). The section says both move rather than one, and
+both did.
+
+**The helper itself is unchanged, which is what it was extracted for.**
+`sb-cjou` touched `lib/statifier_blocks/core/assign_location.ex` in its
+moduledoc comment only: `check/5` and `location/4` still take the rule and the
+wording as arguments, so the widening reached them as a different argument
+rather than as a different helper.
+
+**The finding text is the one this section named.** `@collect_message` is
+`"must be a datamodel path, like cards.answers"` (`map.ex:256`), which is the
+wording the other three fields produce - the section's reason for moving the
+message with the rule, so an author meets one complaint and not two.
+
+**A bare lowercase identifier is still a valid `collect`.**
+`Config.datamodel_path?/1` is non-empty and carrying no whitespace
+(`lib/statifier_blocks/core/config.ex:53-55`), which every bare lowercase
+identifier satisfies. The field refuses nothing it accepted before.
+
+**The environment write lands at the dotted path the author named.** A
+`core.map` whose `collect` is `cards.batch` reports that path as its write
+signature and is readable at it, with no bare `batch` invented beside it; the
+test that says so is `"a core.map collecting at a dotted path writes there"`
+(`test/statifier_blocks/environment_test.exs:495-517`).
+
+**The byte corpus did not move.** The fifteen goldens under
+`test/fixtures/corpus/` are untouched by `802043e`, which is what a widening
+that refuses nothing it accepted before should do to a corpus of configs that
+were already accepted.
+
+Filed with `sb-rp6h`; `sb-pxkf` is the section and `sb-cjou` the code.
 
 ## Note (2026-09-06): the 2026-09-05 bracketed Note's two clauses about `collect`'s grammar are historical
 
