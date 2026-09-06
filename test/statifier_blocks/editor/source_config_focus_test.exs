@@ -86,13 +86,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     describe "a plain span" do
+      # "Selects only" is two claims, and the absent focus instruction is the
+      # weaker one: a key that names no field of the selected block focuses
+      # nothing either way. The claim with teeth is that the click did not
+      # route through the config-emitted clause at all, and the tab the
+      # author is left on is what says so - which is why this starts on
+      # Findings rather than on the default Config.
+      #
       # Sabotage: `phx-value-config-key` posting `""` instead of omitting
-      # itself for a span with no `config_key` - the plain clause would never
-      # match and every plain click would wrongly ask to focus a field.
-      test "selects only - no focus instruction", %{conn: conn} do
+      # itself for a span with no `config_key` - the config clause would
+      # match every plain click and pull the author off the tab they were
+      # reading.
+      test "selects only - no focus instruction, and no tab switch", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn, document: EditorFixtures.invoke_step())
 
         open_source(view)
+        view |> element("#sb-inspector-tab-findings") |> render_click()
         _ = selections()
 
         html =
@@ -102,6 +111,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert [%{id: "blk_flow"}] = selections()
         assert focused_field(html) == nil
+        assert has_element?(view, ~s(#sb-inspector-tab-findings[aria-selected="true"]))
       end
     end
 
@@ -133,8 +143,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
 
       # A plain selection right after a config-emitted one must not leave the
-      # earlier field's focus instruction for the newly selected block's
-      # Config tab to replay.
+      # earlier field's focus instruction standing. The second click is a
+      # role span of the SAME block on purpose: a stale key resolves against
+      # whatever block is selected when it renders, so clicking away to a
+      # different block would hide the stale key behind a form that has no
+      # field by that name, and the assertion would hold whether the clause
+      # cleared it or not.
+      #
+      # Sabotage: dropping `config_field_focus: nil` from the plain `"select"`
+      # clause - the key from the earlier click survives, and the block's own
+      # Config tab refocuses a field this click never pointed at.
       test "is cleared by the very next plain selection", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn, document: EditorFixtures.invoke_step())
 
@@ -144,11 +162,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> element(~s(.sb-source__span[data-config-key="invoke_type"]))
         |> render_click()
 
+        # The run of bytes the value sits inside, which the same block owns
+        # and no config field wrote. Named by its text rather than its byte
+        # offset: an offset is a property of the serializer's output, and a
+        # test that pins one fails the day an unrelated attribute moves.
         html =
           view
-          |> element(~s(.sb-source__span[data-block="blk_flow"][data-offset="0"]))
+          |> element(
+            ~s(.sb-source__span[data-block="blk_authorize"][data-role="running"]),
+            ~s(<invoke type=")
+          )
           |> render_click()
 
+        assert [%{id: "blk_authorize"}] = selections()
         assert focused_field(html) == nil
       end
     end
