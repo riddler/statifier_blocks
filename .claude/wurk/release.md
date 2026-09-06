@@ -21,12 +21,13 @@ and that commit disagree, the commit is the evidence and this file is the
 defect.
 
 **This file names no SHA for that reference, on purpose, and it carries no
-version string anywhere.** A hard-coded reference stops being the most recent
-the moment the next release lands: the sentence that used to sit in step B
-named the 0.11.0 prep commit and asserted it was the shape to copy, and the
-0.17.0 prep found it five releases stale (`sb-0id2`). Nothing below needs
-editing at a release, and a release commit does not touch this file - the
-table at the end lists every file it does touch, and this is not one of them.
+version string anywhere except in the historical claims below.** A hard-coded
+reference stops being the most recent the moment the next release lands: the
+sentence that used to sit in step B named the 0.11.0 prep commit and asserted
+it was the shape to copy, and the 0.17.0 prep found it five releases stale
+(`sb-0id2`). Nothing below needs editing at a release, and a release commit
+does not touch this file - the table at the end lists every file it does
+touch, and this is not one of them.
 
 Commits cited further down are historical evidence for a claim about the past
 ("this happened once, in that commit"). They are not the reference, and they
