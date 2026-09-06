@@ -482,6 +482,16 @@ defmodule StatifierBlocks.BlockType do
   names the path `io/1`'s `consumes` and `produces` desugar against. A
   document whose entry block declares none has no subject and that sugar is
   inert; `StatifierBlocks.Environment.subject_path/2` is the reader.
+
+  `default_config` is the config a block of this type is *asked about* with
+  before anyone has configured one - `default_config/1` is the reader, and
+  the editor's insert probe is the only thing that reads it. It is layered
+  over `config_schema/1`'s own `default:` values rather than replacing them,
+  so a type declares it only for the fields whose schema default says
+  nothing useful: a `{:path, _}` field defaulting to `""` names no path, so
+  a read declared on it is silent on a probe and every slot accepts a block
+  a configured one would be refused from. Naming the path here is what makes
+  the probe ask the question the author will actually be asking.
   """
   @type palette_entry :: %{
           optional(:label) => String.t(),
@@ -499,7 +509,8 @@ defmodule StatifierBlocks.BlockType do
           optional(:badge) => String.t(),
           optional(:join_label) => join_label(),
           optional(:singleton) => singleton(),
-          optional(:subject) => String.t()
+          optional(:subject) => String.t(),
+          optional(:default_config) => %{optional(String.t()) => Block.json()}
         }
 
   @doc """
@@ -970,6 +981,47 @@ defmodule StatifierBlocks.BlockType do
   end
 
   def singleton(_entry), do: nil
+
+  @doc """
+  The config a probe of this type is built with, over `config_schema/1`'s
+  own defaults, as its palette entry declares it - or `%{}`.
+
+  Total, under the same refuse-never-raise discipline `singleton/1` and
+  `badge/1` carry, and one step stricter than either: the value is a config
+  map, so a declaration that is not a map reads as absent, and a map with
+  keys that are not strings has those pairs dropped rather than being
+  refused whole. A block's config is string-keyed everywhere else in this
+  package, and an atom key here would land in a config no `config_schema/1`
+  field can ever name.
+
+  Nothing repairs the values. A host that declares a path that does not
+  exist gets a probe reading a path the environment does not hold, which is
+  `:unknown` and so satisfied - the same answer an unconfigured probe gave.
+
+      iex> StatifierBlocks.BlockType.default_config(%{default_config: %{"subject" => "cards.current_txn"}})
+      %{"subject" => "cards.current_txn"}
+
+      iex> StatifierBlocks.BlockType.default_config(%{default_config: %{subject: "cards.current_txn"}})
+      %{}
+
+      iex> StatifierBlocks.BlockType.default_config(%{default_config: "cards.current_txn"})
+      %{}
+
+      iex> StatifierBlocks.BlockType.default_config(%{})
+      %{}
+  """
+  @spec default_config(palette_entry() | map()) :: Block.config()
+  def default_config(entry) when is_map(entry) do
+    case Map.get(entry, :default_config) do
+      declared when is_map(declared) ->
+        for {key, value} <- declared, is_binary(key), into: %{}, do: {key, value}
+
+      _refused ->
+        %{}
+    end
+  end
+
+  def default_config(_entry), do: %{}
 
   @doc """
   What the join marker under this block type's side-by-side arrangement
