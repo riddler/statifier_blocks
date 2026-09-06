@@ -210,6 +210,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
     )
 
+    attr(:path_types, :map,
+      default: %{},
+      doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
+    )
+
     attr(:event_candidates, :list,
       default: [],
       doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
@@ -353,6 +358,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               invoke_types={@invoke_types}
               path_candidates={@path_candidates}
               value_candidates={@value_candidates}
+              path_types={@path_types}
               event_candidates={@event_candidates}
               outcome_candidates={@outcome_candidates}
               field_candidates={@field_candidates}
@@ -433,6 +439,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:invoke_types, :list, required: true)
     attr(:path_candidates, :list, required: true)
     attr(:value_candidates, :map, required: true)
+    attr(:path_types, :map, required: true)
     attr(:event_candidates, :list, required: true)
     attr(:outcome_candidates, :list, required: true)
     attr(:field_candidates, :map, required: true)
@@ -456,6 +463,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         invoke_types={@invoke_types}
         path_candidates={@path_candidates}
         value_candidates={@value_candidates}
+        path_types={@path_types}
         event_candidates={@event_candidates}
         outcome_candidates={@outcome_candidates}
         field_candidates={@field_candidates}

@@ -789,6 +789,74 @@ defmodule StatifierBlocks.DatamodelTest do
     end
   end
 
+  # sb-23e0: the kind half of the same read. The projection itself is
+  # `StatifierDatamodel.Index.path_types/1`'s and sd's own suite owns it;
+  # what is asserted here is that this package reads the document through
+  # it, on the same total-normalizer terms as every other reader above.
+  describe "path_types/1" do
+    # Sabotage: `path_types/1` answering `%{}` for a document it has -> every
+    # assertion here goes red. Handing the map to the editor is the whole
+    # bead, and nothing downstream can be right if the read is empty.
+    test "a declared path answers the expression language's kind for it" do
+      assert Datamodel.path_types(
+               value_datamodel([
+                 %{"path" => "amount_cents", "type" => "integer"},
+                 %{"path" => "settled_on", "type" => "date"},
+                 %{"path" => "risk_reasons", "type" => "list", "item_type" => "string"}
+               ])
+             ) == %{
+               "amount_cents" => :number,
+               "settled_on" => :date,
+               "risk_reasons" => {:list, :string}
+             }
+    end
+
+    # The vocabulary is the language's and not the document's: `integer` and
+    # `decimal` are nine types collapsed to the one distinction predicator
+    # draws. This is asserted here rather than left to sd because it is the
+    # reason a caller cannot read `Index.type/2` and get the same answer.
+    #
+    # Sabotage: reaching for `declared_view/3`'s `type` instead -> both
+    # paths answer `:integer` and `:decimal` and this goes red.
+    test "integer and decimal both answer :number" do
+      assert Datamodel.path_types(
+               value_datamodel([
+                 %{"path" => "amount_cents", "type" => "integer"},
+                 %{"path" => "rate", "type" => "decimal"}
+               ])
+             ) == %{"amount_cents" => :number, "rate" => :number}
+    end
+
+    # Absence is unknown, not wrong - the same stance the undeclared-path
+    # advisory takes, and what makes an editor handed this map behave on a
+    # path it does not name exactly as it did before there was a map.
+    #
+    # Sabotage: carrying an unprojectable type through as itself -> the two
+    # paths appear and this goes red.
+    test "a path whose type projects to no kind is absent, not present and unknown" do
+      types =
+        Datamodel.path_types(
+          value_datamodel([
+            %{"path" => "card", "type" => "object"},
+            %{"path" => "tags", "type" => "list"},
+            %{"path" => "amount_cents", "type" => "integer"}
+          ])
+        )
+
+      assert types == %{"amount_cents" => :number}
+    end
+
+    # Sabotage: `path_types/1` raising rather than answering `%{}` on a shape
+    # `index/1` declines -> these go red. Shape comes from the document
+    # alone, so every other spelling of a datamodel declares no kinds.
+    test "a datamodel that is not a document declares no kinds" do
+      assert Datamodel.path_types(nil) == %{}
+      assert Datamodel.path_types(["amount_cents"]) == %{}
+      assert Datamodel.path_types(MapSet.new(["amount_cents"])) == %{}
+      assert Datamodel.path_types(%{"scopes" => "not a list"}) == %{}
+    end
+  end
+
   describe "declared_types/1" do
     # ADR-0011 decision 9: a field whose type names another declaration reads
     # as that declaration's label, which is the same rendering a finding

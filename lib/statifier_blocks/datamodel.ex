@@ -514,6 +514,60 @@ defmodule StatifierBlocks.Datamodel do
     |> Map.merge(host_values(host))
   end
 
+  @doc """
+  The value kind the datamodel document declares per path, as an expression
+  editor consumes it: `StatifierDatamodel.Index.path_types/1`'s map,
+  `%{path => kind | {:list, kind} | {:one_of, values}}`.
+
+  sd-ADR-0001 decision 11 owns the projection and this package does not
+  restate it. It is the expression language's vocabulary rather than the
+  document's nine types - `integer` and `decimal` both answer `:number`,
+  because that is the distinction the language draws - and a path whose
+  type projects to no kind at all is absent rather than present and
+  unknown.
+
+  It is `value_candidates/2`'s sibling and reads the same surface for the
+  same reason `declared_view/3` does: **shape comes from the ADR-0006
+  document alone.** A set of paths carries no types, and a declared root
+  carries none by 11l, so neither of the other two declaring surfaces 11k
+  names contributes here. This is not a narrowing of the advisory's union -
+  that question is "is this path declared?" and this one is "what did the
+  document say is at it?".
+
+  ## This declares a control, and nothing else
+
+  What consumes the map is statifier-ui's expression editor, which reads a
+  declared kind as *which operators to offer and which control to draw* and
+  never as a claim about the author's source: the operator the source
+  carries is still offered, the value in it is still kept, and a
+  disagreement renders as an advisory beside the clause. So this is the
+  same suggests-never-constrains posture the path `<datalist>`, the value
+  candidates and the 11e advisory all take, and `validate_config/1` remains
+  the only authority on a value.
+
+  Total, like every other reader here: anything that is not a datamodel
+  document declares no kinds.
+
+      iex> alias StatifierBlocks.Datamodel
+      iex> Datamodel.path_types(%{"scopes" => [%{"scope" => "local", "entries" => [
+      ...>   %{"path" => "amount_cents", "type" => "integer"},
+      ...>   %{"path" => "card.brand", "type" => "string",
+      ...>     "one_of" => ["visa", "amex"]}]}]})
+      %{"amount_cents" => :number, "card.brand" => {:one_of, ["visa", "amex"]}}
+
+      iex> StatifierBlocks.Datamodel.path_types(["card.brand"])
+      %{}
+
+      iex> StatifierBlocks.Datamodel.path_types(nil)
+      %{}
+  """
+  @spec path_types(term()) :: %{optional(String.t()) => Index.value_kind()}
+  def path_types(datamodel) do
+    datamodel
+    |> Index.index()
+    |> Index.path_types()
+  end
+
   @typedoc """
   One field of a declared record or shape, as the Datamodel tab draws it:
   the field's own name, the type rendered for a reader (ADR-0011 decision
