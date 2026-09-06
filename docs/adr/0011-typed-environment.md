@@ -1,9 +1,14 @@
 # ADR-0011: Nothing flows between adjacent blocks - a pre-order walk carries an environment from datamodel path to type, and a block declares what it reads and writes there
 
-Status: proposed (2026-09-06, drafted for `sb-kcdw` under the operator's
+Status: accepted (2026-09-06, drafted for `sb-kcdw` under the operator's
 campaign-032 grant). It merges at proposed under that campaign's invariant,
 like every other section filed with it; flipping it to accepted is a separate
 request through the same `docs/adr/` gate, and `sb-ok9s` carries it.
+
+[Note 2026-09-06, `sb-ok9s`: the paragraph above is the record as it was
+drafted, and it is left standing rather than rewritten. The status word is
+now `accepted`; this is the separate request that sentence points at, and
+the Note at the foot of this record carries what the flip verified.]
 
 ## Context
 
@@ -762,3 +767,109 @@ it, in a palette whose datamodel never declared it, is ADR-0005 clause 11e's
   sense the answer is already yes. Whether a palette entry may declare a type
   the document does not is a different question, it has no consumer today, and
   nothing above depends on the answer.
+
+## Note (2026-09-06): what the flip verified, and seven readings the code settles
+
+A dated note rather than an amendment. Nothing this record decides changes
+here: every decision above stands in the words it was accepted in, no clause
+gains or loses a member, and the deferred list is untouched. What this records
+is the check the flip from proposed to accepted ran - every decision read
+against `main` as it stands after the beads that built them - and the seven
+places where a reader of the record and a reader of the code would otherwise
+come away with different answers.
+
+The record was drafted before any of it was built. `sb-jzg1` took the
+dependency, `sb-v5a3` built the walk, `sb-u7zt` declared the write signatures
+across the `core.*` vocabulary, `sb-xk1h` built the two `{:path, opts}` keys
+and the capture control, and `sb-sy0q` built the two surfaces of decision 9.
+Decisions 1 through 8 and 10 through 14 hold as written; decision 9 holds and
+is now built rather than promised. The readings below are the residue.
+
+**1. Decision 2's seed and decision 1's read order, at the entry block's own
+position.** Decision 2 says the entry block's write signature "is applied
+before the walk begins", and decision 1 says a block's reads are checked
+"before that block's own writes are applied". Both cannot hold at the entry
+block's own position. The code resolves it in decision 1's favour and the
+resolution is the honest one: `Environment.seed/3` puts `ctx[:entry_type]` at
+the **subject path only**, and the entry block's own writes land through the
+walk like every other block's, so the entry block does not read what it is
+about to write. Decision 2's sentence describes what every position *after*
+the entry block sees, which is what it was written to describe.
+
+**2. Decision 2's write rule reads narrower than its literal words.** Decision
+2 says a write signature is "a `{:path, opts}` field with no `writes` key".
+Read literally that reaches a read-only `{:path, %{expects: T}}` field and
+would blank the very path that field checks. The code reads
+expects-without-writes as a **read only**: `Environment.writes?/1` answers
+`false` for a field carrying `expects` and no `writes`, `true` for one
+carrying neither, and `written_type/1` supplies `:unknown` for the latter. The
+same reading is what `t:StatifierBlocks.BlockType.path_opts/0` documents, and
+the `sb-u7zt` reviewer flagged the same divergence independently. Decision 2's
+rule is to be read as "no `writes` key **and** no `expects` key".
+
+**3. Decision 4 is silent on an empty slot, and the code says an empty slot
+contributes no arm.** A container's empty slot is rejected before the merge
+rather than merged as an arm holding nothing (`Environment.arms/5`). Counting
+one would blank every `core.branch` on its empty `otherwise` slot, which is
+the opposite of what decision 4's per-path merge exists to buy. This is a
+clarification of a case decision 4 does not address, not a change to the merge
+rule it states.
+
+**4. Decision 11's two fields are declared on `core.foreach`, not
+`core.map`.** The heading says "`core.map` keeps `item_as` and `index_as`",
+and on `main` those two fields are declared, validated and defaulted in
+`lib/statifier_blocks/core/foreach.ex`; `core.map` declares neither. `core.map`
+also has no `body` slot - `slots/1` returns `on_done` and `on_error` only - so
+the binding decision 11 describes could not reach a `core.map`'s children even
+if the fields were declared there. The walk's binding is declaration-driven
+rather than type-named (`Environment.fan_out_bindings_for/4` fires for a block
+declaring a datamodel-path `items` field **and** carrying a `body` slot), so
+`core.foreach` binds today and `core.map` does not. `sb-otpv` carries the gap.
+
+Two smaller readings inside the same decision. `index_as`'s schema `default:`
+is the empty string, not `"index"`; the record's `"index"` is the **walk's**
+default, applied by `Environment.name/3` when the config carries no name - so
+the record's defaults are the names a child actually sees, which is what
+decision 11 claims, arrived at one layer further in. And `core.placeholder`
+reaches `produces: :unknown` through the `use StatifierBlocks.BlockType`
+default `io/1` rather than by declaring it, which is decision 6's inert-sugar
+case doing its job.
+
+**5. Decision 10's control shipped as described, with one detail the record
+does not name.** The capture row is a repeated two-control row, one row per
+pair, with **one trailing blank row** that adds a pair when it is filled and
+**no add or remove events**. That is the shape a repetition takes when the
+schema already expresses it, and it is why decision 10 could close the
+authoring surface without adding a map field type.
+
+**6. Decision 13 shipped, and the sentence describing the defect it fixes is
+now historical.** The record's decision 13 describes `check_assign_to/2` as
+still refusing anything that is not a bare lowercase identifier. That refusal
+is gone: both sites in `core/subchart.ex` - the validation and the emission -
+now ask `StatifierBlocks.Core.Config.datamodel_path?/1`, the same predicate
+`core.assign` uses, so the candidates and the validation agree exactly as
+decision 13 requires. The three other bare-identifier refusals the decision
+deliberately did not reach are still in place, still deferred, and `sb-3j9u`
+carries whether the four should agree.
+
+**7. The file and line citations throughout this record point at the files as
+they stood when it was drafted, and the beads that implemented it moved
+them.** The record's argument does not depend on a line number, so no citation
+is rewritten here; a reader following one should search for the function
+rather than the line. Three citations still resolve exactly -
+`lib/statifier_blocks/shell.ex:175` for the drawer's fifth tab,
+`lib/statifier_blocks/core/invoke.ex:299` and
+`lib/statifier_blocks/invoke_step.ex:430` for two of the three deferred
+refusals - and `lib/statifier_blocks/core/map.ex:68-70` still carries the
+`collect` sentence quoted from it. The rest have drifted: the `path` field
+cited at `core/assign.ex:73-79` is at `:67-73`, its rule at `:89`;
+`core/subchart.ex`'s `assign_to` field is at `:260-265`, `check_assign_to/2`
+at `:306-316`, and the emission's `assign/1` at `:622-634`;
+`core/config.ex:37` is `identifier?/1` at `:40`, beside the
+`datamodel_path?/1` reading 6 names at `:54`; and `core.map`'s `collect`
+refusal, cited at `core/map.ex:188` and `:300-308`, is `@collect_message` at
+`:199` with `check_collect/2` at `:311-319`.
+
+Decision 12 is the one claim worth stating positively because it is easy to
+miss in the schema: `core.map`'s `collect` field is declared
+`type: {:path, %{writes: {:list, :unknown}}}`, exactly as decision 12 says.
