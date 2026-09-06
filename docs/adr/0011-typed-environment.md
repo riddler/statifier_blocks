@@ -559,11 +559,26 @@ ADR-0003's second force refused, arriving by the back door.
 ## Worked shape
 
 One card-processing document, in the canonical domain. The datamodel document
-declares two records and one shape:
+declares two paths and, under `types`, two records and one shape. It carries
+`scopes` because `sd-ADR-0001` decision 6's `index/1` admits a map carrying a
+list under `"scopes"` and returns `nil` for anything else - a document that
+declared only `types` would not be a document:
 
 ```json
 {
   "version": 1,
+  "scopes": [
+    {"scope": "global", "label": "Global", "entries": []},
+    {
+      "scope": "local",
+      "label": "This run",
+      "entries": [
+        {"name": "current_txn", "path": "cards.current_txn", "type": "object", "label": "Current transaction"},
+        {"name": "settlement", "path": "cards.settlement", "type": "object", "label": "Settlement"}
+      ]
+    },
+    {"scope": "event", "label": "Event", "entries": []}
+  ],
   "types": [
     {
       "name": "cards.credit_txn",
@@ -599,8 +614,13 @@ declares two records and one shape:
 }
 ```
 
-The document's entry block's palette entry declares
-`subject: "cards.current_txn"` and its `io/1` declares
+The two artifacts say different things about the same path and that is the
+point. The `scopes` entry says `cards.current_txn` **exists**, which is what
+ADR-0005 clause 11e's advisory reads and all it reads; its `type` there is the
+scalar `object`, because `sd-ADR-0001` decision 6 normalizes an entry `type`
+outside the closed nine to `nil`. The **environment's** type at that path comes
+from a block's declaration, not from the entry: the document's entry block's
+palette entry declares `subject: "cards.current_txn"` and its `io/1` declares
 `produces: "cards.credit_txn"`. So the seed is:
 
     %{"cards.current_txn" => "cards.credit_txn"}
