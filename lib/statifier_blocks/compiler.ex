@@ -49,8 +49,8 @@ defmodule StatifierBlocks.Compiler do
   fails, and the errors a caller gets back come from that one stage. Config
   and Structure are the one pair that does not: when Config finds something,
   Structure still runs, and the refusal carries the **union** of what both
-  found (RQ-SF035-2, and the dated Notes of 2026-09-06 on ADR-0011 and
-  ADR-0002).
+  found (RQ-SF035-2, and the dated Notes of 2026-09-06 on ADR-0004
+  decision 10 and on ADR-0011 decision 1).
 
   The reason is that they are not in a consequence relation the way the
   later stages are. Emit reads the tree Structure has already agreed is
