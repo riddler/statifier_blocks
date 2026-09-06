@@ -10,6 +10,78 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.21.0] 2026-09-06
+
+0.21.0 makes the editor a debugger and widens what a block can say. The
+drawer gains a Source tab - the compiled SCXML with every run of bytes
+traced back to the block that emitted it, and a click on a config-emitted
+span opening the Config tab on the field it came from - and the canvas
+takes a seat in a run pane, with statifier-ui's status, scrubber and event
+log around it and a send control that pushes a block type's fixture events
+straight into a live session. `core.branch` declares a third slot,
+`undecided`, for an arm whose condition cannot be decided (ADR-0012); a
+block type may class one of its outcomes as a failure, and the compiler
+stamps a reserved `<donedata>` param on that outcome's final so a durable
+stepper can tell a chart that finished badly from one that merely finished
+(ADR-0008's accepted amendment); a host can state a rule about a whole
+document through `validate_document/1` and the palette's new `:validators`
+list; `core.invoke`'s and `StatifierBlocks.InvokeStep`'s `assign_to` take
+any datamodel path and declare the path they write; and `core.map` names
+what a child run sees its item and its position under, through `item_as`
+and `index_as`.
+
+It is a minor, and nothing stored is invalidated by it: a `core.branch`
+that leaves `undecided` empty, and every type that classes no outcome as a
+failure, compile to the bytes they compiled to at 0.20.0. `statifier_ui`
+is now an optional dependency at `~> 0.9`, the release that added the
+state-id reads `StatifierBlocks.Runtime.Marks.from_trace/2` composes;
+`statifier_datamodel` stays at `~> 0.1`.
+
+### Added
+
+- `core.branch` declares a third slot, `undecided`, labelled "Cannot be decided". A branch that puts children in it emits one extra transition, after every arm and before `otherwise`, taken when an arm's condition could not be decided - a comparison predicator answers with its undefined sentinel rather than `true` or `false`, such as a path missing under a bound datamodel root, or operands whose types do not match.
+
+- The drawer has a Source tab: the compiled SCXML as numbered lines, with the block that emitted each run of bytes, and a click on any run selecting that block.
+- `StatifierBlocks.SourceView` builds that listing from a document and a palette, without the editor.
+
+- The editor takes a `run_session` - a `Statifier.Session.server()` - and the Run pane draws a send control over it: one button per event in the selected block's type's fixture sample, sending straight into the session through statifier-ui's `EventInjection`.
+- The send control is enabled only over a live stream with a session supplied; over a persisted run, or with no session, every button renders disabled with a one-line note, and a send never writes to the document.
+
+- `StatifierBlocks.Runtime.Marks.from_trace/2` turns a statifier-ui trace read model and a provenance map into the run marks the editor canvas already accepts, so a host observing a run marks the blocks a configuration is inside without naming them itself.
+
+- A block type may class one of the outcomes it declares as a **failure** through the new optional `failure_outcomes/1` callback, and the compiler emits a reserved `<donedata>` param - `statifier_persistence:run_status` with the value `failed` - on that outcome's top-level `<final>` under both the `:child_use` and the `:terminate` compile options, so a durable stepper can tell that a chart finished badly rather than merely finished. `core.map` and `core.subchart` class their `error` outcome; every other type classes nothing.
+
+- A host can state a rule about a whole document, not just about one block's config: `StatifierBlocks.DocumentValidator` is the behaviour, `validate_document/1` its one callback, and a module implementing it goes in the palette's new `validators` list (`StatifierBlocks.Palette.new/2`'s `:validators` option, defaulting to `[]`).
+- A validator says where and what - `{anchor, message}` or `{anchor, message, severity: ...}` on decision 11's existing anchors - and the package stamps the source `:lint` and defaults the severity to `:warning`. The findings render in the editor's Findings drawer tab and count toward `StatifierBlocks.Editor.findings_count/3` like every other finding.
+
+- `core.map` declares `item_as` and `index_as` - the names a child run sees its item and its position under, defaulting to `item` and to no position name - and carries both into its `<invoke>` beside the list's path, so a child recipe reads what the author named rather than whatever the fan-out handler chose.
+
+- Clicking a config-emitted span in the Source tab opens the Config tab and focuses the field it came from; a span with no owning field still selects the block as before.
+
+- The editor takes a `run` - statifier-ui's `StatifierUI.Live.State`, live or persisted - and seats the canvas in a run pane: statifier-ui's status and scrubber above it, its event log below, and no Mermaid diagram. Scrubbing or clicking a log entry moves the canvas's run marks, and clicking a log entry also selects the block whose state handled that step.
+- While a run is seated the Datamodel drawer tab's "what is known here" table shows what the run held at each path, beside the type the position declares.
+- `StatifierBlocks.Runtime.Handled.block/3` answers which block's state handled one macrostep of a run, and `StatifierBlocks.Runtime.RunValues.at/1` what a run held at its selection; both are pure and neither needs statifier-ui to be present.
+- `StatifierBlocks.Runtime.Selection.scrub/2` and `select/2` move a run's selection, which is what the pane's two events do.
+
+### Changed
+
+- A `core.branch` that leaves `undecided` empty compiles to exactly the bytes it compiled to at 0.20.0, so every stored document is unaffected until its author wires the slot.
+
+- `statifier_ui` is now an optional dependency at `~> 0.9`, the release that added the state-id reads `from_trace/2` composes; hosts on `0.8` upgrade the package to use the new module and are otherwise unaffected.
+
+- A document whose root block is a `core.map` or a `core.subchart`, compiled with `child_use: true` or `terminate: true`, gains the reserved param on its `error` final. Its content hash changes with it, so it is a different chart revision under statifier-ex ADR-0052 - the same one-time choice opting into `terminate` already is. Every other document compiles to the bytes it compiled to.
+
+- A palette entry's `singleton` declaration is now derived through the same document-rule path a validator's findings take, and runs first among them. Its findings are unchanged: still `:config`, still `:error`, still anchored at the root.
+
+- A `core.map` compiled before this release gains an `item_as` param carrying the default name; a stored config that never had the key still validates and needs no migration.
+
+- `core.invoke`'s `assign_to` is declared as a datamodel path field, so the editor offers the host's declared paths as candidates on it and a path it does not declare draws the usual advisory rather than a refusal.
+- `core.invoke`'s and `StatifierBlocks.InvokeStep`'s `assign_to` accept any datamodel path, dotted or not, in place of a bare lowercase identifier - the rule `core.assign` and `core.subchart` already accept for the same `<assign>` element. `core.map`'s `collect` is unchanged.
+
+### Fixed
+
+- A path `core.invoke` writes is visible to the environment: it was emitted without being declared, so nothing downstream saw the write.
+
 ## [0.20.0] 2026-09-06
 
 0.20.0 is about types. The datamodel document's declarations become
@@ -2023,6 +2095,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.21.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.21.0
 [0.20.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.20.0
 [0.19.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.19.0
 [0.18.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.18.0

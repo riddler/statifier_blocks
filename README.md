@@ -40,7 +40,7 @@ off a closed built-in vocabulary.
 ```elixir
 def deps do
   [
-    {:statifier_blocks, "~> 0.20"}
+    {:statifier_blocks, "~> 0.21"}
   ]
 end
 ```
@@ -480,7 +480,7 @@ injected here would let a type that compiles nothing look complete.
 
 A leaf step that **names** one host invoke type and waits for the answer is
 the shape a host writes over and over, so it has a base of its own.
-`use StatifierBlocks.InvokeStep` fills in all nine callbacks from a
+`use StatifierBlocks.InvokeStep` fills in every callback from a
 declaration:
 
 ```elixir
