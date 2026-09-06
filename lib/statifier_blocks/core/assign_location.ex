@@ -13,15 +13,17 @@ defmodule StatifierBlocks.Core.AssignLocation do
   # three ways for one of them to drift, and ADR-0011 decision 13's
   # deferred list is what drift looks like when it has already happened.
   #
-  # The shape is shared here; the rule and the wording stay with the field,
-  # because they are not the same rule at all four sites yet.
-  # `core.invoke`, `StatifierBlocks.InvokeStep` and `core.subchart` read
+  # The shape is shared here; the rule and the wording are still passed in
+  # by the field rather than fixed here, and all four now pass the same
+  # one. `core.invoke`, `StatifierBlocks.InvokeStep`, `core.subchart` and
+  # `core.map`'s `collect` all read
   # `StatifierBlocks.Core.Config.datamodel_path?/1` - the predicate
   # `core.assign` reads, for ADR-0011 decision 13's reason: the same
   # `<assign>` element writes the same datamodel, so one location rule.
-  # `core.map`'s `collect` still reads `identifier?/1`, because ADR-0009
-  # decision 4 decides that field's grammar in as many words and widening
-  # it is that record's amendment to make, not this helper's to imply.
+  # `collect` was the last of the four to widen, and it widened as ADR-0009
+  # decision 4's Amendment of 2026-09-06 rather than as this helper's
+  # implication - which is what the rule being an argument, and not a
+  # constant in here, is for.
   #
   # Both entry points exist because a field is checked twice: once by
   # `validate_config/1`, which accumulates findings, and once by `emit/2`,

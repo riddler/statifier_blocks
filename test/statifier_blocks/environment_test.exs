@@ -485,6 +485,37 @@ defmodule StatifierBlocks.EnvironmentTest do
       assert Environment.type_of(%{}, Map.get(env, "results")) == :list
     end
 
+    # ADR-0009 decision 4's Amendment of 2026-09-06: `collect` accepts a
+    # dotted datamodel path, and the write lands at the path the author
+    # named rather than at a bare name the environment invented for it.
+    #
+    # sabotage: keyed the write on the field's last segment instead of its
+    # value - `cards.batch` is invisible at its own path and this goes red
+    # (verified)
+    test "a core.map collecting at a dotted path writes there" do
+      block =
+        Block.new("core.map",
+          id: "blk_MAP",
+          config: %{
+            "items" => "cards.lines",
+            "chart" => "bdoc_child",
+            "collect" => "cards.batch"
+          }
+        )
+
+      document = document([open(), block, settle("blk_STL")])
+
+      assert Environment.write_signatures(palette(), document, block) == [
+               {"items", "cards.lines", :unknown},
+               {"collect", "cards.batch", {:list, :unknown}}
+             ]
+
+      env = Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx())
+
+      assert Map.get(env, "cards.batch") == {:list, :unknown}
+      refute Map.has_key?(env, "batch")
+    end
+
     # sabotage: made `capture_writes/1` fall through its `is_map` clause and
     # answer `[]` -> the captured path is invisible to everything after the
     # handler and this goes red (verified)

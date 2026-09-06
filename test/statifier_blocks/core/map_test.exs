@@ -82,13 +82,29 @@ defmodule StatifierBlocks.Core.MapTest do
       assert List.keyfind(findings, "chart", 0)
     end
 
-    # `collect` keeps the one grammar `assign_to` already has, refused with
-    # the same wording, because an author meeting it on a subchart and on a
-    # map is meeting one field (decision 4).
+    # `collect` reads the one grammar the other three `<assign location>`
+    # fields read - `Config.datamodel_path?/1`, through `AssignLocation` -
+    # refused with the same wording, because an author meeting it on a
+    # subchart and on a map is meeting one field (decision 4 as amended
+    # 2026-09-06).
     #
-    # sabotage: loosened the check to any non-empty string - the dotted
-    # value validates and the refusal assertion goes red (verified)
-    test "collect is optional, and a bare lowercase identifier when present" do
+    # sabotage: put `identifier?/1` back at the call site - the dotted
+    # value is refused again and the first assertion goes red (verified)
+    test "collect is optional, and a datamodel path when present" do
+      assert Map.validate_config(%{
+               "items" => "order.line_ids",
+               "chart" => "bdoc_LINE",
+               "collect" => "cards.batch"
+             }) == :ok
+
+      # The widening refuses nothing it accepted before: every bare
+      # lowercase identifier is already a datamodel path.
+      assert Map.validate_config(%{
+               "items" => "order.line_ids",
+               "chart" => "bdoc_LINE",
+               "collect" => "line_results"
+             }) == :ok
+
       assert Map.validate_config(%{"items" => "order.line_ids", "chart" => "bdoc_LINE"}) == :ok
 
       assert Map.validate_config(%{
@@ -101,11 +117,28 @@ defmodule StatifierBlocks.Core.MapTest do
                Map.validate_config(%{
                  "items" => "order.line_ids",
                  "chart" => "bdoc_LINE",
-                 "collect" => "order.results"
+                 "collect" => "order results"
                })
 
       assert {"collect", message} = List.keyfind(findings, "collect", 0)
-      assert message =~ "bare lowercase identifier"
+      assert message =~ "datamodel path"
+    end
+
+    # `validate_config/1` and `emit/2` read one rule, which is what
+    # `AssignLocation`'s two entry points are for: a value one accepts and
+    # the other refuses is the drift the helper exists to prevent, and it
+    # would only ever surface as an `emit/2` error on a config the author
+    # was told was fine. So the dotted path has to reach the emitted bytes,
+    # not merely survive validation.
+    #
+    # sabotage: left `emit/2`'s own `collect/1` on `identifier?/1` - the
+    # dotted config validates and then fails to compile, and this goes red
+    # (verified)
+    test "a dotted collect compiles, and the <assign> writes at the dotted path" do
+      scxml = compile!(order(collect: "cards.batch")).scxml
+
+      assert scxml =~ ~s(<param expr="'cards.batch'" name="collect"/>)
+      assert scxml =~ ~s(<assign expr="_event.data" location="cards.batch"/>)
     end
 
     # Decision 6: `quorum` is reserved by refusing everything outside the
@@ -529,7 +562,10 @@ defmodule StatifierBlocks.Core.MapTest do
         {:ok, nil} ->
           %{named | "on" => Keyword.get(opts, :on, "all")} |> Elixir.Map.delete("collect")
 
-        _otherwise ->
+        {:ok, location} ->
+          %{named | "on" => Keyword.get(opts, :on, "all"), "collect" => location}
+
+        :error ->
           %{named | "on" => Keyword.get(opts, :on, "all")}
       end
 
