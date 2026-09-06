@@ -708,3 +708,50 @@ descriptor, so "`core.map` over chunk descriptors" needs nothing from decision
 4's declaration surface that a descriptor list does not already satisfy.
 
 Filed with `sb-uxko`, campaign-031 ruling `D31-9`.
+
+---
+
+## Note (2026-09-06): decision 4, two of the four deferred fields are decided, and two stay deferred
+
+A dated Note rather than an amendment: decision 4's declaration surface is
+unchanged in what the module declares today, no line above is edited, and the
+2026-09-05 Note that deferred four fields keeps every word. What this Note
+records is that two of the four now have the record the earlier Note said each
+was owed, and that the other two are still deferred for reasons worth writing
+down.
+
+That Note deferred `item_as`, `index_as`, `max_concurrency` and `params`, said
+deferring was not dropping, and said each had "somewhere it would be decided".
+
+**`item_as` and `index_as` are decided in `ADR-0011` decision 11: kept, with
+the defaults `item` and `index`.** The somewhere turned out to be the typed
+environment. `ADR-0011`'s walk binds the two names **inside the fan-out body**,
+so a block in the body that reads `item` reads a path the environment holds,
+put there by the fan-out rather than by any block. Without them the body has no
+vocabulary for what it is iterating over, and a walk that cannot name the item
+cannot check a read inside a body at all. That record does not change what the
+handler passes a child; it names what the walk knows.
+
+**`max_concurrency` stays deferred**, on this record's own argument: campaign
+031's ruling on the fan-out runtime put the bound in the runtime as a
+configuration key and clamps a block-level hint below the queue limit, so a
+field here would be a hint to a runtime that already has the number.
+
+**`params` stays deferred**, with one reason added to the narrowness the
+earlier Note gave it: `ADR-0011` makes the values a handler reads path
+literals, so a `params` member sending literal values to every child would put
+two spellings of "what the child gets" into one declaration surface. That
+collision is worth deciding on purpose rather than by shipping.
+
+Neither is dropped. Dropping either is still a decision about this record's
+declaration surface and still this record's to make.
+
+Two further facts about this record that `ADR-0011` states and does not change.
+`collect` is typed there as `{:list, :unknown}` - a list, dense and in
+item-index order per decision 5 - because the shipped child recipe emits the
+outcome name and nothing else; whether a child chart may declare what its
+`donedata` carries is left as this record's open question, on decisions 5 and 6,
+and `sb-pg91` carries it. And `collect`'s bare-lowercase-identifier refusal is
+deliberately **not** reached by `ADR-0011` decision 13, which resolves only
+`core.subchart`'s `assign_to`; whether the two fields should agree is named
+there as a deferred question rather than answered.

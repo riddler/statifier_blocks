@@ -858,3 +858,43 @@ neighbours would be a marker nobody placed.
   it into the flow the ordinary seam and kind rules decide it, with the same
   findings and the same reasons they would have given if it had been dropped
   there directly.
+
+## Note (2026-09-06): ADR-0011 supersedes decisions 1, 2, 4, 5 and 6
+
+A dated note rather than an amendment, and a pointer rather than a decision:
+nothing in this record's text changes, no line above is edited, and every
+superseded decision keeps every word it has. The note exists because a reader
+who lands on decision 4 should find out here that a later record answers it,
+rather than after implementing it.
+
+`ADR-0011` records that every value a shipped block produces is written to a
+datamodel path by name, so the data-flow question is not a question about the
+sibling at `index - 1`. It replaces the seam with a pre-order walk carrying an
+environment from datamodel path to type, and it names the five decisions of
+this record it reaches, with their headings quoted, in its own "What this
+record supersedes, and what it leaves standing" section:
+
+- **decision 1**, the opaque string and string identity - superseded by
+  relocation: identity is still the rule and it is `sd-ADR-0001` decision 8's
+  rule, defined once in the package that owns the datamodel document.
+- **decision 2**, `io(config)`'s three keys as the whole declaration surface -
+  `kinds` and `slot_accepts` are untouched; `consumes` and `produces` become
+  sugar over a subject path, and the declaration surface for reads and writes
+  moves onto the field, as `{:path, %{expects: T}}` and `{:path, %{writes: T}}`.
+- **decision 4**, the seam and the walked inbound type - superseded by
+  replacement. The walk survives; what it carries does not.
+- **decision 5**, `:unknown` permissive in both positions - superseded by
+  relocation, for the same adoption-curve reason, as `sd-ADR-0001` decision 8's
+  first step.
+- **decision 6**, the host-supplied widening module - superseded by narrowing.
+  The module stays on the palette and its one-way property is kept and
+  strengthened: it now runs after record-into-shape coverage as well as after
+  identity, so the floor it cannot lower is a higher floor than it was.
+
+**Decisions 3, 7, 8 and 9 stand as accepted**, and so do both amendments
+above. Decision 3's kind tags are untouched in every clause. The 2026-08-29
+amendment's reason vocabulary keeps its five arms and gains a sixth,
+`:shape_not_satisfied`, in `ADR-0011` decision 8; decision 8's two finding
+tuples gain no member. The 2026-08-31 amendment's A2 - the data-flow walk does
+not enter the shelf - is carried forward verbatim in effect, with a parked
+fragment walked from an empty environment.

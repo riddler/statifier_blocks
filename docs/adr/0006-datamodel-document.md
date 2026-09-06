@@ -578,3 +578,38 @@ and the wire form does not read this document.
 - The record still reaches no engine. This is an authoring-time declaration of
   how a duration is written down for a reader, and the compiler does not read
   this document at all.
+
+## Note (2026-09-06): the document is `sd-ADR-0001`'s now, and it carries a `types` key, a `required?` field flag, and `date`
+
+A dated note rather than an amendment: nothing this record decides changes,
+no line above is edited, and the shape, the projection, decision 9's
+"advisory, never a gate" and every open question stand exactly as written.
+What the note records is that the document this record describes has been
+re-homed, and what the re-homed version adds.
+
+`statifier_datamodel`'s `sd-ADR-0001` carries this record's document forward
+into a package that depends on nothing in the family. Decision 3's two keys
+and three scopes, decision 5's scope semantics and event prefix, and decision
+6's projection are carried unchanged - that record states decision 6 as
+"verbatim in effect". Three things are new there, and `ADR-0011` in this
+repository is what consumes all three:
+
+- **A `types` key**, a list of named `record` and `shape` declarations with
+  ordered typed fields (`sd-ADR-0001` decision 5). A declaration carries
+  `name`, `kind`, `label`, `fields` and an optional `note`; a field carries
+  `name`, `type` and an optional `required?`, `label`, `note` and `one_of`.
+  `types` **contributes no paths** (`sd-ADR-0001` decision 7), so this record's
+  decision 6 projection is unchanged in what it returns for every document
+  written before the key existed and for every document written after.
+- **`required?` on a field**, a boolean defaulting to `false`, which is what
+  the record-into-shape coverage check in `sd-ADR-0001` decision 8 is decided
+  against.
+- **`date` in the scalar set**, making it nine where decision 4 above says
+  eight. It is a distinct type rather than a `datetime` because the expression
+  language distinguishes them, and the widening has the real member decision 4
+  asked for: a card's expiry month, a signup's date of birth, a settlement
+  date. Decision 4's floor is untouched - still no floats, `decimal` still a
+  string.
+
+`version` stays at `1` there, on this record's decision 8 reasoning: a
+consumer that ignores keys it does not know misreads nothing.

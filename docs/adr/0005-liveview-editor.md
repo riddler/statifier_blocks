@@ -6599,3 +6599,60 @@ author put it.
   found it.
 
 Filed with `sb-w2m1`, campaign-031's lane H.
+
+## Note (2026-09-06): decision 11 and the Datamodel tab carry the typed environment, and the "seven field types" count is stale
+
+A dated Note rather than an amendment, carrying two items. It records where
+something decided elsewhere renders here, and it corrects a count in a
+consequences bullet above. Nothing this record decides changes and no line
+above is edited.
+
+### 1. Where the typed environment lands
+
+`ADR-0011` replaces `ADR-0003`'s data-flow seam with a pre-order walk carrying
+an environment from datamodel path to type. Its decision 9 fixes what that
+environment makes available to an author, and says in as many words that how
+either surface is drawn stays this record's. The two places are:
+
+- **Findings carry the declared label.** A finding about a datamodel path
+  names the declaration's `label` - required on every entry and on every
+  `sd-ADR-0001` type declaration - rather than only the dotted path. This is
+  decision 11's message copy, not a new source and not a new severity.
+- **The Datamodel tab lists the environment at the selected block.** The
+  drawer's fifth package tab, `:datamodel` (the 2026-09-02 Note on decision 1A
+  above), is a read-only view over the datamodel document; it gains "what is
+  known here", the paths the environment holds at the selected block's
+  position with their types. It could not have answered that before, because
+  nothing computed a per-position answer.
+
+Two clauses of decision 11 are reached by `ADR-0011` and neither is rewritten.
+Clause **11e**'s `:info` advisory for a path outside the declared set keeps its
+severity, its wording, and the three sources 11k feeds it: `ADR-0011` decision
+5 rules that a read of a path the environment does not hold **stays** that
+`:info`, on 11f's own grounding argument that the advisory answers a claim
+somebody actually made. What is new is a second, different failure - an
+**unsatisfied read**, where a write and a read make claims that cannot both be
+true - and `ADR-0011` decision 5 gives that one the validation `:error`
+standing `ADR-0003` decision 8 gave `{:type_mismatch, ...}`. Clause **11n** and
+every other clause are untouched.
+
+One widening of an existing advisory follows and it is worth naming because it
+closes a gap this record's own layer had: `core.on_event`'s `capture` keys are
+datamodel paths that reached 11e's advisory through no field declaration, so
+paths a capture writes were invisible to the pass covering every other
+datamodel path. `ADR-0011` decision 10 makes a capture's target paths write
+signatures, which puts them in front of the same advisory by the same
+mechanism as every other path. `sb-sy0q` builds the two surfaces and `sb-xk1h`
+the capture control.
+
+### 2. The count in the 2026-09-05 duration amendment's consequences
+
+That amendment's consequences say, of `ADR-0002` decision 7's closed
+field-type set, that "`:duration` is still one of the seven field types and
+still holds a string" (`:5589`). The sentence's point - that the set is
+untouched by the duration change - is correct and unchanged. **The number is
+stale.** `ADR-0002`'s amendment of the same date added an eighth member,
+`{:path, opts}`, so the set has eight. Read the bullet as "one of the field
+types"; nothing else in it moves, and the line stays where it is because
+amending it in place would edit an accepted section to fix a count a dated
+Note can carry.
