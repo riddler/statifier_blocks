@@ -1117,3 +1117,68 @@ which is more information and not different information.
 Filed with `sb-jvz3`, against `ADR-0013` as merged (PR 319, `b90d40e`);
 campaign-SF035, from campaign-034's ruling `RQ-034-2`. `sb-nqfd` builds it,
 behind `sb-myt1`.
+
+## Note (2026-09-06): decision 1's walk now runs on a partially-configured document, and a block whose config was refused contributes nothing to it
+
+`RQ-SF035-2`, taken by the operator with the campaign-SF035 walk, changes
+when the compiler asks for this walk. Until now the Structure stage ran only
+after the Config stage had passed, so every block the walk met carried a
+config `validate_config/1` had accepted. From `sb-c9b6` the two stages report
+together (`ADR-0004`'s Note of this date amends decision 10's "first failing
+stage" sentence, which is where that sequencing was recorded), so this walk
+is now also asked about documents in which one or more blocks have a
+`:config` finding standing against them.
+
+Decision 1 is not restated by this. The walk is the same walk - pre-order,
+one pass, pure, last-write-wins by position, arms merged per decision 4, the
+shelf not entered - and the environment's inhabitants are the same four. What
+this Note adds is what such a block contributes to it, which decision 1 had
+no occasion to say because such a block could not reach the walk.
+
+**A block whose config the Config stage refused contributes nothing.** Its
+read signature is not checked and its write signature puts no entry, so the
+path it claimed to write holds whatever it held before the block. The walk
+continues past it: its siblings are walked in the same pre-order, its slots
+are still descended, and a child of it is treated on its own terms, because a
+child's config is its own and was accepted or refused on its own.
+
+The reason is decision 2's, read one step further. A write signature is not a
+property of a block type; it is read off the block's **config** - the path a
+`{:path, %{writes: t}}` field names and the type the declaration gives it.
+When that config is the one the compiler has just refused, the signature is
+derived from a value nobody has agreed is well-formed. Applying it would put
+an entry in the environment on the strength of a refused config, and the next
+block's read would then be checked - and quite possibly satisfied - against a
+type nobody declared. Decision 5 makes an unsatisfied read an `:error`, so
+that is not a cosmetic difference: it decides whether the document refuses.
+Leaving the entry out is the answer that says only what is known.
+
+Skipping is by **block id**, and it is an absence of one block's
+contribution rather than a shortened walk. The mechanism is a `:skip_blocks`
+key on the walk's context (`lib/statifier_blocks/environment.ex`, the
+`context/0` typedoc and `through/5`), which
+`StatifierBlocks.Assignability.validate/3` reads for the same set so that the
+findings it reports and the environment it reports them against agree. The
+key is caller-supplied and the compiler is the only caller that sets one; the
+editor's queries - `check/5`, `valid_targets/4`, `Environment.at/4` - pass no
+skip set and are unchanged in every particular.
+
+The property that keeps this from touching anything already shipped: for a
+document with no `:config` finding the skip set is empty, and an empty skip
+set makes every clause above a no-op. Such a document's environment, at
+every position, is the one decision 1 has always described. The compiler's
+byte corpus (`test/statifier_blocks/compiler/byte_corpus_test.exs`, still
+pinned to the 0.21.0 goldens) is green unchanged, which is that property
+cashed rather than asserted.
+
+Nothing in decisions 2 through 14 is amended. In particular decision 3's read
+check is untouched - the question of *whether* a held type satisfies an
+expected one is `sd-ADR-0001` decision 8's and this Note does not go near it;
+only the question of what the environment holds at a path is narrowed, and
+only for a block the compiler has already refused.
+
+Filed with `sb-c9b6`, campaign-SF035, from the walk's ruling `RQ-SF035-2`
+(which also folds `sb-lvh1`). `sb-myt1`'s amendment to decision 1 - the
+inline-shape arm of `type_expr()` - is a separate and later change to this
+same decision and does not interact with this one: one narrows what the walk
+carries for a refused block, the other widens what a type may spell.

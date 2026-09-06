@@ -1,7 +1,7 @@
 defmodule StatifierBlocks.Compiler.BothStageFindingsTest do
   @moduledoc """
   Config and Structure are reported together (RQ-SF035-2, and the dated
-  Notes of 2026-09-06 on ADR-0011 and ADR-0002).
+  Notes of 2026-09-06 on ADR-0004 decision 10 and ADR-0011 decision 1).
 
   Two claims, and both are needed. The first is the change: a `:config`
   finding on one card no longer hides an unsatisfied read on another, so the

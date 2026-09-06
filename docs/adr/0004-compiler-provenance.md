@@ -2677,3 +2677,107 @@ reason, unchanged.
 Filed with `sb-jvz3`, against `ADR-0013` as merged (PR 319, `b90d40e`);
 campaign-SF035, from campaign-034's ruling `RQ-034-2`. `sb-nqfd` builds the
 emission.
+
+## Note (2026-09-06): decision 10's "first failing stage" takes exactly one exception - Config and Structure report together
+
+`RQ-SF035-2`, taken by the operator with the campaign-SF035 walk and
+implemented by `sb-c9b6`, amends one sentence of decision 10. The sentence is
+"The pipeline stops at the first stage producing errors and reports every
+error from that stage", and the rule it states now holds everywhere except
+across the Config/Structure boundary: when the Config stage produces errors,
+the Structure stage still runs, and the refusal carries the **union** of what
+both found.
+
+### Why this record and not another
+
+The `sb-c9b6` brief named `ADR-0002` for this Note. That is a mis-cite and it
+is worth saying so here rather than leaving the correction to be re-derived:
+`ADR-0002` decision 10 is the outcome-name vocabulary, and `ADR-0002` decides
+what a block type declares rather than when the compiler consults it. The
+"first failing stage" rule is this record's decision 10, so this is where the
+amendment belongs.
+
+### What is amended, and what is not
+
+The stage table is unchanged: the same five stages produce the same errors,
+and Config and Structure keep the rows they have. What changes is only the
+sequencing between those two rows.
+
+Unchanged, and each for its own reason:
+
+- **Resolve still stops the pipeline.** Decision 10's cascade argument is
+  literally true there - a document with an unresolvable block type has no
+  module to ask for a config schema or a slot set, so neither later stage has
+  a question to put.
+- **Structure still stops the pipeline before Emit.** Emit reads a tree
+  Structure has agreed is well-formed, so an emit finding on a document
+  Structure refused is a consequence, which is exactly what decision 10
+  exists to keep out of an error panel. Chart and the stages after it are
+  likewise untouched.
+- **Within a stage every finding is still reported.** That clause is not
+  weakened; this Note extends its argument by one boundary rather than
+  replacing it.
+- **Every finding still names a block.** Decision 5's totality is what makes
+  the union renderable at all - two findings from two stages on two different
+  cards are two annotations, not a list an author has to read positionally.
+- **Refusal semantics are unchanged.** A document with a Config finding still
+  does not compile. It now says more about why.
+
+### Why the boundary moves here and nowhere else
+
+Decision 10's own justification is that a later stage's findings on a
+document an earlier stage refused are *consequences* rather than siblings.
+Config and Structure are the one adjacent pair for which that is false.
+Config reads config **values** - what `validate_config/1` says about them,
+what a declaration is missing, what a declared payload does not carry.
+Structure reads the **document** - slot counts, placement, and the reads and
+writes blocks declare along the walk. A mis-typed field on one card and an
+unsatisfied read on another are two independent statements about one
+document, in decision 10's own sense of the word: neither is derived from the
+other, and neither becomes true or false when the other is fixed.
+
+The cost of treating them as sequential is paid by whoever has to fix the
+document. A `:config` finding anywhere in a document hid every assignability
+finding everywhere in it, so an author fixed the config, recompiled, and only
+then discovered the typed refusal - one round trip per stage, on a surface
+whose whole purpose is to answer while the author is still looking at the
+card. The first production embedder cannot report a typed refusal in that
+state at all, which is the ruling's occasion.
+
+### The precondition the old sequencing bought, and how it is bought now
+
+Running Config first bought something every source in the Structure stage
+relied on without saying so: **only accepted config ever reached Structure**.
+That is not a fact about assignability alone. `SlotValidation` counts a
+block's children against the slot set `slots/1` derives from that block's
+config (`ADR-0002` decision 6); `StatifierBlocks.Shelf` places a block the
+config named; and a read or write signature is read off the config's path
+fields. All three consult the value Config just refused.
+
+So the precondition is bought again explicitly. A block Config refused is
+**skipped by id** for the whole Structure stage: it reports no structure
+finding of its own, and its declared writes leave no entry in the typed
+environment (`ADR-0011`'s Note of this date carries the walk-side half). The
+walk is not shortened - its siblings, its children and every other block are
+checked exactly as they would have been - so what this is, is an absence of
+one block's answers. A document with no `:config` finding has an empty skip
+set and is compiled by the pipeline it was always compiled by; the byte
+corpus is green unchanged.
+
+### What a consumer of the finding list sees
+
+One list may now carry findings from two stages at once, and therefore two of
+`ADR-0005` decision 11's `source` values - `:config` and `:assignability` -
+where before a refusal carried one. No value is added to that enum and no
+mapping changes: `11h`'s stage-to-source rule already answers per finding,
+and the adapter never promised a list was homogeneous. A surface that
+*groups* findings by source will render two groups where it rendered one,
+which is the intended result and the reason decision 5's per-block anchor
+matters. Document order over blocks is also unchanged - the union is sorted
+by the same pre-order rank, so a card's own findings stay together.
+
+Filed with `sb-c9b6`, campaign-SF035. Code:
+`lib/statifier_blocks/compiler.ex` (`compile/3`'s `with`,
+`config_and_structure_stages/4`, `structure_stage/4`); goldens in
+`test/statifier_blocks/compiler/both_stage_findings_test.exs`. Folds
+`sb-lvh1`, which asked this question from the reference embedder's document.
