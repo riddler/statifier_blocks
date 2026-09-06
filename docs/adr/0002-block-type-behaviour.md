@@ -4321,3 +4321,317 @@ merged. Read them at the right-hand column; the text above is not edited.
 
 P1's other cite, `compiler.ex:87` for the `:datamodel` option, is unmoved and
 reads as written.
+
+## Amendment (2026-09-06): `core.invoke` declares and classes `error`, a failure-classed final is unconditional, and an unhandled failure below the root reaches the root
+
+**Status: proposed (2026-09-06), on the operator's campaign-034 rulings
+`RQ-034-1` and `RQ-034-13`.** Drafted for `sb-ii2k`; it merges at proposed and
+flips to accepted in a separate change once `sb-hxs5` has the code on main.
+
+An amendment rather than a Note, because it changes what a shipped type
+declares and what the compiler emits, rather than only recording a callback
+that already existed. It is written by addition and edits nothing above this
+line: amendment A's `{name, label}` pairs, A2's refusal to marry an outcome to
+a slot, and the Note of this date that added the optional `failure_outcomes/1`
+all keep every word. Taken by the operator as campaign-034 ruling `RQ-034-1`,
+filed with `sb-ii2k`; the code is `sb-hxs5`.
+
+**The defect it answers.** `sb-napt` gave a block type the ability to say that
+one of its outcomes means *this block finished badly*, and gave the compiler
+one byte span to emit when a document's **root** block reaches such an
+outcome. Both halves work, and between them they reach almost no real
+document. A chunk chart in the reference embedder is a `core.sequence` around
+one `core.invoke`: the invoke is not the root, so the root emission never
+looks at it, and `core.invoke` classes nothing anyway - it declares no
+`outcomes/1` at all, so `BlockType.outcome_names/2` reads the default single
+`done` while `emit/2` mints an `error` outcome final beside it. The chart
+therefore cannot reach a failure-classed final by any authoring, and the host
+translation that `statifier_persistence`'s ADR-0008 amendment of 2026-09-06
+(`sp-n8g`, decision 6) exists to delete has nothing to be replaced by. Two
+things are missing: a declaration on the one type that calls something out to
+the world, and a rule for what a failure below the root does.
+
+### 1. `core.invoke` declares `done` and `error`
+
+`outcomes/1` returns `[{"done", "Done"}, {"error", "Error"}]`, fixed rather
+than config-derived - the same pair `StatifierBlocks.InvokeStep.outcomes/0`
+already returns for every host type built on it. Until now `core.invoke`
+exported no `outcomes/1`, so the resolver's default single `done` was the
+whole of its declaration while `emit/2` minted an `error` outcome final whose
+entry raises `done.outcome.<state id>.error`. A type that raises an outcome
+event it does not declare is the summary lie that `ADR-0004`'s outcome
+amendment of 2026-08-28 forbids in its clause 2e -
+a parent's child summary advertises the events the declaration names, and here
+one of the two raised events was in no summary.
+
+Two consequences, both wanted. The editor's outcome-event candidate list -
+which offers a `core.on_event` author the events a sibling block can raise, and
+which deliberately offers nothing for a type that implements no `outcomes/1` -
+gains two rows for every `core.invoke` in the document, `done` and `error`,
+where it previously offered none. And a parent may wire on
+`done.outcome.<invoke state id>.error` the way it may wire on any declared
+outcome, which is what section 4 below relies on.
+
+The `on_error` slot is unchanged: still one `zero_or_one` slot, still named for
+the failure path. A2's refusal stands - the slot and the outcome share a word
+here and are not thereby married, exactly as `core.subchart` and `core.map`
+have had both for longer.
+
+### 2. A failure-classed outcome's final is emitted whether or not its slot is occupied - in `core.invoke`, `core.map` and `core.subchart` alike
+
+Taken by the operator as campaign-034 ruling `RQ-034-13`, which extends this
+section from `core.invoke` alone to all three shipped types that class an
+outcome. The rule is one rule because the reason is one reason, and a rule
+that held for one of the three would leave sections 4 and 5 true of that one
+only.
+
+Today the failure half of the emission is all of one piece and all of it
+conditional, in each of the three:
+
+- `core.invoke` with `on_error` empty emits no failure transition, no child
+  and no `error` final, and the moduledoc's own sentence for that case is
+  "the error propagates as it does today", meaning
+  `error.communication.invoke` is selected by nothing this block emitted;
+- `core.map` with `on_error` empty does the same - `error_final/1` and
+  `failure_transition/1` each answer `[]` for an absent slot, and the
+  moduledoc says so in as many words, "exactly as `core.invoke` has it";
+- `core.subchart` with `on_error` empty emits no failure transition
+  (`failure_transition/1` finds no route carrying a child) and emits the
+  `error` final only when the **referenced chart's** own declared outcome
+  list happens to name `error`, which is the `routed? or child` filter in
+  `finals/1`. With the slot empty and `error` not among the child chart's
+  declared outcomes - the ordinary case, since this type appends `error`
+  itself rather than reading it from the author's list - the failure final is
+  absent.
+
+Those three sentences are superseded for the empty-slot case, and only for
+it. A failure-classed outcome's final is emitted always, because a declared
+outcome whose final is sometimes absent cannot be classed: the class is read
+off the final, and the only thing that raises
+`done.outcome.<state id>.<outcome>` - the event section 4's root catch
+selects - is that final's own `onentry`. With the slot empty the failure
+transition targets that final directly - the final whose id
+`Context.outcome_id(context, "error")` mints, which is the id each of the three
+types already uses for the occupied case. Today only `core.subchart` mints that
+id for an unoccupied route, because its `routes/2` asks for every declared
+outcome's id whatever the slot holds; `core.invoke`'s `error_parts/1` and
+`core.map`'s equivalent mint it only in the branch that has a child, and under
+this rule they mint it in both. With the slot occupied every byte is what it is
+today: the transition targets the child, and the child's own `done_event`
+carries it into the final.
+
+This is what makes section 5's per-container table true as written and
+section 4's rule reachable for all three types rather than for `core.invoke`
+alone; it is also what section 6 counts as a cost, on all three.
+
+An author who wants the old silence for a particular call, batch or child
+chart has the slot: an occupied `on_error` is section 4's definition of
+handling.
+
+### 3. `core.invoke` classes `error`, and so does every `InvokeStep` type by default
+
+`core.invoke` exports `failure_outcomes/1` returning `["error"]`. Reaching that
+outcome means the call did not succeed, which is what the outcome has always
+meant and what the `slot_style` `:failure` on `on_error` has always drawn.
+
+`StatifierBlocks.InvokeStep`'s `use` macro defines the same default for every
+host type built on it, beside the `outcomes/1` it already defines, and adds
+`failure_outcomes: 1` to the `defoverridable` list. A host type whose `error`
+is routine - a probe that reports "not found" through it, say - overrides it
+with `[]` or with its own list, in the same place it would override
+`outcomes/1`.
+
+**This narrows one sentence of the Note of this date above**, and it is worth
+saying which. That Note says a type that does not export the callback classes
+nothing, "so a host type written before the callback existed compiles to the
+bytes it compiled to". For a type built on `use StatifierBlocks.InvokeStep`
+that is no longer true: it now exports the callback by inheritance, so its
+`error` outcome is classed without its author writing anything. That is the
+intended reading of the ruling - a step that calls out to the world and comes
+back on `error` failed, and a host that disagrees says so in one line - but it
+is a change to a host's compiled bytes that the earlier Note's sentence did not
+anticipate, and section 6 counts it.
+
+### 4. The nested-to-root propagation rule
+
+**What handling means.** A failure-classed outcome of a block is **handled**
+when the block's own type declares an `on_<outcome>` slot for it and the
+document put a child in that slot. It is **unhandled** when the type declares
+no such slot, or declares it and the document left it empty. Nothing else in
+this package counts as handling it, because nothing else in this package looks
+at a child's outcome: `Emit.chain/2` wires a container's children on
+`done.state.<child>`, which fires for every final a child can reach, and no
+core container emits a transition selected by `done.outcome.<child>.<outcome>`.
+
+The reading is deliberately about the failing block rather than about the
+container above it. A container that runs a step and then runs the next one has
+not decided anything about how the step ended; the author who filled in "if it
+fails" has.
+
+**What the compiler emits.** Under `child_use: true` or `terminate: true` -
+the same gate the root completion finals already sit behind, and nothing at
+all outside it:
+
+1. Walk the resolved tree **below** the root block, in document pre-order.
+   Collect the pair `{state_id(block), outcome}` for every outcome in
+   `BlockType.failure_outcomes(module, config)` that is also in
+   `BlockType.outcome_names(module, config)` and is unhandled by the reading
+   above. A class naming an outcome the type does not declare contributes
+   nothing, which is the resolver's own posture toward a malformed return.
+2. If the collected set is empty, emit nothing. A document with no unhandled
+   failure-classed outcome below its root compiles to the bytes it compiles to
+   today.
+3. Otherwise emit **one** additional top-level `<final>`, sibling of the root
+   completion finals, its id minted from the root block's id under the role
+   `child_failed` or `root_failed` - the same two prefixes the completion
+   finals use, so a reader can tell which compile option produced it. Its
+   `<donedata>` carries the reserved `statifier_persistence:run_status` param
+   with the value `failed`, spelled exactly as the Note of this date spells it;
+   under `child_use: true` it carries the `outcome` param beside it, with the
+   value `error`.
+4. And emit, **on the root block's own state**, one `<transition>` per
+   collected pair in walk order: `event="done.outcome.<state id>.<outcome>"`,
+   `target` the single final from step 3, external. External because the point
+   is to leave the root state for a sibling final; the completion transitions
+   beside it are external for the same reason.
+
+Attribution follows `ADR-0004` decision 5 and `Emit.chain/2`'s rule rather
+than the completion finals': each transition is stamped to **the failing block**,
+because "what happens after the authorize step fails" is a fact about the
+authorize step, and the shared final is stamped to the root block, which is the
+only block the document's own ending is a fact about. The provenance map stays
+total over the added bytes.
+
+**Why it reaches the root before the container advances.** The two events are
+both on the internal queue and their order is fixed by the SCXML processor's
+own procedure: entering a `<final>` runs its `onentry` content - which is where
+`Emit.final/1` puts the `<raise>` of `done.outcome.<state id>.<outcome>` - and
+only then is `done.state.<parent>` generated. The internal queue is FIFO, so
+the outcome event is selected first. The root's transition exits the root
+state, `done.state.<parent>` is then selected by nothing, and the sequence
+never takes its step. This is the whole mechanism; there is no flag, no
+datamodel write, and nothing a container has to cooperate with.
+
+**Why an inner handler wins without the root knowing.** Transition selection
+walks outward from the atomic states, and a transition in a descendant
+pre-empts one in an ancestor for the same event. So a container that one day
+does route a child's outcome event - a `core.branch` on an outcome, say, if a
+later record decides to have one - pre-empts this catch by construction, and
+nothing here needs a rule for it. Today no container does, which is why the
+slot reading above is the whole of the definition rather than the first case of
+it.
+
+**Why one shared final rather than one per pair.** What a durable stepper reads
+is that the run failed; *which* block failed is in the trace and in the
+provenance map, at higher fidelity than a final id could carry. One final also
+keeps the added bytes proportional to "does this document have any unhandled
+failure at all" rather than to the number of blocks in it, and keeps the
+top-level shape a reader has to hold in their head at the size ADR-0004's root
+shape fixed it at.
+
+**Why `outcome` is `error` under `child_use`.** That compile option exists so a
+parent chart can branch on how the child chart ended, and the parent reads the
+child through `core.subchart`, which appends `error` to its outcomes whether or
+not the author listed it. `error` is therefore the one word a parent is
+guaranteed to have a route for, and reporting the nested block's own outcome
+name instead would put a name from inside the child chart into the parent's
+branch vocabulary - which is exactly what `core.subchart`'s declared outcome
+list exists to prevent.
+
+**Where the emission is recorded.** The compiled shape a document's root
+carries, its provenance and its byte determinism are `ADR-0004`'s, not this
+record's. This section fixes what the added bytes *are* and why, because that
+is a fact about outcomes and their classes; the reading of them as a root shape
+is Noted on `ADR-0004` by `sb-hxs5` when the code lands, exactly as the
+reserved failure param's was on 2026-09-06.
+
+**The root block itself is untouched.** The walk starts below it, and the
+completion finals it already emits for its own outcomes are unchanged,
+including when its own `on_<outcome>` slot is occupied. That asymmetry is on
+purpose: at the root the outcome *is* the document's answer, and a chart that
+ends on its failure-classed outcome reports failure whatever ran on the way
+out; below the root the outcome is not the document's answer, the document goes
+on, and an occupied slot is the author saying what going on means.
+
+### 5. Where each container leaves a failure, today
+
+Read down the second column for whether the container itself does anything
+about a child's failure-classed outcome, and the third for what a document sees.
+
+| Container and slot | Routes a child's failure-classed outcome? | What happens |
+|---|---|---|
+| `core.sequence` `body` | no - `Emit.ordered/2` chains on `done.state.<child>` | the root catch selects first; the sequence is exited mid-chain and its pending `done.state` is selected by nothing |
+| `core.group`, `core.resumable_group`, `core.drafts` bodies | no - the same `Emit.ordered/2` and `Emit.interruptible/2` chain | as `core.sequence` |
+| `core.branch` arms | no - an arm is chosen by its condition before the child runs, and the branch finishes on `done.state.<child>` | as `core.sequence`; the branch is exited from whichever arm was taken |
+| `core.parallel` regions | no | as `core.sequence`; the sibling regions are torn down with the root state, which is what leaving a `<parallel>` means |
+| `core.foreach` `body` | no | as `core.sequence`; the iteration stops where it is, mid-list |
+| `core.on_event` | it declares no outcome to class - `abandon` and `resume` are the interrupt protocol's events, not outcomes - and it routes none | nothing of its own; a failure inside the body it guards reaches the root exactly as it would anywhere else |
+| `core.invoke` `on_error` | **yes**, when occupied | occupied: the child runs and the block ends on `error`, the container advances, and nothing reaches the root. Empty: the root catch fires |
+| `core.subchart` `on_<outcome>` | **yes**, when `on_error` is occupied | occupied: the child runs and the block ends on `error`, and nothing reaches the root. Empty: the root catch fires, on section 2's unconditional final. The child chart's own run has already failed on its own root, which is how the `error` outcome was reached at all |
+| `core.map` `on_error` | **yes**, when occupied | occupied: the batch ends on `error` into the slot's child, and nothing reaches the root. Empty: the root catch fires, on section 2's unconditional final. The body is a separate chart document, so a failed *child of the batch* is data in `collect` (ADR-0009 decision 5) and is not a failure of this document; what the class is about is the batch ending on `error` |
+
+Every "the root catch fires" in the third column depends on section 2: before
+this amendment all three of the routing types emitted their failure final only
+when the slot was occupied, so with the slot empty there was no final, no
+`done.outcome.<state id>.<outcome>` and nothing for the root to select. Under
+the extended rule the final is there in every case, and the three rows read the
+same way as the six above them.
+
+The two chart-referencing types are where the rule composes: a nested failure
+in a child chart fails **that** document's run through this same rule at its own
+root, the durable stepper reads the reserved param, the invocation comes back
+as failed, and `core.map` or `core.subchart` takes its own `error` outcome -
+which is then either handled by its slot or caught by this rule one level up.
+There is no separate cross-document mechanism, and no document needs to know
+how deep it is.
+
+### 6. What this costs a host, and what it does not
+
+Five kinds of document compile to different bytes than they did at 0.21.0. The
+first three are section 2's and apply whatever the compile options are, because
+an outcome final is emitted by the block type rather than by the root pass; the
+last two are section 4's and section 3's and arrive only under `child_use:
+true` or `terminate: true`:
+
+- one containing a `core.invoke` whose `on_error` slot is **empty** - it gains
+  that block's `error` outcome final and the transition into it (section 2);
+- one containing a `core.map` whose `on_error` slot is **empty** - the same two
+  byte spans, on the same reason (section 2). A failed batch now ends the
+  block on `error` and, below the root, propagates, where before it was
+  selected by nothing;
+- one containing a `core.subchart` whose `on_error` slot is **empty** and whose
+  referenced chart does not itself declare `error` - the same again (section
+  2). A failed child chart now ends the block on `error` and, below the root,
+  propagates. Where the referenced chart *does* declare `error`, the final was
+  already emitted and only the transition into it is new;
+- one containing any unhandled failure-classed outcome below its root, under
+  the two compile options - it gains the shared failed final and one transition
+  per pair (section 4);
+- one containing a host type built on `use StatifierBlocks.InvokeStep`, on the
+  same counts, because that type is now classed by default (section 3).
+
+A document's content hash changes with its bytes, so such a document is a
+different chart revision under statifier-ex ADR-0052 - the same one-time cost
+the Note of this date already described for a root `core.map` or
+`core.subchart`. It is why 0.22.0 is a minor release carrying this record's
+Notes, and not a patch.
+
+Nothing else moves. Routing is unchanged: a failure-classed outcome is still
+reached from `done.outcome.<state id>.<outcome>` like any other, and a
+`core.branch` arm, an `on_<outcome>` slot and an editor connector still treat it
+exactly as they treat `done`. ADR-0011's typed environment reads nothing new and
+writes nothing new. No slot arity, no `slot_style`, no palette entry and no card
+changes. And no `<invoke>`, `<send>` or datamodel element is added anywhere: the
+whole of the addition is transitions and one final.
+
+**Decision 10's rows are not edited here**, in the posture every Note above this
+line takes - and they need no edit: the `core.invoke` row's `outcomes(config)`
+column has read `done` and `error` since the amendment of 2026-08-28 that wrote
+it. What changes from this date is not the row but the code beneath it, which
+now exports the `outcomes/1` the row has always described.
+
+Filed with `sb-ii2k`, campaign-034 rulings `RQ-034-1` and `RQ-034-13`. The code
+is `sb-hxs5`; this section merges at proposed and the record's own acceptance
+is the operator's, through `sb-ju4d`. The reference embedder's host-side
+translation comes out with `se-cqr`, against `statifier_persistence`'s ADR-0008
+amendment of 2026-09-06, decision 6.
