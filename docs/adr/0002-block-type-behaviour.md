@@ -3563,3 +3563,57 @@ row above. The rows say what the type itself declares.
 
 `sb-u7zt` declares these across `lib/statifier_blocks/core/` and pins each row
 by test; `sb-xk1h` is where a `core.*` row would first gain an `expects`.
+
+## Note (2026-09-06): the two `core.subchart` cites under G14 have drifted, and what they read today
+
+A dated Note rather than an amendment, recorded for `sb-50lu` under
+campaign-033. Nothing above this line is edited and no decision moves: this
+is a cite errata for the two `lib/statifier_blocks/core/subchart.ex` line
+ranges the Notes under G14 use as evidence. The claims those ranges support
+are unchanged and still hold; only the numbers naming them went stale, and
+the two functions the Notes point at are still `finals/1` and
+`outcome_names/1` in that module. The form is the one `statifier-ui`'s
+ADR-0016 amendment uses for a fact that moved after a record merged: say
+what the record says, say what is true now, and add rather than rewrite.
+
+### What the two Notes cite, and when each was true
+
+The Note added 2026-09-05 beneath G14d cites `outcome_names/1` at
+`lib/statifier_blocks/core/subchart.ex:463-467` and `finals/1` at
+`:448-453`. Both were true at `3fef9a8`, the commit that added that Note.
+
+The Note added 2026-09-06 beneath G14a cites `outcome_names/1` at `:516-521`
+and `finals/1` at `:500-505`. The first was true at `b7acfcf`, the commit
+that added it. The second was one line high at each end there: `finals/1`
+ran `:501-506`, so the range as written opened on the last line of the
+comment above the function and stopped one line short of its `end`. The two
+lines the claim rests on - the `Enum.filter` and the `Emit.final` it pipes
+into - sat at `:504` and `:505`, inside the range either way, so the claim
+held while the range naming it did not.
+
+### What they read on `main` today
+
+Read at `1cdcc9d`, and given `@spec` line through `end` line for both:
+
+| Function | Cited 2026-09-05 | Cited 2026-09-06 | On `main` today |
+|---|---|---|---|
+| `finals/1` | `:448-453` | `:500-505` | `lib/statifier_blocks/core/subchart.ex:518-523` |
+| `outcome_names/1` | `:463-467` | `:516-521` | `lib/statifier_blocks/core/subchart.ex:533-538` |
+
+Three commits moved them, none of which touched either function's body:
+`23d1455` and `0ae8c3f` between the two Notes, and `bbe55ac` after the
+second. `finals/1` still filters on `routed? or child` and maps
+`Emit.final/1` over what survives, and `outcome_names/1` still appends
+`error` unless the author listed it, which is what both Notes read off them.
+
+One inconsistency inside the 2026-09-05 cites is worth naming so this table
+is not read as correcting a fourth thing: `:448-453` spans `@spec` through
+`end`, while `:463-467` stops at the body's last line and leaves `end` out.
+The column above uses the first convention for both rather than preserving
+the difference.
+
+A line range is the citation form this record has used since G, and it ages
+against a file that moves. The durable half of each cite is the function
+name, which is why the ranges above are given beside `finals/1` and
+`outcome_names/1` rather than instead of them, and why a reader who finds a
+range that no longer lands should read the name and not the number.
