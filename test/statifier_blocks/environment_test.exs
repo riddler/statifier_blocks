@@ -763,6 +763,10 @@ defmodule StatifierBlocks.EnvironmentTest do
       refute Code.ensure_loaded?(StatifierBlocks.Coverage)
 
       # The read check that is used instead, named so a reader finds it.
+      # function_exported?/3 answers false for a module the VM has not loaded
+      # yet, so on a cold VM this pair passes only when some earlier test
+      # happened to load it. Load it here and the file stands on its own.
+      assert Code.ensure_loaded?(StatifierDatamodel.Types)
       assert function_exported?(StatifierDatamodel.Types, :satisfies, 3)
       assert function_exported?(StatifierDatamodel.Types, :satisfies?, 3)
     end
