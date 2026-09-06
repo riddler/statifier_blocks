@@ -3730,3 +3730,59 @@ is that record's amendment to make. The refusal's *shape* is now shared -
 `StatifierBlocks.Core.AssignLocation`, one blank-permissive check anchored
 on the field's own key per `ADR-0005` decision 11 - and only the rule and
 the wording differ. G15's sentence should be read as naming the shape.
+
+## Note (2026-09-06): G15's `collect` sentence, read against the four `<assign>` location fields as they now stand
+
+A dated Note rather than an amendment, and it edits nothing above this line.
+The Note immediately above already records that G15's sentence - a `collect`
+that is present and not a bare lowercase identifier is "refused in the same
+words `core.invoke` and `core.subchart` produce for `assign_to`" - should be
+read as naming the refusal's *shape*, and it records that as one consequence
+of `sb-r313` among several. This Note is the per-field table behind that
+reading, because the sentence's claim is scoped to four fields and three of
+them have moved since it was written, and it names the bead that owns the one
+question left open. It decides nothing.
+
+Four fields name the location of an `<assign>` this package emits. After
+`sb-xk1h` carried `ADR-0011` decision 13 to `core.subchart` and `sb-r313`
+carried its argument to `core.invoke` and to `StatifierBlocks.InvokeStep`,
+they stand like this on `main`:
+
+| Field | Declared as | Location rule | Refusal reads | Record that decides the grammar |
+|---|---|---|---|---|
+| `core.invoke`'s `assign_to` | `{:path, %{}}` (`core/invoke.ex:105`) | `StatifierBlocks.Core.Config.datamodel_path?/1` (`:138`, `:314`) | "must be a datamodel path, like cards.authorization" (`:75`) | `ADR-0011` decision 13's argument, carried here by `sb-r313` |
+| `StatifierBlocks.InvokeStep`'s `assign_to` | the host declares the field; the moduledoc example declares `{:path, %{}}` (`invoke_step.ex:20`) | `datamodel_path?/1` (`:301`, `:435`) | the same sentence (`:115`) | as above |
+| `core.subchart`'s `assign_to` | `{:path, %{}}` (`core/subchart.ex:260`) | `datamodel_path?/1` (`:307`, `:619`) | "must be a datamodel path, like eligibility.outcome" (`:316`) | `ADR-0011` decision 13 |
+| `core.map`'s `collect` | `{:path, %{writes: {:list, :unknown}}}` (`core/map.ex:264`) | `StatifierBlocks.Core.Config.identifier?/1` (`:318`, `:528`) | "must be a bare lowercase identifier, like answers" (`:205`) | `ADR-0009` decision 4 |
+
+So the sentence names three wordings where it once named one, and `collect`
+alone keeps the bare-identifier grammar. What all four share now is the
+refusal's shape, and it is written once: `StatifierBlocks.Core.AssignLocation`
+(`@moduledoc false`), `check/5` at `:39` for the `validate_config/1` pass and
+`location/4` at `:51` for the `emit/2` re-check. A blank value passes and
+emits nothing, a value the field's rule accepts passes, and anything else is
+one finding anchored on the field's own key, which is `ADR-0005` decision 11.
+The rule and the wording are arguments to that helper rather than properties
+of it, which is exactly what let three of the four move while the fourth
+stayed.
+
+Two readings of the G15 row above follow from that, and neither edits it. The
+row declares `collect` as `{:path, %{}}`; the `writes` key that row predates
+arrived with `ADR-0011`, the Note of 2026-09-06 on decision 7 records its
+arrival, and the Note of 2026-09-06 on decision 10 already carries `collect`,
+`{:list, :unknown}` in its writes table, which is the current reading of the
+declaration. And nothing else in G15 moved: the four-field census, the `on`
+default read through `core.parallel`'s G7a shape, and the "refuses nothing
+else, and in particular nothing about N" clause are all unaffected, because
+only the `assign_to` half of one sentence changed under them.
+
+**`collect` is now declared a path and refused as an identifier**, which is
+the candidates-versus-validation mismatch `ADR-0011` decision 13 called a
+defect either way round when it found it on `core.subchart`: the editor
+offers the host's declared dotted paths on a `{:path, opts}` field, and this
+field's rule refuses every one of them. Resolving it is an amendment to
+`ADR-0009` decision 4 - "There is no per-item path grammar and no dotted
+form" - on that record's own argument, and nobody has ruled it. `sb-h6qt`
+owns that question, with both directions named on it: widen `collect` to a
+dotted path, or narrow its declaration to match the grammar. This record
+takes neither, and G15 stands as written until that one is ruled.
