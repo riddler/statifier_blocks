@@ -18,8 +18,12 @@ defmodule StatifierBlocks.ViewModel do
   `build/3`'s third argument is a caller-supplied `[StatifierBlocks.Finding.t()]`.
   This module derives sources of its own, because decision 13
   puts resolution, migration and validation inside `ViewModel` rather than
-  upstream of it. The count grew with ADR-0005 clause 11o, which supersedes
-  the "exactly two" this moduledoc used to say:
+  upstream of it. There are **five** of them, listed below. The count grew
+  with ADR-0005 clause 11o, which superseded the "exactly two" this
+  moduledoc used to say, and again with clauses 11p to 11t, which gave a
+  host a whole-document rule of its own - so the number is stated here
+  rather than left to a reader to count, and the list beneath it is what it
+  counts:
 
     * `:resolution` - `Palette.resolve/2` failing on a block
       (`:unknown_block_type`, `:block_type_too_new`, `:migration_failed`),
@@ -33,13 +37,20 @@ defmodule StatifierBlocks.ViewModel do
       cardinality declaration" below.
     * `:lint` - a summary chip the presentation cap refused, anchored
       `{:block, id}`, severity `:warning`.
+    * `:lint` again, this time from a host's own whole-document rule - a
+      `StatifierBlocks.DocumentValidator` in the palette's `validators`
+      (ADR-0005 clauses 11p to 11t) - anchored wherever the rule says,
+      severity `:warning` unless the rule says otherwise. The rule says
+      where and what; this module stamps the source, which is what keeps a
+      host's rule distinguishable from a declared shape's `:config`.
 
-  `:assignability` and `:lint` findings are never produced here; their
-  producers live elsewhere - `StatifierBlocks.SlotValidation`
-  (palette-aware slot arity and undeclared-slot checks; landed under `sb-da9`,
-  was described here as "not yet built") and `Assignability.validate/3` for
-  the first, the compiler's invoke-type lint for the second - and this module
-  does not
+  `:assignability` findings are never produced here, and the two `:lint`
+  producers above are the only ones that are; the rest live elsewhere -
+  `StatifierBlocks.SlotValidation` (palette-aware slot arity and
+  undeclared-slot checks; landed under `sb-da9`, was described here as "not
+  yet built") and `Assignability.validate/3` for `:assignability`, the
+  compiler's invoke-type lint for a `:lint` this module has never derived -
+  and this module does not
   adapt `StatifierBlocks.Compiler.Finding` into `StatifierBlocks.Finding`
   to manufacture them. That adapter is a real, mechanical possibility
   (`Compiler.Finding` carries `block_id` and `config_key`, which map onto
@@ -147,7 +158,17 @@ defmodule StatifierBlocks.ViewModel do
   schema is a function of config (ADR-0002 decision 7), not a cache of one.
   """
 
-  alias StatifierBlocks.{Block, BlockType, CanonicalJson, Document, Finding, Palette, Shelf}
+  alias StatifierBlocks.{
+    Block,
+    BlockType,
+    CanonicalJson,
+    Document,
+    DocumentValidator,
+    Finding,
+    Palette,
+    Shelf
+  }
+
   alias StatifierBlocks.Core.Subchart
 
   defmodule Field do
@@ -413,7 +434,14 @@ defmodule StatifierBlocks.ViewModel do
 
   The `:lint` half is the summary chips the presentation cap refused
   (`StatifierBlocks.BlockType.summary_refusals/2`), one `:warning` per
-  refusal - the only derived finding here that is not an error.
+  refusal, and whatever the palette's `validators` return - the derived
+  findings that are not errors.
+
+  The document-level rules run after the per-block ones and before the
+  `findings` argument (ADR-0005 clause 11t): the palette's own `singleton`
+  declarations first, then each `StatifierBlocks.DocumentValidator` in the
+  palette's list order. A palette declaring neither has nothing to run and
+  builds exactly the view model it built before either existed.
   """
   @spec build(Document.t(), Palette.t(), [Finding.t()]) :: t()
   def build(%Document{} = document, %Palette{} = palette, findings) when is_list(findings) do
@@ -827,8 +855,106 @@ defmodule StatifierBlocks.ViewModel do
         end
       end)
 
-    per_block ++ singleton_findings(document, palette)
+    per_block ++ document_rule_findings(document, palette)
   end
+
+  # ADR-0005 clause 11t. The document-level rules, in one arm: the package's
+  # own `singleton` rule first, then the palette's validators in list order,
+  # and every one of them stating its findings in the same
+  # `StatifierBlocks.DocumentValidator.finding_spec/0` vocabulary through the
+  # same normalizer. There is one mechanism here rather than two - which is
+  # the point of running the declared rule on the seam the written ones use -
+  # and the source stamp is what separates them, because that is what the
+  # difference actually is: `:config` says a declared shape is not satisfied,
+  # `:lint` says the editor applied a rule (`11r`). Their severities differ
+  # for the same reason: a declared shape not being satisfied is decision
+  # 11's `:error`, and a host's rule cannot make a document not compile.
+  #
+  # `singleton` is not itself a `DocumentValidator`: the callback is handed
+  # the document and only the document (`11q`), and this rule reads the
+  # palette, which is where a host declared it.
+  @spec document_rule_findings(Document.t(), Palette.t()) :: [Finding.t()]
+  defp document_rule_findings(%Document{} = document, %Palette{} = palette) do
+    document
+    |> singleton_specs(palette)
+    |> normalize_specs(:config, :error)
+    |> Kernel.++(validator_findings(document, palette))
+  end
+
+  # Every validator runs, in the palette's list order, and a later one does
+  # not replace an earlier one - the list is not a lookup. The order is fixed
+  # by the palette rather than by a map's iteration for the reason
+  # `singleton_specs/2` sorts: a findings list whose order moved between
+  # builds would be a rendering that moved for no reason the author can see.
+  #
+  # A raise inside a host's callback is deliberately not rescued (`11r`):
+  # that is the host's bug, and swallowing it would hide it at the only
+  # moment it is visible.
+  @spec validator_findings(Document.t(), Palette.t()) :: [Finding.t()]
+  defp validator_findings(%Document{} = document, %Palette{validators: validators}) do
+    Enum.flat_map(validators, fn module ->
+      document |> module.validate_document() |> normalize_specs(:lint, :warning)
+    end)
+  end
+
+  # Decision 10's normalizer discipline, applied to a rule's return value
+  # (`11r`): a term that is not a list, and a member that is neither
+  # `{anchor, message}` nor `{anchor, message, opts}`, is read as NO finding.
+  # Nothing raises here and nothing is refused back at the caller. A
+  # `:severity` outside the enum falls back to the default for the same
+  # reason - it is a value this function did not recognise, and the finding
+  # it belongs to still says something true about the document.
+  @spec normalize_specs(term(), Finding.source(), Finding.severity()) :: [Finding.t()]
+  defp normalize_specs(specs, source, default_severity) when is_list(specs) do
+    Enum.flat_map(specs, &normalize_spec(&1, source, default_severity))
+  end
+
+  defp normalize_specs(_not_a_list, _source, _default_severity), do: []
+
+  @spec normalize_spec(term(), Finding.source(), Finding.severity()) :: [Finding.t()]
+  defp normalize_spec({anchor, message}, source, default_severity),
+    do: spec_finding(anchor, message, source, default_severity)
+
+  defp normalize_spec({anchor, message, opts}, source, default_severity) when is_list(opts) do
+    if Keyword.keyword?(opts) do
+      spec_finding(anchor, message, source, spec_severity(opts, default_severity))
+    else
+      []
+    end
+  end
+
+  defp normalize_spec(_other, _source, _default_severity), do: []
+
+  @severities [:error, :warning, :info]
+
+  @spec spec_severity(keyword(), Finding.severity()) :: Finding.severity()
+  defp spec_severity(opts, default_severity) do
+    case Keyword.get(opts, :severity, default_severity) do
+      severity when severity in @severities -> severity
+      _unrecognised -> default_severity
+    end
+  end
+
+  @spec spec_finding(term(), term(), Finding.source(), Finding.severity()) :: [Finding.t()]
+  defp spec_finding(anchor, message, source, severity) when is_binary(message) do
+    if anchor?(anchor) do
+      [Finding.new(anchor, source, message, severity: severity)]
+    else
+      []
+    end
+  end
+
+  defp spec_finding(_anchor, _message, _source, _severity), do: []
+
+  # The anchor enum decision 11 has and no fourth member (`11s`). An anchor
+  # naming an id the document does not hold is NOT checked here: `build/3`
+  # already splits those into `orphan_findings`, which is the existing safety
+  # net rather than a new refusal.
+  @spec anchor?(term()) :: boolean()
+  defp anchor?({:block, id}) when is_binary(id), do: true
+  defp anchor?({:slot, id, name}) when is_binary(id) and is_binary(name), do: true
+  defp anchor?({:config, id, key}) when is_binary(id) and is_binary(key), do: true
+  defp anchor?(_other), do: false
 
   # ADR-0005 clause 11o. The declarations come from the palette rather than
   # from the document, which is what makes the zero case expressible: a type
@@ -838,8 +964,8 @@ defmodule StatifierBlocks.ViewModel do
   # in the same order - `palette.types` is a map, and a finding list whose
   # order depended on map iteration would be a rendering that moved for no
   # reason the author can see.
-  @spec singleton_findings(Document.t(), Palette.t()) :: [Finding.t()]
-  defp singleton_findings(%Document{} = document, %Palette{types: types} = palette) do
+  @spec singleton_specs(Document.t(), Palette.t()) :: [DocumentValidator.finding_spec()]
+  defp singleton_specs(%Document{} = document, %Palette{types: types} = palette) do
     blocks = Document.blocks(document)
     head = head_of_root(document, palette)
 
@@ -848,37 +974,34 @@ defmodule StatifierBlocks.ViewModel do
     |> Enum.flat_map(fn {type_name, module} ->
       case BlockType.singleton(palette_entry_with_defaults(module, type_name)) do
         nil -> []
-        declared -> singleton_finding(document, blocks, type_name, module, declared, head)
+        declared -> singleton_spec(document, blocks, type_name, module, declared, head)
       end
     end)
   end
 
-  @spec singleton_finding(
+  @spec singleton_spec(
           Document.t(),
           [Block.t()],
           Block.type_name(),
           module(),
           BlockType.singleton(),
           {Block.slot_name() | nil, Block.t() | nil}
-        ) :: [Finding.t()]
-  defp singleton_finding(document, blocks, type_name, module, declared, head) do
+        ) :: [DocumentValidator.finding_spec()]
+  defp singleton_spec(document, blocks, type_name, module, declared, head) do
     label = singleton_label(module, type_name)
     anchor = {:block, document.root.id}
 
     case Enum.filter(blocks, &(&1.type == type_name)) do
       [] ->
-        [Finding.new(anchor, :config, "this document needs a #{label}, and holds none")]
+        [{anchor, "this document needs a #{label}, and holds none"}]
 
       [only] ->
-        misplaced_finding(document, anchor, label, declared, head, only)
+        misplaced_spec(document, anchor, label, declared, head, only)
 
       many ->
         [
-          Finding.new(
-            anchor,
-            :config,
-            "this document holds #{length(many)} #{label} blocks, and may hold exactly one"
-          )
+          {anchor,
+           "this document holds #{length(many)} #{label} blocks, and may hold exactly one"}
         ]
     end
   end
@@ -887,27 +1010,24 @@ defmodule StatifierBlocks.ViewModel do
   # position. The message names the slot it measured against, because a root
   # type declaring more than one slot leaves "the root's first slot"
   # ambiguous to everyone but this function.
-  @spec misplaced_finding(
+  @spec misplaced_spec(
           Document.t(),
           Finding.anchor(),
           String.t(),
           BlockType.singleton(),
           {Block.slot_name() | nil, Block.t() | nil},
           Block.t()
-        ) :: [Finding.t()]
-  defp misplaced_finding(_document, _anchor, _label, :anywhere, _head, _only), do: []
+        ) :: [DocumentValidator.finding_spec()]
+  defp misplaced_spec(_document, _anchor, _label, :anywhere, _head, _only), do: []
 
-  defp misplaced_finding(document, anchor, label, :head, {slot_name, head_block}, only) do
+  defp misplaced_spec(document, anchor, label, :head, {slot_name, head_block}, only) do
     if head_block && head_block.id == only.id do
       []
     else
       [
-        Finding.new(
-          anchor,
-          :config,
-          "a #{label} belongs first in #{slot_label(slot_name)}, " <>
-            "and this document's is #{where_is(document, only)}"
-        )
+        {anchor,
+         "a #{label} belongs first in #{slot_label(slot_name)}, " <>
+           "and this document's is #{where_is(document, only)}"}
       ]
     end
   end

@@ -1001,6 +1001,7 @@ the theme - rather than a callback the editor calls back into:
 | Seam | Declared on | What it does |
 |---|---|---|
 | `:assignability` | `Palette.new/2` (also `from_modules/2`) | the host's widening relation for "may this block land in this slot" - both gates, kind admission and data flow, run against the palette the caller passed. It runs last, after the datamodel document's own read check (ADR-0003 decision 6 as ADR-0011 decision 3 narrows it) |
+| `:validators` | `Palette.new/2` | the host's own whole-document rules: a list of `StatifierBlocks.DocumentValidator` modules, each handed the document as authored and answering `{anchor, message}` (optionally with `severity:`) for anything it objects to. Every module in the list runs, in list order; the package stamps the source `:lint` and defaults the severity to `:warning`, because a host's rule cannot make a document not compile. It is for the rules that are about the document rather than about one block - "a decision step must precede an act step" - which `validate_config/1` has no way to see (ADR-0005 `11p`-`11t`) |
 | `accent_token` | palette entry | the NAME of a `--sb-*` property, stamped on that type's cards and palette rows |
 | `badge` | palette entry | a short chip for the card header |
 | `join_label` | palette entry | a one-argument function of config, phrasing the join marker under a side-by-side arrangement |

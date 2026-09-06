@@ -46,6 +46,20 @@ defmodule StatifierBlocks.Palette do
   collide, because nothing resolves a name without knowing which map it is
   asking: a document's `type_name` is looked up in `types` and only there,
   and a palette browser entry carries which of the two it came from.
+
+  ## Validators, the list
+
+  A palette also carries **validators** (ADR-0005 clause `11p`): modules
+  behind `StatifierBlocks.DocumentValidator`, each stating one of the host's
+  own whole-document rules. They ride the palette for the reason
+  `assignability` and `recipes` do - it is already the value a host builds
+  and hands in, so a host declaring a rule adds a module to a value it was
+  building anyway, with no assign, no mount option and no editor callback
+  added.
+
+  They are a **list**, not a third map. Nothing resolves a validator by
+  name, so there is nothing to key on and nothing to collide: every module
+  in the list runs, in list order.
   """
 
   alias StatifierBlocks.{Block, Core}
@@ -56,10 +70,11 @@ defmodule StatifierBlocks.Palette do
   @type t :: %__MODULE__{
           types: %{optional(Block.type_name()) => module()},
           recipes: %{optional(recipe_name()) => module()},
-          assignability: module() | nil
+          assignability: module() | nil,
+          validators: [module()]
         }
 
-  defstruct types: %{}, recipes: %{}, assignability: nil
+  defstruct types: %{}, recipes: %{}, assignability: nil, validators: []
 
   @doc """
   Builds a palette from a `type_name => module` map. Defaults to an empty
@@ -75,13 +90,23 @@ defmodule StatifierBlocks.Palette do
       implementations (clause 1C). Defaults to `%{}`. It is a second map
       rather than a second kind of entry in the first, because the two names
       are two namespaces.
+    * `:validators` - a list of `StatifierBlocks.DocumentValidator`
+      implementations, the host's own whole-document rules (ADR-0005 clause
+      `11p`). Defaults to `[]`, and a palette that declares none pays
+      nothing: there are no modules to call and the view model is identical.
+      It is a **list rather than a map**, and ordered - there is no name to
+      key on, nothing resolves a validator by name, every module in it runs
+      in list order, and a later entry does not replace an earlier one. That
+      is deliberately not `types`/`recipes`' rule, because those are lookups
+      and this is not.
   """
   @spec new(%{optional(Block.type_name()) => module()}, keyword()) :: t()
   def new(types \\ %{}, opts \\ []) when is_map(types) do
     %__MODULE__{
       types: types,
       recipes: Keyword.get(opts, :recipes, %{}),
-      assignability: Keyword.get(opts, :assignability)
+      assignability: Keyword.get(opts, :assignability),
+      validators: Keyword.get(opts, :validators, [])
     }
   end
 
