@@ -3,7 +3,7 @@ defmodule StatifierBlocks.Core.EmitTest do
 
   alias StatifierBlocks.{Block, Compiler, Document, Emission, Palette}
   alias StatifierBlocks.Compiler.Context
-  alias StatifierBlocks.Core.{Emit, OnEvent}
+  alias StatifierBlocks.Core.{Branch, Emit, OnEvent}
   alias StatifierBlocks.CoreFixtures
 
   describe "the one convention (ADR-0004 decision 2)" do
@@ -133,6 +133,214 @@ defmodule StatifierBlocks.Core.EmitTest do
         )
 
       assert compile!(root, Palette.core()).scxml =~ ~s(<transition target="s_blk_BR__o_done"/>)
+    end
+  end
+
+  describe "core.branch's undecided slot (ADR-0012)" do
+    # The record's own worked shape, driven through the four-function
+    # surface. `accounts.current` is bound and holds no `limit`, which is
+    # the situation ADR-0012 decision 1 routes: predicator answers the
+    # comparison with its `:undefined` sentinel rather than a boolean, and
+    # at 0.20.0 that behaved exactly as `false`.
+    #
+    # sabotage: emit the guard transition *before* the arms rather than
+    # after -> the "over the limit" row lands in review instead of decline
+    # and this goes red (verified)
+    test "an undecided condition reaches the wired slot, and a decided one does not" do
+      assert leaf(wired_branch(), limit: 100) == "s_blk_DECLINE__waiting"
+      assert leaf(wired_branch(), limit: 500) == "s_blk_AUTHORIZE__waiting"
+      assert leaf(wired_branch(), limit: :absent) == "s_blk_REVIEW__waiting"
+    end
+
+    # Decision 3, asserted as behaviour rather than as bytes: the same
+    # undecided condition on a branch that leaves the slot empty goes where
+    # it went at 0.20.0.
+    #
+    # sabotage: emit the guard whenever the slot is *declared* rather than
+    # when it holds children -> the third row below lands in review and this
+    # goes red (verified)
+    test "an unwired slot leaves an undecided condition falling to otherwise" do
+      assert leaf(unwired_branch(), limit: 100) == "s_blk_DECLINE__waiting"
+      assert leaf(unwired_branch(), limit: 500) == "s_blk_AUTHORIZE__waiting"
+      assert leaf(unwired_branch(), limit: :absent) == "s_blk_AUTHORIZE__waiting"
+    end
+
+    # The byte half of decision 3. The literal below is what 0.20.0 emitted
+    # for this document, character for character, and the second assertion
+    # says the guard's own spelling appears nowhere in the chart.
+    #
+    # sabotage: append the `undecided` branch to `emit/2`'s list
+    # unconditionally -> an empty third branch mints a transition targeting
+    # the block's own `<final>` and the literal no longer matches (verified)
+    test "an unwired slot compiles to 0.20.0's bytes" do
+      scxml = compile!(unwired_branch(), Palette.core()).scxml
+
+      assert scxml =~
+               ~s|<state id="s_blk_BR__pick">| <>
+                 ~s|<transition cond="cards.credit_txn.amount &gt; accounts.current.limit" target="s_blk_DECLINE"/>| <>
+                 ~s|<transition target="s_blk_AUTHORIZE"/>| <>
+                 ~s|</state>|
+
+      refute scxml =~ "==="
+    end
+
+    # Decisions 4 and 5's emission, against the record's own worked XML.
+    # One transition, after every arm and before `otherwise`, spelled from
+    # the arm's source with `===` and parenthesized exactly once.
+    #
+    # sabotage: composed the conjuncts as `(ci) === true` rather than
+    # `=== false` -> the literal below no longer matches and the routing
+    # test above inverts with it (verified). The `=== false` spelling with
+    # the negation outside is what lets the arms keep the author's bytes,
+    # which is what the provenance spans are composed inside.
+    test "a wired slot adds exactly one guard transition, after the arms" do
+      scxml = compile!(wired_branch(), Palette.core()).scxml
+
+      assert scxml =~
+               ~s|<state id="s_blk_BR__pick">| <>
+                 ~s|<transition cond="cards.credit_txn.amount &gt; accounts.current.limit" target="s_blk_DECLINE"/>| <>
+                 ~s|<transition cond="not ((cards.credit_txn.amount &gt; accounts.current.limit) === false)" target="s_blk_REVIEW"/>| <>
+                 ~s|<transition target="s_blk_AUTHORIZE"/>| <>
+                 ~s|</state>|
+    end
+
+    # Decision 5's `cond_key` half: the arm's transition carries the key
+    # that routes an upstream expression error back to the field the author
+    # typed into, and the guard - which the type composed - carries none.
+    #
+    # sabotage: pass `cond_key: slot` on the guard branch too -> the guard's
+    # emission grows an owner and the second assertion goes red (verified)
+    test "the guard carries no cond_key and the arm still carries one" do
+      {:ok, emission} =
+        Branch.emit(
+          wired_branch(),
+          Context.new("blk_BR", "bdoc_T", %{
+            "arm_over_limit" => [Context.summary("blk_DECLINE")],
+            "otherwise" => [Context.summary("blk_AUTHORIZE")],
+            "undecided" => [Context.summary("blk_REVIEW")]
+          })
+        )
+
+      [arm, guard, otherwise] = pick_transitions(emission)
+
+      assert %Emission{attribute_owners: [{"cond", "arm_over_limit"}]} = arm
+      assert guard.attribute_owners == []
+      assert otherwise.attribute_owners == []
+    end
+
+    # Decision 5's last paragraph: "a branch with no well-formed arm emits
+    # no guard transition, because there is no condition that could go
+    # undecided". Wiring the slot on such a branch is the deferred advisory,
+    # not an emission this record invents.
+    #
+    # sabotage: fold `arm_conditions/1`'s empty case into the general one ->
+    # `not ()` is emitted, the upstream compile refuses the chart, and the
+    # first assertion goes red (verified)
+    test "a branch with no usable condition emits no guard at all" do
+      root =
+        Block.new("core.branch",
+          id: "blk_BR",
+          config: %{"arms" => []},
+          slots: %{
+            "otherwise" => [waiting("blk_AUTHORIZE")],
+            "undecided" => [waiting("blk_REVIEW")]
+          }
+        )
+
+      scxml = compile!(root, Palette.core()).scxml
+
+      assert {:ok, _machine} = Statifier.compile(scxml)
+      refute scxml =~ "==="
+    end
+
+    # An arm whose *root* the run left unbound is decision 1's erroring
+    # case, not its undecided one: the engine builds its evaluator with
+    # `on_unbound: :error` (`Statifier.Evaluator.context/1`), so the load
+    # errors, the guard evaluates the same source and fails the same way,
+    # and the block falls to `otherwise` - which is where that arm already
+    # sent it. See the Note of 2026-09-06 on ADR-0012.
+    #
+    # sabotage: none available in this package - the routing is the engine's
+    # policy. The assertion is a characterization of it, and it is here so
+    # that a future engine that relaxes the policy is caught by a red test
+    # rather than by a surprised author.
+    test "an arm whose root is unbound falls to otherwise even when the slot is wired" do
+      assert leaf(wired_branch(), limit: :no_root) == "s_blk_AUTHORIZE__waiting"
+    end
+
+    # The document of ADR-0012's worked shape, with the slot wired.
+    defp wired_branch do
+      branch_with(%{
+        "arm_over_limit" => [waiting("blk_DECLINE")],
+        "otherwise" => [waiting("blk_AUTHORIZE")],
+        "undecided" => [waiting("blk_REVIEW")]
+      })
+    end
+
+    # The same document at 0.20.0: the slot is declared by `slots/1` and
+    # holds nothing.
+    defp unwired_branch do
+      branch_with(%{
+        "arm_over_limit" => [waiting("blk_DECLINE")],
+        "otherwise" => [waiting("blk_AUTHORIZE")]
+      })
+    end
+
+    defp branch_with(slots) do
+      Block.new("core.branch",
+        id: "blk_BR",
+        config: %{
+          "arms" => [
+            %{
+              "slot" => "arm_over_limit",
+              "cond" => "cards.credit_txn.amount > accounts.current.limit"
+            }
+          ]
+        },
+        slots: slots
+      )
+    end
+
+    # The one active leaf after initializing the compiled chart with a
+    # datamodel built from `limit`. Every destination is a `core.wait`, so
+    # the leaf names the path the chart took rather than the block's own
+    # `<final>`, which all three paths reach.
+    #
+    #   * an integer - the comparison decides;
+    #   * `:absent` - `accounts.current` is bound and holds no `limit`, so
+    #     the comparison is undecided;
+    #   * `:no_root` - `accounts` itself is unbound, which the engine's
+    #     `on_unbound: :error` makes an error rather than the sentinel.
+    defp leaf(root, limit: limit) do
+      accounts =
+        case limit do
+          :no_root -> %{}
+          :absent -> %{"accounts" => %{"current" => %{}}}
+          value -> %{"accounts" => %{"current" => %{"limit" => value}}}
+        end
+
+      datamodel = Map.merge(%{"cards" => %{"credit_txn" => %{"amount" => 120}}}, accounts)
+
+      {machine_state, _effects} = run(root, datamodel: datamodel)
+
+      machine_state |> Statifier.active_leaf_states() |> Enum.sort() |> hd()
+    end
+
+    # The `pick` state's own transitions, read out of the emission tree
+    # rather than the serialized string, which is the only place
+    # `attribute_owners` survives. They are the children of the one child
+    # element of the block's state that carries transitions of its own.
+    defp pick_transitions(%Emission{children: children}) do
+      %Emission{children: picks} =
+        Enum.find(children, fn
+          %Emission{name: "state", attributes: attributes} ->
+            {"id", "s_blk_BR__pick"} in attributes
+
+          _other ->
+            false
+        end)
+
+      picks
     end
   end
 

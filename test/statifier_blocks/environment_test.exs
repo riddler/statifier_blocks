@@ -261,6 +261,39 @@ defmodule StatifierBlocks.EnvironmentTest do
       assert Map.get(env, "cards.only_here") == :unknown
       assert Map.get(env, "cards.elsewhere") == :unknown
     end
+
+    # ADR-0012 decision 8, which is ADR-0011 decision 4 applied to the new
+    # slot rather than a rule of its own: the `undecided` slot is one of the
+    # branch's arms, so it starts from the environment that reached the
+    # branch, with nothing added and nothing removed. A condition that did
+    # not decide says nothing about what any path holds.
+    #
+    # sabotage: gave `slot_start/4` a clause blanking every entry for a slot
+    # named `undecided` -> this goes red (verified). That clause is exactly
+    # the temptation decision 8 exists to refuse: the walk has learned that
+    # a condition could not be decided, and spelling that as a type would
+    # cost the slot's children every check the arms keep.
+    test "the undecided slot starts from the branch's inbound environment" do
+      branch =
+        Block.new("core.branch",
+          id: "blk_BR",
+          config: %{"arms" => [%{"slot" => "arm_receipt", "cond" => "true"}]},
+          slots: %{
+            "arm_receipt" => [assign("blk_RCP", "cards.receipt")],
+            "undecided" => [assign("blk_REV", "cards.review")]
+          }
+        )
+
+      document = document([open(), branch, settle("blk_STL")])
+
+      inbound = Environment.at(palette(), document, {"blk_ROOT", "body", 1}, ctx())
+      at_arm = Environment.at(palette(), document, {"blk_BR", "arm_receipt", 0}, ctx())
+      at_undecided = Environment.at(palette(), document, {"blk_BR", "undecided", 0}, ctx())
+
+      assert at_undecided == inbound
+      assert at_undecided == at_arm
+      assert Map.get(at_undecided, @subject) == "cards.credit_txn"
+    end
   end
 
   describe "a fan-out binds its item inside the body" do

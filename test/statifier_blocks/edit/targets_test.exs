@@ -136,15 +136,21 @@ defmodule StatifierBlocks.Edit.TargetsTest do
       # otherwise: `core.resumable_group`'s `interrupts` slot declares
       # `slot_accepts: %{"interrupts" => [:interrupt_handler]}}`, `:step`
       # does not intersect `[:interrupt_handler]`, and the slot is
-      # correctly dark. Six slots, not seven - the ADR's own conditional
-      # language already predicts this, and this assertion is against the
-      # real, executable relation rather than the illustration.
+      # correctly dark. The `core.branch` half of the set gained
+      # `{"blk_BR", "undecided"}` with ADR-0012: a third declared slot on
+      # the branch is a third droppable one, since the relation reads
+      # `slots/1` and this slot accepts what the arms accept. Six of the
+      # ADR's seven, plus that one - the ADR's own conditional language
+      # already predicts the missing `interrupts`, and this assertion is
+      # against the real, executable relation rather than the
+      # illustration.
       assert MapSet.new(result) ==
                MapSet.new([
                  {"blk_ROOT", "body"},
                  {"blk_GRP", "body"},
                  {"blk_BR", "arm_approved"},
                  {"blk_BR", "otherwise"},
+                 {"blk_BR", "undecided"},
                  {"blk_PAR", "lane_capture"},
                  {"blk_PAR", "lane_receipt"}
                ])

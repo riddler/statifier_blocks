@@ -1,22 +1,43 @@
 defmodule StatifierBlocks.Core.Branch do
   @moduledoc """
   `core.branch`: one slot per condition arm, plus `otherwise` (ADR-0002
-  decision 10).
+  decision 10) and `undecided` (ADR-0012 decision 2).
 
   The config-parameterized case ADR-0001 decision 5 exists for. `config`
   carries an ordered `"arms"` list, each arm a `%{"slot" => name, "cond" =>
   expression}` pair, and `slots/1` returns one slot per arm in that order
-  followed by `otherwise`:
+  followed by `otherwise` and `undecided`:
 
       config = %{"arms" => [%{"slot" => "arm_approved", "cond" => "budget_remaining > amount"}]}
 
       slots(config)
       #=> [{"arm_approved", :at_least_one, ~s(When "approved")},
-      #=>  {"otherwise", :any, "Otherwise"}]
+      #=>  {"otherwise", :any, "Otherwise"},
+      #=>  {"undecided", :any, "Cannot be decided"}]
+
+  ## The third slot is the reading, not a third destination
+
+  A predicator condition has three readings and the compiled chart used to
+  have two destinations. A comparison against an operand it cannot compare
+  - an unbound datamodel path being the ordinary case - produces neither
+  `true` nor `false` but predicator's `:undefined` sentinel, which the
+  engine turns into "the transition is not taken, plus one
+  `error.execution`". So an undecided condition behaved exactly as a false
+  one. ADR-0012 gives that reading a slot of its own, and the whole of the
+  compiled difference is one synthesized guard transition - see `emit/2`.
+
+  Wiring is what turns the difference on: a branch that leaves `undecided`
+  empty compiles to the bytes it compiled to at 0.20.0, `error.execution`
+  included (ADR-0012 decision 3).
 
   Three details worth naming, because each is a place a reader would
   reasonably guess the other way:
 
+    * **`undecided` is a slot, not an outcome.** `outcomes/1` is
+      untouched: `slots/1` says where children live and `outcomes/1` says
+      how finishing can differ (ADR-0002 amendment A2). An undecided
+      condition changes which children run; it does not change how the
+      branch finishes.
     * **An arm stores its whole slot name**, `"arm_approved"`, not the
       suffix. ADR-0002 decision 10's table says "slot suffix"; the ADR-0001
       worked example stores the full name, and the stored bytes are what
@@ -62,18 +83,25 @@ defmodule StatifierBlocks.Core.Branch do
   def current_version, do: 1
 
   @doc """
-  One slot per well-formed arm, in config order, then `otherwise`.
+  One slot per well-formed arm, in config order, then `otherwise`, then
+  `undecided`.
 
   Total for any config, including config `validate_config/1` rejects:
   malformed arms are skipped rather than raised on, which is what keeps
   ADR-0002 decision 6's stability rule true while an author is mid-edit.
+
+  `undecided` is ADR-0012 decision 2: a slot rather than an outcome,
+  `:any` for the same reason `otherwise` is, and labelled
+  `"Cannot be decided"` because that label is the whole of the
+  explanation an author gets in the editor. It cannot collide with an
+  arm, whose slot name must match `arm_[a-z][a-z0-9_]*`.
   """
   @impl true
   def slots(config) do
     arm_slots =
       Enum.map(arms(config), fn %{"slot" => slot} -> {slot, :at_least_one, arm_label(slot)} end)
 
-    arm_slots ++ [{"otherwise", :any, "Otherwise"}]
+    arm_slots ++ [{"otherwise", :any, "Otherwise"}, {"undecided", :any, "Cannot be decided"}]
   end
 
   @doc """
@@ -170,6 +198,17 @@ defmodule StatifierBlocks.Core.Branch do
   arms through, so a malformed arm an author is mid-edit on is not
   counted and the card agrees with the slot list.
 
+  `undecided` is not named here, in either direction. ADR-0012 decision 9
+  asks for `"1 arm + otherwise + undecided"` on a branch that **wires**
+  the slot, and this callback cannot answer that: `@callback
+  summary(Block.config())` is handed the config alone
+  (`lib/statifier_blocks/block_type.ex:573`), and whether a slot holds
+  children is a fact about the block's `slots` map rather than its
+  config. Widening the callback to see the block is a contract change no
+  record has asked for, so the card reads exactly as it did at 0.20.0 -
+  which is decision 9's own answer for every unwired branch, and an
+  under-report by one for a wired one.
+
       iex> StatifierBlocks.Core.Branch.summary(%{"arms" => [%{"slot" => "arm_approved", "cond" => "x"}]})
       "1 arm + otherwise"
 
@@ -242,6 +281,39 @@ defmodule StatifierBlocks.Core.Branch do
   every arm's last step transitions to the block's own `<final>`, so a
   branch is done when whichever arm it took is done. An empty `otherwise`
   transitions there directly.
+
+  ## The `undecided` guard, when the slot is wired
+
+  A branch whose `undecided` slot holds at least one child emits **one**
+  extra transition, and it sits after every arm and before `otherwise`
+  (ADR-0012 decision 4). Its condition is composed from the arms' own
+  sources:
+
+      not ((c1) === false and (c2) === false and ... and (cn) === false)
+
+  Strict equality is the one comparison predicator answers with a boolean
+  when handed its `:undefined` sentinel, so each conjunct is `true`
+  exactly when that arm decided `false`, and the negation is `true`
+  exactly when at least one arm did not decide (ADR-0012 decision 5).
+  Ordering is what keeps the guard that simple: by the time it is reached
+  no arm decided `true`, so "some arm was undecided" is all that is left
+  to test, and an earlier undecided arm never shadows a later decided one
+  (decision 6).
+
+  Two things the guard deliberately does not do. It does not rewrite the
+  arms' own transitions into `(ci) === true`, because a prefix on the
+  author's source would offset every provenance span composed inside it;
+  the arms keep the author's bytes. And it carries **no `cond_key`**,
+  because it is the type's composition rather than an author's
+  `:expression` field - a typo in `ci` surfaces on that arm's own
+  transition, which does carry the key.
+
+  An arm that *errors* rather than going undecided makes the guard error
+  the same way, so the guard is not taken and the block falls to
+  `otherwise` - which is where that arm already sent it. Wiring the slot
+  therefore adds a second `error.execution` for such an arm and routes
+  nothing differently (ADR-0012 decisions 5 and 7). A branch with no
+  usable condition emits no guard at all.
   """
   @impl true
   def emit(%Block{config: config}, context) do
@@ -249,7 +321,9 @@ defmodule StatifierBlocks.Core.Branch do
 
     with {:ok, pick} <- Context.role_id(context, "pick") do
       branches =
-        arm_branches(config, context) ++ [{nil, nil, Context.children(context, "otherwise")}]
+        arm_branches(config, context) ++
+          guard_branch(config, Context.children(context, "undecided")) ++
+          [{nil, nil, Context.children(context, "otherwise")}]
 
       picks =
         Enum.map(branches, fn {condition, key, children} ->
@@ -282,6 +356,50 @@ defmodule StatifierBlocks.Core.Branch do
     Enum.map(arms(config), fn %{"slot" => slot} = arm ->
       {Map.get(arm, "cond"), slot, Context.children(context, slot)}
     end)
+  end
+
+  # `[]` or the one guard branch of ADR-0012 decisions 4 and 5, in the
+  # same `{cond, config key, children}` shape the arms use so it takes its
+  # place in the emission by position alone.
+  #
+  # Two conditions have to hold before a guard is emitted, and each maps to
+  # a sentence in the record. The slot has to be **wired**, because an
+  # unwired one compiles to 0.20.0's bytes (decision 3). And there has to be
+  # at least one condition that could go undecided: "a branch with no
+  # well-formed arm emits no guard transition" (decision 5).
+  #
+  # The `key` is `nil`, which is `Emit.transition/2`'s rule for a condition
+  # the type composed rather than one the author typed.
+  defp guard_branch(_config, []), do: []
+
+  defp guard_branch(config, children) do
+    case arm_conditions(config) do
+      [] ->
+        []
+
+      conditions ->
+        conjunction = Enum.map_join(conditions, " and ", &"(#{&1}) === false")
+        [{"not (#{conjunction})", nil, children}]
+    end
+  end
+
+  # The arms' conditions, in config order, read through the same filter
+  # `slots/1` and `arm_branches/2` read arms through, and then narrowed to
+  # the arms that actually carry a condition.
+  #
+  # That second step is forced rather than chosen: `arms/1` admits an arm
+  # whose `"cond"` is missing or blank - `validate_config/1` reports it, but
+  # `slots/1` may not raise on config an author is mid-edit on - and such an
+  # arm compiles to an *unconditional* transition ahead of the guard, which
+  # makes the guard unreachable anyway. Splicing its empty source into the
+  # conjunction would emit `(() === false)` and fail the whole document's
+  # upstream compile, so a branch mid-edit would take the rest of the
+  # document down with it.
+  defp arm_conditions(config) do
+    config
+    |> arms()
+    |> Enum.map(&Map.get(&1, "cond"))
+    |> Enum.filter(&Config.non_empty_string?/1)
   end
 
   defp entry([], done), do: done

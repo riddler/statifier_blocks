@@ -3786,3 +3786,45 @@ form" - on that record's own argument, and nobody has ruled it. `sb-h6qt`
 owns that question, with both directions named on it: widen `collect` to a
 dotted path, or narrow its declaration to match the grammar. This record
 takes neither, and G15 stands as written until that one is ruled.
+
+## Note (2026-09-06): `core.branch` declares a third slot on `main`, and the three rows that describe its slots and its card
+
+A dated Note rather than an amendment, and it edits nothing above this line.
+It decides nothing and it is **not** the amendment `ADR-0012` names: that
+record is proposed, and it says in its own words that the rows below "are not
+edited here". This Note records what the code does today, so that a reader who
+finds a row and the code disagreeing is reading a dated entry rather than
+making a discovery.
+
+`sb-2hoh` built `ADR-0012`'s decision 2. `StatifierBlocks.Core.Branch.slots/1`
+now returns the arm slots in config order, then `{"otherwise", :any,
+"Otherwise"}`, then `{"undecided", :any, "Cannot be decided"}`
+(`lib/statifier_blocks/core/branch.ex`). `outcomes/1`, `slot_style`,
+`config_schema/1` and `validate_config/1` are untouched, so every other row in
+this record that describes `core.branch` still reads correctly.
+
+Three rows describe the slots and the card, and each is now a row about a
+branch with one slot fewer than the type declares:
+
+- decision 10's vocabulary row, "one `arm_*` per declared arm, then
+  `{"otherwise", :any, ...}`" (`:341`) - true of the arms and of `otherwise`,
+  silent about the third slot;
+- amendment H's summary row, "`N arms + otherwise`" (`:1883`) - still exactly
+  what `summary/1` returns, and `ADR-0012` decision 9 asked for
+  `"+ undecided"` on a branch that wires the slot. The callback is handed the
+  config alone (`@callback summary(Block.config())`, `:573` of
+  `lib/statifier_blocks/block_type.ex`), and whether a slot holds children is
+  a fact about the block rather than its config, so the wired case is not
+  reachable without widening the callback. `sb-2hoh` left the card as it was
+  and said so in `summary/1`'s own doc; widening the contract is nobody's
+  decision yet;
+- the Note of 2026-09-06's environment table row, "one arm slot per declared
+  arm, then `otherwise`, merged per path" (`:3528`) - the merge rule it states
+  is unchanged and now covers one more slot. `ADR-0011` decision 4 already
+  says why: every slot of a container starts from the environment that
+  reached the container, and `ADR-0012` decision 8 names the new slot as one
+  of those arms rather than adding a rule.
+
+Nothing here is a decision about how those rows should eventually read. That
+is the amendment `ADR-0012`'s own closing section reserves for its
+acceptance, and it stays reserved.

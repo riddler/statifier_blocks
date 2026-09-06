@@ -353,7 +353,9 @@ defmodule StatifierBlocks.Runtime.FixtureRuns do
   #     `:not_comparable` - arms are `:at_least_one` and `otherwise` is
   #     `:any`, so at most one slot is ever empty in a valid document, and
   #     seeing more than one here means the block is not the single-empty-arm
-  #     shape this inference is sound for.
+  #     shape this inference is sound for. `core.branch`'s `undecided` slot
+  #     is excluded from the count when it is empty, for the reason
+  #     `candidate_empty_slot?/2` gives.
   #   * the block's own id is not entered -> `:unreached`. The chart never
   #     got to this block with this row's datamodel.
   @spec taken_slot(ViewModel.Node.t(), MapSet.t(StatifierBlocks.Block.id())) ::
@@ -366,11 +368,11 @@ defmodule StatifierBlocks.Runtime.FixtureRuns do
   end
 
   defp taken_slot_by_elimination(
-         %ViewModel.Node{block_id: block_id, slots: slots},
+         %ViewModel.Node{block_id: block_id, slots: slots} = node,
          entered_block_ids
        ) do
     if MapSet.member?(entered_block_ids, block_id) do
-      case Enum.filter(slots, &(&1.children == [])) do
+      case Enum.filter(slots, &(&1.children == [] and candidate_empty_slot?(node, &1))) do
         [%ViewModel.Slot{name: name}] ->
           {:ok, name}
 
@@ -381,6 +383,27 @@ defmodule StatifierBlocks.Runtime.FixtureRuns do
       :unreached
     end
   end
+
+  # Whether an empty slot is a destination the emission could have taken,
+  # and so a candidate for the elimination above.
+  #
+  # Every empty slot is one, with a single exception. `core.branch`'s
+  # `undecided` slot emits **no transition at all** while it holds no
+  # children (ADR-0012 decision 3): an undecided condition then falls to
+  # `otherwise` exactly as it did at 0.20.0, and decision 9 names the empty
+  # slot in those words - "not a path out of the block". Counting it would
+  # make every branch with an empty `otherwise` - the shape this inference
+  # exists for - read `:ambiguous_empty_slots` instead.
+  #
+  # A **wired** `undecided` slot is not empty, so it never reaches here: it
+  # holds children, and the walk above finds it the ordinary way.
+  @spec candidate_empty_slot?(ViewModel.Node.t(), ViewModel.Slot.t()) :: boolean()
+  defp candidate_empty_slot?(%ViewModel.Node{type: "core.branch"}, %ViewModel.Slot{
+         name: "undecided"
+       }),
+       do: false
+
+  defp candidate_empty_slot?(_node, _slot), do: true
 
   @spec slot_entered?(ViewModel.Slot.t(), MapSet.t(StatifierBlocks.Block.id())) :: boolean()
   defp slot_entered?(%ViewModel.Slot{children: children}, entered_block_ids) do

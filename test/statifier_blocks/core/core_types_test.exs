@@ -278,15 +278,19 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
     }
 
     # Sabotage: appended `otherwise` before the arms - red on slot order,
-    # which is the order the editor renders arms in.
-    test "derives one at-least-one slot per arm, in config order, then otherwise" do
+    # which is the order the editor renders arms in. A second mutation
+    # appending `undecided` before `otherwise` is red the same way, and
+    # ADR-0012 decision 4's ordering is what that guards.
+    test "derives one slot per arm, in config order, then otherwise, then undecided" do
       assert Core.Branch.slots(@arms) == [
                {"arm_approved", :at_least_one, ~s(When "approved")},
                {"arm_review", :at_least_one, ~s(When "review")},
-               {"otherwise", :any, "Otherwise"}
+               {"otherwise", :any, "Otherwise"},
+               {"undecided", :any, "Cannot be decided"}
              ]
 
-      assert Core.Branch.slots(%{}) == [{"otherwise", :any, "Otherwise"}]
+      assert Core.Branch.slots(%{}) ==
+               [{"otherwise", :any, "Otherwise"}, {"undecided", :any, "Cannot be decided"}]
     end
 
     # Sabotage: keyed the per-arm field on `"arms"` - red, and a finding
@@ -359,7 +363,8 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
       assert accepts == %{
                "arm_approved" => [:step],
                "arm_review" => [:step],
-               "otherwise" => [:step]
+               "otherwise" => [:step],
+               "undecided" => [:step]
              }
     end
 

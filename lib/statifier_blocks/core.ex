@@ -13,7 +13,7 @@ defmodule StatifierBlocks.Core do
   |---|---|---|
   | `core.sequence` | `#{inspect(__MODULE__)}.Sequence` | `body` |
   | `core.group` | `#{inspect(__MODULE__)}.Group` | `body`, `interrupts` |
-  | `core.branch` | `#{inspect(__MODULE__)}.Branch` | one per arm, then `otherwise` |
+  | `core.branch` | `#{inspect(__MODULE__)}.Branch` | one per arm, then `otherwise`, then `undecided` |
   | `core.parallel` | `#{inspect(__MODULE__)}.Parallel` | one per lane |
   | `core.wait` | `#{inspect(__MODULE__)}.Wait` | none |
   | `core.await` | `#{inspect(__MODULE__)}.Await` | none |

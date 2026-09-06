@@ -259,6 +259,48 @@ defmodule StatifierBlocks.Runtime.FixtureRunsTest do
 
       assert %Run{expected_slot: "otherwise", taken_slot: "otherwise", verdict: :pass} = run
     end
+
+    # The same branch, with ADR-0012's slot wired. `undecided` now holds a
+    # child, so it is not empty and never reaches the elimination at all;
+    # `otherwise` is still the single empty slot and is still found.
+    #
+    # Sabotage: removed `candidate_empty_slot?/2` from the filter in
+    # `taken_slot_by_elimination/2` -> the *previous* test goes red with
+    # `{:ambiguous_empty_slots, ["otherwise", "undecided"]}`, because every
+    # branch declares `undecided` from ADR-0012 onward and an unwired one is
+    # empty. This test stays green under that mutation, which is why both
+    # are here: this one pins the wired shape, the one above pins the
+    # unwired shape that the exclusion exists for (verified).
+    test "a wired undecided slot leaves the empty otherwise the only candidate" do
+      root =
+        Block.new("core.branch",
+          id: "blk_ELIM",
+          config: %{"arms" => [%{"slot" => "arm_full", "cond" => "false"}]},
+          slots: %{
+            "arm_full" => [container("blk_FULL")],
+            "undecided" => [container("blk_REVIEW")]
+          }
+        )
+
+      document = Document.new(root, id: "bdoc_T")
+
+      spec = %{
+        name: "elim",
+        columns: [
+          %{key: "arm_full", source: "false"},
+          %{key: "otherwise", source: nil}
+        ]
+      }
+
+      row_spec = %{name: "falls through", bindings: %{}, expected: %{"otherwise" => true}}
+      {:ok, table} = TruthTable.build(spec, [row_spec])
+      fixtures = %{"blk_ELIM" => [table]}
+
+      assert %FixtureRuns{status: :ready, runs: [run]} =
+               FixtureRuns.run(document, Palette.core(), fixtures)
+
+      assert %Run{expected_slot: "otherwise", taken_slot: "otherwise", verdict: :pass} = run
+    end
   end
 
   describe "row_count and failure_count" do
