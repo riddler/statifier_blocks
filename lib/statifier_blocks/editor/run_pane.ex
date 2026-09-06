@@ -60,11 +60,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     The canvas, seated in a run.
 
     `state` is a `StatifierUI.Live.State`, or `nil` for no run - see the
-    moduledoc for what `nil` renders. `scrub_event` and `select_event` are the
-    names the two statifier-ui components push, and they default to this
-    package's own namespace rather than statifier-ui's, so a host embedding
-    both an ops view and this editor on one page does not get one component's
-    clicks in the other's handler.
+    moduledoc for what `nil` renders. `scrub_event`, `select_event` and
+    `send_event` are the names the pane's own controls push, and they default
+    to this package's own namespace rather than statifier-ui's, so a host
+    embedding both an ops view and this editor on one page does not get one
+    component's clicks in the other's handler. `events` is the send palette -
+    already derived by the editor from the selected block's fixtures - and
+    `sendable?` says whether this run has a live session to send into; with
+    no entries the send region is not drawn at all.
     """
     attr(:id, :string,
       required: true,
@@ -75,6 +78,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:target, :any, default: nil, doc: "`phx-target` for the two events.")
     attr(:scrub_event, :string, default: "run-scrub")
     attr(:select_event, :string, default: "run-select")
+
+    attr(:events, :list,
+      default: [],
+      doc: "the send palette: `%{name:, payload_text:}` maps, already derived by the editor."
+    )
+
+    attr(:sendable?, :boolean,
+      default: false,
+      doc: "whether this run can be sent to: a live stream with a session supplied."
+    )
+
+    attr(:send_event, :string, default: "run-send")
 
     slot(:inner_block, required: true, doc: "the canvas, in the diagram's seat.")
 
@@ -114,6 +129,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         <p :if={@status == nil or @scrubber == nil or @event_log == nil} class="sb-run__unavailable">
           The run surfaces need the statifier_ui package on the load path.
+        </p>
+
+        <div :if={@events != []} class="sb-run__send">
+          <button
+            :for={entry <- @events}
+            type="button"
+            class="sb-button"
+            disabled={not @sendable?}
+            phx-click={@send_event}
+            phx-value-event={entry.name}
+            phx-target={@target}
+          >
+            {entry.name}
+          </button>
+        </div>
+
+        <p :if={@events != [] and not @sendable?} class="sb-run__unavailable">
+          A persisted run has nothing to send to.
         </p>
 
         <div class="sb-run__stage">

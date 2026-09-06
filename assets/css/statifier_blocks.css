@@ -4059,6 +4059,12 @@ button.sb-inspector__group-row:hover {
   margin: 0;
 }
 
+.sb-run__send {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sb-space-half);
+}
+
 /* The seat the diagram would have had. `min-height: 0` for the reason
  * `.sb-canvas-panel` carries one: without it a flex item refuses to go below
  * its content and the canvas inside can never scroll. */
