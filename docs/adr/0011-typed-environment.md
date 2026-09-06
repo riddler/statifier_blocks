@@ -1015,11 +1015,16 @@ the campaign invariant; flipping it to accepted is a separate gated request
 through the same `docs/adr/` gate, and `sb-upv0` carries it. Additive: decision
 12 stands as accepted, and no text above this line is edited by this section.
 
-An amendment rather than a Note, and this record's first: every dated section
-above is a Note, and each opens by saying that "the deferred list is
-untouched" (`:785`, `:950`). This one touches it - decision 12's own open
-question is answered - and decision 12 states the type it writes in as many
-words, so the form is the one the sibling records use for the same case
+An amendment rather than a Note, and this record's first: the three dated
+sections above are all Notes. Two of them open by saying that "the deferred
+list is untouched" (`:785`, `:950`), and the third records that two of the
+three parts of one deferred question have been answered "in the direction
+decision 13 already argued for" (`:891-896`) - so touching the deferred list
+is not by itself what makes a section an amendment, and this section does not
+rest on that. What makes this one an amendment is the test the sibling records
+apply: decision 12 states the type it writes in as many words, and this
+section states it differently. That is the form those records use for the same
+case
 (`docs/adr/0009-fan-out-block-type.md:967-972`,
 `docs/adr/0002-block-type-behaviour.md:2761`): a `## Amendment` heading with a
 `Status:` line, additive, nothing above it edited.
