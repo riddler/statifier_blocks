@@ -1,15 +1,23 @@
 # ADR-0013: A fan-out child's summary is typed by the parent's declaration, with an optional child-side one and a dormant agreement check
 
 Status: proposed (2026-09-06, drafted for `sb-57yc` under the operator's
-campaign-034 grant, recording campaign-033's ruling `RQ-033-19` B and
-campaign-034's rulings `RQ-034-2` and `RQ-034-14`, all of 2026-09-06). The
-labelled form is ADR-0009's, at
+campaign-034 grant and finished under campaign-SF035's, recording
+campaign-033's ruling `RQ-033-19` B, campaign-034's rulings `RQ-034-2`,
+`RQ-034-14` and `RQ-034-15` b, and campaign-SF035's `RQ-SF035-1`, all of
+2026-09-06). The labelled form is ADR-0009's, at
 `docs/adr/0009-fan-out-block-type.md:710`, rather than ADR-0012's bare
-"recording the ruling of <date>": this record carries three rulings from two
+"recording the ruling of <date>": this record carries five rulings from three
 campaigns and one date does not tell them apart. It merges at proposed under
-that campaign's invariant, like every other record filed with it; flipping it
+the campaign invariant, like every other record filed with it; flipping it
 to accepted is a separate request through the same `docs/adr/` gate, after
 `sb-nqfd` has built it.
+
+Decisions 3 and 5 below are the campaign-SF035 rewrite. ADR-0009's Note of
+2026-09-06 (`docs/adr/0009-fan-out-block-type.md:891-965`) merged while this
+record's first draft was under review and fixed what one collected element is:
+an envelope, not the child's answer. `RQ-034-15` b ruled that this record is
+rewritten against that Note rather than held, and the two decisions below say
+so where an earlier draft said otherwise.
 
 This record decides only what is written below. The four amendments it needs
 in the records it widens - ADR-0002's callback surface, ADR-0004's C1,
@@ -23,7 +31,7 @@ made here. A proposed record does not reach into an accepted one.
 ADR-0009 decision 5 (`docs/adr/0009-fan-out-block-type.md:286`) has the whole
 result of the block written to one author-named location as a dense list in
 item-index order. The shipped field is `collect`
-(`lib/statifier_blocks/core/map.ex:347-353`; decision 4's table at `:183`
+(`lib/statifier_blocks/core/map.ex:353-359`; decision 4's table at `:183`
 declares it `assign_to`, and the Note of 2026-09-05 records the four fields
 that shipped instead). Its declared write is
 `{:path, %{writes: {:list, :unknown}}}`.
@@ -38,13 +46,31 @@ is the open question this leaves". ADR-0009's Note of 2026-09-06
 same question on its decisions 5 and 6 and names `sb-pg91` as carrying it.
 This record answers it.
 
+**A collected element is an envelope, and the child's answer sits inside it.**
+ADR-0009's Note of 2026-09-06
+(`docs/adr/0009-fan-out-block-type.md:891-965`) records what the shipped
+handler already writes, per item, as a map with string keys: `"index"`, and
+`"status"` - one of `"completed"`, `"failed"`, `"cancelled"` - and then either
+the child's `"donedata"` on a completed child, or `"failure"` (a map with
+`"reason"`, `"attempts"` and `"detail"`, `st-ADR-0068`'s three keys) on a
+failed one, or nothing further on a cancelled one (the table at `:921-925`
+and the sentence at `:927-929`). A child whose chart settles in a
+failure-classed final is stored `failed`, and the driver answers the parent's
+invocation with `{:failed, reason: <the run's failure>}` **rather than with
+donedata** (`:915-917`). Two things follow for this record, and both are
+written into the decisions rather than left to a reader: what a parent
+declares is what one element's `"donedata"` member holds, not what the element
+holds; and a
+declared field never reaches the parent from a child that failed, because
+there is no donedata on that arm at all.
+
 **The bytes that are not there are C1's.** ADR-0004's amendment C1
 (`docs/adr/0004-compiler-provenance.md:1262-1287`) has a document compiled for
 use as a child emit one top-level `<final>` per root-block outcome, carrying
 the outcome name as done data and, since the campaign-033 failure seam, the
 reserved `statifier_persistence:run_status` param on a failure-classed one
 (the key is `@run_status_key` at `lib/statifier_blocks/compiler.ex:263-264`,
-minted by `run_status_param/0` at `:1421-1427` and appended at `:1401-1403`).
+minted by `run_status_param/0` at `:1443-1444` and appended at `:1423-1425`).
 Two params, both
 compiler-minted, neither of them the child's answer. The 2026-09-05 Note at
 `docs/adr/0004-compiler-provenance.md:1707-1712` says the sibling it adds "does
@@ -74,7 +100,9 @@ and `Types.satisfies/3` are the read check
 `:134`). A declaration's ordered `fields` are read off the map `fetch/2`
 answers rather than through a function of their own - `fields/2` in that
 module is private (`:179`). This record adds no type grammar; it says which
-existing spellings go where.
+spellings go where, and where the spelling it needs is another package's to
+define - the inline shape decision 5 rests on - it cites that package's record
+rather than writing a second grammar here.
 
 Two things moved in `statifier_datamodel` 0.3.0, and neither moves this
 record's premise. That package's own decision 3, as amended 2026-09-06, lets a
@@ -89,11 +117,14 @@ paragraph states and the one every decision below rests on.
 
 ## Decision
 
-**1. `core.map` declares the element type of `collect`, in a new optional
-config field spelled in `statifier_datamodel`'s vocabulary.**
+**1. `core.map` declares what a collected element's `"donedata"` holds, in a
+new optional config field spelled in `statifier_datamodel`'s vocabulary.**
 
 The field is `collect_type`, optional, with an empty default, and it is
-meaningful only when `collect` is set. Its value is **one** spelling: the
+meaningful only when `collect` is set. It names the type of the child's
+answer - the `"donedata"` member of the envelope decision 5 fixes - and not
+the type of an element, which is the envelope itself and is the same on every
+`core.map`. Its value is **one** spelling: the
 stored text is a type **name**, read by `StatifierDatamodel.Types.parse/2`
 against the parent document's declarations. Normally that is
 `{:declared, name}` for a name the datamodel document's `types` key declares;
@@ -114,13 +145,26 @@ whose closing sentence is "**No ninth field type is added by it**"
 `statifier_datamodel`'s vocabulary, and it takes the shape the first one took
 rather than inventing a second.
 
-The inline arm is deferred **by name**, to the typed-shapes theme of the next
-campaign (SF035), as four things that are only worth deciding together: a
+The inline arm for **this field** is deferred **by name**, to campaign-SF035's
+typed-shapes theme, as four things that are only worth deciding together: a
 `{:type_expr, opts}` member of ADR-0002 decision 7's field-type set, an
-anonymous-shape inhabitant of `StatifierBlocks.Environment`'s `type_expr()`,
+inline-shape inhabitant of `StatifierBlocks.Environment`'s `type_expr()`,
 the editor control that renders one, and the migration of ADR-0002's `payload`
 field onto the same spelling. Each on its own is a partial answer, and
-`payload` is already waiting for the whole one.
+`payload` is already waiting for the whole one. `sb-268w` carries the
+migration of both fields to `{:type_expr, opts}`, and a document storing a
+string reads as the name arm unchanged when it lands; until then
+`collect_type`'s field type is `:string` and nothing here changes that.
+
+The second of those four is not only deferred here: decision 5 **needs** it.
+The environment entry that decision fixes is a structure, and
+`type_expr()` cannot spell a structure today. That inhabitant is
+`statifier_datamodel`'s to define and this package's to consume - the
+inline-shape amendment to `sd-ADR-0001` (`statifier_datamodel`, proposed,
+campaign-SF035 ruling `RQ-SF035-1`), which `sb-myt1` cites into ADR-0011's
+decision 1 without respelling it. This record does the same: it says which
+members the envelope has and which are required, and it spells none of the
+grammar.
 
 An absent or empty `collect_type` is what every stored document has today and
 means what ADR-0011 decision 12 says: the element is `:unknown`. Nothing about
@@ -136,7 +180,7 @@ wrong.
 
 The declaration is the **parent's** because the parent is the document that is
 being compiled. A `core.map` block names its child chart by document id
-(`chart`, `lib/statifier_blocks/core/map.ex:326-332`) and cannot resolve it, so
+(`chart`, `lib/statifier_blocks/core/map.ex:332-338`) and cannot resolve it, so
 the parent-side declaration is the only one that is always in hand where
 `collect`'s environment entry is computed.
 
@@ -200,7 +244,7 @@ the count worth stating here rather than counting from the record.
 The name is `donedata_type/1` and not `summary/1` or `child_summary/1` on
 purpose. `summary/1` is the card's second line (`:609`) and
 `Context.child_summary()` is the compiler's resolved-child record
-(`lib/statifier_blocks/compiler.ex:1149`, `:1154`); both are shipped, and a
+(`lib/statifier_blocks/compiler.ex:1164`, `:1169`); both are shipped, and a
 third meaning of "summary" on the same behaviour would be a collision an author
 has to disambiguate by reading two records.
 
@@ -224,8 +268,27 @@ either position; byte stability picks this one.
 
 The fields are emitted on **every** top-level `child_use` final, including a
 failure-classed one, because the declaration is a property of the document and
-not of an outcome. What a path holds when a child finished badly is the child's
-business; the parent reads the element it was given.
+not of an outcome, and the compiler has no other information at the point it
+mints them.
+
+**They do not thereby reach the parent from a failed child.** ADR-0009's Note
+of 2026-09-06 records that a child run whose chart settles in a
+failure-classed final is stored `failed` and that the driver answers the
+parent's invocation with `{:failed, reason: <the run's failure>}` rather than
+with donedata (`docs/adr/0009-fan-out-block-type.md:915-917`). So on that arm
+the element carries `"status" => "failed"` and a `"failure"` map and no
+`"donedata"` key at all (`:921-925`), and the declared fields, emitted or not,
+are not in it. The parent reads the envelope's `"failure"` arm for a failed
+child and its `"donedata"` arm for a completed one; decision 5's table is
+where that is typed.
+
+The emission is still on every final rather than on the completed ones only,
+and the reason is byte determinism, not reachability: `donedata_type/1` is a
+pure function of the root block's config (decision 2) and the compiler classes
+outcomes, not runs. A final whose params are never read across the invoke
+boundary costs the bytes of the params in the compiled document and nothing
+else, and a document compiled for use as a child is also a document a host may
+run directly, where its `<donedata>` is read by whoever invoked it.
 
 This widens ADR-0004's C1, which today has the final carry the outcome name and
 nothing else. `sb-jvz3` carries that amendment.
@@ -253,8 +316,8 @@ The projected fields are `required?: true` rather than optional, because
 decision 3 emits every entry of `donedata_type/1` on every top-level final:
 the child promises each one, and an optional held field satisfies no required
 one in sd's check
-(`deps/statifier_datamodel/lib/statifier_datamodel/types.ex:338`, the rule
-stated in the comment at `:333-337`).
+(`deps/statifier_datamodel/lib/statifier_datamodel/types.ex:337`, the rule
+stated in the comment at `:334-336`).
 
 One consequence of sd's covering step is worth stating rather than leaving to
 be discovered. It answers `:covers` only where the *expected* side is a
@@ -276,8 +339,8 @@ Four states, and each is decided rather than incidental:
 | no | yes | the child's declaration produces the params of decision 3, and `collect` stays `{:list, :unknown}` at the parent. The bytes are richer; the parent's typing is not |
 | yes | yes | **the parent's wins for typing**, and the pair is checked as above wherever both documents are in hand |
 
-The parent's winning is campaign-034's second-order ruling `RQ-034-2`, and it follows
-from decision 1's reason: the parent's compile has the parent's document and
+The parent's winning is campaign-034's second-order ruling `RQ-034-2`, and it
+follows from decision 1's reason: the parent's compile has the parent's document and
 never the child's, so a typing that depended on the child's declaration would
 be a typing that is available in the editor and absent in the compiler. A type
 that changes with who is looking is worse than one that is only ever the
@@ -297,30 +360,63 @@ It is dormant rather than absent because the alternative is a compile that
 fails on a document the compiler cannot read, which is a refusal an author
 cannot act on and a build that breaks when an unrelated document changes.
 
-**5. `collect` types as `{:list, T}`, where `T` is the parent's declaration and
-`:unknown` when there is none.**
+**5. `collect` types as `{:list, <the ADR-0009 envelope>}`, and the parent's
+declaration types the envelope's `"donedata"` member.**
 
-ADR-0011 decision 12's `{:list, :unknown}` becomes a reference to this record
-rather than a constant. `core.map`'s environment contribution - ADR-0011
-decision 2's rule for a `{:path, %{writes: T}}` field - is:
+An element is not the child's answer. ADR-0009's Note of 2026-09-06 fixes it
+as a string-keyed map (`docs/adr/0009-fan-out-block-type.md:921-929`), so the
+declaration of decision 1 sits one level below the element and
+`{:list, <the declared name>}` - which an earlier draft of this record wrote -
+would be a wrong environment entry. ADR-0011 decision 12's `{:list, :unknown}`
+becomes a reference to the envelope rather than to a name.
+
+The envelope, as an inline shape, spelled by member name and requiredness only
+(the grammar is the `sd-ADR-0001` amendment's, cited in decision 1 and not
+respelled here):
+
+| Member | Required | Type |
+|---|---|---|
+| `"index"` | yes | `integer` |
+| `"status"` | yes | `string` - one of `"completed"`, `"failed"`, `"cancelled"` |
+| `"donedata"` | no | the parent's `collect_type` as `Types.parse/2` reads it, or `:unknown` when there is none |
+| `"failure"` | no | a shape of `"reason"`, `"attempts"` and `"detail"` - `st-ADR-0068`'s three keys, as ADR-0009's Note carries them |
+
+`"donedata"` and `"failure"` are optional because no element carries both and
+a cancelled element carries neither; `"index"` and `"status"` are required
+because every element carries both, on all three arms. `"status"` is typed as
+a string rather than as a three-member enumeration because
+`t:StatifierDatamodel.Types.t/0` has no enumeration member
+(`deps/statifier_datamodel/lib/statifier_datamodel/types.ex:82-86`) and this
+record invents no grammar. A document's `one_of` enumerations are that
+package's index talking about its own paths, not a type expression a field
+can be given. The three values are named here so a reader of the type knows
+them, and ADR-0009's Note is where they are decided.
+
+`core.map`'s environment contribution - ADR-0011 decision 2's rule for a
+`{:path, %{writes: T}}` field - is that envelope in every case:
 
 | `collect_type` | The environment entry at `collect`'s path |
 |---|---|
-| absent or empty | `{:list, :unknown}` |
-| a name (a declaration, a scalar, or an opaque string) | `{:list, <that name>}` |
+| absent or empty | `{:list, <envelope>}`, its `"donedata"` member `:unknown` |
+| a name (a declaration, a scalar, or an opaque string) | `{:list, <envelope>}`, its `"donedata"` member that name |
 
-There is no third row, and the absence is the point. `Environment`'s
-`type_expr()` is a *spelling* - a string, `:unknown`, or a list of one of
-those (`lib/statifier_blocks/environment.ex:93`) - and decision 1 admits
-exactly a name, which is what that type already carries. So a declared
-`collect_type` flows to the blocks after the `core.map` with **no widening of
-`type_expr()` at all**, and the row an earlier draft of this record carried
-for an inline shape - typing such a `collect` as `{:list, :unknown}` because a
-shape has no spelling - is **moot**: decision 1 admits no inline shape for it
-to describe. Widening `type_expr()` to carry a structural entry reaches every
-field with a `writes` key and not only this one; it belongs to the deferred
-typed-shapes theme of decision 1, and it is ADR-0011's decision when it is
-taken.
+Both rows are richer than what ships today, and the first one is richer with
+no declaration at all: a block after a `core.map` learns that an element has
+an index and a status and how a failure is shaped, whether or not the author
+declared anything. That is the honest reading of ADR-0009's Note, which
+records bytes the handler already writes.
+
+**This entry needs the inline-shape inhabitant of `type_expr()`, and that is
+the sequencing constraint of the whole record.** `Environment`'s `type_expr()`
+is a *spelling* today - a string, `:unknown`, or a list of one of those
+(`lib/statifier_blocks/environment.ex:93`) - and cannot carry a structure. The
+inhabitant is `sb-myt1`'s amendment to ADR-0011 decision 1, citing the
+inline-shape amendment to `sd-ADR-0001`. Until it lands the shipped entry
+stays ADR-0011 decision 12's `{:list, :unknown}`, unchanged and not wrong,
+because a spelling that cannot be written is not written; `sb-nqfd` builds
+this decision after `sb-myt1` and not before. Widening `type_expr()` reaches
+every field with a `writes` key and not only this one, which is why it is
+ADR-0011's decision and not this record's.
 
 **6. The payload discipline is `N` times the declared summary's size, and the
 cap stays the host's.**
@@ -332,6 +428,13 @@ This record makes the multiplicand nameable. Before it, "the child chart decides
 the size of its own answer" was guidance a host could only follow by reading the
 child; after it, the size is the declared summary's, and it is **`N` times the
 declared summary's size** where `N` is the length of `items`.
+
+The envelope of decision 5 adds a constant per element on top of that - an
+index, a status string, and, on a failed element, `st-ADR-0068`'s three keys -
+and it is there whether or not anything is declared. It is not what this
+decision makes nameable, and it is not new: the shipped handler already writes
+it. What decision 1 makes nameable is the multiplicand that the author
+controls.
 
 Two consequences, and the second is the operative one:
 
@@ -363,6 +466,22 @@ optional key - and
 `donedata_type/1` is a new optional callback that no shipped type exports.
 A document declaring neither is every document that exists today.
 
+**The environment entry changes for every `core.map` that writes `collect`,
+declared or not.** Decision 5's envelope replaces ADR-0011 decision 12's
+`{:list, :unknown}` on documents that declare nothing as well as on documents
+that declare something, because the envelope is what the shipped handler
+writes and the constant was only ever a statement about what this package had
+not looked at. A consumer that read `{:list, :unknown}` and branched on it -
+the editor's expression surface is the one that exists - reads a list of a
+shape instead, which is more information and not different information. No
+compiled bytes move with it.
+
+**This record cannot be built before the typed-shapes theme.** Decision 5's
+entry is unspellable until `type_expr()` admits an inline shape (`sb-myt1`,
+citing `statifier_datamodel`'s amendment). That is a sequencing consequence
+and not a hidden dependency: `sb-nqfd` builds this record and is ordered
+behind `sb-myt1` for it. Decisions 1, 2, 3, 4 and 6 have no such constraint.
+
 **A root block type becomes a thing an author designs, not only a thing a
 document has.** Until now the root block of a document compiled for use as a
 child was ordinary; the only thing that made it a root was where it sat. It now
@@ -381,7 +500,8 @@ alternatives: a compile that reads the child (impossible, per Context), a
 compile that refuses without reading it (a refusal on no evidence), or one
 declaration only (which forces either the parent to guess or the compiler to
 resolve). Drift is visible in the editor and at a host's publish check, and it
-costs a wrong element type in the environment rather than wrong bytes.
+costs a wrong `"donedata"` member on the envelope of decision 5 rather than
+wrong bytes.
 
 **The editor renders `collect_type` as a text field, and a better control is a
 follow-up.** The field's type is `:string`, so ADR-0005 decision 9's control
@@ -443,7 +563,7 @@ def donedata_type(module, config)
 ```
 
 `core.map`'s new field, as decision 1 fixes it. `config_schema/1` returns six
-entries today (`lib/statifier_blocks/core/map.ex:317-366`), so the new field is
+entries today (`lib/statifier_blocks/core/map.ex:322-372`), so the new field is
 the **sixth**, inserted after `collect` and before `on`:
 
 ```elixir
@@ -461,8 +581,9 @@ the **sixth**, inserted after `collect` and before `on`:
 editor advisory (decision 4). `StatifierBlocks.Compiler`'s `child_use` path
 gains decision 3's third group of params, appended to the list
 `completion_final/4` already builds
-(`lib/statifier_blocks/compiler.ex:1399-1409`, the list itself at
-`:1401-1403`; the plural `completion_finals/4` that calls it is `:1361-1375`).
+(`lib/statifier_blocks/compiler.ex:1421-1431`, the list itself at
+`:1423-1425`; the plural `completion_finals/4` that calls it is `:1361-1374`,
+with its second clause at `:1378`).
 
 The agreement check, as a function of the two declarations rather than of the
 two documents:
@@ -552,14 +673,32 @@ Three readings of the same pair of documents:
 
 | Where the pair is | What is checked | What follows |
 |---|---|---|
-| the parent's compile | nothing (decision 4 is dormant) | `results` is `{:list, "cards.chunk_result"}` in the environment, from `collect_type` alone |
+| the parent's compile | nothing (decision 4 is dormant) | `results` is `{:list, <envelope>}` in the environment, the envelope's `"donedata"` member `cards.chunk_result`, from `collect_type` alone |
 | the editor, child loaded | the child's projection satisfies `cards.chunk_result` | `:covers` - both required fields are present as integers, so no advisory |
 | the editor, after someone renames the child's `declined` field to `refused` | the same check | `{:missing, ["declined"]}` - a `:warning` on the `collect_type` field, and the parent still compiles to the same bytes |
 
+What one element of `results` holds, on each of the three arms ADR-0009's Note
+fixes:
+
+```json
+{"index": 7, "status": "completed",
+ "donedata": {"authorized": 41, "declined": 3}}
+
+{"index": 8, "status": "failed",
+ "failure": {"reason": "invoke_refused", "attempts": 3, "detail": {}}}
+
+{"index": 9, "status": "cancelled"}
+```
+
+The declared `cards.chunk_result` types the first one's `"donedata"` and
+appears nowhere on the other two. A block after the `core.map` that wants the
+counts reads `"status"` first, which is decision 5's table read as code.
+
 The cost, by decision 6: a day of 400 chunks costs 400 two-integer maps in the
-parent's datamodel, serialized on every persisted step until the run ends. A
-root type that had declared the whole capture list instead would cost 400 of
-those, which is the multiplication the declaration makes visible in one file.
+parent's datamodel, inside 400 envelopes, serialized on every persisted step
+until the run ends. A root type that had declared the whole capture list
+instead would cost 400 of those, which is the multiplication the declaration
+makes visible in one file; the envelopes are there either way.
 
 ## What this record owes the accepted records
 
@@ -579,29 +718,32 @@ through the same `docs/adr/` gate, citing this record.
   widening worth stating rather than assuming.
 - **ADR-0009 decisions 4, 5 and 7**
   (`docs/adr/0009-fan-out-block-type.md:183`, `:286`, `:386`), for
-  `config_schema/1`'s new field, for what one accumulated element now holds,
-  and for decision 6's naming of the multiplicand. The Note of 2026-09-06 at
-  `docs/adr/0009-fan-out-block-type.md:714` names this question as that
-  record's own open one and points at `sb-pg91` (`:754`); it is not that
-  record's closing Note - four later Notes follow it, at `:761`, `:803`,
-  `:860` and `:891`. `sb-pg91` closes as folded when this record lands.
+  `config_schema/1`'s new field (decision 4), for the typing of an element's
+  `"donedata"` member (decision 5 - the element's own shape is already
+  recorded by that record's Note of `:891`, and nothing here moves it), and
+  for this record's decision 6 naming decision 7's multiplicand. The Note of
+  2026-09-06 at `:714` names this question as that record's own open one and
+  points at `sb-pg91` (`:754`); it is not that record's closing Note - six
+  later Notes follow it, at `:761`, `:803`, `:860`, `:891`, `:1104` and
+  `:1134`, and an amendment at `:967`. The Note at `:891` is decision 5's
+  premise, and `sb-pg91` closes as folded when this record lands.
 - **ADR-0011 decision 12** (`docs/adr/0011-typed-environment.md:520-535`),
-  whose `{:list, :unknown}` becomes decision 5's table. Its sentence "whether a
+  whose `{:list, :unknown}` becomes decision 5's envelope. Its sentence "whether a
   child chart may declare what its `donedata` carries is the open question this
   leaves" is answered here, and its deferred list loses that entry.
 
 ## Deferred questions, named rather than guessed
 
-- **The inline-shape arm, as one piece.** Decision 1 admits a name and not a
-  shape, and the four things an inline shape needs are deferred together to
-  the typed-shapes theme of the next campaign (SF035): a `{:type_expr, opts}`
-  member of ADR-0002 decision 7's field-type set, an anonymous-shape
-  inhabitant of `Environment`'s `type_expr()`
-  (`lib/statifier_blocks/environment.ex:93`), the editor control that renders
-  one, and the migration of ADR-0002's `payload` field onto the same spelling.
-  Widening `type_expr()` reaches every field with a `writes` key and not only
-  this one, so it is ADR-0011's decision; the other three are ADR-0002's and
-  ADR-0005's. None of the four is made here.
+- **The inline-shape arm, split into the half this record needs and the half
+  it defers.** The `type_expr()` inhabitant is **not** deferred: decision 5
+  needs it, it is `sb-myt1`'s amendment to ADR-0011 decision 1, and it cites
+  the inline-shape amendment to `sd-ADR-0001` rather than respelling it.
+  Three things are deferred, and only `collect_type`'s own spelling is at
+  stake in them: a `{:type_expr, opts}` member of ADR-0002 decision 7's
+  field-type set, the editor control that renders one, and the migration of
+  ADR-0002's `payload` field onto the same spelling - `sb-268w` carries the
+  migration of `payload` and `collect_type` together. Those three are
+  ADR-0002's and ADR-0005's decisions; none of them is made here.
 - **Should `statifier_datamodel` decide a `record` against a `record`?**
   Decision 4's advisory is raised only where the parent's `collect_type` names
   a `shape`, because sd's covering step is a record read as a shape and
@@ -635,3 +777,21 @@ through the same `docs/adr/` gate, citing this record.
   runtime, and the refusal on the ordinary error route. Whether a host wants to
   refuse at publish time instead, using the declared size, is a host question
   this record makes answerable and does not answer.
+
+---
+
+## Note (2026-09-06): `collect_type`'s field type stays `:string` until `sb-268w`
+
+Decision 1 fixes `collect_type`'s `config_schema/1` field type as the existing
+`:string`, carrying a declared **name**, and ADR-0002 decision 7's set stays
+closed at eight (`lib/statifier_blocks/block_type.ex:149-157`). That is
+campaign-034's ruling `RQ-034-14` a and it stands unchanged through the
+campaign-SF035 rewrite of decisions 3 and 5: the envelope of decision 5 is a
+fact about the environment's type expressions, not about what an author types
+into a config field, and the two move independently.
+
+`sb-268w` migrates `collect_type` and ADR-0002's `payload` together to
+`{:type_expr, opts}` when the typed-shapes theme has settled the field type,
+the editor control and the inhabitant; a stored string reads as the name arm
+unchanged when it does. Until then a `collect_type` that wants an inline
+shape has no spelling, and that is the state this record leaves.
