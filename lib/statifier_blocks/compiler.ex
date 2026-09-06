@@ -531,12 +531,20 @@ defmodule StatifierBlocks.Compiler do
     )
   end
 
+  # Both keys are optional and both are read by the environment the
+  # data-flow gate runs over: `:entry_type` seeds the document's subject
+  # path, and `:datamodel` is the document the type declarations the read
+  # check consults come from (ADR-0011 decisions 2 and 3). The `:datamodel`
+  # option is the same one the sensitive-path refusal reads, passed through
+  # untouched - a caller supplies one datamodel, not two.
   @spec assignability_context(keyword()) :: Assignability.context()
   defp assignability_context(opts) do
-    case Keyword.fetch(opts, :entry_type) do
-      {:ok, entry_type} -> %{entry_type: entry_type}
-      :error -> %{}
-    end
+    Enum.reduce([:entry_type, :datamodel], %{}, fn key, acc ->
+      case Keyword.fetch(opts, key) do
+        {:ok, value} -> Map.put(acc, key, value)
+        :error -> acc
+      end
+    end)
   end
 
   @spec structure_finding(Assignability.finding()) :: Finding.t()
@@ -550,12 +558,12 @@ defmodule StatifierBlocks.Compiler do
     )
   end
 
-  defp structure_finding({:type_mismatch, id, source, produced, consumed} = reason) do
+  defp structure_finding({:type_mismatch, id, source, held, expected, path} = reason) do
     Finding.new(
       :structure,
       reason,
-      "this block consumes #{inspect(consumed)} but #{inspect(source)} produces " <>
-        "#{inspect(produced)}",
+      "this block reads #{inspect(expected)} at #{path}, where #{inspect(source)} " <>
+        "left #{inspect(held)}",
       block_id: id
     )
   end

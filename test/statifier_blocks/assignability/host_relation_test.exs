@@ -105,8 +105,14 @@ defmodule StatifierBlocks.Assignability.HostRelationTest do
       assert {:error, [finding]} =
                Assignability.validate(palette, document_with_ledger_placed(), %{})
 
+      # ADR-0011 decision 8: the ref is the block whose write signature put
+      # the type at the path, found by name rather than by adjacency. Under
+      # ADR-0003 decision 4 this said `:slot_entry`, because `blk_LDG` sits
+      # at index 0 of a slot - the deliberate limit that record's own
+      # amendment named, and the one this record removes.
       assert finding ==
-               {:type_mismatch, "blk_LDG", :slot_entry, "myapp.credit_card_txn", "myapp.card_txn"}
+               {:type_mismatch, "blk_LDG", "blk_AUTH", "myapp.credit_card_txn", "myapp.card_txn",
+                "cards.current_txn"}
     end
 
     # Sabotage: `Edit.Targets.slot_verdicts/3` calling
@@ -151,7 +157,7 @@ defmodule StatifierBlocks.Assignability.HostRelationTest do
 
       assert Assignability.validate(widening, document, ctx) == :ok
 
-      assert {:error, [{:type_mismatch, "blk_LDG", _ref, _produced, _consumed}]} =
+      assert {:error, [{:type_mismatch, "blk_LDG", _ref, _held, _expected, _path}]} =
                Assignability.validate(floor, document, ctx)
     end
   end
@@ -166,13 +172,18 @@ defmodule StatifierBlocks.Assignability.HostRelationTest do
 
       verdicts = Targets.slot_verdicts(document_with_empty_group(), palette, ledger_candidate())
 
-      assert {{"blk_GRP", "body"}, {:refused, :not_assignable}} =
+      # `{:fixable_by, id}` rather than `:not_assignable`, per ADR-0011
+      # decision 8: the environment names the block whose write signature
+      # put the offending type at the path, so the author has somewhere to
+      # go. What this test is about is unchanged - the slot and the finding
+      # still answer with one function.
+      assert {{"blk_GRP", "body"}, {:refused, {:fixable_by, "blk_AUTH"}}} =
                Enum.find(verdicts, &match?({{"blk_GRP", "body"}, _verdict}, &1))
 
       assert {:error, [finding]} =
                Assignability.validate(palette, document_with_ledger_placed(), %{})
 
-      assert Assignability.finding_reason(palette, finding) == :not_assignable
+      assert Assignability.finding_reason(palette, finding) == {:fixable_by, "blk_AUTH"}
     end
   end
 
@@ -192,7 +203,7 @@ defmodule StatifierBlocks.Assignability.HostRelationTest do
       # ADR-0003's 2026-08-29 amendment, 8c: the reason is not a field on
       # the finding, it is a projection of what the finding already carries.
       # So the compile pipeline needs no new plumbing to convey it.
-      assert Assignability.finding_reason(palette, finding.reason) == :not_assignable
+      assert Assignability.finding_reason(palette, finding.reason) == {:fixable_by, "blk_AUTH"}
     end
 
     # Sabotage: `Finding.from_compiler/2`'s stage table mapping

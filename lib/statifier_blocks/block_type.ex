@@ -412,6 +412,14 @@ defmodule StatifierBlocks.BlockType do
   for the two values and `singleton/1` for the reader. It is the one key whose
   subject is the document rather than the card, and the only thing that reads
   it is the document finding `StatifierBlocks.ViewModel` derives from it.
+
+  `subject` is ADR-0011 decision 6's datamodel path, and it is the second key
+  whose subject is the document rather than the card - `singleton` is the
+  first, and it is the precedent this one follows. It is read from the
+  **entry** block's entry, the first block of the root's `body` slot, and it
+  names the path `io/1`'s `consumes` and `produces` desugar against. A
+  document whose entry block declares none has no subject and that sugar is
+  inert; `StatifierBlocks.Environment.subject_path/2` is the reader.
   """
   @type palette_entry :: %{
           optional(:label) => String.t(),
@@ -428,7 +436,8 @@ defmodule StatifierBlocks.BlockType do
           optional(:accent_token) => String.t(),
           optional(:badge) => String.t(),
           optional(:join_label) => join_label(),
-          optional(:singleton) => singleton()
+          optional(:singleton) => singleton(),
+          optional(:subject) => String.t()
         }
 
   @doc """

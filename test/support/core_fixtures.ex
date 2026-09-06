@@ -55,6 +55,12 @@ defmodule StatifierBlocks.CoreFixtures do
     @impl true
     def io(_config), do: %{kinds: [:step], produces: "myapp.credit_card_txn"}
 
+    # ADR-0011 decision 6's subject path: `consumes` and `produces`
+    # desugar against it, and it is read from whichever of these
+    # types a document opens with.
+    @impl true
+    def palette_entry, do: %{subject: "cards.current_txn"}
+
     @impl true
     def emit(%Block{} = block, context),
       do: StatifierBlocks.CoreFixtures.invoke_leaf(block, context)
@@ -103,6 +109,12 @@ defmodule StatifierBlocks.CoreFixtures do
 
     @impl true
     def io(_config), do: %{kinds: [:step], consumes: "myapp.credit_card_txn"}
+
+    # ADR-0011 decision 6's subject path: `consumes` and `produces`
+    # desugar against it, and it is read from whichever of these
+    # types a document opens with.
+    @impl true
+    def palette_entry, do: %{subject: "cards.current_txn"}
 
     @impl true
     def emit(%Block{} = block, context),
