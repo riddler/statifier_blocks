@@ -4016,9 +4016,11 @@ button.sb-inspector__group-row:hover {
  *
  * statifier-ui ships no stylesheet and says so: every element it draws carries
  * a `statifier-ui-*` class for a host to style with its own system. That is
- * what the descendant rules at the bottom of this section are, and they are
- * deliberately layout and type only - a package that themed another package's
- * markup in depth would be claiming a surface it does not own. Every token
+ * what the descendant rules at the bottom of this section are, and they reach
+ * no further than seating that markup in a pane: spacing, the type scale, the
+ * subtle-text colour, and the four scrubber controls drawn as buttons rather
+ * than as whatever the browser draws by default. Theming another package's
+ * markup in depth would be claiming a surface this one does not own. Every token
  * here is already declared, so amendment 14e's both-directions audit has
  * nothing new to account for. */
 

@@ -6887,9 +6887,10 @@ run adds no tab, and the one drawer surface it does reach is described below.
 ### What it does change, named rather than left to be found
 
 - **The Datamodel tab's "what is known here" table grows a column while a run
-  is seated.** Decision 9's two surfaces are unchanged in what they are for,
-  and this one is still read-only, still produces no finding, and still tints
-  nothing: the added cell says what the run was holding at that path at the
+  is seated.** `ADR-0011` decision 9's two surfaces - the surfaces that record
+  names, and the ones this record already cites in that qualified form above -
+  are unchanged in what they are for, and this one is still read-only, still
+  produces no finding, and still tints nothing: the added cell says what the run was holding at that path at the
   point the scrubber is on, beside the type the position declares. A declared
   type and a held value side by side is how a read that should not have worked
   becomes visible without this package ruling on it. With no run the column is
@@ -6912,8 +6913,13 @@ run adds no tab, and the one drawer surface it does reach is described below.
   that this package emits no unprefixed class of its own and depends on no
   framework's, and that is unchanged - these classes are another package's,
   drawn by that package's components, in its own documented namespace. This
-  package's stylesheet gives them layout and type only, under `.sb-run`, and
-  themes nothing it does not own.
+  package's stylesheet reaches them only under `.sb-run`, and only far enough
+  to seat them in a pane: spacing, the type scale, the subtle-text colour, and
+  the four scrubber controls drawn as buttons rather than as whatever the
+  browser draws by default. That last one is a chrome treatment rather than
+  layout, and it is named here so the restraint is not overstated - what the
+  package does not do is theme that markup in depth, which would be claiming a
+  surface it does not own.
 
 - **No new hook.** Decision 7's two hooks are untouched. The scrubber's four
   buttons and the log's entries are server round trips, which is the same
