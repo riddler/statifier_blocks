@@ -180,7 +180,7 @@ defmodule StatifierBlocks.Core.Subchart do
 
   alias StatifierBlocks.Block
   alias StatifierBlocks.Compiler.Context
-  alias StatifierBlocks.Core.{Config, Emit, Invoke}
+  alias StatifierBlocks.Core.{AssignLocation, Config, Emit, Invoke}
   alias StatifierBlocks.Emission
 
   @invoke_type "statifier_blocks:subchart"
@@ -304,17 +304,13 @@ defmodule StatifierBlocks.Core.Subchart do
   # non-empty whitespace-free path through, so the two read one rule out of
   # `Config.datamodel_path?/1` and cannot disagree about a location.
   defp check_assign_to(findings, config) do
-    case Map.get(config, "assign_to") do
-      blank when blank in [nil, ""] ->
-        findings
-
-      value ->
-        if Config.datamodel_path?(value) do
-          findings
-        else
-          [{"assign_to", assign_to_message()} | findings]
-        end
-    end
+    AssignLocation.check(
+      findings,
+      config,
+      "assign_to",
+      &Config.datamodel_path?/1,
+      assign_to_message()
+    )
   end
 
   defp assign_to_message, do: "must be a datamodel path, like eligibility.outcome"
@@ -619,18 +615,26 @@ defmodule StatifierBlocks.Core.Subchart do
   defp chart?(value), do: Config.non_empty_string?(value) and not String.contains?(value, " ")
 
   @spec assign(term()) :: {:ok, [Emission.t()]} | {:error, [{String.t(), String.t()}]}
-  defp assign(location) when location in [nil, ""], do: {:ok, []}
-
   defp assign(location) do
-    if Config.datamodel_path?(location) do
-      {:ok,
-       [
-         "assign"
-         |> Emission.element([{"expr", "_event.data"}, {"location", location}])
-         |> Emission.attribute_from_config("location", "assign_to")
-       ]}
-    else
-      {:error, [{"assign_to", assign_to_message()}]}
+    case AssignLocation.location(
+           location,
+           "assign_to",
+           &Config.datamodel_path?/1,
+           assign_to_message()
+         ) do
+      {:ok, nil} ->
+        {:ok, []}
+
+      {:ok, path} ->
+        {:ok,
+         [
+           "assign"
+           |> Emission.element([{"expr", "_event.data"}, {"location", path}])
+           |> Emission.attribute_from_config("location", "assign_to")
+         ]}
+
+      {:error, findings} ->
+        {:error, findings}
     end
   end
 

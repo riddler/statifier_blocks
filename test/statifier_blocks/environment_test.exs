@@ -372,6 +372,25 @@ defmodule StatifierBlocks.EnvironmentTest do
       assert Map.get(env, "settlement") == :unknown
     end
 
+    # sabotage: reverted `core.invoke`'s `assign_to` to a plain `:string`
+    # -> the path the block really writes goes back to being invisible here
+    # and both assertions go red (verified)
+    test "core.invoke writes assign_to" do
+      block =
+        Block.new("core.invoke",
+          id: "blk_INV",
+          config: %{"invoke_type" => "myapp:authorize", "assign_to" => "cards.authorization"}
+        )
+
+      document = document([open(), block, settle("blk_STL")])
+
+      assert Environment.write_signatures(palette(), document, block) ==
+               [{"assign_to", "cards.authorization", :unknown}]
+
+      env = Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx())
+      assert Map.get(env, "cards.authorization") == :unknown
+    end
+
     # sabotage: dropped the `writes` key off `core.map`'s `collect`
     # (`{:path, %{}}`) -> the block after the fan-out sees `:unknown` instead
     # of a list and this goes red (verified)
@@ -479,8 +498,8 @@ defmodule StatifierBlocks.EnvironmentTest do
     end
 
     # sabotage: gave `core.wait` a `{:path, %{}}` field -> the census below
-    # names a fifth writer and this goes red (verified)
-    test "the vocabulary's path-field writers are exactly the four the record names" do
+    # names a sixth writer and this goes red (verified)
+    test "the vocabulary's path-field writers are the five that declare one" do
       writers =
         for {name, module} <- Palette.core_types(),
             Code.ensure_loaded?(module),
@@ -488,7 +507,16 @@ defmodule StatifierBlocks.EnvironmentTest do
             Enum.any?(module.config_schema(%{}), &StatifierBlocks.BlockType.datamodel_path?/1),
             do: name
 
-      assert Enum.sort(writers) == ["core.assign", "core.foreach", "core.map", "core.subchart"]
+      # `core.invoke` joined the four the ADR-0002 Note of 2026-09-06 named,
+      # on `sb-r313`: its `assign_to` is a declared `{:path, %{}}` field
+      # rather than a location only the emission knew about.
+      assert Enum.sort(writers) == [
+               "core.assign",
+               "core.foreach",
+               "core.invoke",
+               "core.map",
+               "core.subchart"
+             ]
     end
   end
 

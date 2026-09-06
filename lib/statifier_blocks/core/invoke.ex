@@ -36,6 +36,20 @@ defmodule StatifierBlocks.Core.Invoke do
   that does names the full event. **The block decides nothing about what
   comes next**: its emission ends at the final it enters.
 
+  ## `assign_to` names a datamodel path
+
+  The field is declared `{:path, %{}}` - ADR-0002 decision 7's eighth field
+  type - so the editor offers the host's declared datamodel paths as
+  candidates on it, a value the datamodel does not declare draws ADR-0005
+  clause 11e's `:info` advisory rather than a refusal, and the write this
+  block makes is visible to `StatifierBlocks.Environment` as `:unknown` at
+  that path (ADR-0011 decision 2) instead of being emitted where nothing
+  declared can see it. Its rule is `core.assign`'s and `core.subchart`'s -
+  any non-empty path with no whitespace - for ADR-0011 decision 13's
+  reason: one `<assign>` element writing one datamodel cannot have two
+  rules about what a location may be. A blank `assign_to` is a call whose
+  answer is thrown away, which is an answer rather than a gap.
+
   ## The params field is knowingly provisional
 
   ADR-0002 decision 7's field types are a closed set and none of them is "a
@@ -50,8 +64,15 @@ defmodule StatifierBlocks.Core.Invoke do
 
   alias StatifierBlocks.Block
   alias StatifierBlocks.Compiler.Context
-  alias StatifierBlocks.Core.{Config, Emit}
+  alias StatifierBlocks.Core.{AssignLocation, Config, Emit}
   alias StatifierBlocks.Emission
+
+  # ADR-0011 decision 13's argument, applied to this type's `assign_to` on
+  # `sb-r313`: the `<assign location="...">` this block emits writes the
+  # same datamodel `core.assign` writes through the same element, so the
+  # location rule is `Config.datamodel_path?/1` here too, and the wording
+  # is `core.subchart`'s sentence with this field's own example.
+  @assign_to_message "must be a datamodel path, like cards.authorization"
 
   @error_event "error.communication.invoke"
   @done_event "done.invoke"
@@ -82,7 +103,7 @@ defmodule StatifierBlocks.Core.Invoke do
       },
       %{
         key: "assign_to",
-        type: :string,
+        type: {:path, %{}},
         label: "Write the result to",
         required?: false,
         default: ""
@@ -114,17 +135,13 @@ defmodule StatifierBlocks.Core.Invoke do
   end
 
   defp check_assign_to(findings, config) do
-    case Map.get(config, "assign_to") do
-      blank when blank in [nil, ""] ->
-        findings
-
-      value ->
-        if Config.identifier?(value) do
-          findings
-        else
-          [{"assign_to", "must be a bare lowercase identifier, like authorization"} | findings]
-        end
-    end
+    AssignLocation.check(
+      findings,
+      config,
+      "assign_to",
+      &Config.datamodel_path?/1,
+      @assign_to_message
+    )
   end
 
   defp check_params(findings, config) do
@@ -293,18 +310,26 @@ defmodule StatifierBlocks.Core.Invoke do
   # `<finalize>`: the result is only a result when the call succeeded, and
   # `<finalize>` runs for every event the invocation delivers.
   @spec assign(term()) :: {:ok, [Emission.t()]} | {:error, [{String.t(), String.t()}]}
-  defp assign(location) when location in [nil, ""], do: {:ok, []}
-
   defp assign(location) do
-    if Config.identifier?(location) do
-      {:ok,
-       [
-         "assign"
-         |> Emission.element([{"expr", "_event.data"}, {"location", location}])
-         |> Emission.attribute_from_config("location", "assign_to")
-       ]}
-    else
-      {:error, [{"assign_to", "must be a bare lowercase identifier, like authorization"}]}
+    case AssignLocation.location(
+           location,
+           "assign_to",
+           &Config.datamodel_path?/1,
+           @assign_to_message
+         ) do
+      {:ok, nil} ->
+        {:ok, []}
+
+      {:ok, path} ->
+        {:ok,
+         [
+           "assign"
+           |> Emission.element([{"expr", "_event.data"}, {"location", path}])
+           |> Emission.attribute_from_config("location", "assign_to")
+         ]}
+
+      {:error, findings} ->
+        {:error, findings}
     end
   end
 
