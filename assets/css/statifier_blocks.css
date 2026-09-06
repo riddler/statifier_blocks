@@ -3929,6 +3929,78 @@ button.sb-inspector__group-row:hover {
   font-weight: var(--sb-weight-medium);
 }
 
+/* The tab carries three sections since `sb-sy0q` - what is known at the
+ * selected block, the declared paths, and the declared types - so each one
+ * needs a heading and the stack needs rhythm. Modelled on the tables above
+ * rather than given a look of its own: three sections that disagree on
+ * their own spacing read as three widgets that happened to land in one
+ * panel. */
+
+.sb-datamodel__section + .sb-datamodel__section {
+  margin-top: var(--sb-space);
+}
+
+.sb-datamodel__heading {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-medium);
+  letter-spacing: 0.04em;
+  margin: 0 0 var(--sb-space-half);
+  text-transform: uppercase;
+}
+
+/* A declaration's label is what an author recognises and its nominal name
+ * is what they type into a field, so the cell carries both, the label
+ * first - the same order and the same reason as a findings row's subject,
+ * which puts the block's label ahead of its id. The name is dropped when
+ * there is no label, and when the label IS the name: a cell reading the same
+ * word twice says the same thing twice, and a shape called `Settleable`
+ * labelled "Settleable" is the ordinary case rather than a corner. */
+.sb-datamodel__type-label {
+  display: block;
+}
+
+.sb-datamodel__type-name {
+  color: var(--sb-fg-subtle);
+  display: block;
+  font-size: var(--sb-text-xs);
+  font-weight: normal;
+}
+
+.sb-datamodel__fields {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sb-datamodel__fields li + li {
+  margin-top: var(--sb-space-half);
+}
+
+.sb-datamodel__field-type {
+  color: var(--sb-fg-subtle);
+  margin-left: var(--sb-space-half);
+}
+
+/* The required mark is a word rather than an asterisk, for the reason
+ * `StatifierBlocks.Shell.cell_word/1` records about truth-table cells: a
+ * reader who does not know the convention gets the same table as everyone
+ * else. It is tinted no differently from the type beside it - a required
+ * field is a fact about the declaration, not a verdict. */
+.sb-datamodel__field-required {
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
+  margin-left: var(--sb-space-half);
+  padding: 0 var(--sb-space-half);
+}
+
+.sb-datamodel__no-fields {
+  color: var(--sb-fg-subtle);
+  margin: 0;
+}
+
 /* ------------------------------------------------- palette strip / sheet */
 
 /* Above 780 the palette is a column and the strip does not exist. The rule is

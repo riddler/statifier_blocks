@@ -198,6 +198,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "`StatifierBlocks.Datamodel.declared_view/3`'s rows for the Datamodel tab"
     )
 
+    attr(:declared_types, :list,
+      default: [],
+      doc: "`StatifierBlocks.Datamodel.declared_types/1`'s rows for the Datamodel tab"
+    )
+
+    attr(:environment_view, :any,
+      default: nil,
+      doc: """
+      What the environment holds at the selected block's position, as
+      `%{path:, type:}` rows, or `nil` when nothing is selected - ADR-0011
+      decision 9's "what is known here". `nil` and `[]` say different things:
+      nothing selected, and nothing known there.
+      """
+    )
+
     attr(:host_tabs, :list,
       default: [],
       doc: """
@@ -342,7 +357,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               <% @view.tab == :fixtures -> %>
                 <.fixture_runs runs={@fixture_runs} />
               <% @view.tab == :datamodel -> %>
+                <.known_here rows={@environment_view} />
                 <.declared_paths rows={@declared_view} />
+                <.declared_types rows={@declared_types} />
               <% true -> %>
                 <p :if={@view.status == :no_fixtures} class="sb-drawer__empty">
                   No fixtures source is attached to this editor, so there are no recorded
@@ -616,38 +633,162 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # than leaving an author to infer it from an empty table.
     defp declared_paths(assigns) do
       ~H"""
-      <p :if={@rows == []} class="sb-drawer__empty">
-        Nothing declares a datamodel path for this document - not the host, not
-        the compile call's roots, and not the document's own envelope. No
-        undeclared-path advisory is produced while that is true.
-      </p>
+      <section class="sb-datamodel__section" data-section="declared-paths">
+        <h3 class="sb-datamodel__heading">Declared paths</h3>
 
-      <div :if={@rows != []} class="sb-datamodel__scroll">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Path</th>
-              <th scope="col">Declared by</th>
-              <th scope="col">Type</th>
-              <th scope="col">Scope</th>
-              <th scope="col">Label</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              :for={row <- @rows}
-              data-path={row.path}
-              data-sensitive={to_string(row.sensitive?)}
-            >
-              <th scope="row">{row.path}</th>
-              <td>{Shell.declared_by(row)}</td>
-              <td>{Shell.declared_shape(row)}</td>
-              <td>{row.scope}</td>
-              <td>{row.label}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        <p :if={@rows == []} class="sb-drawer__empty">
+          Nothing declares a datamodel path for this document - not the host, not
+          the compile call's roots, and not the document's own envelope. No
+          undeclared-path advisory is produced while that is true.
+        </p>
+
+        <div :if={@rows != []} class="sb-datamodel__scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Path</th>
+                <th scope="col">Declared by</th>
+                <th scope="col">Type</th>
+                <th scope="col">Scope</th>
+                <th scope="col">Label</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                :for={row <- @rows}
+                data-path={row.path}
+                data-sensitive={to_string(row.sensitive?)}
+              >
+                <th scope="row">{row.path}</th>
+                <td>{Shell.declared_by(row)}</td>
+                <td>{Shell.declared_shape(row)}</td>
+                <td>{row.scope}</td>
+                <td>{row.label}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      """
+    end
+
+    attr(:rows, :any, default: nil)
+
+    # ADR-0011 decision 9's second surface: the paths the environment holds at
+    # the SELECTED block's position, with their types. It sits above the
+    # declared-path table rather than beside it because the two answer
+    # different questions and the order is the order an author asks them in -
+    # "what can I read right here" first, "what exists anywhere in this
+    # document" second.
+    #
+    # Three states, and they are three because collapsing any two of them
+    # lies. `nil` is *nothing selected*, and there is no position to answer
+    # for. `[]` is *a block is selected and nothing is known there*, which is
+    # the honest answer for a document whose entry block declares no subject
+    # (decision 2) and is not the same as not having asked. Rows are the
+    # answer.
+    #
+    # Nothing here is clickable and nothing here is a finding. The record is
+    # explicit that neither of decision 9's surfaces changes a verdict or
+    # produces a finding of its own, so this is a read-only statement of what
+    # the walk computed on the way to the block the author is looking at.
+    defp known_here(assigns) do
+      ~H"""
+      <section class="sb-datamodel__section" data-section="known-here">
+        <h3 class="sb-datamodel__heading">What is known here</h3>
+
+        <p :if={@rows == nil} class="sb-drawer__empty">
+          Select a block to see what the datamodel holds at its position.
+        </p>
+
+        <p :if={@rows == []} class="sb-drawer__empty">
+          Nothing is known at this block's position. The document opens with its
+          entry block's subject, and this one is reached before anything has
+          been written.
+        </p>
+
+        <div :if={@rows not in [nil, []]} class="sb-datamodel__scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Path</th>
+                <th scope="col">Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :for={row <- @rows} data-path={row.path} data-type={row.type}>
+                <th scope="row">{row.path}</th>
+                <td>{row.type}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      """
+    end
+
+    attr(:rows, :list, default: [])
+
+    # The declared `record` and `shape` vocabulary, with each declaration's
+    # fields and its required marks. It is what a `:type_mismatch` naming a
+    # shape is about: an author told that a record does not cover `Settleable`
+    # needs to be able to read what `Settleable` requires, and until this
+    # section the editor never said.
+    #
+    # The fields are an inner list inside the row rather than a second table
+    # keyed by declaration name, because a field has no meaning away from the
+    # declaration that declares it - `amount_minor` is a row of `Settleable`,
+    # not a row of the document. A required field is marked with a word and
+    # not only with a symbol, for `Shell.cell_word/1`'s reason.
+    defp declared_types(assigns) do
+      ~H"""
+      <section class="sb-datamodel__section" data-section="declared-types">
+        <h3 class="sb-datamodel__heading">Declared types</h3>
+
+        <p :if={@rows == []} class="sb-drawer__empty">
+          The datamodel document declares no records or shapes, so every type a
+          block reads or writes is read by identity on its own spelling.
+        </p>
+
+        <div :if={@rows != []} class="sb-datamodel__scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Type</th>
+                <th scope="col">Kind</th>
+                <th scope="col">Fields</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :for={row <- @rows} data-type={row.name} data-kind={row.kind}>
+                <th scope="row">
+                  <span class="sb-datamodel__type-label">{row.label || row.name}</span>
+                  <span :if={row.label not in [nil, row.name]} class="sb-datamodel__type-name">
+                    {row.name}
+                  </span>
+                </th>
+                <td>{row.kind}</td>
+                <td>
+                  <p :if={row.fields == []} class="sb-datamodel__no-fields">no fields</p>
+                  <ul :if={row.fields != []} class="sb-datamodel__fields">
+                    <li
+                      :for={field <- row.fields}
+                      data-field={field.name}
+                      data-required={to_string(field.required?)}
+                    >
+                      <span class="sb-datamodel__field-name">{field.name}</span>
+                      <span class="sb-datamodel__field-type">{field.type}</span>
+                      <span :if={field.required?} class="sb-datamodel__field-required">
+                        required
+                      </span>
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
       """
     end
   end
