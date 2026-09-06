@@ -84,6 +84,18 @@ reference prep commit above.
    above the previous version's section, dated today. The heading form is the
    one the file already uses - the bracketed version and the date, with no
    separator between them.
+
+   **The date is the operator's local date, not UTC** (the convention the
+   operator set on 2026-09-06). A prep run late in the local evening is cut
+   under a UTC date that is already tomorrow; writing that UTC date puts a
+   section in the file dated a day the release was not cut on, and a reader
+   comparing it against the tag or the commit date sees a discrepancy that
+   is not real. Take the date from `date +%F` on the machine cutting the prep
+   and write that. The 0.20.0 section is dated `2026-09-06`, which was the UTC
+   date at the time and one day ahead of the local `2026-09-05`; it is left
+   as it stands, because rewriting a shipped section to match a convention
+   adopted after it was written buys nothing and loses the record of what the
+   published section said.
 3. Under the heading, write a short lead paragraph saying what the release is,
    then the fragments' bullets grouped by heading and ordered `Added`,
    `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
