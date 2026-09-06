@@ -241,6 +241,7 @@ defmodule StatifierBlocks.Core.Map do
 
   @done_slot "on_done"
   @error_slot "on_error"
+  @error_outcome "error"
 
   @default_on "all"
   @policies ["all", "first_error"]
@@ -291,7 +292,26 @@ defmodule StatifierBlocks.Core.Map do
   to branch on.
   """
   @impl true
-  def outcomes(_config), do: [{"done", "Done"}, {"error", "Error"}]
+  def outcomes(_config), do: [{"done", "Done"}, {@error_outcome, "Error"}]
+
+  @doc """
+  `error` is failure-classed: a batch that ended on the error route is a
+  batch that finished badly (the campaign-033 failure seam, 2026-09-06).
+
+  ADR-0009 decision 4's outcome set is untouched by this - there are still
+  exactly two outcomes, `done` and `error`, and the class is a second axis
+  on `error` rather than a third outcome. Nor does it change what decision
+  5's `collect` holds: the per-child answers are still data, one element
+  per item in index order, and an author still branches on them with a
+  `core.branch` after the block. What the class changes is one thing only,
+  and only for a document whose **root** block is a `core.map`: the
+  top-level `<final>` for `error` carries the reserved `<donedata>`
+  `<param>` that tells a durable stepper the run failed, so a fan-out that
+  ended badly settles its parent's invocation instead of completing
+  quietly.
+  """
+  @impl true
+  def failure_outcomes(_config), do: [@error_outcome]
 
   @impl true
   def config_schema(_config),
