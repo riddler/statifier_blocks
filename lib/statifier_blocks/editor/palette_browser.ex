@@ -351,9 +351,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # either way and a line whose subject changed with the host's registry is
     # one an author cannot learn to read. The recipes hang off it behind a
     # semicolon and the word "listed" rather than a comma, so that the sentence
-    # about what fits ends before the recipes are named: "2 of 16 block types
+    # about what fits ends before the recipes are named: "N of M block types
     # fit here, and 1 recipe" would read as the recipe fitting too, which is
-    # the claim this whole change exists to stop making.
+    # the claim this whole change exists to stop making. N and M stand for the
+    # two counts this clause computes; no literal total is written here,
+    # because the palette's type count moves as the host registers types.
     @spec fit_line(non_neg_integer(), non_neg_integer(), String.t()) :: String.t()
     defp fit_line(shown_types, total_types, ""),
       do: "#{shown_types} of #{total_types} block types fit here"
