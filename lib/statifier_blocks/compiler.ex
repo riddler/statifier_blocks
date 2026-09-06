@@ -263,6 +263,21 @@ defmodule StatifierBlocks.Compiler do
   @run_status_key "statifier_persistence:run_status"
   @run_status_failed "failed"
 
+  # ADR-0002's amendment of 2026-09-06, section 4: the role the one shared
+  # top-level final for an unhandled failure below the root is minted
+  # under, appended to whichever of the two prefixes above the compile
+  # option chose - `child_failed` or `root_failed`, so a reader can tell
+  # which option produced it.
+  @failed_role "failed"
+
+  # The outcome name that final reports under `:child_use`. It is `error`
+  # rather than the nested block's own outcome name because a parent reads
+  # a child chart through `core.subchart`, which appends `error` to its
+  # outcomes whether or not the author listed it - so `error` is the one
+  # word a parent is guaranteed to have a route for, and a name from
+  # inside the child chart would not be.
+  @propagated_outcome "error"
+
   # The provenance role a host-declared `<data>` root carries. Not a role
   # in `StateId`'s sense and deliberately not spellable as one: the
   # leading colon fails `StateId.role?/1`, so this name cannot collide
@@ -1360,7 +1375,12 @@ defmodule StatifierBlocks.Compiler do
 
   @spec completion_finals(Resolved.t(), Emission.t(), String.t(), boolean()) ::
           {Emission.t(), [Emission.t()]}
-  defp completion_finals(%Resolved{block: block, module: module}, emission, prefix, donedata?) do
+  defp completion_finals(
+         %Resolved{block: block, module: module} = node,
+         emission,
+         prefix,
+         donedata?
+       ) do
     failures = BlockType.failure_outcomes(module, block.config)
 
     pairs =
@@ -1371,7 +1391,9 @@ defmodule StatifierBlocks.Compiler do
     transitions = Enum.map(pairs, &elem(&1, 0))
     finals = Enum.map(pairs, &elem(&1, 1))
 
-    {%{emission | children: emission.children ++ transitions}, finals}
+    {catches, failed} = propagation(node, prefix, donedata?)
+
+    {%{emission | children: emission.children ++ transitions ++ catches}, finals ++ failed}
   end
 
   @spec completion_outcome(Block.id(), String.t(), String.t(), boolean(), boolean()) ::
@@ -1430,6 +1452,132 @@ defmodule StatifierBlocks.Compiler do
           {:ok, Emission.t()} | {:error, {:unknown_attribution, Block.id()}}
   defp stamp_completion(emission, root_id) do
     Attribution.stamp(emission, root_id, MapSet.new([root_id]))
+  end
+
+  # -- Stage 5a-bis: the nested-to-root failure catch --------------------------
+
+  # ADR-0002's amendment of 2026-09-06, section 4. Under the same two
+  # options the completion finals sit behind, and nothing at all outside
+  # them: an outcome a block below the root declares, that the block's own
+  # type classes as a failure, and that the document did not handle,
+  # reaches the document's own ending instead of being selected by
+  # nothing.
+  #
+  # **Handled** is a property of the failing block, not of the container
+  # above it: the block's type declares an `on_<outcome>` slot for that
+  # outcome and the document put a child in it. Nothing else in this
+  # package counts, because nothing else looks at a child's outcome -
+  # `Emit.chain/2` wires a container's children on `done.state.<child>`,
+  # which fires for every final a child can reach, and no core container
+  # emits a transition selected by `done.outcome.<child>.<outcome>`. A
+  # container that runs a step and then runs the next one has decided
+  # nothing about how the step ended; the author who filled in "if it
+  # fails" has.
+  #
+  # One shared final rather than one per pair: what a durable stepper
+  # reads is that the run failed, and *which* block failed is in the trace
+  # and in the provenance map at higher fidelity than a final id could
+  # carry. It also keeps the added bytes proportional to "does this
+  # document have any unhandled failure at all" rather than to the number
+  # of blocks in it.
+  #
+  # Attribution splits, following decision 5 and `Emit.chain/2`'s rule
+  # rather than the completion finals': each transition is stamped to
+  # **the failing block**, because what happens after the authorize step
+  # fails is a fact about the authorize step, and the shared final is
+  # stamped to the root block, the only block the document's own ending is
+  # a fact about. The provenance map stays total over the added bytes.
+  #
+  # The transitions reach the root before the container advances, and
+  # nothing here arranges that: entering a `<final>` runs its `onentry` -
+  # where `Emit.final/1` puts the raise of
+  # `done.outcome.<state id>.<outcome>` - and only then is
+  # `done.state.<parent>` generated. The internal queue is FIFO, so the
+  # outcome event is selected first, the root's transition exits the root
+  # state, and the container's pending `done.state` is selected by
+  # nothing.
+  @spec propagation(Resolved.t(), String.t(), boolean()) :: {[Emission.t()], [Emission.t()]}
+  defp propagation(%Resolved{block: %Block{id: root_id}} = node, prefix, donedata?) do
+    case unhandled_failures(node) do
+      [] ->
+        {[], []}
+
+      pairs ->
+        with {:ok, final_id} <- StateId.state_id(root_id, prefix <> @failed_role),
+             {:ok, final} <-
+               stamp_completion(
+                 completion_final(final_id, @propagated_outcome, donedata?, true),
+                 root_id
+               ),
+             {:ok, transitions} <- propagation_transitions(pairs, final_id) do
+          {transitions, [final]}
+        else
+          _refused -> {[], []}
+        end
+    end
+  end
+
+  # The walk starts **below** the root: the root block's own outcomes are
+  # the document's answer and its completion finals already report them,
+  # including when its own `on_<outcome>` slot is occupied.
+  @spec unhandled_failures(Resolved.t()) :: [{Block.id(), StateId.t(), String.t()}]
+  defp unhandled_failures(%Resolved{slots: slots}), do: child_failures(slots)
+
+  @spec child_failures([{Block.slot_name(), [Resolved.t()]}]) ::
+          [{Block.id(), StateId.t(), String.t()}]
+  defp child_failures(slots) do
+    Enum.flat_map(slots, fn {_name, children} -> Enum.flat_map(children, &node_failures/1) end)
+  end
+
+  # Document pre-order: the block itself, then its slots in `slots/1`
+  # declaration order. An outcome the class names that `outcomes/1` does
+  # not declare contributes nothing, which is the resolver's own posture
+  # toward a malformed return.
+  @spec node_failures(Resolved.t()) :: [{Block.id(), StateId.t(), String.t()}]
+  defp node_failures(%Resolved{block: block, module: module, slots: slots} = node) do
+    failures = BlockType.failure_outcomes(module, block.config)
+
+    own =
+      module
+      |> BlockType.outcome_names(block.config)
+      |> Enum.filter(&(&1 in failures and unhandled?(node, &1)))
+      |> Enum.map(&{block.id, StateId.state_id(block.id), &1})
+
+    own ++ child_failures(slots)
+  end
+
+  @spec unhandled?(Resolved.t(), String.t()) :: boolean()
+  defp unhandled?(%Resolved{slots: slots}, outcome) do
+    case List.keyfind(slots, "on_" <> outcome, 0) do
+      {_name, [_child | _rest]} -> false
+      _undeclared_or_empty -> true
+    end
+  end
+
+  # External, like the completion transitions beside them and for the same
+  # reason: the point is to leave the root state for a sibling final.
+  # `<transition>` with no `type` attribute is external in SCXML, so the
+  # attribute is absent rather than spelled out.
+  @spec propagation_transitions([{Block.id(), StateId.t(), String.t()}], StateId.t()) ::
+          {:ok, [Emission.t()]} | {:error, {:unknown_attribution, Block.id()}}
+  defp propagation_transitions(pairs, final_id) do
+    pairs
+    |> Enum.reduce_while({:ok, []}, fn {block_id, state_id, outcome}, {:ok, acc} ->
+      "transition"
+      |> Emission.element([
+        {"event", StateId.outcome_event(state_id, outcome)},
+        {"target", final_id}
+      ])
+      |> Attribution.stamp(block_id, MapSet.new([block_id]))
+      |> case do
+        {:ok, stamped} -> {:cont, {:ok, [stamped | acc]}}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, acc} -> {:ok, Enum.reverse(acc)}
+      {:error, _reason} = error -> error
+    end
   end
 
   # -- Stage 5a': the chart-use refusal ---------------------------------------
