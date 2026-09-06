@@ -1524,19 +1524,22 @@ defmodule StatifierBlocks.ViewModel do
     %{node | outcome: BlockType.outcome_name(block.config, outcome_key)}
   end
 
+  # `default:` is required of a declaration and read permissively anyway. The
+  # compiler's config stage refuses a datamodel-path field that omits it, and
+  # that is where a malformed declaration is meant to be caught - but the
+  # editor builds a view model for documents that never reach a compile, so
+  # destructuring the key here made a declaration defect surface as a
+  # `FunctionClauseError` from inside the build instead of as a rendered
+  # control the author can still read. A field whose declaration omits the
+  # key renders with no default, exactly as one declaring `default: nil` does.
   @spec build_fields([BlockType.field_decl()], Block.config(), %{
           optional(String.t()) => [Finding.t()]
         }) ::
           [Field.t()]
   defp build_fields(schema, config, config_findings) do
-    Enum.map(schema, fn %{
-                          key: key,
-                          type: type,
-                          label: label,
-                          required?: required?,
-                          default: default
-                        } = decl ->
+    Enum.map(schema, fn %{key: key, type: type, label: label, required?: required?} = decl ->
       path = BlockType.value_path(decl)
+      default = Map.get(decl, :default)
 
       %Field{
         key: key,
