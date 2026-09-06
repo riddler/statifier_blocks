@@ -92,6 +92,54 @@ defmodule StatifierBlocks.Compiler.FindingsTest do
     end
   end
 
+  defmodule TwoReads do
+    @moduledoc """
+    A host leaf declaring two reads on two config fields, both pointed at
+    the same datamodel path. It is the case ADR-0011 decision 2's anchoring
+    is for: the path alone cannot say which of the author's two controls a
+    refusal is about, and the field key can.
+    """
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+    @impl true
+    def slots(_config), do: []
+
+    @impl true
+    def config_schema(_config) do
+      [
+        %{
+          key: "settle_from",
+          type: {:path, %{expects: "settlement"}},
+          label: "Settle from",
+          required?: false,
+          default: ""
+        },
+        %{
+          key: "refund_from",
+          type: {:path, %{expects: "refund"}},
+          label: "Refund from",
+          required?: false,
+          default: ""
+        }
+      ]
+    end
+
+    @impl true
+    def validate_config(_config), do: :ok
+    @impl true
+    def io(_config), do: %{kinds: [:step]}
+    @impl true
+    def palette_entry, do: %{subject: "cards.current_txn"}
+
+    @impl true
+    def emit(_block, context) do
+      done = Context.done_id(context)
+      {:ok, Emit.state(context.state_id, done, [Emit.final(done)])}
+    end
+  end
+
   defmodule Reconciler do
     @moduledoc """
     A host leaf whose `<finalize>` raises an event, which SCXML 6.5.2
@@ -323,6 +371,67 @@ defmodule StatifierBlocks.Compiler.FindingsTest do
              } = warning
 
       assert warning.path == [{"blk_ROOT", "body", 0}]
+    end
+  end
+
+  describe "ADR-0011 decision 2: a refused read anchors on the field" do
+    # Sabotage: made `Compiler.read_keys/2` key on `{id, path}` alone - red,
+    # because the second field then finds the first already there and both
+    # findings claim `settle_from`, which is the very confusion the key is
+    # here to end.
+    test "two fields reading one path are told apart by the key each declared" do
+      both =
+        Document.new(
+          Block.new("core.sequence",
+            id: "blk_ROOT",
+            slots: %{
+              "body" => [
+                Block.new("cards.charge", id: "blk_AUTH", config: %{"operation" => "authorize"}),
+                Block.new("cards.two",
+                  id: "blk_TWO",
+                  config: %{
+                    "settle_from" => "cards.current_txn",
+                    "refund_from" => "cards.current_txn"
+                  }
+                )
+              ]
+            }
+          ),
+          id: "bdoc_cards"
+        )
+
+      assert {:error, findings} = Compiler.compile(both, palette(%{"cards.two" => TwoReads}))
+
+      assert Enum.map(findings, &{&1.code, &1.block_id, &1.config_key}) == [
+               {:type_mismatch, "blk_TWO", "settle_from"},
+               {:type_mismatch, "blk_TWO", "refund_from"}
+             ]
+
+      assert Enum.map(findings, & &1.fault) == [:author, :author]
+    end
+
+    # Sabotage: dropped the `is_binary(key)` guard from `read_keys/2` - red,
+    # because `:consumes` is then offered as a config key, and an editor
+    # told to focus a control by that name has none to focus.
+    test "a refusal on the consumes sugar still names no field" do
+      misplaced =
+        Document.new(
+          Block.new("core.sequence",
+            id: "blk_ROOT",
+            slots: %{
+              "body" => [
+                Block.new("cards.charge", id: "blk_AUTH", config: %{"operation" => "authorize"}),
+                Block.new("cards.ledger", id: "blk_LEDGER")
+              ]
+            }
+          ),
+          id: "bdoc_cards"
+        )
+
+      assert {:error, [finding]} =
+               Compiler.compile(misplaced, palette(%{"cards.ledger" => Ledger}))
+
+      assert %Finding{code: :type_mismatch, config_key: nil, fault: :author} = finding
     end
   end
 

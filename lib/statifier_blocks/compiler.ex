@@ -557,8 +557,12 @@ defmodule StatifierBlocks.Compiler do
 
     assignability_findings =
       case Assignability.validate(palette, document, ctx) do
-        :ok -> []
-        {:error, findings} -> Enum.map(findings, &structure_finding(&1, declarations))
+        :ok ->
+          []
+
+        {:error, findings} ->
+          read_keys = read_keys(palette, document)
+          Enum.map(findings, &structure_finding(&1, declarations, read_keys))
       end
 
     shelf_findings =
@@ -623,11 +627,24 @@ defmodule StatifierBlocks.Compiler do
   # hand the declarations are empty, every spelling renders as itself, and the
   # message is word for word the one this stage produced before the labels
   # existed.
-  @spec structure_finding(Assignability.finding(), StatifierDatamodel.Declarations.t()) ::
-          Finding.t()
+  #
+  # `read_keys` is the other half of decision 2's promise. A read signature is
+  # declared ON A FIELD, and the reason it is - the finding anchors on the
+  # key the author has a control for, rather than on the card - only holds if
+  # the key survives the trip. `Assignability.finding()` names the datamodel
+  # path and not the field (decision 8's tuple is six wide and stays six
+  # wide), so the key is looked back up here, where the palette and the
+  # document are both in hand, instead of being re-derived by every consumer
+  # that wants to underline something.
+  @spec structure_finding(
+          Assignability.finding(),
+          StatifierDatamodel.Declarations.t(),
+          read_keys()
+        ) :: Finding.t()
   defp structure_finding(
          {:kind_not_admitted, id, parent_id, slot, kinds, accepts} = reason,
-         _declarations
+         _declarations,
+         _read_keys
        ) do
     Finding.new(
       :structure,
@@ -640,15 +657,39 @@ defmodule StatifierBlocks.Compiler do
 
   defp structure_finding(
          {:type_mismatch, id, source, held, expected, path} = reason,
-         declarations
+         declarations,
+         read_keys
        ) do
     Finding.new(
       :structure,
       reason,
       "this block reads #{named(declarations, expected)} at #{path}, " <>
         "where #{inspect(source)} left #{named(declarations, held)}",
-      block_id: id
+      block_id: id,
+      config_key: Map.get(read_keys, {id, path, expected})
     )
+  end
+
+  @typedoc false
+  @type read_keys :: %{{Block.id(), String.t(), term()} => String.t()}
+
+  # Every read signature in the document that a form field declared, keyed by
+  # what a `:type_mismatch` carries about it. The two together are what tells
+  # two path fields reading the same path apart: they disagree on the type
+  # they expect, or they are the same declaration twice and no consumer could
+  # tell them apart anyway. `Environment.read_signatures/3` also yields the
+  # `:consumes` sugar and capture pairs, whose key is an atom naming a
+  # declaration form rather than a control an author can be sent to - those
+  # are dropped here, and their findings keep the `nil` config key they have
+  # always carried.
+  @spec read_keys(Palette.t(), Document.t()) :: read_keys()
+  defp read_keys(palette, document) do
+    for %Block{id: id} = block <- Document.blocks(document),
+        {key, path, expected} <- Environment.read_signatures(palette, document, block),
+        is_binary(key),
+        reduce: %{} do
+      acc -> Map.put_new(acc, {id, path, expected}, key)
+    end
   end
 
   # A declared type reads as its label and everything else reads as it always
