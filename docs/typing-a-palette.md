@@ -19,8 +19,7 @@ The types themselves live in the datamodel document, which
 read check. This package takes it as a dependency and calls it; it defines no
 second read check and no compatibility or coverage module of its own.
 
-The dependency is a pinned git commit today and becomes `~> 0.1` once that
-package publishes:
+The dependency resolves from Hex, at a floor of the package's first release:
 
 ```elixir
 # mix.exs
