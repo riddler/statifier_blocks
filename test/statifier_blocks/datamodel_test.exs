@@ -53,10 +53,10 @@ defmodule StatifierBlocks.DatamodelTest do
     # sabotage: dropped the ADR-0006 document clause, so a typed document
     # fell through to `_unrecognized` and returned `nil` - both assertions
     # here go red (verified). The projection itself is asserted in
-    # `StatifierBlocks.Predicates.DatamodelTest`; what this one holds is
-    # that the arm exists and that an empty document is a claim rather
-    # than an absence (ADR-0006 decision 6).
-    test "reads an ADR-0006 document through Predicates.Datamodel" do
+    # `statifier_datamodel`'s own suite; what this one holds is that the
+    # arm exists, that it reaches that package, and that an empty document
+    # is a claim rather than an absence (ADR-0006 decision 6).
+    test "reads an ADR-0006 document through StatifierDatamodel" do
       assert Datamodel.declared_paths(%{"version" => 1, "scopes" => []}) == MapSet.new([])
 
       assert Datamodel.declared_paths(%{
@@ -72,6 +72,19 @@ defmodule StatifierBlocks.DatamodelTest do
     test "drops blanks and non-strings from a supplied list" do
       assert Datamodel.declared_paths(["signup.step", "", 42, nil]) ==
                MapSet.new(["signup.step"])
+    end
+
+    # Folded here when `StatifierBlocks.Predicates.Datamodel` moved to the
+    # `statifier_datamodel` package: the arm that reads a document delegates
+    # now, and these are the shapes that delegation has to leave alone.
+    #
+    # sabotage: had the document clause answer `MapSet.new()` for a map the
+    # package's admission step declines - a malformed shape became an empty
+    # claim, every annotated path would have been flagged, and the
+    # `%{"scopes" => "global"}` assertion went red (verified).
+    test "a map the admission step declines is unrecognized, not an empty claim" do
+      assert Datamodel.declared_paths(%{"scopes" => "global"}) == nil
+      assert Datamodel.declared_paths(%{}) == nil
     end
   end
 
@@ -470,8 +483,9 @@ defmodule StatifierBlocks.DatamodelTest do
                ["card.brand", "card.last4"]
     end
 
-    # sabotage: the `nil ->` arm calling `Predicates.Datamodel.under(nil, prefix)`
-    # instead of returning `[]` - a flat list has no order to query and this
+    # sabotage: `candidates_under/2` rewritten to index the datamodel here and
+    # call `StatifierDatamodel.Index.under/2` on the result, without the
+    # package's own `nil` arm - a flat list has no order to query and this
     # raises rather than returning empty (verified).
     test "a datamodel that is not an ADR-0006 document has no order to query" do
       assert Datamodel.candidates_under(["card.brand"], "card") == []

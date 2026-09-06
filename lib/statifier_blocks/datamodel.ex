@@ -49,10 +49,12 @@ defmodule StatifierBlocks.Datamodel do
 
   It accepts nothing else. The document arm is the one 11f promised and
   `sb-oiq` built: ADR-0006 (accepted 2026-08-29) defines the shape and its
-  decision 6 gives the projection, and
-  `StatifierBlocks.Predicates.Datamodel` implements both, so this module
-  reads a document through that one total function rather than growing a
-  second reader of a schema. Nothing else here moved - the set is still the
+  decision 6 gives the projection, and the `statifier_datamodel` package
+  implements both, so this module reads a document through that one total
+  function rather than growing a second reader of a schema. ADR-0006's
+  2026-09-06 note records the re-homing: the document is `sd-ADR-0001`'s
+  now, and `StatifierDatamodel.Index` and `StatifierDatamodel.Document` are
+  where its reads live. Nothing else here moved - the set is still the
   whole contract this check needs, which is what 11e says: "This section is
   written against the set, so it holds under either."
 
@@ -151,8 +153,15 @@ defmodule StatifierBlocks.Datamodel do
   module does not answer it either.
   """
 
-  alias StatifierBlocks.{Block, BlockType, Document, Finding, Palette, Predicates}
+  alias StatifierBlocks.{Block, BlockType, Document, Finding, Palette}
   alias StatifierBlocks.Document.DatamodelEntry
+
+  # `StatifierDatamodel.Index` is the datamodel document's reader. It is
+  # aliased and `StatifierDatamodel.Document` is not, deliberately: `Document`
+  # is already this package's own block document above, and two modules of
+  # that name in one file is exactly the confusion an alias is supposed to
+  # remove. The document-level reads below are spelled out in full.
+  alias StatifierDatamodel.Index
 
   @typedoc """
   The normalized datamodel: the set of paths the host declares, or `nil`
@@ -189,9 +198,9 @@ defmodule StatifierBlocks.Datamodel do
   @type declared_row :: %{
           path: String.t(),
           sources: [source()],
-          type: Predicates.Datamodel.type() | nil,
-          item_type: Predicates.Datamodel.type() | nil,
-          scope: Predicates.Datamodel.scope() | nil,
+          type: Index.type() | nil,
+          item_type: Index.type() | nil,
+          scope: Index.scope() | nil,
           label: String.t() | nil,
           sensitive?: boolean()
         }
@@ -236,14 +245,12 @@ defmodule StatifierBlocks.Datamodel do
     |> MapSet.new()
   end
 
-  # The ADR-0006 arm, additive over the three above: `index/1` is the
-  # record's admission step, and a map it declines is still an
-  # unrecognized shape rather than an empty claim.
+  # The ADR-0006 arm, additive over the three above. The projection is
+  # `statifier_datamodel`'s, and its `nil` means the same thing here as it
+  # does there: a map carrying a `scopes` key that the record's admission
+  # step still declines is an unrecognized shape rather than an empty claim.
   def declared_paths(%{"scopes" => _scopes} = document) do
-    case Predicates.Datamodel.index(document) do
-      nil -> nil
-      index -> Predicates.Datamodel.declared_paths(index)
-    end
+    StatifierDatamodel.Document.declared_paths(document)
   end
 
   def declared_paths(_unrecognized), do: nil
@@ -388,7 +395,8 @@ defmodule StatifierBlocks.Datamodel do
   @doc """
   The candidates strictly under `prefix`, in the datamodel document's own
   order - ADR-0006 decision 6's completion query, reached through
-  `StatifierBlocks.Predicates.Datamodel.under/2` rather than restated here.
+  `StatifierDatamodel.Document.candidates_under/2` rather than restated
+  here.
 
   This is the narrowing query the `expression_component` seam needs and the
   shipped `<datalist>` does not: a datalist is handed the whole set once and
@@ -414,10 +422,7 @@ defmodule StatifierBlocks.Datamodel do
   """
   @spec candidates_under(term(), term()) :: [String.t()]
   def candidates_under(datamodel, prefix) do
-    case Predicates.Datamodel.index(datamodel) do
-      nil -> []
-      index -> index |> Predicates.Datamodel.under(prefix) |> Enum.map(& &1.path)
-    end
+    StatifierDatamodel.Document.candidates_under(datamodel, prefix)
   end
 
   @doc """
@@ -442,8 +447,8 @@ defmodule StatifierBlocks.Datamodel do
   host can write, and it is carried through as one.
 
   The enumeration is read off the ADR-0006 index through
-  `StatifierBlocks.Predicates.Datamodel`, which is the only reader that has
-  it: `candidates/3` answers path strings and carries no per-path shape at
+  `StatifierDatamodel.Document.declared_values/1`, which is the only reader
+  that has it: `candidates/3` answers path strings and carries no per-path shape at
   all, and `declared_view/3`'s rows carry `type`, `item_type`, `scope`,
   `label` and `sensitive?` and not `one_of`.
 
@@ -492,7 +497,7 @@ defmodule StatifierBlocks.Datamodel do
   @spec value_candidates(term(), term()) :: %{optional(String.t()) => [candidate()]}
   def value_candidates(datamodel, host \\ %{}) do
     datamodel
-    |> declared_values()
+    |> StatifierDatamodel.Document.declared_values()
     |> Map.merge(host_values(host))
   end
 
@@ -515,7 +520,7 @@ defmodule StatifierBlocks.Datamodel do
   the second.
 
   Shape comes from the ADR-0006 document alone, through
-  `StatifierBlocks.Predicates.Datamodel.fetch/2`, and is absent for
+  `StatifierDatamodel.Index.fetch/2`, and is absent for
   everything else. A set of paths carries no types, and a declared root
   carries none by 11l, so those rows are shapeless rather than guessed at.
 
@@ -538,7 +543,7 @@ defmodule StatifierBlocks.Datamodel do
   """
   @spec declared_view(Document.t(), term(), term()) :: [declared_row()]
   def declared_view(%Document{} = document, datamodel, declare \\ []) do
-    index = Predicates.Datamodel.index(datamodel)
+    index = Index.index(datamodel)
 
     surfaces = [
       datamodel: declared_paths(datamodel) || MapSet.new(),
@@ -552,7 +557,7 @@ defmodule StatifierBlocks.Datamodel do
     |> Enum.map(&row(&1, surfaces, index))
   end
 
-  @spec row(String.t(), keyword(MapSet.t(String.t())), Predicates.Datamodel.t() | nil) ::
+  @spec row(String.t(), keyword(MapSet.t(String.t())), Index.t() | nil) ::
           declared_row()
   defp row(path, surfaces, index) do
     entry = entry_at(index, path)
@@ -570,50 +575,15 @@ defmodule StatifierBlocks.Datamodel do
 
   # An empty map rather than `nil`, so the row above reads every field the
   # same way whether an entry describes the path or nothing does.
-  @spec entry_at(Predicates.Datamodel.t() | nil, String.t()) :: map()
+  @spec entry_at(Index.t() | nil, String.t()) :: map()
   defp entry_at(nil, _path), do: %{}
 
   defp entry_at(index, path) do
-    case Predicates.Datamodel.fetch(index, path) do
+    case Index.fetch(index, path) do
       {:ok, entry} -> entry
       :error -> %{}
     end
   end
-
-  # The derived half: every indexed entry whose `one_of` yields at least one
-  # drawable option. An entry that yields none is left out rather than
-  # mapped to `[]`, because `[]` is the host's spelling of "offer nothing
-  # here" and a derivation must not be able to write it by accident.
-  @spec declared_values(term()) :: %{optional(String.t()) => [String.t()]}
-  defp declared_values(datamodel) do
-    case Predicates.Datamodel.index(datamodel) do
-      nil ->
-        %{}
-
-      index ->
-        index
-        |> Predicates.Datamodel.entries()
-        |> Enum.reduce(%{}, &declared_value/2)
-    end
-  end
-
-  @spec declared_value(Predicates.Datamodel.entry(), map()) :: map()
-  defp declared_value(entry, acc) do
-    case options(Map.get(entry, :one_of)) do
-      [] -> acc
-      values -> Map.put(acc, entry.path, values)
-    end
-  end
-
-  @spec options(term()) :: [String.t()]
-  defp options(one_of) when is_list(one_of), do: Enum.flat_map(one_of, &option/1)
-  defp options(_absent), do: []
-
-  @spec option(term()) :: [String.t()]
-  defp option(value) when is_binary(value), do: [value]
-  defp option(value) when is_boolean(value), do: [to_string(value)]
-  defp option(value) when is_integer(value) or is_float(value), do: [to_string(value)]
-  defp option(_undrawable), do: []
 
   # A struct is a map and is not a candidate map, so the shape check is
   # narrower than `is_map/1`. Same total-normalizer discipline as
