@@ -782,6 +782,9 @@ through the same `docs/adr/` gate, citing this record.
 
 ## Note (2026-09-06): `collect_type`'s field type stays `:string` until `sb-268w`
 
+A dated Note rather than an amendment: no decision above this line moves, and
+the Note records where one of them stops rather than changing what it says.
+
 Decision 1 fixes `collect_type`'s `config_schema/1` field type as the existing
 `:string`, carrying a declared **name**, and ADR-0002 decision 7's set stays
 closed at eight (`lib/statifier_blocks/block_type.ex:149-157`). That is
