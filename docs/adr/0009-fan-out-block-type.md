@@ -963,3 +963,142 @@ only what the enclosing **document** does when nobody caught the block's
 Filed with `sb-ii2k`, campaign-034 rulings `RQ-034-1` and `RQ-034-13`; the code
 is `sb-hxs5`, and ADR-0002's amendment of this date is where the propagation
 rule is stated.
+
+## Amendment (2026-09-06): decision 4, `collect` admits a dotted datamodel path through the shared location helper
+
+**Status: proposed (2026-09-06, campaign 034, bead `sb-pxkf`).** A decision
+record merges at proposed under campaign 034's invariant; flipping it to
+accepted is a separate gated request. Additive: decision 4 stands as accepted,
+and no text above this line is edited by this section.
+
+An amendment rather than a Note, because decision 4 decides this field's
+grammar in as many words and this record now decides it differently. Nothing
+above this line is edited. Decision 4's sentence - "**`assign_to` keeps the one
+grammar it already has**: a bare lowercase identifier, validated by the shared
+`check_assign_to`, refused with the same finding text `core.invoke` and
+`core.subchart` produce today. There is no per-item path grammar and no dotted
+form; decision 5 is why" - keeps every word, and this amendment supersedes its
+"no dotted form" clause for this field by addition. The per-item half of that
+sentence is untouched and stays refused.
+
+**What is decided.** The accumulation field - `assign_to` in decision 4's
+table, `collect` in the shipped surface the 2026-09-05 Note beneath it records
+- accepts a **dotted datamodel path**, in exactly the grammar the other three
+`<assign location="...">` fields this package writes already accept:
+`core.invoke`'s `assign_to`, `StatifierBlocks.InvokeStep`'s `assign_to`, and
+`core.subchart`'s `assign_to`. That grammar is
+`StatifierBlocks.Core.Config.datamodel_path?/1` - a non-empty string carrying
+no whitespace, the predicate `core.assign` reads for the location it writes -
+and it is reached through `StatifierBlocks.Core.AssignLocation`, the helper
+`sb-r313` introduced to hold the one refusal shape behind all four fields. A
+bare lowercase identifier is still a valid `collect`, because every bare
+lowercase identifier is already a datamodel path: this widens the field and
+refuses nothing it accepted before.
+
+**Both of this field's sites move, not one.** `check_collect/2` and the
+emission's own `collect/1` in `StatifierBlocks.Core.Map` each call
+`AssignLocation` with `Config.identifier?/1` today, and they read one rule so
+that the two cannot disagree - `emit/2` has to answer for a config
+`validate_config/1` would have rejected. What changes is the predicate passed
+at both call sites and the finding text that goes with it; the helper itself is
+unchanged, which is what it was extracted for.
+
+**Why decision 5 does not forbid it.** Decision 4's sentence gives one reason
+for the narrow grammar and names decision 5 as the argument, so the amendment
+owes an answer to decision 5 rather than to the sentence. Decision 5 is about
+**per-item** locations: the per-child answers are one dense list in item-index
+order, written once to one author-named place, rather than N writes an author
+addresses one at a time. That argument is untouched here. A dotted `collect` is
+not a per-item path; it is the parent's single write location, one `<assign>`
+to one place - exactly the write decision 5 describes - and all this amendment
+says is that the one place may be `cards.answers` and not only `answers`.
+Decision 5 forbids N locations; it says nothing about how deep the one location
+is.
+
+**Why it is decided this way round rather than the other.** `collect` is
+declared with ADR-0002 decision 7's `{:path, opts}` field type, carrying
+`writes: {:list, :unknown}`, so the editor already offers the host's declared
+datamodel paths as candidates on it - dotted ones among them - while the
+validation refused everything but a bare identifier. `ADR-0011` decision 13
+named that shape in as many words for `core.subchart`'s `assign_to`: "A control
+that offers what its own validation refuses is a defect either way round, so
+which way to fix it is a decision rather than a repair." It resolved
+`core.subchart`'s by widening the validation to match the candidates, and it
+deliberately did not reach this field, saying so - "`collect`'s emission is
+ADR-0009's rather than this decision's", and "[w]hether the four should agree is
+in the deferred list". This amendment is this record making that decision for
+its own field, in the same direction and for the same reason: the same
+`<assign>` element writes the same datamodel, so there is one location rule to
+have, and the rule with the dotted worked example in it is the one that is
+right.
+
+**What does not change.** The outcome set is still two and still fixed.
+Decision 5's list is still dense, one element per item, in item-index order,
+and this amendment says nothing about what one element of it holds. Decision
+6's two policies still decide which outcome the block reaches. Decision 8's
+empty fan-out still succeeds over nothing. A blank `collect` is still the
+author declining to accumulate, which is `AssignLocation`'s first clause rather
+than this field's rule at all. And this reaches `collect` and nothing else:
+what a child chart may declare its `donedata` carries, decision 5's element
+union, and decision 7's cost rule are each named elsewhere and are not decided
+here.
+
+Filed with `sb-pxkf`, campaign-034 ruling `RQ-034-5`, split from `sb-jvz3` by
+ruling `RQ-034-15`; it folds `sb-h6qt`'s half of the question. The code is
+`sb-cjou`.
+
+## Note (2026-09-06): the 2026-09-05 bracketed Note's two clauses about `collect`'s grammar are historical
+
+A dated Note rather than an amendment: it decides nothing, edits nothing, and
+records only that two clauses written on 2026-09-05 describe a state of affairs
+the Amendment above has ended. The bracketed Note beneath decision 4 keeps
+every word.
+
+That Note explains the rename from `assign_to` to `collect` and says of it:
+"`collect` says what the block does with the answers rather than borrowing a
+name whose grammar it now only partly shares, and it keeps the same finding
+text so an author meets one complaint and not two."
+
+**"only partly shares" is historical, and now shares fully.** It was written
+when this field's rule was `identifier?/1` and `core.subchart`'s `assign_to`
+was too, so the two grammars were the same rule under two names and the
+partial sharing was about the field types rather than the validation. After
+`ADR-0011` decision 13 and `sb-r313` the three `assign_to` fields read
+`datamodel_path?/1` and this one did not, which made the sharing genuinely
+partial for the first time. After the Amendment above all four read one
+predicate, and the grammar is shared entirely.
+
+**"keeps the same finding text" is historical in the same shape, and comes
+back true.** It was true on 2026-09-05, went false on 2026-09-06 when three of
+the four fields widened and this one's message stayed behind, and is true again
+once this field's message names a datamodel path as theirs do. The clause's
+reason - an author meets one complaint and not two - is why the text moves with
+the rule rather than staying put.
+
+Filed with `sb-pxkf`, campaign-034 ruling `RQ-034-5`.
+
+## Note (2026-09-06): the deferred-question half of this record's Note on `ADR-0011` decision 13 is answered
+
+A dated Note rather than an amendment, on one sentence of the Note of this date
+that decided two of decision 4's four deferred fields. That Note keeps every
+word; this one records that half of its last sentence has since been answered,
+in this record, on the same day.
+
+The sentence: "And `collect`'s bare-lowercase-identifier refusal is
+deliberately **not** reached by `ADR-0011` decision 13, which resolves only
+`core.subchart`'s `assign_to`; whether the two fields should agree is named
+there as a deferred question rather than answered."
+
+**Its first half stands unchanged.** `ADR-0011` decision 13 still resolves
+`core.subchart`'s `assign_to` and still reaches nothing else, and that record's
+decision to name the other three rather than sweep them up is still the right
+reading of it.
+
+**Its second half is historical.** The question of whether the two fields
+should agree is no longer deferred: the Amendment above answers it, and the
+answer is that they agree. It is answered here rather than in `ADR-0011`
+because that is where the sentence said it belonged - `collect`'s grammar is
+this record's decision to make - and it is answered in the direction decision
+13 argued for, on this record's own reading of its decision 5.
+
+Filed with `sb-pxkf`, campaign-034 ruling `RQ-034-5`.
