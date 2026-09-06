@@ -1557,6 +1557,44 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # The block the two insert paths ask `Edit.Targets` about: `new_block/2`'s
+    # block, with the palette entry's `default_config` merged over the config
+    # `config_schema/1`'s own `default:` values folded (sb-1c7g).
+    #
+    # The schema's defaults are not enough on their own, and the gap is not a
+    # corner case. A `{:path, _}` field defaulting to `""` names no path, so
+    # `Environment.read_signatures/3` yields nothing for it and a block whose
+    # read is declared on that field asks nothing of any slot - every slot
+    # stamps `ok`, and the drop-time refusal ADR-0011 promises never fires
+    # for exactly the blocks whose reads are worth checking. `default_config`
+    # is the entry saying what the author is about to configure, so the probe
+    # asks the question the configured block would ask.
+    #
+    # This is the probe only. The block a pick or a drop actually inserts
+    # still comes from `new_block/2`: the entry's declaration is what a type
+    # would be asked about, not a config the author never wrote.
+    @spec probe(Palette.t(), Block.type_name()) :: {:ok, Block.t()} | :error
+    defp probe(palette, type) do
+      with {:ok, block} <- new_block(palette, type),
+           {:ok, module} <- Palette.fetch(palette, type) do
+        {:ok, %{block | config: Map.merge(block.config, entry_default_config(module))}}
+      else
+        _error -> :error
+      end
+    end
+
+    # `palette_entry/0` is optional, and a type name can resolve to a module
+    # that is not loadable, so both are checked the way
+    # `Environment.subject_path/2` checks them for the same callback.
+    @spec entry_default_config(module()) :: Block.config()
+    defp entry_default_config(module) do
+      if Code.ensure_loaded?(module) and function_exported?(module, :palette_entry, 0) do
+        BlockType.default_config(module.palette_entry())
+      else
+        %{}
+      end
+    end
+
     @spec change_config(Phoenix.LiveView.Socket.t(), Block.id(), Block.config()) ::
             Phoenix.LiveView.Socket.t()
     defp change_config(socket, id, config) do
@@ -2684,7 +2722,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       palette.types
       |> Map.keys()
       |> Enum.filter(fn type ->
-        case new_block(palette, type) do
+        case probe(palette, type) do
           {:ok, probe} ->
             {parent_id, slot} in Targets.droppable_slots_for(document, palette, probe, ctx)
 
@@ -2722,7 +2760,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp insert_drag_session(socket, type) do
       %{document: document, palette: palette} = socket.assigns
 
-      case new_block(palette, type) do
+      case probe(palette, type) do
         {:ok, probe} ->
           document
           |> Targets.slot_verdicts(palette, probe, assignability_context(socket.assigns))
