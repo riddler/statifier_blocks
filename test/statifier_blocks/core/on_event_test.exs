@@ -5,6 +5,31 @@ defmodule StatifierBlocks.Core.OnEventTest do
   alias StatifierBlocks.Compiler.Context
   alias StatifierBlocks.Core.OnEvent
 
+  # One record with a field of each shape the walk has to answer for: a
+  # scalar, a declared record, a list, and a spelling the document declares
+  # nothing for.
+  @datamodel %{
+    "types" => [
+      %{
+        "name" => "cards.declined",
+        "kind" => "record",
+        "label" => "Declined authorization",
+        "fields" => [
+          %{"name" => "reason", "type" => "string"},
+          %{"name" => "txn", "type" => "cards.credit_txn"},
+          %{"name" => "attempts", "type" => "list", "item_type" => "cards.credit_txn"},
+          %{"name" => "vendor", "type" => "vendors.opaque"}
+        ]
+      },
+      %{
+        "name" => "cards.credit_txn",
+        "kind" => "record",
+        "label" => "Credit card transaction",
+        "fields" => [%{"name" => "amount_minor", "type" => "integer"}]
+      }
+    ]
+  }
+
   describe "validate_config/1 and the capture map" do
     # sabotage: dropped `check_capture/2` from `validate_config/1`'s pipeline
     # -> every rejected map below went green, taking this red (verified)
@@ -234,7 +259,184 @@ defmodule StatifierBlocks.Core.OnEventTest do
     end
   end
 
+  describe "the payload declaration" do
+    # sabotage: dropped the `payload` declaration from `config_schema/1` ->
+    # this went red, and so did the field-order assertion in
+    # `core_types_test.exs`, which is the editor's only route to the field
+    # (verified)
+    test "declares payload as an optional string carrying a declared type name" do
+      assert Enum.find(OnEvent.config_schema(%{}), &(&1.key == "payload")) == %{
+               key: "payload",
+               type: :string,
+               label: "Its payload is",
+               required?: false,
+               default: ""
+             }
+    end
+
+    # The name resolving is not this callback's question: an unresolvable
+    # name is the amendment's P4 case, unchanged behaviour, and only a
+    # stored value that is not a string at all is a finding here.
+    #
+    # sabotage: made `check_payload/2`'s `nil` clause report a finding ->
+    # this went red, and so did every test that compiles a handler with no
+    # payload (verified)
+    test "accepts an absent, a blank and a named payload, and refuses a non-string" do
+      assert OnEvent.validate_config(%{"event" => "cards.declined", "outcome" => "abandon"}) ==
+               :ok
+
+      assert OnEvent.validate_config(payload_config("")) == :ok
+      assert OnEvent.validate_config(payload_config("cards.declined")) == :ok
+      assert OnEvent.validate_config(payload_config("kaboom.not.declared")) == :ok
+
+      assert {:error, [{"payload", _message}]} = OnEvent.validate_config(payload_config(%{}))
+    end
+  end
+
+  describe "the declared payload's refusal at compile" do
+    # sabotage: made `payload_capture_findings/2` return `[]` for every
+    # input -> this went red, with the two other tests that assert a
+    # refusal, and every test that asserts a compile stayed green
+    # (verified)
+    test "refuses a pair reading a member the declared payload does not carry" do
+      assert {:error, [finding]} = typed_compile(%{"card.why" => "code"}, "cards.declined")
+
+      assert %Compiler.Finding{
+               stage: :config,
+               block_id: "blk_OE",
+               config_key: "capture",
+               severity: :error,
+               fault: :author
+             } = finding
+
+      assert finding.message =~ "card.why"
+      assert finding.message =~ "code"
+      assert finding.message =~ "cards.declined"
+    end
+
+    # sabotage: made `carries?/3` return `false` for every path -> this went
+    # red, which is the guard against a refusal that refuses every read
+    # (verified)
+    test "compiles a pair reading a declared member" do
+      assert {:ok, _compiled} = typed_compile(%{"card.why" => "reason"}, "cards.declined")
+    end
+
+    # One finding for the whole key, naming every pair that reads past the
+    # payload, in the destinations' sorted order - the order the assigns
+    # themselves are emitted in.
+    #
+    # sabotage: reported one finding per offending pair -> the single-element
+    # match went red (verified)
+    test "reports one finding for the key, naming each offending pair" do
+      assert {:error, [finding]} =
+               typed_compile(%{"card.why" => "code", "card.at" => "when"}, "cards.declined")
+
+      assert finding.config_key == "capture"
+      assert index(finding.message, "card.at") < index(finding.message, "card.why")
+    end
+
+    # sabotage: had `descend/3`'s `{:declared, name}` clause return `true`
+    # rather than walking -> the second assertion went red (verified)
+    test "walks a deeper segment through a field whose type is itself declared" do
+      assert {:ok, _compiled} =
+               typed_compile(%{"card.amount" => "txn.amount_minor"}, "cards.declined")
+
+      assert {:error, [_finding]} =
+               typed_compile(%{"card.amount" => "txn.no_such_field"}, "cards.declined")
+    end
+
+    # P5's depth rule: a field this package cannot see into stops the walk
+    # and refuses nothing beyond it. A scalar, a list and an opaque
+    # spelling are the three ways that happens.
+    #
+    # sabotage: made `descend/3`'s catch-all return `false` -> all three
+    # went red (verified)
+    test "stops the walk at a scalar, a list and an opaque field type" do
+      assert {:ok, _scalar} = typed_compile(%{"card.why" => "reason.deeper"}, "cards.declined")
+      assert {:ok, _list} = typed_compile(%{"card.why" => "attempts.deeper"}, "cards.declined")
+      assert {:ok, _opaque} = typed_compile(%{"card.why" => "vendor.deeper"}, "cards.declined")
+    end
+
+    # The amendment's P4, by both its routes: a payload naming a type the
+    # document does not declare, and a compile with no datamodel at all.
+    # Neither refuses anything, and neither is a finding of its own.
+    #
+    # sabotage: refused a payload whose name resolves to nothing -> the
+    # first assertion went red (verified)
+    test "refuses nothing when the payload resolves to nothing" do
+      assert {:ok, _unresolvable} =
+               typed_compile(%{"card.why" => "code"}, "cards.not_declared")
+
+      assert {:ok, _no_datamodel} =
+               Compiler.compile(
+                 Document.new(payload_handler(%{"card.why" => "code"}, "cards.declined"),
+                   id: "bdoc_T"
+                 ),
+                 Palette.core()
+               )
+    end
+
+    # The untyped document, unchanged: no payload, no finding, and the same
+    # bytes the handler compiled to before the key existed.
+    #
+    # sabotage: made an absent payload resolve to a declaration with no
+    # fields, so an untyped handler refuses every pair -> this went red,
+    # with every other test that captures without declaring (verified)
+    test "leaves a handler with no payload exactly as it was" do
+      typed =
+        Compiler.compile(
+          Document.new(handler(%{"order.cancel_reason" => "nowhere_in_any_payload"}),
+            id: "bdoc_T"
+          ),
+          Palette.core(),
+          datamodel: @datamodel
+        )
+
+      assert {:ok, compiled} = typed
+
+      assert compiled.scxml ==
+               compile!(handler(%{"order.cancel_reason" => "nowhere_in_any_payload"}))
+    end
+
+    # `payload` is a declaration and not an emission: the compiled bytes are
+    # the ones the same handler compiles to without it.
+    #
+    # sabotage: emitted the payload name as an attribute on the transition
+    # -> this went red (verified)
+    test "emits nothing of its own" do
+      {:ok, declared} =
+        Compiler.compile(
+          Document.new(payload_handler(%{"card.why" => "reason"}, "cards.declined"), id: "bdoc_T"),
+          Palette.core(),
+          datamodel: @datamodel
+        )
+
+      assert declared.scxml == compile!(payload_handler(%{"card.why" => "reason"}, nil))
+    end
+  end
+
   # -- helpers ---------------------------------------------------------------
+
+  defp payload_config(value) do
+    %{"event" => "cards.declined", "outcome" => "abandon", "payload" => value}
+  end
+
+  defp payload_handler(pairs, payload) do
+    config = %{"event" => "cards.declined", "outcome" => "abandon", "capture" => pairs}
+
+    Block.new("core.on_event",
+      id: "blk_OE",
+      config: if(payload == nil, do: config, else: Map.put(config, "payload", payload))
+    )
+  end
+
+  defp typed_compile(pairs, payload) do
+    Compiler.compile(
+      Document.new(payload_handler(pairs, payload), id: "bdoc_T"),
+      Palette.core(),
+      datamodel: @datamodel
+    )
+  end
 
   defp capture(value), do: %{"event" => "order.cancelled", "outcome" => "abandon"} |> put(value)
 
