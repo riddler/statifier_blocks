@@ -943,3 +943,66 @@ candidates on it. Nothing about decision 2 changes; a declaration that was
 missing from its input is now in it. The census this adds a member to lives
 in `ADR-0002`'s Note of 2026-09-06, and that record carries the
 corresponding note.
+
+## Note (2026-09-06): decision 11's two names ship on `core.map`, and they bind nothing this walk can see
+
+A dated note rather than an amendment. Every decision above stands in the
+words it was accepted in, no clause gains or loses a member, and the deferred
+list is untouched. What this records is how decision 11 was built, because the
+record's sentence "the names the walk binds inside the fan-out body" turned
+out to describe a shape `core.map` does not have, and the resolution is worth
+writing down rather than leaving to be inferred from the module.
+
+**What the gap was.** Reading 4 of this record's Note of 2026-09-06 recorded
+it: the two fields were declared on `core.foreach` and not on `core.map`, and
+`core.map` carries no `body` slot, so the walk's binding - which fires for a
+block declaring a datamodel-path `items` field **and** a slot called `body` -
+reached the loop and not the fan-out. Two ways out were open. `core.map` could
+gain a `body` slot, and the binding would then reach it with no change to
+`StatifierBlocks.Environment` at all; or the fields could be declared without
+one, and the walk left alone.
+
+**The body slot is not available to take, and that decides it.** `ADR-0009`
+decision 3 says "a per-item chart, not a per-item body" and gives the reason
+in the same paragraph: an inline `body` slot "was considered and is not
+built", because it needs a rule for what a compiled-out-of-line subtree's
+identity is, how `ADR-0004`'s provenance map addresses a position inside it,
+and how a document with no document id is pinned. None of those is answered by
+an accepted record. Adding the slot here to make a binding fall out for free
+would decide all three by implication, on the strength of a convenience, which
+is the sweep decision 13 declined to make in the other direction.
+
+**So the names ship declared and emitted, and the walk is unchanged.**
+`core.map` declares `item_as` (default `item`) and `index_as` (no default
+name, the author's or nothing), validates each as a bare lowercase identifier,
+refuses the two sharing one name, and carries both into the one `<invoke>` as
+`<param>` literals beside `items` - which is the param list `ADR-0009`
+decision 3 describes in as many words. Nothing in `StatifierBlocks.Environment`
+changes: a `core.map`'s contribution to the environment stays the `collect`
+write of decision 12, and the two names are bound by the handler inside a
+child run, one document away from anything this walk can check. `item_as` is
+read through its default, so a document stored before the field existed
+validates as it did.
+
+That is the honest reading of decision 11 for this type, and it is narrower
+than the decision's own sentence: the walk binds the two names inside a
+fan-out **body**, and the type that has one is `core.foreach`. On `core.map`
+the same two names are authoring state for the child's vocabulary, checked
+here and bound elsewhere. Decision 11's claim that they are "the names a child
+sees its item and its position under" is exactly what ships; the clause about
+where the walk binds them is what only `core.foreach` satisfies, and reading 4
+above already said so.
+
+**Two sentences elsewhere are historical as of this bead.** Reading 4 of the
+Note of 2026-09-06 says "`core.map` declares neither": it declares both now,
+and the rest of that reading - no `body` slot, so the binding does not reach
+it - is still exactly true and is now true on purpose. And `ADR-0009`'s Note
+of 2026-09-05 says of these two fields "Nothing in the shipped emission
+carries them, so a child chart today reads whatever the fan-out handler passes
+it": the emission carries both, and what the handler passes a child is now the
+author's word rather than the handler's convention. Saying so on that record,
+where its own declaration-surface table and `ADR-0002`'s row for this type
+also stand to be brought up to date, is that record's Note to write and not
+this one's.
+
+`sb-otpv` implements it.

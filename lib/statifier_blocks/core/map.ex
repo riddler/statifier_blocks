@@ -69,14 +69,47 @@ defmodule StatifierBlocks.Core.Map do
   a whole succeeded. An author who wants to branch on the answers reads
   the collected list with a `core.branch` after the block.
 
-  ## The four fields
+  ## The six fields
 
   | Key | Type | What it names |
   |---|---|---|
   | `items` | `{:path, %{}}` | the datamodel path holding the descriptor list |
   | `chart` | `:string` | the document id of the chart run once per item |
+  | `item_as` | `:string` | the name a child sees its item under, default `item` |
+  | `index_as` | `:string` | the name a child sees its position under, when the author wants one |
   | `collect` | `{:path, %{writes: {:list, :unknown}}}` | where the assembled answer is written |
   | `on` | `{:select, ...}` | the aggregation policy, `all` or `first_error` |
+
+  ## The names a child sees, and why they bind nothing here
+
+  `item_as` and `index_as` are ADR-0009 decision 4's declared names for
+  the item and its position, kept with the defaults `item` and `index` by
+  ADR-0011 decision 11. They are the **child's** vocabulary: decision 3's
+  `<param>` list carries them beside `items`, and the handler is what
+  binds one item and one position per child run. Nothing in this document
+  reads them, and this module declares no `<data>` root for either.
+
+  That is the one place a reader coming from `core.foreach` has to slow
+  down. A foreach's `item_as` and `index_as` are declared roots in *this*
+  chart, written by the loop's own `<assign>`, so a block in its body
+  reads them and the walk binds them there. A map has no body to bind
+  into: ADR-0009 decision 3 is "a per-item chart, not a per-item body",
+  and an inline body slot was considered there and deliberately not built.
+  So `StatifierBlocks.Environment`'s fan-out binding - which fires for a
+  block declaring a datamodel-path `items` field **and** carrying a slot
+  called `body` - does not reach a `core.map`, and this block's only
+  contribution to the environment stays the `collect` write of decision
+  12. A name a child sees is bound in the child's own run, one document
+  away from anything this walk can check.
+
+  Two smaller consequences follow from the same fact. Neither name is a
+  datamodel path, so neither draws ADR-0005 clause 11e's declared-path
+  advisory and neither is offered path candidates. And neither can
+  collide with an enclosing loop's binding the way `core.foreach`'s can
+  (that check is `DeclaredRoots`', and there is no root here to collide),
+  so the only cross-field rule this type carries is the foreach one that
+  still means something: the item and its position cannot share one name,
+  because the handler would bind the second over the first.
 
   `items` and `collect` are declared `{:path, opts}` - ADR-0002 decision
   7's eighth field type - so the editor offers the host's declared
@@ -124,6 +157,8 @@ defmodule StatifierBlocks.Core.Map do
           <invoke id="blk_INV" src="bdoc_CHILD" type="statifier_blocks:map">
             <param expr="'signup.invitees'" name="items"/>
             <param expr="'bdoc_CHILD'" name="chart"/>
+            <param expr="'invitee'" name="item_as"/>
+            <param expr="'position'" name="index_as"/>
             <param expr="'answers'" name="collect"/>
             <param expr="'all'" name="on"/>
           </invoke>
@@ -145,9 +180,19 @@ defmodule StatifierBlocks.Core.Map do
 
   **Every `<param>` carries a literal, not an expression.** The handler
   evaluates `items`; the parent does not. So each value is emitted quoted,
-  and the three fields whose values reach a quoted expression refuse a
+  and every field whose value reaches a quoted expression is refused a
   single quote in `validate_config/1` - a value that closed the literal
-  early would compile to something the author did not write.
+  early would compile to something the author did not write. `item_as` and
+  `index_as` are identifiers, so their own rule already excludes it.
+
+  **`item_as` is emitted through its default and `index_as` only when the
+  author named one.** `on`'s G7a shape, for `on`'s reason: a stored config
+  from before either key existed reads as `item` and no position name, so
+  it validates exactly as it did and nothing has an older shape to migrate
+  from (`current_version` stays `1`). What it does *not* do is stay
+  byte-identical: a document compiled before this type carried the names
+  gains the `item_as` param, because ADR-0009 decision 3 says the param
+  list carries them and until now it did not.
 
   **`chart` is emitted twice**, as `src` and as a param. `src` is decision
   3's requirement and is what the self-reference pass and a reading host
@@ -200,10 +245,15 @@ defmodule StatifierBlocks.Core.Map do
   @default_on "all"
   @policies ["all", "first_error"]
 
+  @default_item_as "item"
+
   @chart_message ~s(names the document to run for each item, like bdoc_01JWIZ)
   @items_message "names the datamodel list to run over, like signup.invitees"
   @collect_message "must be a bare lowercase identifier, like answers"
   @on_message ~s(must be "all" or "first_error")
+  @item_as_message "must be a bare lowercase identifier, like invitee"
+  @index_as_message "must be a bare lowercase identifier, like position"
+  @distinct_message "the item and its position cannot share one name"
 
   @impl true
   def current_version, do: 1
@@ -261,6 +311,20 @@ defmodule StatifierBlocks.Core.Map do
         default: ""
       },
       %{
+        key: "item_as",
+        type: :string,
+        label: "Call the item",
+        required?: true,
+        default: @default_item_as
+      },
+      %{
+        key: "index_as",
+        type: :string,
+        label: "Call the position (optional)",
+        required?: false,
+        default: ""
+      },
+      %{
         key: "collect",
         type: {:path, %{writes: {:list, :unknown}}},
         label: "Collect the answers into",
@@ -282,17 +346,26 @@ defmodule StatifierBlocks.Core.Map do
     ]
 
   @doc """
-  The four fields' findings, and nothing about N.
+  The six fields' findings, and nothing about N.
 
-  `on` is read through its default, so a config that never carried the
-  key validates exactly as it did before the key existed; a stored `null`
-  is not an absent key and is refused (ADR-0001 decision 6).
+  `on` and `item_as` are read through their defaults, so a config that
+  never carried either key validates exactly as it did before the key
+  existed; a stored `null` is not an absent key and is refused (ADR-0001
+  decision 6).
+
+  The one cross-field check is `core.foreach`'s, and it earns its place
+  here for the same reason it does there: two bindings that share a name
+  read fine and mean nothing, since the handler binding the position
+  would overwrite the item.
   """
   @impl true
   def validate_config(config) do
     []
     |> check_items(config)
     |> check_chart(config)
+    |> check_item_as(config)
+    |> check_index_as(config)
+    |> check_distinct(config)
     |> check_collect(config)
     |> check_on(config)
     |> Config.verdict()
@@ -311,6 +384,45 @@ defmodule StatifierBlocks.Core.Map do
       findings
     else
       [{"chart", @chart_message} | findings]
+    end
+  end
+
+  # Read through the default, `on`'s G7a shape: a config stored before
+  # this key existed reads as `"item"` and validates as it did, and a
+  # stored `null` reaches `identifier?/1` as the `nil` it is and is
+  # refused.
+  defp check_item_as(findings, config) do
+    if Config.identifier?(item_as(config)) do
+      findings
+    else
+      [{"item_as", @item_as_message} | findings]
+    end
+  end
+
+  # The optional-field idiom `core.foreach` states for the same key: `""`
+  # is this field's own default, which the config form writes into every
+  # block of this type, so absent and empty are both silent.
+  defp check_index_as(findings, config) do
+    case Map.get(config, "index_as") do
+      blank when blank in [nil, ""] ->
+        findings
+
+      value ->
+        if Config.identifier?(value) do
+          findings
+        else
+          [{"index_as", @index_as_message} | findings]
+        end
+    end
+  end
+
+  defp check_distinct(findings, config) do
+    item_as = item_as(config)
+
+    if Config.identifier?(item_as) and item_as == Map.get(config, "index_as") do
+      [{"index_as", @distinct_message} | findings]
+    else
+      findings
     end
   end
 
@@ -399,6 +511,8 @@ defmodule StatifierBlocks.Core.Map do
          {:ok, done_final} <- Context.outcome_id(context, "done"),
          {:ok, chart} <- chart(Map.get(config, "chart")),
          {:ok, items} <- items(Map.get(config, "items")),
+         {:ok, item_as} <- item_as_value(config),
+         {:ok, index_as} <- index_as_value(config),
          {:ok, collect} <- collect(Map.get(config, "collect")),
          {:ok, on} <- on(config),
          {:ok, error_parts} <- error_parts(context) do
@@ -406,7 +520,7 @@ defmodule StatifierBlocks.Core.Map do
         "invoke"
         |> Emission.element(
           [{"id", context.block_id}, {"src", chart}, {"type", @invoke_type}],
-          params(items, chart, collect, on)
+          params(items, chart, item_as, index_as, collect, on)
         )
         |> Emission.attribute_from_config("src", "chart")
 
@@ -430,23 +544,33 @@ defmodule StatifierBlocks.Core.Map do
     end
   end
 
-  # ADR-0009 decision 3: the params carry the *list's path*, not the list
-  # and not N copies of an item, so the emitted bytes are the same over
-  # any N. `collect` is omitted when the author declared none, which is
-  # decision 7 clause 3's supported shape rather than an empty string the
-  # handler would have to read as absence.
-  @spec params(String.t(), String.t(), String.t() | nil, String.t()) :: [Emission.t()]
-  defp params(items, chart, collect, on) do
+  # ADR-0009 decision 3: the params carry the *list's path* and the names
+  # the child sees, not the list and not N copies of an item, so the
+  # emitted bytes are the same over any N. `index_as` and `collect` are
+  # omitted when the author declared neither, which is decision 7 clause
+  # 3's supported shape rather than an empty string the handler would have
+  # to read as absence.
+  @spec params(
+          String.t(),
+          String.t(),
+          String.t(),
+          String.t() | nil,
+          String.t() | nil,
+          String.t()
+        ) :: [Emission.t()]
+  defp params(items, chart, item_as, index_as, collect, on) do
     [
       literal_param("items", items, "items"),
-      literal_param("chart", chart, "chart")
+      literal_param("chart", chart, "chart"),
+      literal_param("item_as", item_as, "item_as")
     ] ++
-      collect_param(collect) ++
+      optional_param("index_as", index_as) ++
+      optional_param("collect", collect) ++
       [literal_param("on", on, "on")]
   end
 
-  defp collect_param(nil), do: []
-  defp collect_param(location), do: [literal_param("collect", location, "collect")]
+  defp optional_param(_name, nil), do: []
+  defp optional_param(name, value), do: [literal_param(name, value, name)]
 
   # A `<param>` carrying a literal, for a value the handler reads rather
   # than one the parent evaluates. `config_key` is stamped as the
@@ -527,6 +651,35 @@ defmodule StatifierBlocks.Core.Map do
   defp collect(value) do
     AssignLocation.location(value, "collect", &Config.identifier?/1, @collect_message)
   end
+
+  @spec item_as_value(Block.config()) :: {:ok, String.t()} | {:error, [{String.t(), String.t()}]}
+  defp item_as_value(config) do
+    value = item_as(config)
+
+    if Config.identifier?(value),
+      do: {:ok, value},
+      else: {:error, [{"item_as", @item_as_message}]}
+  end
+
+  @spec index_as_value(Block.config()) ::
+          {:ok, String.t() | nil} | {:error, [{String.t(), String.t()}]}
+  defp index_as_value(config) do
+    case Map.get(config, "index_as") do
+      blank when blank in [nil, ""] ->
+        {:ok, nil}
+
+      value ->
+        if Config.identifier?(value),
+          do: {:ok, value},
+          else: {:error, [{"index_as", @index_as_message}]}
+    end
+  end
+
+  # The name the child sees its item under, read through the default so an
+  # absent key means `"item"` and a stored `null` stays the `nil` that
+  # `identifier?/1` refuses.
+  @spec item_as(Block.config()) :: term()
+  defp item_as(config), do: Map.get(config, "item_as", @default_item_as)
 
   @spec on(Block.config()) :: {:ok, String.t()} | {:error, [{String.t(), String.t()}]}
   defp on(config) do
