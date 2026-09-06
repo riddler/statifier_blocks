@@ -664,6 +664,65 @@ defmodule StatifierBlocks.EnvironmentTest do
     end
   end
 
+  # sd-ADR-0001's amendment of 2026-09-06 (`statifier_datamodel` 0.3.0): a
+  # scope entry's `type` may name a declaration, and the index projects the
+  # declaration's fields beneath the entry's own path.
+  #
+  # Decision 1 is why that reaches the walk the way it does. The environment
+  # is what the document has **written** on the way to a position, not what
+  # the datamodel says exists: `ctx[:datamodel]` is read for its declarations
+  # and for nothing else (`declarations/1` is the only reader). So a
+  # projected field and an inlined one are treated the same here in the
+  # strongest sense available - neither is a seed, and both are named the
+  # same way when a block does write one. That equivalence is what these
+  # assert; `StatifierBlocks.DatamodelTest` asserts the projection itself,
+  # where the index is actually read.
+  describe "a datamodel entry typed by a declaration" do
+    @projected_datamodel Cards.datamodel()
+                         |> Map.put("scopes", [
+                           %{
+                             "scope" => "local",
+                             "label" => "This run",
+                             "entries" => [
+                               %{
+                                 "name" => "current_txn",
+                                 "path" => "cards.current_txn",
+                                 "type" => "cards.credit_txn",
+                                 "label" => "Current transaction"
+                               }
+                             ]
+                           }
+                         ])
+
+    # sabotage: have `declarations/1` read the scope entries instead of
+    # `Declarations.from_document/1` - the declared record stops resolving
+    # through the entry's document and this goes red.
+    test "the declarations are the document's own, whichever way an entry names one" do
+      declarations = Environment.declarations(%{datamodel: @projected_datamodel})
+
+      assert Environment.type_label(declarations, "cards.credit_txn") ==
+               "Credit card transaction"
+
+      assert Environment.satisfies(declarations, "cards.credit_txn", "Settleable") == :covers
+    end
+
+    # sabotage: seed the environment from the datamodel's declared paths -
+    # the two answers stop agreeing and this goes red. Decision 1: a path is
+    # in the environment because a block wrote it, and a document that only
+    # *declares* a path declares nothing about the walk.
+    test "the walk answers exactly what it answers for the inlined twin" do
+      document =
+        document([open(), settle("blk_STL"), assign("blk_A", "cards.current_txn.currency")])
+
+      target = {"blk_ROOT", "body", 2}
+
+      projected = Environment.at(palette(), document, target, %{datamodel: @projected_datamodel})
+
+      assert projected == Environment.at(palette(), document, target, ctx())
+      refute Map.has_key?(projected, "cards.current_txn.currency")
+    end
+  end
+
   describe "what this package does not define" do
     # sabotage: add a `StatifierBlocks.Compatibility` module -> this goes
     # red. ADR-0011 decision 3: the eight-row table is asserted once, in the

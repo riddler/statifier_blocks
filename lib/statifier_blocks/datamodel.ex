@@ -207,12 +207,20 @@ defmodule StatifierBlocks.Datamodel do
   entry describes it. A bare declared root is exactly that case, and 11l is
   why it is a row with no shape rather than no row: a root says storage
   exists at a name and says nothing about what is under it.
+
+  `type` and `item_type` are `t:StatifierDatamodel.Index.entry_type/0`, so
+  either may be `{:declared, name}` for an entry that names a declaration
+  rather than one of the nine (`sd-ADR-0001`'s amendment of 2026-09-06).
+  Such an entry's members are rows of their own here, at the entry's path
+  followed by the field name, carrying the field's own type - the index
+  projects them exactly as it projects an inlined `object` entry's `fields`,
+  and this view neither knows nor cares which of the two the document wrote.
   """
   @type declared_row :: %{
           path: String.t(),
           sources: [source()],
-          type: Index.type() | nil,
-          item_type: Index.type() | nil,
+          type: Index.entry_type() | nil,
+          item_type: Index.entry_type() | nil,
           scope: Index.scope() | nil,
           label: String.t() | nil,
           sensitive?: boolean()
