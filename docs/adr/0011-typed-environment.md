@@ -1006,3 +1006,107 @@ also stand to be brought up to date, is that record's Note to write and not
 this one's.
 
 `sb-otpv` implements it.
+
+## Amendment (2026-09-06): decision 12's `{:list, :unknown}` becomes a reference into the parent's declaration
+
+**Status: proposed (2026-09-06, campaign SF035, bead `sb-jvz3`, recording
+campaign-034's ruling `RQ-034-2`).** A decision record merges at proposed under
+the campaign invariant; flipping it to accepted is a separate gated request
+through the same `docs/adr/` gate, and `sb-upv0` carries it. Additive: decision
+12 stands as accepted, and no text above this line is edited by this section.
+
+An amendment rather than a Note, and this record's first: every dated section
+above is a Note, and each opens by saying that "the deferred list is
+untouched" (`:785`, `:950`). This one touches it - decision 12's own open
+question is answered - and decision 12 states the type it writes in as many
+words, so the form is the one the sibling records use for the same case
+(`docs/adr/0009-fan-out-block-type.md:967-972`,
+`docs/adr/0002-block-type-behaviour.md:2761`): a `## Amendment` heading with a
+`Status:` line, additive, nothing above it edited.
+
+An amendment **narrowly**, and the scope is worth stating before the decision.
+Two other sections of this record move in campaign SF035 and neither moves
+here: `sb-myt1` amends **decision 1** for the inline-shape inhabitant of
+`type_expr()` and for seeding declared path types from the datamodel index
+(campaign-SF035 ruling `RQ-SF035-15`), and `sb-c9b6` files its own Note. This
+section writes only what `ADR-0013` needs of decision 12 and states its
+dependence on `sb-myt1`'s work rather than doing any of it.
+
+### What is decided
+
+Decision 12 types `core.map`'s `collect` as `{:list, :unknown}` and says "this
+record says nothing about what one element of it holds" (`:524-525`). It now
+says something, and the something is **not** the declared summary: an element
+is an **envelope**, and the declaration sits one level inside it.
+
+`ADR-0009`'s Note of 2026-09-06
+(`docs/adr/0009-fan-out-block-type.md:891`, the table at `:921-925` and the
+sentence at `:927-929`) reads the shipped fan-out handler and fixes what one
+collected element is - a string-keyed map with `"index"` and `"status"`, plus
+`"donedata"` on a completed child, `"failure"` on a failed one, and neither on
+a cancelled one. `ADR-0013` decision 5 types that envelope and puts the
+parent's declaration on its `"donedata"` member. So decision 12's `T` becomes:
+
+| `core.map`'s `collect_type` | The environment entry at `collect`'s path |
+|---|---|
+| absent or empty | `{:list, <the envelope>}`, its `"donedata"` member `:unknown` |
+| a name (a declaration, a scalar, or an opaque string) | `{:list, <the envelope>}`, its `"donedata"` member that name |
+
+The envelope's members, requiredness and member types are `ADR-0009`'s
+amendment of this date, filed with this section; they are not respelled here
+and this record decides none of them. `collect_type` is `ADR-0013` decision 1's
+new optional `core.map` field, carrying a type **name** read by
+`StatifierDatamodel.Types.parse/2` against the parent document's declarations.
+Decision 2's rule for a `{:path, %{writes: T}}` field is what puts the entry
+there and is unchanged; only the `T` moves.
+
+**Both rows are richer than what ships**, and the first is richer with no
+declaration at all: a block after a `core.map` learns that an element has an
+index and a status and how a failure is shaped, whether or not the author
+declared anything. That is the honest reading of a Note that records bytes the
+handler already writes, and it is why this amendment reaches every document
+rather than only the declaring ones. Nothing about a stored document changes
+otherwise and no compiled bytes move: `collect_type` produces none.
+
+**Decision 12's reason is superseded, and its sentence is quoted so the
+supersession is met where the sentence is.** It says the element is unknown
+because "the shipped child recipe emits the outcome name and nothing else, so a
+declared item type would be a claim about bytes that are not there"
+(`:527-529`). Two things falsify it from this date: the envelope's `"index"`
+and `"status"` were always there and this record had not looked, and
+`ADR-0013` decisions 2 and 3 put the child's declared fields into the bytes
+through an optional `donedata_type/1` callback and the `<donedata>` params
+`ADR-0004`'s amendment of this date emits. The claim is no longer about bytes
+that are not there. The rest of decision 12 stands: the list is still dense and
+still in item-index order per `ADR-0009` decision 5, and a block after a
+`core.map` still knows exactly what is true and no more.
+
+### The deferred entry this closes, and the one sequencing constraint
+
+The first entry of the deferred list - "**What a fan-out child's `donedata` may
+declare**" (`:743-749`), which decision 12 explicitly names and which
+`sb-pg91` carries - is answered by `ADR-0013` and loses its place from this
+date. `sb-pg91` closes as folded with that record. The other five entries are
+untouched, including decision 13's, which `ADR-0009`'s amendment at `:967`
+and this record's Note at `:889` moved on their own terms.
+
+**This entry is not spellable until decision 1's `type_expr()` admits an
+inline shape**, and that is a sequencing constraint rather than a hidden
+dependency. `type_expr()` today is a spelling - a string, `:unknown`, or a
+list of one of those (`lib/statifier_blocks/environment.ex:93`) - and cannot
+carry a structure, which is exactly what an envelope is. The inhabitant is
+`sb-myt1`'s amendment to decision 1, citing the inline-shape amendment to
+`sd-ADR-0001` in `statifier_datamodel` rather than respelling its grammar;
+widening `type_expr()` reaches every field with a `writes` key and not only
+this one, which is why it is decision 1's and not decision 12's. Until it
+lands the shipped entry stays `{:list, :unknown}`, unchanged and not wrong -
+a spelling that cannot be written is not written - and `sb-nqfd` builds this
+amendment after `sb-myt1` rather than before.
+
+A consumer that read `{:list, :unknown}` and branched on it - the editor's
+expression surface is the one that exists - reads a list of a shape instead,
+which is more information and not different information.
+
+Filed with `sb-jvz3`, against `ADR-0013` as merged (PR 319, `b90d40e`);
+campaign-SF035, from campaign-034's ruling `RQ-034-2`. `sb-nqfd` builds it,
+behind `sb-myt1`.

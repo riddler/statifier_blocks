@@ -2586,3 +2586,94 @@ for the empty-slot case from this date; nothing else in it moves.
 
 Filed with `sb-hxs5`, against ADR-0002's amendment of 2026-09-06;
 campaign-034 rulings `RQ-034-1` and `RQ-034-13`.
+
+## Amendment (2026-09-06): C1's `child_use` final may carry declared summary params after the outcome param
+
+**Status: proposed (2026-09-06, campaign SF035, bead `sb-jvz3`, recording
+campaign-034's ruling `RQ-034-2`).** A decision record merges at proposed under
+the campaign invariant; flipping it to accepted is a separate gated request
+through the same `docs/adr/` gate, and `sb-upv0` carries it. Additive: C1
+stands as accepted, and no text above this line is edited by this section.
+
+An amendment rather than a Note, because C1 says what a `child_use` final
+carries in as many words - "carrying the outcome name as done data"
+(`:1267`), with the `<donedata>` shape drawn as a single `<param>` at `:1272` -
+and this record now says a final may carry more.
+
+**What is decided.** A document compiled with `child_use: true` still emits one
+top-level `<final>` per root-block outcome, reached by the same transition on
+the same `done.outcome.s_blk_ROOT.<outcome>` event. Its `<donedata>` may now
+carry, in this order:
+
+1. `<param name="outcome" expr="'<outcome>'"/>` - C1's own, unchanged, first;
+2. the reserved `<param name="statifier_persistence:run_status" expr="'failed'"/>`
+   on a failure-classed outcome only - the Note of 2026-09-06 at `:2457`'s,
+   unchanged, second;
+3. one `<param name="<name>" expr="<path>"/>` per entry the root block type's
+   optional `donedata_type/1` callback declares, in declaration order.
+
+The third group is `ADR-0013` decision 3
+(`docs/adr/0013-typed-fan-out-child-summary.md`, proposed 2026-09-06); the
+callback that produces it is that record's decision 2, recorded on `ADR-0002`
+by the Note filed with this amendment. `ADR-0013` itself says the widening is
+this record's to make and does not make it (`:293-294`).
+
+**Why after both compiler-minted params rather than between them.** Decision
+6's byte determinism. A document whose root type declares nothing compiles to
+exactly the bytes it compiles to today, and a failure-classed final does not
+have its two existing params reordered by a declaration that arrives later.
+The ruling's phrase "after the outcome param" is satisfied by either position;
+byte stability picks this one. A document that declares something moves its
+content hash and is a new chart revision under statifier-ex `ADR-0052`, the
+one-time cost the Note at `:2522` already describes for the shared failure
+final.
+
+**The declared params are emitted on every top-level `child_use` final**,
+including a failure-classed one, because `donedata_type/1` is a pure function
+of the root block's config and the compiler classes outcomes rather than runs.
+It has no other information at the point it mints them. They do not thereby
+reach the parent from a failed child: `ADR-0009`'s Note of 2026-09-06 records
+that a child run settling in a failure-classed final is stored `failed` and
+that the driver answers the parent's invocation with
+`{:failed, reason: <the run's failure>}` rather than with donedata
+(`docs/adr/0009-fan-out-block-type.md:915-917`), so on that arm the collected
+element carries a `"failure"` map and no `"donedata"` key at all (`:921-925`).
+The bytes are minted and unread there, which is a cost in the compiled document
+and nothing else - and a document compiled for use as a child is also a
+document a host may run directly, where its `<donedata>` is read by whoever
+invoked it.
+
+**Two names a declaration may not mint.** `outcome` and
+`statifier_persistence:run_status` are the compiler's, reserved by C1 and by
+the failure seam respectively, and a `donedata_type/1` entry colliding with
+either is an `:invalid_donedata_field` Emit finding against the root block
+rather than a silently shadowed param. That refusal is what keeps the two
+groups above separable, and it is `ADR-0002`'s Note of this date that declares
+it.
+
+### What this amendment narrows in the Note of 2026-08-29
+
+That Note's `terminate` sibling closes on a sentence this amendment reads
+against, and it is quoted here so a reader meets the narrowing rather than
+inferring it. Under the heading "`child_use` stays the child-chart shape"
+(`:1707`) it says: "This note adds a sibling; it does not widen C1"
+(`:1709`). Every word of that sentence held when it was written and holds now
+about **that** Note: the `terminate` option added a sibling shape and widened
+nothing. What it is not is a promise that C1 is never widened - and this
+amendment widens it, from a different bead, a different campaign and a
+different question. The sentence is narrowed to its subject from this date:
+the `terminate` Note does not widen C1; this section does.
+
+Nothing else in that Note moves. `child_use: true` remains what a document
+compiled **for use as a child** passes and remains the only thing that emits
+`<donedata>` (`:1710-1712`); the two options remain **mutually exclusive**,
+refused at compile with an `:emit` finding when both are passed
+(`:1714-1719`); and the `terminate` finals still carry no `<donedata>` at all
+(`:1696-1698`), so `donedata_type/1` reaches them not at all. A root type that
+declares fields and is compiled with `terminate: true` emits none of them,
+because there is no boundary for them to cross - which is that Note's own
+reason, unchanged.
+
+Filed with `sb-jvz3`, against `ADR-0013` as merged (PR 319, `b90d40e`);
+campaign-SF035, from campaign-034's ruling `RQ-034-2`. `sb-nqfd` builds the
+emission.

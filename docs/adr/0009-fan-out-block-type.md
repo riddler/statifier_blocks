@@ -1156,3 +1156,161 @@ this record's decision to make - and it is answered in the direction decision
 13 argued for, on this record's own reading of its decision 5.
 
 Filed with `sb-pxkf`, campaign-034 ruling `RQ-034-5`.
+
+## Amendment (2026-09-06): decision 4 gains `collect_type`, decision 5's element is the envelope this record already fixed, and decision 7's multiplicand is nameable
+
+**Status: proposed (2026-09-06, campaign SF035, bead `sb-jvz3`, recording
+campaign-034's ruling `RQ-034-2` and campaign-033's `RQ-033-19` B).** A
+decision record merges at proposed under the campaign invariant; flipping it to
+accepted is a separate gated request through the same `docs/adr/` gate, and
+`sb-upv0` carries it. Additive: decisions 4, 5 and 7 stand as accepted, and no
+text above this line is edited by this section. The form is the amendment of
+this date at `:967`, this record's own.
+
+An amendment rather than a Note, because decision 4 declares this type's
+config surface as a closed ordered table and this section adds a row to it,
+and because decision 5 says "this record says nothing about what one element
+holds" - via `ADR-0011` decision 12, which cites it - and this section says
+something. It is filed with the three sibling amendments `ADR-0013` names in
+"What this record owes the accepted records"
+(`docs/adr/0013-typed-fan-out-child-summary.md:703-733`), and it decides
+nothing `ADR-0013` did not already decide.
+
+### Decision 4's table gains one optional field
+
+| Key | Type | Required | Notes |
+|---|---|---|---|
+| `collect_type` | `:string` | no | `ADR-0013` decision 1's declaration of what one collected element's `"donedata"` member holds |
+
+It sits after the accumulation field and before `aggregate` - in the shipped
+surface, after `collect` and before `on`, which is `config_schema/1`'s sixth
+entry (`lib/statifier_blocks/core/map.ex:322-372`, six entries today). Its
+default is the empty string, and an absent or empty value is what every stored
+document carries: no declaration, and nothing about such a document changes.
+
+**It is a type and never a path.** It does not carry `datamodel_path?: true`,
+it is not read through `StatifierBlocks.Core.AssignLocation`, and the
+amendment at `:967` - which widened the *accumulation* field's grammar to a
+dotted datamodel path - does not reach it. The two fields are adjacent and
+answer different questions: `collect` says **where** the list is written,
+`collect_type` says **what** one element's answer is.
+
+Its stored value is a type **name**, read by `StatifierDatamodel.Types.parse/2`
+against the parent document's declarations - normally `{:declared, name}`, and
+a scalar spelling or an opaque string too, because `parse/2` is total. A
+spelling that names nothing is not a refusal here, which is the permissiveness
+`ADR-0006` and `ADR-0011` already chose. Its `config_schema/1` field type is
+the existing `:string` and `ADR-0002` decision 7's set stays closed at eight;
+`sb-268w` migrates it and `ADR-0002`'s `payload` together to a
+`{:type_expr, opts}` spelling when the typed-shapes theme settles, and a stored
+string reads as the name arm unchanged when it does.
+
+The declaration is the **parent's**, because a `core.map` names its child chart
+by document id and cannot resolve it: decision 4's own reason for `chart` being
+a string is this section's reason for the declaration being on this side.
+
+### Decision 5's element is the envelope, and `collect_type` types its `"donedata"` member
+
+Decision 5 fixes the list - dense, one element per item, in item-index order -
+and this section fixes what one element **is**. It is not new: the Note of
+2026-09-06 at `:891` already read it off the shipped handler and recorded it as
+a string-keyed map with `"index"` and `"status"`, plus `"donedata"` on a
+completed child or `"failure"` on a failed one and nothing further on a
+cancelled one (the table at `:921-925`, the sentence at `:927-929`). What this
+section adds is that the map is a **declarable type** rather than an
+undescribed shape, and where the author's declaration lands inside it.
+
+The element, as an inline shape - spelled by member name and requiredness
+only, because the grammar is `statifier_datamodel`'s and this record invents
+none:
+
+| Member | Required | Type |
+|---|---|---|
+| `"index"` | yes | `integer` |
+| `"status"` | yes | `string` - one of `"completed"`, `"failed"`, `"cancelled"`, the three the Note at `:891` fixes |
+| `"donedata"` | no | the parent's `collect_type` as `Types.parse/2` reads it, or `:unknown` when there is none |
+| `"failure"` | no | a shape of `"reason"`, `"attempts"` and `"detail"` - `st-ADR-0068`'s three keys, as the Note at `:925` carries them |
+
+`"donedata"` and `"failure"` are optional because no element carries both and
+a cancelled element carries neither; `"index"` and `"status"` are required
+because every element carries both, on all three arms. `"status"` is a string
+rather than a three-member enumeration because `t:StatifierDatamodel.Types.t/0`
+has no enumeration member; the three values are named here so a reader of the
+type knows them, and the Note at `:891` is where they are decided.
+
+The inline-shape grammar itself is the amendment to `sd-ADR-0001` in
+`statifier_datamodel` (a type expression admits an inline, unnamed shape beside
+a declared name), cited rather than respelled here, exactly as `ADR-0013`
+decision 5 cites it. **The environment entry this implies is `ADR-0011`
+decision 12's to state**, and the amendment filed with this section states it
+there; this record's decision 5 is about what the list holds and not about how
+the typed environment spells it.
+
+**Two things a reader should take from the shape rather than infer.** The
+parent's declaration sits **one level below** the element: what an author
+declares in `collect_type` is what one element's `"donedata"` member holds, not
+what an element holds, and the element is the same envelope on every
+`core.map`. And a declared field **never reaches the parent from a child that
+failed** - the Note at `:915-917` records that the driver answers the parent's
+invocation with `{:failed, reason: <the run's failure>}` rather than with
+donedata, so the failed arm has no `"donedata"` key at all and the declaration,
+emitted into the child's bytes or not, is not in it. A block after the
+`core.map` reads `"status"` first.
+
+Decision 5's four chosen properties are untouched: order is still by item index
+and never by completion order, errors still sit in place, cancelled siblings
+under `first_error` still occupy their indices, and the write still happens
+once at the invocation's completion.
+
+### Decision 7's multiplicand is nameable, and the cap stays the host's
+
+Decision 7 states the cost as per-step rather than per-run and its clause 1
+puts the lever on the child: "the child chart decides the size of its own
+answer" (`:401-408`). That guidance a host could only follow by reading the
+child. `ADR-0013` decision 6 makes the multiplicand nameable: the size is the
+declared summary's, and the collected list costs **`N` times the declared
+summary's size** where `N` is the length of `items`, plus the envelope's
+per-element constant - an index, a status string, and on a failed element
+`st-ADR-0068`'s three keys - which is there whether or not anything is declared
+and which the shipped handler already writes.
+
+**No clause of decision 7 is dropped or narrowed.** Clause 1's lever is still
+the child's answer size and is now visible in one file rather than one chart.
+Clause 2's error element is still a reason rather than a diagnosis, and the
+Note at `:891` is where its shape is fixed. `max_concurrency` is still a hint
+and `sensitive?` still applies to the location holding `N` answers; there is
+still no compression, no truncation and no spill; and the fourth clause's
+refusal to set a number stands word for word. **The cap is still the host's and
+neither record sets one**: the compiler cannot know `N`, and a limit written
+into a document would be a deployment property in a document. What is added is
+that a host enforcing a cap now has a compile-time quantity to enforce
+against - the declared summary's field count and types - rather than only a
+runtime measurement of what the children happened to return. The refusal
+remains the runtime's, on the ordinary error route, and is not a compile
+finding.
+
+An optional accumulation field simply omitted is still the cheapest correct
+shape for a large batch, and a `collect_type` on a `core.map` that writes
+nothing types nothing: whether that dead declaration deserves an advisory is
+`ADR-0005`'s findings-layer question, named in `ADR-0013`'s deferred list and
+not taken here.
+
+### What this section does not touch
+
+The outcome set is still two and still fixed (the Note at `:803`), decision
+6's `all` and `first_error` still decide which outcome the block reaches and a
+failure-classed child still does not by itself decide it, and decision 8's
+empty fan-out still succeeds over nothing (the Note at `:761`). `collect_type`
+produces no bytes: it feeds the typed environment and an editor advisory, and
+the block's emission is unchanged by it. The child-side half - the optional
+`donedata_type/1` callback and the `<donedata>` params it mints - is
+`ADR-0002`'s and `ADR-0004`'s, amended of this date by the sections filed with
+this one.
+
+The open question this record's Note of 2026-09-06 at `:714` left on decisions
+5 and 6 - what a fan-out child's `donedata` may declare, named at `:754` as
+`sb-pg91`'s - is answered by `ADR-0013` and by this section. `sb-pg91` closes
+as folded with that record.
+
+Filed with `sb-jvz3`, against `ADR-0013` as merged (PR 319, `b90d40e`);
+campaign-SF035. `sb-nqfd` builds it.

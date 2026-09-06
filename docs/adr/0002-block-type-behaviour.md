@@ -4854,3 +4854,102 @@ by a status line) and as the Note at `:4656` states in as many words at
 `:4739-4740`: Notes in this family do not carry one.
 
 Filed with `sb-nhw0`, from `sb-i0cc`'s pass-2 reviewer NOTES.
+
+## Note (2026-09-06): an optional `donedata_type/1`, the thirteenth callback, and what decision 5's table of nine counts
+
+A dated Note rather than an amendment. It edits nothing above this line, and in
+particular it does not touch decision 5: the five required callbacks are still
+the five it names, `emit/2` is still listed for the reason it gives, and no row
+of its table gains or loses a word. What this Note records is a **new optional
+callback beside** those, declared by `ADR-0013`
+(`docs/adr/0013-typed-fan-out-child-summary.md`, decision 2, proposed
+2026-09-06 under the operator's campaign-SF035 grant, recording campaign-034's
+ruling `RQ-034-2`), and what it does and does not reach.
+
+The form is the Note of this date at `:3832`, which recorded `failure_outcomes/1`
+the same way and for the same reason: a new optional callback is additive to
+decision 5 rather than a change to it, and the record catches up to the
+behaviour rather than re-deciding the surface.
+
+This record has taken the other form once, and the difference is worth stating
+rather than leaving to look like an inconsistency. Amendment H of 2026-08-30
+(`:1751`) recorded the optional `summary/1` as an **amendment**, because it
+also decided what a core card's second line says - a presentation decision this
+record owns and had not taken. `donedata_type/1` decides nothing this record
+owns: what it declares is `statifier_datamodel`'s vocabulary, where the params
+it produces go is `ADR-0004`'s C1, and what a parent does with them is
+`ADR-0009`'s and `ADR-0011`'s. So it takes the `failure_outcomes/1` shape and
+not amendment H's.
+
+**The callback.** `StatifierBlocks.BlockType` declares
+`donedata_type(config) :: [donedata_field()]`, optional, where a
+`donedata_field` is a map of `name`, `path` and `type` - the `<param>` name a
+field is emitted under, the datamodel path its `expr` reads at the child's own
+runtime, and the field's type in `statifier_datamodel`'s vocabulary
+(`t:StatifierDatamodel.Types.t/0`). It is resolved through
+`BlockType.donedata_type/2` the way `outcomes/1` and `failure_outcomes/1` are -
+`Code.ensure_loaded?/1` plus `function_exported?/3`, defaulting to `[]`. A type
+that does not export it declares nothing, which is where every shipped `core.*`
+type stays, so a host type written before the callback existed compiles to the
+bytes it compiled to.
+
+The three rules `slots/1` and `config_schema/1` carry apply to it unchanged -
+it is a **pure function of `config`**, it is **total** for any config
+`validate_config/1` accepts, and it **never raises**. Those are the three
+`summary/1` restates in those words
+(`lib/statifier_blocks/block_type.ex:609-612`) and the three `outcomes/1`
+states as its stability rule (`:538-542`). Order is declaration order and is
+never sorted, for `ADR-0004` decision 6's reason: the params serialize in the
+order the callback returns them, so reordering the list moves compiled bytes.
+
+**Two reserved names it may not mint.** A declared `name` may be neither
+`outcome` nor `statifier_persistence:run_status`. Those two are the compiler's -
+the first is `ADR-0004`'s amendment C1, the second the failure seam's reserved
+param recorded in the Note of this date at `:3832` - and a declaration that
+collides with either is an `:invalid_donedata_field` Emit finding against the
+root block rather than a silently shadowed param.
+
+**What decision 5's table of nine counts, and what is declared today.** The
+table at `:109-121` reads "nine callbacks, five required" and lists nine.
+Twelve are declared on the module today - `slots/1`, `config_schema/1`,
+`validate_config/1`, `current_version/0`, `emit/2`, `io/1`, `migrate_config/2`,
+`fixtures/0`, `palette_entry/0`, `outcomes/1`, `failure_outcomes/1`,
+`summary/1` (`lib/statifier_blocks/block_type.ex:252`, `:330`, `:338`, `:345`,
+`:374`, `:382`, `:389`, `:424`, `:520`, `:548`, `:581`, `:620`), seven of them
+optional (`:622-628`) - and `donedata_type/1` is the **thirteenth**. The count
+is stated here rather than left to be derived from the table because the table
+lists nine where the module declares twelve, and has done since before this
+Note - which is also why nothing above this line is edited to correct it.
+Three callbacks arrived after decision 5 was accepted, and each was recorded
+the way this one is: `outcomes/1` by amendment A (`:703`), `summary/1` by
+amendment H (`:1751`), and `failure_outcomes/1` by the Note at `:3832`. A reader wanting the live surface reads `@optional_callbacks` and the
+`@callback` list; a reader wanting what decision 5 contracted reads the table.
+
+**What it does not reach.** Nothing in this package's editor, routing or
+palette branches on it. It declares no outcome and classes none, so
+`outcomes/1` and `failure_outcomes/1` are untouched and amendment A2's refusal
+to marry an outcome to a slot is not in play. No slot arity, no `slot_style`,
+no `palette_entry/0` key and no card changes; `summary/1` is still the card's
+second line and the two are deliberately differently named, which `ADR-0013`
+decision 2 gives its reason for. Decision 7's closed field-type set is not
+widened by this Note: `core.map`'s companion field `collect_type` is typed
+`:string`, which is the split the `payload` amendment of this date took in its
+section `P3` at `:4108` - the declared-name arm gets a field typed `:string`
+(`:4126`), the inline-shape arm gets no field type and none is invented for it
+(`:4133`) - under the sentence that section closes its opening on at
+`:4121-4122`: "**No ninth field type is added by it.**".
+
+**Where the bytes go.** The declared fields are emitted as `<donedata>`
+`<param>`s on every top-level `child_use` final, after both compiler-minted
+params. That is `ADR-0013` decision 3 and it widens `ADR-0004`'s amendment C1;
+the amendment filed with this Note carries it on that record, and the ordering
+is what keeps the reserved failure-seam param's bytes stable.
+
+This Note carries no `Status:` line, which is this file's convention for a Note
+- the Note at `:3456` shows it (its heading is followed by prose at `:3458`,
+not by a status line) and the Note at `:4656` states it in as many words at
+`:4739-4740`. `sb-upv0` flips the sections that carry one; there is nothing to
+flip here.
+
+Filed with `sb-jvz3`, against `ADR-0013` as merged; campaign-SF035, from
+campaign-034's ruling `RQ-034-2`. `sb-nqfd` builds the callback.

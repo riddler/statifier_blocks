@@ -798,3 +798,56 @@ into a config field, and the two move independently.
 the editor control and the inhabitant; a stored string reads as the name arm
 unchanged when it does. Until then a `collect_type` that wants an inline
 shape has no spelling, and that is the state this record leaves.
+
+## Note (2026-09-06): eight `block_type.ex` cites, repointed at the lines they mean
+
+A dated Note rather than an amendment. No decision above this line moves, no
+statement above this line is wrong, and nothing this record decides changes:
+what is corrected is where eight citations **point**, after `sb-1c7g` grew
+`lib/statifier_blocks/block_type.ex` above `palette_entry/0` (commit
+`f3e737f`) while this record's own request was open. Every claim those
+citations support was true when it was written and is true now; the line
+numbers drifted by eleven and the sentences did not.
+
+The correction is by addition rather than in place, which is this campaign's
+term for a record on `main` - amend-by-addition, zero removed lines - and which
+`ADR-0002`'s Note of this date states as the reason a known long line was left
+standing (`docs/adr/0002-block-type-behaviour.md:4838-4840`). It matters twice
+over here: `ADR-0002` cites **this record** by line number, at `:143-144`
+(`docs/adr/0002-block-type-behaviour.md:4825-4830`), so an in-place edit above
+that point would move the lines another record on `main` names. This Note sits
+below everything and moves nothing.
+
+| Where in this record | What it cites | Printed | Reads today |
+|---|---|---|---|
+| `:225` | the three rules `summary/1` restates | `:598-601` | `:609-612` |
+| `:226` | `outcomes/1`'s stability rule | `:527-531` | `:538-542` |
+| `:239` | `palette_entry/0`'s `@callback` | `:509` | `:520` |
+| `:239` | `outcomes/1`'s `@callback` | `:537` | `:548` |
+| `:239` | `failure_outcomes/1`'s `@callback` | `:570` | `:581` |
+| `:239` | `summary/1`'s `@callback` | `:609` | `:620` |
+| `:240` | the `@optional_callbacks` list | `:611-617` | `:622-628` |
+| `:245` | `summary/1` as the card's second line | `:609` | `:620` |
+
+Each was read off `main` at `7cb3d28`. The eight are one drift and not eight:
+every one of them sits below `palette_entry/0`, and every one moved by the same
+eleven lines.
+
+**Four cites in this record are checked and did not move**, and they are listed
+so a reader knows the table above is the whole of it: decision 7's closed
+field-type set at `:136` and `:790` is still
+`lib/statifier_blocks/block_type.ex:149-157`, and the eight `@callback` lines
+this record names above `palette_entry/0` across `:238-239` - `:252`, `:330`,
+`:338`, `:345`, `:374`, `:382`, `:389`, `:424` - are each still what they say. `sb-1c7g`'s growth was
+entirely below `:424` and entirely above `:509`.
+
+The count of declared callbacks this record states - twelve today, this
+record's the thirteenth (`:234-242`) - is unchanged by the repointing, and the
+`ADR-0002` Note filed with this one restates it there against the same tip.
+
+This Note carries no `Status:` line, which is the convention for a Note in this
+family, as `ADR-0002`'s Note of this date states in as many words
+(`docs/adr/0002-block-type-behaviour.md:4851-4854`). The record's head status
+is untouched and stays `proposed`; `sb-upv0` flips it.
+
+Filed with `sb-jvz3`, as folded residue from `sb-57yc`; campaign-SF035.
