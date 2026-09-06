@@ -10,6 +10,194 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.20.0] 2026-09-06
+
+0.20.0 is about types. The datamodel document's declarations become
+something the whole package reads: `StatifierBlocks.Environment` carries the
+path-to-type map at any position in a document with one pre-order walk,
+every `core.*` block type declares what it reads and writes at datamodel
+paths, and the data-flow check is defined over that environment rather than
+over the block immediately before this one. The path/type index itself moved
+out to the `statifier_datamodel` package, taken from Hex at `~> 0.1`; the
+drawer's Datamodel tab answers what is known at the selected block and lists
+the declared records and shapes; and the condition editor is handed the
+declared kinds, so a clause on a path declared `integer` offers the numeric
+operators.
+
+It is a minor with two breaking edges to read before upgrading.
+`StatifierBlocks.Predicates.Datamodel` is gone: its functions are
+`StatifierDatamodel.Index`'s, under the same names, so a caller swaps the
+module name and nothing else. And a type expression spelled exactly
+`unknown` now reads as the permissive `:unknown` rather than as an opaque
+expression that happens to be spelled that way - it only ever admits, so
+nothing that passed before is refused now. The signature changes under
+Changed keep their arities; `{:type_mismatch, ...}` gains a sixth member
+naming the datamodel path the read was checked at.
+
+### Added
+
+- The kinds a datamodel document declares reach the condition editor. With a
+  document supplied, `StatifierBlocks.Datamodel.path_types/1` projects it to
+  the expression language's own value kinds and the editor hands that map to
+  statifier-ui's expression editor, so a clause on a path declared `integer`
+  offers the numeric operators and one on a `date` path the date set, rather
+  than whichever set its current source happens to imply. It draws a control
+  and decides nothing: the operator the source carries is still offered, the
+  value in it is still kept, a disagreement renders as an advisory beside the
+  clause, and a path the document does not declare renders exactly as it did.
+  A host that supplies its own `expression_component` is handed the same map.
+
+- A `:type_mismatch` finding names a declared type by its **label**. A pair
+  of names the datamodel document's `types` key declares reads as the two
+  human names an author recognises; a pair of opaque spellings a host
+  carries reads exactly as it did before there were declarations. The rule
+  is one function, `StatifierBlocks.Environment.type_label/2`, so the
+  finding and the editor cannot disagree about what a type is called.
+- The drawer's Datamodel tab answers **what is known here**: the paths the
+  environment holds at the selected block's position, with their types, as
+  computed by the pre-order walk at that exact position - before the block's
+  own writes land. Nothing selected and nothing known are two different
+  states and the panel says which it is.
+- The same tab lists the **declared records and shapes**, each with its
+  ordered fields, their types and their required marks, through
+  `StatifierBlocks.Datamodel.declared_types/1`. An author told that a record
+  does not cover a shape can now read what that shape requires without
+  leaving the editor.
+
+- Write signatures across the `core.*` vocabulary, so the environment
+  survives one. `core.assign` writes its `path` and `core.subchart` its
+  `assign_to` as known-but-untyped; `core.map` writes `collect` as
+  `{:list, :unknown}`, so the block after a fan-out knows it is looking at a
+  list; `core.on_event` writes one path per `capture` pair on the interrupt
+  path; `core.wait`, `core.send`, `core.raise` and `core.await` write nothing
+  and leave the environment exactly as it reached them; and a container hands
+  its children's writes out through the per-path merge.
+
+- `StatifierBlocks.Environment` - the datamodel path to type map at any
+  position in a document, carried by one pre-order walk. `at/3` answers it,
+  `subject_path/2` names the path a document's subject lives at,
+  `read_signatures/3` and `write_signatures/3` say what a block declares
+  there, and `type_of/2` and `satisfies/3` read a declaration's spelling
+  against the datamodel document's own type declarations.
+- `palette_entry/0` gains an optional `subject` key: the datamodel path a
+  document's subject lives at, read from the document's entry block.
+- `StatifierBlocks.Assignability.context/0` gains an optional `:datamodel`
+  key, and `StatifierBlocks.Compiler.compile/3` threads its existing
+  `:datamodel` option into it, so the read check can consult the document's
+  `record` and `shape` declarations.
+- The reason vocabulary gains `{:shape_not_satisfied, missing}`: the
+  environment holds a record at the path, the read expects a shape, and
+  `missing` names the required fields the record does not cover.
+
+- A `{:path, opts}` field declares what it reads and writes at its path:
+  `expects: T` is a read signature the environment at the block's position
+  must satisfy, and `writes: T` puts `T` there for every block after it.
+  Both keys are optional, and a field carrying neither behaves exactly as it
+  did - a write of `:unknown`, known but untyped, that refuses nothing.
+- `field_candidates`, the values a host offers for one field, keyed
+  `{type_name, field_key}`. A `:string` field with a closed list -
+  `[{value, label}]` - renders a `<select>`; an open one -
+  `{:open, [{value, label}]}` - renders the text input with a `<datalist>`;
+  no list renders the input the field already had. It draws a control and
+  decides nothing: `validate_config/1` is still the only authority on a
+  value, and a stored value a closed list does not offer is drawn as its own
+  option rather than silently rewritten. It is an editor assign and a
+  `StatifierBlocks.Compiler.compile/3` option, where a value outside a
+  closed list is a **warning** on the compiled artifact and never an error.
+- `core.on_event`'s `capture` has an authoring surface: a repeated
+  two-control row, one row per pair - the datamodel path written beside the
+  path read inside the firing event's payload - with the source control
+  offered the block type's own `fixtures/0` payload for the configured
+  event. There is always one blank row at the end, which is what adds a
+  pair; clearing both controls of a row removes one. The key was authored
+  through the document before this and had no control at all.
+- A capture's target paths reach the declared-path advisory, anchored on the
+  `capture` key. They are datamodel paths that no field declaration names,
+  so the pass covering every other datamodel path could not see them.
+
+### Changed
+
+- The optional `statifier_ui` dependency's floor moves to `~> 0.8`, which is
+  the release that takes `:path_types`. The dependency is optional in the same
+  sense it always was: a tree without it renders the plain source input, and
+  nothing adds it for you.
+
+- `statifier_datamodel` is a Hex dependency at `~> 0.1` rather than a pinned
+  git revision, so a host resolves this package's dependencies from Hex alone.
+
+- `StatifierBlocks.Datamodel` reads the datamodel document through
+  `statifier_datamodel` rather than through an index of its own.
+  `declared_paths/1`, `candidates/3`, `candidates_under/2`,
+  `value_candidates/2` and `declared_view/3` keep their signatures and their
+  behaviour; what changed is where the projection lives.
+- The declared type set gains `date` alongside the eight it already carried,
+  because the re-homed record widened it. A document that used no `date`
+  entry is unaffected.
+
+- **Breaking.** The data-flow check is no longer a question about the block
+  before this one. A block declares what it reads and writes at datamodel
+  paths, and `check/5`, `valid_targets/4`, `validate/3`, `inbound_type/4` and
+  `seam_reason/4` are defined over the environment at a position. They keep
+  their arities. `io/1`'s `consumes` and `produces` keep their meaning as
+  sugar: `consumes` is a read at the document's subject path and `produces`
+  is a write there. A palette that declares no `subject` on its entry block's
+  palette entry has no subject path, so that sugar declares nothing and the
+  document validates exactly as an untyped one always did.
+- **Breaking.** `{:type_mismatch, block_id, ref, held, expected}` gains a
+  sixth member, the datamodel path the read was checked at. A block may carry
+  several read signatures on several paths, so a message that says which two
+  types disagreed without saying where is one an author cannot act on.
+  `{:kind_not_admitted, ...}` is unchanged.
+- **Breaking.** A type expression spelled exactly `"unknown"` now reads as
+  the permissive `:unknown` rather than as an opaque expression that happens
+  to be spelled that way. It only ever admits: an opaque `"unknown"` compared
+  by identity was already satisfied against another `"unknown"`, so nothing
+  that passed before is refused now.
+- The refusal a `{:type_mismatch, ...}` names is the block whose write
+  signature put the type at the path, found by name rather than by adjacency.
+  A refusal at index 0 of a slot that used to answer `:not_assignable` -
+  because there was no previous sibling to name - now answers
+  `{:fixable_by, block_id}` when a block upstream of the container did
+  declare the type.
+- The read check itself is `StatifierDatamodel.Types.satisfies/3`: unknown,
+  then identity, then a record covering a shape's required set. The palette's
+  host relation still runs, and now runs **last**, after that coverage step -
+  so the floor a host cannot lower is higher than it was, and a host that was
+  widening records into shapes by hand can delete that half of its module.
+- A `core.branch`'s arms and a `core.parallel`'s lanes no longer blank
+  everything downstream. What leaves a container is the per-path merge: a
+  path every arm holds at one type keeps it, and only a path the arms
+  disagree about drops to `:unknown`.
+
+- `core.subchart`'s `assign_to` accepts a **datamodel path**, not only a
+  bare lowercase identifier: any non-empty string with no whitespace in it,
+  which is exactly what `core.assign` accepts for the path it writes. The
+  validation and the emission widen together. It is a widening and nothing
+  else - a bare identifier is a one-segment path, so every document that
+  validated before still validates and compiles to the same bytes - and it
+  settles the field offering dotted candidates its own validation refused.
+  The identical refusal on an `<assign>` location elsewhere in the
+  vocabulary is untouched.
+
+### Removed
+
+- `StatifierBlocks.Predicates.Datamodel` is gone. The datamodel document's
+  path/type index moved to the `statifier_datamodel` package as
+  `StatifierDatamodel.Index`, which carries the same functions under the same
+  names (`index/1`, `declared_paths/1`, `sensitive_paths/1`, `datamodel/1`,
+  `entries/1`, `fetch/2`, `type/2`, `declared?/2`, `under/2`); a caller
+  swaps the module name and nothing else.
+
+### Fixed
+
+- The editor's drop check consults the datamodel document the editor already
+  holds, instead of asking the data-flow question with an empty context. The
+  coverage step - a record satisfying a shape by covering its required set -
+  could not run there, so a placement the compiler accepts was drawn as
+  refused. `StatifierBlocks.Edit.Targets.droppable_slots/3`,
+  `droppable_slots_for/3` and `slot_verdicts/3` each take an optional
+  context as a fourth argument; called with three, every one of them behaves
+  exactly as it did.
 ## [0.19.0] 2026-09-05
 
 0.19.0 is about what a chart does with the world outside it. `core.map`
@@ -1835,6 +2023,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.20.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.20.0
 [0.19.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.19.0
 [0.18.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.18.0
 [0.17.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.17.0
