@@ -3423,3 +3423,50 @@ existing field.
 
 Filed with `sb-7haw`, campaign-031. `sb-kqno` (PR 281, `a852429`) is the
 implementation this row is read off.
+
+## Note (2026-09-06): decision 7, `{:path, opts}` gets its first two keys, and a `field_candidates` feed
+
+A dated Note rather than an amendment: decision 7 is unchanged, its closed
+field-type set still has eight members, and no line above this one is edited.
+The 2026-09-05 `{:path, opts}` amendment says `opts` "carries no defined key
+today" and is a tuple precisely "so that what a control needs can arrive
+without widening the set a second time". This Note records that a later record
+has taken that door, and points at it rather than restating what it decides.
+
+`ADR-0011` gives `opts` two keys, and both are optional:
+
+- **`expects: T`** - a read signature. The block reads the path the field's
+  value names and requires the environment at the block's position to satisfy
+  `T`.
+- **`writes: T`** - a write signature. The block puts `T` at that path for
+  every block after it.
+
+`T` is one of `sd-ADR-0001`'s nine scalars, the `name` of a `record` or
+`shape` declaration there, `{:list, T}`, or `:unknown`. A `{:path, opts}`
+field with neither key keeps behaving exactly as the 2026-09-05 amendment
+describes, and so does a `:string` field carrying `datamodel_path?: true` -
+`ADR-0011` decision 2 reads both as writing `:unknown` at the path, which is
+known-but-untyped and refuses nothing. The `path_kind` enum the 2026-08-29
+amendment refused stays refused; neither key is it.
+
+`ADR-0011` also names a **`field_candidates`** feed beside the two keys: an
+editor assign and compile option keyed `{type_name, key} -> [{value, label}]`,
+so a field may offer the values a host expects without a new field type.
+`validate_config/1` stays the only authority per decision 7, and the schema is
+still not a validation language: a candidate list is what a control draws, not
+what a config is checked against.
+
+Two of this record's own sections are read by `ADR-0011` and neither is
+changed by it. The 2026-09-05 Note on `core.on_event`'s optional `capture`
+says `config_schema/1` declares no field for the map, and leaves the authoring
+surface open; `ADR-0011` decision 10 closes it as a repeated two-control row -
+a `{:path, opts}` target beside an `_event.data` source path, with the source
+control's candidates from `fixtures/0` - and adds no member to decision 7's
+set. And `ADR-0011` decision 13 resolves `core.subchart`'s `assign_to` by
+admitting a dotted path: G5's row records what the type declares and G5a hands
+the emitted bytes to `ADR-0004`, so neither states a constraint on what an
+`<assign>` location may be, and `core.assign` already emits a dotted one. That
+decision widens two call sites in `core/subchart.ex` and changes nothing in
+G5 or G5a.
+
+`sb-xk1h` implements both keys and the feed.

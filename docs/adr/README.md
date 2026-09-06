@@ -12,6 +12,7 @@
 | [0008](0008-durable-subchart-handler.md) | The durable subchart handler answers at dispatch time, not from a pure `start/2`, and its refusal set gains exactly one reason | accepted |
 | [0009](0009-fan-out-block-type.md) | Durable fan-out is a new block type, `core.map`, compiling to one invocation whose handler starts N children | accepted |
 | [0010](0010-clock-interrupt-spelling.md) | A clock interrupt is a delayed `core.send` at the head of a group's body caught by a `core.on_event` on its rail, and there is no `core.timeout` | accepted |
+| [0011](0011-typed-environment.md) | Nothing flows between adjacent blocks - a pre-order walk carries an environment from datamodel path to type, and a block declares what it reads and writes there | proposed |
 
 New ADRs: next number, same three-section format (Context, Decision,
 Consequences). Pick the number against a freshly fetched remote.
