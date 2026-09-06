@@ -60,7 +60,8 @@ defmodule StatifierBlocks.Core.WorkedExampleTest do
 
     assert Core.Branch.slots(branch.config) == [
              {"arm_approved", :at_least_one, ~s(When "approved")},
-             {"otherwise", :any, "Otherwise"}
+             {"otherwise", :any, "Otherwise"},
+             {"undecided", :any, "Cannot be decided"}
            ]
 
     assert Core.Parallel.slots(parallel.config) == [

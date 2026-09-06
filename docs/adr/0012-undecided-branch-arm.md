@@ -400,3 +400,54 @@ covers the new slot, which is true whether or not this record is accepted.
   and there the consequence is that the handler does not fire. Whether an
   interrupt handler wants a third path is a different question with a
   different shape - a rail, not a slot - and it has no consumer today.
+
+## Note (2026-09-06): the engine evaluates a chart's `cond` with `on_unbound: :error`, so an unbound root is decision 1's erroring case
+
+A dated Note rather than an amendment, and it edits nothing above this line.
+It decides nothing: decision 1 already draws the line at "the `:undefined`
+sentinel reaching a `cond`, and nothing else", and this Note records which
+situations reach that line once the chart is running inside
+`Statifier`. It is written now because `sb-2hoh` built the slot and drove it,
+and one sentence of the Context reads differently against what the runs
+actually do.
+
+The Context says an unbound datamodel path is the first of predicator's two
+sentinel situations, "unless the evaluator was built with `on_unbound:
+:error` ... and the `core.*` vocabulary builds no such evaluator". That is
+true of this package: nothing under `lib/statifier_blocks/` builds a
+predicator evaluator at all. The evaluator that runs a compiled chart is the
+engine's, and it does build one that way:
+`Statifier.Evaluator.context/1` carries "the resolved `functions` map and
+`on_unbound: :error`" (`deps/statifier/lib/statifier/evaluator.ex:90`,
+`:150`). Under that policy a `["load", name]` whose name is not in the
+datamodel is an error rather than the sentinel, whatever the surrounding
+expression would have made of it.
+
+So the two situations the Context names are reached from a chart like this,
+and only the second of them routes to the new slot:
+
+| At the branch | What the arm's `cond` answers | Where the run goes |
+|---|---|---|
+| `accounts.current.limit` bound | `true` or `false` | the arm, or `otherwise` |
+| `accounts.current` bound and holding no `limit` | `{:ok, :undefined}` - a missing path under a bound root | `undecided`, when the slot is wired |
+| the operands' types do not match | `{:ok, :undefined}` - a mixed-type comparison | `undecided`, when the slot is wired |
+| `accounts` itself unbound | the engine's `on_unbound: :error` makes it an error | `otherwise`, wired or not |
+
+The fourth row is decision 5's own erroring-arm paragraph reached by a second
+route: the guard evaluates the arm's source, the unbound load errors there
+too, neither transition is taken, and the block falls to `otherwise` - which
+is where that arm already sent it. Two `error.execution` events rather than
+one, exactly as decision 7 describes for an arm that errors.
+
+The worked shape above is unaffected in the form it is written. Its prose has
+`accounts.current` bound - "the account lookup is an earlier `myapp:*` invoke
+that can answer without it" - and its third row is the second row of the table
+here. What the shape does not cover, and this Note now says plainly, is a
+document whose branch reads a root the run never bound at all: that document
+gets today's routing and the `undecided` slot never sees it.
+
+Whether the engine should distinguish the two is not this record's call. It is
+`Statifier`'s evaluator policy, in the repository that owns the interpreter
+contract, and it is named here rather than worked around: this package
+composes the guard from the author's own source and cannot ask predicator a
+question the engine's context does not permit.

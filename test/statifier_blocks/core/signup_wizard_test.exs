@@ -81,13 +81,16 @@ defmodule StatifierBlocks.Core.SignupWizardTest do
   end
 
   # Sabotage: made `Core.Branch.slots/1` drop the `otherwise` slot - red,
-  # because the wizard's `otherwise` becomes undeclared.
+  # because the wizard's `otherwise` becomes undeclared. The wizard stores
+  # no `undecided` children, which is ADR-0012 decision 3's ordinary case:
+  # the slot is declared and the stored `slots` map does not mention it.
   test "the branch's arm set is exactly what its config declares", ctx do
     branch = block(ctx.document, "blk_WBR")
 
     assert Core.Branch.slots(branch.config) == [
              {"arm_variant_b", :at_least_one, ~s(When "variant_b")},
-             {"otherwise", :any, "Otherwise"}
+             {"otherwise", :any, "Otherwise"},
+             {"undecided", :any, "Cannot be decided"}
            ]
 
     assert Map.keys(branch.slots) |> Enum.sort() == ["arm_variant_b", "otherwise"]
