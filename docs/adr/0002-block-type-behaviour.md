@@ -3694,15 +3694,15 @@ were written and are not any more, and both are consequences of one change
 `sb-r313` made under `ADR-0011` decision 13's argument rather than of any
 decision made here.
 
-**The 2026-08-29 section D table declares `assign_to` as `:string`.** It is
-`{:path, %{}}` on `main` - decision 7's eighth field type, from the
-2026-09-05 amendment - exactly as `core.subchart`'s became on `sb-2ym4` and
-for the same reason: the field names a datamodel location, the editor
-reaches a candidate list by the field type alone, and a value the host's
-datamodel does not declare draws `ADR-0005` clause 11e's `:info` advisory
-rather than a refusal. Decision 7's set gains no member and the D table's
-`core.invoke` row is otherwise unchanged; a reader of that row should read
-the type as `{:path, %{}}`.
+**Section D of the 2026-08-28 amendment declares `assign_to` as `:string`
+in its table.** It is `{:path, %{}}` on `main` - decision 7's eighth field
+type, from the 2026-09-05 amendment - exactly as `core.subchart`'s became
+on `sb-2ym4` and for the same reason: the field names a datamodel location,
+the editor reaches a candidate list by the field type alone, and a value
+the host's datamodel does not declare draws `ADR-0005` clause 11e's `:info`
+advisory rather than a refusal. Decision 7's set gains no member and the D
+table's `core.invoke` row is otherwise unchanged; a reader of that row
+should read the type as `{:path, %{}}`.
 
 **The Note of 2026-09-06's writes table says `core.invoke` writes
 nothing.** Its row reads "none | none | its `<assign>` location is emitted
