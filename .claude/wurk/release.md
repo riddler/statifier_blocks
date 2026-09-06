@@ -131,8 +131,7 @@ dropped that the skill bumps. It is named here only so that the carriers a
 release moves are all listed in one place.
 
 The pin's current value is not written down here, for the same reason no
-version is written down anywhere else in this file. Read it and check it
-against the version file instead:
+current version is. Read it and check it against the version file instead:
 
 ```bash
 grep 'statifier_blocks, "~>' README.md   # the pin
