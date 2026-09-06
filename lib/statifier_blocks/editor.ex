@@ -159,6 +159,60 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     package inventing a second one. The stylesheet tints the two the spike
     proved and leaves every other outcome the neutral treatment.
 
+    ## The Run pane's send control, and who moves the run (sb-j18n)
+
+    `run_session` is the other half of that seam, and it points the other way.
+    `run` is what a host says about a run; `run_session` is a live
+    `Statifier.Session.server()` the Run pane's send control puts an event
+    into, drawn from the selected block type's `fixtures/0` rows. The control
+    writes to that session and to nothing else - never to the document, and
+    never to `run` either - which is why ADR-0005 decision 15's deferral of a
+    per-entry fixtures panel is untouched by it.
+
+    So the pane does not sync itself after a send, and that is a decision
+    rather than an omission. This component holds no subscription to a
+    session, does not know what a session announces its steps on, and cannot
+    tell a step this control caused from one a timer or an invoke handler
+    caused. The run assign is the host's - a host is the only party that
+    already knows how its own runs are watched, and decision 15 leaves how a
+    document is executed and stored outside this package entirely - so
+    re-seating it after a send is the host's too. **The answer is a documented
+    host recipe, not an editor-owned subscriber.**
+
+    It is the loop the marks above already describe, with the session added.
+    A host that passes `run_session`:
+
+    1. subscribes to whatever its own runs announce on - a `Phoenix.PubSub`
+       topic keyed on the run, a trace subscriber, a monitor on the session
+       process;
+    2. passes the live session as `run_session`, and the run it is watching as
+       `run` (with `active_marks` and `invoke_mark` beside it);
+    3. on each message saying the run moved, re-reads the run and pushes the
+       new reading back with `send_update/3`.
+
+    Step 3 is the whole of it, and it is the same `send_update/3` the marks
+    section shows. The reference embedder's `StatifierExamplesWeb.EditorLive`
+    is that shape already: it subscribes per run id and its private
+    `push_run/1` pushes the marks and the drawer tab descriptors from every
+    handler that could have moved the run, including the announcement of a
+    step nothing on the page pressed. A send through the pane is exactly that
+    case - an advance the page did not initiate, arriving on the subscription
+    it already holds - so a host wiring the pane up adds `run` and
+    `run_session` to what it passes and nothing at all to what it does when a
+    message arrives.
+
+    Pushing rather than passing matters here for the reason the drawer tabs
+    give: a host tab's `content` is a closure this package calls while
+    rendering the panel, and an ordinary parent re-render does not re-enter
+    that subtree.
+
+    Without a subscription the send still lands. The session advances, the
+    canvas does not, and the author sees an event that went somewhere they
+    cannot see - the honest reading for an editor mounted without a host
+    watching its runs, and the reason the control is enabled only once a
+    session is supplied and a **live** `run` is seated beside it - a persisted
+    run reads as not sendable, because there is no session for it to send to.
+
     ## Opening at a fit (sb-ehqn)
 
     A document wider than the canvas opens with its right-hand columns off
@@ -378,7 +432,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `active_marks` | no | the block ids a run has activated; held as editor state, and cleared when the host opens a different document |
     | `invoke_mark` | no | the block a run is calling out to and how the call came back - `{block_id, outcome}`, a bare `block_id` for no answer yet, or `nil` for no call at all |
     | `run` | no | a run to watch over this document: statifier-ui's `StatifierUI.Live.State`, live or persisted, or `nil` (the default) for no run. It seats the canvas in a run pane, decides the marks outright while it is there, and puts the run's held values beside the declared ones in the Datamodel tab. Held as editor state behind the same guard the marks use, and cleared when the host opens a different document |
-    | `run_session` | no | the live session the Run pane's send control puts events into: a `Statifier.Session.server()`, or `nil` (the default) for none. Held as editor state behind the same guard `run` uses, and cleared when the host opens a different document |
+    | `run_session` | no | the live session the Run pane's send control puts events into: a `Statifier.Session.server()`, or `nil` (the default) for none. Held as editor state behind the same guard `run` uses, and cleared when the host opens a different document. The send writes to the session only: re-seating `run` afterwards is the host's, per *The Run pane's send control* above |
     | `theme` | no | `--sb-*` custom properties for the canvas root |
     | `fit` | no | the fit the editor **opens** in: `:manual` (the default), `:width` or `:active`; the first measurement performs it once, and an unknown value is refused into `:manual` |
     | `fixtures` | no | `%{block_id => [TruthTable.t()]}`, read by both the drawer's truth-table tab and, as of `sb-4yze`, its Fixtures tab (`refresh_fixture_runs/1` drives each row through the compiled chart), and, as of `sb-e30x`, by the inspector's config form for the fixture hint beside an `:expression` control, and, as of `sb-0l36`, by the inspector's own Fixtures tab, which shows the selected block's runs out of the same result; `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
