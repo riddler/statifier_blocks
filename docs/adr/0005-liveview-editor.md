@@ -7002,3 +7002,163 @@ an error - and `11r` applies it one level up, to a host's return value rather
 than to a host's declaration. The clause stands as written.
 
 Filed with `sb-wkg9`, campaign 034's docs fill.
+
+## Note (2026-09-06): decision 9, the control for a `{:type_expr, opts}` field
+
+A dated Note rather than an amendment. Decision 9's field-type table gains one
+row by addition; no clause of decision 9 is edited, its "re-derived after every
+config change" rule stands, the `:update_config` gate is untouched, and no line
+above this one changes. Drafted as the record ahead of its code - `sb-1jcr`
+builds the control - and it merges at proposed under the campaign invariant
+like every other section filed with it.
+
+The field type itself is not this record's. `ADR-0002` decision 7 as amended
+for `{:type_expr, opts}` (campaign-SF035, `sb-zvar`, in flight) admits the
+member and fixes what it stores, what `opts` carries, what config-time
+validation reads, and which existing fields migrate to it. This section decides
+the one thing the editor's table is keyed on: how the control is drawn.
+
+### The row
+
+| Field type | Rendering |
+|---|---|
+| `{:type_expr, opts}` | per `opts.arms`: a text input bound to a `<datalist>` of the document's declared type names, or an inline member-list form; a toggle when the field admits both |
+
+### The name arm, and where its `<datalist>` comes from
+
+**The name arm is the `invoke_type` control's shape, over a different feed.** A
+single-line text input with a `<datalist>` beside it, free text still valid,
+the plain input when the list is empty - the same "an empty list is markup that
+suggests nothing" rule the 2026-09-01 Note above states for the path feed.
+
+**The names are the datamodel document's declarations, not its index.** A
+declared type name is the `name` of a `record` or a `shape` the document's
+`types` key declares, and this package already computes exactly that list:
+`StatifierBlocks.Datamodel.declared_types/1`
+(`lib/statifier_blocks/datamodel.ex:635`), sorted by name, the reader the
+Datamodel tab's declared-types half already draws (`lib/statifier_blocks/editor.ex:738`,
+`lib/statifier_blocks/editor/drawer.ex:387`). The control reads that same list rather than deriving a
+second one, for the reason the 2026-09-01 Note gives about paths: the set an
+author is offered and the set validation judges must not be able to drift
+apart.
+
+**It is a different feed from `{:path, opts}`'s, and deliberately disjoint.**
+`sd-ADR-0001` decision 7 says the `types` key contributes no path, so the
+declared *paths* a `{:path, opts}` field suggests and the declared *type names*
+this field suggests share no member and are never merged. Two feeds, two
+controls, one field type each.
+
+**It suggests and never constrains.** A name the author types that no
+declaration carries is stored verbatim; this Note adds no refusal for it, and
+whether such a name earns an advisory is decided where every other such
+question is - `ADR-0002` decision 7 as amended, for the refusal, and clause
+`11e` for the advisory. Nothing here adds a source, a severity, or an anchor.
+
+### The inline arm: a member-list form, and it renders in the Config tab
+
+**The inline arm draws a form of its own: an ordered member list, each row
+carrying the member's name, its type, and whether it is required.** Adding and
+removing a row is the affordance `{:list, t}`'s rows already have
+(`lib/statifier_blocks/editor/field.ex:699`), and a member's *type* control is
+this same row recursing - the name arm's `<datalist>`, or one of the scalars
+the datamodel's closed set admits - so a member may itself hold an inline
+shape and the form nests as a `{:list, t}` of a `{:list, t}` nests.
+
+**The member spelling is `sd-ADR-0001`'s, and this record does not re-spell
+it.** Its 2026-09-06 inline-shape amendment - merged in `statifier_datamodel` at
+proposed on ruling `RQ-SF035-1`, and taking effect when `sd-izx` lands its code
+and the status flips - gives the arm, gives a member its three keys, and settles
+two things this control must not re-decide: a member's type is never absent -
+a spelling that resolves to nothing is the datamodel's unknown - and **member
+order is authoring order while identity is member-set-wise**. So the form
+preserves the order the author writes, because that is the order an unmet-member
+reason is rendered in, and it must not present reordering as though it changed
+the value. What the editor stores is what that amendment defines; where it is
+written down is there and only there.
+
+**And the arm this control writes is not a datamodel document's.** That
+amendment's clause (c) says an inline shape is built by a *consumer* and has no
+document syntax in `statifier_datamodel`; nothing here reopens that. What this
+control edits is a field inside one block's `config`, in a block document, which
+`ADR-0001` owns and which has carried consumer-built values since it existed.
+How that field's bytes are stored and parsed back is `ADR-0002` decision 7 as
+amended (`sb-zvar`), not this section: the control edits a value, and the
+spelling of the value on disk is decided where the field type is.
+
+**One correction to where it renders.** `sb-j2vp` was filed saying the inline
+editor renders "inside the drawer (`drawer.ex`)". It does not, and ruling 3A is
+why: the inspector is about the selected block and the drawer is about the
+document, which is the whole reason the Datamodel is a drawer tab here and was
+an inspector tab in the spike. A config field is about the selected block, so
+every control in decision 9's table renders in the **inspector's Config tab**,
+through `StatifierBlocks.Editor.ConfigForm` and `Editor.Field`
+(`lib/statifier_blocks/editor/inspector.ex:464`,
+`lib/statifier_blocks/editor/config_form.ex:171`). The inline arm is a nested form inside that
+field's control and nowhere else. Nothing in 1A's tabular test admits it to the
+drawer, and no drawer tab is added by this Note.
+
+### The toggle, when a field admits both arms
+
+**Which arm shows is `opts.arms`, and a field declaring one arm shows no
+toggle.** A field admitting both draws a two-way toggle above the control,
+labelled by the arms themselves, and the arm it opens on is the one the stored
+value already is.
+
+**Switching arms replaces the value; it never translates it.** A name and a
+member list are not two spellings of one value - `sd-ADR-0001`'s own step 2
+compares a declared name nominally and an inline shape member-set-wise - so
+there is nothing to carry across, and a control that guessed a translation
+would be authoring a shape the author did not write. The new arm opens empty,
+and the edit reaches the document through `:update_config` exactly as every
+other field edit does. No new command, no new hook, no new host assign.
+
+### A value the control cannot read renders raw
+
+**A stored value that is neither arm renders in the name arm's text input,
+showing the bytes exactly as stored, and the field carries its `:config`
+finding beneath it.** Raw rather than blank, for decision 9's own reason that
+an invalid form never reaches the document: a control that showed nothing would
+invite the author to save over a value they never saw, which turns an author's
+typo into an editor's deletion.
+
+The finding is **not new here**. It is the one `{:type_expr, opts}`'s
+config-time validation already produces (`ADR-0002` decision 7 as amended,
+`sb-zvar`), anchored `{:config, block_id, key}` and routed beneath its field by
+decision 11's existing rule (`lib/statifier_blocks/finding.ex:39-41`). This
+Note adds no finding, no source, and no severity; it says only what the control
+draws while one is outstanding.
+
+### Worked example, signup
+
+A `core.on_event` handling `myapp:signup` declares its `payload`. The host's
+datamodel declares a `record` named `signup.registration`, so the author types
+`s` and takes it from the list; the field is stored as that name, and a
+`core.assign` reading `signup.registration.email` is checked against it.
+
+A second handler carries a one-off the host does not want in its `types` key.
+Its `payload` field admits both arms, so the author toggles to the inline arm
+and writes two members - `email`, string, required; `variant`, string, not
+required - and the same check runs against the shape they just wrote, with no
+name minted in the host's document.
+
+### What this Note does not do
+
+- **It adds no field type.** The member is `ADR-0002` decision 7's, admitted
+  there; this is its row.
+- **It adds no JavaScript.** Decision 7's two-hook limit is untouched and still
+  mechanically enforced by `test/statifier_blocks/assets_test.exs`.
+- **It does not make the table exhaustive again, and one row is still owed.**
+  Decision 9 calls its table "exhaustive by construction", and the 2026-09-06
+  Note above records that `ADR-0002`'s set reached eight members with
+  `{:path, opts}`. That member has shipped its control and its row in
+  `Editor.Field`'s own table (`lib/statifier_blocks/editor/field.ex:19`), and
+  the 2026-09-01 Note above describes its feed - but decision 9's table has
+  never carried its row. With this section the table holds eight rows of a set
+  of nine. Repairing that is `{:path, opts}`'s own record debt and is not taken
+  here, because writing another member's row into this section would put a
+  second proposal inside this one.
+- **It moves no cite and edits no clause.** Every line number above is a census
+  taken on `f3e737f`, in the sense the 2026-09-06 census Note fixes: dated to
+  this section, re-counted by a later reader rather than trusted.
+
+Filed with `sb-j2vp`, campaign-SF035's Lane A.
