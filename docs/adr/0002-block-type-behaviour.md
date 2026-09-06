@@ -3855,8 +3855,9 @@ thing was a slot, and the reasoning carries: a `{name, label}` pair is what
 the compiler mints ids and events from and what the editor draws, and
 widening it would move every host type's declaration for a fact only the
 compiler's final emission reads. A separate list is additive in the sense
-decision 6's byte determinism needs - a type that says nothing is unchanged -
-and it keeps the class out of the serialized outcome order entirely. The
+`ADR-0004` decision 6's byte determinism needs - a type that says nothing
+is unchanged - and it keeps the class out of the serialized outcome order
+entirely. The
 resolver is total over any return value for `outcome_names/2`'s reason: a
 declaration that is not a list of binaries reads as `[]` rather than raising
 inside the compiler.

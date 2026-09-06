@@ -850,8 +850,8 @@ above that reaffirmed it. An empty fan-out still succeeds over nothing and
 takes `done` immediately, so it never reaches the failure-classed outcome -
 the two campaign-033 rulings agree rather than collide.
 
-**Decision 7 is untouched.** No payload grows: the reserved param is a fixed
-eight-byte value on one final of the parent document, not a per-item cost, and
+**Decision 7 is untouched.** No payload grows: the reserved param is one fixed
+attribute on one final of the parent document, not a per-item cost, and
 it multiplies by nothing.
 
 Filed with `sb-napt`, mirrored with `sp-n8g` in `statifier_persistence`;
