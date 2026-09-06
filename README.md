@@ -838,6 +838,14 @@ text. Without `statifier_ui` the same field is the plain source input this
 package has always rendered, so the dependency is genuinely optional. Pass
 `expression_component` to override both.
 
+When you pass a datamodel **document**, the kinds it declares reach that
+editor too: a clause on a path declared `integer` offers the numeric
+operators, and one on a `date` path the date set, rather than whichever set
+the clause's current source happens to imply. It is a control and not a
+check - the operator the source carries is still offered, the value in it is
+still kept, and a disagreement renders as an advisory beside the clause - and
+a path the document says nothing about renders exactly as it always did.
+
 **Icons.** You do not have to pass `icon`. The package ships
 `StatifierBlocks.Editor.Icons`, a small set of inline SVGs for the names the
 core block types declare - no font, no CDN, nothing to register in your asset
@@ -895,7 +903,7 @@ those directly.
 ### With statifier_ui
 
 [statifier_ui](https://github.com/riddler/statifier-ui) is an **optional**
-dependency of this package, declared `{:statifier_ui, "~> 0.4", optional: true}`
+dependency of this package, declared `{:statifier_ui, "~> 0.8", optional: true}`
 beside `phoenix_live_view` and optional in the same sense: its only consumer is
 a LiveView component, so a tree with no editor in it would be resolving a
 package nothing there can call. Nothing adds it for you, nothing warns at

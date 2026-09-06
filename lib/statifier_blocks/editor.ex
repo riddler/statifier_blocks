@@ -646,6 +646,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:declarations, declaration_entries(assigns))
         |> assign(:path_candidates, path_candidates(assigns))
         |> assign(:offered_values, offered_values(assigns))
+        |> assign(:declared_path_types, declared_path_types(assigns))
         |> assign(:event_candidates, event_candidates(assigns))
         |> assign(:outcome_candidates, chart_outcome_candidates(assigns))
         |> assign(:capture_pairs, capture_pairs(assigns))
@@ -739,6 +740,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             invoke_types={@invoke_types}
             path_candidates={@path_candidates}
             value_candidates={@offered_values}
+            path_types={@declared_path_types}
             event_candidates={@event_candidates}
             outcome_candidates={@outcome_candidates}
             field_candidates={@field_candidates}
@@ -1652,6 +1654,25 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec offered_values(map()) :: %{optional(String.t()) => [Datamodel.candidate()]}
     defp offered_values(assigns) do
       Datamodel.value_candidates(assigns.datamodel, assigns.value_candidates)
+    end
+
+    # The kind half of the same question (sb-23e0), and the reason it takes
+    # no host override where `offered_values/1` above takes one: a value set
+    # is something only a host knows, while a path's KIND is something the
+    # document either declares or does not. There is nothing for a host to
+    # correct here that it could not correct by amending the document it
+    # already supplied.
+    #
+    # It reads `datamodel` for the reason `offered_values/1` does - the
+    # normalized `declared_paths` set carries no per-path shape - and the
+    # projection itself is `StatifierDatamodel.Index.path_types/1`'s, wrapped
+    # by `StatifierBlocks.Datamodel.path_types/1` so that this module reads
+    # the document through the one reader every other read here goes through.
+    # With no datamodel supplied the map is empty, and an empty map is what
+    # the expression editor behaved as before there was one at all.
+    @spec declared_path_types(map()) :: %{optional(String.t()) => term()}
+    defp declared_path_types(assigns) do
+      Datamodel.path_types(assigns.datamodel)
     end
 
     # The completion events a `core.on_event`'s `event` field offers

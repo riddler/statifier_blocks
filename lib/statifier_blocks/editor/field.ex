@@ -105,6 +105,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     no entry gets a free-text value control, which is the same "suggests,
     never constrains" posture the path `<datalist>` takes.
 
+    ## `path_types`
+
+    The value kind the host's datamodel document declares per path,
+    `%{path => kind | {:list, kind} | {:one_of, values}}`, from
+    `StatifierBlocks.Datamodel.path_types/1`. It reaches the
+    `expression_component` beside `candidates` and `value_candidates`, and
+    like both of those, nothing in this package interprets it.
+
+    What is behind the seam reads a declared kind as *which operators the
+    row offers and which control it draws* - so a path the document declares
+    `integer` offers the numeric operators rather than the ones its current
+    source happens to imply. It is not a claim about the author's source: the
+    operator the source carries is still offered, the value in it is still
+    kept, and a disagreement renders as an advisory beside the clause. `%{}`,
+    which is what an editor with no datamodel supplies, is the behaviour
+    every `:expression` field had before the map existed.
+
     ## `candidates`
 
     The values a host says belong in THIS field, supplied per
@@ -347,6 +364,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:path_types, :map,
+      default: %{},
+      doc: """
+      The kinds the host's datamodel declares per path, from
+      `StatifierBlocks.Datamodel.path_types/1`. Passed to
+      `expression_component` as `:path_types` and read only there; `%{}`
+      declares none and a path with no entry renders as it always did.
+      """
+    )
+
     attr(:event_candidates, :list,
       default: [],
       doc: """
@@ -401,6 +428,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           invoke_types={@invoke_types}
           path_candidates={@path_candidates}
           value_candidates={@value_candidates}
+          path_types={@path_types}
           event_candidates={@event_candidates}
           outcome_candidates={@outcome_candidates}
           candidates={@candidates}
@@ -426,6 +454,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:invoke_types, :list, default: [])
     attr(:path_candidates, :list, default: [])
     attr(:value_candidates, :map, default: %{})
+    attr(:path_types, :map, default: %{})
     attr(:event_candidates, :list, default: [])
     attr(:outcome_candidates, :list, default: [])
     attr(:candidates, :any, default: [])
@@ -581,7 +610,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # machinery than the deferral is worth.
       #
       # `candidates` is additive to that map (sb-0vt), and
-      # `value_candidates` is additive in exactly the same way (sb-m6e0). An
+      # `value_candidates` (sb-m6e0) and `path_types` (sb-23e0) are additive
+      # in exactly the same way. An
       # override written before either existed takes a map and ignores a key
       # it does not read, so nothing that worked stops working; an override
       # written after can offer the declared paths, and the host's own value
@@ -594,7 +624,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         name: input_name(@field),
         value: to_text(@field.value),
         candidates: @path_candidates,
-        value_candidates: @value_candidates
+        value_candidates: @value_candidates,
+        path_types: @path_types
       })}
       """
     end

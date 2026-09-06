@@ -369,7 +369,7 @@ _typed_palette =
 
 ## Read the result in the editor
 
-Three surfaces show the environment, and none of them changes a verdict:
+Four surfaces show the environment, and none of them changes a verdict:
 
 - **Findings carry the declared label.** A finding about a path renders the
   declaration's `label`, so an author reads "Credit card transaction" rather
@@ -380,7 +380,11 @@ Three surfaces show the environment, and none of them changes a verdict:
   position, with their types.
 - **Path controls offer candidates.** A `{:path, opts}` control offers the
   declared paths as candidates; with no datamodel, it is a plain text input.
-
-For the expression editor's own view of the datamodel - the projection from
-declared paths to value kinds - see `StatifierDatamodel.Index.path_types/1`;
-it reaches statifier-ui in a later release.
+- **The condition editor offers the operators the type allows.**
+  `StatifierDatamodel.Index.path_types/1` projects the declared paths to the
+  expression language's own value kinds, and the editor hands that map to
+  statifier-ui (0.8 or later), so a condition on a path declared `integer`
+  offers the numeric operators and one on a `date` path the date set. Like
+  every other surface here it draws a control and decides nothing: the
+  operator your author already wrote is still offered, their value is still
+  kept, and a path the document does not declare is unchanged.
