@@ -119,6 +119,22 @@ defmodule StatifierBlocks.MixProject do
     [statifier_dep()] ++
       live_view_dep() ++
       [
+        # The datamodel document, its path/type index and the declared types
+        # live here now: `sd-ADR-0001` carries ADR-0006's record forward into
+        # a package that depends on nothing else in the family, and
+        # `StatifierBlocks.Datamodel` reads that package rather than a second
+        # copy of the same projection.
+        #
+        # Pinned to a git revision rather than a version requirement because
+        # `statifier_datamodel` is not on Hex yet. The pin is a commit on that
+        # repository's default branch, not a branch name, so the tree this
+        # resolves is the same tree on every machine and in CI. It is
+        # deliberately temporary: the requirement becomes `~> 0.1` as soon as
+        # the package's first release is published, and `mix hex.build` is
+        # expected to refuse a package carrying a git dependency until then.
+        {:statifier_datamodel,
+         git: "https://github.com/riddler/statifier_datamodel.git",
+         ref: "525ee6c3c44449a06735263c99d35e9b615cdb2c"},
         # Direct because `StatifierBlocks.Core.Duration` calls
         # `Predicator.Duration.parse/1` to read a stored predicator duration
         # string. It already resolves through statifier, so naming it here
