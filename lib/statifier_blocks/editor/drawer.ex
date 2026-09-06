@@ -213,6 +213,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:run?, :boolean,
+      default: false,
+      doc: """
+      Whether a run is seated in the editor. The Datamodel tab's
+      "what is known here" table draws its held-value column only while one
+      is - see `StatifierBlocks.Runtime.RunValues`.
+      """
+    )
+
     attr(:source_view, :any,
       default: nil,
       doc: """
@@ -373,7 +382,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               <% @view.tab == :source -> %>
                 <.source view={@source_view} selected_id={@selected_id} target={@target} />
               <% @view.tab == :datamodel -> %>
-                <.known_here rows={@environment_view} />
+                <.known_here rows={@environment_view} run?={@run?} />
                 <.declared_paths rows={@declared_view} />
                 <.declared_types rows={@declared_types} />
               <% true -> %>
@@ -786,6 +795,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     attr(:rows, :any, default: nil)
+    attr(:run?, :boolean, default: false)
 
     # ADR-0011 decision 9's second surface: the paths the environment holds at
     # the SELECTED block's position, with their types. It sits above the
@@ -805,6 +815,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # explicit that neither of decision 9's surfaces changes a verdict or
     # produces a finding of its own, so this is a read-only statement of what
     # the walk computed on the way to the block the author is looking at.
+    #
+    # With a run seated the table grows one column: what that run was actually
+    # holding at each of these paths, at the point the scrubber is on. The
+    # pairing is the whole value of it - a path this position declares one
+    # type and the run held something else is a read that should not have
+    # worked, and it is visible by looking at the two cells rather than by
+    # this package ruling on them. Still no verdict, still no finding, still
+    # no colour: an author reads the row.
+    #
+    # The column appears only while a run is there. An empty third column
+    # under a document nobody is running would read as "held nothing", which
+    # is a claim, where the truth is that nobody asked.
     defp known_here(assigns) do
       ~H"""
       <section class="sb-datamodel__section" data-section="known-here">
@@ -826,12 +848,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               <tr>
                 <th scope="col">Path</th>
                 <th scope="col">Type</th>
+                <th :if={@run?} scope="col">Held here</th>
               </tr>
             </thead>
             <tbody>
-              <tr :for={row <- @rows} data-path={row.path} data-type={row.type}>
+              <tr
+                :for={row <- @rows}
+                data-path={row.path}
+                data-type={row.type}
+                data-held={@run? && held_text(row)}
+              >
                 <th scope="row">{row.path}</th>
                 <td>{row.type}</td>
+                <td :if={@run?} class="sb-datamodel__held">{held_text(row)}</td>
               </tr>
             </tbody>
           </table>
@@ -839,6 +868,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       </section>
       """
     end
+
+    # "declared T, held V" is what the row says across its cells, and the two
+    # halves are not the same kind of thing: the type is what the document
+    # promised, the value is what the run had. A path the run never wrote is
+    # not `nil` and not an empty string either - both of those are values a
+    # run could genuinely hold - so it says so in words.
+    @spec held_text(map()) :: String.t()
+    defp held_text(%{held: held}) when is_binary(held), do: held
+    defp held_text(_unwritten), do: "not written"
 
     attr(:rows, :list, default: [])
 

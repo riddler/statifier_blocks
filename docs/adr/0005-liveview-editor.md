@@ -6815,3 +6815,109 @@ Filed with `sb-nyla`, campaign 033's second-pass code lane. The moduledoc
 count in item 3 is the item `sb-q1r4` was holding for this bead; the two
 record-prose items that bead also carries are untouched here and stay with
 it.
+
+---
+
+## Note (2026-09-06): the run pane, and why the event log is not a drawer tab
+
+A dated note rather than an amendment. Nothing this record decides changes, no
+clause is edited, no line above this one is touched, and nothing here widens
+1A's admission test or adds a region to the shell. What it records is where a
+new surface went and, more usefully, why 1A did not claim half of it - because
+the 2026-08-29 shell amendment's rule reads onto an event log at a glance, and
+a reader who applies it that way would conclude the code contradicts this
+record.
+
+### What the pane is
+
+The editor accepts a **run** - statifier-ui's `StatifierUI.Live.State`, live
+or persisted - and while one is seated the canvas is drawn inside a pane that
+composes statifier-ui's `status/1` and `scrubber/1` above it and its
+`event_log/1` below. The canvas takes the seat an ops view gives a Mermaid
+diagram, and that diagram is not mounted: the blocks the author wrote are a
+better drawing of the same chart, and they are already laid out and already
+markable. Scrubbing or clicking a log entry moves the run's selection, and the
+marks the canvas draws are re-resolved from it on every render.
+
+The three surfaces are statifier-ui's, drawn as statifier-ui ships them. No
+statifier-ui module changed for this, no wire type was added, and the two
+events the components emit are renamed rather than re-invented -
+`scrub_event` and `select_event` are attrs those components already declare
+for exactly this.
+
+### It is not a new region, and the arithmetic says so
+
+The 2026-08-29 shell amendment's 1A names three columns plus one full-width
+drawer row, and 7A tabulates that arrangement at four container widths. This
+pane adds to none of it. `.sb-editor__main` - the element that occupies the
+`canvas` grid area, and has since the shell graduation - is a flex column
+holding the canvas toolbar and the canvas panel; the pane is a third child of
+that element. `grid-template-areas`, `grid-template-columns` and
+`grid-template-rows` are byte-identical in the base rule and in all four of
+7A's breakpoints; no `grid-area` was added or moved.
+
+The pane also carries the pane header shape the other three carry, which is
+the toolbar's own argument in its moduledoc applied once more: a region that
+does not name itself is a region a reader has to identify by its contents.
+
+### Why the event log is not in the drawer
+
+1A's test for the drawer is two words, **tabular** and **document-level**, and
+the sentence that makes it a rule is "content that is a grid of rows about the
+whole document goes to the drawer; content that is about one block does not,
+whatever its shape". An event log is a grid of rows, so the first half fits.
+The second half is where it stops, and the reason is worth writing down
+because it is the case 1A did not have in front of it.
+
+A run's event log is not about the document. It is about **one run over** the
+document, which is a third subject 1A names neither side of: the drawer's
+content is derived from the document and is true of it whoever is looking,
+while a log is true of one execution and is meaningless without the run it
+came from. Putting it in the drawer would also separate it from the scrubber,
+and those two are one control - the log's entries and the scrubber's four
+buttons move the same selection, and an author moving between them across two
+regions of the shell is being asked to hold a relationship the layout has
+hidden. So the pane keeps the three run surfaces together, around the thing
+they are describing.
+
+This claims nothing about future drawer tabs. 1A's test governs those
+unchanged and unweakened, and the drawer's own six tabs are untouched: the
+run adds no tab, and the one drawer surface it does reach is described below.
+
+### What it does change, named rather than left to be found
+
+- **The Datamodel tab's "what is known here" table grows a column while a run
+  is seated.** Decision 9's two surfaces are unchanged in what they are for,
+  and this one is still read-only, still produces no finding, and still tints
+  nothing: the added cell says what the run was holding at that path at the
+  point the scrubber is on, beside the type the position declares. A declared
+  type and a held value side by side is how a read that should not have worked
+  becomes visible without this package ruling on it. With no run the column is
+  absent rather than empty, because an empty cell would be a claim that
+  nothing was held where the truth is that nobody asked.
+
+- **The marks are the run's while a run is seated.** The host's
+  `active_marks` and `invoke_mark` still exist and still behave as they did;
+  they simply do not contribute while a run is there, because merging two
+  answers to "where is this run" would draw a configuration no point in the
+  run was ever at.
+
+- **A different document puts the run away**, beside the marks and for a
+  reason the 2026-08-30 amendment's pane-fold exemption does not reach: a run
+  resolves through the provenance map of the document it is over, so over
+  another document it would name blocks that do not exist.
+
+- **Markup carrying statifier-ui's own class names now reaches the page**, in
+  the `statifier-ui-*` namespace, while a run is seated. Decision 14's rule is
+  that this package emits no unprefixed class of its own and depends on no
+  framework's, and that is unchanged - these classes are another package's,
+  drawn by that package's components, in its own documented namespace. This
+  package's stylesheet gives them layout and type only, under `.sb-run`, and
+  themes nothing it does not own.
+
+- **No new hook.** Decision 7's two hooks are untouched. The scrubber's four
+  buttons and the log's entries are server round trips, which is the same
+  discipline the drawer resize takes.
+
+Filed with `sb-xbyt`, campaign 033's editor-as-debugger lane, alongside
+`sb-grc1`, which built the marks resolution this pane hangs on.
