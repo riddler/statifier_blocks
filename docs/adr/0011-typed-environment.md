@@ -225,7 +225,7 @@ in that record's order:
 record is never read as another record by structure, there is no union, no
 least-upper-bound, no inference beyond the four steps above, and no runtime
 enforcement of any of it - the check is an authoring-time relation exactly as
-ADR-0003 decision 9's third bullet said, and no SCXML carries a type.
+ADR-0003 decision 9's first bullet said, and no SCXML carries a type.
 
 **This package defines no `Compatibility` or `Coverage` module of its own.**
 `sd-ADR-0001` decisions 9, 10 and 11 already define `breaks/2` (how a
@@ -534,38 +534,32 @@ the candidates the field already offers.** The evidence is this package's own
 emission. ADR-0002's G5 row records what `core.subchart` declares and G5a
 hands the emitted bytes to ADR-0004; neither states a constraint on what an
 `<assign>` location may be: the bare-identifier rule is
-`Config.identifier?/1`'s (`lib/statifier_blocks/core/config.ex:37`), applied at
-this one call site by `check_assign_to/2` and by the emission's own `assign/1`.
-Meanwhile `core.assign` - the type whose entire job is
-writing one datamodel path - accepts any non-empty path with no whitespace
+`Config.identifier?/1`'s (`lib/statifier_blocks/core/config.ex:37`), reached
+for this field by `check_assign_to/2` (`:291-300`) and by the emission's own
+`assign/1` (`:604-618`). Meanwhile `core.assign` - the type whose entire job
+is writing one datamodel path - accepts any non-empty path with no whitespace
 (`lib/statifier_blocks/core/assign.ex:96-102`), emits it verbatim as
 `<assign location="...">`, and its own moduledoc's worked example is a dotted
 location (`:146`). A subchart's outcome is written by the same element to the
 same datamodel, so one of the two rules is wrong, and it is not the one with
 the dotted example in it.
 
-The widening reaches **two** call sites in that type, not one:
-`check_assign_to/2` and the emission's own `assign/1`
-(`lib/statifier_blocks/core/subchart.ex:604-618`), which repeats the refusal
-because `emit/2` has to answer for a config `validate_config/1` would have
-rejected. `sb-xk1h` implements both, and the candidates and the validation
-agree afterwards.
+The widening reaches **both** of those sites in `core/subchart.ex` and not
+one: the emission repeats the refusal because `emit/2` has to answer for a
+config `validate_config/1` would have rejected. `sb-xk1h` implements both, and
+the candidates and the validation agree afterwards.
 
 **It reaches nothing else, and the rest is named rather than swept up.** The
 identical `defp assign(location)` refusal on an `<assign>` location stands
 unchanged in `core.invoke` (`lib/statifier_blocks/core/invoke.ex:299`) and in
 `StatifierBlocks.InvokeStep` (`lib/statifier_blocks/invoke_step.ex:430`), and
 `core.map`'s `collect` carries its own
-(`lib/statifier_blocks/core/map.ex:188`, `:300-308`). This decision was ruled
-about `core.subchart`'s `assign_to`, and widening three more fields on the
-strength of one field's argument is the sweep a record should not make by
-implication. Whether the four should agree is in the deferred list.
-
-`core.map`'s `collect` carries a byte-identical refusal
-(`lib/statifier_blocks/core/map.ex:188`, `:300-308`) and this record does
-**not** decide it: `collect`'s emission is ADR-0009's and the two fields
-arrived at the same wording by different routes. It is named in the deferred
-list so that the next reader finds it named rather than finds it by hitting it.
+(`lib/statifier_blocks/core/map.ex:188`, `:300-308`), and `collect`'s emission
+is ADR-0009's rather than this decision's. This decision was ruled about
+`core.subchart`'s `assign_to`, and widening three more fields on the strength
+of one field's argument is the sweep a record should not make by implication.
+Whether the four should agree is in the deferred list, so that the next reader
+finds it named rather than finds it by hitting it.
 
 ### 14. No cardinality on a seam
 
@@ -738,11 +732,18 @@ it, in a palette whose datamodel never declared it, is ADR-0005 clause 11e's
   child's own declared collect fields - is ADR-0009 decisions 5 and 6's
   question and is not answered here. `sb-pg91` carries it; it is the one
   question decision 12 explicitly names.
-- **The empty fan-out.** `core.map` over zero items is refused rather than
-  answered today, and no accepted record decides it. It is ADR-0009's question
-  and not this record's - it is named here only because a reader of decision 12
-  will wonder what `{:list, :unknown}` means when the list is empty, and the
-  answer is that the block never gets that far. `sb-kha0` carries it.
+- **The empty fan-out, at the layer below.** This record's own layer has no
+  question here, and it is worth saying so rather than leaving a reader of
+  decision 12 to wonder what `{:list, :unknown}` means when the list is empty.
+  ADR-0009 decision 8 already answers it: "**Which is why an empty list is not
+  a refusal.** `items` resolving to `[]` is a successful fan-out over nothing:
+  zero children start, the accumulated list is written as `[]`, and the block
+  takes `done` immediately." That empty list is a `{:list, :unknown}` like any
+  other and nothing downstream changes. What is open is one layer down, where
+  a runtime disagrees with that record: `statifier_oban`'s fan-out refuses an
+  empty items list on the invocation's error route, and who answers `N = 0` on
+  the settlement side is undecided. Neither is this repository's to settle;
+  `sb-kha0` carries it.
 - **The other three bare-identifier refusals on an `<assign>` location.**
   Decision 13 resolves `core.subchart`'s `assign_to` and deliberately reaches
   neither `core.map`'s `collect` (whose emission is ADR-0009's) nor the
