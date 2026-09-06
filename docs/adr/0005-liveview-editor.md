@@ -6656,3 +6656,70 @@ stale.** `ADR-0002`'s amendment of the same date added an eighth member,
 types"; nothing else in it moves, and the line stays where it is because
 amending it in place would edit an accepted section to fix a count a dated
 Note can carry.
+
+## Note (2026-09-06): the 2026-09-05 corrections Note's `Palette.resolve/2` enumeration is a census, and it has moved
+
+A dated Note rather than an amendment. It re-counts one enumeration in the
+2026-09-05 corrections Note above and says what kind of claim such an
+enumeration is. Nothing this record decides changes, no line above is edited,
+and the reading the enumerated bullet was written to give is untouched.
+
+### What the bullet says, and when it was exact
+
+The first of that Note's "Two readings the sections below ask for"
+(`:6263-6280`) argues that "it runs at open" names the occasion an author
+meets rather than an exclusive one, and supports that by counting where
+`Palette.resolve/2` is actually called: "in `lib/` ... ten call sites across
+seven modules, and in `test/` ... nineteen more across seven files", followed
+by the ten `lib/` cites.
+
+Those numbers were exact on the commit that merged them (`e22849b`,
+2026-09-05). `lib/` held ten calls across seven modules on that tree, and
+`lib/statifier_blocks/slot_validation.ex:56` was excluded from the count,
+correctly, as a doc mention rather than a call.
+
+### The census as of `02fa1dc`
+
+`lib/` now holds **fourteen** calls across **eight** modules: assignability
+(`lib/statifier_blocks/assignability.ex:384`, `:566`), the compiler
+(`lib/statifier_blocks/compiler.ex:361`), the datamodel walk
+(`lib/statifier_blocks/datamodel.ex:655`), the edit path
+(`lib/statifier_blocks/edit.ex:270`,
+`lib/statifier_blocks/edit/targets.ex:267`), the editor shell
+(`lib/statifier_blocks/editor.ex:1622`, `:1684`), slot validation
+(`lib/statifier_blocks/slot_validation.ex:78`) and the view model
+(`lib/statifier_blocks/view_model.ex:820`, `:924`, `:1010`, `:1093`,
+`:1180`). `slot_validation.ex:56` is still a doc mention and still not
+counted.
+
+Three movements account for the difference, all of them later than `e22849b`:
+
+- the view model went from three calls to five - `:924` arrived with the
+  cardinality seam (`5d7de42`) and the fifth with the host's subchart
+  outcomes (`0ae8c3f`);
+- the editor shell became the eighth module, with two calls, when the body's
+  outcomes reached `core.on_event`'s event field (`66b5874`);
+- the remaining cites moved by line only, not by existence: `edit.ex:219` is
+  now `:270`, and the view model's `:772`, `:826` and `:879` are now `:820`,
+  `:1010` and `:1093`.
+
+The `test/` half is unchanged: nineteen occurrences across seven files,
+`test/support/core_fixtures.ex` among them.
+
+### What this does and does not settle
+
+The bullet's argument does not depend on the arithmetic. "At open" names the
+occasion whatever the census is; a larger count strengthens the point rather
+than qualifying it, and the 2026-09-05 sub-note on that bullet - that the
+enumeration after "seven files:" lists the `lib/` sites and not the `test/`
+files - reads exactly as it did.
+
+What this Note settles is the standing of such an enumeration. **A call-site
+count in this record is a census dated to the section that took it, not a
+claim about the code at any later date.** A reader citing one re-counts it
+against the tree first, and a section that takes a fresh one says which commit
+it counted on, as this one does. Both counts above are taken on `02fa1dc`; a
+later commit that adds or removes a caller moves them again, and falsifies
+neither this Note nor the one above it.
+
+Filed with `sb-06al`, campaign 032's docs fill.
