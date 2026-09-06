@@ -505,9 +505,10 @@ defmodule StatifierBlocks.Compiler do
         {:error, findings} -> findings
       end
 
+    declared = declaration_findings(block, module)
     typed = declared_payload_findings(node, declarations)
 
-    Enum.map(own ++ typed, fn {key, message} ->
+    Enum.map(declared ++ own ++ typed, fn {key, message} ->
       Finding.new(:config, {:invalid_config, key}, message,
         block_id: block.id,
         config_key: key
@@ -517,6 +518,52 @@ defmodule StatifierBlocks.Compiler do
         Enum.flat_map(children, &config_findings(&1, declarations))
       end)
   end
+
+  # The one config check that is about the *declaration* rather than the
+  # value under it: a `{:path, opts}` field written without a `default:` key
+  # is refused here, at compile, naming the field.
+  #
+  # `t:StatifierBlocks.BlockType.field_decl/0` has required `:default` from
+  # the start, so a declaration missing it was never well-formed. What it did
+  # instead of failing was reach the view model, where every field's default
+  # is destructured out of the declaration, and raise a `FunctionClauseError`
+  # from inside the build - a stack trace naming neither the block type nor
+  # the field, produced by whichever screen happened to render the block. The
+  # earliest place the defect is visible with the field's name still attached
+  # is the stage that already asks a block type what it declares, so that is
+  # where it is refused.
+  #
+  # Only the path arm is checked. A path field's `default:` is what the
+  # editor puts in an unset control and what a read of the path falls back
+  # to, so the missing key changes behaviour there rather than only shape;
+  # for every other field type the view model now reads the key permissively
+  # and renders. Widening the refusal to all field types is a change to what
+  # a block type may declare, which is the record's call and not this
+  # stage's.
+  #
+  # The finding is per *block*, not per type. `config_schema/1` takes the
+  # block's config, so what a type declares is not a property of the type
+  # alone - two blocks of one type can differ - and nothing in the compile
+  # de-duplicates by type. Anchoring on each block also sends an author to a
+  # card they can see, which is what decision 11's routing is for; a
+  # document with two offending blocks reports two findings, one apiece.
+  @spec declaration_findings(Block.t(), module()) :: [BlockType.finding()]
+  defp declaration_findings(%Block{config: config}, module) do
+    config
+    |> module.config_schema()
+    |> Enum.filter(&path_field_without_default?/1)
+    |> Enum.map(fn %{key: key} ->
+      {key,
+       ~s(the #{key} field is declared as a datamodel path with no default: key, ) <>
+         ~s(so it has no value to read when a config leaves it unset)}
+    end)
+  end
+
+  @spec path_field_without_default?(BlockType.field_decl()) :: boolean()
+  defp path_field_without_default?(%{type: {:path, _opts}} = decl),
+    do: not Map.has_key?(decl, :default)
+
+  defp path_field_without_default?(_decl), do: false
 
   # The one config check in this package that reads the datamodel document.
   # `core.on_event` owns both halves of it - what a `payload` declares and
