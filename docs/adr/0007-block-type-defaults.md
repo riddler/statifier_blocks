@@ -266,7 +266,7 @@ the cost list, `:69` in the decision, `:171` in the Consequences - and each is
 the nine-row table `ADR-0002` decision 5 carried when this record was written.
 The three callbacks added beside it since are `outcomes/1`, `summary/1` and
 `failure_outcomes/1`, each added by its own amendment or Note on that record.
-`ADR-0002` decision 5's own line (`:110`) still reads "nine callbacks, five
+`ADR-0002` decision 5's own line (`:109`) still reads "nine callbacks, five
 required" too; correcting it there is that record's amendment to make and not
 this Note's.
 

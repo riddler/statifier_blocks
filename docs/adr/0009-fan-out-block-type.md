@@ -872,7 +872,7 @@ unless it is a bare lowercase identifier, and the emitted `<invoke>` carries
 nothing - and `index_as` as one only when the author declares it.
 
 The sentence is the deferral bullet for the pair, in the 2026-09-05 block
-beneath decision 4 (`:266-267`): "Nothing in the shipped emission carries them,
+beneath decision 4 (`:266-269`): "Nothing in the shipped emission carries them,
 so a child chart today reads whatever the fan-out handler passes it, which is
 the handler's contract rather than this one's." True when written, and now
 historical on both halves - the emission carries them, and what a child sees
