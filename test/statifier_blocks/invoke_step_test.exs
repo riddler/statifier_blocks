@@ -146,11 +146,22 @@ defmodule StatifierBlocks.InvokeStepTest do
     # Sabotage: narrowed `check_assign_to/2`'s blank arm to `nil` - a
     # stored empty string stops counting as blank, so a step that keeps
     # nothing is refused and this goes red (verified).
-    test "assign_to is optional by default, and an identifier when it is there" do
+    test "assign_to is optional by default" do
       assert Receipt.validate_config(%{"assign_to" => ""}) == :ok
+      assert Receipt.validate_config(%{}) == :ok
+    end
 
-      assert {:error, [{"assign_to", _message}]} =
-               Receipt.validate_config(%{"assign_to" => "Auth.x"})
+    # Sabotage: narrowed `check_assign_to/2` back to `Config.identifier?/1`
+    # - the dotted path `core.invoke` and `core.subchart` admit is refused
+    # on a host step and the first assertion goes red (verified).
+    test "assign_to admits a datamodel path, and refuses whitespace in one" do
+      assert Receipt.validate_config(%{"assign_to" => "cards.receipt"}) == :ok
+      assert Receipt.validate_config(%{"assign_to" => "receipt"}) == :ok
+
+      assert {:error, [{"assign_to", message}]} =
+               Receipt.validate_config(%{"assign_to" => "cards receipt"})
+
+      assert message =~ "datamodel path"
     end
 
     # Sabotage: made `check_identifier/4` accept anything - the required

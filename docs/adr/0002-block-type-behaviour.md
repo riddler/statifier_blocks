@@ -3685,3 +3685,48 @@ moved" paragraph counts that same single sequence by ordinal rather than by
 table. Neither reading is disturbed here: this Note corrects only the
 decision 10 Note's clause, which says "decision 10's table" and then counts
 all seventeen.
+
+## Note (2026-09-06): `core.invoke`'s `assign_to` is a declared path, so the writes table gains a row
+
+A dated Note rather than an amendment, and it edits nothing above this line.
+Two statements this record makes about `core.invoke` were true when they
+were written and are not any more, and both are consequences of one change
+`sb-r313` made under `ADR-0011` decision 13's argument rather than of any
+decision made here.
+
+**The 2026-08-29 section D table declares `assign_to` as `:string`.** It is
+`{:path, %{}}` on `main` - decision 7's eighth field type, from the
+2026-09-05 amendment - exactly as `core.subchart`'s became on `sb-2ym4` and
+for the same reason: the field names a datamodel location, the editor
+reaches a candidate list by the field type alone, and a value the host's
+datamodel does not declare draws `ADR-0005` clause 11e's `:info` advisory
+rather than a refusal. Decision 7's set gains no member and the D table's
+`core.invoke` row is otherwise unchanged; a reader of that row should read
+the type as `{:path, %{}}`.
+
+**The Note of 2026-09-06's writes table says `core.invoke` writes
+nothing.** Its row reads "none | none | its `<assign>` location is emitted
+rather than declared, so nothing here sees it", which was the defect
+`sb-r313` was filed for rather than a property worth keeping. The row is now:
+
+| Block type | Reads | Writes | How it reaches the environment |
+|---|---|---|---|
+| `core.invoke` | none | `assign_to`, `:unknown` | a `{:path, opts}` field carrying no `writes` key, so the path becomes known without becoming typed - `core.subchart`'s row exactly, and for the same reason: what the call answers is the host's, not this record's |
+
+That row is the only change to that Note's table, and the reading beneath it
+that opens "**No core type declares a read**" still holds: this is a write.
+The census of path-field writers across the `core.*` vocabulary is five
+after it rather than four.
+
+**The same Note's sentence about `collect`'s wording.** Section G15's prose
+says a `collect` that is present and not a bare lowercase identifier is
+"refused in the same words `core.invoke` and `core.subchart` produce for
+`assign_to`". Those three wordings have diverged in two steps: `sb-xk1h`
+moved `core.subchart`'s to the datamodel-path sentence when it implemented
+`ADR-0011` decision 13, and `sb-r313` moved `core.invoke`'s to the same
+sentence. `core.map`'s `collect` keeps the bare-identifier wording, because
+`ADR-0009` decision 4 decides that field's grammar outright and widening it
+is that record's amendment to make. The refusal's *shape* is now shared -
+`StatifierBlocks.Core.AssignLocation`, one blank-permissive check anchored
+on the field's own key per `ADR-0005` decision 11 - and only the rule and
+the wording differ. G15's sentence should be read as naming the shape.

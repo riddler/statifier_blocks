@@ -885,3 +885,56 @@ decision 13 quotes from `core/assign.ex:146` is at `:139`.
 Decision 12 is the one claim worth stating positively because it is easy to
 miss in the schema: `core.map`'s `collect` field is declared
 `type: {:path, %{writes: {:list, :unknown}}}`, exactly as decision 12 says.
+
+## Note (2026-09-06): two of the three deferred `<assign>` refusals are resolved, and the third is another record's
+
+A dated note rather than an amendment. Every decision above stands in the
+words it was accepted in, and no clause gains or loses a member. What this
+records is that the deferred question named above as "**The other three
+bare-identifier refusals on an `<assign>` location**" has been answered for
+two of the three, in the direction decision 13 already argued for, and that
+the third is deliberately left where it is.
+
+**What moved.** `core.invoke`'s `assign_to` and
+`StatifierBlocks.InvokeStep`'s now read
+`StatifierBlocks.Core.Config.datamodel_path?/1` at both of their sites - the
+`validate_config/1` check and the emission that has to answer for a config
+that check would have rejected - which is exactly the pair decision 13
+widened in `core/subchart.ex`. Decision 13's argument reaches them without
+being widened itself: the three write the same `<assign location="...">`
+element into the same datamodel that `core.assign` writes any non-empty
+whitespace-free path through, and one element writing one datamodel cannot
+carry two rules about what a location may be. `sb-r313` implements it.
+
+**What did not, and why it is not this record's to move.** `core.map`'s
+`collect` keeps the bare-identifier rule. It is the one of the four whose
+grammar an accepted decision states outright: `ADR-0009` decision 4 says
+"`assign_to` keeps the one grammar it already has: a bare lowercase
+identifier ... There is no per-item path grammar and no dotted form", of the
+field that ships as `collect`. Widening it is that record's amendment to
+make, on that record's own argument, and doing it here on the strength of
+this record's would be the sweep by implication decision 13 declined to
+make. So the deferred question above closes for two members and stays open
+for one, with the owner named rather than left to be found: `sb-3j9u` closes
+as folded into `sb-r313`, and whoever reopens `collect` reopens `ADR-0009`.
+
+**One reading the code now settles that this record's Note of 2026-09-06
+had the other way round.** That Note's reading 6 says "The three other
+bare-identifier refusals the decision deliberately did not reach are still
+in place, still deferred". Two of the three are no longer in place; the
+sentence is historical as of `sb-r313` and the citations beside it -
+`lib/statifier_blocks/core/invoke.ex:299` and
+`lib/statifier_blocks/invoke_step.ex:430` - now land on the shared helper's
+call sites rather than on a refusal of their own.
+
+**A second thing followed, and it is the reason the bead was filed as a
+bug.** `core.invoke`'s `assign_to` was declared `type: :string` with no
+`datamodel_path?` key while the block emitted an `<assign>` from it, so a
+path the block really wrote was invisible to decision 2's write signature
+and to `ADR-0005` clause 11e's advisory. The field is now `{:path, %{}}`,
+so the walk reads it as a write of `:unknown` at that path like every other
+untyped path field, and the editor offers the host's declared paths as
+candidates on it. Nothing about decision 2 changes; a declaration that was
+missing from its input is now in it. The census this adds a member to lives
+in `ADR-0002`'s Note of 2026-09-06, and that record carries the
+corresponding note.

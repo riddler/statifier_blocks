@@ -82,10 +82,16 @@ defmodule StatifierBlocks.Core.Map do
   7's eighth field type - so the editor offers the host's declared
   datamodel paths as candidates on both and gives a value the datamodel
   does not declare ADR-0005 clause 11e's `:info` advisory, which is a
-  remark and not a refusal. `collect` accepts what `core.subchart`'s
-  `assign_to` accepts, refused with the same wording: a bare lowercase
-  identifier. Two spellings of the same complaint would suggest an author
-  had met two fields.
+  remark and not a refusal. `collect` is refused unless it is a bare
+  lowercase identifier, which is the one grammar ADR-0009 decision 4 gives
+  it in as many words. The other three fields this package writes an
+  `<assign location="...">` from - `core.invoke`'s and
+  `StatifierBlocks.InvokeStep`'s `assign_to`, and `core.subchart`'s -
+  admit any datamodel path since ADR-0011 decision 13 and `sb-r313`, so
+  `collect` is now the narrow one of the four. Whether it should stay
+  narrow is ADR-0009's amendment to make, not this module's: the shape of
+  all four refusals is shared in `StatifierBlocks.Core.AssignLocation`,
+  and only the rule differs.
 
   `collect` carries the `writes` key ADR-0002's Note of 2026-09-06
   records, and what it writes is `{:list, :unknown}` (ADR-0011 decision
@@ -180,7 +186,7 @@ defmodule StatifierBlocks.Core.Map do
 
   alias StatifierBlocks.Block
   alias StatifierBlocks.Compiler.Context
-  alias StatifierBlocks.Core.{Config, Emit}
+  alias StatifierBlocks.Core.{AssignLocation, Config, Emit}
   alias StatifierBlocks.Emission
 
   @invoke_type "statifier_blocks:map"
@@ -309,15 +315,7 @@ defmodule StatifierBlocks.Core.Map do
   end
 
   defp check_collect(findings, config) do
-    case Map.get(config, "collect") do
-      blank when blank in [nil, ""] ->
-        findings
-
-      value ->
-        if Config.identifier?(value),
-          do: findings,
-          else: [{"collect", @collect_message} | findings]
-    end
+    AssignLocation.check(findings, config, "collect", &Config.identifier?/1, @collect_message)
   end
 
   defp check_on(findings, config) do
@@ -526,12 +524,8 @@ defmodule StatifierBlocks.Core.Map do
   end
 
   @spec collect(term()) :: {:ok, String.t() | nil} | {:error, [{String.t(), String.t()}]}
-  defp collect(value) when value in [nil, ""], do: {:ok, nil}
-
   defp collect(value) do
-    if Config.identifier?(value),
-      do: {:ok, value},
-      else: {:error, [{"collect", @collect_message}]}
+    AssignLocation.location(value, "collect", &Config.identifier?/1, @collect_message)
   end
 
   @spec on(Block.config()) :: {:ok, String.t()} | {:error, [{String.t(), String.t()}]}

@@ -34,18 +34,53 @@ defmodule StatifierBlocks.Core.InvokeTest do
     end
 
     # sabotage: dropped the blank arm so an absent assign_to was checked as
-    # an identifier -> the optional field becomes required and this goes
-    # red (verified)
-    test "assign_to is optional, and an identifier when it is there" do
+    # a path -> the optional field becomes required and this goes red
+    # (verified)
+    test "assign_to is optional, and a datamodel path when it is there" do
       assert Invoke.validate_config(%{"invoke_type" => "myapp:capture"}) == :ok
 
       assert Invoke.validate_config(%{"invoke_type" => "myapp:capture", "assign_to" => ""}) == :ok
+    end
 
-      assert {:error, [{"assign_to", _message}]} =
+    # sabotage: narrowed `check_assign_to/2` back to `Config.identifier?/1`
+    # - the dotted path this field has always offered as a candidate is
+    # refused again and the first assertion goes red (verified)
+    test "assign_to admits a dotted path, and everything it admitted before" do
+      assert Invoke.validate_config(%{
+               "invoke_type" => "myapp:capture",
+               "assign_to" => "cards.authorization"
+             }) == :ok
+
+      assert Invoke.validate_config(%{
+               "invoke_type" => "myapp:capture",
+               "assign_to" => "authorization"
+             }) == :ok
+    end
+
+    # sabotage: widened the rule to `non_empty_string?/1` - whitespace in a
+    # location stops being refused and this goes red (verified)
+    test "a location with whitespace in it is still not a datamodel path" do
+      assert {:error, [{"assign_to", message}]} =
                Invoke.validate_config(%{
                  "invoke_type" => "myapp:capture",
-                 "assign_to" => "Auth.x"
+                 "assign_to" => "cards authorization"
                })
+
+      assert message =~ "datamodel path"
+    end
+
+    # sabotage: reverted the declaration to `type: :string` - the field
+    # stops being a datamodel path by construction, so the editor loses its
+    # candidates and `Environment` stops seeing the write; this goes red
+    # (verified)
+    test "assign_to is declared a {:path, opts} field" do
+      field =
+        %{}
+        |> Invoke.config_schema()
+        |> Enum.find(&(&1.key == "assign_to"))
+
+      assert field.type == {:path, %{}}
+      assert StatifierBlocks.BlockType.datamodel_path?(field)
     end
 
     # sabotage: stopped splitting the line on "=" and treated the whole
@@ -119,6 +154,20 @@ defmodule StatifierBlocks.Core.InvokeTest do
       assert scxml =~
                ~s(<transition event="done.invoke" target="s_blk_INV__o_done">) <>
                  ~s(<assign expr="_event.data" location="authorization"/></transition>)
+    end
+
+    # sabotage: narrowed the emission's rule back to `Config.identifier?/1`
+    # - a dotted location `validate_config/1` accepts is refused by `emit/2`
+    # and the compile returns an error instead of the bytes (verified)
+    test "a dotted location reaches the emitted <assign> verbatim" do
+      dotted =
+        Block.new("core.invoke",
+          id: "blk_INV",
+          config: %{"invoke_type" => "myapp:authorize", "assign_to" => "cards.authorization"}
+        )
+
+      assert compile!(dotted).scxml =~
+               ~s(<assign expr="_event.data" location="cards.authorization"/>)
     end
 
     # sabotage: emitted the failure transition on ADR-0068's full event

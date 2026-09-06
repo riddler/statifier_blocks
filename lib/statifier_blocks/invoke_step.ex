@@ -18,11 +18,10 @@ defmodule StatifierBlocks.InvokeStep do
           fields: [
             %{
               key: "assign_to",
-              type: :string,
+              type: {:path, %{}},
               label: "Write the decision to",
               required?: true,
-              default: "authorization",
-              datamodel_path?: true
+              default: "cards.authorization"
             }
           ],
           palette: %{
@@ -100,7 +99,7 @@ defmodule StatifierBlocks.InvokeStep do
 
   alias StatifierBlocks.{Block, BlockType, Emission}
   alias StatifierBlocks.Compiler.Context
-  alias StatifierBlocks.Core.{Config, Emit}
+  alias StatifierBlocks.Core.{AssignLocation, Config, Emit}
 
   @done_event "done.invoke"
   @error_event "error.communication.invoke"
@@ -110,8 +109,10 @@ defmodule StatifierBlocks.InvokeStep do
   # The wording `StatifierBlocks.Core.Invoke` uses for the same key, on
   # purpose: an author who meets `assign_to` on a core block and on a host
   # step is meeting one field, and two spellings of its complaint would
-  # suggest otherwise.
-  @assign_to_message "must be a bare lowercase identifier, like authorization"
+  # suggest otherwise. Both widened to the datamodel-path rule on
+  # `sb-r313`, for ADR-0011 decision 13's reason - the two emit the same
+  # `<assign>` element into the same datamodel.
+  @assign_to_message "must be a datamodel path, like cards.authorization"
 
   # `label`, `group`, `icon` and `accent_token` are deliberately not among
   # the defaults. Which heading a step files under is the host domain's
@@ -285,19 +286,25 @@ defmodule StatifierBlocks.InvokeStep do
   Checks an `assign_to` the step declared as optional: a blank one is a
   step that throws its answer away, which is an answer rather than a gap.
 
-  A step that requires the key instead - because a decision nobody keeps is
-  not a decision - declares the field `required?: true` and adds
-  `check_identifier/4`, which refuses the blank.
+  What it accepts is `core.assign`'s and `core.invoke`'s datamodel path -
+  any non-empty value with no whitespace, dotted or not (ADR-0011 decision
+  13, widened here on `sb-r313`). A step that requires the key instead -
+  because a decision nobody keeps is not a decision - declares the field
+  `required?: true` and adds a refusal of the blank of its own; this check
+  stays blank-permissive either way, so the two compose rather than
+  disagreeing about the same value. `check_identifier/4` is the shipped
+  shape for a step field whose rule really is a bare identifier, which
+  `assign_to` no longer is.
   """
   @spec check_assign_to([BlockType.finding()], Block.config()) :: [BlockType.finding()]
   def check_assign_to(findings, config) when is_list(findings) and is_map(config) do
-    case Map.get(config, "assign_to") do
-      blank when blank in [nil, ""] ->
-        findings
-
-      stored ->
-        refute_unless(findings, Config.identifier?(stored), "assign_to", @assign_to_message)
-    end
+    AssignLocation.check(
+      findings,
+      config,
+      "assign_to",
+      &Config.datamodel_path?/1,
+      @assign_to_message
+    )
   end
 
   @doc """
@@ -424,18 +431,26 @@ defmodule StatifierBlocks.InvokeStep do
   end
 
   @spec assign(term()) :: {:ok, [Emission.t()]} | {:error, [BlockType.finding()]}
-  defp assign(location) when location in [nil, ""], do: {:ok, []}
-
   defp assign(location) do
-    if Config.identifier?(location) do
-      {:ok,
-       [
-         "assign"
-         |> Emission.element([{"expr", "_event.data"}, {"location", location}])
-         |> Emission.attribute_from_config("location", "assign_to")
-       ]}
-    else
-      {:error, [{"assign_to", @assign_to_message}]}
+    case AssignLocation.location(
+           location,
+           "assign_to",
+           &Config.datamodel_path?/1,
+           @assign_to_message
+         ) do
+      {:ok, nil} ->
+        {:ok, []}
+
+      {:ok, path} ->
+        {:ok,
+         [
+           "assign"
+           |> Emission.element([{"expr", "_event.data"}, {"location", path}])
+           |> Emission.attribute_from_config("location", "assign_to")
+         ]}
+
+      {:error, findings} ->
+        {:error, findings}
     end
   end
 
