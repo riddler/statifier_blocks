@@ -403,6 +403,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Palette,
       Recipe,
       Shelf,
+      SourceView,
       ViewModel
     }
 
@@ -475,6 +476,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          fixtures: nil,
          fixture_runs: nil,
          fixture_runs_key: nil,
+         source_view: nil,
+         source_view_key: nil,
          inspector_tab: :config,
          drawer_open: false,
          drawer_tabs: [],
@@ -762,6 +765,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             declared_view={@declared_view}
             declared_types={@declared_types}
             environment_view={@environment_view}
+            source_view={@source_view}
+            selected_id={@selected_id}
             focus_tab={@drawer_tab_focus}
             target={@myself}
           />
@@ -878,7 +883,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     def handle_event("drawer-open", _params, socket),
       do:
         {:noreply,
-         socket |> assign(drawer_open: true, drawer_tab_focus: nil) |> refresh_fixture_runs()}
+         socket
+         |> assign(drawer_open: true, drawer_tab_focus: nil)
+         |> refresh_fixture_runs()
+         |> refresh_source_view()}
 
     def handle_event("drawer-close", _params, socket),
       do: {:noreply, assign(socket, drawer_open: false, drawer_tab_focus: nil)}
@@ -898,7 +906,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:noreply,
        socket
        |> assign(drawer_tab_id: picked, drawer_tab_focus: nil)
-       |> refresh_fixture_runs()}
+       |> refresh_fixture_runs()
+       |> refresh_source_view()}
     end
 
     # WAI-ARIA's tablist arrow keys, server-side. The drawer's moduledoc
@@ -925,7 +934,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           {:noreply,
            socket
            |> assign(drawer_tab_id: picked, drawer_tab_focus: picked)
-           |> refresh_fixture_runs()}
+           |> refresh_fixture_runs()
+           |> refresh_source_view()}
       end
     end
 
@@ -1568,6 +1578,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         host_tabs: assigns.drawer_tabs,
         declarations: assigns.document.datamodel,
         declared_view: Map.get_lazy(assigns, :declared_view, fn -> declared_view(assigns) end),
+        source_view: Map.get(assigns, :source_view),
         selected_id: assigns.selected_id
       })
     end
@@ -1998,6 +2009,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       |> assign(:pending_fields, pending_fields(socket, selected))
       |> notify_select(selected)
       |> refresh_fixture_runs()
+      |> refresh_source_view()
     end
 
     # The runs are not on `drawer()` and not in `drawer_view/1`, deliberately.
@@ -2055,6 +2067,49 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp wants_fixture_runs?(assigns) do
       (assigns.drawer_open and drawer_view(assigns).tab == :fixtures) or
         (assigns.inspector_tab == :fixtures and assigns.selected_id != nil)
+    end
+
+    # The Source listing, on the same discipline and for the same reason: it
+    # runs off a compile, so it is recomputed only while the drawer is
+    # actually open on it and only when the inputs moved.
+    #
+    # The key deliberately does NOT carry the selection. Which spans are
+    # highlighted is decided in the markup from `selected_id`, so moving the
+    # selection redraws the panel without recompiling anything - the same
+    # split the fixture runs make.
+    #
+    # The value being replaced goes in as `:previous`, which is what turns a
+    # mid-edit document that no longer compiles into the last chart it
+    # produced, marked stale, rather than an emptied panel.
+    @spec refresh_source_view(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
+    defp refresh_source_view(socket) do
+      assigns = socket.assigns
+      declare = Map.get(assigns, :declare, [])
+      key = {assigns.document, assigns.palette, declare}
+
+      cond do
+        not wants_source_view?(assigns) ->
+          socket
+
+        key == assigns.source_view_key ->
+          socket
+
+        true ->
+          view =
+            SourceView.build(assigns.document, assigns.palette,
+              declare: declare,
+              previous: assigns.source_view
+            )
+
+          socket
+          |> assign(:source_view, view)
+          |> assign(:source_view_key, key)
+      end
+    end
+
+    @spec wants_source_view?(map()) :: boolean()
+    defp wants_source_view?(assigns) do
+      assigns.drawer_open and drawer_view(assigns).tab == :source
     end
 
     # The one composition of a view model in this component, called by

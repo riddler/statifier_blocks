@@ -4001,6 +4001,105 @@ button.sb-inspector__group-row:hover {
   margin: 0;
 }
 
+/* -------------------------------------------------------------- source */
+
+/* The compiled chart, one numbered row per element. The serializer emits no
+ * whitespace at all, so every space and newline the reader sees is drawn by
+ * these rules rather than carried in the bytes: the indent is a padding, and
+ * the line break is `<li>` being a block. That is why the markup inside a
+ * line is unbroken - a space added there would be a byte of the chart that
+ * is not in the chart.
+ *
+ * Monospace, because the listing is source and the columns of an XML
+ * attribute list only line up in one font. */
+
+.sb-source__lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--sb-font-mono);
+  font-size: var(--sb-text-sm);
+  overflow-x: auto;
+}
+
+.sb-source__line {
+  display: flex;
+  gap: var(--sb-space);
+  white-space: pre;
+}
+
+/* The number is markup rather than a `::before` counter, because it is a
+ * fact about the listing that a test and a reader both have to be able to
+ * see. It is not selected with the source, which is what `user-select` is
+ * for: copying a chart out of this panel should give the chart. */
+.sb-source__number {
+  color: var(--sb-fg-subtle);
+  flex: none;
+  min-width: 3ch;
+  text-align: right;
+  user-select: none;
+}
+
+/* The indent is a padding the markup computes per line off `--sb-space`, not
+ * a run of spaces: no byte of the chart is moved or added to draw it, so what
+ * a reader copies out of this panel is the chart. It carries no token of its
+ * own - the depth is data about one line rather than a value a host would
+ * ever set for the whole editor, and decision 14 wants every `--sb-*` token
+ * on the editor root where a host can reach it. */
+.sb-source__text {
+  white-space: pre;
+}
+
+.sb-source__plain {
+  color: var(--sb-fg-subtle);
+}
+
+/* A span is a button because it selects a block, and it has to look like the
+ * source it is rather than like a control: no border, no background, and the
+ * type it inherits. What it does keep is a pointer and a focus ring, so the
+ * gesture is discoverable and the keyboard reaches it. */
+.sb-source__span {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  white-space: pre;
+  cursor: pointer;
+}
+
+.sb-source__span:hover {
+  background: var(--sb-bg-muted);
+}
+
+.sb-source__span:focus-visible {
+  outline: 2px solid var(--sb-accent);
+  outline-offset: 1px;
+}
+
+/* The selection, in the editor's own "here" colour - the same
+ * `--sb-accent-muted` the canvas marks a selected card with, so a block
+ * highlighted in two panes is highlighted the same way in both. */
+.sb-source__span[data-selected="true"] {
+  background: var(--sb-accent-muted);
+  color: var(--sb-fg);
+}
+
+.sb-source__stale {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-sm);
+  margin: 0 0 var(--sb-space);
+}
+
+.sb-source__findings {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-sm);
+  margin: 0 0 var(--sb-space);
+  padding-left: var(--sb-space);
+}
+
 /* ------------------------------------------------- palette strip / sheet */
 
 /* Above 780 the palette is a column and the strip does not exist. The rule is

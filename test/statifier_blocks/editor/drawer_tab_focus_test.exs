@@ -8,12 +8,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     The drawer strip as a keyboard widget: one Tab stop, and the arrow keys
     that reach the other tabs from it.
 
-    A `role="tablist"` is a single widget on the Tab sequence, and the six
-    drawer tabs were six consecutive stops ahead of the height slider and the
-    collapse control - so reaching the slider from the canvas cost six Tab
-    presses, and the strip announced itself six times. The roving attribute
-    fixed that and left the other half owing: with one stop, the five tabs
-    that are not it are reachable by arrow key or not at all, and once the
+    A `role="tablist"` is a single widget on the Tab sequence, and the drawer
+    tabs were one consecutive stop each ahead of the height slider and the
+    collapse control - so reaching the slider from the canvas cost one Tab
+    press per tab, and the strip announced itself once per tab. The roving
+    attribute fixed that and left the other half owing: with one stop, every
+    tab that is not the active one is reachable by arrow key or not at all,
+    and once the
     strip began scrolling at the narrow breakpoint with its scrollbar hidden
     (`sb-mtak`), "not at all" also meant not visible.
 
@@ -32,15 +33,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use StatifierBlocks.EditorLiveCase
 
-    # A sixth tab, so the strip is the width the narrow breakpoint clips and
-    # the far end of it is five presses from the near end.
+    # A host's tab past the package's, so the strip is the width the narrow
+    # breakpoint clips and the far end of it is a walk from the near end.
     @runs %{id: "runs", title: "Runs", count: 0}
 
-    # The strip's order: the package's five, then the host's, which is how
+    # The strip's order: the package's own, then the host's, which is how
     # `Shell.drawer_view/1` assembles it.
-    @order ~w(tables findings declarations fixtures datamodel runs)
+    @order ~w(tables findings declarations fixtures datamodel source runs)
 
-    defp mount_six(conn) do
+    defp mount_with_host_tab(conn) do
       {:ok, view, _html} = mount_editor(conn, host_tabs: [@runs])
       view |> element(".sb-drawer__strip") |> render_click()
       view
@@ -90,7 +91,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # button - no button matches the pairing pattern, the list comes back
       # empty and the emptiness assertion goes red.
       test "makes only the active tab a Tab stop", %{conn: conn} do
-        stops = conn |> mount_six() |> render() |> tab_stops()
+        stops = conn |> mount_with_host_tab() |> render() |> tab_stops()
 
         assert stops != []
         {active, inactive} = Enum.split_with(stops, fn {_id, tabindex} -> tabindex == "0" end)
@@ -105,7 +106,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # stays green, and this one goes red the moment the author picks a
       # second tab.
       test "moves the Tab stop to whichever tab is active", %{conn: conn} do
-        view = mount_six(conn)
+        view = mount_with_host_tab(conn)
 
         view |> element(~s(.sb-drawer__tab[phx-value-tab="declarations"])) |> render_click()
 
@@ -118,7 +119,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     describe "the arrow keys" do
-      # The one stop is only worth having if the other five tabs are reachable
+      # The one stop is only worth having if the other tabs are reachable
       # from it, so this walks the whole strip a press at a time and checks
       # every landing rather than one of them.
       #
@@ -127,7 +128,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # `tables` only if `tables` is where the walk starts, and the second
       # landing is wrong whatever it started on.
       test "Right walks the strip one tab at a time and wraps", %{conn: conn} do
-        view = mount_six(conn)
+        view = mount_with_host_tab(conn)
         start = view |> render() |> active()
         from = Enum.find_index(@order, &(&1 == start))
 
@@ -149,7 +150,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # written out because it says the wrap is intended rather than inherited
       # from an indexing convention.)
       test "Left wraps from the first tab to the last", %{conn: conn} do
-        view = mount_six(conn)
+        view = mount_with_host_tab(conn)
 
         view |> element(~s(.sb-drawer__tab[phx-value-tab="tables"])) |> render_click()
 
@@ -161,7 +162,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # `List.first(ids)` - both go red, and neither is caught by the walk
       # above, which never presses either.
       test "Home and End go to the ends", %{conn: conn} do
-        view = mount_six(conn)
+        view = mount_with_host_tab(conn)
 
         assert view |> key("End") |> active() == "runs"
         assert view |> key("Home") |> active() == "tables"
@@ -175,7 +176,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # rather than `nil` - Enter on a tab past the first silently jumps the
       # strip back to `tables`.
       test "a key the strip does not answer changes nothing", %{conn: conn} do
-        view = mount_six(conn)
+        view = mount_with_host_tab(conn)
 
         view |> element(~s(.sb-drawer__tab[phx-value-tab="fixtures"])) |> render_click()
 
@@ -197,7 +198,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # `drawer_tab_focus: nil` - the tab still moves, so every test above
       # stays green, and the strip stops asking for focus at all.
       test "names the tab the key landed on", %{conn: conn} do
-        view = mount_six(conn)
+        view = mount_with_host_tab(conn)
 
         assert view |> key("End") |> focus_request() == "runs"
         assert view |> key("Home") |> focus_request() == "tables"
@@ -209,12 +210,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # standing, and reopening the drawer later moves focus for a keystroke
       # nobody pressed.
       test "is asked for by a key press and by nothing else", %{conn: conn} do
-        view = mount_six(conn)
+        view = mount_with_host_tab(conn)
 
         assert view |> render() |> focus_request() == nil
         assert view |> key("ArrowRight") |> focus_request() != nil
 
-        view |> element(~s(.sb-drawer__tab[phx-value-tab="datamodel"])) |> render_click()
+        view |> element(~s(.sb-drawer__tab[phx-value-tab="source"])) |> render_click()
         assert view |> render() |> focus_request() == nil
 
         assert view |> key("ArrowRight") |> focus_request() == "runs"
@@ -229,16 +230,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # it - the one the narrow breakpoint clips - and the strip both selects
       # it and asks for focus on it.
       #
-      # Sabotage: capping `drawer_tab_step/3` at the package's five tabs
+      # Sabotage: capping `drawer_tab_step/3` at the package's own tabs
       # (`Shell.drawer_tabs()` without `host_tab_ids/1`) - the walk stops at
       # `datamodel` and the host's tab stays unreachable, which is the defect
       # this bead was filed for.
-      test "reaches the far end of a six-tab strip from the near end", %{conn: conn} do
-        view = mount_six(conn)
+      test "reaches the far end of the strip from the near end", %{conn: conn} do
+        view = mount_with_host_tab(conn)
 
         view |> element(~s(.sb-drawer__tab[phx-value-tab="tables"])) |> render_click()
 
-        html = Enum.reduce(1..5, nil, fn _step, _last -> key(view, "ArrowRight") end)
+        html =
+          Enum.reduce(1..(length(@order) - 1), nil, fn _step, _last ->
+            key(view, "ArrowRight")
+          end)
 
         assert active(html) == "runs"
         assert focus_request(html) == "runs"
