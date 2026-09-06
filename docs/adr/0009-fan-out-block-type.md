@@ -856,3 +856,34 @@ it multiplies by nothing.
 
 Filed with `sb-napt`, mirrored with `sp-n8g` in `statifier_persistence`;
 campaign-033 ruling `RQ-033-3`.
+
+## Note (2026-09-06): decision 4's `item_as` and `index_as` reach the shipped emission, so one sentence of the 2026-09-05 deferral is historical
+
+A dated Note rather than an amendment, and it edits nothing above this line. It
+decides nothing the Note of 2026-09-06 above ("two of the four deferred fields
+are decided") did not already decide; what it adds is that the pair is now
+**declared and emitted** rather than only named in `ADR-0011`, and that one
+sentence written while they were neither is now a statement about the past.
+
+`sb-otpv` gave `StatifierBlocks.Core.Map` an `item_as` field (`:string`,
+default `item`) and an `index_as` field (`:string`, optional), each refused
+unless it is a bare lowercase identifier, and the emitted `<invoke>` carries
+`item_as` as a `<param>` always - through its default when the author sets
+nothing - and `index_as` as one only when the author declares it.
+
+The sentence is the deferral bullet for the pair, in the 2026-09-05 block
+beneath decision 4 (`:266-267`): "Nothing in the shipped emission carries them,
+so a child chart today reads whatever the fan-out handler passes it, which is
+the handler's contract rather than this one's." True when written, and now
+historical on both halves - the emission carries them, and what a child sees
+its item and its position under is this record's declaration rather than the
+handler's private convention. Decision 3 is why they are params and nothing
+else: the `<param>` list is the handler's whole input. `ADR-0002`'s G15 row and
+the Note beneath it read the shipped declaration, and that Note of this date
+records the six-field count.
+
+`max_concurrency` and `params` are untouched by this and stay deferred exactly
+as the Note above leaves them, on the reasons it gives each. Deferring is still
+not dropping.
+
+Filed with `sb-uewa`, folding `sb-z4vz`; campaign-034 ruling `RQ-034-6`.

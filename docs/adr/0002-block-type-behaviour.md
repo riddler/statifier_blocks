@@ -3898,3 +3898,104 @@ neither type's outcome list changed.
 
 Filed with `sb-napt`, mirrored with `sp-n8g` in `statifier_persistence`;
 campaign-033 ruling `RQ-033-3`.
+
+## Amendment (2026-09-06): decision 10's `core.branch` row and the environment table row, now that `slots/1` returns `undecided`
+
+This is the amendment `ADR-0012`'s closing section reserved for its
+acceptance. That record is accepted, `sb-2hoh` has built its decision 2, and
+the Note of 2026-09-06 above ("`core.branch` declares a third slot on `main`")
+named the three rows the debt covers and deliberately edited none of them.
+Two of the three are amended here. The third is withdrawn from the debt, and
+section C says why.
+
+Amendment by addition, per this record's convention: **no line above is
+edited**. Each row below is restated in full as it now reads, and the restated
+row is the one a reader follows.
+
+### A. Decision 10's `core.branch` vocabulary row (`:341`)
+
+| Block type | `slots(config)` | Config schema | Notes |
+|---|---|---|---|
+| `core.branch` | one `arm_*` per declared arm, then `{"otherwise", :any, "Otherwise"}`, then `{"undecided", :any, "Cannot be decided"}` | `arms`: a list of `{slot name, condition expression}` (amended 2026-08-27: the full slot name, e.g. `arm_approved`, not a suffix - matching ADR-0001's worked-example bytes) | conditions are `:expression` fields; the third slot is `ADR-0012` decision 2's, and it takes the children of a condition the engine could not decide |
+
+Only the `slots(config)` column moves. `config_schema/1` is untouched -
+`undecided` is not an arm and declares no condition field - and so is
+`validate_config/1`. The row's reading of the arms and of `otherwise` was never
+wrong; it was silent about a third slot, and it is not silent now.
+
+### B. The environment table row of the Note of 2026-09-06 (`:3528`)
+
+| Block type | Reads | Writes | How it reaches the environment |
+|---|---|---|---|
+| `core.branch` | none | none | one arm slot per declared arm, then `otherwise`, then `undecided`, merged per path |
+
+The merge rule the row states is unchanged and now covers one more slot, which
+is what the Note of 2026-09-06 above already said it would. `ADR-0011` decision
+4 is why it needs no new rule: every slot of a container starts from the
+environment that reached the container, and `ADR-0012` decision 8 names the new
+slot as one of those rather than adding a case. Reads and writes stay `none` in
+both columns.
+
+### C. Amendment H's summary row (`:1883`) is **not** amended, and leaves the debt
+
+`ADR-0012`'s closing section listed it as the third row owed. It is not owed.
+`ADR-0012` decision 9's `summary/1` clause is withdrawn by that record's own
+Note of 2026-09-06, so `N arms + otherwise` is still exactly what `summary/1`
+returns and exactly what amendment H's row should say. The card under-reports a
+*wired* `undecided` slot by one path, and that under-report is decision 9's own
+answer rather than a drift: `@callback summary(Block.config())` is handed the
+config alone, and whether a slot holds children is a fact about the block's
+`slots` map rather than its config. Widening the callback to see the block is a
+contract change no record has asked for. Recorded here because `ADR-0012`'s
+closing section still lists three rows, and a reader who counts two amendments
+against it should find the third accounted for rather than missing.
+
+### D. Cite errata: `summary/1` is at `:609`, not `:573`
+
+`@callback summary(Block.config())` is at
+`lib/statifier_blocks/block_type.ex:609` on `main`; `:573` was the line before
+`failure_outcomes/1` was declared above it. Two places carry the old number:
+
+- the Note of 2026-09-06 above, in its reading of amendment H's summary row
+  (`:3814-3815` of this file), which cites `` `:573` of
+  `lib/statifier_blocks/block_type.ex` `` - `:609` is the line it means;
+- the doc of `StatifierBlocks.Core.Branch.summary/1`
+  (`lib/statifier_blocks/core/branch.ex`), corrected to `:609` in the request
+  that carries this amendment.
+
+Neither cite's argument changes; only the number does. A line cite in this
+record family is a reading aid rather than a claim, which is why an errata
+paragraph is the right shape for it: the Note above keeps its words, and the
+number is corrected here.
+
+Filed with `sb-uewa`; campaign-034 ruling `RQ-034-6`. Sections A, B and C
+discharge the debt `ADR-0012` reserved.
+
+## Note (2026-09-06): G15 and G15b, read against `core.map`'s six shipped fields
+
+A dated Note rather than an amendment, and it edits nothing above this line. It
+decides nothing: G15's field census and G15b's reconciliation were both correct
+on the date they were written, and `sb-otpv` has since shipped two of the
+fields they say the module does not carry. This records the count so that a
+reader who finds those rows and the module disagreeing is reading a dated entry
+rather than making a discovery.
+
+`StatifierBlocks.Core.Map.config_schema/1` now declares **six** fields:
+`items`, `chart`, `item_as`, `index_as`, `collect`, `on`. The two new ones are
+`ADR-0009` decision 4's declared names for what a child sees its item and its
+position under - `item_as` a `:string` with the default `item`, `index_as` a
+`:string` the author declares only when they want one - and `ADR-0011`'s Note
+of 2026-09-06 is where they are recorded on the typed environment's side.
+
+**G15's row (`:3329`) lists four config fields, and there are six.** Everything
+else in that row holds: `slots/1`, the `slot_style`, the `outcomes/1` pair and
+the `on` default read exactly as they did. The two additions are declaration,
+not structure - no slot, no outcome and no card changes because of them.
+
+**G15b (`:3418`) says the four further fields `ADR-0009` declares are ones "the
+shipped surface does not carry", and two of the four now ship.**
+`max_concurrency` and `params` are still deferred, for the reasons `ADR-0009`'s
+Note of 2026-09-06 gives each; the `assign_to`/`collect` and `aggregate`/`on`
+spelling reconciliation that is the rest of G15b is untouched by this.
+
+Filed with `sb-uewa`, folding `sb-z4vz`; campaign-034 ruling `RQ-034-6`.

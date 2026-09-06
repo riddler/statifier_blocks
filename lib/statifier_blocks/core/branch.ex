@@ -202,7 +202,7 @@ defmodule StatifierBlocks.Core.Branch do
   asks for `"1 arm + otherwise + undecided"` on a branch that **wires**
   the slot, and this callback cannot answer that: `@callback
   summary(Block.config())` is handed the config alone
-  (`lib/statifier_blocks/block_type.ex:573`), and whether a slot holds
+  (`lib/statifier_blocks/block_type.ex:609`), and whether a slot holds
   children is a fact about the block's `slots` map rather than its
   config. Widening the callback to see the block is a contract change no
   record has asked for, so the card reads exactly as it did at 0.20.0 -
