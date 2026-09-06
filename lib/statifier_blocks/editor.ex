@@ -560,6 +560,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          pending_fields: [],
          palette_position: nil,
          palette_allowed: nil,
+         palette_allowed_recipes: nil,
          palette_query: "",
          palette_sheet: false,
          palette_collapsed: false,
@@ -789,6 +790,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             groups={@view_model.palette_groups}
             query={@palette_query}
             allowed={@palette_allowed}
+            allowed_recipes={@palette_allowed_recipes}
             sheet_open={@palette_sheet}
             collapsed={@palette_collapsed}
             insert_target={@insert_target}
@@ -1294,6 +1296,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
        assign(socket,
          palette_position: position,
          palette_allowed: accepted_types(socket, parent_id, slot),
+         palette_allowed_recipes: accepted_recipes(socket, position),
          palette_query: "",
          palette_collapsed: false
        )}
@@ -1304,6 +1307,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
        assign(socket,
          palette_position: nil,
          palette_allowed: nil,
+         palette_allowed_recipes: nil,
          palette_unarmed_pick: false
        )}
     end
@@ -1484,6 +1488,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           |> assign(
             palette_position: nil,
             palette_allowed: nil,
+            palette_allowed_recipes: nil,
             palette_unarmed_pick: false,
             selected_id: block.id
           )
@@ -1504,6 +1509,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # is the ordinary case clause 3C names, and nothing is written. A list
     # that reaches outside clause 3C's bound is a recipe module's bug, and
     # it is refused HERE, before it is applied, rather than trusted.
+    #
+    # An armed palette no longer offers a row either of them would refuse
+    # (`accepted_recipes/2`), so the ordinary case is answered before the
+    # author clicks. Both checks stay: a pick can arrive for a row the
+    # filter removed, and the module's bound is a property of the write.
     @spec insert_from_recipe(
             Phoenix.LiveView.Socket.t(),
             Palette.recipe_name(),
@@ -1520,6 +1530,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(
           palette_position: nil,
           palette_allowed: nil,
+          palette_allowed_recipes: nil,
           palette_unarmed_pick: false,
           selected_id: first_inserted_id(commands) || socket.assigns.selected_id
         )
@@ -1681,6 +1692,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             declaration_draft: nil,
             palette_position: nil,
             palette_allowed: nil,
+            palette_allowed_recipes: nil,
             palette_unarmed_pick: false,
             palette_sheet: false,
             # A mark addresses one block, so it stops being true when that
@@ -2731,6 +2743,42 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         end
       end)
       |> MapSet.new()
+    end
+
+    # The same question for the palette's other kind, asked the only way a
+    # recipe's fit can be asked (ADR-0005 clause 3C). A recipe is not a block
+    # type, so no set of type names answers for it: what answers is the recipe
+    # itself, handed the armed position and the document. `insert/2` refuses
+    # the positions the arrangement does not suit - a deadline where the
+    # enclosing block has no interrupts rail - and `within_reach?/2` says
+    # whether the commands it did answer with stay inside clause 3C's bound.
+    #
+    # Both are the pick's own checks, run here before the row is drawn rather
+    # than after it is clicked. `insert_from_recipe/3` still runs them, and
+    # still refuses: a pick can arrive for a row this filter removed - a stale
+    # sheet, a document swapped under an armed palette - and the refusal is
+    # what keeps the recipe module's bound enforced at the write rather than
+    # at the paint.
+    @spec accepted_recipes(Phoenix.LiveView.Socket.t(), Edit.target()) ::
+            MapSet.t(Palette.recipe_name())
+    defp accepted_recipes(socket, position) do
+      %{document: document, palette: palette} = socket.assigns
+
+      palette.recipes
+      |> Map.keys()
+      |> Enum.filter(&recipe_lands?(palette, document, &1, position))
+      |> MapSet.new()
+    end
+
+    @spec recipe_lands?(Palette.t(), Document.t(), Palette.recipe_name(), Edit.target()) ::
+            boolean()
+    defp recipe_lands?(palette, document, name, position) do
+      with {:ok, module} <- Palette.fetch_recipe(palette, name),
+           {:ok, commands} <- module.insert(position, document) do
+        Recipe.within_reach?(position, commands)
+      else
+        _refused_or_missing -> false
+      end
     end
 
     # Everything the drag needs, from one enumeration: the accepting slots,
