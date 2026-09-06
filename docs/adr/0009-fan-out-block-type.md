@@ -788,7 +788,7 @@ for an empty `items` that assembles the empty list and completes. This
 package's side needs no change, and this Note carries no `lib/` change: nothing
 here declares anything about the length of `items`, because the compiled
 invocation carries the `items` datamodel path once rather than the list
-(decision 3, as the 2026-09-05 Tier A Note below restates), so the length
+(decision 3, as the 2026-09-05 Tier A Note above restates), so the length
 exists only at runtime where the handler evaluates the path.
 
 **One thing this Note does not decide.** Decision 4 fixes this block's outcome
