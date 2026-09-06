@@ -125,16 +125,13 @@ defmodule StatifierBlocks.MixProject do
         # `StatifierBlocks.Datamodel` reads that package rather than a second
         # copy of the same projection.
         #
-        # Pinned to a git revision rather than a version requirement because
-        # `statifier_datamodel` is not on Hex yet. The pin is a commit on that
-        # repository's default branch, not a branch name, so the tree this
-        # resolves is the same tree on every machine and in CI. It is
-        # deliberately temporary: the requirement becomes `~> 0.1` as soon as
-        # the package's first release is published, and `mix hex.build` is
-        # expected to refuse a package carrying a git dependency until then.
-        {:statifier_datamodel,
-         git: "https://github.com/riddler/statifier_datamodel.git",
-         ref: "525ee6c3c44449a06735263c99d35e9b615cdb2c"},
+        # The floor is 0.1 because every module this package names -
+        # `StatifierDatamodel.Index`, `StatifierDatamodel.Document`,
+        # `StatifierDatamodel.Types` and `StatifierDatamodel.Declarations` -
+        # shipped in 0.1.0, that package's first release. Below 1.0 a `~>`
+        # requirement admits only the 0.1.x line, so a breaking 0.2 does not
+        # resolve here without a deliberate bump.
+        {:statifier_datamodel, "~> 0.1"},
         # Direct because `StatifierBlocks.Core.Duration` calls
         # `Predicator.Duration.parse/1` to read a stored predicator duration
         # string. It already resolves through statifier, so naming it here
