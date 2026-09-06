@@ -98,7 +98,9 @@ below with the shelf's fragments starting from an empty environment instead of
 from `:unknown`. Decision 7's local/global split between the editor's
 per-edit question and validation's whole-document authority stands, though
 decision 1 below changes which set of positions "local" covers. Decision 8's
-finding tuples stand and gain no member. Decision 9's three deferrals stand.
+finding standing is unchanged and its `{:kind_not_admitted, ...}` tuple gains
+no member; its `{:type_mismatch, ...}` tuple gains one, the path the read was
+checked at, per decision 8 below. Decision 9's three deferrals stand.
 
 The superseded decisions are not all superseded in the same direction, and it
 is worth saying which is which before the decisions below. Decisions 1 and 5
@@ -397,11 +399,21 @@ signature put the offending type at the path is the declaration an author would
 change, and under this record that block is findable by name rather than by
 adjacency, which makes the arm more useful than it was.
 
-ADR-0003 decision 8's two finding tuples are unchanged and gain no member.
+ADR-0003 decision 8's `{:kind_not_admitted, ...}` tuple is unchanged.
 `{:type_mismatch, block_id, upstream_ref, produced, consumed}` is the tuple an
 unsatisfied read produces, with `upstream_ref` naming the block whose write
 signature the read disagrees with, or `:slot_entry` when the seed is what it
-disagrees with.
+disagrees with - and it **gains one member, the datamodel path the read was
+checked at**.
+
+The path is added rather than left to be re-derived because under this record
+it cannot be re-derived. Decision 8's tuple was complete when a seam was a pair
+of adjacent blocks and the disagreement was about the seam itself; the same
+disagreement is now about a named path, a block may carry several read
+signatures on several paths, and a message that says which two types
+disagreed without saying where is a message an author cannot act on. It is the
+one member the tuple gains, and `{:kind_not_admitted, ...}` gains none: a
+structural refusal is about a slot and has no path to name.
 
 ### 9. The environment reaches the author in two places, and both are ADR-0005's to shape
 
@@ -521,9 +533,10 @@ is a decision rather than a repair.
 the candidates the field already offers.** The evidence is this package's own
 emission. ADR-0002's G5 row records what `core.subchart` declares and G5a
 hands the emitted bytes to ADR-0004; neither states a constraint on what an
-`<assign>` location may be, and the bare-identifier rule lives only in
-`Config.identifier?/1` (`lib/statifier_blocks/core/config.ex:37`) and the two
-call sites that use it. Meanwhile `core.assign` - the type whose entire job is
+`<assign>` location may be: the bare-identifier rule is
+`Config.identifier?/1`'s (`lib/statifier_blocks/core/config.ex:37`), applied at
+this one call site by `check_assign_to/2` and by the emission's own `assign/1`.
+Meanwhile `core.assign` - the type whose entire job is
 writing one datamodel path - accepts any non-empty path with no whitespace
 (`lib/statifier_blocks/core/assign.ex:96-102`), emits it verbatim as
 `<assign location="...">`, and its own moduledoc's worked example is a dotted
@@ -531,11 +544,22 @@ location (`:146`). A subchart's outcome is written by the same element to the
 same datamodel, so one of the two rules is wrong, and it is not the one with
 the dotted example in it.
 
-The widening reaches **two** call sites, not one: `check_assign_to/2` and the
-emission's own `assign/1` (`lib/statifier_blocks/core/subchart.ex:604-618`),
-which repeats the refusal because `emit/2` has to answer for a config
-`validate_config/1` would have rejected. `sb-xk1h` implements both, and the
-candidates and the validation agree afterwards.
+The widening reaches **two** call sites in that type, not one:
+`check_assign_to/2` and the emission's own `assign/1`
+(`lib/statifier_blocks/core/subchart.ex:604-618`), which repeats the refusal
+because `emit/2` has to answer for a config `validate_config/1` would have
+rejected. `sb-xk1h` implements both, and the candidates and the validation
+agree afterwards.
+
+**It reaches nothing else, and the rest is named rather than swept up.** The
+identical `defp assign(location)` refusal on an `<assign>` location stands
+unchanged in `core.invoke` (`lib/statifier_blocks/core/invoke.ex:299`) and in
+`StatifierBlocks.InvokeStep` (`lib/statifier_blocks/invoke_step.ex:430`), and
+`core.map`'s `collect` carries its own
+(`lib/statifier_blocks/core/map.ex:188`, `:300-308`). This decision was ruled
+about `core.subchart`'s `assign_to`, and widening three more fields on the
+strength of one field's argument is the sweep a record should not make by
+implication. Whether the four should agree is in the deferred list.
 
 `core.map`'s `collect` carries a byte-identical refusal
 (`lib/statifier_blocks/core/map.ex:188`, `:300-308`) and this record does
@@ -697,7 +721,8 @@ it, in a palette whose datamodel never declared it, is ADR-0005 clause 11e's
   catch**, exactly as ADR-0003's consequences said, and for the same reason.
   What changes is that the untyped part is now visible: the Datamodel tab shows
   a path at `:unknown` where a typed palette would have shown a name.
-- **Four records carry a dated Note and none loses a line.** ADR-0003 keeps
+- **Five records carry a dated Note and none loses a line** - ADR-0003's is
+  the supersession pointer and the other four are the amendments. ADR-0003 keeps
   every word of its superseded decisions, and a reader who lands on decision 4
   finds the Note before they find the seam.
 - **The host relation is used less and is worth more.** It is asked only after
@@ -718,10 +743,13 @@ it, in a palette whose datamodel never declared it, is ADR-0005 clause 11e's
   and not this record's - it is named here only because a reader of decision 12
   will wonder what `{:list, :unknown}` means when the list is empty, and the
   answer is that the block never gets that far. `sb-kha0` carries it.
-- **`core.map`'s `collect` and its bare-identifier refusal.** Decision 13
-  resolves `core.subchart`'s `assign_to` and deliberately does not reach
-  `collect`, whose emission is ADR-0009's. Whether the two fields should agree
-  is a question for whoever next touches that record.
+- **The other three bare-identifier refusals on an `<assign>` location.**
+  Decision 13 resolves `core.subchart`'s `assign_to` and deliberately reaches
+  neither `core.map`'s `collect` (whose emission is ADR-0009's) nor the
+  identical refusals in `core.invoke` and `StatifierBlocks.InvokeStep`.
+  Whether all four should agree is a question for whoever next touches those
+  records, and it is a question about consistency rather than about
+  correctness: each refusal is sound on its own today.
 - **Two `core.parallel` lanes writing one path.** Decision 4's merge answers
   it without needing to know which lane ran second, and whether the shape
   deserves an advisory of its own is ADR-0005's findings layer's call.
