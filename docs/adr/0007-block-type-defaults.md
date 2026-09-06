@@ -246,3 +246,46 @@ handler a host registers with `statifier` per session (st-ADR-0051), it
 resolves no block type, it appears in no palette, and no block type reaches
 for one. The convention is where a later handler goes, not permission for one
 to exist; whether this package ships a second is that handler's own bead.
+
+## Note (2026-09-06): the declaration surface is twelve callbacks, five required
+
+A dated Note rather than an amendment, and it edits nothing above this line. It
+decides nothing - `ADR-0002` decision 5 owns the declaration surface and this
+record only cites it - and what it records is that the count cited here has
+moved since it was written while every argument the count appears in has not.
+
+`StatifierBlocks.BlockType` declares **twelve** `@callback`s on `main`. Five
+are required - `slots/1`, `config_schema/1`, `validate_config/1`,
+`current_version/0`, `emit/2` - and seven are optional: `io/1`,
+`migrate_config/2`, `fixtures/0`, `palette_entry/0`, `outcomes/1`,
+`failure_outcomes/1`, `summary/1`. The module's own moduledoc carries that
+split and a per-callback table of what each optional absence degrades to.
+
+This record says nine in four places - `:8` and `:10` in the Context, `:30` in
+the cost list, `:69` in the decision, `:171` in the Consequences - and each is
+the nine-row table `ADR-0002` decision 5 carried when this record was written.
+The three callbacks added beside it since are `outcomes/1`, `summary/1` and
+`failure_outcomes/1`, each added by its own amendment or Note on that record.
+`ADR-0002` decision 5's own line (`:110`) still reads "nine callbacks, five
+required" too; correcting it there is that record's amendment to make and not
+this Note's.
+
+**The required half - the half this record's argument actually rests on - has
+not moved.** Five callbacks were required then and five are required now; every
+callback added since has been optional, which is what `ADR-0002` amendment A
+and the Notes after it each chose on purpose. So the `use` macro's case is
+untouched: a leaf type still restates `slots/1`, `validate_config/1` and
+`current_version/0` for no decision of its own, and that is what the defaults
+remove. The clause at `:69` that "a type that writes all nine out by hand is
+unaffected" is a statement that hand-written modules keep working, true of
+twelve as it was of nine. The Consequences' "the behaviour contract is
+untouched" at `:171` is a claim about `ADR-0002` owning the surface, which
+twelve callbacks leaves exactly where nine did. Read every "nine" above this
+line as "the declaration surface as decision 5 then fixed it".
+
+A thirteenth callback is proposed in the new record filed beside this Note
+under `sb-57yc`. What it is belongs to that record; this Note names only that
+the count moves again if it is accepted.
+
+Filed with `sb-uewa`, folding the `ADR-0007` half of `sb-35c0` (its `README.md`
+half landed with the 0.21.0 prep); campaign-034 ruling `RQ-034-6`.
