@@ -7206,9 +7206,10 @@ edits run under, and amendments here are additive.
 
 Same Note, the enumeration of capitalised lettered lanes (`:6947-:6953`), where
 the `Lane S0` group reads `` `:5610`, `:5836`, `:5832`, `:5982`, `:6132` ``.
-The other groups are written in ascending line order - Lane G's in two
-ascending runs, its four headings and then its four attributions; this one is
-not, because `:5836` and `:5832` are transposed.
+The other groups are written in ascending line order - Lane G's in the two
+ascending runs that sentence itself splits it into, the four it lists first and
+then the four it calls attributions; this one is not, because `:5836` and
+`:5832` are transposed.
 
 All five cites resolve, and to what the sentence claims of them:
 
