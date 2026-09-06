@@ -2958,6 +2958,35 @@ because a group was abandoned - leaves no timer behind. An await with no
 `timeout` arms nothing, and there is nothing to cancel. Nothing in
 `Compiler.Cancels` changes for this row.
 
+*[Note added 2026-09-06, with `sb-6uzm` under campaign-032: G14a's first
+sentence pre-dates the answer the Note beneath G14d records, and now reads
+looser than what ships. "One `<final>` per outcome" was written while G14d
+still held the outcome list open, and the count it states is the count for an
+await whose `timeout` is stored, not for one whose `timeout` is blank.
+
+What ships is one `<final>` per outcome the block can reach. `outcomes/1`
+returns both `received` and `timed_out` for every config
+(`lib/statifier_blocks/core/await.ex:123`), while `emit/2` writes the
+`received` final unconditionally and takes the `timed_out` final from the
+deadline (`:271-290`): `deadline/4`'s no-deadline clause returns empty
+`onentry`, `transitions` and `finals` together (`:298-299`) and its other
+clause returns all three (`:301-312`), which is the "a deadline is all of
+this, or none of it" decision its own comment names. An await with no
+`timeout` therefore compiles to the awaited transition and one final. The
+paragraph above already makes the `<onentry>` `<send>` and the timer
+transition conditional on a stored `timeout`; the final that transition
+targets is conditional on the same thing, and only the sentence's opening
+count reads otherwise.
+
+This is the shape the Note beneath G14d names rather than a new one, and
+`core.subchart` is where the vocabulary already carries it: `outcome_names/1`
+appends `error` whether or not the author listed it
+(`lib/statifier_blocks/core/subchart.ex:516-521`), while `finals/1` emits a
+`<final>` only for an outcome that is routed or slotted (`:500-505`). Read
+G14a's opening sentence as the declaration count and the Note beneath G14d as
+the emission count. Nothing else in G14a changes: the waiting child, the two
+transitions, the send id and the cancel story stand as written.]*
+
 **G14b. Why this is a row and not an arrangement.** ADR-0010 decision 1
 states the vocabulary's admission test in its sharpest form: a type whose
 whole content is a spelling of an arrangement the vocabulary already
