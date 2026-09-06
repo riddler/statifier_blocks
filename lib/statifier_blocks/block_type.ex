@@ -28,11 +28,11 @@ defmodule StatifierBlocks.BlockType do
   ## Required and optional callbacks
 
   Five callbacks are required; a module missing one of them is not a valid
-  `StatifierBlocks.BlockType` and fails to compile as one. Five are
+  `StatifierBlocks.BlockType` and fails to compile as one. Seven are
   optional (`@optional_callbacks io: 1, migrate_config: 2, fixtures: 0,
-  palette_entry: 0, outcomes: 1`); a module that implements only the five
-  required ones compiles cleanly, and each optional absence degrades to a
-  stated default rather than an error:
+  palette_entry: 0, outcomes: 1, failure_outcomes: 1, summary: 1`); a
+  module that implements only the five required ones compiles cleanly, and
+  each optional absence degrades to a stated default rather than an error:
 
   | Callback | Required? | Absent means |
   |---|---|---|
@@ -46,6 +46,8 @@ defmodule StatifierBlocks.BlockType do
   | `fixtures/0` | no | the palette entry has no executable examples |
   | `palette_entry/0` | no | the editor falls back to the type name |
   | `outcomes/1` | no | the block has one outcome, `{"done", "Done"}` |
+  | `failure_outcomes/1` | no | none of the block's outcomes is failure-classed |
+  | `summary/1` | no | the palette card has no second line |
 
   ## Who owns what
 
@@ -59,6 +61,7 @@ defmodule StatifierBlocks.BlockType do
   | `emit/2` | ADR-0004 (compiler provenance) |
   | `palette_entry/0` | ADR-0005 (LiveView editor) |
   | `outcomes/1` | this record's amendment A; the emission is ADR-0004's |
+  | `failure_outcomes/1` | this record's 2026-09-06 Note; the reserved `<donedata>` key is `statifier_persistence`'s ADR-0008 |
 
   ## Declaring the defaults instead of spelling them (ADR-0007)
 
@@ -533,6 +536,39 @@ defmodule StatifierBlocks.BlockType do
   """
   @callback outcomes(Block.config()) :: [outcome_decl()]
 
+  @doc """
+  The subset of `outcomes/1`'s names that mean **this block finished
+  badly** (the campaign-033 failure seam, 2026-09-06).
+
+  A type that does not export it classes none of its outcomes as a
+  failure, which is where every accepted `core.*` type except `core.map`
+  and `core.subchart` stays. `failure_outcomes/2` on this module is the
+  resolver every consumer reads it through.
+
+  The class is a **second axis on the outcomes a type already declares**,
+  not a third element of `t:outcome_decl/0` and not a new outcome. Section
+  A2 of ADR-0002's outcome amendment kept the declaration a `{name,
+  label}` pair when it refused to marry an outcome to a slot, and the same
+  reasoning applies here: a name returned by this callback that
+  `outcomes/1` does not declare classes nothing, because there is no
+  outcome for it to class.
+
+  What the class buys is one compiled byte span. `StatifierBlocks.Compiler`
+  emits a reserved `<donedata>` `<param>` on the top-level `<final>` of a
+  failure-classed outcome, under `:child_use` and under `:terminate`
+  alike, and a durable stepper reads it to decide that the run failed
+  (`statifier_persistence`'s ADR-0008 amendment of 2026-09-06). Nothing
+  else in this package branches on the class: routing, slots, the editor
+  and the typed environment treat a failure-classed outcome exactly like
+  any other outcome.
+
+  Order is irrelevant here - the compiler asks whether one name is in the
+  list - but the same purity rule `outcomes/1` carries applies: a pure
+  function of `config` that returns without raising for any config
+  `validate_config/1` accepts.
+  """
+  @callback failure_outcomes(Block.config()) :: [String.t()]
+
   @typedoc """
   What a block type says about one block's config on the card's second
   line (ADR-0002 amendment H1).
@@ -577,6 +613,7 @@ defmodule StatifierBlocks.BlockType do
                       fixtures: 0,
                       palette_entry: 0,
                       outcomes: 1,
+                      failure_outcomes: 1,
                       summary: 1
 
   # ADR-0002 amendment A1's default: a type that declares no outcomes has
@@ -627,6 +664,35 @@ defmodule StatifierBlocks.BlockType do
   @spec outcome_name(term()) :: String.t()
   defp outcome_name({name, _label}) when is_binary(name), do: name
   defp outcome_name(malformed), do: inspect(malformed)
+
+  @doc """
+  `module.failure_outcomes(config)`, or `[]` when `failure_outcomes/1` is
+  absent or `module` is not loadable.
+
+  Checked with `Code.ensure_loaded?/1` plus `function_exported?/3`, the
+  pattern `outcomes/2` above already uses, so a host type written before
+  the callback existed classes no outcome and compiles exactly as it did.
+
+  Total over any return value: anything that is not a list of binaries
+  comes back as `[]`, for `outcome_names/2`'s reason - a host type that
+  declares nonsense here should compile to the bytes it compiled to
+  before rather than crash the compiler.
+  """
+  @spec failure_outcomes(module(), Block.config()) :: [String.t()]
+  def failure_outcomes(module, config) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :failure_outcomes, 1) do
+      sanitize_failure_outcomes(module.failure_outcomes(config))
+    else
+      []
+    end
+  end
+
+  @spec sanitize_failure_outcomes(term()) :: [String.t()]
+  defp sanitize_failure_outcomes(names) when is_list(names) do
+    if Enum.all?(names, &is_binary/1), do: names, else: []
+  end
+
+  defp sanitize_failure_outcomes(_malformed), do: []
 
   @doc """
   Where a field declaration's value lives, as a path from the config root.

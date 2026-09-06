@@ -3828,3 +3828,72 @@ branch with one slot fewer than the type declares:
 Nothing here is a decision about how those rows should eventually read. That
 is the amendment `ADR-0012`'s own closing section reserves for its
 acceptance, and it stays reserved.
+
+## Note (2026-09-06): an optional `failure_outcomes/1`, a second axis on the outcomes amendment A already declares
+
+A dated Note rather than an amendment. It edits nothing above this line, and
+in particular it does not touch amendment A: `outcomes/1` still returns
+`{name, label}` pairs in declaration order, the default is still the single
+outcome `done`, and A2's refusal to marry an outcome to a slot stands word for
+word. What this Note records is a **new optional callback beside** that one,
+built by `sb-napt` under the operator's campaign-033 ruling `RQ-033-3` of
+2026-09-06, and what it does and does not reach.
+
+**The callback.** `StatifierBlocks.BlockType` declares
+`failure_outcomes(config) :: [String.t()]`, optional, resolved through
+`BlockType.failure_outcomes/2` the way `outcomes/1` is resolved through
+`outcomes/2` - `Code.ensure_loaded?/1` plus `function_exported?/3`, defaulting
+to `[]`. It returns the subset of the names `outcomes/1` already declares that
+mean *this block finished badly*. A type that does not export it classes
+nothing, which is where every accepted `core.*` type except `core.map` and
+`core.subchart` stays, so a host type written before the callback existed
+compiles to the bytes it compiled to.
+
+**Why a second callback rather than a third element of the outcome
+declaration.** A2 refused to make the declaration a triple when the third
+thing was a slot, and the reasoning carries: a `{name, label}` pair is what
+the compiler mints ids and events from and what the editor draws, and
+widening it would move every host type's declaration for a fact only the
+compiler's final emission reads. A separate list is additive in the sense
+decision 6's byte determinism needs - a type that says nothing is unchanged -
+and it keeps the class out of the serialized outcome order entirely. The
+resolver is total over any return value for `outcome_names/2`'s reason: a
+declaration that is not a list of binaries reads as `[]` rather than raising
+inside the compiler.
+
+**What the class buys, in full.** One compiled byte span, described in
+`ADR-0004`'s Note of this date: the top-level `<final>` for a failure-classed
+outcome carries a reserved `<donedata>` `<param>`, key
+`statifier_persistence:run_status` and value `failed`, under both the
+`:child_use` and the `:terminate` compile options. The key and its closed
+value set are `statifier_persistence`'s, fixed by that package's ADR-0008
+amendment of 2026-09-06 (`sp-n8g`, the mirrored half of `sb-napt`), and this
+package spells them rather than deciding them.
+
+**What the class does not buy, and this is the longer half.** Nothing else in
+this package branches on it. Routing is unchanged - a failure-classed outcome
+is reached from `done.outcome.<root state id>.<outcome>` like any other, and a
+`core.branch` arm, an `on_<outcome>` slot and an editor connector treat it
+exactly as they treat `done`. The typed environment of `ADR-0011` writes
+nothing and reads nothing new. No slot arity, no `slot_style`, no palette
+entry and no card changes: `core.subchart` already gives its `on_error` slot
+`slot_style: %{"on_error" => :failure}`, and that is the editor's separate,
+older word for the same fact rather than a thing this callback now feeds.
+
+**The two core types that class an outcome, and why only those two.**
+`core.map`'s `error` and `core.subchart`'s `error` - in both cases the one
+outcome the type itself appends or fixes for "the work did not succeed".
+Nothing an author lists is classed: `core.subchart` takes the rest of its
+outcomes from a chart this package cannot read, so what a `declined` or an
+`expired` means there is the author's word and not a class this package may
+assign. The operator's `RQ-033-3` is the boundary the code draws - a failure
+is a final an author routed to on purpose, and an unhandled `error.*` is not
+a failure by itself.
+
+**Decision 10's rows are not edited here**, in the posture the Notes above
+this line take: the `core.map` and `core.subchart` rows still read as their
+amendments wrote them, because `outcomes(config)` is the column they carry and
+neither type's outcome list changed.
+
+Filed with `sb-napt`, mirrored with `sp-n8g` in `statifier_persistence`;
+campaign-033 ruling `RQ-033-3`.

@@ -249,6 +249,12 @@ defmodule StatifierBlocks.Compiler do
   # namespace or the child-use family, and it says what it is.
   @root_role_prefix "root_"
 
+  # ADR-0008's 2026-09-06 amendment in `statifier_persistence`: the
+  # reserved `<donedata>` key a failure-classed final carries, and the one
+  # value its set is closed at.
+  @run_status_key "statifier_persistence:run_status"
+  @run_status_failed "failed"
+
   # The provenance role a host-declared `<data>` root carries. Not a role
   # in `StateId`'s sense and deliberately not spellable as one: the
   # leading colon fails `StateId.role?/1`, so this name cannot collide
@@ -1276,6 +1282,20 @@ defmodule StatifierBlocks.Compiler do
   #     nothing is listening across a boundary and what the option buys is
   #     the session reaching `:done` at all.
   #
+  # One exception, added 2026-09-06 with the campaign-033 failure seam and
+  # noted on both records: a final for a **failure-classed** outcome - one
+  # `BlockType.failure_outcomes/2` names - carries a reserved `<donedata>`
+  # `<param>` under **both** options. The key is
+  # `statifier_persistence:run_status` and its value is `'failed'`, spelled
+  # here exactly as `statifier_persistence`'s ADR-0008 amendment of
+  # 2026-09-06 fixes it, and a durable stepper reads it to decide that the
+  # run failed. Under `:terminate` it is the only `<param>` the final
+  # carries, because the root shape still says nothing about which outcome
+  # was reached; under `:child_use` it rides beside the `outcome` param
+  # that shape already emits. The colon separator is the record's: a dotted
+  # key would be indistinguishable from a nested map in a predicator path
+  # expression, and a colon is not a predicator identifier character.
+  #
   # In both cases the root block's own outcome finals and the raises inside
   # them are untouched - what is added here is what turns that internal
   # signal into a top-level `<final>` the session can actually enter.
@@ -1308,10 +1328,12 @@ defmodule StatifierBlocks.Compiler do
   @spec completion_finals(Resolved.t(), Emission.t(), String.t(), boolean()) ::
           {Emission.t(), [Emission.t()]}
   defp completion_finals(%Resolved{block: block, module: module}, emission, prefix, donedata?) do
+    failures = BlockType.failure_outcomes(module, block.config)
+
     pairs =
       module
       |> BlockType.outcome_names(block.config)
-      |> Enum.flat_map(&completion_outcome(block.id, &1, prefix, donedata?))
+      |> Enum.flat_map(&completion_outcome(block.id, &1, prefix, donedata?, &1 in failures))
 
     transitions = Enum.map(pairs, &elem(&1, 0))
     finals = Enum.map(pairs, &elem(&1, 1))
@@ -1319,14 +1341,14 @@ defmodule StatifierBlocks.Compiler do
     {%{emission | children: emission.children ++ transitions}, finals}
   end
 
-  @spec completion_outcome(Block.id(), String.t(), String.t(), boolean()) ::
+  @spec completion_outcome(Block.id(), String.t(), String.t(), boolean(), boolean()) ::
           [{Emission.t(), Emission.t()}]
-  defp completion_outcome(root_id, outcome, prefix, donedata?) do
+  defp completion_outcome(root_id, outcome, prefix, donedata?, failure?) do
     with {:ok, final_id} <- StateId.state_id(root_id, prefix <> outcome),
          {:ok, transition} <-
            stamp_completion(completion_transition(root_id, outcome, final_id), root_id),
          {:ok, final} <-
-           stamp_completion(completion_final(final_id, outcome, donedata?), root_id) do
+           stamp_completion(completion_final(final_id, outcome, donedata?, failure?), root_id) do
       [{transition, final}]
     else
       _refused -> []
@@ -1341,17 +1363,34 @@ defmodule StatifierBlocks.Compiler do
     ])
   end
 
-  @spec completion_final(StateId.t(), String.t(), boolean()) :: Emission.t()
-  defp completion_final(final_id, outcome, true) do
-    Emission.element("final", [{"id", final_id}], [
-      Emission.element("donedata", [], [
-        Emission.element("param", [{"expr", "'" <> outcome <> "'"}, {"name", "outcome"}])
-      ])
-    ])
+  @spec completion_final(StateId.t(), String.t(), boolean(), boolean()) :: Emission.t()
+  defp completion_final(final_id, outcome, donedata?, failure?) do
+    params =
+      if(donedata?, do: [outcome_param(outcome)], else: []) ++
+        if failure?, do: [run_status_param()], else: []
+
+    case params do
+      [] -> Emission.element("final", [{"id", final_id}])
+      params -> Emission.element("final", [{"id", final_id}], [donedata(params)])
+    end
   end
 
-  defp completion_final(final_id, _outcome, false) do
-    Emission.element("final", [{"id", final_id}])
+  @spec donedata([Emission.t()]) :: Emission.t()
+  defp donedata(params), do: Emission.element("donedata", [], params)
+
+  @spec outcome_param(String.t()) :: Emission.t()
+  defp outcome_param(outcome) do
+    Emission.element("param", [{"expr", "'" <> outcome <> "'"}, {"name", "outcome"}])
+  end
+
+  # The failure seam's reserved key, spelled as `statifier_persistence`'
+  # ADR-0008 amendment of 2026-09-06 fixes it: one key, one closed value.
+  @spec run_status_param() :: Emission.t()
+  defp run_status_param do
+    Emission.element(
+      "param",
+      [{"expr", "'" <> @run_status_failed <> "'"}, {"name", @run_status_key}]
+    )
   end
 
   @spec stamp_completion(Emission.t(), Block.id()) ::

@@ -534,6 +534,27 @@ defmodule StatifierBlocks.Core.Subchart do
   end
 
   @doc """
+  `error` is failure-classed: a child that reported `error` is a child
+  that finished badly (the campaign-033 failure seam, 2026-09-06).
+
+  It is the one outcome this type appends itself, and the moduledoc
+  already calls it "the failure outcome"; nothing else the author listed
+  is classed, because this package cannot know what a chart's own
+  `declined` or `expired` means. The class is a second axis on an outcome
+  that already exists, so the outcome list, the `on_<outcome>` slots and
+  the `error.communication.invoke` routing are all unchanged - and so is
+  the `slot_style` `:failure` the palette entry already gives `on_error`,
+  which is the editor's word for the same fact.
+
+  It changes one thing, and only for a document whose **root** block is a
+  `core.subchart`: the top-level `<final>` for `error` carries the
+  reserved `<donedata>` `<param>` that tells a durable stepper the run
+  failed.
+  """
+  @impl true
+  def failure_outcomes(_config), do: [@error_outcome]
+
+  @doc """
   The outcomes the **referenced chart** declares, in the order the author
   wrote them, defaulting to `["done"]`.
 

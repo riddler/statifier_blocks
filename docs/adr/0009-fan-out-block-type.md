@@ -799,3 +799,60 @@ and not this one's.
 
 Answers `sb-kha0`. Filed with `sb-xwhj`, campaign-033 ruling `RQ-033-4`; the
 runtime half is `sob-as0`.
+
+## Note (2026-09-06): decision 4's outcome set stays two, and `error` becomes failure-classed
+
+A dated Note rather than an amendment, and the answer to the question the Note
+above this one left open in as many words: "Decision 4 fixes this block's
+outcome set at two ... and the campaign-033 bead `sb-napt` proposes a
+failure-classed outcome that would reach that decision. Whether it does, and
+what it would change here, is that bead's record to write." This is that
+record's entry, and the answer is that decision 4 is unchanged in every clause.
+
+**The outcome set is still two, and still fixed.** `outcomes/1` returns
+`[{"done", "Done"}, {"error", "Error"}]`, not config-derived, and no third
+outcome appears. Decision 4's sentence that "the outcome set is fixed at two,
+and this is a real decision rather than a default" keeps every word, and so
+does the paragraph behind it: N children still report N outcomes, joining them
+into one branch target still has no meaning, and "seven said `approved` and one
+said `declined`" is still data rather than control flow.
+
+**What is new is a class, not an outcome.** `StatifierBlocks.Core.Map` now
+also exports `failure_outcomes/1`, the optional callback ADR-0002's Note of
+this date records, returning `["error"]`. It says of an outcome that already
+exists that reaching it means the block finished badly. The whole of its
+effect is one compiled byte span, described in ADR-0004's Note of this date:
+when a `core.map` is a document's **root** block, that document's top-level
+`<final>` for `error` carries a reserved `<donedata>` `<param>` a durable
+stepper reads to decide the run failed. Nothing about the block's own
+compilation inside a parent chart changes, and nothing about a nested
+`core.map` changes at all.
+
+**Decision 5 is untouched, and `collect` still holds data.** The alternative
+considered and not taken was to let a failed child reach control flow - to
+grow the outcome set, or to route per-child failure somewhere other than the
+accumulated list. Decision 4's reasoning refuses both and this Note follows
+it: the per-child answers stay in `collect`, one element per item in index
+order, dense, errors sitting at their own index in the `st-ADR-0068`
+`reason`/`detail` shape decision 7 clause 2 gives them. An author who wants to
+branch on which children failed reads that list with a `core.branch` after the
+block, exactly as decision 4 already tells them to. The class answers a
+different question - *did the fan-out as a whole end badly* - which is the
+question the block's own `error` outcome was already the answer to.
+
+**Decision 6's aggregation policy decides which outcome is reached, and this
+Note adds no rule to it.** `all` and `first_error` still govern whether a batch
+with a failed child takes `done` or `error`; the class only says what taking
+`error` means to a stepper.
+
+**Decision 8 is untouched**, including the empty-list paragraph and the Note
+above that reaffirmed it. An empty fan-out still succeeds over nothing and
+takes `done` immediately, so it never reaches the failure-classed outcome -
+the two campaign-033 rulings agree rather than collide.
+
+**Decision 7 is untouched.** No payload grows: the reserved param is a fixed
+eight-byte value on one final of the parent document, not a per-item cost, and
+it multiplies by nothing.
+
+Filed with `sb-napt`, mirrored with `sp-n8g` in `statifier_persistence`;
+campaign-033 ruling `RQ-033-3`.

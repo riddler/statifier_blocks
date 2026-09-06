@@ -2453,3 +2453,68 @@ still compile to the same bytes, which is all decision 6 claims.
 - **Chart identity and the invoke-handler registry.** st-ADR-0052 and
   st-ADR-0051 are statifier-ex's; this record remains a client of both and
   changes neither.
+
+## Note (2026-09-06): a failure-classed outcome's top-level `<final>` carries a reserved `<donedata>` param, under both options
+
+A dated Note rather than an amendment. It edits nothing above this line, and
+two sentences above it are narrowed by it rather than replaced - both are
+quoted here so a reader meets the narrowing where the sentence is, not by
+inference.
+
+The 2026-08-29 root-termination Note says of a `terminate: true` compile that
+"the finals carry **no `<donedata>`**", and its closing paragraph says
+`child_use: true` "remains the only thing that emits `<donedata>`". Both were
+true of every outcome a block type could declare when they were written,
+because no outcome could say anything about itself. `sb-napt` gives one the
+means to, under the operator's campaign-033 ruling `RQ-033-3` of 2026-09-06.
+
+**The narrowing, in one sentence.** A top-level `<final>` for an outcome that
+`StatifierBlocks.BlockType.failure_outcomes/2` classes as a failure carries a
+`<donedata>` with the single reserved `<param>`
+
+    <param expr="'failed'" name="statifier_persistence:run_status"/>
+
+under `:terminate` **and** under `:child_use`, where it is appended after the
+`outcome` param the child shape already emits. Every other final is
+byte-identical to what it was: a `:terminate` final for an unclassed outcome
+is still bare, a `:child_use` final for one still carries the `outcome` param
+alone, and a compile passing neither option still emits no top-level final at
+all.
+
+**Why the root shape gains a payload it was written not to have.** The
+root-termination Note's reason for emitting none was that "nothing is
+listening across a boundary". That is no longer true: a durable stepper reads
+the `{:done, _}` effect of a root document's own run and, on this key, decides
+that the run **failed** rather than completed. The reader is the run's own
+host rather than a parent across an `<invoke>`, which is precisely the case
+the Note did not have. The key and its closed value set are not this record's
+to set - they are fixed by `statifier_persistence`'s ADR-0008 amendment of
+2026-09-06 (`sp-n8g`, the mirrored half of this bead), which also records why
+`<donedata>` carries the tag rather than a state-id convention or a compiled
+`<final>` attribute, and why the separator is a colon rather than a dot.
+
+**Determinism is untouched (decision 6).** The class is a pure function of the
+block type and its config, the param is emitted in one place in one order, and
+a document whose root type classes no outcome compiles to the bytes it
+compiled to before the callback existed. Opting into `terminate` is still the
+one-time chart-identity choice that Note describes, and a root type that
+*starts* classing an outcome moves the document's content hash for the same
+reason and with the same consequence.
+
+**Decision 5's totality holds by construction.** The `<donedata>` and its
+`<param>` are children of the final the root block already owns, stamped
+through the same `Attribution.stamp/3` call, so they carry the root block's
+id in its `root_` or `child_` role and the map stays total over the added
+bytes rather than growing a hole nobody owns.
+
+**One thing a chart author has to do for the final to be reachable**, noted
+because it is easy to miss and is not new: `core.map` and `core.subchart` emit
+the route to their `error` outcome only when the matching `on_error` slot is
+occupied (`core.invoke`'s rule, unchanged here). A root document that classes
+`error` and leaves the slot empty compiles a failure-classed final nothing can
+enter - which is the pre-existing shape ADR-0002's outcome amendment already
+describes for any wired-but-unemitted outcome, met here for the first time by
+an outcome that matters to a stepper.
+
+Filed with `sb-napt`, mirrored with `sp-n8g` in `statifier_persistence`;
+campaign-033 ruling `RQ-033-3`.
