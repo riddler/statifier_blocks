@@ -6723,3 +6723,95 @@ later commit that adds or removes a caller moves them again, and falsifies
 neither this Note nor the one above it.
 
 Filed with `sb-06al`, campaign 032's docs fill.
+
+## Note (2026-09-06): clauses `11p` to `11t` have code, and three things the amendment left to the implementation
+
+A dated note rather than an amendment. It records that the section above is no
+longer a record ahead of its code, and it says how three points that section
+left open were settled in the building. Nothing this record decides changes,
+no clause is edited, and no line above this one is touched.
+
+### The merge
+
+`11p` to `11t` shipped with `sb-nyla`, campaign 033's second-pass code lane.
+`StatifierBlocks.Palette` carries `validators`, defaulting to `[]`, supplied
+through a `:validators` option on `new/2`; `StatifierBlocks.DocumentValidator`
+is the behaviour, with `validate_document/1` as its one callback; and
+`StatifierBlocks.ViewModel.build/3` runs the palette's validators after the
+per-block derived sources and before the `findings` argument, stamping `:lint`
+and defaulting the severity to `:warning`.
+
+The seam is the one `11p` names and no other. **No assign, no mount option and
+no editor callback was added**, which is the property `1C` established for
+recipes and `11p` said this clause does not weaken. The implementing bead's
+own title describes the callback as sitting "beside `on_change`"; what that
+describes is when a host's rule speaks, not where it is declared, and where it
+is declared is the palette, exactly as `11p` says.
+
+The drawer needed no change at all. A validator's finding reaches the Findings
+tab through decision 11's existing anchors and the existing routing table, and
+the row already carries the source chip that says which rule is speaking -
+which is the claim this section's Consequences makes ("this section adds a
+fourth producer, on an existing source, through existing anchors, onto
+existing routes") arriving as a rendering test rather than as prose.
+
+### 1. `singleton` runs on the same path, and keeps `:config`
+
+The declared rule and the written one are now **one mechanism**: the palette's
+`singleton` declarations state their findings in the same
+`{anchor, message} | {anchor, message, opts}` vocabulary a validator uses, go
+through the same normalizer, and run in the same arm of
+`ViewModel.build/3` - the declared rule first, then the validators in the
+palette's list order, which is the order `11t` fixes.
+
+What did **not** move is the source. A `singleton` finding is still `:config`
+at `:error`, and a validator's is `:lint` at `:warning`. That is `11r`'s own
+distinction doing its work: `:config` says a declared shape is not satisfied,
+`:lint` says the editor applied a rule, and `11t` requires the two to stay
+distinguishable where a host's rule contradicts a declared `singleton`. The
+shared path is the mechanism; the stamp is the meaning, and only the mechanism
+was shared.
+
+`singleton` is therefore not itself a `DocumentValidator`, and could not be:
+`11q` hands the callback the document and only the document, and the
+`singleton` rule reads the palette, which is where a host declared it.
+
+### 2. What "read as no finding" covers, member by member
+
+`11r` says a returned term that is not a list, and a member that is neither of
+the two shapes, is read as no finding. Three cases the clause does not
+enumerate were settled the same way, all of them by the same reading -
+a member this package does not recognise is not a finding, and nothing is
+raised or refused back at the host:
+
+| The member | What happens |
+|---|---|
+| a third element that is not a keyword list | no finding: `{anchor, message, opts}` declares `opts` a keyword list, so this is not that shape |
+| an anchor outside the three rows of `11s` | no finding |
+| a message that is not a string | no finding |
+
+One case is settled the other way, and it is the only one: a `:severity`
+outside decision 11's three-valued enum falls back to the **default severity**
+rather than dropping the finding. The member is the declared shape, its anchor
+and message say something true about the document, and an unrecognised option
+value is not a reason to silence a rule that fired. This is the narrowest
+reading of "total on its own data" that keeps the finding, and it is recorded
+here because `11r` does not name the case.
+
+Anchors are still not validated against the document. An anchor naming an id
+this document does not hold lands in `orphan_findings` through the split
+`11s` points at, which is what that clause says should happen.
+
+### 3. The moduledoc count `11o` left stale
+
+`11o`'s Consequences superseded `StatifierBlocks.ViewModel`'s "exactly two
+derived sources" sentence without giving it a replacement number, and the
+sentence has been carrying a superseded count since. It now states the true
+one: **five**, with the list beneath it as the thing counted. Nothing in this
+record depends on the number; it is recorded here because two sections above
+sent a reader to that moduledoc.
+
+Filed with `sb-nyla`, campaign 033's second-pass code lane. The moduledoc
+count in item 3 is the item `sb-q1r4` was holding for this bead; the two
+record-prose items that bead also carries are untouched here and stay with
+it.
