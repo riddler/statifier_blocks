@@ -180,6 +180,54 @@ defmodule StatifierBlocks.Palette do
   end
 
   @typedoc """
+  One line of a palette's manifest: a block type's name beside its module's
+  `current_version/0`, or a recipe's name beside `:recipe`.
+
+  A recipe carries the marker rather than a number because a recipe has no
+  version to carry - `StatifierBlocks.Recipe` declares no `current_version/0`,
+  and a placeholder integer would read as one.
+  """
+  @type manifest_entry ::
+          {Block.type_name(), pos_integer()} | {recipe_name(), :recipe}
+
+  @doc """
+  The palette as a sorted list of `{name, version}` entries - the one value
+  a host pins to assert what its palette carries.
+
+      Palette.manifest(Palette.core())
+      #=> [{"core.assign", 1}, {"core.await", 1}, ..., {"deadline", :recipe}]
+
+  Types and recipes share one sorted list, and the second element says which
+  map an entry came from: an integer is a block type at that
+  `current_version/0`, `:recipe` is a recipe. The two names are still two
+  namespaces (see the moduledoc), so a palette carrying a type and a recipe
+  both named `"deadline"` produces both entries; sorted, the type comes
+  first.
+
+  It is a **list rather than a hash or a count**, because the point is the
+  failure message. A count moves from 27 to 29 and says nothing about which
+  types arrived; a hash says only that something moved. A list diffs
+  entry by entry, so the assertion that fails names the type that was added,
+  removed, or version-bumped.
+
+  Sorting is what makes two palettes comparable: `new/2` takes a map and
+  `from_modules/2` a list, so insertion order is not a fact about a palette
+  and the manifest does not carry one.
+
+  This is the one function here that calls into the modules a palette
+  names - `current_version/0` on each, the same call `resolve/2` makes - so
+  a palette naming a module that is not compiled raises here, where
+  `fetch/2` would not.
+  """
+  @spec manifest(t()) :: [manifest_entry()]
+  def manifest(%__MODULE__{types: types, recipes: recipes}) do
+    type_entries = Enum.map(types, fn {name, module} -> {name, module.current_version()} end)
+    recipe_entries = Enum.map(recipes, fn {name, _module} -> {name, :recipe} end)
+
+    Enum.sort(type_entries ++ recipe_entries)
+  end
+
+  @typedoc """
   One registration: the name a document uses, and the module implementing
   it. ADR-0002 decision 1 puts the string in the document and the mapping
   in the palette, so a registration carries both halves - see
