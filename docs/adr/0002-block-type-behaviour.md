@@ -3449,9 +3449,10 @@ describes, and so does a `:string` field carrying `datamodel_path?: true` -
 known-but-untyped and refuses nothing. The `path_kind` enum the 2026-08-29
 amendment refused stays refused; neither key is it.
 
-`ADR-0011` also names a **`field_candidates`** feed beside the two keys: an
-editor assign and compile option keyed `{type_name, key} -> [{value, label}]`,
-so a field may offer the values a host expects without a new field type.
+`ADR-0011` also **names** a `field_candidates` feed beside the two keys, and
+names it without fixing its shape: what a candidate list is keyed on and how it
+is supplied are `sb-xk1h`'s, and this Note records only that the feed exists so
+that a field may offer the values a host expects without a new field type.
 `validate_config/1` stays the only authority per decision 7, and the schema is
 still not a validation language: a candidate list is what a control draws, not
 what a config is checked against.

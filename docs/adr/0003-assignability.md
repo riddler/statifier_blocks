@@ -894,7 +894,11 @@ record supersedes, and what it leaves standing" section:
 **Decisions 3, 7, 8 and 9 stand as accepted**, and so do both amendments
 above. Decision 3's kind tags are untouched in every clause. The 2026-08-29
 amendment's reason vocabulary keeps its five arms and gains a sixth,
-`:shape_not_satisfied`, in `ADR-0011` decision 8; decision 8's two finding
-tuples gain no member. The 2026-08-31 amendment's A2 - the data-flow walk does
+`:shape_not_satisfied`, in `ADR-0011` decision 8. Decision 8's finding standing
+is unchanged and its `{:kind_not_admitted, ...}` tuple gains no member; its
+`{:type_mismatch, ...}` tuple gains one - the datamodel path the read was
+checked at, which under that record cannot be re-derived from the tuple's other
+members because a block may carry several read signatures on several paths.
+The 2026-08-31 amendment's A2 - the data-flow walk does
 not enter the shelf - is carried forward verbatim in effect, with a parked
 fragment walked from an empty environment.
