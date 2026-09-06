@@ -10,6 +10,92 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.22.0] 2026-09-06
+
+0.22.0 makes failure a first-class outcome across the block vocabulary, and
+widens what a document can declare. `core.invoke` now declares the two
+outcomes it has always emitted, `done` and `error`, and classes `error` as a
+failure; every host type built on `StatifierBlocks.InvokeStep` classes its
+own `error` the same way by default, and opts out with `failure_outcomes/1`
+returning `[]`. `core.invoke`, `core.map` and `core.subchart` emit their
+`error` outcome's `<final>` whether or not the failure slot is occupied, and
+a failure-classed outcome a block below the document root leaves unhandled
+now reaches the document's own ending, through one shared top-level `<final>`
+carrying the reserved `statifier_persistence:run_status` donedata param.
+Beside that, `core.on_event` takes an optional `payload` declaration naming a
+type the datamodel document declares, and a `capture` pair reading a member
+that payload does not carry is refused at compile; `core.map`'s `collect`
+accepts any datamodel path rather than only a bare identifier; and the editor
+takes a `compile_options` assign, so the recompile behind the Run pane's
+marks resolves against the chart the run is a run of.
+
+It is a minor, and a minor with notes. Compiled bytes move for three kinds of
+document: one containing a `core.invoke`, `core.map` or `core.subchart` whose
+failure slot is empty; one with a failure-classed outcome left unhandled
+below its root, compiled under `child_use: true` or `terminate: true`; and
+one containing a host type built on `InvokeStep`. Each of those is a new
+chart revision. Every other document compiles to the bytes it compiled to at
+0.21.0. ADR-0002's amendment of 2026-09-06, section 6, works through what
+this costs a host and what it does not. The `statifier_datamodel` floor also
+moves to `~> 0.3`; a host on 0.1 or 0.2 updates it with the rest of the
+dependency tree.
+
+### Added
+
+- `core.on_event` takes an optional `payload` config key: the name of a type
+  the datamodel document declares, saying what `_event.data` carries for the
+  event that handler names. With one declared, a `capture` pair whose source
+  path reads a member the payload does not carry is refused at compile - one
+  `:config` finding on the `capture` key, naming the pairs and the payload -
+  so the interpreter's unbound marker is never written for a captured path on
+  a typed document. A handler with no `payload`, a `payload` naming a type the
+  document does not declare, and a compile with no `:datamodel` are all
+  unchanged: no new finding, and the same compiled bytes. `payload` itself
+  emits nothing.
+
+- The editor takes a `compile_options` assign: the option list the host
+  compiled the open document with, forwarded to the recompile behind the Run
+  pane's marks so a run of a `terminate: true` chart resolves against the
+  chart it is a run of.
+
+- A failure-classed outcome a block below the document root leaves unhandled
+  now reaches the document's own ending: under `child_use: true` or
+  `terminate: true` the compiler emits one shared top-level `<final>`
+  carrying the reserved `statifier_persistence:run_status` donedata param,
+  and one transition into it per unhandled pair.
+- `core.invoke` declares the two outcomes it has always emitted, `done` and
+  `error`, so a parent may wire `done.outcome.<state id>.error` and the
+  editor offers both on the outcome-event candidate list.
+
+### Changed
+
+- `core.map`'s `collect` accepts any datamodel path, not only a bare lowercase
+  identifier, so a fan-out can assemble its answers at `cards.batch` and not
+  only at `batch`. All four fields this package writes an
+  `<assign location="...">` from now read one grammar and one refusal wording.
+
+- `core.invoke` classes its `error` outcome as a failure, and so does every
+  host type built on `use StatifierBlocks.InvokeStep`. A host whose `error`
+  is routine defines `failure_outcomes/1` returning `[]` beside its
+  `outcomes/1` to keep the old classing.
+- `core.invoke`, `core.map` and `core.subchart` emit their `error` outcome's
+  `<final>` whether or not the failure slot is occupied; with the slot empty
+  the failure transition targets that final directly instead of being
+  selected by nothing. A document containing one of the three with an empty
+  failure slot, one with an unhandled failure below its root under the two
+  compile options, or a host `InvokeStep` type, compiles to different bytes
+  and so is a new chart revision; every other document is byte-identical.
+
+- The `statifier_datamodel` floor moves to `~> 0.3`, so a datamodel entry
+  whose `type` names a declaration contributes the declaration's fields as
+  declared paths beneath its own: they are offered as expression candidates,
+  they carry their declared types in the Datamodel tab, and a block that
+  writes one gets no undeclared-path advisory, exactly as an inlined `object`
+  entry's `fields` do. A host on `statifier_datamodel` 0.1 or 0.2 updates it
+  with the rest of the dependency tree.
+- The Datamodel tab renders an entry typed by a declaration as the name it
+  names, rather than raising on the `{:declared, name}` that release added.
+
 ## [0.21.0] 2026-09-06
 
 0.21.0 makes the editor a debugger and widens what a block can say. The
@@ -2095,6 +2181,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.22.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.22.0
 [0.21.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.21.0
 [0.20.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.20.0
 [0.19.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.19.0
