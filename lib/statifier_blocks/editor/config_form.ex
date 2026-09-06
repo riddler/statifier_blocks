@@ -30,6 +30,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
+    alias Phoenix.LiveView.JS
     alias StatifierBlocks.{BlockType, DurationInput}
     alias StatifierBlocks.Editor.Field
     alias StatifierBlocks.Shell
@@ -115,8 +116,25 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:field_focus, :any,
+      default: nil,
+      doc: """
+      One-shot: the `config_key` of the field the source tab's click-through
+      (`sb-rd29`) just asked to be focused, or `nil` for "leave focus alone".
+      `StatifierBlocks.Editor` sets it on a click into a config-emitted span
+      and clears it on every other route, the same discipline
+      `StatifierBlocks.Editor.Drawer`'s `focus_tab` keeps for the tab strip.
+      Resolved here against `@node.form.fields` rather than trusted verbatim,
+      so a key belonging to some other block's form - stale, or never valid -
+      focuses nothing.
+      """
+    )
+
     @doc "One block's form: unrouted findings, then a control per schema field."
     def config_form(assigns) do
+      assigns =
+        assign(assigns, :focus_input_id, focus_input_id(assigns.node, assigns.field_focus))
+
       ~H"""
       <form
         id={"sb-form-" <> @node.block_id}
@@ -126,6 +144,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         phx-submit="config-change"
         phx-target={@target}
       >
+        <span
+          :if={@focus_input_id}
+          id={"sb-config-focus-" <> @focus_input_id}
+          hidden
+          phx-mounted={JS.focus(to: "#" <> @focus_input_id)}
+        ></span>
         <input type="hidden" name="block-id" value={@node.block_id} />
         <div :if={@pending != []} class="sb-form__pending" data-pending={length(@pending)}>
           <p class="sb-form__pending-note">
@@ -418,6 +442,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       "This block's config is committed as a unit, and #{labels} " <>
         "#{if length(fields) == 1, do: "is", else: "are"} not accepted yet."
+    end
+
+    # `sb-rd29`'s resolution step: a `config_key` off a source span is a
+    # string that crossed a click, not a proof that this block's form still
+    # has a field by that name - the selection could have moved to a
+    # different block's span between the click and this render, or the
+    # schema could have changed under it. Finding the field first and reading
+    # its id back through `Field.input_id/1` is what keeps a stale or
+    # mistargeted key from asking the browser to focus an element that is not
+    # there, or, worse, one that is but belongs to someone else's field.
+    @spec focus_input_id(ViewModel.Node.t(), String.t() | nil) :: String.t() | nil
+    defp focus_input_id(_node, nil), do: nil
+
+    defp focus_input_id(%ViewModel.Node{form: form}, key) do
+      case form && Enum.find(form.fields, &(&1.key == key)) do
+        nil -> nil
+        field -> Field.input_id(field)
+      end
     end
 
     # The hint is an `:expression` field's alone. Every other field type is

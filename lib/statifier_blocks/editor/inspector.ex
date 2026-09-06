@@ -245,6 +245,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "Passed through to `StatifierBlocks.Editor.ConfigForm`; see its moduledoc."
     )
 
+    attr(:field_focus, :any,
+      default: nil,
+      doc: "Passed through to `StatifierBlocks.Editor.ConfigForm`; see its moduledoc."
+    )
+
     attr(:fixture_runs, :any,
       default: nil,
       doc:
@@ -365,6 +370,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               capture_pairs={@capture_pairs}
               capture_sources={@capture_sources}
               fixtures={@fixtures}
+              field_focus={@field_focus}
               target={@target}
             />
           </section>
@@ -446,6 +452,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:capture_pairs, :any, required: true)
     attr(:capture_sources, :list, required: true)
     attr(:fixtures, :any, required: true)
+    attr(:field_focus, :any, required: true)
     attr(:target, :any, required: true)
 
     # Decision 12's read-only case reaches here as `form: nil`, and it is the
@@ -470,6 +477,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         capture_pairs={@capture_pairs}
         capture_sources={@capture_sources}
         fixtures={@fixtures}
+        field_focus={@field_focus}
       />
       <p :if={@node.form == nil} class="sb-inspector__empty">
         This block's type is not registered here, so nothing declares which of its
