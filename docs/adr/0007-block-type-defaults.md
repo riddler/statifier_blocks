@@ -261,7 +261,7 @@ are required - `slots/1`, `config_schema/1`, `validate_config/1`,
 `failure_outcomes/1`, `summary/1`. The module's own moduledoc carries that
 split and a per-callback table of what each optional absence degrades to.
 
-This record says nine in four places - `:8` and `:10` in the Context, `:30` in
+This record says nine in five places - `:8` and `:10` in the Context, `:30` in
 the cost list, `:69` in the decision, `:171` in the Consequences - and each is
 the nine-row table `ADR-0002` decision 5 carried when this record was written.
 The three callbacks added beside it since are `outcomes/1`, `summary/1` and
@@ -271,17 +271,18 @@ required" too; correcting it there is that record's amendment to make and not
 this Note's.
 
 **The required half - the half this record's argument actually rests on - has
-not moved.** Five callbacks were required then and five are required now; every
-callback added since has been optional, which is what `ADR-0002` amendment A
-and the Notes after it each chose on purpose. So the `use` macro's case is
-untouched: a leaf type still restates `slots/1`, `validate_config/1` and
-`current_version/0` for no decision of its own, and that is what the defaults
-remove. The clause at `:69` that "a type that writes all nine out by hand is
-unaffected" is a statement that hand-written modules keep working, true of
-twelve as it was of nine. The Consequences' "the behaviour contract is
-untouched" at `:171` is a claim about `ADR-0002` owning the surface, which
-twelve callbacks leaves exactly where nine did. Read every "nine" above this
-line as "the declaration surface as decision 5 then fixed it".
+not moved.** Five callbacks were required then and five are required now;
+every callback added since has been optional, which is what `ADR-0002`
+amendment A, amendment H and the Note of 2026-09-06 each chose on purpose. So
+the `use` macro's case is untouched: a leaf type still restates `slots/1`,
+`validate_config/1` and `current_version/0` for no decision of its own, and
+that is what the defaults remove. The clause at `:69` that "a type that writes
+all nine out by hand is unaffected" is a statement that hand-written modules
+keep working, true of twelve as it was of nine. The Consequences' "the
+behaviour contract is untouched" at `:171` is a claim about `ADR-0002` owning
+the surface, which twelve callbacks leaves exactly where nine did. Read every
+"nine" above this line as "the declaration surface as decision 5 then fixed
+it".
 
 A thirteenth callback is proposed in the new record filed beside this Note
 under `sb-57yc`. What it is belongs to that record; this Note names only that
