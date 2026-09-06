@@ -43,7 +43,9 @@ This record answers it.
 use as a child emit one top-level `<final>` per root-block outcome, carrying
 the outcome name as done data and, since the campaign-033 failure seam, the
 reserved `statifier_persistence:run_status` param on a failure-classed one
-(`lib/statifier_blocks/compiler.ex:255-256`, `:1367-1379`). Two params, both
+(the key is `@run_status_key` at `lib/statifier_blocks/compiler.ex:263-264`,
+minted by `run_status_param/0` at `:1421-1427` and appended at `:1401-1403`).
+Two params, both
 compiler-minted, neither of them the child's answer. The 2026-09-05 Note at
 `docs/adr/0004-compiler-provenance.md:1707-1712` says the sibling it adds "does
 not widen C1"; this record does widen it, and says so.
@@ -79,7 +81,8 @@ record's premise. That package's own decision 3, as amended 2026-09-06, lets a
 datamodel entry's `type` or `item_type` **name a declaration**; and
 `Index.path_types/1` projects an entry into the expression language's six
 kinds, leaving a declared name out of that projection
-(`deps/statifier_datamodel/lib/statifier_datamodel/index.ex:417-430`, `:534`).
+(`deps/statifier_datamodel/lib/statifier_datamodel/index.ex:417-430`;
+`scalar_kind/1`'s catch-all answers `nil` at `:542`).
 Both are about what a document says about **its own** paths. The parent's
 compiler still cannot read the child's document, which is the premise the next
 paragraph states and the one every decision below rests on.
@@ -152,7 +155,7 @@ with
 @type donedata_field :: %{
         name: String.t(),
         path: String.t(),
-        type: StatifierDatamodel.Types.t() | :unknown
+        type: StatifierDatamodel.Types.t()
       }
 ```
 
@@ -174,9 +177,11 @@ nothing, which is where every shipped `core.*` type stays. It is resolved
 through a `BlockType.donedata_type/2` on this module, the way `outcomes/1` and
 `failure_outcomes/1` are - `Code.ensure_loaded?/1` plus
 `function_exported?/3`, defaulting to `[]`. The three rules `slots/1` and
-`outcomes/1` carry apply unchanged: it is a **pure function of `config`**, it
-is **total** for any config `validate_config/1` accepts, and it **never
-raises**.
+`config_schema/1` carry apply unchanged - `summary/1` is where they are
+restated in those words (`lib/statifier_blocks/block_type.ex:598-601`), and
+`outcomes/1` states the same three as its stability rule (`:527-531`): it is a
+**pure function of `config`**, it is **total** for any config
+`validate_config/1` accepts, and it **never raises**.
 
 Order is declaration order and is never sorted, for ADR-0004 decision 6's
 reason: the params serialize in the order this callback returns them, so
@@ -195,7 +200,7 @@ the count worth stating here rather than counting from the record.
 The name is `donedata_type/1` and not `summary/1` or `child_summary/1` on
 purpose. `summary/1` is the card's second line (`:609`) and
 `Context.child_summary()` is the compiler's resolved-child record
-(`lib/statifier_blocks/compiler.ex:1116`, `:1121`); both are shipped, and a
+(`lib/statifier_blocks/compiler.ex:1149`, `:1154`); both are shipped, and a
 third meaning of "summary" on the same behaviour would be a collision an author
 has to disambiguate by reading two records.
 
@@ -248,7 +253,8 @@ The projected fields are `required?: true` rather than optional, because
 decision 3 emits every entry of `donedata_type/1` on every top-level final:
 the child promises each one, and an optional held field satisfies no required
 one in sd's check
-(`deps/statifier_datamodel/lib/statifier_datamodel/types.ex:337`).
+(`deps/statifier_datamodel/lib/statifier_datamodel/types.ex:338`, the rule
+stated in the comment at `:333-337`).
 
 One consequence of sd's covering step is worth stating rather than leaving to
 be discovered. It answers `:covers` only where the *expected* side is a
@@ -414,7 +420,7 @@ field's type in `statifier_datamodel`'s vocabulary.
 @type donedata_field :: %{
         name: String.t(),
         path: String.t(),
-        type: StatifierDatamodel.Types.t() | :unknown
+        type: StatifierDatamodel.Types.t()
       }
 
 @callback donedata_type(Block.config()) :: [donedata_field()]
@@ -455,7 +461,8 @@ the **sixth**, inserted after `collect` and before `on`:
 editor advisory (decision 4). `StatifierBlocks.Compiler`'s `child_use` path
 gains decision 3's third group of params, appended to the list
 `completion_final/4` already builds
-(`lib/statifier_blocks/compiler.ex:1367-1379`).
+(`lib/statifier_blocks/compiler.ex:1399-1409`, the list itself at
+`:1401-1403`; the plural `completion_finals/4` that calls it is `:1361-1375`).
 
 The agreement check, as a function of the two declarations rather than of the
 two documents:
@@ -576,8 +583,8 @@ through the same `docs/adr/` gate, citing this record.
   and for decision 6's naming of the multiplicand. The Note of 2026-09-06 at
   `docs/adr/0009-fan-out-block-type.md:714` names this question as that
   record's own open one and points at `sb-pg91` (`:754`); it is not that
-  record's closing Note - three later Notes follow it, at `:761`, `:803` and
-  `:860`. `sb-pg91` closes as folded when this record lands.
+  record's closing Note - four later Notes follow it, at `:761`, `:803`,
+  `:860` and `:891`. `sb-pg91` closes as folded when this record lands.
 - **ADR-0011 decision 12** (`docs/adr/0011-typed-environment.md:520-535`),
   whose `{:list, :unknown}` becomes decision 5's table. Its sentence "whether a
   child chart may declare what its `donedata` carries is the open question this
