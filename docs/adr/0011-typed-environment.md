@@ -803,9 +803,10 @@ would blank the very path that field checks. The code reads
 expects-without-writes as a **read only**: `Environment.writes?/1` answers
 `false` for a field carrying `expects` and no `writes`, `true` for one
 carrying neither, and `written_type/1` supplies `:unknown` for the latter. The
-same reading is what `t:StatifierBlocks.BlockType.path_opts/0` documents, and
-the `sb-u7zt` reviewer flagged the same divergence independently. Decision 2's
-rule is to be read as "no `writes` key **and** no `expects` key".
+same reading is what `t:StatifierBlocks.BlockType.path_opts/0` documents in
+as many words: "A field declaring `expects` and no `writes` is a read and not
+also a write." Decision 2's rule is to be read as "no `writes` key **and** no
+`expects` key".
 
 **3. Decision 4 is silent on an empty slot, and the code says an empty slot
 contributes no arm.** A container's empty slot is rejected before the merge
@@ -866,9 +867,10 @@ cited at `core/assign.ex:73-79` is at `:67-73`, its rule at `:89`;
 `core/subchart.ex`'s `assign_to` field is at `:260-265`, `check_assign_to/2`
 at `:306-316`, and the emission's `assign/1` at `:622-634`;
 `core/config.ex:37` is `identifier?/1` at `:40`, beside the
-`datamodel_path?/1` reading 6 names at `:54`; and `core.map`'s `collect`
+`datamodel_path?/1` reading 6 names at `:54`; `core.map`'s `collect`
 refusal, cited at `core/map.ex:188` and `:300-308`, is `@collect_message` at
-`:199` with `check_collect/2` at `:311-319`.
+`:199` with `check_collect/2` at `:311-319`; and the dotted `<assign>` example
+decision 13 quotes from `core/assign.ex:146` is at `:139`.
 
 Decision 12 is the one claim worth stating positively because it is easy to
 miss in the schema: `core.map`'s `collect` field is declared
