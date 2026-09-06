@@ -887,3 +887,79 @@ as the Note above leaves them, on the reasons it gives each. Deferring is still
 not dropping.
 
 Filed with `sb-uewa`, folding `sb-z4vz`; campaign-034 ruling `RQ-034-6`.
+
+## Note (2026-09-06): what `collect` holds for a child that ends in a failure-classed final, and where a nested `core.map` failure goes
+
+A dated Note rather than an amendment. Decision 4's outcome set is still two
+and still fixed, decision 5's `collect` is still one dense element per item in
+item-index order, decision 6's two policies still decide which outcome the
+block reaches, and decision 8's empty fan-out still succeeds over nothing. The
+Note of this date filed with `sb-napt` said all four, and this one repeats none
+of the reasoning.
+What is recorded here is the answer to the question campaign 033 left deferred -
+what the shipped fan-out writes into `collect` for a child whose own run ended
+badly - and one sentence about where a nested `core.map`'s `error` now goes,
+from ADR-0002's amendment of this date.
+
+**The question.** `sb-napt` classed this type's `error` outcome as a failure
+and left a verification item behind it: a child chart that now settles in a
+failure-classed final is a child run the durable stepper marks failed, and
+nothing in this record said what the batch's accumulated list carries at that
+child's index. Decision 5 says errors sit at their own index in the
+`st-ADR-0068` `reason`/`detail` shape, decision 7 clause 2 says the same, and
+whether the shipped code agreed was not checked.
+
+**It agrees, and this is what it writes.** Read off
+`statifier_persistence`'s `Driver` on 2026-09-06. A child run whose chart
+settles in a failure-classed final is stored with status `failed` - that is
+`statifier_persistence`'s ADR-0008 amendment of the same date - and the driver
+answers the parent's invocation with `{:failed, reason: <the run's failure>}`
+rather than with donedata. The assembled list is dense over
+`0..child_count - 1`, and the entry at a failed child's index is a map with
+string keys:
+
+| Key | Value |
+|---|---|
+| `"index"` | the item's index, as for every other entry |
+| `"status"` | `"failed"` |
+| `"failure"` | a map with `"reason"`, `"attempts"` and `"detail"` - `st-ADR-0068`'s own three keys |
+
+A child that completed carries `"status" => "completed"` and its `"donedata"`
+instead, and a child `first_error` cancelled before it started - or cancelled
+mid-flight - carries `"status" => "cancelled"` and nothing else. So a reader of
+`collect` distinguishes the three terminal fates by one key, and reads a failed
+item exactly as they read a failed single invocation, which is decision 5's
+sentence and decision 7 clause 2's shape both honoured. **No runtime bead is
+filed**: the shipped handler is right, and this Note is the record catching up
+to it rather than the other way round.
+
+Two things follow that are worth writing down because a reader will ask.
+`"failure"` is a map rather than the `reason` string alone, which is what makes
+a `core.branch` after the block able to distinguish a refused call from an
+exhausted retry without a second read. And a failure-classed child does **not**
+by itself decide the block's own outcome: decision 6's `all` and `first_error`
+still do, unchanged, and an `all` batch with one failed child still reaches
+`done` with that child's failure sitting in the list. The class says what
+reaching `error` means, never when it is reached.
+
+**Where a nested `core.map`'s `error` goes.** The Note of this date filed with
+`sb-napt` said the class changes one thing and only for a document whose root
+block is a `core.map`. From ADR-0002's amendment of this date that is no longer
+the whole of it: a `core.map` **below** the root whose `on_error` slot is empty
+now reaches the document's own failed final too. Two halves of that amendment
+make it so - its section 2, which emits this type's `error` final whether or
+not the `on_error` slot is occupied, so the block raises
+`done.outcome.<state id>.error` in the empty case at all; and its section 4,
+which catches that event on the root block's state under `child_use: true` or
+`terminate: true`.
+Neither half alone would reach a nested batch. A `core.map` whose `on_error`
+slot is occupied is handled and reaches nothing - the author said what happens
+when the batch ends badly and it happens. Nothing in this record changes with
+it: the outcome set is still two, `collect` still holds the same list, and the
+block's own compilation inside a parent chart is untouched. What changed is
+only what the enclosing **document** does when nobody caught the block's
+`error`.
+
+Filed with `sb-ii2k`, campaign-034 rulings `RQ-034-1` and `RQ-034-13`; the code
+is `sb-hxs5`, and ADR-0002's amendment of this date is where the propagation
+rule is stated.
