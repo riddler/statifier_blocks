@@ -7162,3 +7162,89 @@ name minted in the host's document.
   this section, re-counted by a later reader rather than trusted.
 
 Filed with `sb-j2vp`, campaign-SF035's Lane A.
+
+## Note (2026-09-06): two pieces of the Status-casing Note's apparatus - `:6145`'s lowercase `lane`, and the `Lane S0` cite list's order
+
+A dated Note rather than an amendment. It concerns the 2026-09-06 Note on the
+`11p`-`11u` amendment's Status casing (`:6935`) and nothing else: no decision
+of this record moves, no clause is edited, and no line above this one changes.
+Both items were raised as non-qualifying tidy notes in the review of the
+request that added that Note and routed to a follow-up rather than cured in
+place, so that merged section stayed the artifact its review read. Every line
+number below is a census taken on `70a3193`, in the sense the 2026-09-06 census
+Note above fixes: dated to this section, re-counted by a later reader rather
+than trusted.
+
+### 1. `:6145` is a third member of the not-at-issue list
+
+That Note's carve-out paragraph (`:6955-:6958`) says the lowercase `lane`
+elsewhere in this record is a different construction, and lists two places
+where it is: `campaign-030's fill lane D` (`:6289`) and `campaign 033's
+second-pass code lane` (`:6814`).
+
+There is a third, and the list omits it. `:6145` reads "Recorded under campaign
+030's fill lane D; it merges at proposed under" - the opening paragraph of the
+2026-09-05 corrections Note (`:6134`), naming the lane that Note was recorded
+under. It is `:6289`'s construction in the part that carries the point:
+`campaign 030's fill lane D` against `:6289`'s `campaign-030's fill lane D`,
+the same descriptive phrase with the campaign's number attached the other way.
+The word is a common noun there, not half of a lettered lane's name.
+**Read `:6145` as a third member of that paragraph's list, beside `:6289` and
+`:6814`.**
+
+Nothing the paragraph claims changes by gaining it. The 2026-09-05 `11p`-`11u`
+amendment is still the only section of this record that lowercases a *lettered*
+lane, it still does so in both of the two places it names one, and `:6293` and
+`:6601` are still read as `Lane H`.
+
+Recording the addition here rather than at `:6957` is the reason that Note
+gives for not correcting `:6293` in place: adding a cite to a merged sentence
+adds words, which puts it outside the formatting-only exemption this record's
+edits run under, and amendments here are additive.
+
+### 2. The `Lane S0` cite list is transposed, and it stays as it stands
+
+Same Note, the enumeration of capitalised lettered lanes (`:6947-:6953`), where
+the `Lane S0` group reads `` `:5610`, `:5836`, `:5832`, `:5982`, `:6132` ``.
+The other groups are written in ascending line order - Lane G's in two
+ascending runs, its four headings and then its four attributions; this one is
+not, because `:5836` and `:5832` are transposed.
+
+All five cites resolve, and to what the sentence claims of them:
+
+| Cite | What is there |
+|---|---|
+| `:5610` | "Status: proposed (2026-09-05, campaign 030 Lane S0, bead `sb-8vkc`)." |
+| `:5832` | "Filed with `sb-8vkc`, campaign-030's Lane S0." |
+| `:5836` | "Status: proposed (2026-09-05, campaign 030 Lane S0, bead `sb-8vkc`)." |
+| `:5982` | "Filed with `sb-8vkc`, campaign-030's Lane S0." |
+| `:6132` | "Filed with `sb-8vkc`, campaign-030's Lane S0." |
+
+**Read the group as `:5610`, `:5832`, `:5836`, `:5982`, `:6132`.** That is the
+whole of the correction, and it is recorded rather than applied for two
+reasons.
+
+The first is that it cannot be applied under the exemption. Swapping two cites
+reorders words, and the formatting-only exemption a merged record's in-place
+edit runs under admits whitespace, wrapping, list indentation and separator
+style only - no word added, removed, or reordered. Applying it would be an
+amendment removing a line from a merged Note, and amendments here are additive.
+
+The second is that nothing turns on the order. The group is a set of places
+where this record capitalises `Lane S0`, offered as evidence for a claim about
+casing; it is not a sequence, no member's meaning depends on which member
+precedes it, and the claim it supports - that the 2026-09-05 amendment is the
+only section that lowercases a lettered lane - is unaffected by the order the
+five are written in. So the transposition is errata, corrected by this
+sentence, and it does not earn a section of its own anywhere else.
+
+### What this Note does not do
+
+- **It edits nothing.** No line above this one is changed, and both clauses of
+  the Status-casing Note read exactly as they did.
+- **It adds no decision.** Neither item touches a decision, a clause, or a
+  control; both are about where a cite points and how a word is set.
+- **It does not re-open the casing question.** `:6293` and `:6601` are still
+  corrected by reading, not in place, for the reason the 2026-09-06 Note gives.
+
+Filed with `sb-x88o`, campaign-SF035's Lane A.
