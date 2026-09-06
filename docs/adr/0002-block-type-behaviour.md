@@ -4009,7 +4009,7 @@ Filed with `sb-uewa`, folding `sb-z4vz`; campaign-034 ruling `RQ-034-6`.
 
 ## Amendment (2026-09-06): `core.on_event` declares its event payload, and a `capture` that reads past it is refused at compile
 
-**Status: proposed (2026-09-06).** Drafted for `sb-i0cc` under the operator
+**Status: accepted (2026-09-06).** Drafted for `sb-i0cc` under the operator
 campaign-034 grant, and merging at proposed under that campaign's invariant
 like every other section filed with it; flipping it to accepted is a separate
 gated request. Additive, by this record's convention: **no line above this one
@@ -4017,6 +4017,17 @@ is edited**. Decision 7's field-type set is not widened, decision 10's table is
 untouched, the Note of 2026-09-05 that introduced `capture` (`:3118`) stands
 word for word, and where this amendment corrects a bullet of that Note it
 restates the bullet in full below rather than editing it in place.
+
+[Note 2026-09-06, `sb-kkd7`: the paragraph above is this section as it was
+drafted, and it is left standing rather than rewritten. The status word is now
+`accepted`. This is the separate gated request that sentence points at, opened
+after `sb-0na2` built P5's check (PR 325, `7f3cda3`) on top of the section
+itself (PR 324, `6975e91`); the Note at the foot of this section carries what
+the flip verified against `main`. The record's head `Status:` line at `:3` is
+not extended by this flip: that line lists the amendments accepted up to
+2026-08-30 and no accepted section since has been added to it - the Amendment
+of 2026-08-31 at `:2069` is accepted and is absent from it too - so extending
+it here would start a convention rather than follow one.]
 
 Records campaign-034 ruling `RQ-034-7`, taken with the operator on 2026-09-06.
 
@@ -4257,3 +4268,56 @@ and is read as the dated entry it is.
 
 Filed with `sb-i0cc`; campaign-034 ruling `RQ-034-7`. `sb-0na2` builds P5's
 check; `sb-kkd7` is the request that flips this section.
+
+### Note (2026-09-06): what the flip checked, and the three cites `sb-0na2` moved
+
+The flip request `sb-kkd7` read P1 through P5 against `main` at `7f3cda3` -
+the tree `sb-0na2` left - rather than against the tree this section was
+drafted over. Every decision holds. Three line cites into `lib/` do not,
+because the implementing commit moved the lines they point at, and two facts
+about the shipped seam are recorded here because the section could not name
+them before the seam existed. Nothing above this Note is edited by it.
+
+**P1 and P3 hold, and the deferred arm stayed deferred.**
+`StatifierBlocks.Core.OnEvent.config_schema/1` declares `payload` second,
+after `event`: `type: :string`, `required?: false`, `default: ""`
+(`lib/statifier_blocks/core/on_event.ex:287-293`). That is P3's
+declared-name arm and only it; no inline-shape arm was built, no ninth field
+type was added, and decision 7's set is still the eight members P3 counted
+(`lib/statifier_blocks/block_type.ex:149-157`).
+
+**P5 holds, and the seam it decided has a name this section did not give
+it.** The refusal is
+`StatifierBlocks.Core.OnEvent.payload_capture_findings/2`
+(`on_event.ex:435`), a **public** function called from the compiler's config
+stage (`lib/statifier_blocks/compiler.ex:513-514`) after that stage was
+widened to take the compile options (`compiler.ex:472-479`). This section
+decides the refusal, its anchor, its source, its severity and its depth rule
+and leaves the spelling to the implementation, so the new function is inside
+what P5 decided; this Note records it rather than amending anything. The
+anchor is the `"capture"` key carried into `Finding.new/4` as `config_key`
+(`compiler.ex:495-499`), which is `Finding.anchor/0`'s config form at
+`lib/statifier_blocks/finding.ex:39-41` - one finding for the whole key, with
+the message naming each offending pair and the declared payload
+(`on_event.ex:489-499`).
+
+**P4 holds.** A handler with no `payload` compiles to the bytes it compiled
+to without one, and the test that says so is `"emits nothing of its own"`
+(`test/statifier_blocks/core/on_event_test.exs:406-415`). One shape check
+the section did not name sits beside it: a `payload` that is present and is
+not a string is a finding on the `"payload"` key (`on_event.ex:393-399`).
+Its `nil` clause is `findings` unchanged, so P4's case - the key absent - is
+reached by neither half of it, and it is recorded here for the reader rather
+than decided again.
+
+**The three moved cites.** Each was correct at `6975e91`, where this section
+merged. Read them at the right-hand column; the text above is not edited.
+
+| Cited above as | What it points at | Where it is at `7f3cda3` |
+|---|---|---|
+| `compiler.ex:127` (in P1) | the `:declare` compile option's bullet | `compiler.ex:135` |
+| `compiler.ex:556-568` (in P2) | `assignability_context/1`, the one datamodel read once | `compiler.ex:587-601` |
+| `on_event.ex:283-296` (in P5) | `check_capture/2`, and why `capture` has no anchor of its own | `on_event.ex:352-373` |
+
+P1's other cite, `compiler.ex:87` for the `:datamodel` option, is unmoved and
+reads as written.
