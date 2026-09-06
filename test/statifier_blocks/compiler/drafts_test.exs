@@ -286,7 +286,7 @@ defmodule StatifierBlocks.Compiler.DraftsTest do
     # is a claim about what the shelf's own body admits and says nothing
     # about what a fragment's own slots admit.
     #
-    # Sabotage: made `structure_stage/3` walk a shelf-pruned copy of the
+    # Sabotage: made `structure_stage/4` walk a shelf-pruned copy of the
     # document instead of the document - red here, and every rule the
     # Structure stage owns would stop reaching a parked fragment. That
     # ordering is the load-bearing half of where the elision sits, and it

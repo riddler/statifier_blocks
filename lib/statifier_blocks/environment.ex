@@ -105,11 +105,22 @@ defmodule StatifierBlocks.Environment do
   @typedoc """
   Caller-supplied, not stored in the document. `:datamodel` is the datamodel
   document the declarations are read from; `:entry_type` seeds the subject
-  path for a document whose entry block declares no `produces` of its own.
+  path for a document whose entry block declares no `produces` of its own;
+  `:skip_blocks` names blocks whose own declared writes the walk leaves out.
+
+  `:skip_blocks` is how a caller that has already refused a block's config
+  keeps that block's declarations out of the answer: a write signature is
+  read off a config, so a config the compiler has already refused cannot be
+  trusted to say what the block writes, and an entry derived from one would
+  make the next block's read disagree with a type nobody declared. The
+  block's *subtree* still contributes - a child's config is its own - and
+  every other position walks exactly as it did. Absent, as it is for every
+  editor query, nothing is skipped.
   """
   @type context :: %{
           optional(:entry_type) => type_expr(),
-          optional(:datamodel) => term()
+          optional(:datamodel) => term(),
+          optional(:skip_blocks) => MapSet.t(Block.id())
         }
 
   @typedoc "A position, as ADR-0001 decision 5 defines one."
@@ -397,12 +408,27 @@ defmodule StatifierBlocks.Environment do
   # through untouched.
   @spec through(Palette.t(), Document.t(), Block.t(), annotated(), context()) :: annotated()
   defp through(palette, document, %Block{} = block, env, ctx) do
-    if Shelf.shelf?(block) do
-      env
-    else
-      env
-      |> arms(palette, document, block, ctx)
-      |> apply_writes(palette, document, block)
+    cond do
+      Shelf.shelf?(block) ->
+        env
+
+      skipped?(block, ctx) ->
+        arms(env, palette, document, block, ctx)
+
+      true ->
+        env
+        |> arms(palette, document, block, ctx)
+        |> apply_writes(palette, document, block)
+    end
+  end
+
+  # `:skip_blocks` membership. A context without the key skips nothing, which
+  # is every caller that has not already refused a config.
+  @spec skipped?(Block.t(), context()) :: boolean()
+  defp skipped?(%Block{id: id}, ctx) do
+    case Map.fetch(ctx, :skip_blocks) do
+      {:ok, skip} -> MapSet.member?(skip, id)
+      :error -> false
     end
   end
 

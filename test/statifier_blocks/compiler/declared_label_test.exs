@@ -53,7 +53,7 @@ defmodule StatifierBlocks.Compiler.DeclaredLabelTest do
              "the nominal name is what the label replaces, not something it sits beside"
     end
 
-    # Sabotage: `structure_stage/3` reading its declarations from `%{}` rather
+    # Sabotage: `structure_stage/4` reading its declarations from `%{}` rather
     # than from the context the check ran against - the labels disappear and
     # this test is the one that says why.
     test "falls back to the nominal names when no datamodel reaches the stage" do
