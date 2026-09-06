@@ -70,11 +70,14 @@ comparison. The ruling of 2026-09-06 gives the reading a slot of its own.
 nothing else.** A condition is *undecided* when evaluating it produces
 `Predicator.Undefined.value/0` as the expression's value - whichever of the
 two shapes above predicator reports it in. A condition that produces a
-predicator **error** on its own terms is not undecided and is unaffected by
-this record: `not 5` is a `TypeMismatchError` before any sentinel exists
+predicator **error** on its own terms is not undecided, and is never routed to
+the new slot: `not 5` is a `TypeMismatchError` before any sentinel exists
 (`deps/predicator/lib/predicator/evaluator.ex:875-878`), `x in 5` is one
-(`:898-899`), and both keep today's behaviour - the arm is not taken, an
-`error.execution` is placed, and the block falls through. The line is drawn
+(`:898-899`), and both keep today's routing - the arm is not taken, an
+`error.execution` is placed, and the block falls through. On a branch that
+wires the slot such an arm places a second `error.execution` as well, because
+the guard of decision 5 evaluates the same source and fails the same way;
+decision 7 states that case. The line is drawn
 where predicator draws it, so this package does not have to maintain a second
 taxonomy of what an expression can fail to do.
 
@@ -98,7 +101,7 @@ ADR-0002 amendment A2 is the reason the distinction is worth a sentence: a
 slot is not an outcome, `slots/1` says where children live and `outcomes/1`
 says how finishing can differ, and "`core.branch` has many slots and one
 outcome" is that section's own example
-(`docs/adr/0002-block-type-behaviour.md:788-790`). An undecided condition
+(`docs/adr/0002-block-type-behaviour.md:789-790`). An undecided condition
 changes which children run; it does not change how the branch finishes. The
 ruling's phrase "a third outcome slot" is read here as the slot it names.
 
@@ -183,11 +186,22 @@ when a later arm decides `true`, exactly as it is today, and `undecided` is
 reached only when no arm decided `true` at all. Ordering among the arms is
 unchanged in every case, wired or not.
 
-**7. The `error.execution` an undecided arm places today is still placed.**
-The guard of position 2 is a total boolean, so evaluating it places nothing of
-its own; the arms' transitions are unchanged, so each undecided arm still
-places one `error.execution` before the guard is reached, exactly as at
-0.20.0. Wiring the slot routes the run, it does not silence the event.
+**7. The `error.execution` an undecided arm places today is still placed, and
+a wired branch with an erroring arm places one more.** For an *undecided* arm
+the guard of position 2 evaluates to a boolean, so it places nothing of its
+own; the arms' transitions are unchanged, so each undecided arm still places
+one `error.execution` before the guard is reached, exactly as at 0.20.0.
+Wiring the slot routes the run, it does not silence the event.
+
+An *erroring* arm is the one case where wiring the slot adds an event. The
+guard evaluates that arm's source too, so it fails the same way the arm's own
+transition did, and `select_transitions/2` places "one `error.execution` per
+failed `cond`"
+(`deps/statifier/lib/statifier/interpreter/selection.ex:341-347`) - two events
+for one arm rather than today's one. Where the run goes is unchanged: neither
+the arm nor the guard is taken and the block falls to `otherwise`, exactly as
+decision 5 says. A test for this record's behaviour should count events per
+*failed cond* rather than per arm.
 
 That is deliberate rather than a debt. Suppressing the event would mean
 rewriting the arms' own conditions, which decision 5 declines for the two
