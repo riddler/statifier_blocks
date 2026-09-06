@@ -1168,10 +1168,16 @@ text above this line is edited by this section. The form is the amendment of
 this date at `:967`, this record's own.
 
 An amendment rather than a Note, because decision 4 declares this type's
-config surface as a closed ordered table and this section adds a row to it,
-and because decision 5 says "this record says nothing about what one element
-holds" - via `ADR-0011` decision 12, which cites it - and this section says
-something. It is filed with the three sibling amendments `ADR-0013` names in
+config surface as an ordered table - "`config_schema/1` declares, in order:"
+(`:196`) - and this section adds a row to it, and because what one collected
+element holds has been left unsaid on this record's behalf and this section
+says it. The sentence that leaves it unsaid is `ADR-0011` decision 12's, not
+this record's: "the assembled answer is a list, dense and in item-index order
+per ADR-0009 decision 5, and this record says nothing about what one element
+of it holds" (`docs/adr/0011-typed-environment.md:522-525`), where "this
+record" is ADR-0011. Decision 5 here fixes the list and its order and simply
+never reaches the element; the amendment filed with this one carries the
+matching change on ADR-0011. It is filed with the three sibling amendments `ADR-0013` names in
 "What this record owes the accepted records"
 (`docs/adr/0013-typed-fan-out-child-summary.md:703-733`), and it decides
 nothing `ADR-0013` did not already decide.

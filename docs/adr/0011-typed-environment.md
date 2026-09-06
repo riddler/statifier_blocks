@@ -1032,8 +1032,10 @@ case
 An amendment **narrowly**, and the scope is worth stating before the decision.
 Two other sections of this record move in campaign SF035 and neither moves
 here: `sb-myt1` amends **decision 1** for the inline-shape inhabitant of
-`type_expr()` and for seeding declared path types from the datamodel index
-(campaign-SF035 ruling `RQ-SF035-15`), and `sb-c9b6` files its own Note. This
+`type_expr()` (campaign-SF035 ruling `RQ-SF035-1`, the arm `sd-ADR-0001`'s
+amendment spells) and for seeding declared path types from the datamodel index
+where the document wrote nothing (campaign-SF035 ruling `RQ-SF035-15`), and
+`sb-c9b6` files its own Note. This
 section writes only what `ADR-0013` needs of decision 12 and states its
 dependence on `sb-myt1`'s work rather than doing any of it.
 
