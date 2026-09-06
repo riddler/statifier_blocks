@@ -918,14 +918,19 @@ make. So the deferred question above closes for two members and stays open
 for one, with the owner named rather than left to be found: `sb-3j9u` closes
 as folded into `sb-r313`, and whoever reopens `collect` reopens `ADR-0009`.
 
-**One reading the code now settles that this record's Note of 2026-09-06
-had the other way round.** That Note's reading 6 says "The three other
-bare-identifier refusals the decision deliberately did not reach are still
-in place, still deferred". Two of the three are no longer in place; the
-sentence is historical as of `sb-r313` and the citations beside it -
+**Two readings of this record's Note of 2026-09-06 are historical as of
+`sb-r313`.** Reading 6 says "The three other bare-identifier refusals the
+decision deliberately did not reach are still in place, still deferred":
+two of the three are no longer in place. Reading 7 lists
 `lib/statifier_blocks/core/invoke.ex:299` and
-`lib/statifier_blocks/invoke_step.ex:430` - now land on the shared helper's
-call sites rather than on a refusal of their own.
+`lib/statifier_blocks/invoke_step.ex:430` among the citations that "still
+resolve exactly", "for two of the three deferred refusals": neither
+refusal exists at those lines any more, and neither line holds one now.
+Each of the two types instead reaches
+`StatifierBlocks.Core.AssignLocation` twice - once from
+`validate_config/1`'s check and once from `emit/2`'s re-check - which is
+reading 7's own advice arriving in practice: search for the name, not the
+number.
 
 **A second thing followed, and it is the reason the bead was filed as a
 bug.** `core.invoke`'s `assign_to` was declared `type: :string` with no
