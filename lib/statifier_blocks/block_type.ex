@@ -154,13 +154,50 @@ defmodule StatifierBlocks.BlockType do
           | {:path, path_opts()}
 
   @typedoc """
-  The second element of a `{:path, opts}` field type. No key is defined
-  today (ADR-0002 decision 7, amended 2026-09-05): the map is there so a
-  control's needs can arrive without widening the closed type set a second
-  time, exactly as `{:select, choices}` and `{:list, inner}` carry theirs.
-  A declaration writes `type: {:path, %{}}`.
+  A type at a datamodel path, as a declaration spells it: one of the
+  datamodel document's nine scalars, the `name` of a `record` or `shape`
+  declared there, an opaque string a host carries, `{:list, T}`, or
+  `:unknown`. `StatifierBlocks.Environment.type_of/2` reads one, and this
+  package mints none of them.
+
+  It is that module's `t:StatifierBlocks.Environment.type_expr/0` under a
+  second name rather than a second definition: the environment is where a
+  signature is read, so the grammar is defined there once.
   """
-  @type path_opts :: map()
+  @type path_type :: StatifierBlocks.Environment.type_expr()
+
+  @typedoc """
+  The second element of a `{:path, opts}` field type. The map was left open
+  by ADR-0002 decision 7's 2026-09-05 amendment so that a control's needs
+  could arrive without widening the closed type set a second time, exactly
+  as `{:select, choices}` and `{:list, inner}` carry theirs, and ADR-0011
+  takes that door with two optional keys:
+
+    * `expects: T` - a **read signature**. The block reads the path the
+      field's value names and requires the environment at the block's
+      position to satisfy `T`; an unsatisfied read is a validation error
+      anchored on this field's `key`.
+    * `writes: T` - a **write signature**. The block puts `T` at that path
+      for every block after it.
+
+  Both are optional and independent, and a field carrying neither behaves
+  exactly as the 2026-09-05 amendment describes: it is a write of
+  `:unknown` at the path, which is known-but-untyped and refuses nothing.
+  So does a `:string` field carrying `datamodel_path?: true`. A
+  declaration writes `type: {:path, %{}}`, `type: {:path, %{expects:
+  "Settleable"}}`, or `type: {:path, %{writes: "cards.settlement"}}`.
+
+  A field declaring `expects` and no `writes` is a read and not also a
+  write: it says what the block needs at the path, not what it leaves
+  there. `StatifierBlocks.Environment` is where both are read, and
+  `validate_config/1` remains the only authority on a field's own value -
+  a signature is a claim about the document's data flow, never a rule
+  about the bytes in this config.
+  """
+  @type path_opts :: %{
+          optional(:expects) => path_type(),
+          optional(:writes) => path_type()
+        }
 
   @typedoc """
   Keys and list indexes from the config root down to one value, as
@@ -264,6 +301,28 @@ defmodule StatifierBlocks.BlockType do
 
   Read it through `datamodel_path?/1`, never by matching the key: a
   declaration that omits it is the common case.
+
+  ## What a path field reads and writes
+
+  A `{:path, opts}` field may declare `expects: T`, `writes: T`, or
+  neither - see `t:path_opts/0`. They are the block's claim about the
+  document's data flow at that path, read by
+  `StatifierBlocks.Environment` and checked by
+  `StatifierBlocks.Assignability`, and they change nothing about this
+  callback's own standing: `validate_config/1` is still the authority on
+  whether a value is acceptable.
+
+  ## Candidate values
+
+  A field may also be offered a **candidate list** - the values a host
+  says belong in it, as `{value, label}` pairs keyed
+  `{type_name, field_key}`. It is supplied by a host rather than declared
+  here, because which values exist is a property of the deployment and not
+  of the block type, and it reaches the editor as the `field_candidates`
+  assign and the compiler as the `:field_candidates` lint option. A
+  candidate list is what a control draws and what an opt-in lint reports
+  against; it is not a validation language, and a value outside it is
+  never refused by this package.
   """
   @callback config_schema(Block.config()) :: [field_decl()]
 

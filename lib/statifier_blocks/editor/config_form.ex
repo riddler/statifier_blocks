@@ -75,6 +75,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:field_candidates, :map,
+      default: %{},
+      doc: """
+      The values a host offers, keyed `{type_name, field_key}`. Looked up
+      here for the selected node's own type and handed to
+      `StatifierBlocks.Editor.Field` one field at a time; see its moduledoc
+      for the two spellings.
+      """
+    )
+
+    attr(:capture_pairs, :any,
+      default: nil,
+      doc: """
+      The block's capture pairs as ordered `{target, source}` rows, or
+      `nil` for a block that takes no capture map. `[]` is a block that
+      takes one and has none yet, which still draws the row.
+      """
+    )
+
+    attr(:capture_sources, :list,
+      default: [],
+      doc: """
+      The source keys a captured event's example payload carries, drawn as
+      the source control's `<datalist>`. Empty renders a plain input.
+      """
+    )
+
     attr(:pending, :list,
       default: [],
       doc: """
@@ -122,9 +149,83 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           value_candidates={@value_candidates}
           event_candidates={@event_candidates}
           outcome_candidates={@outcome_candidates}
+          candidates={candidates_for(@field_candidates, @node.type, field)}
           fixture_hint={fixture_hint(@fixtures, @node.block_id, field)}
         />
+        <.capture_rows
+          :if={@capture_pairs != nil}
+          rows={@capture_pairs}
+          sources={@capture_sources}
+          target={@target}
+          block_id={@node.block_id}
+        />
       </form>
+      """
+    end
+
+    attr(:rows, :list, required: true)
+    attr(:sources, :list, required: true)
+    attr(:target, :any, required: true)
+    attr(:block_id, :string, required: true)
+
+    @doc """
+    The capture pairs, one two-control row each (ADR-0011 decision 10).
+
+    A row is a datamodel path written and a path inside the firing event's
+    `_event.data` read, and it is a repeated row rather than a field
+    because ADR-0002 decision 7's closed field-type set has no member that
+    describes a map and this record declined to add one. So the pairs have
+    no `config_schema/1` declaration to render from, and they are drawn
+    here from the config the editor already holds.
+
+    There is always **one blank row at the end**, and it is what adds a
+    pair: filling it writes a pair and the next blank row appears beneath
+    it. Clearing both controls of a row is what removes one. That is two
+    gestures rather than an add button and a remove button, and it is the
+    shape the pairs already have: a map with a blank key is not a pair, so
+    a row that says nothing is a row that is not there.
+
+    A stored map has no order of its own, so the rows before the blank one
+    are in their targets' sorted order - the order the emission already
+    fixes, for the same reason.
+    """
+    def capture_rows(assigns) do
+      assigns = assign(assigns, :list_id, "sb-capture-sources-" <> assigns.block_id)
+
+      ~H"""
+      <div class="sb-capture" data-capture-rows={length(@rows)}>
+        <p class="sb-capture__label">Capture from the event</p>
+        <div
+          :for={{{target, source}, index} <- Enum.with_index(@rows ++ [{"", ""}])}
+          class="sb-capture__row"
+          data-capture-row={index}
+        >
+          <input
+            class="sb-field__input sb-capture__target"
+            type="text"
+            id={"sb-capture-target-" <> Integer.to_string(index)}
+            name={"capture[" <> Integer.to_string(index) <> "][target]"}
+            value={target}
+            placeholder="a datamodel path"
+            spellcheck="false"
+            autocomplete="off"
+          />
+          <input
+            class="sb-field__input sb-capture__source"
+            type="text"
+            id={"sb-capture-source-" <> Integer.to_string(index)}
+            name={"capture[" <> Integer.to_string(index) <> "][source]"}
+            value={source}
+            placeholder="a path in the event payload"
+            list={if @sources != [], do: @list_id}
+            spellcheck="false"
+            autocomplete="off"
+          />
+        </div>
+        <datalist :if={@sources != []} id={@list_id} data-capture-sources={length(@sources)}>
+          <option :for={source <- @sources} value={source}></option>
+        </datalist>
+      </div>
       """
     end
 
@@ -182,7 +283,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     def decode(fields, params, base \\ %{}) when is_list(fields) and is_map(params) do
       posted = Map.get(params, "config", %{})
 
-      Enum.reduce(fields, base, fn %ViewModel.Field{} = field, config ->
+      fields
+      |> Enum.reduce(base, fn %ViewModel.Field{} = field, config ->
         value =
           case Map.fetch(posted, field.key) do
             {:ok, raw} -> Field.decode(field.type, raw)
@@ -197,6 +299,74 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           BlockType.put_value(config, path, value)
         end
       end)
+      |> decode_capture(params)
+    end
+
+    # The capture rows, which have no field to be decoded through: the
+    # posted rows ARE the map, so a form that drew them replaces
+    # `config["capture"]` wholesale and a form that did not leaves the key
+    # exactly as it was.
+    #
+    # A row saying nothing at all is dropped, which is what makes clearing
+    # a row remove its pair and the trailing blank row cost nothing. A row
+    # that says only half of a pair is KEPT, at the blank key it has -
+    # `validate_config/1` refuses that map and the draft holds it, so an
+    # author who typed the source first sees a finding and their own bytes
+    # rather than watching them vanish between keystrokes. An empty map is
+    # written rather than the key dropped, which is the value
+    # `validate_config/1` and `emit/2` both already read as "captures
+    # nothing".
+    @spec decode_capture(StatifierBlocks.Block.config(), map()) ::
+            StatifierBlocks.Block.config()
+    defp decode_capture(config, %{"capture" => rows}) when is_map(rows) do
+      pairs =
+        rows
+        |> Enum.sort_by(fn {index, _row} -> row_index(index) end)
+        |> Enum.map(fn {_index, row} -> {row_text(row, "target"), row_text(row, "source")} end)
+        |> Enum.reject(fn {target, source} -> target == "" and source == "" end)
+        |> Map.new()
+
+      Map.put(config, "capture", pairs)
+    end
+
+    defp decode_capture(config, _no_capture_posted), do: config
+
+    @spec row_text(term(), String.t()) :: String.t()
+    defp row_text(row, key) when is_map(row) do
+      case Map.get(row, key) do
+        text when is_binary(text) -> String.trim(text)
+        _absent_or_not_text -> ""
+      end
+    end
+
+    defp row_text(_row, _key), do: ""
+
+    # Row keys arrive as the strings a form posted, so `"10"` sorts before
+    # `"2"` unless they are read as numbers. Order decides only which of two
+    # rows naming one target survives the map, and it should be the one
+    # further down the form rather than the one that sorts later as text.
+    @spec row_index(term()) :: integer()
+    defp row_index(index) when is_binary(index) do
+      case Integer.parse(index) do
+        {number, ""} -> number
+        _not_a_number -> 0
+      end
+    end
+
+    defp row_index(_index), do: 0
+
+    @doc """
+    The candidate list a host offered for one field, or `[]`.
+
+    Keyed `{type_name, field_key}`: the values belong to a field of a
+    block TYPE rather than to a block, because which values exist is a
+    property of the deployment and the same field on two blocks of one
+    type offers the same ones.
+    """
+    @spec candidates_for(map(), StatifierBlocks.Block.type_name(), ViewModel.Field.t()) :: term()
+    def candidates_for(field_candidates, type_name, %ViewModel.Field{key: key})
+        when is_map(field_candidates) do
+      Map.get(field_candidates, {type_name, key}, [])
     end
 
     # A `:duration` is the one field type with a value that means "no key".

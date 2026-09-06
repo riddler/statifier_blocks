@@ -50,6 +50,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          fixtures: session["fixtures"],
          invoke_types: session["invoke_types"] || [],
          value_candidates: session["value_candidates"] || %{},
+         # `Map.get/3` for `chart_outcomes`' reason, which the comment below
+         # spells: `session/2` fills every key, and one more `||` here
+         # crosses Credo's complexity bound for the whole function.
+         field_candidates: Map.get(session, "field_candidates", %{}),
          # `Map.get/3` rather than the `||` its neighbours use: `session/2`
          # below fills every key with its own default, so the fallback here is
          # only for a session built by hand - and one more `||` in this
@@ -82,6 +86,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         fixtures={@fixtures}
         invoke_types={@invoke_types}
         value_candidates={@value_candidates}
+        field_candidates={@field_candidates}
         chart_outcomes={@chart_outcomes}
         drawer_height={@drawer_height}
         drawer_tabs={drawer_tabs(@host_tabs, @feed)}
@@ -220,7 +225,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     Options: `:document`, `:palette`, `:findings`, `:datamodel`, `:declare`, `:theme`,
     `:on_select` (`false` mounts without the selection seam; the default passes
     it),
-    `:fit`, `:fixtures`, `:invoke_types`, `:value_candidates`, `:drawer_height`,
+    `:fit`, `:fixtures`, `:invoke_types`, `:value_candidates`,
+    `:field_candidates`, `:drawer_height`,
     `:header`, `:icon`,
     `:host_tabs` and `:feed` - the last five being the
     shell amendment's host seam (8A), a truth-table source, the height the host
@@ -263,6 +269,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "fixtures" => Keyword.get(opts, :fixtures),
         "invoke_types" => Keyword.get(opts, :invoke_types, []),
         "value_candidates" => Keyword.get(opts, :value_candidates, %{}),
+        "field_candidates" => Keyword.get(opts, :field_candidates, %{}),
         "chart_outcomes" => Keyword.get(opts, :chart_outcomes, %{}),
         "drawer_height" => Keyword.get(opts, :drawer_height),
         "header" => Keyword.get(opts, :header),

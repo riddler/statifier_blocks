@@ -372,6 +372,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `icon` | no | function component resolving an icon *name* to markup |
     | `expression_component` | no | override for `:expression` fields (sui-bob's seam); with it unset, an `:expression` renders statifier-ui's own expression editor when that package is on the host's load path, and the package's plain source input when it is not |
     | `value_candidates` | no | the values offered per datamodel path, `%{path => [%{label:, value:} \| binary]}`; **merged over the datamodel's own `one_of` enumerations, per path**, so a path this map names uses this map's list and a path it does not name keeps what the datamodel declares. Read only by an expression editor that draws value pickers; `%{}` (the default) now means *nothing beyond what the datamodel declares* rather than nothing at all |
+    | `field_candidates` | no | the values a host offers for one field, keyed `{type_name, field_key}`: `[{value, label}]` for a closed list, which a `:string` field draws as a `<select>`, or `{:open, [{value, label}]}` for an open one, drawn as a `<datalist>`. `%{}` (the default) offers none, and a field it does not name renders exactly as it did. It draws a control and decides nothing: `validate_config/1` is still the only authority on a value, and a stored value a closed list does not offer is drawn rather than rewritten |
     | `invoke_types` | no | the invoke types the host is prepared to answer; suggestions on an `invoke_type` field, never a constraint, and `[]` (the default) means *no list supplied* |
     | `chart_outcomes` | no | what the host says each of its stored documents finishes with, `%{document id => [outcome]}`; offered as candidates on a `core.subchart`'s `outcomes` field and compared against what that block declares (`StatifierBlocks.ViewModel.outcome_findings/3`). `%{}` (the default) says nothing about any chart, and a chart the map does not name is *unknown*, which is not disagreement |
     | `active_marks` | no | the block ids a run has activated; held as editor state, and cleared when the host opens a different document |
@@ -447,6 +448,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          invoke_types: [],
          chart_outcomes: %{},
          value_candidates: %{},
+         field_candidates: %{},
          theme: %{},
          class: nil,
          history_limit: :infinity,
@@ -640,6 +642,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:offered_values, offered_values(assigns))
         |> assign(:event_candidates, event_candidates(assigns))
         |> assign(:outcome_candidates, chart_outcome_candidates(assigns))
+        |> assign(:capture_pairs, capture_pairs(assigns))
+        |> assign(:capture_sources, capture_sources(assigns))
         |> assign(:declaration_refusal, declaration_refusal(assigns))
         |> assign(:marks, marks(assigns))
         |> assign(:fit_target, fit_target(assigns))
@@ -731,6 +735,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             value_candidates={@offered_values}
             event_candidates={@event_candidates}
             outcome_candidates={@outcome_candidates}
+            field_candidates={@field_candidates}
+            capture_pairs={@capture_pairs}
+            capture_sources={@capture_sources}
             fixtures={@fixtures}
             fixture_runs={@fixture_runs}
             target={@myself}
@@ -1658,6 +1665,136 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp chart_outcome_candidates(_not_a_subchart), do: []
+
+    # The selected block's capture pairs, as ordered rows for the two-control
+    # row the config form draws (ADR-0011 decision 10). `nil` for every other
+    # selection, which is what makes the row absent rather than empty, and it
+    # is derived here for `event_candidates/1`'s reason: whether a block
+    # takes a capture map is a question about the SELECTION, and the form
+    # component tests no block type.
+    #
+    # The pairs come from the block's effective config - a draft when there
+    # is one - so a half-typed row survives the round trip that refuses it.
+    # Sorted by target, which is the order the emission already fixes,
+    # because a map has none of its own.
+    @spec capture_pairs(map()) :: [{String.t(), String.t()}] | nil
+    defp capture_pairs(%{selected_node: %ViewModel.Node{type: @on_event_type} = node} = assigns) do
+      case Map.get(selected_config(assigns, node.block_id), "capture") do
+        pairs when is_map(pairs) ->
+          pairs
+          |> Enum.filter(fn {target, source} -> is_binary(target) and is_binary(source) end)
+          |> Enum.sort_by(fn {target, _source} -> target end)
+
+        _absent_or_not_a_map ->
+          []
+      end
+    end
+
+    defp capture_pairs(_takes_no_capture), do: nil
+
+    # The source keys a capture row offers: the payload of the event this
+    # handler waits for, out of its own type's `fixtures/0` (ADR-0011
+    # decision 10). A handler's fixture payload is the only place in the
+    # package that knows what an event of that name actually carries, and
+    # ADR-0002 decision 9's Note already makes a fixture value the hint drawn
+    # beside a field.
+    #
+    # With no fixture there are no candidates and the control is a plain text
+    # input, which is what the `{:path, opts}` amendment already says about a
+    # path control with no datamodel. A bundle spelled as a path or as a
+    # struct this package does not own reads as no fixture: the loader is
+    # statifier-ui's, and this package does not depend on it.
+    @spec capture_sources(map()) :: [String.t()]
+    defp capture_sources(%{selected_node: %ViewModel.Node{type: @on_event_type} = node} = assigns) do
+      with %Block{} = block <- block_by_id(assigns.document, node.block_id),
+           {:ok, module, resolved} <- Palette.resolve(assigns.palette, block) do
+        module
+        |> fixture_events()
+        |> payload_for(Map.get(resolved.config, "event"))
+        |> payload_paths()
+      else
+        _unresolvable -> []
+      end
+    end
+
+    defp capture_sources(_takes_no_capture), do: []
+
+    # `fixtures/0`'s events, in the two map spellings this package can read
+    # without the loader: atom `:events` and string `"events"`, each a map
+    # from event name to one example payload.
+    @spec fixture_events(module()) :: %{optional(String.t()) => term()}
+    defp fixture_events(module) do
+      with true <- Code.ensure_loaded?(module) and function_exported?(module, :fixtures, 0),
+           bundle when is_map(bundle) <- module.fixtures(),
+           events when is_map(events) <- Map.get(bundle, :events) || Map.get(bundle, "events") do
+        events
+      else
+        _no_readable_events -> %{}
+      end
+    end
+
+    # The payload the configured event name declares, or - when the config
+    # names no event, or names one the bundle has no sample for - every
+    # payload the bundle carries. A handler whose event is still empty is
+    # offered what its type's samples know rather than nothing at all, which
+    # is the same posture the fixture hint takes.
+    @spec payload_for(%{optional(String.t()) => term()}, term()) :: [term()]
+    defp payload_for(events, event) when is_binary(event) do
+      case Map.fetch(events, event) do
+        {:ok, payload} -> [payload]
+        :error -> Map.values(events)
+      end
+    end
+
+    defp payload_for(events, _no_event_named), do: Map.values(events)
+
+    # A payload's leaves, as the dotted paths a capture's source names -
+    # `_event.data` is the root the emission adds, so the stored source is
+    # the path BELOW it. Sorted and distinct, because a suggestion list with
+    # a repeat in it is a list somebody has to explain.
+    @spec payload_paths([term()]) :: [String.t()]
+    defp payload_paths(payloads) do
+      payloads
+      |> Enum.flat_map(&paths_under("", &1))
+      |> Enum.uniq()
+      |> Enum.sort()
+    end
+
+    @spec paths_under(String.t(), term()) :: [String.t()]
+    defp paths_under(prefix, payload) when is_map(payload) do
+      Enum.flat_map(payload, fn {key, value} ->
+        if is_binary(key) do
+          paths_under(join_path(prefix, key), value)
+        else
+          []
+        end
+      end)
+    end
+
+    defp paths_under("", _leaf), do: []
+    defp paths_under(prefix, _leaf), do: [prefix]
+
+    @spec join_path(String.t(), String.t()) :: String.t()
+    defp join_path("", key), do: key
+    defp join_path(prefix, key), do: prefix <> "." <> key
+
+    # The config a selected block is being edited against: its draft when it
+    # has one, and what the document holds when it does not. The same answer
+    # `effective_config/2` gives an event handler, asked of assigns because
+    # this one runs in `render/1`.
+    @spec selected_config(map(), Block.id()) :: Block.config()
+    defp selected_config(assigns, id) do
+      case Map.fetch(assigns.drafts, id) do
+        {:ok, draft} ->
+          draft
+
+        :error ->
+          case block_by_id(assigns.document, id) do
+            %Block{config: config} -> config
+            _no_block -> %{}
+          end
+      end
+    end
 
     # What "the enclosing body" means, asked of the declaration rather than
     # of a slot name: a slot that admits ADR-0003's `:step` kind. That is

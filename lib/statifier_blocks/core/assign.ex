@@ -54,12 +54,6 @@ defmodule StatifierBlocks.Core.Assign do
   alias StatifierBlocks.Core.{Config, Emit}
   alias StatifierBlocks.Emission
 
-  # Any whitespace, not just the space/tab/newline trio - a carriage return,
-  # a vertical tab, or a non-breaking space is whitespace too, and a check
-  # that only named three characters would let the rest through a rule
-  # whose stated shape is "no whitespace".
-  @whitespace ~r/\s/
-
   @impl true
   def current_version, do: 1
 
@@ -88,15 +82,14 @@ defmodule StatifierBlocks.Core.Assign do
     |> Config.verdict()
   end
 
-  # Non-empty and no whitespace, and deliberately NOT a dotted-identifier
-  # grammar: this package does not own the datamodel path grammar, and a
-  # regex here that accepted `review.parked` and refused something a
-  # host's datamodel legitimately declares would be a second, quieter
-  # proposal riding along with this one.
+  # `Config.datamodel_path?/1`: non-empty and no whitespace, and
+  # deliberately NOT a dotted-identifier grammar. The rule is spelled once
+  # there because `core.subchart`'s `assign_to` writes the same datamodel
+  # through the same `<assign>` element and has to admit the same paths.
   defp check_path(findings, config) do
     path = Map.get(config, "path")
 
-    if Config.non_empty_string?(path) and not Regex.match?(@whitespace, path) do
+    if Config.datamodel_path?(path) do
       findings
     else
       [{"path", "must be a datamodel path, like review.parked"} | findings]
@@ -178,7 +171,7 @@ defmodule StatifierBlocks.Core.Assign do
   # rather than raising on it - the compiler's Config stage makes that arm
   # unreachable in practice, never impossible (see `core.on_event`).
   defp path(path) do
-    if Config.non_empty_string?(path) and not Regex.match?(@whitespace, path) do
+    if Config.datamodel_path?(path) do
       {:ok, path}
     else
       {:error, [{"path", "must be a datamodel path, like review.parked"}]}

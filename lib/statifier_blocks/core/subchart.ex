@@ -139,14 +139,23 @@ defmodule StatifierBlocks.Core.Subchart do
       `:info` advisory anchored on the `assign_to` key, which is a remark
       and not a refusal.
 
-  What does not change is **what the field accepts**. `validate_config/1`
-  still requires a bare lowercase identifier here and `emit/2` still
-  writes exactly that string into the `<assign>`'s `location`, so every
-  document written before this type existed keeps validating and keeps
-  compiling to the same bytes. A bare identifier is a one-segment path, so
-  the claim the type makes was already true of every value this field ever
-  held; admitting a dotted location is a separate question about what an
-  `<assign>` may target and is not this one's to answer.
+  **The field accepts a datamodel path** (ADR-0011 decision 13): any
+  non-empty string with no whitespace in it, which is exactly what
+  `core.assign` accepts for the path it writes, read out of one
+  `StatifierBlocks.Core.Config.datamodel_path?/1`. `validate_config/1` and
+  `emit/2` are widened together, because the emission has to answer for a
+  config the validation would have rejected.
+
+  It is a widening and nothing else: a bare identifier is a one-segment
+  path, so every document written before this type existed keeps
+  validating and keeps compiling to the same bytes, and `emit/2` still
+  writes the author's string verbatim into the `<assign>`'s `location`.
+  What it settles is that the field no longer refuses the dotted paths its
+  own candidate list offers - a control that offers what its validation
+  refuses is a defect either way round. The identical refusal on an
+  `<assign>` location elsewhere in the vocabulary is untouched: that
+  decision was ruled about this field, and widening the others on the
+  strength of one field's argument is a sweep it did not make.
 
   ## What `src` names, and what it does not
 
@@ -288,19 +297,27 @@ defmodule StatifierBlocks.Core.Subchart do
     end
   end
 
+  # A datamodel path, not a bare identifier (ADR-0011 decision 13). The
+  # field offers dotted paths as candidates, and a control that offers what
+  # its own validation refuses is a defect either way round; the emission
+  # is `<assign location="...">`, the same element `core.assign` writes any
+  # non-empty whitespace-free path through, so the two read one rule out of
+  # `Config.datamodel_path?/1` and cannot disagree about a location.
   defp check_assign_to(findings, config) do
     case Map.get(config, "assign_to") do
       blank when blank in [nil, ""] ->
         findings
 
       value ->
-        if Config.identifier?(value) do
+        if Config.datamodel_path?(value) do
           findings
         else
-          [{"assign_to", "must be a bare lowercase identifier, like eligibility"} | findings]
+          [{"assign_to", assign_to_message()} | findings]
         end
     end
   end
+
+  defp assign_to_message, do: "must be a datamodel path, like eligibility.outcome"
 
   defp check_params(findings, config) do
     case Invoke.param_rows(Map.get(config, "params")) do
@@ -605,7 +622,7 @@ defmodule StatifierBlocks.Core.Subchart do
   defp assign(location) when location in [nil, ""], do: {:ok, []}
 
   defp assign(location) do
-    if Config.identifier?(location) do
+    if Config.datamodel_path?(location) do
       {:ok,
        [
          "assign"
@@ -613,7 +630,7 @@ defmodule StatifierBlocks.Core.Subchart do
          |> Emission.attribute_from_config("location", "assign_to")
        ]}
     else
-      {:error, [{"assign_to", "must be a bare lowercase identifier, like eligibility"}]}
+      {:error, [{"assign_to", assign_to_message()}]}
     end
   end
 

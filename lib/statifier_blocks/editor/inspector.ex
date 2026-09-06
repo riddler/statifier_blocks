@@ -220,6 +220,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
     )
 
+    attr(:field_candidates, :map,
+      default: %{},
+      doc: "Passed through to `StatifierBlocks.Editor.ConfigForm`; see its moduledoc."
+    )
+
+    attr(:capture_pairs, :any,
+      default: nil,
+      doc: "Passed through to `StatifierBlocks.Editor.ConfigForm`; see its moduledoc."
+    )
+
+    attr(:capture_sources, :list,
+      default: [],
+      doc: "Passed through to `StatifierBlocks.Editor.ConfigForm`; see its moduledoc."
+    )
+
     attr(:fixtures, :any,
       default: nil,
       doc: "Passed through to `StatifierBlocks.Editor.ConfigForm`; see its moduledoc."
@@ -340,6 +355,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               value_candidates={@value_candidates}
               event_candidates={@event_candidates}
               outcome_candidates={@outcome_candidates}
+              field_candidates={@field_candidates}
+              capture_pairs={@capture_pairs}
+              capture_sources={@capture_sources}
               fixtures={@fixtures}
               target={@target}
             />
@@ -417,6 +435,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:value_candidates, :map, required: true)
     attr(:event_candidates, :list, required: true)
     attr(:outcome_candidates, :list, required: true)
+    attr(:field_candidates, :map, required: true)
+    attr(:capture_pairs, :any, required: true)
+    attr(:capture_sources, :list, required: true)
     attr(:fixtures, :any, required: true)
     attr(:target, :any, required: true)
 
@@ -437,6 +458,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         value_candidates={@value_candidates}
         event_candidates={@event_candidates}
         outcome_candidates={@outcome_candidates}
+        field_candidates={@field_candidates}
+        capture_pairs={@capture_pairs}
+        capture_sources={@capture_sources}
         fixtures={@fixtures}
       />
       <p :if={@node.form == nil} class="sb-inspector__empty">

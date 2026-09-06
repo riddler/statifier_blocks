@@ -151,6 +151,38 @@ defmodule StatifierBlocks.EnvironmentTest do
     def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
   end
 
+  defmodule WriteString do
+    @moduledoc "Writes one of the nine scalars at the path its field names."
+
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+    @impl true
+    def slots(_config), do: []
+
+    @impl true
+    def config_schema(_config),
+      do: [
+        %{
+          key: "at",
+          type: {:path, %{writes: "string"}},
+          label: "Write a string to",
+          required?: true,
+          default: ""
+        }
+      ]
+
+    @impl true
+    def validate_config(_config), do: :ok
+    @impl true
+    def io(_config), do: %{kinds: [:step]}
+    @impl true
+    def palette_entry, do: %{label: "Write a string"}
+    @impl true
+    def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+  end
+
   defmodule Widens do
     @moduledoc "Widens `cards.credit_txn` into `Settled`, and nothing else."
 
@@ -174,6 +206,16 @@ defmodule StatifierBlocks.EnvironmentTest do
     Palette.new(
       Map.merge(Palette.core_types(), %{"cards.open" => Open, "cards.settle" => Settle}),
       assignability: assignability
+    )
+  end
+
+  defp string_palette do
+    Palette.new(
+      Map.merge(Palette.core_types(), %{
+        "cards.open" => Open,
+        "cards.settle" => Settle,
+        "cards.write_string" => WriteString
+      })
     )
   end
 
@@ -336,6 +378,48 @@ defmodule StatifierBlocks.EnvironmentTest do
       document = document([open(), settle("blk_STL", %{"subject" => "cards.nowhere"})])
 
       assert Assignability.validate(palette(), document, ctx()) == :ok
+    end
+
+    # The record's first contrast case, and the one an author meets most: a
+    # step expecting a shape at a path a scalar was written to. It refuses,
+    # it names the path, and the reason is not the coverage arm - nothing
+    # was covered, the two are simply different - but `{:fixable_by, id}`,
+    # naming the block whose write signature put the scalar there.
+    #
+    # sabotage: made `written_type/1` answer `:unknown` for a
+    # `{:path, %{writes: T}}` field -> the scalar never reaches the path,
+    # the read is satisfied by permissiveness, and this goes red (verified).
+    test "a shape read at a path holding a scalar is refused, naming the path" do
+      scalar = Block.new("cards.settle", id: "blk_SCALAR", config: %{"assign_to" => @subject})
+      document = document([open(), scalar, settle("blk_STL")])
+
+      # The write is a `cards.settlement`, not a string, until the type is
+      # replaced - `config_schema/1` declares what the field writes, so a
+      # scalar reaches the path through a block that declares one.
+      assert Map.get(
+               Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx()),
+               @subject
+             ) ==
+               "cards.settlement"
+
+      string = Block.new("cards.write_string", id: "blk_STR", config: %{"at" => @subject})
+      stringed = document([open(), string, settle("blk_STL")])
+
+      assert Map.get(
+               Environment.at(string_palette(), stringed, {"blk_ROOT", "body", 2}, ctx()),
+               @subject
+             ) == "string"
+
+      assert {:error, [finding]} = Assignability.validate(string_palette(), stringed, ctx())
+
+      assert finding ==
+               {:type_mismatch, "blk_STL", "blk_STR", "string", "Settleable", @subject}
+
+      assert Assignability.finding_reason(
+               string_palette(),
+               finding,
+               StatifierDatamodel.Declarations.from_document(@datamodel)
+             ) == {:fixable_by, "blk_STR"}
     end
   end
 

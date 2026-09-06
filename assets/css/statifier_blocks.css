@@ -2143,6 +2143,35 @@
   font-style: italic;
 }
 
+/* The capture pairs. A repeated two-control row rather than a field, so it
+ * wears its own block: the controls are the field family's, and what is here
+ * is the pair's shape - two controls of equal weight side by side, because
+ * neither the path written nor the payload key read is subordinate to the
+ * other. The label reads like a field's, since to an author the section is
+ * one more thing on the form. */
+.sb-capture {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-half);
+}
+
+.sb-capture__label {
+  font-size: var(--sb-text-sm);
+  color: var(--sb-fg-muted);
+}
+
+.sb-capture__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space);
+}
+
+.sb-capture__target,
+.sb-capture__source {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .sb-field__refusal {
   font-size: var(--sb-text-sm);
   border-radius: var(--sb-radius-sm);
