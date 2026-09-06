@@ -85,9 +85,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       test "the same slot without the relation is stamped refusing, and says why" do
         html = drag_ledger(build_conn(), nil)
 
+        # `fixable_by:<id>` rather than `not_assignable`, per ADR-0011
+        # decision 8: the environment names the block whose write signature
+        # put the offending type at the path, so the attribute now sends the
+        # author to a declaration instead of to nothing.
         assert slot_attrs(html, "blk_GRP", "body") == %{
                  drop: "no",
-                 reason: "not_assignable"
+                 reason: "fixable_by:blk_AUTH"
                }
       end
 
@@ -127,7 +131,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           )
 
         html = canvas(view) |> render_hook("dragstart", %{"block-id" => "blk_LDG"})
-        assert slot_attrs(html, "blk_GRP", "body").reason == "not_assignable"
+        assert slot_attrs(html, "blk_GRP", "body").reason == "fixable_by:blk_AUTH"
 
         html = canvas(view) |> render_hook("dragend", %{})
         assert slot_attrs(html, "blk_GRP", "body") == %{drop: nil, reason: nil}

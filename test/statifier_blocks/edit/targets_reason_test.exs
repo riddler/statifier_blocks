@@ -98,7 +98,11 @@ defmodule StatifierBlocks.Edit.TargetsReasonTest do
           Block.new("myapp.authorize", id: "blk_A2")
         )
 
-      assert verdict(verdicts, {"blk_GRP", "body"}) == {:refused, :not_assignable}
+      # `{:fixable_by, id}` rather than `:not_assignable`, per ADR-0011
+      # decision 8: the environment names the block whose write signature put
+      # the offending type at the path, rather than answering `:slot_entry`
+      # because the gap happens to sit at index 0 of its slot.
+      assert verdict(verdicts, {"blk_GRP", "body"}) == {:refused, {:fixable_by, "blk_AUTH"}}
     end
 
     # Sabotage: `gap_reason/2` taking `Enum.find(findings, &match?(

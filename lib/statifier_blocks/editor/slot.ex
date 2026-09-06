@@ -434,6 +434,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # attribute that dropped it would be `:not_assignable` spelled longer.
     @spec reason_string(StatifierBlocks.Assignability.reason()) :: String.t()
     defp reason_string({:fixable_by, block_id}), do: "fixable_by:" <> block_id
+
+    # The missing field names ride along for the same reason `:fixable_by`'s
+    # id does: they are what the author has to go and change, and an
+    # attribute that dropped them would be `:not_assignable` spelled longer.
+    defp reason_string({:shape_not_satisfied, missing}),
+      do: "shape_not_satisfied:" <> Enum.join(missing, ",")
+
     defp reason_string(reason) when is_atom(reason), do: Atom.to_string(reason)
 
     # One place spells the severity modifiers, and it is outside

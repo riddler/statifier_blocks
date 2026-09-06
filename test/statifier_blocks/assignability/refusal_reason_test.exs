@@ -116,7 +116,8 @@ defmodule StatifierBlocks.Assignability.RefusalReasonTest do
       assert {:error, [finding]} = Assignability.validate(palette, document, %{})
 
       assert finding ==
-               {:type_mismatch, "blk_AUTH", "blk_STL", "myapp.settled_txn", "myapp.transaction"}
+               {:type_mismatch, "blk_AUTH", "blk_STL", "myapp.settled_txn", "myapp.transaction",
+                "cards.current_txn"}
 
       assert Assignability.finding_reason(palette, finding) == {:fixable_by, "blk_STL"}
     end

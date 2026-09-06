@@ -108,6 +108,12 @@ defmodule MyApp.Blocks.Authorize do
   @impl true
   def io(_config), do: %{kinds: [:step], produces: "myapp.credit_card_txn"}
 
+  # The document's subject path. This type is the flow's first block, so it
+  # is the one whose entry names where the subject lives - and `produces`
+  # above is a write there.
+  @impl true
+  def palette_entry, do: %{label: "Authorize", subject: "cards.current_txn"}
+
   @impl true
   def emit(block, context), do: MyApp.Blocks.invoke_leaf(block, context)
 end
@@ -137,27 +143,37 @@ defmodule MyApp.Blocks.Capture do
 end
 ```
 
-`io/1` is where a type declares how data flows through it. `produces` and
-`consumes` are opaque strings compared for identity, widened only by a
-relation the host supplies - there is no built-in type lattice.
+`io/1` is where a type declares how data flows through it. Nothing flows
+between adjacent blocks: every value a block writes goes to a datamodel path
+by name, so `produces` and `consumes` are read as a **write** and a **read**
+at the document's subject path - the path the document's first block names
+with `subject:` on its `palette_entry/0`. A document whose first block names
+none has no subject, and the two keys declare nothing.
 
-That relation rides on the palette (`Palette.new(types, assignability:
-MyApp.Blocks.Types)`) and it reaches every consumer through that one value.
-`Assignability.validate/3` - what the compiler runs over the whole document -
-and `Edit.Targets.slot_verdicts/3` - what the editor runs once at drag start
-to mark every droppable slot before the pointer moves - are the same
-implementation reading the same relation, so widening the host module opens a
-drop target and clears the matching finding in the same edit. The relation can
-only widen: identity is checked first, so a host callback can never refuse
-something the default rule accepts.
+`StatifierBlocks.Environment` carries a map from datamodel path to type
+through the document, and the check at a position is whether what the
+environment holds there satisfies what the block reads. That check is
+`StatifierDatamodel.Types.satisfies/3`: unknown is permissive both ways,
+identity is nominal, and a record satisfies a shape when it covers the
+shape's required fields. There is no built-in type lattice here and no second
+read check.
 
-Where a seam refuses, `Assignability.finding_reason/2` says why in a small
-vocabulary (`:not_assignable`, `{:fixable_by, block_id}`), and
-`Assignability.seam_reasons/3` names the seams that passed only because a
-block declared nothing (`:source_untyped`, `:target_untyped`,
-`:both_untyped`) - the way to find the parts of a palette you have not typed
-yet. The editor stamps a refused slot's reason beside its validity as
-`data-drop-reason`.
+A host relation still rides on the palette (`Palette.new(types,
+assignability: MyApp.Blocks.Types)`) and reaches every consumer through that
+one value, and it runs **last** - after unknown, identity and coverage - so
+it can only ever widen. `Assignability.validate/3`, what the compiler runs
+over the whole document, and `Edit.Targets.slot_verdicts/3`, what the editor
+runs once at drag start to mark every droppable slot before the pointer
+moves, are the same implementation over the same walk, so widening the host
+module opens a drop target and clears the matching finding in the same edit.
+
+Where a read refuses, `Assignability.finding_reason/2` says why in a small
+vocabulary (`:not_assignable`, `{:fixable_by, block_id}`,
+`{:shape_not_satisfied, missing_fields}`), and `Assignability.seam_reasons/3`
+names the reads that passed only because a block declared nothing
+(`:source_untyped`, `:target_untyped`, `:both_untyped`) - the way to find the
+parts of a palette you have not typed yet. The editor stamps a refused slot's
+reason beside its validity as `data-drop-reason`.
 
 **2. Compose the document.** Your two types, arranged by the `core.*`
 vocabulary this package ships. Seventeen types: the containers that arrange
@@ -893,10 +909,11 @@ the theme - rather than a callback the editor calls back into:
 
 | Seam | Declared on | What it does |
 |---|---|---|
-| `:assignability` | `Palette.new/2` (also `from_modules/2`) | the host's widening relation for "may this block land in this slot" - both gates, kind admission and data flow, run against the palette the caller passed (ADR-0003 decision 6) |
+| `:assignability` | `Palette.new/2` (also `from_modules/2`) | the host's widening relation for "may this block land in this slot" - both gates, kind admission and data flow, run against the palette the caller passed. It runs last, after the datamodel document's own read check (ADR-0003 decision 6 as ADR-0011 decision 3 narrows it) |
 | `accent_token` | palette entry | the NAME of a `--sb-*` property, stamped on that type's cards and palette rows |
 | `badge` | palette entry | a short chip for the card header |
 | `join_label` | palette entry | a one-argument function of config, phrasing the join marker under a side-by-side arrangement |
+| `subject` | palette entry | a datamodel path. Read from the document's **entry** block - the first block of the root's `body` slot - it names where the document's subject lives, and `io/1`'s `consumes` and `produces` are a read and a write there. Absent means the document has no subject and those two keys declare nothing (ADR-0011 decision 6) |
 | `singleton` | palette entry | `:anywhere` or `:head` - how many blocks of this type the document may hold, and (for `:head`) that the one it holds is first in the root's first declared slot. A document that does not comply draws one `:config` finding on the root, one per violating type; nothing is ever inserted, removed or moved for you (ADR-0005 `10z`/`11o`) |
 | `slot_outcome_key` | palette entry | names the config key the blocks in one slot carry their outcome under, so a renderer routes an interrupt rule's escape without branching on a type name; it reaches the view model as `Slot.outcome_key` and the resolved value as `Node.outcome` |
 | `--sb-*` tokens | the `theme` assign, or your own CSS | every colour, space, radius and drag treatment - see [`docs/theming.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/theming.md) |

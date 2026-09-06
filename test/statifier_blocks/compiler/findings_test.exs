@@ -37,6 +37,12 @@ defmodule StatifierBlocks.Compiler.FindingsTest do
     @impl true
     def io(_config), do: %{kinds: [:step], produces: "authorization"}
 
+    # ADR-0011 decision 6's subject path: `consumes` and `produces`
+    # desugar against it, and it is read from whichever of these types a
+    # document opens with.
+    @impl true
+    def palette_entry, do: %{subject: "cards.current_txn"}
+
     @impl true
     def emit(%Block{config: config}, %Context{} = context) do
       done = Context.done_id(context)
@@ -72,6 +78,12 @@ defmodule StatifierBlocks.Compiler.FindingsTest do
     def validate_config(_config), do: :ok
     @impl true
     def io(_config), do: %{kinds: [:step], consumes: "settlement"}
+
+    # ADR-0011 decision 6's subject path: `consumes` and `produces`
+    # desugar against it, and it is read from whichever of these types a
+    # document opens with.
+    @impl true
+    def palette_entry, do: %{subject: "cards.current_txn"}
 
     @impl true
     def emit(_block, context) do

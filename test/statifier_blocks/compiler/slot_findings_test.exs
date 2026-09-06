@@ -35,6 +35,12 @@ defmodule StatifierBlocks.Compiler.SlotFindingsTest do
     @impl true
     def io(_config), do: %{kinds: [:step], produces: "myapp.token"}
 
+    # ADR-0011 decision 6's subject path: `consumes` and `produces`
+    # desugar against it, and it is read from whichever of these types a
+    # document opens with.
+    @impl true
+    def palette_entry, do: %{subject: "cards.current_txn"}
+
     @impl true
     def emit(_block, context) do
       done = Context.done_id(context)
@@ -61,6 +67,12 @@ defmodule StatifierBlocks.Compiler.SlotFindingsTest do
     def validate_config(_config), do: :ok
     @impl true
     def io(_config), do: %{kinds: [:step], consumes: "myapp.other_token"}
+
+    # ADR-0011 decision 6's subject path: `consumes` and `produces`
+    # desugar against it, and it is read from whichever of these types a
+    # document opens with.
+    @impl true
+    def palette_entry, do: %{subject: "cards.current_txn"}
 
     @impl true
     def emit(_block, context) do

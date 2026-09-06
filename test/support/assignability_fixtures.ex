@@ -49,6 +49,12 @@ defmodule StatifierBlocks.AssignabilityFixtures do
     def io(_config), do: %{consumes: "myapp.transaction", produces: "myapp.credit_card_txn"}
     @impl true
     def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+
+    # ADR-0011 decision 6: the subject path the document's `consumes` and
+    # `produces` desugar against. Every type here names the same one, so
+    # whichever of them a fixture document opens with is a real entry block.
+    @impl true
+    def palette_entry, do: %{label: "Authorize", subject: "cards.current_txn"}
   end
 
   defmodule Settle do
@@ -68,6 +74,12 @@ defmodule StatifierBlocks.AssignabilityFixtures do
     def io(_config), do: %{consumes: "myapp.credit_card_txn", produces: "myapp.settled_txn"}
     @impl true
     def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+
+    # ADR-0011 decision 6: the subject path the document's `consumes` and
+    # `produces` desugar against. Every type here names the same one, so
+    # whichever of them a fixture document opens with is a real entry block.
+    @impl true
+    def palette_entry, do: %{label: "Settle", subject: "cards.current_txn"}
   end
 
   defmodule PostToLedger do
@@ -90,6 +102,12 @@ defmodule StatifierBlocks.AssignabilityFixtures do
     def io(_config), do: %{consumes: "myapp.card_txn", produces: :unknown}
     @impl true
     def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+
+    # ADR-0011 decision 6: the subject path the document's `consumes` and
+    # `produces` desugar against. Every type here names the same one, so
+    # whichever of them a fixture document opens with is a real entry block.
+    @impl true
+    def palette_entry, do: %{label: "Post to ledger", subject: "cards.current_txn"}
   end
 
   defmodule OnChargeback do
@@ -109,6 +127,12 @@ defmodule StatifierBlocks.AssignabilityFixtures do
     def io(_config), do: %{kinds: [:interrupt_handler]}
     @impl true
     def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+
+    # ADR-0011 decision 6: the subject path the document's `consumes` and
+    # `produces` desugar against. Every type here names the same one, so
+    # whichever of them a fixture document opens with is a real entry block.
+    @impl true
+    def palette_entry, do: %{label: "On chargeback", subject: "cards.current_txn"}
   end
 
   defmodule Widens do

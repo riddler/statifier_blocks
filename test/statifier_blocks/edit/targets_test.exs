@@ -23,6 +23,12 @@ defmodule StatifierBlocks.Edit.TargetsTest do
     def validate_config(_config), do: :ok
     @impl true
     def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+
+    # ADR-0011 decision 6's subject path: the same one on every type here,
+    # so whichever of them a document opens with names it and the
+    # `consumes`/`produces` sugar desugars against it.
+    @impl true
+    def palette_entry, do: %{subject: "signup.applicant"}
   end
 
   # Two typed signup-wizard steps and a candidate that only fits at the
@@ -46,6 +52,12 @@ defmodule StatifierBlocks.Edit.TargetsTest do
     def io(_config), do: %{kinds: [:step], produces: "signup.email_captured"}
     @impl true
     def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+
+    # ADR-0011 decision 6's subject path: the same one on every type here,
+    # so whichever of them a document opens with names it and the
+    # `consumes`/`produces` sugar desugars against it.
+    @impl true
+    def palette_entry, do: %{subject: "signup.applicant"}
   end
 
   defmodule ConfirmEmail do
@@ -67,6 +79,12 @@ defmodule StatifierBlocks.Edit.TargetsTest do
 
     @impl true
     def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+
+    # ADR-0011 decision 6's subject path: the same one on every type here,
+    # so whichever of them a document opens with names it and the
+    # `consumes`/`produces` sugar desugars against it.
+    @impl true
+    def palette_entry, do: %{subject: "signup.applicant"}
   end
 
   defmodule Personalize do

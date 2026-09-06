@@ -308,14 +308,15 @@ defmodule StatifierBlocks.AssignabilityTest do
     # of recursing through `fetch_path/2` -> this assertion goes red for a
     # container that is itself nested past the root
     test "index 0 falls back to the parent block's own inbound type" do
+      authorize = Block.new("myapp.authorize", id: "blk_auth")
       inner = Block.new("core.sequence", id: "blk_inner", slots: %{"body" => []})
-      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [inner]})
+      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [authorize, inner]})
       document = Document.new(root, id: "bdoc_b")
       palette = AssignabilityFixtures.palette()
       ctx = %{entry_type: "myapp.transaction"}
 
       assert Assignability.inbound_type(palette, document, {"blk_inner", "body", 0}, ctx) ==
-               "myapp.transaction"
+               "myapp.credit_card_txn"
     end
   end
 
@@ -323,7 +324,8 @@ defmodule StatifierBlocks.AssignabilityTest do
     # sabotage: change `Map.get(ctx, :entry_type, :unknown)` to always
     # `:unknown` -> this assertion goes red
     test "the root takes ctx[:entry_type]" do
-      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => []})
+      authorize = Block.new("myapp.authorize", id: "blk_auth")
+      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [authorize]})
       document = Document.new(root, id: "bdoc_c")
       palette = AssignabilityFixtures.palette()
 
@@ -361,28 +363,28 @@ defmodule StatifierBlocks.AssignabilityTest do
       document = Document.new(root, id: "bdoc_e")
       palette = AssignabilityFixtures.palette()
 
-      assert Assignability.inbound_type(palette, document, {"blk_root", "body", 1}, %{}) ==
-               "myapp.credit_card_txn"
+      assert Assignability.produces(palette, document, nested, %{}) == "myapp.credit_card_txn"
     end
 
     # sabotage: change the empty-slot branch of `resolve_produces` from
     # `own_inbound_type(...)` to `:unknown` -> this assertion goes red
     test "an empty passthrough sequence falls back to its own inbound type" do
+      authorize = Block.new("myapp.authorize", id: "blk_auth")
       empty_seq = Block.new("core.sequence", id: "blk_empty", slots: %{"body" => []})
       post_to_ledger = Block.new("myapp.post_to_ledger", id: "blk_ledger")
 
       root =
         Block.new("core.sequence",
           id: "blk_root",
-          slots: %{"body" => [empty_seq, post_to_ledger]}
+          slots: %{"body" => [authorize, empty_seq, post_to_ledger]}
         )
 
       document = Document.new(root, id: "bdoc_f")
       palette = AssignabilityFixtures.palette()
       ctx = %{entry_type: "myapp.transaction"}
 
-      assert Assignability.inbound_type(palette, document, {"blk_root", "body", 1}, ctx) ==
-               "myapp.transaction"
+      assert Assignability.produces(palette, document, empty_seq, ctx) ==
+               "myapp.credit_card_txn"
     end
 
     # sabotage: n/a directly (a wrong-answer sabotage is already covered
@@ -410,9 +412,7 @@ defmodule StatifierBlocks.AssignabilityTest do
       palette = AssignabilityFixtures.palette()
 
       task =
-        Task.async(fn ->
-          Assignability.inbound_type(palette, document, {"blk_root", "body", 1}, %{})
-        end)
+        Task.async(fn -> Assignability.produces(palette, document, chain, %{}) end)
 
       assert Task.await(task, 5_000) == "myapp.credit_card_txn"
     end
@@ -522,7 +522,7 @@ defmodule StatifierBlocks.AssignabilityTest do
                {:error,
                 [
                   {:type_mismatch, "blk_cand", "blk_scr", "myapp.settled_txn",
-                   "myapp.transaction"}
+                   "myapp.transaction", "cards.current_txn"}
                 ]}
     end
 
@@ -537,13 +537,17 @@ defmodule StatifierBlocks.AssignabilityTest do
 
       assert Assignability.check(palette, document, {"blk_root", "body", 0}, candidate, %{}) ==
                {:error,
-                [{:type_mismatch, "blk_scr", "blk_cand", "myapp.other", "myapp.credit_card_txn"}]}
+                [
+                  {:type_mismatch, "blk_scr", "blk_cand", "myapp.other", "myapp.credit_card_txn",
+                   "cards.current_txn"}
+                ]}
     end
 
     # sabotage: change `upstream_ref/2`'s `index == 0` clause to look up a
     # sibling instead of returning `:slot_entry` -> this assertion goes red
     test "a :type_mismatch at index 0 names :slot_entry" do
-      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => []})
+      ledger = Block.new("myapp.post_to_ledger", id: "blk_ledger")
+      root = Block.new("core.sequence", id: "blk_root", slots: %{"body" => [ledger]})
       document = Document.new(root, id: "bdoc_ins_slot_entry")
       candidate = Block.new("myapp.settle", id: "blk_cand")
       palette = AssignabilityFixtures.palette()
@@ -558,7 +562,7 @@ defmodule StatifierBlocks.AssignabilityTest do
                {:error,
                 [
                   {:type_mismatch, "blk_cand", :slot_entry, "myapp.transaction",
-                   "myapp.credit_card_txn"}
+                   "myapp.credit_card_txn", "cards.current_txn"}
                 ]}
     end
 
@@ -595,7 +599,10 @@ defmodule StatifierBlocks.AssignabilityTest do
 
       assert Assignability.check(palette, document, {"blk_root", "body", 3}, b, %{}) ==
                {:error,
-                [{:type_mismatch, "blk_c", "blk_a", "myapp.credit_card_txn", "myapp.transaction"}]}
+                [
+                  {:type_mismatch, "blk_c", "blk_a", "myapp.credit_card_txn", "myapp.transaction",
+                   "cards.current_txn"}
+                ]}
     end
 
     # sabotage: remove the `nil -> nil` clause from `vacated_seam_finding/6`'s
@@ -708,7 +715,7 @@ defmodule StatifierBlocks.AssignabilityTest do
                {:error,
                 [
                   {:type_mismatch, "blk_auth_candidate", "blk_STL", "myapp.settled_txn",
-                   "myapp.transaction"}
+                   "myapp.transaction", "cards.current_txn"}
                 ]}
     end
 
@@ -787,7 +794,7 @@ defmodule StatifierBlocks.AssignabilityTest do
                {:error,
                 [
                   {:type_mismatch, "blk_ledger_candidate", "blk_STL", "myapp.settled_txn",
-                   "myapp.card_txn"}
+                   "myapp.card_txn", "cards.current_txn"}
                 ]}
     end
   end
