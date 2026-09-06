@@ -378,6 +378,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `active_marks` | no | the block ids a run has activated; held as editor state, and cleared when the host opens a different document |
     | `invoke_mark` | no | the block a run is calling out to and how the call came back - `{block_id, outcome}`, a bare `block_id` for no answer yet, or `nil` for no call at all |
     | `run` | no | a run to watch over this document: statifier-ui's `StatifierUI.Live.State`, live or persisted, or `nil` (the default) for no run. It seats the canvas in a run pane, decides the marks outright while it is there, and puts the run's held values beside the declared ones in the Datamodel tab. Held as editor state behind the same guard the marks use, and cleared when the host opens a different document |
+    | `run_session` | no | the live session the Run pane's send control puts events into: a `Statifier.Session.server()`, or `nil` (the default) for none. Held as editor state behind the same guard `run` uses, and cleared when the host opens a different document |
     | `theme` | no | `--sb-*` custom properties for the canvas root |
     | `fit` | no | the fit the editor **opens** in: `:manual` (the default), `:width` or `:active`; the first measurement performs it once, and an unknown value is refused into `:manual` |
     | `fixtures` | no | `%{block_id => [TruthTable.t()]}`, read by both the drawer's truth-table tab and, as of `sb-4yze`, its Fixtures tab (`refresh_fixture_runs/1` drives each row through the compiled chart), and, as of `sb-e30x`, by the inspector's config form for the fixture hint beside an `:expression` control, and, as of `sb-0l36`, by the inspector's own Fixtures tab, which shows the selected block's runs out of the same result; `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
@@ -466,6 +467,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          active_ids: MapSet.new(),
          invoking: nil,
          run: nil,
+         run_session: nil,
          run_provenance: nil,
          run_provenance_key: nil,
          drag: nil,
@@ -578,7 +580,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           socket
         end
 
-      socket = put_run(socket, assigns)
+      socket = socket |> put_run(assigns) |> put_run_session(assigns)
 
       socket =
         if Map.has_key?(assigns, :history_limit) and socket.assigns.history.undo == [] do
@@ -663,6 +665,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:outcome_candidates, chart_outcome_candidates(assigns))
         |> assign(:capture_pairs, capture_pairs(assigns))
         |> assign(:capture_sources, capture_sources(assigns))
+        |> assign(:run_events, run_events(assigns))
+        |> assign(:run_sendable?, run_sendable?(assigns))
         |> assign(:declaration_refusal, declaration_refusal(assigns))
         |> assign(:marks, marks(assigns))
         |> assign(:fit_target, fit_target(assigns))
@@ -721,7 +725,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               target={@myself}
             />
 
-            <RunPane.run_pane id={"#{@id}-run"} state={@run} target={@myself}>
+            <RunPane.run_pane
+              id={"#{@id}-run"}
+              state={@run}
+              target={@myself}
+              events={@run_events}
+              sendable?={@run_sendable?}
+            >
               <Canvas.canvas
                 root={@view_model.root}
                 drag={@drag}
@@ -880,6 +890,29 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           {:noreply, socket}
       end
     end
+
+    # The Run pane's send control. `render/1`'s assigns do not reach here (see
+    # the `declared_view` comment above), so the palette and the enabled rule
+    # are re-derived from `socket.assigns` rather than read off it. A no-op
+    # when the run cannot be sent to, when `event` names no entry in the
+    # palette, or when the send-injection module does not resolve - in every
+    # case the socket comes back unchanged, because this handler never writes
+    # to the document.
+    def handle_event("run-send", %{"event" => event}, socket) do
+      assigns = socket.assigns
+
+      with true <- run_sendable?(assigns),
+           entry when entry != nil <- Enum.find(run_events(assigns), &(&1.name == event)),
+           injection_module when not is_nil(injection_module) <- event_injection_module() do
+        injection_module.send_draft(assigns.run_session, entry.name, entry.payload_text)
+      else
+        _not_sendable -> :ok
+      end
+
+      {:noreply, socket}
+    end
+
+    def handle_event("run-send", _params, socket), do: {:noreply, socket}
 
     def handle_event("measure", params, socket) do
       {:noreply,
@@ -1540,6 +1573,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             # by the document that is being swapped out, so the marks it
             # yields would name blocks the new document does not have.
             run: nil,
+            run_session: nil,
             run_provenance: nil,
             run_provenance_key: nil
           )
@@ -1933,6 +1967,80 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # The Run pane's send palette: the selected block's type's `fixtures/0`
+    # events map, taken verbatim (ADR-0011 decision 10's Note - the names are
+    # examples, not the block's configured `event`) and carried through
+    # statifier-ui's own pane model so the entries this package renders are
+    # exactly the ones `StatifierUI.EventInjection` would offer.
+    #
+    # Unlike `capture_sources/1` this reads whatever block is selected, not
+    # only an on_event handler - an await is as good a source of fixture
+    # events as a handler is, and the palette rule does not care which kind
+    # of block declared the sample.
+    #
+    # `Entry` values are flattened to plain `%{name:, payload_text:}` maps so
+    # nothing downstream of `render/1` names a statifier-ui struct - the same
+    # posture `capture_sources/1` already takes with `payload_paths/1`.
+    @spec run_events(map()) :: [%{name: String.t(), payload_text: String.t()}]
+    defp run_events(%{selected_node: %ViewModel.Node{block_id: block_id}} = assigns) do
+      with %Block{} = block <- block_by_id(assigns.document, block_id),
+           {:ok, module, _resolved} <- Palette.resolve(assigns.palette, block),
+           fixtures_module when not is_nil(fixtures_module) <- fixtures_module(),
+           events = fixture_events(module),
+           true <- map_size(events) > 0,
+           {:ok, fixtures} <- fixtures_module.new(events: events),
+           injection_module when not is_nil(injection_module) <- event_injection_module(),
+           {:ok, pane} <- injection_module.build(fixtures) do
+        pane
+        |> injection_module.entries()
+        |> Enum.map(&%{name: &1.name, payload_text: &1.payload_text})
+      else
+        _unresolvable -> []
+      end
+    end
+
+    defp run_events(_no_selection), do: []
+
+    # Enabled only when a session was supplied AND the run reads as live -
+    # `stats == nil` is statifier-ui's own persisted signal
+    # (`StatifierUI.Live`'s `status_kind/1`). `Map.get/3` rather than a struct
+    # match against `StatifierUI.Live.State`, the same discipline
+    # `StatifierBlocks.Runtime.Selection` uses, so this compiles in a tree with
+    # no statifier-ui at all.
+    @spec run_sendable?(map()) :: boolean()
+    defp run_sendable?(assigns) do
+      assigns.run_session != nil and assigns.run != nil and Map.get(assigns.run, :stats) != nil
+    end
+
+    # The two statifier-ui modules this bead reaches into, resolved exactly
+    # the way `RunPane`'s `component/1` resolves `:run_pane_module` and
+    # `Runtime.Selection` resolves `:trace_inspector_module`: a module out of
+    # application config, guarded with `Code.ensure_loaded?/1` and
+    # `function_exported?/3`, never a compile-time alias.
+    @spec fixtures_module() :: module() | nil
+    defp fixtures_module do
+      module = Application.get_env(:statifier_blocks, :fixtures_module, StatifierUI.Fixtures)
+
+      if Code.ensure_loaded?(module) and function_exported?(module, :new, 1) do
+        module
+      end
+    end
+
+    @spec event_injection_module() :: module() | nil
+    defp event_injection_module do
+      module =
+        Application.get_env(
+          :statifier_blocks,
+          :event_injection_module,
+          StatifierUI.EventInjection
+        )
+
+      if Code.ensure_loaded?(module) and function_exported?(module, :build, 1) and
+           function_exported?(module, :entries, 1) and function_exported?(module, :send_draft, 3) do
+        module
+      end
+    end
+
     # The payload the configured event name declares, or - when the config
     # names no event, or names one the bundle has no sample for - every
     # payload the bundle carries. A handler whose event is still empty is
@@ -2241,6 +2349,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp put_run(socket, assigns) do
       if Map.has_key?(assigns, :run) do
         assign(socket, :run, assigns.run)
+      else
+        socket
+      end
+    end
+
+    # `run_session` is the host's input the same way `run` is: a `send_update`
+    # that says nothing about it must leave whatever session is seated alone,
+    # which is why this checks `Map.has_key?/2` rather than reading a default.
+    @spec put_run_session(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
+    defp put_run_session(socket, assigns) do
+      if Map.has_key?(assigns, :run_session) do
+        assign(socket, :run_session, assigns.run_session)
       else
         socket
       end
