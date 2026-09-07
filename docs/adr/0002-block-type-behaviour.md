@@ -6728,3 +6728,576 @@ left in the abstract because it is the smallest composite that has the problem.
 - **The `Collapse` operation**: a later record's, and no code in this campaign.
 
 Filed with `sb-2gdx`, campaign SF037, folding `sb-3ejc`.
+
+## Amendment (2026-09-07): decisions 1-4, a palette entry may be `{module, state}`, resolved through one call seam, and `Composite.Data` is the stateful composite
+
+**Status: proposed (2026-09-07, campaign SF037, bead `sb-5b7j`, on ruling
+`RQ-SF037-1`).** A decision record merges at proposed under campaign SF037's
+invariant. This section's status line flips to accepted by `sb-v3ny` **only if
+`sb-5xqr` lands in SF037**; if that request does not land, this section stays
+at proposed and `sb-v3ny` records that fact as a dated note instead of flipping
+it. Additive: decisions 1 (`:58-63`), 2 (`:65-70`), 3 (`:86-88`), 4 (`:97-107`)
+and 5 (`:109`), the composite amendment immediately above this line, and every
+other clause in this file stand exactly as written, and no text above this line
+is edited by this section.
+
+It is appended at the **end of this file**, after the `use
+StatifierBlocks.Composite` amendment it builds on, for the reason that
+amendment gives about itself: other records on `main` cite this one by line
+number, and an insert above any of them would leave those citations pointing at
+the wrong text.
+
+Every code cite below is a reading of `main` at `d0af5f0`, dated to this
+section and to be re-read rather than trusted. The counts in the census are a
+re-count at that commit; where an earlier count differs, this section's number
+is the one to work from and the anchor beside it - a function head, not a line
+number alone - is how to find the site after the line has moved.
+
+### The question this section answers, and where decision 4 left it open
+
+Decision 4 (`:103-107`) already says what a block type does when it needs
+external data at authoring time: the host "resolv[es] it *before* the operation
+and pass[es] it in the palette entry's own options, not by the callback
+reaching for it", and then says in as many words that "that mechanism is not
+specified here". This section specifies it, for the one case that forces it.
+
+The forcing case is a host whose **users** save composites. The amendment above
+derives a composite block type from a `params` list and a `subtree/1` function
+written at compile time in a `use` block. A host that lets a tenant build a
+composite in a browser has no compile step in that loop: what the tenant saved
+is a row, and what the palette must carry is that row. The subtree is data, the
+params are data, and the block type has to be assembled from them at the moment
+the host builds the palette for an operation - which is exactly decision 2's
+cadence (`:80-84`), one palette value per editing or compiling operation.
+
+### The entry shape
+
+**`Palette.types` admits `module()` or `{module(), state}`.** One type name
+still resolves to one entry; the entry may now carry a term beside the module.
+
+    @type type_ref :: module() | {module(), state :: term()}
+
+    types: %{optional(Block.type_name()) => type_ref()}
+
+`state` is an opaque term to `Palette`: this record fixes that it is *carried*
+and *prepended*, and fixes nothing about its shape. `Composite.Data` below is
+the one module in this package that declares a shape for its own, and a host's
+stateful type declares its own.
+
+**`fetch/2` answers the entry as stored.** Its return widens from `{:ok,
+module()}` to `{:ok, type_ref()}`, and it neither normalizes a bare module into
+`{module, nil}` nor unwraps a pair into its module. Decision 3's totality
+(`:86-88`) and its `{:error, {:unknown_block_type, type_name}}` arm - the one
+error arm decision 3 names, and the only one `fetch/2` has
+(`palette.ex:405-407`) - are untouched. `resolve/2` widens the same way, to
+`{:ok, type_ref(), Block.t()}`, and its three error arms (`palette.ex:517-521`)
+are untouched too.
+
+Answering the entry as stored rather than normalizing is what keeps this change
+**source-compatible for every host that has one today**: a host matching `{:ok,
+module}` on `fetch/2` still matches, because a host that registered no stateful
+entry can be handed no pair. The widening is visible only to a host that opted
+into it by registering one. A normalizing `fetch/2` would have broken every
+such match at once, for the benefit of a case most palettes do not have.
+
+**`registration/0` widens with it**, to `{Block.type_name(), type_ref()}`, so
+`from_modules/2` (`palette.ex:311`) takes a stateful entry in the ordered list
+a host already writes.
+
+**There is still no `:kind` key on a palette entry**, and none is added here.
+The amendment above records why (`Palette` keeps types and recipes in two maps,
+`palette.ex:70-75`, for the reason `:90-92` gives); a pair is not a kind tag,
+it is one entry that carries a term.
+
+### `Palette.call/4` is the one call seam
+
+    @spec call(type_ref(), atom(), [term()], term()) :: term()
+    Palette.call(type_ref, callback, args, default)
+
+`call/4` resolves the entry, decides whether the callback is there, and calls
+it: for a bare `module` entry it calls `module.callback(args...)`; for a
+`{module, state}` entry it calls `module.callback(state, args...)`, with
+`state` **prepended** to the declared argument list. When the callback is not
+exported at the arity the entry implies, `call/4` answers `default`.
+
+Three things belong to the seam and to nothing else, and they are why it is one
+function rather than a convention:
+
+1. **The arity arithmetic.** A callback declared at arity *n* is exported at
+   arity *n + 1* by a stateful module. Every `function_exported?/3` in the
+   package asks about a fixed arity today; asking about the wrong one would
+   silently answer "not declared" and degrade a stateful type into the absent-
+   callback path, which looks exactly like a type that declared nothing.
+2. **The absent-callback default**, which is why the seam takes four arguments
+   and not three. Nine of the fourteen callbacks are optional, and every call
+   site in the package today is written as a probe followed by a fallback -
+   `%{}` for an absent `io/1` (`assignability.ex:166-172`), the default
+   outcomes for an absent `outcomes/1` (`block_type.ex:855-861`), the type's
+   label for an absent `sentence/1` (`block_type.ex:1559-1566`). Folding the
+   probe and its fallback into the seam is what makes the arity arithmetic
+   unrepeatable, because there is no longer a probe outside the seam to get
+   wrong.
+3. **The `state`-prepending itself**, which is the whole of what a caller must
+   not know.
+
+For one of the five **required** callbacks the default is unreachable - a
+module that does not export `emit/2` is not a block type at all - and a caller
+passes a value whose appearance would be a bug rather than a degradation. The
+seam does not distinguish the two cases; the behaviour's required list already
+does.
+
+`Palette.declares?/3` answers the same question without calling, for the two
+sites that need declaredness alone rather than a value:
+`ViewModel.declares_sentence?/1` (`view_model.ex:1984`) and the editor's
+`declares_outcomes?/1` (`editor.ex:2755`). Both feed a *presentation* branch
+rather than a fallback value - ADR-0005's three-way chain reads the first, and
+the second decides whether a card draws an outcome row at all - so neither can
+be expressed as `call/4` with a default. It is one predicate, not a second
+seam: `call/4` is written in terms of it.
+
+**The seam is a generalization, not an invention.** `StatifierBlocks.BlockType`
+already wraps six of the fourteen callbacks in exactly this shape - **probe,
+call, fall back** - in `outcomes/2` (`block_type.ex:855-861`),
+`failure_outcomes/2` (`:901-907`), `donedata_type/2` (`:936-942`),
+`sentence/2` (`:1560-1566`), the private `declared_chips/2` (`:1795-1802`)
+and the private `label/1` (`:1866-1875`). Those six become the seam's **first
+callers**: they keep their signatures with `module()` widened to `type_ref()`,
+and their bodies lose the probe to `call/4`. They do not become a second seam.
+
+**The rescue is not part of that shape, and it stays where it is.** Four of the
+six - `outcomes/2`, `failure_outcomes/2`, `donedata_type/2` and `label/1` -
+carry no rescue at all; the two that reach one reach it a level down, in
+`call_sentence/2` (`:1838-1846`) and `call_summary/2` (`:1809-1816`). That
+asymmetry is deliberate and this section does not disturb it: a rescue is B3's
+degradation, about a *callback* that raises, while the seam is about how an
+entry is reached. Folding a rescue into `call/4` would quietly give one to
+every site that today has none.
+
+**What the seam does not do.** It does not rescue on behalf of a site that does
+not rescue today, it does not memoize, and it does not change any callback's
+declared arity in the behaviour. `StatifierBlocks.BlockType`'s `@callback`
+list is untouched by this section: fourteen callbacks, five required, declared
+at the arities the amendment above tabulates. A stateful module implements them
+at one higher arity because `use StatifierBlocks.Composite.Data`'s generated
+functions take the state; the *behaviour* is unchanged, which is why a stateful
+module does not `@behaviour StatifierBlocks.BlockType` and why nothing in the
+package may reach one except through the seam.
+
+### The census: every site that goes through the seam
+
+A site is in the census when it calls a callback on a module a palette resolved
+- `module.callback(...)` where `module` came from `Palette.fetch/2`,
+`Palette.resolve/2`, or a `types` map read. Counted at `d0af5f0`: **38 call
+sites in 12 files**, and **17 declaredness probes in 6 files**, of which 15
+guard one of those 38 in the same expression and 2 stand alone.
+
+| File | Call sites | Anchors (function head, line at `d0af5f0`) |
+|---|---|---|
+| `lib/statifier_blocks/block_type.ex` | 7 | `outcomes/2` `:857`, `failure_outcomes/2` `:903`, `donedata_type/2` `:938`, `type_expr_findings/2` `:1096`, `call_summary/2` `:1810`, `call_sentence/2` `:1839`, `label/1` `:1868` |
+| `lib/statifier_blocks/compiler.ex` | 6 | `resolve_children/3` `:505`, `config_findings/2` `:704`, `declaration_findings/2` `:767`, `emit/2` `:1432`, `candidate_findings/2` `:2172`, `entries/1` `:2278` |
+| `lib/statifier_blocks/palette.ex` | 6 | `manifest/1` `:225`, `ordered_entry/1` `:368`, `new_block/2` `:452` and `:455`, `resolve/2` `:524`, `migrate/3` `:542` |
+| `lib/statifier_blocks/view_model.ex` | 6 | `head_of_root/2` `:1416`, `chip_label/2` `:1505`, `config_findings/3` `:1642`, `build_resolved_node/4` `:1691` and `:1701`, `palette_entry_with_defaults/2` `:2146` |
+| `lib/statifier_blocks/editor.ex` | 3 | `entry_default_config/1` `:1867`, `fixture_events/1` `:2570`, `draft_findings/3` `:3193` |
+| `lib/statifier_blocks/environment.ex` | 3 | `subject_of/1` `:1031`, `io/2` `:1130`, `schema/2` `:1139` |
+| `lib/statifier_blocks/assignability.ex` | 2 | `io/2` `:169`, `target_verdicts/4` `:783` |
+| `lib/statifier_blocks/slot_validation.ex` | 1 | `block_findings/2` `:80` |
+| `lib/statifier_blocks/edit.ex` | 1 | `check_config/3` `:271` |
+| `lib/statifier_blocks/edit/targets.ex` | 1 | `full?/4` `:297` |
+| `lib/statifier_blocks/datamodel.ex` | 1 | `block_findings/5` `:818` |
+| `lib/statifier_blocks/core/deadline_recipe.ex` | 1 | `config/2` `:228` |
+| **Total** | **38** | **12 files** |
+
+The 17 probes sit in `block_type.ex` (6: `:856`, `:902`, `:937`, `:1561`,
+`:1796`, `:1867`), `environment.ex` (3: `:1030`, `:1129`, `:1138`), `editor.ex`
+(3: `:1866`, `:2569`, `:2755`), `view_model.ex` (2: `:1984`, `:2145`),
+`palette.ex` (2: `:367`, `:541`) and `assignability.ex` (1: `:168`).
+
+Two counts that are **not** the census, named because both are easy to reach
+for and both are wrong:
+
+- **The literal `palette.types` and `Palette.fetch(` reads outside
+  `palette.ex`** are six, not thirty-eight: `Editor.probe/2`
+  (`editor.ex:1854`), `Editor.draft_findings/3` (`:3192`),
+  `Editor.accepted_types/3` (`:3214`), `ViewModel.singleton_specs/2`
+  (`view_model.ex:1339`), `ViewModel.palette_groups/1` (`:2175`) and
+  `Composite.member_module/1` (`composite.ex:598-603`), plus one `recipes`
+  read in `Editor.accepted_recipes/2` (`editor.ex:3247`). The last of those
+  fetches from `Palette.core()` rather than the caller's palette, so it can
+  meet no stateful entry today; it is listed because it is the same read and
+  will meet one the moment it is passed a host palette. Those are
+  the sites that must stop assuming a `types` value is a module; they are a
+  subset of the problem, and a request that fixed only them would leave 38
+  call sites still calling a bare module.
+- **`RunPane.component/1` (`editor/run_pane.ex:191-196`) is not in the census.**
+  Its `apply(module, name, [&1])` looks like a callback dispatch and is not one:
+  the module it applies comes from `Application.get_env(:statifier_blocks,
+  :run_pane_module, StatifierUI.Live)`, not from a palette, and the functions
+  it probes are LiveView components rather than block-type callbacks. It stays
+  as it is.
+
+**A site outside this package is out of scope and stays source-compatible**
+for the reason `fetch/2`'s clause gives: a host that registered no stateful
+entry is handed none.
+
+### The expansion's own dispatches, now that `Composite` is code
+
+`sb-xio9` landed `use StatifierBlocks.Composite` on `main`
+(`lib/statifier_blocks/composite.ex`, `d0af5f0`) while this section was
+being written, so `Composite.expand/2` is code rather than a proposal and
+this section can say what a stateful entry costs it instead of guessing.
+
+`expand/2` is declared `@spec expand(Block.t(), module())` with an
+`is_atom(module)` guard (`composite.ex:368-369`); `composite?/1` is
+`is_atom(module)` plus `function_exported?(module, :__composite__, 0)`
+(`:341-346`); the declaration is read back through a `__composite__/0` the
+macro generates (`:224-225`) at three sites - `recipe_insert/3` (`:455`),
+`params_of/2` (`:494`) and `probe_block/2` (`:501`) - and `subtree/1` is
+called directly at `:378`.
+
+Three consequences follow from the entry shape and from nothing else:
+
+1. **`expand/2`'s second argument widens to `type_ref()`**, and its
+   `is_atom/1` guard becomes the seam's question rather than the caller's.
+   It is still the ONE expansion function - `Composite.expand/2`, unrenamed
+   and unforked - reached with an entry instead of a bare module.
+2. **`__composite__/0` and `subtree/1` are seam calls like any other**, at
+   one higher arity for a stateful entry:
+   `Palette.call(ref, :__composite__, [], nil)` and
+   `Palette.call(ref, :subtree, [params], nil)`. They are **not**
+   `StatifierBlocks.BlockType` callbacks, so they are not in the census
+   above and the count of 38 does not move; they are in the seam for the
+   census's reason, and the implementing request carries them with it.
+3. **For `Composite.Data` both answers are the state.**
+   `__composite__/0` reads a module attribute the macro wrote at compile
+   time, and `Composite.Data` has no such attribute to read: its
+   declaration arrives at run time. So its `__composite__(state)` answers
+   the decoded `state`, and its `subtree(state, params)` answers the
+   template with its placeholders substituted. That is the whole reason the
+   declaration **is** the state rather than a pointer to one.
+
+### Where a stateful entry is still visible, and why that is right
+
+The seam makes a stateful entry invisible to a *caller of a callback*. It does
+not make it invisible to the places that ask about **identity** rather than
+behaviour, and this section decides those explicitly rather than leaving them
+to be discovered.
+
+**`Palette.manifest/1` (`:224-229`) and the compiler's `palette_hash/1`
+(`compiler.ex:2261-2273`) need no new arm.** The manifest's type entries are
+`{name, current_version()}` and carry no module at all; the hash's triples are
+`{type_name, module, current_version}`, and for every data composite the module
+element is the same one. So both distinguish two data composites **by type name
+and version**, and neither distinguishes two *revisions of one declaration
+registered under one name at one version*.
+
+That is not a gap this section closes, because the record that owns it already
+answers it. `StatifierBlocks.CompilationRecord` states that `palette_hash` "is
+a hygiene aid, not a commitment", that it is "**not** a cryptographic
+commitment to those modules' behaviour", and that "a host that changes an
+`emit/2` without bumping `current_version/0` has moved a compile input without
+moving the record; that is a palette-hygiene obligation on the host"
+(`lib/statifier_blocks/compilation_record.ex:40-51`). An edited declaration is
+that same obligation with a different author. What this section adds is to name
+who now carries it: **the declaration's `"version"` is required, and a host that
+changes a data composite's `params` or `subtree` bumps it.** A host whose users
+edit composites has more occasions to forget than a host whose developers do,
+which is exactly why the obligation is written down beside the shape rather
+than left in the other record.
+
+**`from_modules/2`'s duplicate-`order` check (`palette.ex:343-373`) needs no
+new arm either**, and for a better reason: it compares the `group` and `order`
+a `palette_entry/0` returns, so once it reads them through the seam, two data
+composites sharing one module are two entries with two answers, and a
+collision between them is caught exactly like a collision between two ordinary
+types.
+
+It does need the seam, though, and this is the one site where forgetting it
+would fail **silently** rather than loudly. `ordered_entry/1` opens with
+`is_atom(module) and Code.ensure_loaded?(module)` (`palette.ex:365`), and its
+`else` arm is `_no_declared_order -> []`. A `{module, state}` entry fails
+`is_atom/1`, so a stateful entry left to that guard does not raise and does not
+warn: it drops out of the duplicate-order check and out of every ordering
+question downstream of it. That guard is the seam's work, not the caller's, and
+the implementing request has a test for it.
+
+### `StatifierBlocks.Composite.Data` and its `state`
+
+**`Composite.Data` is the only stateful module this package ships.** It is the
+data-driven half of the amendment above: `use StatifierBlocks.Composite`
+derives a block type from a declaration written in Elixir at compile time;
+`Composite.Data` derives the same block type from the same declaration written
+as **data** at run time. Everything the amendment above decides about a
+composite holds here unchanged - `slots/1` is `[]` (`RQ-SF037-3`),
+`config_schema/1` is `params`, `emit/2` raises, the expansion root is the
+subtree's head, ids are minted deterministically from the composite block's id,
+and `Composite.expand/2` is the one expansion function. A data composite is
+expanded by the *same* `Composite.expand/2` over the *same* subtree, which is
+why it answers the environment walk the same way: `RQ-SF037-15` was ruled on
+2026-09-07 - the walk computes a composite's read and write
+signatures at its one position through `Environment.read_signatures/3` and
+`write_signatures/3` fed with `expand/2`'s subtree and the expanded config, no
+descent, no new `type_expr` arm and no fifteenth callback - and that ruling
+covers a data composite without a clause of its own.
+
+Its `state` is a **declaration map**, JSON-shaped throughout, because the point
+of it is that a host can store it in a column and hand it back:
+
+| Key | Required | Shape |
+|---|---|---|
+| `"type_name"` | yes | the name the document uses, and the key this entry is registered under |
+| `"version"` | yes | a positive integer; `current_version/0` returns it |
+| `"params"` | yes | a list of field declarations, JSON-shaped (below) |
+| `"subtree"` | yes | a non-empty list of template nodes (below); the head is the expansion root |
+| `"palette_entry"` | no | the map `palette_entry/0` returns, with string keys |
+| `"sentence"` | no | a template string; `{{key}}` is replaced by the param's value rendered as a string |
+
+**Two of the three overridables have a key here; the third cannot.** The
+amendment above lets a `use`-composite declaration override `sentence/1`,
+`palette_entry/0` and `validate_config/1`, and no others. The first two are
+values, so they are the `"sentence"` and `"palette_entry"` keys above. The
+third is a **function**, and a declaration held as data cannot hold one - the
+same ground this section gives for the subtree being a template rather than a
+`subtree/1`. So a data composite gets `validate_config/1` as `params` alone
+refuse it, and a cross-param refusal is one of the two things a host must
+still write a `use`-composite module for (the other being a `sentence` that
+is not a substitution). That is a cost of the data shape, not an oversight,
+and a later record that wants it will need a declared refusal vocabulary
+rather than a key.
+
+**`"params"` is decision 7's `field_decl()` in JSON.** Each entry is a map with
+string keys: `"key"`, `"type"` (the field type's name as a string), `"label"`,
+and whichever of `"required?"`, `"default"`, `"value_path"`,
+`"datamodel_path?"`, `"sensitive?"`, `"hidden?"` and `"readonly?"` the
+declaration writes. No new key and no new field type is introduced here, and
+every refusal decision 7 and its amendments state applies to a param
+unchanged - including F3's missing-`default:` refusal and F4's `nil`-is-not-an-
+empty-hidden-default clause. `Composite.Data` **decodes** this list into
+decision 7 `field_decl()` maps once, when the entry is built, and
+`config_schema/1` returns the decoded list; it is not decoded per call, because
+decision 4 makes `config_schema/1` pure and a decode that could fail on the
+hot path is a callback that can fail.
+
+**Every refusal is at entry-build time, not at call time.** A host builds the
+state through `Composite.Data.declaration/1`, which answers `{:ok, state}` or
+`{:error, [reason]}`, and registers `{module, state}` only on the `:ok`. That
+placement is forced by decision 4 and by decision 3 together: a callback must
+be pure and total, and `fetch/2` must not raise, so the last moment a malformed
+declaration can be refused is before it is in the palette. `declaration/1` is
+not new surface in `RQ-SF035-17`'s sense - it is the function this section's own
+decision forces, and without it there is no moment at which a declaration can
+be refused at all.
+
+### The subtree template's data shape
+
+A template node is a map with string keys:
+
+    %{
+      "type"      => "core.invoke",
+      "id_suffix" => "call",
+      "config"    => %{"invoke_type" => %{"$param" => "invoke_type"},
+                       "assign_to"   => ""},
+      "slots"     => %{"on_error" => [ ...nodes... ]}
+    }
+
+- **`"type"`** is a `type_name` resolvable in the same palette. It is not
+  checked at declaration time - the palette is not built yet - and an
+  unresolvable one is the compiler's ordinary unknown-block-type arm on the
+  expanded block, which decision 3 already makes total.
+- **`"id_suffix"`** matches `~r/\A[a-z0-9]+(_[a-z0-9]+)*\z/` and is unique
+  within one declaration. The minted id is the composite block's own id, an
+  underscore, and the suffix - so the "Guarded step" example's `blk_GS` mints
+  `blk_GS_call`. That pattern is what discharges the amendment above's two
+  acceptance properties: it can produce no `__`, so `ADR-0004` decision 3's
+  uniqueness argument - "a `blk_`-prefixed UXID contains no `__`, and roles
+  cannot contain `__`" (`docs/adr/0004-compiler-provenance.md:147-149`) - and
+  the `unstate_id/1` invertibility it buys both hold; and it is injective
+  per composite, so document-uniqueness is inherited from the composite
+  block's id.
+- **`"config"`** is a map of the type's config keys to JSON values.
+- **`"slots"`** is optional, defaulting to `%{}`: a slot name to a list of
+  nodes.
+
+**The placeholder vocabulary is one arm, and one escape.** A map with exactly
+the single key `"$param"`, whose value is a declared param key, is a
+placeholder: it is replaced **whole** by that param's value, at that param's
+declared type, so a `:boolean` param substitutes a boolean and not the string
+`"true"`. A map with exactly the single key `"$literal"` is its value,
+unsubstituted - the escape that keeps a config value which genuinely is a
+one-key `"$param"` map expressible. Every other JSON value is a literal,
+including every other map. A `"$param"` naming an undeclared key is refused by
+`declaration/1`.
+
+**Whole-value substitution is the whole vocabulary, and that is a decision, not
+an omission.** There is no interpolation of a param into a larger string, no
+expression, no conditional, and no default-if-blank. The reason is
+`Collapse`. `ADR-0005`'s amendment of this date states the gesture at
+proposed (`docs/adr/0005-liveview-editor.md:8692-8710`) and hands this
+record the shape it produces: the author "marks which of the arrangement's
+config values become params, and the subtree becomes the declaration's
+template with those values replaced by the params that stand for them", and
+the output is "a declaration in the shape `ADR-0002`'s data-composite
+amendment fixes". A lifted config value is a **whole** value, so whole-value
+substitution is exactly what that gesture can emit and the arm it needs. A
+template arm `Collapse` cannot emit is a shape with no producer in this
+package - it would exist only for a declaration written by hand, in a feature
+whose whole point is declarations that were not. A host that needs
+`"prefix-" <> param` writes two params, or waits for the record that adds an
+arm and says which producer emits it.
+
+**`param_map` for a data composite is derived, not declared.** The amendment
+above defines `expand/2`'s `param_map` as expanded-block-id to param key or
+`nil`. For `Composite.Data`: a node is attributed to param key *K* when the
+placeholders in **its own `"config"`**, not its slots' children, name exactly
+one distinct param, and to `nil` when they name none or more than one. That is
+what makes `RQ-SF037-5`'s attribution mechanical for a declaration nobody
+wrote by hand.
+
+### Per-instance module generation is rejected
+
+The obvious alternative is to keep `types` as `name => module` and generate a
+module per saved composite - `Module.create/3` over the declaration, registered
+under a minted name. It is rejected, on four grounds, each of which is an
+existing decision of this record rather than a taste:
+
+1. **It mints atoms a tenant controls.** A module name is an atom and the atom
+   table is never collected. A feature whose whole premise is that users save
+   composites turns every save into a permanent allocation in a VM that has no
+   way to reclaim it. That is a denial of service with the tenant holding the
+   trigger.
+2. **A generated module is not a value, and decision 2 requires one**
+   (`:65-70`). A palette is "a caller-supplied value, not global state" with
+   "no `Application` env lookup, no named ETS table, no process registry, and
+   no 'register at boot' side effect". The code server is exactly such a
+   registry: two palettes that differ would agree about a generated module,
+   because there is only one code server and the last writer wins.
+3. **It breaks decision 2's multi-tenant ground** (`:76-78`): "a value lets a
+   multi-tenant host hold different palettes for different tenants in one VM".
+   Two tenants who name a composite the same thing collide on one module name,
+   and the repair - a tenant id inside the module name - is the state, moved
+   into a global namespace and made irreversible.
+4. **It weakens decision 3's totality** (`:86-88`). `fetch/2` returning `{:ok,
+   module}` means the caller has a module it can call. A generated module can
+   be purged out from under an operation that is already running, so the same
+   `{:ok, module}` would no longer carry that meaning, and the failure would
+   arrive as a raise inside a callback rather than as decision 3's
+   `{:unknown_block_type, ...}` arm or one of `resolve/2`'s other two.
+
+The cost of the chosen shape is real and is stated rather than hidden: every
+callback call in the package pays one extra function call, a stack trace from
+inside a host callback now shows `Palette.call/4` between the caller and the
+callback, and a static reader can no longer see which module a given site
+dispatches to. Those are the price of one seam, and they are paid once at the
+seam rather than 38 times at the sites.
+
+### Worked example: "Guarded step", saved by a tenant
+
+A tenant in the card-processing domain builds a composite in the host's
+editor: call out, and record the failure if the call comes back on the error
+path. It is the amendment above's "Guarded step", arriving as a row instead of
+as a `use` block - the same subtree, the same two params, and a different
+place for the declaration to have come from. That is the point of the example:
+nothing downstream of the palette can tell which one it got.
+
+**What the host stores and hands back**, as the `state` of one palette entry:
+
+    %{
+      "type_name" => "myapp.guarded_step",
+      "version"   => 1,
+      "sentence"  => "Call {{invoke_type}}, recording failure at {{failure_path}}",
+      "params" => [
+        %{"key" => "invoke_type", "type" => "string", "label" => "Call",
+          "required?" => true, "default" => ""},
+        %{"key" => "failure_path", "type" => "string", "label" => "Record the failure at",
+          "required?" => true, "default" => "", "datamodel_path?" => true}
+      ],
+      "subtree" => [
+        %{"type" => "core.invoke", "id_suffix" => "call",
+          "config" => %{"invoke_type" => %{"$param" => "invoke_type"},
+                        "assign_to" => ""},
+          "slots" => %{"on_error" => [
+            %{"type" => "core.assign", "id_suffix" => "guard",
+              "config" => %{"path"  => %{"$param" => "failure_path"},
+                            "value" => "failed"}}
+          ]}}
+      ]
+    }
+
+**What the host registers.**
+
+    Palette.from_modules(
+      [{"myapp.guarded_step", {StatifierBlocks.Composite.Data, state}}],
+      []
+    )
+
+after `{:ok, state} = Composite.Data.declaration(row)`.
+
+**What a caller sees.** For a composite block `blk_AD` whose config is
+`%{"invoke_type" => "myapp:authorize", "failure_path" => "cards.authorization.failure"}`:
+
+| The call site | What it writes today | What it writes through the seam | Answer |
+|---|---|---|---|
+| `ViewModel.build_resolved_node/4` (`:1701`) | `module.config_schema(config)` | `Palette.call(ref, :config_schema, [config], [])` | the two params |
+| `ViewModel.build_resolved_node/4` (`:1691`) | `module.slots(config)` | `Palette.call(ref, :slots, [config], [])` | `[]` (`RQ-SF037-3`) |
+| `BlockType.call_sentence/2` (`:1839`) | `module.sentence(config)` | `Palette.call(ref, :sentence, [config], nil)` | "Call myapp:authorize, recording failure at cards.authorization.failure" |
+| `Compiler.entries/1` (`:2278`) | `module.current_version()` | `Palette.call(ref, :current_version, [], 1)` | `1`, the declaration's |
+| `Compiler.emit/2` (`:1432`) | `module.emit(block, context)` | `Palette.call(ref, :emit, [block, context], :never)` | never reached - `blk_AD` does not survive Resolve |
+
+Not one of those five sites knows the entry is a pair, and none of them is a
+composite-aware site: they are the same lines that answer for `core.assign`.
+That is the property this section exists to buy.
+
+**What the expansion is.** `Composite.expand/2` over `blk_AD` returns the two
+blocks the amendment above's "Guarded step" returns, with `blk_AD_call` and
+`blk_AD_guard` as their minted ids, and a `param_map` of `%{"blk_AD_call" =>
+"invoke_type", "blk_AD_guard" => "failure_path"}` - each node's own `"config"`
+names exactly one param, so neither is `nil` here. `core.invoke` declares
+`invoke_type` and `assign_to` among its config keys
+(`lib/statifier_blocks/core/invoke.ex:130-153`) and one `on_error` slot at
+`:zero_or_one` (`:96`); `core.assign` declares `path` and `value`
+(`lib/statifier_blocks/core/assign.ex:64-75`).
+
+**And what the tenant's second save costs, stated with its sharp edge.**
+Editing the declaration and re-registering it at `"version" => 1` moves a
+compile input without moving `palette_hash` - the obligation named above.
+Bumping to `2` moves the manifest entry and the hash, and it also puts every
+stored `blk_AD` at a `type_version` below `current_version/0`, which sends
+`Palette.resolve/2` down `migrate/3`'s third clause (`palette.ex:540-549`).
+`ADR-0007` injects `migrate_config(from, _config), do: {:error,
+{:no_migration_from, from}}` (`block_type.ex:137-138`) and the amendment above
+leaves that injection alone for a composite, so a bump with no migration
+declared refuses every existing block of that type.
+
+That is a real cost and this section does not pretend it away. What it decides
+is only the minimum: `"version"` is **required**, so a declaration always has
+one to bump, and a host that changes `params` or `subtree` has a place to
+record that it did. **How a data composite declares a migration is not decided
+here** - it is the first thing the implementing request will find, and it is
+listed below.
+
+### What this section does not decide
+
+- **A shape for a host's own `state`.** `Composite.Data`'s is fixed here;
+  `Palette` treats every other one as opaque, and a host's stateful type says
+  what its own is.
+- **Whether `Composite.Data` ships in SF037.** `sb-5xqr` is the request that
+  builds it, and it is that campaign's cut line. If it does not land, this
+  section stays at proposed.
+- **How a host persists a declaration.** The shape above is JSON-shaped so that
+  it can be stored; which column, which schema and which migration are the
+  host's, and `ADR-0001`'s document schema is untouched - a document holding a
+  data composite is an ordinary `schema_version` 1 document naming a type by
+  string.
+- **A pass-through slot, a marker on an expanded block, or the `Collapse`
+  operation**: unchanged from the amendment above - `RQ-SF037-3`,
+  `RQ-SF037-2`, and `ADR-0005`'s amendment respectively.
+- **How a data composite declares a migration.** The paragraph above shows why
+  it matters: a declaration is the only thing that can supply one, and this
+  section fixes no key for it. Until that is decided, a host bumping
+  `"version"` on a declaration with stored blocks is choosing a refusal, and
+  the implementing request must not paper over it with a derived
+  `{:ok, config}` - which is exactly the answer `ADR-0007`'s injected refusal
+  exists to refuse.
+- **Any change to the fourteen `@callback`s**: none is added, removed or
+  re-arity'd by this section.
+
+Filed with `sb-5b7j`, campaign SF037. The implementing request is `sb-5xqr`.
