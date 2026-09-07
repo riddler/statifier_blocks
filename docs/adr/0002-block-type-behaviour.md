@@ -5641,18 +5641,31 @@ here.
 
 Filed with `sb-wzoa`, campaign SF035's Lane A.
 
-## Note (2026-09-07): decision 7, `hidden?` and `readonly?`, and the missing-`default:` refusal widened to every field type
+## Amendment (2026-09-07): decision 7, optional `hidden?` and `readonly?` keys, and the missing-`default:` refusal widened to every field type
 
-A dated Note rather than an amendment: decision 7 is unchanged, no line above
-this one is edited, and the closed field-type set gains no member. Two optional
-keys arrive on the field declaration, in the shape the `value_path` amendment of
-2026-08-27 (`:204-215`) and the `datamodel_path?` amendment of 2026-08-29
-(`:1004`) established - a boolean or a list on `field_decl/0`, defaulting to
-today's behaviour when absent, with the editor and the compiler reading it and
-nothing else changing.
+**Status: proposed.** Drafted for `sb-s0jt` under the operator's campaign-SF036
+grant, recording that campaign's ruling `RQ-SF036-3` and the two record
+questions carried on `sb-btx0`, and merging at proposed under that campaign's
+invariant like every other section filed with it; flipping it to accepted is a
+separate gated request, and `sb-xnxw` carries it. Additive: decision 7 and
+every amendment and Note it has taken - `value_path` (2026-08-27),
+`datamodel_path?` (`:1004`), `sensitive?` (`:1187`), the `{:path, opts}`
+amendment at `:2761`, the Note that gave `opts` its first two keys at `:3456`
+and the `{:type_expr, opts}` amendment at `:4957` - all stand exactly as
+written, no text above this line is edited by this section, and the closed
+field-type set gains no member.
 
-Status: **proposed**. It merges at proposed and is flipped by its own gated PR
-after the implementing bead lands.
+It is an amendment rather than a dated Note because it adds two keys to
+`field_decl/0` and widens a compile refusal, which is what decision 7 says
+rather than a reading of it; the `datamodel_path?` section at `:1004` is the
+precedent, and it took the same shape for the same reason - one optional
+boolean on the field declaration, defaulting to today's behaviour when absent,
+with the editor and the compiler reading it and nothing else changing.
+
+It is appended at the **end of this file** rather than beside decision 7, for
+the reason the `{:type_expr, opts}` amendment at `:4957` gives about itself:
+other records on `main` cite this one by line number, and an insert above any
+of them would leave those citations pointing at the wrong text.
 
 ### Context: the key that is informative but not editable has no spelling
 
@@ -5717,7 +5730,7 @@ field that is not rendered has nothing to render as a value.
 
 ### F2. The existing rule: `field_decl/0` already requires `default:`
 
-This is not new and this Note does not change it. `field_decl/0` reads
+This is not new and this section does not change it. `field_decl/0` reads
 `required(:default) => Block.json()` (`block_type.ex:256`): a declaration
 without `default:` has never been a well-formed declaration under this record.
 
@@ -5730,7 +5743,7 @@ comment above it (`:700-707`) says why, and says whose call the rest is:
 > Widening the refusal to all field types is a change to what a block type may
 > declare, which is the record's call and not this stage's.
 
-This Note is that record, and it takes the call.
+This amendment is that record, and it takes the call.
 
 ### F3. The missing-`default:` refusal widens to every field type
 
@@ -5800,7 +5813,7 @@ vocabulary is `:package | :author`. Both refusals above are `:config` findings
 about a **declaration**, which is the block type's text and not the document
 author's, so both are attributed to the party who did not write them.
 
-**This record accepts the misattribution rather than widening the vocabulary or
+**This section accepts the misattribution rather than widening the vocabulary or
 the classifier**, for two reasons. The first is that `fault` answers "who can
 act on this", and in the deployment these records are written for the author of
 a document and the host that declares its block types reach the same operator
@@ -5812,7 +5825,7 @@ failure mode decision 7 refuses schemas for. A finding's *message* already says
 plainly that a field is declared wrongly, which is what a reader acts on.
 
 If a later record needs the distinction machine-readable, the door is a new
-`stage` rather than a new `fault` - and this Note does not open it.
+`stage` rather than a new `fault` - and this section does not open it.
 
 ### F6. Keeping a hidden value needs no decoder change, and that is a property
 
@@ -5902,7 +5915,7 @@ Source tab and `validate_config/1` all see `config["variant_seed"]` exactly as
 the document holds it. Declaring `variant_seed` with `default: ""` would be
 refused under F4; omitting `default:` altogether would be refused under F3.
 
-### What this Note does not decide
+### What this amendment does not decide
 
 - **No new field type**, and no member added to the closed set of nine. Both
   keys are orthogonal to type.
@@ -5916,12 +5929,12 @@ refused under F4; omitting `default:` altogether would be refused under F3.
 
 ### Implementing beads
 
-`sb-21gm` implements F1, F4, F6, F7 and the rendering half of F1's
-`readonly?` clause, from this Note as merged. `sb-btx0`'s two record questions -
+`sb-21gm` implements F1, F3, F4, F6, F7 and the rendering half of F1's
+`readonly?` clause, from this section as merged. `sb-btx0`'s two record questions -
 whether a `:config` finding for a declaration defect may be `:package`, and
 whether the missing-`default:` refusal widens beyond `{:path, opts}` - are
 answered here by F5 and F3 respectively, and land in the same pair. `sb-xnxw`
-flips this Note to accepted after `sb-21gm` lands.
+flips this section to accepted after `sb-21gm` lands.
 
 Cites above were read on `b71740c` and are to be re-counted by a later reader
 rather than trusted.
