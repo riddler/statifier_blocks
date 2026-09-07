@@ -8763,3 +8763,124 @@ and `resolve/2` would report `{:error, {:migration_failed, block.id,
 
 Filed with `sb-ekkt`, campaign SF038. Implemented by `sb-mulk`; flipped to
 accepted by `sb-vjvq` once it has landed.
+
+## Note (2026-09-07): a composite's derived recipe carries its type's palette entry, so the duplicate-order refusal exempts exactly that pair
+
+This Note records campaign SF038's ruling `RQ-SF038-26`, taken by the
+operator on 2026-09-07 (bead `sb-4zyk`) - the form this file already uses
+for the SF038 walk's rulings at `:7921-7923`. It is a reading of `main` at
+`b65a1d5`. It carries no `Status:` line and flips nothing, it edits no text
+above this line, and it adds no callback, option or declaration key: the
+registration it exempts is already legal by this file's own rule, and the
+ruling settles which of the two palette builders was reading that rule
+correctly.
+
+### 1. The pair, and why it is one card at one order
+
+A composite's declaration derives a `StatifierBlocks.Recipe` at
+`<Module>.Recipe` (`lib/statifier_blocks/composite.ex:333-334`) whose
+`palette_entry/0` is the block type's own. Not a copy of it and not a second
+entry beside it, but a delegation:
+
+    def palette_entry, do: unquote(owner).palette_entry()
+
+(`composite.ex:349`), which `test/statifier_blocks/composite_test.exs:823-825`
+("`palette_entry/0` is the block type's") pins by equality. The
+`use StatifierBlocks.Composite` Amendment of this date says the same in prose
+under `### The derived recipe` (`:6599-6615`) and draws the conclusion this
+Note starts from: a host may register the composite in `types` **and** its
+derived recipe in `recipes`, "so a composite registered in both is legal and
+draws two entries" (`:6612-6613`). `composite_test.exs:830-845` ("a composite
+registers in a palette like any other type") exercises that registration.
+
+Two entries, then, but **one card at one order**: both answer, through the
+same `palette_entry/0`, with the same `%{label:, group:, order:}` map. One
+label, in one group, at one number - registered twice.
+
+### 2. What the refusal is for, and why this pair sits outside it
+
+`StatifierBlocks.Palette.refute_duplicate_orders!/2`
+(`lib/statifier_blocks/palette.ex:450-471`) reads types and recipes together,
+groups the entries that declare an `order` by `{group, order}`, and raises on
+the first key whose entries collide. The reason is in the moduledoc's
+`## Ordering a group` (`:72-106`) and at length in the comment above the
+function: `ADR-0005` decision 10 sorts a palette-browser group by `order`, so
+two entries sharing one number "leave the pick between them to whatever the
+sort happened to do", and "there is no degraded reading of 'both are
+seventh'" (`:404-408`).
+
+That is a reason about two entries an author can **tell apart**. Whichever
+the sort puts first, the author reads a different card there, and the
+palette's order changes between releases for no stated cause. A type and its
+own derived recipe cannot be told apart: the sort's choice between them
+changes nothing an author can observe, because the two entries answer with
+the same map. The refusal has no work to do on that pair, and refusing it
+would make a registration this file calls legal impossible to mount.
+
+### 3. The exemption, stated
+
+**Two palette entries sharing a `{group, order}` collide, unless they are
+exactly two and one is a `types` entry whose module is a composite while the
+other is that same composite's own derived recipe registered in `recipes`.**
+That pair is admitted. Everything else stays refused, unchanged, and for the
+reason section 2 gives:
+
+- two `types` entries sharing the number, including two type names
+  registered for one composite module;
+- two `recipes` entries sharing it;
+- a `types` entry and a hand-written recipe module that is not that type's
+  derived one, even one whose `palette_entry/0` answers the same map;
+- a `types` entry and a *different* composite's derived recipe;
+- three or more entries at one number, whichever two of them happen to be a
+  derived pair.
+
+The pair is identified by **both halves of the derivation**: the recipe's
+module is the `<Module>.Recipe` the `use` created (`composite.ex:333-334`)
+**and** its `palette_entry/0` answers the type's entry. Neither half alone
+is the ruling: entry equality alone admits two unrelated modules that happen
+to declare one card, and the module link alone admits a hand-written
+`Foo.Recipe` that is not derived from `Foo` at all
+(`palette.ex:487-493`, and the comment at `:433-445`).
+
+Today the exemption can only fire for a module composite:
+`StatifierBlocks.Composite.Data` derives no recipe - `data.ex` names none -
+and the pair test's own guard reads a plain module rather than a
+`{module, state}` entry (`palette.ex:487-488`). Whether a data composite
+should derive a recipe is not asked here.
+
+### 4. Both builders run the same check
+
+Before this ruling the check ran in `from_modules/2` alone, so the
+registration this file calls legal was refused by that builder and admitted
+by `new/2` - and `composite_test.exs:830-845` passed only because it builds
+its palette with `new/2` (`:831-835`). Two constructors of one value may not
+disagree about which palettes exist, so the ruling closes the split: **both
+builders run the same check, with the exemption above.** They do, as of
+`sb-ba15` (`8b6105a`): the check moved into `new/2` (`:178-189`), which
+`from_modules/2` (`:393-402`) builds through, and `new/2`'s own doc records
+both the refusal and the admitted pair (`:163-170`).
+
+This Note fixes what the check must decide. How the pair is recognised in
+code is `sb-ba15`'s, and the shape above is that request's as it landed.
+
+### 5. What this Note does not decide
+
+- **Whether a host should register both.** `:6613-6615` stands as written:
+  the derived recipe is a compatibility surface for a host mid-migration,
+  and a host that registers both is choosing to show two. The ruling says
+  that choice mounts, not that it is the one to make.
+- **What a palette browser draws for the pair.** Nothing here
+  de-duplicates anything or adds a drawing rule; two registered entries are
+  two entries, and what a browser does with two entries carrying one card is
+  `ADR-0005`'s question, unasked here.
+- **The message, or the skip rule.** An entry whose module is not loaded,
+  exports no `palette_entry/0`, or declares no `order` is still skipped
+  rather than refused (`palette.ex:495-503`), and a real collision still
+  names both entries by name and module.
+- **Where the check runs.** That a builder runs it is the decision; which
+  function holds the code is not.
+- **Any change to the fourteen `@callback`s, or to `Composite`'s
+  declaration keys.** None is added, removed or re-arityed.
+
+Filed with `sb-4zyk`, campaign SF038, recording the operator's ruling
+`RQ-SF038-26` of 2026-09-07. Implemented by `sb-ba15`, landed at `8b6105a`.
