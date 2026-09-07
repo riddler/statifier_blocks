@@ -54,6 +54,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          # spells: `session/2` fills every key, and one more `||` here
          # crosses Credo's complexity bound for the whole function.
          field_candidates: Map.get(session, "field_candidates", %{}),
+         debounce: session["debounce"],
          # `Map.get/3` rather than the `||` its neighbours use: `session/2`
          # below fills every key with its own default, so the fallback here is
          # only for a session built by hand - and one more `||` in this
@@ -89,6 +90,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         invoke_types={@invoke_types}
         value_candidates={@value_candidates}
         field_candidates={@field_candidates}
+        debounce={@debounce}
         chart_outcomes={@chart_outcomes}
         drawer_height={@drawer_height}
         drawer_tabs={drawer_tabs(@host_tabs, @feed)}
@@ -288,6 +290,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "invoke_types" => Keyword.get(opts, :invoke_types, []),
         "value_candidates" => Keyword.get(opts, :value_candidates, %{}),
         "field_candidates" => Keyword.get(opts, :field_candidates, %{}),
+        "debounce" => Keyword.get(opts, :debounce),
         "chart_outcomes" => Keyword.get(opts, :chart_outcomes, %{}),
         "drawer_height" => Keyword.get(opts, :drawer_height),
         "header" => Keyword.get(opts, :header),

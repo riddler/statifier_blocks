@@ -567,6 +567,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `selected_id` | no | the block the editor is about, written by a host that has a selection surface of its own; honoured only on an update that carries it, and an id the open document does not hold clears the selection instead of naming it. Held as editor state, and cleared when the host opens a different document. Not a command: it moves the selection, it does not edit the document |
     | `icon` | no | function component resolving an icon *name* to markup |
     | `expression_component` | no | override for `:expression` fields (sui-bob's seam); with it unset, an `:expression` renders statifier-ui's own expression editor when that package is on the host's load path, and the package's plain source input when it is not |
+    | `debounce` | no | what `phx-debounce` the inspector's config controls carry - `nil` (the default) renders no attribute anywhere, which is byte for byte what this component rendered before the assign existed. The form posts `phx-change` on each change event and this component offers an `:update_config` for each one it decodes, so a host persisting on its own `on_change` writes once per keystroke unless it asks for something slower. `StatifierBlocks.Editor.ConfigForm`'s own attr, which a host composing that component reached directly, documents the accepted values and why every control means every control; this is the same attr, reachable from the mount |
     | `value_candidates` | no | the values offered per datamodel path, `%{path => [%{label:, value:} \| binary]}`; **merged over the datamodel's own `one_of` enumerations, per path**, so a path this map names uses this map's list and a path it does not name keeps what the datamodel declares. Read only by an expression editor that draws value pickers; `%{}` (the default) now means *nothing beyond what the datamodel declares* rather than nothing at all |
     | `field_candidates` | no | the values a host offers for one field, keyed `{type_name, field_key}`: `[{value, label}]` for a closed list, which a `:string` field draws as a `<select>`, or `{:open, [{value, label}]}` for an open one, drawn as a `<datalist>`. A `{:path, opts}` and an `:expression` field read it too and draw either spelling as a `<datalist>`, ahead of the declared datamodel paths, because the value stays typed by the control. `%{}` (the default) offers none, and a field it does not name renders exactly as it did. It draws a control and decides nothing: `validate_config/1` is still the only authority on a value, and a stored value a closed list does not offer is drawn rather than rewritten |
     | `invoke_types` | no | the invoke types the host is prepared to answer; suggestions on an `invoke_type` field, never a constraint, and `[]` (the default) means *no list supplied* |
@@ -702,6 +703,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          on_collapse: nil,
          icon: nil,
          expression_component: nil,
+         debounce: nil,
          invoke_types: [],
          chart_outcomes: %{},
          value_candidates: %{},
@@ -1078,6 +1080,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             fixtures={@fixtures}
             fixture_runs={@fixture_runs}
             field_focus={@config_field_focus}
+            debounce={@debounce}
             target={@myself}
           />
 
@@ -1695,8 +1698,25 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # here, so the gate, the undo stack and the host notification each have
     # one implementation rather than one per event.
     @spec commit(Phoenix.LiveView.Socket.t(), Edit.t()) :: Phoenix.LiveView.Socket.t()
-    defp commit(socket, command) do
-      socket |> edit_session() |> Session.commit(command) |> landed(socket)
+    defp commit(socket, command), do: commit(socket, command, :keep)
+
+    # The same funnel, taking the selection the command MOVES it to. A caller
+    # that wrote the selection after the commit instead - Expand did, until
+    # sb-h0nt - paid two rebuilds per gesture: `landed/2`'s, then a second one
+    # whose only job was to report the moved selection out. `rebuild/1` is the
+    # whole view model plus the fixture runs, the source listing and the run
+    # provenance, so the second pass is real work for an answer that is
+    # already there. Handing the selection in puts it on the socket between
+    # the document landing and the one rebuild, which is the only order in
+    # which `put_selected_id/2`'s normalization still reads the NEW document
+    # and `notify_select/2` still fires exactly once.
+    #
+    # `:keep` is the atom for "this command does not move the selection", and
+    # is not a block id: ids are `blk_`-prefixed strings (decision 2).
+    @spec commit(Phoenix.LiveView.Socket.t(), Edit.t(), Block.id() | nil | :keep) ::
+            Phoenix.LiveView.Socket.t()
+    defp commit(socket, command, select) do
+      socket |> edit_session() |> Session.commit(command) |> landed(socket, select)
     end
 
     # The socket half of the funnel, and the only half that is this
@@ -1735,7 +1755,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     @spec landed({:ok, Session.t()} | {:error, Session.t()}, Phoenix.LiveView.Socket.t()) ::
             Phoenix.LiveView.Socket.t()
-    defp landed({:ok, session}, socket) do
+    defp landed(result, socket), do: landed(result, socket, :keep)
+
+    @spec landed(
+            {:ok, Session.t()} | {:error, Session.t()},
+            Phoenix.LiveView.Socket.t(),
+            Block.id() | nil | :keep
+          ) :: Phoenix.LiveView.Socket.t()
+    defp landed({:ok, session}, socket, select) do
       socket
       |> assign(
         history: session.history,
@@ -1744,19 +1771,30 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         draft_findings: session.draft_findings,
         last_error: nil
       )
+      |> select(select)
       |> notify_change(session.document)
       |> rebuild()
     end
 
-    defp landed({:error, session}, socket) do
+    defp landed({:error, session}, socket, select) do
       socket
       |> assign(
         drafts: session.drafts,
         draft_findings: session.draft_findings,
         last_error: session.last_error
       )
+      |> select(select)
       |> rebuild()
     end
+
+    # Written on both arms, and deliberately: a refused command leaves the
+    # document where it was, so the id the caller named is normalized against
+    # the document that is still open - which is the same answer the trailing
+    # `put_selected_id/2` gave when it ran after the refusal.
+    @spec select(Phoenix.LiveView.Socket.t(), Block.id() | nil | :keep) ::
+            Phoenix.LiveView.Socket.t()
+    defp select(socket, :keep), do: socket
+    defp select(socket, id), do: put_selected_id(socket, id)
 
     # The declarations panel's own funnel (2l). It differs from `commit/2` in
     # one way and only one: a refusal is held as a DRAFT of the list the
@@ -1788,28 +1826,38 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # Through `Edit.Session` like every other gesture, not around it
+    # (sb-h0nt). The panel used to reach `Edit.History.commit/4` itself,
+    # which made it a second funnel: the gate, the undo stack and the host
+    # notification had two implementations, and a decision taken in
+    # `Session` - drafts survive a command that is not a config change,
+    # `last_error` is cleared on a landing - was true here only by having
+    # been copied. What is genuinely this surface's stays here, in the
+    # socket half: a refusal is held as a DRAFT of the list the author
+    # typed, with the sentence saying why, rather than in `last_error`.
+    # That is decision 9's draft treatment applied to the second surface
+    # with the same problem, and it is a rendering decision, so the session
+    # answers with the reason and this decides where the reason goes.
     @spec commit_declarations(Phoenix.LiveView.Socket.t(), [DatamodelEntry.t()]) ::
             Phoenix.LiveView.Socket.t()
     defp commit_declarations(socket, candidate) do
-      %{history: history, palette: palette, document: document} = socket.assigns
-
-      case History.commit(history, palette, document, {:set_datamodel, candidate}) do
-        {:ok, new_history, new_document} ->
+      case socket |> edit_session() |> Session.commit({:set_datamodel, candidate}) do
+        {:ok, session} ->
           socket
           |> assign(
-            history: new_history,
-            document: new_document,
+            history: session.history,
+            document: session.document,
             declaration_draft: nil,
             last_error: nil
           )
-          |> notify_change(new_document)
+          |> notify_change(session.document)
           |> rebuild()
 
-        {:error, reason} ->
+        {:error, session} ->
           socket
           |> assign(
             :declaration_draft,
-            %{entries: candidate, refusal: Declarations.refusal(reason)}
+            %{entries: candidate, refusal: Declarations.refusal(session.last_error)}
           )
           |> rebuild()
       end
@@ -1956,13 +2004,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         # the normalization answer here too: the id it names is a block the new
         # document holds, and the fallback - the selection the author already
         # had - is cleared exactly when that was the composite which has just
-        # gone (3S). The trailing `rebuild/1` is what reports the new selection
-        # out, `commit/2`'s own rebuild having run before it.
+        # gone (3S). Handed to `commit/3` rather than written after it, so the
+        # gesture rebuilds once and the host is told the new selection once
+        # (sb-h0nt).
         socket
         |> drop_draft(id)
-        |> commit({:compound, [{:remove, id} | inserts]})
-        |> put_selected_id(first_inserted_id(inserts) || socket.assigns.selected_id)
-        |> rebuild()
+        |> commit(
+          {:compound, [{:remove, id} | inserts]},
+          first_inserted_id(inserts) || socket.assigns.selected_id
+        )
       else
         {:error, reason} -> refused(socket, reason)
       end

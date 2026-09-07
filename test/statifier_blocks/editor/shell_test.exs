@@ -116,6 +116,41 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute "blk_email_step" in Enum.map(Document.blocks(latest_document()), & &1.id)
       end
 
+      # The history lives in this LiveComponent's assigns and nothing reads it
+      # from outside: `History.can_undo?/1` reaches the toolbar as a boolean,
+      # and the disabled attribute on the Undo control is the whole of what a
+      # host - or a host's test suite - can see of the stack's depth. sb-h0nt
+      # weighed exposing a depth reader and declined: a count would be public
+      # surface for a number no surface draws, and the control already answers
+      # the question anyone actually asks, which is "how many undos take this
+      # document back to where it started".
+      #
+      # So the reader is pinned rather than replaced. One gesture is one
+      # entry: after it the control is live, after exactly one undo it is
+      # disabled again, and Redo has moved the other way in the same step.
+      #
+      # Sabotage: `Edit.History.commit/4` pushing the inverse onto the undo
+      # stack twice - the first undo leaves the control live and this is the
+      # only test in the file that goes red, where every test asserting only
+      # that the document came back stays green (verified).
+      test "one gesture is one undo entry, read off the control", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        assert has_element?(view, ~s(button[phx-click="undo"][disabled]))
+
+        view
+        |> element(~s([data-block-id="blk_email_step"] > .sb-node__chrome > .sb-node__remove))
+        |> render_click()
+
+        refute has_element?(view, ~s(button[phx-click="undo"][disabled]))
+        assert has_element?(view, ~s(button[phx-click="redo"][disabled]))
+
+        view |> element(~s(button[phx-click="undo"])) |> render_click()
+
+        assert has_element?(view, ~s(button[phx-click="undo"][disabled]))
+        refute has_element?(view, ~s(button[phx-click="redo"][disabled]))
+      end
+
       test "undo is disabled with nothing to undo", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn)
 

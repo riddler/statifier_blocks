@@ -306,6 +306,31 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert [%{id: "blk_GS_call", type: "core.invoke"}] = selections()
       end
 
+      # The gesture rebuilds ONCE (sb-h0nt item 2). `rebuild/1` recomputes the
+      # whole view model, the fixture runs, the source listing and the run
+      # provenance, and Expand ran all of it twice: `commit/2`'s own rebuild,
+      # then a trailing one whose only job was to report the moved selection
+      # out. Handing the selection to `commit/3` puts it on the socket between
+      # the document landing and the one rebuild, which is the only order in
+      # which `put_selected_id/2` still normalizes against the NEW document.
+      #
+      # Read off the source because the saving is a cost, not an output: the
+      # rendered page and every host seam answer identically at one rebuild
+      # and at two, which is also why this refactor changes no assertion above.
+      # The idiom is `PresentationTest`'s "no component branches on a block
+      # type name".
+      #
+      # Sabotage: restored the trailing `|> put_selected_id(...) |> rebuild()`
+      # on `expand_composite/2` and reverted the call to `commit/2` - the body
+      # names both again and this goes red on each (verified).
+      test "the gesture rebuilds once" do
+        body = expand_composite_body()
+
+        refute body =~ "rebuild()"
+        refute body =~ "put_selected_id("
+        assert body =~ "first_inserted_id(inserts) || socket.assigns.selected_id"
+      end
+
       # Sabotage: inserted every member at the composite's own index rather
       # than at index + n - red, because the two members then arrive reversed
       # and the wizard records the confirmation before it sends anything.
@@ -568,6 +593,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     # -- fixtures ----------------------------------------------------------
+
+    # `expand_composite/2`'s body, comments stripped: what the rebuild-count
+    # test reads is code, and the prose above the pipeline names the very
+    # words it scans for.
+    defp expand_composite_body do
+      [_before, from_head] =
+        "lib/statifier_blocks/editor.ex"
+        |> File.read!()
+        |> String.split("defp expand_composite(socket, id) do", parts: 2)
+
+      [body, _after] = String.split(from_head, "\n    end\n", parts: 2)
+
+      String.replace(body, ~r/^\s*#.*$/m, "")
+    end
 
     defp expand(view, id) do
       view

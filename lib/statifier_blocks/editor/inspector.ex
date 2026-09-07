@@ -276,6 +276,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "Passed through to `StatifierBlocks.Editor.ConfigForm`; see its moduledoc."
     )
 
+    attr(:debounce, :any,
+      default: nil,
+      doc: "Passed through to `StatifierBlocks.Editor.ConfigForm`; see its moduledoc."
+    )
+
     attr(:fixture_runs, :any,
       default: nil,
       doc:
@@ -398,6 +403,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               capture_sources={@capture_sources}
               fixtures={@fixtures}
               field_focus={@field_focus}
+              debounce={@debounce}
               read_only={@read_only}
               target={@target}
             />
@@ -482,6 +488,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:capture_sources, :list, required: true)
     attr(:fixtures, :any, required: true)
     attr(:field_focus, :any, required: true)
+    attr(:debounce, :any, default: nil)
     attr(:read_only, :boolean, default: false)
     attr(:target, :any, required: true)
 
@@ -509,6 +516,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         capture_sources={@capture_sources}
         fixtures={@fixtures}
         field_focus={@field_focus}
+        debounce={@debounce}
         read_only={@read_only}
       />
       <p :if={@node.form == nil} class="sb-inspector__empty">

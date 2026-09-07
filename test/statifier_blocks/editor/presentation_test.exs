@@ -849,6 +849,96 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           assert css =~ selector, "the reveal rule lost #{selector}"
         end
       end
+
+      # The delete OFFER (ADR-0005's 2026-09-07 amendment, clause 3D), which
+      # until sb-h0nt was asserted only by `RecipeDeleteTest` - a LiveView
+      # test about what the gesture COMMITS. Its presentation is a contract of
+      # its own and the opposite of the control above: `data-reveal="always"`,
+      # because the pair is on the canvas only while the author's own delete
+      # gesture is unanswered, and an offer nobody can see is not an offer.
+      # Asserted here, beside the rest rule it is the exception to, so the two
+      # halves of R2 cannot drift apart without one of these going red.
+      #
+      # Sabotage: dropping `data-reveal` from the offer `<span>` - the pair
+      # falls out of the `[data-reveal="always"]` rule below, has no rule of
+      # its own left, and this goes red on the attribute.
+      test "the delete offer replaces the control and says it is always shown",
+           %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: deadline_document(), palette: deadline_palette())
+
+        view
+        |> element(~s(button[phx-click="remove"][phx-value-block-id="blk_deadline"]))
+        |> render_click()
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_deadline"] > .sb-node__chrome > ) <>
+                   ~s(.sb-node__offer[data-reveal="always"])
+               )
+
+        refute has_element?(
+                 view,
+                 ~s([data-block-id="blk_deadline"] > .sb-node__chrome > .sb-node__remove)
+               ),
+               "the offer stands in for the control it came from, it does not sit beside it"
+      end
+
+      # The stylesheet half, and the half the LiveView test cannot reach: the
+      # attribute above is only worth asserting if a rule actually leaves the
+      # pair visible at rest, where the control it replaced is hidden.
+      # Sabotage: changing the offer rule's `opacity: 1` to `opacity: 0` - the
+      # markup assertion above still passes, the author sees nothing to answer
+      # a question they have already been asked, and this goes red.
+      test "the stylesheet leaves the offer visible at rest" do
+        css = File.read!("assets/css/statifier_blocks.css")
+
+        [_before, from_offer_rule] =
+          String.split(css, ~s(.sb-node__offer[data-reveal="always"] {), parts: 2)
+
+        [offer_declarations, _after] = String.split(from_offer_rule, "}", parts: 2)
+
+        assert offer_declarations =~ "opacity: 1"
+
+        for selector <- [".sb-node__offer-keep", ".sb-node__offer-confirm"] do
+          assert css =~ selector, "the offer's #{selector} lost its rule"
+        end
+      end
+
+      # The amendment's worked example, small: one `core.send` naming a
+      # deadline event and the `core.on_event` that answers it, in one group,
+      # which is the arrangement the core deadline recipe claims.
+      defp deadline_document do
+        Document.new(
+          Block.new("core.sequence",
+            id: "blk_deadline_root",
+            slots: %{
+              "body" => [
+                Block.new("core.group",
+                  id: "blk_settle",
+                  slots: %{
+                    "body" => [
+                      Block.new("core.send",
+                        id: "blk_deadline",
+                        config: %{"event" => "deadline.a1b2c3d4", "delay" => "1h"}
+                      )
+                    ],
+                    "interrupts" => [
+                      Block.new("core.on_event",
+                        id: "blk_deadline_handler",
+                        config: %{"event" => "deadline.a1b2c3d4"}
+                      )
+                    ]
+                  }
+                )
+              ]
+            }
+          ),
+          id: "doc_deadline"
+        )
+      end
+
+      defp deadline_palette, do: Palette.from_modules([], core: true)
     end
 
     describe "the remaining field controls" do
