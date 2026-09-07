@@ -262,7 +262,7 @@ defmodule StatifierBlocks.Compiler do
     SlotValidation
   }
 
-  alias StatifierBlocks.Core.{OnEvent, ResumableGroup, Send}
+  alias StatifierBlocks.Core.{Config, OnEvent, ResumableGroup, Send}
 
   alias StatifierBlocks.Compiler.{
     Attribution,
@@ -301,6 +301,10 @@ defmodule StatifierBlocks.Compiler do
   # ADR-0008's 2026-09-06 amendment in `statifier_persistence`: the
   # reserved `<donedata>` key a failure-classed final carries, and the one
   # value its set is closed at.
+  # C1's own `<param>` name, and one of the two a `donedata_type/1` entry
+  # may not mint.
+  @outcome_param_name "outcome"
+
   @run_status_key "statifier_persistence:run_status"
   @run_status_failed "failed"
 
@@ -392,6 +396,7 @@ defmodule StatifierBlocks.Compiler do
          :ok <- config_and_structure_stages(document, palette, node, opts),
          {node, shelf_warnings} = elide_shelf(node),
          :ok <- chart_use_stage(node, opts),
+         :ok <- donedata_stage(node, opts),
          {:ok, {emission, emit_warnings}} <- emit_stage(node, document, opts),
          :ok <- self_reference_stage(emission, document.id),
          :ok <- sensitive_stage(emission, opts) do
@@ -1552,28 +1557,40 @@ defmodule StatifierBlocks.Compiler do
          donedata?
        ) do
     failures = BlockType.failure_outcomes(module, block.config)
+    declared = if donedata?, do: declared_params(module, block.config), else: []
 
     pairs =
       module
       |> BlockType.outcome_names(block.config)
-      |> Enum.flat_map(&completion_outcome(block.id, &1, prefix, donedata?, &1 in failures))
+      |> Enum.flat_map(
+        &completion_outcome(block.id, &1, prefix, donedata?, &1 in failures, declared)
+      )
 
     transitions = Enum.map(pairs, &elem(&1, 0))
     finals = Enum.map(pairs, &elem(&1, 1))
 
-    {catches, failed} = propagation(node, prefix, donedata?)
+    {catches, failed} = propagation(node, prefix, donedata?, declared)
 
     {%{emission | children: emission.children ++ transitions ++ catches}, finals ++ failed}
   end
 
-  @spec completion_outcome(Block.id(), String.t(), String.t(), boolean(), boolean()) ::
-          [{Emission.t(), Emission.t()}]
-  defp completion_outcome(root_id, outcome, prefix, donedata?, failure?) do
+  @spec completion_outcome(
+          Block.id(),
+          String.t(),
+          String.t(),
+          boolean(),
+          boolean(),
+          [Emission.t()]
+        ) :: [{Emission.t(), Emission.t()}]
+  defp completion_outcome(root_id, outcome, prefix, donedata?, failure?, declared) do
     with {:ok, final_id} <- StateId.state_id(root_id, prefix <> outcome),
          {:ok, transition} <-
            stamp_completion(completion_transition(root_id, outcome, final_id), root_id),
          {:ok, final} <-
-           stamp_completion(completion_final(final_id, outcome, donedata?, failure?), root_id) do
+           stamp_completion(
+             completion_final(final_id, outcome, donedata?, failure?, declared),
+             root_id
+           ) do
       [{transition, final}]
     else
       _refused -> []
@@ -1588,11 +1605,13 @@ defmodule StatifierBlocks.Compiler do
     ])
   end
 
-  @spec completion_final(StateId.t(), String.t(), boolean(), boolean()) :: Emission.t()
-  defp completion_final(final_id, outcome, donedata?, failure?) do
+  @spec completion_final(StateId.t(), String.t(), boolean(), boolean(), [Emission.t()]) ::
+          Emission.t()
+  defp completion_final(final_id, outcome, donedata?, failure?, declared) do
     params =
       if(donedata?, do: [outcome_param(outcome)], else: []) ++
-        if failure?, do: [run_status_param()], else: []
+        if(failure?, do: [run_status_param()], else: []) ++
+        declared
 
     case params do
       [] -> Emission.element("final", [{"id", final_id}])
@@ -1605,7 +1624,42 @@ defmodule StatifierBlocks.Compiler do
 
   @spec outcome_param(String.t()) :: Emission.t()
   defp outcome_param(outcome) do
-    Emission.element("param", [{"expr", "'" <> outcome <> "'"}, {"name", "outcome"}])
+    Emission.element("param", [{"expr", "'" <> outcome <> "'"}, {"name", @outcome_param_name}])
+  end
+
+  # ADR-0004's C1 as widened on 2026-09-06, from ADR-0013 decision 3: the
+  # root block type's optional `donedata_type/1` declares fields, and each
+  # one is a `<param>` reading the datamodel path the declaration names.
+  #
+  # They come **after** both compiler-minted params - the `outcome` param
+  # and, on a failure-classed outcome, the reserved run-status one - so a
+  # root type declaring nothing compiles to the bytes it compiled to
+  # before the callback existed, and a failure-classed final does not have
+  # its two existing params reordered by a declaration that arrives later.
+  # Declaration order is preserved for decision 6's reason: sorting the
+  # list would move a host's compiled bytes.
+  #
+  # They are emitted on **every** top-level final, failure-classed
+  # included, because `donedata_type/1` is a pure function of the root
+  # block's config and the compiler classes outcomes rather than runs. On
+  # the failure arm they do not thereby reach a parent: ADR-0009's Note of
+  # 2026-09-06 has the driver answer the invocation with the run's failure
+  # rather than with done data, so the collected element carries no
+  # `"donedata"` key at all. The bytes are minted and unread there, which
+  # is a cost in the compiled document and nothing else - and a document
+  # compiled for use as a child is also one a host may run directly, where
+  # its `<donedata>` is read by whoever invoked it.
+  #
+  # Only under `:child_use`. The `:terminate` finals carry no `<donedata>`
+  # at all, so there is no boundary for a declared field to cross;
+  # `completion_finals/4`'s caller is where that is decided.
+  @spec declared_params(module(), Block.config()) :: [Emission.t()]
+  defp declared_params(module, config) do
+    module
+    |> BlockType.donedata_type(config)
+    |> Enum.map(fn %{name: name, path: path} ->
+      Emission.element("param", [{"expr", path}, {"name", name}])
+    end)
   end
 
   # The failure seam's reserved key, spelled as `statifier_persistence`'
@@ -1666,8 +1720,9 @@ defmodule StatifierBlocks.Compiler do
   # outcome event is selected first, the root's transition exits the root
   # state, and the container's pending `done.state` is selected by
   # nothing.
-  @spec propagation(Resolved.t(), String.t(), boolean()) :: {[Emission.t()], [Emission.t()]}
-  defp propagation(%Resolved{block: %Block{id: root_id}} = node, prefix, donedata?) do
+  @spec propagation(Resolved.t(), String.t(), boolean(), [Emission.t()]) ::
+          {[Emission.t()], [Emission.t()]}
+  defp propagation(%Resolved{block: %Block{id: root_id}} = node, prefix, donedata?, declared) do
     case unhandled_failures(node) do
       [] ->
         {[], []}
@@ -1676,7 +1731,7 @@ defmodule StatifierBlocks.Compiler do
         with {:ok, final_id} <- StateId.state_id(root_id, prefix <> @failed_role),
              {:ok, final} <-
                stamp_completion(
-                 completion_final(final_id, @propagated_outcome, donedata?, true),
+                 completion_final(final_id, @propagated_outcome, donedata?, true, declared),
                  root_id
                ),
              {:ok, transitions} <- propagation_transitions(pairs, final_id) do
@@ -1779,6 +1834,55 @@ defmodule StatifierBlocks.Compiler do
     else
       :ok
     end
+  end
+
+  # -- Stage 5a'-bis: the declared-summary refusal ----------------------------
+
+  # ADR-0013 decision 2 and ADR-0002's Note of 2026-09-06: two `<param>`
+  # names are the compiler's - `outcome`, C1's, and the failure seam's
+  # reserved run-status key - and a `donedata_type/1` entry colliding with
+  # either is an `:invalid_donedata_field` Emit finding against the root
+  # block rather than a silently shadowed param. A name outside the bare
+  # lowercase identifier shape the record fixes is the same finding: the
+  # `<param>` it would mint is not a name this package mints anywhere else.
+  #
+  # It runs only under `:child_use`, because that is the only compile that
+  # emits the declared params at all - a `:terminate` final carries no
+  # `<donedata>`, so there is no param there to shadow (ADR-0004's
+  # 2026-09-06 amendment). Like the refusal above it, it is not a new
+  # pipeline stage: decision 10's table is unchanged, and it runs before
+  # Emit only because there is nothing worth emitting once it fires.
+  @spec donedata_stage(Resolved.t(), [option()]) :: :ok | {:error, [Finding.t()]}
+  defp donedata_stage(%Resolved{block: block, module: module}, opts) do
+    if Keyword.get(opts, :child_use, false) do
+      module
+      |> BlockType.donedata_type(block.config)
+      |> Enum.reject(&declarable_param?/1)
+      |> Enum.map(&donedata_finding(&1, block.id))
+      |> case do
+        [] -> :ok
+        findings -> {:error, findings}
+      end
+    else
+      :ok
+    end
+  end
+
+  @spec declarable_param?(BlockType.donedata_field()) :: boolean()
+  defp declarable_param?(%{name: name}) do
+    Config.identifier?(name) and name not in [@outcome_param_name, @run_status_key]
+  end
+
+  @spec donedata_finding(BlockType.donedata_field(), Block.id()) :: Finding.t()
+  defp donedata_finding(%{name: name}, root_id) do
+    Finding.new(
+      :emit,
+      {:invalid_donedata_field, name},
+      ~s(declares the done-data field "#{name}", which is either one of the two names the ) <>
+        ~s(compiler mints - "#{@outcome_param_name}" and "#{@run_status_key}" - or not a ) <>
+        "bare lowercase identifier",
+      block_id: root_id
+    )
   end
 
   # -- Stage 5a'': the self-reference refusal ---------------------------------

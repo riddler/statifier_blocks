@@ -69,7 +69,7 @@ defmodule StatifierBlocks.Core.Map do
   a whole succeeded. An author who wants to branch on the answers reads
   the collected list with a `core.branch` after the block.
 
-  ## The six fields
+  ## The seven fields
 
   | Key | Type | What it names |
   |---|---|---|
@@ -78,7 +78,36 @@ defmodule StatifierBlocks.Core.Map do
   | `item_as` | `:string` | the name a child sees its item under, default `item` |
   | `index_as` | `:string` | the name a child sees its position under, when the author wants one |
   | `collect` | `{:path, %{writes: {:list, :unknown}}}` | where the assembled answer is written |
+  | `collect_type` | `:string` | what a collected answer is, as a declared type name |
   | `on` | `{:select, ...}` | the aggregation policy, `all` or `first_error` |
+
+  ## `collect_type`, and what it is not
+
+  ADR-0013 decision 1: the parent declares what one child's answer holds,
+  and it declares it by **name** - a name the parent document's datamodel
+  declares, read through `StatifierDatamodel.Types.parse/2`. It is
+  meaningful only beside a `collect`, it is optional, and an absent or
+  empty one is what every document stored before it existed carries.
+
+  It is a **type**, never a path and never an expression: it does not
+  carry `datamodel_path?`, it is not read through
+  `StatifierBlocks.Core.AssignLocation`, and it is offered no path
+  candidates. It has no findings of its own either. `parse/2` is total and
+  answers `{:opaque, s}` for a name it does not recognize, which is the
+  permissiveness ADR-0006 and ADR-0011 already chose: what the document
+  does not say is not thereby wrong.
+
+  The declaration is the **parent's** because the parent is the document
+  being compiled. A `core.map` names its child chart by document id and
+  cannot resolve it, so the parent's is the only declaration always in
+  hand where `collect`'s environment entry is computed - and where both
+  are in hand, `StatifierBlocks.BlockType.agrees?/3` is the dormant
+  agreement check of ADR-0013 decision 4.
+
+  It produces **no bytes**. `emit/2` gains nothing from it, and the
+  environment entry it will type is ADR-0013 decision 5's, which needs an
+  inline-shape type expression `StatifierBlocks.Environment` cannot spell
+  yet; until that lands, `collect` writes what it writes below.
 
   ## The names a child sees, and why they bind nothing here
 
@@ -358,6 +387,13 @@ defmodule StatifierBlocks.Core.Map do
         default: ""
       },
       %{
+        key: "collect_type",
+        type: :string,
+        label: "Each answer is a",
+        required?: false,
+        default: ""
+      },
+      %{
         key: "on",
         type:
           {:select,
@@ -372,7 +408,12 @@ defmodule StatifierBlocks.Core.Map do
     ]
 
   @doc """
-  The six fields' findings, and nothing about N.
+  The six fields with findings, and nothing about N.
+
+  `collect_type` is the seventh field and has no check here: it carries a
+  type name rather than a path or an expression, and
+  `StatifierDatamodel.Types.parse/2` is total over any spelling, so there
+  is nothing about it a config finding could say (ADR-0013 decision 1).
 
   `on` and `item_as` are read through their defaults, so a config that
   never carried either key validates exactly as it did before the key
