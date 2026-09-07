@@ -104,7 +104,7 @@ defmodule StatifierBlocks.Edit.Targets do
   module carries, alongside the two argued above.
   """
 
-  alias StatifierBlocks.{Assignability, Block, Document, Environment, Palette}
+  alias StatifierBlocks.{Assignability, Block, BlockType, Document, Environment, Palette}
 
   @doc """
   Slots that would accept `id`'s block: declared, kind-admitted (rule 1 and
@@ -139,6 +139,96 @@ defmodule StatifierBlocks.Edit.Targets do
         ctx \\ %{}
       ) do
     for {slot_ref, :ok} <- slot_verdicts(document, palette, block, ctx), do: slot_ref
+  end
+
+  @doc """
+  Which of `palette`'s block types would be accepted at `target`.
+
+  `target` is a `{parent_id, slot}` pair, the granularity
+  `droppable_slots_for/4` answers at; the index within the slot is not part
+  of the question, for the reason the moduledoc's reduction gives.
+
+  This is the palette's own filter - what "+" offers here, and what an
+  insert picker offers there - and it is `droppable_slots_for/4`'s
+  predicate asked once per candidate type against a **probe** block of that
+  type. Not a parallel implementation: the same function, with a block that
+  is not in the document yet, which is exactly the case
+  `droppable_slots_for/4` exists to serve.
+
+  The probe is `probe/2`'s, which is the part a surface writing this filter
+  by hand gets wrong: a type whose
+  `c:StatifierBlocks.BlockType.palette_entry/0` declares a `default_config`
+  affecting what it reads is answered differently by a probe built from
+  `StatifierBlocks.Palette.new_block/2` alone. Two views filtering the same
+  palette against the same document then disagree about whether a type
+  fits, and neither is visibly wrong.
+
+  A type that does not resolve through `palette` is left out rather than
+  raising, the way every other palette walk in this package treats one.
+  """
+  @spec accepted_types(
+          Document.t(),
+          Palette.t(),
+          {Block.id(), Block.slot_name()},
+          Assignability.context()
+        ) :: MapSet.t(Block.type_name())
+  def accepted_types(
+        %Document{} = document,
+        %Palette{} = palette,
+        {parent_id, slot},
+        ctx \\ %{}
+      ) do
+    palette.types
+    |> Map.keys()
+    |> Enum.filter(fn type ->
+      case probe(palette, type) do
+        {:ok, block} -> {parent_id, slot} in droppable_slots_for(document, palette, block, ctx)
+        :error -> false
+      end
+    end)
+    |> MapSet.new()
+  end
+
+  @doc """
+  A block of `type` as the assignability questions should be asked about it.
+
+  `StatifierBlocks.Palette.new_block/2`'s block, with the type's
+  `c:StatifierBlocks.BlockType.palette_entry/0` `default_config` merged over
+  its config. Without the merge, a block type whose read is declared on a
+  config field - a path field, say - declares no read at all while that
+  field holds its schema default, and every slot stamps `ok`: the drop-time
+  refusal ADR-0011 promises never fires for exactly the blocks whose reads
+  are worth checking. `default_config` is the entry saying what the author
+  is about to configure, so the probe asks the question the configured
+  block would ask.
+
+  This is the probe only. The block a pick or a drop actually **inserts**
+  still comes from `StatifierBlocks.Palette.new_block/2`: the entry's
+  declaration is what a type would be asked about, not a config the author
+  never wrote.
+
+  `palette_entry/0` is optional and a type name can resolve to a module that
+  is not loadable, so both are checked the way
+  `StatifierBlocks.Environment.subject_path/2` checks them for the same
+  callback.
+  """
+  @spec probe(Palette.t(), Block.type_name()) :: {:ok, Block.t()} | :error
+  def probe(%Palette{} = palette, type) do
+    with {:ok, block} <- Palette.new_block(palette, type),
+         {:ok, module} <- Palette.fetch(palette, type) do
+      {:ok, %{block | config: Map.merge(block.config, entry_default_config(module))}}
+    else
+      _error -> :error
+    end
+  end
+
+  @spec entry_default_config(module()) :: Block.config()
+  defp entry_default_config(module) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :palette_entry, 0) do
+      BlockType.default_config(module.palette_entry())
+    else
+      %{}
+    end
   end
 
   @typedoc """
