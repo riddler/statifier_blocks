@@ -220,6 +220,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:expandable, :any,
+      default: nil,
+      doc: """
+      The document's composite block ids, threaded to `BlockNode`
+      (ADR-0005's 2026-09-07 amendment, clause 1E).
+      """
+    )
+
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:class, :string, default: nil)
@@ -295,6 +303,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           marks={@marks}
           armed={@armed}
           pending_remove={@pending_remove}
+          expandable={@expandable}
           target={@target}
           icon={@icon}
         />
@@ -315,6 +324,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:marks, :any, default: nil)
     attr(:armed, :any, default: nil)
     attr(:pending_remove, :any, default: nil)
+    attr(:expandable, :any, default: nil)
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:depth, :integer, default: 0)
@@ -331,6 +341,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         marks={@marks}
         armed={@armed}
         pending_remove={@pending_remove}
+        expandable={@expandable}
         target={@target}
         icon={@icon}
       />

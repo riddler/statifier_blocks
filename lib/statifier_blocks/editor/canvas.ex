@@ -114,6 +114,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:expandable, :any,
+      default: nil,
+      doc: """
+      The document's composite block ids, a `MapSet` or `nil`, threaded to the
+      card that draws the Expand control (ADR-0005's 2026-09-07 amendment,
+      clause 1E).
+      """
+    )
+
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:theme, :map, default: %{})
@@ -166,6 +175,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               marks={@marks}
               armed={@armed}
               pending_remove={@pending_remove}
+              expandable={@expandable}
               target={@target}
               icon={@icon}
             />
