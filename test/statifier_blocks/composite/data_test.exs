@@ -587,4 +587,353 @@ defmodule StatifierBlocks.Composite.DataTest do
       assert message =~ "whatever"
     end
   end
+
+  # -- the declared migrations chain -------------------------------------
+
+  # ADR-0002's migrations amendment, worked example M9: a card-processing
+  # tenant saved the composite at version 1 with a `limit` param, renamed it
+  # `amount_limit` at version 2, and added `currency` at version 3.
+  @authorize %{
+    "type_name" => "myapp.authorize_with_deadline",
+    "version" => 3,
+    "params" => [
+      %{
+        "key" => "amount_limit",
+        "type" => "integer",
+        "label" => "Amount ceiling",
+        "required?" => true,
+        "default" => 0
+      },
+      %{
+        "key" => "currency",
+        "type" => "string",
+        "label" => "Currency",
+        "required?" => true,
+        "default" => "USD"
+      },
+      %{
+        "key" => "deadline",
+        "type" => "duration",
+        "label" => "Deadline",
+        "required?" => false,
+        "default" => ""
+      }
+    ],
+    "migrations" => [
+      %{"from" => 1, "rename" => %{"limit" => "amount_limit"}},
+      %{"from" => 2, "default" => %{"currency" => "USD"}}
+    ],
+    "subtree" => [
+      %{
+        "type" => "core.invoke",
+        "id_suffix" => "call",
+        "config" => %{
+          "invoke_type" => "myapp:authorize",
+          "assign_to" => "",
+          "params" => ""
+        }
+      }
+    ]
+  }
+
+  defp authorize_state(overrides \\ %{}) do
+    {:ok, state} = Data.declaration(Map.merge(@authorize, overrides))
+    state
+  end
+
+  defp authorize_error(overrides) do
+    {:error, errors} = Data.declaration(Map.merge(@authorize, overrides))
+    errors
+  end
+
+  describe ~s(a declaration's "migrations" chain) do
+    # Sabotage: made `apply_step/2` skip the `"rename"` part - red. The value
+    # MOVES and nothing else about it changes, which is the whole of what a
+    # rename means to a stored config.
+    test ~s(a "rename" moves the value under the new key) do
+      state = authorize_state(%{"version" => 2, "migrations" => [hd(@authorize["migrations"])]})
+
+      assert Data.migrate_config(state, 1, %{"limit" => 500, "deadline" => "PT30S"}) ==
+               {:ok, %{"amount_limit" => 500, "deadline" => "PT30S"}}
+    end
+
+    # Sabotage: made `"drop"` a no-op - red. A dropped key that survives is a
+    # config key the current params do not declare, which decision 7's
+    # refusals then reject at the compile - a migration arriving as a wrong
+    # answer.
+    test ~s(a "drop" removes the key) do
+      state =
+        authorize_state(%{
+          "version" => 2,
+          "migrations" => [%{"from" => 1, "drop" => ["legacy_mode"]}]
+        })
+
+      assert Data.migrate_config(state, 1, %{"amount_limit" => 500, "legacy_mode" => true}) ==
+               {:ok, %{"amount_limit" => 500}}
+    end
+
+    # Sabotage: made `"default"` write `nil` instead of the declared value -
+    # red. The value is the one the step names, and it is what an OLD stored
+    # block's config gains - not the param's own `"default"`.
+    test ~s(a "default" adds the key with the step's value) do
+      state =
+        authorize_state(%{
+          "version" => 2,
+          "migrations" => [%{"from" => 1, "default" => %{"currency" => "USD"}}]
+        })
+
+      assert Data.migrate_config(state, 1, %{"amount_limit" => 500}) ==
+               {:ok, %{"amount_limit" => 500, "currency" => "USD"}}
+    end
+
+    # Sabotage: applied only the step whose `"from"` equals the stored
+    # version - red. `Palette.resolve/2` calls `migrate_config` ONCE, straight
+    # from the stored version to current, so the ladder has to run inside the
+    # one call or a version-1 block arrives at version 3 half-migrated.
+    test "a two-step chain walks both steps, in ascending order" do
+      state = authorize_state()
+
+      assert Data.migrate_config(state, 1, %{"limit" => 500, "deadline" => "PT30S"}) ==
+               {:ok, %{"amount_limit" => 500, "currency" => "USD", "deadline" => "PT30S"}}
+    end
+
+    # Sabotage: made the walk start at the first step regardless of `from` -
+    # red. A block stored at version 2 has already been renamed, so replaying
+    # the version-1 step over it would rename a key it does not carry.
+    test "a block stored mid-chain walks only the steps above it" do
+      state = authorize_state()
+
+      assert Data.migrate_config(state, 2, %{"amount_limit" => 500, "deadline" => "PT30S"}) ==
+               {:ok, %{"amount_limit" => 500, "currency" => "USD", "deadline" => "PT30S"}}
+    end
+
+    # Sabotage: answered `{:ok, config}` for a version below the earliest
+    # step - red. A declaration says which versions it carries forward, and a
+    # derived `{:ok, config}` for one it wrote no step for is exactly the
+    # answer ADR-0007's refusal exists to refuse.
+    test "a block stored below the earliest step is still refused" do
+      state =
+        authorize_state(%{"migrations" => [%{"from" => 2, "default" => %{"currency" => "USD"}}]})
+
+      assert Data.migrate_config(state, 1, %{"amount_limit" => 500}) ==
+               {:error, {:no_migration_from, 1}}
+    end
+
+    # Sabotage: defaulted a missing `"migrations"` key to a chain that
+    # answers `:ok` - red. `[]` is exactly today's behaviour, which is what
+    # makes this an amendment by addition rather than a change.
+    test "a declaration that writes no migrations keeps the unconditional refusal" do
+      state = state()
+
+      assert Data.migrate_config(state, 1, %{}) == {:error, {:no_migration_from, 1}}
+      assert %{migrations: []} = state
+    end
+  end
+
+  describe ~s("migrations" refusals, every one at entry-build time) do
+    # Sabotage: accepted a gap - red. There is no partial chain: a list that
+    # cannot carry its own earliest version to its current one is broken, and
+    # a gap would strand every block stored below it with a silent wrong
+    # answer rather than a refusal.
+    test ~s(a gap between the earliest step and "version") do
+      errors =
+        authorize_error(%{
+          "migrations" => [
+            %{"from" => 1, "rename" => %{"limit" => "amount_limit"}},
+            %{"from" => 3, "default" => %{"currency" => "USD"}}
+          ],
+          "version" => 4
+        })
+
+      assert Enum.any?(errors, &(&1 =~ "contiguous"))
+    end
+
+    # Sabotage: dropped the last-step check - red. A chain whose last
+    # `"from"` is not `version - 1` never reaches the current shape.
+    test ~s(a chain that does not end at "version" - 1) do
+      errors = authorize_error(%{"version" => 4})
+
+      assert Enum.any?(errors, &(&1 =~ ~s("version" - 1)))
+    end
+
+    # Sabotage: accepted a duplicate and an out-of-order `"from"` - red. The
+    # walk is ascending, so a repeated or descending `"from"` applies a step
+    # to a shape it was not written for.
+    test ~s(a duplicate or out-of-order "from") do
+      for froms <- [[1, 1], [2, 1]] do
+        errors =
+          authorize_error(%{
+            "migrations" => Enum.map(froms, &%{"from" => &1, "drop" => ["x"]})
+          })
+
+        assert Enum.any?(errors, &(&1 =~ "ascending")), "accepted #{inspect(froms)}"
+      end
+    end
+
+    # Sabotage: checked the chain forwards from a shape nobody declared -
+    # red. A declaration states its current params and NOT the shape it
+    # started from, so the backwards walk from the declared param keys is the
+    # only end of the chain that is known.
+    test "a step naming an unknown key, by the backwards walk" do
+      errors =
+        authorize_error(%{
+          "migrations" => [
+            %{"from" => 1, "rename" => %{"limit" => "no_such_param"}},
+            %{"from" => 2, "default" => %{"currency" => "USD"}}
+          ]
+        })
+
+      assert [message] = errors
+      assert message =~ "unknown key"
+      assert message =~ "no_such_param"
+    end
+
+    # Sabotage: undid the parts in the forward order - red. The undo order is
+    # the reverse of M2's, so a step that renames and then defaults is undone
+    # by removing the default first.
+    test "a step whose parts only resolve in the reverse order" do
+      assert %{migrations: [%{from: 1}]} =
+               authorize_state(%{
+                 "version" => 2,
+                 "migrations" => [
+                   %{
+                     "from" => 1,
+                     "rename" => %{"old_limit" => "amount_limit"},
+                     "default" => %{"currency" => "USD"}
+                   }
+                 ]
+               })
+    end
+
+    # Sabotage: decoded an unknown step key with `String.to_atom/1` - red.
+    # A step map carrying any key other than the four is refused BY NAME,
+    # which is the practice `decode_param/1` already follows.
+    test "a step key this shape cannot spell" do
+      errors = authorize_error(%{"migrations" => [%{"from" => 1, "transform" => %{}}]})
+
+      assert Enum.any?(errors, &(&1 =~ "cannot spell"))
+      assert Enum.any?(errors, &(&1 =~ "transform"))
+    end
+
+    # Sabotage: treated a step with no part as a no-op - red. Its `"from"`
+    # claims a version bump that changed nothing, which is the hygiene
+    # obligation's business rather than a migration's.
+    test ~s(a step carrying none of "rename", "drop" and "default") do
+      errors = authorize_error(%{"version" => 2, "migrations" => [%{"from" => 1}]})
+
+      assert Enum.any?(errors, &(&1 =~ "carries none of"))
+    end
+
+    # Sabotage: let the overlap through and let the fixed order settle it -
+    # red. A key named by both is a contradiction rather than an ordering
+    # question.
+    test ~s(a key named by both "drop" and "default" in one step) do
+      errors =
+        authorize_error(%{
+          "version" => 2,
+          "migrations" => [
+            %{"from" => 1, "drop" => ["currency"], "default" => %{"currency" => "USD"}}
+          ]
+        })
+
+      assert Enum.any?(errors, &(&1 =~ ~s(both "drop" and "default")))
+    end
+
+    # Sabotage: accepted a `"from"` of 0 and a non-list `"migrations"` - red.
+    # Every refusal is here, at entry-build time, because a callback must be
+    # pure and total and `fetch/2` must not raise.
+    test "the shapes: a non-list, a non-map step, and a non-positive from" do
+      assert Enum.any?(authorize_error(%{"migrations" => %{}}), &(&1 =~ "must be a list"))
+
+      assert Enum.any?(
+               authorize_error(%{"migrations" => ["step"]}),
+               &(&1 =~ "must be a map")
+             )
+
+      assert Enum.any?(
+               authorize_error(%{"migrations" => [%{"from" => 0, "drop" => ["x"]}]}),
+               &(&1 =~ "positive integer")
+             )
+
+      assert Enum.any?(
+               authorize_error(%{"migrations" => [%{"drop" => ["x"]}]}),
+               &(&1 =~ ~s(declares no "from"))
+             )
+
+      assert Enum.any?(
+               authorize_error(%{"version" => 2, "migrations" => [%{"from" => 1, "drop" => "x"}]}),
+               &(&1 =~ ~s("drop" must be a list))
+             )
+
+      assert Enum.any?(
+               authorize_error(%{
+                 "version" => 2,
+                 "migrations" => [%{"from" => 1, "rename" => %{"a" => ""}}]
+               }),
+               &(&1 =~ ~s("rename" must map))
+             )
+
+      assert Enum.any?(
+               authorize_error(%{
+                 "version" => 2,
+                 "migrations" => [%{"from" => 1, "default" => []}]
+               }),
+               &(&1 =~ ~s("default" must be a map))
+             )
+
+      assert Enum.any?(
+               authorize_error(%{
+                 "version" => 2,
+                 "migrations" => [%{"from" => 1, "default" => %{"" => 1}}]
+               }),
+               &(&1 =~ ~s("default" must be a map with non-empty string keys))
+             )
+    end
+
+    # Sabotage: undid `"drop"` and `"default"` the other way round - red.
+    # Undoing a `"drop"` ADDS the key back, so a step dropping a key the
+    # current shape still declares is naming one the shape above it does not
+    # have; undoing a `"default"` REMOVES it, so a step defaulting a key the
+    # current shape never declares is the same fault.
+    test ~s(the backwards walk over a "drop" and over a "default") do
+      dropped =
+        authorize_error(%{
+          "version" => 2,
+          "migrations" => [%{"from" => 1, "drop" => ["currency"]}]
+        })
+
+      assert [dropped_message] = dropped
+      assert dropped_message =~ "unknown key"
+      assert dropped_message =~ "currency"
+
+      defaulted =
+        authorize_error(%{
+          "version" => 2,
+          "migrations" => [%{"from" => 1, "default" => %{"no_such_param" => 1}}]
+        })
+
+      assert [defaulted_message] = defaulted
+      assert defaulted_message =~ "unknown key"
+      assert defaulted_message =~ "no_such_param"
+    end
+  end
+
+  describe "a module composite is untouched by the migrations key" do
+    # Sabotage: derived a chain for a `use`-composite from a `migrations:`
+    # option - red. A module composite has the whole of Elixir for the job:
+    # it writes `migrate_config/2` itself, and ADR-0007's injected refusal
+    # stays the default for one that does not.
+    test "its migrate_config/2 is ADR-0007's injected refusal, unchanged" do
+      assert GuardedStep.migrate_config(1, %{"invoke_type" => "myapp:authorize"}) ==
+               {:error, {:no_migration_from, 1}}
+    end
+
+    # Sabotage: put `:migrations` into the normalized declaration - red. The
+    # key is the DATA kind's answer to a question the module kind never had,
+    # and `__composite__/0` is the shape both kinds share.
+    test "its declaration carries no migrations key" do
+      refute Map.has_key?(GuardedStep.__composite__(), :migrations)
+      refute Map.has_key?(Data.__composite__(authorize_state()), :migrations)
+    end
+  end
 end
