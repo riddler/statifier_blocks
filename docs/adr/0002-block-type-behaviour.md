@@ -4953,3 +4953,350 @@ flip here.
 
 Filed with `sb-jvz3`, against `ADR-0013` as merged; campaign-SF035, from
 campaign-034's ruling `RQ-034-2`. `sb-nqfd` builds the callback.
+
+## Amendment (2026-09-06): decision 7, the `{:type_expr, opts}` field type
+
+**Status: proposed (2026-09-06).** Drafted for `sb-zvar` under the operator's
+campaign-SF035 grant, recording that campaign's ruling `RQ-SF035-1`, and
+merging at proposed under that campaign's invariant like every other section
+filed with it; flipping it to accepted is a separate gated request, and
+`sb-wzoa` carries it. Additive: decision 7 and every amendment and Note it has
+taken - `value_path` (2026-08-27), `datamodel_path?` (2026-08-29), `sensitive?`
+(2026-08-29), the `{:path, opts}` amendment at `:2761` and the Note that gave
+`opts` its first two keys at `:3456` - all stand exactly as written, and no
+text above this line is edited by this section.
+
+It is appended at the **end of this file** rather than beside decision 7 for
+the reason the Note at `:4803` gives about itself: `ADR-0013` cites this record
+by line number, and three of the four lines it names sit inside `P3`
+(`docs/adr/0013-typed-fan-out-child-summary.md:143-144`, citing `:4108`,
+`:4121-4122`, `:4126` and `:4133`). An insert above any of them would leave
+another record on `main` pointing at the wrong text.
+
+### Context
+
+`P3` of the payload amendment of 2026-09-06 (`:4108`) split a type expression
+into two arms and took one of them. The declared-name arm got a field typed
+`:string`; the inline-shape arm got no field type, "and none is invented for
+it" (`:4133`), under the sentence the section closes its opening on at
+`:4121-4122`: "**No ninth field type is added by it.**" The reason given there
+was not that the arm is unwanted but that no member of decision 7's set
+describes a shape, and adding one to spell a shape nothing stored yet would
+have been a second proposal riding along with the first.
+
+`ADR-0013` reached the same fork the same day and took the same half.
+`collect_type` on `core.map` is declared `:string`, "ADR-0002 decision 7's set
+stays closed at the eight members declared today ... and no ninth is added
+here" (`docs/adr/0013-typed-fan-out-child-summary.md:133-135`). That record then
+deferred the inline arm **by name**, to this campaign's typed-shapes theme, as
+four things only worth deciding together: a `{:type_expr, opts}` member of this
+record's field-type set, an inline-shape inhabitant of
+`StatifierBlocks.Environment`'s `type_expr()`, the editor control that renders
+one, and the migration of `payload` onto the same spelling
+(`:148-157`). "Each on its own is a partial answer, and `payload` is already
+waiting for the whole one."
+
+This section is the **first** of those four, and the other three are placed
+rather than pending: the control's row is decided beside it, the environment's
+inhabitant is `sb-myt1`'s, and the migration is `sb-268w`'s. What all four were
+waiting on - a way to *say* a shape without naming it - has landed.
+
+**A shape can be said without being named.** `sd-ADR-0001`'s inline-shape
+amendment is accepted in `statifier_datamodel` on this campaign's ruling
+`RQ-SF035-1`, and its code is on that repository's `main`. A type expression
+there may now be `{:shape, members}`, `members` an ordered list of maps each
+carrying exactly `name`, `type` and `required?`; member order is authoring
+order and identity is member-set-wise; an inline shape is **built by a
+consumer** and has no document syntax. That is the vocabulary this package
+reads and does not mint, exactly as `P2` says of the rest of it (`:4076`).
+
+**The control has a row.** `ADR-0005`'s Note of 2026-09-06
+(`docs/adr/0005-liveview-editor.md:7006`) decides how a `{:type_expr, opts}`
+field is drawn - a `<datalist>` of the document's declared type names for the
+name arm, a member-list form in the inspector's Config tab for the inline arm,
+a toggle when a field admits both - and says in terms that the field type
+itself is this record's: what it stores, what `opts` carries, what config-time
+validation reads, and which fields migrate. This section is that half.
+
+**Two fields want it.** `payload` on `core.on_event` is declared `:string`
+today (`lib/statifier_blocks/core/on_event.ex:287-292`), by `P3`.
+`collect_type` on `core.map` is declared `:string` by `ADR-0013` decision 1 and
+is not in `config_schema/1` yet (`docs/adr/0013-typed-fan-out-child-summary.md:568-578`).
+`P3`'s objection - a member for a shape nothing stores - is spent: two fields
+store one, one of them shipped.
+
+### Decision
+
+**Decision 7's closed field-type set gains a ninth member, `{:type_expr,
+opts}`.** The set is `:string`, `:integer`, `:boolean`, `{:select, choices}`,
+`:expression`, `:duration`, `{:list, field_type}`, `{:path, opts}`, and now
+`{:type_expr, opts}`. It is still closed, and this is a widening by one named
+member rather than an opening, on the argument the eighth member was admitted
+on (`:2801-2806`): the property the closed set exists for is that the editor
+can draw every member, and a type expression left as a bare `:string` gets no
+list of declared names and no form for an inline shape, exactly as a path left
+as a bare `:string` got no candidates and no advisory.
+
+**1. What the field holds: three arms, and the third is absence.** A
+`{:type_expr, opts}` field's value is one of:
+
+- **a declared type name** - the `name` of a `record` or a `shape` the
+  datamodel document's `types` key declares, stored as text and resolved with
+  `StatifierDatamodel.Declarations.fetch/2`. This is the arm `P3` already
+  decided and the arm every stored value is today;
+- **an inline shape** - `sd-ADR-0001`'s `{:shape, [member()]}`, a member being
+  `%{name: String.t(), type: t(), required?: boolean()}`. This record **cites**
+  that spelling and does not respell it: the grammar, member order, the
+  member-set-wise identity and the rule that a member's type is never absent
+  are written down in that amendment and only there;
+- **absent** - no key, or an empty value. That is what every document written
+  before this date carries, and clause 5 says what it means.
+
+**1a. The stored spelling is JSON, and neither arm is an Elixir term on disk.**
+`ADR-0001` owns the stored bytes and a block's `config` is opaque JSON, so
+`ADR-0005`'s Note is right to send the question here and this clause answers
+it:
+
+- the **name arm** is a JSON **string** - exactly the bytes both migrating
+  fields store today;
+- the **inline arm** is a JSON **list of objects**, each carrying `"name"`,
+  `"type"` and the optional boolean `"required?"`. Those are the same three
+  keys, spelled the same way, that a field object carries inside a datamodel
+  document's declaration (`sd-ADR-0001` decision 5, whose worked shape writes
+  `{"name": "brand", "type": "string", "required?": true}`). A member's
+  `"type"` is itself a type expression under this clause, so a member may hold
+  a member list of its own and the spelling recurses;
+- the **absent arm** is a missing key, `null`, or `""`.
+
+The two arms are told apart by the JSON type alone and no tag key is minted
+for it: a string is never a member list. `{:shape, members}` is the Elixir term
+this package **builds** from that list when it hands the value to
+`statifier_datamodel` (clause 3); it is never what a document holds.
+
+This adds no document syntax to `statifier_datamodel` and does not reopen its
+clause (c). A block document is `ADR-0001`'s and has carried consumer-built
+values since it existed, which is the distinction `ADR-0005`'s Note draws in
+the same words.
+
+There is no fourth arm. A scalar spelling and an opaque string are not arms of
+their own: they are what `StatifierDatamodel.Types.parse/2` returns for text
+the document declares nothing for, they are read exactly as that package reads
+them, and `P2`'s sentence about them is unchanged (`:4095-4099`).
+
+**2. `opts` carries two keys, and both are optional.** `opts` is the second
+element of a tuple for the reason `{:select, choices}`, `{:list, inner}` and
+`{:path, opts}` have one (`:2822-2830`): what a control needs can arrive
+without widening the set a second time.
+
+```elixir
+@type type_expr_opts :: %{
+        optional(:arms) => [:name | :inline, ...],
+        optional(:allow_empty?) => boolean()
+      }
+```
+
+and decision 7's field-type union gains `| {:type_expr, type_expr_opts()}`
+beside `{:path, path_opts()}`, in the reading the last bullet of *What this
+section does not decide* describes rather than in the bytes of any of the
+three places that union is written out.
+
+- **`arms: [:name | :inline]`** - which arms this field admits. The default is
+  both. A field declaring `arms: [:name]` admits a declared name and nothing
+  else; a field declaring `arms: [:inline]` admits a member list and nothing
+  else. It is the key `ADR-0005`'s Note of 2026-09-06 reads to decide whether
+  its control draws a toggle, and it is why that decision needed no key of its
+  own.
+- **`allow_empty?: boolean()`** - whether the absent arm is admitted. The
+  default is `true`, which is what both migrating fields want and what every
+  stored document already is. A field declaring `allow_empty?: false` has an
+  empty value refused by clause 4's shared check rather than by each block type
+  re-implementing the same test in `validate_config/1`.
+
+`allow_empty?` and decision 7's own `required?` flag are **not** the same
+claim, and a declaration carrying `required?: true` with `allow_empty?: true`
+is neither a contradiction nor a finding. `required?` is a field declaration's
+flag on every field type, and decision 7 fixes what it is: part of a rendering
+hint, above the sentence that makes `validate_config/1` the authority
+(`:180-186`, `:216-226`). `allow_empty?` is scoped to this member and says what
+this member's own shared check does with an empty value. Neither reads the
+other, and `validate_config/1` remains the authority over both, per decision 7
+unamended.
+
+No third key is defined here. Read/write direction is not one: a type
+expression names a type and never a location, so the key the `{:path, opts}`
+amendment holds open for its own `opts` (`:2826-2829`) has nothing to say about
+this member.
+
+**3. Config-time validation reads the document's declarations for the name arm,
+and builds the inline arm rather than parsing it.** Both halves run in the
+compile's `:config` stage, against the **same** `:datamodel` compile option the
+typed environment and `P2` already read - one document, supplied once, read
+once.
+
+- **The name arm** resolves through `StatifierDatamodel.Declarations.fetch/2`,
+  which is the resolution `P2` names for `payload` and is unchanged by this
+  section.
+- **The inline arm is constructed here, not parsed there.**
+  `sd-ADR-0001`'s clause (c) is explicit that `Types.parse/2` reads a *binary*
+  spelling, that there is no document syntax for an inline shape, and that one
+  enters that package only as an argument a consumer hands `Types.satisfies/3`.
+  So this package builds the `{:shape, members}` term from the members stored
+  in the block's `config` and hands it over; it does not ask `Types` to parse a
+  shape out of bytes, because that function does not do it and this section
+  does not ask that package to change. Member well-formedness is
+  `sd-ADR-0001`'s and is read from there, not restated here: a member whose
+  `name` is not a non-empty string contributes nothing, a repeated member name
+  keeps its first occurrence, and a member `type` that resolves to nothing is
+  the datamodel's unknown.
+
+**4. The refusal, and the two things that are not refusals.** A stored value
+that is **neither arm the field admits** - text where `arms: [:inline]`, a
+member list where `arms: [:name]`, an empty value where `allow_empty?: false`,
+or bytes that are no arm at all - is a `:config` finding at compile, anchored
+on the block and carrying the field's `key` as its `config_key`. That is the
+existing anchor and the existing key: `{:config, block_id, key}` routes beneath
+the field by decision 11's rule in `ADR-0005`, and `config_key` is the key on
+the `Finding` struct already, which `sb-8mki`'s declaration refusal sets and
+which campaign-SF035's ruling `RQ-SF035-5` settled as the place a field-scoped
+finding names its field rather than growing the anchor tuple. No new finding
+code, no new
+severity, no new option. `ADR-0005`'s Note of 2026-09-06 draws such a value raw
+in the name arm's text input with this finding beneath it, and adds none of its
+own.
+
+Two cases are **not** refusals, and are named so neither is read as a gap:
+
+- **A name the document does not declare.** It resolves to nothing and is the
+  undeclared case, exactly as `P4` fixed it for `payload` (`:4166-4172`): this
+  section decides no finding for it, and whether it earns an advisory is
+  `ADR-0005` clause `11e`'s kind of question. `ADR-0005`'s Note reaches the
+  same answer from the control's side - the `<datalist>` "suggests and never
+  constrains".
+- **A compile with no `:datamodel`.** No declared name resolves, and clause 5
+  governs, which is `P2`'s sentence unchanged.
+
+**5. An absent value is today's behaviour, exactly.** A block whose config
+carries no value for a `{:type_expr, opts}` field - which is every block in
+every document authored before this date - is unchanged in every respect: no
+new finding at any severity, and identical compiled bytes, because neither
+migrating field emits anything. `ADR-0011` decision 12 already says what an
+absent `collect_type` means and `P4` already says what an absent `payload`
+means; this section changes neither.
+
+**6. `datamodel_path?/1` is false for a `{:type_expr, opts}` field.** The
+field is a **type**, never a path and never an expression - the sentence
+`ADR-0013` decision 1 already writes about `collect_type`
+(`docs/adr/0013-typed-fan-out-child-summary.md:171-174`).
+`StatifierBlocks.BlockType.datamodel_path?/1` is total and true for two
+spellings only, `{:path, _opts}` and the literal `datamodel_path?: true`
+(`lib/statifier_blocks/block_type.ex:760-762`), so it answers `false` here
+without a clause being added to it, and this section adds none. What follows is
+what should follow: no path candidate list, no `ADR-0005` clause `11e`
+undeclared-path advisory, and no `AssignLocation` read. `ADR-0005`'s Note keeps
+the two feeds disjoint on `sd-ADR-0001` decision 7's own ground - the `types`
+key contributes no path, so the declared paths a `{:path, opts}` field suggests
+and the declared type names this one suggests share no member and are never
+merged.
+
+**7. Two fields migrate to it, and `sb-268w` migrates them.**
+
+| Field | Declared today | After the migration |
+|---|---|---|
+| `payload` on `core.on_event` | `:string`, by `P3` (`lib/statifier_blocks/core/on_event.ex:287-292`) | `{:type_expr, opts}` admitting both arms |
+| `collect_type` on `core.map` | `:string`, by `ADR-0013` decision 1; not in `config_schema/1` yet (`docs/adr/0013-typed-fan-out-child-summary.md:133-135`, `:568-578`) | `{:type_expr, opts}` admitting both arms |
+
+**Nothing migrates by this section being accepted.** `sb-268w` carries both, as
+`ADR-0013` named it, and it is the same shape the `{:path, opts}` amendment
+took: that section named `core.subchart`'s `assign_to` and left the migration
+to `sb-2ym4` (`:2849-2854`). Which arms each field ends up admitting is that
+bead's, within what clause 2 defines; both want both today.
+
+**8. A stored string stays valid as the name arm, and no document changes.**
+Both migrating fields store text today, and after the migration that text is
+read as the name arm: the same bytes, the same resolution through
+`Declarations.fetch/2`, the same findings. No stored document is rewritten, no
+`migrate_config/2` is called for it, and `ADR-0001`'s `schema_version` stays at
+`1` - a field type is a block-type contract, which is this record's, and that
+is the argument `P1` made for `payload`'s key itself (`:4066-4070`).
+
+This is the whole of what makes the deferral `P3` and `ADR-0013` both took a
+deferral rather than a debt: the arm each of them declined was additive to a
+value neither of them changed.
+
+**9. The `default:` rule for a `{:path, opts}` field, stated in the record.**
+Campaign-SF035's ruling `RQ-SF035-6` rides here because it is decision 7's
+rule and had no home in the record. A field declaration has always had to carry
+`default:` - it is a required key of `field_decl/0` - and a `{:path, opts}`
+field declared without it is **refused at declaration**, in the compile's
+`:config` stage, as a finding anchored on the block and carrying the field as
+its `config_key`. It is never a render-time raise, which is what the omission
+produced before: a `FunctionClauseError` from inside the view-model build,
+naming neither the block type nor the field, in whichever screen happened to
+draw the block. `sb-8mki`'s code is on `main`
+(`lib/statifier_blocks/compiler.ex:619-637`).
+
+Three things this clause is careful **not** to say:
+
+- **No example in this record gains a `default:`.** Every full
+  `config_schema/1` example above already carries the key on every field; the
+  only spelling that omits it is the inline `type: {:path, %{}}` at `:2830`,
+  which is a sentence about a type and not a declaration. Nothing above this
+  line is edited, here least of all.
+- **The refusal is not widened past `{:path, opts}` by this clause.** For every
+  other field type the view model reads `default:` permissively and renders a
+  declaration written without it, so a `{:type_expr, opts}` field declared
+  without the key renders rather than raising. The code says in as many words
+  that widening the refusal to every field type "is a change to what a block
+  type may declare, which is the record's call and not this stage's"
+  (`lib/statifier_blocks/compiler.ex:604-611`). This section does not take that
+  call. It is open, and it is not opened or closed here.
+- **It attributes no fault.** Whether the pre-refusal raise was the view
+  model's, the declaration's or the typespec's is not a question this record
+  answers, and none of the three is named here as the one that was wrong.
+
+### What this section does not decide
+
+- **The control.** How either arm is drawn, what feeds the name arm's list,
+  where the inline form renders and what a toggle does are `ADR-0005`
+  decision 9's, decided by its Note of 2026-09-06
+  (`docs/adr/0005-liveview-editor.md:7006`). Not restated here, and not
+  reopened.
+- **The environment's inhabitant.** `StatifierBlocks.Environment`'s
+  `type_expr/0` (`lib/statifier_blocks/environment.ex:93`) has no inline-shape
+  inhabitant today, and admitting a field type does not admit one: an
+  environment entry and a config field are different values in different
+  places. `ADR-0011` decision 1 is amended for it by `sb-myt1`, which is in
+  flight as this section is written and unmerged - cited as the record that
+  takes the question, not as a record whose text this one has read on `main`.
+  A reader after both have landed reads that amendment for the environment's
+  grammar and this section for the field's.
+- **The migration itself.** `sb-268w`, per clause 7.
+- **Widening the `default:` refusal.** Per clause 9.
+- **The record's own typespec appendix is not edited, and neither is the code,
+  yet.** Decision 7's list is written out in three other places, and the
+  convention the `{:path, opts}` amendment states at `:2871-2877` is read into
+  this section unchanged: this member is added to each of them **in the
+  reading** rather than in the bytes, and a reader who finds eight values in
+  one of them and nine here is looking at that convention rather than at drift.
+  Two are code - `field_type/0` (`lib/statifier_blocks/block_type.ex:149-157`)
+  and the "eight closed `field_type/0` values" sentence in `config_schema/1`'s
+  doc (`:260-262`) - and the code follows the record, so `sb-1jcr` moves both.
+  The third is *The contract as typespecs* above, whose `field_type` union
+  still lists the original seven (`:448-455`).
+- **Anything about the wire format.** Nothing here adds a trace type or moves
+  a version; a config field is not a trace event.
+
+### Where the counts stand after this section
+
+`ADR-0005`'s Note of 2026-09-06 closes by saying its decision 9 table "holds
+eight rows of a set of nine". The set of nine is this one, and that Note is
+the row for the ninth member; the row it says is still owed is `{:path,
+opts}`'s, which is that record's debt and not this one's. Sections on `main`
+that count the set at eight - `P3` at `:4108-4133`, the Note at `:4934-4941`,
+`ADR-0013` decision 1, and the `config_schema/1` doc at `:260-262` - are each
+accurate as of the day they were written and are read forward under the
+convention above.
+
+Filed with `sb-zvar`, campaign-SF035's Lane A, on ruling `RQ-SF035-1` and
+carrying ruling `RQ-SF035-6`. `sb-268w` migrates the two fields; `sb-1jcr`
+builds the type; `sb-wzoa` flips this section.
