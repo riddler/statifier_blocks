@@ -8821,3 +8821,216 @@ campaign builds `11E` to `13E`.
 
 Filed with `sb-mjrt`, campaign SF037, on rulings `RQ-SF037-2` and `RQ-SF037-4`,
 folding `sb-luo1`.
+
+## Amendment (2026-09-07): a `selected_id` a host may write, honoured in `update/2` through `rebuild/1`
+
+**Status: proposed (2026-09-07, campaign SF037, bead `sb-2lx1`, on ruling
+`RQ-SF037-12`).** A decision record merges at proposed under this campaign's
+invariant; flipping it to accepted is a separate gated request, `sb-v3ny`,
+after `sb-gbxt` builds it. Additive. The 2026-09-05 amendment *the host seams,
+`on_select` and a selection descriptor* (`:5107`, whose own status line at
+`:5109` is untouched and stays at proposed), decision 2's closed command set,
+and every other clause above this line stand exactly as written; no text above
+this line is edited by this section. Nothing here is built yet.
+
+Every code cite below is a reading of `main` at `b37cf1d`, dated to this
+section and to be re-read rather than trusted.
+
+### Context
+
+The selection crosses this component's boundary in one direction. The
+2026-09-05 amendment (`:5107`) added `on_select`, and its argument for a
+callback rather than a reader was that a selection "is editor state that only
+the component knows, produced by a gesture on the canvas, and there is no pure
+function of the host's assigns that answers it" (`:5140-:5142`). That argument
+is about *reading* a selection, and it is correct. It says nothing about
+*setting* one, and the assigns table (`lib/statifier_blocks/editor.ex:498-525`)
+accordingly carries no key
+that does.
+
+A host now has a surface that needs to. The 2026-09-07 amendment on
+`ViewModel.Node.sentence` and `ViewModel.outline/1` (`:7852`) hands a host the
+rows to draw its own outline pane or plan view beside the editor, from the same
+walk the canvas draws from. An operator clicking a row in that pane is making a
+selection, and the pane has nowhere to put it. The double-pick the 2026-09-05
+amendment records as the cost of having no seam - "Two selections that must
+agree, with nothing keeping them in agreement" (`:5133-:5134`) - comes back in the
+mirror image: the host's pane and the canvas each hold a selection, `on_select`
+keeps the pane in step with the canvas, and nothing keeps the canvas in step
+with the pane.
+
+What a host reaches for instead is worth recording, because it is the cost.
+`selected_id` is component state with an internal default (`:650` of
+`lib/statifier_blocks/editor.ex`) and no row in the assigns table, but
+`update/2` opens with `assign(assigns)` (`lib/statifier_blocks/editor.ex:707`),
+which writes every key the caller named. A host can therefore pass
+`selected_id` through `send_update/3` today and see something happen. Three
+things are wrong with that, and only the third is obvious:
+
+- **It is an undocumented internal.** The record does not list it, so nothing
+  about it is promised: a rename, a split, or a move into a struct is a change
+  this record would be free to make, and it would break a host silently.
+- **It is not normalized.** The internal paths are careful never to leave
+  `selected_id` naming a block the document does not hold - `remove_block/2`
+  clears it when the removed block was the selected one
+  (`lib/statifier_blocks/editor.ex:1737`), `remove_compound/2` does the same for
+  a set (`:1749`), and `switch_document/2` clears it outright on a document
+  swap (`:2007`). A raw write from outside is held to none of that, and an id
+  the document does not hold survives into `notified_id`
+  (`lib/statifier_blocks/editor.ex:651`, `:3372`), where it silences the next
+  genuine selection of a real block that happens to be compared against it.
+- **It is unguarded.** `assign(assigns)` writes what the caller named, so a
+  host that passes the key on one `send_update/3` and not the next is not
+  clearing the selection, it is leaving it - which is the right behaviour, but
+  it is the right behaviour by accident rather than by a rule anyone wrote
+  down.
+
+There is already an assign of exactly this kind, and it is the model.
+
+### Decision
+
+**1S. `selected_id` is a documented input assign, honoured only when the update
+carries it.** It gains a row in the assigns table
+(`lib/statifier_blocks/editor.ex:498-525`) beside `on_select` (`:506` of that
+file), and a guarded branch in `update/2`
+(`lib/statifier_blocks/editor.ex:699`) keyed on
+`Map.has_key?(assigns, :selected_id)`, placed with the other guarded branches
+and before `{:ok, rebuild(socket)}` (`:782`). The guard is `active_marks`'
+guard (`lib/statifier_blocks/editor.ex:757-763`) and it is there for the reason
+that branch's comment gives (`:751-:756`): `send_update/3` "delivers the keys
+it names and nothing else", so an assign read unguarded vanishes on the next
+re-render the host made for a reason of its own. An update that does not carry
+the key leaves the selection exactly as the author left it.
+
+**2S. `active_marks` is the symmetry, clause for clause.** `active_marks` is
+the existing host-supplied assign that is *held as editor state* rather than
+merely read: it has a row in the assigns table
+(`lib/statifier_blocks/editor.ex:513`) that says so, a
+`has_key?` guard (`lib/statifier_blocks/editor.ex:758`), a normalizer on
+the way in (`active_list/1`, `lib/statifier_blocks/editor.ex:2095-2100`), a
+derived companion assigned in the same breath (`:active_ids`, `:761`), and a
+reset on a document swap (`switch_document/2`,
+`lib/statifier_blocks/editor.ex:2023`). `selected_id` takes that shape and adds
+nothing to it: guard, normalizer (3S), and a reset on document swap it already
+has (`:2007`). This is not a new kind of assign; it is the second member of a
+kind this record already has one of.
+
+**3S. An id the document does not hold clears the selection.** The branch
+resolves the incoming id against the document being rendered. If it resolves,
+`selected_id` becomes that id. If it does not - a stale row, a block a
+collaborator removed, a typo - `selected_id` becomes `nil`, and *not* the
+unknown id. This is the invariant `:1737`, `:1749` and `:2007` already keep
+from the inside, stated once for the outside: `selected_id` never names a block
+the document does not hold. Refusing the update instead was considered and
+rejected: a host whose pane is one render behind the document is the normal
+case, not an error, and `update/2` has no channel to refuse on - it answers
+`{:ok, socket}` and nothing else.
+
+**4S. Clearing fires `on_select` with `nil`, and so does every other change.**
+The branch sits before `rebuild/1` (`lib/statifier_blocks/editor.ex:2824`),
+which calls `notify_select/2` (`:2844`, `:3363`), so an input selection is
+reported out on exactly the terms the 2026-09-05 amendment set: `nil` is a
+selection and is delivered like one (`:5175`), and the callback fires when the
+selection changes and not otherwise (`:5182`) - a host that writes the id
+already selected gets no callback, because `notify_select/2` compares against
+`notified_id` (`lib/statifier_blocks/editor.ex:3364`) and finds no change.
+Because 3S normalizes *before* `rebuild/1` runs, `notified_id` records `nil`
+rather than the unknown id, and the next selection of a real block fires.
+
+A host that both writes `selected_id` and passes `on_select` therefore hears
+its own write back. That is deliberate and it is not an echo to suppress: the
+callback reports what the component's selection *is*, the write says what the
+host would like it to be, and 3S is precisely the case where the two differ.
+A host that suppressed its own write would never learn that its id was cleared.
+
+**5S. It is an input, not a command.** A selection is editor state and not a
+document edit. Decision 2's closed command set is untouched by this section:
+there is no `:select` command, nothing about a selection is serialized, stored,
+undone or redone, and `on_change` does not fire for one. This is the same
+closure the 2026-09-05 amendment states at `:5188` ("No new command, and
+`on_change` is untouched"), read from the other side - that section closed the
+command set against the seam *out*, and this one adds no command to the seam
+*in*. The moduledoc's "There is no `:select` command"
+(`lib/statifier_blocks/editor.ex:461`) stands as written and needs no
+qualification, because a documented assign is not a command.
+
+**6S. The input takes the canvas gesture's companion resets, and nothing
+else.** Selecting on the canvas closes the palette sheet and drops the
+config-field focus in the same assignment
+(`lib/statifier_blocks/editor.ex:1070`), because both are anchored to the block
+the author was working on. A selection arriving from a host's pane leaves the
+same two surfaces stale, so it takes the same two resets. It does *not* open
+the drawer, change the inspector tab, scroll the canvas, or discard a draft: a
+host that moves the selection is saying which block the editor is about, not
+operating the editor's chrome.
+
+### Worked example: an outline row click in the signup domain
+
+A host mounts the editor for its `myapp:signup` document and draws its own
+outline pane beside it from `ViewModel.outline/1` (`:7852`), one row per block.
+The operator clicks the row for the block that sends the confirmation. The host
+holds that row's block id, and calls
+
+    send_update(StatifierBlocks.Editor,
+      id: "signup-editor",
+      selected_id: "blk_send_confirmation"
+    )
+
+`update/2`'s guarded branch reads the key (1S), the id resolves against the
+document (3S), and `rebuild/1` draws the canvas with that block selected and
+the inspector addressing it. `notify_select/2` sees the selection change and
+calls the host's `on_select` with
+`%{id: "blk_send_confirmation", type: ..., label: ...}` (4S), which the host's
+pane uses to mark the row it just clicked - the same descriptor a canvas click
+would have produced, by the same path. The two surfaces agree, and neither is
+the authority: whichever one the operator touched last is.
+
+Now suppose a collaborator removed that block and the host's pane is a render
+behind. The id does not resolve, 3S clears the selection to `nil`, and
+`on_select` fires with `nil`. The host's pane empties itself, which is the
+behaviour the 2026-09-05 amendment already requires of a panel that follows the
+canvas (`:5175`), reached here through the input rather than through a
+deselection gesture. What does *not* happen is the inspector addressing a block
+that is gone.
+
+### Consequences
+
+- **A host's own outline pane or plan view becomes a selection surface.** That
+  is the whole of what this buys. `on_select` made the canvas's selection
+  observable; this makes it writable, and the pair is what a two-surface host
+  needs to keep one selection rather than two.
+- **The host acquires no obligation.** The assign is optional, its internal
+  default (`lib/statifier_blocks/editor.ex:650`) is unchanged, and a host that
+  never passes it sees no difference of any kind.
+- **Two writers, one assign, and no conflict to resolve.** The canvas gesture
+  and the host both write `selected_id`, one write per update, last write wins.
+  There is no merge, no priority and no "host mode": a selection has one value
+  and the most recent gesture - from either side - decides it.
+- **The inspector is unaffected.** It reads the selection out of component
+  state exactly as it does today; this section changes where a write may come
+  from, not what reads it.
+- **Expand is the first in-package consumer, and `3E` is unaffected.** Clause
+  `3E` (`:8524`) selects the first expanded block after the compound commits,
+  and it does so for the reason 3S generalizes: the composite's id "is gone
+  from the document, so leaving `selected_id` ... pointing at it would leave
+  the inspector addressing a block that no longer exists" (`:8531-:8534`).
+  That is the invariant of 3S, reached from inside the component, and Expand
+  is the first thing in this package to need it - which is why `3E` is the
+  first in-package consumer of this section's rule rather than an exception to
+  it. Nothing in `3E` is revised: it names an internal write
+  (`lib/statifier_blocks/editor.ex:1723` is the existing shape of one), and an
+  internal write that already names a block the document holds satisfies 3S
+  trivially. What this section adds is that one normalization now answers both
+  paths, which is `sb-gbxt`'s to arrange.
+- **Nothing about the wire format, the document, or the command set.** No new
+  command (5S), no serialized field, no schema change. A document is what
+  `ADR-0001` says it is, before and after.
+
+### Implementing and flipping beads
+
+`sb-gbxt` builds this section from it as merged - the assigns-table row, the
+guarded branch, the normalization, and the tests that prove 3S and 4S. `sb-v3ny`
+flips this section's status line to accepted after `sb-gbxt` lands, and re-reads
+every cite above against `main` as it stands then.
+
+Filed with `sb-2lx1`, campaign SF037, on ruling `RQ-SF037-12`.
