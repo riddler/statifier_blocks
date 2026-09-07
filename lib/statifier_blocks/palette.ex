@@ -214,10 +214,11 @@ defmodule StatifierBlocks.Palette do
   `from_modules/2` a list, so insertion order is not a fact about a palette
   and the manifest does not carry one.
 
-  This is the one function here that calls into the modules a palette
-  names - `current_version/0` on each, the same call `resolve/2` makes - so
-  a palette naming a module that is not compiled raises here, where
-  `fetch/2` would not.
+  This function calls into the modules a palette names - `current_version/0`
+  on each, the same call `resolve/2` makes - so a palette naming a module
+  that is not compiled raises here, where `fetch/2` would not.
+  (`from_modules/2`'s duplicate-`order` check also calls a module, but only
+  one it can already load, and it skips the rest rather than raising.)
   """
   @spec manifest(t()) :: [manifest_entry()]
   def manifest(%__MODULE__{types: types, recipes: recipes}) do
@@ -285,16 +286,26 @@ defmodule StatifierBlocks.Palette do
   need a declaration the accepted behaviour does not have, and adding one
   is a change to that record rather than an implementation convenience.
 
-  ## What it does not check
+  ## What it checks, and what it does not
 
-  It does not load the module, does not assert the behaviour, and does not
-  call a callback. A palette is a value that may name a module compiled
-  later, and every consumer already carries the unresolvable case as an
-  ordinary arm (ADR-0002 decision 3). What it *does* refuse is an entry
-  that is not a `{type_name, module}` pair at all: that is a mount-time
-  programmer error with no sensible degraded reading, so it raises
-  `ArgumentError` naming the offending entry rather than quietly building
-  a palette missing a type the host believes it registered.
+  It does not assert the behaviour, and it does not resolve a module it
+  cannot load: a palette is a value that may name a module compiled later,
+  and every consumer already carries the unresolvable case as an ordinary
+  arm (ADR-0002 decision 3).
+
+  It refuses two things, both mount-time programmer errors with no sensible
+  degraded reading, each raising `ArgumentError` rather than quietly
+  building a palette a host would misread:
+
+    * an entry that is not a `{type_name, module}` pair at all - the message
+      names the offending entry;
+    * two entries of one palette-browser **group** declaring the same
+      `order` - the message names both, by name and module. ADR-0005
+      decision 10 sorts a group by `order`, so a duplicate leaves the pick
+      between the two to whatever the sort happened to do. Types and recipes
+      are checked together, because the browser draws them into one group.
+      An entry whose module is not loaded, exports no `palette_entry/0`, or
+      declares no `order` is skipped, not refused.
   """
   @spec from_modules([registration()], keyword()) :: t()
   def from_modules(registrations, opts \\ []) when is_list(registrations) do
@@ -303,9 +314,62 @@ defmodule StatifierBlocks.Palette do
     recipe_base = if core?, do: core_recipes(), else: %{}
     recipes = Enum.reduce(Keyword.get(opts, :recipes, []), recipe_base, &register_recipe/2)
 
-    registrations
-    |> Enum.reduce(base, &register/2)
-    |> new(Keyword.put(opts, :recipes, recipes))
+    types = Enum.reduce(registrations, base, &register/2)
+
+    refute_duplicate_orders!(types, recipes)
+
+    new(types, Keyword.put(opts, :recipes, recipes))
+  end
+
+  # ADR-0005 decision 10 sorts a palette browser group by its entries'
+  # `order`, so two entries of one group declaring the same number leave the
+  # pick between them to whatever the sort happened to do - a host reads a
+  # stable-looking palette whose two entries can swap places between
+  # releases. There is no degraded reading of "both are seventh", so this is
+  # the second mount-time programmer error `from_modules/2` refuses, beside a
+  # malformed registration, and the message names BOTH entries: the one a
+  # host would have to look for is the one it did not write.
+  #
+  # Types and recipes are checked TOGETHER because the browser draws them
+  # into one group (a recipe carries `group` like a type does) even though
+  # their names live in two namespaces. Entries whose module is not loaded,
+  # exports no `palette_entry/0`, or declares no `order` are skipped rather
+  # than refused - a palette may name a module compiled later (decision 3),
+  # and `order` is an optional key.
+  @spec refute_duplicate_orders!(
+          %{optional(Block.type_name()) => module()},
+          %{optional(recipe_name()) => module()}
+        ) :: :ok
+  defp refute_duplicate_orders!(types, recipes) do
+    (Map.to_list(types) ++ Map.to_list(recipes))
+    |> Enum.flat_map(&ordered_entry/1)
+    |> Enum.group_by(fn {group, order, _name, _module} -> {group, order} end)
+    |> Enum.sort_by(fn {key, _entries} -> key end)
+    |> Enum.find(fn {_key, entries} -> length(entries) > 1 end)
+    |> case do
+      nil ->
+        :ok
+
+      {{group, order}, entries} ->
+        raise ArgumentError,
+              "two palette entries in group #{inspect(group)} both declare order #{order}: " <>
+                (entries
+                 |> Enum.sort()
+                 |> Enum.map_join(" and ", fn {_g, _o, name, module} ->
+                   "#{inspect(name)} (#{inspect(module)})"
+                 end))
+    end
+  end
+
+  @spec ordered_entry({String.t(), module()}) :: [{String.t(), integer(), String.t(), module()}]
+  defp ordered_entry({name, module}) do
+    with true <- is_atom(module) and Code.ensure_loaded?(module),
+         true <- function_exported?(module, :palette_entry, 0),
+         %{group: group, order: order} when is_integer(order) <- module.palette_entry() do
+      [{group, order, name, module}]
+    else
+      _no_declared_order -> []
+    end
   end
 
   @spec register(registration(), %{optional(Block.type_name()) => module()}) ::

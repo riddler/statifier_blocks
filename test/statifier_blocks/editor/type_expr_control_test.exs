@@ -197,6 +197,40 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute has_element?(view, ~s(input#sb-field-summary-2-name))
       end
 
+      # Sabotage: dropped `block_id` from `type_expr_value/1`'s recursive
+      # call - the nested gestures lose the attribute while the outer ones
+      # keep it, and the second pair of assertions goes red (verified). The
+      # id has to survive the recursion for the same reason the path does:
+      # a host reading the event has only what the button carries.
+      test "the member gestures name the block they belong to, at every depth", %{conn: conn} do
+        nested = [
+          %{"name" => "amount_minor", "type" => "integer", "required?" => true},
+          %{"name" => "inner", "type" => [%{"name" => "x", "type" => "string"}]}
+        ]
+
+        view = view(conn, %{"summary" => nested})
+
+        assert has_element?(
+                 view,
+                 ~s(button.sb-field__add[phx-value-path=""][phx-value-block-id="blk_TYP"])
+               )
+
+        assert has_element?(
+                 view,
+                 ~s(button.sb-field__remove[phx-value-path=""][phx-value-block-id="blk_TYP"])
+               )
+
+        assert has_element?(
+                 view,
+                 ~s(button.sb-field__add[phx-value-path="1"][phx-value-block-id="blk_TYP"])
+               )
+
+        assert has_element?(
+                 view,
+                 ~s(button.sb-field__remove[phx-value-path="1"][phx-value-block-id="blk_TYP"])
+               )
+      end
+
       # Sabotage: `member_required?/1` answering `false` for `true` - the
       # promised member stops being checked and this goes red (verified).
       test "a promised member is checked and an unpromised one is not", %{conn: conn} do

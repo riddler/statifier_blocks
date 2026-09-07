@@ -92,7 +92,7 @@ defmodule StatifierBlocks.Core.DeadlineRecipe do
       description: "Puts a timer on this group, and a rule for when it runs out.",
       icon: "clock",
       keywords: ["deadline", "timeout", "timer", "expire", "interrupt", "sla"],
-      order: 7
+      order: 17
     }
 
   @spec enclosing_group(Document.t(), Block.id()) ::

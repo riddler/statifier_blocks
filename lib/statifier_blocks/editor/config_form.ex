@@ -162,7 +162,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <p :for={finding <- @node.form.unrouted} class={["sb-finding", severity_class(finding)]}>
           {finding.message}
         </p>
-        <Field.field :for={field <- @fields} field={field} target={@target} />
+        <Field.field
+          :for={field <- @fields}
+          field={field}
+          target={@target}
+          block_id={@node.block_id}
+        />
         <div :if={@capture_pairs not in [nil, []]} class="sb-capture sb-capture--readonly">
           <p class="sb-capture__label">Capture from the event</p>
           <p :for={{target, source} <- @capture_pairs} class="sb-capture__row sb-field__value">
@@ -214,6 +219,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           :for={field <- rendered_fields(@node.form.fields)}
           field={field}
           target={@target}
+          block_id={@node.block_id}
           expression_component={@expression_component}
           invoke_types={@invoke_types}
           path_candidates={@path_candidates}
