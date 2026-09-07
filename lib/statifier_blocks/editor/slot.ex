@@ -212,6 +212,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:pending_remove, :any,
+      default: nil,
+      doc: """
+      The delete offer the canvas is holding, threaded to `BlockNode`
+      (ADR-0005's 2026-09-07 amendment, clause 3D).
+      """
+    )
+
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:class, :string, default: nil)
@@ -286,6 +294,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           collapsed={@collapsed}
           marks={@marks}
           armed={@armed}
+          pending_remove={@pending_remove}
           target={@target}
           icon={@icon}
         />
@@ -305,6 +314,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:collapsed, :any, default: nil)
     attr(:marks, :any, default: nil)
     attr(:armed, :any, default: nil)
+    attr(:pending_remove, :any, default: nil)
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:depth, :integer, default: 0)
@@ -320,6 +330,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         collapsed={@collapsed}
         marks={@marks}
         armed={@armed}
+        pending_remove={@pending_remove}
         target={@target}
         icon={@icon}
       />

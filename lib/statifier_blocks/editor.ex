@@ -617,7 +617,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # exist for a crafted payload, and a sentence rendered at a control that
     # is not there has no reader.
     @read_only_refused ~w(
-      drop insert-drop remove undo redo
+      drop insert-drop remove remove-confirm remove-cancel undo redo
       dragstart dragend insert-dragstart
       palette-open palette-close palette-pick
       config-change discard-draft field-list-add field-list-remove
@@ -669,6 +669,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          palette_sheet: false,
          palette_collapsed: false,
          palette_unarmed_pick: false,
+         pending_remove: nil,
          inspector_collapsed: false,
          fixtures: nil,
          fixture_runs: nil,
@@ -957,6 +958,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 collapsed={@collapsed_ids}
                 marks={@marks}
                 armed={@palette_position}
+                pending_remove={@pending_remove}
                 target={@myself}
                 icon={@icon}
                 theme={@theme}
@@ -1414,14 +1416,46 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:noreply, socket}
     end
 
+    # ADR-0005's 2026-09-07 amendment, clause 3D. A delete first ASKS the
+    # palette's recipes whether the block is half of an arrangement one of
+    # them recognises. No claim - the overwhelming case, and every case
+    # before this clause - and the commit is `{:remove, id}` byte for byte
+    # what it was. One claim, and the compound is OFFERED rather than
+    # imposed: an author who asked to delete one block and got two removed
+    # without being told would learn not to trust the delete.
+    #
+    # The offer is held as `pending_remove` and drawn by the card's own
+    # delete control (`BlockNode`) as a count and a confirm. That is the
+    # smallest presentation that is honest about what the second click
+    # does, and the amendment leaves the choice open - it takes no layout
+    # ruling, so none is taken here and no mode is added to the editor.
     def handle_event("remove", %{"block-id" => id}, socket) do
-      socket =
-        socket
-        |> update(:selected_id, fn selected -> if selected == id, do: nil, else: selected end)
-        |> update(:drafts, &Map.delete(&1, id))
-        |> commit({:remove, id})
+      # A second delete replaces the first offer rather than leaving two open
+      # on the canvas: an offer is the answer to the gesture the author just
+      # made, and they have just made another one.
+      socket = assign(socket, :pending_remove, nil)
 
-      {:noreply, socket}
+      case recipe_claim(socket, id) do
+        [] -> {:noreply, remove_block(socket, id)}
+        ids -> {:noreply, assign(socket, :pending_remove, %{block_id: id, ids: ids})}
+      end
+    end
+
+    # The author's word. The claim is recomputed rather than replayed: the
+    # document may have moved under the offer, and the recipes are the
+    # authority on what is an arrangement NOW. A claim that has gone away
+    # leaves the plain remove the author asked for in the first place.
+    def handle_event("remove-confirm", %{"block-id" => id}, socket) do
+      socket = assign(socket, :pending_remove, nil)
+
+      case recipe_claim(socket, id) do
+        [] -> {:noreply, remove_block(socket, id)}
+        ids -> {:noreply, remove_compound(socket, ids)}
+      end
+    end
+
+    def handle_event("remove-cancel", _params, socket) do
+      {:noreply, assign(socket, :pending_remove, nil)}
     end
 
     def handle_event("undo", _params, socket) do
@@ -1695,6 +1729,97 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # One block out, unchanged from before clause 3D existed.
+    @spec remove_block(Phoenix.LiveView.Socket.t(), Block.id()) ::
+            Phoenix.LiveView.Socket.t()
+    defp remove_block(socket, id) do
+      socket
+      |> update(:selected_id, fn selected -> if selected == id, do: nil, else: selected end)
+      |> update(:drafts, &Map.delete(&1, id))
+      |> commit({:remove, id})
+    end
+
+    # The arrangement out. ONE `{:compound, ...}`, which by clause 2n is one
+    # undo entry - the arrangement comes out the way it went in, and one undo
+    # puts it back whole.
+    @spec remove_compound(Phoenix.LiveView.Socket.t(), [Block.id()]) ::
+            Phoenix.LiveView.Socket.t()
+    defp remove_compound(socket, ids) do
+      socket
+      |> update(:selected_id, fn selected -> if selected in ids, do: nil, else: selected end)
+      |> update(:drafts, fn drafts -> Map.drop(drafts, ids) end)
+      |> commit({:compound, Enum.map(ids, &{:remove, &1})})
+    end
+
+    # What the recipes say about `id`, or `[]` for "nobody claims it".
+    #
+    # Every recipe in the palette that exports `members/2` is asked, in name
+    # order, and the FIRST valid claim wins. The amendment makes the tiebreak
+    # a deterministic pick rather than a refusal, on the ground that two
+    # recipes recognising one shape is a host having registered two
+    # (clause 1C's collision rule), and an author at delete time needs an
+    # answer rather than an argument.
+    #
+    # Two answers are refused here rather than trusted, both for the reason
+    # `insert_from_recipe/3` refuses an out-of-reach command list - a bound
+    # on a write is a property of the write, not of the module:
+    #
+    #   * a claim naming a block that does not sit in the same enclosing
+    #     block as the asked-about one, which is clause 3C's bound read at
+    #     delete time (`2D`);
+    #   * a claim that does not name the asked-about block at all. By 1D the
+    #     answer includes it when the recipe claims it, so an answer without
+    #     it has not claimed it, and committing it would remove blocks the
+    #     author did not point at while leaving the one they did.
+    #
+    # A claim of one id is no claim: 1D says a compound of one remove and a
+    # plain remove are the same gesture, so it takes the unchanged path.
+    @spec recipe_claim(Phoenix.LiveView.Socket.t(), Block.id()) :: [Block.id()]
+    defp recipe_claim(socket, id) do
+      %{palette: %Palette{recipes: recipes}, document: document} = socket.assigns
+
+      recipes
+      |> Enum.sort_by(fn {name, _module} -> name end)
+      |> Enum.find_value([], fn {_name, module} -> claim(module, id, document) end)
+    end
+
+    @spec claim(module(), Block.id(), Document.t()) :: [Block.id()] | nil
+    defp claim(module, id, document) do
+      with true <- members_exported?(module),
+           [_first, _second | _rest] = ids <- module.members(id, document),
+           true <- id in ids,
+           true <- same_enclosing_block?(document, id, ids) do
+        ids
+      else
+        _no_claim -> nil
+      end
+    end
+
+    @spec members_exported?(module()) :: boolean()
+    defp members_exported?(module) do
+      Code.ensure_loaded?(module) and function_exported?(module, :members, 2)
+    end
+
+    # Clause 3C's bound at delete time: every claimed block sits in the same
+    # enclosing block as the one the author pointed at. The enclosing block is
+    # the last step of the document path, and the root - which has no step and
+    # cannot be deleted anyway - is in no arrangement.
+    @spec same_enclosing_block?(Document.t(), Block.id(), [Block.id()]) :: boolean()
+    defp same_enclosing_block?(document, id, ids) do
+      case enclosing_block_id(document, id) do
+        nil -> false
+        enclosing -> Enum.all?(ids, &(enclosing_block_id(document, &1) == enclosing))
+      end
+    end
+
+    @spec enclosing_block_id(Document.t(), Block.id()) :: Block.id() | nil
+    defp enclosing_block_id(document, id) do
+      case Document.fetch_path(document, id) do
+        {:ok, [_step | _rest] = path} -> path |> List.last() |> elem(0)
+        _root_or_absent -> nil
+      end
+    end
+
     @spec refused(Phoenix.LiveView.Socket.t(), term()) :: Phoenix.LiveView.Socket.t()
     defp refused(socket, reason), do: socket |> assign(:last_error, reason) |> rebuild()
 
@@ -1887,6 +2012,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             palette_allowed_recipes: nil,
             palette_unarmed_pick: false,
             palette_sheet: false,
+            # An offer addresses one block for the reason a mark does, and it
+            # is an UNANSWERED question besides: carried across a swap it
+            # would put to the new document a yes it never asked for.
+            pending_remove: nil,
             # A mark addresses one block, so it stops being true when that
             # block is gone. The amendment's exemption from this reset is the
             # pane folds', and for the reason that does not reach a mark: a

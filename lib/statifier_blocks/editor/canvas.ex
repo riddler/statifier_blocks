@@ -106,6 +106,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:pending_remove, :any,
+      default: nil,
+      doc: """
+      The delete offer, `%{block_id:, ids:}` or `nil`, threaded to the card
+      that raised it (ADR-0005's 2026-09-07 amendment, clause 3D).
+      """
+    )
+
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:theme, :map, default: %{})
@@ -157,6 +165,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               collapsed={@collapsed}
               marks={@marks}
               armed={@armed}
+              pending_remove={@pending_remove}
               target={@target}
               icon={@icon}
             />

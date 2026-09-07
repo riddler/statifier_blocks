@@ -266,6 +266,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:pending_remove, :any,
+      default: nil,
+      doc: """
+      The delete offer this canvas is holding - `%{block_id:, ids:}`, or
+      `nil` when none is open (ADR-0005's 2026-09-07 amendment, clause 3D).
+      Threaded the way `marks` is and for the same reason: it is editor
+      state that addresses a block, and nothing in the view model carries
+      it. Only the card whose `block_id` it names draws anything.
+      """
+    )
+
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:class, :string, default: nil)
@@ -368,7 +379,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             {@node.findings_count}
           </span>
           <button
-            :if={not @root?}
+            :if={not @root? and not offered?(@node, @pending_remove)}
             type="button"
             class="sb-node__remove"
             data-reveal="hover-or-selected"
@@ -380,6 +391,29 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           >
             x
           </button>
+          <span :if={offered?(@node, @pending_remove)} class="sb-node__offer" data-reveal="always">
+            <button
+              type="button"
+              class="sb-node__offer-keep"
+              aria-label={"Keep " <> ViewModel.title(@node)}
+              title="Keep"
+              phx-click="remove-cancel"
+              phx-target={@target}
+            >
+              keep
+            </button>
+            <button
+              type="button"
+              class="sb-node__offer-confirm"
+              aria-label={offer_label(@node, @pending_remove)}
+              title={offer_label(@node, @pending_remove)}
+              phx-click="remove-confirm"
+              phx-target={@target}
+              phx-value-block-id={@node.block_id}
+            >
+              x{offer_count(@pending_remove)}
+            </button>
+          </span>
         </div>
 
         <p :if={unresolvable?(@node)} class="sb-node__reason">{reason_line(@node)}</p>
@@ -411,6 +445,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             collapsed={@collapsed}
             marks={@marks}
             armed={@armed}
+            pending_remove={@pending_remove}
             target={@target}
             icon={@icon}
           />
@@ -449,6 +484,34 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # the children that happen to be in it.
     @spec container?(ViewModel.Node.t()) :: boolean()
     defp container?(%ViewModel.Node{slots: slots}), do: slots != []
+
+    # The offer, drawn on the one card that raised it and nowhere else
+    # (ADR-0005's 2026-09-07 amendment, clause 3D). A recipe has claimed this
+    # block as half of an arrangement, and the editor is putting the compound
+    # to the author rather than committing it behind their back.
+    #
+    # The presentation is the delete control itself, counting: `x2` where `x`
+    # was, revealed at rest so it cannot be missed, with a Keep beside it. The
+    # amendment takes no layout ruling, so this takes none either - the count
+    # and the second click are what make the gesture honest about how many
+    # blocks it removes, and no dialog, mode or pane is added to say it.
+    @spec offered?(ViewModel.Node.t(), map() | nil) :: boolean()
+    defp offered?(_node, nil), do: false
+
+    defp offered?(%ViewModel.Node{block_id: id}, %{block_id: id}), do: true
+
+    defp offered?(_node, _pending), do: false
+
+    @spec offer_count(map()) :: non_neg_integer()
+    defp offer_count(%{ids: ids}), do: length(ids)
+
+    @spec offer_label(ViewModel.Node.t(), map()) :: String.t()
+    defp offer_label(node, pending) do
+      others = offer_count(pending) - 1
+      plural = if others == 1, do: "block", else: "blocks"
+
+      "Delete #{ViewModel.title(node)} and the #{others} #{plural} it goes with"
+    end
 
     # The two run marks, read the way `collapsed?/2` below reads its set: the
     # marks are the editor's state rather than the document's, so they are

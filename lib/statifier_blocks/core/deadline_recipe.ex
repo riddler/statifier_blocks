@@ -40,6 +40,38 @@ defmodule StatifierBlocks.Core.DeadlineRecipe do
   recipe, not the editor learning what a block is called: a host whose own
   group type carries an `interrupts` rail registers its own recipe under
   this name, which is exactly what clause 1C's collision rule is for.
+
+  ## Recognising the pair again at delete time
+
+  `members/2` (ADR-0005's 2026-09-07 amendment, clause `2D`) is `insert/2`
+  read backwards. It is handed a block id and the document and answers the
+  ids of the pair that block is half of, so the editor can take the
+  arrangement out in the one gesture it went in as.
+
+  It recognises the **shape**, not the origin. Nothing in the document says
+  a send is a deadline's send (clause `11u`), so the recipe looks for what
+  `insert/2` writes: a `core.send` carrying an `event` and a `delay` in a
+  group's `body`, and a `core.on_event` on **that same group's**
+  `interrupts` rail whose `event` is the same string. Three consequences
+  follow, and each is the amendment's:
+
+    * a **hand-built** pair is claimed - an author who put both halves down
+      themselves built the arrangement, and the recipe cannot tell the
+      difference;
+    * a **renamed** event still matches, because the test is that the two
+      halves AGREE, not that either matches `event_name/1`'s generated form.
+      The config form writes one half at a time, so a pair renamed apart is
+      no longer a pair and is not claimed;
+    * nothing outside the enclosing group is ever named. The rail is read
+      off the group the asked-about block sits in and off no other block,
+      which is clause `3C`'s bound arriving by construction the way
+      `insert/2`'s does.
+
+  The answer includes the asked-about id, and is `[]` for everything else -
+  a block of another type, a half whose partner is absent, and a half whose
+  partner disagrees. The last of those is the amendment's conservative
+  reading of a partial arrangement, which it records as the behaviour in the
+  absence of a decision rather than as the decision.
   """
 
   @behaviour StatifierBlocks.Recipe
@@ -94,6 +126,74 @@ defmodule StatifierBlocks.Core.DeadlineRecipe do
       keywords: ["deadline", "timeout", "timer", "expire", "interrupt", "sla"],
       order: 17
     }
+
+  @doc """
+  Both ids of the deadline pair `block_id` is half of, or `[]`.
+
+  The send first and the handler second, whichever half was asked about, so
+  one arrangement answers one list however the author reached it.
+  """
+  @impl true
+  def members(block_id, %Document{} = document) do
+    with {:ok, [{parent_id, slot, _index} | _up]} <- reversed_path(document, block_id),
+         {:ok, group} <- enclosing_group(document, parent_id),
+         %Block{} = block <- block_by_id(document, block_id) do
+      pair(group, slot, block)
+    else
+      _not_an_arrangement -> []
+    end
+  end
+
+  # The path runs root-first, so the LAST step is the one that names the
+  # block's own parent and slot. The root itself has taken no steps and is
+  # half of nothing.
+  @spec reversed_path(Document.t(), Block.id()) :: {:ok, Document.path()} | :error
+  defp reversed_path(document, block_id) do
+    with {:ok, path} <- Document.fetch_path(document, block_id) do
+      {:ok, Enum.reverse(path)}
+    end
+  end
+
+  @spec block_by_id(Document.t(), Block.id()) :: Block.t() | nil
+  defp block_by_id(document, block_id) do
+    document |> Document.blocks() |> Enum.find(&(&1.id == block_id))
+  end
+
+  # Asked about the timer, look down the rail; asked about the handler, look
+  # into the body. Both clauses require the send's `delay`, because a send
+  # without one is not the arrangement `insert/2` writes.
+  @spec pair(Block.t(), Block.slot_name(), Block.t()) :: [Block.id()]
+  defp pair(group, @body, %Block{type: "core.send", id: id, config: config}) do
+    with event when is_binary(event) and event != "" <- Map.get(config, "event"),
+         delay when is_binary(delay) and delay != "" <- Map.get(config, "delay"),
+         %Block{id: handler_id} <- partner(group, @interrupts, "core.on_event", event) do
+      [id, handler_id]
+    else
+      _no_partner -> []
+    end
+  end
+
+  defp pair(group, @interrupts, %Block{type: "core.on_event", id: id, config: config}) do
+    with event when is_binary(event) and event != "" <- Map.get(config, "event"),
+         %Block{id: timer_id, config: timer_config} <-
+           partner(group, @body, "core.send", event),
+         delay when is_binary(delay) and delay != "" <- Map.get(timer_config, "delay") do
+      [timer_id, id]
+    else
+      _no_partner -> []
+    end
+  end
+
+  defp pair(_group, _slot, _block), do: []
+
+  @spec partner(Block.t(), Block.slot_name(), String.t(), String.t()) :: Block.t() | nil
+  defp partner(%Block{slots: slots}, slot, type, event) do
+    slots
+    |> Map.get(slot, [])
+    |> Enum.find(fn %Block{type: block_type, config: config} ->
+      block_type == type and Map.get(config, "event") == event
+    end)
+  end
 
   @spec enclosing_group(Document.t(), Block.id()) ::
           {:ok, Block.t()} | {:error, {:no_interrupts_slot, Block.id()}}
