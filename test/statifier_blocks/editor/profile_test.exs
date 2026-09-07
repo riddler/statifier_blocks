@@ -235,6 +235,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert html =~ "StatifierBlocksMeasure"
       end
 
+      # sb-ako9 (RQ-SF038-8). `palette-open` was already on
+      # `@read_only_refused`, so the click was inert - but the comment beside
+      # that list says a read-only mount draws no control that could have sent
+      # one of these, and forty-one "+" buttons were exactly such controls.
+      #
+      # Sabotage: `:if={not @read_only}` removed from the gap's button in
+      # `Slot.gap/1`. Ran red on the refute below and on nothing else in the
+      # suite, which is what says this pair is the only cover for the clause.
+      test "draws no gap \"+\" on the canvas", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, profile: %{read_only?: true})
+
+        html = render(view)
+
+        refute html =~ "sb-gap__add"
+        refute html =~ ~s(phx-click="palette-open")
+        assert html =~ "sb-gap"
+      end
+
+      test "an editing mount still draws the gap \"+\"", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, profile: %{read_only?: false})
+
+        html = render(view)
+
+        assert html =~ "sb-gap__add"
+        assert html =~ ~s(phx-click="palette-open")
+      end
+
       test "hides Undo and Redo whatever the toolbar list says", %{conn: conn} do
         {:ok, view, _html} =
           mount_editor(conn, profile: %{read_only?: true, toolbar: [:history, :zoom]})

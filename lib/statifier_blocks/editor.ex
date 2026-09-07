@@ -542,10 +542,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     crashes at render.
 
     `read_only?: true` renders the document without offering any way to change
-    it: no palette column, no drag hook on the canvas, config fields drawn as
-    values rather than controls, Undo and Redo hidden rather than disabled,
-    and every gesture that would reach the document answered with the socket
-    unchanged - so `on_change` never fires. Selection and findings are
+    it: no palette column, no drag hook on the canvas, no "+" button on the
+    gaps between blocks, config fields drawn as values rather than controls,
+    Undo and Redo hidden rather than disabled, and every gesture that would
+    reach the document answered with the socket unchanged - so `on_change`
+    never fires. Selection and findings are
     untouched, because reading the document is the whole point of the mount.
     A document is never refused for being read-only.
 
@@ -1026,6 +1027,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               <Canvas.canvas
                 root={@view_model.root}
                 drag_hook?={not @read_only?}
+                read_only={@read_only?}
                 drag={@drag}
                 selected_id={@selected_id}
                 collapsed={@collapsed_ids}

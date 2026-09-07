@@ -290,6 +290,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:read_only, :boolean,
+      default: false,
+      doc: """
+      Whether this mount edits (ADR-0005's 2026-09-07 profile amendment,
+      `read_only?`), threaded on to this node's slots so their gaps draw no
+      "+" button.
+      """
+    )
+
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:class, :string, default: nil)
@@ -486,6 +495,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             armed={@armed}
             pending_remove={@pending_remove}
             expandable={@expandable}
+            read_only={@read_only}
             target={@target}
             icon={@icon}
           />
