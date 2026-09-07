@@ -199,17 +199,79 @@ defmodule StatifierBlocks.Composite.Data do
   hand, and it is the same answer `StatifierBlocks.Composite`'s own
   `param_map` reaches by comparing values.
 
-  ## What this module does not decide: a migration
+  ## The declaration-level `"migrations"` key
 
-  A declaration is the only thing that can supply a migration, and no key is
-  fixed for one. So a host that bumps `"version"` on a declaration with
-  stored blocks is **choosing a refusal**: ADR-0007's injected
-  `migrate_config/2` answers `{:error, {:no_migration_from, from}}`, this
-  module leaves that injection alone, and `StatifierBlocks.Palette.resolve/2`
-  therefore refuses every stored block of that type at the older version.
-  That is not papered over with a derived `{:ok, config}`, which is exactly
-  the answer ADR-0007's refusal exists to refuse. How a data composite
-  declares a migration is an open question the record leaves open.
+  Optional, defaulting to `[]`: an ordered list of migration steps, each a
+  map with string keys carrying `"from"` and at least one of `"rename"`,
+  `"drop"` and `"default"` (ADR-0002's 2026-09-07 migrations amendment).
+
+      %{
+        "from"    => 1,
+        "rename"  => %{"limit" => "amount_limit"},
+        "drop"    => ["legacy_mode"],
+        "default" => %{"currency" => "USD"}
+      }
+
+    * **`"from"`** (required) is a positive integer, the `type_version` the
+      step carries a config **from**; the step carries it to `from + 1`.
+    * **`"rename"`** is a map of old config key to new config key. The value
+      moves; nothing else about it changes.
+    * **`"drop"`** is a list of config keys removed.
+    * **`"default"`** is a map of config key to a JSON value, the keys the
+      old config **gains** with that value.
+
+  **Within one step the three parts run in a fixed order: `rename`, then
+  `drop`, then `default`**, so `"drop"` and `"default"` are written in the
+  names the step produces rather than the names it consumes. A key named by
+  both `"drop"` and `"default"` in one step is a contradiction rather than
+  an ordering question, and is refused.
+
+  The `"from"` values are **strictly ascending and contiguous**, and the last
+  is `version - 1`: a list that cannot carry its own earliest version to its
+  current one is broken, not usable-in-part. `migrate_config/3` applies every
+  step at or above the stored version and below `"version"`, in ascending
+  order, in **one** call - `StatifierBlocks.Palette.resolve/2`'s one-call rule
+  is untouched, and the ladder runs inside the call.
+
+  A step naming an **unknown key** is refused. Known is defined by walking
+  the chain **backwards** from the declared param keys - the shape at
+  `"version"` - undoing each step in descending `"from"` order and, within a
+  step, in the reverse of the forward order: undo `"default"` (each key must
+  be present; remove it), then `"drop"` (each key must be absent; add it),
+  then `"rename"` (each new name present and each old name absent; put the
+  old name back). A declaration states its current params and not the shape
+  it started from, so the current end of the chain is the only known one.
+  A step's values are **not** type-checked here, for the reason a template
+  node's `"config"` values are not: the migrated config meets decision 7's
+  refusals at the compile, exactly as a stored config does.
+
+  Every one of these refusals is `declaration/1`'s, at entry-build time, so a
+  palette can never hold a broken chain and `migrate_config/3` can never meet
+  one.
+
+  ### `"default"` here is not a param's `"default"`
+
+  A param's `"default"` is decision 7's `field_decl/0` key, one level inside
+  `"params"`, and it is the value a **new** block starts with. A step's
+  `"default"` is one level inside `"migrations"` and it is the value an
+  **old stored** block's config gains. The nesting depth says which is meant.
+
+  ### What a step cannot express is still a refusal
+
+  `rename`, `drop` and `default` are the whole vocabulary: no value
+  transform, no merge, no split, no conditional. A declaration held as data
+  cannot hold a function, the same ground the subtree is a template. So a
+  change no step can express keeps the answer it has: the declaration writes
+  no step for that version, a block stored **below the earliest step's
+  `"from"`** answers `{:error, {:no_migration_from, from}}`, and a host that
+  needs more writes a `use`-composite module and its own `migrate_config/2`.
+  A declaration that writes no `"migrations"` key, or writes the empty list,
+  keeps that refusal for every stored version.
+
+  **A module composite is untouched.** `use StatifierBlocks.Composite` gains
+  no `migrations:` option: a module composite has the whole of Elixir for the
+  job and writes `migrate_config/2` itself, with ADR-0007's injected refusal
+  as the default for one that does not.
 
   ## The hygiene obligation a bump is for
 
@@ -238,6 +300,20 @@ defmodule StatifierBlocks.Composite.Data do
         }
 
   @typedoc """
+  One migration step, decoded: the `type_version` it carries a config from,
+  and the three parts, each defaulting to empty.
+
+  The parts run `rename`, then `drop`, then `default` (ADR-0002's
+  migrations amendment, M2).
+  """
+  @type migration_step :: %{
+          from: pos_integer(),
+          rename: %{optional(String.t()) => String.t()},
+          drop: [String.t()],
+          default: %{optional(String.t()) => term()}
+        }
+
+  @typedoc """
   The decoded declaration - what a palette entry carries beside this module.
 
   `StatifierBlocks.Palette` treats it as opaque; this is the one shape this
@@ -251,7 +327,8 @@ defmodule StatifierBlocks.Composite.Data do
           sentence: String.t() | nil,
           palette_entry: BlockType.palette_entry(),
           subtree: [node_template(), ...],
-          slots: [Composite.pass_through_decl()]
+          slots: [Composite.pass_through_decl()],
+          migrations: [migration_step()]
         }
 
   @id_suffix ~r/\A[a-z0-9]+(_[a-z0-9]+)*\z/
@@ -349,10 +426,14 @@ defmodule StatifierBlocks.Composite.Data do
     {sentence, sentence_errors} = decode_sentence(row["sentence"], params)
     {slots, slot_errors} = decode_slots(row["slots"], subtree, params, subtree_errors)
 
+    {migrations, migration_errors} =
+      decode_migrations(row["migrations"], version, params, param_errors)
+
     errors =
       name_errors(name) ++
         version_errors(version) ++
-        param_errors ++ subtree_errors ++ entry_errors ++ sentence_errors ++ slot_errors
+        param_errors ++
+        subtree_errors ++ entry_errors ++ sentence_errors ++ slot_errors ++ migration_errors
 
     case errors do
       [] ->
@@ -364,7 +445,8 @@ defmodule StatifierBlocks.Composite.Data do
            sentence: sentence,
            palette_entry: entry,
            subtree: subtree,
-           slots: slots
+           slots: slots,
+           migrations: migrations
          }}
 
       errors ->
@@ -426,12 +508,49 @@ defmodule StatifierBlocks.Composite.Data do
   def palette_entry(%{palette_entry: entry}), do: entry
 
   @doc """
-  ADR-0007's injected refusal, unchanged: a declaration held as data fixes
-  no migration key, so a `"version"` bump with stored blocks refuses rather
-  than guessing.
+  Walks the declared `"migrations"` chain once, from the stored version to
+  the declaration's current one (ADR-0002's migrations amendment, M3).
+
+  Every step at or above `from` and below `"version"` runs, in ascending
+  `"from"` order, and the result comes back as one `{:ok, config}`. A stored
+  version **below the earliest step's `"from"`** - which includes every
+  version when the declaration writes no steps - is ADR-0007's refusal,
+  unchanged: a declaration says which versions it carries forward, and one
+  it wrote no step for is one it does not claim to understand (M6).
+
+  The chain was validated at `declaration/1`, so this function cannot meet a
+  gap, an out-of-order step or an unknown key (M5).
   """
-  @spec migrate_config(state(), pos_integer(), Block.config()) :: {:error, term()}
-  def migrate_config(_state, from, _config), do: {:error, {:no_migration_from, from}}
+  @spec migrate_config(state(), pos_integer(), Block.config()) ::
+          {:ok, Block.config()} | {:error, term()}
+  def migrate_config(%{migrations: steps, version: version}, from, config) do
+    case Enum.filter(steps, &(&1.from >= from and &1.from < version)) do
+      [%{from: ^from} | _rest] = applicable ->
+        {:ok, Enum.reduce(applicable, config, &apply_step/2)}
+
+      _none_or_starting_above ->
+        {:error, {:no_migration_from, from}}
+    end
+  end
+
+  # `rename`, then `drop`, then `default` (M2). A `"rename"` whose old key
+  # the stored config never carried moves nothing rather than writing `nil`;
+  # a `"default"` ADDS its key, so a stored config that already carries one
+  # keeps its own value - `"drop"` is the vocabulary's only removal.
+  @spec apply_step(migration_step(), Block.config()) :: Block.config()
+  defp apply_step(%{rename: rename, drop: drop, default: default}, config) do
+    renamed =
+      Enum.reduce(rename, config, fn {old, new}, acc ->
+        case Map.pop(acc, old, :absent) do
+          {:absent, _acc} -> acc
+          {value, rest} -> Map.put(rest, new, value)
+        end
+      end)
+
+    dropped = Map.drop(renamed, drop)
+
+    Enum.reduce(default, dropped, fn {key, value}, acc -> Map.put_new(acc, key, value) end)
+  end
 
   @doc """
   ADR-0007's injected `:ok`, for the reason the `use`-composite leaves it
@@ -964,6 +1083,266 @@ defmodule StatifierBlocks.Composite.Data do
 
     Composite.mapping_errors(Enum.map(subtree, &instantiate(&1, defaults)), decls)
   end
+
+  # -- the migrations chain ----------------------------------------------
+  #
+  # M5's refusals, every one of them here at entry-build time: the shape of
+  # the list, the shape of each step, the chain's arithmetic, and the
+  # backwards walk that defines "unknown key". A host registers `{module,
+  # state}` only on the `:ok`, so a palette can never hold a broken chain
+  # and `migrate_config/3` can never meet one.
+  @spec decode_migrations(term(), term(), [BlockType.field_decl()], [String.t()]) ::
+          {[migration_step()], [String.t()]}
+  defp decode_migrations(nil, _version, _params, _param_errors), do: {[], []}
+
+  defp decode_migrations(migrations, version, params, param_errors) when is_list(migrations) do
+    {decoded, errors} =
+      migrations
+      |> Enum.map(&decode_migration_step/1)
+      |> Enum.split_with(&match?({:ok, _step}, &1))
+
+    steps = Enum.map(decoded, fn {:ok, step} -> step end)
+    messages = Enum.map(errors, fn {:error, message} -> message end)
+
+    case messages do
+      # A step that did not decode is not walked: its own error is the one to
+      # fix first, and the chain's arithmetic over a partial list says
+      # nothing true.
+      [] ->
+        {steps, chain_errors(steps, version) ++ unknown_key_errors(steps, params, param_errors)}
+
+      messages ->
+        {steps, messages}
+    end
+  end
+
+  defp decode_migrations(migrations, _version, _params, _param_errors),
+    do: {[], [~s("migrations" must be a list of migration steps, got: #{inspect(migrations)})]}
+
+  @spec decode_migration_step(term()) :: {:ok, migration_step()} | {:error, String.t()}
+  defp decode_migration_step(step) when is_map(step) do
+    with :ok <- step_key_errors(step),
+         {:ok, from} <- step_from(step),
+         {:ok, rename} <- step_rename(Map.get(step, "rename", %{}), from),
+         {:ok, drop} <- step_drop(Map.get(step, "drop", []), from),
+         {:ok, default} <- step_default(Map.get(step, "default", %{}), from),
+         :ok <- step_part_present(step, from),
+         :ok <- step_overlap_errors(drop, default, from) do
+      {:ok, %{from: from, rename: rename, drop: drop, default: default}}
+    end
+  end
+
+  defp decode_migration_step(step),
+    do: {:error, "a migration step must be a map, got: #{inspect(step)}"}
+
+  # Refused BY NAME, which is the practice `decode_param/1` already follows.
+  @step_keys ~w(from rename drop default)
+
+  @spec step_key_errors(map()) :: :ok | {:error, String.t()}
+  defp step_key_errors(step) do
+    case Map.keys(step) -- @step_keys do
+      [] ->
+        :ok
+
+      unknown ->
+        {:error,
+         "a migration step declares keys this shape cannot spell: #{inspect(Enum.sort(unknown))}"}
+    end
+  end
+
+  @spec step_from(map()) :: {:ok, pos_integer()} | {:error, String.t()}
+  defp step_from(%{"from" => from}) when is_integer(from) and from > 0, do: {:ok, from}
+
+  defp step_from(%{"from" => from}),
+    do: {:error, ~s(a migration step's "from" must be a positive integer, got: #{inspect(from)})}
+
+  defp step_from(_step), do: {:error, ~s(a migration step declares no "from")}
+
+  @spec step_rename(term(), pos_integer()) ::
+          {:ok, %{optional(String.t()) => String.t()}} | {:error, String.t()}
+  defp step_rename(rename, from) when is_map(rename) do
+    if Enum.all?(rename, fn {old, new} -> filled?(old) and filled?(new) end),
+      do: {:ok, rename},
+      else:
+        {:error,
+         step_message(from, ~s("rename" must map non-empty strings to non-empty strings), rename)}
+  end
+
+  defp step_rename(rename, from),
+    do: {:error, step_message(from, ~s("rename" must be a map), rename)}
+
+  @spec step_drop(term(), pos_integer()) :: {:ok, [String.t()]} | {:error, String.t()}
+  defp step_drop(drop, from) when is_list(drop) do
+    if Enum.all?(drop, &filled?/1),
+      do: {:ok, drop},
+      else: {:error, step_message(from, ~s("drop" must be a list of non-empty strings), drop)}
+  end
+
+  defp step_drop(drop, from),
+    do: {:error, step_message(from, ~s("drop" must be a list of non-empty strings), drop)}
+
+  # A step's values are NOT type-checked here, for the reason a template
+  # node's `"config"` values are not: the migrated config meets decision 7's
+  # refusals at the compile, exactly as a stored config does, and a check
+  # here would duplicate one that already runs and can already fail.
+  @spec step_default(term(), pos_integer()) ::
+          {:ok, %{optional(String.t()) => term()}} | {:error, String.t()}
+  defp step_default(default, from) when is_map(default) do
+    if Enum.all?(Map.keys(default), &filled?/1),
+      do: {:ok, default},
+      else:
+        {:error,
+         step_message(from, ~s("default" must be a map with non-empty string keys), default)}
+  end
+
+  defp step_default(default, from),
+    do: {:error, step_message(from, ~s("default" must be a map), default)}
+
+  # A step with no part is refused rather than treated as a no-op: its
+  # `"from"` would claim a version bump that changed nothing, and a version
+  # bump that changed nothing is the hygiene obligation's business.
+  @spec step_part_present(map(), pos_integer()) :: :ok | {:error, String.t()}
+  defp step_part_present(step, from) do
+    if Enum.any?(@step_keys -- ["from"], &Map.has_key?(step, &1)),
+      do: :ok,
+      else:
+        {:error, ~s(migration step "from" #{from} carries none of "rename", "drop" and "default")}
+  end
+
+  # The one genuinely ambiguous overlap - a key named by both `"drop"` and
+  # `"default"` in one step - is a contradiction rather than an ordering
+  # question.
+  @spec step_overlap_errors([String.t()], map(), pos_integer()) :: :ok | {:error, String.t()}
+  defp step_overlap_errors(drop, default, from) do
+    case Enum.filter(drop, &Map.has_key?(default, &1)) do
+      [] ->
+        :ok
+
+      both ->
+        {:error,
+         ~s(migration step "from" #{from} names ) <>
+           ~s(#{inspect(Enum.sort(Enum.uniq(both)))} in both "drop" and "default")}
+    end
+  end
+
+  @spec step_message(pos_integer(), String.t(), term()) :: String.t()
+  defp step_message(from, what, got),
+    do: ~s(migration step "from" #{from}: ) <> what <> ", got: #{inspect(got)}"
+
+  @spec filled?(term()) :: boolean()
+  defp filled?(value), do: is_binary(value) and value != ""
+
+  # Strictly ascending, contiguous, and ending at `version - 1`. There is no
+  # partial chain: a list that cannot carry its own earliest version to its
+  # current one is broken, not usable-in-part. A `"version"` that did not
+  # itself decode is not compared against - its own error comes back.
+  @spec chain_errors([migration_step()], term()) :: [String.t()]
+  defp chain_errors([], _version), do: []
+
+  defp chain_errors(steps, version) when is_integer(version) and version > 0 do
+    froms = Enum.map(steps, & &1.from)
+    contiguous = Enum.to_list(hd(froms)..(version - 1)//1)
+
+    if froms == contiguous do
+      []
+    else
+      [
+        ~s("migrations" must declare strictly ascending, contiguous "from" values ending at ) <>
+          ~s["version" - 1 (#{version - 1}), got: #{inspect(froms)}]
+      ]
+    end
+  end
+
+  defp chain_errors(_steps, _version), do: []
+
+  # M4: the chain is checked BACKWARDS. A declaration states its current
+  # params and does not state the shape it started from, so the current end
+  # of the chain is the only known one. Start from the declared param keys -
+  # the shape at `"version"` - and undo each step in descending `"from"`
+  # order, and within a step in the reverse of the forward order. Params
+  # that did not decode are not walked against.
+  @spec unknown_key_errors([migration_step()], [BlockType.field_decl()], [String.t()]) ::
+          [String.t()]
+  defp unknown_key_errors(_steps, _params, [_error | _rest]), do: []
+
+  defp unknown_key_errors(steps, params, []) do
+    {_keys, errors} =
+      steps
+      |> Enum.sort_by(& &1.from, :desc)
+      |> Enum.reduce({MapSet.new(params, & &1.key), []}, &undo_step/2)
+
+    Enum.reverse(errors)
+  end
+
+  @spec undo_step(migration_step(), {MapSet.t(String.t()), [String.t()]}) ::
+          {MapSet.t(String.t()), [String.t()]}
+  defp undo_step(%{from: from, rename: rename, drop: drop, default: default}, acc) do
+    acc
+    |> undo_default(default, from)
+    |> undo_drop(drop, from)
+    |> undo_rename(rename, from)
+  end
+
+  # Each defaulted key must be IN the running set; remove it.
+  defp undo_default({keys, errors}, default, from) do
+    Enum.reduce(default, {keys, errors}, fn {key, _value}, {keys, errors} ->
+      if MapSet.member?(keys, key) do
+        {MapSet.delete(keys, key), errors}
+      else
+        {keys,
+         [
+           unknown_key(from, "default", key, "the shape above this step does not declare it")
+           | errors
+         ]}
+      end
+    end)
+  end
+
+  # Each dropped key must be ABSENT from the running set; add it.
+  defp undo_drop({keys, errors}, drop, from) do
+    Enum.reduce(drop, {keys, errors}, fn key, {keys, errors} ->
+      if MapSet.member?(keys, key) do
+        {keys,
+         [
+           unknown_key(from, "drop", key, "the shape above this step still declares it")
+           | errors
+         ]}
+      else
+        {MapSet.put(keys, key), errors}
+      end
+    end)
+  end
+
+  # Each new name must be IN the set and each old name ABSENT; replace the
+  # new name with the old.
+  defp undo_rename({keys, errors}, rename, from) do
+    Enum.reduce(rename, {keys, errors}, fn {old, new}, {keys, errors} ->
+      cond do
+        not MapSet.member?(keys, new) ->
+          {keys,
+           [
+             unknown_key(from, "rename", new, "the shape above this step does not declare it")
+             | errors
+           ]}
+
+        MapSet.member?(keys, old) ->
+          {keys,
+           [
+             unknown_key(from, "rename", old, "the shape above this step already declares it")
+             | errors
+           ]}
+
+        true ->
+          {keys |> MapSet.delete(new) |> MapSet.put(old), errors}
+      end
+    end)
+  end
+
+  @spec unknown_key(pos_integer(), String.t(), String.t(), String.t()) :: String.t()
+  defp unknown_key(from, part, key, why),
+    do:
+      ~s(migration step "from" #{from} names an unknown key #{inspect(key)} in ) <>
+        ~s("#{part}": #{why})
 
   @spec decode_entry(term(), term()) :: {BlockType.palette_entry(), [String.t()]}
   defp decode_entry(nil, name), do: {%{label: label_for(name)}, []}
