@@ -141,6 +141,101 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # sb-pm3k. `Fit active` reads the marks, and a seated run is the other
+    # place marks come from: the host-named list has answered since sb-le70,
+    # and a run the pane resolved for itself had not. Everything here drives
+    # the toolbar's own button, because the claim is about a control an
+    # observer can press rather than about the resolver behind it.
+    describe "Fit active over a seated run" do
+      defp fit_active_disabled?(view),
+        do: has_element?(view, ~s(button[phx-value-fit="active"][disabled]))
+
+      defp fit_active(view) do
+        view |> element(~s(button[phx-value-fit="active"])) |> render_click()
+        view
+      end
+
+      defp revealed(view) do
+        case Regex.run(~r/data-sb-reveal="\d+:([^"]+)"/, render(view)) do
+          [_match, block_id] -> block_id
+          nil -> nil
+        end
+      end
+
+      # Sabotage: dropped the run clause from `fit_target/2`, so the resolution
+      # fell back to the host's empty `active_marks` - the marks were on the
+      # canvas and the button over them was dead, which is exactly the defect
+      # (verified: red on the second assertion).
+      test "the run enables the control that nothing was selecting", %{conn: conn, run: run} do
+        {:ok, view} = mount_run(conn, nil)
+
+        assert fit_active_disabled?(view)
+
+        seat(view, run.state)
+
+        refute fit_active_disabled?(view)
+      end
+
+      # The run stands on the settle block, and a configuration marks the
+      # container it is inside as well - so an outermost-first resolution
+      # would fit the root sequence, which is the whole tree and `Fit width`
+      # under another name.
+      #
+      # Sabotage: had `first_marked/2` answer the outermost marked node
+      # instead of the innermost - the reveal came back as the root block and
+      # this went red (verified).
+      test "it fits the block the run is at, not the container", %{conn: conn, run: run} do
+        {:ok, view} = mount_run(conn, run.state)
+
+        assert view |> fit_active() |> revealed() == CardRunFixtures.settle_block()
+      end
+
+      # Sabotage: resolved the target's marks at the live tip rather than at
+      # the scrubber's selection - every other test here stayed green and the
+      # reveal stayed on the settle block after scrubbing, which is this
+      # test's whole claim (verified: red here alone).
+      test "scrubbing back moves what it fits", %{conn: conn, run: run} do
+        {:ok, view} = mount_run(conn, run.state)
+
+        view |> scrub("prev") |> scrub("prev")
+
+        assert view |> fit_active() |> revealed() == CardRunFixtures.entry_block()
+      end
+
+      # Sabotage: put the run clause of `fit_target/2` ahead of the selection
+      # clause - an author who selects a block during a run was thrown to
+      # whatever the run was marking instead (verified).
+      test "a selection still wins over the run's marks", %{conn: conn, run: run} do
+        {:ok, view} = mount_run(conn, run.state)
+
+        view |> select(CardRunFixtures.entry_block()) |> fit_active()
+
+        assert revealed(view) == CardRunFixtures.entry_block()
+      end
+
+      # The canvas draws a seated run's marks and not the host's, so this
+      # control has to resolve the same way: a host that painted marks before
+      # seating a run and never cleared them would otherwise send the button
+      # to a card that carries no ring.
+      #
+      # Sabotage: let the `active_marks` clause match before the run clause -
+      # the reveal came back as the host's stale block while the canvas ringed
+      # the run's, and this went red (verified).
+      test "a stale host list does not decide it while a run is seated", %{conn: conn, run: run} do
+        {:ok, view} = mount_run(conn, run.state)
+
+        Phoenix.LiveView.send_update(view.pid, Editor,
+          id: "editor",
+          active_marks: [CardRunFixtures.entry_block()]
+        )
+
+        render(view)
+
+        refute active?(view, CardRunFixtures.entry_block())
+        assert view |> fit_active() |> revealed() == CardRunFixtures.settle_block()
+      end
+    end
+
     describe "the event log" do
       # The capture event was handled by the block that was waiting for it, and
       # that is the block a click on its entry selects.

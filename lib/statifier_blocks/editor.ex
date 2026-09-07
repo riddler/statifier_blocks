@@ -179,6 +179,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     where the canvas asks the question as a set. With no selection and no
     marks there is nothing to fit, and the control stays disabled.
 
+    A **seated run** marks blocks the same way and reaches the same control,
+    which is the point of resolving the target out of the marks the canvas
+    drew rather than out of the assign one of the two sources happens to use.
+    A seated run decides its marks outright, so it also decides this: with a
+    run seated the target comes from the resolved marks and not from an
+    `active_marks` list a host is still carrying beside them. What a resolved
+    run hands over is a set rather than a list, so "the first marked block"
+    there is read off the document instead: the innermost ringed card, and
+    the first of those in document order. Innermost, because a run standing
+    on a leaf marks the containers it is inside as well, and fitting the
+    outermost of those is `Fit width` under another name - the card a reader
+    watching a run wants is the one the run is at.
+
     What reaches the markup is `data-run-active`, `data-run-invoking` and -
     only for a call that has come back - `data-invoke-outcome`, on the block's
     `.sb-node`. The outcome is passed through rather than checked against a
@@ -739,6 +752,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:declared_types, Datamodel.declared_types(assigns.datamodel))
         |> assign(:environment_view, environment_view(assigns))
 
+      # One resolution of the marks, read twice: the canvas draws them and
+      # `Fit active` resolves its target out of the same map. Recomputing them
+      # for the second reader is how the button and the canvas would come to
+      # disagree about which blocks a run has ringed.
+      run_marks = marks(assigns)
+
       assigns =
         assigns
         |> assign(:drawer, drawer_view(assigns))
@@ -753,8 +772,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:run_events, run_events(assigns))
         |> assign(:run_sendable?, run_sendable?(assigns))
         |> assign(:declaration_refusal, declaration_refusal(assigns))
-        |> assign(:marks, marks(assigns))
-        |> assign(:fit_target, fit_target(assigns))
+        |> assign(:marks, run_marks)
+        |> assign(:fit_target, fit_target(assigns, run_marks))
         |> assign(:depth, Shell.depth(assigns.view_model.root))
         |> assign(:block_count, Shell.block_count(assigns.view_model.root))
         |> assign(:edges, Connectors.edges(assigns.view_model.root, assigns.measurement))
@@ -1831,11 +1850,58 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # state and the handler's answer cannot disagree: a control that is
     # enabled and then does nothing is the defect that pairing them prevents.
     # The selection wins when there is one - it is the author's own answer to
-    # which block matters - and the first mark stands in when there is not,
-    # which is the whole of what an observer watching a run ever has.
+    # which block matters - and a mark stands in when there is not, which is
+    # the whole of what an observer watching a run ever has.
+    #
+    # Which mark is the same question the canvas answers, and it is answered
+    # from the same place: a seated run decides its marks outright, so with
+    # one seated the target is resolved out of the marks that were drawn and
+    # never out of the `active_marks` a host may still be carrying beside
+    # them. The two orderings differ because their sources do. A host naming
+    # blocks itself named them in an order, and the first one it named is the
+    # one it meant; a resolved run hands over a set, which has no order of its
+    # own, so the target is the first marked block in document order - the
+    # topmost ringed card on the canvas, which is what a reader would point at.
+    # The handler resolves the marks for itself; the render has already done
+    # it for the canvas and hands them over rather than resolving a run twice
+    # in one pass.
     @spec fit_target(map()) :: String.t() | nil
-    defp fit_target(%{selected_id: id}) when is_binary(id), do: id
-    defp fit_target(%{active_marks: marks}), do: List.first(marks)
+    defp fit_target(assigns), do: fit_target(assigns, marks(assigns))
+
+    @spec fit_target(map(), map() | nil) :: String.t() | nil
+    defp fit_target(%{selected_id: id}, _marks) when is_binary(id), do: id
+
+    defp fit_target(%{run: run, run_provenance: provenance} = assigns, marks)
+         when run != nil and provenance != nil do
+      case marks do
+        %{active: active} -> first_marked(assigns.view_model.root, active)
+        _nothing_marked -> nil
+      end
+    end
+
+    defp fit_target(%{active_marks: marks}, _run_marks), do: List.first(marks)
+
+    # The innermost marked block, and among several the first in document
+    # order - the order the canvas lays the cards out in.
+    #
+    # Innermost rather than topmost because of what a configuration is: a run
+    # standing on a leaf marks its containers too, so the outermost marked
+    # block is very nearly always the root, and fitting the root is `Fit
+    # width` under another name. The card a reader watching a run is looking
+    # for is the one the run is *at*, so a container yields to any marked
+    # block inside it and answers only when nothing inside it is marked.
+    # A tree with no marked node in it answers nothing rather than a block
+    # that was never ringed.
+    @spec first_marked(ViewModel.Node.t(), MapSet.t(String.t())) :: String.t() | nil
+    defp first_marked(%ViewModel.Node{block_id: id, slots: slots}, active) do
+      slots
+      |> Enum.flat_map(& &1.children)
+      |> Enum.find_value(&first_marked(&1, active))
+      |> case do
+        nil -> if MapSet.member?(active, id), do: id
+        inner -> inner
+      end
+    end
 
     @spec drawer_view(map()) :: Shell.drawer()
     defp drawer_view(assigns) do
