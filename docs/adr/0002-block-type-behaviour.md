@@ -8031,13 +8031,13 @@ because the section describes neither.
 And the collision, which both readings above reach for. **Ruled
 (`RQ-SF038-14`): the module side takes the first param in *declaration
 order*.** The declaration has an order to take: `:params` is a
-`[t:StatifierBlocks.BlockType.field_decl/0]` (`composite.ex:203`), which is why
+`[t:StatifierBlocks.BlockType.field_decl/0]` (`composite.ex:204`), which is why
 `config_schema/1` answers "`params`, in declaration order" (`composite.ex:79`,
 `:228`).
 
 The code does not take it yet, and this Note records that rather than reading
 the ruling back as description. `blamed_param/2` answers `nil` when none **or
-more than one** param matches (`composite.ex:589-592`), which the comment at
+more than one** param matches (`composite.ex:590-593`), which the comment at
 `composite.ex:570-572` calls "no single param is responsible", "the honest
 answer in both directions". Nor could it take the ruling where it stands:
 `params_of/2` (`composite.ex:500-506`) hands `blamed_param/2` a `Map.new/2`
