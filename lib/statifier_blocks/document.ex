@@ -36,6 +36,12 @@ defmodule StatifierBlocks.Document do
   roots the document's own guards and assigns read (ADR-0001 decision 11).
   It follows, never leads, the compile call's `:declare` option - see
   `StatifierBlocks.Compiler`'s moduledoc for the precedence rule.
+
+  `committed_config/2` and `effective_config/3` are the two config readers
+  a surface asks the document, public because the reference embedder's Plan
+  view - the first consumer of both - had written them out privately in
+  order to draw a config form over a document at all. They are lookups over
+  `blocks/1`: what the document says, and what a held draft says instead.
   """
 
   alias StatifierBlocks.{Block, CanonicalJson, Decode, Validation}
@@ -148,6 +154,94 @@ defmodule StatifierBlocks.Document do
       :error -> find_in_slot(parent_id, slot_name, rest, id, index + 1)
     end
   end
+
+  @doc """
+  The config the document holds for the block carrying `id`, or `%{}` when
+  no block in `document` carries it.
+
+  A lookup over `blocks/1` and nothing else: what the document says, with
+  no draft, no palette and no schema anywhere near the answer. The first
+  consumer is the reference embedder's Plan view, which needs the
+  committed config in order to show what an editor's unaccepted draft would
+  change; the package's own editor asks the same question for the same
+  reason.
+
+  `%{}` for an absent block rather than `nil`, because every caller is
+  about to read config keys out of the answer and a block that is not there
+  has none of them - the same shape as a block that carries no config at
+  all.
+
+      iex> alias StatifierBlocks.{Block, Document}
+      iex> root =
+      ...>   Block.new("core.sequence",
+      ...>     id: "root",
+      ...>     slots: %{"body" => [Block.new("core.wait", id: "wait", config: %{"duration" => "30s"})]}
+      ...>   )
+      iex> document = Document.new(root)
+      iex> Document.committed_config(document, "wait")
+      %{"duration" => "30s"}
+      iex> Document.committed_config(document, "absent")
+      %{}
+  """
+  @spec committed_config(t(), Block.id()) :: Block.config()
+  def committed_config(%__MODULE__{} = document, id) do
+    case Enum.find(blocks(document), &(&1.id == id)) do
+      %Block{config: config} -> config
+      nil -> %{}
+    end
+  end
+
+  @doc """
+  The config a surface should act on for the block carrying `id`: the
+  draft `drafts` holds for it, else `committed_config/2`.
+
+  A draft is config the document refused, held so the author keeps their
+  keystrokes (ADR-0002 decision 9). Reading a form back, or offering a
+  value to a field control, has to start from the draft where one exists
+  or the author's second edit is applied to the value their first one
+  replaced.
+
+  `drafts` is the map a surface keeps of block id to unaccepted config.
+
+      iex> alias StatifierBlocks.{Block, Document}
+      iex> root =
+      ...>   Block.new("core.sequence",
+      ...>     id: "root",
+      ...>     slots: %{"body" => [Block.new("core.wait", id: "wait", config: %{"duration" => "30s"})]}
+      ...>   )
+      iex> document = Document.new(root)
+      iex> Document.effective_config(document, "wait", %{"wait" => %{"duration" => "48h"}})
+      %{"duration" => "48h"}
+      iex> Document.effective_config(document, "wait", %{})
+      %{"duration" => "30s"}
+  """
+  @spec effective_config(t(), Block.id(), %{optional(Block.id()) => Block.config()}) ::
+          Block.config()
+  def effective_config(%__MODULE__{} = document, id, drafts) when is_map(drafts) do
+    case Map.fetch(drafts, id) do
+      {:ok, draft} -> draft
+      :error -> committed_config(document, id)
+    end
+  end
+
+  @doc """
+  `effective_config/3` for a caller holding no drafts: `committed_config/2`.
+
+  It exists so that a surface that has not grown drafts yet, and a test
+  that is not about them, need not invent an empty map in order to say
+  there are none.
+
+      iex> alias StatifierBlocks.{Block, Document}
+      iex> root =
+      ...>   Block.new("core.sequence",
+      ...>     id: "root",
+      ...>     slots: %{"body" => [Block.new("core.wait", id: "wait", config: %{"duration" => "30s"})]}
+      ...>   )
+      iex> Document.effective_config(Document.new(root), "wait")
+      %{"duration" => "30s"}
+  """
+  @spec effective_config(t(), Block.id()) :: Block.config()
+  def effective_config(%__MODULE__{} = document, id), do: committed_config(document, id)
 
   @doc """
   Checks `document` against ADR-0001's structural rules: schema version,

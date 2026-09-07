@@ -1,7 +1,10 @@
 defmodule StatifierBlocks.DocumentTest do
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{Block, Document}
+  doctest StatifierBlocks.Document,
+    only: [committed_config: 2, effective_config: 2, effective_config: 3]
+
+  alias StatifierBlocks.{Block, Document, DocumentFixtures}
   alias StatifierBlocks.Document.DatamodelEntry
 
   # sabotage: default revision to 1 instead of 0 -> red
@@ -135,6 +138,43 @@ defmodule StatifierBlocks.DocumentTest do
       document = Document.new(root)
 
       assert Document.fetch_path(document, "blk_missing") == :error
+    end
+  end
+
+  describe "committed_config/2 and effective_config/3" do
+    # sabotage: search only the root instead of walking `blocks/1` -> red
+    test "committed_config/2 answers what the document holds for a nested block" do
+      document = DocumentFixtures.worked_example()
+
+      assert Document.committed_config(document, "blk_WAI") == %{"duration" => "48h"}
+      assert Document.committed_config(document, "blk_CAP") == %{"invoke_type" => "myapp:capture"}
+    end
+
+    # sabotage: answer nil for an absent id instead of %{} -> red
+    test "committed_config/2 answers %{} for a block the document does not carry" do
+      assert Document.committed_config(DocumentFixtures.worked_example(), "blk_ABSENT") == %{}
+    end
+
+    # sabotage: read the drafts map before falling back, but with the id
+    # ignored, so any draft answers for any block -> red
+    test "effective_config/3 answers the draft when one is held for that id" do
+      document = DocumentFixtures.worked_example()
+      drafts = %{"blk_WAI" => %{"duration" => "72h"}}
+
+      assert Document.effective_config(document, "blk_WAI", drafts) == %{"duration" => "72h"}
+
+      assert Document.effective_config(document, "blk_CAP", drafts) ==
+               Document.committed_config(document, "blk_CAP")
+    end
+
+    # sabotage: default `drafts` to the document own metadata rather
+    # than %{} -> red
+    test "effective_config/2 with no drafts is committed_config/2" do
+      document = DocumentFixtures.signup_wizard()
+
+      for %{id: id} <- Document.blocks(document) do
+        assert Document.effective_config(document, id) == Document.committed_config(document, id)
+      end
     end
   end
 end

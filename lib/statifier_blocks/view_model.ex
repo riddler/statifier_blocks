@@ -165,6 +165,20 @@ defmodule StatifierBlocks.ViewModel do
   form - is the surface that skips them. Keeping them in the list is also
   what lets `ConfigForm.decode/3` preserve a hidden value, since that
   function is keyed off the fields it is handed.
+
+  ## The readers a host asks the view model
+
+  `find_node/2`, `parent_of/2`, `positions/1`, `sentence/1`,
+  `shown_fields/1`, `fields_for/2`, `overlay_draft/2` and
+  `drafted_field/2` answer questions about a built view model and derive
+  nothing new. They are public because the reference embedder's Plan view -
+  `statifier_examples`' read-and-edit page over these same documents, and
+  the first consumer of every one of them - had written each of them out
+  privately in order to draw a list of blocks at all. A fragment that
+  answers a question about a document promotes; a fragment that decides how
+  a page is arranged does not, which is why there is no layout mode here to
+  go with them. The package's own editor calls these too, so the two
+  surfaces cannot answer the same question differently.
   """
 
   alias StatifierBlocks.{
@@ -986,6 +1000,214 @@ defmodule StatifierBlocks.ViewModel do
       :fan -> "one of"
       :stack -> nil
     end
+  end
+
+  @doc """
+  The node carrying `id`, or `nil` when no block in the tree does.
+
+  The first consumer is the reference embedder's Plan view, which wrote
+  this walk out privately in order to answer "which node is selected" -
+  the question a view model that already holds the tree should answer
+  itself. It takes either the view model or a node, so a caller holding
+  a subtree can search inside it without reaching for `root` first.
+
+      iex> alias StatifierBlocks.{Block, Document, Palette, ViewModel}
+      iex> root =
+      ...>   Block.new("core.sequence",
+      ...>     id: "root",
+      ...>     slots: %{"body" => [Block.new("core.wait", id: "wait", config: %{"duration" => "30s"})]}
+      ...>   )
+      iex> vm = root |> Document.new() |> ViewModel.build(Palette.core(), [])
+      iex> ViewModel.find_node(vm, "wait").type
+      "core.wait"
+      iex> ViewModel.find_node(vm, "absent")
+      nil
+  """
+  @spec find_node(t() | Node.t(), Block.id()) :: Node.t() | nil
+  def find_node(%__MODULE__{root: root}, id), do: find_node(root, id)
+  def find_node(%Node{block_id: id} = node, id), do: node
+
+  def find_node(%Node{slots: slots}, id) do
+    slots
+    |> Enum.flat_map(& &1.children)
+    |> Enum.find_value(fn child -> find_node(child, id) end)
+  end
+
+  @doc """
+  Where the block carrying `id` sits: the `{parent block id, slot name,
+  index}` its parent holds it at, or `nil`.
+
+  The root has no position, which is what makes moving and deleting it
+  refuse rather than raise - `StatifierBlocks.Edit.apply/2` refuses to
+  remove the root too, and this is that refusal one step earlier, so a
+  surface can draw no button that cannot work. An id no block carries is
+  `nil` for the same reason.
+
+  The tuple is `StatifierBlocks.Edit.target/0`: what this answers is
+  directly what a command takes.
+
+      iex> alias StatifierBlocks.{Block, Document, Palette, ViewModel}
+      iex> root =
+      ...>   Block.new("core.sequence",
+      ...>     id: "root",
+      ...>     slots: %{"body" => [Block.new("core.wait", id: "wait", config: %{"duration" => "30s"})]}
+      ...>   )
+      iex> vm = root |> Document.new() |> ViewModel.build(Palette.core(), [])
+      iex> ViewModel.parent_of(vm, "wait")
+      {"root", "body", 0}
+      iex> ViewModel.parent_of(vm, "root")
+      nil
+  """
+  @spec parent_of(t() | Node.t(), Block.id()) ::
+          {Block.id(), Block.slot_name(), non_neg_integer()} | nil
+  def parent_of(%__MODULE__{root: root}, id), do: parent_of(root, id)
+
+  def parent_of(%Node{block_id: parent_id, slots: slots}, id) do
+    Enum.find_value(slots, fn slot ->
+      case Enum.find_index(slot.children, &(&1.block_id == id)) do
+        nil -> Enum.find_value(slot.children, &parent_of(&1, id))
+        index -> {parent_id, slot.name, index}
+      end
+    end)
+  end
+
+  @doc """
+  Where every block sits, as one map from block id to
+  `parent_of/2`'s tuple.
+
+  `parent_of/2` asked of one block; this is the same answer for the whole
+  document in one walk, which is what a surface drawing a row per block
+  wants rather than a lookup per row. The root is absent from the map for
+  the reason `parent_of/2` answers `nil` for it.
+
+      iex> alias StatifierBlocks.{Block, Document, Palette, ViewModel}
+      iex> root =
+      ...>   Block.new("core.sequence",
+      ...>     id: "root",
+      ...>     slots: %{"body" => [Block.new("core.wait", id: "wait", config: %{"duration" => "30s"})]}
+      ...>   )
+      iex> root |> Document.new() |> ViewModel.build(Palette.core(), []) |> ViewModel.positions()
+      %{"wait" => {"root", "body", 0}}
+  """
+  @spec positions(t() | Node.t()) ::
+          %{Block.id() => {Block.id(), Block.slot_name(), non_neg_integer()}}
+  def positions(%__MODULE__{root: root}), do: positions(root)
+  def positions(%Node{} = root), do: collect_positions(root, %{})
+
+  @spec collect_positions(Node.t(), %{
+          Block.id() => {Block.id(), Block.slot_name(), non_neg_integer()}
+        }) :: %{Block.id() => {Block.id(), Block.slot_name(), non_neg_integer()}}
+  defp collect_positions(%Node{block_id: parent_id, slots: slots}, acc) do
+    Enum.reduce(slots, acc, fn slot, slot_acc ->
+      slot.children
+      |> Enum.with_index()
+      |> Enum.reduce(slot_acc, fn {child, index}, child_acc ->
+        child_acc
+        |> Map.put(child.block_id, {parent_id, slot.name, index})
+        |> then(&collect_positions(child, &1))
+      end)
+    end)
+  end
+
+  @doc """
+  A node's line of prose: its own `sentence`, else `title/1`.
+
+  `Node.sentence` is the block type's own line where the type declares
+  `sentence/1`, and `title/1` is the fallback this module already uses for
+  a type that declares none - so the answer is never blank for a block the
+  document holds. Every surface drawing a row writes this same two-clause
+  fallback, and writing it once is what keeps two surfaces from naming one
+  block differently.
+
+  It is the arity that separates it from the two other `sentence`s in the
+  package, and the three are deliberately distinct: this one takes a node
+  and answers what to draw, `StatifierBlocks.BlockType.sentence/2` asks a
+  block type for its own line, and this module's private `sentence/5` is
+  where a built node's `sentence` field came from in the first place.
+
+      iex> alias StatifierBlocks.{Block, Document, Palette, ViewModel}
+      iex> root =
+      ...>   Block.new("core.sequence",
+      ...>     id: "root",
+      ...>     slots: %{"body" => [Block.new("core.wait", id: "wait", config: %{"duration" => "30s"})]}
+      ...>   )
+      iex> vm = root |> Document.new() |> ViewModel.build(Palette.core(), [])
+      iex> vm |> ViewModel.find_node("wait") |> ViewModel.sentence()
+      "Wait 30s"
+  """
+  @spec sentence(Node.t()) :: String.t()
+  def sentence(%Node{sentence: sentence}) when is_binary(sentence) and sentence != "",
+    do: sentence
+
+  def sentence(%Node{} = node), do: title(node)
+
+  @doc """
+  A node's fields with the hidden ones rejected, or `[]` for a node with
+  no form.
+
+  `hidden?` is a field flag the view model sets and every surface honours
+  (ADR-0005 decision 11's field-flags amendment): the view model lists
+  every declared field and the surface filters. Repeating that filter per
+  surface is how a hidden field gets drawn once by accident, so it is
+  written here once instead.
+  """
+  @spec shown_fields(Node.t()) :: [Field.t()]
+  def shown_fields(%Node{form: %Form{fields: fields}}), do: Enum.reject(fields, & &1.hidden?)
+  def shown_fields(%Node{}), do: []
+
+  @doc """
+  The config fields of the block carrying `id`, or `[]` when there is no
+  such block or it has no form.
+
+  `find_node/2` and `shown_fields/1`'s subject in one call: the list a
+  form decoder needs in order to read a submitted form back into a config.
+  """
+  @spec fields_for(t() | Node.t(), Block.id()) :: [Field.t()]
+  def fields_for(view_model_or_node, id) do
+    case find_node(view_model_or_node, id) do
+      %Node{form: %Form{fields: fields}} -> fields
+      _no_node_or_form -> []
+    end
+  end
+
+  @doc """
+  One field, showing `draft`'s value where the draft has one.
+
+  A field the draft says nothing about keeps the value the document holds,
+  which is what makes a partially typed form show one changed row rather
+  than a blank set. The draft is read at the field's
+  `StatifierBlocks.ViewModel.Field.value_path/1`, so a field whose value
+  lives inside a nested member is drafted the same way a flat one is.
+  """
+  @spec drafted_field(Field.t(), Block.config()) :: Field.t()
+  def drafted_field(%Field{} = field, draft) when is_map(draft) do
+    case BlockType.fetch_value(draft, Field.value_path(field)) do
+      {:ok, value} -> %{field | value: value}
+      :error -> field
+    end
+  end
+
+  @doc """
+  `node` with `draft`'s values over its form's fields, or the node
+  unchanged when it has no form.
+
+  This is the effective config a form shows beside a refused draft
+  (ADR-0002 decision 9): a config the document never accepted, made
+  visible without letting it near the document. Values only - only the
+  form is touched, and `slots/1` is never called on a draft, which is the
+  promise decision 6 is owed. A consumer wanting the draft's own findings
+  beside the values derives them itself; this function states no opinion
+  about whether the draft validates.
+
+  `nil` in, `nil` out, so a caller that has not resolved a selection yet
+  can pipe through it.
+  """
+  @spec overlay_draft(Node.t() | nil, Block.config()) :: Node.t() | nil
+  def overlay_draft(nil, _draft), do: nil
+  def overlay_draft(%Node{form: nil} = node, _draft), do: node
+
+  def overlay_draft(%Node{form: %Form{} = form} = node, draft) when is_map(draft) do
+    %{node | form: %{form | fields: Enum.map(form.fields, &drafted_field(&1, draft))}}
   end
 
   @spec derived_findings(Document.t(), Palette.t(), BlockType.chip_labels()) :: [Finding.t()]

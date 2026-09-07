@@ -1479,7 +1479,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     def handle_event("config-change", %{"block-id" => id} = params, socket) do
-      config = ConfigForm.decode(fields_for(socket, id), params, effective_config(socket, id))
+      config =
+        ConfigForm.decode(
+          ViewModel.fields_for(socket.assigns.view_model, id),
+          params,
+          Document.effective_config(socket.assigns.document, id, socket.assigns.drafts)
+        )
+
       {:noreply, change_config(socket, id, config)}
     end
 
@@ -1774,8 +1780,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           ) :: Phoenix.LiveView.Socket.t()
     defp update_list(socket, key, params, gesture) do
       with id when not is_nil(id) <- socket.assigns.selected_id,
-           %ViewModel.Field{} = field <- Enum.find(fields_for(socket, id), &(&1.key == key)) do
-        config = effective_config(socket, id)
+           %ViewModel.Field{} = field <-
+             Enum.find(ViewModel.fields_for(socket.assigns.view_model, id), &(&1.key == key)) do
+        config = Document.effective_config(socket.assigns.document, id, socket.assigns.drafts)
         path = ViewModel.Field.value_path(field)
 
         rows =
@@ -2625,7 +2632,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # the card, and two derivations of one name is how those drift apart.
     @spec candidate_label(map(), Block.t()) :: String.t()
     defp candidate_label(assigns, %Block{} = block) do
-      case find_node(assigns.view_model.root, block.id) do
+      case ViewModel.find_node(assigns.view_model, block.id) do
         %ViewModel.Node{} = node -> ViewModel.title(node)
         nil -> block.type
       end
@@ -2990,7 +2997,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           []
 
         {:ok, draft} ->
-          committed = committed_config(socket.assigns.document, id)
+          committed = Document.committed_config(socket.assigns.document, id)
 
           Enum.filter(form.fields, fn field ->
             path = ViewModel.Field.value_path(field)
@@ -3004,17 +3011,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp selected_node(socket, %ViewModel{root: root}) do
       case socket.assigns.selected_id do
         nil -> nil
-        id -> root |> find_node(id) |> overlay_draft(socket, id)
+        id -> root |> ViewModel.find_node(id) |> overlay_draft(socket, id)
       end
-    end
-
-    @spec find_node(ViewModel.Node.t(), Block.id()) :: ViewModel.Node.t() | nil
-    defp find_node(%ViewModel.Node{block_id: id} = node, id), do: node
-
-    defp find_node(%ViewModel.Node{slots: slots}, id) do
-      slots
-      |> Enum.flat_map(& &1.children)
-      |> Enum.find_value(fn child -> find_node(child, id) end)
     end
 
     # Decision 9's draft, made visible without letting it near the document.
@@ -3040,14 +3038,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       by_key = draft_findings(palette, node, draft)
       keys = MapSet.new(node.form.fields, & &1.key)
 
+      # The value half is `ViewModel.overlay_draft/2`, which is decision 9's
+      # own treatment and is now public because a host writing its own form
+      # needs exactly it; the findings half is this module's, because only a
+      # surface that draws them has to route them.
       fields =
-        Enum.map(node.form.fields, fn field ->
-          %{
-            field
-            | value: Map.get(draft, field.key, field.value),
-              findings: Map.get(by_key, field.key, [])
-          }
-        end)
+        node
+        |> ViewModel.overlay_draft(draft)
+        |> then(fn %ViewModel.Node{form: %ViewModel.Form{fields: fields}} -> fields end)
+        |> Enum.map(fn field -> %{field | findings: Map.get(by_key, field.key, [])} end)
 
       unrouted =
         by_key
@@ -3200,30 +3199,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec find_document_block(Document.t(), Block.id()) :: Block.t() | nil
     defp find_document_block(document, id),
       do: Enum.find(Document.blocks(document), &(&1.id == id))
-
-    @spec fields_for(Phoenix.LiveView.Socket.t(), Block.id()) :: [ViewModel.Field.t()]
-    defp fields_for(socket, id) do
-      case find_node(socket.assigns.view_model.root, id) do
-        %ViewModel.Node{form: %ViewModel.Form{fields: fields}} -> fields
-        _none -> []
-      end
-    end
-
-    @spec effective_config(Phoenix.LiveView.Socket.t(), Block.id()) :: Block.config()
-    defp effective_config(socket, id) do
-      case Map.fetch(socket.assigns.drafts, id) do
-        {:ok, draft} -> draft
-        :error -> committed_config(socket.assigns.document, id)
-      end
-    end
-
-    @spec committed_config(Document.t(), Block.id()) :: Block.config()
-    defp committed_config(document, id) do
-      case Enum.find(Document.blocks(document), &(&1.id == id)) do
-        %Block{config: config} -> config
-        nil -> %{}
-      end
-    end
 
     @spec notify_change(Phoenix.LiveView.Socket.t(), Document.t()) :: Phoenix.LiveView.Socket.t()
     defp notify_change(socket, document) do

@@ -245,7 +245,7 @@ defmodule StatifierBlocks.Runtime.FixtureRuns do
   defp drive_row(block_id, table, %TruthTable.Row{} = row, machine, provenance, view_model) do
     entered_ids = enter_row(machine, row)
     entered_block_ids = owner_ids(provenance, entered_ids)
-    node = find_node(view_model.root, block_id)
+    node = ViewModel.find_node(view_model.root, block_id)
 
     {verdict, expected_slot, taken_slot, detail} =
       verdict_for(node, row, entered_block_ids)
@@ -430,14 +430,5 @@ defmodule StatifierBlocks.Runtime.FixtureRuns do
   defp node_entered?(%ViewModel.Node{block_id: block_id, slots: slots}, entered_block_ids) do
     MapSet.member?(entered_block_ids, block_id) or
       Enum.any?(slots, &slot_entered?(&1, entered_block_ids))
-  end
-
-  @spec find_node(ViewModel.Node.t(), StatifierBlocks.Block.id()) :: ViewModel.Node.t() | nil
-  defp find_node(%ViewModel.Node{block_id: id} = node, id), do: node
-
-  defp find_node(%ViewModel.Node{slots: slots}, id) do
-    Enum.find_value(slots, fn %ViewModel.Slot{children: children} ->
-      Enum.find_value(children, &find_node(&1, id))
-    end)
   end
 end
