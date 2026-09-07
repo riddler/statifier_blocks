@@ -282,7 +282,7 @@ defmodule StatifierBlocks.Environment do
       children
       |> Enum.take(index)
       |> Enum.reduce(
-        slot_start(palette, block, slot, env),
+        slot_start(palette, document, block, slot, env, ctx),
         &through(palette, document, &1, &2, ctx)
       )
     end
@@ -703,7 +703,11 @@ defmodule StatifierBlocks.Environment do
   # how the slots map was built - and the merge is order-independent anyway.
   @spec arms(annotated(), Palette.t(), Document.t(), Block.t(), context()) :: annotated()
   defp arms(env, palette, document, %Block{slots: slots} = block, ctx) do
-    case slots |> Enum.sort_by(&elem(&1, 0)) |> Enum.reject(fn {_name, kids} -> kids == [] end) do
+    slots
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.reject(fn {_name, kids} -> kids == [] end)
+    |> declared_only(palette, block)
+    |> case do
       [] ->
         env
 
@@ -730,7 +734,7 @@ defmodule StatifierBlocks.Environment do
           context()
         ) :: annotated()
   defp slot_env(palette, document, block, slot, children, env, ctx) do
-    bound = slot_start(palette, block, slot, env)
+    bound = slot_start(palette, document, block, slot, env, ctx)
     scoped = Map.keys(bound) -- Map.keys(env)
 
     walked = Enum.reduce(children, bound, &through(palette, document, &1, &2, ctx))
@@ -744,12 +748,143 @@ defmodule StatifierBlocks.Environment do
   # container, plus a fan-out's item and index bindings, and nothing at all
   # inside a `core.drafts` shelf - a parked fragment reads nothing as known
   # because nothing put it there.
-  @spec slot_start(Palette.t(), Block.t(), Block.slot_name(), annotated()) :: annotated()
-  defp slot_start(palette, %Block{} = block, slot, env) do
+  @spec slot_start(
+          Palette.t(),
+          Document.t(),
+          Block.t(),
+          Block.slot_name(),
+          annotated(),
+          context()
+        ) :: annotated()
+  defp slot_start(palette, document, %Block{} = block, slot, env, ctx) do
     if Shelf.shelf?(block) do
       %{}
     else
-      Map.merge(env, fan_out_bindings(palette, block, slot, env))
+      case pass_through(palette, block, slot) do
+        {:ok, ref, inner_id, inner_slot} ->
+          mapped_start(palette, document, block, ref, inner_id, inner_slot, env, ctx)
+
+        :not_declared ->
+          %{}
+
+        :none ->
+          Map.merge(env, fan_out_bindings(palette, block, slot, env))
+      end
+    end
+  end
+
+  # `ADR-0011`'s amendment of 2026-09-07, section 2: the environment a
+  # pass-through slot's first child sees is NOT the one reaching the
+  # composite. It is the composite's expansion flattened up to the block the
+  # declaration's local id names, each earlier member's writes applied as the
+  # walk applies any block's, and then that inner block's own `inner_slot`
+  # starting environment - which is the environment the author's block would
+  # see had the author placed the expansion by hand and dropped the child
+  # where the splice puts it.
+  #
+  # The rule composes by construction: `into_slot/7` re-enters `slot_start/6`
+  # at the inner block, so an inner block that is itself a composite with a
+  # pass-through slot is answered by this same clause again.
+  @spec mapped_start(
+          Palette.t(),
+          Document.t(),
+          Block.t(),
+          Palette.type_ref(),
+          Block.id(),
+          Block.slot_name(),
+          annotated(),
+          context()
+        ) :: annotated()
+  defp mapped_start(palette, document, block, ref, inner_id, inner_slot, env, ctx) do
+    {members, _param_map} = Composite.expand(block, ref)
+
+    members
+    |> Enum.reduce_while(env, fn member, acc ->
+      if holds?(member, inner_id) do
+        {:halt, {:found, into_member(palette, document, member, inner_id, inner_slot, acc, ctx)}}
+      else
+        {:cont, through(palette, document, member, acc, ctx)}
+      end
+    end)
+    |> case do
+      {:found, reached} -> reached
+      walked when is_map(walked) -> walked
+    end
+  end
+
+  # The environment at index 0 of `inner_id`'s `inner_slot`, from the
+  # environment reaching `member`. `descend/6`'s shape, over the expansion's
+  # blocks rather than the document's.
+  @spec into_member(
+          Palette.t(),
+          Document.t(),
+          Block.t(),
+          Block.id(),
+          Block.slot_name(),
+          annotated(),
+          context()
+        ) :: annotated()
+  defp into_member(palette, document, %Block{id: id} = member, id, inner_slot, env, ctx),
+    do: into_slot(palette, document, member, inner_slot, 0, env, ctx)
+
+  defp into_member(palette, document, %Block{} = member, inner_id, inner_slot, env, ctx) do
+    member.slots
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.find_value(fn {name, kids} ->
+      case Enum.find_index(kids, &holds?(&1, inner_id)) do
+        nil ->
+          nil
+
+        index ->
+          child_env = into_slot(palette, document, member, name, index, env, ctx)
+          child = Enum.at(kids, index)
+
+          {:ok, into_member(palette, document, child, inner_id, inner_slot, child_env, ctx)}
+      end
+    end)
+    |> case do
+      {:ok, reached} -> reached
+      nil -> env
+    end
+  end
+
+  @spec holds?(Block.t(), Block.id()) :: boolean()
+  defp holds?(%Block{id: id}, id), do: true
+
+  defp holds?(%Block{slots: slots}, id),
+    do: Enum.any?(slots, fn {_name, kids} -> Enum.any?(kids, &holds?(&1, id)) end)
+
+  # `slot`'s pass-through mapping, minted; `:not_declared` for a slot key a
+  # composite carries and its declaration does not name, which the walk
+  # reaches nothing through; `:none` for every block that is not a composite.
+  @spec pass_through(Palette.t(), Block.t(), Block.slot_name()) ::
+          {:ok, Palette.type_ref(), Block.id(), Block.slot_name()} | :not_declared | :none
+  defp pass_through(palette, %Block{} = block, slot) do
+    with {:ok, ref, _resolved} <- Palette.resolve(palette, block),
+         true <- Composite.composite?(ref) do
+      case Map.fetch(Composite.pass_through(block, ref), slot) do
+        {:ok, {inner_id, inner_slot}} -> {:ok, ref, inner_id, inner_slot}
+        :error -> :not_declared
+      end
+    else
+      _not_a_composite -> :none
+    end
+  end
+
+  # `ADR-0011`'s amendment of 2026-09-07, section 2, last paragraph: nothing
+  # else in a composite's `slots` is descended. A slot key the declaration
+  # does not declare is not a pass-through slot, carries no mapping, and the
+  # walk reaches nothing through it.
+  @spec declared_only([{Block.slot_name(), [Block.t()]}], Palette.t(), Block.t()) ::
+          [{Block.slot_name(), [Block.t()]}]
+  defp declared_only(populated, palette, %Block{} = block) do
+    with {:ok, ref, _resolved} <- Palette.resolve(palette, block),
+         true <- Composite.composite?(ref) do
+      declared = block |> Composite.pass_through(ref) |> Map.keys() |> MapSet.new()
+
+      Enum.filter(populated, fn {name, _kids} -> MapSet.member?(declared, name) end)
+    else
+      _not_a_composite -> populated
     end
   end
 

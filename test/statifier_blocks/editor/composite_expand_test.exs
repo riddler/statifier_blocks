@@ -125,6 +125,39 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # -- P6/P7: a composite with a pass-through slot -----------------------
+
+    defmodule GuardedSection do
+      @moduledoc """
+      `ADR-0002`'s pass-through amendment, P8: the same shape with a `body`
+      slot the composite exposes, mapped into the `core.group` the subtree
+      writes as `"then"`.
+      """
+
+      use StatifierBlocks.Composite,
+        name: "myapp.guarded_section",
+        params: [
+          %{key: "invoke_type", type: :string, label: "Call", required?: true, default: ""}
+        ],
+        slots: [%{name: "body", to: {"then", "body"}, label: "Then"}],
+        sentence: "Call {invoke_type}",
+        palette_entry: %{label: "Guarded section", group: "Structure"},
+        version: 1
+
+      alias StatifierBlocks.Block
+
+      @impl StatifierBlocks.Composite
+      def subtree(params) do
+        [
+          Block.new("core.invoke",
+            id: "call",
+            config: %{"invoke_type" => params["invoke_type"], "assign_to" => "", "params" => ""}
+          ),
+          Block.new("core.group", id: "then", slots: %{"body" => []})
+        ]
+      end
+    end
+
     describe "1E-3E: one compound, one undo entry" do
       # Sabotage: dropped the `{:remove, id}` from the head of the compound -
       # red at the first assertion, because the composite is then still in the
@@ -322,6 +355,73 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "P6/P7: a pass-through slot draws an interior, and Expand carries it" do
+      # Sabotage: left the generated `slots/1` at `[]` - red, because the
+      # card then draws no interior and the block the author put in the
+      # section has nowhere to be drawn.
+      test "P6: the card draws an interior for the declared slot", %{conn: conn} do
+        {:ok, _view, html} = mount_editor(conn, document: section_document(), palette: palette())
+
+        card = card(html, "blk_GX")
+
+        assert card =~ ~s(data-container="true")
+        assert card =~ "Then"
+        refute card(html, "blk_TAIL") =~ ~s(data-container="true")
+      end
+
+      # Sabotage: had `Composite.expand/2` answer the subtree without the
+      # splice - red, because the gesture then drops the author's own block
+      # on the floor and the undo cannot put back what was never removed.
+      test "P7: Expand carries the children, at their own ids", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: section_document(), palette: palette())
+
+        expand(view, "blk_GX")
+
+        assert_receive {:document, document}
+
+        assert ids(document) == [
+                 "blk_ROOT",
+                 "blk_GX_call",
+                 "blk_GX_then",
+                 "blk_notify",
+                 "blk_TAIL"
+               ]
+      end
+
+      # Sabotage: committed the remove and the inserts separately - red,
+      # because the first undo then leaves the author's block inside a group
+      # the composite no longer stands beside.
+      test "one undo puts the composite and its children back, byte for byte", %{conn: conn} do
+        before = section_document()
+        {:ok, view, _html} = mount_editor(conn, document: before, palette: palette())
+
+        expand(view, "blk_GX")
+        assert_receive {:document, _expanded}
+
+        view |> element(~s(button[phx-click="undo"])) |> render_click()
+
+        assert_receive {:document, restored}
+        assert restored == before
+      end
+
+      # Sabotage: minted the spliced child's id in the editor's inserts -
+      # red, because the state ids in the two charts then disagree. This is
+      # `ADR-0004`'s T4 and consent clause 6, from the editor's side.
+      test "the chart before Expand is byte-identical to the chart after it", %{conn: conn} do
+        before = section_document()
+        {:ok, view, _html} = mount_editor(conn, document: before, palette: palette())
+
+        expand(view, "blk_GX")
+        assert_receive {:document, expanded}
+
+        assert {:ok, composed} = Compiler.compile(before, palette())
+        assert {:ok, after_expand} = Compiler.compile(expanded, palette())
+
+        assert composed.scxml == after_expand.scxml
+        assert composed.provenance == after_expand.provenance
+      end
+    end
+
     # -- fixtures ----------------------------------------------------------
 
     defp expand(view, id) do
@@ -334,6 +434,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Palette.new(
         Map.merge(Palette.core_types(), %{
           "myapp.guarded_step" => GuardedStep,
+          "myapp.guarded_section" => GuardedSection,
           "signup.confirm_contact" => ConfirmContact
         })
       )
@@ -388,6 +489,31 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         config: %{
           "invoke_type" => "myapp:signup",
           "confirmed_path" => "signup.contact.confirmed"
+        }
+      )
+    end
+
+    defp section_document do
+      Document.new(
+        Block.new("core.sequence",
+          id: "blk_ROOT",
+          slots: %{"body" => [guarded_section("blk_GX"), tail()]}
+        ),
+        id: "bdoc_EXPAND"
+      )
+    end
+
+    defp guarded_section(id) do
+      Block.new("myapp.guarded_section",
+        id: id,
+        config: %{"invoke_type" => "myapp:signup"},
+        slots: %{
+          "body" => [
+            Block.new("core.assign",
+              id: "blk_notify",
+              config: %{"path" => "signup.notified", "value" => "true"}
+            )
+          ]
         }
       )
     end

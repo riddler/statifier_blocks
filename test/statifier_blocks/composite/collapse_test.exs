@@ -591,6 +591,114 @@ defmodule StatifierBlocks.Composite.CollapseTest do
     end
   end
 
+  # -- 20E, the data half: a proposed pass-through slot, expanded ---------
+
+  defmodule GuardedSection do
+    @moduledoc """
+    The `use`-composite twin of the collapsed "Guarded section": the same one
+    member, and the same pass-through slot `propose/3` proposes for its
+    unfilled `on_error`, spelled as `ADR-0002`'s pass-through amendment
+    fixes it.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "myapp.guarded_section",
+      params: [
+        %{
+          key: "invoke_type",
+          type: :string,
+          label: "Invoke type",
+          required?: true,
+          default: "myapp:signup"
+        }
+      ],
+      slots: [%{name: "on_error", to: {"invoke", "on_error"}}],
+      version: 1
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(params) do
+      [
+        Block.new("core.invoke",
+          id: "invoke",
+          config: %{"invoke_type" => params["invoke_type"], "assign_to" => ""},
+          slots: %{"on_error" => []}
+        )
+      ]
+    end
+  end
+
+  describe "20E: the proposed pass-through slot, registered and expanded" do
+    setup do
+      {:ok, row} =
+        propose(document(guarded_section_arrangement()), ["blk_7"],
+          marks: %{"blk_7" => ["invoke_type"]}
+        )
+
+      {:ok, state} = Data.declaration(Map.put(row, "type_name", "myapp.guarded_section"))
+
+      composite =
+        Block.new("myapp.guarded_section",
+          id: "blk_AD",
+          config: %{"invoke_type" => "myapp:signup"},
+          slots: %{
+            "on_error" => [
+              Block.new("core.assign",
+                id: "blk_notify",
+                config: %{"path" => "signup.verification.failure", "value" => "failed"}
+              )
+            ]
+          }
+        )
+
+      %{row: row, ref: {Data, state}, composite: composite}
+    end
+
+    # Sabotage: had `Data.declaration/1` drop the row's `"slots"` key - red.
+    # `propose/3` emits the mapping in the array shape P2 fixes, and a decode
+    # that ignored it would make the proposal a slot nothing can fill.
+    test "the proposed row declares the slot the module twin declares", %{ref: {Data, state}} do
+      assert Data.slots(state, %{}) == GuardedSection.slots(%{})
+    end
+
+    # Sabotage: spliced the children before taking the param map - red on the
+    # map, which is ADR-0004 T3's mechanism, and green everywhere else, which
+    # is why the assertion names it explicitly.
+    test "the same expansion, block for block", %{ref: ref, composite: composite} do
+      assert Composite.expand(composite, GuardedSection) == Composite.expand(composite, ref)
+
+      {[root], param_map} = Composite.expand(composite, ref)
+
+      assert root.id == "blk_AD_invoke"
+      assert [%Block{id: "blk_notify"}] = root.slots["on_error"]
+      assert Map.keys(param_map) == ["blk_AD_invoke"]
+    end
+
+    # Sabotage: minted the spliced child's id along with the members - red.
+    # Byte identity across the two declarations is consent clause 6's
+    # obligation, and the child's stored id is what T2 keeps unchanged.
+    test "the same compiled bytes", %{ref: ref, composite: composite} do
+      document = document(composite)
+
+      assert {:ok, from_module} =
+               Compiler.compile(
+                 document,
+                 Palette.from_modules([{"myapp.guarded_section", GuardedSection}], core: true)
+               )
+
+      assert {:ok, from_collapse} =
+               Compiler.compile(
+                 document,
+                 Palette.from_modules([{"myapp.guarded_section", ref}], core: true)
+               )
+
+      assert from_module.scxml == from_collapse.scxml
+      assert from_module.provenance == from_collapse.provenance
+      assert from_module.scxml =~ "s_blk_notify"
+    end
+  end
+
   # -- 17E: the replacement compound -------------------------------------
 
   describe "replacement/4" do

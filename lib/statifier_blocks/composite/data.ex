@@ -146,7 +146,29 @@ defmodule StatifierBlocks.Composite.Data do
       invertibility holding.
     * **`"config"`** is a map of the type's config keys to JSON values.
     * **`"slots"`** is optional, defaulting to `%{}`: a slot name to a list
-      of nodes.
+      of nodes. This is the **node-level** key; the declaration-level
+      `"slots"` below is a different one, and the nesting says which is
+      meant - the node-level one is reached only through `"subtree"`.
+
+  ### The declaration-level `"slots"` key: pass-through slots
+
+  Optional, defaulting to `%{}`: a map of the slot name the composite
+  exposes to the `[local_id, inner_slot]` it maps to - a two-element JSON
+  array, because JSON has no tuple. A value may instead be a map carrying
+  `"to"` and the optional `"label"` (defaulting to the slot name) and
+  `"arity"` (one of `"any"`, `"one"`, `"zero_or_one"`, `"one_or_more"`,
+  defaulting to `"any"`); the array is sugar for that map with the two
+  defaults. It decodes to the same list `use StatifierBlocks.Composite`'s
+  `:slots` option writes, so `slots/2` here and `slots/1` there answer the
+  same thing from the same shape.
+
+  A mapping that does not fit its own subtree is refused **here**, where
+  a module composite's is refused at its first expansion: the template is
+  static, so `declaration/1` sees all three cases - a `local_id` naming no
+  node, an `inner_slot` the named node's own `"slots"` does not write, and
+  a mapped inner slot the template also fills - and this is the last moment
+  a malformed declaration can be refused. Two slots mapped to one inner
+  slot is refused with them.
 
   ### The placeholder vocabulary is one arm, and one escape
 
@@ -228,7 +250,8 @@ defmodule StatifierBlocks.Composite.Data do
           version: pos_integer(),
           sentence: String.t() | nil,
           palette_entry: BlockType.palette_entry(),
-          subtree: [node_template(), ...]
+          subtree: [node_template(), ...],
+          slots: [Composite.pass_through_decl()]
         }
 
   @id_suffix ~r/\A[a-z0-9]+(_[a-z0-9]+)*\z/
@@ -324,11 +347,12 @@ defmodule StatifierBlocks.Composite.Data do
     {subtree, subtree_errors} = decode_subtree(row["subtree"], keys)
     {entry, entry_errors} = decode_entry(row["palette_entry"], name)
     {sentence, sentence_errors} = decode_sentence(row["sentence"], params)
+    {slots, slot_errors} = decode_slots(row["slots"], subtree, params, subtree_errors)
 
     errors =
       name_errors(name) ++
         version_errors(version) ++
-        param_errors ++ subtree_errors ++ entry_errors ++ sentence_errors
+        param_errors ++ subtree_errors ++ entry_errors ++ sentence_errors ++ slot_errors
 
     case errors do
       [] ->
@@ -339,7 +363,8 @@ defmodule StatifierBlocks.Composite.Data do
            version: version,
            sentence: sentence,
            palette_entry: entry,
-           subtree: subtree
+           subtree: subtree,
+           slots: slots
          }}
 
       errors ->
@@ -363,7 +388,7 @@ defmodule StatifierBlocks.Composite.Data do
   """
   @spec __composite__(state()) :: Composite.declaration()
   def __composite__(state) do
-    Map.take(state, [:name, :params, :version, :sentence, :palette_entry])
+    Map.take(state, [:name, :params, :version, :sentence, :palette_entry, :slots])
   end
 
   @doc """
@@ -383,9 +408,14 @@ defmodule StatifierBlocks.Composite.Data do
   @spec config_schema(state(), Block.config()) :: [BlockType.field_decl()]
   def config_schema(%{params: params}, _config), do: params
 
-  @doc "`[]`: a composite exposes no slot of its own."
+  @doc """
+  The declared pass-through slots, in declaration order, and `[]` for a
+  declaration that names none - the same answer, from the same shape, that
+  a `use`-composite's `slots/1` gives (`ADR-0002`'s pass-through amendment,
+  P2).
+  """
   @spec slots(state(), Block.config()) :: [BlockType.slot_decl()]
-  def slots(_state, _config), do: []
+  def slots(state, _config), do: Composite.derived_slots(__composite__(state))
 
   @doc "The version the declaration states."
   @spec current_version(state()) :: pos_integer()
@@ -820,6 +850,119 @@ defmodule StatifierBlocks.Composite.Data do
   @spec suffixes(node_template()) :: [String.t()]
   defp suffixes(%{id_suffix: suffix, slots: slots}) do
     [suffix | Enum.flat_map(slots, fn {_name, kids} -> Enum.flat_map(kids, &suffixes/1) end)]
+  end
+
+  # P2's declaration-level `"slots"` key: a map of slot name to
+  # `[local_id, inner_slot]`, or to a map carrying `"to"` and the optional
+  # `"label"` and `"arity"`, the array being sugar for the map with the two
+  # defaults. It is a SIBLING of `"subtree"`, not the node-level `"slots"`
+  # key inside it, and the nesting is what says which is meant.
+  #
+  # P5's three subtree-dependent refusals are answered HERE rather than at
+  # the first expansion, because a data composite's subtree is a static
+  # template: this is the last moment a malformed declaration can be
+  # refused, which is what `declaration/1` is for.
+  @spec decode_slots(term(), [node_template()], [BlockType.field_decl()], [String.t()]) ::
+          {[Composite.pass_through_decl()], [String.t()]}
+  defp decode_slots(nil, _subtree, _params, _subtree_errors), do: {[], []}
+
+  defp decode_slots(slots, subtree, params, subtree_errors) when is_map(slots) do
+    {decoded, errors} =
+      slots
+      |> Enum.sort_by(&elem(&1, 0))
+      |> Enum.map(fn {name, value} -> decode_slot(name, value) end)
+      |> Enum.split_with(&match?({:ok, _decl}, &1))
+
+    decls = Enum.map(decoded, fn {:ok, decl} -> decl end)
+    messages = Enum.map(errors, fn {:error, message} -> message end)
+
+    {decls,
+     messages ++
+       duplicate_target_errors(decls) ++ mapping_errors(decls, subtree, params, subtree_errors)}
+  end
+
+  defp decode_slots(slots, _subtree, _params, _subtree_errors),
+    do:
+      {[],
+       [
+         ~s("slots" must be a map of slot name to [local_id, inner_slot], got: ) <>
+           "#{inspect(slots)}"
+       ]}
+
+  @spec decode_slot(term(), term()) :: {:ok, Composite.pass_through_decl()} | {:error, String.t()}
+  defp decode_slot(name, [local_id, inner_slot])
+       when is_binary(name) and name != "" and is_binary(local_id) and local_id != "" and
+              is_binary(inner_slot) and inner_slot != "" do
+    {:ok, %{name: name, to: {local_id, inner_slot}, label: name, arity: :any}}
+  end
+
+  defp decode_slot(name, %{"to" => [_local_id, _inner_slot] = to} = value) when is_binary(name) do
+    with {:ok, decl} <- decode_slot(name, to),
+         {:ok, arity} <- decode_arity(Map.get(value, "arity")) do
+      {:ok, %{decl | label: label_value(Map.get(value, "label"), name), arity: arity}}
+    else
+      {:error, message} -> {:error, message}
+    end
+  end
+
+  defp decode_slot(name, value),
+    do:
+      {:error,
+       ~s(slot #{inspect(name)} must map to [local_id, inner_slot] or to a map carrying "to", ) <>
+         "got: #{inspect(value)}"}
+
+  @spec label_value(term(), String.t()) :: String.t()
+  defp label_value(label, _name) when is_binary(label) and label != "", do: label
+  defp label_value(_absent_or_blank, name), do: name
+
+  @spec decode_arity(term()) :: {:ok, BlockType.slot_arity()} | {:error, String.t()}
+  defp decode_arity(nil), do: {:ok, :any}
+  defp decode_arity("any"), do: {:ok, :any}
+  defp decode_arity("one"), do: {:ok, :one}
+  defp decode_arity("zero_or_one"), do: {:ok, :zero_or_one}
+  defp decode_arity("one_or_more"), do: {:ok, :one_or_more}
+
+  defp decode_arity(other),
+    do:
+      {:error,
+       ~s("arity" must be one of "any", "one", "zero_or_one", "one_or_more", got: ) <>
+         "#{inspect(other)}"}
+
+  @spec duplicate_target_errors([Composite.pass_through_decl()]) :: [String.t()]
+  defp duplicate_target_errors(decls) do
+    targets = Enum.map(decls, & &1.to)
+
+    case targets -- Enum.uniq(targets) do
+      [] ->
+        []
+
+      duplicates ->
+        [
+          ~s("slots" maps more than one slot to ) <>
+            "#{inspect(Enum.uniq(duplicates))}; the mapped inner slot holds one author's " <>
+            "children and only them"
+        ]
+    end
+  end
+
+  # The subtree as blocks, over the params' own defaults, which is what
+  # `StatifierBlocks.Composite.mapping_errors/2` reads: the template's
+  # `"id_suffix"` values ARE the local ids, and substitution touches config
+  # and never a slot key. A subtree that did not decode is not checked -
+  # its own errors are the ones to fix first.
+  @spec mapping_errors(
+          [Composite.pass_through_decl()],
+          [node_template()],
+          [BlockType.field_decl()],
+          [String.t()]
+        ) :: [String.t()]
+  defp mapping_errors([], _subtree, _params, _subtree_errors), do: []
+  defp mapping_errors(_decls, _subtree, _params, [_ | _]), do: []
+
+  defp mapping_errors(decls, subtree, params, []) do
+    defaults = Map.new(params, fn %{key: key, default: default} -> {key, default} end)
+
+    Composite.mapping_errors(Enum.map(subtree, &instantiate(&1, defaults)), decls)
   end
 
   @spec decode_entry(term(), term()) :: {BlockType.palette_entry(), [String.t()]}
