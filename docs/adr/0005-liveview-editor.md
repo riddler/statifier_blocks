@@ -8445,3 +8445,379 @@ injected default is declared.
 
 Filed with `sb-xnxw`, campaign SF036, folding the `ADR-0005` half of
 `sb-xtcp`'s residue.
+
+## Amendment (2026-09-07): Expand as one compound edit, how a composite block draws, and Collapse recorded at proposed
+
+**Status: proposed (2026-09-07, campaign SF037, bead `sb-mjrt`, on rulings
+`RQ-SF037-2` and `RQ-SF037-4`).** Parts **(i)** and **(ii)** below are flipped
+to accepted by a separate gated request, `sb-v3ny`, after `sb-hgxl` lands the
+gesture and the card. Part **(iii)**, Collapse, **is at proposed by its own
+words and is not flipped in campaign SF037**: `RQ-SF037-4` rules it record
+only, no bead in this campaign builds it, and a section whose code is a later
+campaign's has nothing for a flip to check.
+
+Additive. Clause `2n` (`:5654`), clauses `1C` to `4C` (`:5698`, `:5722`,
+`:5745`, `:5776`), the Amendment of this date on `Recipe.members/2` (`:8069`,
+whose own status line at `:8071` is untouched and stays at proposed), and every
+other clause above this line stand exactly as written; no text above this line
+is edited by this section. Nothing in parts (i) and (ii) is built yet, and
+nothing in part (iii) is scheduled.
+
+Every code cite below is a reading of `main` at `b1c3308`, dated to this
+section and to be re-read rather than trusted.
+
+### What a composite is, and which record decides which half
+
+A **composite** is a block type derived from params plus a pure subtree: the
+host declares the params an author fills in and the arrangement they produce,
+and the package derives the type, the recipe and the expansion from that one
+declaration. The declaration itself, and the behaviour a host `use`s to write
+one, are `ADR-0002`'s: bead `sb-2gdx`, "ADR-0002 decision 5 amendment
+(proposed): `use StatifierBlocks.Composite` - a block type derived from params
+plus a pure subtree". What the **compiler** does with one - it expands at the
+Resolve stage, and a finding inside an expansion is attributed one level up to
+the param that produced it - is `ADR-0004`'s: bead `sb-nzc1`, "ADR-0004
+amendment (proposed): the compiler expands a composite at the Resolve stage,
+and a finding inside an expansion is attributed one level up to the param that
+produced it". A composite that carries state, and the palette entry shape
+`{module, state}` that reaches it, are the later `ADR-0002` amendment `sb-5b7j`,
+"ADR-0002 amendment (proposed): a palette entry may be `{module, state}`,
+resolved through one call seam, and `Composite.Data` is the stateful
+composite". Those sections are in flight beside this one and are cited here by
+bead and title deliberately: they have no line numbers yet, and a record does
+not cite a line that does not exist.
+
+This record decides the **editor's** half and nothing else: the gesture that
+replaces a composite with its expansion, how a composite draws on the canvas
+and in the palette browser, and - at proposed - the inverse gesture that turns
+a selection into a declaration.
+
+### (i) Expand: one gesture, one compound, one undo entry
+
+**1E. Expand commits one `{:compound, ...}` whose first member removes the
+composite.** A gesture on a selected composite block commits
+
+    {:compound, [{:remove, id} | inserts]}
+
+where `inserts` is the expansion's blocks as `{:insert, target, block}`
+commands, in the order the expansion gives them. It is clause `2n`'s
+constructor (`:5654`) used for exactly what `2n` describes: one author gesture,
+a list of ordinary commands, and nothing new in the algebra. The set of edits
+is still five, and Expand adds no sixth.
+
+**2E. The remove comes first, and the inserts land at the composite's own
+target.** `2n` says `Edit.apply/2` applies a compound's members "left to right
+against the intermediate documents", and that is the whole reason the order is
+fixed rather than incidental: the composite is removed first so that the
+position it occupied is free, and each insert then names **the composite's own
+target** - the same parent, the same slot, the same index the composite held -
+so the expansion appears where the composite was rather than after it. A member
+that refuses refuses the whole compound and `apply/2` answers `{:error, term()}`
+with no document at all (`2n`), so an Expand that cannot complete leaves the
+composite exactly where it was.
+
+How many roots an expansion has is not this record's to fix - it is the shape
+of `sb-2gdx`'s declaration - so the clause is written for a list of one or
+more. Where a declaration's expansion is a single subtree, `inserts` is one
+command.
+
+**3E. One undo entry, and the selection lands on the first expanded block.**
+By `2n` a compound is one undo entry - "one gesture in, one gesture out, and
+no state between the halves that the author can stop in" - and its inverse is
+the compound of each member's inverse in reverse order. So one undo removes
+every expanded block and puts the composite back whole, and there is no
+intermediate document in which the composite is gone and the expansion is not
+yet there. After the commit the editor selects the **first** expanded block:
+the block of the first `:insert` in the list. The composite's id is gone from
+the document, so leaving `selected_id` (`lib/statifier_blocks/editor.ex:650`)
+pointing at it would leave the inspector addressing a block that no longer
+exists; selecting the first expanded block is the smallest answer that keeps
+the author's attention where their gesture landed.
+
+**4E. Expanded blocks carry no marker.** Nothing in the document records that a
+block came out of a composite. `ADR-0001` decision 2 - "**2. A block is
+`{type, id, config, slots}` and nothing else.**"
+(`docs/adr/0001-block-document-schema.md:63`) - stands unweakened, and this
+clause is what keeps it standing: an expanded block is an ordinary block, a
+document holding one is an ordinary `ADR-0001` document, and a document that
+has been Expanded is byte-identical to the same arrangement an author built by
+hand.
+
+Three consequences follow, and each is deliberate.
+
+*Provenance is the history's, not the document's.* A plan view may say
+"expanded from X" only while the compound `1E` committed still **heads the
+history**; once another edit is committed on top, the document no longer knows,
+and nothing is entitled to say it. This is the same discipline `2D` (`:8134`)
+takes for the deadline pair: a recipe recognises its arrangement structurally
+and not by a mark, because there is no mark.
+
+*Collapse recognises structurally.* Part (iii)'s inverse gesture reads the
+subtree in front of it, exactly as `members/2` reads the document it is shown
+(`2D`, `:8134`). It never asks what a block used to be.
+
+*A hand-built arrangement is indistinguishable from an expanded one, and that
+is correct.* The same argument `2D` makes for the deadline pair - "an author
+who put down a `core.send` and a rail `core.on_event` by hand ... has built the
+arrangement whether or not they used the palette entry" - applies here word for
+word.
+
+**5E. Expand is refused when the target slot cannot hold the expansion's
+root.** A composite declares its own `kinds`, and its expansion's root block
+declares its own; nothing makes the two equal. So a slot that admitted the
+composite need not admit what comes out of it, and the check is real rather
+than defensive: before the compound is built, the editor asks whether the
+target slot admits the expansion's root, by `ADR-0003` decision 3's rule -
+"`:any` admits everything, otherwise `P`'s `slot_accepts[S]` and `B`'s `kinds`
+must intersect" (`docs/adr/0003-assignability.md:98-99`; the editor already
+reads `Assignability.slot_accepts/3` at
+`lib/statifier_blocks/editor.ex:2595`). If it does not, **the gesture is
+refused**: nothing is written, no command is built, and the composite stays.
+
+The refusal is a **refused gesture, not a finding**, in exactly the sense `3C`
+takes for a "deadline" armed where there is no `interrupts` rail (`:5745`,
+"nothing is written, so there is nothing for the view model to say anything
+about"). No lint, no warning, no view-model finding, and no entry in the
+document.
+
+**6E. This clause names the gesture, not the control's label.** "Expand" is the
+name of the gesture in this record. It is already a **user-facing label** in
+this package for something else: the card fold and unfold toggle answers
+"Expand" when a card is folded
+(`lib/statifier_blocks/editor/block_node.ex:496`), and the inspector's own
+collapse control reads "Expand the inspector"
+(`lib/statifier_blocks/editor/inspector.ex:338-339`). Two controls on the same
+card both reading "Expand" would teach an author that unfolding a card and
+replacing it with its expansion are one thing, which is the opposite of true.
+So the implementing bead (`sb-hgxl`) chooses a label that does not collide with
+the fold toggle, and this record takes no layout or wording ruling beyond that
+constraint - the same restraint `4C`'s non-decisions take about where recipe
+entries sit in the palette browser (`:5796-5799`). The module and function
+names `Composite.expand/2` are free of the collision entirely; it is the label
+on the card that is at issue.
+
+### (ii) The card: a composite draws as one card, with no interior
+
+**7E. A composite draws as an ordinary leaf card.** It is one block in the
+document, so it is one node in the view model, and it draws the way any type
+with no slots draws - summary chips and a sentence above them, and nothing
+inside. `ViewModel.Node` (`lib/statifier_blocks/view_model.ex:309-428`) needs
+no new field for it: the chips come from the composite's **params**, which are
+its `config`, through the same `summary_chips/1` a `myapp:capture` invoke's
+chips come through, and the sentence resolves through the same three-step
+`Node.sentence` the Amendment of this date at `:7852` records. Nothing on the
+canvas is special-cased for a composite, and that is the claim: if the drawing
+code has to learn the word "composite", this clause has been implemented wrong.
+
+**8E. A composite's `slots/1` is empty, in campaign SF037.** By `RQ-SF037-3` a
+composite exposes **no slot of its own**: its `slots/1` answers `[]`, so it has
+no interior an author can drop a block into, and the arrangement inside the
+expansion is not addressable until it is expanded. A composite is therefore a
+whole step or nothing, and an author who wants to edit its interior Expands it
+first. Pass-through slots - a composite that offers one of its expansion's
+slots to the author - are a later campaign's question and are not decided here.
+
+**9E. A composite's palette entry is `kind: :type`.** The palette browser's
+entry kind is `@type kind :: :type | :recipe`
+(`lib/statifier_blocks/view_model.ex:445`), and a composite is a **block type**:
+it has a `type_name`, it appears in a document, and `1C` (`:5698`) puts it in
+the palette's `types` map, not beside it in `recipes`. No third kind is added.
+An author picking a composite from the browser is doing the same thing as an
+author picking a `core.group`, and `2C`'s argument for why a recipe draws like
+a type (`:5722`, "an entry that announced itself as a special kind of entry
+would be teaching a distinction the author does not have to make") is the same
+argument, applied to an entry that really is a type.
+
+**10E. The boundary between a recipe and a composite is the one this record
+already named.** The Amendment of this date on `Recipe.members/2` states it
+under "Which recipe-removes survive a composite block type" (`:8255`), and that
+sentence is the boundary parts (i) and (ii) rest on:
+
+> So the boundary is not "recipes versus composites" as authoring gestures - it
+> is whether the arrangement is **written down as one thing**.
+
+A composite is written down as one thing: one block id, one `{:remove, id}` on
+delete, and no recipe asked anything (`3D`, `:8184`). Expand is the gesture
+that turns it back into the several things a recipe's arrangement always was -
+and after Expand, `members/2` is what recognises the result, because after
+Expand there is nothing else to recognise it by.
+
+### Worked example: "Authorize with a deadline" expanded in the card-processing document
+
+A host ships a composite block type, `myapp.authorize_with_deadline`, declaring
+two params: `delay`, a duration string, and `amount`, a path the authorization
+reads. Its expansion is one subtree: a `core.group` whose `body` holds a
+`core.send` carrying a generated deadline event and the declared `delay`, then
+a `myapp:authorize` invoke reading `amount`; and on that same group's
+`interrupts` rail, a `core.on_event` naming the same event and leading to a
+`myapp:capture` reversal. It is, block for block, the arrangement `4C`'s
+`"deadline"` recipe writes (`:5776`) with the authorization dropped inside it -
+the difference is that the recipe writes those blocks into the author's
+document and steps back, while the composite **is** a block in the document
+that stands for them.
+
+The author has one such block, id `"b7"`, at index 2 of the `body` of the
+document root - a `core.sequence` with id `"seq1"` - drawn as a
+single card reading "Authorize with a deadline" with a `1h` chip and an
+`amount` chip - no interior, nothing to open (`7E`, `8E`). They want to change
+what happens when the clock runs out, which the composite's params do not
+expose. They select the card and Expand.
+
+The editor checks that `seq1`'s `body` admits a `core.group` (`5E`); it does
+(`ADR-0003` decision 3: a `core.sequence`'s `body` admits `:step`, and a
+`core.group` is one).
+It commits
+
+    {:compound, [
+      {:remove, "b7"},
+      {:insert, {"seq1", "body", 2}, %Block{type: "core.group", ...}}
+    ]}
+
+- one command, one undo entry (`3E`) - and selects the inserted group. The
+document now holds an ordinary `core.group` with an ordinary send, invoke and
+rail handler inside it, indistinguishable from the same arrangement built by
+hand (`4E`). The author edits the `core.on_event`'s subtree freely.
+
+Two things follow that are worth stating because they are easy to expect
+otherwise. **The document does not remember.** Once the author commits their
+next edit, nothing anywhere says these four blocks were once one; a plan view
+that said "expanded from Authorize with a deadline" while the compound headed
+the history stops saying it (`4E`). And **the deadline recipe now claims the
+pair**: the send and the rail handler are exactly the shape `2D` (`:8134`)
+recognises, so deleting either one offers the compound delete the Amendment of
+this date describes. Before the Expand, deleting the composite was one
+`{:remove, id}` and no recipe was asked (`3D`'s fourth table row, `:8184`).
+That is `10E`'s boundary, walked in one document in two gestures.
+
+### (iii) Collapse: "save selection as a step", proposed and not built
+
+**This part is at proposed by its own words and is not flipped in campaign
+SF037.** `RQ-SF037-4` rules Collapse record only: no bead in this campaign
+implements it, `sb-v3ny` flips parts (i) and (ii) and not this part, and a
+later campaign's record - which will have code to check the clauses against -
+is what may flip it. What follows is a proposal, stated fully enough to be
+argued with and to bound what the SF037 code must not foreclose.
+
+**11E. The proposal.** A gesture on a selection, "save selection as a step",
+offers to turn the selected arrangement into a composite **declaration**: the
+author marks which of the arrangement's config values become params, and the
+subtree becomes the declaration's template with those values replaced by the
+params that stand for them. The output is a declaration in the shape
+`ADR-0002`'s data-composite amendment fixes - bead `sb-5b7j`, "ADR-0002
+amendment (proposed): a palette entry may be `{module, state}`, resolved
+through one call seam, and `Composite.Data` is the stateful composite" - and
+not a new shape of this record's invention. This record proposes the gesture;
+that record owns the declaration it produces.
+
+**12E. The selection must be exactly one subtree under one parent.** Collapse
+refuses anything else: two siblings, a block and a cousin, a selection
+straddling two slots, or a partial subtree with a child left outside. The
+reason is `1E`'s inverse read backwards. Expand replaces one block with an
+expansion rooted where the block was; for Collapse to be its inverse, what it
+replaces must be a single rooted thing occupying a single position, or there is
+no one position for the composite to take. A selection of two siblings would
+have to become two blocks or one block with two roots, and neither is a
+composite.
+
+**13E. A subtree that would need a pass-through slot is refused.** By `8E` a
+composite in this campaign has no slots. A subtree with an **empty** slot the
+author plainly means to keep filling - a `core.group` whose `body` the author
+left open for later - cannot be expressed as a composite that exposes nothing,
+and Collapse refuses it rather than silently freezing the slot shut. This
+refusal is `8E`'s bound showing up on the authoring side, and it is the clause
+that a later campaign's pass-through slots would relax. Like `5E`'s, it is a
+refused gesture and not a finding.
+
+**14E. Code is a later campaign's.** Nothing in campaign SF037 builds `11E` to
+`13E`, and the SF037 code is under no obligation to leave a seam for them
+beyond what parts (i) and (ii) already require. What it **is** obliged not to
+do is foreclose them, and the two clauses that could have are already settled
+the other way: `4E`'s no-marker rule means Collapse has nothing to look up and
+must recognise structurally, which is what `12E` assumes; and `8E`'s empty
+`slots/1` is what `13E` refuses against.
+
+### What this section does not decide
+
+- **How Expand is offered.** Whether the gesture is a control on the card, a
+  context-menu entry, a toolbar action, or a keystroke is presentation, and
+  this record takes no layout ruling - only `6E`'s constraint that whatever
+  label it carries does not collide with the fold toggle.
+- **Whether a non-root member of an expansion can be refused where its root is
+  admitted.** `5E` tests the root, because the root is what takes the
+  composite's position. Whether an expansion can even contain a second block
+  that the same slot would refuse is a question about the shape of `sb-2gdx`'s
+  declaration and is that record's, not this one's.
+- **Anything about the compiler.** The compiler never sees an `Edit.t()`
+  (`4C`'s third non-decision, `:5800-5802`), and Expand is an `Edit.t()`.
+  What the compiler does with an unexpanded composite is `sb-nzc1`'s
+  amendment of `ADR-0004`, and this record neither restates nor qualifies it.
+- **Anything about how a composite's expansion reaches the environment.** How
+  a composite exposes its expansion's path reads and writes to the environment
+  walk is an open question at the time this section is written, it concerns
+  `ADR-0002` and `ADR-0011` rather than this record, and this section asserts
+  no mechanism for it.
+- **No new finding, anywhere.** `5E`'s refusal and `13E`'s refusal write
+  nothing, and a document holding a composite is a document `ADR-0001` blesses
+  unchanged.
+- **Nothing about `2n`, `1C` to `4C`, or `Recipe.members/2`.** Every one of
+  those clauses stands as written; this section adds beside them and revises
+  none of them.
+
+### Two corrections to the Note at `:7749`, folding `sb-luo1`
+
+`sb-luo1` records two residue items the `sb-4m4x` direction reviewer left
+against the Note of 2026-09-07 at `:7749` ("the formatting-only exemption this
+record's edits run under, stated here"). Both are answered here, by addition
+and with no line removed.
+
+**The quote-boundary cite reads `:6962-:6964`.** That Note's first table row
+(`:7763`) cites `:6963-:6964` for the quotation
+
+> "a change of case is a change to a word, which puts it outside the
+> formatting-only exemption this record's edits run under"
+
+The article that opens the quotation sits at the **end of `:6962`**, which
+reads "unambiguously either way. It is corrected here rather than in place
+because a"; `:6963` begins "change of case is a change to a word". The quoted
+span is therefore `:6962-:6964`, one line wider than the row says. The row is
+inherited from `sb-4m4x`'s own bead text and the narrow reading was carried
+into the table with it. **Read `:7763`'s cite as `:6962-:6964`.** Nothing else
+in that row changes: the quotation itself is exact, and the argument the Note
+builds on it is untouched.
+
+**The exemption's attribution stands as written, uncited, and the reason is
+recorded rather than the cite added.** The Note says at `:7787-:7788` that the
+formatting-only exemption "is the campaign convention this record has been
+edited under since 2026-09-05", with no citation, where this record elsewhere
+uses a qualified form for a campaign ruling - "the campaign-014 ruling D4"
+(`:1847`), "under campaign-020 ruling D7" (`:2970`). `sb-luo1` asks whether the
+attribution should take that form, and files the general question - whether a
+public commit or request body is a citable anchor for this record - for a walk.
+
+The judgement recorded here is that **the uncited attribution stands**, on a
+distinction the two qualified forms make plain. `:1847` and `:2970` cite
+rulings that **decided something this record then wrote down**: D4 chose the
+duration control, D7 chose the arming behaviour, and each is a decision the
+record is accountable for and a reader may want to trace. The exemption is not
+of that kind. The Note itself says so in terms at `:7786` - "This is not a
+decision of this record and it decides nothing about the editor" - and states
+the rule in full in this record's own words immediately above, precisely so
+that a reader can resolve it **without** leaving the file. A cite to an
+external anchor would suggest the anchor governs and the statement paraphrases
+it, when the Note's whole purpose is that the statement here is the one a
+reader of this record uses. The general question `sb-luo1` raises is left open
+for a walk and is not answered by this judgement, which is about this one
+sentence.
+
+### Implementing and flipping beads
+
+`sb-hgxl` builds parts (i) and (ii) - the Expand gesture, the compound, the
+refusal, and the composite card - from this section as merged, against
+`sb-2gdx`'s and `sb-nzc1`'s amendments as merged. `sb-v3ny` flips **parts (i)
+and (ii) of this section's status line** to accepted after `sb-hgxl` lands, and
+re-reads every cite above against `main` as it stands then. **Part (iii) is not
+flipped by `sb-v3ny`** and no bead in campaign SF037 flips it. No bead in this
+campaign builds `11E` to `13E`.
+
+Filed with `sb-mjrt`, campaign SF037, on rulings `RQ-SF037-2` and `RQ-SF037-4`,
+folding `sb-luo1`.
