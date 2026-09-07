@@ -183,6 +183,27 @@ defmodule StatifierBlocks.Core.Send do
   def io(_config), do: %{kinds: [:step]}
 
   @doc """
+  This block as one line of prose (ADR-0002's 2026-09-07 amendment).
+
+  The event name, held to the same test `summary/1` holds it to: a name
+  that is not well formed is a finding on the card and does not belong in
+  a line that reads as though it were settled. The delay is deliberately
+  left out - the sentence says what goes out, and when it goes out is the
+  chip's.
+
+      iex> StatifierBlocks.Core.Send.sentence(%{"event" => "order.paid"})
+      "Send order.paid"
+
+      iex> StatifierBlocks.Core.Send.sentence(%{})
+      "Send an event"
+  """
+  @impl true
+  def sentence(config) do
+    event = Map.get(config, "event")
+    if Config.event_name?(event), do: "Send " <> event, else: "Send an event"
+  end
+
+  @doc """
   The spike's descriptor declares a static `sends` badge here. ADR-0005
   decision 10's `palette_entry/0` key set has no `badge`, so there is
   nothing to declare it in yet and the icon carries the whole visual

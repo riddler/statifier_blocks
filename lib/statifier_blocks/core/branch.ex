@@ -225,6 +225,31 @@ defmodule StatifierBlocks.Core.Branch do
   end
 
   @doc """
+  This block as one line of prose (ADR-0002's 2026-09-07 amendment).
+
+  The first arm's label and the fallback, which is what a reader scanning
+  a list needs to know a decision happens here and where the untaken paths
+  go. It reads `slots/1` rather than the arm list directly, so the label
+  a line draws and the label the slot draws can never disagree.
+
+  A branch with no well-formed arm takes `otherwise` every time, and the
+  sentence says so rather than naming an arm that is not there.
+
+      iex> StatifierBlocks.Core.Branch.sentence(%{"arms" => [%{"slot" => "arm_approved", "cond" => "x"}]})
+      ~s(Decide: When "approved", otherwise)
+
+      iex> StatifierBlocks.Core.Branch.sentence(%{})
+      "Decide: otherwise"
+  """
+  @impl true
+  def sentence(config) do
+    case slots(config) do
+      [{"otherwise", _arity, _label} | _rest] -> "Decide: otherwise"
+      [{_slot, _arity, label} | _rest] -> "Decide: #{label}, otherwise"
+    end
+  end
+
+  @doc """
   Two datasets and one condition evaluated against both, so a palette panel
   can show what an arm's expression does before the author commits to it.
 

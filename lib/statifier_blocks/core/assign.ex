@@ -120,6 +120,34 @@ defmodule StatifierBlocks.Core.Assign do
   @impl true
   def io(_config), do: %{kinds: [:step]}
 
+  @doc """
+  This block as one line of prose (ADR-0002's 2026-09-07 amendment).
+
+  The datamodel path written to, which is the whole of what this block
+  does that a reader scanning a list cares about. The literal is left out:
+  it is one field away in the inspector, and a value long enough to be
+  interesting is long enough to bury the path.
+
+      iex> StatifierBlocks.Core.Assign.sentence(%{"path" => "cards.settlement.status"})
+      "Set cards.settlement.status"
+
+      iex> StatifierBlocks.Core.Assign.sentence(%{})
+      "Set a value"
+  """
+  @impl true
+  def sentence(config) do
+    case Map.get(config, "path") do
+      path when is_binary(path) ->
+        case String.trim(path) do
+          "" -> "Set a value"
+          trimmed -> "Set " <> trimmed
+        end
+
+      _absent_or_malformed ->
+        "Set a value"
+    end
+  end
+
   @impl true
   def palette_entry,
     do: %{

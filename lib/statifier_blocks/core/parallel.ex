@@ -169,6 +169,32 @@ defmodule StatifierBlocks.Core.Parallel do
     %{kinds: [:step], produces: :unknown, slot_accepts: accepts}
   end
 
+  @doc """
+  This block as one line of prose (ADR-0002's 2026-09-07 amendment).
+
+  How many lanes, and that they run together. The count is the well-formed
+  lanes - the same list `summary/1` draws chips for and `slots/1` mints
+  slots from - so a malformed entry costs the count rather than putting a
+  broken name in a sentence.
+
+      iex> StatifierBlocks.Core.Parallel.sentence(%{"lanes" => ["fraud", "credit"]})
+      "Run 2 lanes at the same time"
+
+      iex> StatifierBlocks.Core.Parallel.sentence(%{"lanes" => ["fraud"]})
+      "Run 1 lane at the same time"
+
+      iex> StatifierBlocks.Core.Parallel.sentence(%{})
+      "Run its lanes at the same time"
+  """
+  @impl true
+  def sentence(config) do
+    case length(lanes(config)) do
+      0 -> "Run its lanes at the same time"
+      1 -> "Run 1 lane at the same time"
+      count -> "Run #{count} lanes at the same time"
+    end
+  end
+
   @impl true
   def palette_entry,
     do: %{

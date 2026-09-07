@@ -333,6 +333,24 @@ defmodule StatifierBlocks.ViewModel do
     rendering side reads a string and never learns which key an author's
     name lives under.
 
+    `sentence` is this block as one line of prose (ADR-0005's 2026-09-07
+    amendment): the string this block type's `sentence/1` callback
+    returned for this config where it declares one and the return is
+    usable, else the author's own `title` where they gave one, else the
+    type's label falling back to the type name. It is resolved by
+    `build/3` like every field beside it rather than being a function a
+    consumer calls later, so a list view, an outline pane and a test read
+    one field.
+
+    It is a fourth thing a node carries, not a re-spelling of `title`:
+    `ViewModel.title/1` keeps both its clauses and every consumer of it
+    reads what it read before. It is **not** a chip - it is uncapped,
+    appears in no chip list, and a card draws what it drew yesterday.
+
+    An unresolvable block has no callback to ask and no label, so it lands
+    on the type name as the document stores it: a list view draws a line
+    for every block in the document and never a blank one.
+
     `summary_titles` is the raw text behind each chip in `summary`, `nil`
     where the chip is drawn as its type declared it (ADR-0005 decision
     10w). It is index-aligned with `summary` by construction rather than
@@ -360,6 +378,7 @@ defmodule StatifierBlocks.ViewModel do
             status: status(),
             entry: BlockType.palette_entry(),
             title: String.t() | nil,
+            sentence: String.t() | nil,
             summary: [String.t()],
             summary_titles: [String.t() | nil],
             invoke_type: String.t() | nil,
@@ -380,6 +399,7 @@ defmodule StatifierBlocks.ViewModel do
       :status,
       entry: %{},
       title: nil,
+      sentence: nil,
       summary: [],
       summary_titles: [],
       invoke_type: nil,
@@ -840,6 +860,107 @@ defmodule StatifierBlocks.ViewModel do
   """
   @spec body_slots(Node.t()) :: [Slot.t()]
   def body_slots(%Node{slots: slots}), do: Enum.reject(slots, &(rail?(&1) or tray?(&1)))
+
+  @typedoc """
+  How a block in `outline/1`'s list is reached from the block above it
+  (ADR-0005's 2026-09-07 amendment).
+
+  A partition of how a block is **reached**, never a filter on which
+  blocks are listed: arms, rails and trays are kinds, not omissions.
+  """
+  @type kind :: :step | :arm | :rail | :tray
+
+  @doc """
+  The document in reading order: one `{node, depth, kind}` per block,
+  pre-order (ADR-0005's 2026-09-07 amendment).
+
+  Pure, and a pure function of the view model alone - it reads `root` and
+  walks the tree `build/3` already put in the struct, resolving nothing,
+  calling no callback, consulting no palette and reading no findings.
+  Calling it twice on one view model returns two identical lists.
+
+  It exists so that the outline pane this package may grow, a host's own
+  list view and a test asserting what a document says read one walk rather
+  than three re-derivations of it. `Node.sentence` is the line each entry
+  draws; `depth` is how far it is indented.
+
+  **Every block appears exactly once.** The first entry is always
+  `{root, 0, :step}`. A consumer wanting only the flow filters the list it
+  was given: the walk hides nothing, because a walk that hides a failure
+  rail is a walk a reviewer cannot trust to be the document.
+
+  | `kind` | The slot the node's parent holds it in |
+  |---|---|
+  | `:step` | the parent's body, where `arrangement/1` is `:stack` |
+  | `:arm` | one of the parent's body slots, where `arrangement/1` is `:fan` or `:lanes` |
+  | `:rail` | a slot `rail?/1` accepts |
+  | `:tray` | a slot `tray?/1` accepts |
+
+  **Depth is block nesting depth and nothing else.** Every child is
+  exactly one deeper than the node whose slot holds it, in all four rows:
+  a slot is not an entry in the list and never consumes a level, so an
+  arm's blocks are one deeper than their container and a rail's blocks sit
+  at the same depth as that container's body blocks. The slot's identity
+  is carried by `kind` instead, which is why `kind` exists rather than a
+  second numeric column.
+
+  `:step` versus `:arm` is `arrangement/1`'s question, asked once here
+  rather than re-derived from a slot count, so a type declaring
+  `layout: :columns` reads as arms for the same reason its slots sit side
+  by side on the canvas and the two surfaces cannot drift apart.
+
+  **Slot order is the canvas's order**: `body_slots/1` first, then the
+  rails, then the trays, each group in `node.slots` order. Within a slot
+  the order is `flow_children/1` then `shelf_children/1`, so a drafts
+  shelf sits at the foot of its slot and takes that slot's kind like any
+  other child - it is visited rather than skipped, because
+  `flow_children/1` exists so a renderer can draw connectors past the
+  shelf, not so a reader can be told the shelf is not in the document.
+  `shelf?/1` and this list are what a consumer wanting the flow alone
+  reads.
+
+      iex> alias StatifierBlocks.{Block, Document, Palette, ViewModel}
+      iex> root =
+      ...>   Block.new("core.sequence",
+      ...>     id: "root",
+      ...>     slots: %{
+      ...>       "body" => [
+      ...>         Block.new("core.wait", id: "wait", config: %{"duration" => "30s"}),
+      ...>         Block.new("core.send", id: "send", config: %{"event" => "order.paid"})
+      ...>       ]
+      ...>     }
+      ...>   )
+      iex> root |> Document.new() |> ViewModel.build(Palette.core(), []) |> ViewModel.outline()
+      ...> |> Enum.map(fn {node, depth, kind} -> {node.block_id, depth, kind, node.sentence} end)
+      [
+        {"root", 0, :step, "Sequence"},
+        {"wait", 1, :step, "Wait 30s"},
+        {"send", 1, :step, "Send order.paid"}
+      ]
+  """
+  @spec outline(t()) :: [{Node.t(), non_neg_integer(), kind()}]
+  def outline(%__MODULE__{root: %Node{} = root}), do: outline_walk(root, 0, :step)
+
+  @spec outline_walk(Node.t(), non_neg_integer(), kind()) ::
+          [{Node.t(), non_neg_integer(), kind()}]
+  defp outline_walk(%Node{} = node, depth, kind) do
+    body_kind = if arrangement(node) == :stack, do: :step, else: :arm
+
+    body = Enum.flat_map(body_slots(node), &outline_slot(&1, depth, body_kind))
+    rails = node.slots |> Enum.filter(&rail?/1) |> Enum.flat_map(&outline_slot(&1, depth, :rail))
+    trays = node.slots |> Enum.filter(&tray?/1) |> Enum.flat_map(&outline_slot(&1, depth, :tray))
+
+    [{node, depth, kind} | body ++ rails ++ trays]
+  end
+
+  @spec outline_slot(Slot.t(), non_neg_integer(), kind()) ::
+          [{Node.t(), non_neg_integer(), kind()}]
+  defp outline_slot(%Slot{} = slot, depth, kind) do
+    slot
+    |> flow_children()
+    |> Kernel.++(shelf_children(slot))
+    |> Enum.flat_map(&outline_walk(&1, depth + 1, kind))
+  end
 
   @doc """
   The words on the pill drawn on the edge below an arranged container, or
@@ -1398,6 +1519,7 @@ defmodule StatifierBlocks.ViewModel do
 
     slots = declared_slots ++ extra_slots
     form = %Form{fields: build_fields(schema, config, config_findings), unrouted: unrouted}
+    title = title_override(schema, config)
 
     %Node{
       block_id: block.id,
@@ -1405,7 +1527,8 @@ defmodule StatifierBlocks.ViewModel do
       type_version: block.type_version,
       status: :ok,
       entry: entry,
-      title: title_override(schema, config),
+      title: title,
+      sentence: sentence(module, config, entry, title, block.type),
       summary: BlockType.summary(module, config, labels),
       summary_titles: BlockType.summary_titles(module, config, labels),
       invoke_type: invoke_type(config),
@@ -1467,6 +1590,10 @@ defmodule StatifierBlocks.ViewModel do
       type_version: block.type_version,
       status: {:unresolvable, reason},
       entry: default_entry(block.type),
+      # No module to ask and no label to fall back to, so the chain's last
+      # arm answers: the type name as the document stores it, which
+      # `default_entry/1` has already put on the entry as its label.
+      sentence: block.type,
       # No schema, so no declared `label` field and no title override - but
       # the config is still bytes this module can read, and a block that
       # says which handler it called says it whether or not its type
@@ -1603,6 +1730,38 @@ defmodule StatifierBlocks.ViewModel do
   # intended shape rather than a gap: "Wait" is what a wait is called, and a
   # type whose steps are worth naming individually is a host's.
   @spec title_override([BlockType.field_decl()], Block.config()) :: String.t() | nil
+  # ADR-0005's 2026-09-07 three-way chain. `declares?/1` is asked
+  # separately from the reader's answer because the two records draw the
+  # line in different places and both lines matter: a type that declares
+  # NOTHING may land on the author's `title` (ADR-0005 row two), while a
+  # declared callback that raises, throws, exits or answers something
+  # unusable lands on the type's label and never on the title (ADR-0002
+  # row three, restated in ADR-0005 as "never the author's `title`"). The
+  # reader answers a string in both cases, so declaredness is the only
+  # thing that separates them.
+  @spec sentence(
+          module(),
+          Block.config(),
+          BlockType.palette_entry(),
+          String.t() | nil,
+          Block.type_name()
+        ) ::
+          String.t()
+  defp sentence(module, config, entry, title, type) do
+    label = Map.get(entry, :label) || type
+
+    if declares_sentence?(module) do
+      BlockType.sentence(module, config) || label
+    else
+      title || label
+    end
+  end
+
+  @spec declares_sentence?(module()) :: boolean()
+  defp declares_sentence?(module) do
+    Code.ensure_loaded?(module) and function_exported?(module, :sentence, 1)
+  end
+
   defp title_override(schema, config) do
     with %{} = field <- Enum.find(schema, &(&1.key == "label" and &1.type == :string)),
          {:ok, value} <- BlockType.fetch_value(config, BlockType.value_path(field)) do

@@ -141,6 +141,38 @@ defmodule StatifierBlocks.Core.Wait do
   end
 
   @doc """
+  This block as one line of prose (ADR-0002's 2026-09-07 amendment).
+
+  The duration is repeated exactly as the author wrote it rather than
+  spelled out in words: `"90m"` is what the field holds, what the emitted
+  `delay` attribute carries, and what an author reading a list back
+  recognizes as the thing they typed.
+
+  A block with nothing in the field yet says only what it is - there is no
+  duration to name, and a sentence naming a default the emission does not
+  use would be a line that lies.
+
+      iex> StatifierBlocks.Core.Wait.sentence(%{"duration" => "30s"})
+      "Wait 30s"
+
+      iex> StatifierBlocks.Core.Wait.sentence(%{})
+      "Wait"
+  """
+  @impl true
+  def sentence(config) do
+    case Map.get(config, "duration") do
+      duration when is_binary(duration) ->
+        case String.trim(duration) do
+          "" -> "Wait"
+          trimmed -> "Wait " <> trimmed
+        end
+
+      _absent_or_malformed ->
+        "Wait"
+    end
+  end
+
+  @doc """
   A compound state that sends itself a delayed event on entry and finishes
   when that event arrives.
 
