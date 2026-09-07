@@ -8448,3 +8448,318 @@ rejected` (`:7155`) is untouched.
 
 Filed with `sb-nlo5`, campaign SF038. Implemented by `sb-q183`; flipped to
 accepted by `sb-vjvq` once it has landed.
+
+## Amendment (2026-09-07): a data composite's declaration may carry a `"migrations"` list - `rename`, `drop` and `default` steps, walked once from the stored version to the current one
+
+**Status: proposed (2026-09-07, campaign SF038, bead `sb-ekkt`, recording
+campaign-SF038's ruling `RQ-SF038-3`, which was `RQ-SF037-16`).** A decision
+record merges at proposed under the campaign invariant; flipping it to accepted
+is a separate gated request through the same `docs/adr/` gate, and `sb-vjvq`
+carries it once `sb-mulk` has landed. Additive: decisions 1-8 stand as
+accepted, the Amendment of this date at `:6360`, the Amendment of this date at
+`:6732` and the Amendment of this date at `:8093` stand as they stand, and no
+text above this line is edited by this section.
+
+An amendment rather than a Note, because this file says three times that a
+declaration held as data fixes **no** migration key and this section fixes one.
+`:7293-7299` names it open, `:7894-7900` records it queued, and
+`StatifierBlocks.Composite.Data`'s own heading
+`## What this module does not decide: a migration`
+(`lib/statifier_blocks/composite/data.ex:180-190`) is the third. The Note at
+`:7925` ruled the question and pointed at this section by name - its item 1
+says in as many words that it "fixes nothing about that shape": not the step
+keys, not the order steps are applied in, not what a gap in the chain does, not
+what an unexpressible change answers. This section fixes all four. The
+pass-through amendment of this date lists the same pointer among the things it
+does not decide (`:8435-8436`).
+
+### The arity this section means
+
+The behaviour's callback is `migrate_config/2`
+(`lib/statifier_blocks/block_type.ex:507-508`), and every module block type
+writes it at that arity. `StatifierBlocks.Composite.Data` is the one stateful
+module this package ships, so it implements the behaviour's callbacks **at one
+higher arity, with the state first** (`composite/data.ex:36-41`) and
+`StatifierBlocks.Palette.call/4` does the arithmetic. The function this section
+changes is therefore `Composite.Data.migrate_config/3`
+(`composite/data.ex:403-404`); "`migrate_config/2`" below means the callback
+that seam answers for. The request text and this file's earlier prose use the
+`/2` spelling for both; the module's arity is `/3`, exactly as the Note at
+`:7940-7943` already records.
+
+### M1. The key: `"migrations"`, optional, a sibling of `"subtree"`
+
+The declaration table at `composite/data.ex:56-65` lists six keys today -
+`"type_name"`, `"version"`, `"params"`, `"subtree"`, `"palette_entry"` and
+`"sentence"` - and the pass-through amendment of this date adds a seventh,
+`"slots"` (`:8155`). This section adds an eighth, `"migrations"`, **optional and
+defaulting to `[]`**: a list of migration steps, ordered, read by
+`StatifierBlocks.Composite.Data.declaration/1` (`composite/data.ex:319`) and
+carried on the decoded `state` beside `version`.
+
+`[]` is exactly today's behaviour, which is why this is an amendment by
+addition: a declaration that writes no `"migrations"` key, or writes the empty
+list, keeps the unconditional refusal `composite/data.ex:404` answers now.
+
+**`"migrations"` is a declaration-level key and `"default"` inside it is not
+the `"default"` a param writes.** A param's `"default"` is decision 7's
+`field_decl/0` key, one level inside `"params"`, and it is the value a *new*
+block starts with. A step's `"default"` is one level inside `"migrations"` and
+it is the value an *old stored* block's config gains. A reader who cannot tell
+which is meant should read the nesting depth, which is the same disambiguation
+the pass-through amendment states for its two `"slots"` (`:8171-8183`).
+
+### M2. The step shape
+
+Each entry of `"migrations"` is a map with string keys:
+
+    %{
+      "from"    => 1,
+      "rename"  => %{"limit" => "amount_limit"},
+      "drop"    => ["legacy_mode"],
+      "default" => %{"currency" => "USD"}
+    }
+
+  * **`"from"`** (**required**) - a positive integer, the `type_version` this
+    step migrates *from*. The step carries a config at version `from` to
+    version `from + 1`.
+  * **`"rename"`** - a map of old config key to new config key, both non-empty
+    strings. The value moves; nothing else about it changes.
+  * **`"drop"`** - a list of non-empty strings, the config keys removed.
+  * **`"default"`** - a map of config key to a JSON value, the keys added with
+    that value.
+
+The three parts are each optional and **at least one must be present**. A step
+with none of them is refused rather than treated as a no-op: its `"from"` would
+claim a version bump that changed nothing, and a version bump that changed
+nothing is the hygiene obligation's business (`composite/data.ex:192-203`), not
+a migration's. A step map carrying any key other than these four is refused
+**by name**, which is the practice `decode_param/1` already follows for a param
+(the Note at `:7682-7701`).
+
+**Within one step the three parts are applied in a fixed order: `rename`, then
+`drop`, then `default`.** Rename runs first so that `drop` and `default` are
+written in the names the step is producing rather than the names it is
+consuming, which is the reading a declaration author expects when the two are
+read top to bottom. The one genuinely ambiguous overlap - a key named by both
+`"drop"` and `"default"` in one step - is a contradiction rather than an
+ordering question, and is refused at `declaration/1` (M5).
+
+### M3. The chain: ascending `from`, contiguous, applied once
+
+`migrate_config/3` is handed the stored version and the stored config, and it
+applies **every step whose `"from"` is at or above the stored version and below
+the declaration's `"version"`, in ascending `"from"` order**, answering
+`{:ok, config}` with the result.
+
+The steps' `"from"` values are **strictly ascending and contiguous**, and the
+last step's `"from"` is `version - 1`. So a declaration at `"version"` 3 whose
+earliest step is `"from" => 1` carries exactly two steps, `1` and `2`, and a
+stored block at version 1 walks both while a stored block at version 2 walks
+one. A duplicate `"from"`, an out-of-order `"from"`, a `"from"` at or above
+`"version"`, and a **gap** - a version between the earliest step and `"version"`
+with no step - are each refused at `declaration/1` (M5). There is no partial
+chain: a list that cannot carry its own earliest version to its current one is
+broken, not usable-in-part.
+
+**This is not a change to `resolve/2`'s one-call rule.**
+`StatifierBlocks.Palette.resolve/2` calls `migrate_config` **once**, straight
+from the stored version to current, "never a version-by-version ladder"
+(`lib/statifier_blocks/palette.ex:652-657`, the call at `:693`). That sentence
+is about the seam, and it is untouched: the ladder this section describes runs
+**inside** the one call, over a list the declaration holds, and the seam still
+sees a single `{:ok, config}` or a single `{:error, reason}`. Nothing in
+`palette.ex` changes.
+
+### M4. What makes a key known: the chain is checked backwards from the params
+
+"A step naming an unknown key is refused" needs a definition of known, and a
+data composite has one without a palette: `config_schema/1` is the params
+(`composite/data.ex:43-48`), so the config keys of the **current** shape are the
+declared param keys.
+
+The check runs the chain **backwards**. Start with the set of declared param
+keys - the shape at `"version"` - and undo each step in **descending** `"from"`
+order:
+
+  * undo `"default"`: each key must be **in** the running set; remove it.
+  * undo `"drop"`: each key must be **absent** from the running set; add it.
+  * undo `"rename"`: each new name must be **in** the set and each old name
+    **absent**; replace the new name with the old.
+
+Within one step the undo order is the reverse of M2's: `default`, then `drop`,
+then `rename`. What remains when the earliest step has been undone is the key
+set of the shape at that step's `"from"`, and every violation along the way is
+a step naming a key the shape does not have at that point - which is what
+"unknown key" means here.
+
+Running it backwards rather than forwards is what makes it checkable at all: a
+declaration states its current params and does not state the shape it started
+from, so the current shape is the only end of the chain that is known. A
+declaration that wants to see the derived starting shape reads it off the same
+walk.
+
+**A step's values are not type-checked here.** A `"default"`'s value is a JSON
+value and this section does not require it to match the param's declared type,
+for the reason a template node's `"config"` values are not checked either
+(`composite/data.ex:137-140`): the migrated config meets decision 7's refusals
+at the compile, exactly as a stored config does, and a check here would
+duplicate one that already runs and can already fail.
+
+### M5. Every refusal is at `declaration/1`, entry-build time
+
+`**Every refusal is here, at entry-build time, and not at call time.**`
+(`composite/data.ex:283-288`) is the module's rule, forced by decision 4 and
+decision 3 together, and this section adds nothing that escapes it. The
+`"migrations"` refusals join the error assembly at `composite/data.ex:328-331`
+beside `version_errors/1` (the call at `:330`, the definition at `:482-486`),
+and `declaration/1` answers `{:error, [...]}` with them. A host registers
+`{module, state}` only on the `:ok`, so a palette can never hold a broken
+migration chain and `migrate_config/3` can never meet one.
+
+The refusals, in one list:
+
+1. `"migrations"` is present and is not a list.
+2. A step is not a map, or carries a key other than `"from"`, `"rename"`,
+   `"drop"` and `"default"`.
+3. A step has no `"from"`, or its `"from"` is not a positive integer.
+4. A step carries none of `"rename"`, `"drop"` and `"default"` (M2).
+5. A `"rename"` that is not a map of non-empty string to non-empty string, a
+   `"drop"` that is not a list of non-empty strings, or a `"default"` that is
+   not a map with string keys.
+6. A key named by both `"drop"` and `"default"` in one step (M2).
+7. The `"from"` values are not strictly ascending, or the last is not
+   `version - 1`, or there is a gap between the earliest and `version` (M3).
+8. A step names an unknown key by M4's backwards walk.
+
+Each is checked against the declaration's **own** params and its own list and
+needs no palette, which is the same property the pass-through amendment's three
+declaration errors have (`:8227-8232`).
+
+### M6. Below the earliest step, the refusal stands
+
+A stored block whose `type_version` is **below the earliest step's `"from"`**
+gets `{:error, {:no_migration_from, from}}` - the answer
+`composite/data.ex:404` gives today, unchanged, carrying the stored version.
+That is deliberate and it is the point of the whole shape: a declaration says
+which versions it can carry forward, and a version it never wrote a step for is
+one it does not claim to understand. Answering such a block with a derived
+`{:ok, config}` is "exactly the answer `ADR-0007`'s refusal exists to refuse"
+(`:7297-7299`), and this section does not start doing it.
+
+There is no arm for a stored version **above** `"version"`: `resolve/2` answers
+`{:error, {:block_type_too_new, ...}}` before the callback is reached
+(`palette.ex:648-651`).
+
+### M7. What a step cannot express is still a refusal
+
+`rename`, `drop` and `default` are the whole vocabulary. There is no value
+transform, no merge of two keys into one, no split of one into two, no
+conditional and no per-value computation - the same shape of decision, and for
+the same reason, as the whole-value substitution the placeholder vocabulary
+fixes (`composite/data.ex:151-169`): a declaration held as data cannot hold a
+function, and the gesture that produces these declarations emits whole values.
+
+So a change no step can express has an answer already, and this section keeps
+it: the declaration writes no step for that version, the stored block gets
+`{:no_migration_from, from}` by M6, and a host that needs more writes a
+`use`-composite module and its own `migrate_config/2`. That is the same cost
+the declaration table already books for a cross-param `validate_config/1` and a
+non-substituting sentence (`composite/data.ex:67-77`), and it is a cost of the
+data shape rather than an oversight.
+
+### M8. A module composite is untouched
+
+`use StatifierBlocks.Composite` gains **no** `migrations:` option. A module
+composite already has the whole of Elixir available for the job: it writes
+`migrate_config/2` itself, at the behaviour's arity, and `ADR-0007`'s injected
+refusal (`lib/statifier_blocks/block_type.ex:139`) stays the default for one
+that does not - which is exactly what `StatifierBlocks.Core.Send` and
+`StatifierBlocks.Core.Wait` do with theirs today
+(`lib/statifier_blocks/core/send.ex:112-113`,
+`lib/statifier_blocks/core/wait.ex:60-61`). This section is the data kind's
+answer to a question the module kind never had.
+
+Nor does it touch the hygiene obligation (`composite/data.ex:192-203`).
+`"version"` stays **required**, and a host that changes a data composite's
+`params` or `subtree` still bumps it. A `"migrations"` list covers the
+config-shape half of a bump - what a stored block's config becomes - and says
+nothing about the subtree half, which is why the two coexist rather than one
+replacing the other. A bump with a subtree change and no config-shape change
+writes no step for that version and refuses stored blocks at it, deliberately.
+
+### M9. Worked example: "Authorize with a deadline", renamed and then defaulted
+
+A card-processing tenant saved a composite at version 1 with a `limit` param.
+At version 2 the tenant renamed it `amount_limit`; at version 3 the tenant
+added a `currency` param. The declaration registered today reads:
+
+    %{
+      "type_name" => "myapp.authorize_with_deadline",
+      "version" => 3,
+      "params" => [
+        %{"key" => "amount_limit", "type" => "integer",
+          "label" => "Amount ceiling", "required?" => true, "default" => 0},
+        %{"key" => "currency", "type" => "string",
+          "label" => "Currency", "required?" => true, "default" => "USD"},
+        %{"key" => "deadline", "type" => "duration",
+          "label" => "Deadline", "required?" => false, "default" => ""}
+      ],
+      "migrations" => [
+        %{"from" => 1, "rename" => %{"limit" => "amount_limit"}},
+        %{"from" => 2, "default" => %{"currency" => "USD"}}
+      ],
+      "subtree" => [
+        %{"type" => "myapp.authorize", "id_suffix" => "call",
+          "config" => %{"amount_limit" => %{"$param" => "amount_limit"},
+                        "currency" => %{"$param" => "currency"}}},
+        %{"type" => "core.wait", "id_suffix" => "deadline",
+          "config" => %{"duration" => %{"$param" => "deadline"}}}
+      ]
+    }
+
+M4's backwards walk over it: start from `{amount_limit, currency, deadline}`;
+undo the `"from" => 2` step's `"default"`, leaving `{amount_limit, deadline}`;
+undo the `"from" => 1` step's `"rename"`, leaving `{limit, deadline}`. That is
+the version-1 shape, every step named a key its shape had, and `declaration/1`
+answers `{:ok, state}`.
+
+A block stored at `type_version` 1 with
+`%{"limit" => 500, "deadline" => "PT30S"}` resolves through
+`StatifierBlocks.Palette.resolve/2`, which calls `migrate_config` once with
+`from` 1. Both steps run, ascending:
+
+    %{"amount_limit" => 500, "currency" => "USD", "deadline" => "PT30S"}
+
+The returned block's `type_version` is left **as stored**, in memory only, and
+nothing is written back - `resolve/2`'s existing rule (`palette.ex:659-664`),
+which this section does not touch.
+
+A block stored at `type_version` 2 walks the second step alone and gains
+`"currency"`. If the tenant had never written the `"from" => 1` step, a block
+stored at version 1 would answer `{:error, {:no_migration_from, 1}}` by M6,
+and `resolve/2` would report `{:error, {:migration_failed, block.id,
+{:no_migration_from, 1}}}` - the shape it already reports.
+
+### What this section does not decide
+
+- **Whether a migration is ever persisted.** It is not: decision 8's
+  in-memory-only rule is untouched, and `resolve/2` still "never calls
+  `Document.to_json/1`, `from_json/1`, or anything else that could persist"
+  (`palette.ex:659-664`). Persisting is the caller's decision, as it was.
+- **A migration for the subtree half of a bump.** M8 says why the hygiene
+  obligation stands beside this key rather than being replaced by it; a bump
+  whose subtree changed and whose config shape did not still refuses stored
+  blocks, and whether that should be relaxed is not asked here.
+- **A `migrations:` option on `use StatifierBlocks.Composite`.** M8: the
+  module kind writes the callback.
+- **Any richer step.** M7: a value transform, a merge, a split or a
+  conditional has no spelling, and adding one is a later record's.
+- **How the editor or a host surfaces a migration.** Nothing here is drawn,
+  and no `ADR-0005` clause is reached.
+- **Any change to the fourteen `@callback`s.** None is added, removed or
+  re-arityed; `migrate_config/2` keeps the signature at `:507-508` and its
+  optional-callback row at `:46`.
+
+Filed with `sb-ekkt`, campaign SF038. Implemented by `sb-mulk`; flipped to
+accepted by `sb-vjvq` once it has landed.
