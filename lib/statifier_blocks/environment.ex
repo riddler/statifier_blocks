@@ -113,7 +113,7 @@ defmodule StatifierBlocks.Environment do
   the whole gain decision 4's per-path merge exists for.
   """
 
-  alias StatifierBlocks.{Block, BlockType, Document, Palette, Shelf}
+  alias StatifierBlocks.{Block, BlockType, Composite, Document, Palette, Shelf}
   alias StatifierDatamodel.{Declarations, Index, Types}
 
   @typedoc """
@@ -356,13 +356,20 @@ defmodule StatifierBlocks.Environment do
 
   A block with three path fields declares three reads and they are
   independent (ADR-0011 decision 2).
+
+  A **composite** answers here with the union of its expansion's reads, taken
+  at its one position in the document: see `expansion_signatures/5`.
   """
   @spec read_signatures(Palette.t(), Document.t(), Block.t()) :: [signature()]
   def read_signatures(%Palette{} = palette, %Document{} = document, %Block{} = block) do
     case Palette.resolve(palette, block) do
       {:ok, module, resolved} ->
-        field_reads(module, resolved.config) ++
-          sugar_read(palette, document, module, resolved.config)
+        if Composite.composite?(module) do
+          expansion_signatures(palette, document, resolved, module, &read_signatures/3)
+        else
+          field_reads(module, resolved.config) ++
+            sugar_read(palette, document, module, resolved.config)
+        end
 
       {:error, _reason} ->
         []
@@ -372,18 +379,56 @@ defmodule StatifierBlocks.Environment do
   @doc """
   Every write `block` declares, in `config_schema/1` order, then its capture
   pairs, then the `produces` sugar (ADR-0011 decision 2).
+
+  A **composite** answers here with the union of its expansion's writes, taken
+  at its one position in the document: see `expansion_signatures/5`.
   """
   @spec write_signatures(Palette.t(), Document.t(), Block.t()) :: [signature()]
   def write_signatures(%Palette{} = palette, %Document{} = document, %Block{} = block) do
     case Palette.resolve(palette, block) do
       {:ok, module, resolved} ->
-        field_writes(module, resolved.config) ++
-          capture_writes(resolved.config) ++
-          sugar_write(palette, document, module, resolved.config)
+        if Composite.composite?(module) do
+          expansion_signatures(palette, document, resolved, module, &write_signatures/3)
+        else
+          field_writes(module, resolved.config) ++
+            capture_writes(resolved.config) ++
+            sugar_write(palette, document, module, resolved.config)
+        end
 
       {:error, _reason} ->
         []
     end
+  end
+
+  # RQ-SF037-15, ruled 2026-09-07 (shape A): a composite's read and write
+  # signatures are computed at its ONE position, by running these same two
+  # functions over `Composite.expand/2`'s subtree with the expanded config.
+  #
+  # No descent, and no second walk: `descend/6` steps into a slot, a composite
+  # in this campaign exposes none (RQ-SF037-3), and the expansion is not in the
+  # document (ADR-0011's Note of 2026-09-07, section 1). What is walked here is
+  # the expansion the compiler will produce at Resolve, at the position the
+  # composite occupies - so the block after it reads what the members left,
+  # exactly as it would had the author placed those members by hand.
+  #
+  # The order is the expansion's own pre-order, which is what makes decision
+  # 1's last-write-wins by position hold inside the union: two members writing
+  # one path leave the later member's type. `config_schema/1` stays the params
+  # and no `type_expr/0` arm is added; the union is obtained here rather than
+  # declared anywhere.
+  @spec expansion_signatures(
+          Palette.t(),
+          Document.t(),
+          Block.t(),
+          module(),
+          (Palette.t(), Document.t(), Block.t() -> [signature()])
+        ) :: [signature()]
+  defp expansion_signatures(palette, document, block, module, signatures) do
+    {members, _param_map} = Composite.expand(block, module)
+
+    members
+    |> Composite.flatten()
+    |> Enum.flat_map(&signatures.(palette, document, &1))
   end
 
   @doc """

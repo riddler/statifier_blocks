@@ -405,6 +405,34 @@ defmodule StatifierBlocks.Compiler.FieldDeclarationTest do
       assert {:ok, _compiled} = compile_hidden(:boolean, true)
     end
 
+    # Sabotage: dropped the leading `nil` clause from `empty_default?/2` -
+    # red on every row but `{:type_expr, opts}`, which is the one row whose
+    # prose happened to enumerate its arms. F4's per-type empty values are a
+    # floor and not a ceiling: `nil` carries nothing in exactly the sense an
+    # empty string does, so it is refused as a hidden field's `default:` for
+    # every row of the table, `:boolean` included - `false` is a decided
+    # value, and `nil` is not `false`.
+    test "nil is refused as an empty hidden default for every one of the nine types" do
+      types = [
+        :string,
+        :integer,
+        :boolean,
+        {:select, [{"a", "A"}]},
+        :expression,
+        :duration,
+        {:list, :string},
+        {:path, %{}},
+        {:type_expr, %{}}
+      ]
+
+      for type <- types do
+        assert {:error, [%{config_key: "f", message: message}]} = compile_hidden(type, nil),
+               "hidden #{inspect(type)} defaulting to nil was not refused"
+
+        assert message =~ "hidden?: true"
+      end
+    end
+
     # Sabotage: refused a non-empty hidden default too - red, because the
     # amendment's worked example declares exactly this and must compile.
     test "a hidden field with a non-empty default compiles" do

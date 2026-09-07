@@ -792,15 +792,29 @@ defmodule StatifierBlocks.Compiler do
 
   # ADR-0002 decision 7's amendment of 2026-09-07, section F4: the empty
   # value refused under `hidden?: true`, one row per member of the closed
-  # nine-value `field_type/0` set. `:boolean` has no row and falls through to
-  # the catch-all, which is the record's own reading of it.
+  # nine-value `field_type/0` set. `:boolean` has no *type-specific* row and
+  # falls through to the catch-all, which is the record's own reading of it.
   @spec hidden_with_empty_default?(BlockType.field_decl()) :: boolean()
   defp hidden_with_empty_default?(%{hidden?: true, type: type, default: default}),
     do: empty_default?(type, default)
 
   defp hidden_with_empty_default?(_decl), do: false
 
+  # `nil` is an empty hidden default for EVERY row, not only the
+  # `{:type_expr, opts}` one whose prose happened to enumerate its arms
+  # (ADR-0002's Composite amendment of 2026-09-07, folding sb-3ejc). F4's own
+  # reason applies unchanged to every row - a hidden field's `default:` is the
+  # only value it will ever have, and `nil` carries nothing in exactly the
+  # sense an empty string does - so the literal reading, under which a hidden
+  # `:string` declaring `default: nil` was accepted while a hidden
+  # `{:type_expr, opts}` declaring the same was refused, was an accident of
+  # which row's prose enumerated its arms.
+  #
+  # `:boolean` is refused with every other row here, and its own clause below
+  # still stands: `false` is a decided value, so a hidden `false` is a hidden
+  # fact. `nil` is not `false`.
   @spec empty_default?(BlockType.field_type(), Block.json()) :: boolean()
+  defp empty_default?(_type, nil), do: true
   defp empty_default?(:string, default), do: default == ""
   defp empty_default?(:integer, default), do: default == ""
   defp empty_default?(:boolean, _default), do: false
