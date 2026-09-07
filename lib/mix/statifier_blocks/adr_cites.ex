@@ -1,15 +1,28 @@
 defmodule Mix.StatifierBlocks.AdrCites do
   @moduledoc """
-  Resolves the line-number citations decision records make into each other, and
-  reports the ones that no longer point at the text they were written against.
+  Resolves the line-number citations this repository's documents make into the
+  decision records, and reports the ones that no longer point at the text they
+  were written against.
 
-  A record in `docs/adr/` cites another record by path and line - for example
+  A document cites a record in `docs/adr/` by path and line - for example
   `docs/adr/0002-block-type-behaviour.md:4108` - often followed by more line
   numbers for the same file (`` `:4121-4122` ``, `` `:4126` ``). Nothing about
   a line number survives an edit above it: an insert or a re-wrap in the cited
-  record silently moves every line below it, and the citing record, on `main`
+  record silently moves every line below it, and the citing document, on `main`
   and untouched, now points at different text. That failure is invisible to
   every other stage of the gate, which is why this one exists.
+
+  ## What it reads
+
+  Two roles, and they are not the same set of files. The **targets** are the
+  records under `docs/adr/`, and only a citation into one of them is checked -
+  a citation into `lib/` or `test/` is left to the compiler and the suite. The
+  **sources** are the documents scanned for citations, and they are wider than
+  the records, because a plan or `CLAUDE.md` cites a record by line exactly as
+  a record does and drifts in exactly the same way. The default globs are
+  `docs/adr/*.md`, `docs/plans/*.md` and `CLAUDE.md`; `analyze/2` takes a
+  `:sources` option that replaces them, which is how a test scans a fixture
+  tree and how another document root would join the check.
 
   ## What it checks
 
@@ -31,7 +44,14 @@ defmodule Mix.StatifierBlocks.AdrCites do
   ## The baseline
 
   Layer 2 reads `docs/adr/.cite-baseline.json`, which records one entry per
-  citation: the normalized text at the cited range and its SHA-256. It is
+  citation: the normalized text at the cited range and its SHA-256. An entry is
+  keyed by the citing document's **base name** and the range it cites, not by
+  the citing document's path. Two sources sharing a base name therefore share a
+  key - harmlessly, because an entry's value is the text at the cited range and
+  says nothing about the source, so the colliding entries are identical. Keying
+  by path instead would rewrite every recorded key the moment the sources
+  widened, and every citation would fall back to the warning layer for a cycle:
+  the protection would lapse exactly when it was being extended. It is
   regenerated with `mix adr.cites --update`, and the regenerated file belongs
   in the same request as the record edit that moved the line.
 
@@ -69,6 +89,12 @@ defmodule Mix.StatifierBlocks.AdrCites do
 
   @adr_dir "docs/adr"
   @baseline_file ".cite-baseline.json"
+
+  # The documents scanned for citations, as globs relative to the project root.
+  # The records cite each other, and the plans and `CLAUDE.md` cite the records;
+  # all three drift the same way, so all three are read. Nothing here decides
+  # what may be *cited* - that stays `docs/adr/`, in `target/2`.
+  @default_sources ["docs/adr/*.md", "docs/plans/*.md", "CLAUDE.md"]
   @text_excerpt 160
 
   @type finding :: %{
@@ -90,17 +116,25 @@ defmodule Mix.StatifierBlocks.AdrCites do
   def baseline_path(root), do: Path.join([root, @adr_dir, @baseline_file])
 
   @doc """
-  Runs every layer over the records under `root`'s `docs/adr/`.
+  Runs every layer over the documents under `root` that the source globs name,
+  resolving what they cite into `root`'s `docs/adr/`.
 
   Returns the failing findings, the advisory ones, and the baseline entries the
   current tree would record.
+
+  ## Options
+
+    * `:sources` - globs, relative to `root`, of the documents to scan for
+      citations. Replaces the default `docs/adr/*.md`, `docs/plans/*.md` and
+      `CLAUDE.md` rather than adding to them.
   """
-  @spec analyze(String.t()) :: report()
-  def analyze(root) do
+  @spec analyze(String.t(), keyword()) :: report()
+  def analyze(root, opts \\ []) do
+    sources = read_sources(root, Keyword.get(opts, :sources, @default_sources))
     records = read_records(root)
     baseline = read_baseline(root)
 
-    root
+    sources
     |> groups(records)
     |> Enum.reduce(%{findings: [], warnings: [], entries: %{}}, fn group, acc ->
       merge(acc, judge(group, records, baseline))
@@ -134,7 +168,23 @@ defmodule Mix.StatifierBlocks.AdrCites do
     end
   end
 
-  # -- records and paragraphs -------------------------------------------------
+  # -- sources, records and paragraphs ----------------------------------------
+
+  # A source is read once and carries its path relative to the root, which is
+  # what a finding reports, and its base name, which is what the baseline keys.
+  defp read_sources(root, globs) do
+    globs
+    |> Enum.flat_map(fn glob -> root |> Path.join(glob) |> Path.wildcard() end)
+    |> Enum.uniq()
+    |> Enum.sort()
+    |> Enum.map(fn path ->
+      %{
+        path: Path.relative_to(path, root),
+        name: Path.basename(path),
+        lines: String.split(File.read!(path), "\n")
+      }
+    end)
+  end
 
   defp read_records(root) do
     [root, @adr_dir, "*.md"]
@@ -143,22 +193,22 @@ defmodule Mix.StatifierBlocks.AdrCites do
     |> Map.new(fn path -> {Path.basename(path), String.split(File.read!(path), "\n")} end)
   end
 
-  defp groups(root, records) do
-    Enum.flat_map(records, fn {name, lines} ->
-      lines
+  defp groups(sources, records) do
+    Enum.flat_map(sources, fn source ->
+      source.lines
       |> paragraphs()
-      |> Enum.map(&group(root, name, lines, records, &1))
+      |> Enum.map(&group(source, records, &1))
       |> Enum.reject(&(&1.cites == []))
     end)
   end
 
-  defp group(root, name, lines, records, {first, last}) do
-    text = lines |> Enum.slice((first - 1)..(last - 1)) |> Enum.join(" ")
+  defp group(source, records, {first, last}) do
+    text = source.lines |> Enum.slice((first - 1)..(last - 1)) |> Enum.join(" ")
     {cites, mixed?} = citations(text, records)
 
     %{
-      source: Path.join([root, @adr_dir, name]),
-      source_name: name,
+      source: source.path,
+      source_name: source.name,
       line: first,
       cites: cites,
       mixed?: mixed?,
@@ -384,7 +434,7 @@ defmodule Mix.StatifierBlocks.AdrCites do
 
   defp finding(group, severity, check, message) do
     %{
-      file: Path.join([@adr_dir, group.source_name]),
+      file: group.source,
       line: group.line,
       severity: severity,
       check: check,
