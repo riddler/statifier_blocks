@@ -222,12 +222,11 @@ defmodule StatifierBlocks.Edit.Targets do
     end
   end
 
-  @spec entry_default_config(module()) :: Block.config()
-  defp entry_default_config(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :palette_entry, 0) do
-      BlockType.default_config(module.palette_entry())
-    else
-      %{}
+  @spec entry_default_config(Palette.type_ref()) :: Block.config()
+  defp entry_default_config(ref) do
+    case Palette.call(ref, :palette_entry, [], nil) do
+      nil -> %{}
+      entry -> BlockType.default_config(entry)
     end
   end
 
@@ -382,9 +381,11 @@ defmodule StatifierBlocks.Edit.Targets do
   @spec full?(Document.t(), Palette.t(), Block.id(), Block.slot_name()) :: boolean()
   defp full?(document, palette, parent_id, slot) do
     with parent when not is_nil(parent) <- find_block(document, parent_id),
-         {:ok, module, resolved} <- Palette.resolve(palette, parent),
+         {:ok, ref, resolved} <- Palette.resolve(palette, parent),
          {_name, arity, _label} <-
-           Enum.find(module.slots(resolved.config), fn {name, _arity, _label} -> name == slot end) do
+           ref
+           |> Palette.call(:slots, [resolved.config], [])
+           |> Enum.find(fn {name, _arity, _label} -> name == slot end) do
       arity in [:exactly_one, :zero_or_one] and Map.get(parent.slots, slot, []) != []
     else
       _no_match -> false

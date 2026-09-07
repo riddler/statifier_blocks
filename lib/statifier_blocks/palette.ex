@@ -1,8 +1,16 @@
 defmodule StatifierBlocks.Palette do
   @moduledoc """
   A palette names the block types a host makes available: a map from a
-  block's `type_name` to the module implementing `StatifierBlocks.BlockType`
+  block's `type_name` to the entry implementing `StatifierBlocks.BlockType`
   for it (ADR-0002 decision 2).
+
+  An entry is a `t:type_ref/0` - a module, or a module paired with an
+  opaque term it carries (ADR-0002's 2026-09-07 amendment). One type name
+  still resolves to one entry, and nothing in this package calls a callback
+  on an entry except through `call/4`, the one call seam. That is what lets
+  a host whose *users* save block types register a declaration held as
+  data: `StatifierBlocks.Composite.Data` is such an entry, and no caller of
+  a callback can tell which kind it got.
 
   It is a **caller-supplied value**, nothing more. A palette is built once
   for an editing or compiling operation and passed explicitly into whatever
@@ -67,8 +75,24 @@ defmodule StatifierBlocks.Palette do
   @typedoc "A recipe's name, as the palette browser and a pick name it."
   @type recipe_name :: String.t()
 
+  @typedoc """
+  What one `types` entry may be: a module, or a module paired with an
+  opaque term carried beside it (ADR-0002's 2026-09-07 amendment).
+
+  One type name still resolves to one entry. `state` is opaque to this
+  module - it is *carried* and *prepended*, and nothing here fixes its
+  shape. `StatifierBlocks.Composite.Data` is the one module in this package
+  that declares a shape for its own, and a host's stateful type declares
+  its own.
+
+  There is no `:kind` key on an entry, and a pair is not one: it is one
+  entry that carries a term. Every callback on an entry goes through
+  `call/4`, which is where the pair stops being visible.
+  """
+  @type type_ref :: module() | {module(), state :: term()}
+
   @type t :: %__MODULE__{
-          types: %{optional(Block.type_name()) => module()},
+          types: %{optional(Block.type_name()) => type_ref()},
           recipes: %{optional(recipe_name()) => module()},
           assignability: module() | nil,
           validators: [module()]
@@ -100,7 +124,7 @@ defmodule StatifierBlocks.Palette do
       is deliberately not `types`/`recipes`' rule, because those are lookups
       and this is not.
   """
-  @spec new(%{optional(Block.type_name()) => module()}, keyword()) :: t()
+  @spec new(%{optional(Block.type_name()) => type_ref()}, keyword()) :: t()
   def new(types \\ %{}, opts \\ []) when is_map(types) do
     %__MODULE__{
       types: types,
@@ -222,19 +246,24 @@ defmodule StatifierBlocks.Palette do
   """
   @spec manifest(t()) :: [manifest_entry()]
   def manifest(%__MODULE__{types: types, recipes: recipes}) do
-    type_entries = Enum.map(types, fn {name, module} -> {name, module.current_version()} end)
+    type_entries =
+      Enum.map(types, fn {name, ref} -> {name, call(ref, :current_version, [], nil)} end)
+
     recipe_entries = Enum.map(recipes, fn {name, _module} -> {name, :recipe} end)
 
     Enum.sort(type_entries ++ recipe_entries)
   end
 
   @typedoc """
-  One registration: the name a document uses, and the module implementing
+  One registration: the name a document uses, and the entry implementing
   it. ADR-0002 decision 1 puts the string in the document and the mapping
   in the palette, so a registration carries both halves - see
   `from_modules/2` for why the name is not derived from the module.
+
+  The second element is a `t:type_ref/0`, so a host registers a stateful
+  entry in the ordered list it already writes.
   """
-  @type registration :: {Block.type_name(), module()}
+  @type registration :: {Block.type_name(), type_ref()}
 
   @doc """
   Builds a palette from an **ordered, explicit list** of registrations -
@@ -297,8 +326,9 @@ defmodule StatifierBlocks.Palette do
   degraded reading, each raising `ArgumentError` rather than quietly
   building a palette a host would misread:
 
-    * an entry that is not a `{type_name, module}` pair at all - the message
-      names the offending entry;
+    * a registration that is neither a `{type_name, module}` nor a
+      `{type_name, {module, state}}` pair - the message names the offending
+      entry;
     * two entries of one palette-browser **group** declaring the same
       `order` - the message names both, by name and module. ADR-0005
       decision 10 sorts a group by `order`, so a duplicate leaves the pick
@@ -336,8 +366,14 @@ defmodule StatifierBlocks.Palette do
   # exports no `palette_entry/0`, or declares no `order` are skipped rather
   # than refused - a palette may name a module compiled later (decision 3),
   # and `order` is an optional key.
+  # A stateful entry must NOT fall out of this check. `ordered_entry/1`'s
+  # guard used to open with `is_atom(module)`, which a `{module, state}`
+  # pair fails silently - no raise, no warning, and the entry drops out of
+  # the duplicate-order check and out of every ordering question downstream
+  # of it. Reading `palette_entry/0` through `call/4` is what closes that:
+  # the guard is the seam's question, not this function's.
   @spec refute_duplicate_orders!(
-          %{optional(Block.type_name()) => module()},
+          %{optional(Block.type_name()) => type_ref()},
           %{optional(recipe_name()) => module()}
         ) :: :ok
   defp refute_duplicate_orders!(types, recipes) do
@@ -361,27 +397,32 @@ defmodule StatifierBlocks.Palette do
     end
   end
 
-  @spec ordered_entry({String.t(), module()}) :: [{String.t(), integer(), String.t(), module()}]
-  defp ordered_entry({name, module}) do
-    with true <- is_atom(module) and Code.ensure_loaded?(module),
-         true <- function_exported?(module, :palette_entry, 0),
-         %{group: group, order: order} when is_integer(order) <- module.palette_entry() do
-      [{group, order, name, module}]
-    else
+  @spec ordered_entry({String.t(), type_ref()}) :: [
+          {String.t(), integer(), String.t(), type_ref()}
+        ]
+  defp ordered_entry({name, ref}) do
+    case call(ref, :palette_entry, [], nil) do
+      %{group: group, order: order} when is_integer(order) -> [{group, order, name, ref}]
       _no_declared_order -> []
     end
   end
 
-  @spec register(registration(), %{optional(Block.type_name()) => module()}) ::
-          %{optional(Block.type_name()) => module()}
+  @spec register(registration(), %{optional(Block.type_name()) => type_ref()}) ::
+          %{optional(Block.type_name()) => type_ref()}
   defp register({type_name, module}, types)
        when is_binary(type_name) and type_name != "" and is_atom(module) do
     Map.put(types, type_name, module)
   end
 
+  defp register({type_name, {module, _state} = ref}, types)
+       when is_binary(type_name) and type_name != "" and is_atom(module) do
+    Map.put(types, type_name, ref)
+  end
+
   defp register(entry, _types) do
     raise ArgumentError,
-          "expected a {type_name, module} registration, got: #{inspect(entry)}"
+          "expected a {type_name, module} or {type_name, {module, state}} registration, " <>
+            "got: #{inspect(entry)}"
   end
 
   @spec register_recipe({recipe_name(), module()}, %{optional(recipe_name()) => module()}) ::
@@ -397,19 +438,126 @@ defmodule StatifierBlocks.Palette do
   end
 
   @doc """
-  Resolves a `type_name` to its module. Total; never raises (ADR-0002
+  Resolves a `type_name` to its entry. Total; never raises (ADR-0002
   decision 3). `Map.fetch/2` rather than a sentinel default, so a palette
   that genuinely maps a name to `nil` stays distinguishable from a name no
   entry carries.
+
+  It answers the entry **as stored**: it neither normalizes a bare module
+  into `{module, nil}` nor unwraps a pair into its module. That is what
+  keeps this source-compatible for every host that has a palette today - a
+  host matching `{:ok, module}` still matches, because a host that
+  registered no stateful entry can be handed no pair. Call a callback on
+  what comes back through `call/4`, never directly.
   """
   @spec fetch(t(), Block.type_name()) ::
-          {:ok, module()}
+          {:ok, type_ref()}
           | {:error, {:unknown_block_type, Block.type_name()}}
   def fetch(%__MODULE__{types: types}, type_name) do
     case Map.fetch(types, type_name) do
-      {:ok, module} -> {:ok, module}
+      {:ok, ref} -> {:ok, ref}
       :error -> {:error, {:unknown_block_type, type_name}}
     end
+  end
+
+  @doc """
+  Calls `callback` on a palette entry, answering `default` when the entry
+  does not declare it.
+
+  This is the **one call seam**. Nothing in this package calls a callback
+  on a module a palette resolved by writing `module.callback(...)`; it
+  writes `Palette.call(ref, :callback, args, default)`, and three things
+  that would otherwise be repeated at every site live here instead:
+
+    * **the arity arithmetic** - a callback declared at arity *n* is
+      exported at arity *n + 1* by a stateful entry's module, and asking
+      about the wrong arity would silently answer "not declared" and
+      degrade a stateful type into the absent-callback path, which looks
+      exactly like a type that declared nothing;
+    * **the absent-callback default**, which is why this takes four
+      arguments and not three: nine of the fourteen callbacks are optional
+      and every site is a probe followed by a fallback, so folding the
+      probe into the seam is what makes the arity arithmetic unrepeatable;
+    * **the `state`-prepending**, which is the whole of what a caller must
+      not know.
+
+  For a bare `module` entry it calls `module.callback(args...)`; for a
+  `{module, state}` entry it calls `module.callback(state, args...)`.
+
+  For one of the five **required** callbacks the default is unreachable -
+  a module that does not export `emit/2` is not a block type at all - and a
+  caller passes a value whose appearance would be a bug rather than a
+  degradation. The seam does not distinguish the two cases; the behaviour's
+  required list already does.
+
+  It does **not** rescue on behalf of a site that does not rescue today, it
+  does not memoize, and it changes no callback's declared arity in
+  `StatifierBlocks.BlockType`. A rescue is B3's degradation, about a
+  callback that *raises*; the seam is about how an entry is *reached*.
+
+      iex> alias StatifierBlocks.Palette
+      iex> Palette.call(StatifierBlocks.Core.Send, :current_version, [], nil)
+      1
+
+      iex> alias StatifierBlocks.Palette
+      iex> Palette.call(StatifierBlocks.Core.Sequence, :sentence, [%{}], :absent)
+      :absent
+
+      iex> alias StatifierBlocks.Palette
+      iex> Palette.call(NoSuchModule, :current_version, [], :absent)
+      :absent
+  """
+  @spec call(type_ref(), atom(), [term()], term()) :: term()
+  def call({module, state}, callback, args, default)
+      when is_atom(module) and is_atom(callback) and is_list(args) do
+    if declares?({module, state}, callback, length(args)) do
+      apply(module, callback, [state | args])
+    else
+      default
+    end
+  end
+
+  def call(module, callback, args, default)
+      when is_atom(module) and is_atom(callback) and is_list(args) do
+    if declares?(module, callback, length(args)) do
+      apply(module, callback, args)
+    else
+      default
+    end
+  end
+
+  @doc """
+  Whether the entry declares `callback` at the declared arity `arity`,
+  without calling it.
+
+  `arity` is the arity `StatifierBlocks.BlockType` declares, not the one a
+  stateful entry's module exports: this function does the same arithmetic
+  `call/4` does, so a caller never writes `arity + 1`.
+
+  It exists for the two sites that need **declaredness alone** rather than
+  a value - `sentence/1` feeding ADR-0005's three-way chain, and
+  `outcomes/1` deciding whether a card draws an outcome row at all. Both
+  feed a *presentation* branch rather than a fallback value, so neither can
+  be expressed as `call/4` with a default. It is one predicate, not a
+  second seam: `call/4` is written in terms of it.
+
+      iex> alias StatifierBlocks.Palette
+      iex> Palette.declares?(StatifierBlocks.Core.Send, :sentence, 1)
+      true
+
+      iex> alias StatifierBlocks.Palette
+      iex> Palette.declares?(StatifierBlocks.Core.Sequence, :sentence, 1)
+      false
+  """
+  @spec declares?(type_ref(), atom(), arity()) :: boolean()
+  def declares?({module, _state}, callback, arity)
+      when is_atom(module) and is_atom(callback) and is_integer(arity) do
+    Code.ensure_loaded?(module) and function_exported?(module, callback, arity + 1)
+  end
+
+  def declares?(module, callback, arity)
+      when is_atom(module) and is_atom(callback) and is_integer(arity) do
+    Code.ensure_loaded?(module) and function_exported?(module, callback, arity)
   end
 
   @doc """
@@ -446,13 +594,17 @@ defmodule StatifierBlocks.Palette do
   @spec new_block(t(), Block.type_name()) :: {:ok, Block.t()} | :error
   def new_block(%__MODULE__{} = palette, type_name) do
     case fetch(palette, type_name) do
-      {:ok, module} ->
+      {:ok, ref} ->
         config =
-          %{}
-          |> module.config_schema()
+          ref
+          |> call(:config_schema, [%{}], [])
           |> Map.new(fn %{key: key, default: default} -> {key, default} end)
 
-        {:ok, Block.new(type_name, config: config, type_version: module.current_version())}
+        {:ok,
+         Block.new(type_name,
+           config: config,
+           type_version: call(ref, :current_version, [], nil)
+         )}
 
       _error ->
         :error
@@ -515,36 +667,33 @@ defmodule StatifierBlocks.Palette do
   the caller owns the walk and what to do with a per-block failure.
   """
   @spec resolve(t(), Block.t()) ::
-          {:ok, module(), Block.t()}
+          {:ok, type_ref(), Block.t()}
           | {:error, {:unknown_block_type, Block.type_name()}}
           | {:error, {:block_type_too_new, Block.id(), pos_integer()}}
           | {:error, {:migration_failed, Block.id(), term()}}
   def resolve(%__MODULE__{} = palette, %Block{} = block) do
-    with {:ok, module} <- fetch(palette, block.type) do
-      migrate(module, block, module.current_version())
+    with {:ok, ref} <- fetch(palette, block.type) do
+      migrate(ref, block, call(ref, :current_version, [], nil))
     end
   end
 
-  @spec migrate(module(), Block.t(), pos_integer()) ::
-          {:ok, module(), Block.t()}
+  @spec migrate(type_ref(), Block.t(), pos_integer()) ::
+          {:ok, type_ref(), Block.t()}
           | {:error, {:block_type_too_new, Block.id(), pos_integer()}}
           | {:error, {:migration_failed, Block.id(), term()}}
-  defp migrate(module, %Block{type_version: current} = block, current) do
-    {:ok, module, block}
+  defp migrate(ref, %Block{type_version: current} = block, current) do
+    {:ok, ref, block}
   end
 
-  defp migrate(_module, %Block{type_version: stored} = block, current) when stored > current do
+  defp migrate(_ref, %Block{type_version: stored} = block, current) when stored > current do
     {:error, {:block_type_too_new, block.id, stored}}
   end
 
-  defp migrate(module, %Block{type_version: stored} = block, current) when stored < current do
-    if Code.ensure_loaded?(module) and function_exported?(module, :migrate_config, 2) do
-      case module.migrate_config(stored, block.config) do
-        {:ok, config} -> {:ok, module, %{block | config: config}}
-        {:error, reason} -> {:error, {:migration_failed, block.id, reason}}
-      end
-    else
-      {:error, {:migration_failed, block.id, :no_migration_available}}
+  defp migrate(ref, %Block{type_version: stored} = block, current) when stored < current do
+    case call(ref, :migrate_config, [stored, block.config], :no_migration_available) do
+      {:ok, config} -> {:ok, ref, %{block | config: config}}
+      {:error, reason} -> {:error, {:migration_failed, block.id, reason}}
+      :no_migration_available -> {:error, {:migration_failed, block.id, :no_migration_available}}
     end
   end
 end

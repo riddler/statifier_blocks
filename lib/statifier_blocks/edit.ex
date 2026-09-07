@@ -267,8 +267,8 @@ defmodule StatifierBlocks.Edit do
 
   def check_config(%Palette{} = palette, %Document{} = document, {:update_config, id, config}) do
     with {:ok, block} <- find_block(document, id),
-         {:ok, module, _resolved_block} <- Palette.resolve(palette, block) do
-      case module.validate_config(config) do
+         {:ok, ref, _resolved_block} <- Palette.resolve(palette, block) do
+      case Palette.call(ref, :validate_config, [config], :ok) do
         :ok -> :ok
         {:error, findings} -> {:error, {:invalid_config, id, findings}}
       end

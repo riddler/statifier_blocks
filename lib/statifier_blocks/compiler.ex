@@ -401,7 +401,7 @@ defmodule StatifierBlocks.Compiler do
 
     @type t :: %__MODULE__{
             block: StatifierBlocks.Block.t(),
-            module: module(),
+            module: StatifierBlocks.Palette.type_ref(),
             slots: [{StatifierBlocks.Block.slot_name(), [t()]}]
           }
 
@@ -635,12 +635,12 @@ defmodule StatifierBlocks.Compiler do
     )
   end
 
-  @spec resolve_children(Palette.t(), module(), Block.t()) ::
+  @spec resolve_children(Palette.t(), Palette.type_ref(), Block.t()) ::
           {:ok, [Resolved.t()], expansion()} | {:error, [Finding.t()], expansion()}
-  defp resolve_children(palette, module, %Block{} = block) do
+  defp resolve_children(palette, ref, %Block{} = block) do
     {slots, findings, expansion} =
-      block.config
-      |> module.slots()
+      ref
+      |> Palette.call(:slots, [block.config], [])
       |> Enum.reduce({[], [], %{}}, fn {name, _arity, _label}, {slots, findings, expansion} ->
         {children, child_findings, child_expansion} = resolve_slot(palette, block, name)
 
@@ -650,7 +650,7 @@ defmodule StatifierBlocks.Compiler do
 
     case findings do
       [] ->
-        {:ok, [%Resolved{block: block, module: module, slots: Enum.reverse(slots)}], expansion}
+        {:ok, [%Resolved{block: block, module: ref, slots: Enum.reverse(slots)}], expansion}
 
       findings ->
         {:error, findings, expansion}
@@ -940,17 +940,17 @@ defmodule StatifierBlocks.Compiler do
 
   @spec config_findings(Resolved.t(), StatifierDatamodel.Declarations.t()) :: [Finding.t()]
   defp config_findings(
-         %Resolved{block: block, module: module, slots: slots} = node,
+         %Resolved{block: block, module: ref, slots: slots} = node,
          declarations
        ) do
     own =
-      case module.validate_config(block.config) do
+      case Palette.call(ref, :validate_config, [block.config], :ok) do
         :ok -> []
         {:error, findings} -> findings
       end
 
-    declared = declaration_findings(block, module)
-    expressions = BlockType.type_expr_findings(module, block.config)
+    declared = declaration_findings(block, ref)
+    expressions = BlockType.type_expr_findings(ref, block.config)
     typed = declared_payload_findings(node, declarations)
 
     Enum.map(declared ++ expressions ++ own ++ typed, fn {key, message} ->
@@ -1004,10 +1004,10 @@ defmodule StatifierBlocks.Compiler do
   # de-duplicates by type. Anchoring on each block also sends an author to a
   # card they can see, which is what decision 11's routing is for; a
   # document with two offending blocks reports two findings, one apiece.
-  @spec declaration_findings(Block.t(), module()) :: [BlockType.finding()]
-  defp declaration_findings(%Block{config: config}, module) do
-    config
-    |> module.config_schema()
+  @spec declaration_findings(Block.t(), Palette.type_ref()) :: [BlockType.finding()]
+  defp declaration_findings(%Block{config: config}, ref) do
+    ref
+    |> Palette.call(:config_schema, [config], [])
     |> Enum.flat_map(&declaration_finding/1)
   end
 
@@ -1667,12 +1667,12 @@ defmodule StatifierBlocks.Compiler do
   end
 
   @spec emit(Resolved.t(), Document.id()) :: {:ok, Emission.t()} | {:error, [Finding.t()]}
-  defp emit(%Resolved{block: block, module: module, slots: slots}, document_id) do
+  defp emit(%Resolved{block: block, module: ref, slots: slots}, document_id) do
     with {:ok, compiled_slots} <- emit_slots(slots, document_id),
-         :ok <- validate_outcomes(block, module) do
+         :ok <- validate_outcomes(block, ref) do
       context = Context.new(block.id, document_id, summaries(slots))
 
-      case module.emit(block, context) do
+      case Palette.call(ref, :emit, [block, context], :never) do
         {:ok, %Emission{} = emission} ->
           emission
           |> Cancels.arm(children(compiled_slots))
@@ -2409,10 +2409,10 @@ defmodule StatifierBlocks.Compiler do
   end
 
   @spec candidate_findings(Resolved.t(), map()) :: [Finding.t()]
-  defp candidate_findings(%Resolved{block: block, module: module, slots: slots}, offered) do
+  defp candidate_findings(%Resolved{block: block, module: ref, slots: slots}, offered) do
     own =
-      block.config
-      |> module.config_schema()
+      ref
+      |> Palette.call(:config_schema, [block.config], [])
       |> Enum.flat_map(&candidate_finding(block, &1, offered))
 
     children =
@@ -2515,11 +2515,23 @@ defmodule StatifierBlocks.Compiler do
     "sha256:" <> Base.encode16(:crypto.hash(:sha256, digest), case: :lower)
   end
 
+  # The hash's triples carry the entry's MODULE, never the entry: a data
+  # composite's `state` is its declaration, and inspecting it here would
+  # make `palette_hash/1` a commitment to a declaration's text, which
+  # `StatifierBlocks.CompilationRecord` is explicit it is not. Two data
+  # composites therefore differ here by type name and version, and two
+  # revisions of one declaration registered under one name at one version
+  # do not - the palette-hygiene obligation that record already names, with
+  # a different author.
   @spec entries(Resolved.t()) :: [{Block.type_name(), module(), pos_integer()}]
-  defp entries(%Resolved{block: block, module: module, slots: slots}) do
+  defp entries(%Resolved{block: block, module: ref, slots: slots}) do
     [
-      {block.type, module, module.current_version()}
+      {block.type, module_of(ref), Palette.call(ref, :current_version, [], nil)}
       | Enum.flat_map(slots, fn {_name, children} -> Enum.flat_map(children, &entries/1) end)
     ]
   end
+
+  @spec module_of(Palette.type_ref()) :: module()
+  defp module_of({module, _state}), do: module
+  defp module_of(module), do: module
 end

@@ -338,19 +338,26 @@ defmodule StatifierBlocks.Composite do
   Expand operation and this module's own derivations - each have to ask
   before they expand, so the question is answered once and here.
   """
-  @spec composite?(module()) :: boolean()
-  def composite?(module) when is_atom(module) do
-    Code.ensure_loaded?(module) and function_exported?(module, :__composite__, 0)
+  @spec composite?(Palette.type_ref()) :: boolean()
+  def composite?({module, _state}) when is_atom(module) do
+    Palette.declares?({module, nil}, :__composite__, 0)
   end
 
-  def composite?(_module), do: false
+  def composite?(module) when is_atom(module) do
+    Palette.declares?(module, :__composite__, 0)
+  end
+
+  def composite?(_ref), do: false
 
   @doc """
   The blocks `block` stands for, and the param each one is blamed on.
 
-  `block` is the composite block as the document stores it; `module` is its
-  own module, which every caller has already resolved through
-  `StatifierBlocks.Palette.fetch/2`. The return is the expanded blocks in
+  `block` is the composite block as the document stores it; `ref` is its
+  own palette entry - a module, or a `{module, state}` pair - which every
+  caller has already resolved through `StatifierBlocks.Palette.fetch/2`.
+  Every read of the declaration below goes through
+  `StatifierBlocks.Palette.call/4`, so a data composite expands through
+  this same function and nothing here knows which kind it got. The return is the expanded blocks in
   document order - **head first, and the head is the expansion root** -
   together with the `t:param_map/0` over every block in the expansion,
   nested members included.
@@ -365,27 +372,27 @@ defmodule StatifierBlocks.Composite do
   list, a non-block, a duplicated local id, or a local id that would mint an
   id carrying `__`.
   """
-  @spec expand(Block.t(), module()) :: {[Block.t()], param_map()}
-  def expand(%Block{} = block, module) when is_atom(module) do
-    unless composite?(module) do
+  @spec expand(Block.t(), Palette.type_ref()) :: {[Block.t()], param_map()}
+  def expand(%Block{} = block, ref) do
+    unless composite?(ref) do
       raise ArgumentError,
-            "#{inspect(module)} is not a composite block type: it does not " <>
+            "#{inspect(ref)} is not a composite block type: it does not " <>
               "use StatifierBlocks.Composite, so there is nothing to expand."
     end
 
-    params = params_of(module, block.config)
+    params = params_of(ref, block.config)
 
-    subtree = module.subtree(params)
+    subtree = Palette.call(ref, :subtree, [params], nil)
 
     unless is_list(subtree) and subtree != [] and Enum.all?(subtree, &match?(%Block{}, &1)) do
       raise ArgumentError,
-            "#{inspect(module)}.subtree/1 must answer a non-empty list of " <>
+            "#{inspect(ref)}.subtree/1 must answer a non-empty list of " <>
               "StatifierBlocks.Block structs, got: #{inspect(subtree)}"
     end
 
-    check_local_ids!(subtree, module)
+    check_local_ids!(subtree, ref)
 
-    members = Enum.map(subtree, &mint(&1, block.id, module))
+    members = Enum.map(subtree, &mint(&1, block.id, ref))
 
     {members, param_map(members, params)}
   end
@@ -411,9 +418,9 @@ defmodule StatifierBlocks.Composite do
   end
 
   @doc false
-  @spec derived_io(module(), Block.config()) :: Assignability.io()
-  def derived_io(module, config) do
-    {members, _param_map} = expand(probe_block(module, config), module)
+  @spec derived_io(Palette.type_ref(), Block.config()) :: Assignability.io()
+  def derived_io(ref, config) do
+    {members, _param_map} = expand(probe_block(ref, config), ref)
 
     kinds =
       members
@@ -430,9 +437,9 @@ defmodule StatifierBlocks.Composite do
   end
 
   @doc false
-  @spec derived_outcomes(module(), Block.config()) :: [BlockType.outcome_decl()]
-  def derived_outcomes(module, config) do
-    {[root | _rest], _param_map} = expand(probe_block(module, config), module)
+  @spec derived_outcomes(Palette.type_ref(), Block.config()) :: [BlockType.outcome_decl()]
+  def derived_outcomes(ref, config) do
+    {[root | _rest], _param_map} = expand(probe_block(ref, config), ref)
 
     BlockType.outcomes(member_module(root), root.config)
   end
@@ -449,10 +456,10 @@ defmodule StatifierBlocks.Composite do
   end
 
   @doc false
-  @spec recipe_insert(module(), Edit.target(), StatifierBlocks.Document.t()) ::
+  @spec recipe_insert(Palette.type_ref(), Edit.target(), StatifierBlocks.Document.t()) ::
           {:ok, [Edit.t()]} | {:error, term()}
-  def recipe_insert(module, {_parent, _slot, _index} = target, _document) do
-    declaration = module.__composite__()
+  def recipe_insert(ref, {_parent, _slot, _index} = target, _document) do
+    declaration = Palette.call(ref, :__composite__, [], nil)
 
     config = Map.new(declaration.params, fn %{key: key, default: default} -> {key, default} end)
 
@@ -489,19 +496,23 @@ defmodule StatifierBlocks.Composite do
   # predates a param, and a composite is not the place to discover a missing
   # key - `Palette.new_block/2` already seeds every default, and this makes a
   # hand-built config behave the same way.
-  @spec params_of(module(), Block.config()) :: Block.config()
-  defp params_of(module, config) do
-    module.__composite__().params
+  @spec params_of(Palette.type_ref(), Block.config()) :: Block.config()
+  defp params_of(ref, config) do
+    ref
+    |> Palette.call(:__composite__, [], nil)
+    |> Map.fetch!(:params)
     |> Map.new(fn %{key: key, default: default} -> {key, default} end)
     |> Map.merge(config)
   end
 
-  @spec probe_block(module(), Block.config()) :: Block.t()
-  defp probe_block(module, config) do
-    Block.new(module.__composite__().name, id: "blk", config: config)
+  @spec probe_block(Palette.type_ref(), Block.config()) :: Block.t()
+  defp probe_block(ref, config) do
+    name = ref |> Palette.call(:__composite__, [], nil) |> Map.fetch!(:name)
+
+    Block.new(name, id: "blk", config: config)
   end
 
-  @spec check_local_ids!([Block.t()], module()) :: :ok
+  @spec check_local_ids!([Block.t()], Palette.type_ref()) :: :ok
   defp check_local_ids!(subtree, module) do
     ids = subtree |> flatten() |> Enum.map(& &1.id)
 
@@ -531,7 +542,7 @@ defmodule StatifierBlocks.Composite do
     :ok
   end
 
-  @spec mint(Block.t(), Block.id(), module()) :: Block.t()
+  @spec mint(Block.t(), Block.id(), Palette.type_ref()) :: Block.t()
   defp mint(%Block{} = block, composite_id, module) do
     slots =
       Map.new(block.slots, fn {name, children} ->
@@ -541,7 +552,7 @@ defmodule StatifierBlocks.Composite do
     %{block | id: mint_id(composite_id, block.id, module), slots: slots}
   end
 
-  @spec mint_id(Block.id(), String.t(), module()) :: Block.id()
+  @spec mint_id(Block.id(), String.t(), Palette.type_ref()) :: Block.id()
   defp mint_id(composite_id, local_id, module) do
     minted = composite_id <> @separator <> local_id
 
@@ -594,7 +605,7 @@ defmodule StatifierBlocks.Composite do
 
   # -- member modules ---------------------------------------------------
 
-  @spec member_module(Block.t()) :: module() | nil
+  @spec member_module(Block.t()) :: Palette.type_ref() | nil
   defp member_module(%Block{type: type}) do
     case Palette.fetch(Palette.core(), type) do
       {:ok, module} -> module

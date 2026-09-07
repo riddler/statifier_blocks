@@ -1025,15 +1025,11 @@ defmodule StatifierBlocks.Environment do
     slots |> Map.get("body", []) |> List.first()
   end
 
-  @spec subject_of(module()) :: String.t() | nil
-  defp subject_of(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :palette_entry, 0) do
-      case module.palette_entry() do
-        %{subject: path} when is_binary(path) and path != "" -> path
-        _no_subject -> nil
-      end
-    else
-      nil
+  @spec subject_of(Palette.type_ref()) :: String.t() | nil
+  defp subject_of(ref) do
+    case Palette.call(ref, :palette_entry, [], nil) do
+      %{subject: path} when is_binary(path) and path != "" -> path
+      _no_subject -> nil
     end
   end
 
@@ -1124,22 +1120,14 @@ defmodule StatifierBlocks.Environment do
     end
   end
 
-  @spec io(module(), Block.config()) :: map()
-  defp io(module, config) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :io, 1) do
-      module.io(config)
-    else
-      %{}
-    end
+  @spec io(Palette.type_ref(), Block.config()) :: map()
+  defp io(ref, config) do
+    Palette.call(ref, :io, [config], %{})
   end
 
-  @spec schema(Block.config(), module()) :: [BlockType.field_decl()]
-  defp schema(config, module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :config_schema, 1) do
-      module.config_schema(config)
-    else
-      []
-    end
+  @spec schema(Block.config(), Palette.type_ref()) :: [BlockType.field_decl()]
+  defp schema(config, ref) do
+    Palette.call(ref, :config_schema, [config], [])
   end
 
   @spec path_value(Block.config(), BlockType.field_decl()) :: String.t() | nil

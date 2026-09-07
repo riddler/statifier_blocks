@@ -187,13 +187,9 @@ defmodule StatifierBlocks.Assignability do
   `function_exported?/3`, the pattern `StatifierBlocks.Palette.resolve/2`
   already uses.
   """
-  @spec io(module(), Block.config()) :: io()
-  def io(module, config) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :io, 1) do
-      module.io(config)
-    else
-      %{}
-    end
+  @spec io(Palette.type_ref(), Block.config()) :: io()
+  def io(ref, config) do
+    Palette.call(ref, :io, [config], %{})
   end
 
   @doc "The block's `kinds`, defaulting to `[:step]` (ADR-0003 decision 5)."
@@ -802,9 +798,9 @@ defmodule StatifierBlocks.Assignability do
           [{target(), :ok | {:error, [finding()]}}]
   def target_verdicts(%Palette{} = palette, %Document{} = document, %Block{} = candidate, ctx) do
     for block <- Document.blocks(document),
-        {module, config} = resolve_module_config(palette, block),
-        module != nil,
-        {slot, _arity, _label} <- module.slots(config),
+        {ref, config} = resolve_module_config(palette, block),
+        ref != nil,
+        {slot, _arity, _label} <- Palette.call(ref, :slots, [config], []),
         index <- 0..length(Map.get(block.slots, slot, [])) do
       target = {block.id, slot, index}
       {target, check(palette, document, target, candidate, ctx)}
