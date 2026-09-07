@@ -6356,3 +6356,375 @@ diff rather than found by the next record to be edited.
 
 Filed with `sb-xnxw`, campaign SF036, folding the residue of `sb-p144`
 (corrections 1-3) and `sb-xtcp` (corrections 4-5).
+
+## Amendment (2026-09-07): decision 5, `use StatifierBlocks.Composite` - a block type derived from params and a pure subtree
+
+**Status: proposed (2026-09-07, campaign SF037, bead `sb-2gdx`, on epic `R3`'s
+settled direction and rulings `RQ-SF037-3`, `RQ-SF037-6` and `RQ-SF037-8`).** A
+decision record merges at proposed under campaign SF037's invariant; flipping
+this section's status line to accepted is a separate gated request (`sb-v3ny`,
+after `sb-xio9` lands the macro). Additive: decision 5's table (`:109-121`) and
+its closing paragraph (`:130-138`), decision 7 (`:180-186`), the field-flags
+amendment at `:5644` and its F4 table, the `sentence/1` amendment at `:5948`,
+and every other clause above this line stand exactly as written, and no text
+above this line is edited by this section. Nothing here is built yet -
+`sb-xio9` is the request that builds it.
+
+It is appended at the **end of this file** rather than beside decision 5, for
+the reason the `{:type_expr, opts}` amendment at `:4957` gives about itself:
+other records on `main` cite this one by line number, and an insert above any
+of them would leave those citations pointing at the wrong text.
+
+Every code cite below is a reading of `main` at `c77356b`, dated to this
+section and to be re-read rather than trusted.
+
+### Why this is an amendment and not a Note
+
+The test the Note at `:4858` applied to `donedata_type/1` - does it decide
+anything this record owns - is the test this section fails in two places, the
+way amendment H at `:1751` did:
+
+1. **It adds a second `use` macro to the declaration surface decision 5 owns.**
+   `use StatifierBlocks.BlockType` (`lib/statifier_blocks/block_type.ex:109`)
+   injects a *fixed* answer per callback, and `ADR-0007` is the record of what
+   those answers are and why. `use StatifierBlocks.Composite` injects answers
+   **derived from a declaration**, which is a different kind of default and a
+   change to what "a block type is a behaviour module" means in this package.
+2. **It fixes which of the derived answers a declaration may override.** That
+   is a narrowing of `ADR-0007`'s "every one is `defoverridable`", and a rule
+   this record states is a rule this record narrows.
+
+### The count this section works from
+
+Decision 5's table is titled "nine callbacks, five required" (`:109`).
+`ADR-0007`'s Note of 2026-09-06 (`docs/adr/0007-block-type-defaults.md:250`)
+recorded that the count had already moved to **twelve**, and it has moved
+again: `StatifierBlocks.BlockType` declares **fourteen** `@callback`s on `main`
+today - decision 5's nine, plus `outcomes/1` (`:657`), `failure_outcomes/1`
+(`:690`), `summary/1` (`:729`), `donedata_type/1` (`:777`) and `sentence/1`
+(`:813`) - and five are still required. This section therefore says "the
+declaration surface" rather than "the nine", and it answers for every callback
+the macro touches and names the ones it does not. The count in decision 5's
+heading is left alone; it is the historical count, and correcting it in place
+would edit text above this line.
+
+### The declaration
+
+`use StatifierBlocks.Composite` takes two things and nothing else.
+
+**`params`** is a `[field_decl()]` in decision 7's shape -
+`t:StatifierBlocks.BlockType.field_decl/0` at `block_type.ex:277-287` - with no
+new key and no new field type. Every flag decision 7 and its amendments give a
+field is available to a param on the same terms: `required?`, `default:`,
+`value_path`, `datamodel_path?`, `sensitive?`, `hidden?` and `readonly?` all
+mean here exactly what they mean on any other declared field, and the F3 and F4
+refusals at `:5644` apply to a param declaration unchanged. That is the whole
+of this package's answer to "a freshly inserted block is not finding-free": a
+composite whose declaration says what its params default to lands finding-free,
+because its params are ordinary fields and ordinary fields already have that
+property.
+
+**The "first option for a required select" convention is declined here.** A
+required `{:select, choices}` param does not silently default to `choices`'
+first entry. A declaration that wants a default writes one, which is what
+every other field in this package does, and F3 already refuses the field that
+writes none.
+
+**`subtree/1`** is a **pure** function from the param map to the blocks the
+composite stands for: a non-empty list of `t:StatifierBlocks.Block.t/0`
+(`lib/statifier_blocks/block.ex:32-38`) of `core.*` and host types, nested
+through their own `slots`. Its **head is the expansion root**, and several
+derivations below read that block and no other. Pure in decision 4's sense
+(`:100-107`): same params in, same subtree out, forever, no I/O, no clock, no
+process dictionary. A composite that would need external data at authoring
+time gets it the way decision 4 already says a callback does - the host
+resolves it before the operation and passes it in - not by `subtree/1`
+reaching for it.
+
+### The ids the subtree mints
+
+**The declaration mints the expanded blocks' ids deterministically from the
+composite block's own id.** They are not fresh UXIDs and they are not a
+counter over the document.
+
+Two properties follow, and they are the acceptance tests for this clause:
+
+- **No `__`.** `ADR-0004` decision 3
+  (`docs/adr/0004-compiler-provenance.md:122-150`) derives every generated
+  state id as `"s_" <> block_id` or `"s_" <> block_id <> "__" <> role`, and its
+  uniqueness argument at `:147-149` rests on a block id containing no `__` -
+  "a `blk_`-prefixed UXID contains no `__`, and roles cannot contain `__`". A
+  minted id that contained one would break the invertibility that decision's
+  `unstate_id/1` promises. So a minted id contains no `__`.
+- **Document-unique, for free.** The composite block's own id is
+  document-unique, opaque and never reused (`ADR-0001` decision 3). An id
+  derived from it by a function that is injective per composite inherits all
+  three, per block rather than per document - which is the same property
+  `ADR-0004` decision 3 buys for state ids, bought the same way and for the
+  same reason: editing one block's config, or inserting a block above it,
+  changes the ids of nothing else.
+
+### What the `use` derives
+
+| Callback | The composite's answer | Derived from | Overridable |
+|---|---|---|---|
+| `config_schema/1` | `params`, in declaration order | the declaration | no |
+| `validate_config/1` | the refusals `params` declare, over the composite's config | the declaration | **yes** |
+| `slots/1` | `[]` | `RQ-SF037-3` | no |
+| `io/1` | see below | the expansion | no |
+| `current_version/0` | the version the declaration states | the declaration | no |
+| `outcomes/1` | the **expansion root's** `outcomes/1`, over its expanded config | the expansion | no |
+| `sentence/1` | the declaration's sentence template rendered over the config; the palette label when the declaration states no template | the declaration | **yes** |
+| `palette_entry/0` | the map the declaration states | the declaration | **yes** |
+| `emit/2` | generated, and never reached | `RQ-SF037-6` | no |
+
+**Overridable by a declaration: `sentence/1`, `palette_entry/0` and
+`validate_config/1`. Those three and no others.** They are the three whose
+answers are about *presentation and refusal* rather than about the expansion:
+a composite that wants a better sentence, a richer palette entry, or a
+cross-param refusal `params` cannot state as a single field's flag is saying
+something the subtree does not know. Every other row is a fact about the
+subtree, and a declaration that overrode one would be asserting something its
+own `subtree/1` contradicts - a second source of truth for the same question,
+which is the failure mode decision 7 refuses schemas for.
+
+`migrate_config/2`, `fixtures/0`, `failure_outcomes/1`, `summary/1` and
+`donedata_type/1` are **not derived**. `migrate_config/2` keeps `ADR-0007`'s
+injected refusal (`block_type.ex:135-139`) unchanged; the other four stay
+optional and absent unless the declaration writes them by hand, and each
+degrades exactly as decision 5's closing paragraph says an absent optional
+callback does.
+
+Two rows need their own paragraph.
+
+**`slots/1` is `[]`, and that is `RQ-SF037-3`.** A composite in this campaign
+exposes no slot of its own: an author fills its params, not its children. A
+pass-through slot - a composite that lets an author drop blocks into a named
+hole in its own subtree - is a later record's, and this one does not open the
+door. The cost is real and stated rather than hidden: the "Guarded step" below
+cannot let an author put their own block on the error path, and a host that
+needs that writes the arrangement out by hand until that record lands.
+
+**`validate_config/1` runs over the params; the members' run at compile.** The
+composite's own callback answers only about the config an author filled in.
+Every expanded member's `validate_config/1` is run by the compiler against that
+member's *expanded* config when the composite is expanded, so a param that
+produces an illegal member config is still refused - one level later, and
+attributed the way `ADR-0004`'s amendment `sb-nzc1` (*the compiler expands a
+composite at the Resolve stage, and a finding inside an expansion is attributed
+one level up to the param that produced it*) says it is. That amendment is
+cited here by bead and title rather than by line, because it is in flight
+beside this one.
+
+**`emit/2` exists and raises.** The behaviour requires `emit/2` and `ADR-0007`
+deliberately injects no default for it (`docs/adr/0007-block-type-defaults.md`,
+"`emit/2` is deliberately not among them"). The macro therefore generates one,
+and it raises if it is ever called, because the compiler expands the composite
+at **Resolve** and no composite block survives to **Emit** (`RQ-SF037-6`;
+`sb-nzc1`). A generated `emit/2` that quietly emitted an empty state would be
+exactly the failure `ADR-0007` refuses to inject a default to avoid: a type
+that compiled to nothing looking complete instead of failing.
+
+### What a composite reads and writes, and the one open question
+
+This section states the *decision* and names the *mechanism* as open, because
+the mechanism does not exist on `main` and this record does not get to invent
+it.
+
+**The decision.** A composite's reads and writes, **as the environment walk
+consumes them**, are the **union of its expanded members'**, each taken over
+that member's expanded config. A composite is not a hole in the data flow: if
+its subtree writes `cards.settlement`, the document after it may read
+`cards.settlement`, and a walk that never descends into an expansion must
+still say so.
+
+**Why that union is not `io/1`.** It is worth spelling out, because the
+obvious reading is wrong. `t:StatifierBlocks.Assignability.io/0`
+(`lib/statifier_blocks/assignability.ex:88-93`) has four keys - `kinds`,
+`consumes`, `produces`, `slot_accepts` - and **none of them carries a
+per-path read or write.** Those come from somewhere else entirely:
+`StatifierBlocks.Environment.read_signatures/3` (`environment.ex:361`) is
+`field_reads/2` followed by the `consumes` sugar, and `write_signatures/3`
+(`:377`) is `field_writes/2`, then the capture pairs, then the `produces`
+sugar. `field_reads`/`field_writes` read `config_schema/1`'s `{:path, opts}`
+`expects:` and `writes:` declarations (`block_type.ex:215-232`), and a
+`:string` field carrying `datamodel_path?: true` counts as a write of
+`:unknown` at its path (`block_type.ex:220-221`). `io/1` contributes only
+`ADR-0011` decision 6's sugar, through `environment.ex:1070-1080`, and both
+sugar keys are **single-valued**: `consumes: T`, not `consumes: [T]`.
+
+So the union above cannot be carried by `io/1` even in principle, and this
+section does not pretend it is.
+
+**What the derived `io/1` therefore answers**, per key:
+
+| `io/0` key | The composite's derived answer | Why |
+|---|---|---|
+| `kinds` | the members' `kinds` concatenated in expansion order, de-duplicated | it is a list, so it holds a union without changing shape |
+| `slot_accepts` | `%{}` | the composite declares no slots (`RQ-SF037-3`), so there is no slot name to accept into, and the root's own entry is dropped with the slot it names |
+| `consumes` | the **expansion root's**, or absent when the root declares none | single-valued; a union of two members' `consumes` has no shape to go in |
+| `produces` | the **expansion root's**, or absent when the root declares none | as above |
+
+Dropping a non-root member's sugar **under-declares** rather than
+over-declares, which is the safe direction and the one `ADR-0011` decision 6
+already takes: a missing subject path desugars "to nothing at all - not to a
+read of `nil`, not to a write at `""`, and not to a finding"
+(`docs/adr/0011-typed-environment.md:345-347`),
+and decision 5 of that record (`:300`) makes a path the environment does not
+hold an `:info` rather than an `:error`. A composite that says less than it
+could is quiet; it is never wrong.
+
+**No new arm of the type-expression vocabulary is opened here.**
+`RQ-SF037-8` stands: if a union the mechanism computes cannot be expressed in
+the arms `sd-ADR-0001` already has, that is a `statifier_datamodel` record
+question and the implementing request stops rather than widening the
+vocabulary from this package.
+
+**Open question: `RQ-SF037-15`, queued 2026-09-07 for the operator.** *By what
+mechanism does a composite expose its expansion's path reads and writes to a
+walk that never descends into the expansion?* Three shapes are on the table and
+this section picks none of them: (A) an `Environment` arm that computes read
+and write signatures over `Composite.expand/2`'s subtree, attributed to the
+composite's one position in the document; (B) a derived `config_schema/1` that
+re-exports the members' path declarations as `hidden?: true` fields, so the
+existing `field_reads`/`field_writes` path answers without a new arm; (C) a new
+optional callback on the behaviour. Each buys the decision above and each pays
+differently - (A) adds a walker arm and keeps the declaration surface fixed,
+(B) adds no code path but puts declarations in a schema that describes no form,
+(C) adds a fifteenth callback. **This amendment is proposed with that question
+open, and it flips to accepted only once the question is ruled and its ruling
+is implemented.** Everything else in this section stands independently of which
+shape is chosen: the union is the decision, the mechanism is the open part.
+
+### The derived recipe
+
+The declaration also derives a `StatifierBlocks.Recipe` whose `insert/2`
+(`lib/statifier_blocks/recipe.ex:53`) returns exactly **one `:insert` of the
+composite block** at the armed target, and whose `palette_entry/0` is the same
+map the block type's is. One command, not the expansion: what an author puts
+down is the composite, and the expansion happens at compile.
+
+It exists for the host that already ships the arrangement as a recipe and is
+replacing it with a composite: the recipe name keeps working, the palette
+browser draws the same entry, and the document it produces is one block instead
+of several. `StatifierBlocks.Palette` keeps types and recipes in **two maps**
+(`lib/statifier_blocks/palette.ex:70-75`), for the reason `:90-92` gives -
+"the two names are two namespaces" - so a composite registered in both is legal
+and draws two entries. **A composite's own palette entry is its `types` entry**;
+the derived recipe is a compatibility surface for a host mid-migration, and a
+host that registers both is choosing to show two.
+
+### `Composite.expand/2` is the one expansion function
+
+    StatifierBlocks.Composite.expand(block, module) ::
+      {[StatifierBlocks.Block.t()], param_map}
+
+`block` is the composite block as the document stores it; `module` is the
+composite's own module, which every caller has already resolved through
+`StatifierBlocks.Palette.fetch/2` (`palette.ex:408`). The return is the
+expanded blocks in document order - **head first, and the head is the expansion
+root** - together with `param_map`, which maps each expanded block's id to the
+**param key** that produced it, or to `nil` for a block no single param is
+responsible for.
+
+**`param_map` is what makes `RQ-SF037-5` implementable.** A finding raised
+inside an expansion is reported against the composite block, with the
+`config_key` the map names - and with `config_key: nil` when the map says no
+param is to blame. An author never sees a finding against a block id they
+cannot find in their document.
+
+**One function, three callers, and that is the point of naming it here.** The
+compiler reads it at Resolve (`sb-nzc1`), the editor's Expand operation reads
+it to replace a composite block with its expansion in the document, and the
+derived recipe reads nothing else about the expansion because it inserts the
+composite rather than the expansion. Three implementations of "what does this
+composite stand for" would be three chances for the compiled chart and the
+expanded document to disagree; there is one, so they cannot.
+
+### `nil` is an empty hidden default for every row of F4
+
+Folding `sb-3ejc`. **F4's per-type empty values (`:5782-5792`) are a floor and
+not a ceiling: `nil` is refused as the `default:` of a `hidden?: true` field
+for every row of that table, not only for the `{:type_expr, opts}` row that
+happens to name it (`:5792`).** F4's own reason applies unchanged to every row
+- a hidden field's `default:` is the only value it will ever have, and `nil`
+carries nothing in exactly the sense an empty string does - and the literal
+reading, under which a hidden `:string` declaring `default: nil` is accepted
+while a hidden `{:type_expr, opts}` declaring the same is refused, is an
+accident of which row's prose enumerated its arms rather than a distinction
+anyone decided.
+
+`:boolean` stays the one row whose *type-specific* empty value is `none`, and
+that is untouched: `false` is a decided value, so a hidden `false` is a hidden
+fact. `nil` is not `false`. A hidden `:boolean` declaring `default: nil` is
+refused with every other row.
+
+The code half is `sb-xio9`'s - one clause in the compiler's private
+`empty_default?/2`, with a test per row.
+
+### Worked example: "Guarded step"
+
+A host in the card-processing domain calls out and records the failure if the
+call comes back on the error path. Written by hand that is two blocks and a
+slot; as a composite it is one block with two params.
+
+**The declaration.**
+
+    params:
+      %{key: "invoke_type",  type: :string, label: "Call",
+        required?: true, default: ""}
+      %{key: "failure_path", type: :string, label: "Record the failure at",
+        required?: true, default: "", datamodel_path?: true}
+
+    subtree(params):
+      core.invoke   id "blk_GS_call"
+        config  %{"invoke_type" => params["invoke_type"], "assign_to" => ""}
+        slots   %{"on_error" => [
+          core.assign  id "blk_GS_guard"
+            config  %{"path"  => params["failure_path"],
+                      "value" => "failed"}
+        ]}
+
+for a composite block whose id is `blk_GS`. `core.invoke` declares exactly one
+slot, `on_error`, at `:zero_or_one` (`lib/statifier_blocks/core/invoke.ex:96`),
+and `invoke_type` and `assign_to` are two of its three declared config keys
+(`:130-153`); `core.assign` declares `path` and `value`
+(`lib/statifier_blocks/core/assign.ex:64-75`). The two minted ids are
+deterministic in `blk_GS`, contain no `__`, and are document-unique because
+`blk_GS` is.
+
+**What the derived block type answers**, for a `blk_GS` whose config is
+`%{"invoke_type" => "myapp:authorize", "failure_path" => "cards.authorization.failure"}`:
+
+| Callback | Answer | Where it comes from |
+|---|---|---|
+| `config_schema/1` | the two params above | the declaration |
+| `slots/1` | `[]` | `RQ-SF037-3` - the author cannot put a block on the error path |
+| `outcomes/1` | `[{"done", "Done"}, {"error", "Error"}]` | the expansion root's (`core/invoke.ex:114`) |
+| `io/1` | `%{kinds: [:step], produces: :unknown}` | `kinds` is `[:step]` merged with `[:step]` (`core/invoke.ex:199-200`, `core/assign.ex:121`); `produces` is the root's `:unknown`; `slot_accepts` is `%{}`, so the root's `%{"on_error" => [:step]}` is dropped with the slot it names |
+| `current_version/0` | the declaration's | the declaration |
+| `sentence/1` | "Call myapp:authorize, recording failure at cards.authorization.failure" | the declaration's template |
+| `emit/2` | raises | no `blk_GS` survives Resolve |
+
+**And what the walk must see, which `io/1` above does not carry.**
+`core.assign`'s `path` is a `:string` with `datamodel_path?: true`, which is a
+write of `:unknown` at that path (`block_type.ex:220-221`). So the expansion
+writes `:unknown` at `cards.authorization.failure`, and a block after `blk_GS`
+reading that path must be answered `:info` rather than `:error`. That write is
+exactly the union this section decides the composite exposes, and exactly the
+thing `RQ-SF037-15` has to pick a mechanism for. It is named here rather than
+left in the abstract because it is the smallest composite that has the problem.
+
+### What this section does not decide
+
+- **The mechanism for the reads-and-writes union**: `RQ-SF037-15`, above.
+- **A pass-through slot**: `slots/1` is `[]` here by `RQ-SF037-3`, and a
+  composite that exposes a slot of its own is a later record's.
+- **Whether an expanded block carries a marker in the document**: it does not
+  (`RQ-SF037-2`), and `ADR-0001` decision 2 is why. That belongs to `ADR-0004`'s
+  amendment `sb-nzc1` and to `ADR-0005`'s, not here.
+- **A stateful composite, or a palette entry that is `{module, state}`**: that
+  is `RQ-SF037-1` and a separate amendment to this record (`sb-5b7j`).
+- **The `Collapse` operation**: a later record's, and no code in this campaign.
+
+Filed with `sb-2gdx`, campaign SF037, folding `sb-3ejc`.
