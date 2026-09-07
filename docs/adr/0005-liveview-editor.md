@@ -7299,3 +7299,345 @@ no row; it edits nothing; and it does not make decision 9's table exhaustive -
 the `{:path, opts}` row that Note says is still owed is still owed.
 
 Filed with `sb-wzoa`, campaign SF035's Lane A.
+
+## Amendment (2026-09-07): a `profile` assign names which surfaces a mount renders, and one of them is read-only
+
+**Status: proposed (2026-09-07, campaign SF036, bead `sb-qhzl`, on rulings
+`RQ-SF036-1` and `RQ-SF036-2`).** A decision record merges at proposed under
+campaign SF036's invariant; flipping it to accepted is a separate gated request
+(`sb-xnxw`, after the implementing bead). Additive: 1B, decision 15 and every
+clause above this line stand exactly as written, and no text above this line is
+edited by this section. Nothing here is built yet - `sb-2bmk` is the request
+that builds it.
+
+Every code cite below is a reading of `main` at `b71740c`, dated to this
+section and to be re-read rather than trusted.
+
+### The gap
+
+Two clauses of this record are read as if they answered this question, and
+neither does.
+
+**1B**, which this record states twice. At `:3356-3359`:
+
+> Not persisted, in either direction: the host is told nothing, no assign
+> survives a remount, and there is no attr for a host to open an editor
+> pre-folded. A fold is a thing an author did a moment ago, not a document
+> property.
+
+and again at `:3540-3544`:
+
+> It is deliberately the same mechanism and not a generalisation of it. One
+> boolean of shell state [...] no hook, no client state, no persistence, and no
+> attr for a host to open the editor with a pane pre-folded.
+
+**Decision 15**, at `:629-631`:
+
+> - **Host concerns**, restated once so they are unambiguous: which palette
+>   entries a tenant may use, who may edit or publish a document, where it is
+>   stored, and what publishing means are all outside this package.
+
+1B is about a *fold*: a pane an author collapsed a moment ago, which the host
+never hears about and cannot pre-set. Decision 15 is about *authority over
+content and lifecycle*: which entries a tenant may use, who may edit, where a
+document lives. Neither is about which **surfaces** a mount draws at all.
+
+The embedder that finds the gap is the one mounting this editor for two
+audiences out of one codebase: its own engineers, who want the whole editor,
+and operations staff who should see a canvas, the Findings and Fixtures tabs
+and nothing else - or a rendering they cannot type into. Today that host's only
+lever is a fork of the component, because 8A's split (`:3513-3515`) gives it the
+`:header` slot and nothing else, and every pane below the header is
+unconditional in `render/1` (`lib/statifier_blocks/editor.ex:752`; the
+`sb-editor__layout` div at `:817`, its `PaletteBrowser.palette_browser` child
+at `:821` and its `Toolbar.toolbar` at `:835`).
+
+### The decision
+
+**A `profile` assign names which of this editor's surfaces a mount renders, and
+whether that mount edits.** It is one optional assign on the editor component,
+a plain map, and its default is everything:
+
+```elixir
+@type toolbar_chip :: :history | :zoom | :fits | :metrics
+
+@type profile :: %{
+        optional(:drawer_tabs) => [Shell.tab_id()] | :all,
+        optional(:inspector_tabs) => [Shell.inspector_tab()] | :all,
+        optional(:palette_groups) => [String.t()] | :all,
+        optional(:toolbar) => [toolbar_chip()] | :all,
+        optional(:read_only?) => boolean()
+      }
+```
+
+with the default
+
+```elixir
+%{
+  drawer_tabs: :all,
+  inspector_tabs: :all,
+  palette_groups: :all,
+  toolbar: :all,
+  read_only?: false
+}
+```
+
+**A host that passes no `profile` gets the 0.23.0 editor, exactly.** That is the
+constraint the shape is built around, and it is why every key is optional and
+why `:all` is a member of every list type rather than a separate flag: a key a
+host does not mention resolves to the default, and the default is what the
+editor already draws. There is no arrangement of this map, including `%{}`, that
+removes a surface a host did not name.
+
+**There are no named profiles.** No `:operations`, no `:reviewer`, no
+`:minimal`, no preset of any kind, in this package or in a host's reach through
+it. A preset is a claim about which audiences exist, and which audiences exist
+is the host's to know - the same reasoning decision 15 already applies to which
+palette entries a tenant may use. A host that wants a name for a profile writes
+the map into a module attribute of its own and names it there. This is a
+positive decision, not an omission: a later request that adds a preset is
+amending this section.
+
+**A profile is not persisted and it is not a document property.** It is what the
+host says about the mount, supplied on every render like `palette` or
+`datamodel`, and it survives a remount only because the host passes it again.
+
+### The ids a profile may list
+
+Each list names ids the package already has. This section adds no id and renames
+none.
+
+| Key | The ids it draws from | Source |
+|---|---|---|
+| `inspector_tabs` | `:config`, `:findings`, `:condition`, `:fixtures` | `Shell.inspector_tabs/0` (`lib/statifier_blocks/shell.ex:477`) over `@inspector_tabs` (`:166`) |
+| `drawer_tabs` | `:tables`, `:findings`, `:declarations`, `:fixtures`, `:datamodel`, `:source`, **and** the string ids of the host's own drawer tabs | `Shell.drawer_tabs/0` (`:501`) over `@drawer_tabs` (`:191`); host ids are the `id` of each entry in the `drawer_tabs` assign, after `Shell.host_tabs/1` (`:551-557`) has had them |
+| `palette_groups` | the `group` name of each palette entry, as strings | the `palette_groups` field of `StatifierBlocks.ViewModel` (`lib/statifier_blocks/view_model.ex:403`), built by grouping the palette on `entry.group` (`:1763-1764`, private); the name is whatever a block type's `palette_entry/0` returned, defaulted to `"Other"` by decision 10's defaults (`lib/statifier_blocks/editor/palette_browser.ex:18`). Core's own types all declare `"Structure"` |
+| `toolbar` | `:history`, `:zoom`, `:fits`, `:metrics` | the four addressable groups of `Editor.Toolbar.toolbar/1` (`lib/statifier_blocks/editor/toolbar.ex:81`): Undo/Redo (`:87-106`), the segmented zoom control (`:108-130`), `Fit width` / `Fit active` (`:132-154`), and the two read chips (`:156-159`) |
+
+Three of these need a word.
+
+**`palette_groups` is an open set of strings, and that is not a defect.** A group
+name is a block type's own word, not a member of a closed list this package
+keeps, so a profile that names `"Structure"` is naming a string that a host's
+palette may or may not contain. That is the same footing the `allowed` set the
+palette already filters on stands on, and it is why the unknown-id rule below
+matters more here than anywhere else.
+
+**`toolbar`'s members are called chips in ruling `RQ-SF036-1`'s spelling, and
+the code uses that word more narrowly.** In `Editor.Toolbar` a chip is
+specifically a read-only fact drawn as `sb-toolbar__chip` - `nested tree`,
+`depth`, `blocks`. `toolbar_chip()` above is the profile's word for **a toolbar
+item a profile may list**, which is wider: two of the four are groups of
+buttons. The type is named for the ruled shape and defined here so no reader
+has to guess which of the two senses a list member is in.
+
+**The `Canvas` heading and the `nested tree` chip are not addressable.** They are
+what makes the canvas read as a pane beside the other two - the toolbar's own
+moduledoc says so at `:38-46` ("without a name a row of unlabelled buttons is
+the only pane in the editor that has to be recognised by its contents") - so a
+profile that could remove them could produce an editor whose middle pane has no
+name. `:metrics` covers the two right-aligned read chips and nothing else.
+
+### An id the shell does not know is dropped, never an error
+
+**A list member the package cannot resolve is dropped, and the mount renders.**
+Not an argument error, not a finding, not a refusal: the surface the id would
+have named is simply not there, and every id in the list that did resolve is.
+
+This is a **new rule**, stated here on this record's own authority. It is worth
+saying plainly because the nearest existing rule is not it: `Shell.host_tabs/1`
+(`:551-557`, doc `:533-549`) drops a host tab whose id collides with one of the
+package's own reserved names, and drops a repeated id, and its doc says in as
+many words that "Nothing else is filtered" (`:543`) - an unknown host tab id is
+exactly what it passes through. That clause is about strip readability. This one
+is about a host list outliving the thing it names.
+
+The precedent it does follow is `Shell.drawer_tab/2` (`:518-530`) and
+`Shell.inspector_tab/1` (`:486-492`): a tab name the package does not know
+resolves to a default and never raises. The reasoning there is that the name
+arrives from outside and a crafted one must not be a crash; the reasoning here
+is adjacent and stronger. A profile is written once, in a host's code, against
+the package's tab set at the version it was written for. If an unknown id
+raised, then removing a tab from this package - or a host removing one of its
+own drawer tabs - would turn every mount whose profile still names it into a
+crash at render, in an audience-scoping map whose entire purpose is to be
+conservative. Dropping makes the failure mode "a surface is missing", which is
+visible and recoverable; raising makes it "the editor is gone", which is
+neither.
+
+A profile list is therefore never validated against the shell's ids at
+declaration, and there is no `validate_profile/1`.
+
+### `read_only?`
+
+**`read_only?: true` renders the document without offering any way to change
+it.** Six clauses, and they are a set rather than a suggestion:
+
+1. **No palette column.** The `PaletteBrowser.palette_browser` call in the layout
+   (`editor.ex:821`, the layout div's first child) does not render. Not a
+   collapsed palette - a mount with no palette at all. `palette_groups` still
+   parses and is simply moot for that mount.
+2. **No drag hook.** The canvas does not mount `phx-hook="StatifierBlocksDrag"`
+   (`lib/statifier_blocks/editor/canvas.ex:132`). The measure hook
+   (`editor/connector_layer.ex:48`) is unaffected: it is decision 7's read-only
+   measurement and reads nothing the author can change.
+3. **Config forms render as values.** The inspector's Config tab draws each
+   field's label and its current value, not a control. It is a rendering of
+   `ViewModel.Field`, not a disabled form: a disabled `<input>` is a control that
+   refuses, and what is wanted here is a reading. This values-only rendering is a
+   surface in its own right, and a host-native read-only view over `ViewModel`
+   in the reference embedder is its second reader.
+4. **Selection and findings stay.** Selecting a block still works, `on_select`
+   still fires, the inspector still follows the selection, and every findings
+   surface - the inspector's tab, the drawer's, the per-card counts - draws
+   exactly what it draws in an editing mount. Reading a document is the whole
+   point of the mount; findings are the most-read thing on it.
+5. **Undo and Redo are hidden.** Not disabled: hidden. `:history` is drawn as if
+   the profile had not listed it, whatever the profile's `toolbar` list says.
+   A history control over a document that cannot change has nothing to offer,
+   and a permanently-disabled pair of buttons is a worse answer than their
+   absence. Zoom, the fits and the metrics are untouched - all four are ways of
+   reading.
+6. **`on_change` never fires.** No edit reaches the document, so there is no new
+   document to hand back, so the callback is never called with one. A host may
+   pass `on_change` alongside `read_only?: true` without that being a
+   contradiction to resolve; it simply never runs.
+
+And one clause about what read-only is *not*:
+
+**A document is never refused for being read-only.** Every document that renders
+in an editing mount renders in a read-only one. There is no shape of document,
+no finding, and no missing assign that makes a read-only mount decline to draw.
+`read_only?` narrows what a mount *offers*, never what it *accepts*.
+
+**This is not the read-only viewer surface `:3515-3520` names.** That paragraph
+declines a *small* chart rendering - "an editing surface that also renders well
+at 200 pixels is two components wearing one name" - and answers it with "a
+separate read-only viewer surface", noted as unbuilt. A read-only mount of this
+editor is the same component at the same size drawing the same canvas, with the
+editing affordances withheld; it makes no claim about thumbnails and does not
+build, schedule or promise the surface that paragraph names, which is still
+unbuilt. The other twenty-odd uses of "read-only" in this record are about a
+read-only *pane* or *view* - decision 12's read-only config inspector surface at
+`:3177`, the declared-path view at `:4628-4713`, the measurement hook - and none
+of them is about a mount.
+
+### The Note this leaves under 1B
+
+1B stands, in both places it is stated, for the thing it is about.
+
+**A fold is the author's gesture; a profile is the host's statement of
+audience.** A fold is one boolean of shell state that an author toggled a moment
+ago and that the host is deliberately never told about, which is why 1B refuses
+an attr for it: an attr would make a transient gesture into something a host
+sets and therefore into something the author is arguing with. A profile is the
+opposite direction of travel. It is a standing fact about *who this mount is
+for*, supplied by the host on every render, and it removes a pane rather than
+collapsing one - a folded palette has a handle that reopens it, a profiled-away
+palette is not there.
+
+So the second is not a generalisation of the first, and this section is not the
+"attr to open the editor with a pane pre-folded" that both `:3356-3359` and
+`:3540-3544` refuse. Both sentences stand for folds, unamended: after this
+section there is still no attr that pre-folds a pane, and a mount whose profile
+draws the palette still opens with it expanded, for the author to fold or not.
+
+### The sentence decision 15 gains
+
+Decision 15's host-concerns list at `:629-631` is a list of things this package
+does not decide. This section adds one sentence to how it is read, without
+editing it:
+
+> **Which surfaces a mount shows is also the host's to say, and this record now
+> gives it the lever.** Decision 15's list names authority over content and
+> lifecycle - which entries a tenant may use, who may edit, where a document is
+> stored. Audience scoping sits beside them and always did; the difference is
+> that this record answers it rather than leaving it outside the package,
+> because the answer is a shape of assign and not a policy.
+
+### Where this lands
+
+- **The assigns table** (`lib/statifier_blocks/editor.ex:469-497`, the table
+  under `## Assigns` at `:467`) gains a `profile` row. It does not gain it
+  in this request: `sb-2bmk` adds the row when it adds the assign.
+- **`docs/profiles.md`** - the host-facing page a profile needs, with the two
+  worked mounts below written out against the real tab ids - is new in
+  `sb-2bmk`. It does not exist yet.
+- **`sb-2bmk`** is the implementing request. **`sb-xnxw`** flips this section
+  from proposed to accepted afterwards.
+
+### Worked example
+
+A card-processing host mounts the same editor twice.
+
+**An operations mount.** Its operations staff investigate settlement documents:
+they need the canvas, the findings, and the fixture runs, and they have no
+business inserting blocks.
+
+```elixir
+<.live_component
+  module={StatifierBlocks.Editor}
+  id="ops-editor"
+  document={@document}
+  palette={@palette}
+  fixtures={@fixtures}
+  profile={%{
+    drawer_tabs: [:findings, :fixtures],
+    inspector_tabs: [:findings, :fixtures],
+    palette_groups: [],
+    toolbar: [:zoom, :fits, :metrics]
+  }}
+/>
+```
+
+The drawer's strip carries two tabs; the inspector's carries two; the palette
+column renders with no groups in it; the toolbar keeps zoom, the fits and the
+metrics and drops Undo/Redo. `read_only?` is absent, so it is `false` and this
+mount still edits - which is the point of showing it: **scoping the surfaces and
+withholding editing are two separate settings**, and a host may want either
+without the other.
+
+**A read-only review mount.** The same document, opened by a reviewer who signs
+off on it:
+
+```elixir
+<.live_component
+  module={StatifierBlocks.Editor}
+  id="review-editor"
+  document={@document}
+  palette={@palette}
+  fixtures={@fixtures}
+  on_select={&JS.push("reviewing", value: &1)}
+  profile={%{
+    drawer_tabs: [:findings, :fixtures, :source],
+    read_only?: true
+  }}
+/>
+```
+
+`inspector_tabs`, `palette_groups` and `toolbar` are unmentioned, so all three
+are `:all` - and then `read_only?` withholds the palette column and hides
+Undo/Redo regardless. The reviewer selects blocks, reads their config as values,
+reads findings and fixture runs and the compiled source, and cannot change a
+character. `on_select` fires on every selection; `on_change` never fires.
+
+### What this section does not decide
+
+- **It names no profile.** See the decision: presets are refused, not deferred.
+- **It says nothing about who a mount is for.** A host decides which profile a
+  given viewer gets, out of its own authorization, exactly as decision 15 leaves
+  it.
+- **It adds no id, tab, group or toolbar item.** Every id a profile may list is
+  one the package already draws.
+- **It does not make `read_only?` an authorization boundary.** A read-only mount
+  withholds affordances; it is not a permission check, and a host that must
+  prevent a write enforces that where it handles the write, not by trusting a
+  rendering. This is decision 15's "who may edit" left exactly where decision 15
+  put it.
+- **It does not build the read-only viewer surface `:3515-3520` names**, which
+  is still unbuilt and still not this component's.
+- **It edits nothing.** 1B, decision 15, 8A and every clause above stand as
+  written; this section is additive and sits at the foot of the record so no
+  line a sibling record cites moves.
+
+Filed with `sb-qhzl`, campaign SF036.
