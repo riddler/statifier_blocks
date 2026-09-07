@@ -270,6 +270,24 @@ defmodule StatifierBlocks.Core.Foreach do
   @impl true
   def io(_config), do: %{kinds: [:step], slot_accepts: %{@body_slot => [:step]}}
 
+  @doc """
+  This block as one line of prose (ADR-0002's 2026-09-07 amendment).
+
+  One constant line. The list this block iterates is a datamodel path
+  rather than a value, so naming it here would put an expression in a
+  sentence - the thing ADR-0005's `10n` keeps out of a chip for the same
+  reason. What a reader needs from a list view is that the body below runs
+  once per item, and the body is right there under it.
+
+      iex> StatifierBlocks.Core.Foreach.sentence(%{"items" => "cards.batch"})
+      "Run once per item"
+
+      iex> StatifierBlocks.Core.Foreach.sentence(%{})
+      "Run once per item"
+  """
+  @impl true
+  def sentence(_config), do: "Run once per item"
+
   @impl true
   def palette_entry,
     do: %{

@@ -28,10 +28,10 @@ defmodule StatifierBlocks.BlockType do
   ## Required and optional callbacks
 
   Five callbacks are required; a module missing one of them is not a valid
-  `StatifierBlocks.BlockType` and fails to compile as one. Eight are
+  `StatifierBlocks.BlockType` and fails to compile as one. Nine are
   optional (`@optional_callbacks io: 1, migrate_config: 2, fixtures: 0,
   palette_entry: 0, outcomes: 1, failure_outcomes: 1, summary: 1,
-  donedata_type: 1`); a
+  donedata_type: 1, sentence: 1`); a
   module that implements only the five required ones compiles cleanly, and
   each optional absence degrades to a stated default rather than an error:
 
@@ -50,6 +50,7 @@ defmodule StatifierBlocks.BlockType do
   | `failure_outcomes/1` | no | none of the block's outcomes is failure-classed |
   | `summary/1` | no | the palette card has no second line |
   | `donedata_type/1` | no | the document's `<donedata>` carries only the params the compiler mints |
+  | `sentence/1` | no | a block's one line of prose is the type's label |
 
   ## Who owns what
 
@@ -65,6 +66,7 @@ defmodule StatifierBlocks.BlockType do
   | `outcomes/1` | this record's amendment A; the emission is ADR-0004's |
   | `failure_outcomes/1` | this record's 2026-09-06 Note; the reserved `<donedata>` key is `statifier_persistence`'s ADR-0008 |
   | `donedata_type/1` | ADR-0013 (the typed child summary); where the params go is ADR-0004's C1 |
+  | `sentence/1` | this record's 2026-09-07 amendment; where the line is drawn is ADR-0005's |
 
   ## Declaring the defaults instead of spelling them (ADR-0007)
 
@@ -135,12 +137,36 @@ defmodule StatifierBlocks.BlockType do
       @impl StatifierBlocks.BlockType
       def migrate_config(from, _config), do: {:error, {:no_migration_from, from}}
 
+      # The type's own label, which is the only label a module holds: a
+      # block type does not know the type NAME a document stores it under,
+      # so the type-name arm stays `StatifierBlocks.BlockType.sentence/2`'s
+      # (ADR-0002's 2026-09-07 amendment). A module with no
+      # `palette_entry/0` and no label in it answers a blank string, which
+      # that reader's refusal set reads as "nothing declared" - so a type
+      # that `use`s the behaviour and overrides nothing is indistinguishable
+      # from a type that declares no `sentence/1` at all.
+      @impl StatifierBlocks.BlockType
+      def sentence(_config) do
+        # `apply/3` rather than a direct call: the direct call is resolved
+        # at compile time and warns in every module that declares no
+        # `palette_entry/0`, which is exactly the case this arm exists for.
+        if function_exported?(__MODULE__, :palette_entry, 0) do
+          case apply(__MODULE__, :palette_entry, []) do
+            %{label: label} when is_binary(label) -> label
+            _no_label -> ""
+          end
+        else
+          ""
+        end
+      end
+
       defoverridable slots: 1,
                      config_schema: 1,
                      validate_config: 1,
                      current_version: 0,
                      io: 1,
-                     migrate_config: 2
+                     migrate_config: 2,
+                     sentence: 1
     end
   end
 
@@ -750,6 +776,42 @@ defmodule StatifierBlocks.BlockType do
   """
   @callback donedata_type(Block.config()) :: [donedata_field()]
 
+  @doc """
+  This block as one line of prose, given this config (ADR-0002's
+  2026-09-07 amendment, on ruling `RQ-SF036-4`).
+
+  Optional. A type that does not export it says nothing beyond its own
+  label, which is the line every block type had before the callback
+  existed.
+
+  It exists because a chip and a sentence are two different things. The
+  24-character cap ADR-0005's `10n` puts on `badge` and the `join_label`
+  return names "a sentence" as the thing it is chosen to exclude, so a
+  consumer rendering a document as a vertical list of lines - a host list
+  view, an outline pane, a diff, a test asserting what a document says -
+  had no surface to read and had to assemble one out of a title, a type
+  label and a list of capped chips. This is that surface, declared once by
+  the type that knows the words.
+
+  The three rules `slots/1` and `config_schema/1` already carry apply
+  unchanged. It is a **pure function of `config`** - a sentence is
+  assembled out of `config` and nothing else, so a callback reaching for a
+  datamodel, a clock or a process is outside the contract exactly as
+  `join_label` is - it is **total** for any config `validate_config/1`
+  accepts, and it **never raises**. One that raises anyway degrades to the
+  type's label rather than taking the list down, the bounded exception
+  `join_label/2` documents.
+
+  **It is not a chip and carries no cap.** `sentence/2` on this module is
+  the resolver every consumer reads it through, and it holds the return to
+  three of amendment B3's four arms: a non-string, a blank string and one
+  carrying a newline, carriage return or tab are refused. The length arm
+  is deliberately not applied - applying the number to the return whose
+  whole purpose is to be the thing the number excludes would refuse every
+  sentence the callback exists to carry.
+  """
+  @callback sentence(Block.config()) :: String.t()
+
   @optional_callbacks io: 1,
                       migrate_config: 2,
                       fixtures: 0,
@@ -757,7 +819,8 @@ defmodule StatifierBlocks.BlockType do
                       outcomes: 1,
                       failure_outcomes: 1,
                       summary: 1,
-                      donedata_type: 1
+                      donedata_type: 1,
+                      sentence: 1
 
   # ADR-0002 amendment A1's default: a type that declares no outcomes has
   # exactly one, named `done`. Named once, here, so the compiler and the
@@ -1440,6 +1503,61 @@ defmodule StatifierBlocks.BlockType do
   def join_label(_entry, _config), do: nil
 
   @doc """
+  `module.sentence(config)` as one line of prose, or the type's own label
+  (ADR-0002's 2026-09-07 amendment).
+
+  The one shape every consumer reads. Four declaration states, and the
+  claim is scoped to all four, so it is a table rather than a sentence:
+
+  | The type's `sentence/1` | This answers |
+  |---|---|
+  | declared, returns a single-line binary | that binary, verbatim, uncapped |
+  | not declared | the type's label |
+  | declared, raises / throws / exits | the type's label |
+  | declared, returns a non-binary, a blank binary, or one carrying a newline, carriage return or tab | the type's label |
+
+  "The type's label" is `palette_entry()`'s `label`. A module exporting no
+  `palette_entry/0`, or declaring no label in it, has no label to answer
+  and comes back `nil`: the type-NAME fallback decision 5's last sentence
+  names is a fact about the document, not about the module, and it is
+  `StatifierBlocks.ViewModel`'s to supply. Absence is checked with
+  `Code.ensure_loaded?/1` plus `function_exported?/3`, the pattern
+  `outcomes/2` already uses, so a module that is not loadable comes back
+  `nil` as well.
+
+  **No cap.** Three of amendment B3's four arms hold - a non-string, a
+  blank string and a multiline one are refused - and the length arm is
+  not applied, for `10n`'s own reason: 24 characters is the number chosen
+  so that a sentence does **not** fit. A callback that raises, throws or
+  exits degrades on the grounds `join_label/2` documents, and the rescued
+  value is never inspected because what comes back is the package's own
+  word for the type either way.
+
+  A raise therefore lands on the label while a type declaring **nothing**
+  may land on an author's `title` first (ADR-0005's three-way chain).
+  That is deliberate: a bounded rescue's answer is the package's own word,
+  not an entry into a fallback chain a host callback could steer by
+  raising.
+
+      iex> StatifierBlocks.BlockType.sentence(StatifierBlocks.Core.Send, %{"event" => "order.paid"})
+      "Send order.paid"
+
+      iex> StatifierBlocks.BlockType.sentence(StatifierBlocks.Core.Sequence, %{})
+      "Sequence"
+
+      iex> StatifierBlocks.BlockType.sentence(NoSuchModule, %{})
+      nil
+  """
+  @spec sentence(module(), Block.config()) :: String.t() | nil
+  def sentence(module, config) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :sentence, 1) do
+      module |> call_sentence(config) |> line() || label(module)
+    else
+      label(module)
+    end
+  end
+
+  @doc """
   The chips `module.summary(config)` declares, or `[]` (ADR-0002
   amendment H2).
 
@@ -1701,6 +1819,51 @@ defmodule StatifierBlocks.BlockType do
   catch
     :throw, _thrown -> nil
     :exit, _reason -> nil
+  end
+
+  # B3's degradation again, with `call_join_label/2`'s shape and for
+  # `call_summary/2`'s reason: a host callback on a reading path that
+  # raises, throws or exits costs one line of prose, never the list. The
+  # rescued value is never inspected - what comes back is the type's label
+  # either way - so `nil` here is "nothing usable", not a value.
+  @spec call_sentence(module(), Block.config()) :: term()
+  defp call_sentence(module, config) do
+    module.sentence(config)
+  rescue
+    _raised -> nil
+  catch
+    :throw, _thrown -> nil
+    :exit, _reason -> nil
+  end
+
+  # `chip/1`'s refusal set with the length arm removed, which is the whole
+  # of the carve-out ADR-0002's 2026-09-07 amendment takes: a sentence is a
+  # LINE, so a blank one and a multiline one are refused for the reasons
+  # B3 gives, and a long one is exactly what the callback exists to carry.
+  @spec line(term()) :: String.t() | nil
+  defp line(text) when is_binary(text) do
+    cond do
+      String.trim(text) == "" -> nil
+      String.contains?(text, ["\n", "\r", "\t"]) -> nil
+      true -> text
+    end
+  end
+
+  defp line(_refused), do: nil
+
+  # The only label a module holds. Not the type name: a block type module
+  # does not know the name a document stores it under, and decision 5's
+  # last sentence is the reader's to honour where the name is known.
+  @spec label(module()) :: String.t() | nil
+  defp label(module) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :palette_entry, 0) do
+      case module.palette_entry() do
+        %{label: label} when is_binary(label) -> line(label)
+        _no_label -> nil
+      end
+    else
+      nil
+    end
   end
 
   # The one refusal set B3's badge row and join-marker row share. Refuse,

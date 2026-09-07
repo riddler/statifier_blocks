@@ -335,6 +335,37 @@ defmodule StatifierBlocks.Core.Subchart do
     %{kinds: [:step], produces: :unknown, slot_accepts: accepts}
   end
 
+  @doc """
+  This block as one line of prose (ADR-0002's 2026-09-07 amendment).
+
+  The chart it runs and the fact that it waits, which are the two things
+  that separate this block from every other step in a list. The chart name
+  is repeated as the author wrote it - it is a key into the host's chart
+  store, and a line that paraphrases it names nothing the author can look
+  up.
+
+  A block with no chart named yet says what it is and stops.
+
+      iex> StatifierBlocks.Core.Subchart.sentence(%{"chart" => "signup.identity"})
+      "Run signup.identity and wait"
+
+      iex> StatifierBlocks.Core.Subchart.sentence(%{})
+      "Run a chart and wait"
+  """
+  @impl true
+  def sentence(config) do
+    case Map.get(config, "chart") do
+      chart when is_binary(chart) ->
+        case String.trim(chart) do
+          "" -> "Run a chart and wait"
+          trimmed -> "Run " <> trimmed <> " and wait"
+        end
+
+      _absent_or_malformed ->
+        "Run a chart and wait"
+    end
+  end
+
   @impl true
   def palette_entry,
     do: %{
