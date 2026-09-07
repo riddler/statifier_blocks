@@ -465,7 +465,43 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
-    @doc "One field: its label, its control, and its own findings (decision 11)."
+    @doc """
+    One field: its label, its control, and its own findings (decision 11).
+
+    Two flags on the declaration change what is drawn (ADR-0002 decision 7,
+    amended 2026-09-07). A `hidden?: true` field renders **nothing at all** -
+    no row, no label, no control. A `readonly?: true` field renders its row
+    and its label, with its **value** where a control would sit; it is not a
+    disabled input and carries no form control, so it posts nothing. Both
+    flags leave the field's findings visible where a row is drawn at all.
+    `hidden?` wins when both are set, because a field that is not rendered
+    has nothing to render as a value.
+    """
+    def field(%{field: %ViewModel.Field{hidden?: true}} = assigns) do
+      ~H"""
+      """
+    end
+
+    def field(%{field: %ViewModel.Field{readonly?: true}} = assigns) do
+      ~H"""
+      <div
+        class={["sb-field", "sb-field--readonly", @class]}
+        data-field={@field.key}
+        data-field-type={type_tag(@field.type)}
+        data-field-readonly="true"
+      >
+        <span class="sb-field__label">
+          <span class="sb-field__label-text">{@field.label}</span>
+          <span :if={@field.required?} class="sb-field__required">Required</span>
+        </span>
+        <p class="sb-field__value">{to_text(@field.value)}</p>
+        <p :for={finding <- @field.findings} class={["sb-finding", severity_class(finding)]}>
+          {finding.message}
+        </p>
+      </div>
+      """
+    end
+
     def field(assigns) do
       ~H"""
       <div class={["sb-field", @class]} data-field={@field.key} data-field-type={type_tag(@field.type)}>

@@ -721,9 +721,10 @@ defmodule StatifierBlocks.Compiler do
       end)
   end
 
-  # The one config check that is about the *declaration* rather than the
-  # value under it: a `{:path, opts}` field written without a `default:` key
-  # is refused here, at compile, naming the field.
+  # The config checks that are about the *declaration* rather than the value
+  # under it: a field written without a `default:` key, and a `hidden?: true`
+  # field whose `default:` is its type's empty value. Both are refused here,
+  # at compile, naming the field.
   #
   # `t:StatifierBlocks.BlockType.field_decl/0` has required `:default` from
   # the start, so a declaration missing it was never well-formed. What it did
@@ -735,13 +736,24 @@ defmodule StatifierBlocks.Compiler do
   # is the stage that already asks a block type what it declares, so that is
   # where it is refused.
   #
-  # Only the path arm is checked. A path field's `default:` is what the
-  # editor puts in an unset control and what a read of the path falls back
-  # to, so the missing key changes behaviour there rather than only shape;
-  # for every other field type the view model now reads the key permissively
-  # and renders. Widening the refusal to all field types is a change to what
-  # a block type may declare, which is the record's call and not this
-  # stage's.
+  # Every arm is checked. Until 2026-09-07 only the `{:path, opts}` arm was,
+  # on the reasoning that a path field's `default:` is what the editor puts
+  # in an unset control and what a read of the path falls back to, while for
+  # every other field type the view model reads the key permissively and
+  # renders `nil`; widening the refusal was a change to what a block type may
+  # declare, which is the record's call and not this stage's. ADR-0002
+  # decision 7's amendment of 2026-09-07 (section F3) takes that call: the
+  # reasoning generalises, because `nil` is a value no block type ever said
+  # was legal and `validate_config/1` cannot see a defect in a declaration.
+  #
+  # The second check is that amendment's F4. `hidden?: true` puts a field
+  # beyond every form, so its `default:` is the only value it will ever have
+  # unless a host writes the key itself; a `default:` that is the type's
+  # *empty* value declares a key that carries nothing and can never be given
+  # anything. The empty value is stated per type by the record rather than
+  # derived here, and `:boolean` is the one type with none - `false` is a
+  # decided value rather than an absence. A `readonly?: true` field takes no
+  # such refusal: it is rendered, so an empty value is visible.
   #
   # The finding is per *block*, not per type. `config_schema/1` takes the
   # block's config, so what a type declares is not a property of the type
@@ -753,19 +765,52 @@ defmodule StatifierBlocks.Compiler do
   defp declaration_findings(%Block{config: config}, module) do
     config
     |> module.config_schema()
-    |> Enum.filter(&path_field_without_default?/1)
-    |> Enum.map(fn %{key: key} ->
-      {key,
-       ~s(the #{key} field is declared as a datamodel path with no default: key, ) <>
-         ~s(so it has no value to read when a config leaves it unset)}
-    end)
+    |> Enum.flat_map(&declaration_finding/1)
   end
 
-  @spec path_field_without_default?(BlockType.field_decl()) :: boolean()
-  defp path_field_without_default?(%{type: {:path, _opts}} = decl),
-    do: not Map.has_key?(decl, :default)
+  @spec declaration_finding(BlockType.field_decl()) :: [BlockType.finding()]
+  defp declaration_finding(%{key: key} = decl) do
+    cond do
+      not Map.has_key?(decl, :default) ->
+        [
+          {key,
+           ~s(the #{key} field is declared with no default: key, ) <>
+             ~s(so it has no value to read when a config leaves it unset)}
+        ]
 
-  defp path_field_without_default?(_decl), do: false
+      hidden_with_empty_default?(decl) ->
+        [
+          {key,
+           ~s(the #{key} field is declared hidden?: true with an empty default:, ) <>
+             ~s(so it carries no value and no form can ever give it one)}
+        ]
+
+      true ->
+        []
+    end
+  end
+
+  # ADR-0002 decision 7's amendment of 2026-09-07, section F4: the empty
+  # value refused under `hidden?: true`, one row per member of the closed
+  # nine-value `field_type/0` set. `:boolean` has no row and falls through to
+  # the catch-all, which is the record's own reading of it.
+  @spec hidden_with_empty_default?(BlockType.field_decl()) :: boolean()
+  defp hidden_with_empty_default?(%{hidden?: true, type: type, default: default}),
+    do: empty_default?(type, default)
+
+  defp hidden_with_empty_default?(_decl), do: false
+
+  @spec empty_default?(BlockType.field_type(), Block.json()) :: boolean()
+  defp empty_default?(:string, default), do: default == ""
+  defp empty_default?(:integer, default), do: default == ""
+  defp empty_default?(:boolean, _default), do: false
+  defp empty_default?({:select, _choices}, default), do: default == ""
+  defp empty_default?(:expression, default), do: default == ""
+  defp empty_default?(:duration, default), do: default == ""
+  defp empty_default?({:list, _inner}, default), do: default == []
+  defp empty_default?({:path, _opts}, default), do: default == ""
+  defp empty_default?({:type_expr, _opts}, default), do: default in ["", nil]
+  defp empty_default?(_type, _default), do: false
 
   # The one config check in this package that reads the datamodel document.
   # `core.on_event` owns both halves of it - what a `payload` declares and

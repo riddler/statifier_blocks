@@ -174,7 +174,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           {finding.message}
         </p>
         <Field.field
-          :for={field <- @node.form.fields}
+          :for={field <- rendered_fields(@node.form.fields)}
           field={field}
           target={@target}
           expression_component={@expression_component}
@@ -284,6 +284,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       * **A field whose control did not post keeps the value it had.** A
         partially rendered form does not blank out the fields it did not show.
 
+    A fourth, added 2026-09-07 with the `hidden?` / `readonly?` flags
+    (ADR-0002 decision 7's amendment, section F6, and campaign-SF036 ruling
+    `RQ-SF036-15`): **a flagged field ignores any posted value for its key.**
+    The decode is keyed off the schema and a hidden field is in the schema,
+    so a crafted payload posting under a hidden field's key would otherwise
+    be decoded through a control no form ever drew. For a `hidden?: true` or
+    `readonly?: true` field the unposted branch is taken unconditionally,
+    which defends a key the form withheld and touches none of the three
+    properties above.
+
     ## Where a decoded value is written
 
     A field's `key` names its control; where the value goes is the field's
@@ -322,7 +332,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       fields
       |> Enum.reduce(base, fn %ViewModel.Field{} = field, config ->
         value =
-          case Map.fetch(posted, field.key) do
+          case posted_value(field, posted) do
             {:ok, raw} -> Field.decode(field.type, raw)
             :error -> field.value
           end
@@ -390,6 +400,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp row_index(_index), do: 0
+
+    # The fields the package's own form draws. `ViewModel.build/3` lists every
+    # declared field, `hidden?: true` ones included, because the view model is
+    # a projection of the schema and a host filters it for its own surface
+    # (ADR-0002 decision 7, amended 2026-09-07, section F7). This is that
+    # filter for this surface. `Field.field/1` renders nothing for a hidden
+    # field either; the two agree, and neither is load-bearing alone.
+    @spec rendered_fields([ViewModel.Field.t()]) :: [ViewModel.Field.t()]
+    defp rendered_fields(fields), do: Enum.reject(fields, & &1.hidden?)
+
+    # A field the form withheld reads nothing out of the params, whatever the
+    # params carry (F6 as ruled by `RQ-SF036-15`). `:error` is the same term
+    # `Map.fetch/2` returns for a key that was never posted, so the reduce
+    # above has one unposted branch rather than two.
+    @spec posted_value(ViewModel.Field.t(), map()) :: {:ok, term()} | :error
+    defp posted_value(%ViewModel.Field{hidden?: true}, _posted), do: :error
+    defp posted_value(%ViewModel.Field{readonly?: true}, _posted), do: :error
+    defp posted_value(%ViewModel.Field{key: key}, posted), do: Map.fetch(posted, key)
 
     @doc """
     The candidate list a host offered for one field, or `[]`.
