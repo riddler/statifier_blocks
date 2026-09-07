@@ -349,6 +349,53 @@ defmodule StatifierBlocks.Palette do
   end
 
   @doc """
+  Builds an unconfigured block of `type_name` from this palette: the type's
+  `c:StatifierBlocks.BlockType.config_schema/1` defaults as the config, and
+  its `c:StatifierBlocks.BlockType.current_version/0` as the stored
+  `type_version`.
+
+  This is what "insert this type" means as a value, with no editor in it.
+  It lives beside `fetch/2` because it is the same question one step
+  further on - a name resolved to a module, then that module asked what a
+  fresh block of it looks like - and a host view that inserts from a
+  palette should not have to reimplement the answer.
+
+  Total, for `fetch/2`'s reason: a `type_name` no entry carries is `:error`
+  rather than a raise. The schema defaults are the *only* source of config
+  here. A palette entry's `:default_config` is a separate declaration and
+  is deliberately not merged in (that is the editor's insert probe, and
+  whether an inserted block should start from it is an open question, not
+  a settled one).
+
+      iex> {:ok, block} =
+      ...>   StatifierBlocks.Palette.new_block(StatifierBlocks.Palette.core(), "core.send")
+      iex> block.type
+      "core.send"
+      iex> block.config
+      %{"delay" => "", "event" => ""}
+      iex> block.type_version == StatifierBlocks.Core.Send.current_version()
+      true
+
+      iex> StatifierBlocks.Palette.new_block(StatifierBlocks.Palette.core(), "no.such.type")
+      :error
+  """
+  @spec new_block(t(), Block.type_name()) :: {:ok, Block.t()} | :error
+  def new_block(%__MODULE__{} = palette, type_name) do
+    case fetch(palette, type_name) do
+      {:ok, module} ->
+        config =
+          %{}
+          |> module.config_schema()
+          |> Map.new(fn %{key: key, default: default} -> {key, default} end)
+
+        {:ok, Block.new(type_name, config: config, type_version: module.current_version())}
+
+      _error ->
+        :error
+    end
+  end
+
+  @doc """
   Resolves a recipe name to its module. Total; never raises, for `fetch/2`'s
   reason.
 

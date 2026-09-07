@@ -1515,7 +1515,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       do: assign(socket, :palette_unarmed_pick, true)
 
     defp insert_from_palette(socket, type, position) do
-      case new_block(socket.assigns.palette, type) do
+      case Palette.new_block(socket.assigns.palette, type) do
         {:ok, block} ->
           socket
           |> assign(
@@ -1585,25 +1585,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end)
     end
 
-    @spec new_block(Palette.t(), Block.type_name()) :: {:ok, Block.t()} | :error
-    defp new_block(palette, type) do
-      case Palette.fetch(palette, type) do
-        {:ok, module} ->
-          config =
-            %{}
-            |> module.config_schema()
-            |> Map.new(fn %{key: key, default: default} -> {key, default} end)
-
-          {:ok, Block.new(type, config: config, type_version: module.current_version())}
-
-        _error ->
-          :error
-      end
-    end
-
-    # The block the two insert paths ask `Edit.Targets` about: `new_block/2`'s
-    # block, with the palette entry's `default_config` merged over the config
-    # `config_schema/1`'s own `default:` values folded (sb-1c7g).
+    # The block the two insert paths ask `Edit.Targets` about:
+    # `Palette.new_block/2`'s block, with the palette entry's `default_config`
+    # merged over the config `config_schema/1`'s own `default:` values folded
+    # (sb-1c7g).
     #
     # The schema's defaults are not enough on their own, and the gap is not a
     # corner case. A `{:path, _}` field defaulting to `""` names no path, so
@@ -1615,11 +1600,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # asks the question the configured block would ask.
     #
     # This is the probe only. The block a pick or a drop actually inserts
-    # still comes from `new_block/2`: the entry's declaration is what a type
-    # would be asked about, not a config the author never wrote.
+    # still comes from `Palette.new_block/2`: the entry's declaration is what
+    # a type would be asked about, not a config the author never wrote.
     @spec probe(Palette.t(), Block.type_name()) :: {:ok, Block.t()} | :error
     defp probe(palette, type) do
-      with {:ok, block} <- new_block(palette, type),
+      with {:ok, block} <- Palette.new_block(palette, type),
            {:ok, module} <- Palette.fetch(palette, type) do
         {:ok, %{block | config: Map.merge(block.config, entry_default_config(module))}}
       else
