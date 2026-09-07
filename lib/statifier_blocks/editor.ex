@@ -464,6 +464,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     out, not a rewiring of what is already inside. See ADR-0005's 2026-09-05
     amendment, *the host seams, `on_select` and a selection descriptor*.
 
+    The seam the other way is the `selected_id` assign, which a host with a
+    selection surface of its own writes to move the selection the callback
+    reports back. It is an input and not a command: the sentence above stands
+    exactly as written, because a documented assign is not a `:select` command
+    and nothing about a selection is serialized, stored, undone or redone. An
+    id the open document does not hold clears the selection rather than naming
+    a block that is not there. See ADR-0005's 2026-09-07 amendment, *a
+    `selected_id` a host may write, honoured in `update/2` through
+    `rebuild/1`*.
+
     ## Profiles, and a read-only mount
 
     A host that mounts this editor for two audiences out of one codebase says
@@ -504,6 +514,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `compile_options` | no | the rest of the option list the host compiles this document with - `terminate:`, `child_use:`, `known_invoke_types:`, `datamodel:` - forwarded to **every** compile this component runs: the provenance recompile behind the Run pane's marks, the Source tab's listing, and the fixture runs. Without it those three describe a chart the host does not have, silently. `:declare` is taken from the `declare` assign whatever this list says, and `[]` (the default) compiles exactly as it did before |
     | `on_change` | no | one-argument function called with each new document |
     | `on_select` | no | one-argument function called with each new selection: a `%{id:, type:, label:}` descriptor, or `nil` for no selection |
+    | `selected_id` | no | the block the editor is about, written by a host that has a selection surface of its own; honoured only on an update that carries it, and an id the open document does not hold clears the selection instead of naming it. Held as editor state, and cleared when the host opens a different document. Not a command: it moves the selection, it does not edit the document |
     | `icon` | no | function component resolving an icon *name* to markup |
     | `expression_component` | no | override for `:expression` fields (sui-bob's seam); with it unset, an `:expression` renders statifier-ui's own expression editor when that package is on the host's load path, and the package's plain source input when it is not |
     | `value_candidates` | no | the values offered per datamodel path, `%{path => [%{label:, value:} \| binary]}`; **merged over the datamodel's own `one_of` enumerations, per path**, so a path this map names uses this map's list and a path it does not name keeps what the datamodel declares. Read only by an expression editor that draws value pickers; `%{}` (the default) now means *nothing beyond what the datamodel declares* rather than nothing at all |
@@ -764,6 +775,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         else
           socket
         end
+
+      # A selection the host writes, on the marks' terms and for the marks'
+      # reason (2S) - extracted for `put_run/2`'s reason rather than written
+      # inline like the marks above: one more branch in this function crosses
+      # Credo's complexity bound for the whole of it.
+      socket = put_selection(socket, assigns)
 
       socket =
         if Map.has_key?(assigns, :invoke_mark) do
@@ -1793,10 +1810,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       with {:ok, block, module} <- fetch_composite(palette, document, id),
            {:ok, target} <- composite_target(document, id),
            {:ok, inserts} <- expansion_inserts(palette, document, target, block, module) do
+        # 3E selects the first expanded block AFTER the compound commits, and
+        # it does so through the one path a selection is written on from
+        # outside the canvas gesture. Reaching it after the commit is what lets
+        # the normalization answer here too: the id it names is a block the new
+        # document holds, and the fallback - the selection the author already
+        # had - is cleared exactly when that was the composite which has just
+        # gone (3S). The trailing `rebuild/1` is what reports the new selection
+        # out, `commit/2`'s own rebuild having run before it.
         socket
         |> update(:drafts, &Map.delete(&1, id))
-        |> assign(:selected_id, first_inserted_id(inserts) || socket.assigns.selected_id)
         |> commit({:compound, [{:remove, id} | inserts]})
+        |> put_selected_id(first_inserted_id(inserts) || socket.assigns.selected_id)
+        |> rebuild()
       else
         {:error, reason} -> refused(socket, reason)
       end
@@ -2917,6 +2943,49 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       case ViewModel.find_node(assigns.view_model, block.id) do
         %ViewModel.Node{} = node -> ViewModel.title(node)
         nil -> block.type
+      end
+    end
+
+    # The guarded branch 1S asks for. It sits here rather than inline beside
+    # the marks it mirrors, for the reason `put_run/2` sits here: one more
+    # branch in `update/2` crosses that function's complexity bound.
+    # `send_update/3` delivers the keys it
+    # names and nothing else, so an update that does not carry this one leaves
+    # the selection exactly as the author left it. It runs after
+    # `switch_document/2`, so a host that swaps a document and selects into it
+    # in one update gets the block it just named rather than the swap's reset.
+    @spec put_selection(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
+    defp put_selection(socket, assigns) do
+      if Map.has_key?(assigns, :selected_id) do
+        # 6S: the canvas gesture's two companion resets, and no editor chrome.
+        # Both are anchored to the block the author was working on, so a
+        # selection arriving from a host's pane leaves both stale - and a host
+        # moving the selection is saying which block the editor is about, not
+        # operating the editor.
+        socket
+        |> put_selected_id(assigns.selected_id)
+        |> assign(palette_sheet: false, config_field_focus: nil)
+      else
+        socket
+      end
+    end
+
+    # 3S's one normalization, and the only place a selection is written from
+    # outside the canvas gesture: `selected_id` never names a block the open
+    # document does not hold. The internal paths keep that invariant one at a
+    # time - `remove_block/2` and `remove_compound/2` clear a removed block's
+    # selection, `switch_document/2` clears it on a swap - and this states it
+    # once, for the host's input (1S) and for Expand (3E). Normalizing on the
+    # way in rather than at the point of use is what keeps an unknown id out of
+    # `notified_id`, so the next selection of a real block still fires (4S).
+    @spec put_selected_id(Phoenix.LiveView.Socket.t(), Block.id() | nil) ::
+            Phoenix.LiveView.Socket.t()
+    defp put_selected_id(socket, nil), do: assign(socket, :selected_id, nil)
+
+    defp put_selected_id(socket, id) do
+      case block_by_id(socket.assigns.document, id) do
+        %Block{} -> assign(socket, :selected_id, id)
+        nil -> assign(socket, :selected_id, nil)
       end
     end
 

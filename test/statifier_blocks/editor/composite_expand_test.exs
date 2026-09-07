@@ -166,6 +166,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute html =~ ~s(id="sb-block-blk_GS")
       end
 
+      # 3E reaches the selection through the one path a selection is written on
+      # from outside the canvas gesture (ADR-0005's 2026-09-07 amendment, *a
+      # `selected_id` a host may write*, clause 3S), which is why the block it
+      # lands on is reported out like any other selection - and why the
+      # composite's own id, gone from the document, is never what it lands on.
+      #
+      # Sabotage: selected before the compound committed rather than after -
+      # red here and at 3E's own test above, because the id then names a block
+      # the document does not yet hold and the normalization clears it to `nil`
+      # (verified).
+      test "the expanded selection is reported out through `on_select`", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: document(), palette: palette())
+
+        expand(view, "blk_GS")
+
+        assert [%{id: "blk_GS_call", type: "core.invoke"}] = selections()
+      end
+
       # Sabotage: inserted every member at the composite's own index rather
       # than at index + n - red, because the two members then arrive reversed
       # and the wizard records the confirmation before it sends anything.
