@@ -21,7 +21,16 @@ defmodule StatifierBlocks.Compiler do
      no palette is consulted.
   2. **Resolve** - every block through
      `StatifierBlocks.Palette.resolve/2`, which also applies an in-memory
-     config migration (ADR-0002 decision 8). Nothing is written back.
+     config migration (ADR-0002 decision 8). Nothing is written back. A
+     resolved node whose module is a composite is **replaced, in place, by
+     the subtree `StatifierBlocks.Composite.expand/2` returns** (ADR-0004's
+     amendment of 2026-09-07, E1), so stages 3-6 read a tree with no
+     composite in it and need no knowledge that one was ever there. The
+     param map the expansion returns is kept beside the tree, and a finding
+     raised against a block inside an expansion is re-anchored to the
+     composite block and the param that produced it before it is reported
+     (E3). The provenance map is never rewritten: every span keeps the
+     expanded block that emitted it.
   3. **Config** - every block's `validate_config/1`, the checks beside it
      that read something a block type cannot see from its own config, and
      the one name a **root** block may not declare as an outcome (ADR-0002's
@@ -294,6 +303,7 @@ defmodule StatifierBlocks.Compiler do
     BlockType,
     CompilationRecord,
     Compiled,
+    Composite,
     Document,
     Emission,
     Environment,
@@ -432,9 +442,34 @@ defmodule StatifierBlocks.Compiler do
   @spec compile(Document.t(), Palette.t(), [option()]) ::
           {:ok, Compiled.t()} | {:error, [Finding.t()]}
   def compile(%Document{} = document, %Palette{} = palette, opts \\ []) when is_list(opts) do
-    with :ok <- document_stage(document),
-         {:ok, node} <- resolve_stage(document, palette),
-         :ok <- config_and_structure_stages(document, palette, node, opts),
+    document
+    |> stages(palette, opts)
+    |> in_document_order(document)
+  end
+
+  # Resolve is pulled out of the `with` because it answers a third thing the
+  # stages after it do not: the expansion index, which every finding - its
+  # own included - is re-anchored through before it is reported.
+  @spec stages(Document.t(), Palette.t(), [option()]) ::
+          {:ok, Compiled.t()} | {:error, [Finding.t()]}
+  defp stages(%Document{} = document, %Palette{} = palette, opts) do
+    with :ok <- document_stage(document) do
+      case resolve_stage(document, palette) do
+        {:ok, node, expansion} ->
+          document
+          |> after_resolve(palette, node, expansion, opts)
+          |> reanchor(expansion)
+
+        {:error, findings, expansion} ->
+          reanchor({:error, findings}, expansion)
+      end
+    end
+  end
+
+  @spec after_resolve(Document.t(), Palette.t(), Resolved.t(), expansion(), [option()]) ::
+          {:ok, Compiled.t()} | {:error, [Finding.t()]}
+  defp after_resolve(document, palette, node, expansion, opts) do
+    with :ok <- config_and_structure_stages(document, palette, node, expansion, opts),
          {node, shelf_warnings} = elide_shelf(node),
          :ok <- chart_use_stage(node, opts),
          :ok <- donedata_stage(node, opts),
@@ -449,7 +484,6 @@ defmodule StatifierBlocks.Compiler do
         opts
       )
     end
-    |> in_document_order(document)
   end
 
   @doc "Decision 6's third determinism input: this package's version."
@@ -478,72 +512,238 @@ defmodule StatifierBlocks.Compiler do
 
   # -- Stage 2: resolve ------------------------------------------------------
 
-  @spec resolve_stage(Document.t(), Palette.t()) :: {:ok, Resolved.t()} | {:error, [Finding.t()]}
+  # Every block inside an expansion, to the composite block it came from and
+  # the param key to blame for what it was given - or `nil` when no single
+  # param is (ADR-0004's amendment of 2026-09-07, E3).
+  #
+  # Built by this stage and read once, when findings are reported. A composite
+  # nested inside another composite's subtree puts its own members here
+  # pointing at it, and itself here pointing at the outer composite, so the
+  # walk to the block an author can hold is `anchor/2`'s.
+  @typep expansion :: %{optional(Block.id()) => {Block.id(), String.t() | nil}}
+
+  @spec resolve_stage(Document.t(), Palette.t()) ::
+          {:ok, Resolved.t(), expansion()} | {:error, [Finding.t()], expansion()}
   defp resolve_stage(%Document{root: root}, palette) do
     case resolve(palette, root) do
-      {:ok, node} -> {:ok, node}
-      {:error, findings} -> {:error, findings}
+      {:ok, [node], expansion} ->
+        {:ok, node, expansion}
+
+      {:ok, [_ | _] = nodes, expansion} ->
+        {:error, [root_expansion_finding(root, length(nodes))], expansion}
+
+      {:error, findings, expansion} ->
+        {:error, findings, expansion}
     end
   end
 
-  @spec resolve(Palette.t(), Block.t()) :: {:ok, Resolved.t()} | {:error, [Finding.t()]}
+  # A block resolves to a *list* of nodes because a composite resolves to its
+  # expansion, which E1 splices in place of it. Every other block resolves to
+  # the one node it always did.
+  @spec resolve(Palette.t(), Block.t()) ::
+          {:ok, [Resolved.t()], expansion()} | {:error, [Finding.t()], expansion()}
   defp resolve(palette, %Block{} = block) do
     case Palette.resolve(palette, block) do
       {:ok, module, resolved} ->
-        resolve_children(palette, module, resolved)
+        if Composite.composite?(module) do
+          expand_node(palette, resolved, module)
+        else
+          resolve_children(palette, module, resolved)
+        end
 
       {:error, reason} ->
-        {:error, [resolve_finding(block, reason) | orphan_findings(palette, block)]}
+        {orphans, expansion} = orphan_findings(palette, block)
+        {:error, [resolve_finding(block, reason) | orphans], expansion}
     end
+  end
+
+  # E1: the replacement is complete before the stage ends, so a member that is
+  # itself a composite expands here too. `Composite.expand/2` raises on a
+  # broken declaration and decision 1 forbids this pipeline to raise, so the
+  # raise becomes a `:resolve` finding against the composite block - the one
+  # block in the neighbourhood an author can see.
+  @spec expand_node(Palette.t(), Block.t(), module()) ::
+          {:ok, [Resolved.t()], expansion()} | {:error, [Finding.t()], expansion()}
+  defp expand_node(palette, %Block{} = block, module) do
+    case expand(block, module) do
+      {:ok, members, param_map} ->
+        own =
+          members
+          |> Composite.flatten()
+          |> Map.new(fn %Block{id: id} -> {id, {block.id, Map.get(param_map, id)}} end)
+
+        members
+        |> Enum.reduce({[], [], own}, &resolve_member(palette, &1, &2))
+        |> then(fn
+          {nodes, [], expansion} -> {:ok, nodes, expansion}
+          {_nodes, findings, expansion} -> {:error, findings, expansion}
+        end)
+
+      {:error, finding} ->
+        {:error, [finding], %{}}
+    end
+  end
+
+  # The composite's own entries win the merge: a member that is itself a
+  # composite reports its members against *it*, and `anchor/2` climbs from
+  # there to the outermost composite the author can hold.
+  @spec resolve_member(
+          Palette.t(),
+          Block.t(),
+          {[Resolved.t()], [Finding.t()], expansion()}
+        ) :: {[Resolved.t()], [Finding.t()], expansion()}
+  defp resolve_member(palette, member, {nodes, findings, expansion}) do
+    case resolve(palette, member) do
+      {:ok, member_nodes, member_expansion} ->
+        {nodes ++ member_nodes, findings, Map.merge(member_expansion, expansion)}
+
+      {:error, member_findings, member_expansion} ->
+        {nodes, findings ++ member_findings, Map.merge(member_expansion, expansion)}
+    end
+  end
+
+  @spec expand(Block.t(), module()) ::
+          {:ok, [Block.t()], Composite.param_map()} | {:error, Finding.t()}
+  defp expand(%Block{} = block, module) do
+    {members, param_map} = Composite.expand(block, module)
+    {:ok, members, param_map}
+  rescue
+    error ->
+      why = Exception.message(error)
+
+      {:error,
+       Finding.new(
+         :resolve,
+         {:composite_expansion_failed, block.id, why},
+         "the composite could not be expanded: #{why}",
+         block_id: block.id
+       )}
+  end
+
+  # ADR-0001 decision 1 gives a document exactly one root, so a composite at
+  # the root whose subtree answers more than one top-level block has nowhere
+  # to splice the rest. Refusing is the only honest answer: silently keeping
+  # the expansion root would drop blocks the declaration wrote.
+  @spec root_expansion_finding(Block.t(), pos_integer()) :: Finding.t()
+  defp root_expansion_finding(%Block{id: id}, count) do
+    Finding.new(
+      :resolve,
+      {:composite_expansion_failed, id, {:root_expansion_not_single, count}},
+      "the document root is a composite whose subtree answers #{count} top-level " <>
+        "blocks, and a document has exactly one root: there is nowhere to splice the rest",
+      block_id: id
+    )
   end
 
   @spec resolve_children(Palette.t(), module(), Block.t()) ::
-          {:ok, Resolved.t()} | {:error, [Finding.t()]}
+          {:ok, [Resolved.t()], expansion()} | {:error, [Finding.t()], expansion()}
   defp resolve_children(palette, module, %Block{} = block) do
-    {slots, findings} =
+    {slots, findings, expansion} =
       block.config
       |> module.slots()
-      |> Enum.reduce({[], []}, fn {name, _arity, _label}, {slots, findings} ->
-        {children, child_findings} = resolve_slot(palette, block, name)
-        {[{name, children} | slots], findings ++ child_findings}
+      |> Enum.reduce({[], [], %{}}, fn {name, _arity, _label}, {slots, findings, expansion} ->
+        {children, child_findings, child_expansion} = resolve_slot(palette, block, name)
+
+        {[{name, children} | slots], findings ++ child_findings,
+         Map.merge(expansion, child_expansion)}
       end)
 
     case findings do
-      [] -> {:ok, %Resolved{block: block, module: module, slots: Enum.reverse(slots)}}
-      findings -> {:error, findings}
+      [] ->
+        {:ok, [%Resolved{block: block, module: module, slots: Enum.reverse(slots)}], expansion}
+
+      findings ->
+        {:error, findings, expansion}
     end
   end
 
-  @spec resolve_slot(Palette.t(), Block.t(), Block.slot_name()) :: {[Resolved.t()], [Finding.t()]}
+  @spec resolve_slot(Palette.t(), Block.t(), Block.slot_name()) ::
+          {[Resolved.t()], [Finding.t()], expansion()}
   defp resolve_slot(palette, %Block{slots: slots}, name) do
     slots
     |> Map.get(name, [])
-    |> Enum.reduce({[], []}, fn child, {nodes, findings} ->
+    |> Enum.reduce({[], [], %{}}, fn child, {nodes, findings, expansion} ->
       case resolve(palette, child) do
-        {:ok, node} -> {[node | nodes], findings}
-        {:error, child_findings} -> {nodes, findings ++ child_findings}
+        {:ok, child_nodes, child_expansion} ->
+          {Enum.reverse(child_nodes) ++ nodes, findings, Map.merge(expansion, child_expansion)}
+
+        {:error, child_findings, child_expansion} ->
+          {nodes, findings ++ child_findings, Map.merge(expansion, child_expansion)}
       end
     end)
-    |> then(fn {nodes, findings} -> {Enum.reverse(nodes), findings} end)
+    |> then(fn {nodes, findings, expansion} -> {Enum.reverse(nodes), findings, expansion} end)
   end
 
   # A block whose own type did not resolve has no `slots/1` to walk, so its
   # children are visited in sorted slot-name order instead. Reporting them
   # too is decision 10's "within a stage every finding is reported": the
   # children's types are siblings of this failure, not consequences of it.
-  @spec orphan_findings(Palette.t(), Block.t()) :: [Finding.t()]
+  @spec orphan_findings(Palette.t(), Block.t()) :: {[Finding.t()], expansion()}
   defp orphan_findings(palette, %Block{slots: slots}) do
     slots
     |> Enum.sort_by(&elem(&1, 0))
     |> Enum.flat_map(fn {_name, children} -> children end)
-    |> Enum.flat_map(&orphan_child_findings(palette, &1))
+    |> Enum.reduce({[], %{}}, fn child, {findings, expansion} ->
+      {child_findings, child_expansion} = orphan_child_findings(palette, child)
+      {findings ++ child_findings, Map.merge(expansion, child_expansion)}
+    end)
   end
 
-  @spec orphan_child_findings(Palette.t(), Block.t()) :: [Finding.t()]
+  @spec orphan_child_findings(Palette.t(), Block.t()) :: {[Finding.t()], expansion()}
   defp orphan_child_findings(palette, child) do
     case resolve(palette, child) do
-      {:ok, _node} -> []
-      {:error, findings} -> findings
+      {:ok, _nodes, expansion} -> {[], expansion}
+      {:error, findings, expansion} -> {findings, expansion}
+    end
+  end
+
+  # E3: a finding raised inside an expansion names a block the author cannot
+  # see, cannot select and cannot edit, so it is re-anchored one level up
+  # before it is reported - onto the composite block, carrying the key the
+  # param map names or `nil` when it names none. It runs before
+  # `in_document_order/2`, because the stored document is where a reported
+  # finding's path comes from and an expanded id has no path in it.
+  #
+  # Nothing else moves. Decision 5's map still owns every span by the member
+  # that emitted it, so the Source tab still highlights the member's own span
+  # and a fixture run still names the member: the author's surface says which
+  # param is wrong, the engineer's says which state carries the bytes.
+  @spec reanchor({:ok, Compiled.t()} | {:error, [Finding.t()]}, expansion()) ::
+          {:ok, Compiled.t()} | {:error, [Finding.t()]}
+  defp reanchor(result, expansion) when map_size(expansion) == 0, do: result
+
+  defp reanchor({:ok, %Compiled{} = compiled}, expansion) do
+    {:ok, %{compiled | warnings: Enum.map(compiled.warnings, &reanchor_finding(&1, expansion))}}
+  end
+
+  defp reanchor({:error, findings}, expansion) do
+    {:error, Enum.map(findings, &reanchor_finding(&1, expansion))}
+  end
+
+  @spec reanchor_finding(Finding.t(), expansion()) :: Finding.t()
+  defp reanchor_finding(%Finding{block_id: nil} = finding, _expansion), do: finding
+
+  defp reanchor_finding(%Finding{block_id: block_id} = finding, expansion) do
+    case anchor(expansion, block_id) do
+      nil -> finding
+      {composite_id, config_key} -> %{finding | block_id: composite_id, config_key: config_key}
+    end
+  end
+
+  # A composite whose subtree holds another composite expands twice, and the
+  # inner expansion's blocks are as invisible to the author as the outer's.
+  # The walk therefore does not stop at the inner composite: it climbs to the
+  # outermost one, carrying that composite's own param key rather than the
+  # inner one's, because the inner key names no field on the form the author
+  # is looking at.
+  @spec anchor(expansion(), Block.id()) :: {Block.id(), String.t() | nil} | nil
+  defp anchor(expansion, block_id) do
+    case Map.fetch(expansion, block_id) do
+      :error ->
+        nil
+
+      {:ok, {composite_id, config_key}} ->
+        anchor(expansion, composite_id) || {composite_id, config_key}
     end
   end
 
@@ -678,16 +878,59 @@ defmodule StatifierBlocks.Compiler do
   # itself. A block with no `block_id` on its finding - there is no such
   # config finding today, since every one of them anchors on a card, but the
   # struct allows it - skips nothing, which is the permissive answer.
-  @spec config_and_structure_stages(Document.t(), Palette.t(), Resolved.t(), keyword()) ::
-          :ok | {:error, [Finding.t()]}
-  defp config_and_structure_stages(document, palette, node, opts) do
+  @spec config_and_structure_stages(
+          Document.t(),
+          Palette.t(),
+          Resolved.t(),
+          expansion(),
+          keyword()
+        ) :: :ok | {:error, [Finding.t()]}
+  defp config_and_structure_stages(document, palette, node, expansion, opts) do
     config = config_stage(node, opts)
-    structure = structure_stage(document, palette, opts, refused_block_ids(config))
+
+    structure =
+      structure_stage(
+        structure_document(document, node, expansion),
+        palette,
+        opts,
+        refused_block_ids(config)
+      )
 
     case config ++ structure do
       [] -> :ok
       findings -> {:error, findings}
     end
+  end
+
+  # E1's third consequence: "Config and Structure see the members". Config
+  # already walks the resolved tree, so it does. Structure walks a
+  # `t:StatifierBlocks.Document.t/0` - `SlotValidation.validate/2`,
+  # `Assignability.validate/3`, `Shelf.validate/1` and the environment all
+  # take one - so for a document holding a composite it is handed the tree
+  # the Resolve stage built instead, with the expansion spliced in. An
+  # expanded member's slot arity and its assignability are then checked
+  # exactly as they would be had an author placed those blocks by hand.
+  #
+  # A document holding no composite is passed through untouched, rather than
+  # rebuilt from the resolved tree: rebuilding would hand Structure each
+  # block's *migrated* config, which is a different question from the one
+  # this bead is answering.
+  @spec structure_document(Document.t(), Resolved.t(), expansion()) :: Document.t()
+  defp structure_document(document, _node, expansion) when map_size(expansion) == 0, do: document
+
+  defp structure_document(document, node, _expansion),
+    do: %{document | root: resolved_block(node)}
+
+  # The resolved tree carries only the slots the block's type *declares*, so
+  # the stored map is merged under it rather than replaced: a slot no type
+  # declares is what `:undeclared_slot` is about, and rebuilding without it
+  # would silence that refusal for every document holding a composite.
+  @spec resolved_block(Resolved.t()) :: Block.t()
+  defp resolved_block(%Resolved{block: block, slots: slots}) do
+    declared =
+      Map.new(slots, fn {name, children} -> {name, Enum.map(children, &resolved_block/1)} end)
+
+    %{block | slots: Map.merge(block.slots, declared)}
   end
 
   @spec refused_block_ids([Finding.t()]) :: MapSet.t(Block.id())
