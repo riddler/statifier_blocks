@@ -600,7 +600,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Environment,
       Finding,
       Palette,
-      Recipe,
       Shelf,
       SourceView,
       ViewModel
@@ -1854,16 +1853,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    # A recipe pick (clause 2C). The recipe is handed the armed position and
-    # the document and answers with the commands that build the arrangement;
-    # they go in as ONE `{:compound, commands}`, which is what makes the
-    # arrangement one undo entry rather than one per block (clause 2n).
+    # A recipe pick (clause 2C). `Targets.recipe_inserts/4` hands the recipe
+    # the armed position and the document and answers with the commands that
+    # build the arrangement; they go in as ONE `{:compound, commands}`, which
+    # is what makes the arrangement one undo entry rather than one per block
+    # (clause 2n). Committing them is the half of the gesture that does not
+    # generalise, and it is what stays here.
     #
     # Two refusals, and they are different in kind. `insert/2` refusing -
     # a deadline armed where the enclosing block has no interrupts rail -
     # is the ordinary case clause 3C names, and nothing is written. A list
     # that reaches outside clause 3C's bound is a recipe module's bug, and
-    # it is refused HERE, before it is applied, rather than trusted.
+    # it is refused before it is applied rather than trusted.
     #
     # An armed palette no longer offers a row either of them would refuse
     # (`accepted_recipes/2`), so the ordinary case is answered before the
@@ -1878,21 +1879,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       do: assign(socket, :palette_unarmed_pick, true)
 
     defp insert_from_recipe(socket, name, position) do
-      with {:ok, module} <- Palette.fetch_recipe(socket.assigns.palette, name),
-           {:ok, commands} <- module.insert(position, socket.assigns.document),
-           true <- Recipe.within_reach?(position, commands) do
-        socket
-        |> assign(
-          palette_position: nil,
-          palette_allowed: nil,
-          palette_allowed_recipes: nil,
-          palette_unarmed_pick: false,
-          selected_id: first_inserted_id(commands) || socket.assigns.selected_id
-        )
-        |> commit({:compound, commands})
-      else
-        false -> refused(socket, {:recipe_out_of_reach, name})
-        {:error, reason} -> refused(socket, reason)
+      %{document: document, palette: palette} = socket.assigns
+
+      case Targets.recipe_inserts(document, palette, name, position) do
+        {:ok, commands} ->
+          socket
+          |> assign(
+            palette_position: nil,
+            palette_allowed: nil,
+            palette_allowed_recipes: nil,
+            palette_unarmed_pick: false,
+            selected_id: first_inserted_id(commands) || socket.assigns.selected_id
+          )
+          |> commit({:compound, commands})
+
+        {:error, reason} ->
+          refused(socket, reason)
       end
     end
 
@@ -3496,32 +3498,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # enclosing block has no interrupts rail - and `within_reach?/2` says
     # whether the commands it did answer with stay inside clause 3C's bound.
     #
-    # Both are the pick's own checks, run here before the row is drawn rather
-    # than after it is clicked. `insert_from_recipe/3` still runs them, and
-    # still refuses: a pick can arrive for a row this filter removed - a stale
+    # Both are the pick's own checks, run before the row is drawn rather than
+    # after it is clicked. `insert_from_recipe/3` still runs them, and still
+    # refuses: a pick can arrive for a row this filter removed - a stale
     # sheet, a document swapped under an armed palette - and the refusal is
     # what keeps the recipe module's bound enforced at the write rather than
-    # at the paint.
+    # at the paint. Both call `Targets.recipe_inserts/4`, so the paint and
+    # the write cannot drift apart on which recipes fit.
     @spec accepted_recipes(Phoenix.LiveView.Socket.t(), Edit.target()) ::
             MapSet.t(Palette.recipe_name())
     defp accepted_recipes(socket, position) do
       %{document: document, palette: palette} = socket.assigns
 
-      palette.recipes
-      |> Map.keys()
-      |> Enum.filter(&recipe_lands?(palette, document, &1, position))
-      |> MapSet.new()
-    end
-
-    @spec recipe_lands?(Palette.t(), Document.t(), Palette.recipe_name(), Edit.target()) ::
-            boolean()
-    defp recipe_lands?(palette, document, name, position) do
-      with {:ok, module} <- Palette.fetch_recipe(palette, name),
-           {:ok, commands} <- module.insert(position, document) do
-        Recipe.within_reach?(position, commands)
-      else
-        _refused_or_missing -> false
-      end
+      Targets.accepted_recipes(
+        document,
+        palette,
+        position,
+        Assignability.context(socket.assigns)
+      )
     end
 
     # Everything the drag needs, from one enumeration: the accepting slots,

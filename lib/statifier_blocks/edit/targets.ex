@@ -102,9 +102,34 @@ defmodule StatifierBlocks.Edit.Targets do
   followed by a call to `droppable_slots_for/3`: there is one
   implementation, not two. This is the third documented widening this
   module carries, alongside the two argued above.
+
+  ## Both of the palette's maps, asked the same way
+
+  A palette carries two maps - block types and recipes (ADR-0005 clause 1C)
+  - and this module answers what-may-land-where for both: `accepted_types/4`
+  for the one, `accepted_recipes/4` and `recipe_inserts/4` for the other.
+
+  The recipe pair was private to `StatifierBlocks.Editor` until ADR-0005's
+  Note of 2026-09-07, item 1, promoted it here. The reason it is public is
+  that a host drawing its **own** picker had to re-derive both answers, and
+  a re-derivation is where clause 3C's bound goes quiet. The reason it lives
+  in this module rather than on `StatifierBlocks.Palette` is that both
+  questions are asked of a target, not of a palette alone.
+
+  The editor keeps the half that does not generalise: assigning, minting a
+  selection, and committing the `{:compound, commands}` as one undo entry.
   """
 
-  alias StatifierBlocks.{Assignability, Block, BlockType, Document, Environment, Palette}
+  alias StatifierBlocks.{
+    Assignability,
+    Block,
+    BlockType,
+    Document,
+    Edit,
+    Environment,
+    Palette,
+    Recipe
+  }
 
   @doc """
   Slots that would accept `id`'s block: declared, kind-admitted (rule 1 and
@@ -187,6 +212,95 @@ defmodule StatifierBlocks.Edit.Targets do
       end
     end)
     |> MapSet.new()
+  end
+
+  @doc """
+  Which of `palette`'s recipe names would land at `target`.
+
+  The recipe half of `accepted_types/4`, and a host drawing its own picker
+  asks the two maps the same way: the document, the palette, the armed
+  position and a context, in that order and with that default (ADR-0005's
+  Note of 2026-09-07, item 1).
+
+  `target` here is a full `t:StatifierBlocks.Edit.target/0` - a
+  `{parent_id, slot, index}` position rather than the `{parent_id, slot}`
+  pair `accepted_types/4` takes - because a recipe's fit has only one way of
+  being asked (ADR-0005 clause 3C): a recipe is not a block type, so no set
+  of type names answers for it. What answers is the recipe itself, handed
+  the armed position and the document. This function is therefore the filter
+  over `palette.recipes` whose test is `recipe_inserts/4` answering
+  `{:ok, _}` - one implementation, so the paint and the write cannot drift
+  apart on which recipes fit.
+
+  `ctx` is carried for the shape a caller asks both maps in. **It reaches no
+  recipe today**: `c:StatifierBlocks.Recipe.insert/2` is handed the target
+  and the document and nothing else, and whether a later clause should
+  thread the context further is a question that item's non-decisions leave
+  open, not a promise.
+
+  A recipe that does not resolve through `palette` is left out rather than
+  raising, the way `accepted_types/4` treats a type that does not resolve.
+  """
+  @spec accepted_recipes(
+          Document.t(),
+          Palette.t(),
+          Edit.target(),
+          Assignability.context()
+        ) :: MapSet.t(Palette.recipe_name())
+  def accepted_recipes(
+        %Document{} = document,
+        %Palette{} = palette,
+        target,
+        _ctx \\ %{}
+      ) do
+    palette.recipes
+    |> Map.keys()
+    |> Enum.filter(fn name ->
+      match?({:ok, _commands}, recipe_inserts(document, palette, name, target))
+    end)
+    |> MapSet.new()
+  end
+
+  @doc """
+  The command list that inserts `name`'s arrangement at `target`, or the
+  refusal.
+
+  `StatifierBlocks.Palette.fetch_recipe/2`, then the recipe's own
+  `c:StatifierBlocks.Recipe.insert/2` (ADR-0005 clause 2C), then
+  `StatifierBlocks.Recipe.within_reach?/2` for clause 3C's bound. Three
+  refusals, distinguishable by their reasons:
+
+    * `{:error, {:unknown_recipe, name}}` - no such recipe in `palette`;
+    * whatever `insert/2` answered - the ordinary case clause 3C names, a
+      deadline armed where the enclosing block has no interrupts rail;
+    * `{:error, {:recipe_out_of_reach, name}}` - a command list that reaches
+      outside clause 3C's bound, which is a recipe module's bug and is
+      refused here rather than trusted.
+
+  It **commits nothing**. Assigning, minting a selection and committing the
+  `{:compound, commands}` as one undo entry (ADR-0005 clause 2n) stay the
+  editor's, which is the half of the gesture that does not generalise.
+
+  Both checks still run at the write. A host that draws its picker from
+  `accepted_recipes/4` and then commits its own compound is running the same
+  two checks in the same order; a host that skips the filter and calls this
+  function alone still gets the refusal.
+  """
+  @spec recipe_inserts(
+          Document.t(),
+          Palette.t(),
+          Palette.recipe_name(),
+          Edit.target()
+        ) :: {:ok, [Edit.t()]} | {:error, term()}
+  def recipe_inserts(%Document{} = document, %Palette{} = palette, name, target) do
+    with {:ok, module} <- Palette.fetch_recipe(palette, name),
+         {:ok, commands} <- module.insert(target, document),
+         true <- Recipe.within_reach?(target, commands) do
+      {:ok, commands}
+    else
+      false -> {:error, {:recipe_out_of_reach, name}}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   @doc """

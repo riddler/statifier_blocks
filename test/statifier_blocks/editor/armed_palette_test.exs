@@ -139,7 +139,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # the recipe's own answer rather than on the kind: a recipe row at a
       # position that takes it is still a row, and still a pick.
       #
-      # Sabotage: `recipe_lands?/4` answering `false` for everything - the row
+      # Sabotage: `Targets.accepted_recipes/4` answering the empty set - the row
       # is gone from both positions and the first assertion here goes red.
       test "one that can land is offered, and inserts", %{conn: conn} do
         {:ok, view, _html} =
