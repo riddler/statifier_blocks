@@ -5944,3 +5944,227 @@ flips this section to accepted after `sb-21gm` lands.
 
 Cites above were read on `b71740c` and are to be re-counted by a later reader
 rather than trusted.
+
+## Amendment (2026-09-07): decision 5, an optional `sentence/1`, and the one refusal set a sentence sits outside
+
+**Status: proposed (2026-09-07, campaign SF036, bead `sb-hlut`, on ruling
+`RQ-SF036-4`).** A decision record merges at proposed under campaign SF036's
+invariant; flipping this section's status line to accepted is a separate gated
+request (`sb-xnxw`, after `sb-w37s` lands the callback). Additive: decision 5's
+table at `:109-121`, its closing paragraph at `:130-138`, amendment B3 at
+`:831` and every clause above this line stand exactly as written, and no text
+above this line is edited by this section. Nothing here is built yet -
+`sb-w37s` is the request that builds it.
+
+Every code cite below is a reading of `main` at `b08c99a`, dated to this
+section and to be re-read rather than trusted.
+
+### Why this is an amendment and not a Note
+
+Three optional callbacks have arrived since decision 5 was accepted, and two
+of the three were recorded as dated Notes rather than as amendments:
+`failure_outcomes/1` at `:3832` and `donedata_type/1` at `:4858`. The Note at
+`:4858` states the test it applied in as many words - `donedata_type/1`
+"decides nothing this record owns", so it is additive to decision 5 rather
+than a change to it - and contrasts itself with amendment H at `:1751`, which
+recorded the optional `summary/1` as an **amendment** because it also decided
+what a core card's second line says.
+
+`sentence/1` falls on amendment H's side of that test, for two reasons this
+record owns and neither of the two Notes had:
+
+1. **It is a carve-out from B3.** `:831`'s normalizer semantics - refuse, do
+   not truncate - are this record's, and `ADR-0005`'s `10o` says so
+   explicitly ("`ADR-0002` keeps ownership of the semantics"). This section
+   places a new executable return **outside** the length arm of that refusal
+   set while keeping the rest of it. Narrowing the reach of a rule this record
+   states is a decision this record takes, not a catch-up entry.
+2. **It changes what `use StatifierBlocks.BlockType` injects.** The injected
+   default set at `lib/statifier_blocks/block_type.ex:107-145` is decision 5's
+   degradation promise in code; adding a member to it is an edit to that
+   promise's surface.
+
+So: an amendment, with a status line, and `sb-xnxw` has a line to flip.
+
+### The gap
+
+`ADR-0005` decision 10's `10n` (`docs/adr/0005-liveview-editor.md:2480-2487`)
+caps `badge` and the `join_label` return at 24 characters, and gives its reason
+at `:2484-2485`, where the number is "the spike's" and the thing it is chosen
+to exclude is named:
+
+> The value is the spike's, chosen so that "calls the host" and "timer" fit and
+> a sentence does not
+
+`10o` at `:2489-2497` adopts B3's discipline over them - refuse, never
+truncate.
+
+That is the right rule for a chip. It leaves the package with no surface at
+all for the other thing an author reads: **a block as one line of prose.**
+"Wait 30 seconds" is not a chip and never will be; it is a sentence, and every
+consumer that wants to render a document as a vertical list of lines - a host
+list view, an outline pane, a diff, a test that asserts what a document says -
+today has to assemble one out of a title, a type label and a list of capped
+chips, each host differently.
+
+### The callback
+
+`StatifierBlocks.BlockType` declares
+
+```elixir
+@callback sentence(Block.config()) :: String.t()
+```
+
+optional. It joins `io/1`, `migrate_config/2`, `fixtures/0`,
+`palette_entry/0`, `outcomes/1`, `failure_outcomes/1`, `summary/1` and
+`donedata_type/1` in `@optional_callbacks` (`block_type.ex:710-717`, eight
+members today, nine with this one). By the count the Note at `:4858`
+establishes - twelve callbacks declared on the module, `donedata_type/1` the
+thirteenth - `sentence/1` is the **fourteenth**. That count is stated here for
+the reason `:4858` states its own: decision 5's table reads "nine callbacks"
+and lists nine, and has done since before that Note, which is also why nothing
+above this line is edited to correct it. A reader wanting the live surface
+reads `@optional_callbacks` and the `@callback` list; a reader wanting what
+decision 5 contracted reads the table.
+
+It carries the same three rules `summary/1` (`block_type.ex:650-652`) and
+`donedata_type/1` (`:701-702`) carry, in the same words: it is a **pure
+function of `config`**, it is **total** for any config `validate_config/1`
+accepts, and it **never raises**. Purity is decision 4's
+and is not relaxed here - a sentence is assembled out of `config` and nothing
+else, so a callback reaching for a datamodel, a clock or a process is outside
+the contract exactly as `join_label` is.
+
+### What the reader answers, per case
+
+The reader is `StatifierBlocks.BlockType.sentence/2`, a palette entry plus a
+config, resolved the way `join_label/2` resolves at `block_type.ex:1389-1397`.
+The claim below is scoped to four declaration states, so it carries a table
+rather than a sentence:
+
+| The type's `sentence/1` | The reader answers | Does the 24-character cap apply |
+|---|---|---|
+| declared, returns a single-line binary | that binary, verbatim | **no** - see the carve-out below |
+| not declared | the type's label | not reached |
+| declared, raises / throws / exits | the type's label | not reached |
+| declared, returns a non-binary, a blank binary, or a binary carrying a newline, carriage return or tab | the type's label | not reached |
+
+"The type's label" is `palette_entry()`'s `label`, and for a type that
+declares no `palette_entry/0` it is the type name - which is decision 5's own
+last sentence at `:138` ("no `palette_entry/0` means the editor falls back to
+the type name"), unchanged and not extended. The **view model's** three-way
+resolution, which puts an author's `title` config into this chain, is
+`ADR-0005` decision 10's and is written in that record's amendment of this
+date; nothing about it is decided here.
+
+**The rescue is `join_label`'s, exactly.** `call_join_label/2` at
+`block_type.ex:1653-1661` rescues a raise and catches a throw and an exit, and
+the comment above it at `:1651-1652` states what comes back: "The rescued value is never inspected:
+what comes back is the editor's own word either way." A `sentence/1` that
+breaks its own never-raises rule is bounded the same way and answers the same
+kind of thing - the package's own word for the type, which is the label. B3's
+authorization at `:831` is for exactly this: a callback that raises degrades
+to the default.
+
+Row 3 has a consequence worth stating rather than leaving to be discovered: a
+type that **declares** `sentence/1` and raises inside it lands on the label,
+while a type that declares **nothing** may land on an author's `title` first
+(`ADR-0005`'s chain). That is deliberate. A bounded rescue's answer is the
+package's own word by B3's discipline; it is not an entry into a fallback
+chain that a host callback can trigger by raising, because a chain a callback
+can steer is a chain a callback can be written against.
+
+### The carve-out: no cap
+
+`chip/1` (`block_type.ex:1666-1673`) and the `chip_refusal/1` it is defined in
+terms of (`:1678-1688`) refuse four things:
+a non-string, a blank string, a string carrying a newline, carriage return or
+tab, and a string longer than `@presentation_cap` (`:1229`, 24). A sentence is
+refused for the first three and **not** the fourth.
+
+The reason is `10n`'s own: the cap exists so that a chip is a chip, and `10n`
+names "a sentence" as the thing 24 characters deliberately excludes. Applying
+the number to the return whose whole purpose is to be the thing the number was
+chosen to exclude would refuse every sentence the callback exists to carry.
+The other three arms stay, because a sentence is **a line**: a return carrying
+a newline is drawn on one line by a list view either way, and refusing it is
+how the package avoids picking a collapse rule; a blank one says nothing that
+the label does not say better.
+
+**Chips are unchanged by this section.** `summary/1`, `badge`, the
+`join_label` return, `@presentation_cap`, `chip/1`, `chip_refusal/1`,
+`summary_refusals/2` and `ADR-0005`'s `10n`, `10o`, `10p`, `10q`, `10r` and
+`10w` all keep every word they have. A block type may declare `summary/1` and
+`sentence/1` and they answer two different questions; a block type may declare
+either alone.
+
+### What `use` injects
+
+`use StatifierBlocks.BlockType` (`block_type.ex:107-145`) gains
+
+```elixir
+@impl StatifierBlocks.BlockType
+def sentence(config), do: ...the type's own label...
+```
+
+alongside the six defaults it injects today, added to `defoverridable`
+(`:138-143`) with them. The injected body answers `palette_entry()[:label]`
+where the module exports `palette_entry/0`, which is the only label a module
+holds: a block type module does not know the type **name** the document stores
+it under, so the type-name arm of `:138` is the reader's and stays the
+reader's. A module that `use`s the behaviour, declares a `palette_entry/0` and
+declares nothing else therefore answers its own label and is indistinguishable
+from a module that declares no `sentence/1` at all - which is the point. The
+injection is for the type that wants to override one default among many, not a
+new degradation path.
+
+Sixteen of the seventeen shipped `core.*` types declare
+`@behaviour StatifierBlocks.BlockType` directly rather than `use`-ing it
+(`lib/statifier_blocks/core/wait.ex:25` is the shape), so the injection does
+not reach them and each declares its own sentence or does not. The exception
+is `core.placeholder` (`lib/statifier_blocks/core/placeholder.ex:56`), the one
+core type that `use`s the behaviour - its moduledoc at `:16` says why ("Every
+callback but three is the default `use StatifierBlocks.BlockType`") - so it
+answers its own palette label from the injected default unless `sb-w37s`
+overrides it, which for a placeholder is the right answer either way.
+
+### Worked example
+
+Two sentences, in the canonical registers, to show the shape and nothing more:
+
+| Type | `config` | `sentence/1` answers |
+|---|---|---|
+| `core.wait` | `%{"duration" => "30s"}` | `"Wait 30 seconds"` |
+| `core.branch` | one arm on slot `"approved"`, labelled `Approved` | `"Decide: Approved, otherwise"` |
+
+Both are longer than 24 characters, which is the carve-out doing its work.
+Neither is settled here: **the sentence every shipped `core.*` type answers is
+`sb-w37s`'s to fix**, together with the exact wording, and this section names
+two only to show that a sentence is a line and a chip is not.
+
+### What this section does not decide
+
+- **No new required callback**, and no row of decision 5's table changes.
+  `sentence/1` is optional and degrades to the label, which is what every
+  optional callback in that table's closing paragraph does.
+- **Nothing about the card.** What a block's card draws is `ADR-0005`'s;
+  `RQ-SF036-4` rules that an author's `title` still wins there, and this
+  section neither states nor weakens that.
+- **No cap of its own.** A sentence has no maximum length here. If one is ever
+  wanted it is `ADR-0005` decision 10's to carry, by `10n`'s own argument
+  about where a presentation number lives.
+- **Nothing about a locale.** The return is a string the type produced; this
+  record has no translation seam and does not open one.
+- **No compiler reach.** `sentence/1` is presentation. Nothing in `emit/2`,
+  the emission, the routing table or any compiled byte reads it.
+- **It edits nothing.** Decision 5, decision 4, amendment B3, amendment H and
+  the Notes at `:3832` and `:4858` stand as written; this section is additive
+  and sits at the foot of the record so no line a sibling record cites moves.
+
+### Implementing and flipping beads
+
+`sb-w37s` builds the callback, the `use` default, the reader and the core
+types' sentences, from this section as merged. `sb-xnxw` flips **this
+section's status line** to accepted after `sb-w37s` lands.
+
+Filed with `sb-hlut`, campaign SF036, on ruling `RQ-SF036-4`.
