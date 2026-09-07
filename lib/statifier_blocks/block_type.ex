@@ -145,7 +145,20 @@ defmodule StatifierBlocks.BlockType do
       # `palette_entry/0` and no label in it answers a blank string, which
       # that reader's refusal set reads as "nothing declared" - so a type
       # that `use`s the behaviour and overrides nothing is indistinguishable
-      # from a type that declares no `sentence/1` at all.
+      # from a type that declares no `sentence/1` at all AT THAT READER:
+      # `sentence/2` lands on the label either way.
+      #
+      # One level up it is not. This is a real `def`, so
+      # `StatifierBlocks.Palette.declares?/3` answers `true` for it, and a
+      # reader that asks the declaration question separately gets a
+      # different answer than the reader above does -
+      # `StatifierBlocks.ViewModel`'s `declares_sentence?/1` counts a
+      # `use`-ing type as **declared** and hands it the reader's answer, so
+      # its outline line is the type's palette label even where the author
+      # gave a `title` that would otherwise have won. That cost is a host's
+      # to meet, by overriding `sentence/1` (ADR-0002's Note of 2026-09-07,
+      # correction 5, which is where the word "indistinguishable" is
+      # bounded).
       @impl StatifierBlocks.BlockType
       def sentence(_config) do
         # `apply/3` rather than a direct call: the direct call is resolved

@@ -33,6 +33,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     "where did this picklist come from" is then answered by a row in this
     table rather than by opening a condition.
 
+    The Source listing is the sixth and came behind no reservation at all,
+    because none was left: one numbered line per line of the chart the
+    document was last compiled to, each carrying the block that emitted its
+    bytes (`StatifierBlocks.SourceView` does the reading; this module only
+    draws it). That is a grid of rows about the whole document, so 1A admits
+    it on its own merits, which is the only way anything joins the drawer
+    now.
+
     The measurable reason the drawer exists at all: a truth table for a branch
     in a credit-card processing document is one row per case and one column per
     bound input plus the verdicts, and at the inspector's width it either
