@@ -149,6 +149,35 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert html =~ "sb-palette"
         refute html =~ ~s(sb-palette__group")
       end
+
+      # sabotage: drop the `order_palette_groups/2` call from
+      # `Editor.palette_groups/2` - the columns draw "Authorization" first,
+      # because the view model's own order is alphabetical.
+      test "a palette group list is a reading order as well as a set", %{conn: conn} do
+        palette =
+          StatifierBlocks.Palette.new(
+            Map.merge(
+              StatifierBlocks.Palette.core_types(),
+              StatifierBlocks.BlockTypeFixtures.raw_palette()
+            )
+          )
+
+        {:ok, view, _html} =
+          mount_editor(conn,
+            palette: palette,
+            profile: %{palette_groups: ["Structure", "Authorization"]}
+          )
+
+        drawn =
+          view
+          |> render()
+          |> then(&Regex.scan(~r/data-group="([^"]+)"/, &1))
+          |> Enum.map(&List.last/1)
+
+        # "Other" is a group this palette carries and the list does not name:
+        # the profile's drop rule still runs, and it runs before the order.
+        assert drawn == ["Structure", "Authorization"]
+      end
     end
 
     describe "an id the profile names that the package does not know" do
