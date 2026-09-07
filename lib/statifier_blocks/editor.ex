@@ -112,22 +112,34 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     a top-level `<final>` per root-block outcome, owned by the root block in
     its `root_<outcome>` role.
 
-    The editor recompiles the open document itself to resolve a run's state
-    ids to blocks (`refresh_run_provenance/1`). Recompiling *without* the
-    host's options resolves against a different chart than the one the run
-    is a run of: a configuration sitting on a state only the host's compile
-    emits resolves to nothing, and the Run pane marks nothing where it
-    should mark the root block. That is the whole of `compile_options` - the
-    host hands over the option list it compiled with, and the recompile uses
-    it. `:declare` is not read from it: the `declare` assign above is where
-    that list already lives, and it is put on top of whatever this one
-    carries so the two can never disagree.
+    This component compiles the open document three times over, and each
+    compile is about the host's chart: `refresh_run_provenance/1` resolves a
+    run's state ids to blocks, `refresh_source_view/1` builds the Source
+    tab's listing of the generated chart, and `refresh_fixture_runs/1`
+    drives every fixture row through it. Compiling *without* the host's
+    options makes each of those about a different chart than the one the
+    host has: a configuration sitting on a state only the host's compile
+    emits resolves to nothing and the Run pane marks nothing where it should
+    mark the root block; the Source tab lists a chart the host does not run;
+    a fixture row is driven through a chart nobody will execute. That is the
+    whole of `compile_options` - the host hands over the option list it
+    compiled with, and all three compiles use it. `:declare` is not read
+    from it: the `declare` assign above is where that list already lives,
+    and it is put on top of whatever this one carries so the two can never
+    disagree.
 
-    `[]` is the default, which is today's behaviour exactly: the recompile
-    passes `declare:` and nothing else, and a host that never sets the
-    assign sees what it saw before. Nothing here validates the list - the
-    compiler is the authority on its own options, and an option this
-    component does not know about is one it must not swallow.
+    `[]` is the default, which is today's behaviour exactly: the compiles
+    pass `declare:` and nothing else, and a host that never sets the assign
+    sees what it saw before. Nothing here validates the list - the compiler
+    is the authority on its own options, and an option this component does
+    not know about is one it must not swallow.
+
+    The assign is optional and it is not optional in the way a default
+    usually is: a host compiling with `terminate:`, `child_use:`,
+    `known_invoke_types:` or `datamodel:` and leaving it unset gets a run
+    that is silently unmarked, a listing of a chart it does not run, and
+    fixture verdicts from the same. Nothing fails; the surfaces just quietly
+    describe a different chart.
 
     ## The run marks a host paints
 
@@ -462,7 +474,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `findings` | no | caller-supplied findings, merged with the two `ViewModel` derives |
     | `datamodel` | no | the paths the host declares; drives the undeclared-path advisories, and `nil` (the default) turns them off entirely |
     | `declare` | no | the `{id, expr}` roots the host will pass the compiler as `:declare`; declared roots count as declared for the advisories (11k), and `[]` (the default) declares none |
-    | `compile_options` | no | the rest of the option list the host compiles this document with - `terminate:`, `known_invoke_types:`, `datamodel:` - forwarded to the provenance recompile so the Run pane resolves the run's state ids against the same chart the host ran; `:declare` is taken from the `declare` assign whatever this list says, and `[]` (the default) recompiles exactly as it did before |
+    | `compile_options` | no | the rest of the option list the host compiles this document with - `terminate:`, `child_use:`, `known_invoke_types:`, `datamodel:` - forwarded to **every** compile this component runs: the provenance recompile behind the Run pane's marks, the Source tab's listing, and the fixture runs. Without it those three describe a chart the host does not have, silently. `:declare` is taken from the `declare` assign whatever this list says, and `[]` (the default) compiles exactly as it did before |
     | `on_change` | no | one-argument function called with each new document |
     | `on_select` | no | one-argument function called with each new selection: a `%{id:, type:, label:}` descriptor, or `nil` for no selection |
     | `icon` | no | function component resolving an icon *name* to markup |
@@ -2452,11 +2464,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec refresh_fixture_runs(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
     defp refresh_fixture_runs(socket) do
       assigns = socket.assigns
-      # The host's RAW `{id, expr}` list, which is what `Compiler.compile/3`'s
-      # `:declare` takes. NOT `host_roots`, which is the derived MapSet of
-      # root ids the advisories read - the compiler refuses it.
-      declare = Map.get(assigns, :declare, [])
-      key = {assigns.document, assigns.palette, assigns.fixtures, declare}
+      # The host's whole option list, `:declare` on top of it - the same list
+      # the provenance recompile passes, for the same reason: a row driven
+      # through a chart the host did not compile is a row about a different
+      # chart. `:declare` inside it is the host's RAW `{id, expr}` list, which
+      # is what `Compiler.compile/3` takes. NOT `host_roots`, which is the
+      # derived MapSet of root ids the advisories read - the compiler
+      # refuses it.
+      options = compile_options(assigns)
+      key = {assigns.document, assigns.palette, assigns.fixtures, options}
 
       cond do
         not wants_fixture_runs?(assigns) ->
@@ -2467,9 +2483,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         true ->
           runs =
-            FixtureRuns.run(assigns.document, assigns.palette, assigns.fixtures,
-              declare: declare,
-              view_model: assigns.view_model
+            FixtureRuns.run(
+              assigns.document,
+              assigns.palette,
+              assigns.fixtures,
+              [{:view_model, assigns.view_model} | options]
             )
 
           socket
@@ -2511,8 +2529,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec refresh_source_view(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
     defp refresh_source_view(socket) do
       assigns = socket.assigns
-      declare = Map.get(assigns, :declare, [])
-      key = {assigns.document, assigns.palette, declare}
+      options = compile_options(assigns)
+      key = {assigns.document, assigns.palette, options}
 
       cond do
         not wants_source_view?(assigns) ->
@@ -2523,9 +2541,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         true ->
           view =
-            SourceView.build(assigns.document, assigns.palette,
-              declare: declare,
-              previous: assigns.source_view
+            SourceView.build(
+              assigns.document,
+              assigns.palette,
+              [{:previous, assigns.source_view} | options]
             )
 
           socket
@@ -2643,11 +2662,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    # The option list the provenance recompile passes, which is the host's own
-    # with `:declare` put on top of it: the `declare` assign is where that list
-    # already lives, so a host that passes it in both places cannot make the
-    # two disagree. `Keyword.put/3` rather than a merge, because the assign is
-    # the authority on that one key and nothing else here is.
+    # The option list every compile this component runs passes - the
+    # provenance recompile, the Source listing and the fixture runs - which is
+    # the host's own with `:declare` put on top of it: the `declare` assign is
+    # where that list already lives, so a host that passes it in both places
+    # cannot make the two disagree. `Keyword.put/3` rather than a merge,
+    # because the assign is the authority on that one key and nothing else
+    # here is.
+    #
+    # One list for the three of them is the point rather than an economy: two
+    # of the three drawing a chart the host did not compile, while the third
+    # drew the one it did, is a disagreement an author would have to notice
+    # to distrust.
     #
     # Every other option is forwarded verbatim and unvalidated - the compiler
     # is the authority on what it accepts, and a key this component filtered

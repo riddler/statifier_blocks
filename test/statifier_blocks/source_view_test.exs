@@ -168,4 +168,52 @@ defmodule StatifierBlocks.SourceViewTest do
       assert %SourceView{status: :compile_error, stale?: false} = view
     end
   end
+
+  describe "the rest of the caller's compile options" do
+    # The claim: `opts` is the compiler's option list, not a two-key
+    # allowance. A host that compiles with `terminate: true` runs a chart
+    # carrying a top-level `<final>` per root outcome; a listing built
+    # without the option is a listing of a chart that host does not have.
+    #
+    # Sabotage: restored `Compiler.compile(document, palette, declare:
+    # Keyword.get(opts, :declare, []))` -> the option never reaches the
+    # compile, the two listings are identical and this goes red (verified).
+    test "reach the compile, so the listing is of the caller's chart" do
+      document = EditorFixtures.invoke_step()
+
+      plain = SourceView.build(document, EditorFixtures.palette())
+      terminating = SourceView.build(document, EditorFixtures.palette(), terminate: true)
+
+      assert %SourceView{status: :ready} = plain
+      assert %SourceView{status: :ready} = terminating
+
+      assert terminating.line_count > plain.line_count
+      refute listing(plain) =~ "s_blk_flow__root_done"
+      assert listing(terminating) =~ ~s(<final id="s_blk_flow__root_done")
+    end
+
+    # `:previous` is this module's own key, and it has to keep working while
+    # the caller is also passing compile options - the case that would break
+    # if the two kinds of option were ever separated by the wrong key.
+    #
+    # Sabotage: replaced `stale(Keyword.get(opts, :previous), findings)` with
+    # `stale(nil, findings)` -> the previous listing is thrown away, the
+    # panel empties on a half-typed document and this goes red (verified).
+    # `Keyword.delete(opts, :previous)` removed from `compile_opts/1` does
+    # NOT redden it: the compiler ignores a key it does not know.
+    test "travel beside :previous, which stays this module's own" do
+      previous = SourceView.build(EditorFixtures.invoke_step(), EditorFixtures.palette())
+
+      view =
+        SourceView.build(EditorFixtures.signup_wizard(), EditorFixtures.palette(),
+          previous: previous,
+          terminate: true
+        )
+
+      assert %SourceView{status: :ready, stale?: true} = view
+      assert view.lines == previous.lines
+    end
+  end
+
+  defp listing(%SourceView{} = view), do: view |> all_spans() |> Enum.map_join(& &1.text)
 end

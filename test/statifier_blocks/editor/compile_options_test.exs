@@ -5,8 +5,11 @@
 if Code.ensure_loaded?(Phoenix.LiveView) do
   defmodule StatifierBlocks.Editor.CompileOptionsTest do
     @moduledoc """
-    The `compile_options` assign: the host's own compile options reaching the
-    editor's provenance recompile.
+    The `compile_options` assign: the host's own compile options reaching
+    every compile the editor runs - the provenance recompile behind the Run
+    pane's marks, and the Source tab's listing. The fixture runs are the
+    third, asserted in `StatifierBlocks.Editor.FixturesTabTest` where the
+    tab's own fixtures live.
 
     The editor recompiles the open document to resolve a run's state ids to
     blocks. A host that runs a document to completion compiles it with
@@ -73,6 +76,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       render(view)
       view
+    end
+
+    # The same host update as `seat/2`, without a run: the Source tab and the
+    # fixture runs are compiled whether or not anything is being watched, so
+    # these cases have no run to seat.
+    defp seat_options(view, extra) do
+      Phoenix.LiveView.send_update(
+        view.pid,
+        Editor,
+        [
+          {:id, "editor"},
+          {:document, CardRunFixtures.document()},
+          {:palette, CardRunFixtures.palette()},
+          {:declare, Keyword.get(extra, :declare, CardRunFixtures.declare())}
+          | Keyword.delete(extra, :declare)
+        ]
+      )
+
+      render(view)
+      view
+    end
+
+    # The Source drawer tab's panel, opened the way `SourceTabTest` opens it.
+    defp source_panel(view) do
+      view |> element(".sb-drawer__strip") |> render_click()
+      view |> element(~s(.sb-drawer__tab[phx-value-tab="source"])) |> render_click()
+      view |> element(".sb-drawer__panel") |> render()
     end
 
     defp active?(view, block_id) do
@@ -168,15 +198,65 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert active?(view, CardRunFixtures.root_block())
       end
+    end
 
-      # A host that contradicts itself between the `declare` assign and a
-      # `:declare` in its option list still gets a chart, and gets it from the
-      # assign. Not asserted here, and deliberately: the roots change the
-      # emitted `<data>` elements and the offsets around them, neither of
-      # which the marks seam reads, so every assertion available at this seam
-      # passes whichever list wins. The rule is in the moduledoc's *the rest
-      # of the host's compile call* and the option list is built in one place;
-      # a claim nothing here can falsify would be worse than the note.
+    describe "the Source tab" do
+      # The same option list, at the second of the three compiles. The Source
+      # listing is a read of what one compile produced, so a host compiling
+      # with `terminate: true` and a tab listing the chart without it are
+      # reading different charts - and this one is visible directly, as the
+      # top-level `<final>` the option adds.
+      #
+      # sabotage: restored `SourceView.build(document, palette, declare:
+      # declare, previous: ...)` in `refresh_source_view/1` -> the listing is
+      # the plain chart again, the top-level final is absent and this goes red
+      # (verified)
+      test "lists the chart the host's options compile", %{conn: conn} do
+        {:ok, view, _html} = mount_run(conn)
+        view = seat_options(view, compile_options: CardRunFixtures.terminate_options())
+
+        assert source_panel(view) =~ CardRunFixtures.terminal_state_id()
+      end
+
+      # The default beside the behaviour, as above.
+      #
+      # sabotage: made the component's own `compile_options` mount default
+      # `[terminate: true]` -> a host that passed nothing gets a listing of a
+      # chart it never compiled and this goes red (verified)
+      test "and without them lists what it listed before", %{conn: conn} do
+        {:ok, view, _html} = mount_run(conn)
+        view = seat_options(view, [])
+
+        refute source_panel(view) =~ CardRunFixtures.terminal_state_id()
+      end
+    end
+
+    describe "a host that contradicts itself about :declare" do
+      # The precedence the moduledoc states, asserted at a seam that can see
+      # it. It could not be asserted at the marks seam: the roots change the
+      # emitted `<data>` elements and the offsets around them, and the marks
+      # resolution reads neither, so every assertion available there passed
+      # whichever list won. The Source listing reads the bytes themselves, so
+      # the losing list is simply absent from it.
+      #
+      # sabotage: `Keyword.put_new(:declare, ...)` instead of
+      # `Keyword.put/3` in `compile_options/1` -> the option list's own
+      # `:declare` wins, the decoy root is emitted and the assign's is not,
+      # and both assertions below go red (verified)
+      test "the declare assign wins, and the option list's :declare is not emitted", %{conn: conn} do
+        {:ok, view, _html} = mount_run(conn)
+
+        view =
+          seat_options(view,
+            declare: CardRunFixtures.declare() ++ [{"host_root", nil}],
+            compile_options: [declare: [{"decoy_root", nil}]]
+          )
+
+        panel = source_panel(view)
+
+        assert panel =~ "host_root"
+        refute panel =~ "decoy_root"
+      end
     end
   end
 end

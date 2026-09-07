@@ -347,6 +347,31 @@ defmodule StatifierBlocks.Runtime.FixtureRunsTest do
     end
   end
 
+  describe "the caller's own compile options" do
+    # The claim: `opts` is the compiler's option list, not a two-key
+    # allowance. `:datamodel` is the option used to assert it because its
+    # effect on a compile is a refusal, which is visible in the result
+    # struct - the row driving never happens, so no verdict has to stand in
+    # for "the compiler saw the option".
+    #
+    # Sabotage: restored `Compiler.compile(document, palette, declare:
+    # declare)` -> the sensitive-path refusal never runs, the compile
+    # succeeds and this reads :ready (verified).
+    test "reach the compile, so a refusal the host's options earn is reported" do
+      document = branch_document()
+      fixtures = %{"blk_BR" => [branch_table([row("over", "150", "arm_a")])]}
+
+      # The arm's own `cond` reads `amount`, which is a datamodel position.
+      assert %FixtureRuns{status: :ready} =
+               FixtureRuns.run(document, Palette.core(), fixtures)
+
+      assert %FixtureRuns{status: :compile_error, runs: [], findings: [%Finding{} | _]} =
+               FixtureRuns.run(document, Palette.core(), fixtures,
+                 datamodel: %{sensitive: ["amount"]}
+               )
+    end
+  end
+
   # -- helpers ---------------------------------------------------------------
 
   defp branch_document do
