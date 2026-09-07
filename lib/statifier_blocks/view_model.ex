@@ -1110,6 +1110,145 @@ defmodule StatifierBlocks.ViewModel do
   end
 
   @doc """
+  The three core containers a host most often flattens in an outline of its
+  own: `core.sequence`, `core.group` and `core.resumable_group`.
+
+  The documented default for the `types` argument the three readers below
+  take, and nothing more than that - it is a list a host passes, extends
+  with its own container types, or replaces outright. The package does not
+  decide which types a host draws through; it only knows which of its own
+  are the obvious candidates, and saying so once here is what keeps three
+  hosts from each writing the same three strings slightly differently.
+
+  Mechanism upstream, policy host: `transparent?/2`, `effective_parent/3`
+  and `end_of_list_target/3` never read this function. A caller passes the
+  list it means.
+
+      iex> StatifierBlocks.ViewModel.core_containers()
+      ["core.sequence", "core.group", "core.resumable_group"]
+  """
+  @spec core_containers() :: [Block.type_name()]
+  def core_containers, do: ["core.sequence", "core.group", "core.resumable_group"]
+
+  @doc """
+  Whether this node is one a caller draws through rather than draws.
+
+  A host that flattens containers in its own outline needs the same test in
+  several places - the row it draws, the parent it climbs past, the slot it
+  appends to - and a type comparison written three times is a type
+  comparison that will disagree with itself once a fourth container joins
+  the list.
+
+  `types` is the caller's list of transparent type names, not the package's:
+  `core_containers/0` is the documented default, not a hidden one.
+
+      iex> alias StatifierBlocks.{Block, Document, Palette, ViewModel}
+      iex> root =
+      ...>   Block.new("core.sequence",
+      ...>     id: "root",
+      ...>     slots: %{"body" => [Block.new("core.wait", id: "wait", config: %{"duration" => "30s"})]}
+      ...>   )
+      iex> vm = root |> Document.new() |> ViewModel.build(Palette.core(), [])
+      iex> ViewModel.transparent?(ViewModel.find_node(vm, "root"), ViewModel.core_containers())
+      true
+      iex> ViewModel.transparent?(ViewModel.find_node(vm, "wait"), ViewModel.core_containers())
+      false
+  """
+  @spec transparent?(Node.t(), [Block.type_name()]) :: boolean()
+  def transparent?(%Node{type: type}, types), do: type in types
+
+  @doc """
+  Where the block carrying `id` sits once the transparent containers above
+  it are drawn through: `parent_of/2`'s tuple, climbed past every
+  transparent ancestor.
+
+  `parent_of/2` answers where a block sits in the *document*. A host that
+  flattens `core.group` out of its outline is drawing a different tree, and
+  the row it drew is held, as far as its reader can tell, by whatever
+  ancestor it did draw. This answers that: the `{parent block id, slot
+  name, index}` of the highest unbroken run of transparent ancestors above
+  `id`, which is a position **inside** the nearest ancestor the host still
+  draws.
+
+  The climb stops at the root whether or not the root's own type is
+  transparent. The root sits in no slot, so there is no tuple above it to
+  climb to, and a flattened outline of an ordinary `core.sequence` document
+  is exactly the case where every ancestor is transparent - answering `nil`
+  there would make this reader useless on the documents it exists for. The
+  root's own answer is `parent_of/2`'s: `nil`.
+
+  An id no block carries is `nil`, for `parent_of/2`'s reason.
+
+      iex> alias StatifierBlocks.{Block, Document, Palette, ViewModel}
+      iex> wait = Block.new("core.wait", id: "wait", config: %{"duration" => "30s"})
+      iex> group = Block.new("core.group", id: "grp", slots: %{"body" => [wait]})
+      iex> vm =
+      ...>   Block.new("core.sequence", id: "root", slots: %{"body" => [group]})
+      ...>   |> Document.new()
+      ...>   |> ViewModel.build(Palette.core(), [])
+      iex> ViewModel.parent_of(vm, "wait")
+      {"grp", "body", 0}
+      iex> ViewModel.effective_parent(vm, "wait", ViewModel.core_containers())
+      {"root", "body", 0}
+  """
+  @spec effective_parent(t(), Block.id(), [Block.type_name()]) ::
+          {Block.id(), Block.slot_name(), non_neg_integer()} | nil
+  def effective_parent(%__MODULE__{} = vm, id, types) do
+    case parent_of(vm, id) do
+      nil ->
+        nil
+
+      {parent_id, _slot, _index} = position ->
+        parent = find_node(vm, parent_id)
+
+        if transparent?(parent, types) and parent_of(vm, parent_id) != nil do
+          effective_parent(vm, parent_id, types)
+        else
+          position
+        end
+    end
+  end
+
+  @doc """
+  Where an "add to the end of this list" lands for the block carrying `id`,
+  once the transparent containers above it are drawn through: the target
+  **after** the last flow child of `effective_parent/3`'s slot.
+
+  The append a flattened outline offers at the foot of a list, as against
+  `effective_parent/3`'s "where this row sits". The index counts
+  `flow_children/1`, not `children` - a shelf is drawn at the foot of the
+  canvas and is in no chain, so appending after it would put the new block
+  after something the reader was never shown in the list.
+
+  `nil` where `effective_parent/3` is `nil` - the root offers no place
+  after itself, which is the same refusal `parent_of/2` makes.
+
+      iex> alias StatifierBlocks.{Block, Document, Palette, ViewModel}
+      iex> wait = Block.new("core.wait", id: "wait", config: %{"duration" => "30s"})
+      iex> group = Block.new("core.group", id: "grp", slots: %{"body" => [wait]})
+      iex> after_group = Block.new("core.wait", id: "after", config: %{"duration" => "1s"})
+      iex> vm =
+      ...>   Block.new("core.sequence", id: "root", slots: %{"body" => [group, after_group]})
+      ...>   |> Document.new()
+      ...>   |> ViewModel.build(Palette.core(), [])
+      iex> ViewModel.effective_parent(vm, "wait", ViewModel.core_containers())
+      {"root", "body", 0}
+      iex> ViewModel.end_of_list_target(vm, "wait", ViewModel.core_containers())
+      {"root", "body", 2}
+  """
+  @spec end_of_list_target(t(), Block.id(), [Block.type_name()]) ::
+          {Block.id(), Block.slot_name(), non_neg_integer()} | nil
+  def end_of_list_target(%__MODULE__{} = vm, id, types) do
+    with {parent_id, slot_name, _index} <- effective_parent(vm, id, types),
+         %Node{slots: slots} <- find_node(vm, parent_id),
+         %Slot{} = slot <- Enum.find(slots, &(&1.name == slot_name)) do
+      {parent_id, slot_name, length(flow_children(slot))}
+    else
+      _no_effective_parent_or_slot -> nil
+    end
+  end
+
+  @doc """
   A node's line of prose: its own `sentence`, else `title/1`.
 
   `Node.sentence` is the block type's own line where the type declares
