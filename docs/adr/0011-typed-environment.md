@@ -1845,7 +1845,7 @@ this record.
 
 ## Amendment (2026-09-07): decision 2's record-typed write also yields one entry per member, recursively through shapes
 
-**Status: proposed (2026-09-07, campaign SF036, bead `sb-vjjl`, recording the
+**Status: accepted (2026-09-07, campaign SF036, bead `sb-vjjl`, recording the
 campaign-SF035 walk ruling `RQ-SF035-23`, taken by the operator as "R3").** A
 decision record merges at proposed under the campaign invariant; flipping it to
 accepted is a separate gated request through the same `docs/adr/` gate, and the
@@ -2129,3 +2129,240 @@ ruling `RQ-SF035-23`, against this record as `sb-m9eq` and `sb-wzoa` left it and
 against `sd-ADR-0001`'s two amendments of 2026-09-06 as merged in
 `statifier_datamodel`. The code half of `sb-vjjl` builds it and may carry its
 flip.
+
+## Note (2026-09-07): `sb-vjjl`'s member-expansion amendment is corrected in four places and flipped to accepted
+
+The Amendment of 2026-09-07 on decision 2 (`:1846`) reads `Status: accepted`
+from this date. `sb-9paa` is the separate gated request that section's own
+status paragraph names, and this Note is what the flip checked and what it
+corrects. It is by addition, sits at the foot where this campaign's records
+append so that no line a sibling record cites moves, edits no clause, carries
+no `Status:` line of its own, and the only line the request removes is the one
+the status word is on - the shape `sb-wzoa`'s flip of the Amendment at `:1186`
+took on this record two requests ago.
+
+Every line cite below is a census taken on `main` at `52e1bdf`, with
+`deps/statifier_datamodel` resolved at `0.4.0`. It is dated to this Note and is
+to be re-counted by a later reader rather than trusted.
+
+### 1. Section 5's first sentence is superseded: a refused member read anchors on the reading block and the reading field
+
+Section 5 (`:1994-1998`) says, in its title and its first sentence:
+
+> A read at `P.m` that the environment refuses reports the finding on the
+> `config_key` of the field that declared the **write at `P`** - the root - and
+> not on any synthesised key.
+
+**That sentence does not hold, and the operator ruled that the code is right
+and the sentence is superseded** (campaign-SF036 ruling `RQ-SF036-17`,
+2026-09-07). What the code does instead:
+
+`StatifierBlocks.Compiler.structure_finding/3`
+(`lib/statifier_blocks/compiler.ex:920-934`) builds a `:type_mismatch` finding
+with `block_id:` the **reading** block's id and `config_key:` the key looked up
+in `read_keys/2` (`:956-964`), which is keyed on `{reading block id, path,
+expected type}` and carries the key of the **reading** field. A member read is
+anchored exactly as a root read is: there is one anchoring rule, and it names
+the control the author's read is written on. Probed on `sb-vjjl`'s branch and
+asserted on `main` in
+`test/statifier_blocks/environment/member_expansion_test.exs:488-503`, a
+refused read of `signup.contact.email` by `blk_B` yields
+`{:type_mismatch, "blk_B", "blk_A", "string", "integer",
+"signup.contact.email"}` - the reading block, and the writing block only in the
+upstream reference.
+
+The root's writing field is named by `upstream_ref` and by the reason, not by
+`config_key`. That much of section 5 holds and is the rest of its own second
+paragraph: `upstream_ref` names the block whose write signature put the type
+there, which for a member entry is the block that wrote the root
+(`t:StatifierBlocks.Assignability.upstream_ref/0`,
+`lib/statifier_blocks/assignability.ex:112`, and the `source` position of the
+`:type_mismatch` tuple at `:126-127`); `{:fixable_by, block_id}` applies to it
+by `refused/2` (`lib/statifier_blocks/assignability.ex:342`, the rule stated at
+`:277`); and no synthesised key is invented anywhere - `read_keys/2` admits
+only a binary key a form field actually declared.
+
+The correction is made **by this Note and not by code**: making the sentence
+true would carry a write signature's key into the environment and widen the
+public `t:StatifierBlocks.Environment.annotated/0`, which is new surface no
+bead asked for. So section 5's title and first sentence stand where they are,
+superseded rather than repointed, and a reader who reaches them reads this part
+with them. The same claim repeated in the worked shape (`:2075-2077`, "a step
+expecting `:integer` there is decision 5's `:error`, `:not_assignable`,
+anchored on the trigger's `:assign_to` field per section 5") is superseded in
+the same words: that finding is anchored on the reading step's own path field,
+and `assign_to` appears in it as the upstream reference's block, not as a
+`config_key`.
+
+Section 5's paragraph about **why** an author is sent somewhere is not
+disturbed by this, only relocated: an author sent to their own read still needs
+the root's writer to fix a wrong member type, and `upstream_ref` plus
+`{:fixable_by, block_id}` is what carries them there.
+
+### 2. Section 4's second bullet: an explicit `P.m` from an earlier block is protected by decision 1, not by section 4's first case
+
+Section 4's "Across positions" bullet closes (`:1985-1987`) with:
+
+> it reaches only the members its own previous write put there - never a member
+> entry an explicit signature at `P.m` wrote, which section 4's first case
+> already protects.
+
+The pointer is too narrow, and this part corrects it **by addition**. Section
+4's first case is scoped to *one block's* signatures - the `declared` set that
+`apply_writes/5` builds from the signatures of the block being applied
+(`lib/statifier_blocks/environment.ex:790-801`) and that `put_derived/6`
+(`:832-856`) skips over. It cannot protect a `P.m` an **earlier** block wrote,
+because that block's signatures are not in the set.
+
+What protects that entry is decision 1's per-path last-write-wins, realised by
+the equality test in `clear_derived/3` and `drop_derived/3`
+(`lib/statifier_blocks/environment.ex:809-830`): a clear drops a member path
+only when the entry standing there is still `{member_type, writer}` of the
+write being replaced. An explicit signature at `P.m` from any position replaced
+that pair when it was applied, so the pair no longer matches and the entry is
+left alone - as the code's own comment at `:803-807` says, "an entry a later
+explicit signature at `path.m` replaced is no longer what the previous write
+put there - decision 1's per-path last-write-wins already took it". Asserted at
+`test/statifier_blocks/environment/member_expansion_test.exs:421-433` ("a
+rewrite does not clear a member an explicit signature wrote").
+
+So: within one block, section 4's first case; across positions, decision 1.
+Both are in force, and the environment needs no second annotation to say which
+entries were derived.
+
+### 3. Naming: `sd-ADR-0001` decision 8 is titled "The read check"
+
+Sections 2 and 3 name `sd-ADR-0001` decision 8 as "coverage check" twice
+(`:1929` and `:1943`). That record titles **decision 8 "The read check"** and
+**decision 10 "Coverage of a map against a shape"** - `satisfies?/3` and
+`missing/3` respectively, in that package's `0001-datamodel-document.md`. The
+two are different questions: decision 8 compares a held type against an
+expected one, and its step 3 is where a record's fields cover a shape's
+required set; decision 10 checks a **map** a host handed in against a shape's
+required fields and does not look at types at all. A correction by addition,
+cited by decision number rather than by title from here on:
+
+- `:1929`, "A member's requiredness is decision 3's question through
+  `sd-ADR-0001` decision 8's coverage check" - read decision 8, the read check,
+  whose step 3 is the covering step. Decision 10 is not in play: no map is
+  being checked.
+- `:1943`, "`sd-ADR-0001` decision 8's coverage check carries a `seen` set" -
+  read decision 8's read check, which is how that record's own inline-shape
+  amendment of 2026-09-06 words it ("the `seen` set decision 8's check already
+  carries is keyed on a pair of declared names").
+
+Neither cite resolves to the wrong decision; only the title is wrong, and no
+argument above moves.
+
+### 4. Section 4 is the record's reading, said explicitly
+
+Section 3 flags its own status in as many words - "**This is the record's
+reading rather than a taken ruling**, derived from the type system and from the
+discipline the declaration side already runs under, and it is flagged as
+derived so a reader does not take it for the operator's word" (`:1940-1942`).
+Section 4 states its precedence rule by construction, from the seeding rule as
+accepted (`:1290`) and from decision 1, and carries no such sentence.
+
+It should be read with the same one, and this part supplies it: **section 4's
+precedence rule is the record's reading rather than a taken ruling.** It is
+derived - the first case from decision 2's independence of fields plus the
+observation that a derived entry is the weaker source, the second from decision
+1's last-write-wins applied to the whole write at a position - and a reader
+should not take it for the operator's word. `RQ-SF035-23` ruled that the
+expansion happens and that `{:from_field, key}` is withdrawn; it did not rule
+on which of two entries at one path survives.
+
+### 5. What the flip verified against `main` at `52e1bdf`
+
+`sb-vjjl`'s code half landed as `52e1bdf` ("Expands a record-typed write into
+member entries"), touching `lib/statifier_blocks/environment.ex` and no other
+`lib/` file. Every remaining claim of the amendment was checked against that
+tree, claim by claim, with
+`test/statifier_blocks/environment/member_expansion_test.exs` as the oracle -
+it carries one test per row of section 2's table plus section 3's chain guard,
+section 4's precedence, section 5's upstream reference, and what expansion does
+not reach.
+
+**Section 1 and section 2's table** hold in every row. `derived_writes/3,4`
+(`:856-878`) walks members depth first in member order and `expansion/3`
+(`:887-902`) is the per-inhabitant split: an inline `{:shape, members}` yields
+its members off the term; a `{:list, _}` yields `:none`; a binary that
+`Declarations.fetch/2` resolves yields the declaration's fields at
+`member_spelling/1` (`:910`), which is a record and a shape alike, because
+`Declarations.fetch/2` does not sort them; anything else yields `:none`, which
+covers a scalar, an opaque name and `:unknown`. Rows 6 and 7 are the recursion
+and the list row reached through a member. `required?` is read by nobody in the
+expansion, as the paragraph after the table says.
+
+**Section 3** holds. The `seen` set is threaded through `derived_writes/4` and
+only `expansion/3`'s binary clause adds to it, so an inline shape puts no name
+on the chain; a re-entered name falls to `:none` through the `with false <-
+MapSet.member?(seen, name)` guard (`:893-900`). The two tests at `:452-474`
+assert both halves - once per chain, and a second unrelated root expands again.
+
+**Section 4** holds as corrected by part 2 above. `apply_writes/5` clears, puts
+the signature's own entry, then puts the derived members skipping every path
+the block declares.
+
+**Section 5** holds but for its first sentence and the worked shape's repeat of
+it, both superseded by part 1 above.
+
+**Section 6** holds. `StatifierBlocks.Datamodel.declared_view/3`
+(`lib/statifier_blocks/datamodel.ex:717-731`, the cite unmoved) still builds
+its rows from the datamodel document's declared paths, the editor's `declare`
+roots and the document's own roots, and types them from
+`StatifierDatamodel.Index`. `Environment` appears nowhere in it, and `52e1bdf`
+did not touch `lib/statifier_blocks/datamodel.ex`.
+
+**The consequences hold.** `t:StatifierBlocks.Environment.type_expr/0` is
+unchanged (`:132`); no field declaration key was added and `writes:` gained no
+inhabitant (`field_writes/2` and `written_type/1` read the same two forms as
+before); and decision 8's reason vocabulary gained no arm -
+`lib/statifier_blocks/assignability.ex` was not touched by `52e1bdf` at all, so
+the `:type_mismatch` tuple (`:126-127`) is the one it has carried since. The
+minor-version claim is what `changelog.d/sb-vjjl.md` filed.
+
+**The worked shape holds**, entry for entry, against the fixture the tests
+carry: `signup.contact` declaring `email`, `phone` and `address`, and
+`address`'s own record declaring `line1` and `postcode`, yielding six entries.
+The fixture spells the nested record `signup.postal_address` where the worked
+shape writes `postal_address`; a worked shape names its own domain and this is
+not a claim about code.
+
+**Five cites moved with `52e1bdf`** and are re-counted here, in the record's
+own order. They are not repointed above - the lines they sit on are not edited
+by this request - so a reader takes the count from this table:
+
+| Cite as written | Reads today |
+|---|---|
+| `lib/statifier_blocks/environment.ex:110` (`t:...Environment.t/0`, `:1870`) | `:138` |
+| `lib/statifier_blocks/environment.ex:107` (`t:...Environment.member/0`, `:1922`) | `:135` |
+| `lib/statifier_blocks/environment.ex:521-529` (`inline_shape/1`, `:1992`) | `:549-557` |
+| `lib/statifier_blocks/environment.ex:852-861` (`field_writes/2`, `:2007`) | `:1007-1016` |
+| `lib/statifier_blocks/datamodel.ex:717-731` (`declared_view/3`, `:2024`) | unmoved |
+
+Every cite this record makes into `docs/adr/0011-typed-environment.md` itself
+still resolves: `52e1bdf` touched no `docs/adr/` file, and this request appends
+only.
+
+### 6. What this Note does not do
+
+- **It flips one status word and corrects four things by addition.** No clause
+  is edited, and the only removed line is the one the status word sits on.
+  Section 5's title and first sentence, the worked shape's repeat of it, the
+  two "coverage check" phrases and the internal pointer at `:1986-1987` all
+  stand where they are, superseded or corrected by the parts above.
+- **It changes no code.** `RQ-SF036-17` ruled the correction is a Note and not
+  a code change, and the request that carries this Note touches this file only.
+- **It settles the amendment's last bullet rather than falsifying it.** "It
+  changes no code and flips no status" (`:2121-2125`) is a statement of
+  sequencing, and the sequence it names has run: `52e1bdf` built the section
+  and this request flips it. It is met here, where it stands, exactly as the
+  Note of 2026-09-07 above met the sentences that named the earlier
+  Amendment's status.
+- **It adds no README row.** An amendment adds none, and neither does a Note.
+
+Filed with `sb-9paa`, campaign SF036's Lane X, recording the operator's ruling
+`RQ-SF036-17` of 2026-09-07 and folding three items the pass-2 review of
+`sb-vjjl`'s record half raised against this file. `sb-vjjl` is the request this one
+follows on this record.
