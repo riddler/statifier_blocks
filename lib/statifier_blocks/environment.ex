@@ -770,9 +770,15 @@ defmodule StatifierBlocks.Environment do
   end
 
   # The document's own declared path types, marked as the declaration's.
-  # The projection is the index's, which is the same one the Datamodel tab
-  # and the editor's typed cells already draw, so the set an author is shown
-  # and the set the walk carries cannot drift apart.
+  # This reads `Index.entries/1` and takes each entry's declared type: a
+  # declaration name stays its name and a scalar stays its own spelling.
+  # The Datamodel tab and the editor's typed cells draw a different
+  # projection of the same index - `StatifierDatamodel.Index.path_types/1`,
+  # wrapped by `StatifierBlocks.Datamodel.path_types/1` - which answers
+  # value kinds for a renderer and so contributes no path for an `object`,
+  # a declaration-typed or an untyped entry. Those are the entries the check
+  # has the most to say about, which is why the two sets differ on purpose
+  # (ADR-0011's Note of 2026-09-07).
   #
   # An entry the index cannot name a type for contributes nothing rather
   # than `:unknown`: an entry at `:unknown` and no entry at all are read
