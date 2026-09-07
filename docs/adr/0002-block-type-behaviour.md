@@ -5640,3 +5640,288 @@ lists the original seven, which that section also says, and it is not edited
 here.
 
 Filed with `sb-wzoa`, campaign SF035's Lane A.
+
+## Note (2026-09-07): decision 7, `hidden?` and `readonly?`, and the missing-`default:` refusal widened to every field type
+
+A dated Note rather than an amendment: decision 7 is unchanged, no line above
+this one is edited, and the closed field-type set gains no member. Two optional
+keys arrive on the field declaration, in the shape the `value_path` amendment of
+2026-08-27 (`:204-215`) and the `datamodel_path?` amendment of 2026-08-29
+(`:1004`) established - a boolean or a list on `field_decl/0`, defaulting to
+today's behaviour when absent, with the editor and the compiler reading it and
+nothing else changing.
+
+Status: **proposed**. It merges at proposed and is flipped by its own gated PR
+after the implementing bead lands.
+
+### Context: the key that is informative but not editable has no spelling
+
+Decision 7 (`:180-186`) makes every field of `config_schema/1` an input: "each
+with a key, a field type, a label, a `required?` flag, and a default". A block
+type whose config carries keys the runtime supplies - an identifier of the run,
+of the tenant, of the chart, the invoke-step shape a production embedder puts on
+every host call - renders them as author-editable expression fields, because
+that is the only thing a declared field can be. There is no way for a type to
+say "this key is part of my config, the compiler and the Source tab must see it,
+and no form may offer it to an author", and no way to say "show this, do not let
+it be typed into".
+
+The two shapes are different, and the difference is not cosmetic. One is about
+whether a value reaches a form at all; the other is about whether the form draws
+an input or a value. So they are two keys, not one enum.
+
+### F1. `field_decl/0` gains `hidden?` and `readonly?`, both optional booleans
+
+`field_decl/0` reads today (`lib/statifier_blocks/block_type.ex:251-259`,
+read on `b71740c`):
+
+```elixir
+@type field_decl :: %{
+        required(:key) => String.t(),
+        required(:type) => field_type(),
+        required(:label) => String.t(),
+        required(:required?) => boolean(),
+        required(:default) => Block.json(),
+        optional(:value_path) => value_path(),
+        optional(:datamodel_path?) => boolean()
+      }
+```
+
+It gains two entries, and only two:
+
+```elixir
+        optional(:hidden?) => boolean(),
+        optional(:readonly?) => boolean()
+```
+
+- **`hidden?: true`** - **never rendered by any form.** No label, no input, no
+  row. The value is the field's `default:`, or whatever a host wrote into the
+  config, and the compiler and the Source tab see it entirely unchanged: this is
+  a rendering claim and nothing else. A hidden field is still a declared field -
+  it appears in `config_schema/1`'s list, `validate_config/1` remains the
+  authority over its value (decision 7), and a `:config` finding on its key
+  routes exactly as it does today.
+- **`readonly?: true`** - **rendered as its value beside the label, never as an
+  input.** The row is drawn, the label is drawn, and where a control would sit
+  the form draws the value. It is not a disabled input and not a
+  `readonly` attribute on one: an author can neither type into it nor post it.
+
+Both default to `false` when the key is absent, on the `required?: boolean()`
+convention decision 7 and the `datamodel_path?` amendment both take. A
+declaration carrying neither key behaves exactly as it does today.
+
+The two are independent booleans rather than one three-valued key because they
+answer different questions and a later record may want a third answer to either.
+Declaring both `true` on one field is not refused; `hidden?` wins, because a
+field that is not rendered has nothing to render as a value.
+
+### F2. The existing rule: `field_decl/0` already requires `default:`
+
+This is not new and this Note does not change it. `field_decl/0` reads
+`required(:default) => Block.json()` (`block_type.ex:256`): a declaration
+without `default:` has never been a well-formed declaration under this record.
+
+What is new is only how far that requirement is *enforced*. Today exactly one
+arm is checked at compile - `declaration_findings/2` filters
+`path_field_without_default?/1` (`lib/statifier_blocks/compiler.ex:719` and
+`:727-731`), which matches `%{type: {:path, _opts}}` and nothing else - and the
+comment above it (`:700-707`) says why, and says whose call the rest is:
+
+> Widening the refusal to all field types is a change to what a block type may
+> declare, which is the record's call and not this stage's.
+
+This Note is that record, and it takes the call.
+
+### F3. The missing-`default:` refusal widens to every field type
+
+**A field declaration without a `default:` key is refused at compile, whatever
+its field type.** Not the `{:path, opts}` arm alone: `:string`, `:integer`,
+`:boolean`, `{:select, choices}`, `:expression`, `:duration`, `{:list, inner}`,
+`{:path, opts}` and `{:type_expr, opts}` alike - the nine members
+`field_type/0` carries on `main` (`block_type.ex:152-161`).
+
+The finding is a `:config` finding, per *block* rather than per type, with the
+same shape and the same routing the `{:path, opts}` refusal already produces
+(`sb-8mki`, campaign SF035): `config_schema/1` takes the block's config, so two
+blocks of one type can differ, and anchoring on each block sends a reader to a
+card they can see.
+
+The reasoning the narrow refusal rested on generalises. A `default:` is what the
+editor puts in an unset control and what a read of the value falls back to; a
+declaration missing it makes the view model read the key permissively and render
+`nil`, which is a value the block type never said was legal. Under decision 7
+`validate_config/1` is the authority over a *value*, and a missing `default:` is
+not a value - it is a defect in the declaration, which no `validate_config/1`
+can see. Refusing it at compile is the only place it can be caught.
+
+### F4. A hidden field whose `default:` is its type's empty value is refused
+
+`hidden?: true` puts the field beyond every form. Its `default:` is therefore
+the only value it will ever have unless a host writes the key itself, and a
+`default:` that is the type's *empty* value declares a key that carries nothing
+and can never be given anything. **That is refused at declaration**, as a
+compile-time `:config` finding - the same door F3 walks through, and the same
+door the missing `{:path, opts}` default already takes.
+
+The claim is scoped to nine field types, so the empty value is stated per type
+rather than left to a reader:
+
+| Field type | Empty value refused under `hidden?: true` |
+|---|---|
+| `:string` | `""` |
+| `:integer` | `""` (the value `Editor.Field.decode/2` returns when `Integer.parse/1` does not consume the whole string, `editor/field.ex:991-996`) |
+| `:boolean` | *none* - `false` is a value; a hidden boolean defaulting to `false` is legal |
+| `{:select, choices}` | `""` (no choice) |
+| `:expression` | `""` |
+| `:duration` | `""` - and it is the one type whose empty value omits its key entirely (ADR-0005 decision 9, amended 2026-08-29; `omitted?/2` at `editor/config_form.ex:412`) |
+| `{:list, inner}` | `[]` |
+| `{:path, opts}` | `""` |
+| `{:type_expr, opts}` | `""`, `null`, or a missing key (the "nothing at all" arm the 2026-09-06 `{:type_expr, opts}` amendment names) |
+
+`:boolean` is the one row with no refusal, and it is deliberate: `false` is a
+decided value rather than an absence, so a hidden `false` is a hidden fact, not
+an empty key. Every other row's empty value is indistinguishable from "the
+author has not filled this in", and a hidden field has no author.
+
+A **`readonly?: true`** field takes no such refusal. It is rendered, so an empty
+value is visible, and a host that wants to show "not set" beside a label is
+doing something coherent.
+
+### F5. The finding's `fault` is `:author`, and the misattribution is accepted
+
+`Finding.fault/2` (`lib/statifier_blocks/compiler/finding.ex:190-196`) reads:
+
+```elixir
+defp fault(stage, _config_key) when stage in [:config, :structure], do: :author
+```
+
+so every `:config` finding is the author's by construction, and the fault
+vocabulary is `:package | :author`. Both refusals above are `:config` findings
+about a **declaration**, which is the block type's text and not the document
+author's, so both are attributed to the party who did not write them.
+
+**This record accepts the misattribution rather than widening the vocabulary or
+the classifier**, for two reasons. The first is that `fault` answers "who can
+act on this", and in the deployment these records are written for the author of
+a document and the host that declares its block types reach the same operator
+through the same editor; a `:package` value would route nowhere different. The
+second is that making `:config` conditionally `:package` means `fault/2` must
+learn which `:config` findings name a declaration and which name a value, which
+is a second classification of findings that must agree with the first - the
+failure mode decision 7 refuses schemas for. A finding's *message* already says
+plainly that a field is declared wrongly, which is what a reader acts on.
+
+If a later record needs the distinction machine-readable, the door is a new
+`stage` rather than a new `fault` - and this Note does not open it.
+
+### F6. Keeping a hidden value needs no decoder change, and that is a property
+
+`ConfigForm.decode/3` (`lib/statifier_blocks/editor/config_form.ex:319`) needs
+no change to **keep** a hidden or readonly value, because the behaviour both
+require is one of the three properties that function already documents as "a bug
+if it is missing" (`:272`, `:284`):
+
+> **A field whose control did not post keeps the value it had.** A partially
+> rendered form does not blank out the fields it did not show.
+
+It is implemented in the decode reduce as `:error -> field.value` (`:327`): a
+schema field whose key is absent from the posted params keeps the value the base
+config carried. A hidden field is exactly a field whose control did not post,
+and a readonly field is exactly a field whose control posted nothing to decode.
+So the value both keys need preserved is preserved already, and **no decoder
+change is a design change**: a decode that dropped a hidden value would be a
+regression against a documented property, not a decision this record takes.
+
+The `base` property holds the same way: the decode starts from the config the
+block already carries, so a key no form drew is never deleted.
+
+One gap the existing properties do **not** close, stated here so the
+implementing bead does not miss it. The decode is keyed off the *schema*, and a
+hidden field is in the schema - so a payload that posts under a hidden field's
+key would be decoded through it even though no form ever offered that control.
+**A `hidden?: true` or `readonly?: true` field ignores any posted value for its
+key**: the decode takes the `:error` branch for it unconditionally rather than
+reading `params`. That is a decode change, and it is the only one: it defends a
+key the form withheld, and it does not touch the three documented properties.
+
+### F7. `ViewModel.Field` carries both flags
+
+`ViewModel.Field` (`lib/statifier_blocks/view_model.ex:174`, `@type t` at
+`:186-195`, `defstruct` at `:198`) gains `hidden?: boolean()` and `readonly?:
+boolean()`, defaulting to `false` and not in `@enforce_keys` - the same posture
+`value_path` takes there.
+
+They are on the view model rather than only inside the package's own form
+component because the view model is what a host reads to draw its own surface.
+A host that filters its view by these flags filters the same way the package's
+config form does, from the same two booleans, and never has to re-derive them
+from a block type module.
+
+### F8. `sensitive?` is not touched, and is not a `field_decl/0` key
+
+`sensitive?` (the amendment of 2026-08-29 at `:1187`) is a key on a **datamodel
+declaration**, not on a field declaration: it lives on
+`StatifierBlocks.Datamodel`'s declaration struct (`lib/statifier_blocks/datamodel.ex:226`)
+and says a declared datamodel path holds a secret. `hidden?` and `readonly?` say
+what a form does with a config field. Nothing here reads, sets, or overrides
+`sensitive?`, and neither key implies the other - a hidden field is not thereby
+sensitive, and a sensitive path is not thereby hidden.
+
+### F9. Worked example
+
+A signup block type whose config carries a seed the host assigns and a step name
+the host owns:
+
+```elixir
+@impl StatifierBlocks.BlockType
+def config_schema(_config) do
+  [
+    %{
+      key: "step_name",
+      type: :string,
+      label: "Step",
+      required?: true,
+      default: "Collect email",
+      readonly?: true
+    },
+    %{
+      key: "variant_seed",
+      type: :string,
+      label: "Variant seed",
+      required?: false,
+      default: "control",
+      hidden?: true
+    }
+  ]
+end
+```
+
+The config form draws one row: `Step` with the text `Collect email` beside the
+label and no input. `variant_seed` is drawn nowhere, and the compiler, the
+Source tab and `validate_config/1` all see `config["variant_seed"]` exactly as
+the document holds it. Declaring `variant_seed` with `default: ""` would be
+refused under F4; omitting `default:` altogether would be refused under F3.
+
+### What this Note does not decide
+
+- **No new field type**, and no member added to the closed set of nine. Both
+  keys are orthogonal to type.
+- **Nothing about `required?` on a hidden field.** `required?: true` beside
+  `hidden?: true` is not refused here; F4 already guarantees the field carries a
+  non-empty default, which is what `required?` asks for at the form.
+- **No host-view policy.** F7 puts the flags where a host can read them; what a
+  host does with them is the host's.
+- **No secrets claim.** `hidden?` is a rendering claim; it is not a security
+  boundary, and F8 says where that lives.
+
+### Implementing beads
+
+`sb-21gm` implements F1, F4, F6, F7 and the rendering half of F1's
+`readonly?` clause, from this Note as merged. `sb-btx0`'s two record questions -
+whether a `:config` finding for a declaration defect may be `:package`, and
+whether the missing-`default:` refusal widens beyond `{:path, opts}` - are
+answered here by F5 and F3 respectively, and land in the same pair. `sb-xnxw`
+flips this Note to accepted after `sb-21gm` lands.
+
+Cites above were read on `b71740c` and are to be re-counted by a later reader
+rather than trusted.
