@@ -1195,9 +1195,10 @@ defmodule StatifierBlocks.ViewModel do
   (ADR-0002 decision 9): a config the document never accepted, made
   visible without letting it near the document. Values only - only the
   form is touched, and `slots/1` is never called on a draft, which is the
-  promise decision 6 is owed. A consumer wanting the draft's own findings
-  beside the values derives them itself; this function states no opinion
-  about whether the draft validates.
+  promise decision 6 is owed. This function states no opinion about
+  whether the draft validates; the findings half is `overlay_findings/2`,
+  and a refused `StatifierBlocks.Edit.Session.change_config/3` has already
+  put the findings to hand it in the session's `draft_findings`.
 
   `nil` in, `nil` out, so a caller that has not resolved a selection yet
   can pipe through it.
@@ -1208,6 +1209,69 @@ defmodule StatifierBlocks.ViewModel do
 
   def overlay_draft(%Node{form: %Form{} = form} = node, draft) when is_map(draft) do
     %{node | form: %{form | fields: Enum.map(form.fields, &drafted_field(&1, draft))}}
+  end
+
+  @doc """
+  `node` with `findings` over its form's fields, or the node unchanged
+  when it has no form.
+
+  The findings half of the pair `overlay_draft/2` opens, and the reason a
+  surface no longer re-runs `c:StatifierBlocks.BlockType.validate_config/1`
+  on a refused draft: `findings` are the
+  `t:StatifierBlocks.BlockType.finding/0` pairs the refusal itself carried,
+  which a refused `StatifierBlocks.Edit.Session.change_config/3` keeps in
+  the session's `draft_findings` under the block's id.
+
+  Routing is decision 11's, asked of the form rather than of the document:
+  a finding whose key names a field on this form is that field's, and one
+  whose key names no field lands in `form.unrouted`, where the form draws
+  it at the head. The unrouted ones are ordered by key so a redraw does
+  not move them. Every field is written, so a field the findings say
+  nothing about is left with none rather than with the document's - the
+  findings shown beside a draft are about the draft.
+
+  `nil` in, `nil` out, so a caller that has not resolved a selection yet
+  can pipe through it.
+
+  ## Examples
+
+      iex> alias StatifierBlocks.ViewModel
+      iex> alias StatifierBlocks.ViewModel.{Field, Form, Node}
+      iex> field = %Field{key: "after", type: :duration, label: "After", required?: true, default: nil, value: "nope"}
+      iex> node = %Node{block_id: "blk_ONE", type: "core.delay", type_version: 1, status: :ok, form: %Form{fields: [field]}}
+      iex> overlaid = ViewModel.overlay_findings(node, [{"after", "is not a duration"}, {"gone", "no such field"}])
+      iex> Enum.map(hd(overlaid.form.fields).findings, & &1.message)
+      ["is not a duration"]
+      iex> Enum.map(overlaid.form.unrouted, & &1.message)
+      ["no such field"]
+  """
+  @spec overlay_findings(Node.t() | nil, [BlockType.finding()]) :: Node.t() | nil
+  def overlay_findings(nil, _findings), do: nil
+  def overlay_findings(%Node{form: nil} = node, _findings), do: node
+
+  def overlay_findings(%Node{block_id: id, form: %Form{} = form} = node, findings)
+      when is_list(findings) do
+    by_key =
+      Enum.group_by(
+        findings,
+        fn {key, _message} -> key end,
+        fn {key, message} -> Finding.new({:config, id, key}, :config, message) end
+      )
+
+    keys = MapSet.new(form.fields, & &1.key)
+
+    fields =
+      Enum.map(form.fields, fn field ->
+        %{field | findings: Map.get(by_key, field.key, [])}
+      end)
+
+    unrouted =
+      by_key
+      |> Enum.reject(fn {key, _findings} -> MapSet.member?(keys, key) end)
+      |> Enum.sort()
+      |> Enum.flat_map(fn {_key, key_findings} -> key_findings end)
+
+    %{node | form: %{form | fields: fields, unrouted: unrouted}}
   end
 
   @spec derived_findings(Document.t(), Palette.t(), BlockType.chip_labels()) :: [Finding.t()]
