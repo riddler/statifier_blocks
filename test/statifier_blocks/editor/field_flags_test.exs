@@ -107,6 +107,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       document |> Document.blocks() |> Enum.find(&(&1.id == id)) |> Map.fetch!(:config)
     end
 
+    # The `data-field` of every row the seeded block's form drew, in document
+    # order. Scoped to the form element rather than the whole page so a row
+    # some other panel draws cannot answer for one this form did not.
+    defp drawn_field_keys(view) do
+      html = view |> element(~s(form.sb-form[data-block-id="blk_seed"])) |> render()
+
+      ~r/data-field="([^"]*)"/
+      |> Regex.scan(html)
+      |> Enum.map(fn [_whole, key] -> key end)
+    end
+
     defp field(key, value, flags \\ []) do
       %ViewModel.Field{
         key: key,
@@ -179,7 +190,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     describe "a hidden field" do
-      # Sabotage: dropped BOTH `ConfigForm`'s `rendered_fields/1` filter and
+      # Sabotage: dropped BOTH `ViewModel.shown_fields/1`'s reject - the one
+      # filter `ConfigForm` calls, since its private twin was deleted - and
       # `Field.field/1`'s `hidden?: true` clause - red. Either one alone
       # leaves this markup unchanged, because each withholds the field on its
       # own; the record states the rule on both surfaces (F1 for the
@@ -202,6 +214,37 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         refute has_element?(view, ~s([data-field="variant_seed"]))
         assert has_element?(view, ~s([data-field="note"] input))
+      end
+    end
+
+    describe "what the form draws" do
+      # F7's filter is one function, `ViewModel.shown_fields/1`, and this is
+      # the equality that says so: the rows on screen are that list, in that
+      # order, and nothing else. `ConfigForm` carried a private twin of the
+      # predicate until `sb-u12s`; the twin is gone, so a host surface drawing
+      # its own form from `shown_fields/1` and the package's own form read the
+      # same filter rather than two copies of it.
+      #
+      # Sabotage: dropped the reject from `ViewModel.shown_fields/1` -> 2
+      # failures in the whole suite and no more, this one and
+      # `PromotionsTest`'s own, both on the list rather than on the markup
+      # (verified). That is the twin's absence: one predicate, and every
+      # caller of it moves together.
+      #
+      # Sabotage: put `@node.form.fields` back at the call site, which is what
+      # the deleted twin was handed -> green, everywhere. `Field.field/1`
+      # withholds a hidden field on its own, so what this component passes the
+      # renderer is not load-bearing for the markup alone (verified) - which
+      # is exactly how a second copy of the predicate could sit here and drift
+      # without a test noticing, and why the record states the rule once.
+      test "is exactly ViewModel.shown_fields/1's list", %{conn: conn} do
+        view = select_seed(conn)
+
+        node = ViewModel.find_node(ViewModel.build(document(), palette(), []), "blk_seed")
+        shown = Enum.map(ViewModel.shown_fields(node), & &1.key)
+
+        assert shown == ["step_name", "note"]
+        assert drawn_field_keys(view) == shown
       end
     end
 

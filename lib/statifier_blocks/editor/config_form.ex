@@ -20,6 +20,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         (decision 12), so `StatifierBlocks.Editor.BlockNode` shows canonical
         JSON read-only instead.
 
+    What it draws is `StatifierBlocks.ViewModel.shown_fields/1`'s list and
+    nothing else. The view model lists every declared field, `hidden?: true`
+    ones included, because it is a projection of the schema; the surface
+    filters (ADR-0002 decision 7, amended 2026-09-07, section F7). That
+    filter is written once, in the view model, and a host drawing its own
+    form calls the same function - so a change to what counts as shown
+    reaches both surfaces at once, with no second copy of the predicate here
+    to fall behind it. `Field.field/1` renders nothing for a hidden field
+    either; the two agree, and neither is load-bearing alone.
+
     `form.unrouted` renders at the head. That bucket exists because
     `Core.Branch.config_schema/1` keys one field per arm by the arm's own
     slot name while `validate_config/1` also emits findings keyed `"arms"` -
@@ -183,7 +193,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assign(
           assigns,
           :fields,
-          Enum.map(rendered_fields(assigns.node.form.fields), &read_only/1)
+          Enum.map(ViewModel.shown_fields(assigns.node), &read_only/1)
         )
 
       ~H"""
@@ -245,7 +255,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           {finding.message}
         </p>
         <Field.field
-          :for={field <- rendered_fields(@node.form.fields)}
+          :for={field <- ViewModel.shown_fields(@node)}
           field={field}
           target={@target}
           block_id={@node.block_id}
@@ -477,15 +487,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp row_index(_index), do: 0
-
-    # The fields the package's own form draws. `ViewModel.build/3` lists every
-    # declared field, `hidden?: true` ones included, because the view model is
-    # a projection of the schema and a host filters it for its own surface
-    # (ADR-0002 decision 7, amended 2026-09-07, section F7). This is that
-    # filter for this surface. `Field.field/1` renders nothing for a hidden
-    # field either; the two agree, and neither is load-bearing alone.
-    @spec rendered_fields([ViewModel.Field.t()]) :: [ViewModel.Field.t()]
-    defp rendered_fields(fields), do: Enum.reject(fields, & &1.hidden?)
 
     # A read-only mount draws every field the way a `readonly?: true` field is
     # already drawn. The flag is set on the projection rather than a second
