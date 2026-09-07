@@ -2192,6 +2192,37 @@
   background: var(--sb-error-bg);
 }
 
+/* The inline variant of a field (`variant: :inline` on `Editor.Field.field/1`).
+ * A host writing its own sentence around a control asks for it per field; the
+ * package's own forms never draw it, which is what keeps this an attribute on
+ * one component rather than a second layout for the editor. The box turns
+ * inline and its parts sit on one baseline so the control reads as a word in
+ * the sentence it was placed in. */
+.sb-field--inline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sb-space-half);
+}
+
+/* The label is moved off the screen, not removed: it is still in the markup,
+ * still bound to the control by `for`, and still what a screen reader
+ * announces. The recipe is the ordinary one - a one-pixel clipped box rather
+ * than `display: none` or `visibility: hidden`, both of which take the element
+ * out of the accessibility tree as well as out of the page, which would leave
+ * the control with no name at all. A host that wants the label back overrides
+ * this one rule; the markup does not change under it. */
+.sb-field__label--inline {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 .sb-field__row {
   display: flex;
   align-items: center;
