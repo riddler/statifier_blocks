@@ -15,7 +15,7 @@ defmodule StatifierBlocks.Recipe do
   two namespaces rather than one. A recipe named `"deadline"` and a block type
   named `"deadline"` do not collide.
 
-  ## The two callbacks
+  ## The callbacks
 
   `palette_entry/0` is `StatifierBlocks.BlockType`'s callback, in every
   particular: the same optional keys, the same total normalizers, the same
@@ -30,6 +30,20 @@ defmodule StatifierBlocks.Recipe do
   ordinary case where the arrangement does not fit the position the author
   armed, and it is an error term, never an exception.
 
+  `members/2` is **optional**, and is the only callback here that is. It is
+  the delete-time counterpart of `insert/2`: handed a block id and the
+  document, it answers the ids of the arrangement that block belongs to, or
+  `[]` when the block is none of the recipe's business. A recipe that
+  implements only `insert/2` and `palette_entry/0` is a valid recipe exactly
+  as it was before the callback existed, and says "not mine" by omission.
+
+  A recipe recognises its arrangement **structurally**, in the document it is
+  shown, rather than by a mark: nothing a document holds says "this send is a
+  deadline's send" (ADR-0005 clause 11u), and `members/2` does not change
+  that. The consequence is deliberate rather than incidental - a hand-built
+  pair is claimed, because the recipe cannot tell it from a picked one and
+  should not.
+
   ## What a recipe may reach
 
   Clause 3C bounds the commands `insert/2` returns to the armed position
@@ -41,6 +55,12 @@ defmodule StatifierBlocks.Recipe do
   The bound is the caller's to enforce: `insert/2` is a pure function
   answering with commands, and it is `StatifierBlocks.Recipe.within_reach?/2`
   that says whether a returned list stays inside it.
+
+  The same bound holds a `members/2` answer, for the same reason and with the
+  same division of labour: an author deleting a block must not have a block
+  removed from a region they are not looking at, so a claim naming a block
+  that does not sit in the same enclosing block as the asked-about one is
+  refused by the caller before a compound is built.
   """
 
   alias StatifierBlocks.{Block, BlockType, Document, Edit}
@@ -58,6 +78,23 @@ defmodule StatifierBlocks.Recipe do
   unchanged.
   """
   @callback palette_entry() :: BlockType.palette_entry()
+
+  @doc """
+  The ids of the arrangement `block_id` belongs to, or `[]`.
+
+  Called with a block id and the document as it stands. Pure, on `insert/2`'s
+  terms: it reads and does not write, mints nothing, and raises nothing.
+
+  The answer **includes the block it was asked about** when the recipe claims
+  it. `[]` is how a recipe says "not mine", and an answer of one id is the
+  same gesture as declining - a compound of one remove and a plain remove are
+  the same thing.
+
+  Optional. A recipe that never wants a compound delete writes nothing.
+  """
+  @callback members(block_id :: Block.id(), document :: Document.t()) :: [Block.id()]
+
+  @optional_callbacks members: 2
 
   @doc """
   Whether every command in `commands` stays inside clause 3C's bound for an

@@ -1275,6 +1275,54 @@
   color: var(--sb-error);
 }
 
+/* The delete OFFER (ADR-0005's 2026-09-07 amendment, clause 3D). A recipe
+ * has claimed this block as half of an arrangement it recognises, so the
+ * next click removes more than one block and the control says how many
+ * before it is clicked: `x2` where the `x` was, with a Keep beside it.
+ *
+ * `data-reveal="always"`, which is not a hole in R2's "nothing at rest".
+ * R2 governs the control that deletes ONE block, and the pair here is on
+ * the canvas only while the author's own delete gesture is unanswered - it
+ * appears because they clicked, and the next click of either button takes
+ * it away. An offer nobody can see is not an offer.
+ *
+ * One absolutely positioned group rather than two absolutely positioned
+ * buttons, so the two controls lay themselves out beside each other and
+ * neither has to know how wide the other became when the count reached
+ * two digits. */
+.sb-node__offer[data-reveal="always"] {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sb-space);
+  opacity: 1;
+}
+
+.sb-node__offer-keep,
+.sb-node__offer-confirm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--sb-space-2);
+  min-width: var(--sb-space-2);
+  padding: 0 var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sb-node__offer-confirm {
+  border-color: var(--sb-error);
+  background: var(--sb-error-bg);
+  color: var(--sb-error);
+}
+
 /* R2's other half, and the only control on the card that is not about the
  * document: the fold. It sits left of the `x` on a container's chrome, in the
  * same square the `x` uses, so a card carries at most two affordances and they
