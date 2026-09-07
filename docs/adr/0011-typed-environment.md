@@ -2597,3 +2597,304 @@ record's practice at `:2552-2556` for a cite that has gone narrow.
 Filed with `sb-v3ny`, campaign SF037, folding the `ADR-0011` item of `sb-cr7e`.
 This Note changes no code, adds no README row, and flips no status line in this
 file.
+
+## Amendment (2026-09-07): the walk descends a pass-through slot's children, at the mapped inner position, and `with_writes/4` moves to `Environment`
+
+**Status: proposed (2026-09-07, campaign SF038, bead `sb-p01u`, recording the
+campaign-SF038 walk rulings `RQ-SF038-5` and `RQ-SF038-16`).** A decision record
+merges at proposed under the campaign invariant; flipping it to accepted is a
+separate gated request through the same `docs/adr/` gate, and `sb-vjvq` carries
+that flip once `sb-q183` has built section 2 and `sb-1eam` section 4. Additive:
+no text above this line is edited by this section.
+
+An amendment rather than a Note, by the test the Amendment at `:1186` applies to
+itself. The Note of 2026-09-07 at `:2396` says in as many words that "The walk
+**descends nothing**" (`:2415`), and gives the reason: "A composite in campaign
+SF037 exposes no slot of its own (`RQ-SF037-3`), so there is no slot to step
+into and nothing in `block.slots` to reach". `RQ-SF038-5` gives a composite a
+slot of its own, so there is now something in `block.slots` to reach and that
+sentence moves. A moved sentence is an amendment. What the Note's section 2
+decided - what the walk consumes *at* the composite's one position - is
+untouched, and section 1 below says so explicitly.
+
+That Note also wrote the question down. Its section 5 ("Pass-through slots:
+named, not decided", `:2498`) named three things that "come back into question"
+when a later record gives a composite pass-through slots, and said none of them
+was decided there. Sections 2, 1 and 3 below answer the first and the third and
+leave the second's `{:passthrough, slot}` half where section 5 put it. This is
+the later record section 5 was written for.
+
+### Context
+
+`RQ-SF038-5` admits a **pass-through slot** on a composite, for module and data
+composites alike: the declaration names a slot of the composite and the inner
+`{local_id, inner_slot}` it maps to, `slots/1` answers the declared slots
+instead of the `[]` that `lib/statifier_blocks/composite.ex:231` answers today,
+the card draws an interior for the declared slot only, and `expand/2` splices
+the composite block's slot children into the mapped inner slot keeping their
+ids. The slot itself - its declaration spelling, its validation at
+`declaration/1`, and the splice - is fixed by the ADR-0002 pass-through
+amendment, which is where a composite is decided. **This section decides only
+what decision 1's walk does about it**, and adds nothing to the declaration.
+
+Two facts make that a real question rather than a restatement. First, a
+pass-through slot's children *are* in the document - they are the author's own
+blocks, in `block.slots`, with the author's ids - so `descend/6`
+(`lib/statifier_blocks/environment.ex:249-251`) reaches them whether or not
+anything decides what environment they should be read against. Second, the
+environment they should be read against is **not** the one reaching the
+composite: the inner blocks the expansion places before the mapped slot have
+written by then, and those writes are the whole reason an author puts a block
+inside a section rather than after it. Left undecided, `slot_start/4` (`:701`)
+would hand a pass-through slot the environment as it reaches the container,
+which is decision 1's rule for an ordinary container and the wrong answer here.
+
+`RQ-SF038-16` is the second half, and it is the drop-check's. The editor's
+placement preview applies a candidate's writes with
+`Assignability.with_writes/4` (`lib/statifier_blocks/assignability.ex:661-667`,
+called from `downstream_findings/6` at `:654`), whose body is
+`Environment.write_signatures/3` reduced into the environment with a plain
+`Map.put` per signature. The walk applies the same writes with
+`Environment.apply_writes/5` (`lib/statifier_blocks/environment.ex:835`), which
+also runs the member expansion the Amendment of 2026-09-07 at `:1846` decided -
+`clear_derived/3` (`:854`), then the entry, then `put_derived/6` (`:885`). Two
+codepaths for one rule is one codepath too many, and the difference is visible:
+see section 5.
+
+### 1. Decided: a composite is still one block and one position for its own signatures
+
+Shape (A) stands exactly as the Note of 2026-09-07 at `:2564` records it. A
+composite's read and write signatures are its expansion's union, computed at its
+one position by `read_signatures/3` (`lib/statifier_blocks/environment.ex:364`)
+and `write_signatures/3` (`:387`) delegating to `expansion_signatures/5`
+(`:426`), which flattens `Composite.expand/2`'s subtree through
+`Composite.flatten/1` and maps the same signature function over it. A
+pass-through slot adds no `type_expr()` arm, no block-type callback, and no
+second answer at the composite's own position: `config_schema/1` is still the
+params, and the block after the composite still reads the union.
+
+Because `expand/2` splices the author's slot children into the mapped inner
+slot, that union now carries the children's own signatures as well. That is the
+correct reading and not a defect: the compiler sees only the expanded tree, so
+the block after the composite must see what the expanded tree left, and it does,
+in the expansion's own pre-order, under decision 1's last-write-wins by
+position.
+
+### 2. Decided: the walk descends a pass-through slot's children, at the mapped inner position
+
+The walk **descends a declared pass-through slot, and nothing else**. For a
+composite block `C` whose declaration maps slot `s` to `{local_id, inner_slot}`:
+
+- the position `{C.id, s, i}` is a position, and `at/3`
+  (`lib/statifier_blocks/environment.ex:203`) and `annotated/3` (`:214`) answer
+  for it;
+- the environment that slot's first child sees is **not** the environment
+  reaching `C`. It is the environment obtained by flattening `C`'s expansion up
+  to the block `local_id` names, applying each earlier member's writes as the
+  walk applies any block's, and then taking that inner block's own `inner_slot`
+  starting environment - which is to say, the environment the author's block
+  would see had the author placed the expansion by hand and dropped the child
+  where the splice puts it;
+- from there the slot is folded left to right exactly as `slot_env/7` (`:685`)
+  folds any slot: child `i` sees the children before it applied;
+- the composite's own writes - the union of section 1 - are applied after its
+  slots, as `through/5` (`:628`) already applies any container's.
+
+Two consequences of that last clause, and both are decided here rather than left
+to be read off an implementation. The paths the expansion's *inner* blocks put -
+paths no block of the document wrote - are **scoped to the slot** and do not
+reach the position after `C`: they are the keys `slot_env/7`'s `scoped` set
+already drops on the way out (`:685-694`), the same mechanism decision 11's
+fan-out bindings are scoped by. And the children's own writes reach the position
+after `C` **once**, through the union of section 1, not twice: the union is
+applied last and decides the environment there.
+
+The rule composes. If the mapped inner block is itself a composite with a
+pass-through slot, the position is the one the flattened expansion carries, and
+this section applies again at it. Nothing else in `block.slots` is descended: a
+slot key the declaration does not declare is not a pass-through slot, carries no
+mapping, and the walk reaches nothing through it.
+
+Per variant, so that the claim is not read wider than it is:
+
+| The composite | `slots/1` | What the walk descends | The environment the child is read against |
+|---|---|---|---|
+| No declared slot (every composite before `RQ-SF038-5`) | `[]` | nothing | - |
+| Declared pass-through slot, children present | the declared slot | those children | the mapped inner position, per this section |
+| Declared pass-through slot, no children | the declared slot | nothing - `arms/5` rejects an empty slot (`:658-670`) | - |
+| A slot key on the block the declaration does not declare | the declared slot | nothing | - |
+| Declared pass-through slot mapped into an inner composite's pass-through slot | the declared slot | those children | the inner composite's mapped position, this section applied again |
+
+A **data** composite is not a separate row. `RQ-SF038-5` admits the pass-through
+slot for module and data composites in one shape, the declaration is read to the
+same `{name, {local_id, inner_slot}}` mapping either way, and this walk asks the
+resolved module the same two questions in both cases.
+
+### 3. Decided: a read that fails inside a pass-through child is the child's own finding
+
+A read signature inside a pass-through slot's child that the environment does
+not satisfy produces decision 8's `{:type_mismatch, ...}` **attributed to the
+child**: the child's block id, the child's `config_key`, at the child's
+position. It is not lifted one level to the composite, and it is not attributed
+to the composite's own union.
+
+The reason is the author, and it is the reason the Note of 2026-09-07 gave for
+the opposite answer about expansion content. That Note's section 4 (`:2480`)
+attributes a finding inside an **expansion** one level up to the composite,
+"never to an expanded block the author cannot see", and argued it from exactly
+that: "section 4's 'one level up' was argued from the fact that an expansion is
+content the author cannot" (`:2513-2514`). A pass-through child is the
+other case. It is a block the author placed, with a field the author filled,
+and it is on screen, so the finding anchors on the thing the author can change
+- which is decision 2's whole rule for why a signature is declared on a field
+and not on a block.
+
+The two rules are complementary and neither edits the other. A read declared by
+a **member of the expansion** is still the compiler's and is still attributed
+one level up, per that Note's section 4 and `ADR-0004`'s provenance amendment;
+a read declared by a **child the author placed in a pass-through slot** is the
+child's. The test is whose block declared the read, not where in the expanded
+tree it ends up.
+
+**Named rather than guessed**: decision 8's tuple also names the block whose
+write signature the read disagrees with, and `annotated/3` (`:214`) is where
+that name comes from. When the disagreeing writer is a member of the expansion,
+that name is a minted id the author never typed and cannot see. What such a
+finding *renders* as - the minted id, the composite that owns it, or the
+composite's sentence - is not decided here, was not put to the walk, and is
+left open for the operator. The attribution decided above is unaffected either
+way: the finding is the child's, whatever the writer half renders as.
+
+### 4. Decided: `Environment.with_writes/4` is public, and the drop-check calls it
+
+`with_writes/4` becomes a public function of `StatifierBlocks.Environment`:
+
+    @spec with_writes(Palette.t(), Document.t(), Block.t(), annotated(), Declarations.t()) ::
+            annotated()
+    def with_writes(palette, document, block, env, declarations \\ %{})
+
+`with_writes/4` is the name a caller writes; the declarations argument carries a
+default, exactly as `at/3` and `annotated/3` carry their `ctx` default in this
+same module. Its body is `Assignability.with_writes/4`'s - `block`'s write
+signatures reduced into `env`, each entry annotated with `block.id` - **plus the
+member expansion the walk already runs**: per signature, the members the
+previous write at that path derived are cleared, the signature's own entry is
+put, and the members its type derives are put, skipping every path the same
+block writes explicitly. That is the Amendment of 2026-09-07 at `:1846` in its
+own words, and it is what `apply_writes/5` (`:835`) does today for the walk.
+
+`Assignability.downstream_findings/6` (`:654`) calls it, and
+`Assignability.with_writes/4` goes away - it is a private helper with one
+caller, and a private function is not a decision this record has to keep.
+`apply_writes/5` calls it too, so the walk and the preview are one codepath and
+not two agreeing ones.
+
+What this buys is stated as an equality rather than an intention: for any block
+`B`, environment `E` and declarations `D`, the entries the drop-check preview
+holds after `B` and the entries decision 1's walk holds after `B` are the same
+map. `sb-1eam`'s acceptance is that equality, and section 5 is the case that
+fails it today.
+
+This adds no `type_expr()` arm, changes no write-signature spelling, and moves
+no rule about *what* a block writes. It moves one function's visibility so that
+one rule has one implementation.
+
+### 5. Worked example: "Guarded section"
+
+The signup domain. The datamodel document declares one record:
+
+```json
+{
+  "name": "signup.applicant",
+  "kind": "record",
+  "label": "Applicant",
+  "fields": [
+    {"name": "email", "type": "string", "required?": true},
+    {"name": "invited_at", "type": "datetime"}
+  ]
+}
+```
+
+**The composite**, `myapp.guarded_section`, block id `blk_GX`, with two params
+and a pass-through slot:
+
+    params:
+      %{key: "applicant_path", type: :string, label: "Record the applicant at",
+        required?: true, default: "", datamodel_path?: true}
+      %{key: "failure_path",   type: :string, label: "Record the failure at",
+        required?: true, default: "", datamodel_path?: true}
+
+    slots:
+      %{name: "body", to: {"blk_GX_then", "body"}, label: "Then"}
+
+    subtree(params):
+      myapp.signup_step  id "blk_GX_call"
+        config  %{"assign_to" => params["applicant_path"]}
+        slots   %{"on_error" => [
+          core.assign  id "blk_GX_guard"
+            config  %{"path" => params["failure_path"], "value" => "failed"}
+        ]}
+      core.group  id "blk_GX_then"
+        slots   %{"body" => []}
+
+`myapp.signup_step` is a host block type whose `assign_to` field is
+`{:path, %{writes: "signup.applicant"}}`; `core.group` declares a `body` slot
+(`lib/statifier_blocks/core/group.ex:37-41`) and `core.assign`'s `path` is a
+`:string` carrying `datamodel_path?: true`
+(`lib/statifier_blocks/core/assign.ex:66-73`), which decision 2 reads as a write
+of `:unknown`.
+
+The author's document holds `blk_GX` with config
+`%{"applicant_path" => "signup.applicant", "failure_path" => "signup.failure"}`
+and one child in its `body` slot: `blk_notify`, a host step whose `to` field is
+`{:path, %{expects: "string"}}`.
+
+**What the walk does.** The environment reaching `blk_GX` holds neither
+`signup.applicant` nor `signup.failure`. Section 2 says `blk_notify` is read
+against the mapped inner position - inside `blk_GX_then`'s `body`, after
+`blk_GX_call` - so the environment it is read against holds
+`signup.applicant` at `signup.applicant`, and, by member expansion,
+`signup.applicant.email` at `string` and `signup.applicant.invited_at` at
+`datetime`. So:
+
+- `blk_notify` with `to` = `signup.applicant.email` **passes**: `string`
+  satisfies `string`. It passes only because the walk descended at the mapped
+  position, and only because member expansion ran there. Read against the
+  environment reaching `blk_GX`, the same block reads a path nothing put an
+  entry at - `ADR-0005` clause 11e's `:info`, which tells the author nothing
+  and would have told them nothing had they misspelt the path.
+- `blk_notify` with `to` = `signup.applicant.invited_at` is
+  `{:type_mismatch, ...}` with reason `:not_assignable`, a validation `:error`
+  by decision 5, anchored on **`blk_notify`** and its `to` key - section 3 -
+  and not on `blk_GX`.
+
+**And what section 4 fixes.** The author drags `blk_notify` into the section and
+the editor previews the drop. `downstream_findings/6` applies `blk_GX_call`'s
+writes to the environment with `Assignability.with_writes/4`, which puts
+`signup.applicant` and stops. `signup.applicant.invited_at` is not in the
+preview's environment, so the preview answers the second case above with
+`ADR-0005` clause 11e's `:info` - a quiet drop - and `validate/3` answers it
+with an `:error` the moment the drop lands. The preview under-reports exactly
+the member mismatch the walk catches. With section 4's `with_writes/4` both run
+the same expansion, and the preview says `:error` before the author lets go.
+
+### What this section does not decide
+
+- **The pass-through slot itself** - its declaration spelling, its validation at
+  `declaration/1`, the splice, the card's interior: the ADR-0002 pass-through
+  amendment's, not this record's.
+- **How a finding renders the writer half when the writer is an expansion
+  member** (section 3): named open, for the operator.
+- **`Collapse`**: `RQ-SF038-1`'s, and no rule of this walk changes for it.
+- **What `{:passthrough, slot}` carries through a pass-through slot.** It is
+  already an inhabitant of `t:StatifierBlocks.Assignability.produces/0`
+  (`lib/statifier_blocks/assignability.ex:85`), the Note of 2026-09-07 named it
+  open at `:2508-2511`, and it stays open: nothing in this section reads it and
+  nothing here decides it.
+- **Any `type_expr()` arm**: the four inhabitants the Note of 2026-09-07 counts
+  at `:2477` stand.
+
+Filed with `sb-p01u`, campaign SF038, recording `RQ-SF038-5` and `RQ-SF038-16`.
+This section adds no README row, flips no status line, and removes no line of
+this file. `sb-q183` builds section 2, `sb-1eam` section 4, and `sb-vjvq`
+carries the flip.
