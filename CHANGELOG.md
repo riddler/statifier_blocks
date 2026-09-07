@@ -10,6 +10,193 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.25.0] 2026-09-07
+
+0.25.0 is about **composites**: a block type derived from params plus a pure
+subtree, so an arrangement a host writes over and over becomes one thing an
+author puts down and one thing they read back. `use StatifierBlocks.Composite`
+declares one from a module, and `StatifierBlocks.Composite.Data` derives one
+from a JSON-shaped declaration, so a host whose *users* save block types can
+register a block type held as data - which is what a `{module, state}` palette
+entry is for. The compiler replaces a composite with its expansion at the
+Resolve stage, so a document holding one compiles to bytes identical to the
+same document with that composite expanded in place, and the editor's
+"Replace with its steps" performs exactly that expansion as one compound edit
+a single undo puts back.
+
+Beside that, this release publishes what a host drawing its own surface over a
+document was otherwise writing privately: `StatifierBlocks.ViewModel`'s
+readers, `StatifierBlocks.Edit.Session` as a commit funnel with no socket in
+it, `StatifierBlocks.Edit.Targets.accepted_types/4`, `Recipe.members/2` with a
+delete path that offers the whole arrangement, a `selected_id` a host may
+write, `field_candidates` honoured on path and expression fields, and a
+`debounce` attr on the config form.
+
+It is a minor, and no compiled chart bytes move. Two things answer differently
+from 0.24.0 for a host that does nothing: `StatifierBlocks.Palette.from_modules/2`
+now refuses a palette whose browser group holds two entries declaring the same
+`order`, which is a mount-time raise for a host that carried a duplicate and
+built at 0.24.0; and `StatifierBlocks.Palette.manifest/1` now answers `nil` as
+a type's version where it used to raise.
+
+### Added
+
+- `StatifierBlocks.ViewModel` answers the readers a host writing its own surface
+  over a document would otherwise write privately: `find_node/2`, `parent_of/2`,
+  `positions/1`, `sentence/1`, `shown_fields/1`, `fields_for/2`,
+  `overlay_draft/2` and `drafted_field/2`.
+- `StatifierBlocks.Document.committed_config/2` and `effective_config/2` and
+  `/3` answer what the document holds for a block, and what an unaccepted draft
+  says instead.
+
+- The editor's `field-list-add` and `field-list-remove` events carry
+  `block-id` beside `key`, so a host handling them knows which block the
+  gesture came from.
+
+- A palette entry may now be `{module, state}` beside a bare module, so a host
+  whose *users* save block types can register a declaration held as data.
+  `StatifierBlocks.Palette.call/4` is the one seam every callback on an entry
+  goes through: it prepends the state, asks about the arity a stateful module
+  actually exports, and answers a caller-supplied default when the entry
+  declares nothing. `StatifierBlocks.Palette.declares?/3` answers declaredness
+  alone for the two presentation branches that need it rather than a value.
+- `StatifierBlocks.Composite.Data` derives a composite block type from a
+  JSON-shaped declaration - params, a subtree template with one `"$param"`
+  placeholder arm and one `"$literal"` escape, and an optional sentence and
+  palette entry - through the same `StatifierBlocks.Composite.expand/2` a
+  `use StatifierBlocks.Composite` module goes through. A data composite and
+  the module composite of the same shape expand to the same blocks and compile
+  to the same bytes. `Composite.Data.declaration/1` refuses a malformed
+  declaration before it reaches a palette, which is the last moment a callback
+  can still be pure and total.
+
+- `StatifierBlocks.Recipe` gains an optional `members/2` callback: asked about
+  a block, a recipe answers the ids of the arrangement that block belongs to,
+  or `[]`. A recipe that does not implement it is unchanged.
+- The core `"deadline"` recipe implements `members/2`, recognising its
+  `core.send` and `core.on_event` pair structurally - a hand-built pair is
+  claimed, a pair renamed apart is not, and no block outside the enclosing
+  group is ever named.
+
+- `selected_id` is a documented input assign. A host that draws a selection
+  surface of its own - an outline pane, a plan view - moves the editor's
+  selection by passing the id through `send_update/3`, and hears the result
+  back on `on_select` like any other selection. It is honoured only on an
+  update that carries it, so a re-render the host made for a reason of its own
+  leaves the author's selection where it was, and an id the open document does
+  not hold clears the selection rather than naming a block that is not there.
+  A selection is not a document edit: no command, nothing serialized, and
+  nothing on the undo stack.
+
+- The editor replaces a selected composite block with the blocks it stands
+  for. The control sits on the composite's own card, reads "Replace with its
+  steps", and commits the removal and the expansion's inserts as one compound
+  edit: one undo puts the composite back whole, and the document it writes is
+  the one `StatifierBlocks.Composite.expand/2` answers, so the chart compiles
+  to the same bytes on both sides of the gesture.
+- The gesture is refused, and nothing is written, when the slot the composite
+  sits in will not admit the blocks that come out of it.
+
+- `StatifierBlocks.Edit.Session` is the commit funnel as a value: `commit/2`,
+  `change_config/3`, `step/2`, `update_list/4` and `apply_gesture/2` over a
+  document, a history and the drafts, with no socket in them. Each answers
+  `{:ok, session}` or `{:error, session}`, and the tag says whether the
+  document moved - which is when a host stores or notifies. Holding a refused
+  config as that block's draft, and dropping every draft across an undo, are
+  the package's decisions rather than each surface's.
+- `StatifierBlocks.Edit.Targets.accepted_types/4` answers which of a palette's
+  block types fit a `{parent_id, slot}` target, and `probe/2` builds the block
+  it asks about: `Palette.new_block/2`'s, with the type's `palette_entry/0`
+  `default_config` merged over it. A surface filtering a palette without that
+  merge answers differently, for any type whose read depends on its config,
+  than the canvas's own drag stamp does.
+- `StatifierBlocks.Assignability.context/1` builds the assignability context
+  from a host's `:datamodel`, so the drop check, the environment walk and a
+  datamodel view are handed the same one.
+
+- `ConfigForm.config_form/1` and `Field.field/1` take a `debounce` attr,
+  written as `phx-debounce` onto every control the form draws, so a host
+  that persists what the form posts can ask for something slower than one
+  write per keystroke. It takes what LiveView takes - milliseconds, or
+  `:blur` - and defaults to no attribute, which is what every existing
+  caller already renders. Controls drawn by an `expression_component`
+  override are that component's own and are not covered.
+
+- A `:composite_expansion_failed` finding at the `:resolve` stage reports a
+  composite whose declaration cannot be expanded, in place of the raise.
+
+- A host's `field_candidates` list is honoured on `{:path, opts}` and
+  `:expression` fields as well as `:string` ones: either spelling draws a
+  `<datalist>` the input is bound to, ahead of the declared datamodel paths,
+  and the value stays typed by the control.
+
+- `use StatifierBlocks.Composite` declares a block type from params plus a
+  pure `subtree/1`, deriving `config_schema/1`, `slots/1`, `io/1`,
+  `outcomes/1`, `current_version/0`, `sentence/1`, `palette_entry/0` and a
+  raising `emit/2`, and leaving only `sentence/1`, `palette_entry/0` and
+  `validate_config/1` overridable.
+- `StatifierBlocks.Composite.expand/2` answers the blocks a composite stands
+  for, with ids minted deterministically from the composite block's own id,
+  together with the param each expanded block is blamed on.
+- A composite's declaration derives a `StatifierBlocks.Recipe` at
+  `<Module>.Recipe` whose `insert/2` puts down one composite block.
+- `StatifierBlocks.Environment.read_signatures/3` and `write_signatures/3`
+  answer a composite with the union of its expansion's reads and writes, taken
+  at the composite's one position in the document.
+
+### Changed
+
+- `StatifierBlocks.Palette.fetch/2` and `resolve/2` answer the entry **as
+  stored**: neither normalizes a bare module into a pair nor unwraps a pair
+  into its module, so a host that registered no stateful entry can be handed
+  none and its existing `{:ok, module}` matches still match. `manifest/1`,
+  `new_block/2` and `from_modules/2` read a stateful entry through the seam,
+  including `from_modules/2`'s duplicate-`order` check - a stateful entry
+  collides with a bare one at the same order and is refused, rather than
+  silently dropping out of the check.
+- `StatifierBlocks.Composite.expand/2` and `composite?/1` take a palette entry
+  where they took a module. The existing module-only calls are unchanged.
+
+- Deleting a block a recipe claims now offers to remove the whole arrangement:
+  the card's delete control counts what the next click removes and a Keep sits
+  beside it. Taking the offer commits one compound, so one undo puts the
+  arrangement back whole. Deleting a block no recipe claims is unchanged.
+
+- The compiler replaces a composite block with its expansion at the Resolve
+  stage, so a document holding a composite compiles to bytes identical to the
+  same document with that composite expanded in place.
+- A finding raised inside an expansion is reported against the composite
+  block, carrying the key of the param that produced it or no key at all, and
+  the provenance map still owns every span by the expanded block that emitted
+  it.
+
+- `nil` is refused as the `default:` of a `hidden?: true` field for every
+  field type, not only `{:type_expr, opts}`.
+
+- **Breaking for a palette with a duplicate `order`.** `StatifierBlocks.Palette.from_modules/2`
+  now raises `ArgumentError` when two entries of one palette-browser group
+  declare the same `order`, naming both. A host whose palette carried such a
+  pair built at 0.24.0 and does not build here: renumber one of the two. The
+  check skips an entry whose module is not loaded, exports no
+  `palette_entry/0`, or declares no `order`.
+- `StatifierBlocks.Palette.manifest/1` answers `nil` as the version of a type
+  whose module cannot be loaded or exports no `current_version/0`, where it
+  used to raise, because it now reads every entry through
+  `StatifierBlocks.Palette.call/4`.
+
+### Fixed
+
+- `core.invoke` and the core `deadline` recipe no longer both declare
+  `order: 7`, so the Structure group of a palette browser has a stable
+  order; `Palette.from_modules/2` refuses two entries of one group that
+  declare the same `order`, naming both.
+
+### Note
+
+- `StatifierBlocks.Composite.Data` fixes no migration key, so bumping a
+  declaration's `"version"` with stored blocks refuses them through ADR-0007's
+  injected `migrate_config/2`, unchanged and deliberately not papered over.
+
 ## [0.24.0] 2026-09-07
 
 0.24.0 is about drawing less of the editor, and saying more about what is
@@ -2541,6 +2728,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.25.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.25.0
 [0.24.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.24.0
 [0.23.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.23.0
 [0.22.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.22.0

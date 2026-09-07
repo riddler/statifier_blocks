@@ -40,7 +40,7 @@ off a closed built-in vocabulary.
 ```elixir
 def deps do
   [
-    {:statifier_blocks, "~> 0.24"}
+    {:statifier_blocks, "~> 0.25"}
   ]
 end
 ```
@@ -528,6 +528,89 @@ registers separately, per session - the two-registry seam this package
 draws, which `use` does not cross. One type is the exception: see
 "The one handler this package does ship" below.
 
+### A type that stands for a subtree
+
+An arrangement a host writes over and over - call a step, and record the
+failure somewhere if it comes back on `error` - can be one block type rather
+than a shape an author has to rebuild each time. `use
+StatifierBlocks.Composite` declares one from **params** plus a pure
+`subtree/1`:
+
+```elixir
+defmodule MyApp.GuardedStep do
+  alias StatifierBlocks.Block
+
+  use StatifierBlocks.Composite,
+    name: "myapp.guarded_step",
+    params: [
+      %{key: "invoke_type", type: :string, label: "Call",
+        required?: true, default: ""},
+      %{key: "failure_path", type: :string, label: "Record the failure at",
+        required?: true, default: "", datamodel_path?: true}
+    ],
+    sentence: "Call {invoke_type}, recording failure at {failure_path}",
+    palette_entry: %{label: "Guarded step", group: "Structure"},
+    version: 1
+
+  @impl true
+  def subtree(params) do
+    [
+      Block.new("core.invoke",
+        id: "call",
+        config: %{"invoke_type" => params["invoke_type"], "assign_to" => ""},
+        slots: %{"on_error" => [
+          Block.new("core.assign",
+            id: "guard",
+            config: %{"path" => params["failure_path"], "value" => "failed"})
+        ]}
+      )
+    ]
+  end
+end
+```
+
+`params` is a list of ordinary field declarations - no new key and no new
+field type - and it **is** the type's `config_schema/1`, so every declaration
+check the compiler already runs runs over it for free. `subtree/1` is pure:
+the same params answer the same blocks, forever, and the ids it writes are
+local, minted by `StatifierBlocks.Composite.expand/2` as
+`composite_id <> "_" <> local_id` so the members inherit the composite
+block's own uniqueness rather than being freshly generated on every call.
+
+The `use` derives `config_schema/1`, `slots/1`, `io/1`, `outcomes/1`,
+`current_version/0`, `sentence/1`, `palette_entry/0` and a raising `emit/2`;
+only `sentence/1`, `palette_entry/0` and `validate_config/1` are overridable,
+because the others are about the expansion rather than about presentation or
+refusal. It also derives a `StatifierBlocks.Recipe` at `<Module>.Recipe`
+whose `insert/2` puts down **one composite block** - one command, not the
+expansion - for a host that already ships the arrangement as a recipe.
+
+Three things are worth knowing before you reach for one:
+
+- **The compiler expands it, at the Resolve stage.** A document holding a
+  composite compiles to bytes identical to the same document with that
+  composite expanded in place, so nothing about the chart depends on which
+  of the two the author stored. `emit/2` raises if it is ever reached,
+  because no composite block survives to Emit.
+- **A finding inside an expansion is reported against the composite.** It
+  carries the key of the param that produced the expanded block, or no key
+  at all where no single param is responsible - never an anchor on a block
+  the author cannot see. A declaration that cannot be expanded is a
+  `:composite_expansion_failed` finding at `:resolve` rather than a raise.
+- **A composite exposes no slot of its own.** `slots/1` is `[]`: an author
+  fills in params, not children. Passing children through to a slot inside
+  the expansion is not something this version does.
+
+A host whose *users* save block types does not have to generate a module per
+type. `StatifierBlocks.Composite.Data` derives the same thing from a
+JSON-shaped declaration - params, a subtree template with one `"$param"`
+placeholder arm and one `"$literal"` escape - and registers as a
+`{module, state}` palette entry beside the bare modules, going through the
+same `Composite.expand/2`. A data composite and the module composite of the
+same shape expand to the same blocks and compile to the same bytes.
+`Composite.Data.declaration/1` refuses a malformed declaration before it
+reaches a palette.
+
 ### The three presentation declarations
 
 A palette entry may also say how the editor should draw the type, and three
@@ -975,6 +1058,17 @@ An `expression_component` you pass still wins over every row: the host's own
 control is clause 1, and it is the answer whether or not `statifier_ui` is
 present.
 
+### Replacing a composite with its steps
+
+A composite block's card carries one control of its own, reading **"Replace
+with its steps"**: it takes the composite out and puts the blocks it stands
+for in where it stood, as a single compound edit, so one undo puts the
+composite back whole. The document it writes is the one
+`StatifierBlocks.Composite.expand/2` answers, which is why the chart compiles
+to the same bytes on both sides of the gesture. It is refused, and nothing is
+written, when the slot the composite sits in will not admit the blocks that
+come out of it.
+
 ### What the mounted component holds
 
 The `document` you pass in, an undo history over it, the current selection,
@@ -982,6 +1076,14 @@ and a `drafts` map of config edits the validation gate has not accepted yet.
 A draft is never in the document and never on the undo stack: a form whose
 config has not been accepted names the fields that are outstanding and offers
 "Discard edits", because a draft was never a command and so cannot be undone.
+
+The selection is the editor's, but a host with a selection surface of its own
+can move it: the **`selected_id` assign** is honoured on any update that
+carries it, and the result comes back on `on_select` like any other
+selection. An update that does not carry it leaves the author's selection
+alone, and an id the open document does not hold clears the selection rather
+than naming a block that is not there. It is not a document edit: no command,
+nothing serialized, nothing on the undo stack.
 
 There is a **`datamodel` assign**, and it carries paths rather than logic. A
 host hands in the datamodel paths it declares, and the one thing that buys is
@@ -1019,6 +1121,10 @@ the theme - rather than a callback the editor calls back into:
 | `expression_component` | the `expression_component` assign | the control an `:expression` field renders. Unset, it resolves to statifier-ui's expression editor when `statifier_ui` is present and to the package's plain source input when it is not; set, the host's own function component wins over both |
 | `value_candidates` | the `value_candidates` assign | the values the host offers per datamodel path, `%{path => [%{label:, value:} \| binary]}`. Read by whatever fills the `expression_component` seam - a path with no entry gets a free-text value control, because only a host knows which of its own paths have a value set |
 | `chart_outcomes` | the `chart_outcomes` assign | what the host says each of its stored documents finishes with, `%{document id => [outcome]}`. A `core.subchart` names a chart by document id and declares its outcomes by hand, because a block type cannot read the document it references; only the host knows which of its documents it compiles with `:child_use` - those are the ones a subchart may name - and what finals each of those emits. The editor offers that list on the `outcomes` field and reports a disagreement between it and what the block declares. A document the map does not name is *unknown*, which is not disagreement: `%{}`, the default, reports nothing about anything |
+| `selected_id` | the `selected_id` assign | the block the editor is about, written by a host that draws its own selection surface. Honoured only on an update that carries it; an id the open document does not hold clears the selection. It moves the selection, it does not edit the document - nothing is serialized and nothing goes on the undo stack |
+| `profile` | the `profile` assign | which of the editor's surfaces this mount draws, and whether it edits at all: `%{drawer_tabs:, inspector_tabs:, palette_groups:, toolbar:, read_only?:}`, every key optional and every list `:all` by default. No arrangement of the map, `%{}` included, removes a surface a host did not name, and an id a list names that the package cannot resolve is dropped rather than raised. `read_only?: true` renders the document offering no way to change it - [`docs/profiles.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/profiles.md) is the page that works it through |
+| `field_candidates` | the `field_candidates` assign | the values a host offers for one field, keyed `{type_name, field_key}`: `[{value, label}]` for a closed list, which a `:string` field draws as a `<select>`, or `{:open, [{value, label}]}` for an open one, drawn as a `<datalist>`. A `{:path, opts}` and an `:expression` field read it too and draw either spelling as a `<datalist>`, ahead of the declared datamodel paths, because the value stays typed by the control. `%{}` (the default) offers none. It draws a control and decides nothing: `validate_config/1` is still the only authority on a value |
+| `debounce` | `StatifierBlocks.Editor.ConfigForm.config_form/1` and `StatifierBlocks.Editor.Field.field/1` | what `phx-debounce` the controls those two draw carry, for a host rendering the config form itself and persisting what it posts. It takes what LiveView takes - milliseconds, or `:blur` - and defaults to no attribute, which is what every existing caller already renders. Controls drawn by an `expression_component` override are that component's own and are not covered |
 | `capture` | `core.on_event` config, in the document | a map that writes values out of the firing event's payload into the datamodel: the key is the destination (a datamodel path) and the value is the source (a path inside `_event.data`). One `<assign>` per pair is emitted on the handler's own transition, in the destinations' sorted order, before the `<raise>` that carries the outcome. `config_schema/1` declares no field for it - the field-type set has no member that describes a map - so it is authored through the document rather than through the editor today. At run time a source whose root is bound but whose named member is missing writes the interpreter's explicit unbound marker and raises nothing (ADR-0002's capture Note, as corrected 2026-09-05), so a reader of a captured path tests for that marker rather than assuming an authored absence - unless the handler declares a `payload`, in which case the read is checked at compile and the marker write never happens |
 | `payload` | `core.on_event` config, an optional `:string` field | the name of a type the datamodel document declares (`StatifierDatamodel.Declarations`), saying what `_event.data` carries **for the event this handler names**. Two handlers for one event may declare different payloads; each governs its own `capture`. With one declared, a `capture` pair whose source path reads a member the payload does not carry is a `:config` refusal on the `capture` key - the first segment against the payload's fields, deeper segments only where the field's own type resolves to another declaration, and a scalar, list or opaque field stops the walk. Absent, blank, naming a type the document does not declare, or compiled with no `:datamodel`: nothing is refused and nothing changes. `payload` emits no SCXML of its own (ADR-0002's amendment of 2026-09-06) |
 
@@ -1049,9 +1155,13 @@ Honest about the edges, so you do not go looking for these:
 - **Connectors.** Blocks are arranged by containment, and there is no
   free-floating edge between two cards. Whether the editor grows one is an
   open ADR-0005 decision-7 question (`sb-y14`).
-- **A fixtures pane.** No panel drives a document against fixture rows, and
-  nothing marks a block as currently invoking. ADR-0005 decision 15 defers
-  the live half to the family's trace conventions (`sui-13q`).
+- **A pass-through slot on a composite.** A composite declares params and no
+  slots of its own, so an author fills it in rather than putting children
+  into it. A composite that exposes a slot is a later record's.
+- **The inverse of "Replace with its steps".** Recognising an arrangement in
+  a document and offering to save it back as a composite is recorded in
+  ADR-0005's 2026-09-07 amendment, at proposed by its own words, and nothing
+  builds it yet.
 - **A datamodel path grammar.** The undeclared-path advisory `11e`-`11g`
   settled is shipped, but only against the set of paths a host declares.
   Nothing here parses or validates a path beyond its shape, and a host that
