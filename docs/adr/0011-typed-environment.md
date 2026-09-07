@@ -1573,3 +1573,140 @@ formatting-only exemption, and amendments here are additive.
   recorded here.
 
 Filed with `sb-wzoa`, campaign SF035's Lane A.
+
+## Note (2026-09-07): seeding is root-forward, the seed reads `Index.entries/1` and each entry's declared type, and a bare `object` is nominal
+
+`RQ-SF035-24` asked two questions of this record and was ruled by the operator
+on 2026-09-07 as `RQ-SF036-0a` and `RQ-SF036-0b`. This Note records the ruling.
+It sits at the foot so that no line a sibling record cites moves, it edits no
+clause, it removes no line, and it carries no `Status:` line of its own. The
+one sentence it supersedes is named below and left standing where it is.
+
+Every line cite below is a reading of `main` at `b71740c`, with
+`deps/statifier_datamodel` resolved at `0.4.0`, and is to be re-counted by a
+later reader rather than trusted.
+
+### 1. Position: seeding is root-forward, and the question was moot as worded
+
+The question was whether a seeded declared type enters the environment at
+**every** position or only **from the document root forward, up to the first
+write at that path**. It is the second, and this record already said so twice
+before the question was asked.
+
+The per-path table in part 2 of the Amendment of 2026-09-06 (`:1295-1300`)
+reads, in its first two rows:
+
+| At a path | The environment holds, at a position |
+|---|---|
+| Declared, and no block wrote it before this position | The declared type, marked as seeded |
+| Declared, and a block wrote it before this position | What that block wrote (decision 1's last-write-wins, unchanged) |
+
+"Before this position" is the root-forward rule stated per position, and it is
+decision 1's last-write-wins doing the work rather than a rule of its own. The
+`seed/3` moduledoc says the same in prose - "a block writing a path replaces
+what the declaration seeded there for every position after it"
+(`lib/statifier_blocks/environment.ex:279-282`) - and the walk implements it by
+having nothing to implement: a seeded entry is an entry, the walk is pre-order,
+and a later write replaces it from its own position onward.
+
+**Decided: nothing changes.** No position rule is added, amended, or removed;
+no walk code changes. The existential-over-positions drop verdict this record
+describes keeps the shape it has, because a blanket refusal and a
+write-following refusal stay distinguishable exactly as before: a declaration
+seeds a path from the root, a write at that path replaces it from the write
+onward, and the two are different sets of positions.
+
+**Why the question arose, and what actually differed.** It arose from a read
+that was refused where the reader expected it to be admitted, in the reference
+embedder's card-processing fixture. That fixture declares the **path**
+`cards.settlement` with `"type": "object"` while its receipt step reads the
+**record** named `cards.settlement`, which the same fixture also declares. The
+seed therefore held `"object"` at that path from the root forward, the receipt
+step's read expected `"cards.settlement"`, and the check refused it. No
+position was involved: the refusal is the same at every position, because
+nothing in that flow writes `cards.settlement` at all. What is wrong is the
+fixture's declaration, not the seeding rule, and the fixture is what changes -
+in `statifier_examples`, under `se-yag`.
+
+### 2. Projection: the seed reads `Index.entries/1` and each entry's declared type
+
+Part 2's deciding sentence (`:1283-1288`) says the environment "holds an entry
+at every path `StatifierDatamodel.Index.path_types/1` projects from
+`ctx[:datamodel]` - the same projection `StatifierBlocks.Datamodel.path_types/1`
+wraps and the editor already draws - at the type it projects". The Note of
+2026-09-07 above (`:1417`) recorded that this is not what the code does and
+held the flip on it.
+
+**Decided: the code is right and the sentence is superseded.** The seed reads
+`StatifierDatamodel.Index.entries/1` and takes each entry's **declared type**.
+`StatifierBlocks.Environment.declared_seed/1`
+(`lib/statifier_blocks/environment.ex:781-787`) is that read, and
+`declared_spelling/1` (`:801-808`) is the spelling: a declaration name stays
+its name, a scalar becomes its own atom spelled out, a list carries its item
+type, and an entry the index cannot name a type for contributes nothing.
+
+The superseded sentence is left where it stands, unedited. It is superseded
+because `path_types/1` answers a different question. It projects **value
+kinds** for a renderer - `integer` and `decimal` both become `:number`, an
+enumeration wins over the type, and `object`, a declaration-typed entry and an
+untyped entry each contribute **no path at all**
+(`Index.path_types/1` over `value_kind/1` and `scalar_kind/1`). Those dropped
+entries are precisely the ones the seed exists to carry: a path declared as a
+record is the case the read check has the most to say about, and a path
+declared as `object` is the case that produced the question in section 1. A
+seed built from `path_types/1` would hold neither.
+
+The two halves of this package therefore draw two projections of one index on
+purpose, and the comment above `declared_seed/1` that claimed they cannot drift
+apart (`:772-775`) is corrected in the same request that carries this Note. The
+Datamodel tab and the editor's typed cells keep reading
+`StatifierBlocks.Datamodel.path_types/1` (`lib/statifier_blocks/editor.ex:2113-2116`),
+because a renderer wants kinds; the walk keeps reading `entries/1` and the
+declared type, because a check wants names.
+
+This releases `sb-wzoa`: with the deciding sentence superseded rather than
+contradicted, the Amendment of 2026-09-06 on decision 1 and decision 2
+(`:1186`) is flippable, and `sb-wzoa` remains the separate gated request that
+flips it.
+
+### 3. A bare `object` is nominal, and does not cover a read of a declared record
+
+**Decided: a path declared `object` holds the type `object` and nothing more.**
+It is a name like any other name, and it satisfies a read only where decision 8
+of `sd-ADR-0001` says a name satisfies one - by identity, or by a record
+covering a shape's required set. `object` names no declaration, so it covers no
+shape; it is not equal to any record name, so it satisfies no record read; and
+it is not unknown, so it is not permissive either. There is no structural arm
+in that check, and this record adds none.
+
+This is not a widening this package could add on its own account. Decision 3 of
+this record already says the read check is `sd-ADR-0001` decision 8's and that
+this package defines no second one. `sd-y3l` lands the matching Note against
+decision 8 in `statifier_datamodel`, saying the same thing from that side.
+
+**Worked example, in the card-processing domain.** A datamodel document
+declares a record `cards.settlement` with `amount_cents`, `currency` and
+`settled_on`, and declares the path `cards.settlement` as `object`. A receipt
+step reads `cards.settlement` expecting the record.
+
+| Held at `cards.settlement` | Read expects | Verdict |
+|---|---|---|
+| `"object"` (the path declared bare) | `"cards.settlement"` | Not satisfied - decision 8 step 4. `object` is not the same name, and names no record whose fields could cover anything |
+| `"cards.settlement"` (the path declared at the record) | `"cards.settlement"` | Satisfied - decision 8 step 2, identity |
+| No entry (the path not declared) | `"cards.settlement"` | No entry to check: decision 5's `:info` |
+
+The middle row is what the reference fixture means to say, which is why the
+fixture is what `se-yag` changes.
+
+### What this Note does not do
+
+- **It flips nothing.** The Amendment at `:1186` still reads `Status: proposed`
+  and `sb-wzoa` still carries its flip.
+- **It removes and moves nothing.** The superseded sentence at `:1283-1288`
+  stands where it is; this Note says it is superseded and why.
+- **It changes no walk behaviour.** The only code in the request that carries
+  it is the corrected comment above `declared_seed/1`.
+
+Filed with `sb-m9eq`, campaign SF036's Lane X. `sb-wzoa` flips the Amendment
+this releases; `se-yag` edits the card-processing fixture; `sd-y3l` lands the
+matching Note on `sd-ADR-0001` decision 8.
