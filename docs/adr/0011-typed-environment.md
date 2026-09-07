@@ -2130,12 +2130,14 @@ against `sd-ADR-0001`'s two amendments of 2026-09-06 as merged in
 `statifier_datamodel`. The code half of `sb-vjjl` builds it and may carry its
 flip.
 
-## Note (2026-09-07): `sb-vjjl`'s member-expansion amendment is corrected in four places and flipped to accepted
+## Note (2026-09-07): `sb-vjjl`'s member-expansion amendment is corrected in four places and flipped to accepted, with two sentences of its section 5 superseded
 
 The Amendment of 2026-09-07 on decision 2 (`:1846`) reads `Status: accepted`
-from this date. `sb-9paa` is the separate gated request that section's own
-status paragraph names, and this Note is what the flip checked and what it
-corrects. It is by addition, sits at the foot where this campaign's records
+from this date. That section's status paragraph reserves the flip for a
+separate gated request through the same `docs/adr/` gate and names `sb-vjjl`'s
+code half as its carrier; that half landed as `52e1bdf` without carrying it,
+and `sb-9paa` is the separate request that does. This Note is what the flip
+checked and what it corrects. It is by addition, sits at the foot where this campaign's records
 append so that no line a sibling record cites moves, edits no clause, carries
 no `Status:` line of its own, and the only line the request removes is the one
 the status word is on - the shape `sb-wzoa`'s flip of the Amendment at `:1186`
@@ -2194,10 +2196,32 @@ the same words: that finding is anchored on the reading step's own path field,
 and `assign_to` appears in it as the upstream reference's block, not as a
 `config_key`.
 
-Section 5's paragraph about **why** an author is sent somewhere is not
-disturbed by this, only relocated: an author sent to their own read still needs
-the root's writer to fix a wrong member type, and `upstream_ref` plus
-`{:fixable_by, block_id}` is what carries them there.
+Section 5's second paragraph closes on the same claim by another route, and is
+superseded in the same words. It says (`:2005-2008`):
+
+> The signature triple the walk already carries is `{key, path, type}`
+> (`field_writes/2`, ...), so a derived signature carries the root field's
+> `key` and nothing new has to be threaded to make this true.
+
+**There is no derived signature.** `field_writes/2` answers what a *block*
+declares and is unchanged; the expansion happens after it, inside the
+environment build, and it carries no key at all. `derived_writes/3,4`
+(`lib/statifier_blocks/environment.ex:856-878`) yields `{member_path,
+member_type}` pairs, and `put_derived/6` (`:832-848`) stores each as
+`{member_type, block_id}` - a type and a writer, which is what
+`t:StatifierBlocks.Environment.annotated/0` holds and all it holds. The key a
+finding is anchored on comes from the other end entirely: `read_keys/2`
+(`lib/statifier_blocks/compiler.ex:956-963`) supplies the **reading** field's
+key, looked up when the finding is built. So the sentence is superseded on the
+same ruling and for the same reason as section 5's first: threading the root
+field's key to a derived entry is exactly the widening of `annotated/0` that
+`RQ-SF036-17` declined.
+
+What survives of that paragraph is its argument about **why** an author needs
+the root's writer at all, and it is not disturbed, only relocated: an author
+sent to their own read still has to reach the block that wrote the record to
+fix a wrong member type, and `upstream_ref` plus `{:fixable_by, block_id}` is
+what carries them there.
 
 ### 2. Section 4's second bullet: an explicit `P.m` from an earlier block is protected by decision 1, not by section 4's first case
 
@@ -2211,7 +2235,7 @@ The pointer is too narrow, and this part corrects it **by addition**. Section
 4's first case is scoped to *one block's* signatures - the `declared` set that
 `apply_writes/5` builds from the signatures of the block being applied
 (`lib/statifier_blocks/environment.ex:790-801`) and that `put_derived/6`
-(`:832-856`) skips over. It cannot protect a `P.m` an **earlier** block wrote,
+(`:832-848`) skips over. It cannot protect a `P.m` an **earlier** block wrote,
 because that block's signatures are not in the set.
 
 What protects that entry is decision 1's per-path last-write-wins, realised by
@@ -2223,7 +2247,7 @@ that pair when it was applied, so the pair no longer matches and the entry is
 left alone - as the code's own comment at `:803-807` says, "an entry a later
 explicit signature at `path.m` replaced is no longer what the previous write
 put there - decision 1's per-path last-write-wins already took it". Asserted at
-`test/statifier_blocks/environment/member_expansion_test.exs:421-433` ("a
+`test/statifier_blocks/environment/member_expansion_test.exs:421-430` ("a
 rewrite does not clear a member an explicit signature wrote").
 
 So: within one block, section 4's first case; across positions, decision 1.
@@ -2304,8 +2328,9 @@ assert both halves - once per chain, and a second unrelated root expands again.
 the signature's own entry, then puts the derived members skipping every path
 the block declares.
 
-**Section 5** holds but for its first sentence and the worked shape's repeat of
-it, both superseded by part 1 above.
+**Section 5** holds but for its first sentence, the closing sentence of its
+second paragraph, and the worked shape's repeat of the first - all three
+superseded by part 1 above.
 
 **Section 6** holds. `StatifierBlocks.Datamodel.declared_view/3`
 (`lib/statifier_blocks/datamodel.ex:717-731`, the cite unmoved) still builds
@@ -2345,13 +2370,14 @@ Every cite this record makes into `docs/adr/0011-typed-environment.md` itself
 still resolves: `52e1bdf` touched no `docs/adr/` file, and this request appends
 only.
 
-### 6. What this Note does not do
+### What this Note does not do
 
 - **It flips one status word and corrects four things by addition.** No clause
   is edited, and the only removed line is the one the status word sits on.
-  Section 5's title and first sentence, the worked shape's repeat of it, the
-  two "coverage check" phrases and the internal pointer at `:1986-1987` all
-  stand where they are, superseded or corrected by the parts above.
+  Section 5's title, its first sentence and its second paragraph's closing
+  sentence, the worked shape's repeat of the first, the two "coverage check"
+  phrases and the internal pointer at `:1986-1987` all stand where they are,
+  superseded or corrected by the parts above.
 - **It changes no code.** `RQ-SF036-17` ruled the correction is a Note and not
   a code change, and the request that carries this Note touches this file only.
 - **It settles the amendment's last bullet rather than falsifying it.** "It
