@@ -763,6 +763,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assigns
         |> assign(:declared_types, Datamodel.declared_types(assigns.datamodel))
         |> assign(:declared_type_names, declared_type_names(assigns.datamodel))
+        |> assign(:declared_values, declared_values(assigns))
         |> assign(:environment_view, environment_view(assigns))
 
       # One resolution of the marks, read twice: the canvas draws them and
@@ -904,6 +905,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             declaration_refusal={@declaration_refusal}
             fixture_runs={@fixture_runs}
             declared_view={@declared_view}
+            declared_values={@declared_values}
             declared_types={@declared_types}
             environment_view={@environment_view}
             run?={@run != nil}
@@ -2098,6 +2100,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec declared_path_types(map()) :: %{optional(String.t()) => term()}
     defp declared_path_types(assigns) do
       Datamodel.path_types(assigns.datamodel)
+    end
+
+    # The enumerations the Datamodel tab's declared-path table draws beside a
+    # path, and the reason it takes no host override where `offered_values/1`
+    # does: that table is a report of what the DOCUMENT declared, and a host
+    # map merged over it would put values in a "Declared paths" grid that the
+    # declaration does not carry. The picker's feed and this report therefore
+    # read the same enumeration and answer two different questions - "what may
+    # an author pick here" and "what did this document say is at this path" -
+    # so `value_candidates/1` is called with its default empty host map rather
+    # than with `assigns.value_candidates`.
+    @spec declared_values(map()) :: %{optional(String.t()) => [Datamodel.candidate()]}
+    defp declared_values(assigns) do
+      Datamodel.value_candidates(assigns.datamodel)
     end
 
     # The completion events a `core.on_event`'s `event` field offers

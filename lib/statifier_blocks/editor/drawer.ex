@@ -25,7 +25,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     whole document and admitted by 1A for the same reason the four before it
     were. It is read-only on purpose - the editable half is the Declarations
     tab beside it, over the document's own roots - and no reserved place
-    remains behind it.
+    remains behind it. A path whose ADR-0006 entry carries a `one_of` draws
+    that enumeration in a Values column beside its shape, cut at **eight
+    values** with the remainder counted ("+3 more") so that a path declaring
+    forty does not turn one row into a paragraph. It is the same enumeration
+    a value picker is fed from, drawn here for the same reason the shape is:
+    "where did this picklist come from" is then answered by a row in this
+    table rather than by opening a condition.
 
     The measurable reason the drawer exists at all: a truth table for a branch
     in a credit-card processing document is one row per case and one column per
@@ -196,6 +202,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:declared_view, :list,
       default: [],
       doc: "`StatifierBlocks.Datamodel.declared_view/3`'s rows for the Datamodel tab"
+    )
+
+    attr(:declared_values, :map,
+      default: %{},
+      doc: """
+      The enumerations the datamodel document declares per path, as
+      `StatifierBlocks.Datamodel.value_candidates/1` projects them - the
+      declaration's own values, with no host map merged over them. Drawn
+      beside the declared path they belong to; a path absent from the map
+      declares none.
+      """
     )
 
     attr(:declared_types, :list,
@@ -383,7 +400,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 <.source view={@source_view} selected_id={@selected_id} target={@target} />
               <% @view.tab == :datamodel -> %>
                 <.known_here rows={@environment_view} run?={@run?} />
-                <.declared_paths rows={@declared_view} />
+                <.declared_paths rows={@declared_view} values={@declared_values} />
                 <.declared_types rows={@declared_types} />
               <% true -> %>
                 <p :if={@view.status == :no_fixtures} class="sb-drawer__empty">
@@ -747,7 +764,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
+    # How many declared values a row draws before it stops and counts the
+    # rest. Eight is a row's worth at the drawer's width: it is enough for the
+    # enumerations an author actually reads off a report - a card brand, a
+    # wizard step, an outcome slot - and short enough that a path declaring
+    # forty does not turn one row into a paragraph and push every row below it
+    # off the panel. The count is drawn rather than the values dropped,
+    # because "+32 more" is a fact about the declaration and an unmarked
+    # truncation is a lie about it. The whole enumeration is one tab away, in
+    # the document itself.
+    @declared_values_shown 8
+
     attr(:rows, :list, default: [])
+    attr(:values, :map, default: %{})
 
     # One row per declared path, and nothing an author can change: the
     # editable surface is the Declarations tab, over the document's own roots,
@@ -779,6 +808,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 <th scope="col">Path</th>
                 <th scope="col">Declared by</th>
                 <th scope="col">Type</th>
+                <th scope="col">Values</th>
                 <th scope="col">Scope</th>
                 <th scope="col">Label</th>
               </tr>
@@ -792,6 +822,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 <th scope="row">{row.path}</th>
                 <td>{Shell.declared_by(row)}</td>
                 <td>{Shell.declared_shape(row)}</td>
+                <td data-cell="values">
+                  <.declared_values_cell values={Map.get(@values, row.path, [])} />
+                </td>
                 <td>{row.scope}</td>
                 <td>{row.label}</td>
               </tr>
@@ -799,6 +832,32 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </table>
         </div>
       </section>
+      """
+    end
+
+    attr(:values, :list, default: [])
+
+    # A path's declared `one_of`, in the order the document wrote it, cut at
+    # `@declared_values_shown` with the remainder counted rather than dropped
+    # silently. A path that declares nothing draws an empty cell and not a
+    # dash: the column already says what it holds, and the row beside it that
+    # does carry values is what makes the absence readable.
+    #
+    # This draws a hint and never a constraint, which is the same posture
+    # `StatifierBlocks.Datamodel.value_candidates/2` documents for the picker
+    # fed from the same enumeration - nothing here refuses a value and nothing
+    # here produces a finding.
+    defp declared_values_cell(assigns) do
+      shown = Enum.take(assigns.values, @declared_values_shown)
+      extra = length(assigns.values) - length(shown)
+
+      assigns = assign(assigns, shown: shown, extra: extra)
+
+      ~H"""
+      <span :if={@shown != []} class="sb-datamodel__values">
+        <code :for={value <- @shown} class="sb-datamodel__value">{value}</code>
+        <span :if={@extra > 0} class="sb-datamodel__values-more">+{@extra} more</span>
+      </span>
       """
     end
 
