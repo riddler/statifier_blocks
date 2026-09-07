@@ -1200,8 +1200,9 @@ declaration, `{:list, type}`, or `:unknown`. There is no other inhabitant"
 (`:141-143`) - and part 1 states it differently; decision 2 states the seed in
 as many words - "the document opens with its subject path holding its subject
 type and nothing else" (`:182-183`, restated at
-`lib/statifier_blocks/environment.ex:242`) - and part 2 states it differently. Two decisions move, so the section is numbered, and
-each part names what it leaves standing.
+`lib/statifier_blocks/environment.ex:242`) - and part 2 states it
+differently. Two decisions move, so the section is numbered, and each part
+names what it leaves standing.
 
 The two parts are independent of each other and both are `sb-1jcr`'s to build.
 They are filed together because they are one ruling pair from one walk and
@@ -1232,8 +1233,8 @@ list of inline shapes is sayable and is what part 1's third consumer below
 needs.
 
 **Decision 1's provenance sentence is the one thing that moves with it.** It
-says "this package mints none of them: every one of them comes from the
-datamodel document or from a block's own declaration" (`:143-144`). An inline
+says "this package mints none: every one of them comes from the datamodel
+document or from a block's own declaration" (`:143-144`). An inline
 shape has no document syntax (`sd-ADR-0001`'s arm (c)), so it cannot come from
 the document, and the value that motivates the arm here is not written on a
 block either: the fan-out envelope is assembled by this package from
