@@ -5643,7 +5643,7 @@ Filed with `sb-wzoa`, campaign SF035's Lane A.
 
 ## Amendment (2026-09-07): decision 7, optional `hidden?` and `readonly?` keys, and the missing-`default:` refusal widened to every field type
 
-**Status: proposed (2026-09-07).** Drafted for `sb-s0jt` under the operator's campaign-SF036
+**Status: accepted (2026-09-07).** Drafted for `sb-s0jt` under the operator's campaign-SF036
 grant, recording that campaign's ruling `RQ-SF036-3` and the two record
 questions carried on `sb-btx0`, and merging at proposed under that campaign's
 invariant like every other section filed with it; flipping it to accepted is a
@@ -5947,7 +5947,7 @@ rather than trusted.
 
 ## Amendment (2026-09-07): decision 5, an optional `sentence/1`, and the one refusal set a sentence sits outside
 
-**Status: proposed (2026-09-07, campaign SF036, bead `sb-hlut`, on ruling
+**Status: accepted (2026-09-07, campaign SF036, bead `sb-hlut`, on ruling
 `RQ-SF036-4`).** A decision record merges at proposed under campaign SF036's
 invariant; flipping this section's status line to accepted is a separate gated
 request (`sb-xnxw`, after `sb-w37s` lands the callback). Additive: decision 5's
@@ -6168,3 +6168,191 @@ types' sentences, from this section as merged. `sb-xnxw` flips **this
 section's status line** to accepted after `sb-w37s` lands.
 
 Filed with `sb-hlut`, campaign SF036, on ruling `RQ-SF036-4`.
+
+## Note (2026-09-07): the field-flags and `sentence/1` amendments are flipped to accepted, with five claims corrected and their code cites re-counted
+
+The Amendment of 2026-09-07 on decision 7 (`:5644`, the optional `hidden?` and
+`readonly?` keys and the widened missing-`default:` refusal) and the Amendment
+of 2026-09-07 on decision 5 (`:5948`, the optional `sentence/1`) both read
+`Status: accepted` from this date. `sb-xnxw` is the separate gated request
+both sections' own status paragraphs name, and this Note is what the flip
+checked and what it corrects.
+
+It is by addition, sits at the **foot** of this record so that no line a
+sibling record cites moves, edits no clause, and carries no `Status:` line of
+its own. The only lines the request removes in this file are the two the
+status words sit on - the shape `sb-wzoa`'s flip at `ADR-0011:1186` and
+`sb-9paa`'s at `ADR-0011:1846` both took. No marker is inserted beside either
+status paragraph: inserting one mid-file is what this campaign's
+append-at-the-end rule exists to prevent, and every forward sentence those
+paragraphs carry is met here instead, where it stands.
+
+### What was implemented, and where the flip read it
+
+| Section | Implementing request | On `main` at | Read for this flip at |
+|---|---|---|---|
+| decision 7, `hidden?` / `readonly?` (`:5644`) | `sb-21gm`, PR 375 | `09d048b` | `8abc655` |
+| decision 5, `sentence/1` (`:5948`) | `sb-w37s`, PR 377 | `ea2fdee` | `8abc655` |
+
+The forward sentences both status paragraphs carry are met by those two
+requests: "`sb-21gm` implements F1, F3, F4, F6, F7 and the rendering half of
+F1's `readonly?` clause" and "`sb-btx0`'s two record questions [...] land in
+the same pair" are met at `09d048b`; "Nothing here is built yet - `sb-w37s` is
+the request that builds it" and "`sb-w37s` builds the callback, the `use`
+default, the reader and the core types' sentences" are met at `ea2fdee`. Both
+sections' closing sentence - that `sb-xnxw` flips them after the implementing
+bead lands - is met by this request.
+
+### What the flip verified, claim by claim
+
+**Decision 7's amendment.** F1: `t:StatifierBlocks.BlockType.field_decl/0`
+(`lib/statifier_blocks/block_type.ex:277-287`) carries `optional(:hidden?) =>
+boolean()` (`:285`) and `optional(:readonly?) => boolean()` (`:286`) and
+gained nothing else. F3: the missing-`default:` refusal is checked for every
+field type - `declaration_finding/1` (`compiler.ex:771-791`) refuses on `not
+Map.has_key?(decl, :default)` (`:774`) with no arm on the field type at all.
+F4: `hidden_with_empty_default?/1` (`:797-801`) over `empty_default?/2`
+(`:803-813`) refuses one empty value per field type, `:boolean` alone having
+none (`:806`), matching the section's table row for row; the `{:type_expr,
+opts}` row's third case, a missing key, is refused by F3's arm rather than
+this one, which is the same refusal by the other door. F5 stands untouched:
+`fault/2` (`compiler/finding.ex:193-195`) still answers `:author` for every
+`:config` finding and no `stage` was added. F6: `posted_value/2`
+(`editor/config_form.ex:463-465`) answers `:error` unconditionally for a
+`hidden?: true` or a `readonly?: true` field, ahead of the `Map.fetch/2`
+clause, and `decode/3`'s reduce turns that into `field.value` (`:374`) - the
+fourth documented property, written at `:324-332` and citing `RQ-SF036-15` by
+name; the three properties at `:309-322` are unedited. F7: `ViewModel.Field`
+carries `hidden?` and `readonly?` in its `@type t` (`view_model.ex:209-210`),
+defaulting to `false` in the `defstruct` (`:223-224`) and absent from
+`@enforce_keys` (`:214`), which is the posture `value_path` takes there. F8
+stands: nothing in the implementation reads, sets or overrides `sensitive?`.
+
+**Decision 5's amendment.** The callback is declared `@callback
+sentence(Block.config()) :: String.t()` (`block_type.ex:813`) and optional
+(`@optional_callbacks` at `:815-823`, nine members with it, as the section
+predicted). The reader is `StatifierBlocks.BlockType.sentence/2`
+(`:1551-1559`), answering the declared return through `line/1` and falling to
+`label(module)` in the section's other three states; the rescue is
+`join_label`'s, `call_sentence/2` (`:1829-1832`) reaching the callback through
+the same shape. The carve-out holds: `line/1` (`:1843-1852`) refuses a
+non-string, a blank string and one carrying a newline, carriage return or tab
+and applies no length arm, while `chip_refusal/1` (`:1885-1894`) keeps all
+four including `@presentation_cap` (`:1335`, 24) - so chips are unchanged and
+a sentence is uncapped. `use StatifierBlocks.BlockType` (`:109-171`) injects a
+`sentence/1` default reading `palette_entry/0`'s `label` (`:148-161`, the
+comment above it at `:140-147`) and adds it to `defoverridable` (`:163-169`).
+Sixteen shipped `core.*` types still declare `@behaviour
+StatifierBlocks.BlockType` directly (`core/wait.ex:25` is the shape) and
+`core.placeholder` (`core/placeholder.ex:56`, moduledoc at `:16`) is still the
+one that `use`s it.
+
+### Five corrections this Note takes
+
+They are corrections of wording and of cites, not of decisions. Nothing either
+section decides moves.
+
+**1. F2's description of the narrow refusal describes the code the amendment
+replaced, and its three cites do not resolve at all.** F2 says "Today exactly
+one arm is checked at compile - `declaration_findings/2` filters
+`path_field_without_default?/1` (`lib/statifier_blocks/compiler.ex` `:719` and
+`:727-731`), which matches `%{type: {:path, _opts}}` and nothing else - and
+the comment above it (`:700-707`) says why". At `8abc655` there is no
+`path_field_without_default?/1` in this repository: `sb-21gm` implemented F3
+by replacing it with `declaration_finding/1` (`compiler.ex:771-791`), which
+asks about `:default` for every field type, and the comment that said the
+widening was the record's call now records that the call was taken
+(`:724-763`, `declaration_findings/2` itself at `:764-769`). F2 is a statement
+about the state **before** this amendment, and the amendment's own F3 is what
+changed it, so it is met rather than falsified - but a reader following its
+line numbers today lands nowhere, and the correction is not the uniform `+37`
+a rebase alone would have produced. The rest of F2 stands unaltered:
+`field_decl/0` has required `:default` from the start, and it still does
+(`block_type.ex:282`).
+
+**2. F8 calls `StatifierBlocks.Datamodel`'s `declared_row` a "declaration
+struct"; it is a `@type` map.** `declared_row/0` is defined at
+`lib/statifier_blocks/datamodel.ex:219-227` as a plain map type with seven
+keys, not a `defstruct`, and `sensitive?` is one of them (`:226`, which is the
+line F8 cites and it still resolves). F8's decision is unaffected -
+`sensitive?` remains a key on a **datamodel** declaration rather than on a
+field declaration, and neither key implies the other - and only the word
+"struct" is wrong.
+
+**3. F4's `{:type_expr, opts}` row names the wrong arm.** The row reads `the
+"nothing at all" arm the 2026-09-06 {:type_expr, opts} amendment names`
+(`:5792`). That amendment names it the **absent arm**: "the **absent arm** is
+a missing key, `null`, or `""`" (`:5069`). The three values F4's row lists are
+exactly that arm's three values, so the row is right about what it refuses and
+wrong only about what the earlier section calls it.
+
+**4. The `sentence/1` amendment describes the reader as "a palette entry plus
+a config"; it is `(module, config)`.** The section's "What the reader answers,
+per case" says "The reader is `StatifierBlocks.BlockType.sentence/2`, a
+palette entry plus a config, resolved the way `join_label/2` resolves". A
+palette entry carries no module, and the reader must ask a module whether it
+exports the callback, so the arity-2 reader is `sentence(module(),
+Block.config())` (`block_type.ex:1551`) - the shape `summary/3`
+(`block_type.ex:1592-1593`) already takes for the same reason. `join_label/2`
+(`:1495-1503`) does take a palette entry, because a join label is declared
+**in** the entry rather than as a callback; what `sentence/2` borrows from it
+is the bounded rescue and the refusal set, not the argument list. Nothing
+about the four-state table changes: each row answers the same thing under the
+corrected signature.
+
+**5. "Indistinguishable from a module that declares no `sentence/1`" is true
+at the reader and false one level up, and the difference has a cost worth
+stating.** The "What `use` injects" section says a module that `use`s the
+behaviour, declares a `palette_entry/0` and declares nothing else "answers its
+own label and is indistinguishable from a module that declares no `sentence/1`
+at all". At the reader that holds: `BlockType.sentence/2` answers the label
+either way. But the injected default is a real `def sentence/1` in the module
+(`block_type.ex:148-161`), so `function_exported?(module, :sentence, 1)`
+answers `true` for it, and `ADR-0005`'s amendment of this date puts a
+**separate** `function_exported?/3` question in the chain: `ViewModel`'s
+`declares_sentence?/1` (`view_model.ex:1760-1763`) decides between "the
+reader's answer" and "the author's `title`, then the label". A `use`-ing type
+that overrides nothing therefore counts as **declared** in the view-model
+chain, and its `Node.sentence` is its palette label even where the author gave
+a `title` - which is the same landing a declared callback that raises takes,
+and by `ADR-0005`'s deliberate rule that a bounded rescue answers the
+package's own word. The cost is exactly that: a `use`-ing block type that
+overrides no `sentence/1` and whose config declares a `label` field lands its
+outline line on the type's palette label rather than on the author's title. No
+shipped `core.*` type is in that set - `core.placeholder` is the only one that
+`use`s the behaviour, and it declares no `label` config field - so the cost is
+a host's to meet, and a host meets it by overriding `sentence/1`. Neither
+record's decision moves: the injection stays, the chain stays, and this Note
+only says where the word "indistinguishable" stops being true.
+
+### Cites re-counted
+
+`sb-21gm` and `sb-w37s` moved code that both sections cite, and both sections
+end by saying their cites are to be re-read rather than trusted. The
+load-bearing ones read, at `8abc655`:
+
+| Cited as, in the section | Reads today, at `8abc655` |
+|---|---|
+| `block_type.ex` `:251-259` (`field_decl/0`) | `:277-287`, `required(:default)` at `:282` |
+| `block_type.ex` `:152-161` (`field_type/0`, nine members) | `:178-187`, still nine |
+| `compiler.ex` `:700-707`, `:719`, `:727-731` | superseded; see correction 1 |
+| `finding.ex` `:190-196` (`fault/2`) | `:193-195` |
+| `editor/field.ex` `:991-996`, the `_other -> raw` clause at `:994` | `:1026-1032`, the clause at `:1030` |
+| `editor/config_form.ex` `:412` (`omitted?/2`) | `:485-486` |
+| `editor/config_form.ex` `:319` (`decode/3`), `:272`/`:284`, `:327` | `:366-386`; the three properties `:309-322`; `:error -> field.value` at `:374` |
+| `view_model.ex` `:174`, `:186-195`, `:198` (`ViewModel.Field`) | `defmodule Field` `:183`, `@type t` `:201-212`, `@enforce_keys` `:214`, `defstruct` `:215-226` |
+| `block_type.ex` `:710-717` (`@optional_callbacks`, eight) | `:815-823`, nine, `sentence: 1` at `:823` |
+| `block_type.ex` `:650-652` / `:701-702` (the three rules) | `summary/1` `:718-723`, `donedata_type/1` `:769-771`, `sentence/1` own `:796-803` |
+| `block_type.ex` `:1389-1397` (`join_label/2`) | `:1495-1503`, the rescue at `:1814-1822` |
+| `block_type.ex` `:1653-1661`, comment `:1651-1652` (`call_join_label/2`) | `:1814-1822`, comment `:1811-1813` |
+| `block_type.ex` `:1666-1673` (`chip/1`), `:1678-1688` (`chip_refusal/1`), `:1229` (`@presentation_cap`) | `:1872-1878`, `:1884-1894`, `:1335` |
+| `block_type.ex` `:107-145` (`use`), `:138-143` (`defoverridable`) | `:109-171`, `:163-169` |
+| `datamodel.ex` `:226` (`sensitive?`) | `:226`, unmoved |
+| `core/wait.ex` `:25`, `core/placeholder.ex` `:56` and `:16` | unmoved |
+
+`docs/adr/.cite-baseline.json` is refreshed in this same request, so the
+cross-record line citations this campaign moved are recorded as a reviewed
+diff rather than found by the next record to be edited.
+
+Filed with `sb-xnxw`, campaign SF036, folding the residue of `sb-p144`
+(corrections 1-3) and `sb-xtcp` (corrections 4-5).
