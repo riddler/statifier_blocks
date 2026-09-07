@@ -96,8 +96,17 @@ defmodule StatifierBlocks.TypingAPaletteTest do
 
     assert StatifierBlocks.Environment.subject_path(palette, document) == "cards.current_txn"
 
+    # The entry block writes a record at the subject path, so the walk also
+    # holds one entry per field of it (ADR-0011's Amendment of 2026-09-07).
     assert Keyword.fetch!(ctx.how_to_binding, :known_at_settle) ==
-             %{"cards.current_txn" => "cards.credit_txn", "cards.settlement" => "object"}
+             %{
+               "cards.current_txn" => "cards.credit_txn",
+               "cards.current_txn.amount_minor" => "integer",
+               "cards.current_txn.currency" => "string",
+               "cards.current_txn.authorized_at" => "datetime",
+               "cards.current_txn.expires_on" => "date",
+               "cards.settlement" => "object"
+             }
   end
 
   # Sabotage: changed the how-to's `expects:` from `"Settleable"` to
@@ -119,7 +128,7 @@ defmodule StatifierBlocks.TypingAPaletteTest do
   test "every output the how-to claims is the one it produces", ctx do
     assert claims(ctx.how_to) == [
              ~s("Credit card transaction"),
-             ~s(%{"cards.current_txn" => "cards.credit_txn", "cards.settlement" => "object"}),
+             ~s(%{"cards.current_txn" => "cards.credit_txn", "cards.current_txn.amount_minor" => "integer", "cards.current_txn.authorized_at" => "datetime", "cards.current_txn.currency" => "string", "cards.current_txn.expires_on" => "date", "cards.settlement" => "object"}),
              ~s(:ok),
              ~s(:covers),
              ~s(:not_assignable),

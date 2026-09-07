@@ -33,6 +33,23 @@ defmodule StatifierBlocks.EnvironmentTest do
   # the declaration seeded there for every position after it.
   @declared %{"cards.current_txn" => "object", "cards.settlement" => "object"}
 
+  # ADR-0011's Amendment of 2026-09-07: a write of a record yields one entry
+  # per member beneath the path as well as the entry at it. The entry block
+  # writes `cards.credit_txn` at the subject path, and a settle step writes
+  # the record `cards.settlement` at its own, so both expand.
+  @subject_members %{
+    "cards.current_txn.amount_minor" => "integer",
+    "cards.current_txn.currency" => "string",
+    "cards.current_txn.authorized_at" => "datetime",
+    "cards.current_txn.expires_on" => "date"
+  }
+
+  @settlement_members %{
+    "cards.settlement.amount_minor" => "integer",
+    "cards.settlement.currency" => "string",
+    "cards.settlement.settled_on" => "date"
+  }
+
   # ADR-0009's Note of 2026-09-06 read onto one collected element, typed by
   # ADR-0013 decision 5: the parent's `collect_type` types `"donedata"` and
   # nothing else.
@@ -73,7 +90,9 @@ defmodule StatifierBlocks.EnvironmentTest do
       document = document([open(), settle("blk_STL")])
 
       assert Environment.at(palette(), document, {"blk_ROOT", "body", 1}, ctx()) ==
-               Map.put(@declared, @subject, "cards.credit_txn")
+               @declared
+               |> Map.put(@subject, "cards.credit_txn")
+               |> Map.merge(@subject_members)
     end
 
     # sabotage: change `seed_annotated/3`'s entry-type clause to answer `%{}`
@@ -135,8 +154,13 @@ defmodule StatifierBlocks.EnvironmentTest do
           settle("blk_STL")
         ])
 
+      # The bare path is written after the record, so decision 1's
+      # last-write-wins replaces the member the record derived there and
+      # leaves its three siblings alone.
       assert Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx()) ==
-               Map.merge(@declared, %{
+               @declared
+               |> Map.merge(@subject_members)
+               |> Map.merge(%{
                  @subject => "cards.credit_txn",
                  "cards.current_txn.authorized_at" => :unknown
                })
@@ -148,10 +172,10 @@ defmodule StatifierBlocks.EnvironmentTest do
     test "a writes: field types the path it names" do
       document = document([open(), settle("blk_STL"), settle("blk_STL2")])
 
-      assert Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx()) == %{
-               @subject => "cards.credit_txn",
-               "cards.settlement" => "cards.settlement"
-             }
+      assert Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx()) ==
+               %{@subject => "cards.credit_txn", "cards.settlement" => "cards.settlement"}
+               |> Map.merge(@subject_members)
+               |> Map.merge(@settlement_members)
     end
   end
 
@@ -479,9 +503,12 @@ defmodule StatifierBlocks.EnvironmentTest do
         assert Environment.read_signatures(palette(), document, block) == []
       end
 
-      # Four blocks later the environment is the seed, untouched.
+      # Four blocks later the environment is what the entry block left,
+      # untouched.
       assert Environment.at(palette(), document, {"blk_ROOT", "body", 5}, ctx()) ==
-               Map.put(@declared, @subject, "cards.credit_txn")
+               @declared
+               |> Map.put(@subject, "cards.credit_txn")
+               |> Map.merge(@subject_members)
     end
 
     # sabotage: reverted `core.subchart`'s `assign_to` to a plain `:string`

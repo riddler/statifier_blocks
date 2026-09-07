@@ -74,8 +74,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         # walk seeds every path the datamodel declares (ADR-0011 decision 2,
         # amended 2026-09-06), and the worked document declares that one as an
         # undescribed `object`.
+        # The four paths beneath `cards.current_txn` are the members of the
+        # record the entry block writes there, which the walk now holds as
+        # entries of their own (ADR-0011's Amendment of 2026-09-07).
         assert known_rows(html) == [
                  {"cards.current_txn", "Credit card transaction"},
+                 {"cards.current_txn.amount_minor", "integer"},
+                 {"cards.current_txn.authorized_at", "datetime"},
+                 {"cards.current_txn.currency", "string"},
+                 {"cards.current_txn.expires_on", "date"},
                  {"cards.settlement", "object"}
                ]
       end

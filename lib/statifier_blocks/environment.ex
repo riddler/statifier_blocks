@@ -68,13 +68,41 @@ defmodule StatifierBlocks.Environment do
   (ADR-0011 decision 2), so a finding anchors on the field key the author has
   to change:
 
-    * `{:path, %{writes: T}}` writes `T` at the path the field's value names;
+    * `{:path, %{writes: T}}` writes `T` at the path the field's value names,
+      and - where `T` names a `record` or a `shape`, or is an inline shape -
+      one further entry per member of `T` beneath that path, recursively
+      (the Amendment of 2026-09-07, and "Member expansion" below);
     * a `{:path, opts}` field with no `writes` key, and a field carrying
       `datamodel_path?: true`, write `:unknown` there - the path becomes
       known without becoming typed;
     * a `capture` config map writes `:unknown` at each of its keys, one per
       pair;
     * `{:path, %{expects: T}}` reads `T` there.
+
+  ## Member expansion
+
+  A write of a record or a shape says what lives beneath the path as well as
+  at it (the Amendment of 2026-09-07). A write signature at `P` whose written
+  type names a `record` or `shape` declaration, or is an inline
+  `{:shape, members}`, puts an entry at `P` **and** an entry at `P.m` for
+  every member `m`, at the member's own type, joined with the same dot the
+  projection uses. A member that is itself a record or a shape expands again,
+  to any depth; a declaration already being expanded on the same chain of
+  paths contributes its entry and expands no further, so a self-referencing
+  declaration is finite. Nothing expands through a `{:list, T}` in either
+  direction - there is no element path to put an entry at.
+
+  A member entry is the weaker source. An explicit write signature at `P.m`
+  in the same block wins over the member derived from `P`'s type, and a
+  rewrite at `P` clears the members its own previous write derived - never a
+  member entry an explicit signature wrote - and derives the new type's,
+  which for a scalar is none. A read a member entry refuses anchors on the
+  `key` of the field that declared the write at the **root**, because a
+  member entry is derived and has no control of its own.
+
+  The seed is untouched: a declared record already reaches the environment as
+  member entries through `StatifierDatamodel.Index.entries/1`, and this is
+  the same expansion said on the write side.
 
   `io/1`'s `consumes` and `produces` are sugar over the **subject path**,
   which the entry block's palette entry names with `subject:` (decision 6):
@@ -563,7 +591,7 @@ defmodule StatifierBlocks.Environment do
       true ->
         env
         |> arms(palette, document, block, ctx)
-        |> apply_writes(palette, document, block)
+        |> apply_writes(palette, document, block, ctx)
     end
   end
 
@@ -747,12 +775,139 @@ defmodule StatifierBlocks.Environment do
     end
   end
 
-  @spec apply_writes(annotated(), Palette.t(), Document.t(), Block.t()) :: annotated()
-  defp apply_writes(env, palette, document, %Block{} = block) do
-    palette
-    |> write_signatures(document, block)
-    |> Enum.reduce(env, fn {_key, path, type}, acc -> Map.put(acc, path, {type, block.id}) end)
+  # Decision 1's last-write-wins, and the Amendment of 2026-09-07's member
+  # expansion applied with it: each signature puts its own entry, and a
+  # record-typed or shape-typed one also puts an entry per member beneath it.
+  #
+  # Three things happen per signature, in this order. The members the
+  # *previous* write at the path derived are cleared, because a stale member
+  # entry beneath a path that no longer holds a record would be a claim
+  # nobody is making. The signature's own entry is put. Then the members its
+  # type derives are put, skipping every path this block writes explicitly -
+  # the explicit signature wins over the derived member, whichever order the
+  # two are declared in.
+  @spec apply_writes(annotated(), Palette.t(), Document.t(), Block.t(), context()) :: annotated()
+  defp apply_writes(env, palette, document, %Block{} = block, ctx) do
+    declarations = declarations(ctx)
+    signatures = write_signatures(palette, document, block)
+    declared = MapSet.new(signatures, fn {_key, path, _type} -> path end)
+
+    Enum.reduce(signatures, env, fn {_key, path, type}, acc ->
+      acc
+      |> clear_derived(declarations, path)
+      |> Map.put(path, {type, block.id})
+      |> put_derived(declarations, path, type, block.id, declared)
+    end)
   end
+
+  # What the write already at `path` derived, and only that. An entry a later
+  # explicit signature at `path.m` replaced is no longer what the previous
+  # write put there - decision 1's per-path last-write-wins already took it -
+  # so the equality test leaves it alone, and the environment needs no second
+  # annotation to say which entries were derived.
+  @spec clear_derived(annotated(), Declarations.t(), String.t()) :: annotated()
+  defp clear_derived(env, declarations, path) do
+    case Map.fetch(env, path) do
+      {:ok, {previous_type, writer}} ->
+        declarations
+        |> derived_writes(path, previous_type)
+        |> Enum.reduce(env, &drop_derived(&2, &1, writer))
+
+      :error ->
+        env
+    end
+  end
+
+  @spec drop_derived(
+          annotated(),
+          {String.t(), type_expr()},
+          Block.id() | :slot_entry | :declaration
+        ) :: annotated()
+  defp drop_derived(env, {member_path, member_type}, writer) do
+    if Map.get(env, member_path) == {member_type, writer},
+      do: Map.delete(env, member_path),
+      else: env
+  end
+
+  @spec put_derived(
+          annotated(),
+          Declarations.t(),
+          String.t(),
+          type_expr(),
+          Block.id(),
+          MapSet.t(String.t())
+        ) :: annotated()
+  defp put_derived(env, declarations, path, type, block_id, declared) do
+    declarations
+    |> derived_writes(path, type)
+    |> Enum.reduce(env, fn {member_path, member_type}, acc ->
+      if MapSet.member?(declared, member_path),
+        do: acc,
+        else: Map.put(acc, member_path, {member_type, block_id})
+    end)
+  end
+
+  # Every `path.m` a write of `type` at `path` yields, depth first in member
+  # order. A named declaration already being expanded on the chain of paths
+  # beneath `path` is not expanded again - the same `seen` discipline
+  # `sd-ADR-0001` decision 8 runs the read check under, and the one that
+  # amendment's index expansion applies - so a self-referencing declaration
+  # contributes its entry and terminates.
+  @spec derived_writes(Declarations.t(), String.t(), type_expr()) ::
+          [{String.t(), type_expr()}]
+  defp derived_writes(declarations, path, type),
+    do: derived_writes(declarations, path, type, MapSet.new())
+
+  @spec derived_writes(Declarations.t(), String.t(), type_expr(), MapSet.t(String.t())) ::
+          [{String.t(), type_expr()}]
+  defp derived_writes(declarations, path, type, seen) do
+    case expansion(declarations, type, seen) do
+      :none ->
+        []
+
+      {members, deeper} ->
+        Enum.flat_map(members, fn {name, member_type} ->
+          member_path = path <> "." <> name
+
+          [
+            {member_path, member_type}
+            | derived_writes(declarations, member_path, member_type, deeper)
+          ]
+        end)
+    end
+  end
+
+  # The members a type expression expands into, and the chain its members are
+  # expanded under. An inline shape puts no name on the chain: it is a finite
+  # term and cannot reference itself. A `{:list, _}` expands into nothing in
+  # either direction, and so do a scalar, an opaque string that names no
+  # declaration, and `:unknown`.
+  @spec expansion(Declarations.t(), type_expr(), MapSet.t(String.t())) ::
+          {[{String.t(), type_expr()}], MapSet.t(String.t())} | :none
+  defp expansion(_declarations, {:shape, members}, seen) when is_list(members) do
+    {for(%{name: name, type: type} <- members, is_binary(name), do: {name, type}), seen}
+  end
+
+  defp expansion(_declarations, {:list, _item}, _seen), do: :none
+
+  defp expansion(declarations, name, seen) when is_binary(name) do
+    with false <- MapSet.member?(seen, name),
+         {:ok, %{fields: fields}} <- Declarations.fetch(declarations, name) do
+      {Enum.map(fields, &{&1.name, member_spelling(&1)}), MapSet.put(seen, name)}
+    else
+      _re_entered_or_undeclared -> :none
+    end
+  end
+
+  defp expansion(_declarations, _no_members, _seen), do: :none
+
+  # A declared field's type, as this module spells one. `declared_spelling/1`
+  # reads the `type`/`item_type` pair a field carries in exactly the shape an
+  # index entry carries it; a field whose spelling names neither the closed
+  # set nor a declaration is `:unknown`, because the amendment puts an entry
+  # at every member and an unnameable one is the datamodel's unknown.
+  @spec member_spelling(Declarations.field()) :: type_expr()
+  defp member_spelling(field), do: declared_spelling(field) || :unknown
 
   # -- the seed --------------------------------------------------------------
 
