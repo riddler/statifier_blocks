@@ -28,9 +28,10 @@ defmodule StatifierBlocks.BlockType do
   ## Required and optional callbacks
 
   Five callbacks are required; a module missing one of them is not a valid
-  `StatifierBlocks.BlockType` and fails to compile as one. Seven are
+  `StatifierBlocks.BlockType` and fails to compile as one. Eight are
   optional (`@optional_callbacks io: 1, migrate_config: 2, fixtures: 0,
-  palette_entry: 0, outcomes: 1, failure_outcomes: 1, summary: 1`); a
+  palette_entry: 0, outcomes: 1, failure_outcomes: 1, summary: 1,
+  donedata_type: 1`); a
   module that implements only the five required ones compiles cleanly, and
   each optional absence degrades to a stated default rather than an error:
 
@@ -48,6 +49,7 @@ defmodule StatifierBlocks.BlockType do
   | `outcomes/1` | no | the block has one outcome, `{"done", "Done"}` |
   | `failure_outcomes/1` | no | none of the block's outcomes is failure-classed |
   | `summary/1` | no | the palette card has no second line |
+  | `donedata_type/1` | no | the document's `<donedata>` carries only the params the compiler mints |
 
   ## Who owns what
 
@@ -62,6 +64,7 @@ defmodule StatifierBlocks.BlockType do
   | `palette_entry/0` | ADR-0005 (LiveView editor) |
   | `outcomes/1` | this record's amendment A; the emission is ADR-0004's |
   | `failure_outcomes/1` | this record's 2026-09-06 Note; the reserved `<donedata>` key is `statifier_persistence`'s ADR-0008 |
+  | `donedata_type/1` | ADR-0013 (the typed child summary); where the params go is ADR-0004's C1 |
 
   ## Declaring the defaults instead of spelling them (ADR-0007)
 
@@ -619,18 +622,72 @@ defmodule StatifierBlocks.BlockType do
   """
   @callback summary(Block.config()) :: summary()
 
+  @typedoc """
+  One field a document's `<donedata>` carries beside the params the
+  compiler mints (ADR-0013 decision 2): the `<param>` name, the datamodel
+  path its `expr` reads at the child's own runtime, and the field's type
+  in `statifier_datamodel`'s vocabulary.
+
+  `name` is a bare lowercase identifier, the shape every other `<param>`
+  name this package mints has, and it may be neither `outcome` nor
+  `statifier_persistence:run_status` - those two are the compiler's,
+  reserved by ADR-0004's C1 and by the failure seam.
+  """
+  @type donedata_field :: %{
+          name: String.t(),
+          path: String.t(),
+          type: StatifierDatamodel.Types.t()
+        }
+
+  @doc """
+  What this document's `<donedata>` carries when it is compiled for use as
+  a child, given this config (ADR-0013 decision 2).
+
+  Optional, and read off the **root** block only. A type that does not
+  export it declares nothing, which is where every `core.*` type stays, so
+  a host type written before the callback existed compiles to the bytes it
+  compiled to. `donedata_type/2` on this module is the resolver every
+  consumer reads it through.
+
+  The declared fields are emitted as `<param>`s on every top-level
+  `child_use` final, **after** both compiler-minted params - the `outcome`
+  param and, on a failure-classed outcome, the reserved
+  `statifier_persistence:run_status` param. That ordering is ADR-0004's C1
+  as widened on 2026-09-06, and it is what keeps a document declaring
+  nothing byte-identical to what it compiled to before.
+
+  **Order is declaration order and is never sorted**, for ADR-0004
+  decision 6's reason: the params serialize in the order this callback
+  returns them, so reordering the list moves compiled bytes.
+
+  The three rules `slots/1` and `config_schema/1` carry apply unchanged.
+  It is a **pure function of `config`**, it is **total** for any config
+  `validate_config/1` accepts, and it **never raises**.
+
+  A declared `name` colliding with either reserved name is an
+  `:invalid_donedata_field` Emit finding against the root block rather
+  than a silently shadowed param.
+  """
+  @callback donedata_type(Block.config()) :: [donedata_field()]
+
   @optional_callbacks io: 1,
                       migrate_config: 2,
                       fixtures: 0,
                       palette_entry: 0,
                       outcomes: 1,
                       failure_outcomes: 1,
-                      summary: 1
+                      summary: 1,
+                      donedata_type: 1
 
   # ADR-0002 amendment A1's default: a type that declares no outcomes has
   # exactly one, named `done`. Named once, here, so the compiler and the
   # editor cannot disagree about what a defaulting type declares.
   @default_outcomes [{"done", "Done"}]
+
+  # The name `agrees?/3` projects the child's declaration under. A colon is
+  # not a character a datamodel document's `types` name carries, so this
+  # cannot shadow one an author wrote.
+  @synthesized_name "statifier_blocks:child_donedata"
 
   @doc """
   `module.outcomes(config)`, or `#{inspect(@default_outcomes)}` when
@@ -704,6 +761,120 @@ defmodule StatifierBlocks.BlockType do
   end
 
   defp sanitize_failure_outcomes(_malformed), do: []
+
+  @doc """
+  `module.donedata_type(config)`, or `[]` when `donedata_type/1` is absent
+  or `module` is not loadable (ADR-0013 decision 2).
+
+  Checked with `Code.ensure_loaded?/1` plus `function_exported?/3`, the
+  pattern `outcomes/2` and `failure_outcomes/2` above already use, so a
+  host type written before the callback existed declares nothing and
+  compiles exactly as it did.
+
+  The list comes back in **declaration order**, never sorted: the params
+  serialize in that order, so a resolver that tidied it would move a
+  host's compiled bytes for no reason it could name.
+
+  Total over any return value: anything that is not a list of maps
+  carrying a binary `name`, a binary `path` and a `type` comes back as
+  `[]`, for `failure_outcomes/2`'s reason - a host type that declares
+  nonsense here should compile to the bytes it compiled to before rather
+  than crash the compiler.
+  """
+  @spec donedata_type(module(), Block.config()) :: [donedata_field()]
+  def donedata_type(module, config) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :donedata_type, 1) do
+      sanitize_donedata_type(module.donedata_type(config))
+    else
+      []
+    end
+  end
+
+  @spec sanitize_donedata_type(term()) :: [donedata_field()]
+  defp sanitize_donedata_type(fields) when is_list(fields) do
+    if Enum.all?(fields, &donedata_field?/1), do: fields, else: []
+  end
+
+  defp sanitize_donedata_type(_malformed), do: []
+
+  @spec donedata_field?(term()) :: boolean()
+  defp donedata_field?(%{name: name, path: path, type: _type})
+       when is_binary(name) and is_binary(path),
+       do: true
+
+  defp donedata_field?(_malformed), do: false
+
+  @doc """
+  Whether a child's declaration answers what a parent expects of it
+  (ADR-0013 decision 4), as `statifier_datamodel`'s own read check sees
+  it.
+
+  `declarations` is the **parent's**, because the parent's `collect_type`
+  is what is being satisfied; `fields` is the child's `donedata_type/1`;
+  `expected` is the parent's `collect_type` spelling, as stored. The
+  answer is `t:StatifierDatamodel.Types.reason/0`, so a consumer that
+  renders why a pair disagrees renders that package's reason and not a
+  second vocabulary of this one's.
+
+  The child's fields are projected as one more declaration of kind
+  `record`, under a name the parent's document does not use, each field
+  `required?: true` - the child promises every one of them, because the
+  compiler emits every one on every top-level final. The map is built for
+  the question and discarded with the answer; neither document is written
+  to.
+
+  **The check is dormant.** It is not a compile finding and its absence is
+  not a warning: a `core.map` whose `collect_type` disagrees with its
+  child's declaration compiles to exactly the bytes it would compile to if
+  they agreed. It answers only where both documents are genuinely in hand,
+  which the parent's compile never is - a `core.map` names its child chart
+  by document id and cannot resolve it.
+
+  One consequence of that package's covering step is worth knowing rather
+  than discovering: it answers `:covers` only where the expected side is a
+  declaration of kind `shape`, so a `collect_type` naming a `record` is
+  `:not_assignable` whatever the child declares. That is evidence about
+  how nominal typing is spelled there, not evidence of drift.
+
+  Total over any input, including a child that declares nothing and a
+  parent that declares nothing.
+  """
+  @spec agrees?(StatifierDatamodel.Declarations.t(), [donedata_field()], term()) ::
+          StatifierDatamodel.Types.reason()
+  def agrees?(declarations, fields, expected) when is_map(declarations) and is_list(fields) do
+    name = synthesized_name(declarations)
+
+    projected =
+      Map.put(declarations, name, %{
+        name: name,
+        kind: :record,
+        label: nil,
+        fields: Enum.map(fields, &projected_field/1)
+      })
+
+    StatifierDatamodel.Types.satisfies(
+      projected,
+      {:declared, name},
+      StatifierDatamodel.Types.parse(projected, expected)
+    )
+  end
+
+  @spec projected_field(donedata_field()) :: StatifierDatamodel.Declarations.field()
+  defp projected_field(%{name: name, type: type}) do
+    %{name: name, type: type, item_type: nil, required?: true, label: nil, one_of: nil}
+  end
+
+  # A document declares its own names; this one is the check's, so it is
+  # spelled the way no `types` entry can be and lengthened until it is free
+  # rather than assumed unique.
+  @spec synthesized_name(StatifierDatamodel.Declarations.t()) :: String.t()
+  defp synthesized_name(declarations) do
+    Enum.reduce_while(0..Enum.count(declarations), @synthesized_name, fn _attempt, name ->
+      if Map.has_key?(declarations, name),
+        do: {:cont, name <> "'"},
+        else: {:halt, name}
+    end)
+  end
 
   @doc """
   Where a field declaration's value lives, as a path from the config root.

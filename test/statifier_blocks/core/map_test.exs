@@ -219,9 +219,44 @@ defmodule StatifierBlocks.Core.MapTest do
   describe "the declaration surface (ADR-0009 decision 4)" do
     # sabotage: reordered the fields - the form an author reads no longer
     # opens on what the block runs over, and this goes red (verified)
-    test "config_schema/1 declares exactly the six fields, in order" do
+    test "config_schema/1 declares exactly the seven fields, in order" do
       assert Enum.map(Map.config_schema(@lines), & &1.key) ==
-               ["items", "chart", "item_as", "index_as", "collect", "on"]
+               ["items", "chart", "item_as", "index_as", "collect", "collect_type", "on"]
+    end
+
+    # ADR-0013 decision 1: the parent declares what one child's answer is,
+    # by name, in the existing `:string` field type - no ninth field type
+    # is added for it, and it sits beside the `collect` it qualifies.
+    #
+    # sabotage: declared `collect_type` as `{:path, %{}}` - it is offered
+    # path candidates and read as a datamodel path it is not, and the
+    # `datamodel_path?/1` assertion below goes red (verified)
+    test "collect_type is an optional :string field, and never a path" do
+      declaration = Map.config_schema(@lines) |> Enum.find(&(&1.key == "collect_type"))
+
+      assert %{
+               key: "collect_type",
+               type: :string,
+               label: "Each answer is a",
+               required?: false,
+               default: ""
+             } = declaration
+
+      refute StatifierBlocks.BlockType.datamodel_path?(declaration)
+    end
+
+    # sabotage: added a `check_collect_type/2` clause refusing a name the
+    # datamodel does not declare - `Types.parse/2` is total and answers
+    # `{:opaque, s}`, so a document naming a type the parent has not
+    # declared yet stops validating and this goes red (verified)
+    test "collect_type carries no findings of its own, whatever it names" do
+      for value <- ["", "cards.settlement_summary", "not a type name", "integer"] do
+        assert Map.validate_config(%{
+                 "items" => "cards.chunks",
+                 "chart" => "bdoc_CHUNK",
+                 "collect_type" => value
+               }) == :ok
+      end
     end
 
     # ADR-0011 decision 11 keeps the two names with the defaults `item`
