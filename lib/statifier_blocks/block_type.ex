@@ -435,6 +435,14 @@ defmodule StatifierBlocks.BlockType do
   candidate list is what a control draws and what an opt-in lint reports
   against; it is not a validation language, and a value outside it is
   never refused by this package.
+
+  Three of decision 7's field types read it: `:string`, `{:path, opts}`
+  and `:expression`. A `:string` draws a closed list as a `<select>` and
+  an open one as a `<datalist>`. The other two draw *either* spelling as a
+  `<datalist>` and keep typing the value, because a path is still checked
+  as a path and an expression still read as an expression - a host's list
+  suggests on them and decides nothing, exactly as this section says of
+  the feed as a whole. Every other field type ignores it.
   """
   @callback config_schema(Block.config()) :: [field_decl()]
 

@@ -13,10 +13,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `:integer` | number input, step 1 |
     | `:boolean` | checkbox |
     | `{:select, choices}` | select, choices in declared order |
-    | `:expression` | statifier-ui's expression editor when that package is present, else a single-line source input |
+    | `:expression` | statifier-ui's expression editor when that package is present, else a single-line source input; a `<datalist>` over a host's candidate list, either spelling, when it supplied one |
     | `:duration` | one text control; duration strings the expression language reads, with on-screen examples |
     | `{:list, t}` | repeatable rows of `t`'s renderer, with add and remove |
-    | `{:path, opts}` | single-line text input bound to a `<datalist>` of the declared datamodel paths; the plain input when there are none |
+    | `{:path, opts}` | single-line text input bound to a `<datalist>` of a host's candidate list, either spelling, when it supplied one, else of the declared datamodel paths; the plain input when there are neither |
     | `{:type_expr, opts}` | per `opts.arms`: a text input bound to a `<datalist>` of the document's declared type names, or an inline member-list form; a toggle when the field admits both |
 
     `:duration`'s row is decision 9 as amended 2026-08-29 and again
@@ -130,9 +130,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     assign and handed down one field at a time. Two spellings, and the
     difference between them is the whole feature:
 
-      * `[{value, label}]` - a **closed** list. The control is a
-        `<select>`, because a host that named the values is saying these
-        are the values.
+      * `[{value, label}]` - a **closed** list. On a `:string` the control
+        is a `<select>`, because a host that named the values is saying
+        these are the values.
       * `{:open, [{value, label}]}` - an **open** list. The control is the
         text input with a `<datalist>`, on the terms every other
         suggestion list here is on: it suggests, it does not constrain,
@@ -140,6 +140,27 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     `[]` is *no list supplied* and renders whatever the field type already
     rendered, so a host that supplies nothing loses nothing.
+
+    Three field types read it, and the *closed* spelling means different
+    things to them (sb-uw3a):
+
+    | Field type | Closed list | Open list |
+    |---|---|---|
+    | `:string` | `<select>` over the offered values | text input bound to a `<datalist>` |
+    | `{:path, opts}` | text input bound to a `<datalist>` | the same |
+    | `:expression` | text input bound to a `<datalist>` | the same |
+
+    A `:path` and an `:expression` type their value - the first is a path
+    into the host's datamodel and the second is source the expression
+    language reads - so a host list can only ever suggest on them, and
+    drawing a closed one as a `<select>` would make it the authority on a
+    value the field's own type already answers for. On both of them the
+    host's list is read **ahead of** `path_candidates`, for the same reason
+    it is read ahead of the key-chosen lists: a list keyed on this field is
+    the narrower claim than the document's declarations. An `:expression`
+    served by an `expression_component` is the host's own control and is
+    not decorated here; it is handed `path_candidates` as `:candidates`, as
+    it always was.
 
     Three properties, and none of them is this component's choice to make:
 
@@ -149,10 +170,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         own selected option rather than silently rewritten to the first
         one, which is what a `<select>` would otherwise do to a document
         the moment its form was opened.
-      * **It is a `:string` field's affordance.** A typed control -
-        a `{:select, choices}`, a `:duration`, a `{:path, opts}` - already
-        knows what to draw, and a second source of options on top of one
-        would be two answers to one question.
+      * **It never changes what a field holds.** A `{:select, choices}`
+        and a `:duration` already know what to draw and ignore it
+        entirely, and on the two types that do read it beside `:string` it
+        draws a suggestion and nothing else: the value stays typed by the
+        control, and `:path`'s undeclared-path advisory (ADR-0005 clause
+        11e) is produced from the value exactly as before.
       * **It is host state, not authoring state.** Which values exist is a
         property of the deployment the document runs in, so it arrives as
         an assign and is never stored in a block.
@@ -311,6 +334,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     clause 11e's `:info` advisory anchored on this field's `key`, never a
     refusal.
 
+    A host that named this field's values in `candidates` gets those in the
+    datalist instead of the declared paths, on identical terms and for the
+    reason the `## candidates` section above gives; the advisory is
+    produced from the stored value either way.
+
     `opts` is read by nothing here, and its two keys are why that is worth
     saying rather than obvious. `expects` and `writes` (ADR-0011 decision
     2) are claims about the document's data flow at the path, read by
@@ -463,7 +491,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       The values a host offers for this field, `[{value, label}]` for a
       closed list or `{:open, [{value, label}]}` for an open one. `[]` is
       *no list supplied* and renders the control the field type already
-      rendered.
+      rendered. Read by `:string`, `{:path, opts}` and `:expression`; on
+      the last two, both spellings draw a `<datalist>` and the value stays
+      typed by the control.
       """
     )
 
@@ -618,6 +648,58 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         </option>
       </select>
       """
+    end
+
+    # The same host list on a `:path` or an `:expression`, where it can only
+    # ever SUGGEST (sb-uw3a). Both controls type their value - a path is
+    # still a path and an expression still an expression, and ADR-0011
+    # decision 9's surfaces are untouched by anything here - so a CLOSED
+    # list draws a `<datalist>` on these two types rather than the
+    # `<select>` a `:string` draws. Swapping the control would make the
+    # host's list the authority on a value the field's own type already
+    # answers for, and neither type has a value set a host could enumerate:
+    # a path is one of the document's declarations and an expression is
+    # source.
+    #
+    # It is read ahead of `path_candidates` for the reason it is read ahead
+    # of the key-chosen lists below: a list keyed on THIS field is the
+    # narrower claim than the document's declared paths, so a host that
+    # named this field's values gets them instead of the package's own
+    # suggestion list rather than beside it.
+    defp control(
+           %{
+             field: %ViewModel.Field{type: :expression},
+             expression_component: nil,
+             candidates: {:open, [_ | _] = offered}
+           } = assigns
+         ) do
+      suggestion_control(assigns, offered, expression_input_class(), "an expression")
+    end
+
+    defp control(
+           %{
+             field: %ViewModel.Field{type: :expression},
+             expression_component: nil,
+             candidates: [_ | _] = offered
+           } = assigns
+         ) do
+      suggestion_control(assigns, offered, expression_input_class(), "an expression")
+    end
+
+    defp control(
+           %{
+             field: %ViewModel.Field{type: {:path, _opts}},
+             candidates: {:open, [_ | _] = offered}
+           } = assigns
+         ) do
+      suggestion_control(assigns, offered, "sb-field__input", nil)
+    end
+
+    defp control(
+           %{field: %ViewModel.Field{type: {:path, _opts}}, candidates: [_ | _] = offered} =
+             assigns
+         ) do
+      suggestion_control(assigns, offered, "sb-field__input", nil)
     end
 
     defp control(%{field: %ViewModel.Field{type: :boolean}} = assigns) do
@@ -1358,6 +1440,44 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         &module.expression_input/1
       end
     end
+
+    # The one control a host's candidate list draws on a `:path` or an
+    # `:expression`: the field's own text input, bound to a `<datalist>` of
+    # the offered values. `data-field-candidates` is the same attribute the
+    # `:string` controls carry, because it counts the same feed; the list id
+    # ends `-candidates` rather than `-paths` so that a field offered both a
+    # host list and the document's declared paths says on screen which one
+    # it drew.
+    @spec suggestion_control(map(), [{String.t(), String.t()}], String.t(), String.t() | nil) ::
+            Phoenix.LiveView.Rendered.t()
+    defp suggestion_control(assigns, offered, input_class, placeholder) do
+      assigns =
+        assigns
+        |> assign(:offered, offered)
+        |> assign(:list_id, input_id(assigns.field) <> "-candidates")
+        |> assign(:input_class, input_class)
+        |> assign(:placeholder, placeholder)
+
+      ~H"""
+      <input
+        class={@input_class}
+        type="text"
+        id={input_id(@field)}
+        name={input_name(@field)}
+        value={to_text(@field.value)}
+        list={@list_id}
+        placeholder={@placeholder}
+        spellcheck="false"
+        autocomplete="off"
+      />
+      <datalist id={@list_id} data-field-candidates={length(@offered)}>
+        <option :for={{value, label} <- @offered} value={value} label={label}></option>
+      </datalist>
+      """
+    end
+
+    @spec expression_input_class() :: String.t()
+    defp expression_input_class, do: "sb-field__input sb-field__input--expression"
 
     # The value a closed list does not offer, which a `<select>` has to draw
     # as an option of its own or lose: a control whose stored value is not
