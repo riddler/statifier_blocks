@@ -30,7 +30,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     eventually does needs no round-trip and no JavaScript, exactly as
     `data-drop` needs none.
 
-    ## The gaps, and why "+" is always there
+    ## The gaps, and why "+" is always there on an editing mount
 
     A slot with n children has n+1 gaps, each carrying `data-parent-id`,
     `data-slot` and `data-index` - the DOM contract decision 7's hook reads.
@@ -39,6 +39,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     dragging, and an affordance that only appears mid-drag would be reachable
     only by dragging. The palette that opens is filtered by the same predicate
     the drag uses, not a parallel implementation of it.
+
+    The one mount that draws no "+" is the read-only one (ADR-0005's
+    2026-09-07 profile amendment, `read_only?`). Its `palette-open` was
+    already on the editor's refused list, so the click was inert - but an
+    inert control is still a control, and the editor's own comment beside
+    that list says a read-only mount draws none. `read_only` is threaded here
+    for that sentence, from the canvas through the node, and the gap draws
+    its `div` and no button: the gap is the flow marker and the empty arm's
+    position, which a reader needs, and the button is the affordance, which
+    a reader does not.
 
     ## The gap IS the insertion marker (R3, operator ruling 2026-08-29)
 
@@ -228,6 +238,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:read_only, :boolean,
+      default: false,
+      doc: """
+      Whether this mount edits (ADR-0005's 2026-09-07 profile amendment,
+      `read_only?`). `true` draws the gaps without their "+" buttons, the way
+      the palette column is not drawn at all: the position stays legible, the
+      affordance goes.
+      """
+    )
+
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:class, :string, default: nil)
@@ -287,6 +307,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           slot={@slot.name}
           index={0}
           armed={@armed}
+          read_only={@read_only}
           target={@target}
         />
         <.child
@@ -304,6 +325,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           armed={@armed}
           pending_remove={@pending_remove}
           expandable={@expandable}
+          read_only={@read_only}
           target={@target}
           icon={@icon}
         />
@@ -325,6 +347,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:armed, :any, default: nil)
     attr(:pending_remove, :any, default: nil)
     attr(:expandable, :any, default: nil)
+    attr(:read_only, :boolean, default: false)
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:depth, :integer, default: 0)
@@ -342,6 +365,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         armed={@armed}
         pending_remove={@pending_remove}
         expandable={@expandable}
+        read_only={@read_only}
         target={@target}
         icon={@icon}
       />
@@ -351,6 +375,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         slot={@slot}
         index={@index + 1}
         armed={@armed}
+        read_only={@read_only}
         target={@target}
       />
       """
@@ -380,6 +405,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:slot, :string, required: true)
     attr(:index, :integer, required: true)
     attr(:armed, :any, default: nil)
+    attr(:read_only, :boolean, default: false)
     attr(:target, :any, required: true)
 
     defp gap(assigns) do
@@ -399,6 +425,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-armed={to_string(@armed?)}
       >
         <button
+          :if={not @read_only}
           type="button"
           class="sb-button sb-gap__add"
           phx-click="palette-open"

@@ -157,7 +157,11 @@ character.
 `read_only?: true` is six clauses, and they are a set:
 
 1. **No palette column.** Not a collapsed palette - a mount with no palette at
-   all. `palette_groups` still parses and is simply moot for that mount.
+   all. `palette_groups` still parses and is simply moot for that mount. The
+   other way into the palette goes with it: the "+" button on the gaps between
+   blocks is not drawn either, so the canvas offers no insertion point. The
+   gaps themselves stay, because a gap is also where an empty arm says it is
+   an arm, and that is a reading.
 2. **No drag hook.** The canvas does not mount the drag hook. The measurement
    hook is unaffected: it reads nothing you can change.
 3. **Config fields render as values.** The inspector's Config tab draws each

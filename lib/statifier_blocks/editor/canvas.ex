@@ -143,6 +143,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:read_only, :boolean,
+      default: false,
+      doc: """
+      Whether this mount edits (ADR-0005's 2026-09-07 profile amendment,
+      `read_only?`). Threaded down the tree so every gap draws its position
+      and no "+" button. Separate from `drag_hook?` on purpose: one is about
+      the hook this element mounts, the other about what the tree beneath it
+      draws, and a host reading either should not have to know they always
+      arrive together.
+      """
+    )
+
     attr(:class, :string, default: nil)
 
     @doc "The canvas root: the hook's element, and the tree beneath it."
@@ -176,6 +188,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               armed={@armed}
               pending_remove={@pending_remove}
               expandable={@expandable}
+              read_only={@read_only}
               target={@target}
               icon={@icon}
             />
