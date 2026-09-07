@@ -9560,3 +9560,512 @@ and the `ADR-0005` items of `sb-ot1x`. This Note changes no code and adds no
 README row; it flips the `Status:` lines at `:8451` and `:8827` and nothing else
 in this file, and clauses `11E` to `14E` stay at proposed by the words of the
 section that holds them.
+
+## Amendment (2026-09-07): part (iii) by addition - Collapse's host seam is a pure proposer, an `on_collapse` callback and a separate replacement compound, and a proposed declaration may spell all nine field kinds
+
+**Status: proposed (2026-09-07, campaign SF038, bead `sb-2fvz`, on rulings
+`RQ-SF038-1`, `RQ-SF038-2` and `RQ-SF038-5`).** A decision record merges at
+proposed under campaign SF038's invariant; flipping it to accepted is a
+separate gated request, `sb-vjvq`, after `sb-uzly` builds it. Additive by
+addition: clauses `11E` (`:8701`), `12E` (`:8712`), `13E` (`:8722`) and `14E`
+(`:8731`), the section that holds them at `:8692`, that section's own status
+paragraph at `:8451-8458`, the flip Note's restatement at `:9253`, and every
+other clause in this file stand exactly as written. **No text above this line
+is edited by this section**, and no line above it is removed.
+
+It is appended at the **end of this file**, after the last Note, for the reason
+`ADR-0002`'s data-composite amendment gives about itself
+(`docs/adr/0002-block-type-behaviour.md:6744-6748`): other records on `main`
+cite this one by line number, and an insert above any of them would leave those
+citations pointing at the wrong text.
+
+Every code cite below is a reading of `main` at `503ed48`, dated to this
+section and to be re-read rather than trusted.
+
+### What this section changes about part (iii), stated first
+
+Part (iii) at `:8692` is a proposal "stated fully enough to be argued with and
+to bound what the SF037 code must not foreclose". Campaign SF038 builds it, so
+it now has to be stated fully enough to be **built** from. This section adds
+`15E` to `20E`. Of the four clauses already there:
+
+| Clause | Status after this section |
+|---|---|
+| `11E` (`:8701`) | Stands. The gesture, the marked params, and the declaration in `ADR-0002`'s shape are unchanged; `15E` to `18E` say what function produces it and where the output goes. |
+| `12E` (`:8712`) | Stands, unamended. Exactly one subtree under one parent. `20E` restates that it stands. |
+| `13E` (`:8722`) | **Relaxed by `20E`**, on `RQ-SF038-5`. It is the clause `13E` itself predicts - "the clause that a later campaign's pass-through slots would relax" (`:8727-8728`). |
+| `14E` (`:8731`) | Superseded in fact and left standing in text. "Code is a later campaign's" was true when written; this campaign is that campaign, and `sb-uzly` is the request. Nothing else `14E` says changes: `4E`'s no-marker rule and structural recognition still hold, and they are what `15E` rests on. |
+
+The section's `Status:` line at `:8451` reads `accepted` for parts (i) and (ii)
+and, by the section's own words at `:8454-8457` and by the flip Note at
+`:9253`, **not** for part (iii). This section does not touch that line. Part
+(iii) is flipped - together with this amendment's own status line above - by
+`sb-vjvq`, after `sb-uzly` lands, and not before.
+
+### `15E`. The proposer is a pure public function, and it is the whole of the package's half
+
+**`StatifierBlocks.Composite.Collapse.propose/3` takes the document, the
+palette and the selection's block ids, and answers
+`{:ok, declaration} | {:error, reason}`.** It reads; it does not write. It
+takes no socket, no assigns and no `Edit.Session.t()`, it is callable from a
+test, a script or a host's own code with no LiveView in the picture, and it is
+the only entry point this package offers to Collapse's first half.
+
+Three arguments and not two. The **document** is what the selection's ids point
+into and what `12E`'s single-subtree check is run against. The **palette** is
+how the proposer learns each selected block's field declarations, which is what
+`18E` needs to decide which values are params and `19E` needs to decide whether
+a value can be spelled at all; a block's type name in the document is a string,
+and only the palette turns it into a schema. The **selection ids** are a list,
+because the gesture's subject is a selection and `12E`'s refusal is a statement
+about a list rather than a precondition the caller must have already met.
+
+**What it answers is the storable row, minus its name.** The `{:ok, ...}` value
+is a JSON-shaped map in the shape `ADR-0002`'s data-composite amendment fixes
+(`docs/adr/0002-block-type-behaviour.md:7192-7223`) with `"version" => 1`,
+`"params"` and `"subtree"` - and **without `"type_name"`**. `RQ-SF038-1` fixes
+the arity at three and none of the three is a name, which is not an oversight:
+a type name is a key in the **host's** palette namespace, the host is the only
+party that knows what is already registered there and what its tenants may
+call things, and a package that minted one would be minting a collision it
+cannot see. `Composite.Data.declaration/1` (`lib/statifier_blocks/composite/data.ex:286`)
+therefore refuses the map until the host names it, and that refusal is the
+seam working rather than a gap in it: naming is the host's act, and the row is
+not a declaration until it has been performed.
+
+`"sentence"` and `"palette_entry"` are omitted for the same reason at one
+remove. Both are optional in `declaration/1`, both are prose or presentation
+the author never typed in this gesture, and a proposer that invented an English
+sentence template or an icon would be inventing content and calling it a
+proposal.
+
+### `16E`. The gesture hands the declaration to `on_collapse`, edits nothing, and persists nothing
+
+**"Save as a step" on a selected subtree calls `propose/3` and hands the result
+to an `on_collapse` host callback, in `on_select`'s shape.** The 2026-09-05
+host-seams amendment (`:5107`) fixes that shape and this clause takes it
+whole: an assign beside `on_change` and `on_select`, absent by default,
+ignored unless it is a function of arity one, invoked for its effect and never
+for its return value, and fired once per thing that happened.
+
+**The gesture edits no document and the package persists nothing.** No command
+is committed, no `Edit.t()` is built, `on_change` does not fire, and the
+undo history is not touched. The document after the gesture is byte-identical
+to the document before it. What the host receives is a map; what it does with
+it - which table, which column, which tenant it belongs to, whether it is
+saved at all - is the host's, and this package has no opinion and no
+storage. That is epic ruling `R5` ("a saved composite lives in the host's own
+table; the package never persists") arriving at the one gesture that could
+have broken it.
+
+This is why the seam is a callback and not a return value, and the 2026-09-05
+amendment's own argument (`:5137-5143`) applies here unchanged: a selection is
+component state the host cannot compute from its own assigns, and neither is
+the declaration derived from it. What cannot be read has to be pushed.
+
+**A refusal is delivered too, or it is not delivered at all.** `propose/3`
+answering `{:error, reason}` is a refused gesture in `5E`'s and `13E`'s sense
+(`:8728-8729`: "it is a refused gesture and not a finding") - the editor
+reports it to the author in its own chrome and writes nothing. `on_collapse`
+fires only on `{:ok, declaration}`, so a host callback never has to pattern
+match a failure it did not ask for.
+
+### `17E`. `Collapse.replacement/4` answers the compound, and the host commits it
+
+**`Collapse.replacement/4` takes the document, the selection's root id, the
+type name the host registered, and the declaration, and answers the
+`{:compound, ...}` that puts the composite where the arrangement was.** It is
+the exact inverse of `1E` (`:8497`):
+
+    {:compound, [{:remove, root_id}, {:insert, target, block}]}
+
+where `target` is the arrangement's own target - the same parent, the same
+slot, the same index the selection's root held - and `block` is a block of the
+named type whose config is each param's declared `"default"`, which by `18E`
+is the value the author had selected. Removing first and inserting at the
+freed position is `2E`'s ordering (`:8508-8518`) for `2E`'s reason, read
+backwards.
+
+**It is a separate public function, and the host calls it or does not.** The
+gesture does not call it, `on_collapse` does not call it, and nothing in this
+package calls it. A host that saves a declaration and never swaps the
+arrangement out has done a legitimate thing - it has added a type to its
+palette - and the arrangement it was built from is still an ordinary
+arrangement, which `4E` (`:8537`) is exactly the guarantee for. The swap can
+only happen after the host has stored the declaration, named it, and rebuilt
+the palette with it, because until then `{:insert, target, block}` names a
+type the document cannot resolve; the ordering is a fact about the host's
+work, not a rule this record imposes.
+
+**One remove and one insert, both singular, and `12E` is why.** A compound is
+one undo entry by `2n` (`:5654`) and `3E` (`:8524`), so the swap is one
+gesture in and one gesture out for the author, with no intermediate document
+in which the arrangement is gone and the composite is not yet there. The host
+commits it through `Edit.Session.commit/2`, the same seam every other edit
+takes.
+
+### `18E`. Which params are proposed, how they are keyed, and what the template becomes
+
+**The proposed params are the config values the author marks in the gesture;
+where the author marks none, every value that differs from its field's
+default.** The marked case is the primary one - the author is the only party
+who knows which of `"myapp:signup"` and `"failed"` is the thing that varies -
+and the unmarked case is a default that is right more often than it is wrong:
+a value left at its field's default is a value the author never chose, and a
+param whose default is the field's default parameterises nothing.
+
+**Each param's field declaration is the source field's, and its default is the
+selected value.** The `"type"`, `"label"`, and whichever of `"required?"`,
+`"value_path"`, `"datamodel_path?"`, `"hidden?"` and `"readonly?"` the source
+field declares are carried across unchanged (`data.ex:80-84`), and `"default"`
+is set to what the block's config held. Nothing is re-derived: the control the
+author sees on the composite's form is the control they were looking at on the
+block, which is the whole of what makes the collapsed step recognisable to the
+person who collapsed it.
+
+**Keys, and the collision the arrangement can force.** A param's key is the
+source field's key. Two blocks in one arrangement can declare the same field
+key - two `core.assign`s both declare `path` (`lib/statifier_blocks/core/assign.ex:64-75`)
+- so where a key would repeat, every colliding param takes the key
+`<id_suffix>_<field key>` instead, with `id_suffix` the template node's own
+(below) and the un-colliding params keeping their bare keys. The rule is
+deterministic and it is stated because the alternative - refusing the
+arrangement - would refuse the two-assign case, which is a perfectly ordinary
+thing to want to save.
+
+**The template is the subtree with each proposed value replaced by a
+placeholder, and whole-value substitution is exactly the arm it needs.** Each
+marked value becomes `%{"$param" => key}`; every other config value is carried
+across as the literal it is. `Composite.Data`'s placeholder vocabulary already
+records that this is its reason for existing (`data.ex:130-148`: "The reason
+is `Collapse`: the gesture that lifts an arrangement's config values into
+params emits **whole** values"), and this clause is the other half of that
+sentence. A config value that genuinely is a one-key `"$param"` map is carried
+as `%{"$literal" => ...}`, which is what that escape is for.
+
+**`"id_suffix"` is minted from the source block's type, not from its id.** The
+suffix is the type name's last dot-separated segment - `core.invoke` gives
+`invoke`, `core.assign` gives `assign` - with a positional discriminator
+appended where a type repeats in the arrangement, in document order:
+`assign`, `assign_2`, `assign_3`. The source block's own id is not used
+because a document id is arbitrary (`blk_7`), carries no meaning to a later
+reader of the declaration, and need not match `@id_suffix`'s pattern
+(`data.ex:213`), while a type segment always does.
+
+One consequence, and it is sharp enough to state rather than leave to be
+found. A `use`-composite twin of a collapsed declaration is byte-identical in
+expansion **only if its authored `id_suffix`es are the ones this rule mints**.
+`ADR-0002`'s "Guarded step" (`docs/adr/0002-block-type-behaviour.md:6665`) is
+authored with `call` and `guard`, so its expansion's block ids are
+`blk_GS_call` and `blk_GS_guard` where a collapse of the same arrangement
+mints `blk_GS_invoke` and `blk_GS_assign`. The configs, the types and the tree
+shape are identical; the ids are not, and a test asserting the byte-identity
+this campaign's invariant requires compares a collapse against a twin written
+with the minted suffixes. Nothing is wrong with either name - the rule simply
+cannot ask an author who is not there.
+
+### `19E`. All nine field kinds have a data spelling, and a value that still cannot be spelled is refused by name
+
+`RQ-SF038-2`. A collapsed declaration is a `Composite.Data` row, so a field
+kind with no JSON spelling is a field the gesture cannot carry. Today five of
+the nine have one and four do not: `data.ex:86-93` says so in terms - the four
+that carry options "are tuples rather than names and are refused here; ... a
+spelling for them is a later record's to decide". **This clause is that
+record.** All four gain a spelling.
+
+**The spelling is one new optional key, `"options"`, beside the `"type"` name
+the row already carries.** `"type"` stays what `data.ex:86-87` says it is - a
+field type's name as a string - and `@field_types` (`data.ex:215-221`) gains
+the four missing names. What the tuple's second element carries rides in
+`"options"`, decoded by `decode_param/1` (`data.ex:478`) per kind:
+
+| `"type"` | `"options"` | The `field_type/0` built (`lib/statifier_blocks/block_type.ex:179-188`) |
+|---|---|---|
+| `"string"`, `"integer"`, `"boolean"`, `"expression"`, `"duration"` | absent | `:string`, `:integer`, `:boolean`, `:expression`, `:duration` - unchanged, and an `"options"` on one of them is refused |
+| `"select"` | `%{"choices" => [[value, label], ...]}` - a list of two-element lists of strings | `{:select, [{value, label}, ...]}` |
+| `"path"` | the path options map: whichever of `"expects"` and `"writes"` the field declares, each a type expression as `ADR-0011` spells one | `{:path, %{expects: T}}` / `{:path, %{writes: T}}` / `{:path, %{}}` (`block_type.ex:205-225`) |
+| `"list"` | `%{"inner" => ...}`, whose value is itself a `"type"` / `"options"` pair - the same spelling, one level down | `{:list, inner}` |
+| `"type_expr"` | `%{"arms" => ["name", "inline"], "allow_empty?" => false}` - both keys optional, `"arms"` any non-empty subset | `{:type_expr, %{arms: [:name, :inline], allow_empty?: bool}}` (`block_type.ex:259-270`) |
+
+Four notes on the table, one per row that needed a choice.
+
+**`"select"`'s choices are pairs and not a map**, because `{:select, choices}`
+is an ordered list of `{value, label}` (`block_type.ex:183`) and a JSON object
+does not promise order. A two-element list is the smallest thing that keeps
+the order the control draws in.
+
+**`"path"`'s options are the map itself**, not a wrapper, because `path_opts`
+is already a map with two optional keys whose values `ADR-0011` already writes
+as strings (`block_type.ex:222-224`: `type: {:path, %{expects: "Settleable"}}`).
+There is nothing to translate.
+
+**`"list"` recurses through the same spelling**, so `%{"type" => "list",
+"options" => %{"inner" => %{"type" => "string"}}}` is `{:list, :string}`, and
+an inner kind that is itself unspellable makes the whole field unspellable by
+the rule below rather than by a special case.
+
+**`"type_expr"` needs no arm from `statifier_datamodel`, and this is the
+premise that decided it.** The value a `{:type_expr, opts}` field holds is
+"a declared type **name** as a JSON string, an inline shape as a JSON list of
+`"name"` / `"type"` / `"required?"` objects, or nothing at all"
+(`block_type.ex:259-265`) - it is already JSON, and `{:shape, members}` "is
+never what a document holds" (`:264-265`). So the spelling carries `opts` and
+nothing else, no type expression crosses a package boundary here, and
+`RQ-SF038-2`'s "sd OUT" is a consequence of that sentence rather than a
+scoping preference.
+
+**A value the spelling still cannot carry is refused, and the refusal names
+the block and the field.** A field type that is none of the nine, a `"select"`
+whose choices are not string pairs, a `{:list, inner}` whose inner is
+unspellable, or a `"default"` that is not JSON: `propose/3` answers
+`{:error, {:unspellable_field, block_id, field_key}}` and proposes nothing.
+Two ids, because "this arrangement cannot be saved" is not actionable and
+"the `payload` field on `blk_13` cannot be saved" is - the author can go and
+look at it. This is `16E`'s refused gesture, not a finding: nothing is written
+and no document is changed.
+
+### `20E`. `12E` stands; `13E` is relaxed, and an unfilled slot is proposed as a pass-through slot
+
+`RQ-SF038-5`.
+
+**`12E` stands exactly as written.** Exactly one subtree under one parent; two
+siblings, a block and a cousin, a selection straddling two slots, or a partial
+subtree with a child left outside are all still refused, for `12E`'s reason
+(`:8712-8721`), which pass-through slots do not touch: a composite still takes
+one position, and a slot the composite exposes is a slot **inside** its one
+subtree, not a second root.
+
+**`13E` is relaxed. A selection whose subtree holds an unfilled slot is
+admitted, and that slot is proposed as a pass-through slot of the
+declaration.** `13E` refused it because `8E` (`:8612`) gave a composite no
+slots, so a `core.group` whose `body` the author left open could only have
+been frozen shut. Campaign SF038 gives a composite slots - `ADR-0002`'s
+pass-through amendment is the record - and the refusal's premise is gone with
+it. `13E`'s own text predicts this ("the clause that a later campaign's
+pass-through slots would relax", `:8727-8728`); this is that relaxation and
+nothing wider.
+
+**In the declaration's words.** The proposed row carries a `"slots"` key in
+the shape the `ADR-0002` pass-through amendment fixes: a slot name to
+`[local_id, inner_slot]`, where `local_id` is the template node's own
+`"id_suffix"` (`18E`) and `inner_slot` is that node's own slot name. This
+record proposes the gesture; that record owns the shape, exactly as `11E`
+already says of the declaration itself (`:8709-8710`), and this section
+invents no second spelling for it.
+
+**The proposed slot's name is the inner slot's own name**, or, where two
+proposed slots would collide on it, `<local_id>_<inner slot>` for every
+colliding one - the same rule and the same reason as `18E`'s param keys.
+
+**A filled slot is not proposed, and its children are not lifted.** Only an
+**unfilled** slot becomes a pass-through slot. A slot with children in it is
+part of what the author selected: its children become template nodes under it
+like every other block in the subtree, they keep their configs and their
+proposed placeholders, and they are not hoisted out into a slot the composite
+exposes. An author who wants them to be a slot empties the slot first and
+collapses again, which is a gesture they can see the result of; a Collapse
+that silently turned a filled slot into an opening would be deciding for them
+that the blocks they put there were an example rather than the thing.
+
+**More than one unfilled slot proposes more than one pass-through slot**, and
+there is no cap. Nothing in `12E` or in the pass-through shape counts them,
+and a rule that admitted one and refused two would be an arbitrary line.
+
+### Worked example: "Guarded step", collapsed
+
+The signup domain. An author has built, by hand, a call that records the
+failure when it comes back on the error path - `ADR-0002`'s "Guarded step"
+arrangement (`docs/adr/0002-block-type-behaviour.md:6665`) with signup values
+rather than card-processing ones:
+
+    core.invoke   id "blk_7"
+      config  %{"invoke_type" => "myapp:signup", "assign_to" => ""}
+      slots   %{"on_error" => [
+        core.assign  id "blk_9"
+          config  %{"path"  => "signup.verification.failure",
+                    "value" => "failed"}
+      ]}
+
+They select `blk_7` and `blk_9`, mark `invoke_type` and `path`, and take "Save
+as a step".
+
+**`propose/3` answers**, with the document, the palette and `["blk_7", "blk_9"]`:
+
+    %{
+      "version" => 1,
+      "params" => [
+        %{"key" => "invoke_type", "type" => "string", "label" => "Invoke type",
+          "required?" => true, "default" => "myapp:signup"},
+        %{"key" => "path", "type" => "string", "label" => "Write to",
+          "required?" => true, "datamodel_path?" => true,
+          "default" => "signup.verification.failure"}
+      ],
+      "subtree" => [
+        %{"type" => "core.invoke", "id_suffix" => "invoke",
+          "config" => %{"invoke_type" => %{"$param" => "invoke_type"},
+                        "assign_to" => ""},
+          "slots" => %{"on_error" => [
+            %{"type" => "core.assign", "id_suffix" => "assign",
+              "config" => %{"path"  => %{"$param" => "path"},
+                            "value" => "failed"}}
+          ]}}
+      ]
+    }
+
+Reading it against the clauses: no `"type_name"`, no `"sentence"`, no
+`"palette_entry"` (`15E`); `"version" => 1`; two params, each carrying its
+source field's `"type"`, `"label"`, `"required?"` and `"datamodel_path?"`
+with the selected value as its `"default"` (`18E`) - `core.assign` declares
+`path` as a `:string` carrying `datamodel_path?: true`, not as a
+`{:path, opts}` field (`lib/statifier_blocks/core/assign.ex:64-75`), and the
+labels are that module's own rather than the ones `ADR-0002`'s hand-written
+declaration chose; `"assign_to"` and `"value"` carried as literals because the
+author did not mark them (`18E`); `"id_suffix"`es minted from the type
+segments, each unique on its first use (`18E`); no `"slots"` key, because
+`on_error` is filled (`20E`).
+
+Nothing here needs `19E`'s new spellings, and the example is left that way
+rather than stretched. Had the author also marked `core.invoke`'s
+`assign_to`, which **is** a `{:path, %{}}` field
+(`lib/statifier_blocks/core/invoke.ex:139-144`), that param would read
+`%{"key" => "assign_to", "type" => "path", "options" => %{}, ...}` by `19E`'s
+table - one new key, and the empty options map because the field declares
+neither `expects` nor `writes`.
+
+**The gesture then stops.** `on_collapse` receives that map; the document is
+unchanged; `blk_7` and `blk_9` are exactly where they were. The host names it
+`"myapp.guarded_step"`, stores it, and registers it - `{:ok, state} =
+Composite.Data.declaration(row)`, then `Palette.from_modules([{"myapp.guarded_step",
+{StatifierBlocks.Composite.Data, state}}], [])`
+(`docs/adr/0002-block-type-behaviour.md:7227-7232`).
+
+**The byte-identity.** A `use`-composite twin declaring the same two params
+and the same subtree with `id_suffix`es `invoke` and `assign` expands, for a
+composite block `blk_AD` with config `%{"invoke_type" => "myapp:signup",
+"path" => "signup.verification.failure"}`, to:
+
+| | Type | Minted id | Config |
+|---|---|---|---|
+| root | `core.invoke` | `blk_AD_invoke` | `%{"invoke_type" => "myapp:signup", "assign_to" => ""}` |
+| in `on_error` | `core.assign` | `blk_AD_assign` | `%{"path" => "signup.verification.failure", "value" => "failed"}` |
+
+which is what the data declaration above expands to, block for block, config
+for config, id for id. `ADR-0002`'s own "Guarded step" is authored with `call`
+and `guard` instead, so it differs in those two ids and in nothing else -
+`18E`'s stated consequence, showing up in the first example that could have
+hidden it.
+
+**And the replacement, if the host wants it.** `Collapse.replacement/4` with
+the document, `"blk_7"`, `"myapp.guarded_step"` and the declaration answers
+
+    {:compound, [
+      {:remove, "blk_7"},
+      {:insert, target_of("blk_7"), %Block{type: "myapp.guarded_step",
+        config: %{"invoke_type" => "myapp:signup",
+                  "path" => "signup.verification.failure"}}}
+    ]}
+
+- the config is each param's `"default"` (`17E`), which is each marked value
+(`18E`), so the composite the author gets back expands to the arrangement they
+started with. The host commits it through `Edit.Session.commit/2` and the
+author sees one undo entry.
+
+### Worked example: "Guarded section", with the inner slot left unfilled
+
+The same author, the same domain, one difference: they have not decided what
+happens on the error path yet, and they want the step saved so that each use
+can answer that for itself.
+
+    core.invoke   id "blk_7"
+      config  %{"invoke_type" => "myapp:signup", "assign_to" => ""}
+      slots   %{"on_error" => []}
+
+`core.invoke` declares `on_error` at `:zero_or_one`
+(`lib/statifier_blocks/core/invoke.ex:96`), so the arrangement is legal as it
+stands. They select `blk_7` alone and mark `invoke_type`.
+
+**Under `13E` this gesture was refused.** The subtree holds an empty slot the
+author "plainly means to keep filling" (`:8723-8726`), a composite had no
+slots to expose it through (`8E`), and refusing was the honest answer.
+
+**Under `20E` it is admitted**, and `propose/3` answers:
+
+    %{
+      "version" => 1,
+      "params" => [
+        %{"key" => "invoke_type", "type" => "string", "label" => "Invoke type",
+          "required?" => true, "default" => "myapp:signup"}
+      ],
+      "slots" => %{"on_error" => ["invoke", "on_error"]},
+      "subtree" => [
+        %{"type" => "core.invoke", "id_suffix" => "invoke",
+          "config" => %{"invoke_type" => %{"$param" => "invoke_type"},
+                        "assign_to" => ""},
+          "slots" => %{"on_error" => []}}
+      ]
+    }
+
+One param, and one pass-through slot: the name `on_error` because nothing
+collides with it, mapped to `["invoke", "on_error"]` - the template node's
+`"id_suffix"` and that node's own slot name, in the `ADR-0002` pass-through
+amendment's words. The template keeps the slot empty; it is the mapping, not a
+hole in the template, that makes the opening real.
+
+Named `"myapp.guarded_section"` and registered, it draws one card with one
+interior, an author drops a `core.assign` into it, and the expansion splices
+that block into the invoke's `on_error` keeping its own id. How the card draws
+the interior and how `expand/2` splices is `ADR-0002`'s pass-through amendment
+and this record's card clauses, not this section's; what this section decides
+is only that Collapse proposes the slot instead of refusing the selection.
+
+**A filled slot, for contrast.** Had the author left the `core.assign` in
+`on_error` and taken the gesture, they would have got the first example: a
+template with the assign inside it and no `"slots"` key at all. The two
+arrangements differ by one block and the declarations differ by a slot,
+which is the relationship `20E`'s two arms are meant to have.
+
+### What this section does not decide
+
+- **How a composite declares a pass-through slot.** `ADR-0002`'s
+  pass-through amendment fixes the `"slots"` shape, the `use` option beside
+  it, `slots/1`'s answer, and what `expand/2` splices. `20E` cites that shape
+  and proposes into it; it does not define it, and where the two are read
+  together, that record is the authority on the shape and this one on the
+  gesture.
+- **How the card draws an interior for a declared slot.** `8E` (`:8612`) says
+  a composite's `slots/1` is empty "in campaign SF037" and `7E` (`:8601`) that
+  it draws as a leaf card. Both are amended elsewhere on `RQ-SF038-5` and
+  `RQ-SF038-14`, and this section neither restates nor qualifies them: it
+  decides what Collapse **proposes**, and nothing about what the editor
+  **draws**.
+- **How a data composite declares a migration**, or what a declaration's
+  `"version"` and a template node's version discipline are. `RQ-SF038-3` and
+  `RQ-SF038-4` are ruled and their record is `ADR-0002`'s. `15E` sets
+  `"version" => 1` on a first proposal because a row must have one; everything
+  after the first save is that record's.
+- **Where the host puts the declaration.** `16E` hands it over and stops. The
+  table, the tenant scoping, the versioning of the host's own rows, and
+  whether the host offers the swap at all are the host's, and epic `R5`,
+  quoted under `16E`, is why.
+- **What the gesture's control looks like.** `6E` (`:8583`) already takes this
+  ruling for Expand - the clause names the gesture and not the control's
+  label - and it applies here word for word. The operator's ruling `D16`
+  (umbrella `docs/decisions.md`), which this record already cites in that
+  qualified form at `:8023` - "components promote and layouts do not" -
+  stands, and **this section adds no layout mode to the package editor**.
+- **Anything about the compiler.** A document holding a collapsed composite is
+  an ordinary `ADR-0001` `schema_version` 1 document naming a type by string;
+  `4E` (`:8537`) is unweakened, an arrangement that has been collapsed and one
+  built by hand are indistinguishable, and what the compiler does with a
+  composite is `ADR-0004`'s.
+
+### Implementing and flipping beads
+
+`sb-uzly` builds `15E` to `20E` from this section as merged, against the
+`ADR-0002` pass-through amendment as merged. `sb-vjvq` flips **part (iii)'s
+clauses `11E` to `20E` and this section's own status line** to accepted after
+`sb-uzly` lands, and re-reads every cite above against `main` as it stands
+then. Nothing in this section is built yet.
+
+Filed with `sb-2fvz`, campaign SF038, on rulings `RQ-SF038-1`, `RQ-SF038-2`
+and `RQ-SF038-5`.
