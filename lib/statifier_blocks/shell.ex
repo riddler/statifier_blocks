@@ -1210,5 +1210,6 @@ defmodule StatifierBlocks.Shell do
   def field_type_tag({:list, inner}), do: "list:" <> field_type_tag(inner)
   def field_type_tag({:select, _options}), do: "select"
   def field_type_tag({:path, _opts}), do: "path"
+  def field_type_tag({:type_expr, _opts}), do: "type_expr"
   def field_type_tag(type) when is_atom(type), do: Atom.to_string(type)
 end

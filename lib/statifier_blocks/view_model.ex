@@ -1259,17 +1259,23 @@ defmodule StatifierBlocks.ViewModel do
   @spec names([String.t()]) :: String.t()
   defp names(list), do: Enum.map_join(list, ", ", &inspect/1)
 
+  # `validate_config/1`, and the one shared check a block type does not
+  # implement: a `{:type_expr, opts}` field whose stored value is not an arm
+  # its declaration admits. The compiler routes the same list into its
+  # `:config` stage (ADR-0002 decision 7, amended 2026-09-06), so the finding
+  # an author reads under the control and the one a compile refuses on are
+  # one finding rather than two implementations of it.
   @spec config_findings(Block.id(), module(), Block.config()) :: [Finding.t()]
   defp config_findings(block_id, module, config) do
-    case module.validate_config(config) do
-      :ok ->
-        []
+    own =
+      case module.validate_config(config) do
+        :ok -> []
+        {:error, findings} -> findings
+      end
 
-      {:error, findings} ->
-        Enum.map(findings, fn {key, message} ->
-          Finding.new({:config, block_id, key}, :config, message)
-        end)
-    end
+    Enum.map(BlockType.type_expr_findings(module, config) ++ own, fn {key, message} ->
+      Finding.new({:config, block_id, key}, :config, message)
+    end)
   end
 
   @spec resolution_message(

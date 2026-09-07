@@ -138,9 +138,17 @@ defmodule StatifierBlocks.MixProject do
         # `StatifierBlocks.Shell.declared_shape/1` renders the new
         # inhabitant, so 0.1 or 0.2 would resolve here and then answer a
         # narrower set of declared paths than this package now says it reads.
-        # Below 1.0 a `~>` requirement admits only the 0.3.x line, so a
-        # breaking 0.4 does not resolve here without a deliberate bump.
-        {:statifier_datamodel, "~> 0.3"},
+        # The floor is 0.4 and not 0.3. `sd-ADR-0001`'s inline-shape amendment
+        # of 2026-09-06 shipped in 0.4.0, and its `{:shape, members}` term is
+        # what `StatifierBlocks.Environment`'s type expression now admits and
+        # what the read check hands `StatifierDatamodel.Types.satisfies/3` when
+        # a block carries an inline shape. 0.3 resolves and then has no such
+        # inhabitant at all. Raising it also widens what a document projects:
+        # 0.4 keeps 0.3's declared-name arm, so a declaration-typed entry still
+        # flattens into that declaration's fields.
+        # Below 1.0 a `~>` requirement admits only the 0.4.x line, so a
+        # breaking 0.5 does not resolve here without a deliberate bump.
+        {:statifier_datamodel, "~> 0.4"},
         # Direct because `StatifierBlocks.Core.Duration` calls
         # `Predicator.Duration.parse/1` to read a stored predicator duration
         # string. It already resolves through statifier, so naming it here

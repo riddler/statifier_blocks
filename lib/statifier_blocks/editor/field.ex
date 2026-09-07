@@ -17,6 +17,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `:duration` | one text control; duration strings the expression language reads, with on-screen examples |
     | `{:list, t}` | repeatable rows of `t`'s renderer, with add and remove |
     | `{:path, opts}` | single-line text input bound to a `<datalist>` of the declared datamodel paths; the plain input when there are none |
+    | `{:type_expr, opts}` | per `opts.arms`: a text input bound to a `<datalist>` of the document's declared type names, or an inline member-list form; a toggle when the field admits both |
 
     `:duration`'s row is decision 9 as amended 2026-08-29 and again
     2026-09-05 (clause 9a, one grammar). One text control, not a value/unit
@@ -250,6 +251,46 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     integer reaches the draft config as the string the author typed rather
     than being silently coerced or dropped.
 
+    ## The `{:type_expr, opts}` control
+
+    ADR-0005 decision 9's Note of 2026-09-06. Two arms and a toggle, and
+    the arm a field admits is `opts.arms` - a field declaring one arm
+    draws that arm and no toggle.
+
+    **The name arm is the `invoke_type` control's shape over a different
+    feed.** A single-line text input with a `<datalist>` beside it, free
+    text still valid, the plain input when the list is empty. The names are
+    the datamodel document's **declarations** - the list
+    `StatifierBlocks.Datamodel.declared_types/1` computes and the Datamodel
+    tab already draws - arriving here as `type_candidates`. It is a
+    different feed from `path_candidates`, and deliberately disjoint: the
+    `types` key contributes no path, so the declared paths a
+    `{:path, opts}` field suggests and the declared type names this one
+    suggests share no member and are never merged. It suggests and never
+    constrains.
+
+    **The inline arm draws an ordered member list**, each row carrying the
+    member's name, its type and whether the shape promises it. Adding and
+    removing a row is the affordance a `{:list, t}`'s rows already have,
+    on the same two events. A member's *type* control is this same control
+    recursing, so a member may itself hold an inline shape and the form
+    nests as a `{:list, t}` of a `{:list, t}` nests. The order the author
+    writes is preserved, because that is the order an unmet-member reason
+    renders in, and nothing here presents reordering as though it changed
+    the value.
+
+    **Switching arms replaces the value; it never translates it.** A name
+    and a member list are not two spellings of one value, so there is
+    nothing to carry across: the new arm opens empty and the edit reaches
+    the document through `:update_config` exactly as every other field
+    edit does.
+
+    **A value the control cannot read renders raw** - in the name arm's
+    text input, showing the bytes exactly as stored, with the field's own
+    `:config` finding beneath it. Raw rather than blank, for decision 9's
+    reason that a control showing nothing invites an author to save over a
+    value they never saw.
+
     ## The `{:path, opts}` control
 
     Decision 7's eighth field type holds a path into the host's datamodel,
@@ -364,6 +405,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:type_candidates, :list,
+      default: [],
+      doc: """
+      The document's declared type **names**, sorted, drawn as the
+      `<datalist>` of a `{:type_expr, opts}` field's name arm and of every
+      member type control inside its inline arm. `[]` renders the plain
+      input, on the same "an empty list is markup that suggests nothing"
+      terms every other feed here is under.
+      """
+    )
+
     attr(:path_types, :map,
       default: %{},
       doc: """
@@ -429,6 +481,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           path_candidates={@path_candidates}
           value_candidates={@value_candidates}
           path_types={@path_types}
+          type_candidates={@type_candidates}
           event_candidates={@event_candidates}
           outcome_candidates={@outcome_candidates}
           candidates={@candidates}
@@ -455,6 +508,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:path_candidates, :list, default: [])
     attr(:value_candidates, :map, default: %{})
     attr(:path_types, :map, default: %{})
+    attr(:type_candidates, :list, default: [])
     attr(:event_candidates, :list, default: [])
     attr(:outcome_candidates, :list, default: [])
     attr(:candidates, :any, default: [])
@@ -666,6 +720,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         id={input_id(@field)}
         name={input_name(@field)}
         value={to_text(@field.value)}
+      />
+      """
+    end
+
+    # ADR-0005 decision 9's Note of 2026-09-06. The field's own control is
+    # the recursive one below, opened on the arm the stored value already
+    # is, with the field's key and an empty index path so that the add and
+    # remove gestures inside it name this field's member list.
+    defp control(%{field: %ViewModel.Field{type: {:type_expr, opts}}} = assigns) do
+      assigns =
+        assigns
+        |> assign(:arms, type_expr_arms(opts))
+        |> assign(:value, assigns.field.value)
+        |> assign(:key, assigns.field.key)
+        |> assign(:prefix, input_name(assigns.field))
+        |> assign(:base_id, input_id(assigns.field))
+
+      ~H"""
+      <.type_expr_value
+        value={@value}
+        arms={@arms}
+        key={@key}
+        prefix={@prefix}
+        base_id={@base_id}
+        path={[]}
+        target={@target}
+        type_candidates={@type_candidates}
       />
       """
     end
@@ -918,8 +999,260 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     def decode({:list, inner}, raw) when is_list(raw), do: Enum.map(raw, &decode(inner, &1))
     def decode({:list, inner}, raw), do: [decode(inner, raw)]
+    def decode({:type_expr, _opts}, raw), do: decode_type_expr(raw)
     def decode(_type, raw) when is_binary(raw), do: raw
     def decode(_type, raw), do: raw
+
+    # -- the type expression ---------------------------------------------------
+
+    attr(:value, :any, required: true)
+    attr(:arms, :list, required: true)
+    attr(:key, :string, required: true)
+    attr(:prefix, :string, required: true)
+    attr(:base_id, :string, required: true)
+    attr(:path, :list, required: true)
+    attr(:target, :any, required: true)
+    attr(:type_candidates, :list, required: true)
+
+    # One type expression: the toggle when the value admits both arms, then
+    # the arm itself. A member's type control is this same component with a
+    # deeper `prefix` and one more index on `path`, which is what makes the
+    # form nest.
+    defp type_expr_value(assigns) do
+      assigns =
+        assigns
+        |> assign(:arm, type_expr_arm(assigns.value, assigns.arms))
+        |> assign(:members, type_expr_members(assigns.value))
+        |> assign(:list_id, assigns.base_id <> "-types")
+
+      ~H"""
+      <div class="sb-type-expr" data-arm={@arm} data-type-expr-path={type_expr_path_param(@path)}>
+        <div :if={length(@arms) > 1} class="sb-type-expr__toggle">
+          <label class="sb-type-expr__arm">
+            <input
+              type="radio"
+              name={@prefix <> "[__arm]"}
+              value="name"
+              checked={@arm == :name}
+              id={@base_id <> "-arm-name"}
+            /> a declared type
+          </label>
+          <label class="sb-type-expr__arm">
+            <input
+              type="radio"
+              name={@prefix <> "[__arm]"}
+              value="inline"
+              checked={@arm == :inline}
+              id={@base_id <> "-arm-inline"}
+            /> members
+          </label>
+        </div>
+        <input
+          :if={length(@arms) == 1}
+          type="hidden"
+          name={@prefix <> "[__arm]"}
+          value={Atom.to_string(@arm)}
+        />
+        <div :if={@arm == :name} class="sb-type-expr__name">
+          <input
+            class="sb-field__input"
+            type="text"
+            id={@base_id}
+            name={@prefix <> "[name]"}
+            value={type_expr_name_text(@value)}
+            list={@list_id}
+            spellcheck="false"
+            autocomplete="off"
+          />
+          <datalist
+            :if={@type_candidates != []}
+            id={@list_id}
+            data-type-candidates={length(@type_candidates)}
+          >
+            <option :for={name <- @type_candidates} value={name}></option>
+          </datalist>
+        </div>
+        <div :if={@arm == :inline} class="sb-type-expr__members">
+          <div
+            :for={{member, index} <- Enum.with_index(@members)}
+            class="sb-type-expr__member"
+            data-member={index}
+          >
+            <input
+              class="sb-field__input sb-type-expr__member-name"
+              type="text"
+              id={@base_id <> "-#{index}-name"}
+              name={@prefix <> "[members][#{index}][name]"}
+              value={member_name(member)}
+              spellcheck="false"
+            />
+            <input type="hidden" name={@prefix <> "[members][#{index}][required?]"} value="false" />
+            <label class="sb-type-expr__required">
+              <input
+                type="checkbox"
+                id={@base_id <> "-#{index}-required"}
+                name={@prefix <> "[members][#{index}][required?]"}
+                value="true"
+                checked={member_required?(member)}
+              /> required
+            </label>
+            <.type_expr_value
+              value={member_type(member)}
+              arms={[:name, :inline]}
+              key={@key}
+              prefix={@prefix <> "[members][#{index}][type]"}
+              base_id={@base_id <> "-#{index}-type"}
+              path={@path ++ [index]}
+              target={@target}
+              type_candidates={@type_candidates}
+            />
+            <button
+              type="button"
+              class="sb-button sb-field__remove"
+              phx-click="field-list-remove"
+              phx-target={@target}
+              phx-value-key={@key}
+              phx-value-index={index}
+              phx-value-path={type_expr_path_param(@path)}
+            >
+              remove
+            </button>
+          </div>
+          <button
+            type="button"
+            class="sb-button sb-field__add"
+            phx-click="field-list-add"
+            phx-target={@target}
+            phx-value-key={@key}
+            phx-value-path={type_expr_path_param(@path)}
+          >
+            add
+          </button>
+        </div>
+      </div>
+      """
+    end
+
+    # Which arms the declaration admits. Both by default, and a declaration
+    # naming an empty list is read as naming neither, which is a declaration
+    # no control can draw - so it reads as both rather than as nothing.
+    @spec type_expr_arms(map()) :: [:name | :inline]
+    defp type_expr_arms(opts) do
+      case Map.get(opts, :arms) do
+        [_first | _rest] = arms -> Enum.filter([:name, :inline], &(&1 in arms))
+        _absent_or_empty -> [:name, :inline]
+      end
+      |> case do
+        [] -> [:name, :inline]
+        arms -> arms
+      end
+    end
+
+    # The arm a stored value opens on: the one it already is. A member list
+    # opens the inline arm; everything else opens the name arm, which is
+    # where a value the control cannot read renders raw. A field admitting
+    # only the inline arm opens it for an empty value, because there is no
+    # name arm to open.
+    @spec type_expr_arm(term(), [:name | :inline]) :: :name | :inline
+    defp type_expr_arm(value, _arms) when is_list(value), do: :inline
+    defp type_expr_arm(value, arms) when is_binary(value) and value != "", do: name_arm(arms)
+    defp type_expr_arm(_empty, arms), do: if(:name in arms, do: :name, else: :inline)
+
+    @spec name_arm([:name | :inline]) :: :name | :inline
+    defp name_arm(arms), do: if(:name in arms, do: :name, else: :name)
+
+    @spec type_expr_members(term()) :: [term()]
+    defp type_expr_members(value) when is_list(value), do: value
+    defp type_expr_members(_not_a_member_list), do: []
+
+    # The bytes exactly as stored, for the name arm's input. A value that is
+    # neither arm renders raw rather than blank.
+    @spec type_expr_name_text(term()) :: String.t()
+    defp type_expr_name_text(value) when is_binary(value), do: value
+    defp type_expr_name_text(nil), do: ""
+    defp type_expr_name_text(value), do: to_text(value)
+
+    # The index path of the member list a gesture is about, dot-joined.
+    # Empty for the field's own list; `"0"` for the member list inside the
+    # first member's type, and so on down.
+    @spec type_expr_path_param([non_neg_integer()]) :: String.t()
+    defp type_expr_path_param(path), do: Enum.map_join(path, ".", &Integer.to_string/1)
+
+    @spec member_name(term()) :: String.t()
+    defp member_name(%{"name" => name}) when is_binary(name), do: name
+    defp member_name(_nameless), do: ""
+
+    @spec member_required?(term()) :: boolean()
+    defp member_required?(%{"required?" => required}), do: required in [true, "true", "on", "1"]
+    defp member_required?(_member), do: false
+
+    @spec member_type(term()) :: term()
+    defp member_type(%{"type" => type}), do: type
+    defp member_type(_member), do: ""
+
+    # The posted slice of a type expression, back into the value a document
+    # holds: a string for the name arm, a list of member objects for the
+    # inline arm.
+    #
+    # The arm the author is on is what the toggle posted, not what the old
+    # value was, which is what makes switching arms replace the value rather
+    # than translate it: the arm being left still has its control in the DOM
+    # and posts it, and that half is read only when the toggle names it.
+    @spec decode_type_expr(term()) :: StatifierBlocks.Block.json()
+    defp decode_type_expr(%{"__arm" => "inline"} = raw),
+      do: decode_members(Map.get(raw, "members"))
+
+    defp decode_type_expr(%{"__arm" => "name"} = raw), do: decode_type_name(raw)
+    defp decode_type_expr(%{"members" => members}), do: decode_members(members)
+    defp decode_type_expr(%{"name" => _name} = raw), do: decode_type_name(raw)
+    defp decode_type_expr(raw), do: raw
+
+    @spec decode_type_name(map()) :: String.t()
+    defp decode_type_name(raw) do
+      case Map.get(raw, "name") do
+        text when is_binary(text) -> text
+        _absent -> ""
+      end
+    end
+
+    # A row saying nothing at all is dropped, which is what makes clearing a
+    # row remove the member; a row that says only half of one is KEPT at the
+    # blank it has, so an author who typed the type first sees their own
+    # bytes rather than watching them vanish between keystrokes.
+    @spec decode_members(term()) :: [map()]
+    defp decode_members(rows) when is_map(rows) do
+      rows
+      |> Enum.sort_by(fn {index, _row} -> member_index(index) end)
+      |> Enum.map(fn {_index, row} -> decode_member(row) end)
+      |> Enum.reject(&blank_member?/1)
+    end
+
+    defp decode_members(_no_rows_posted), do: []
+
+    @spec decode_member(term()) :: map()
+    defp decode_member(row) when is_map(row) do
+      %{
+        "name" => String.trim(member_name(row)),
+        "type" => decode_type_expr(Map.get(row, "type")),
+        "required?" => member_required?(row)
+      }
+    end
+
+    defp decode_member(_row), do: %{"name" => "", "type" => "", "required?" => false}
+
+    @spec blank_member?(map()) :: boolean()
+    defp blank_member?(%{"name" => "", "type" => type}), do: type in ["", []]
+    defp blank_member?(_member), do: false
+
+    @spec member_index(term()) :: integer()
+    defp member_index(index) when is_binary(index) do
+      case Integer.parse(index) do
+        {number, _rest} -> number
+        :error -> 0
+      end
+    end
+
+    defp member_index(_index), do: 0
 
     @doc "The DOM id for a field's control. Part of decision 7's DOM contract."
     @spec input_id(ViewModel.Field.t()) :: String.t()

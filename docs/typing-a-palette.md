@@ -19,15 +19,17 @@ The types themselves live in the datamodel document, which
 read check. This package takes it as a dependency and calls it; it defines no
 second read check and no compatibility or coverage module of its own.
 
-The dependency resolves from Hex, at a floor of 0.3:
+The dependency resolves from Hex, at a floor of 0.4:
 
 ```elixir
 # mix.exs
-{:statifier_datamodel, "~> 0.3"}
+{:statifier_datamodel, "~> 0.4"}
 ```
 
 0.3.0 is the release in which an entry's `type` may name a declaration, which
-the section below uses.
+the section below uses; 0.4.0 is the one in which a type expression admits an
+inline, unnamed shape beside a declared name, which the environment reads and
+a `{:type_expr, opts}` field stores.
 
 ## Declare the records and shapes your paths hold
 
@@ -304,11 +306,24 @@ palette =
 ctx = %{datamodel: datamodel}
 
 known_at_settle = Environment.at(palette, document, {"blk_root", "body", 1}, ctx)
-#=> %{"cards.current_txn" => "cards.credit_txn"}
+#=> %{"cards.current_txn" => "cards.credit_txn", "cards.settlement" => "object"}
 
 verdict = Assignability.validate(palette, document, ctx)
 #=> :ok
 ```
+
+`cards.settlement` is in that map without any block having written it: the
+environment seeds every path the datamodel declares, at the type it declares
+there (ADR-0011 decision 2, amended 2026-09-06), and a type a block writes
+replaces the seeded one from that position on - which is what
+`cards.current_txn` shows, seeded `object` and then written
+`cards.credit_txn` by the entry block's `produces`.
+
+That is worth one sentence of care in a guide: a path your document declares
+is now **checked**. A read at it that found nothing before, and was an
+advisory, meets the declared type instead - so a document that validated may
+refuse once its host supplies a datamodel, and the fix is either the block's
+declaration or the document's.
 
 The settle step expects `Settleable` and the environment holds
 `cards.credit_txn`. That is not identity, so the check asks coverage:

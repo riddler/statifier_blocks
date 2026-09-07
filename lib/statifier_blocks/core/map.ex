@@ -77,7 +77,7 @@ defmodule StatifierBlocks.Core.Map do
   | `chart` | `:string` | the document id of the chart run once per item |
   | `item_as` | `:string` | the name a child sees its item under, default `item` |
   | `index_as` | `:string` | the name a child sees its position under, when the author wants one |
-  | `collect` | `{:path, %{writes: {:list, :unknown}}}` | where the assembled answer is written |
+  | `collect` | `{:path, %{writes: {:list, envelope}}}` | where the assembled answer is written |
   | `collect_type` | `:string` | what a collected answer is, as a declared type name |
   | `on` | `{:select, ...}` | the aggregation policy, `all` or `first_error` |
 
@@ -104,10 +104,9 @@ defmodule StatifierBlocks.Core.Map do
   are in hand, `StatifierBlocks.BlockType.agrees?/3` is the dormant
   agreement check of ADR-0013 decision 4.
 
-  It produces **no bytes**. `emit/2` gains nothing from it, and the
-  environment entry it will type is ADR-0013 decision 5's, which needs an
-  inline-shape type expression `StatifierBlocks.Environment` cannot spell
-  yet; until that lands, `collect` writes what it writes below.
+  It produces **no bytes**. `emit/2` gains nothing from it. What it types
+  is the `"donedata"` member of `collect`'s element, which is ADR-0013
+  decision 5's entry and is spelled below.
 
   ## The names a child sees, and why they bind nothing here
 
@@ -159,15 +158,33 @@ defmodule StatifierBlocks.Core.Map do
   accepted before.
 
   `collect` carries the `writes` key ADR-0002's Note of 2026-09-06
-  records, and what it writes is `{:list, :unknown}` (ADR-0011 decision
-  12): the assembled answer is a list, dense and in item-index order per
-  ADR-0009 decision 5, and this block says nothing about what one element of
-  it holds, because the shipped child recipe emits the outcome name and
-  nothing else. A block after a `core.map` therefore knows it is looking
-  at a list - which is more than it knew before - and knows nothing about
-  an element, which is exactly true. `items` carries neither key, so
-  ADR-0011 decision 2 reads it as writing `:unknown` at the path it names:
-  known without becoming typed.
+  records, and what it writes is `{:list, <the envelope>}` (ADR-0011
+  decision 12 as amended 2026-09-06, over ADR-0013 decision 5): the
+  assembled answer is a list, dense and in item-index order per ADR-0009
+  decision 5, and one element of it is the envelope the shipped handler
+  writes rather than the child's answer itself.
+
+  The envelope is an inline shape, and the declaration sits one level
+  inside it:
+
+  | Member | Required | Type |
+  |---|---|---|
+  | `index` | yes | `integer` |
+  | `status` | yes | `string` - one of `completed`, `failed`, `cancelled` |
+  | `donedata` | no | this block's `collect_type`, or `unknown` when there is none |
+  | `failure` | no | a shape of `reason`, `attempts` and `detail` |
+
+  `donedata` and `failure` are optional because no element carries both
+  and a cancelled element carries neither; `index` and `status` are
+  required because every element carries both, on all three arms. Both
+  rows of decision 5's table are richer than what shipped before, and the
+  undeclared row is richer with no declaration at all: a block after a
+  `core.map` learns that an element has an index and a status and how a
+  failure is shaped whether or not the author declared anything. No
+  compiled bytes move with it.
+
+  `items` carries neither key, so ADR-0011 decision 2 reads it as writing
+  `:unknown` at the path it names: known without becoming typed.
 
   `on` is read **through its default**, in `core.parallel`'s G7a shape: an
   absent key reads as `"all"` everywhere, so a block an author never
@@ -264,7 +281,7 @@ defmodule StatifierBlocks.Core.Map do
   alias StatifierBlocks.Block
   alias StatifierBlocks.Compiler.Context
   alias StatifierBlocks.Core.{AssignLocation, Config, Emit}
-  alias StatifierBlocks.Emission
+  alias StatifierBlocks.{Emission, Environment}
 
   @invoke_type "statifier_blocks:map"
 
@@ -283,6 +300,18 @@ defmodule StatifierBlocks.Core.Map do
   @chart_message ~s(names the document to run for each item, like bdoc_01JWIZ)
   @items_message "names the datamodel list to run over, like signup.invitees"
   @collect_message "must be a datamodel path, like cards.answers"
+
+  # `st-ADR-0068`'s three keys, as ADR-0009's Note of 2026-09-06 carries
+  # them onto a failed element. `reason` is promised because every failure
+  # carries one; `attempts` and `detail` are not, because a refusal made
+  # before the first attempt carries no count and a failure with nothing to
+  # add carries no detail.
+  @failure_shape {:shape,
+                  [
+                    %{name: "reason", type: "string", required?: true},
+                    %{name: "attempts", type: "integer", required?: false},
+                    %{name: "detail", type: "object", required?: false}
+                  ]}
   @on_message ~s(must be "all" or "first_error")
   @item_as_message "must be a bare lowercase identifier, like invitee"
   @index_as_message "must be a bare lowercase identifier, like position"
@@ -348,8 +377,38 @@ defmodule StatifierBlocks.Core.Map do
   @impl true
   def failure_outcomes(_config), do: [@error_outcome]
 
+  # One collected element, as ADR-0009's Note of 2026-09-06 reads it off
+  # the shipped handler and ADR-0013 decision 5 types it. It is an inline
+  # shape rather than a name because no document declares it: it is
+  # assembled here from a record's own decision, which is the one source
+  # ADR-0011 decision 1 admits beside a block and the document.
+  #
+  # The parent's `collect_type` types `"donedata"` and nothing else. An
+  # absent or empty one leaves that member `:unknown`, which is the
+  # undeclared row of decision 5's table and still richer than the
+  # `{:list, :unknown}` this field wrote before: an element has an index
+  # and a status whether or not anything was declared.
+  @spec envelope(Block.config()) :: Environment.type_expr()
+  defp envelope(config) do
+    {:shape,
+     [
+       %{name: "index", type: "integer", required?: true},
+       %{name: "status", type: "string", required?: true},
+       %{name: "donedata", type: declared_summary(config), required?: false},
+       %{name: "failure", type: @failure_shape, required?: false}
+     ]}
+  end
+
+  @spec declared_summary(Block.config()) :: Environment.type_expr()
+  defp declared_summary(config) do
+    case Map.get(config, "collect_type") do
+      name when is_binary(name) -> if String.trim(name) == "", do: :unknown, else: name
+      _absent_or_malformed -> :unknown
+    end
+  end
+
   @impl true
-  def config_schema(_config),
+  def config_schema(config),
     do: [
       %{
         key: "items",
@@ -381,7 +440,7 @@ defmodule StatifierBlocks.Core.Map do
       },
       %{
         key: "collect",
-        type: {:path, %{writes: {:list, :unknown}}},
+        type: {:path, %{writes: {:list, envelope(config)}}},
         label: "Collect the answers into",
         required?: false,
         default: ""

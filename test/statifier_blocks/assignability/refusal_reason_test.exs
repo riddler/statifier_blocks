@@ -84,6 +84,20 @@ defmodule StatifierBlocks.Assignability.RefusalReasonTest do
              ) == {:fixable_by, "blk_STL"}
     end
 
+    # Sabotage: `refused/2`'s `:declaration` clause dropped - the refusal
+    # becomes `{:fixable_by, :declaration}`, which sends an author to a
+    # block that does not exist, and this goes red (verified).
+    test "a type the datamodel document declared is not fixable by any block" do
+      palette = widening_palette()
+
+      assert Assignability.seam_reason(
+               palette,
+               "myapp.settled_txn",
+               "myapp.transaction",
+               :declaration
+             ) == :not_assignable
+    end
+
     # Sabotage: `assignable?/3`'s `%Palette{assignability: nil}` clause
     # returning `true` - the second assertion goes red, because the floor
     # palette stops refusing and the reason disappears with the refusal.

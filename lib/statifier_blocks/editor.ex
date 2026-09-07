@@ -762,6 +762,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       assigns =
         assigns
         |> assign(:declared_types, Datamodel.declared_types(assigns.datamodel))
+        |> assign(:declared_type_names, declared_type_names(assigns.datamodel))
         |> assign(:environment_view, environment_view(assigns))
 
       # One resolution of the marks, read twice: the canvas draws them and
@@ -882,6 +883,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             path_candidates={@path_candidates}
             value_candidates={@offered_values}
             path_types={@declared_path_types}
+            type_candidates={@declared_type_names}
             event_candidates={@event_candidates}
             outcome_candidates={@outcome_candidates}
             field_candidates={@field_candidates}
@@ -1373,12 +1375,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:noreply, socket |> update(:drafts, &Map.delete(&1, id)) |> rebuild()}
     end
 
-    def handle_event("field-list-add", %{"key" => key}, socket) do
-      {:noreply, update_list(socket, key, &(&1 ++ [""]))}
+    def handle_event("field-list-add", %{"key" => key} = params, socket) do
+      {:noreply, update_list(socket, key, params, :add)}
     end
 
-    def handle_event("field-list-remove", %{"key" => key, "index" => index}, socket) do
-      {:noreply, update_list(socket, key, &List.delete_at(&1, to_index(index)))}
+    def handle_event("field-list-remove", %{"key" => key, "index" => index} = params, socket) do
+      {:noreply, update_list(socket, key, params, {:remove, to_index(index)})}
     end
 
     # The declarations panel (the 2026-09-01 amendment, 2i-2m). Four gestures,
@@ -1664,9 +1666,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # 2026-08-27), the same place the form's other writes go. A key naming
     # no field in the selected block's schema edits nothing, which is the
     # same crafted-payload guard `ConfigForm.decode/3` applies.
-    @spec update_list(Phoenix.LiveView.Socket.t(), String.t(), ([term()] -> [term()])) ::
-            Phoenix.LiveView.Socket.t()
-    defp update_list(socket, key, fun) do
+    @spec update_list(
+            Phoenix.LiveView.Socket.t(),
+            String.t(),
+            map(),
+            :add | {:remove, integer()}
+          ) :: Phoenix.LiveView.Socket.t()
+    defp update_list(socket, key, params, gesture) do
       with id when not is_nil(id) <- socket.assigns.selected_id,
            %ViewModel.Field{} = field <- Enum.find(fields_for(socket, id), &(&1.key == key)) do
         config = effective_config(socket, id)
@@ -1674,15 +1680,63 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         rows =
           case BlockType.fetch_value(config, path) do
-            {:ok, value} -> List.wrap(value)
+            {:ok, value} -> rows_of(field.type, value)
             :error -> []
           end
 
-        change_config(socket, id, BlockType.put_value(config, path, fun.(rows)))
+        rows = apply_gesture(rows, member_path(params), gesture, blank_row(field.type))
+
+        change_config(socket, id, BlockType.put_value(config, path, rows))
       else
         _none -> socket
       end
     end
+
+    # A `{:list, t}` wraps whatever it finds, which is the behaviour a stored
+    # scalar has always had there. A `{:type_expr, opts}` does not: its
+    # inline arm is a list and its name arm is a string, and wrapping the
+    # string would turn a type name into a nameless member.
+    @spec rows_of(BlockType.field_type(), term()) :: [term()]
+    defp rows_of({:type_expr, _opts}, value) when is_list(value), do: value
+    defp rows_of({:type_expr, _opts}, _not_a_member_list), do: []
+    defp rows_of(_type, value), do: List.wrap(value)
+
+    @spec blank_row(BlockType.field_type()) :: term()
+    defp blank_row({:type_expr, _opts}), do: %{"name" => "", "type" => "", "required?" => false}
+    defp blank_row(_type), do: ""
+
+    # Which member list the gesture is about. Empty is the field's own, and
+    # each further index steps into that member's own type - the same descent
+    # the control makes when it nests.
+    @spec member_path(map()) :: [non_neg_integer()]
+    defp member_path(%{"path" => path}) when is_binary(path) and path != "" do
+      path |> String.split(".") |> Enum.map(&to_index/1)
+    end
+
+    defp member_path(_no_path), do: []
+
+    @spec apply_gesture([term()], [non_neg_integer()], :add | {:remove, integer()}, term()) ::
+            [term()]
+    defp apply_gesture(rows, [], :add, blank), do: rows ++ [blank]
+    defp apply_gesture(rows, [], {:remove, index}, _blank), do: List.delete_at(rows, index)
+
+    defp apply_gesture(rows, [index | rest], gesture, blank) do
+      List.update_at(rows, index, fn row ->
+        inner =
+          case row do
+            %{"type" => members} when is_list(members) -> members
+            _no_nested_members -> []
+          end
+
+        row
+        |> member_row()
+        |> Map.put("type", apply_gesture(inner, rest, gesture, blank))
+      end)
+    end
+
+    @spec member_row(term()) :: map()
+    defp member_row(row) when is_map(row), do: row
+    defp member_row(_row), do: %{"name" => "", "required?" => false}
 
     # 2A: the drawer closes on a document switch. A drawer left open across one
     # would be showing the new document's blocks under the old one's subject,
@@ -2045,6 +2099,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # the document through the one reader every other read here goes through.
     # With no datamodel supplied the map is empty, and an empty map is what
     # the expression editor behaved as before there was one at all.
+    # The declared type NAMES, which is the name arm's feed and a different
+    # question from `declared_path_types/1`: the `types` key contributes no
+    # path, so the two lists share no member and are never merged. The rows
+    # are the same ones the Datamodel tab draws, already sorted by name, so
+    # the set an author is offered and the set validation judges cannot
+    # drift apart.
+    @spec declared_type_names(term()) :: [String.t()]
+    defp declared_type_names(datamodel) do
+      datamodel |> Datamodel.declared_types() |> Enum.map(& &1.name)
+    end
+
     @spec declared_path_types(map()) :: %{optional(String.t()) => term()}
     defp declared_path_types(assigns) do
       Datamodel.path_types(assigns.datamodel)

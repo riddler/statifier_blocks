@@ -307,9 +307,50 @@ defmodule StatifierBlocks.Core.MapTest do
 
       # `items` says where without saying what, which ADR-0011 decision 2
       # reads as writing `:unknown` there; `collect` carries decision 12's
-      # type, and says nothing about an element of the list.
+      # type as ADR-0013 decision 5 types it - a list of the ADR-0009
+      # envelope, whose `"donedata"` member is this block's `collect_type`.
       assert opts.("items") == %{}
-      assert opts.("collect") == %{writes: {:list, :unknown}}
+
+      assert %{writes: {:list, {:shape, members}}} = %{writes: opts.("collect").writes}
+
+      assert Enum.map(members, & &1.name) == ["index", "status", "donedata", "failure"]
+      assert Enum.map(members, & &1.required?) == [true, true, false, false]
+
+      assert Enum.map(members, & &1.type) == [
+               "integer",
+               "string",
+               :unknown,
+               {:shape,
+                [
+                  %{name: "reason", type: "string", required?: true},
+                  %{name: "attempts", type: "integer", required?: false},
+                  %{name: "detail", type: "object", required?: false}
+                ]}
+             ]
+    end
+
+    # sabotage: `declared_summary/1` answering `:unknown` whatever the
+    # config holds - the declaration stops reaching the envelope's
+    # `"donedata"` member and this goes red (verified).
+    test "collect_type types the envelope's donedata member and nothing else" do
+      config = Elixir.Map.put(@lines, "collect_type", "cards.chunk_result")
+
+      %{type: {:path, %{writes: {:list, {:shape, members}}}}} =
+        Map.config_schema(config) |> Enum.find(&(&1.key == "collect"))
+
+      donedata = Enum.find(members, &(&1.name == "donedata"))
+
+      assert donedata == %{name: "donedata", type: "cards.chunk_result", required?: false}
+
+      # And an empty one is the undeclared row of ADR-0013 decision 5's
+      # table: the envelope is still there, its `"donedata"` unknown.
+      %{type: {:path, %{writes: {:list, {:shape, undeclared}}}}} =
+        @lines
+        |> Elixir.Map.put("collect_type", "")
+        |> Map.config_schema()
+        |> Enum.find(&(&1.key == "collect"))
+
+      assert Enum.find(undeclared, &(&1.name == "donedata")).type == :unknown
     end
 
     # sabotage: same revert - `datamodel_path?/1` answers false for the

@@ -97,7 +97,7 @@ defmodule StatifierBlocks.TypingAPaletteTest do
     assert StatifierBlocks.Environment.subject_path(palette, document) == "cards.current_txn"
 
     assert Keyword.fetch!(ctx.how_to_binding, :known_at_settle) ==
-             %{"cards.current_txn" => "cards.credit_txn"}
+             %{"cards.current_txn" => "cards.credit_txn", "cards.settlement" => "object"}
   end
 
   # Sabotage: changed the how-to's `expects:` from `"Settleable"` to
@@ -119,7 +119,7 @@ defmodule StatifierBlocks.TypingAPaletteTest do
   test "every output the how-to claims is the one it produces", ctx do
     assert claims(ctx.how_to) == [
              ~s("Credit card transaction"),
-             ~s(%{"cards.current_txn" => "cards.credit_txn"}),
+             ~s(%{"cards.current_txn" => "cards.credit_txn", "cards.settlement" => "object"}),
              ~s(:ok),
              ~s(:covers),
              ~s(:not_assignable),

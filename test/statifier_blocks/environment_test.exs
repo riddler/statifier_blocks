@@ -26,6 +26,36 @@ defmodule StatifierBlocks.EnvironmentTest do
   # below keep every assertion below reading exactly as it did.
   @subject Cards.subject()
 
+  # What ADR-0011 decision 2 as amended 2026-09-06 seeds from the worked
+  # datamodel: an entry at every path it declares, at the type it declares
+  # there. Both of the worked document's local entries are `object`, so the
+  # seed is two of them, and a block writing the subject path replaces what
+  # the declaration seeded there for every position after it.
+  @declared %{"cards.current_txn" => "object", "cards.settlement" => "object"}
+
+  # ADR-0009's Note of 2026-09-06 read onto one collected element, typed by
+  # ADR-0013 decision 5: the parent's `collect_type` types `"donedata"` and
+  # nothing else.
+  defp envelope(donedata) do
+    {:shape,
+     [
+       %{name: "index", type: "integer", required?: true},
+       %{name: "status", type: "string", required?: true},
+       %{name: "donedata", type: donedata, required?: false},
+       %{
+         name: "failure",
+         type:
+           {:shape,
+            [
+              %{name: "reason", type: "string", required?: true},
+              %{name: "attempts", type: "integer", required?: false},
+              %{name: "detail", type: "object", required?: false}
+            ]},
+         required?: false
+       }
+     ]}
+  end
+
   defp palette(assignability \\ nil), do: Cards.palette(assignability)
   defp string_palette, do: Cards.string_palette()
   defp ctx, do: Cards.ctx()
@@ -42,9 +72,8 @@ defmodule StatifierBlocks.EnvironmentTest do
     test "the entry block's produces seeds the subject path" do
       document = document([open(), settle("blk_STL")])
 
-      assert Environment.at(palette(), document, {"blk_ROOT", "body", 1}, ctx()) == %{
-               @subject => "cards.credit_txn"
-             }
+      assert Environment.at(palette(), document, {"blk_ROOT", "body", 1}, ctx()) ==
+               Map.put(@declared, @subject, "cards.credit_txn")
     end
 
     # sabotage: change `seed_annotated/3`'s entry-type clause to answer `%{}`
@@ -55,12 +84,44 @@ defmodule StatifierBlocks.EnvironmentTest do
 
       # The seed, and only the seed: the entry block's own `produces` lands
       # on the way out of it, so it is not in front of its own reads.
-      assert Environment.at(palette(), document, {"blk_ROOT", "body", 0}, seeded) == %{
-               @subject => "cards.applicant"
-             }
+      assert Environment.at(palette(), document, {"blk_ROOT", "body", 0}, seeded) ==
+               Map.put(@declared, @subject, "cards.applicant")
 
-      # And with nothing seeded, the document opens holding nothing at all.
-      assert Environment.at(palette(), document, {"blk_ROOT", "body", 0}, ctx()) == %{}
+      # And with no entry type, the document opens holding what its datamodel
+      # declares and nothing else - the amendment of 2026-09-06, whose seed
+      # runs before the entry type is applied over it.
+      assert Environment.at(palette(), document, {"blk_ROOT", "body", 0}, ctx()) == @declared
+    end
+
+    # sabotage: drop the `Map.merge/2` in `seed_annotated/3` so the subject
+    # seed replaces the declared one rather than being applied over it ->
+    # the declared entry disappears and the first assertion goes red.
+    test "a seeded entry is marked as the declaration's, and a block's write wins" do
+      document = document([open(), settle("blk_STL")])
+
+      # Before any block: the entry is the document's, and the walk says so.
+      before = Environment.annotated(palette(), document, {"blk_ROOT", "body", 0}, ctx())
+
+      assert Map.get(before, "cards.settlement") == {"object", :declaration}
+      assert Map.get(before, @subject) == {"object", :declaration}
+
+      # After the entry block: the subject path is the block's by decision
+      # 1's last-write-wins, and the path no block wrote is still the
+      # declaration's.
+      after_open = Environment.annotated(palette(), document, {"blk_ROOT", "body", 1}, ctx())
+
+      assert Map.get(after_open, @subject) == {"cards.credit_txn", "blk_OPEN"}
+      assert Map.get(after_open, "cards.settlement") == {"object", :declaration}
+    end
+
+    # sabotage: have `declared_seed/1` read `ctx` unconditionally rather
+    # than through `Index.index/1`'s `nil` -> a caller with no datamodel
+    # starts seeding and this goes red.
+    test "a caller with no datamodel seeds nothing new" do
+      document = document([open(), settle("blk_STL")])
+
+      assert Environment.at(palette(), document, {"blk_ROOT", "body", 0}, %{}) == %{}
+      assert Environment.seed(palette(), document, %{}) == %{}
     end
 
     # sabotage: drop `datamodel_path?/1` from `field_writes/2`'s filter, so a
@@ -74,10 +135,11 @@ defmodule StatifierBlocks.EnvironmentTest do
           settle("blk_STL")
         ])
 
-      assert Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx()) == %{
-               @subject => "cards.credit_txn",
-               "cards.current_txn.authorized_at" => :unknown
-             }
+      assert Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx()) ==
+               Map.merge(@declared, %{
+                 @subject => "cards.credit_txn",
+                 "cards.current_txn.authorized_at" => :unknown
+               })
     end
 
     # sabotage: change `written_type/1`'s `{:path, %{writes: T}}` clause to
@@ -354,7 +416,7 @@ defmodule StatifierBlocks.EnvironmentTest do
 
       after_it = Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx())
       refute Map.has_key?(after_it, "line")
-      assert Map.get(after_it, "results") == {:list, :unknown}
+      assert Map.get(after_it, "results") == {:list, envelope(:unknown)}
     end
   end
 
@@ -418,9 +480,8 @@ defmodule StatifierBlocks.EnvironmentTest do
       end
 
       # Four blocks later the environment is the seed, untouched.
-      assert Environment.at(palette(), document, {"blk_ROOT", "body", 5}, ctx()) == %{
-               @subject => "cards.credit_txn"
-             }
+      assert Environment.at(palette(), document, {"blk_ROOT", "body", 5}, ctx()) ==
+               Map.put(@declared, @subject, "cards.credit_txn")
     end
 
     # sabotage: reverted `core.subchart`'s `assign_to` to a plain `:string`
@@ -476,12 +537,12 @@ defmodule StatifierBlocks.EnvironmentTest do
       # `items` says where without saying what; `collect` says both.
       assert Environment.write_signatures(palette(), document, block) == [
                {"items", "cards.lines", :unknown},
-               {"collect", "results", {:list, :unknown}}
+               {"collect", "results", {:list, envelope(:unknown)}}
              ]
 
       env = Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx())
 
-      assert Map.get(env, "results") == {:list, :unknown}
+      assert Map.get(env, "results") == {:list, envelope(:unknown)}
       assert Environment.type_of(%{}, Map.get(env, "results")) == :list
     end
 
@@ -507,12 +568,12 @@ defmodule StatifierBlocks.EnvironmentTest do
 
       assert Environment.write_signatures(palette(), document, block) == [
                {"items", "cards.lines", :unknown},
-               {"collect", "cards.batch", {:list, :unknown}}
+               {"collect", "cards.batch", {:list, envelope(:unknown)}}
              ]
 
       env = Environment.at(palette(), document, {"blk_ROOT", "body", 2}, ctx())
 
-      assert Map.get(env, "cards.batch") == {:list, :unknown}
+      assert Map.get(env, "cards.batch") == {:list, envelope(:unknown)}
       refute Map.has_key?(env, "batch")
     end
 
@@ -641,7 +702,7 @@ defmodule StatifierBlocks.EnvironmentTest do
       task =
         Task.async(fn -> Environment.at(palette(), document, {"blk_seq0", "body", 0}, ctx()) end)
 
-      assert Task.await(task, 5_000) == %{}
+      assert Task.await(task, 5_000) == @declared
     end
 
     # sabotage: remove the `index > length(children)` guard from
@@ -737,20 +798,78 @@ defmodule StatifierBlocks.EnvironmentTest do
       assert Environment.satisfies(declarations, "cards.credit_txn", "Settleable") == :covers
     end
 
-    # sabotage: seed the environment from the datamodel's declared paths -
-    # the two answers stop agreeing and this goes red. Decision 1: a path is
-    # in the environment because a block wrote it, and a document that only
-    # *declares* a path declares nothing about the walk.
-    test "the walk answers exactly what it answers for the inlined twin" do
+    # The same four fields, written into the entry itself rather than named
+    # through the `types` key. The index projects both the same way, and
+    # from ADR-0011's amendment of 2026-09-06 the seed carries that
+    # projection into the walk.
+    @inlined_datamodel Cards.datamodel()
+                       |> Map.put("scopes", [
+                         %{
+                           "scope" => "local",
+                           "label" => "This run",
+                           "entries" => [
+                             %{
+                               "name" => "current_txn",
+                               "path" => "cards.current_txn",
+                               "type" => "object",
+                               "label" => "Current transaction",
+                               "fields" => [
+                                 %{
+                                   "name" => "amount_minor",
+                                   "path" => "cards.current_txn.amount_minor",
+                                   "type" => "integer"
+                                 },
+                                 %{
+                                   "name" => "currency",
+                                   "path" => "cards.current_txn.currency",
+                                   "type" => "string"
+                                 },
+                                 %{
+                                   "name" => "authorized_at",
+                                   "path" => "cards.current_txn.authorized_at",
+                                   "type" => "datetime"
+                                 },
+                                 %{
+                                   "name" => "expires_on",
+                                   "path" => "cards.current_txn.expires_on",
+                                   "type" => "date"
+                                 }
+                               ]
+                             }
+                           ]
+                         }
+                       ])
+
+    # sabotage: drop `declared_seed/1` from `seed_annotated/3` - the declared
+    # field stops being seeded, the two answers agree by both holding
+    # nothing there, and both assertions go red.
+    test "the walk seeds a projected field exactly as it seeds the inlined twin's" do
       document =
         document([open(), settle("blk_STL"), assign("blk_A", "cards.current_txn.currency")])
 
       target = {"blk_ROOT", "body", 2}
 
       projected = Environment.at(palette(), document, target, %{datamodel: @projected_datamodel})
+      inlined = Environment.at(palette(), document, target, %{datamodel: @inlined_datamodel})
 
-      assert projected == Environment.at(palette(), document, target, ctx())
-      refute Map.has_key?(projected, "cards.current_txn.currency")
+      # The field the block never wrote is in the walk because the document
+      # declared it, and the two spellings of that declaration are one fact.
+      assert Map.get(projected, "cards.current_txn.expires_on") == "date"
+
+      assert Map.get(projected, "cards.current_txn.expires_on") ==
+               Map.get(inlined, "cards.current_txn.expires_on")
+
+      # And after the block that writes one of them, that path is the
+      # block's by decision 1's last-write-wins, in both.
+      after_write = {"blk_ROOT", "body", 3}
+
+      assert palette()
+             |> Environment.at(document, after_write, %{datamodel: @projected_datamodel})
+             |> Map.get("cards.current_txn.currency") == :unknown
+
+      assert palette()
+             |> Environment.at(document, after_write, %{datamodel: @inlined_datamodel})
+             |> Map.get("cards.current_txn.currency") == :unknown
     end
   end
 
