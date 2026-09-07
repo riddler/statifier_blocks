@@ -1237,11 +1237,11 @@ defmodule StatifierBlocks.ViewModel do
 
       iex> alias StatifierBlocks.ViewModel
       iex> alias StatifierBlocks.ViewModel.{Field, Form, Node}
-      iex> field = %Field{key: "after", type: :duration, label: "After", required?: true, default: nil, value: "nope"}
-      iex> node = %Node{block_id: "blk_ONE", type: "core.delay", type_version: 1, status: :ok, form: %Form{fields: [field]}}
-      iex> overlaid = ViewModel.overlay_findings(node, [{"after", "is not a duration"}, {"gone", "no such field"}])
+      iex> field = %Field{key: "duration", type: :duration, label: "Wait for", required?: true, default: nil, value: "nope"}
+      iex> node = %Node{block_id: "blk_ONE", type: "core.wait", type_version: 1, status: :ok, form: %Form{fields: [field]}}
+      iex> overlaid = ViewModel.overlay_findings(node, [{"duration", "must be a duration"}, {"gone", "no such field"}])
       iex> Enum.map(hd(overlaid.form.fields).findings, & &1.message)
-      ["is not a duration"]
+      ["must be a duration"]
       iex> Enum.map(overlaid.form.unrouted, & &1.message)
       ["no such field"]
   """
