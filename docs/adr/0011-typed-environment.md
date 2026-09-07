@@ -1182,3 +1182,178 @@ Filed with `sb-c9b6`, campaign-SF035, from the walk's ruling `RQ-SF035-2`
 inline-shape arm of `type_expr()` - is a separate and later change to this
 same decision and does not interact with this one: one narrows what the walk
 carries for a refused block, the other widens what a type may spell.
+
+## Amendment (2026-09-06): decision 1's type expression admits an inline shape, and the environment seeds the declared path types the document has not written
+
+**Status: proposed (2026-09-06, campaign SF035, bead `sb-myt1`, recording the
+walk's rulings `RQ-SF035-1` and `RQ-SF035-15`).** A decision record merges at
+proposed under the campaign invariant; flipping it to accepted is a separate
+gated request through the same `docs/adr/` gate, and `sb-wzoa` carries it.
+Additive: no text above this line is edited by this section, and both parts
+grow decisions 1 and 2 rather than taking anything away from a document
+already written.
+
+An amendment rather than a Note, by the test the sibling records apply and the
+section above applied to decision 12: decision 1 states the type vocabulary in
+as many words - "one of the nine scalars, the `name` of a `record` or `shape`
+declaration, `{:list, type}`, or `:unknown`. There is no other inhabitant"
+(`:141-143`) - and part 1 states it differently; decision 2 states the seed in
+as many words - "the document opens with its subject path holding its subject
+type and nothing else" (`:182-183`, restated at
+`lib/statifier_blocks/environment.ex:242`) - and part 2 states it differently. Two decisions move, so the section is numbered, and
+each part names what it leaves standing.
+
+The two parts are independent of each other and both are `sb-1jcr`'s to build.
+They are filed together because they are one ruling pair from one walk and
+because they meet in one function: the seed is where a declared type first
+enters the environment, and an inline shape is one of the types it may be.
+
+### 1. `type_expr()` admits an inline shape, and the arm is `sd-ADR-0001`'s
+
+Decision 1's type vocabulary gains **one inhabitant**, the inline, unnamed
+shape that `sd-ADR-0001`'s amendment of this date defines - its section
+"Amendment (2026-09-06): a type expression admits an inline, unnamed shape
+beside a declared name" in `statifier_datamodel`, accepted on the operator's
+same-walk ruling `RQ-SF035-1`, its code on that package's `main` in `3116a72`.
+That amendment's arms (a) through (e) are the arm's whole definition: the
+spelling `{:shape, [member()]}` with a member's three keys, member-set-wise
+identity rather than term equality, construction by a consumer with no
+document syntax to write one, the member-wise step the read check gains and
+its per-variant table, and the three things an unnamed shape cannot do. **This
+record cites that section and respells none of it**, for the reason decision 3
+already gives for the read check: the grammar and the check are that package's
+and this one defines no second copy.
+
+So decision 1's sentence reads, from this date: a type is one of the nine
+scalars, the `name` of a `record` or `shape` declaration, an inline shape as
+`sd-ADR-0001`'s amendment spells it, `{:list, type}`, or `:unknown`. The
+`{:list, type}` arm recurses over the new one without further comment, so a
+list of inline shapes is sayable and is what part 1's third consumer below
+needs.
+
+**Decision 1's provenance sentence is the one thing that moves with it.** It
+says "this package mints none of them: every one of them comes from the
+datamodel document or from a block's own declaration" (`:143-144`). An inline
+shape has no document syntax (`sd-ADR-0001`'s arm (c)), so it cannot come from
+the document, and the value that motivates the arm here is not written on a
+block either: the fan-out envelope is assembled by this package from
+`ADR-0009`'s reading of the shipped handler and typed by `ADR-0013` decision
+5. The sentence therefore gains a third source and stops being a claim that
+this package mints nothing: **an inline shape may also be one this package
+assembles from a record's own decision**, and the envelope is today the only
+such value. It is a narrow widening and deliberately so - a type expression
+this package assembles has to be traceable to a record that decided its
+members, and an inline shape invented at a call site is not what this arm is
+for.
+
+**Every consumer of the type vocabulary, and what the arm reaches in it:**
+
+| Consumer | Where | What the arm reaches |
+|---|---|---|
+| The spelling itself | `t:StatifierBlocks.Environment.type_expr/0` (`lib/statifier_blocks/environment.ex:93`), and its second name `t:StatifierBlocks.BlockType.path_type/0` (`lib/statifier_blocks/block_type.ex:159-166`) | One definition and one edit: `block_type.ex` is that typespec under a second name rather than a second definition, and its prose sentence names the same inhabitants |
+| The read check | Decision 3, which is `StatifierDatamodel`'s `satisfies/3` and `satisfies?/3` reached through `StatifierBlocks.Assignability` | Nothing to decide: the member-wise step and its refusals are `sd-ADR-0001`'s arm (d), and decision 3's "this package defines no second one" is why |
+| The expected/held pair a refusal reports | `t:StatifierBlocks.Assignability.finding/0`'s `:type_mismatch`, whose `produced` and `consumed` members are `type_expr()` (`lib/statifier_blocks/assignability.ex:116-117`) | Both members may hold an inline shape. The tuple **does not grow**: the member decision 8 added is the path, and this arm adds none |
+| `core.map`'s `collect` | Decision 12 as amended by the section above, over the `ADR-0009` envelope whose `"donedata"` member `ADR-0013` decision 5 types | The inhabitant that section is waiting on. It says the entry "is not spellable until decision 1's `type_expr()` admits an inline shape" (`:1100-1101`); this part is that inhabitant, `sb-nqfd` builds the entry, and neither the envelope's members nor its requiredness is decided here |
+| The editor's typed cells and the expression surface | `StatifierBlocks.Datamodel.path_types/1` (`lib/statifier_blocks/datamodel.ex:572-576`), wrapping `StatifierDatamodel.Index.path_types/1`, reaching the editor through `declared_path_types/1` (`lib/statifier_blocks/editor.ex:1970-1972`) and `Editor.Field`'s `path_types` attribute (`lib/statifier_blocks/editor/field.ex:367-371`) | A projected entry may carry one. What the surface draws for it is `ADR-0005`'s, per decision 9, and `sui-9pj` follows in `statifier-ui` |
+
+The code is `sb-1jcr`'s. Until it lands nothing spells an inline shape and
+every consumer above behaves exactly as it does today, which is the same
+sequencing the section above states for `sb-nqfd`.
+
+### 2. The environment seeds the declared path types the document has not written, and a written type wins
+
+**What decision 1 says and what it costs.** The environment is what the
+document has written on the way to a position: a block's write signature puts
+an entry, the seed is decision 2's entry-block subject, and nothing else puts
+anything anywhere. `sb-y4i7` (PR 327, `259b6dc`) read that against the
+declaration-typed scope entry `sd-ADR-0001`'s `sd-wj1` amendment added and
+found the two halves of this package disagree: the projection reaches
+`StatifierBlocks.Datamodel` - `declared_paths/1`, `candidates/3`,
+`path_types/1` and `declared_view/3` all go through `StatifierDatamodel.Index`
+and get the projected members for free - and it does **not** reach the
+`Environment`, whose sole reader of `ctx[:datamodel]` is `declarations/1`
+(`lib/statifier_blocks/environment.ex:323-331`) and reads it for its
+declarations alone. A path the host declared and no block wrote is therefore a
+completion candidate with a type in the Datamodel tab and an absent entry in
+the walk, and a read at it is decision 5's `:info` however precisely the host
+typed it. That is not a property anybody decided; it is decision 1's sentence
+reaching a case it was written before.
+
+**Decided: the seed carries the document's declared path types.** Before the
+walk begins, the environment holds an entry at every path
+`StatifierDatamodel.Index.path_types/1` projects from `ctx[:datamodel]` - the
+same projection `StatifierBlocks.Datamodel.path_types/1` wraps and the editor
+already draws - at the type it projects. Decision 2's entry-block subject is
+applied over that, and the walk then runs exactly as decision 1 describes.
+
+**A type the document writes wins**, by position and with no new rule: a
+seeded entry is an entry like any other, so decision 1's last-write-wins is
+what settles the disagreement, and a block writing `cards.settlement` replaces
+what the declaration seeded there for every position after it. Per path:
+
+| At a path | The environment holds, at a position |
+|---|---|
+| Declared, and no block wrote it before this position | The declared type, marked as seeded |
+| Declared, and a block wrote it before this position | What that block wrote (decision 1's last-write-wins, unchanged) |
+| Not declared, and a block wrote it | What that block wrote |
+| Neither | No entry, and a read there is decision 5's `:info` |
+
+**Seeded entries are marked.** The environment already carries, per entry, the
+block that wrote it - `t:StatifierBlocks.Environment.annotated/0` (`:103`),
+whose second member is a `Block.id()` or `:slot_entry`, and which is what
+decision 8's `upstream_ref` names. A seeded entry's writer is neither: it is
+the datamodel document. That member gains **one inhabitant, `:declaration`**,
+so a finding can say the type it disagreed with came from the host's
+declaration rather than from a block, and `:type_mismatch`'s `upstream_ref`
+admits it beside `:slot_entry`. Two consequences are worth stating because
+they are what the marking is for. `{:fixable_by, block_id}` does not apply to
+such a finding - there is no block whose declaration an author would change,
+and the change is to the datamodel document - and a message can say *which*
+of the two sources typed the path, which is the difference between "your
+block writes the wrong type here" and "the host declares this path as
+something else".
+
+**What this does not change.** Decision 3's read check is untouched: whether a
+held type satisfies an expected one is `sd-ADR-0001` decision 8's question and
+seeding does not go near it. Decision 4's merge is untouched: a seeded entry
+is present and identical in every arm of a container, so it agrees with itself
+and merges to itself. Decision 2's write and read signatures are untouched -
+this section adds no signature and no block declares a seed. The `:skip_blocks`
+narrowing the Note above adds is untouched and does not interact: it removes a
+refused block's own writes, and a seeded entry was put there before any block
+was walked. And the shelf's rule stands as decision 1 states it - a parked
+fragment is walked from an **empty** environment, which is the shelf's own
+rule about what a fragment may assume, and a fragment assumes no more of the
+host's declarations than it assumes of its neighbours.
+
+**Two sentences of decision 2 are superseded, and they are quoted so the
+supersession is met where they are.** "A document whose first block declares
+no subject seeds an empty environment" and "every read in it is a read of a
+path the environment does not hold - which decision 5 makes an `:info` and not
+an error, so an untyped document validates exactly as it does today"
+(`:183-187`). From this date the first holds only where no datamodel document
+is supplied, and the second holds only for a path the datamodel does not
+declare. **This is a behaviour change and the honest reading of it is that a
+document can now refuse where it advised**: a read at a declared path whose
+declared type does not satisfy the read was an `:info` and becomes decision
+5's `:error`. That is the ruling's point rather than a side effect - a host
+that took the trouble to declare a path said what is there, and a document
+disagreeing with it is wrong in the same way it is wrong when it disagrees
+with a block - but it means a stored document that validated may stop
+validating when its host supplies a datamodel, and it is why `sb-1jcr` is a
+minor-version change rather than a patch. A caller that supplies no
+`:datamodel` seeds nothing new and is unaffected in every particular; today
+that is every caller that has no document to read, the compiler and the editor
+both supplying one when they have it (`lib/statifier_blocks/compiler.ex:682`
+and `lib/statifier_blocks/editor.ex:1922-1923`).
+
+**`RQ-SF035-15` is where this was decided**, taken by the operator with the
+campaign-SF035 walk on `sb-g6me`'s question, which `sb-y4i7` raised and
+declined to answer on the grounds that seeding declared path types is a record
+question and not a bead's. It was right; this is the record answering it.
+`sb-g6me` closes as folded with this section.
+
+Filed with `sb-myt1`, campaign SF035, from the walk's rulings `RQ-SF035-1` and
+`RQ-SF035-15`, against `sd-ADR-0001`'s inline-shape amendment as merged in
+`statifier_datamodel` and against this record as `sb-jvz3` and `sb-c9b6` left
+it. `sb-1jcr` builds both parts; `sb-wzoa` flips this section.
