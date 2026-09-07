@@ -617,6 +617,46 @@ defmodule StatifierBlocks.Core.OnEvent do
   end
 
   @doc """
+  This block as one line of prose (ADR-0002's 2026-09-07 amendment).
+
+  The event that fires the handler, then the outcome it raises. It is the
+  reverse of `summary/1`'s chip order, and deliberately so: a chip list has
+  no grammar to carry "when", so the outcome leads there because it is what
+  the block does; a sentence has that grammar, and a reader scanning an
+  `interrupts` slot asks which handler answers which event before asking
+  what it does to the group.
+
+  Each half is held to the same test the card holds it to. An event name
+  that is not well formed, and an outcome that is not one of the two
+  declared values, are findings on the card, and repeating either in a line
+  that reads as settled would bury the finding rather than report it.
+
+  A handler with no outcome yet falls back to the one thing both declared
+  outcomes have in common - it interrupts the group it sits in - rather
+  than naming a default the emission does not use.
+
+      iex> StatifierBlocks.Core.OnEvent.sentence(%{"event" => "card.authz_timed_out", "outcome" => "abandon"})
+      "When card.authz_timed_out, abandon"
+
+      iex> StatifierBlocks.Core.OnEvent.sentence(%{"event" => "order.cancelled"})
+      "When order.cancelled, interrupt the group"
+
+      iex> StatifierBlocks.Core.OnEvent.sentence(%{})
+      "When an event, interrupt the group"
+  """
+  @impl true
+  def sentence(config) do
+    event = event_chip(Map.get(config, "event")) || "an event"
+    outcome = declared_outcome(Map.get(config, "outcome")) || "interrupt the group"
+
+    "When #{event}, #{outcome}"
+  end
+
+  defp declared_outcome(outcome) do
+    if Config.one_of(outcome, @outcomes), do: outcome, else: nil
+  end
+
+  @doc """
   One example event payload, so a palette panel can show what `_event.data`
   looks like when this handler fires.
 
