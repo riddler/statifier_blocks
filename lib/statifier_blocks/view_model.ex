@@ -581,6 +581,49 @@ defmodule StatifierBlocks.ViewModel do
   def accent_token(_entry), do: nil
 
   @doc """
+  `groups` in the reading order `order` names: the groups it names first, in
+  its order, then every group it did not name, by name.
+
+  `build/3` orders the palette's groups by name (decision 10's grouping
+  rule), which is the only order a package that does not know what its own
+  groups mean can produce. A host that regroups its palette by intent -
+  "Authorization" ahead of "Structure" because that is the order its staff
+  work in - does know, and the `palette_groups` list of a profile is already
+  that knowledge written down. This is how a caller spends it.
+
+  `order` is the caller's list, not the package's, on the footing
+  `core_containers/0` sets: `:all` - the profile default - is a host that
+  named no order, and the groups come back untouched, by name, as they
+  always were. A name no group carries orders nothing. A group the list does
+  not name is **not** dropped here; it sorts after the named ones, by name.
+  Dropping is the profile's own rule and it runs where the profile is read
+  (`docs/profiles.md`), so a host calling this directly keeps every group it
+  built and only says which come first.
+
+      iex> alias StatifierBlocks.ViewModel
+      iex> alias StatifierBlocks.ViewModel.PaletteGroup
+      iex> groups = [
+      ...>   %PaletteGroup{name: "Authorization"},
+      ...>   %PaletteGroup{name: "Structure"},
+      ...>   %PaletteGroup{name: "Timing"}
+      ...> ]
+      iex> groups |> ViewModel.order_palette_groups(["Structure", "Authorization"]) |> Enum.map(& &1.name)
+      ["Structure", "Authorization", "Timing"]
+      iex> groups |> ViewModel.order_palette_groups(:all) |> Enum.map(& &1.name)
+      ["Authorization", "Structure", "Timing"]
+  """
+  @spec order_palette_groups([PaletteGroup.t()], [String.t()] | :all) :: [PaletteGroup.t()]
+  def order_palette_groups(groups, :all) when is_list(groups), do: groups
+
+  def order_palette_groups(groups, order) when is_list(groups) and is_list(order) do
+    positions = order |> Enum.with_index() |> Map.new()
+
+    {named, unnamed} = Enum.split_with(groups, &Map.has_key?(positions, &1.name))
+
+    Enum.sort_by(named, &Map.fetch!(positions, &1.name)) ++ Enum.sort_by(unnamed, & &1.name)
+  end
+
+  @doc """
   The name on the face of a card: the author's own, when this block carries
   one, and the block type's palette label otherwise.
 

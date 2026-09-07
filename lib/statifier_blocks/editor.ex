@@ -2521,15 +2521,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp toolbar_items(%{toolbar: listed}), do: listed
 
-    # The palette groups this mount draws. A group name is a block type's own
-    # word rather than a member of a closed list, so a profile that names one
-    # the palette does not carry is naming a string that resolves to nothing -
-    # dropped, like every other unresolvable id.
+    # The palette groups this mount draws, in the order the list gives them.
+    # A group name is a block type's own word rather than a member of a closed
+    # list, so a profile that names one the palette does not carry is naming a
+    # string that resolves to nothing - dropped, like every other unresolvable
+    # id.
+    #
+    # The list is a reading order as well as a set, and this is the one profile
+    # key that reads it that way: the tab strips intersect with an order the
+    # shell keeps, whereas group names are the host's own words and the package
+    # has no order for them but alphabetical. `ViewModel.order_palette_groups/2`
+    # is the ordering; the filter above it is the profile's drop rule, so a
+    # group the list does not name is gone before the order is applied.
     @spec palette_groups(map(), map()) :: [ViewModel.PaletteGroup.t()]
     defp palette_groups(assigns, %{palette_groups: :all}), do: assigns.view_model.palette_groups
 
-    defp palette_groups(assigns, %{palette_groups: listed}),
-      do: Enum.filter(assigns.view_model.palette_groups, &(&1.name in listed))
+    defp palette_groups(assigns, %{palette_groups: listed}) do
+      assigns.view_model.palette_groups
+      |> Enum.filter(&(&1.name in listed))
+      |> ViewModel.order_palette_groups(listed)
+    end
 
     # The inspector tab this mount shows. The socket's tab where the profile
     # left it, and otherwise the first tab the profile did leave: a mount

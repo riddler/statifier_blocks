@@ -57,9 +57,29 @@ names `"Structure"` is naming a string your palette may or may not contain.
 are what makes the canvas read as a pane beside the other two, so a profile that
 could remove them could produce an editor whose middle pane has no name.
 
-Order is this package's, not yours: a list is an intersection with the tab
+Tab order is this package's, not yours: a tab list is an intersection with the
 order the shell already keeps, so two hosts that name the same tabs in
 different orders draw the same strip.
+
+**`palette_groups` is the exception, and it is the one list that reads as an
+order.** A tab has a place in a strip this package designed; a palette group
+has only the name a block type gave it, and the order the package can produce
+for a set of names it has never seen is alphabetical - which is an order about
+spelling, not about work. So the list you write is the reading order you get:
+
+```elixir
+palette_groups: ["Authorization", "Timing", "Structure"]
+```
+
+draws those three headings in that order, whatever their names sort as. The
+list is still a set as well: a group you do not name is not drawn at all, and a
+name your palette does not carry is dropped like any other unresolvable id. If
+you want the order without the filtering - your own palette column, drawing
+every group your palette has - call
+`StatifierBlocks.ViewModel.order_palette_groups/2` with the same list: it puts the groups you named first, in your order, and
+every group you did not name after them by name.
+
+Naming no list still draws every group by name, exactly as it always did.
 
 ## An id the package does not know is dropped
 
