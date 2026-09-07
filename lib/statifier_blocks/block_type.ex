@@ -255,7 +255,9 @@ defmodule StatifierBlocks.BlockType do
           required(:required?) => boolean(),
           required(:default) => Block.json(),
           optional(:value_path) => value_path(),
-          optional(:datamodel_path?) => boolean()
+          optional(:datamodel_path?) => boolean(),
+          optional(:hidden?) => boolean(),
+          optional(:readonly?) => boolean()
         }
 
   @typedoc "Names the offending config key; message is author-facing."
@@ -344,6 +346,47 @@ defmodule StatifierBlocks.BlockType do
 
   Read it through `datamodel_path?/1`, never by matching the key: a
   declaration that omits it is the common case.
+
+  ## What a form does with a field
+
+  A declaration may carry the optional booleans `hidden?` and `readonly?`
+  (ADR-0002 decision 7, amended 2026-09-07). Both default to `false` when
+  absent, so a declaration carrying neither behaves exactly as it does
+  today.
+
+    * `hidden?: true` - the field is **never rendered by any form**: no
+      label, no input, no row. Its value is its `default:`, or whatever a
+      host wrote into the config, and the compiler, the Source tab and
+      `validate_config/1` all see it entirely unchanged. It is a rendering
+      claim and nothing else - a hidden field is still a declared field, it
+      still appears in `config_schema/1`'s list, and a `:config` finding on
+      its key still routes to it.
+    * `readonly?: true` - the field is **rendered as its value beside the
+      label, never as an input**. It is not a disabled input and not a
+      `readonly` attribute on one: an author can neither type into it nor
+      post it.
+
+  The two are independent booleans rather than one three-valued key
+  because they answer different questions. Declaring both is not refused;
+  `hidden?` wins, because a field that is not rendered has nothing to
+  render as a value.
+
+  Neither key is a security boundary, and neither implies `sensitive?`,
+  which is a key on a **datamodel** declaration rather than on a field
+  declaration.
+
+  Two declaration-time refusals attach to them, both reported by the
+  compile's config stage as `:config` findings anchored on the block:
+
+    * A field declaration **without a `default:` key** is refused, whatever
+      its field type. `default:` has been required of a declaration from
+      the start; before 2026-09-07 only the `{:path, opts}` arm was
+      enforced.
+    * A **`hidden?: true`** field whose `default:` is its type's *empty*
+      value is refused. A hidden field's default is the only value it will
+      ever have, so an empty one declares a key that carries nothing and
+      can never be given anything. `:boolean` is the one type with no empty
+      value: `false` is a decided value rather than an absence.
 
   ## What a path field reads and writes
 

@@ -156,6 +156,15 @@ defmodule StatifierBlocks.ViewModel do
   runs. Nothing here memoizes a schema across an edit: a branch that gains
   an arm gains a field the very next time `build/3` is called, because the
   schema is a function of config (ADR-0002 decision 7), not a cache of one.
+
+  A field declared `hidden?: true` (ADR-0002 decision 7, amended
+  2026-09-07) **is still listed in `form.fields`**, carrying the flag. The
+  projection is the whole schema, and hiding is a rendering claim rather
+  than a filter: a host reads the list and filters by the flag to draw its
+  own surface, and `StatifierBlocks.Editor.ConfigForm` - the package's own
+  form - is the surface that skips them. Keeping them in the list is also
+  what lets `ConfigForm.decode/3` preserve a hidden value, since that
+  function is keyed off the fields it is handed.
   """
 
   alias StatifierBlocks.{
@@ -181,6 +190,12 @@ defmodule StatifierBlocks.ViewModel do
     said otherwise (ADR-0002 decision 7, amended 2026-08-27). `nil` means
     it did not; read it through `value_path/1` rather than the struct
     field, and the two cases collapse into one path.
+
+    `hidden?` and `readonly?` are the block type's rendering claims about
+    the field (ADR-0002 decision 7, amended 2026-09-07), carried here so a
+    host draws its own surface from the same two booleans the package's own
+    form reads rather than re-deriving them from a block type module. Both
+    default to `false`.
     """
 
     @type t :: %__MODULE__{
@@ -191,11 +206,24 @@ defmodule StatifierBlocks.ViewModel do
             default: Block.json(),
             value: Block.json(),
             value_path: BlockType.value_path() | nil,
+            hidden?: boolean(),
+            readonly?: boolean(),
             findings: [Finding.t()]
           }
 
     @enforce_keys [:key, :type, :label, :required?, :default, :value]
-    defstruct [:key, :type, :label, :required?, :default, :value, :value_path, findings: []]
+    defstruct [
+      :key,
+      :type,
+      :label,
+      :required?,
+      :default,
+      :value,
+      :value_path,
+      hidden?: false,
+      readonly?: false,
+      findings: []
+    ]
 
     @doc "Where this field's value lives, defaulting to `[key]`."
     @spec value_path(t()) :: BlockType.value_path()
@@ -1554,6 +1582,8 @@ defmodule StatifierBlocks.ViewModel do
         required?: required?,
         default: default,
         value_path: Map.get(decl, :value_path),
+        hidden?: Map.get(decl, :hidden?) == true,
+        readonly?: Map.get(decl, :readonly?) == true,
         value: value_at(config, path, default),
         findings: Map.get(config_findings, key, [])
       }
