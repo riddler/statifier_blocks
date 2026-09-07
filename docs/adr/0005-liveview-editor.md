@@ -10069,3 +10069,234 @@ then. Nothing in this section is built yet.
 
 Filed with `sb-2fvz`, campaign SF038, on rulings `RQ-SF038-1`, `RQ-SF038-2`
 and `RQ-SF038-5`.
+
+## Note (2026-09-07): the recipe seam a host picker calls, decision 9's decode answer, what `5E` admits, and the partial arrangement at delete time
+
+Four items, from campaign SF038's walk (rulings `RQ-SF038-15`, `RQ-SF038-17`
+and `RQ-SF038-14`). This is a **Note**: it carries no status line, nothing
+flips with it, and no text above this line is changed by it. Items 1 and 2
+answer questions earlier sections left open; items 3 and 4 say which of two
+readings already written down here is the decision, so that the next reader is
+not left to infer one from the code.
+
+**Every `lib/` line number below is read at `main` `7fa35a2`.** The `mix
+adr.cites` baseline covers citations into `docs/adr/` and nothing else, so a
+cite into code is protected by the name beside it rather than by the gate: the
+function, heading or comment named is what a later reader matches, and the
+number is where it stood on that day. Item 3 is the worked example of why -
+it re-counts two cites the 2026-09-07 corrections Note made against a
+`lib/statifier_blocks/editor.ex` that has moved since.
+
+### 1. A host picker that offers recipes calls `Edit.Targets`, not the editor
+
+`1C` (`:5698`) lets a palette name recipes beside types, and `4C` (`:5776`)
+registers core's one. What neither clause gave is a way for a host drawing its
+**own** picker to ask the two questions this package already answers for its
+own palette browser: which recipe names would land at an armed position, and
+what command list inserts one. Both answers exist, and both are private to
+`StatifierBlocks.Editor` - `accepted_recipes/2`
+(`lib/statifier_blocks/editor.ex:3490-3492`, called from the palette-open
+handler at `:1610`), the `recipe_lands?/4` it filters with (`:3501-3503`), and
+`insert_from_recipe/3` (`:1872-1880`). A host that wants its own picker today
+has to re-derive them, and a re-derivation is where `3C`'s bound goes quiet.
+
+**The pair is promoted to `StatifierBlocks.Edit.Targets`**, which is already
+the module that answers what-may-land-where for the palette's other map:
+
+    @spec accepted_recipes(
+            Document.t(),
+            Palette.t(),
+            Edit.target(),
+            Assignability.context()
+          ) :: MapSet.t(Palette.recipe_name())
+
+    @spec recipe_inserts(
+            Document.t(),
+            Palette.t(),
+            Palette.recipe_name(),
+            Edit.target()
+          ) :: {:ok, [Edit.t()]} | {:error, term()}
+
+`accepted_recipes/4` takes the document, the palette, the armed position and a
+context, in that order and with that default, because
+`Edit.Targets.accepted_types/4` (`lib/statifier_blocks/edit/targets.ex:169-175`)
+takes exactly those for exactly the same question asked of `types`. A host
+composing a picker asks the two maps the same way or it learns two shapes for
+one gesture.
+
+`recipe_inserts/4` is `insert_from_recipe/3`'s middle with the socket taken
+out: `Palette.fetch_recipe/2`, then the recipe's own `insert/2` (`2C`,
+`:5722`), then `Recipe.within_reach?/2` for `3C`'s bound
+(`lib/statifier_blocks/recipe.ex:127`). It answers the commands or the
+refusal, and it commits nothing - assigning, minting a selection and committing
+the `{:compound, commands}` stay the editor's, which is the half of
+`insert_from_recipe/3` that does not generalise.
+
+**The two compose, and that is what retires the third private.**
+`accepted_recipes/4` is the filter over `palette.recipes` whose test is
+`recipe_inserts/4` answering `{:ok, _}`. That is what `recipe_lands?/4` is
+today, spelled once instead of twice, so the paint and the write cannot drift
+apart on which recipes fit.
+
+**Both checks still run at the write.** The comment above
+`insert_from_recipe/3` (`editor.ex:1862-1871`) gives the reason and it is
+unweakened by the promotion: a pick can arrive for a row the filter removed - a
+stale sheet, a document swapped under an armed palette - and a recipe module's
+bound is a property of the write rather than of the paint. A host that draws
+its own picker from `accepted_recipes/4` and then commits its own compound is
+running the same two checks in the same order; a host that skips the filter and
+calls `recipe_inserts/4` alone still gets the refusal.
+
+**The editor calls what it exports.** `accepted_recipes/2` becomes the same
+three-line socket wrapper `accepted_types/3` already is (`:3463-3474`) -
+unpack `document` and `palette`, pass `Assignability.context(socket.assigns)` -
+and `recipe_lands?/4` goes.
+
+#### What item 1 does not decide
+
+- **Whether recipe admission should consult the context.** It does not today,
+  and the promotion does not change that: `2C`'s `insert/2` callback is handed
+  the target and the document and nothing else, so the fourth argument reaches
+  no recipe. The comment at `editor.ex:3476-3477` already says a recipe's fit
+  has one way of being asked. The argument is there for the shape a caller
+  asks both maps in, and whether a later clause should thread it further is a
+  question, not a promise.
+- **Nothing about `Recipe`.** No callback is added, removed or widened;
+  `insert/2` and `palette_entry/0` (`2C`) and the optional `members/2` are as
+  written.
+- **How a host draws the picker.** `4C`'s own non-decision (`:5796-5799`)
+  stands, and this item takes no layout ruling.
+
+`sb-5i4p` builds this item, after this Note. Nothing here is built yet.
+
+### 2. Decision 9's decode does not omit untouched blank optionals
+
+`RQ-SF038-17` answers the record question `sb-pgis` named in its request and
+`RQ-SF037-12` put out of that campaign: whether `ConfigForm.decode/3`
+(`lib/statifier_blocks/editor/config_form.ex:414-416`) should omit a blank
+optional field the author never reached, rather than writing an empty string
+into config. **The answer is no**, and the three parts the question asked for
+are answered in its own order.
+
+**(i) A blank optional field is not omitted, for any field type.** The one
+exemption is the one that already exists.
+
+**(ii) `decode/3`'s posting property stands, and the `:duration` omission stays
+a special case rather than generalising.** The property is that a field whose
+control did not post keeps the value it had: `decode/3` reduces over the
+**schema's** fields, and a field the params have nothing for falls to
+`field.value` (`config_form.ex:422-425`). The `:duration` omission is
+`omitted?/2`'s single non-default clause (`:526-527`), and the heading above
+`decode/3` calls it the one value that is not written at all (`:396`). The
+decision-9 amendment of 2026-08-29 (`:1826`) is why it is there and why it does
+not spread: a cleared `:duration` and a never-set `:duration` have to be the
+same value because there is no zero-duration stand-in for them to differ by.
+No other field type has that property. An empty `:string` is a string, an
+empty `:expression` is an expression that fails to parse, and an empty
+`:select` is a choice the schema either offers or does not - each is a value
+the key can hold, so for each of them "absent" and "blank" are two states an
+author can be in and a config can record.
+
+**(iii) Clearing a field and never touching it stay the same value.** They are
+the same today and this item keeps them so, which is exactly why the request
+cannot be honoured: a `phx-change` payload posts the same empty string for
+both, so "untouched" is not a thing the form can say. Honouring it would take a
+new signal in the markup or a new rule about which blanks are meaningful, and
+either is a change to the contract rather than a change to the decode.
+
+Per case, over a field the schema declares and the form drew:
+
+| What the author did | What the params carry | What `decode/3` writes |
+|---|---|---|
+| typed a value | that value | the value, at the field's path |
+| cleared a `:duration` to blank | `""` | **the key is dropped** (`omitted?/2`, the exemption) |
+| never reached a `:duration`, and it was already blank | `""` | the key is dropped, which is the same config - and that identity is the point of the exemption |
+| cleared any other field to blank | `""` | `""`, at the field's path |
+| never reached any other field | `""` | `""` - indistinguishable from clearing it, by (iii) |
+| a field whose control did not post at all (a read-only form, a field the form did not draw) | nothing | `field.value`, unchanged |
+
+**A `{config, changed?}` return is declined.** Widening `decode/3` from a
+config to a pair would put the question back on every caller as a value to
+thread, and it would answer a different question from the one asked: whether
+the decode's output differs from its input is not whether the **author**
+touched a field, which is the thing the payload cannot say. `decode/3`'s
+return is `Block.config()` and stays it.
+
+Nothing in `config_form.ex` changes under this item. It is recorded because two
+records - ADR-0002 decision 7 on `config_schema/1` as a rendering hint, and
+decision 9 here on the gate and the `:duration` omission - are what a change
+would have had to move, and a question answered in a request body is answered
+nowhere a later reader will look.
+
+### 3. `5E` admits every top-level member, and the code is the decision
+
+The Note of 2026-09-07 on the Expand and card amendment names this as a record
+question and declines to decide it (`:9299-9318`): `5E` is written as a test of
+**the expansion's root**, the code tests every top-level member
+(`Enum.all?(members, &admits_expansion?(...))` at `editor.ex:2010`, with
+`admits_expansion?/5` at `:2028-2030`), and the earlier non-decision says the
+question belongs to another record. Those two cites are re-counted here
+against the code as it stands: the correction Note reads them at `:1876` and
+`:1896-1908`, where the lines have since moved.
+
+`RQ-SF038-14` decides it here: **`5E` admits every top-level member of the
+expansion, adopting the code.** The strict reading is the decision and the
+root-only reading is superseded.
+
+Two reasons. The first is that the strict reading is the one that keeps `5E`'s
+own promise. `5E` refuses the gesture whole - nothing written, no command built
+- so that an author never lands in a document the slot would not have accepted.
+An expansion whose root the slot admits and whose second top-level member it
+refuses would land exactly that document, and the refusal would arrive
+afterwards as a finding on a block the author did not choose to put there. The
+second is that the strict reading is the conservative one: every arrangement
+root-only admission would have accepted, member-wise admission accepts too,
+unless some member is refused - and in that case the gesture is refused rather
+than a document being written that a later record would have to explain.
+
+The correction Note's other holdings are untouched: `5E`'s refusal semantics
+stand as written, and nothing it decided is reopened. Its two `editor.ex`
+cites for this clause moved with a later edit and are re-counted above; that is
+the ordinary cost of a line-number cite rather than a defect in what it said.
+What changes is only that the question it named is no longer open.
+
+### 4. The partial arrangement at delete time: the conservative reading is the decision
+
+The `members/2` amendment records the conservative reading in its per-variant
+table - a lone deadline half deletes as one block (`:8219`) - and its
+non-decisions say the table records that "as the behaviour in the absence of a
+decision, not as the decision" (`:8289-8296`).
+
+`RQ-SF038-14` makes it the decision. **A partial arrangement deletes as one
+block, and `members/2` claims nothing whose partner is absent.**
+
+- **`members/2` answers `[]` for a block whose partner is missing**, or whose
+  partner's event has been renamed apart, or that sits in a different enclosing
+  group from the one the recipe recognises. It claims a block only when it can
+  answer the whole arrangement.
+- **The editor therefore commits `{:remove, id}`**, one block and one command,
+  which is what it does for every block no recipe claims - the table's second
+  row, reached by the third.
+- **There is no compound of one.** A single-element `{:compound, [{:remove,
+  id}]}` would be a second spelling of `{:remove, id}` with the same undo
+  entry, and the offer `members/2` exists to make - the editor putting a
+  two-block delete to the author before committing it - has nothing to put.
+
+This is the reading `11u` (`:6477`) forces at the other end of the same
+question. `11u` decides that a lone half produces no finding, because the pair
+has no representation in the document: nothing marks a `core.send` as a
+deadline's send, so there is no *the* missing half to find. A `members/2` that
+claimed a lone half would be asserting at delete time precisely the thing
+`11u` says is not there at compile time - that this block is half of something -
+and it would assert it on a guess about an author's intent rather than on
+anything written down. The two halves of `sb-5ju0`'s question get the same
+answer for the same reason, which is the outcome the non-decision left room
+for.
+
+Nothing under `11u` is reopened and no finding is added anywhere. The
+amendment's table row at `:8219` reads as the decision it already describes;
+its wording is left as written, and this item is what makes it one.
+
+Filed with `sb-twa0`, campaign SF038, on rulings `RQ-SF038-15`, `RQ-SF038-17`
+and `RQ-SF038-14`. `sb-5i4p` implements item 1; items 2, 3 and 4 record
+decisions about code that already stands.
