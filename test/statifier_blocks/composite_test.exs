@@ -152,6 +152,110 @@ defmodule StatifierBlocks.CompositeTest do
     end
   end
 
+  # -- a card-processing composite rooted at a HOST type -----------------
+
+  defmodule Authorizes do
+    @moduledoc """
+    A host leaf that authorizes a card: it declares sugar and outcomes of its
+    own, neither of which `StatifierBlocks.Palette.core_types/0` carries. That
+    is what makes a composite rooted at it read differently through a palette
+    than through the callback.
+    """
+
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+    @impl true
+    def slots(_config), do: []
+
+    @impl true
+    def config_schema(_config),
+      do: [
+        %{key: "invoke_type", type: :string, label: "Call", required?: true, default: ""}
+      ]
+
+    @impl true
+    def validate_config(_config), do: :ok
+
+    @impl true
+    def io(_config),
+      do: %{
+        kinds: [:step],
+        consumes: "cards.Authorization",
+        produces: "cards.AuthorizationResult"
+      }
+
+    @impl true
+    def outcomes(_config), do: [{"approved", "Approved"}, {"declined", "Declined"}]
+
+    @impl true
+    def palette_entry, do: %{label: "Authorizes"}
+    @impl true
+    def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+  end
+
+  defmodule Reviews do
+    @moduledoc "A host leaf a reviewer picks up, declaring a kind of its own."
+
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+    @impl true
+    def slots(_config), do: []
+    @impl true
+    def config_schema(_config), do: []
+    @impl true
+    def validate_config(_config), do: :ok
+    @impl true
+    def io(_config), do: %{kinds: [:step, :reviewable]}
+    @impl true
+    def palette_entry, do: %{label: "Reviews"}
+    @impl true
+    def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+  end
+
+  defmodule AuthorizeWithDeadline do
+    @moduledoc """
+    The card-processing reference composite, rooted at a **host** type: the
+    authorization, and the review the decline is handed to. Its exact `io` and
+    `outcomes` exist only through a palette that carries `myapp.authorizes`
+    and `myapp.reviews`; `io/1` and `outcomes/1` take the documented
+    core-only fallback.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "myapp.authorize_with_deadline",
+      params: [
+        %{key: "invoke_type", type: :string, label: "Call", required?: true, default: ""},
+        %{key: "deadline", type: :string, label: "Deadline", required?: true, default: ""},
+        %{
+          key: "audit_at",
+          type: :string,
+          label: "Audit at",
+          required?: true,
+          default: "cards.audit",
+          hidden?: true
+        }
+      ],
+      sentence: "Authorize with {invoke_type} inside {deadline}",
+      palette_entry: %{label: "Authorize with a deadline"}
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(params) do
+      [
+        Block.new("myapp.authorizes",
+          id: "authorize",
+          config: %{"invoke_type" => params["invoke_type"]}
+        ),
+        Block.new("myapp.reviews", id: "review")
+      ]
+    end
+  end
+
   # -- a composite whose members are not one-param-each ------------------
 
   defmodule TwoInOne do
@@ -185,12 +289,37 @@ defmodule StatifierBlocks.CompositeTest do
     end
   end
 
+  defmodule OwnSummary do
+    @moduledoc """
+    A composite that says its own card line. `summary/1` is overridable for
+    `sentence/1`'s reason: what a card says is presentation, and a
+    declaration whose params do not spell it says it itself.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "myapp.own_summary",
+      params: [%{key: "lane", type: :string, label: "Lane", required?: true, default: ""}]
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(params) do
+      [Block.new("core.assign", id: "mark", config: %{"path" => params["lane"], "value" => "1"})]
+    end
+
+    @impl StatifierBlocks.BlockType
+    def summary(_config), do: ["one lane"]
+  end
+
   # -- helpers -----------------------------------------------------------
 
   defp palette do
     Palette.new(
       Map.merge(Palette.core_types(), %{
+        "myapp.authorize_with_deadline" => AuthorizeWithDeadline,
+        "myapp.authorizes" => Authorizes,
         "myapp.guarded_step" => GuardedStep,
+        "myapp.reviews" => Reviews,
         "myapp.two_in_one" => TwoInOne,
         "signup.confirm_contact" => ConfirmContact,
         "signup.reads" => Reads
@@ -211,6 +340,17 @@ defmodule StatifierBlocks.CompositeTest do
       config: %{
         "invoke_type" => "myapp:authorize",
         "failure_path" => "cards.authorization.failure"
+      }
+    )
+  end
+
+  defp with_deadline do
+    Block.new("myapp.authorize_with_deadline",
+      id: "blk_AWD",
+      config: %{
+        "invoke_type" => "myapp:authorize",
+        "deadline" => "2h",
+        "audit_at" => "cards.audit"
       }
     )
   end
@@ -544,6 +684,122 @@ defmodule StatifierBlocks.CompositeTest do
       assert block.slots == %{}
       assert GuardedStep.slots(block.config) == []
       assert Assignability.kinds(GuardedStep, block.config) == [:step]
+    end
+  end
+
+  describe "Composite.io/2 and Composite.outcomes/2 (ADR-0002's Note, item 3)" do
+    # Sabotage: resolved the members through `Palette.core()` inside `io/2` and
+    # `outcomes/2` -> 3 failures (verified): this test, the outcomes one below
+    # and the routed `produces/4`. This is the whole of what arity 2 buys: the
+    # SAME derivation, over the palette the reader is holding.
+    test "io/2 answers exactly for a composite rooted at a host type" do
+      assert Composite.io(palette(), with_deadline()) == %{
+               kinds: [:step, :reviewable],
+               slot_accepts: %{},
+               consumes: "cards.Authorization",
+               produces: "cards.AuthorizationResult"
+             }
+    end
+
+    # Sabotage: routed the callback through the palette too - red. Item 3 is
+    # explicit that no callback gains a palette argument, so the fallback the
+    # moduledoc documents has to still be `io/1`'s answer.
+    test "io/1 keeps the core-only fallback the callback documents" do
+      assert AuthorizeWithDeadline.io(%{}) == %{kinds: [:step], slot_accepts: %{}}
+    end
+
+    # Sabotage: took the last member's outcomes - red. The root is
+    # `myapp.authorizes`, and only a palette carrying it can say so.
+    test "outcomes/2 answers the host root's outcomes" do
+      assert Composite.outcomes(palette(), with_deadline()) == [
+               {"approved", "Approved"},
+               {"declined", "Declined"}
+             ]
+    end
+
+    # Sabotage: as above, on the callback - red. `[{"done", "Done"}]` is
+    # `StatifierBlocks.BlockType`'s default for a name the core map does not
+    # carry, which is what "falls back" means here.
+    test "outcomes/1 keeps the core-only fallback the callback documents" do
+      assert AuthorizeWithDeadline.outcomes(%{}) == [{"done", "Done"}]
+    end
+
+    # Sabotage: passed the caller's palette to `derived_io/2` - red here,
+    # because a composite rooted at `core.*` must answer the same through
+    # either door, which is what makes the routing invisible to every existing
+    # reference composite.
+    test "a composite rooted at core.* answers the same through both doors" do
+      block = guarded_step("blk_GS")
+
+      assert Composite.io(palette(), block) == GuardedStep.io(block.config)
+      assert Composite.outcomes(palette(), block) == GuardedStep.outcomes(block.config)
+    end
+
+    # Sabotage: took the type ref as a second argument instead of resolving it
+    # here - red, because then a caller could pair a block with another type's
+    # entry and the expansion would be of something else.
+    test "io/2 refuses a block whose type the palette does not carry" do
+      assert_raise ArgumentError, ~r/is not in the palette/, fn ->
+        Composite.io(Palette.new(%{}), with_deadline())
+      end
+    end
+
+    # Sabotage: dropped the composite check - red. There is nothing to expand,
+    # and `expand/2`'s own refusal is the one that says so.
+    test "io/2 refuses a block that is not a composite" do
+      assert_raise ArgumentError, ~r/is not a composite block type/, fn ->
+        Composite.io(palette(), Block.new("core.assign", id: "blk_A"))
+      end
+    end
+
+    # Sabotage: left `produces/4` reading `io/1` -> 1 failure (verified). That
+    # reader HAS a palette, so item 3 says it resolves through it; the second
+    # assertion is what it answered before.
+    test "Assignability.produces/4 is routed, and read :unknown before" do
+      block = with_deadline()
+
+      assert Assignability.produces(palette(), document([block]), block, %{}) ==
+               "cards.AuthorizationResult"
+
+      assert Map.get(AuthorizeWithDeadline.io(block.config), :produces, :unknown) == :unknown
+    end
+  end
+
+  describe "the derived summary/1 (ADR-0002's Note, item 4)" do
+    # Sabotage: dropped the `hidden?` rejection -> 2 failures (verified), this
+    # one and the `BlockType.summary/3` test, each gaining the hidden param's
+    # chip. A param no form renders is not a chip either.
+    test "one chip per visible param, minus the hidden ones" do
+      assert AuthorizeWithDeadline.summary(with_deadline().config) == [
+               "Call: myapp:authorize",
+               "Deadline: 2h"
+             ]
+    end
+
+    # Sabotage: kept a chip for a blank value - red. A label with nothing after
+    # it says less than no chip at all.
+    test "a param whose value renders blank draws no chip" do
+      assert AuthorizeWithDeadline.summary(%{"invoke_type" => "myapp:authorize"}) == [
+               "Call: myapp:authorize"
+             ]
+
+      assert AuthorizeWithDeadline.summary(%{}) == []
+    end
+
+    # Sabotage: derived nothing and left `summary/1` absent - red, because
+    # `BlockType.summary/3` decides absence with `Palette.declares?/3` and
+    # would answer `[]`.
+    test "the chips reach BlockType.summary/3" do
+      assert BlockType.summary(AuthorizeWithDeadline, with_deadline().config) == [
+               "Call: myapp:authorize",
+               "Deadline: 2h"
+             ]
+    end
+
+    # Sabotage: left `summary: 1` out of `defoverridable` - red: the derived
+    # chips win and the declaration cannot say its own card line.
+    test "the derivation is overridable" do
+      assert OwnSummary.summary(%{"lane" => "capture"}) == ["one lane"]
     end
   end
 

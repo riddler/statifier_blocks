@@ -83,15 +83,34 @@ defmodule StatifierBlocks.Composite do
   | `current_version/0` | the version the declaration states | no |
   | `outcomes/1` | the expansion root's, over its expanded config | no |
   | `sentence/1` | the declaration's template rendered over the config | **yes** |
+  | `summary/1` | one chip per visible param (`RQ-SF038-14`) | **yes** |
   | `palette_entry/0` | the map the declaration states | **yes** |
   | `emit/2` | generated, and raises if reached (`RQ-SF037-6`) | no |
 
-  `sentence/1`, `palette_entry/0` and `validate_config/1` and **no others**
-  are overridable: they are the three whose answers are about presentation and
-  refusal rather than about the expansion. `migrate_config/2` keeps ADR-0007's
-  injected refusal unchanged, and `fixtures/0`, `failure_outcomes/1`,
-  `summary/1` and `donedata_type/1` are not derived - they stay optional and
-  absent unless a declaration writes them by hand.
+  `sentence/1`, `summary/1`, `palette_entry/0` and `validate_config/1` and
+  **no others** are overridable: they are the four whose answers are about
+  presentation and refusal rather than about the expansion. `migrate_config/2`
+  keeps ADR-0007's injected refusal unchanged, and `fixtures/0`,
+  `failure_outcomes/1` and `donedata_type/1` are not derived - they stay
+  optional and absent unless a declaration writes them by hand.
+
+  ### The derived `summary/1`
+
+  `ADR-0002`'s Note of 2026-09-07, item 4: the chips are the declaration's
+  `params`, minus those declared `hidden?: true`. `hidden?` is a rendering
+  claim (`block_type.ex`, "the field is **never rendered by any form**"), so a
+  param the author has already said no form draws is not a chip either - the
+  same reading `StatifierBlocks.ViewModel` takes of the flag. Each surviving
+  param draws as `"<label>: <value>"`, and a param whose value renders blank
+  draws no chip at all rather than a label with nothing after it.
+
+  The value is read with `Map.get/2` on the param's `:key`, which is the
+  reading `render_sentence/2` beside it already takes of the same declaration:
+  a composite's params are its own config's keys, and the two derivations that
+  read them cannot be allowed to disagree about which key a param is at.
+
+  It is **overridable** for `sentence/1`'s reason - a declaration whose card
+  wants to say something the params cannot spell says it itself.
 
   `validate_config/1` is left at ADR-0007's injected `:ok`, deliberately. The
   refusals a param declares are declaration-level - F3's missing `default:`,
@@ -132,18 +151,29 @@ defmodule StatifierBlocks.Composite do
   Dropping a non-root member's sugar under-declares rather than over-declares,
   which is the safe direction `ADR-0011` decision 6 already takes.
 
-  ### The one limitation in the derived `io/1` and `outcomes/1`
+  ### The callbacks are core-only, and a reader with a palette is not
 
   Both rows read a **member's module**, and a `t:StatifierBlocks.Block.t/0`
   carries a type *name*. Resolving a name to a module is
   `StatifierBlocks.Palette`'s job, and neither `c:StatifierBlocks.BlockType.io/1`
-  nor `c:StatifierBlocks.BlockType.outcomes/1` is handed a palette - so these
-  two derivations resolve through `StatifierBlocks.Palette.core_types/0`, the
-  one type map this package holds as a value. A composite whose expansion root
-  is a **host** type therefore falls back: `outcomes/1` to the behaviour's
-  default outcomes, and `io/1` to `[:step]` kinds with no sugar. Both
-  reference composites root at `core.*` and are exact. The environment walk is
-  unaffected - it has a palette, and resolves every member through it.
+  nor `c:StatifierBlocks.BlockType.outcomes/1` is handed a palette - so the two
+  **callbacks** resolve members through `StatifierBlocks.Palette.core/0`,
+  whose types are `StatifierBlocks.Palette.core_types/0`, the one type map this
+  package holds as a value. A composite whose expansion root is a **host** type
+  therefore falls back *in the callback*: `outcomes/1` to the behaviour's
+  default outcomes, and `io/1` to `[:step]` kinds with no sugar.
+
+  That fallback is the callbacks' answer and stays their answer (`ADR-0002`'s
+  Note of 2026-09-07, item 3: no `@callback` is added, removed or re-arity'd,
+  and neither derivation gains a palette argument). What a **reader holding a
+  palette** does instead is call `io/2` and `outcomes/2` below, which take the
+  palette as their first argument and resolve every member through it - so the
+  same composite is exact wherever a palette is in hand and takes the
+  documented fallback only where none is.
+
+  The environment walk needs neither: it recurses into
+  `StatifierBlocks.Environment.read_signatures/3` and `write_signatures/3` over
+  the expansion, so no composite reaches its `io/1` there at all.
 
   ## The derived recipe
 
@@ -244,6 +274,10 @@ defmodule StatifierBlocks.Composite do
         do: StatifierBlocks.Composite.render_sentence(@composite_declaration, config)
 
       @impl StatifierBlocks.BlockType
+      def summary(config),
+        do: StatifierBlocks.Composite.derived_summary(@composite_declaration, config)
+
+      @impl StatifierBlocks.BlockType
       def palette_entry, do: @composite_declaration.palette_entry
 
       @impl StatifierBlocks.BlockType
@@ -255,7 +289,7 @@ defmodule StatifierBlocks.Composite do
                 "means the expansion did not run."
       end
 
-      defoverridable sentence: 1, palette_entry: 0
+      defoverridable sentence: 1, summary: 1, palette_entry: 0
 
       @before_compile StatifierBlocks.Composite
     end
@@ -417,31 +451,109 @@ defmodule StatifierBlocks.Composite do
     end)
   end
 
+  @doc """
+  `block`'s io, with every member resolved through `palette` (`ADR-0002`'s
+  Note of 2026-09-07, item 3).
+
+  The exact answer for a composite whose expansion root is a **host** type,
+  which `c:StatifierBlocks.BlockType.io/1` cannot give: the callback is handed
+  a config and nothing else, so it resolves members through
+  `StatifierBlocks.Palette.core/0` and falls back for a name that map does not
+  carry. This is what a reader **holding a palette** calls instead - the whole
+  of the difference is which palette the members are resolved through, and the
+  per-key table above is unchanged.
+
+  `block` is the composite block as the document stores it, and `palette` must
+  carry its type: the type name is resolved here rather than taken as a second
+  argument, so a caller cannot pair a block with another type's entry. The
+  config is read **as handed** - `resolve/2`'s migration, if the caller ran
+  one, is already on the block it passes.
+
+  Raises for a `block` whose type is not a composite, for `expand/2`'s reason:
+  there is nothing to derive from. Ask `composite?/1` first, which is what
+  every routed reader does.
+  """
+  @spec io(Palette.t(), Block.t()) :: Assignability.io()
+  def io(%Palette{} = palette, %Block{} = block) do
+    io_over(palette, block, composite_ref!(palette, block))
+  end
+
+  @doc """
+  `block`'s outcomes - its expansion root's, over the root's expanded config -
+  with the root resolved through `palette` (`ADR-0002`'s Note of 2026-09-07,
+  item 3).
+
+  `io/2`'s companion, and everything that doc says about the palette, the
+  block, the config and the refusal holds here unchanged.
+  """
+  @spec outcomes(Palette.t(), Block.t()) :: [BlockType.outcome_decl()]
+  def outcomes(%Palette{} = palette, %Block{} = block) do
+    outcomes_over(palette, block, composite_ref!(palette, block))
+  end
+
   @doc false
   @spec derived_io(Palette.type_ref(), Block.config()) :: Assignability.io()
   def derived_io(ref, config) do
-    {members, _param_map} = expand(probe_block(ref, config), ref)
+    io_over(Palette.core(), probe_block(ref, config), ref)
+  end
+
+  @doc false
+  @spec derived_outcomes(Palette.type_ref(), Block.config()) :: [BlockType.outcome_decl()]
+  def derived_outcomes(ref, config) do
+    outcomes_over(Palette.core(), probe_block(ref, config), ref)
+  end
+
+  # The one derivation both the callback and `io/2` run; they differ in the
+  # palette the members are resolved through and in nothing else.
+  @spec io_over(Palette.t(), Block.t(), Palette.type_ref()) :: Assignability.io()
+  defp io_over(%Palette{} = palette, %Block{} = block, ref) do
+    {members, _param_map} = expand(block, ref)
 
     kinds =
       members
       |> flatten()
-      |> Enum.flat_map(&Assignability.kinds(member_module(&1), &1.config))
+      |> Enum.flat_map(&Assignability.kinds(member_module(&1, palette), &1.config))
       |> Enum.uniq()
 
     [root | _rest] = members
-    root_io = Assignability.io(member_module(root), root.config)
+    root_io = Assignability.io(member_module(root, palette), root.config)
 
     %{kinds: kinds, slot_accepts: %{}}
     |> copy_key(root_io, :consumes)
     |> copy_key(root_io, :produces)
   end
 
-  @doc false
-  @spec derived_outcomes(Palette.type_ref(), Block.config()) :: [BlockType.outcome_decl()]
-  def derived_outcomes(ref, config) do
-    {[root | _rest], _param_map} = expand(probe_block(ref, config), ref)
+  @spec outcomes_over(Palette.t(), Block.t(), Palette.type_ref()) :: [BlockType.outcome_decl()]
+  defp outcomes_over(%Palette{} = palette, %Block{} = block, ref) do
+    {[root | _rest], _param_map} = expand(block, ref)
 
-    BlockType.outcomes(member_module(root), root.config)
+    BlockType.outcomes(member_module(root, palette), root.config)
+  end
+
+  @spec composite_ref!(Palette.t(), Block.t()) :: Palette.type_ref()
+  defp composite_ref!(%Palette{} = palette, %Block{type: type}) do
+    case Palette.fetch(palette, type) do
+      {:ok, ref} ->
+        ref
+
+      {:error, _unknown} ->
+        raise ArgumentError,
+              "#{inspect(type)} is not in the palette handed to " <>
+                "StatifierBlocks.Composite.io/2 or outcomes/2, so its expansion " <>
+                "cannot be derived. Resolve the block through the palette first."
+    end
+  end
+
+  @doc false
+  @spec derived_summary(declaration(), Block.config()) :: [String.t()]
+  def derived_summary(%{params: params}, config) do
+    params
+    |> Enum.reject(&Map.get(&1, :hidden?, false))
+    |> Enum.map(fn %{key: key} = param ->
+      {Map.get(param, :label, key), to_text(Map.get(config, key))}
+    end)
+    |> Enum.reject(fn {_label, value} -> String.trim(value) == "" end)
+    |> Enum.map(fn {label, value} -> label <> ": " <> value end)
   end
 
   @doc false
@@ -605,10 +717,14 @@ defmodule StatifierBlocks.Composite do
 
   # -- member modules ---------------------------------------------------
 
-  @spec member_module(Block.t()) :: Palette.type_ref() | nil
-  defp member_module(%Block{type: type}) do
-    case Palette.fetch(Palette.core(), type) do
-      {:ok, module} -> module
+  # `nil` for a name the palette does not carry, which is what puts
+  # `Assignability`'s and `BlockType`'s documented defaults in front of the
+  # member: an unresolvable member degrades rather than raising (ADR-0003
+  # decision 5).
+  @spec member_module(Block.t(), Palette.t()) :: Palette.type_ref() | nil
+  defp member_module(%Block{type: type}, %Palette{} = palette) do
+    case Palette.fetch(palette, type) do
+      {:ok, ref} -> ref
       {:error, _unknown} -> nil
     end
   end

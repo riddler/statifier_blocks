@@ -2972,7 +2972,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         state_id = StateId.state_id(block.id)
         label = candidate_label(assigns, block)
 
-        for outcome <- BlockType.outcome_names(module, resolved.config) do
+        for outcome <- outcome_names(assigns.palette, module, resolved) do
           %{
             label: label <> @candidate_separator <> outcome,
             value: StateId.outcome_event(state_id, outcome)
@@ -2980,6 +2980,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         end
       else
         _no_declared_outcomes -> []
+      end
+    end
+
+    # ADR-0002's Note of 2026-09-07, item 3: this reader HAS a palette, so a
+    # composite sibling in the body offers the outcomes its expansion root
+    # really declares, rather than the core-only fallback
+    # `c:StatifierBlocks.BlockType.outcomes/1` is confined to. A candidate list
+    # that named an outcome the compiled chart never emits would be a wire that
+    # is not there, which is the same objection `declares_outcomes?/1` answers.
+    @spec outcome_names(Palette.t(), Palette.type_ref(), Block.t()) :: [String.t()]
+    defp outcome_names(%Palette{} = palette, ref, %Block{} = resolved) do
+      if Composite.composite?(ref) do
+        palette |> Composite.outcomes(resolved) |> BlockType.outcome_names()
+      else
+        BlockType.outcome_names(ref, resolved.config)
       end
     end
 

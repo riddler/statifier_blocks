@@ -875,7 +875,26 @@ defmodule StatifierBlocks.BlockType do
   def outcome_names(module, config) do
     module
     |> outcomes(config)
-    |> Enum.map(&outcome_name/1)
+    |> outcome_names()
+  end
+
+  @doc """
+  The names in an outcome list, in declaration order.
+
+  `outcome_names/2` in terms of a list a caller already has, for the one
+  caller that cannot use `outcome_names/2`: a reader holding a **palette**
+  reads a composite's outcomes through
+  `StatifierBlocks.Composite.outcomes/2` (ADR-0002's Note of 2026-09-07,
+  item 3), which answers the list rather than taking a module and a config.
+  It exists so that reader takes the same names, with the same totality,
+  rather than repeating this mapping at its own site.
+
+      iex> StatifierBlocks.BlockType.outcome_names([{"approved", "Approved"}])
+      ["approved"]
+  """
+  @spec outcome_names([outcome_decl()]) :: [String.t()]
+  def outcome_names(outcomes) when is_list(outcomes) do
+    Enum.map(outcomes, &outcome_name/1)
   end
 
   @spec outcome_name(term()) :: String.t()
