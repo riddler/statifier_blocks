@@ -114,6 +114,8 @@ defmodule StatifierBlocks.InvokeStep do
   # `<assign>` element into the same datamodel.
   @assign_to_message "must be a datamodel path, like cards.authorization"
 
+  @failure_outcomes_message ~s(must be a list of outcome names, such as ["error"])
+
   # `label`, `group`, `icon` and `accent_token` are deliberately not among
   # the defaults. Which heading a step files under is the host domain's
   # fact, and a shared default would quietly file a signup step under card
@@ -133,12 +135,19 @@ defmodule StatifierBlocks.InvokeStep do
     * `:fields` - extra field declarations, appended after `label` and
       `invoke_type` in the order given.
     * `:palette` - palette-entry keys, merged over this module's defaults.
+    * `:failure_outcomes` - the outcome names this step's family counts as
+      having failed, declared once here rather than as an `@impl` on every
+      member. Absent, the injection is `failure_outcomes/0`'s `["error"]`,
+      exactly as it was before the option existed. A host wrapper macro
+      over this one may set it for its whole family (ADR-0002's Note of
+      2026-09-07, item 6).
   """
   defmacro __using__(opts) do
     invoke_type = checked_declaration(Keyword.fetch!(opts, :invoke_type))
     produces = Keyword.get(opts, :produces)
     fields = Keyword.get(opts, :fields, [])
     palette = Keyword.get(opts, :palette, Macro.escape(%{}))
+    failure_outcomes = failure_outcomes_body(Keyword.get(opts, :failure_outcomes))
 
     quote do
       use StatifierBlocks.BlockType
@@ -169,7 +178,7 @@ defmodule StatifierBlocks.InvokeStep do
       def outcomes(_config), do: StatifierBlocks.InvokeStep.outcomes()
 
       @impl StatifierBlocks.BlockType
-      def failure_outcomes(_config), do: StatifierBlocks.InvokeStep.failure_outcomes()
+      def failure_outcomes(_config), do: unquote(failure_outcomes)
 
       @impl StatifierBlocks.BlockType
       def palette_entry, do: StatifierBlocks.InvokeStep.palette_entry(unquote(palette))
@@ -207,6 +216,28 @@ defmodule StatifierBlocks.InvokeStep do
 
   defp checked_declaration(value), do: value
 
+  # The body injected for `failure_outcomes/1`. Absent, it is the call to
+  # `failure_outcomes/0` the injection has always carried, so a step that
+  # declares nothing compiles to exactly what it compiled to before the
+  # option existed and a later change to the module default still reaches
+  # it (ADR-0002's Note of 2026-09-07, item 6).
+  @spec failure_outcomes_body(term()) :: Macro.t()
+  defp failure_outcomes_body(nil), do: quote(do: StatifierBlocks.InvokeStep.failure_outcomes())
+
+  defp failure_outcomes_body(declared), do: checked_failure_outcomes(declared)
+
+  # Checked where it is written, for `checked_declaration/1`'s reason. Only
+  # a literal that cannot be a list is refused: a bare name, a module
+  # attribute or anything else computed is an expression at this point, not
+  # a value, and is left to be whatever it evaluates to.
+  @spec checked_failure_outcomes(term()) :: term()
+  defp checked_failure_outcomes(value) when is_binary(value) or is_atom(value) do
+    raise ArgumentError,
+          ~s(failure_outcomes: #{inspect(value)} #{@failure_outcomes_message})
+  end
+
+  defp checked_failure_outcomes(value), do: value
+
   @doc """
   The two ways a call can finish, in the order they compile in.
 
@@ -221,11 +252,12 @@ defmodule StatifierBlocks.InvokeStep do
   (ADR-0002's amendment of 2026-09-06, section 3).
 
   The `use` macro defines `failure_outcomes/1` from this for every host
-  type built on it, so a step that calls out to the world and comes back
-  on `error` is classed as having failed without its author writing
-  anything. It is in `defoverridable`: a host whose `error` is routine - a
-  probe that reports "not found" through it, say - defines its own
-  `failure_outcomes/1` returning `[]` or its own list, in the same place it
+  type built on it that does not declare `failure_outcomes:` itself, so a
+  step that calls out to the world and comes back on `error` is classed as
+  having failed without its author writing anything. It is in
+  `defoverridable`: a host whose `error` is routine - a probe that reports
+  "not found" through it, say - declares `failure_outcomes: []` at the
+  `use` site or defines its own `failure_outcomes/1`, in the same place it
   would override `outcomes/1`.
 
   This narrows one sentence of `StatifierBlocks.BlockType.failure_outcomes/1`'s
