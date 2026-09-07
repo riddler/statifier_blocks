@@ -477,6 +477,32 @@ defmodule StatifierBlocks.Shell do
   def inspector_tabs, do: @inspector_tabs
 
   @doc """
+  The inspector tabs a profile leaves, in this module's order.
+
+  `listed` is a profile's `inspector_tabs` value: `:all`, or the ids it names
+  (ADR-0005's 2026-09-07 profile amendment). The result is the intersection,
+  and it keeps **this module's** order rather than the profile's, so two hosts
+  that name the same tabs in different orders draw the same strip.
+
+  A listed id the package does not know is dropped and the mount renders -
+  the amendment's own rule, on the same reasoning as `inspector_tab/1`: a
+  profile is written once against the tab set of the version it was written
+  for, and an id that outlives its tab must leave a surface missing rather
+  than a crash at render.
+
+      iex> StatifierBlocks.Shell.inspector_tabs(:all)
+      [:config, :findings, :condition, :fixtures]
+
+      iex> StatifierBlocks.Shell.inspector_tabs([:fixtures, :nope, :config])
+      [:config, :fixtures]
+  """
+  @spec inspector_tabs([inspector_tab()] | :all) :: [inspector_tab()]
+  def inspector_tabs(:all), do: @inspector_tabs
+
+  def inspector_tabs(listed) when is_list(listed),
+    do: Enum.filter(@inspector_tabs, &(&1 in listed))
+
+  @doc """
   The tab `value` names, or `:config`.
 
   The tab arrives from a `phx-value-tab` attribute, so an unknown one is a
@@ -499,6 +525,27 @@ defmodule StatifierBlocks.Shell do
   """
   @spec drawer_tabs() :: [drawer_tab()]
   def drawer_tabs, do: @drawer_tabs
+
+  @doc """
+  The package's drawer tabs a profile leaves, in this module's order.
+
+  This is `drawer_view/1`'s own half of the strip: the host's tabs are
+  filtered against the same list there, where the two halves are put
+  together. Same rule as `inspector_tabs/1` - the intersection in this
+  module's order, and a listed id the package does not know is dropped
+  rather than raised (ADR-0005's 2026-09-07 profile amendment). A host tab
+  id is a string, so it passes through this function without matching
+  anything, which is why the filter for those runs where the host's
+  descriptors are.
+
+      iex> StatifierBlocks.Shell.drawer_tabs([:source, "runs", :findings])
+      [:findings, :source]
+  """
+  @spec drawer_tabs([tab_id()] | :all) :: [drawer_tab()]
+  def drawer_tabs(:all), do: @drawer_tabs
+
+  def drawer_tabs(listed) when is_list(listed),
+    do: Enum.filter(@drawer_tabs, &(&1 in listed))
 
   @doc """
   The drawer tab `value` names, out of the package's tabs and `host_ids`, or
@@ -1060,16 +1107,18 @@ defmodule StatifierBlocks.Shell do
           optional(:declarations) => [DatamodelEntry.t()],
           optional(:declared_view) => [Datamodel.declared_row()],
           optional(:source_view) => SourceView.t() | nil,
-          optional(:selected_id) => Block.id() | nil
+          optional(:selected_id) => Block.id() | nil,
+          optional(:profile) => [tab_id()] | :all
         }) :: drawer()
   def drawer_view(state) do
     fixtures = Map.get(state, :fixtures)
     selected_id = Map.get(state, :selected_id)
     findings = Map.get(state, :findings) || []
     declared_view = Map.get(state, :declared_view) || []
+    listed = Map.get(state, :profile) || :all
 
     own =
-      Enum.map(@drawer_tabs, fn
+      Enum.map(drawer_tabs(listed), fn
         :tables ->
           %{id: :tables, title: drawer_title(:tables), count: table_count(fixtures)}
 
@@ -1106,6 +1155,7 @@ defmodule StatifierBlocks.Shell do
       |> Map.get(:host_tabs)
       |> Kernel.||([])
       |> host_tabs()
+      |> Enum.filter(&listed?(&1.id, listed))
       |> Enum.map(&%{id: &1.id, title: &1.title, count: Map.get(&1, :count) || 0})
 
     tabs = own ++ contributed
@@ -1122,9 +1172,9 @@ defmodule StatifierBlocks.Shell do
       tables: [],
       findings: findings,
       orphans: MapSet.new(Map.get(state, :orphan_findings) || []),
-      count: active.count,
+      count: tab_count(active),
       jumps: table_block_ids(fixtures),
-      title: active.title
+      title: tab_title(active)
     }
 
     if base.open?, do: opened(base, fixtures, selected_id), else: %{base | jumps: []}
@@ -1152,11 +1202,37 @@ defmodule StatifierBlocks.Shell do
       tab
     else
       case Enum.find(tabs, &(&1.count > 0)) do
-        nil -> :tables
+        nil -> first_tab(tabs)
         entry -> entry.id
       end
     end
   end
+
+  # The tab an unchosen strip with nothing in any of its tabs rests on. It is
+  # `:tables` for every strip the package draws unprofiled, because `:tables`
+  # is first in `@drawer_tabs` and 2A's arrival order puts it there. A profile
+  # that does not list it moves the resting place to whatever the profile left
+  # first, and a profile that leaves no tab at all leaves none to rest on.
+  @spec first_tab([drawer_tab_entry()]) :: tab_id() | nil
+  defp first_tab([]), do: nil
+  defp first_tab([first | _rest]), do: first.id
+
+  # A strip with no tabs has no active entry, which is the one state the
+  # unprofiled drawer cannot reach: every unprofiled strip carries six.
+  @spec tab_count(drawer_tab_entry() | nil) :: non_neg_integer()
+  defp tab_count(nil), do: 0
+  defp tab_count(entry), do: entry.count
+
+  @spec tab_title(drawer_tab_entry() | nil) :: String.t()
+  defp tab_title(nil), do: ""
+  defp tab_title(entry), do: entry.title
+
+  # Whether a host tab's id survives the profile. Host ids are strings and the
+  # package's are atoms, so a profile lists a host tab by the same string the
+  # host gave it - which is also the string `drawer_tab/2` resolves.
+  @spec listed?(tab_id(), [tab_id()] | :all) :: boolean()
+  defp listed?(_id, :all), do: true
+  defp listed?(id, listed) when is_list(listed), do: id in listed
 
   @spec opened(drawer(), fixtures(), Block.id() | nil) :: drawer()
   defp opened(base, nil, _selected_id), do: %{base | status: :no_fixtures}

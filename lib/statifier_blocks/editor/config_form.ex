@@ -135,7 +135,44 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:read_only, :boolean,
+      default: false,
+      doc: """
+      Whether this mount edits. A read-only form is not a form: it is a
+      `<div>` of the same fields drawn through `Field.field/1`'s
+      **readonly** branch - label and value, no control, nothing that posts
+      (ADR-0005's 2026-09-07 profile amendment, `read_only?` clause 3). A
+      disabled input is a control that refuses, and what is wanted here is a
+      reading, which is why the same branch `readonly?: true` already renders
+      one field with is what renders all of them.
+      """
+    )
+
     @doc "One block's form: unrouted findings, then a control per schema field."
+    def config_form(%{read_only: true} = assigns) do
+      assigns =
+        assign(
+          assigns,
+          :fields,
+          Enum.map(rendered_fields(assigns.node.form.fields), &read_only/1)
+        )
+
+      ~H"""
+      <div class="sb-form sb-form--readonly" data-block-id={@node.block_id} data-read-only="true">
+        <p :for={finding <- @node.form.unrouted} class={["sb-finding", severity_class(finding)]}>
+          {finding.message}
+        </p>
+        <Field.field :for={field <- @fields} field={field} target={@target} />
+        <div :if={@capture_pairs not in [nil, []]} class="sb-capture sb-capture--readonly">
+          <p class="sb-capture__label">Capture from the event</p>
+          <p :for={{target, source} <- @capture_pairs} class="sb-capture__row sb-field__value">
+            {target} &larr; {source}
+          </p>
+        </div>
+      </div>
+      """
+    end
+
     def config_form(assigns) do
       assigns =
         assign(assigns, :focus_input_id, focus_input_id(assigns.node, assigns.field_focus))
@@ -409,6 +446,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # field either; the two agree, and neither is load-bearing alone.
     @spec rendered_fields([ViewModel.Field.t()]) :: [ViewModel.Field.t()]
     defp rendered_fields(fields), do: Enum.reject(fields, & &1.hidden?)
+
+    # A read-only mount draws every field the way a `readonly?: true` field is
+    # already drawn. The flag is set on the projection rather than a second
+    # values-only renderer being written beside `Field.field/1`: the rendering
+    # the amendment asks for and the rendering that flag already produces are
+    # one rendering, and two spellings of one rendering is how they drift.
+    @spec read_only(ViewModel.Field.t()) :: ViewModel.Field.t()
+    defp read_only(field), do: %{field | readonly?: true}
 
     # A field the form withheld reads nothing out of the params, whatever the
     # params carry (F6 as ruled by `RQ-SF036-15`). `:error` is the same term

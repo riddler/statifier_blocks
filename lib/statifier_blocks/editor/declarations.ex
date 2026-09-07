@@ -81,6 +81,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "the sentence for a refused change, or `nil` when the document holds what is drawn"
     )
 
+    attr(:read_only, :boolean,
+      default: false,
+      doc: """
+      Whether this mount edits. A read-only panel draws the same three
+      columns as values and no Order column, and it draws no Add control:
+      order is load-bearing but it is a document edit, and a mount that
+      cannot make one has nothing to move (ADR-0005's 2026-09-07 profile
+      amendment - `read_only?` renders the document without offering any way
+      to change it, and clause 3's reasoning about a disabled control
+      applies to a row of them as much as to one field).
+      """
+    )
+
     attr(:target, :any, required: true)
 
     @doc "The declarations table: one row per declared root, plus the Add control."
@@ -101,7 +114,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 <th scope="col">Name</th>
                 <th scope="col">Initial value</th>
                 <th scope="col">Description</th>
-                <th scope="col"><span class="sb-declarations__actions-head">Order</span></th>
+                <th :if={not @read_only} scope="col">
+                  <span class="sb-declarations__actions-head">Order</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -110,6 +125,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 entry={entry}
                 index={index}
                 last={index == length(@entries) - 1}
+                read_only={@read_only}
                 target={@target}
               />
             </tbody>
@@ -117,6 +133,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         </div>
 
         <button
+          :if={not @read_only}
           type="button"
           class="sb-declarations__add"
           phx-click="declaration-add"
@@ -131,12 +148,28 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:entry, DatamodelEntry, required: true)
     attr(:index, :integer, required: true)
     attr(:last, :boolean, required: true)
+    attr(:read_only, :boolean, default: false)
     attr(:target, :any, required: true)
 
     # One form per row rather than one for the panel. The index is a hidden
     # input rather than a `phx-value-index`, because a form's change payload
     # carries its inputs and not the attributes on the element - the value
     # has to be in the form to arrive with it.
+    # A read-only row: the same three columns, drawn as values. Deliberately a
+    # separate clause rather than a `disabled` sweep through the row above -
+    # the amendment's clause 3 says a disabled input is a control that
+    # refuses and what is wanted is a reading, and that is as true of a name
+    # as of a config field.
+    defp row(%{read_only: true} = assigns) do
+      ~H"""
+      <tr class="sb-declarations__row" data-index={@index} data-id={@entry.id} data-read-only="true">
+        <td class="sb-declarations__value">{@entry.id}</td>
+        <td class="sb-declarations__value">{@entry.expr}</td>
+        <td class="sb-declarations__value">{@entry.description}</td>
+      </tr>
+      """
+    end
+
     defp row(assigns) do
       ~H"""
       <tr class="sb-declarations__row" data-index={@index} data-id={@entry.id}>
