@@ -306,7 +306,7 @@ palette =
 ctx = %{datamodel: datamodel}
 
 known_at_settle = Environment.at(palette, document, {"blk_root", "body", 1}, ctx)
-#=> %{"cards.current_txn" => "cards.credit_txn", "cards.settlement" => "object"}
+#=> %{"cards.current_txn" => "cards.credit_txn", "cards.current_txn.amount_minor" => "integer", "cards.current_txn.authorized_at" => "datetime", "cards.current_txn.currency" => "string", "cards.current_txn.expires_on" => "date", "cards.settlement" => "object"}
 
 verdict = Assignability.validate(palette, document, ctx)
 #=> :ok
@@ -318,6 +318,16 @@ there (ADR-0011 decision 2, amended 2026-09-06), and a type a block writes
 replaces the seeded one from that position on - which is what
 `cards.current_txn` shows, seeded `object` and then written
 `cards.credit_txn` by the entry block's `produces`.
+
+The four paths beneath `cards.current_txn` are there because that write names
+a **record** (ADR-0011's Amendment of 2026-09-07): a write signature whose
+type is a record, a shape, or an inline shape puts an entry at the path and
+one at every member beneath it, at the member's own type, recursively and to
+any depth. So a later step reading `cards.current_txn.amount_minor` is
+checked against `integer` rather than getting the nothing-is-known advisory,
+and a declaration-only field naming that path is unnecessary. Nothing expands
+through a `list`, and an explicit write signature at one of those member
+paths wins over the member the record derived.
 
 That is worth one sentence of care in a guide: a path your document declares
 is now **checked**. A read at it that found nothing before, and was an
