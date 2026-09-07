@@ -1340,6 +1340,49 @@
  * rather than a computed style nothing can check. Always visible while shut
  * is not symmetry: a control that hides a region has to be the way back to
  * it, and hover is not a gesture a keyboard has. */
+/* Expand (ADR-0005's 2026-09-07 amendment, clause 1E): the control that
+ * replaces a composite with the blocks it stands for. It sits on the same
+ * chrome as the delete control and obeys the same R2 reveal contract - a
+ * gesture that rewrites the card is not one to leave sitting at rest - and
+ * it is offset one control's width to the left of the `x` so the two never
+ * overlap. A composite has no interior (clause 8E), so the fold toggle is
+ * absent from this card and there is no third control to make room for.
+ *
+ * A word rather than a glyph, for the same reason the delete offer's Keep
+ * is a word: there is no single character that says "this card is about to
+ * be replaced by several", and a glyph the author has to learn is worse
+ * than a short label they can read. */
+.sb-node__expand[data-reveal="hover-or-selected"] {
+  position: absolute;
+  top: 0;
+  right: calc(var(--sb-space-2) + var(--sb-space));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--sb-space-2);
+  padding: 0 var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  line-height: 1;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 120ms ease-out;
+}
+
+.sb-node__chrome:hover > .sb-node__expand,
+.sb-node__expand:focus-visible,
+.sb-node--selected > .sb-node__chrome > .sb-node__expand {
+  opacity: 1;
+}
+
+.sb-node__expand:hover {
+  border-color: var(--sb-border-strong);
+  color: var(--sb-fg);
+}
+
 .sb-node__fold {
   position: absolute;
   top: 0;

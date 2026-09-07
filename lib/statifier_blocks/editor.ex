@@ -531,6 +531,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Assignability,
       Block,
       BlockType,
+      Composite,
       Connectors,
       Datamodel,
       Declarations,
@@ -670,6 +671,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          palette_collapsed: false,
          palette_unarmed_pick: false,
          pending_remove: nil,
+         expandable_ids: MapSet.new(),
          inspector_collapsed: false,
          fixtures: nil,
          fixture_runs: nil,
@@ -959,6 +961,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 marks={@marks}
                 armed={@palette_position}
                 pending_remove={@pending_remove}
+                expandable={@expandable_ids}
                 target={@myself}
                 icon={@icon}
                 theme={@theme}
@@ -1458,6 +1461,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:noreply, assign(socket, :pending_remove, nil)}
     end
 
+    # ADR-0005's 2026-09-07 amendment, part (i): the gesture that replaces a
+    # composite with what it stands for. The event is named for the gesture
+    # the record names; the LABEL the author reads is chosen in `BlockNode`
+    # under clause 6E, which forbids only the collision with the fold
+    # toggle's own "Expand".
+    #
+    # A delete offer standing on the canvas is answered by any other gesture
+    # the same way `"remove"` answers a second delete: the author has moved
+    # on, and an offer nobody is looking at is an offer that lies.
+    def handle_event("expand", %{"block-id" => id}, socket) do
+      {:noreply, socket |> assign(:pending_remove, nil) |> expand_composite(id)}
+    end
+
     def handle_event("undo", _params, socket) do
       %{history: history, palette: palette, document: document} = socket.assigns
       {:noreply, replay(socket, History.undo(history, palette, document))}
@@ -1751,6 +1767,142 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       |> commit({:compound, Enum.map(ids, &{:remove, &1})})
     end
 
+    # Expand (clauses 1E-5E). The composite comes out, its expansion goes in
+    # where it stood, and the two travel as ONE `{:compound, ...}` - which by
+    # clause 2n is one undo entry, so one undo puts the composite back whole
+    # and there is no intermediate document in which the composite is gone and
+    # the expansion is not yet there (3E).
+    #
+    # `Composite.expand/2` is the one expansion function (ADR-0002's
+    # amendment): the compiler reads it at Resolve and this reads it here, so
+    # the document after Expand holds exactly the blocks the compiler would
+    # have spliced. That is what keeps consent clause 6's byte-identity
+    # obligation true on both sides of the gesture rather than by coincidence.
+    #
+    # Three refusals, all of them refused GESTURES and none of them findings
+    # (5E, on clause 3C's ground): a block that is not a composite, the
+    # document root - which has no target to insert at and which
+    # `Edit.apply/2` refuses to remove anyway (`check_not_root/2`) - and a
+    # slot that will not admit the expansion. Nothing is written in any of
+    # them and the composite stays exactly where it was.
+    @spec expand_composite(Phoenix.LiveView.Socket.t(), Block.id()) ::
+            Phoenix.LiveView.Socket.t()
+    defp expand_composite(socket, id) do
+      %{palette: palette, document: document} = socket.assigns
+
+      with {:ok, block, module} <- fetch_composite(palette, document, id),
+           {:ok, target} <- composite_target(document, id),
+           {:ok, inserts} <- expansion_inserts(palette, document, target, block, module) do
+        socket
+        |> update(:drafts, &Map.delete(&1, id))
+        |> assign(:selected_id, first_inserted_id(inserts) || socket.assigns.selected_id)
+        |> commit({:compound, [{:remove, id} | inserts]})
+      else
+        {:error, reason} -> refused(socket, reason)
+      end
+    end
+
+    @spec fetch_composite(Palette.t(), Document.t(), Block.id()) ::
+            {:ok, Block.t(), module()} | {:error, term()}
+    defp fetch_composite(palette, document, id) do
+      with %Block{} = block <- block_by_id(document, id),
+           {:ok, module, resolved} <- Palette.resolve(palette, block),
+           true <- Composite.composite?(module) do
+        {:ok, resolved, module}
+      else
+        nil -> {:error, {:no_such_block, id}}
+        false -> {:error, {:not_a_composite, id}}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+
+    # The composite's OWN target: the last step of its path, which is the
+    # `{parent id, slot, index}` triple `Document.fetch_path/2` speaks in.
+    # The root's path is `[]` (it has taken no steps), and that is the arm
+    # that refuses the root.
+    @spec composite_target(Document.t(), Block.id()) :: {:ok, Edit.target()} | {:error, term()}
+    defp composite_target(document, id) do
+      case Document.fetch_path(document, id) do
+        {:ok, []} -> {:error, {:cannot_expand_root, id}}
+        {:ok, path} -> {:ok, List.last(path)}
+        :error -> {:error, {:no_such_block, id}}
+      end
+    end
+
+    # The expansion as `:insert` commands, and 5E's admission check ahead of
+    # them.
+    #
+    # The index WALKS. Clause 2E fixes the parent and the slot at the
+    # composite's own and gives its reason - "so the expansion appears where
+    # the composite was rather than after it" - and clause 1E fixes the ORDER
+    # as "the order the expansion gives them". A list of two or more members
+    # inserted at one index arrives reversed, which satisfies neither 1E nor
+    # the compiler, whose splice puts the members at the composite's position
+    # head first. So the n-th member lands at the composite's index plus n,
+    # which is the only reading that keeps both clauses and consent clause 6
+    # true at once. For a one-member expansion - every case 2E's worked
+    # example walks - the two readings are the same command.
+    @spec expansion_inserts(Palette.t(), Document.t(), Edit.target(), Block.t(), module()) ::
+            {:ok, [Edit.t()]} | {:error, term()}
+    defp expansion_inserts(palette, document, {parent_id, slot, index} = target, block, module) do
+      {members, _param_map} = Composite.expand(block, module)
+
+      if Enum.all?(members, &admits_expansion?(palette, document, parent_id, slot, &1)) do
+        inserts =
+          members
+          |> Enum.with_index(index)
+          |> Enum.map(fn {member, at} -> {:insert, {parent_id, slot, at}, member} end)
+
+        {:ok, inserts}
+      else
+        {:error, {:expansion_not_admitted, target}}
+      end
+    end
+
+    # ADR-0003 decision 3's structural verdict, asked before the compound is
+    # built rather than discovered by `Edit.apply/2` - which is purely
+    # structural and would have admitted it. A composite declares its own
+    # `kinds` and its expansion's members declare theirs; nothing makes the
+    # two equal, so a slot that admitted the composite need not admit what
+    # comes out of it.
+    @spec admits_expansion?(Palette.t(), Document.t(), Block.id(), Block.slot_name(), Block.t()) ::
+            boolean()
+    defp admits_expansion?(palette, document, parent_id, slot, %Block{} = member) do
+      with %Block{} = parent <- block_by_id(document, parent_id),
+           {:ok, parent_module, resolved_parent} <- Palette.resolve(palette, parent),
+           {:ok, member_module, resolved_member} <- Palette.resolve(palette, member) do
+        Assignability.admits?(
+          {parent_module, resolved_parent.config},
+          slot,
+          {member_module, resolved_member.config}
+        )
+      else
+        _unresolvable -> false
+      end
+    end
+
+    # Which blocks in the document are composites, for the card that draws the
+    # Expand control. Editor state that addresses a block, threaded to the
+    # canvas the way `pending_remove` and `marks` are - and for the reason
+    # clause 7E gives: `ViewModel.Node` gains no field for a composite and the
+    # drawing code never learns the word, so a composite draws as the ordinary
+    # leaf card it is (7E, 8E) and only the affordance knows the difference.
+    @spec composite_ids(Document.t(), Palette.t()) :: MapSet.t(Block.id())
+    defp composite_ids(%Document{} = document, %Palette{} = palette) do
+      document
+      |> Document.blocks()
+      |> Enum.filter(&composite?(palette, &1))
+      |> MapSet.new(& &1.id)
+    end
+
+    @spec composite?(Palette.t(), Block.t()) :: boolean()
+    defp composite?(palette, %Block{} = block) do
+      case Palette.resolve(palette, block) do
+        {:ok, module, _resolved} -> Composite.composite?(module)
+        {:error, _unresolvable} -> false
+      end
+    end
+
     # What the recipes say about `id`, or `[]` for "nobody claims it".
     #
     # Every recipe in the palette that exports `members/2` is asked, in name
@@ -2016,6 +2168,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             # is an UNANSWERED question besides: carried across a swap it
             # would put to the new document a yes it never asked for.
             pending_remove: nil,
+            expandable_ids: MapSet.new(),
             # A mark addresses one block, so it stops being true when that
             # block is gone. The amendment's exemption from this reset is the
             # pane folds', and for the reason that does not reach a mark: a
@@ -2838,6 +2991,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       socket
       |> assign(:view_model, view_model)
+      |> assign(:expandable_ids, composite_ids(document, palette))
       |> assign(:selected_node, selected)
       |> assign(:selected_slot, Shell.slot_label(view_model.root, socket.assigns.selected_id))
       |> assign(:pending_fields, pending_fields(socket, selected))

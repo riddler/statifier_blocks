@@ -234,7 +234,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # and nothing a type would have to correct.
     @default_join_label "continue"
 
-    alias StatifierBlocks.Connectors
+    alias StatifierBlocks.{Block, Connectors}
     alias StatifierBlocks.Editor.{Icons, Slot}
     alias StatifierBlocks.ViewModel
 
@@ -274,6 +274,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Threaded the way `marks` is and for the same reason: it is editor
       state that addresses a block, and nothing in the view model carries
       it. Only the card whose `block_id` it names draws anything.
+      """
+    )
+
+    attr(:expandable, :any,
+      default: nil,
+      doc: """
+      The block ids in this document that are composite block types - a
+      `MapSet`, or `nil` when none is threaded. Threaded the way
+      `pending_remove` is and for the reason ADR-0005's 2026-09-07 amendment
+      clause 7E gives: a composite draws as the ordinary leaf card it is and
+      `ViewModel.Node` gains no field for it, so nothing in the drawing code
+      learns the word "composite" and only the Expand affordance (clause 1E)
+      reads this.
       """
     )
 
@@ -362,6 +375,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </div>
           <span :if={@node.invoke_type} class="sb-node__invoke">{@node.invoke_type}</span>
           <button
+            :if={expandable?(@node, @expandable)}
+            type="button"
+            class="sb-node__expand"
+            data-reveal="hover-or-selected"
+            aria-label={"Replace " <> ViewModel.title(@node) <> " with its steps"}
+            title="Replace with its steps"
+            phx-click="expand"
+            phx-target={@target}
+            phx-value-block-id={@node.block_id}
+          >
+            steps
+          </button>
+          <button
             :if={container?(@node)}
             type="button"
             class="sb-node__fold"
@@ -446,6 +472,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             marks={@marks}
             armed={@armed}
             pending_remove={@pending_remove}
+            expandable={@expandable}
             target={@target}
             icon={@icon}
           />
@@ -496,6 +523,27 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # and the second click are what make the gesture honest about how many
     # blocks it removes, and no dialog, mode or pane is added to say it.
     @spec offered?(ViewModel.Node.t(), map() | nil) :: boolean()
+    # Clause 1E's affordance, and clause 6E's label.
+    #
+    # 6E forbids one thing only: a label that collides with the card's fold
+    # toggle, which answers "Expand" when the card is folded. On a composite
+    # card the fold toggle is not drawn at all - a composite's `slots/1` is
+    # empty by clause 8E, so `container?/1` is false and there is no toggle to
+    # collide with. The label is still chosen distinct, because the
+    # inspector's own "Expand the inspector" is on screen beside it and 6E's
+    # reason - that unfolding a card and replacing it with its expansion must
+    # not read as one thing - survives the card the toggle is missing from.
+    #
+    # "Replace with its steps" is what 1E actually does, said in the author's
+    # words: the composite comes out and the blocks it stands for go in where
+    # it stood. It borrows no verb from the fold, and it warns that the card
+    # in front of the author is about to stop existing.
+    @spec expandable?(ViewModel.Node.t(), MapSet.t(Block.id()) | nil) :: boolean()
+    defp expandable?(_node, nil), do: false
+
+    defp expandable?(%ViewModel.Node{block_id: id}, expandable),
+      do: MapSet.member?(expandable, id)
+
     defp offered?(_node, nil), do: false
 
     defp offered?(%ViewModel.Node{block_id: id}, %{block_id: id}), do: true
