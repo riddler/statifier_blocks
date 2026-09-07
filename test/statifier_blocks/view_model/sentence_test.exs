@@ -23,6 +23,7 @@ defmodule StatifierBlocks.ViewModel.SentenceTest do
   doctest StatifierBlocks.Core.Parallel, only: [sentence: 1]
   doctest StatifierBlocks.Core.Send, only: [sentence: 1]
   doctest StatifierBlocks.Core.Assign, only: [sentence: 1]
+  doctest StatifierBlocks.Core.OnEvent, only: [sentence: 1]
 
   defmodule Speaking do
     @moduledoc "A host type with words of its own, and a name an author may override."
@@ -226,6 +227,18 @@ defmodule StatifierBlocks.ViewModel.SentenceTest do
       view_model = ViewModel.build(document, Palette.new(%{}), [])
 
       assert view_model.root.sentence == "host.gone"
+    end
+
+    # sabotage: drop `sentence/1` from `Core.OnEvent` -> the reader falls
+    # back to the palette label "On event" -> red. The core type is asserted
+    # through the view model as well as in its doctest because the line a
+    # handler draws in an `interrupts` slot is what the seam is for.
+    test "is core.on_event's own line for a handler in the document" do
+      config = %{"event" => "card.authz_timed_out", "outcome" => "abandon"}
+      document = Document.new(Block.new("core.on_event", id: "blk", config: config), id: "doc")
+      view_model = ViewModel.build(document, Palette.core(), [])
+
+      assert ViewModel.sentence(view_model.root) == "When card.authz_timed_out, abandon"
     end
   end
 
