@@ -474,6 +474,54 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     `selected_id` a host may write, honoured in `update/2` through
     `rebuild/1`*.
 
+    ## "Save as a step", and the declaration a host receives (`on_collapse`)
+
+    The other seam out, and the one that had to be built without becoming a
+    write. `StatifierBlocks.Composite.Collapse.propose/3` reads a selection
+    back as the `Composite.Data` declaration that stands for it; the gesture
+    calls it and hands the result to `on_collapse`, a one-argument function
+    beside `on_change` and `on_select`, called for its effect and never for
+    its return value.
+
+    **The gesture edits no document and this package persists nothing.** No
+    command is committed, no `StatifierBlocks.Edit` is built, `on_change`
+    never fires, and the undo history is not touched: the document after the
+    gesture is byte-identical to the document before it. What the host
+    receives is a map, and which table it goes in, which tenant it belongs
+    to, and whether it is saved at all are the host's - ADR-0005's 2026-09-07
+    amendment, clauses `15E` to `20E`, and epic ruling `R5` behind them.
+
+    A refusal is delivered too, or it is not delivered at all: `propose/3`
+    answering `{:error, reason}` is a refused gesture in the sense Expand's
+    three refusals already are, reported in the editor's own chrome, and
+    `on_collapse` fires only on the `{:ok, _}`, so a host callback never has
+    to match a failure it did not ask for.
+
+    The **marking step** is the smallest presentation that is honest about
+    what `18E` decides. `18E` says the proposed params are the values the
+    author marks, and every value differing from its field's default where
+    they mark none - so the gesture cannot be a single button, and it does
+    not need to be more than a list. "Save as a step" on the selected card
+    opens a tray naming every block in the selected subtree and every config
+    field on it, each a checkbox; Save proposes, Cancel closes, and a tray
+    with nothing ticked is `18E`'s unmarked reading rather than a proposal
+    with no params. There is no preview of the declaration, no naming step
+    and no type-name field, because naming is the host's act (`15E`) and a
+    package that drew a name field would be drawing a decision it cannot
+    make.
+
+    It is offered on a read-only mount as well, and that is deliberate rather
+    than an oversight: it is not on `@read_only_refused` because it reaches
+    nothing a read-only mount withholds. Reading a document is the whole
+    point of such a mount, and this gesture is a read.
+
+    `Collapse.replacement/4` - the compound that swaps the arrangement for a
+    composite of the name the host registered - is a separate public
+    function, and **nothing in this component calls it** (`17E`). A host that
+    wants the swap commits it itself through
+    `StatifierBlocks.Edit.Session.commit/2`, after it has stored the
+    declaration, named it, and rebuilt its palette with it.
+
     ## Profiles, and a read-only mount
 
     A host that mounts this editor for two audiences out of one codebase says
@@ -514,6 +562,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `compile_options` | no | the rest of the option list the host compiles this document with - `terminate:`, `child_use:`, `known_invoke_types:`, `datamodel:` - forwarded to **every** compile this component runs: the provenance recompile behind the Run pane's marks, the Source tab's listing, and the fixture runs. Without it those three describe a chart the host does not have, silently. `:declare` is taken from the `declare` assign whatever this list says, and `[]` (the default) compiles exactly as it did before |
     | `on_change` | no | one-argument function called with each new document |
     | `on_select` | no | one-argument function called with each new selection: a `%{id:, type:, label:}` descriptor, or `nil` for no selection |
+    | `on_collapse` | no | one-argument function called with each declaration the "Save as a step" gesture proposes, in `on_select`'s shape. The gesture edits no document and this package persists nothing: what the host does with the map - which table, which tenant, whether it is saved at all - is the host's |
     | `selected_id` | no | the block the editor is about, written by a host that has a selection surface of its own; honoured only on an update that carries it, and an id the open document does not hold clears the selection instead of naming it. Held as editor state, and cleared when the host opens a different document. Not a command: it moves the selection, it does not edit the document |
     | `icon` | no | function component resolving an icon *name* to markup |
     | `expression_component` | no | override for `:expression` fields (sui-bob's seam); with it unset, an `:expression` renders statifier-ui's own expression editor when that package is on the host's load path, and the package's plain source input when it is not |
@@ -559,6 +608,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     alias StatifierBlocks.{Compiled, Compiler}
     alias StatifierBlocks.Compiler.StateId
+    alias StatifierBlocks.Composite.Collapse
     alias StatifierBlocks.Document.DatamodelEntry
     alias StatifierBlocks.Edit.{History, Session, Targets}
     alias StatifierBlocks.Runtime.{FixtureRuns, Handled, Marks, RunValues, Selection}
@@ -570,6 +620,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Inspector,
       PaletteBrowser,
       RunPane,
+      SaveStepTray,
       Toolbar
     }
 
@@ -648,6 +699,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          host_roots: MapSet.new(),
          on_change: nil,
          on_select: nil,
+         on_collapse: nil,
          icon: nil,
          expression_component: nil,
          invoke_types: [],
@@ -671,6 +723,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          run_provenance: nil,
          run_provenance_key: nil,
          drag: nil,
+         save_as_step: nil,
          drafts: %{},
          draft_findings: %{},
          declaration_draft: nil,
@@ -913,6 +966,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           :insert_target,
           Shell.insert_target(assigns.view_model.root, assigns.palette_position)
         )
+        |> assign(:save_as_step_rows, save_as_step_rows(assigns))
 
       ~H"""
       <div
@@ -990,6 +1044,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 reveal={@reveal}
               />
             </RunPane.run_pane>
+
+            <SaveStepTray.save_step_tray
+              :if={@save_as_step != nil}
+              rows={@save_as_step_rows}
+              target={@myself}
+            />
           </div>
 
           <Inspector.inspector
@@ -1490,6 +1550,43 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # on, and an offer nobody is looking at is an offer that lies.
     def handle_event("expand", %{"block-id" => id}, socket) do
       {:noreply, socket |> assign(:pending_remove, nil) |> expand_composite(id)}
+    end
+
+    # ADR-0005 part (iii), clauses 15E to 20E: the four events the "Save as a
+    # step" gesture is made of. None of them reaches the document.
+    #
+    # Opening the tray answers a standing delete offer the way every other
+    # gesture does, and it holds the marks rather than the declaration:
+    # `propose/3` is called once, on Save, over the document as it stands
+    # then, so a tray left open across an edit proposes what is there now
+    # rather than what was there when it opened.
+    def handle_event("save-as-step", %{"block-id" => id}, socket) do
+      socket = assign(socket, :pending_remove, nil)
+
+      {:noreply, assign(socket, :save_as_step, %{root_id: id, marks: %{}})}
+    end
+
+    def handle_event(
+          "save-as-step-mark",
+          %{"block-id" => id, "field-key" => key},
+          %{assigns: %{save_as_step: %{marks: marks} = open}} = socket
+        ) do
+      marked = Map.get(marks, id, [])
+
+      marked =
+        if key in marked, do: List.delete(marked, key), else: Enum.sort([key | marked])
+
+      {:noreply, assign(socket, :save_as_step, %{open | marks: Map.put(marks, id, marked)})}
+    end
+
+    def handle_event("save-as-step-mark", _params, socket), do: {:noreply, socket}
+
+    def handle_event("save-as-step-cancel", _params, socket) do
+      {:noreply, assign(socket, :save_as_step, nil)}
+    end
+
+    def handle_event("save-as-step-confirm", _params, socket) do
+      {:noreply, save_as_step(socket)}
     end
 
     def handle_event("undo", _params, socket) do
@@ -2151,6 +2248,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             # is an UNANSWERED question besides: carried across a swap it
             # would put to the new document a yes it never asked for.
             pending_remove: nil,
+            # An open marking tray addresses one block for the same reason,
+            # and the declaration it is halfway through proposing is about
+            # the document being swapped out.
+            save_as_step: nil,
             expandable_ids: MapSet.new(),
             # A mark addresses one block, so it stops being true when that
             # block is gone. The amendment's exemption from this reset is the
@@ -3475,6 +3576,99 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec find_document_block(Document.t(), Block.id()) :: Block.t() | nil
     defp find_document_block(document, id),
       do: Enum.find(Document.blocks(document), &(&1.id == id))
+
+    # The gesture, end to end, and every line of it a read. `propose/3` is
+    # the whole of the package's half (15E): it answers a map, the map goes to
+    # `on_collapse`, and the socket that comes back holds the same document it
+    # went in with. A refusal is a refused GESTURE - reported in the editor's
+    # own chrome through `refused/2`, exactly as Expand's three are - and the
+    # tray stays open on it, because the author has something to change.
+    @spec save_as_step(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
+    defp save_as_step(%{assigns: %{save_as_step: nil}} = socket), do: socket
+
+    defp save_as_step(%{assigns: %{save_as_step: %{root_id: root_id, marks: marks}}} = socket) do
+      %{document: document, palette: palette} = socket.assigns
+      ids = subtree_ids(document, root_id)
+
+      case Collapse.propose(document, palette, ids, marks: marks) do
+        {:ok, declaration} ->
+          socket |> notify_collapse(declaration) |> assign(:save_as_step, nil)
+
+        {:error, reason} ->
+          refused(socket, reason)
+      end
+    end
+
+    # `notify_change/2`'s and `notify_select/2`'s sibling for the third
+    # subject a host may follow. It fires once per gesture and only on the
+    # `{:ok, _}`, so a host callback never has to match a failure it did not
+    # ask for (16E).
+    @spec notify_collapse(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
+    defp notify_collapse(socket, declaration) do
+      case socket.assigns.on_collapse do
+        fun when is_function(fun, 1) -> fun.(declaration)
+        _none -> :ok
+      end
+
+      socket
+    end
+
+    # The selection the gesture is about: one subtree, whole, which is what
+    # 12E admits and what `propose/3` re-checks for itself.
+    @spec subtree_ids(Document.t(), Block.id()) :: [Block.id()]
+    defp subtree_ids(document, id) do
+      case block_by_id(document, id) do
+        nil -> []
+        block -> descendant_ids(block)
+      end
+    end
+
+    @spec descendant_ids(Block.t()) :: [Block.id()]
+    defp descendant_ids(%Block{id: id, slots: slots}) do
+      [id | Enum.flat_map(slots, fn {_slot, kids} -> Enum.flat_map(kids, &descendant_ids/1) end)]
+    end
+
+    # The tray's rows: every block in the selected subtree, every config field
+    # its type declares, and whether this tray has it ticked. A block the
+    # palette cannot resolve contributes no row rather than an empty one -
+    # there is no schema to draw from, and `propose/3` will refuse the
+    # selection on the same ground when Save is taken.
+    @spec save_as_step_rows(map()) :: [
+            %{
+              block_id: Block.id(),
+              label: String.t(),
+              fields: [%{key: String.t(), label: String.t(), marked?: boolean()}]
+            }
+          ]
+    defp save_as_step_rows(%{save_as_step: nil}), do: []
+
+    defp save_as_step_rows(%{save_as_step: %{root_id: root_id, marks: marks}} = assigns) do
+      %{document: document, palette: palette} = assigns
+
+      document
+      |> subtree_ids(root_id)
+      |> Enum.flat_map(fn id ->
+        with %Block{} = block <- block_by_id(document, id),
+             {:ok, ref, resolved} <- Palette.resolve(palette, block) do
+          marked = Map.get(marks, id, [])
+
+          [
+            %{
+              block_id: id,
+              label: block.type,
+              fields:
+                ref
+                |> Palette.call(:config_schema, [resolved.config], [])
+                |> Enum.map(fn field ->
+                  %{key: field.key, label: field.label, marked?: field.key in marked}
+                end)
+            }
+          ]
+        else
+          _unresolvable -> []
+        end
+      end)
+    end
 
     @spec notify_change(Phoenix.LiveView.Socket.t(), Document.t()) :: Phoenix.LiveView.Socket.t()
     defp notify_change(socket, document) do

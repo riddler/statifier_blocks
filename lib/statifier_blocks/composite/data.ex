@@ -83,14 +83,35 @@ defmodule StatifierBlocks.Composite.Data do
   No new key and no new field type is introduced here, and every refusal
   decision 7 and its amendments state applies to a param unchanged.
 
-  `"type"` is a field type's **name as a string**, so the five field types
-  that have one - `"string"`, `"integer"`, `"boolean"`, `"expression"` and
-  `"duration"` - are what a declaration held as data can spell. The four
-  that carry options (`{:select, choices}`, `{:list, inner}`,
-  `{:path, opts}` and `{:type_expr, opts}`) are tuples rather than names and
-  are refused here; a host needing one writes a `use`-composite module, and
-  a spelling for them is a later record's to decide, not this module's to
-  invent.
+  `"type"` is a field type's **name as a string**, and all nine of decision
+  7's field types now have one (ADR-0005's 2026-09-07 amendment, clause
+  `19E`). The five that carry nothing - `"string"`, `"integer"`,
+  `"boolean"`, `"expression"` and `"duration"` - are the name alone, and an
+  `"options"` on one of them is refused. The four that carry options
+  (`{:select, choices}`, `{:list, inner}`, `{:path, opts}` and
+  `{:type_expr, opts}`) are the name plus **one optional `"options"` key**,
+  which is what the tuple's second element rides in:
+
+  | `"type"` | `"options"` | The `t:StatifierBlocks.BlockType.field_type/0` built |
+  |---|---|---|
+  | `"select"` | `%{"choices" => [[value, label], ...]}`, a non-empty list of two-element lists of strings | `{:select, [{value, label}, ...]}` |
+  | `"path"` | the path options map: whichever of `"expects"` and `"writes"` the field declares, each a type expression as ADR-0011 spells one - a non-empty string | `{:path, %{expects: T}}` / `{:path, %{writes: T}}` / `{:path, %{}}` |
+  | `"list"` | `%{"inner" => ...}`, whose value is itself a `"type"` / `"options"` pair - the same spelling, one level down | `{:list, inner}` |
+  | `"type_expr"` | `%{"arms" => ["name", "inline"], "allow_empty?" => false}`, both keys optional and `"arms"` any non-empty subset | `{:type_expr, %{arms: [:name, :inline], allow_empty?: bool}}` |
+
+  `"select"`'s choices are **pairs and not a map** because `{:select,
+  choices}` is an *ordered* list and a JSON object does not promise order.
+  `"path"`'s options are the map itself rather than a wrapper, because
+  `path_opts` is already a map with two optional keys - and its values are
+  the strings ADR-0011 already writes, so a `writes:` carrying a
+  `{:list, T}` or a `{:shape, members}` term has no spelling here and is
+  refused rather than half-carried. `"list"` recurses through the same
+  spelling, so an inner kind that is itself unspellable makes the whole
+  field unspellable by the ordinary rule rather than by a special case.
+  `"type_expr"` needs nothing from `statifier_datamodel`: the value such a
+  field holds is already JSON (`StatifierBlocks.BlockType`'s
+  `t:StatifierBlocks.BlockType.type_expr_opts/0`), so the spelling carries
+  `opts` and no type expression crosses a package boundary.
 
   The list is **decoded once**, when the entry is built, and
   `config_schema/1` answers the decoded list. It is not decoded per call,
@@ -212,13 +233,25 @@ defmodule StatifierBlocks.Composite.Data do
 
   @id_suffix ~r/\A[a-z0-9]+(_[a-z0-9]+)*\z/
 
-  @field_types %{
+  # The five field types whose whole spelling is their name. An `"options"`
+  # beside one of them is refused: there is no second element to carry.
+  @plain_field_types %{
     "string" => :string,
     "integer" => :integer,
     "boolean" => :boolean,
     "expression" => :expression,
     "duration" => :duration
   }
+
+  # The four that carry options, spelled as the name plus `"options"`
+  # (ADR-0005's 2026-09-07 amendment, clause 19E).
+  @option_field_types ~w(select path list type_expr)
+
+  @field_types Map.keys(@plain_field_types) ++ @option_field_types
+
+  @path_opt_keys %{"expects" => :expects, "writes" => :writes}
+
+  @type_expr_arms %{"name" => :name, "inline" => :inline}
 
   @param_flags %{
     "required?" => :required?,
@@ -478,26 +511,18 @@ defmodule StatifierBlocks.Composite.Data do
   defp decode_param(%{"key" => key, "type" => type, "label" => label} = param)
        when is_binary(key) and is_binary(label) do
     cond do
-      not Map.has_key?(@field_types, type) ->
-        {:error,
-         ~s(param #{inspect(key)} declares an unspellable field type #{inspect(type)}; ) <>
-           "a declaration held as data spells one of " <>
-           "#{inspect(Map.keys(@field_types) |> Enum.sort())}"}
-
       not Map.has_key?(param, "default") ->
         {:error,
          ~s(param #{inspect(key)} is declared with no "default", so it has no ) <>
            "value to read when a config leaves it unset"}
 
-      true ->
-        unknown =
-          Map.keys(param) -- (["key", "type", "label", "default"] ++ Map.keys(@param_flags))
+      (unknown = param_unknown_keys(param)) != [] ->
+        {:error, ~s(param #{inspect(key)} declares unknown keys: #{inspect(unknown)})}
 
-        if unknown == [] do
-          {:ok, decoded_param(key, type, label, param)}
-        else
-          {:error,
-           ~s(param #{inspect(key)} declares unknown keys: #{inspect(Enum.sort(unknown))})}
+      true ->
+        case decode_field_type(type, Map.get(param, "options", :absent)) do
+          {:ok, field_type} -> {:ok, decoded_param(key, field_type, label, param)}
+          {:error, message} -> {:error, ~s(param #{inspect(key)} ) <> message}
         end
     end
   end
@@ -506,11 +531,162 @@ defmodule StatifierBlocks.Composite.Data do
     do:
       {:error, ~s(a param declares "key", "type", "label" and "default", got: #{inspect(param)})}
 
-  @spec decoded_param(String.t(), String.t(), String.t(), map()) :: BlockType.field_decl()
+  @spec param_unknown_keys(map()) :: [String.t()]
+  defp param_unknown_keys(param) do
+    known = ["key", "type", "label", "default", "options"] ++ Map.keys(@param_flags)
+
+    (Map.keys(param) -- known) |> Enum.sort()
+  end
+
+  # Clause 19E's table, read the other way: a `"type"` name and an optional
+  # `"options"` map become one `t:StatifierBlocks.BlockType.field_type/0`.
+  # Every refusal names what it could not spell, because this is the last
+  # moment a malformed declaration can be refused.
+  @spec decode_field_type(term(), term()) :: {:ok, BlockType.field_type()} | {:error, String.t()}
+  defp decode_field_type(type, :absent) when is_map_key(@plain_field_types, type),
+    do: {:ok, Map.fetch!(@plain_field_types, type)}
+
+  defp decode_field_type(type, _options) when is_map_key(@plain_field_types, type),
+    do:
+      {:error,
+       ~s(declares an "options" beside the field type #{inspect(type)}, which carries none)}
+
+  defp decode_field_type("select", %{"choices" => choices} = options)
+       when map_size(options) == 1 do
+    if is_list(choices) and choices != [] and Enum.all?(choices, &choice_pair?/1) do
+      {:ok, {:select, Enum.map(choices, fn [value, label] -> {value, label} end)}}
+    else
+      {:error,
+       ~s(declares "select" choices that are not a non-empty list of ) <>
+         "[value, label] string pairs, got: #{inspect(choices)}"}
+    end
+  end
+
+  defp decode_field_type("select", options),
+    do:
+      {:error, ~s(declares "select" with no "choices" in its "options", got: #{inspect(options)})}
+
+  defp decode_field_type("path", :absent), do: {:ok, {:path, %{}}}
+
+  defp decode_field_type("path", options) when is_map(options) do
+    case Map.keys(options) -- Map.keys(@path_opt_keys) do
+      [] ->
+        decode_path_opts(options)
+
+      unknown ->
+        {:error,
+         ~s(declares "path" options this shape cannot spell: #{inspect(Enum.sort(unknown))})}
+    end
+  end
+
+  defp decode_field_type("path", options),
+    do: {:error, ~s(declares "path" options that are not a map, got: #{inspect(options)})}
+
+  defp decode_field_type("list", %{"inner" => inner} = options)
+       when map_size(options) == 1 and is_map(inner) do
+    case Map.keys(inner) -- ["type", "options"] do
+      [] ->
+        case decode_field_type(Map.get(inner, "type"), Map.get(inner, "options", :absent)) do
+          {:ok, decoded} -> {:ok, {:list, decoded}}
+          {:error, message} -> {:error, ~s(declares a "list" whose inner field type ) <> message}
+        end
+
+      unknown ->
+        {:error,
+         ~s(declares a "list" whose "inner" carries unknown keys: #{inspect(Enum.sort(unknown))})}
+    end
+  end
+
+  defp decode_field_type("list", options),
+    do:
+      {:error,
+       ~s(declares "list" with no "inner" field type in its "options", got: #{inspect(options)})}
+
+  defp decode_field_type("type_expr", :absent), do: {:ok, {:type_expr, %{}}}
+
+  defp decode_field_type("type_expr", options) when is_map(options) do
+    case Map.keys(options) -- ["arms", "allow_empty?"] do
+      [] ->
+        decode_type_expr_opts(options)
+
+      unknown ->
+        {:error,
+         ~s(declares "type_expr" options this shape cannot spell: #{inspect(Enum.sort(unknown))})}
+    end
+  end
+
+  defp decode_field_type("type_expr", options),
+    do: {:error, ~s(declares "type_expr" options that are not a map, got: #{inspect(options)})}
+
+  defp decode_field_type(type, _options),
+    do:
+      {:error,
+       ~s(declares an unspellable field type #{inspect(type)}; a declaration held as ) <>
+         "data spells one of #{inspect(Enum.sort(@field_types))}"}
+
+  @spec choice_pair?(term()) :: boolean()
+  defp choice_pair?([value, label]) when is_binary(value) and is_binary(label), do: true
+  defp choice_pair?(_choice), do: false
+
+  # ADR-0011 writes a path signature as a string, and that is the whole of
+  # what this shape carries: a `{:list, T}` or a `{:shape, members}` term is
+  # not JSON, so a field declaring one has no spelling here and is refused
+  # rather than half-carried.
+  @spec decode_path_opts(map()) :: {:ok, BlockType.field_type()} | {:error, String.t()}
+  defp decode_path_opts(options) do
+    bad = for {key, value} <- options, not (is_binary(value) and value != ""), do: key
+
+    if bad == [] do
+      {:ok,
+       {:path, Map.new(options, fn {key, value} -> {Map.fetch!(@path_opt_keys, key), value} end)}}
+    else
+      {:error,
+       ~s(declares "path" signatures that are not non-empty strings: #{inspect(Enum.sort(bad))})}
+    end
+  end
+
+  @spec decode_type_expr_opts(map()) :: {:ok, BlockType.field_type()} | {:error, String.t()}
+  defp decode_type_expr_opts(options) do
+    arms = Map.get(options, "arms", :absent)
+    allow_empty? = Map.get(options, "allow_empty?", :absent)
+
+    cond do
+      arms != :absent and not admitted_arms?(arms) ->
+        {:error,
+         ~s(declares "type_expr" arms that are not a non-empty subset of ) <>
+           ~s(["name", "inline"], got: #{inspect(arms)})}
+
+      allow_empty? != :absent and not is_boolean(allow_empty?) ->
+        {:error,
+         ~s(declares a "type_expr" "allow_empty?" that is not a boolean, got: ) <>
+           inspect(allow_empty?)}
+
+      true ->
+        opts =
+          %{}
+          |> put_unless_absent(:arms, arms, &Enum.map(&1, fn arm -> @type_expr_arms[arm] end))
+          |> put_unless_absent(:allow_empty?, allow_empty?, & &1)
+
+        {:ok, {:type_expr, opts}}
+    end
+  end
+
+  @spec admitted_arms?(term()) :: boolean()
+  defp admitted_arms?(arms) when is_list(arms) and arms != [],
+    do: arms == Enum.uniq(arms) and Enum.all?(arms, &is_map_key(@type_expr_arms, &1))
+
+  defp admitted_arms?(_arms), do: false
+
+  @spec put_unless_absent(map(), atom(), term(), (term() -> term())) :: map()
+  defp put_unless_absent(opts, _key, :absent, _decode), do: opts
+  defp put_unless_absent(opts, key, value, decode), do: Map.put(opts, key, decode.(value))
+
+  @spec decoded_param(String.t(), BlockType.field_type(), String.t(), map()) ::
+          BlockType.field_decl()
   defp decoded_param(key, type, label, param) do
     base = %{
       key: key,
-      type: Map.fetch!(@field_types, type),
+      type: type,
       label: label,
       required?: Map.get(param, "required?", false),
       default: Map.fetch!(param, "default")

@@ -1383,6 +1383,100 @@
   color: var(--sb-fg);
 }
 
+/* "Save as a step" (ADR-0005 part (iii), clause 16E). It sits LEFT of the
+ * fold and Expand controls rather than in their lane, because unlike those
+ * two it is drawn on any selected card and would otherwise land on top of
+ * whichever of them that card also has. A word for Expand's reason, and a
+ * different word from it: the two gestures are inverses and a reader has to
+ * be able to tell them apart at a glance. */
+.sb-node__save-step[data-reveal="hover-or-selected"] {
+  position: absolute;
+  top: 0;
+  right: calc(var(--sb-space-2) * 2 + var(--sb-space-2));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--sb-space-2);
+  padding: 0 var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  background: var(--sb-bg);
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  line-height: 1;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 120ms ease-out;
+}
+
+.sb-node__chrome:hover > .sb-node__save-step,
+.sb-node__save-step:focus-visible,
+.sb-node--selected > .sb-node__chrome > .sb-node__save-step {
+  opacity: 1;
+}
+
+.sb-node__save-step:hover {
+  border-color: var(--sb-border-strong);
+  color: var(--sb-fg);
+}
+
+/* The marking tray. It is a list and a pair of buttons and nothing else:
+ * 18E decides which values become params and the smallest presentation that
+ * says so is one checkbox per field. It carries no name field, because
+ * naming the type is the host's act (15E). */
+.sb-save-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space);
+  padding: var(--sb-space-2);
+  border-top: var(--sb-border-width) solid var(--sb-border);
+  background: var(--sb-bg);
+  color: var(--sb-fg);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-save-step__hint {
+  margin: 0;
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+}
+
+.sb-save-step__block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sb-space);
+}
+
+.sb-save-step__block-label {
+  margin: 0;
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+}
+
+.sb-save-step__field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sb-space-half);
+  cursor: pointer;
+}
+
+.sb-save-step__actions {
+  display: flex;
+  gap: var(--sb-space);
+}
+
+/* Both wear `sb-button`, so the family carries the border, the hover and
+ * the two states; what is left here is the one thing that separates them,
+ * which is which of the two the eye should land on first. */
+.sb-save-step__confirm {
+  font-weight: var(--sb-weight-strong, 600);
+}
+
+.sb-save-step__cancel {
+  color: var(--sb-fg-muted);
+}
+
 .sb-node__fold {
   position: absolute;
   top: 0;

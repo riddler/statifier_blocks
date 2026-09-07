@@ -65,6 +65,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          feed: session["feed"] || [],
          icon: session["icon"] && (&host_icon/1),
          on_select?: session["on_select"] != false,
+         on_collapse?: session["on_collapse"] != false,
          profile: session["profile"],
          test_pid: session["test_pid"]
        )}
@@ -93,6 +94,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         drawer_tabs={drawer_tabs(@host_tabs, @feed)}
         on_change={notifier(@test_pid)}
         on_select={if @on_select?, do: selection_notifier(@test_pid)}
+        on_collapse={if @on_collapse?, do: collapse_notifier(@test_pid)}
         on_drawer_resize={height_notifier(@test_pid)}
         {profile_attr(@profile)}
       >
@@ -187,6 +189,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     # 8A's other half of the host seam: the height arrives as an event and the
     # host is what remembers it. Here the "host" is a test process.
+    # The Collapse seam's host half (ADR-0005 part (iii), clause 16E). It
+    # rides the same route `on_select` does and for the same reason: a session
+    # is signed with `:erlang.term_to_binary/1` and carries no functions.
+    defp collapse_notifier(nil), do: nil
+    defp collapse_notifier(pid), do: fn declaration -> send(pid, {:collapse, declaration}) end
+
     defp height_notifier(nil), do: nil
     defp height_notifier(pid), do: fn height -> send(pid, {:drawer_height, height}) end
   end
@@ -287,6 +295,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "feed" => Keyword.get(opts, :feed, []),
         "icon" => Keyword.get(opts, :icon),
         "on_select" => Keyword.get(opts, :on_select, true),
+        "on_collapse" => Keyword.get(opts, :on_collapse, true),
         "profile" => Keyword.get(opts, :profile),
         "test_pid" => test_pid
       }
@@ -306,6 +315,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp collect_selections(acc) do
       receive do
         {:selection, selection} -> collect_selections([selection | acc])
+      after
+        0 -> acc
+      end
+    end
+
+    @doc """
+    Every declaration the editor has proposed since the last call, oldest
+    first. A list for `selections/0`'s reason: what these tests assert is how
+    MANY times the seam fired, and a gesture that edits nothing is proved by a
+    seam that fired exactly once and a document that never moved.
+    """
+    @spec collapses() :: [map()]
+    def collapses, do: Enum.reverse(collect_collapses([]))
+
+    defp collect_collapses(acc) do
+      receive do
+        {:collapse, declaration} -> collect_collapses([declaration | acc])
       after
         0 -> acc
       end

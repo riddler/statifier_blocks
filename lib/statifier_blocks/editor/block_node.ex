@@ -388,6 +388,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             steps
           </button>
           <button
+            :if={@node.block_id == @selected_id and not @root?}
+            type="button"
+            class="sb-node__save-step"
+            data-reveal="hover-or-selected"
+            aria-label={"Save " <> ViewModel.title(@node) <> " as a step"}
+            title="Save as a step"
+            phx-click="save-as-step"
+            phx-target={@target}
+            phx-value-block-id={@node.block_id}
+          >
+            save
+          </button>
+          <button
             :if={container?(@node)}
             type="button"
             class="sb-node__fold"
