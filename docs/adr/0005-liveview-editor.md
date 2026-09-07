@@ -9563,7 +9563,7 @@ section that holds them.
 
 ## Amendment (2026-09-07): part (iii) by addition - Collapse's host seam is a pure proposer, an `on_collapse` callback and a separate replacement compound, and a proposed declaration may spell all nine field kinds
 
-**Status: proposed (2026-09-07, campaign SF038, bead `sb-2fvz`, on rulings
+**Status: accepted (2026-09-07, campaign SF038, bead `sb-2fvz`, on rulings
 `RQ-SF038-1`, `RQ-SF038-2` and `RQ-SF038-5`).** A decision record merges at
 proposed under campaign SF038's invariant; flipping it to accepted is a
 separate gated request, `sb-vjvq`, after `sb-uzly` builds it. Additive by
@@ -10300,3 +10300,117 @@ its wording is left as written, and this item is what makes it one.
 Filed with `sb-twa0`, campaign SF038, on rulings `RQ-SF038-15`, `RQ-SF038-17`
 and `RQ-SF038-14`. `sb-5i4p` implements item 1; items 2, 3 and 4 record
 decisions about code that already stands.
+
+## Note (2026-09-07): part (iii)'s Collapse amendment is flipped to accepted, its cites re-counted, two readings recorded as the code's, and 7E/8E pointed at the pass-through amendment
+
+The Amendment of 2026-09-07 *part (iii) by addition* (`:9564`) is flipped to
+**accepted**. Its own status line at `:9566` is the one word this Note's
+request changed in that section; nothing else in it, and no line above it, is
+edited. `sb-uzly` (PR 412, `main` `7fa35a2`) landed `15E` to `20E`, and this
+Note is `sb-vjvq`, the flip the section names.
+
+Read at `main` `d6fb241`.
+
+### 1. The sentences the flip falsifies, met here rather than edited
+
+The section carries its status in prose in several places, and the campaign's
+record rule is that such a sentence is met in a foot Note rather than reworded
+or removed. Each is left standing exactly as written:
+
+- `:8694-8698`, inside part (iii): "**This part is at proposed by its own words
+  and is not flipped in campaign SF037.**" True of campaign SF037, which is the
+  campaign it names. Campaign SF038 is the "later campaign's record - which
+  will have code to check the clauses against" that the same sentence says
+  "is what may flip it", and this is that flip.
+- `:8454-8457`, the section-level status paragraph: "Part **(iii)**, Collapse,
+  **is at proposed by its own words and is not flipped in campaign SF037**".
+  Same reading; the section's one `Status:` line at `:8451` already reads
+  `accepted` and is **not** touched by this request.
+- `:8818-8820`: "**Part (iii) is not flipped by `sb-v3ny`** and no bead in
+  campaign SF037 flips it." It was not. `sb-vjvq` is a campaign-SF038 bead.
+- `:9253-9259`, the SF037 flip Note: "**Part (iii), Collapse, is not flipped.**
+  ... clauses `11E` to `14E` remain at proposed **by the section's own words**".
+  That was the state after `sb-v3ny`. Clauses `11E` to `20E` are accepted as of
+  this Note, which is the amendment's own instruction at `:10064-10068`
+  ("`sb-vjvq` flips **part (iii)'s clauses `11E` to `20E` and this section's own
+  status line** to accepted after `sb-uzly` lands").
+- `:9564`'s section: "Nothing in this section is built yet" (`:10068`). It is
+  built now, by `sb-uzly`.
+- `:8463-8464`, "Nothing in parts (i) and (ii) is built yet, and nothing in
+  part (iii) is scheduled", and `:8834`, "Nothing here is built yet": both
+  halves are now false and both lines stand, met here.
+- The dating disclaimers at `:8466-8467`, `:8836-8837` and `:9582-9583`, each
+  asking to be re-read rather than trusted. They were, at `d6fb241`.
+
+### 2. Two record-vs-code readings, recorded as the code's
+
+Neither is a claim the flip refuses; both are the record read one way and the
+code built another, and this Note records the code's reading as the one that
+stands.
+
+1. **`propose/3` is `propose/4` with a default.** `15E` fixes the proposer at
+   three arguments and this Note keeps that: `propose/3` is exactly the
+   record's signature, is `18E`'s unmarked reading, and is what the doctest
+   calls. `18E`'s **marked** case needs a marks channel, so the marks ride an
+   optional fourth argument - `Collapse.propose(document, palette, ids, marks:
+   %{block_id => [field key]})`, `collapse.ex:186-190`, one head with
+   `opts \\ []`. An empty marks map and an absent one both read as `18E`'s
+   unmarked case (`collapse.ex:193-201`), which is what a tray with nothing
+   ticked hands over. The record's arity sentence is met, not widened.
+2. **`replacement/4` answers `{:ok, compound}`, not the bare compound.**
+   `17E`'s prose says the function "answers the `{:compound, ...}`"; the code
+   answers `{:ok, {:compound, [...]}} | {:error, reason}`
+   (`collapse.ex:234-255`), because it must refuse the document root
+   (`{:error, {:cannot_collapse_root, id}}`) and an id the document does not
+   hold (`{:error, {:no_such_block, id}}`) rather than raise. The compound
+   inside the `:ok` is exactly the one `17E` prints, in `17E`'s order. The
+   tagged return is the reading that stands.
+
+Also recorded, from `19E`'s implementation: a `{:path, opts}` field's options
+are spelled as **strings only** (`19E`'s own reasoning, "whose values `ADR-0011`
+already writes as strings"), so a `{:path, %{writes: {:list, shape}}}` field -
+`core.map`'s `collect` - is refused as `{:error, {:unspellable_field, block_id,
+field_key}}`. That is `19E`'s last clause applied, not an exception to it.
+
+### 3. Cites re-counted at `d6fb241`
+
+Every cite this section makes into this file resolves unchanged: `:5107`,
+`:5137-5143`, `:5654`, `:8023`, `:8451`, `:8497`, `:8508-8518`, `:8524`,
+`:8537`, `:8583`, `:8601`, `:8612`, `:8692`, `:8701`, `:8712`, `:8722`,
+`:8731`, `:9253`. Appends land at the end of this file, so no line above moved.
+
+The code cites have moved, and these are the readings at `d6fb241`:
+
+| The section's cite | At `d6fb241` |
+|---|---|
+| `data.ex:286`, `declaration/1` | `composite/data.ex:419` |
+| `data.ex:80-84`, a param's declared keys | `composite/data.ex:80-84`, unmoved |
+| `data.ex:86-93`, "four ... are refused here" | `composite/data.ex:86-93`, and it now reads the other way: all nine field types have a name, the five plain ones alone and the four option-carrying ones with an optional `"options"` key. `19E` is what changed it |
+| `data.ex:130-148`, the placeholder vocabulary | `composite/data.ex:175-192` |
+| `data.ex:213`, `@id_suffix` | `composite/data.ex:334` (the prose statement of the same pattern at `:141-146`) |
+| `data.ex:215-221`, `@field_types` | `composite/data.ex:350` |
+| `data.ex:478`, `decode_param/1` | `composite/data.ex:660` |
+| `block_type.ex:179-188`, `field_type/0` | unmoved |
+| `block_type.ex:183`, `{:select, choices}` | unmoved |
+| `block_type.ex:205-225`, `path_opts` | `:205-230`; the three-spelling example the section quotes is at `:223-225` |
+| `block_type.ex:259-270`, `type_expr_opts` | unmoved; "`{:shape, members}` ... is never what a document holds" at `:263-265` |
+| `core/assign.ex:64-75`, `path` and `value` | `:63-75`, `path` at `:65-73` |
+| `core/invoke.ex:96`, `on_error` at `:zero_or_one` | unmoved |
+| `core/invoke.ex:139-144`, `assign_to` as `{:path, %{}}` | `:139-145` |
+| new: the proposer | `composite/collapse.ex:186-209` (`propose`), `:234-255` (`replacement`), `:504-552` (`19E`'s spellings), `:659-672` (`20E`'s pass-through proposal) |
+
+The cites into `ADR-0002` - `:7192-7223`, `:6665`, `:7227-7232`, `:6744-6748` -
+resolve, and `mix adr.cites` is green over this request.
+
+### 4. `7E` and `8E`, and where their amendment lives (`sb-o9ex`)
+
+`7E` (`:8601`, "A composite draws as an ordinary leaf card") and `8E` (`:8612`,
+"A composite's `slots/1` is empty, in campaign SF037") are **amended by
+addition** for the declared slot's interior; see `ADR-0002`'s pass-through
+Amendment of 2026-09-07, `P6`
+(`docs/adr/0002-block-type-behaviour.md:8274`). Neither clause's text is
+edited here, and this Note adds no card rule of its own: `P6` is the authority
+on what the card draws, exactly as this section's "What this section does not
+decide" already says of it.
+
+Filed with `sb-vjvq`, campaign SF038.

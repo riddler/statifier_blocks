@@ -2600,7 +2600,7 @@ file.
 
 ## Amendment (2026-09-07): the walk descends a pass-through slot's children, at the mapped inner position, and `with_writes/4` moves to `Environment`
 
-**Status: proposed (2026-09-07, campaign SF038, bead `sb-p01u`, recording the
+**Status: accepted (2026-09-07, campaign SF038, bead `sb-p01u`, recording the
 campaign-SF038 walk rulings `RQ-SF038-5` and `RQ-SF038-16`).** A decision record
 merges at proposed under the campaign invariant; flipping it to accepted is a
 separate gated request through the same `docs/adr/` gate, and `sb-vjvq` carries
@@ -2898,3 +2898,89 @@ Filed with `sb-p01u`, campaign SF038, recording `RQ-SF038-5` and `RQ-SF038-16`.
 This section adds no README row, flips no status line, and removes no line of
 this file. `sb-q183` builds section 2, `sb-1eam` section 4, and `sb-vjvq`
 carries the flip.
+
+## Note (2026-09-07): the pass-through-walk amendment is flipped to accepted, its cites re-counted, and one arity spelling recorded as the code's
+
+The Amendment of 2026-09-07 *the walk descends a pass-through slot's children,
+at the mapped inner position, and `with_writes/4` moves to `Environment`*
+(`:2601`) is flipped to **accepted**. Its status line at `:2603` is the one
+word this request changed in this file; no other line of the section, and no
+line above it, is edited. `sb-q183` (PR 422, `main` `e61890a`) built sections
+1 to 3 and `sb-1eam` (PR 411, `main` `1c6b143`) built section 4.
+
+Read at `main` `d6fb241`.
+
+### 1. The sentences the flip falsifies, met here rather than edited
+
+- `:2605-2607`, "flipping it to accepted is a separate gated request ... and
+  `sb-vjvq` carries that flip once `sb-q183` has built section 2 and `sb-1eam`
+  section 4". Both built; the flip is this Note.
+- `:2898-2900`, "`sb-q183` builds section 2, `sb-1eam` section 4, and `sb-vjvq`
+  carries the flip." Performed.
+- `:2415`, in the Note of 2026-09-07 at `:2396`: "The walk **descends
+  nothing**." Left standing, and superseded by section 2 exactly as the
+  section's own opening says it is - that sentence being a moved sentence is
+  why this is an amendment rather than a Note.
+- Section 4's "`Assignability.with_writes/4` goes away". It has: there is no
+  `with_writes` definition in `lib/statifier_blocks/assignability.ex` at
+  `d6fb241`, and `downstream_findings/6` calls `Environment.with_writes/5`
+  (`assignability.ex:668`).
+- Section 5's "the preview under-reports exactly the member mismatch the walk
+  catches" is the state **before** section 4; after `sb-1eam` the two run one
+  codepath, which is the equality section 4 states as its acceptance.
+
+### 2. What the code answers, per section, at `d6fb241`
+
+| Section | Where it is |
+|---|---|
+| 1, a composite is one block and one position for its own signatures | `environment.ex:364` (`read_signatures/3`), `:387` (`write_signatures/3`), `:473` (`expansion_signatures/5`) - all unchanged in kind; the union now carries the spliced children's signatures because `expand/2` splices them, which is section 1's stated reading |
+| 2, the walk descends the declared slot at the mapped inner position | `environment.ex:759-773` (`slot_start/6`, dispatching on `pass_through/3` at `:862`), `:798-816` (`mapped_start/8`: the expansion flattened to the named member, earlier members' writes applied, then that block's own `inner_slot` start), `:705-721` (`arms/5`, whose `declared_only/3` is "nothing else in `block.slots` is descended" and whose empty-slot reject is the table's third row), `:736-749` (`slot_env/7`, the left-to-right fold and the `scoped` drop), `:675` (`through/5`, the composite's own writes applied after its slots). The mapping is resolved through `Composite.pass_through/2` (`composite.ex:486-494`), so minting has one implementation |
+| 3, a read that fails inside a pass-through child is the child's own finding | falls out of 2 and of `ADR-0004`'s `T3`: the child is walked at its own position with its own id, and it is absent from the expansion index (`composite.ex:463-468`), so nothing lifts it |
+| 4, `Environment.with_writes` public, one codepath | `environment.ex:430-432` (the `@spec` and head, the declarations argument defaulted), called by `assignability.ex:668` in `downstream_findings/6` (`:656`) and by the walk's `apply_writes/5` (`environment.ex:1010`) |
+
+### 3. One arity spelling, recorded as the code's
+
+Section 4 writes the function as **`with_writes/4`** - "the name a caller
+writes" - above a five-argument `@spec` whose last argument carries a default.
+The code writes it the same way and Elixir counts the arity of the head:
+`Environment.with_writes/5` is the definition (`environment.ex:430-432`),
+`with_writes/4` is the call every caller makes. The record's own sentence
+("the declarations argument carries a default, exactly as `at/3` and
+`annotated/3` carry their `ctx` default in this same module") is what settles
+it, and `at/3` and `annotated/3` are spelled the same way in this file and are
+`at/4` and `annotated/4` in `environment.ex` (`:203`, `:214`). Nothing about
+the decision changes; this Note records the spelling so a reader matching the
+record against `@spec`s is not surprised.
+
+The same reading applies to `slot_start`: section 2 cites it as `slot_start/4`
+at `:701`; at `d6fb241` it is `slot_start/6` at `:759`. The function is the
+one the section describes.
+
+### 4. Cites re-counted at `d6fb241`
+
+Every cite this section makes into this file resolves unchanged: `:1186`,
+`:1846`, `:2396`, `:2415`, `:2477`, `:2480`, `:2498`, `:2508-2511`,
+`:2513-2514`, `:2564`. Its cites into `ADR-0002` and `ADR-0005` resolve;
+appends land at the end of each file, so no line above moved, and
+`mix adr.cites` is green over this request.
+
+The code cites have moved. Read at `d6fb241`:
+
+| The section's cite | At `d6fb241` |
+|---|---|
+| `environment.ex:249-251` (`descend/6`) | unmoved |
+| `environment.ex:203` (`at/3`), `:214` (`annotated/3`) | both unmoved |
+| `environment.ex:364` (`read_signatures/3`), `:387` (`write_signatures/3`) | both unmoved |
+| `environment.ex:426` (`expansion_signatures/5`) | `:473` |
+| `environment.ex:628` (`through/5`) | `:675` |
+| `environment.ex:658-670` (`arms/5`) | `:705-721` |
+| `environment.ex:685` and `:685-694` (`slot_env/7` and its `scoped` drop) | `:736-749` |
+| `environment.ex:701` (`slot_start/4`) | `:759` (`slot_start/6`) |
+| `environment.ex:835` (`apply_writes/5`), `:854` (`clear_derived/3`), `:885` (`put_derived/6`) | `:1010`, `:1020`, `:1051` |
+| `assignability.ex:661-667` (`Assignability.with_writes/4`), `:654` (`downstream_findings/6`) | the first is **gone** (section 4); `downstream_findings/6` is at `:656`, its `Environment.with_writes` call at `:668` |
+| `assignability.ex:85` (`{:passthrough, slot}` in `produces/0`) | unmoved, and still untouched by this section |
+| `composite.ex:231` (`slots/1` answering `[]`) | superseded: the injected `slots/1` at `:283` answers `Composite.derived_slots/1` |
+| `core/group.ex:37-41`, `core/assign.ex:66-73` | `:37-41` unmoved; assign's `path` declaration at `:65-73` |
+| new: the mapping resolver | `composite.ex:486-494` (`Composite.pass_through/2`) |
+
+Filed with `sb-vjvq`, campaign SF038.

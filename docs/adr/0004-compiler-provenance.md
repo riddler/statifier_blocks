@@ -3216,7 +3216,7 @@ file.
 
 ## Amendment (2026-09-07): a pass-through slot's children are spliced into the expansion with their ids unchanged, and a finding on one of them is that child's own
 
-**Status: proposed (2026-09-07, campaign SF038, bead `sb-1700`, recording
+**Status: accepted (2026-09-07, campaign SF038, bead `sb-1700`, recording
 campaign-SF038's ruling `RQ-SF038-5`).** A decision record merges at proposed
 under the campaign invariant; flipping it to accepted is a separate gated
 request through the same `docs/adr/` gate, and `sb-vjvq` carries it once
@@ -3477,3 +3477,59 @@ about the expansion is stored.
 
 Filed with `sb-1700`, campaign SF038, recording campaign-SF038's ruling
 `RQ-SF038-5`. `sb-q183` implements it, and `sb-vjvq` carries the flip.
+
+## Note (2026-09-07): the pass-through splice amendment is flipped to accepted, and its cites re-counted
+
+The Amendment of 2026-09-07 *a pass-through slot's children are spliced into
+the expansion with their ids unchanged* (`:3217`) is flipped to **accepted**.
+Its status line at `:3219` is the one word this request changed in this file;
+no other line of the section, and no line above it, is edited. `sb-q183`
+(PR 422, `main` `e61890a`) built `T1` to `T4`.
+
+Read at `main` `d6fb241`.
+
+### 1. The sentences the flip falsifies, met here rather than edited
+
+- `:3222-3224`, "flipping it to accepted is a separate gated request through
+  the same `docs/adr/` gate, and `sb-vjvq` carries it once `sb-q183` has
+  landed". Performed rather than pending; the sentence stands.
+- `:3398-3399`, "`sb-q183` builds the splice and carries the test that proves
+  it". It did.
+- `:3477-3479`, "`sb-q183` implements it, and `sb-vjvq` carries the flip". Both
+  performed.
+- `:3085-3086`, in the Amendment at `:2848`: "Nothing here gives a composite a
+  slot of its own". Still true **of that section**, which is what it says; the
+  slot is given by this section and by `ADR-0002`'s pass-through amendment.
+  That sentence is the reason this one is an amendment rather than a Note, and
+  it is unedited.
+
+### 2. What the code answers, per clause, at `d6fb241`
+
+| Clause | Where it is |
+|---|---|
+| `T1`, the splice at Resolve into the mapped inner slot, in stored order | `composite.ex:880-906`: `splice/3` folds the declared slots and `put_children/4` writes the children into the member minted from the local id, replacing that slot's list, so the mapped inner slot "holds them and only them". An unfilled slot splices nothing (`:884-889`, the `[] -> acc` arm) |
+| `T2`, the children keep their stored ids | the spliced children are placed **outside** `mint/3`'s walk (`composite.ex:910-918`), which recurses only over `subtree/1`'s own blocks and their slot children. Nothing rewrites a spliced child's id |
+| `T3`, a finding on a pass-through child is that child's own | `composite.ex:463-468`: the param map - which is what the compiler builds the expansion index from - is taken over the minted members **before** the children are spliced in, so a pass-through child has no entry in it and `anchor/2` returns it unchanged. The comment at `:463-467` cites this section by name |
+| `T4`, the compiled bytes are equal before and after Expand | the equality `sb-q183` carries the test for; `expand/2` (`composite.ex:441-470`) is the one expansion function the compiler and the Expand gesture both read, which is what makes the two sides the same tree |
+
+`T3`'s stated mechanism - "The expansion index maps **expansion members only**"
+- is the code's mechanism verbatim, and it is worth recording that it is
+implemented by **where** `param_map/2` is called rather than by a filter over
+the index: there is no code that removes a pass-through child from the index,
+because none is ever added.
+
+### 3. Cites re-counted at `d6fb241`
+
+Every cite this section makes into this file resolves unchanged: `:122-126`,
+`:2848`, `:2867`, `:2904`, `:2926`, `:2934-2937`, `:2975`, `:2977-2978`,
+`:2994`, `:3030`, `:3085-3086`, `:3129`, `:3134-3135`, `:3160-3161`. So do its
+cites into `ADR-0001` (`:63`, `:110`) and `ADR-0005` (`:8601`); appends land at
+the end of each file, so no line above moved, and `mix adr.cites` is green over
+this request.
+
+This section cites no line of `lib/`, so there is no code cite to re-count.
+The functions it describes, for a later reader, are at `composite.ex:441`
+(`expand/2`), `:880` (`splice/3`), `:893` (`put_children/4`), `:910` (`mint/3`)
+and `:468` (the `param_map/2` call `T3` rests on).
+
+Filed with `sb-vjvq`, campaign SF038.

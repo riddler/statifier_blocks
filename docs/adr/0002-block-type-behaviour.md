@@ -8092,7 +8092,7 @@ names the change it is measured against.
 
 ## Amendment (2026-09-07): a composite may declare a pass-through slot - `slots:` on the `use`, a `"slots"` key on a data declaration - and the card draws an interior for it
 
-**Status: proposed (2026-09-07, campaign SF038, bead `sb-nlo5`, recording
+**Status: accepted (2026-09-07, campaign SF038, bead `sb-nlo5`, recording
 campaign-SF038's ruling `RQ-SF038-5` and the card half of `RQ-SF038-14`).** A
 decision record merges at proposed under the campaign invariant; flipping it to
 accepted is a separate gated request through the same `docs/adr/` gate, and
@@ -8451,7 +8451,7 @@ accepted by `sb-vjvq` once it has landed.
 
 ## Amendment (2026-09-07): a data composite's declaration may carry a `"migrations"` list - `rename`, `drop` and `default` steps, walked once from the stored version to the current one
 
-**Status: proposed (2026-09-07, campaign SF038, bead `sb-ekkt`, recording
+**Status: accepted (2026-09-07, campaign SF038, bead `sb-ekkt`, recording
 campaign-SF038's ruling `RQ-SF038-3`, which was `RQ-SF037-16`).** A decision
 record merges at proposed under the campaign invariant; flipping it to accepted
 is a separate gated request through the same `docs/adr/` gate, and `sb-vjvq`
@@ -8884,3 +8884,111 @@ code is `sb-ba15`'s, and the shape above is that request's as it landed.
 
 Filed with `sb-4zyk`, campaign SF038, recording the operator's ruling
 `RQ-SF038-26` of 2026-09-07. Implemented by `sb-ba15`, landed at `8b6105a`.
+
+## Note (2026-09-07): the pass-through and migrations amendments are flipped to accepted, their cites re-counted, and three of their own witnesses superseded by the code they asked for
+
+Two amendments on this file are flipped to **accepted** by `sb-vjvq`, in the
+order this file carries them:
+
+- the Amendment of 2026-09-07 *a composite may declare a pass-through slot*
+  (`:8093`), whose status line at `:8095` was the one word changed there.
+  `sb-q183` (PR 422, `main` `e61890a`) built `P1` to `P9`.
+- the Amendment of 2026-09-07 *a data composite's declaration may carry a
+  `"migrations"` list* (`:8452`), whose status line at `:8454` was the one word
+  changed there. `sb-mulk` (PR 425, `main` `aa0d755`) built `M1` to `M9`.
+
+No other line of either section, and no line above either of them, is edited.
+Read at `main` `d6fb241`.
+
+### 1. The sentences the flips falsify, met here rather than edited
+
+- The pass-through amendment's status paragraph, "flipping it to accepted is a
+  separate gated request ... and `sb-vjvq` carries it once `sb-q183` has
+  landed" (`:8098-8099`), and its closing line, "Implemented by `sb-q183`;
+  flipped to accepted by `sb-vjvq` once it has landed" (`:8450-8451`). Both are
+  now performed rather than pending, and both stand.
+- The migrations amendment's matching pair at `:8457-8459` and `:8765-8766`.
+  Same reading, with `sb-mulk` in `sb-q183`'s place.
+- The migrations amendment's third witness that this file "fixes no migration
+  key": `## What this module does not decide: a migration` at
+  `composite/data.ex:180-190`. That heading is **gone from the code**, replaced
+  by `## The declaration-level "migrations" key` (`composite/data.ex:202-274`),
+  which is `M1` to `M8` written down where the heading was. The witness is
+  superseded by the thing it was witnessing the absence of; the record's
+  sentence naming it is unedited. The other two witnesses, `:7293-7299` and
+  `:7894-7900`, are prose in this file and stand as written.
+- The pass-through amendment's four witnesses that a composite has no slot of
+  its own - `:6500`, `:6702`, `:6721` and `:7030`, with `:7656`'s claim-table
+  row for the data kind - all stand, unedited, and are read with `P3`: `[]`
+  remains `slots/1`'s answer for every composite that declares no slot, which
+  is every composite written before `RQ-SF038-5`.
+
+### 2. What the code answers, per clause, at `d6fb241`
+
+Pass-through:
+
+| Clause | Where it is, at `d6fb241` |
+|---|---|
+| `P1`, `:slots` on the `use` | `composite.ex:260-266` (the option), `:267` (the macro), `:215-229` (`pass_through_decl/0` and `declaration/0`), `:753-800` (`normalize_slots!/1`, the duplicate-`:name` refusal at `:796`) |
+| `P2`, the `"slots"` row key | `composite/data.ex:986-1003` (`decode_slots/4`), `:1011-1030` (`decode_slot/2`, the array and the map-with-`"to"` sugar, `"label"` and `"arity"` defaulted), `:500` (`slots/2`) |
+| `P3`, `slots/1` and `slot_accepts` | `composite.ex:283` (the injected `slots/1`), `:496-499` (`derived_slots/1`), `:654-656` (`slot_accepts/4`, `%{}` for a composite declaring none) |
+| `P4`, the splice, ids unchanged | `composite.ex:441-470` (`expand/2`), `:880-906` (`splice/3` and `put_children/4`), `:910-918` (`mint/3`, which the spliced children are placed outside of) |
+| `P5`, the three declaration errors | module kind: `composite.ex:862-875` (`check_mapping!/3`) beside `check_local_ids!/2` (`:826`) and `mint_id/3` (`:920`); data kind: `composite/data.ex:1072-1085` and `Composite.mapping_errors/2` (`composite.ex:512-530`), assembled into `declaration/1`'s error list at `composite/data.ex:429-436`. Two slots mapped to one inner slot is `duplicate_target_errors/1` (`composite/data.ex:1050-1066`) |
+| `P6`, the card's interior | drawn from the `slot_decl/0` `slots/1` answers, through the path any slotted type takes; no drawing code learns the word "composite", and no layout mode is added |
+| `P7`, Expand carries the children | `expand/2` is the one expansion function and Expand writes what it answers |
+
+Migrations:
+
+| Clause | Where it is, at `d6fb241` |
+|---|---|
+| `M1`, the key | `composite/data.ex:202-274` (the declaration prose), `:309-331` (`migration_step/0` and the state), `:429-449` (read by `declaration/1`) |
+| `M2`, the step shape and `rename`/`drop`/`default` order | `composite/data.ex:1122-1230` (decode and refuse by name), `:540-553` (`apply_step/2`, in that order) |
+| `M3`, the chain | `composite/data.ex:526-535` (`migrate_config/3`: every step at or above `from` and below `version`, ascending), `:1239-1262` (`chain_errors/2`) |
+| `M4`, the backwards walk | `composite/data.ex:1264-1345` (`unknown_key_errors/3`, `undo_step/2` and the three undo arms) |
+| `M5`, every refusal at `declaration/1` | `composite/data.ex:1094-1120` (`decode_migrations/4`), assembled at `:429-436` |
+| `M6`, below the earliest step | the `_none_or_starting_above` arm at `composite/data.ex:531-532`, answering `{:error, {:no_migration_from, from}}` |
+| `M8`, the module kind untouched | no `migrations:` option on the `use`; `block_type.ex:139` is still the injected refusal, and `core/send.ex:112-113` and `core/wait.ex:60-61` still write their own |
+
+`migrate_config/3` is the arity the record itself names (`:8481-8486`), and the
+seam's one-call rule is unchanged: `palette.ex` is not touched by either build.
+
+### 3. Cites re-counted at `d6fb241`
+
+Cites into this file and into `ADR-0004`, `ADR-0005` and `ADR-0011` resolve as
+written; appends land at the end of each file, so no line above moved, and
+`mix adr.cites` is green over this request.
+
+The code cites have moved. Read at `d6fb241`:
+
+| The sections' cite | At `d6fb241` |
+|---|---|
+| `composite.ex:226-244` (the `use` options), `:245` (the macro) | `:249-266`, `:267` |
+| `composite.ex:154-176` (the callbacks are core-only) | `:156-177` |
+| `composite.ex:261` (`slots/1` answering `[]`) | superseded: `:283` answers `derived_slots/1` |
+| `composite.ex:409` (`expand/2`) | `:441` |
+| `composite.ex:476` (`Composite.io/2`) | `:599` |
+| `composite.ex:497` (`Palette.core/0` in the derivation) | `:619` and `:625` |
+| `composite.ex:515`, `:519`, `:521` (the `slot_accepts` derivation) | `:654-669` |
+| `composite.ex:628` (`check_local_ids!/2`), `:657` (`mint/3`), `:668` (`mint_id/3`) | `:826`, `:910`, `:920` |
+| `composite/data.ex:319` (`declaration/1`) | `:419` |
+| `composite/data.ex:388` (`slots/2`, answering `[]`) | superseded: `:500` answers the declared slots |
+| `composite/data.ex:127`, `:148` (the template node's keys and its own `"slots"`) | `:128-135`, `:148-152` |
+| `composite/data.ex:137-140` (a node's `"type"` is not checked here) | unmoved |
+| `composite/data.ex:141-146` (`"id_suffix"`'s pattern in prose) | unmoved; the attribute itself at `:334` |
+| `composite/data.ex:734` (the node's slots decoded) | `:880-930` (`decode_node/2`, `decode_node_body/5`) |
+| `composite/data.ex:36-41`, `:43-48`, `:56-65`, `:67-77` | `:36-41`, `:43-48`, `:56-65`, `:67-77`, all unmoved |
+| `composite/data.ex:116-123` ("the last moment a malformed declaration can be refused") | `:383-387`, and the same sentence as a code comment at `:980-984` |
+| `composite/data.ex:151-169` (whole-value substitution) | `:175-192` |
+| `composite/data.ex:180-190` (`## What this module does not decide: a migration`) | superseded, see 1 above |
+| `composite/data.ex:192-203` (the hygiene obligation) | `:276-287` |
+| `composite/data.ex:283-288` ("Every refusal is here, at entry-build time") | `:383-387` |
+| `composite/data.ex:328-331`, `:330`, `:482-486` (the error assembly and `version_errors/1`) | `:429-436`; the `version_errors/1` call at `:434` and its definition at `:632-637` |
+| `composite/data.ex:403-404`, `:404` (`migrate_config/3`'s unconditional refusal) | superseded: `:526-535` walks the chain and `:531-532` is the refusal that remains |
+| `block_type.ex:321` (`c:slots/1`), `:177` (`slot_decl/0`) | both unmoved |
+| `block_type.ex:507-508` (`c:migrate_config/2`), `:139` (the injected refusal), `:46` (the optional-callback row) | all unmoved |
+| `core/group.ex:37-41`, `core/assign.ex:64-75` | `:37-41` unmoved; assign's `config_schema/1` at `:63-75`, `path` at `:65-73` |
+| `core/send.ex:112-113`, `core/wait.ex:60-61` | both unmoved |
+| `palette.ex:652-657` (never a ladder), `:693` (the call), `:648-651` (`:block_type_too_new`), `:659-664` (in-memory only) | `:747-752`, `:788`, `:741-746`, `:755-760` |
+| `assignability.ex:661-667`, `:654` | see the `ADR-0011` foot Note of this date |
+
+Filed with `sb-vjvq`, campaign SF038.
