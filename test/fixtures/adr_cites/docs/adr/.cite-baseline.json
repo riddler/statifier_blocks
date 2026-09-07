@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "cites": {
+    "0001-citing.md|0002-cited.md:11-11": {"sha256": "ac826cb122b292f56d000f77c094350916a380909500a8d1395c745f9c579a31", "text": "A fifth line, reached only through a continuation citation."},
+    "0001-citing.md|0002-cited.md:3-3": {"sha256": "88e1b6ffd89c7dfe10cc6f87ec3b9e9ed6e6463cef498d240b42fcc9b1551d53", "text": "A decision the citing record quotes: \"the arm gets a field\"."},
+    "0001-citing.md|0002-cited.md:5-5": {"sha256": "0000000000000000000000000000000000000000000000000000000000000000", "text": "A second decision, as it read before a line was inserted above it"},
+    "0001-citing.md|0002-cited.md:7-7": {"sha256": "5d192707dabe6c15893e6b3360ef25c4461e15c3f5fd2125ef4fcc44d6489d54", "text": "A third line, cited by a paragraph that quotes nothing at all."}
+  }
+}
