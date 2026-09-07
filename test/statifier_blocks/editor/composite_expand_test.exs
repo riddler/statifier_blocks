@@ -14,6 +14,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     draws as an ordinary leaf card with chips, a sentence and no interior
     (7E, 8E).
 
+    5E's refusal has a fourth member here that the record does not name, and
+    it is the one the gesture reaches most often while a declaration is being
+    written: a declaration too broken to expand at all. `Composite.expand/2`
+    raises on it, and a raise inside a click handler takes the author's
+    LiveView down. The compiler answers the same case as data - a
+    `:composite_expansion_failed` finding - and the gesture answers it as a
+    refusal, which is the editor's word for the same thing.
+
     The obligation the campaign's consent states as prose is stated here as
     an assertion, from the editor's side rather than the compiler's: the SCXML
     the document compiles to before Expand is byte-identical to the SCXML the
@@ -158,6 +166,87 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # -- sb-spn7: declarations too broken to expand at all ------------------
+
+    defmodule BrokenSubtree do
+      @moduledoc """
+      One composite whose `subtree/1` answers a different broken shape per
+      param value, so every raise `Composite.expand/2` can produce out of a
+      subtree reaches the gesture through one palette entry.
+
+      Nothing here is a shape an author would write on purpose. They are the
+      shapes a half-written declaration passes through, and the editor is
+      where a half-written declaration is looked at.
+      """
+
+      use StatifierBlocks.Composite,
+        name: "myapp.broken_subtree",
+        params: [
+          %{key: "break", type: :string, label: "Break", required?: true, default: "empty"}
+        ],
+        sentence: "Broken subtree: {break}",
+        palette_entry: %{label: "Broken subtree", group: "Structure"},
+        version: 1
+
+      alias StatifierBlocks.Block
+
+      @impl StatifierBlocks.Composite
+      def subtree(%{"break" => "empty"}), do: []
+      def subtree(%{"break" => "not_a_block"}), do: [%{id: "record", type: "core.assign"}]
+      def subtree(%{"break" => "duplicate"}), do: [member("record"), member("record")]
+      def subtree(%{"break" => "minted_id"}), do: [member("blk_record")]
+      def subtree(%{"break" => "separator"}), do: [member("record__twice")]
+
+      defp member(id) do
+        Block.new("core.assign",
+          id: id,
+          config: %{"path" => "cards.authorization.failure", "value" => "failed"}
+        )
+      end
+    end
+
+    defmodule BrokenMapping do
+      @moduledoc """
+      `ADR-0002`'s pass-through amendment (P5) added two more declaration
+      errors to `expand/2` - a declared slot mapped at a local id the subtree
+      has not, and one mapped at an inner slot that member has not. A module
+      composite has no subtree until it has params, so neither is caught at
+      `use` time and both arrive at the gesture as a raise.
+      """
+
+      use StatifierBlocks.Composite,
+        name: "myapp.broken_mapping",
+        params: [
+          %{
+            key: "break",
+            type: :string,
+            label: "Break",
+            required?: true,
+            default: "no_such_local_id"
+          }
+        ],
+        slots: [%{name: "body", to: {"then", "body"}, label: "Then"}],
+        sentence: "Broken mapping: {break}",
+        palette_entry: %{label: "Broken mapping", group: "Structure"},
+        version: 1
+
+      alias StatifierBlocks.Block
+
+      @impl StatifierBlocks.Composite
+      def subtree(%{"break" => "no_such_local_id"}) do
+        [Block.new("core.group", id: "otherwise", slots: %{"body" => []})]
+      end
+
+      def subtree(%{"break" => "no_such_inner_slot"}) do
+        [
+          Block.new("core.assign",
+            id: "then",
+            config: %{"path" => "signup.notified", "value" => "true"}
+          )
+        ]
+      end
+    end
+
     describe "1E-3E: one compound, one undo entry" do
       # Sabotage: dropped the `{:remove, id}` from the head of the compound -
       # red at the first assertion, because the composite is then still in the
@@ -292,6 +381,62 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         expand(view, "blk_GS")
 
         assert has_element?(view, ~s(button[phx-click="undo"][disabled]))
+      end
+    end
+
+    describe "sb-spn7: a declaration too broken to expand refuses the gesture" do
+      # Sabotage: dropped the `rescue` from the editor's `expanded_members/2` -
+      # red before the first assertion of every case below, because
+      # `render_click/1` then raises the ArgumentError out of the component
+      # and takes the LiveView down with it. That is the defect: a click on a
+      # half-written declaration killed the author's session rather than
+      # telling them what was wrong with it.
+      #
+      # `last_error` is asserted through the gesture's observable half - the
+      # document does not move, the composite stays, and undo stays empty -
+      # because the editor renders no surface from `last_error` today; the
+      # 5E refusals above are tested the same way, and this refusal is the
+      # same refusal.
+      for {break, what} <- [
+            {"empty", "a subtree/1 that answers an empty list"},
+            {"not_a_block", "a subtree/1 that answers something that is not a block"},
+            {"duplicate", "a duplicated local id"},
+            {"minted_id", "a `blk_`-prefixed local id"},
+            {"separator", "a local id that would mint a `__`"}
+          ] do
+        test "#{what}: nothing is written and the editor survives", %{conn: conn} do
+          assert_refused(conn, broken_subtree_document(unquote(break)), "blk_BS")
+        end
+      end
+
+      for {break, what} <- [
+            {"no_such_local_id", "a declared slot mapped at no local id of the subtree"},
+            {"no_such_inner_slot", "a declared slot mapped at an inner slot the member has not"}
+          ] do
+        test "#{what}: nothing is written and the editor survives", %{conn: conn} do
+          assert_refused(conn, broken_mapping_document(unquote(break)), "blk_BM")
+        end
+      end
+
+      # The reason the gesture refuses with is `{:composite_expansion_failed,
+      # id, why}` - the compiler's own vocabulary for this case - and `why` is
+      # `Exception.message/1` of the raise. So what the author is told is
+      # whatever the raise said, and this pins that it names the broken
+      # declaration rather than reporting that a gesture failed. Asserted at
+      # `Composite.expand/2` because that is where the message is made; what
+      # the editor adds is the `rescue`, which the cases above prove is there.
+      #
+      # Sabotage: replaced the two messages in `composite.ex` with a bare
+      # "cannot expand" - red at both assertions, because the refusal then
+      # carries a sentence the author cannot act on.
+      test "the message the refusal carries names the declaration error" do
+        assert_raise ArgumentError, ~r/duplicate local ids/, fn ->
+          Composite.expand(broken_subtree("blk_BS", "duplicate"), BrokenSubtree)
+        end
+
+        assert_raise ArgumentError, ~r/no local id of the subtree/, fn ->
+          Composite.expand(broken_mapping("blk_BM", "no_such_local_id"), BrokenMapping)
+        end
       end
     end
 
@@ -435,9 +580,53 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         Map.merge(Palette.core_types(), %{
           "myapp.guarded_step" => GuardedStep,
           "myapp.guarded_section" => GuardedSection,
+          "myapp.broken_subtree" => BrokenSubtree,
+          "myapp.broken_mapping" => BrokenMapping,
           "signup.confirm_contact" => ConfirmContact
         })
       )
+    end
+
+    # The gesture's observable refusal, which is 5E's: the host is not told
+    # the document moved, the composite is still on the canvas, and there is
+    # nothing to undo. `render/1` reaching its assertion at all is the half
+    # that is new here - it is the editor still being alive after the click.
+    defp assert_refused(conn, document, id) do
+      {:ok, view, _html} = mount_editor(conn, document: document, palette: palette())
+
+      expand(view, id)
+
+      refute_receive {:document, _document}
+      assert render(view) =~ ~s(id="sb-block-#{id}")
+      assert has_element?(view, ~s(button[phx-click="undo"][disabled]))
+    end
+
+    defp broken_subtree_document(break) do
+      Document.new(
+        Block.new("core.sequence",
+          id: "blk_ROOT",
+          slots: %{"body" => [broken_subtree("blk_BS", break), tail()]}
+        ),
+        id: "bdoc_BROKEN"
+      )
+    end
+
+    defp broken_subtree(id, break) do
+      Block.new("myapp.broken_subtree", id: id, config: %{"break" => break})
+    end
+
+    defp broken_mapping_document(break) do
+      Document.new(
+        Block.new("core.sequence",
+          id: "blk_ROOT",
+          slots: %{"body" => [broken_mapping("blk_BM", break), tail()]}
+        ),
+        id: "bdoc_BROKEN"
+      )
+    end
+
+    defp broken_mapping(id, break) do
+      Block.new("myapp.broken_mapping", id: id, config: %{"break" => break})
     end
 
     defp document do

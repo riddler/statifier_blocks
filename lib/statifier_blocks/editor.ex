@@ -1932,12 +1932,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # have spliced. That is what keeps consent clause 6's byte-identity
     # obligation true on both sides of the gesture rather than by coincidence.
     #
-    # Three refusals, all of them refused GESTURES and none of them findings
+    # Four refusals, all of them refused GESTURES and none of them findings
     # (5E, on clause 3C's ground): a block that is not a composite, the
     # document root - which has no target to insert at and which
-    # `Edit.apply/2` refuses to remove anyway (`check_not_root/2`) - and a
-    # slot that will not admit the expansion. Nothing is written in any of
-    # them and the composite stays exactly where it was.
+    # `Edit.apply/2` refuses to remove anyway (`check_not_root/2`) - a slot
+    # that will not admit the expansion, and a declaration too broken to
+    # expand at all. Nothing is written in any of them and the composite stays
+    # exactly where it was.
     @spec expand_composite(Phoenix.LiveView.Socket.t(), Block.id()) ::
             Phoenix.LiveView.Socket.t()
     defp expand_composite(socket, id) do
@@ -1945,7 +1946,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       with {:ok, block, module} <- fetch_composite(palette, document, id),
            {:ok, target} <- composite_target(document, id),
-           {:ok, inserts} <- expansion_inserts(palette, document, target, block, module) do
+           {:ok, members} <- expanded_members(block, module),
+           {:ok, inserts} <- expansion_inserts(palette, document, target, members) do
         # 3E selects the first expanded block AFTER the compound commits, and
         # it does so through the one path a selection is written on from
         # outside the canvas gesture. Reaching it after the commit is what lets
@@ -2004,11 +2006,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # which is the only reading that keeps both clauses and consent clause 6
     # true at once. For a one-member expansion - every case 2E's worked
     # example walks - the two readings are the same command.
-    @spec expansion_inserts(Palette.t(), Document.t(), Edit.target(), Block.t(), module()) ::
+    @spec expansion_inserts(Palette.t(), Document.t(), Edit.target(), [Block.t()]) ::
             {:ok, [Edit.t()]} | {:error, term()}
-    defp expansion_inserts(palette, document, {parent_id, slot, index} = target, block, module) do
-      {members, _param_map} = Composite.expand(block, module)
-
+    defp expansion_inserts(palette, document, {parent_id, slot, index} = target, members) do
       if Enum.all?(members, &admits_expansion?(palette, document, parent_id, slot, &1)) do
         inserts =
           members
@@ -2019,6 +2019,36 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       else
         {:error, {:expansion_not_admitted, target}}
       end
+    end
+
+    # A declaration too broken to expand RAISES out of `Composite.expand/2` -
+    # a `subtree/1` that answers an empty list or something that is not a
+    # block, a duplicated or `blk_`-prefixed local id, a local id that would
+    # mint an id carrying `__`, and (`ADR-0002`'s pass-through amendment) a
+    # declared slot whose mapping does not fit the subtree. This is a click
+    # handler, so an unrescued raise takes the author's LiveView down over a
+    # declaration the author cannot fix from the canvas.
+    #
+    # The compiler already answers the same case, and answers it as data:
+    # `StatifierBlocks.Compiler`'s own `expand/2` rescues into a
+    # `{:composite_expansion_failed, id, why}` finding. The gesture answers it
+    # with that same reason in 5E's refusal shape rather than a new one - the
+    # editor writes nothing, the composite stays where it was, and
+    # `last_error` carries the declaration error the exception named, so the
+    # author is told which declaration is broken and why.
+    #
+    # The arm is deliberately over the whole call and not over one named
+    # exception: every raise the declaration can produce - today's five and
+    # any a later amendment adds - refuses the gesture the same way, and a
+    # narrower rescue would let the next one through to the socket.
+    @spec expanded_members(Block.t(), module()) :: {:ok, [Block.t()]} | {:error, term()}
+    defp expanded_members(%Block{} = block, module) do
+      {members, _param_map} = Composite.expand(block, module)
+
+      {:ok, members}
+    rescue
+      error ->
+        {:error, {:composite_expansion_failed, block.id, Exception.message(error)}}
     end
 
     # ADR-0003 decision 3's structural verdict, asked before the compound is
