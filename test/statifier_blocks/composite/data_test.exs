@@ -108,6 +108,10 @@ defmodule StatifierBlocks.Composite.DataTest do
     ]
   }
 
+  # A template naming no param, for the tests that are about the PARAMS and
+  # would otherwise have to re-declare the worked example's placeholders.
+  @leaf [%{"type" => "core.assign", "id_suffix" => "leaf", "config" => %{"value" => "x"}}]
+
   # -- helpers -----------------------------------------------------------
 
   defp state do
@@ -436,15 +440,139 @@ defmodule StatifierBlocks.Composite.DataTest do
     # Sabotage: defaulted a missing `"default"` to `""` - red. F3's
     # missing-`default:` refusal applies to a param unchanged, and this is
     # where the `use` macro refuses the same thing.
-    test "a param with no default, and one whose field type has no name" do
+    #
+    # [Note 2026-09-07, sb-uzly: the second half of this test read
+    # `"type" => "select"` against `unspellable field type`, because a
+    # declaration held as data spelled five field types and `"select"` was
+    # not one of them. ADR-0005's 2026-09-07 amendment, clause 19E, gives all
+    # nine a spelling, so `"select"` is now a NAME this shape knows and the
+    # refusal it earns is the one below - a `"select"` with no `"choices"`.
+    # A type name none of the nine carries is what still earns the original
+    # message, and it is asserted here so the arm does not go untested.]
+    test "a param with no default, one whose options are missing, and one whose type is not a kind" do
       no_default = %{"key" => "p", "type" => "string", "label" => "P"}
-      compound = %{"key" => "p", "type" => "select", "label" => "P", "default" => ""}
+      no_choices = %{"key" => "p", "type" => "select", "label" => "P", "default" => ""}
+      no_kind = %{"key" => "p", "type" => "whatever", "label" => "P", "default" => ""}
 
       assert {:error, [m1 | _rest]} = Data.declaration(%{@row | "params" => [no_default]})
       assert m1 =~ ~s("default")
 
-      assert {:error, [m2 | _rest]} = Data.declaration(%{@row | "params" => [compound]})
-      assert m2 =~ "unspellable field type"
+      assert {:error, [m2 | _rest]} = Data.declaration(%{@row | "params" => [no_choices]})
+      assert m2 =~ ~s("choices")
+
+      assert {:error, [m3 | _rest]} = Data.declaration(%{@row | "params" => [no_kind]})
+      assert m3 =~ "unspellable field type"
+    end
+
+    # Sabotage: admitted an `"options"` on a scalar kind - red. There is no
+    # second element on a `:string` for one to carry, so a declaration that
+    # wrote one meant something the shape cannot express and saying so is
+    # better than ignoring it (19E's first table row).
+    test "an options beside a field type that carries none" do
+      param = %{
+        "key" => "p",
+        "type" => "string",
+        "label" => "P",
+        "default" => "",
+        "options" => %{}
+      }
+
+      assert {:error, [message | _rest]} = Data.declaration(%{@row | "params" => [param]})
+      assert message =~ ~s("options")
+    end
+
+    # Sabotage: spelled a `{:path, opts}` signature by `inspect/1` - red.
+    # ADR-0011 writes a signature as a string; a `{:list, T}` term is not
+    # JSON, and half-carrying it would put a string that looks like a term
+    # into a stored declaration.
+    test "a path signature that is not a string, and type_expr arms that are not a subset" do
+      path = %{
+        "key" => "p",
+        "type" => "path",
+        "label" => "P",
+        "default" => "",
+        "options" => %{"writes" => ["Answer"]}
+      }
+
+      arms = %{
+        "key" => "p",
+        "type" => "type_expr",
+        "label" => "P",
+        "default" => "",
+        "options" => %{"arms" => ["name", "shape"]}
+      }
+
+      assert {:error, [m1 | _rest]} = Data.declaration(%{@row | "params" => [path]})
+      assert m1 =~ "non-empty strings"
+
+      assert {:error, [m2 | _rest]} = Data.declaration(%{@row | "params" => [arms]})
+      assert m2 =~ "subset"
+    end
+
+    # Sabotage: made `"list"`'s inner spelling a bare type name - red. The
+    # inner rides the same `"type"` / `"options"` pair one level down, so an
+    # unspellable inner is refused by the ordinary rule rather than by a
+    # special case.
+    test "a list whose inner kind is itself unspellable" do
+      param = %{
+        "key" => "p",
+        "type" => "list",
+        "label" => "P",
+        "default" => [],
+        "options" => %{"inner" => %{"type" => "select"}}
+      }
+
+      assert {:error, [message | _rest]} = Data.declaration(%{@row | "params" => [param]})
+      assert message =~ ~s(a "list" whose inner field type)
+    end
+
+    # Sabotage: dropped the `{:list, inner}` recursion and answered
+    # `{:list, :string}` outright - red on the nested arm. The four kinds
+    # 19E adds are decoded into the same `field_type/0` terms a `use`
+    # composite declares, which is what makes a collapsed row and its module
+    # twin the same block type.
+    test "the four option-carrying kinds decode into the field types they name" do
+      params = [
+        %{
+          "key" => "s",
+          "type" => "select",
+          "label" => "S",
+          "default" => "a",
+          "options" => %{"choices" => [["a", "A"], ["b", "B"]]}
+        },
+        %{
+          "key" => "p",
+          "type" => "path",
+          "label" => "P",
+          "default" => "",
+          "options" => %{"expects" => "Settleable"}
+        },
+        %{
+          "key" => "l",
+          "type" => "list",
+          "label" => "L",
+          "default" => [],
+          "options" => %{
+            "inner" => %{"type" => "list", "options" => %{"inner" => %{"type" => "string"}}}
+          }
+        },
+        %{
+          "key" => "t",
+          "type" => "type_expr",
+          "label" => "T",
+          "default" => "",
+          "options" => %{"arms" => ["inline"], "allow_empty?" => false}
+        }
+      ]
+
+      assert {:ok, state} = Data.declaration(%{@row | "params" => params, "subtree" => @leaf})
+
+      assert Enum.map(state.params, & &1.type) == [
+               {:select, [{"a", "A"}, {"b", "B"}]},
+               {:path, %{expects: "Settleable"}},
+               {:list, {:list, :string}},
+               {:type_expr, %{arms: [:inline], allow_empty?: false}}
+             ]
     end
 
     # Sabotage: decoded an unknown `"palette_entry"` key with
