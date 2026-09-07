@@ -148,6 +148,35 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:debounce, :any,
+      default: nil,
+      doc: """
+      What `phx-debounce` this form's controls carry, or `nil` for none.
+      Handed to `StatifierBlocks.Editor.Field` and to the capture rows,
+      which write it onto every control they render; that module's attr
+      documents the accepted values and why every control means every
+      control.
+
+      The form posts `phx-change` on each change event and
+      `StatifierBlocks.Editor` offers an `:update_config` for each one it
+      decodes, so a host that persists on its own `on_change` writes once
+      per keystroke unless it asks for something slower. Asking is what
+      this attr is: how often a document is written is a decision about
+      the host's storage, and the controls are this package's markup, so
+      the host needs a way to say it here.
+
+      `nil` renders no attribute anywhere, which is byte for byte what
+      this component rendered before the attr existed. Nothing about
+      decoding changes with it either: `decode/3` still reads only the
+      params a post carried, and a field whose control did not post still
+      keeps the value it had - a slower post is a *later* post, never a
+      partial one.
+
+      A read-only form draws no controls at all, so it has nothing to
+      carry this and is not handed it.
+      """
+    )
+
     @doc "One block's form: unrouted findings, then a control per schema field."
     def config_form(%{read_only: true} = assigns) do
       assigns =
@@ -197,7 +226,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           hidden
           phx-mounted={JS.focus(to: "#" <> @focus_input_id)}
         ></span>
-        <input type="hidden" name="block-id" value={@node.block_id} />
+        <input type="hidden" name="block-id" value={@node.block_id} phx-debounce={@debounce} />
         <div :if={@pending != []} class="sb-form__pending" data-pending={length(@pending)}>
           <p class="sb-form__pending-note">
             Nothing is stored yet. {pending_sentence(@pending)}
@@ -230,6 +259,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           outcome_candidates={@outcome_candidates}
           candidates={candidates_for(@field_candidates, @node.type, field)}
           fixture_hint={fixture_hint(@fixtures, @node.block_id, field)}
+          debounce={@debounce}
         />
         <.capture_rows
           :if={@capture_pairs != nil}
@@ -237,6 +267,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           sources={@capture_sources}
           target={@target}
           block_id={@node.block_id}
+          debounce={@debounce}
         />
       </form>
       """
@@ -246,6 +277,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:sources, :list, required: true)
     attr(:target, :any, required: true)
     attr(:block_id, :string, required: true)
+    attr(:debounce, :any, default: nil)
 
     @doc """
     The capture pairs, one two-control row each (ADR-0011 decision 10).
@@ -288,6 +320,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             placeholder="a datamodel path"
             spellcheck="false"
             autocomplete="off"
+            phx-debounce={@debounce}
           />
           <input
             class="sb-field__input sb-capture__source"
@@ -299,6 +332,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             list={if @sources != [], do: @list_id}
             spellcheck="false"
             autocomplete="off"
+            phx-debounce={@debounce}
           />
         </div>
         <datalist :if={@sources != []} id={@list_id} data-capture-sources={length(@sources)}>

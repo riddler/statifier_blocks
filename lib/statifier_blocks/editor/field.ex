@@ -506,6 +506,36 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:debounce, :any,
+      default: nil,
+      doc: """
+      What `phx-debounce` this field's controls carry, or `nil` for none.
+      Written verbatim onto every form control this component renders, so
+      the accepted values are LiveView's own: milliseconds as an integer
+      or a string, or `:blur` for "post when the control loses focus".
+
+      `nil` renders no attribute at all - byte for byte what this
+      component rendered before the attr existed, and the behaviour
+      LiveView gives a control with no `phx-debounce`, which is to post
+      every change event as it happens. There is deliberately no non-`nil`
+      default: a package that debounced on its own would change the event
+      stream of every host already mounted on it, and how often a document
+      is written is the host's decision rather than this component's.
+
+      Every control is every control: the hidden inputs that pair a
+      checkbox and stand in for an empty list carry it too. The attribute
+      is inert on an input that fires no input event, and the rule a
+      reader can check against the markup - no control in this form is
+      missing it - is worth more than trimming an attribute that does
+      nothing.
+
+      A host's own `expression_component` override is not handed this
+      value. It renders its own markup from the assigns ADR-0005 decision
+      9's seam names, and how that markup rate-limits is the override's
+      decision, not this component's.
+      """
+    )
+
     @doc """
     One field: its label, its control, and its own findings (decision 11).
 
@@ -563,6 +593,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           event_candidates={@event_candidates}
           outcome_candidates={@outcome_candidates}
           candidates={@candidates}
+          debounce={@debounce}
         />
         <p
           :if={@fixture_hint}
@@ -591,6 +622,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:event_candidates, :list, default: [])
     attr(:outcome_candidates, :list, default: [])
     attr(:candidates, :any, default: [])
+    attr(:debounce, :any, default: nil)
 
     # A host's candidate list for THIS field, ahead of every clause that
     # chooses a control by key: a list keyed on `{type_name, key}` is the
@@ -622,6 +654,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         list={@list_id}
         spellcheck="false"
         autocomplete="off"
+        phx-debounce={@debounce}
       />
       <datalist id={@list_id} data-field-candidates={length(@offered)}>
         <option :for={{value, label} <- @offered} value={value} label={label}></option>
@@ -641,6 +674,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         id={input_id(@field)}
         name={input_name(@field)}
         data-field-candidates={length(@offered)}
+        phx-debounce={@debounce}
       >
         <option :if={@unoffered != nil} value={@unoffered} selected>{@unoffered}</option>
         <option :for={{value, label} <- @offered} value={value} selected={@field.value == value}>
@@ -705,7 +739,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp control(%{field: %ViewModel.Field{type: :boolean}} = assigns) do
       ~H"""
       <div class="sb-field__row">
-        <input type="hidden" name={input_name(@field)} value="false" />
+        <input type="hidden" name={input_name(@field)} value="false" phx-debounce={@debounce} />
         <input
           class="sb-field__input"
           type="checkbox"
@@ -713,6 +747,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           name={input_name(@field)}
           value="true"
           checked={@field.value == true}
+          phx-debounce={@debounce}
         />
       </div>
       """
@@ -727,6 +762,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         id={input_id(@field)}
         name={input_name(@field)}
         value={to_text(@field.value)}
+        phx-debounce={@debounce}
       />
       """
     end
@@ -735,7 +771,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       assigns = assign(assigns, :choices, choices)
 
       ~H"""
-      <select class="sb-field__input" id={input_id(@field)} name={input_name(@field)}>
+      <select
+        class="sb-field__input"
+        id={input_id(@field)}
+        name={input_name(@field)}
+        phx-debounce={@debounce}
+      >
         <option :for={{value, label} <- @choices} value={value} selected={@field.value == value}>
           {label}
         </option>
@@ -763,6 +804,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         placeholder="an expression"
         spellcheck="false"
         autocomplete="off"
+        phx-debounce={@debounce}
       />
       <datalist id={@list_id} data-path-candidates={length(@path_candidates)}>
         <option :for={path <- @path_candidates} value={path}></option>
@@ -782,6 +824,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         value={to_text(@field.value)}
         placeholder="an expression"
         spellcheck="false"
+        phx-debounce={@debounce}
       />
       """
     end
@@ -833,6 +876,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         list={@list_id}
         spellcheck="false"
         autocomplete="off"
+        phx-debounce={@debounce}
       />
       <datalist id={@list_id} data-path-candidates={length(@path_candidates)}>
         <option :for={path <- @path_candidates} value={path}></option>
@@ -851,6 +895,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         id={input_id(@field)}
         name={input_name(@field)}
         value={to_text(@field.value)}
+        phx-debounce={@debounce}
       />
       """
     end
@@ -879,6 +924,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         target={@target}
         block_id={@block_id}
         type_candidates={@type_candidates}
+        debounce={@debounce}
       />
       """
     end
@@ -899,6 +945,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         placeholder={DurationInput.placeholder()}
         spellcheck="false"
         aria-describedby={@examples_id}
+        phx-debounce={@debounce}
       />
       <p class="sb-field__examples" id={@examples_id}>
         Try {Enum.join(DurationInput.examples(), ", ")}.
@@ -923,6 +970,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             value={value}
             id={input_id(@field) <> "-#{index}"}
             name={input_name(@field) <> "[]"}
+            debounce={@debounce}
           />
           <button
             type="button"
@@ -936,7 +984,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             remove
           </button>
         </div>
-        <input :if={@rows == []} type="hidden" name={input_name(@field) <> "[]"} value="" />
+        <input
+          :if={@rows == []}
+          type="hidden"
+          name={input_name(@field) <> "[]"}
+          value=""
+          phx-debounce={@debounce}
+        />
         <button
           type="button"
           class="sb-button sb-field__add"
@@ -973,6 +1027,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         list={@list_id}
         spellcheck="false"
         autocomplete="off"
+        phx-debounce={@debounce}
       />
       <datalist id={@list_id} data-invoke-types={length(@invoke_types)}>
         <option :for={type <- @invoke_types} value={type}></option>
@@ -1009,6 +1064,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         list={@list_id}
         spellcheck="false"
         autocomplete="off"
+        phx-debounce={@debounce}
       />
       <datalist id={@list_id} data-event-candidates={length(@event_candidates)}>
         <option
@@ -1047,6 +1103,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         list={@list_id}
         spellcheck="false"
         autocomplete="off"
+        phx-debounce={@debounce}
       />
       <datalist id={@list_id} data-outcome-candidates={length(@outcome_candidates)}>
         <option :for={outcome <- @outcome_candidates} value={outcome}></option>
@@ -1062,6 +1119,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         id={input_id(@field)}
         name={input_name(@field)}
         value={to_text(@field.value)}
+        phx-debounce={@debounce}
       />
       """
     end
@@ -1070,10 +1128,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:value, :any, required: true)
     attr(:id, :string, required: true)
     attr(:name, :string, required: true)
+    attr(:debounce, :any, default: nil)
 
     defp row_control(%{inner: :boolean} = assigns) do
       ~H"""
-      <select class="sb-field__input" id={@id} name={@name}>
+      <select class="sb-field__input" id={@id} name={@name} phx-debounce={@debounce}>
         <option value="true" selected={@value == true}>true</option>
         <option value="false" selected={@value != true}>false</option>
       </select>
@@ -1084,7 +1143,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       assigns = assign(assigns, :choices, elem(assigns.inner, 1))
 
       ~H"""
-      <select class="sb-field__input" id={@id} name={@name}>
+      <select class="sb-field__input" id={@id} name={@name} phx-debounce={@debounce}>
         <option :for={{value, label} <- @choices} value={value} selected={@value == value}>
           {label}
         </option>
@@ -1101,13 +1160,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         id={@id}
         name={@name}
         value={to_text(@value)}
+        phx-debounce={@debounce}
       />
       """
     end
 
     defp row_control(assigns) do
       ~H"""
-      <input class="sb-field__input" type="text" id={@id} name={@name} value={to_text(@value)} />
+      <input
+        class="sb-field__input"
+        type="text"
+        id={@id}
+        name={@name}
+        value={to_text(@value)}
+        phx-debounce={@debounce}
+      />
       """
     end
 
@@ -1148,6 +1215,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:target, :any, required: true)
     attr(:block_id, :string, default: nil)
     attr(:type_candidates, :list, required: true)
+    attr(:debounce, :any, default: nil)
 
     # One type expression: the toggle when the value admits both arms, then
     # the arm itself. A member's type control is this same component with a
@@ -1170,6 +1238,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               value="name"
               checked={@arm == :name}
               id={@base_id <> "-arm-name"}
+              phx-debounce={@debounce}
             /> a declared type
           </label>
           <label class="sb-type-expr__arm">
@@ -1179,6 +1248,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               value="inline"
               checked={@arm == :inline}
               id={@base_id <> "-arm-inline"}
+              phx-debounce={@debounce}
             /> members
           </label>
         </div>
@@ -1187,6 +1257,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           type="hidden"
           name={@prefix <> "[__arm]"}
           value={Atom.to_string(@arm)}
+          phx-debounce={@debounce}
         />
         <div :if={@arm == :name} class="sb-type-expr__name">
           <input
@@ -1198,6 +1269,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             list={@list_id}
             spellcheck="false"
             autocomplete="off"
+            phx-debounce={@debounce}
           />
           <datalist
             :if={@type_candidates != []}
@@ -1220,8 +1292,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               name={@prefix <> "[members][#{index}][name]"}
               value={member_name(member)}
               spellcheck="false"
+              phx-debounce={@debounce}
             />
-            <input type="hidden" name={@prefix <> "[members][#{index}][required?]"} value="false" />
+            <input
+              type="hidden"
+              name={@prefix <> "[members][#{index}][required?]"}
+              value="false"
+              phx-debounce={@debounce}
+            />
             <label class="sb-type-expr__required">
               <input
                 type="checkbox"
@@ -1229,6 +1307,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 name={@prefix <> "[members][#{index}][required?]"}
                 value="true"
                 checked={member_required?(member)}
+                phx-debounce={@debounce}
               /> required
             </label>
             <.type_expr_value
@@ -1241,6 +1320,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               target={@target}
               block_id={@block_id}
               type_candidates={@type_candidates}
+              debounce={@debounce}
             />
             <button
               type="button"
@@ -1469,6 +1549,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         placeholder={@placeholder}
         spellcheck="false"
         autocomplete="off"
+        phx-debounce={@debounce}
       />
       <datalist id={@list_id} data-field-candidates={length(@offered)}>
         <option :for={{value, label} <- @offered} value={value} label={label}></option>
