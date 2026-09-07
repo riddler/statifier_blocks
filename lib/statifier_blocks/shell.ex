@@ -781,21 +781,12 @@ defmodule StatifierBlocks.Shell do
   def insert_target(_root, nil), do: nil
 
   def insert_target(%ViewModel.Node{} = root, {parent_id, slot_name, _index}) do
-    with %ViewModel.Node{} = parent <- find_node(root, parent_id),
+    with %ViewModel.Node{} = parent <- ViewModel.find_node(root, parent_id),
          %ViewModel.Slot{} = slot <- Enum.find(parent.slots, &(&1.name == slot_name)) do
       %{slot: slot.label, parent: ViewModel.title(parent)}
     else
       _no_such_parent_or_slot -> nil
     end
-  end
-
-  @spec find_node(ViewModel.Node.t(), Block.id()) :: ViewModel.Node.t() | nil
-  defp find_node(%ViewModel.Node{block_id: id} = node, id), do: node
-
-  defp find_node(%ViewModel.Node{slots: slots}, id) do
-    Enum.find_value(slots, fn %ViewModel.Slot{children: children} ->
-      Enum.find_value(children, &find_node(&1, id))
-    end)
   end
 
   @doc """
