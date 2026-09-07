@@ -2950,12 +2950,15 @@ it - `block_id` becomes the composite block's, and `config_key` becomes the
 param's key or `nil`:
 
 - **A finding with a param to blame is reported against the composite block,
-  with that param's key.** `Composite.expand/2` returns the expanded blocks
-  together with a **param map**: for each expanded member's config key that
-  was filled from a composite param, which param filled it. When a mapped
-  finding's `owner` carries a `config_key` the param map answers for, the
-  reported finding's `block_id` is the composite block's and its `config_key`
-  is that param's key. `ADR-0005` decision 11 ("Findings are anchored, and the
+  with that param's key.** Alongside the expanded blocks, `Composite.expand/2`
+  returns a **param map**. Its shape is `ADR-0002`'s to declare and this
+  record does not restate it: `ADR-0002`'s amendment filed with `sb-2gdx`
+  owns the function's return, and what this record needs of the map is only
+  that it answers, for a block inside the expansion, which composite param is
+  to blame for what that block was given - or that none is. When the map names
+  a param for the block a mapped finding's `owner` points at, the reported
+  finding's `block_id` is the composite block's and its `config_key` is that
+  param's key. `ADR-0005` decision 11 ("Findings are anchored, and the
   anchor decides where they render") then renders it on a
   `{:config, block_id, key}` anchor - inline beneath a field on the
   composite's own form, which is the one field the author typed into and the
@@ -3003,7 +3006,12 @@ inferred from decision 6:
 
 > The SCXML a document holding a composite block compiles to is
 > **byte-identical** to the SCXML the same document compiles to after that
-> composite has been expanded in place, and the provenance maps are equal.
+> composite has been expanded in place.
+
+The provenance maps are equal too, but as a corollary rather than a second
+obligation: the same members emit the same spans and own them by the same ids,
+so decision 6's own pairing of byte-identical SCXML with an equal map holds
+across the expansion for decision 6's own reason.
 
 Expanding in place is the editor's Expand action, which `ADR-0005`'s amendment
 filed with `sb-mjrt` ("Expand as one compound edit, how a composite card
@@ -3036,14 +3044,14 @@ Resolve, through Composite.expand/2
   blk_GS_arm   core.branch
     └── blk_GS_call  core.invoke  %{"invoke_type" => "myapp:capture", ...}
 
-  param map: %{"blk_GS_call" => %{"invoke_type" => "invoke_type"}}
+  param map: %{"blk_GS_arm" => nil, "blk_GS_call" => "invoke_type"}
 ```
 
 Stages 3-6 run over the two members. Decision 8's invoke lint fires on the
 `<invoke>` the call emitted, decision 9 maps its span to the innermost owner -
 `%{block_id: "blk_GS_call", role: nil, config_key: "invoke_type"}`, correctly,
-because that member emitted the bytes - and E3 re-anchors the finding before it
-is reported:
+because that member emitted the bytes. The param map names `invoke_type` for
+`blk_GS_call`, so E3 re-anchors the finding before it is reported:
 
 ```elixir
 compiled.warnings
@@ -3058,7 +3066,7 @@ The editor draws the warning beneath the "Invoke type" field on the "Guarded
 step" card, which is the field the author filled in.
 
 Had the same lint fired on an `<invoke>` the declaration writes itself, with
-no param feeding it, the param map would answer nothing: the finding would
+no param feeding it, the param map would name none: the finding would
 still carry `block_id: "blk_GS"` and would carry `config_key: nil`, and the
 editor would draw it on the composite's chrome with nothing to point at,
 because there is nothing on that form the author can change. The Source tab,
