@@ -10,6 +10,155 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.26.0] 2026-09-07
+
+0.26.0 is about what a host does **around** a composite.
+`StatifierBlocks.Composite.Collapse` reads a selected arrangement back as the
+`Composite.Data` declaration that stands for it, and the editor's "Save as a
+step" control hands that declaration to a new `on_collapse` callback - the
+gesture edits no document and this package persists nothing, because which
+table a saved step lives in, and whether it is saved at all, is the host's. A
+composite may now declare **pass-through slots**, so an author puts children
+into one instead of only filling in params, and `expand/2` splices them into
+the mapped member's slot with their ids unchanged. A data declaration may
+carry a `"migrations"` chain, so a block saved against an older revision of a
+saved composite resolves instead of being refused. And all nine field types
+now have a JSON spelling, so a declaration held as data reaches the same
+field-type set a module composite declares.
+
+Beside that, this release publishes what a host drawing its own surface over a
+document was otherwise writing privately: `Composite.io/2` and `outcomes/2`
+resolved through a palette you supply, a derived `summary/1`,
+`Edit.Targets.accepted_recipes/4` and `recipe_inserts/4` beside the type half,
+`Environment.with_writes/4`, `ViewModel.transparent?/2`, `effective_parent/3`,
+`end_of_list_target/3` and `core_containers/0`, `ViewModel.overlay_findings/2`
+over the session's own `draft_findings`, `ViewModel.order_palette_groups/2`, a
+`variant: :inline` on `Editor.Field.field/1`, a `debounce` assign on the
+editor mount, and `use StatifierBlocks.InvokeStep, failure_outcomes: [...]`.
+
+It is a minor, and no compiled chart bytes move: a document holding a
+composite with a pass-through slot compiles to the bytes of the same document
+with that composite expanded in place, exactly as one with no slot does. Two
+things answer differently from 0.25.0 for a host that does nothing:
+`StatifierBlocks.Palette.new/2` now runs the duplicate-`order` refusal that
+`from_modules/2` already ran, so a palette built by merging onto `core_types/0`
+raises where it used to build; and a composite's `slots/1` answers its
+declared pass-through slots rather than always `[]`.
+
+### Added
+
+- `StatifierBlocks.Environment.with_writes/5` is public: `env` with one
+  block's own writes applied, member expansion included. The declarations
+  argument carries a default, so `with_writes/4` is the spelling a caller
+  writes.
+
+- `StatifierBlocks.Editor.Field.field/1` takes a `variant` attribute
+  (`:block`, the default and byte-identical to what it rendered before, or
+  `:inline`), so a host placing one field inside a sentence of its own gets
+  the same control, the same posted params and a label that is off the screen
+  but still announced, without the editor gaining a layout mode.
+
+- `core.on_event` answers `sentence/1` - "When card.authz_timed_out, abandon" -
+  so a host list view draws the handler's own line instead of the palette
+  label "On event".
+
+- `StatifierBlocks.Edit.Targets.accepted_recipes/4` answers which of a palette's
+  recipe names would land at a target, the recipe half of `accepted_types/4`, so
+  a host drawing its own insert picker offers recipes beside block types.
+- `StatifierBlocks.Edit.Targets.recipe_inserts/4` answers the command list that
+  inserts a named recipe's arrangement at a target, or the refusal, without
+  committing anything.
+
+- `ViewModel.transparent?/2`, `effective_parent/3` and `end_of_list_target/3`
+  answer where a row sits and where an append lands once a host has flattened
+  its transparent containers, taking the transparent type names as an argument.
+- `ViewModel.core_containers/0` names the three core containers a host most
+  often flattens, as the documented default for those readers rather than a
+  built-in policy.
+
+- `StatifierBlocks.Edit.Session` carries a `draft_findings` map: the per-field
+  findings each refused `change_config/3` was handed, keyed by block id.
+- `StatifierBlocks.ViewModel.overlay_findings/2` routes those findings onto a
+  node's form fields, with a finding naming no field landing in
+  `form.unrouted` - the findings half of `overlay_draft/2`.
+
+- `StatifierBlocks.Composite.io/2` and `outcomes/2` answer a composite block's
+  io and outcomes with every member resolved through a palette you supply, so a
+  composite rooted at a host block type is exact wherever a palette is in hand.
+- A composite derives `summary/1`: one card chip per declared param that is not
+  `hidden?: true`, drawn as `"<label>: <value>"` and overridable.
+- `StatifierBlocks.BlockType.outcome_names/1` answers the names in an outcome
+  list a caller already holds.
+
+- `use StatifierBlocks.InvokeStep, failure_outcomes: [...]` declares a step
+  family's failure class once at the `use` site, so a host whose steps all
+  fail the same way no longer writes `failure_outcomes/1` on every member.
+
+- `ViewModel.order_palette_groups/2` puts palette groups in a reading order a
+  caller names, keeping the groups it did not name after them by name.
+
+- `StatifierBlocks.Editor` takes a `debounce` assign and passes it to the
+  inspector's config form, so a host that mounts the editor can say how often
+  its controls post without composing `ConfigForm.config_form/1` itself.
+
+- A `StatifierBlocks.Composite.Data` declaration may carry a `"migrations"` list: ordered `rename` / `drop` / `default` steps, each keyed by the `type_version` it migrates from. `migrate_config/3` walks every step at or above the stored version and below the declaration's `"version"` in one call, so a block saved against an older revision of a saved composite resolves instead of being refused.
+- The whole chain is validated at `declaration/1`, entry-build time: a step of the wrong shape, a step carrying none of the three parts, a key named by both `"drop"` and `"default"`, a duplicate, out-of-order or gapped `"from"`, a chain not ending at `"version" - 1`, and a step naming a key the declaration's own params do not account for are each refused before the entry reaches a palette.
+
+- A composite may declare **pass-through slots**: `use StatifierBlocks.Composite, slots: [%{name: ..., to: {local_id, inner_slot}}]` on a module composite and a declaration-level `"slots"` key on a `Composite.Data` row. The composite's card draws an interior for each declared slot, and `expand/2` splices the children the author put there into the mapped slot of the mapped member, with their ids unchanged.
+- `StatifierBlocks.Composite.pass_through/2` answers a composite block's declared slots resolved to the minted id of the member each maps into.
+- `StatifierBlocks.Composite.mapping_errors/2` answers the three refusals a pass-through mapping can earn against its own subtree: an unknown local id, an inner slot the subtree does not write, and a mapped inner slot the subtree also fills. A module composite raises them at its first expansion; a data composite answers them from `declaration/1`.
+
+- `StatifierBlocks.Composite.Collapse.propose/3` reads a selected arrangement back as the `Composite.Data` declaration that stands for it, without naming it - naming the type stays the host's act.
+- `StatifierBlocks.Composite.Collapse.replacement/4` answers the compound that swaps an arrangement for a composite of the name a host registered; the host commits it, and nothing in the package does.
+- The editor's "Save as a step" control on the selected card, with a marking tray for the values the saved step should ask for, handing the proposal to a new `on_collapse` callback. The gesture edits no document and the package persists nothing.
+- All nine field types now have a JSON spelling in a `Composite.Data` declaration: `select`, `path`, `list` and `type_expr` are the type's name plus an optional `"options"` key.
+
+### Changed
+
+- A surface drawing a refused config draft reads the findings from the session
+  instead of calling `validate_config/1` again to re-derive them.
+
+- `StatifierBlocks.Assignability.produces/4` and the editor's `core.on_event`
+  event candidates read a composite's io and outcomes through the palette they
+  already hold rather than through the core-only fallback. The
+  `c:StatifierBlocks.BlockType.io/1` and `outcomes/1` callbacks are unchanged
+  and keep that fallback.
+
+- `StatifierBlocks.Palette.new/2` refuses two entries of one palette-browser
+  group that declare the same `order`, raising the `ArgumentError` naming both
+  entries that `from_modules/2` already raised, so a palette built by merging
+  onto `core_types/0` meets the same refusal; the fix is to renumber one of the
+  two entries, and the moduledoc's "Ordering a group" states the convention.
+- Both builders now admit one pair at a single `order`: a composite's `types`
+  entry beside that same composite's own derived `<Module>.Recipe`, whose
+  `palette_entry/0` is the block type's. Registering both stays the host's
+  choice to show two entries; `from_modules/2` used to refuse it.
+
+- The palette column draws its groups in the order a profile's
+  `palette_groups` list gives them, rather than by name; a mount that names no
+  list draws them by name as before.
+
+- A block stored below a declaration's earliest migration step still answers `{:error, {:no_migration_from, from}}`, and so does every stored version of a declaration that writes no `"migrations"` key - the previous behaviour, unchanged. A module composite is untouched: `use StatifierBlocks.Composite` gains no `migrations:` option and still writes `migrate_config/2` itself.
+
+- A composite's `slots/1` answers its declared pass-through slots instead of always `[]`, and `io/1`'s `slot_accepts` answers each declared slot at the mapped inner slot's own accepted kinds.
+- The environment walk descends a declared pass-through slot's children at the mapped inner position - the environment they would have seen had the expansion been placed by hand - and reaches nothing through a slot key the declaration does not declare. A read that fails inside such a child is reported against the child, not against the composite.
+
+- The editor's config form draws `StatifierBlocks.ViewModel.shown_fields/1`'s
+  list, so a host surface drawing its own form reads the same filter the
+  package's own form reads rather than a second copy of it.
+
+### Fixed
+
+- The editor's drop-check preview no longer under-reports a member mismatch
+  the drop would introduce. It applied a candidate's writes without the
+  member expansion the walk runs, so a read of `record.member` was answered
+  with an advisory before the drop and an error the moment it landed. The
+  preview and the walk are now one codepath, and they agree.
+
+- A read-only editor mount no longer draws the "+" button on the gaps between
+  blocks; the gaps themselves stay, so an empty arm still reads as one.
+
+- The editor's Expand gesture refuses a composite whose declaration is too broken to expand - an empty or non-block `subtree/1`, a duplicated, `blk_`-prefixed or `__`-minting local id, or a pass-through slot mapped at something the subtree does not hold - naming the declaration error, instead of raising out of the author's LiveView. The compiler already answered the same case with a `:composite_expansion_failed` finding.
 ## [0.25.0] 2026-09-07
 
 0.25.0 is about **composites**: a block type derived from params plus a pure
@@ -2728,6 +2877,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.26.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.26.0
 [0.25.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.25.0
 [0.24.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.24.0
 [0.23.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.23.0
