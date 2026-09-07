@@ -651,23 +651,13 @@ defmodule StatifierBlocks.Assignability do
     with parent when not is_nil(parent) <- find_block(document, parent_id),
          downstream when not is_nil(downstream) <-
            Enum.at(Map.get(parent.slots, slot, []), index) do
-      after_candidate = with_writes(palette, document, candidate, env)
+      after_candidate =
+        Environment.with_writes(palette, document, candidate, env, declarations)
+
       read_findings(palette, document, after_candidate, downstream, declarations)
     else
       nil -> []
     end
-  end
-
-  # `env` with `block`'s own write signatures applied, which is what the
-  # block after it would see. The candidate's slots are not walked: a
-  # placement question is about the block being placed, and what its subtree
-  # writes is `validate/3`'s business once the document holds it.
-  @spec with_writes(Palette.t(), Document.t(), Block.t(), Environment.annotated()) ::
-          Environment.annotated()
-  defp with_writes(palette, document, %Block{} = block, env) do
-    palette
-    |> Environment.write_signatures(document, block)
-    |> Enum.reduce(env, fn {_key, path, type}, acc -> Map.put(acc, path, {type, block.id}) end)
   end
 
   # The reads a move vacates: nothing when `candidate` is not already in
