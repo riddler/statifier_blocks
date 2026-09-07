@@ -53,6 +53,26 @@ The unreleased-work check the skill makes before anything else reads
 `README.md`, there is nothing to release, and the run stops exactly as it
 would on an empty unreleased section.
 
+### A sibling that merges after the prep re-checks its own fragment
+
+A prep consumes the fragments that are on `main` when it runs, and step B
+deletes them. It cannot consume one that was still on a branch, so **a
+sibling pull request that merges after the prep has landed, or whose rebase
+resurrects a fragment the prep already promoted, re-checks its own fragment
+by hand** - there are only two answers and the pull request body says which
+one it took. Either the fragment describes work that shipped in the section
+the prep just wrote, in which case its bullet is already in `CHANGELOG.md`
+and the file left behind in `changelog.d/` is a duplicate to delete; or it
+describes work the prep never saw, in which case it belongs to the next
+version and it stays exactly where it is. Nothing here is automatic: a
+stranded fragment reads the same either way, and only the author of the
+branch knows which release its bullet landed in.
+
+The ordering that keeps this rare is the other half of the rule: **a release
+prep lands last on its lane**, after every sibling that has a fragment to
+contribute. A record status flip is the exception, because it touches no
+fragment at all - a flip may land after a prep without re-checking anything.
+
 ## Step A: the compiler's version carrier
 
 Placed with the skill's version-file edit, in the same commit.
