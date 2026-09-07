@@ -260,6 +260,21 @@ The rules that do not wait to be looked up:
 - This gate is deliberately smaller than statifier-ex's, and `.quality.exs`
   records that decision. Documentation may point at the gate; it never
   enlarges it.
+- **`ADR cites`** is the one custom stage, and the one exception to the line
+  above: `mix adr.cites` resolves the line-number citations the records make
+  into each other and fails when a cited line has moved. Records cite each
+  other as `docs/adr/0002-...md:4108`, and an insert or a re-wrap above that
+  line silently repoints the citing record without touching it - drift no
+  other stage can see. The check compares each cited range against
+  `docs/adr/.cite-baseline.json`, so **a request that legitimately moves a
+  cited line runs `mix adr.cites --update` and commits the regenerated
+  baseline in that same request**, where the move is reviewed as a diff of the
+  recorded text. A citation the baseline has not seen warns rather than fails,
+  so writing a new citation never reds someone else's gate; it is protected
+  from the next `--update` on. `mix adr.cites` on its own also lists the
+  advisory anchoring findings the gate leaves out. Merged records are not
+  rewritten to anchor-based citations - the line numbers stay, and this is
+  what keeps them honest. (Operator ruling, 2026-09-07.)
 
 ## Conventions
 

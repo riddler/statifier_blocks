@@ -44,5 +44,25 @@
       stages: [:format, :compile, :credo, :test],
       test: [scope: :changed, coverage: false]
     ]
+  ],
+
+  # The first custom stage this package has taken, and the exception the header
+  # above describes rather than a change of mind about inheriting statifier-ex's
+  # gate: there is now something for it to protect. The records cite each other
+  # by line number, and nothing else in the gate can tell that an insert in one
+  # record has moved a line another record points at. `mix adr.cites` resolves
+  # every such citation against a recorded baseline and fails when the cited
+  # text has changed underneath it; the module doc says how, and what it warns
+  # about rather than failing. It reads `docs/adr/` and nothing else, so it is a
+  # reader, and it is absent from the loop profile's `stages:` allow-list, which
+  # makes it a pre-commit concern rather than an every-edit one.
+  custom: [
+    [
+      key: :adr_cites,
+      name: "ADR cites",
+      command: "mix",
+      args: ["adr.cites", "--format", "json"],
+      kind: :reader
+    ]
   ]
 ]

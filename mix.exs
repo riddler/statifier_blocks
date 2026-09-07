@@ -32,7 +32,9 @@ defmodule StatifierBlocks.MixProject do
       docs: docs(),
       package: package(),
       test_coverage: [tool: ExCoveralls],
-      dialyzer: [plt_add_apps: [:ex_unit]],
+      # `:mix` joins the PLT for the gate tooling under `lib/mix/`, which is a mix
+      # task and a plain module beside it; statifier-ex's own gate does the same.
+      dialyzer: [plt_add_apps: [:mix, :ex_unit]],
       preferred_cli_env: [
         coveralls: :test,
         "coveralls.detail": :test,
@@ -107,7 +109,12 @@ defmodule StatifierBlocks.MixProject do
       # source (ADR-0005 decisions 7 and 14, sui-ADR-0009's delivery model),
       # and source that is not in the tarball is not public API however
       # carefully it is versioned. The record calls this out by name.
-      files: ~w(lib assets mix.exs README.md LICENSE CHANGELOG.md),
+      # `lib/statifier_blocks` rather than `lib`, because `lib/mix` holds this
+      # repo's own gate tooling. A mix task in the tarball would install itself
+      # into every project that depends on this package, which is not something
+      # a dependency should do to its host.
+      files:
+        ~w(lib/statifier_blocks lib/statifier_blocks.ex assets mix.exs README.md LICENSE CHANGELOG.md),
       links: %{
         "GitHub" => @source_url,
         "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
