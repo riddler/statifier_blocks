@@ -76,8 +76,8 @@ defmodule StatifierBlocks.SlotValidation do
   @spec block_findings(Palette.t(), Block.t()) :: [finding()]
   defp block_findings(palette, %Block{} = block) do
     case Palette.resolve(palette, block) do
-      {:ok, module, resolved} ->
-        declared = module.slots(resolved.config)
+      {:ok, ref, resolved} ->
+        declared = Palette.call(ref, :slots, [resolved.config], [])
         arity_findings(declared, block) ++ undeclared_findings(declared, block)
 
       {:error, _reason} ->

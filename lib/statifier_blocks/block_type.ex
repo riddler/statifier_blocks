@@ -100,6 +100,7 @@ defmodule StatifierBlocks.BlockType do
 
   alias StatifierBlocks.Block
   alias StatifierBlocks.Compiler.StateId
+  alias StatifierBlocks.Palette
 
   @doc """
   Declares the behaviour and injects the overridable defaults ADR-0007
@@ -841,23 +842,20 @@ defmodule StatifierBlocks.BlockType do
   @synthesized_name "statifier_blocks:child_donedata"
 
   @doc """
-  `module.outcomes(config)`, or `#{inspect(@default_outcomes)}` when
-  `outcomes/1` is absent or `module` is not loadable (ADR-0002 amendment
-  A1). Checked with `Code.ensure_loaded?/1` plus `function_exported?/3`,
-  the pattern `StatifierBlocks.Palette.resolve/2` already uses.
+  The palette entry's `outcomes(config)`, or
+  `#{inspect(@default_outcomes)}` when `outcomes/1` is absent or the
+  entry's module is not loadable (ADR-0002 amendment A1). Reached through
+  `StatifierBlocks.Palette.call/4`, the one call seam, which owns the
+  declaredness probe and the fallback together so no site repeats them.
 
   The list comes back in **declaration order**, never sorted: ADR-0004
   decision 6's byte determinism reads that order, and a resolver that
   tidied it would move a host's compiled bytes for no reason it could
   name.
   """
-  @spec outcomes(module(), Block.config()) :: [outcome_decl()]
-  def outcomes(module, config) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :outcomes, 1) do
-      module.outcomes(config)
-    else
-      @default_outcomes
-    end
+  @spec outcomes(Palette.type_ref(), Block.config()) :: [outcome_decl()]
+  def outcomes(ref, config) do
+    Palette.call(ref, :outcomes, [config], @default_outcomes)
   end
 
   @doc """
@@ -885,25 +883,21 @@ defmodule StatifierBlocks.BlockType do
   defp outcome_name(malformed), do: inspect(malformed)
 
   @doc """
-  `module.failure_outcomes(config)`, or `[]` when `failure_outcomes/1` is
-  absent or `module` is not loadable.
+  The palette entry's `failure_outcomes(config)`, or `[]` when
+  `failure_outcomes/1` is absent or the entry's module is not loadable.
 
-  Checked with `Code.ensure_loaded?/1` plus `function_exported?/3`, the
-  pattern `outcomes/2` above already uses, so a host type written before
-  the callback existed classes no outcome and compiles exactly as it did.
+  Reached through `StatifierBlocks.Palette.call/4`, the seam `outcomes/2`
+  above already uses, so a host type written before the callback existed
+  classes no outcome and compiles exactly as it did.
 
   Total over any return value: anything that is not a list of binaries
   comes back as `[]`, for `outcome_names/2`'s reason - a host type that
   declares nonsense here should compile to the bytes it compiled to
   before rather than crash the compiler.
   """
-  @spec failure_outcomes(module(), Block.config()) :: [String.t()]
-  def failure_outcomes(module, config) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :failure_outcomes, 1) do
-      sanitize_failure_outcomes(module.failure_outcomes(config))
-    else
-      []
-    end
+  @spec failure_outcomes(Palette.type_ref(), Block.config()) :: [String.t()]
+  def failure_outcomes(ref, config) do
+    sanitize_failure_outcomes(Palette.call(ref, :failure_outcomes, [config], []))
   end
 
   @spec sanitize_failure_outcomes(term()) :: [String.t()]
@@ -914,13 +908,13 @@ defmodule StatifierBlocks.BlockType do
   defp sanitize_failure_outcomes(_malformed), do: []
 
   @doc """
-  `module.donedata_type(config)`, or `[]` when `donedata_type/1` is absent
-  or `module` is not loadable (ADR-0013 decision 2).
+  The palette entry's `donedata_type(config)`, or `[]` when
+  `donedata_type/1` is absent or the entry's module is not loadable
+  (ADR-0013 decision 2).
 
-  Checked with `Code.ensure_loaded?/1` plus `function_exported?/3`, the
-  pattern `outcomes/2` and `failure_outcomes/2` above already use, so a
-  host type written before the callback existed declares nothing and
-  compiles exactly as it did.
+  Reached through `StatifierBlocks.Palette.call/4`, the seam `outcomes/2`
+  and `failure_outcomes/2` above already use, so a host type written before
+  the callback existed declares nothing and compiles exactly as it did.
 
   The list comes back in **declaration order**, never sorted: the params
   serialize in that order, so a resolver that tidied it would move a
@@ -932,13 +926,9 @@ defmodule StatifierBlocks.BlockType do
   nonsense here should compile to the bytes it compiled to before rather
   than crash the compiler.
   """
-  @spec donedata_type(module(), Block.config()) :: [donedata_field()]
-  def donedata_type(module, config) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :donedata_type, 1) do
-      sanitize_donedata_type(module.donedata_type(config))
-    else
-      []
-    end
+  @spec donedata_type(Palette.type_ref(), Block.config()) :: [donedata_field()]
+  def donedata_type(ref, config) do
+    sanitize_donedata_type(Palette.call(ref, :donedata_type, [config], []))
   end
 
   @spec sanitize_donedata_type(term()) :: [donedata_field()]
@@ -1090,10 +1080,10 @@ defmodule StatifierBlocks.BlockType do
       iex> StatifierBlocks.BlockType.type_expr_findings(CoreMap, %{})
       []
   """
-  @spec type_expr_findings(module(), Block.config()) :: [finding()]
-  def type_expr_findings(module, config) do
-    config
-    |> module.config_schema()
+  @spec type_expr_findings(Palette.type_ref(), Block.config()) :: [finding()]
+  def type_expr_findings(ref, config) do
+    ref
+    |> Palette.call(:config_schema, [config], [])
     |> Enum.flat_map(&type_expr_finding(&1, config))
   end
 
@@ -1528,10 +1518,9 @@ defmodule StatifierBlocks.BlockType do
   `palette_entry/0`, or declaring no label in it, has no label to answer
   and comes back `nil`: the type-NAME fallback decision 5's last sentence
   names is a fact about the document, not about the module, and it is
-  `StatifierBlocks.ViewModel`'s to supply. Absence is checked with
-  `Code.ensure_loaded?/1` plus `function_exported?/3`, the pattern
-  `outcomes/2` already uses, so a module that is not loadable comes back
-  `nil` as well.
+  `StatifierBlocks.ViewModel`'s to supply. Absence is decided by
+  `StatifierBlocks.Palette.declares?/3`, the seam's own predicate, so a
+  module that is not loadable comes back `nil` as well.
 
   **No cap.** Three of amendment B3's four arms hold - a non-string, a
   blank string and a multiline one are refused - and the length arm is
@@ -1556,25 +1545,24 @@ defmodule StatifierBlocks.BlockType do
       iex> StatifierBlocks.BlockType.sentence(NoSuchModule, %{})
       nil
   """
-  @spec sentence(module(), Block.config()) :: String.t() | nil
-  def sentence(module, config) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :sentence, 1) do
-      module |> call_sentence(config) |> line() || label(module)
+  @spec sentence(Palette.type_ref(), Block.config()) :: String.t() | nil
+  def sentence(ref, config) do
+    if Palette.declares?(ref, :sentence, 1) do
+      ref |> call_sentence(config) |> line() || label(ref)
     else
-      label(module)
+      label(ref)
     end
   end
 
   @doc """
-  The chips `module.summary(config)` declares, or `[]` (ADR-0002
-  amendment H2).
+  The chips the palette entry's `summary(config)` declares, or `[]`
+  (ADR-0002 amendment H2).
 
   The one shape every consumer reads: a possibly-empty list of chips. A
-  `nil`, a module that does not export `summary/1`, and a module that is
-  not loadable all come back `[]`; a string comes back as a one-element
-  list; a list comes back filtered. Absence is checked with
-  `Code.ensure_loaded?/1` plus `function_exported?/3`, the pattern
-  `outcomes/2` already uses.
+  `nil`, an entry that does not declare `summary/1`, and one whose module
+  is not loadable all come back `[]`; a string comes back as a one-element
+  list; a list comes back filtered. Absence is decided by
+  `StatifierBlocks.Palette.declares?/3`, the seam's own predicate.
 
   Each chip is held to `badge/1`'s refusal set, unchanged: a non-string,
   an empty or all-whitespace string, one carrying a newline, carriage
@@ -1791,10 +1779,10 @@ defmodule StatifierBlocks.BlockType do
   # The one declaration pass every reader above shares, so the chips that
   # are drawn and the chips that are refused can never be computed from two
   # different readings of the same callback.
-  @spec declared_chips(module(), Block.config()) :: [term()]
-  defp declared_chips(module, config) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :summary, 1) do
-      module
+  @spec declared_chips(Palette.type_ref(), Block.config()) :: [term()]
+  defp declared_chips(ref, config) do
+    if Palette.declares?(ref, :summary, 1) do
+      ref
       |> call_summary(config)
       |> List.wrap()
     else
@@ -1805,9 +1793,9 @@ defmodule StatifierBlocks.BlockType do
   # H4's degradation, on the same grounds and with the same shape as
   # `call_join_label/2`: the rescued value is never inspected, because
   # what comes back is the ordinary card either way.
-  @spec call_summary(module(), Block.config()) :: term()
-  defp call_summary(module, config) do
-    module.summary(config)
+  @spec call_summary(Palette.type_ref(), Block.config()) :: term()
+  defp call_summary(ref, config) do
+    Palette.call(ref, :summary, [config], [])
   rescue
     _raised -> []
   catch
@@ -1834,9 +1822,9 @@ defmodule StatifierBlocks.BlockType do
   # raises, throws or exits costs one line of prose, never the list. The
   # rescued value is never inspected - what comes back is the type's label
   # either way - so `nil` here is "nothing usable", not a value.
-  @spec call_sentence(module(), Block.config()) :: term()
-  defp call_sentence(module, config) do
-    module.sentence(config)
+  @spec call_sentence(Palette.type_ref(), Block.config()) :: term()
+  defp call_sentence(ref, config) do
+    Palette.call(ref, :sentence, [config], nil)
   rescue
     _raised -> nil
   catch
@@ -1862,15 +1850,11 @@ defmodule StatifierBlocks.BlockType do
   # The only label a module holds. Not the type name: a block type module
   # does not know the name a document stores it under, and decision 5's
   # last sentence is the reader's to honour where the name is known.
-  @spec label(module()) :: String.t() | nil
-  defp label(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :palette_entry, 0) do
-      case module.palette_entry() do
-        %{label: label} when is_binary(label) -> line(label)
-        _no_label -> nil
-      end
-    else
-      nil
+  @spec label(Palette.type_ref()) :: String.t() | nil
+  defp label(ref) do
+    case Palette.call(ref, :palette_entry, [], nil) do
+      %{label: label} when is_binary(label) -> line(label)
+      _no_label -> nil
     end
   end
 

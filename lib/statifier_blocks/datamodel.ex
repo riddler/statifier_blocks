@@ -807,15 +807,15 @@ defmodule StatifierBlocks.Datamodel do
 
   @spec block_findings(
           Block.t(),
-          module(),
+          StatifierBlocks.Palette.type_ref(),
           Block.config(),
           MapSet.t(String.t()),
           MapSet.t(String.t())
         ) :: [Finding.t()]
-  defp block_findings(%Block{id: id}, module, config, declared, roots) do
+  defp block_findings(%Block{id: id}, ref, config, declared, roots) do
     declared_findings =
-      config
-      |> module.config_schema()
+      ref
+      |> StatifierBlocks.Palette.call(:config_schema, [config], [])
       |> Enum.filter(&BlockType.datamodel_path?/1)
       |> Enum.flat_map(fn decl ->
         case BlockType.fetch_value(config, BlockType.value_path(decl)) do

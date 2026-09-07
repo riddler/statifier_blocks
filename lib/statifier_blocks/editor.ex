@@ -2674,10 +2674,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # `fixtures/0`'s events, in the two map spellings this package can read
     # without the loader: atom `:events` and string `"events"`, each a map
     # from event name to one example payload.
-    @spec fixture_events(module()) :: %{optional(String.t()) => term()}
-    defp fixture_events(module) do
-      with true <- Code.ensure_loaded?(module) and function_exported?(module, :fixtures, 0),
-           bundle when is_map(bundle) <- module.fixtures(),
+    @spec fixture_events(Palette.type_ref()) :: %{optional(String.t()) => term()}
+    defp fixture_events(ref) do
+      with bundle when is_map(bundle) <- Palette.call(ref, :fixtures, [], nil),
            events when is_map(events) <- Map.get(bundle, :events) || Map.get(bundle, "events") do
         events
       else
@@ -2860,9 +2859,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    @spec declares_outcomes?(module()) :: boolean()
-    defp declares_outcomes?(module) do
-      Code.ensure_loaded?(module) and function_exported?(module, :outcomes, 1)
+    @spec declares_outcomes?(Palette.type_ref()) :: boolean()
+    defp declares_outcomes?(ref) do
+      Palette.declares?(ref, :outcomes, 1)
     end
 
     # The card's own name, read off the view model through the public
@@ -3343,8 +3342,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec draft_findings(Palette.t(), ViewModel.Node.t(), Block.config()) ::
             %{optional(String.t()) => [Finding.t()]}
     defp draft_findings(palette, %ViewModel.Node{block_id: id, type: type}, draft) do
-      with {:ok, module} <- Palette.fetch(palette, type),
-           {:error, findings} <- module.validate_config(draft) do
+      with {:ok, ref} <- Palette.fetch(palette, type),
+           {:error, findings} <- Palette.call(ref, :validate_config, [draft], :ok) do
         Enum.group_by(
           findings,
           fn {key, _message} -> key end,

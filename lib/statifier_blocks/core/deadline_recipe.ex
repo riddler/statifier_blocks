@@ -222,10 +222,10 @@ defmodule StatifierBlocks.Core.DeadlineRecipe do
   # written over them - the same shape `StatifierBlocks.Editor` mints a
   # palette pick's config in, so a block a recipe puts down and a block a
   # pick puts down differ only in the keys the recipe filled in.
-  @spec config(module(), Block.config()) :: Block.config()
-  defp config(module, overrides) do
-    %{}
-    |> module.config_schema()
+  @spec config(StatifierBlocks.Palette.type_ref(), Block.config()) :: Block.config()
+  defp config(ref, overrides) do
+    ref
+    |> StatifierBlocks.Palette.call(:config_schema, [%{}], [])
     |> Map.new(fn %{key: key, default: default} -> {key, default} end)
     |> Map.merge(overrides)
   end

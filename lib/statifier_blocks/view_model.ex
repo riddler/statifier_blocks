@@ -1413,8 +1413,11 @@ defmodule StatifierBlocks.ViewModel do
   defp head_of_root(%Document{root: root}, %Palette{} = palette) do
     declared =
       case Palette.resolve(palette, root) do
-        {:ok, module, resolved} -> Enum.map(module.slots(resolved.config), &elem(&1, 0))
-        {:error, _reason} -> []
+        {:ok, ref, resolved} ->
+          ref |> Palette.call(:slots, [resolved.config], []) |> Enum.map(&elem(&1, 0))
+
+        {:error, _reason} ->
+          []
       end
 
     slot_name = List.first(declared) || first_carried_slot(root)
@@ -1499,10 +1502,10 @@ defmodule StatifierBlocks.ViewModel do
   @spec chip_label(Block.t(), Palette.t()) :: String.t()
   defp chip_label(%Block{} = block, %Palette{} = palette) do
     case Palette.resolve(palette, block) do
-      {:ok, module, resolved} ->
-        entry = palette_entry_with_defaults(module, block.type)
+      {:ok, ref, resolved} ->
+        entry = palette_entry_with_defaults(ref, block.type)
 
-        title_override(module.config_schema(resolved.config), resolved.config) ||
+        title_override(Palette.call(ref, :config_schema, [resolved.config], []), resolved.config) ||
           Map.get(entry, :label) || block.type
 
       # An unresolvable block draws its type name and nothing else
@@ -1636,15 +1639,15 @@ defmodule StatifierBlocks.ViewModel do
   # `:config` stage (ADR-0002 decision 7, amended 2026-09-06), so the finding
   # an author reads under the control and the one a compile refuses on are
   # one finding rather than two implementations of it.
-  @spec config_findings(Block.id(), module(), Block.config()) :: [Finding.t()]
-  defp config_findings(block_id, module, config) do
+  @spec config_findings(Block.id(), Palette.type_ref(), Block.config()) :: [Finding.t()]
+  defp config_findings(block_id, ref, config) do
     own =
-      case module.validate_config(config) do
+      case Palette.call(ref, :validate_config, [config], :ok) do
         :ok -> []
         {:error, findings} -> findings
       end
 
-    Enum.map(BlockType.type_expr_findings(module, config) ++ own, fn {key, message} ->
+    Enum.map(BlockType.type_expr_findings(ref, config) ++ own, fn {key, message} ->
       Finding.new({:config, block_id, key}, :config, message)
     end)
   end
@@ -1680,15 +1683,15 @@ defmodule StatifierBlocks.ViewModel do
     end
   end
 
-  @spec build_resolved_node(Block.t(), module(), Block.t(), ctx()) :: Node.t()
+  @spec build_resolved_node(Block.t(), Palette.type_ref(), Block.t(), ctx()) :: Node.t()
   defp build_resolved_node(
          %Block{} = block,
-         module,
+         ref,
          %Block{config: config},
          {_palette, by_block, labels} = ctx
        ) do
     own_findings = Map.get(by_block, block.id, [])
-    declared = module.slots(config)
+    declared = Palette.call(ref, :slots, [config], [])
     declared_names = MapSet.new(declared, fn {name, _arity, _label} -> name end)
 
     extra_names =
@@ -1698,13 +1701,13 @@ defmodule StatifierBlocks.ViewModel do
       |> Enum.reject(&MapSet.member?(declared_names, &1))
 
     slot_names = MapSet.union(declared_names, MapSet.new(extra_names))
-    schema = module.config_schema(config)
+    schema = Palette.call(ref, :config_schema, [config], [])
     schema_keys = MapSet.new(schema, & &1.key)
 
     {block_findings, slot_findings, config_findings, unrouted} =
       route_own_findings(own_findings, schema_keys, slot_names)
 
-    entry = palette_entry_with_defaults(module, block.type)
+    entry = palette_entry_with_defaults(ref, block.type)
 
     conditions = slot_conditions(schema, config)
 
@@ -1750,9 +1753,9 @@ defmodule StatifierBlocks.ViewModel do
       status: :ok,
       entry: entry,
       title: title,
-      sentence: sentence(module, config, entry, title, block.type),
-      summary: BlockType.summary(module, config, labels),
-      summary_titles: BlockType.summary_titles(module, config, labels),
+      sentence: sentence(ref, config, entry, title, block.type),
+      summary: BlockType.summary(ref, config, labels),
+      summary_titles: BlockType.summary_titles(ref, config, labels),
       invoke_type: invoke_type(config),
       join_label: BlockType.join_label(entry, config),
       slots: slots,
@@ -1979,9 +1982,9 @@ defmodule StatifierBlocks.ViewModel do
     end
   end
 
-  @spec declares_sentence?(module()) :: boolean()
-  defp declares_sentence?(module) do
-    Code.ensure_loaded?(module) and function_exported?(module, :sentence, 1)
+  @spec declares_sentence?(Palette.type_ref()) :: boolean()
+  defp declares_sentence?(ref) do
+    Palette.declares?(ref, :sentence, 1)
   end
 
   defp title_override(schema, config) do
@@ -2139,14 +2142,10 @@ defmodule StatifierBlocks.ViewModel do
     end
   end
 
-  @spec palette_entry_with_defaults(module(), Block.type_name()) :: BlockType.palette_entry()
-  defp palette_entry_with_defaults(module, type_name) do
-    raw =
-      if Code.ensure_loaded?(module) and function_exported?(module, :palette_entry, 0) do
-        module.palette_entry()
-      else
-        %{}
-      end
+  @spec palette_entry_with_defaults(Palette.type_ref(), Block.type_name()) ::
+          BlockType.palette_entry()
+  defp palette_entry_with_defaults(ref, type_name) do
+    raw = Palette.call(ref, :palette_entry, [], %{})
 
     default_entry(type_name) |> Map.merge(raw)
   end
