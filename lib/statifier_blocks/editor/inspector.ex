@@ -178,7 +178,28 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     alias StatifierBlocks.Editor.{ConfigForm, Findings}
     alias StatifierBlocks.{Finding, Shell, ViewModel}
 
-    attr(:tab, :atom, required: true)
+    attr(:tab, :any, required: true)
+
+    attr(:tabs, :any,
+      default: nil,
+      doc: """
+      The tabs this strip draws, out of `StatifierBlocks.Shell.inspector_tabs/0`
+      and in that order, or `nil` for all four. It is a profile's
+      `inspector_tabs` list after the shell has intersected it (ADR-0005's
+      2026-09-07 profile amendment), so an id the package does not know has
+      already been dropped by the time it arrives.
+      """
+    )
+
+    attr(:read_only, :boolean,
+      default: false,
+      doc: """
+      Whether this mount edits. A read-only inspector draws each config field
+      as its value rather than as a control (`read_only?` clause 3), and every
+      other panel it draws - findings, condition, fixtures - is unchanged,
+      because all three are readings already.
+      """
+    )
 
     attr(:collapsed, :boolean,
       default: false,
@@ -321,7 +342,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         <div class="sb-inspector__tabs" role="tablist" aria-label="Inspector">
           <button
-            :for={tab <- Shell.inspector_tabs()}
+            :for={tab <- @tabs || Shell.inspector_tabs()}
             type="button"
             role="tab"
             id={"sb-inspector-tab-#{tab}"}
@@ -377,6 +398,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               capture_sources={@capture_sources}
               fixtures={@fixtures}
               field_focus={@field_focus}
+              read_only={@read_only}
               target={@target}
             />
           </section>
@@ -460,6 +482,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:capture_sources, :list, required: true)
     attr(:fixtures, :any, required: true)
     attr(:field_focus, :any, required: true)
+    attr(:read_only, :boolean, default: false)
     attr(:target, :any, required: true)
 
     # Decision 12's read-only case reaches here as `form: nil`, and it is the
@@ -486,6 +509,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         capture_sources={@capture_sources}
         fixtures={@fixtures}
         field_focus={@field_focus}
+        read_only={@read_only}
       />
       <p :if={@node.form == nil} class="sb-inspector__empty">
         This block's type is not registered here, so nothing declares which of its

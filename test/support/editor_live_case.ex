@@ -65,6 +65,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          feed: session["feed"] || [],
          icon: session["icon"] && (&host_icon/1),
          on_select?: session["on_select"] != false,
+         profile: session["profile"],
          test_pid: session["test_pid"]
        )}
     end
@@ -93,6 +94,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         on_change={notifier(@test_pid)}
         on_select={if @on_select?, do: selection_notifier(@test_pid)}
         on_drawer_resize={height_notifier(@test_pid)}
+        {profile_attr(@profile)}
       >
         <:header :if={@header}>
           <p class="host-header">{@header}</p>
@@ -100,6 +102,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       </.live_component>
       """
     end
+
+    # The `profile` attr, passed only when the test named one. A host that
+    # names none passes the assign at all, which is the case the
+    # byte-identity test is about: `profile={nil}` would be a host naming one.
+    defp profile_attr(nil), do: []
+    defp profile_attr(profile), do: [profile: profile]
 
     # A host swapping the open document, which is 8A's half of the split: which
     # document is open is the host's decision, and 2A says the drawer closes
@@ -233,7 +241,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     remembered, markup for the header slot, and the drawer tabs the host
     contributes together with the feed the one called `runs` renders.
     `:host_tabs` takes `%{id:, title:, count:}` descriptors; this host supplies
-    the `content` function for each. The
+    the `content` function for each. `:profile` is ADR-0005's 2026-09-07
+    profile map, and its default - `nil` - mounts with the attr **absent**,
+    which is the unprofiled editor rather than a host naming the default. The
     `:datamodel` default is `nil` - no datamodel supplied - which is what the
     editor's own default is and what ADR-0005 amendment 11f makes meaningful.
     `:declare` defaults to `[]`, the compile call's roots the editor reads
@@ -277,6 +287,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "feed" => Keyword.get(opts, :feed, []),
         "icon" => Keyword.get(opts, :icon),
         "on_select" => Keyword.get(opts, :on_select, true),
+        "profile" => Keyword.get(opts, :profile),
         "test_pid" => test_pid
       }
     end

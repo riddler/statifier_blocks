@@ -464,6 +464,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     out, not a rewiring of what is already inside. See ADR-0005's 2026-09-05
     amendment, *the host seams, `on_select` and a selection descriptor*.
 
+    ## Profiles, and a read-only mount
+
+    A host that mounts this editor for two audiences out of one codebase says
+    so with the `profile` assign: a plain map naming which of the editor's
+    surfaces this mount draws, and whether this mount edits at all. It is
+    ADR-0005's 2026-09-07 amendment, and `docs/profiles.md` is the page that
+    works it through - the default, the ids each list draws from, a minimal
+    mount and a read-only one.
+
+    Two properties are worth having here rather than only there. **A host
+    that passes no `profile` gets the editor it had before the assign
+    existed**, because every key is optional and every list defaults to
+    `:all`; there is no arrangement of the map, `%{}` included, that removes a
+    surface a host did not name. And **an id a list names that the package
+    cannot resolve is dropped, never raised** - a profile is written once
+    against the tab set of the version it was written for, and an id that
+    outlives its tab has to leave a surface missing rather than a mount that
+    crashes at render.
+
+    `read_only?: true` renders the document without offering any way to change
+    it: no palette column, no drag hook on the canvas, config fields drawn as
+    values rather than controls, Undo and Redo hidden rather than disabled,
+    and every gesture that would reach the document answered with the socket
+    unchanged - so `on_change` never fires. Selection and findings are
+    untouched, because reading the document is the whole point of the mount.
+    A document is never refused for being read-only.
+
     ## Assigns
 
     | Assign | Required | Meaning |
@@ -495,6 +522,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `on_drawer_resize` | no | one-argument function called with each new drawer height, which is how the host comes to have one to remember |
     | `class` | no | appended to the root element's own classes |
     | `history_limit` | no | bound on the undo stack; `:infinity` by default |
+    | `profile` | no | which surfaces this mount draws, and whether it edits: `%{drawer_tabs:, inspector_tabs:, palette_groups:, toolbar:, read_only?:}`, every key optional and every list `:all` by default. An id a list names that the package cannot resolve is dropped. See *Profiles, and a read-only mount* above and `docs/profiles.md` |
     """
 
     use Phoenix.LiveComponent
@@ -546,6 +574,56 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @subchart_type "core.subchart"
     @candidate_separator " · "
 
+    @typedoc """
+    A toolbar item a profile may list.
+
+    Wider than `Editor.Toolbar`'s own word for a chip - two of the four are
+    groups of buttons - and named for the shape ruling `RQ-SF036-1` spells.
+    `:metrics` is the two right-aligned read chips and nothing else; the
+    `Canvas` heading and the `nested tree` chip are not addressable, because a
+    profile that could remove them could leave the middle pane unnamed.
+    """
+    @type toolbar_chip :: :history | :zoom | :fits | :metrics
+
+    @typedoc """
+    Which surfaces a mount renders, and whether it edits (ADR-0005's
+    2026-09-07 amendment). Every key is optional and every list may be `:all`.
+    """
+    @type profile :: %{
+            optional(:drawer_tabs) => [Shell.tab_id()] | :all,
+            optional(:inspector_tabs) => [Shell.inspector_tab()] | :all,
+            optional(:palette_groups) => [String.t()] | :all,
+            optional(:toolbar) => [toolbar_chip()] | :all,
+            optional(:read_only?) => boolean()
+          }
+
+    # The profile a mount that names none gets, spelled out rather than left
+    # implicit: it is the 0.23.0 editor, and every clause below reads it
+    # rather than asking whether a profile was supplied at all.
+    @default_profile %{
+      drawer_tabs: :all,
+      inspector_tabs: :all,
+      palette_groups: :all,
+      toolbar: :all,
+      read_only?: false
+    }
+
+    # The events a read-only mount answers with the socket unchanged: every
+    # gesture that would reach the document, its drafts or its declaration
+    # list. The reason is the one `palette_unarmed_pick` gives for its own
+    # no-op - a refusal with a reason recorded where a reader will find it -
+    # and it is recorded here rather than in an assign because a read-only
+    # mount draws no control that could have sent one of these: the events
+    # exist for a crafted payload, and a sentence rendered at a control that
+    # is not there has no reader.
+    @read_only_refused ~w(
+      drop insert-drop remove undo redo
+      dragstart dragend insert-dragstart
+      palette-open palette-close palette-pick
+      config-change discard-draft field-list-add field-list-remove
+      declaration-add declaration-remove declaration-move declaration-change
+    )
+
     @impl Phoenix.LiveComponent
     def mount(socket) do
       {:ok,
@@ -567,6 +645,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          theme: %{},
          class: nil,
          history_limit: :infinity,
+         profile: @default_profile,
          history: History.new(),
          selected_id: nil,
          notified_id: nil,
@@ -690,7 +769,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           socket
         end
 
-      socket = socket |> put_run(assigns) |> put_run_session(assigns)
+      socket = socket |> put_run(assigns) |> put_run_session(assigns) |> put_profile(assigns)
 
       socket =
         if Map.has_key?(assigns, :history_limit) and socket.assigns.history.undo == [] do
@@ -759,6 +838,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # earlier than this line.
       assigns = assign(assigns, :declared_view, declared_view(assigns))
 
+      # The profile, resolved once and read by five surfaces below. A mount
+      # that named none is holding the default, so nothing here branches on
+      # whether the host supplied one.
+      profile = normalize_profile(Map.get(assigns, :profile))
+
+      assigns =
+        assigns
+        |> assign(:profile, profile)
+        |> assign(:read_only?, profile.read_only? == true)
+        |> assign(:profile_inspector_tabs, Shell.inspector_tabs(profile.inspector_tabs))
+        |> assign(:profile_toolbar, toolbar_items(profile))
+        |> assign(
+          :effective_inspector_tab,
+          inspector_tab_in(assigns.inspector_tab, Shell.inspector_tabs(profile.inspector_tabs))
+        )
+        |> assign(:profile_palette_groups, palette_groups(assigns, profile))
+
       assigns =
         assigns
         |> assign(:declared_types, Datamodel.declared_types(assigns.datamodel))
@@ -820,7 +916,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           data-inspector={if @inspector_collapsed, do: "collapsed", else: "expanded"}
         >
           <PaletteBrowser.palette_browser
-            groups={@view_model.palette_groups}
+            :if={not @read_only?}
+            groups={@profile_palette_groups}
             query={@palette_query}
             allowed={@palette_allowed}
             allowed_recipes={@palette_allowed_recipes}
@@ -834,6 +931,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
           <div class="sb-editor__main">
             <Toolbar.toolbar
+              items={@profile_toolbar}
               zoom={@zoom}
               fit={@fit}
               depth={@depth}
@@ -853,6 +951,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             >
               <Canvas.canvas
                 root={@view_model.root}
+                drag_hook?={not @read_only?}
                 drag={@drag}
                 selected_id={@selected_id}
                 collapsed={@collapsed_ids}
@@ -871,7 +970,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </div>
 
           <Inspector.inspector
-            tab={@inspector_tab}
+            tab={@effective_inspector_tab}
+            tabs={@profile_inspector_tabs}
+            read_only={@read_only?}
             collapsed={@inspector_collapsed}
             node={@selected_node}
             slot_label={@selected_slot}
@@ -898,6 +999,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
           <Drawer.drawer
             view={@drawer}
+            read_only={@read_only?}
             height={@drawer_height}
             root={@view_model.root}
             host_tabs={Shell.host_tabs(@drawer_tabs)}
@@ -933,7 +1035,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # nobody made. Cleared here on the very next plain selection, on a manual
     # pick of another inspector tab, and on a document switch - see those
     # handlers below.
+    # A read-only mount answers every gesture that would reach the document
+    # with the socket it was given (`read_only?`, clause 6: no edit reaches
+    # the document, so there is no new document to hand back, so `on_change`
+    # is never called). It is first so the clauses below stay the editing
+    # editor's, unbranched - and it is a match on the assigns rather than a
+    # check inside each one, so a gesture added later is refused by being on
+    # `@read_only_refused` rather than by remembering to guard it.
     @impl Phoenix.LiveComponent
+    def handle_event(event, _params, %{assigns: %{profile: %{read_only?: true}}} = socket)
+        when event in @read_only_refused,
+        do: {:noreply, socket}
+
     def handle_event("select", %{"block-id" => id, "config-key" => key}, socket) do
       {:noreply,
        socket
@@ -1968,9 +2081,90 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         declarations: assigns.document.datamodel,
         declared_view: Map.get_lazy(assigns, :declared_view, fn -> declared_view(assigns) end),
         source_view: Map.get(assigns, :source_view),
-        selected_id: assigns.selected_id
+        selected_id: assigns.selected_id,
+        profile: normalize_profile(Map.get(assigns, :profile)).drawer_tabs
       })
     end
+
+    # The profile a mount is holding, with every key present. A key a host did
+    # not name, and a key whose value is neither a list nor `:all`, resolves
+    # to the default for that key: the amendment refuses a `validate_profile/1`
+    # and rules that an id the package cannot resolve is dropped rather than
+    # raised, and a malformed *value* is the same failure one level up - a
+    # profile written against a version that spelled the key differently. So
+    # it drops to the default, which is the surface the host had before it
+    # named anything, and never to a crash.
+    @spec normalize_profile(term()) :: %{
+            drawer_tabs: [Shell.tab_id()] | :all,
+            inspector_tabs: [Shell.inspector_tab()] | :all,
+            palette_groups: [String.t()] | :all,
+            toolbar: [toolbar_chip()] | :all,
+            read_only?: boolean()
+          }
+    # Normalized on the way in, behind the same `send_update/3` guard the
+    # host's other inputs use: what a profile means is decided once here, and
+    # every reader below takes a map with all five keys in it.
+    @spec put_profile(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
+    defp put_profile(socket, assigns) do
+      if Map.has_key?(assigns, :profile) do
+        assign(socket, :profile, normalize_profile(assigns.profile))
+      else
+        socket
+      end
+    end
+
+    defp normalize_profile(profile) when is_map(profile) do
+      %{
+        drawer_tabs: profile_list(profile, :drawer_tabs),
+        inspector_tabs: profile_list(profile, :inspector_tabs),
+        palette_groups: profile_list(profile, :palette_groups),
+        toolbar: profile_list(profile, :toolbar),
+        read_only?: Map.get(profile, :read_only?) == true
+      }
+    end
+
+    defp normalize_profile(_other), do: @default_profile
+
+    @spec profile_list(map(), atom()) :: list() | :all
+    defp profile_list(profile, key) do
+      case Map.get(profile, key, :all) do
+        :all -> :all
+        listed when is_list(listed) -> listed
+        _other -> :all
+      end
+    end
+
+    # The toolbar items this mount draws. `:history` is dropped for a
+    # read-only mount whatever the profile's list says - `read_only?` clause 5
+    # hides Undo and Redo rather than disabling them, because a history
+    # control over a document that cannot change has nothing to offer.
+    @spec toolbar_items(map()) :: [toolbar_chip()] | :all
+    defp toolbar_items(%{read_only?: true, toolbar: :all}), do: [:zoom, :fits, :metrics]
+
+    defp toolbar_items(%{read_only?: true, toolbar: listed}),
+      do: Enum.reject(listed, &(&1 == :history))
+
+    defp toolbar_items(%{toolbar: listed}), do: listed
+
+    # The palette groups this mount draws. A group name is a block type's own
+    # word rather than a member of a closed list, so a profile that names one
+    # the palette does not carry is naming a string that resolves to nothing -
+    # dropped, like every other unresolvable id.
+    @spec palette_groups(map(), map()) :: [ViewModel.PaletteGroup.t()]
+    defp palette_groups(assigns, %{palette_groups: :all}), do: assigns.view_model.palette_groups
+
+    defp palette_groups(assigns, %{palette_groups: listed}),
+      do: Enum.filter(assigns.view_model.palette_groups, &(&1.name in listed))
+
+    # The inspector tab this mount shows. The socket's tab where the profile
+    # left it, and otherwise the first tab the profile did leave: a mount
+    # whose profile drops Config would otherwise open on a tab that is not on
+    # its own strip, because `:config` is what `inspector_tab/1` resolves an
+    # unknown name to and what `mount/1` starts on.
+    @spec inspector_tab_in(Shell.inspector_tab(), [Shell.inspector_tab()]) ::
+            Shell.inspector_tab() | nil
+    defp inspector_tab_in(tab, []), do: tab
+    defp inspector_tab_in(tab, [first | _rest] = tabs), do: if(tab in tabs, do: tab, else: first)
 
     # The read-only declared-path view's rows. The RAW `datamodel` assign and
     # not the normalized `declared_paths` set beside it: the set has already

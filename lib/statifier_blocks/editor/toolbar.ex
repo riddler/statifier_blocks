@@ -74,6 +74,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:can_undo?, :boolean, required: true)
     attr(:can_redo?, :boolean, required: true)
     attr(:fittable?, :boolean, default: false, doc: "whether `Fit active` has a block to fit")
+
+    attr(:items, :any,
+      default: :all,
+      doc: """
+      Which of the four addressable groups this toolbar draws: `:all`, or a
+      list out of `:history`, `:zoom`, `:fits` and `:metrics` (ADR-0005's
+      2026-09-07 profile amendment). The `Canvas` heading and the
+      `nested tree` chip are not addressable and are always drawn - without a
+      name a row of unlabelled buttons is the only pane in the editor that has
+      to be recognised by its contents, which is the moduledoc's own reason
+      above. An item the list names that is not one of the four is dropped by
+      being nothing this function asks about.
+      """
+    )
+
     attr(:target, :any, required: true)
     attr(:class, :string, default: nil)
 
@@ -84,7 +99,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <h2 class="sb-toolbar__title">Canvas</h2>
         <span class="sb-toolbar__chip">nested tree</span>
 
-        <div class="sb-toolbar__group">
+        <div :if={drawn?(@items, :history)} class="sb-toolbar__group">
           <button
             type="button"
             class="sb-button sb-toolbar__button"
@@ -105,7 +120,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </button>
         </div>
 
-        <div class="sb-toolbar__group sb-toolbar__zoom" role="group" aria-label="Canvas zoom">
+        <div
+          :if={drawn?(@items, :zoom)}
+          class="sb-toolbar__group sb-toolbar__zoom"
+          role="group"
+          aria-label="Canvas zoom"
+        >
           <button
             type="button"
             class="sb-button sb-toolbar__button sb-toolbar__zoom-step"
@@ -129,7 +149,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </button>
         </div>
 
-        <div class="sb-toolbar__group">
+        <div :if={drawn?(@items, :fits)} class="sb-toolbar__group">
           <button
             type="button"
             class="sb-button sb-toolbar__button"
@@ -153,12 +173,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </button>
         </div>
 
-        <p class="sb-toolbar__metrics">
+        <p :if={drawn?(@items, :metrics)} class="sb-toolbar__metrics">
           <span class="sb-toolbar__chip" data-metric="depth">depth {@depth}</span>
           <span class="sb-toolbar__chip" data-metric="blocks">{@count} blocks</span>
         </p>
       </div>
       """
     end
+
+    # Whether one of the four addressable groups is drawn.
+    @spec drawn?([atom()] | :all, atom()) :: boolean()
+    defp drawn?(:all, _item), do: true
+    defp drawn?(items, item) when is_list(items), do: item in items
   end
 end

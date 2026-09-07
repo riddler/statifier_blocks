@@ -114,6 +114,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:zoom, :integer, default: 100)
     attr(:viewport, :any, default: nil)
     attr(:reveal, :string, default: nil)
+
+    attr(:drag_hook?, :boolean,
+      default: true,
+      doc: """
+      Whether the canvas mounts decision 7's one drag hook. `false` for a
+      read-only mount (ADR-0005's 2026-09-07 profile amendment, `read_only?`
+      clause 2): not a hook that refuses a drag, but no hook at all. The
+      measure hook on the connector layer is unaffected - it is decision 7's
+      read-only measurement and reads nothing an author can change.
+      """
+    )
+
     attr(:class, :string, default: nil)
 
     @doc "The canvas root: the hook's element, and the tree beneath it."
@@ -129,7 +141,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <div
             class={["sb-canvas", @class]}
             id="sb-canvas"
-            phx-hook="StatifierBlocksDrag"
+            phx-hook={@drag_hook? && "StatifierBlocksDrag"}
             phx-target={@target}
             data-dragging={to_string(@drag != nil)}
             data-sb-anchor={Connectors.stage_anchor()}

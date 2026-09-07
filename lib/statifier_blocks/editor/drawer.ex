@@ -169,6 +169,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     alias StatifierBlocks.{Shell, SourceView, ViewModel}
 
     attr(:view, :map, required: true, doc: "`StatifierBlocks.Shell.drawer_view/1`'s value")
+
+    attr(:read_only, :boolean,
+      default: false,
+      doc: """
+      Whether this mount edits. The only panel it changes is the
+      declarations list, which is the drawer's one editing surface; every
+      other tab here is a reading already (ADR-0005's 2026-09-07 profile
+      amendment).
+      """
+    )
+
     attr(:height, :float, required: true)
     attr(:root, ViewModel.Node, required: true)
     attr(:target, :any, required: true)
@@ -392,6 +403,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 <Declarations.declarations
                   entries={@declarations}
                   refusal={@declaration_refusal}
+                  read_only={@read_only}
                   target={@target}
                 />
               <% @view.tab == :fixtures -> %>
