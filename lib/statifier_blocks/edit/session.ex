@@ -5,8 +5,9 @@ defmodule StatifierBlocks.Edit.Session do
 
   A session is the editing state a surface holds between gestures - the
   palette it resolves types through, the document it is editing, the undo
-  history behind it, the per-block config drafts the document has refused,
-  and the last refusal that had nowhere else to go. Every function here is
+  history behind it, the per-block config drafts the document has refused
+  with the findings each refusal carried, and the last refusal that had
+  nowhere else to go. Every function here is
   a pure function of that value: it takes a session and returns a session,
   with no socket, no assigns and no process state in it.
 
@@ -65,7 +66,7 @@ defmodule StatifierBlocks.Edit.Session do
         history: StatifierBlocks.Edit.History.new()
       }
 
-  `drafts` defaults to `%{}` and `last_error` to `nil`.
+  `drafts` and `draft_findings` default to `%{}` and `last_error` to `nil`.
   """
 
   alias StatifierBlocks.{Block, BlockType, Document, Edit, Palette, ViewModel}
@@ -74,16 +75,34 @@ defmodule StatifierBlocks.Edit.Session do
   @typedoc "Per-block config the document refused, keyed by block id."
   @type drafts :: %{optional(Block.id()) => Block.config()}
 
+  @typedoc """
+  Why each draft was refused: the per-field findings the refusal carried,
+  keyed by the same block id the draft is keyed by.
+
+  A key here always has a key in `t:drafts/0`, and the findings are the
+  ones `StatifierBlocks.Edit.History.commit/4` stated about that exact
+  config - not a re-derivation of them.
+  """
+  @type draft_findings :: %{optional(Block.id()) => [BlockType.finding()]}
+
   @type t :: %__MODULE__{
           palette: Palette.t(),
           document: Document.t(),
           history: History.t(),
           drafts: drafts(),
+          draft_findings: draft_findings(),
           last_error: term() | nil
         }
 
   @enforce_keys [:palette, :document, :history]
-  defstruct [:palette, :document, :history, drafts: %{}, last_error: nil]
+  defstruct [
+    :palette,
+    :document,
+    :history,
+    drafts: %{},
+    draft_findings: %{},
+    last_error: nil
+  ]
 
   @typedoc "What a list control asks of one member list: append a blank, or drop the member at an index."
   @type gesture :: :add | {:remove, integer()}
@@ -149,6 +168,15 @@ defmodule StatifierBlocks.Edit.Session do
   A config the document accepts clears that block's draft: the author has
   resolved the refusal that produced it.
 
+  The refusal's per-field findings are kept beside the draft, in
+  `draft_findings` under the same id. They are the findings
+  `Edit.History.commit/4` already stated about this exact config, so a
+  surface drawing the refused form reads them rather than re-running
+  `c:StatifierBlocks.BlockType.validate_config/1` to re-derive the answer
+  the funnel was handed and threw away.
+  `StatifierBlocks.ViewModel.overlay_findings/2` is the other half: it
+  routes them onto the form's fields.
+
   """
   @spec change_config(t(), Block.id(), Block.config()) :: {:ok, t()} | {:error, t()}
   def change_config(%__MODULE__{} = session, id, config) do
@@ -165,11 +193,17 @@ defmodule StatifierBlocks.Edit.Session do
            | history: history,
              document: document,
              drafts: Map.delete(session.drafts, id),
+             draft_findings: Map.delete(session.draft_findings, id),
              last_error: nil
          }}
 
-      {:error, {:invalid_config, ^id, _findings}} ->
-        {:error, %{session | drafts: Map.put(session.drafts, id, config)}}
+      {:error, {:invalid_config, ^id, findings}} ->
+        {:error,
+         %{
+           session
+           | drafts: Map.put(session.drafts, id, config),
+             draft_findings: Map.put(session.draft_findings, id, findings)
+         }}
 
       {:error, reason} ->
         {:error, %{session | last_error: reason}}
@@ -210,7 +244,15 @@ defmodule StatifierBlocks.Edit.Session do
 
     case stepped do
       {:ok, history, document} ->
-        {:ok, %{session | history: history, document: document, drafts: %{}, last_error: nil}}
+        {:ok,
+         %{
+           session
+           | history: history,
+             document: document,
+             drafts: %{},
+             draft_findings: %{},
+             last_error: nil
+         }}
 
       {:error, reason} ->
         {:error, %{session | last_error: reason}}

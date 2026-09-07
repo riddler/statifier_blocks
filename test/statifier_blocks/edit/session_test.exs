@@ -46,7 +46,7 @@ defmodule StatifierBlocks.Edit.SessionTest do
     def validate_config(config) do
       case Map.get(config, "label") do
         label when is_binary(label) -> :ok
-        _refused -> {:error, %{"label" => "must be a string"}}
+        _refused -> {:error, [{"label", "must be a string"}]}
       end
     end
 
@@ -148,6 +148,27 @@ defmodule StatifierBlocks.Edit.SessionTest do
       assert Document.committed_config(cleared.document, "blk_LIST")["label"] == "ok"
     end
 
+    # Sabotage: matching `_findings` on the `{:invalid_config, id, _}` arm
+    # again - the sentences the gate already stated are thrown away, and the
+    # only way back to them is the `validate_config/1` call the funnel has
+    # just made.
+    test "the findings the refusal carried are kept beside the draft" do
+      assert {:error, drafted} = Session.change_config(session(), "blk_LIST", %{"label" => 42})
+
+      assert drafted.draft_findings == %{"blk_LIST" => [{"label", "must be a string"}]}
+    end
+
+    # Sabotage: the success arm deleting the draft and keeping the findings -
+    # the form draws a sentence about a value the author has already fixed.
+    test "a config the document takes clears that block's findings too" do
+      {:error, drafted} = Session.change_config(session(), "blk_LIST", %{"label" => 42})
+
+      assert {:ok, cleared} =
+               Session.change_config(drafted, "blk_LIST", %{"label" => "ok", "tags" => []})
+
+      assert cleared.draft_findings == %{}
+    end
+
     # Sabotage: `change_config/3`'s last arm recording the refusal in
     # `drafts` rather than in `last_error` - a refusal with no config to hold
     # is keyed by nothing.
@@ -170,6 +191,7 @@ defmodule StatifierBlocks.Edit.SessionTest do
 
       assert Enum.map(Document.blocks(back.document), & &1.id) == ["blk_ROOT", "blk_LIST"]
       assert back.drafts == %{}
+      assert back.draft_findings == %{}
       assert back.last_error == nil
     end
 

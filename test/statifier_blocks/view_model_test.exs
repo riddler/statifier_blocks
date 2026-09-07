@@ -295,6 +295,67 @@ defmodule StatifierBlocks.ViewModelTest do
     end
   end
 
+  describe "overlay_findings/2" do
+    # A refused config and the findings the refusal carried, in the shape
+    # `Edit.Session.change_config/3` leaves them: the block's own form, and
+    # the `{key, message}` pairs `validate_config/1` stated about the draft.
+    defp drafted_group do
+      group = Block.new("core.resumable_group", id: "blk_RG", config: %{"history" => "shallow"})
+
+      document_with(group) |> build() |> find_node("blk_RG")
+    end
+
+    # Sabotage: `Map.get(by_key, field.key, [])` replaced by `field.findings`
+    # - the form goes on showing the findings the document produced, and the
+    # sentence about the value being typed never appears.
+    test "a finding whose key names a field is that field's" do
+      node = ViewModel.overlay_findings(drafted_group(), [{"history", "pick shallow or deep"}])
+      field = Enum.find(node.form.fields, &(&1.key == "history"))
+
+      assert Enum.map(field.findings, & &1.message) == ["pick shallow or deep"]
+      assert Enum.map(field.findings, & &1.anchor) == [{:config, "blk_RG", "history"}]
+      assert Enum.map(field.findings, & &1.source) == [:config]
+      assert node.form.unrouted == []
+    end
+
+    # Sabotage: dropping the `Enum.reject/2` and putting every finding on
+    # the fields - a finding naming no field is silently lost, which is the
+    # case decision 11's fourth routing row exists for.
+    test "a finding whose key names no field lands in unrouted, ordered by key" do
+      node =
+        ViewModel.overlay_findings(drafted_group(), [
+          {"zzz", "last"},
+          {"aaa", "first"},
+          {"history", "pick shallow or deep"}
+        ])
+
+      assert Enum.map(node.form.unrouted, & &1.message) == ["first", "last"]
+    end
+
+    # Sabotage: keeping the fields untouched when `findings` is empty - a
+    # draft that now validates every field goes on showing the last
+    # refusal's sentences.
+    test "an empty findings list clears every field" do
+      node =
+        drafted_group()
+        |> ViewModel.overlay_findings([{"history", "pick shallow or deep"}])
+        |> ViewModel.overlay_findings([])
+
+      assert Enum.all?(node.form.fields, &(&1.findings == []))
+      assert node.form.unrouted == []
+    end
+
+    # Sabotage: dropping the `nil` and `form: nil` clauses - a caller with
+    # no selection, or one whose selected block has no config, crashes
+    # instead of piping through.
+    test "nil in, nil out; a node with no form is unchanged" do
+      formless = %Node{block_id: "blk_X", type: "core.sequence", type_version: 1, status: :ok}
+
+      assert ViewModel.overlay_findings(nil, [{"k", "m"}]) == nil
+      assert ViewModel.overlay_findings(formless, [{"k", "m"}]) == formless
+    end
+  end
+
   describe "the \"arms\" case" do
     # Sabotage: in `build_resolved_node/4`, add `"arms"` to `schema_keys`
     # (`MapSet.put(MapSet.new(schema, & &1.key), "arms")`) - this test

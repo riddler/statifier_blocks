@@ -159,6 +159,31 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute html =~ "sb-form__pending"
         assert html =~ ~s(value="signup.tier"), "the last config that validated"
       end
+
+      # The sentence beside a draft is the one the gate itself stated when it
+      # refused that config, carried on the session, and no longer a second
+      # `validate_config/1` call made at render time to ask a question that
+      # has already been answered.
+      #
+      # Sabotage: `Edit.Session.change_config/3` matching `_findings` on its
+      # `{:invalid_config, id, _}` arm again - the session carries nothing
+      # for the overlay to route and the form draws no finding at all.
+      test "the finding beside a draft is the one the refusal carried", %{conn: conn} do
+        view = mount_assign(conn)
+
+        change(view, %{"path" => "signup.tier", "value" => "gold"})
+        html = change(view, %{"path" => "not a path", "value" => "gold"})
+
+        assert html =~ "must be a datamodel path",
+               "the sentence the refusal itself stated about this draft"
+
+        html =
+          view
+          |> element(~s(#sb-form-blk_write .sb-form__discard))
+          |> render_click()
+
+        refute html =~ "must be a datamodel path"
+      end
     end
 
     describe "placeholders by control type (sb-ed7)" do

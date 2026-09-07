@@ -672,6 +672,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          run_provenance_key: nil,
          drag: nil,
          drafts: %{},
+         draft_findings: %{},
          declaration_draft: nil,
          pending_fields: [],
          palette_position: nil,
@@ -1558,7 +1559,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # to invert and no history entry to step back through - discarding is the
     # only way out of one, and the form returns to what the document holds.
     def handle_event("discard-draft", %{"block-id" => id}, socket) do
-      {:noreply, socket |> update(:drafts, &Map.delete(&1, id)) |> rebuild()}
+      {:noreply, socket |> drop_draft(id) |> rebuild()}
     end
 
     def handle_event("field-list-add", %{"key" => key} = params, socket) do
@@ -1614,8 +1615,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         document: document,
         history: history,
         drafts: drafts,
+        draft_findings: socket.assigns.draft_findings,
         last_error: socket.assigns.last_error
       }
+    end
+
+    # A draft and the findings that produced it are one thing in two maps,
+    # so they leave together. Both assigns exist for the same reason - the
+    # session is rebuilt from them on every gesture - and a findings entry
+    # outliving its draft would draw a sentence about a value the form no
+    # longer shows.
+    @spec drop_draft(Phoenix.LiveView.Socket.t(), Block.id()) :: Phoenix.LiveView.Socket.t()
+    defp drop_draft(socket, id), do: drop_drafts(socket, [id])
+
+    @spec drop_drafts(Phoenix.LiveView.Socket.t(), [Block.id()]) :: Phoenix.LiveView.Socket.t()
+    defp drop_drafts(socket, ids) do
+      socket
+      |> update(:drafts, &Map.drop(&1, ids))
+      |> update(:draft_findings, &Map.drop(&1, ids))
     end
 
     @spec landed({:ok, Session.t()} | {:error, Session.t()}, Phoenix.LiveView.Socket.t()) ::
@@ -1626,6 +1643,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         history: session.history,
         document: session.document,
         drafts: session.drafts,
+        draft_findings: session.draft_findings,
         last_error: nil
       )
       |> notify_change(session.document)
@@ -1634,7 +1652,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp landed({:error, session}, socket) do
       socket
-      |> assign(drafts: session.drafts, last_error: session.last_error)
+      |> assign(
+        drafts: session.drafts,
+        draft_findings: session.draft_findings,
+        last_error: session.last_error
+      )
       |> rebuild()
     end
 
@@ -1783,7 +1805,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp remove_block(socket, id) do
       socket
       |> update(:selected_id, fn selected -> if selected == id, do: nil, else: selected end)
-      |> update(:drafts, &Map.delete(&1, id))
+      |> drop_draft(id)
       |> commit({:remove, id})
     end
 
@@ -1795,7 +1817,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp remove_compound(socket, ids) do
       socket
       |> update(:selected_id, fn selected -> if selected in ids, do: nil, else: selected end)
-      |> update(:drafts, fn drafts -> Map.drop(drafts, ids) end)
+      |> drop_drafts(ids)
       |> commit({:compound, Enum.map(ids, &{:remove, &1})})
     end
 
@@ -1834,7 +1856,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         # gone (3S). The trailing `rebuild/1` is what reports the new selection
         # out, `commit/2`'s own rebuild having run before it.
         socket
-        |> update(:drafts, &Map.delete(&1, id))
+        |> drop_draft(id)
         |> commit({:compound, [{:remove, id} | inserts]})
         |> put_selected_id(first_inserted_id(inserts) || socket.assigns.selected_id)
         |> rebuild()
@@ -2118,6 +2140,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             config_field_focus: nil,
             selected_id: nil,
             drafts: %{},
+            draft_findings: %{},
             declaration_draft: nil,
             palette_position: nil,
             palette_allowed: nil,
@@ -3299,8 +3322,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     # Decision 9's draft, made visible without letting it near the document.
     # Values come from the draft so the author keeps their keystrokes;
-    # findings come from `validate_config/1` on the draft so they are about
-    # the value being typed rather than the last one that validated. Only
+    # findings come from the refusal the draft was recorded by, so they are
+    # about the value being typed rather than the last one that validated.
+    # Both are read from assigns the session wrote, in step, which is why
+    # neither can be about a different config than the other. Only
     # the form is touched - `slots/1` is never called on a draft, which is
     # the promise ADR-0002 decision 6 is owed.
     @spec overlay_draft(ViewModel.Node.t() | nil, Phoenix.LiveView.Socket.t(), Block.id()) ::
@@ -3311,47 +3336,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp overlay_draft(%ViewModel.Node{} = node, socket, id) do
       case Map.fetch(socket.assigns.drafts, id) do
         :error -> node
-        {:ok, draft} -> apply_draft(node, socket.assigns.palette, draft)
+        {:ok, draft} -> apply_draft(node, draft, Map.get(socket.assigns.draft_findings, id, []))
       end
     end
 
-    @spec apply_draft(ViewModel.Node.t(), Palette.t(), Block.config()) :: ViewModel.Node.t()
-    defp apply_draft(%ViewModel.Node{} = node, palette, draft) do
-      by_key = draft_findings(palette, node, draft)
-      keys = MapSet.new(node.form.fields, & &1.key)
-
-      # The value half is `ViewModel.overlay_draft/2`, which is decision 9's
-      # own treatment and is now public because a host writing its own form
-      # needs exactly it; the findings half is this module's, because only a
-      # surface that draws them has to route them.
-      fields =
-        node
-        |> ViewModel.overlay_draft(draft)
-        |> then(fn %ViewModel.Node{form: %ViewModel.Form{fields: fields}} -> fields end)
-        |> Enum.map(fn field -> %{field | findings: Map.get(by_key, field.key, [])} end)
-
-      unrouted =
-        by_key
-        |> Enum.reject(fn {key, _findings} -> MapSet.member?(keys, key) end)
-        |> Enum.sort()
-        |> Enum.flat_map(fn {_key, findings} -> findings end)
-
-      %{node | form: %{node.form | fields: fields, unrouted: unrouted}}
-    end
-
-    @spec draft_findings(Palette.t(), ViewModel.Node.t(), Block.config()) ::
-            %{optional(String.t()) => [Finding.t()]}
-    defp draft_findings(palette, %ViewModel.Node{block_id: id, type: type}, draft) do
-      with {:ok, ref} <- Palette.fetch(palette, type),
-           {:error, findings} <- Palette.call(ref, :validate_config, [draft], :ok) do
-        Enum.group_by(
-          findings,
-          fn {key, _message} -> key end,
-          fn {key, message} -> Finding.new({:config, id, key}, :config, message) end
-        )
-      else
-        _ok_or_missing -> %{}
-      end
+    # Both halves of the overlay are the package's, and neither is this
+    # module's own any more. `ViewModel.overlay_draft/2` is decision 9's
+    # value treatment; `ViewModel.overlay_findings/2` routes the findings
+    # the refusal carried onto the same form. The findings are the ones
+    # `Edit.History.commit/4` stated about this exact draft, kept on the
+    # session by `Edit.Session.change_config/3`, so nothing here asks
+    # `validate_config/1` the question it has already been answered.
+    @spec apply_draft(ViewModel.Node.t(), Block.config(), [BlockType.finding()]) ::
+            ViewModel.Node.t()
+    defp apply_draft(%ViewModel.Node{} = node, draft, findings) do
+      node
+      |> ViewModel.overlay_draft(draft)
+      |> ViewModel.overlay_findings(findings)
     end
 
     # d8's filter is d5's predicate, asked once per candidate type against a
