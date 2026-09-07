@@ -158,13 +158,16 @@ defmodule StatifierBlocks.BlockType do
           | :duration
           | {:list, field_type()}
           | {:path, path_opts()}
+          | {:type_expr, type_expr_opts()}
 
   @typedoc """
   A type at a datamodel path, as a declaration spells it: one of the
   datamodel document's nine scalars, the `name` of a `record` or `shape`
-  declared there, an opaque string a host carries, `{:list, T}`, or
-  `:unknown`. `StatifierBlocks.Environment.type_of/2` reads one, and this
-  package mints none of them.
+  declared there, an inline unnamed shape, an opaque string a host carries,
+  `{:list, T}`, or `:unknown`. `StatifierBlocks.Environment.type_of/2` reads
+  one, and this package mints none of the named ones - an inline shape is
+  the one arm a consumer builds rather than reads out of a document, and the
+  fan-out envelope is today the only value this package assembles.
 
   It is that module's `t:StatifierBlocks.Environment.type_expr/0` under a
   second name rather than a second definition: the environment is where a
@@ -203,6 +206,40 @@ defmodule StatifierBlocks.BlockType do
   @type path_opts :: %{
           optional(:expects) => path_type(),
           optional(:writes) => path_type()
+        }
+
+  @typedoc """
+  The second element of a `{:type_expr, opts}` field type (ADR-0002
+  decision 7, amended 2026-09-06). Both keys are optional, and the map is a
+  tuple element for the reason `{:select, choices}` and `{:path, opts}`
+  carry theirs: what a control needs can arrive without widening the closed
+  field-type set a second time.
+
+    * `arms: [:name | :inline]` - which arms the field admits. Both by
+      default. A field declaring one arm draws that arm's control and no
+      toggle; a field admitting both draws a toggle above it.
+    * `allow_empty?: boolean()` - whether the absent arm is admitted.
+      `true` by default, which is what every stored document already is.
+      `false` has an empty value refused by the compile's shared check
+      rather than by each block type re-implementing the same test.
+
+  `allow_empty?` and a field declaration's own `required?` are not the same
+  claim and never contradict each other: `required?` is part of a rendering
+  hint on every field type, `allow_empty?` says what this member's shared
+  check does with an empty value, and `validate_config/1` remains the
+  authority over both.
+
+  A `{:type_expr, opts}` field holds a declared type **name** as a JSON
+  string, an inline shape as a JSON list of `"name"` / `"type"` /
+  `"required?"` objects, or nothing at all - a missing key, `null` or `""`.
+  The two arms are told apart by the JSON type alone: a string is never a
+  member list. `{:shape, members}` is the term this package builds from
+  that list when it hands the value to `statifier_datamodel`; it is never
+  what a document holds.
+  """
+  @type type_expr_opts :: %{
+          optional(:arms) => [:name | :inline, ...],
+          optional(:allow_empty?) => boolean()
         }
 
   @typedoc """
@@ -260,9 +297,9 @@ defmodule StatifierBlocks.BlockType do
   config-parameterized the same way slots are.
 
   This is a rendering hint, not the authority - `validate_config/1` is.
-  The eight closed `field_type/0` values are `:string`, `:integer`,
+  The nine closed `field_type/0` values are `:string`, `:integer`,
   `:boolean`, `{:select, options}`, `:expression`, `:duration`,
-  `{:list, field_type()}`, and `{:path, opts}`.
+  `{:list, field_type()}`, `{:path, opts}`, and `{:type_expr, opts}`.
 
   ## Where a field's value lives
 
@@ -893,6 +930,93 @@ defmodule StatifierBlocks.BlockType do
   def value_path(%{key: key}), do: [key]
 
   @doc """
+  Every `{:type_expr, opts}` field of `module`'s schema whose stored value is
+  not an arm the declaration admits (ADR-0002 decision 7, amended
+  2026-09-06).
+
+  The one implementation the compiler and the editor both consult, in the
+  shape `c:validate_config/1` returns: the compiler routes it into its
+  `:config` stage and the editor's view model routes it beneath the field,
+  so the set an author is shown and the set a compile refuses cannot drift
+  apart.
+
+  What it refuses is a value that is not an arm the field admits: text where
+  only the inline arm is admitted, a member list where only the name arm is,
+  an empty value where `allow_empty?: false`, or bytes that are no arm at
+  all. The two arms are told apart by their JSON type alone - a string is
+  never a member list - and no tag key is read.
+
+  Two cases are deliberately **not** refused. A name the datamodel document
+  does not declare resolves to nothing and is the undeclared case, which the
+  record decides no finding for; and a compile with no datamodel resolves no
+  declared name at all. Member well-formedness is not checked here either:
+  it is `statifier_datamodel`'s, applied where the term is built.
+
+      iex> alias StatifierBlocks.Core.Map, as: CoreMap
+      iex> StatifierBlocks.BlockType.type_expr_findings(CoreMap, %{})
+      []
+  """
+  @spec type_expr_findings(module(), Block.config()) :: [finding()]
+  def type_expr_findings(module, config) do
+    config
+    |> module.config_schema()
+    |> Enum.flat_map(&type_expr_finding(&1, config))
+  end
+
+  @spec type_expr_finding(field_decl(), Block.config()) :: [finding()]
+  defp type_expr_finding(%{key: key, type: {:type_expr, opts}} = decl, config) do
+    arms = Map.get(opts, :arms, [:name, :inline])
+    empty? = Map.get(opts, :allow_empty?, true)
+
+    case stored_arm(decl, config) do
+      :absent -> if empty?, do: [], else: [{key, empty_message(key)}]
+      :name -> if :name in arms, do: [], else: [{key, name_message(key)}]
+      :inline -> if :inline in arms, do: [], else: [{key, inline_message(key)}]
+      :neither -> [{key, neither_message(key)}]
+    end
+  end
+
+  defp type_expr_finding(_other_field_type, _config), do: []
+
+  @spec empty_message(String.t()) :: String.t()
+  defp empty_message(key) do
+    "the #{key} field names a type, and this declaration does not admit an empty one - " <>
+      "name a type the datamodel document declares, or write the members inline"
+  end
+
+  @spec name_message(String.t()) :: String.t()
+  defp name_message(key) do
+    "the #{key} field takes an inline shape - a list of members, each with a name and a " <>
+      "type - and holds the name of a type"
+  end
+
+  @spec inline_message(String.t()) :: String.t()
+  defp inline_message(key) do
+    "the #{key} field takes the name of a type the datamodel document declares, and holds " <>
+      "an inline shape"
+  end
+
+  @spec neither_message(String.t()) :: String.t()
+  defp neither_message(key) do
+    "the #{key} field takes the name of a declared type or an inline shape - a list of " <>
+      "members - and holds neither"
+  end
+
+  # Which arm the stored bytes are, by JSON type. An absent key, `null` and
+  # `""` are one value - the absent arm - which is what every document
+  # written before the field type existed carries.
+  @spec stored_arm(field_decl(), Block.config()) :: :absent | :name | :inline | :neither
+  defp stored_arm(decl, config) do
+    case fetch_value(config, value_path(decl)) do
+      {:ok, text} when is_binary(text) -> if String.trim(text) == "", do: :absent, else: :name
+      {:ok, members} when is_list(members) -> :inline
+      {:ok, nil} -> :absent
+      {:ok, _no_arm} -> :neither
+      :error -> :absent
+    end
+  end
+
+  @doc """
   Whether a field declaration says its value is a datamodel path - the two
   spellings decision 7 admits, read in one place.
 
@@ -912,8 +1036,17 @@ defmodule StatifierBlocks.BlockType do
   a typo in a host's registry degrades to the behaviour that predates the
   key.
 
+  A `{:type_expr, opts}` field is **false** here, and the totality above is
+  why no clause is added for it: the field names a type and never a
+  location, so it has no path candidates, no undeclared-path advisory and
+  no assign location. The declared type names it suggests and the declared
+  paths a `{:path, opts}` field suggests share no member.
+
       iex> StatifierBlocks.BlockType.datamodel_path?(%{key: "path", datamodel_path?: true})
       true
+
+      iex> StatifierBlocks.BlockType.datamodel_path?(%{key: "payload", type: {:type_expr, %{}}})
+      false
 
       iex> StatifierBlocks.BlockType.datamodel_path?(%{key: "assign_to", type: {:path, %{}}})
       true

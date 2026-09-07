@@ -670,9 +670,10 @@ defmodule StatifierBlocks.Compiler do
       end
 
     declared = declaration_findings(block, module)
+    expressions = BlockType.type_expr_findings(module, block.config)
     typed = declared_payload_findings(node, declarations)
 
-    Enum.map(declared ++ own ++ typed, fn {key, message} ->
+    Enum.map(declared ++ expressions ++ own ++ typed, fn {key, message} ->
       Finding.new(:config, {:invalid_config, key}, message,
         block_id: block.id,
         config_key: key
@@ -888,11 +889,19 @@ defmodule StatifierBlocks.Compiler do
       :structure,
       reason,
       "this block reads #{named(declarations, expected)} at #{path}, " <>
-        "where #{inspect(source)} left #{named(declarations, held)}",
+        "where #{source_phrase(source)} #{named(declarations, held)}",
       block_id: id,
       config_key: Map.get(read_keys, {id, path, expected})
     )
   end
+
+  # Which of the two sources typed the path, which is the difference between
+  # "your block writes the wrong type here" and "the host declares this path
+  # as something else" - and what the environment marks a seeded entry for.
+  # A block and the slot entry read exactly as they always did.
+  @spec source_phrase(Assignability.upstream_ref()) :: String.t()
+  defp source_phrase(:declaration), do: "the datamodel document declares"
+  defp source_phrase(source), do: "#{inspect(source)} left"
 
   @typedoc false
   @type read_keys :: %{{Block.id(), String.t(), term()} => String.t()}

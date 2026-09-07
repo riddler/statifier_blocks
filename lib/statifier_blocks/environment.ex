@@ -11,10 +11,13 @@ defmodule StatifierBlocks.Environment do
   ## The type of a type
 
   A type is one of the nine the datamodel document closes its set at, the
-  `name` of a `record` or `shape` that document declares, an opaque string a
-  host carries, `{:list, type}`, or `:unknown`. This module mints none of
-  them: every one arrives from a block's own declaration or from the
-  document. `type_of/2` reads a declaration's spelling into
+  `name` of a `record` or `shape` that document declares, an inline unnamed
+  shape as `{:shape, members}`, an opaque string a host carries,
+  `{:list, type}`, or `:unknown`. A named type arrives from a block's own
+  declaration or from the datamodel document; an inline shape has no
+  document syntax at all and arrives from a record's own decision, which
+  the fan-out envelope is today the only instance of. `type_of/2` reads a
+  declaration's spelling into
   `t:StatifierDatamodel.Types.t/0` and `satisfies/3` hands the pair to
   `StatifierDatamodel.Types.satisfies/3`, which is the read check
   (ADR-0011 decision 3). There is no second one here, and no `Compatibility`
@@ -83,14 +86,25 @@ defmodule StatifierBlocks.Environment do
   """
 
   alias StatifierBlocks.{Block, BlockType, Document, Palette, Shelf}
-  alias StatifierDatamodel.{Declarations, Types}
+  alias StatifierDatamodel.{Declarations, Index, Types}
 
   @typedoc """
   A type at a path. One of `t:StatifierDatamodel.Types.t/0`'s inhabitants as
   a document spells it - a scalar name, a declared name, an opaque string -
-  or `:unknown`, or a list of one of those.
+  or `:unknown`, or a list of one of those, or an inline unnamed shape.
+
+  The inline arm is `sd-ADR-0001`'s, cited rather than respelled here: its
+  members carry exactly `name`, `type` and `required?`, member order is
+  authoring order, identity is member-set-wise, and a member's type is
+  never absent. A member's `type` is a spelling in this module's own
+  vocabulary, so the arm recurses and a member may hold an inline shape of
+  its own; `type_of/2` is where the whole term is read into
+  `t:StatifierDatamodel.Types.t/0`.
   """
-  @type type_expr :: String.t() | :unknown | {:list, type_expr()}
+  @type type_expr :: String.t() | :unknown | {:list, type_expr()} | {:shape, [member()]}
+
+  @typedoc "One member of an inline shape, as a spelling carries it."
+  @type member :: %{name: String.t(), type: type_expr(), required?: boolean()}
 
   @typedoc "Datamodel path to type. ADR-0011 decision 1's environment."
   @type t :: %{optional(String.t()) => type_expr()}
@@ -98,9 +112,19 @@ defmodule StatifierBlocks.Environment do
   @typedoc """
   The environment with the block that wrote each entry, which is what
   ADR-0011 decision 8's `upstream_ref` names. `:slot_entry` is the seed, or a
-  merge whose arms agreed on a type without agreeing on who put it there.
+  merge whose arms agreed on a type without agreeing on who put it there,
+  and `:declaration` is the datamodel document itself - the writer of an
+  entry the seed took from the document's own declared path types.
+
+  The two non-block writers differ in what an author would change. Neither
+  earns a `{:fixable_by, block_id}` reason, because neither is a block; a
+  `:declaration` says in as many words that the host's document typed the
+  path, which is the difference between "your block writes the wrong type
+  here" and "the host declares this path as something else".
   """
-  @type annotated :: %{optional(String.t()) => {type_expr(), Block.id() | :slot_entry}}
+  @type annotated :: %{
+          optional(String.t()) => {type_expr(), Block.id() | :slot_entry | :declaration}
+        }
 
   @typedoc """
   Caller-supplied, not stored in the document. `:datamodel` is the datamodel
@@ -237,16 +261,31 @@ defmodule StatifierBlocks.Environment do
   end
 
   @doc """
-  The environment the document opens with (ADR-0011 decision 2).
+  The environment the document opens with (ADR-0011 decision 2, amended
+  2026-09-06).
 
-  `ctx[:entry_type]` at the subject path, and nothing else. It is ADR-0003
-  decision 4's context key, kept meaning what it meant - the type entering the
-  document - now that the document has a path to hold it at. A document with
-  no entry block, or one whose palette entry declares no `subject:`, seeds
-  empty however the context is filled: with no subject path there is nowhere
-  for a subject type to be. Every read is then a read of a path the
-  environment does not hold, which is an advisory and not an error, so an
-  untyped document validates exactly as it did.
+  Two sources, and the second is applied over the first:
+
+    * every path `ctx[:datamodel]` declares, at the type it declares there,
+      written by the document rather than by any block;
+    * `ctx[:entry_type]` at the subject path. It is ADR-0003 decision 4's
+      context key, kept meaning what it meant - the type entering the
+      document - now that the document has a path to hold it at.
+
+  A document with no entry block, or one whose palette entry declares no
+  `subject:`, seeds no subject however the context is filled: with no
+  subject path there is nowhere for a subject type to be.
+
+  A type the document's blocks write still wins, by position and with no
+  new rule: a seeded entry is an entry like any other, so decision 1's
+  last-write-wins settles the disagreement and a block writing a path
+  replaces what the declaration seeded there for every position after it.
+
+  **A read at a declared path is now checked.** Before this it was a read
+  of a path the environment did not hold, which is decision 5's `:info`;
+  where the host declared the path and the document disagrees with it, it
+  is decision 5's `:error`. A caller that supplies no `:datamodel` seeds
+  nothing new and is unaffected in every particular.
 
   The entry block's own writes are **not** applied here. Decision 2 says the
   document opens with its subject path holding its subject type, and the walk
@@ -335,17 +374,47 @@ defmodule StatifierBlocks.Environment do
   Reads a declared spelling into a type expression.
 
   Total, and it defers to `StatifierDatamodel.Types.parse/2` for everything
-  the grammar already covers. Two readings are this package's own: the atom
-  `:unknown` and the string `"unknown"` are both `:unknown`, and a
+  the grammar already covers. Three readings are this package's own: the
+  atom `:unknown` and the string `"unknown"` are both `:unknown`, a
   `{:list, _}` is the document's own `list` - ADR-0011 decision 14 puts no
   cardinality on a read, so a list is checked as a list and its item type is
-  carried for a fan-out to bind, not for the check to descend into.
+  carried for a fan-out to bind, not for the check to descend into - and an
+  inline shape is **built** here rather than parsed there. That package
+  reads a binary spelling and has no syntax for a shape, so a member's own
+  type is read by this function recursively and the members are handed over
+  as the term `StatifierDatamodel.Types.satisfies/3` takes.
+
+      iex> alias StatifierBlocks.Environment
+      iex> Environment.type_of(%{}, {:shape, [
+      ...>   %{name: "index", type: "integer", required?: true}]})
+      {:shape, [%{name: "index", type: :integer, required?: true}]}
   """
   @spec type_of(Declarations.t(), term()) :: Types.t()
   def type_of(_declarations, :unknown), do: :unknown
   def type_of(_declarations, "unknown"), do: :unknown
   def type_of(_declarations, {:list, _item}), do: :list
+
+  def type_of(declarations, {:shape, members}) when is_list(members) do
+    {:shape, Enum.map(members, &member_of(declarations, &1))}
+  end
+
   def type_of(declarations, spelling), do: Types.parse(declarations, spelling)
+
+  # A member's own type is a spelling, so the arm recurses. `required?` is
+  # normalized to a boolean here rather than trusted: a stored document
+  # carries whatever JSON it carries, and the member spelling admits only
+  # the two values.
+  @spec member_of(Declarations.t(), term()) :: Types.member()
+  defp member_of(declarations, %{name: name, type: type} = member) do
+    %{
+      name: name,
+      type: type_of(declarations, type),
+      required?: Map.get(member, :required?) == true
+    }
+  end
+
+  defp member_of(_declarations, other),
+    do: %{name: inspect(other), type: :unknown, required?: false}
 
   @doc """
   How a type expression is written for a human (ADR-0011 decision 9).
@@ -380,6 +449,10 @@ defmodule StatifierBlocks.Environment do
   def type_label(_declarations, :unknown), do: "unknown"
   def type_label(declarations, {:list, item}), do: "list of " <> type_label(declarations, item)
 
+  def type_label(declarations, {:shape, members}) when is_list(members) do
+    "{" <> Enum.map_join(members, ", ", &member_label(declarations, &1)) <> "}"
+  end
+
   def type_label(declarations, spelling) when is_binary(spelling) do
     case Declarations.fetch(declarations, spelling) do
       {:ok, %{label: label}} when is_binary(label) and label != "" -> label
@@ -388,6 +461,18 @@ defmodule StatifierBlocks.Environment do
   end
 
   def type_label(_declarations, other), do: inspect(other)
+
+  # An unnamed shape has no name to render, so it renders its members, in
+  # authoring order, each `name: type`, with a `?` after the name of a
+  # member the shape does not promise - the spelling
+  # `StatifierDatamodel.Types.to_string/1` prints for the same term.
+  @spec member_label(Declarations.t(), term()) :: String.t()
+  defp member_label(declarations, %{name: name, type: type} = member) do
+    promised = if Map.get(member, :required?) == true, do: "", else: "?"
+    name <> promised <> ": " <> type_label(declarations, type)
+  end
+
+  defp member_label(_declarations, other), do: inspect(other)
 
   @doc """
   The read check: `StatifierDatamodel.Types.satisfies/3` over the two
@@ -400,6 +485,66 @@ defmodule StatifierBlocks.Environment do
   def satisfies(declarations, held, expected) do
     Types.satisfies(declarations, type_of(declarations, held), type_of(declarations, expected))
   end
+
+  @doc """
+  Reads a stored member list into an inline shape (ADR-0002 decision 7,
+  amended 2026-09-06).
+
+  A `{:type_expr, opts}` field stores its inline arm as JSON: a list of
+  objects each carrying `"name"`, `"type"` and the optional boolean
+  `"required?"`. This is where those bytes become the arm decision 1
+  admits, and it is the only direction that exists - an inline shape has no
+  document syntax, so nothing parses one out of a binary and
+  `StatifierDatamodel.Types.parse/2` never returns one.
+
+  Member well-formedness is `sd-ADR-0001`'s and is applied rather than
+  restated: a member whose name is not a non-empty string contributes
+  nothing, a repeated member name keeps its first occurrence, and a
+  member's type is never absent - a spelling that resolves to nothing is
+  the datamodel's unknown. Member order is the order the author wrote,
+  because that is the order an unmet-member reason renders in.
+
+  Total: anything that is not a list is `:unknown`.
+
+      iex> alias StatifierBlocks.Environment
+      iex> Environment.inline_shape([
+      ...>   %{"name" => "index", "type" => "integer", "required?" => true},
+      ...>   %{"name" => "note", "type" => "string"}])
+      {:shape, [
+        %{name: "index", type: "integer", required?: true},
+        %{name: "note", type: "string", required?: false}
+      ]}
+
+      iex> StatifierBlocks.Environment.inline_shape("cards.settlement")
+      :unknown
+  """
+  @spec inline_shape(term()) :: type_expr()
+  def inline_shape(members) when is_list(members) do
+    {:shape,
+     members
+     |> Enum.flat_map(&stored_member/1)
+     |> Enum.uniq_by(& &1.name)}
+  end
+
+  def inline_shape(_not_a_member_list), do: :unknown
+
+  @spec stored_member(term()) :: [member()]
+  defp stored_member(%{"name" => name} = member) when is_binary(name) and name != "" do
+    [
+      %{
+        name: name,
+        type: stored_member_type(Map.get(member, "type")),
+        required?: Map.get(member, "required?") == true
+      }
+    ]
+  end
+
+  defp stored_member(_nameless), do: []
+
+  @spec stored_member_type(term()) :: type_expr()
+  defp stored_member_type(spelling) when is_binary(spelling) and spelling != "", do: spelling
+  defp stored_member_type(members) when is_list(members), do: inline_shape(members)
+  defp stored_member_type(_absent_or_malformed), do: :unknown
 
   # -- the walk --------------------------------------------------------------
 
@@ -613,11 +758,60 @@ defmodule StatifierBlocks.Environment do
 
   @spec seed_annotated(Palette.t(), Document.t(), context()) :: annotated()
   defp seed_annotated(palette, document, ctx) do
+    Map.merge(declared_seed(ctx), subject_seed(palette, document, ctx))
+  end
+
+  @spec subject_seed(Palette.t(), Document.t(), context()) :: annotated()
+  defp subject_seed(palette, document, ctx) do
     case {subject_path(palette, document), Map.fetch(ctx, :entry_type)} do
       {path, {:ok, entry_type}} when is_binary(path) -> %{path => {entry_type, :slot_entry}}
       _no_subject_or_no_entry_type -> %{}
     end
   end
+
+  # The document's own declared path types, marked as the declaration's.
+  # The projection is the index's, which is the same one the Datamodel tab
+  # and the editor's typed cells already draw, so the set an author is shown
+  # and the set the walk carries cannot drift apart.
+  #
+  # An entry the index cannot name a type for contributes nothing rather
+  # than `:unknown`: an entry at `:unknown` and no entry at all are read
+  # identically by the check, and the absent one keeps the walk's answer the
+  # size of what the document actually said.
+  @spec declared_seed(context()) :: annotated()
+  defp declared_seed(ctx) do
+    case ctx |> Map.get(:datamodel) |> Index.index() do
+      nil -> %{}
+      index -> index |> Index.entries() |> Enum.flat_map(&seeded_entry/1) |> Map.new()
+    end
+  end
+
+  @spec seeded_entry(map()) :: [{String.t(), {type_expr(), :declaration}}]
+  defp seeded_entry(entry) do
+    case declared_spelling(entry) do
+      nil -> []
+      spelling -> [{entry.path, {spelling, :declaration}}]
+    end
+  end
+
+  # An index entry's type, as this module spells one. A list carries its
+  # item type where the entry declared one, which is decision 14's reading
+  # of a list: the cardinality is not the check's, and the item type is
+  # carried for a fan-out to bind.
+  @spec declared_spelling(map()) :: type_expr() | nil
+  defp declared_spelling(%{type: nil}), do: nil
+
+  defp declared_spelling(%{type: :list} = entry) do
+    {:list, entry_spelling(Map.get(entry, :item_type))}
+  end
+
+  defp declared_spelling(%{type: type}), do: entry_spelling(type)
+
+  @spec entry_spelling(term()) :: type_expr()
+  defp entry_spelling(nil), do: :unknown
+  defp entry_spelling({:declared, name}) when is_binary(name), do: name
+  defp entry_spelling(scalar) when is_atom(scalar), do: Atom.to_string(scalar)
+  defp entry_spelling(_unnameable), do: :unknown
 
   # The first block of the root's `body` slot (ADR-0011 decision 6).
   @spec entry_block(Document.t()) :: Block.t() | nil

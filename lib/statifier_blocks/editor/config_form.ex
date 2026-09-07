@@ -61,6 +61,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
     )
 
+    attr(:type_candidates, :list,
+      default: [],
+      doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
+    )
+
     attr(:event_candidates, :list,
       default: [],
       doc: "Passed through to `StatifierBlocks.Editor.Field`; see its moduledoc."
@@ -177,6 +182,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           path_candidates={@path_candidates}
           value_candidates={@value_candidates}
           path_types={@path_types}
+          type_candidates={@type_candidates}
           event_candidates={@event_candidates}
           outcome_candidates={@outcome_candidates}
           candidates={candidates_for(@field_candidates, @node.type, field)}

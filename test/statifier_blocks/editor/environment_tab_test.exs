@@ -70,7 +70,31 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         html = open(view) |> render()
 
-        assert known_rows(html) == [{"cards.current_txn", "Credit card transaction"}]
+        # `cards.settlement` is there without a block having written it: the
+        # walk seeds every path the datamodel declares (ADR-0011 decision 2,
+        # amended 2026-09-06), and the worked document declares that one as an
+        # undescribed `object`.
+        assert known_rows(html) == [
+                 {"cards.current_txn", "Credit card transaction"},
+                 {"cards.settlement", "object"}
+               ]
+      end
+
+      # Sabotage: `Environment.seed/3` keeping its declared seed when no
+      # datamodel is supplied - the empty state stops being reachable and
+      # this goes red. A caller with no document to read seeds nothing new
+      # and is unaffected in every particular, which is the amendment's own
+      # sentence about it.
+      test "says nothing is known where the document declares nothing", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: document(), palette: Cards.palette())
+
+        view |> element(~s([phx-click="select"][phx-value-block-id="blk_OPEN"])) |> render_click()
+
+        html = open(view) |> render()
+
+        assert known_rows(html) == []
+        assert known_here(html) =~ "Nothing is known at this block&#39;s position"
       end
 
       # Sabotage: `environment_view/1` reading `List.first(path)` rather than
@@ -84,10 +108,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         html = open(view) |> render()
 
-        assert known_rows(html) == [],
-               "the entry block is the first position walked, so nothing is known in front of it"
-
-        assert known_here(html) =~ "Nothing is known at this block&#39;s position"
+        # The entry block is the first position walked, so nothing a BLOCK
+        # wrote is known in front of it - what is known there is what the
+        # document declares, which the seed put in before the walk began.
+        assert known_rows(html) == [
+                 {"cards.current_txn", "object"},
+                 {"cards.settlement", "object"}
+               ]
       end
 
       # Sabotage: `environment_view/1` dropping its `nil` clause and answering

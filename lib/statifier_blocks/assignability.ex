@@ -73,9 +73,10 @@ defmodule StatifierBlocks.Assignability do
   @typedoc """
   A type as a declaration spells it. Opaque to this package - never parsed,
   split or normalized here; `StatifierDatamodel.Types.parse/2` reads it
-  against the datamodel document, and a list carries its item type.
+  against the datamodel document, a list carries its item type, and an
+  inline unnamed shape carries its members.
   """
-  @type type_expr :: String.t() | {:list, type_expr()}
+  @type type_expr :: Environment.type_expr()
 
   @typedoc ~S(Structural tag. `:step` and `:interrupt_handler` ship here; hosts may mint more.)
   @type kind :: atom()
@@ -102,6 +103,15 @@ defmodule StatifierBlocks.Assignability do
   @type target :: {Block.id(), Block.slot_name(), non_neg_integer()}
 
   @typedoc """
+  What put the held type at the path a `:type_mismatch` names (ADR-0011
+  decision 8, amended 2026-09-06). A block id where a block's write
+  signature put it; `:slot_entry` where the seed's subject type - or a merge
+  with no single writer to name - did; `:declaration` where the datamodel
+  document's own declared type did.
+  """
+  @type upstream_ref :: Block.id() | :slot_entry | :declaration
+
+  @typedoc """
   ADR-0003 decision 8's vocabulary, with the one member ADR-0011 decision 8
   adds: a `:type_mismatch` carries the **datamodel path** the read was
   checked at, last. It is added rather than left to be re-derived because a
@@ -113,7 +123,7 @@ defmodule StatifierBlocks.Assignability do
   @type finding ::
           {:kind_not_admitted, Block.id(), Block.id(), Block.slot_name(), [kind()],
            [kind()] | :any}
-          | {:type_mismatch, Block.id(), Block.id() | :slot_entry, type_expr() | :unknown,
+          | {:type_mismatch, Block.id(), upstream_ref(), type_expr() | :unknown,
              type_expr() | :unknown, String.t()}
 
   @typedoc """
@@ -249,8 +259,9 @@ defmodule StatifierBlocks.Assignability do
 
   `producing_ref` is the block whose write signature put `held` at the path,
   exactly as ADR-0011 decision 8's `:type_mismatch` tuple names it, or
-  `:slot_entry` when the seed - or a merge with no single writer to name - is
-  what the read disagrees with.
+  `:slot_entry` when the seed - or a merge with no single writer to name -
+  is what the read disagrees with, or `:declaration` when the datamodel
+  document's own declared type is.
 
   `nil` means **there is nothing to explain**: both sides are typed and the
   read passed, by identity, by coverage, or because the palette's relation
@@ -265,6 +276,11 @@ defmodule StatifierBlocks.Assignability do
        missing}`;
     6. `producing_ref` is a block id -> `{:fixable_by, producing_ref}`;
     7. otherwise -> `:not_assignable`.
+
+    Step 6 is why the two non-block refs land on step 7: neither
+    `:slot_entry` nor `:declaration` names a block whose declaration an
+    author would change, and for a `:declaration` the change is to the
+    datamodel document rather than to anything in this one.
 
   **This function decides nothing.** It reads a verdict `assignable?/4` has
   already reached and labels it; nothing in this package branches a verdict
@@ -286,7 +302,7 @@ defmodule StatifierBlocks.Assignability do
           Palette.t(),
           type_expr() | :unknown,
           type_expr() | :unknown,
-          Block.id() | :slot_entry,
+          upstream_ref(),
           Declarations.t()
         ) :: reason() | nil
   def seam_reason(%Palette{} = palette, held, expected, producing_ref, declarations \\ %{}) do
@@ -302,7 +318,7 @@ defmodule StatifierBlocks.Assignability do
           Palette.t(),
           term(),
           term(),
-          Block.id() | :slot_entry,
+          upstream_ref(),
           Declarations.t()
         ) :: reason() | nil
   defp refusal_reason(palette, held, expected, producing_ref, declarations) do
@@ -319,9 +335,10 @@ defmodule StatifierBlocks.Assignability do
     end
   end
 
-  @spec refused({:missing, [String.t()]} | :not_assignable, Block.id() | :slot_entry) :: reason()
+  @spec refused({:missing, [String.t()]} | :not_assignable, upstream_ref()) :: reason()
   defp refused({:missing, names}, _producing_ref), do: {:shape_not_satisfied, names}
   defp refused(:not_assignable, :slot_entry), do: :not_assignable
+  defp refused(:not_assignable, :declaration), do: :not_assignable
   defp refused(:not_assignable, producing_ref), do: {:fixable_by, producing_ref}
 
   @doc """
@@ -379,7 +396,7 @@ defmodule StatifierBlocks.Assignability do
   with a `nil`.
   """
   @spec seam_reasons(Palette.t(), Document.t(), context()) ::
-          [{Block.id(), Block.id() | :slot_entry, reason()}]
+          [{Block.id(), upstream_ref(), reason()}]
   def seam_reasons(%Palette{} = palette, %Document{} = document, ctx) do
     declarations = Environment.declarations(ctx)
 
@@ -582,7 +599,7 @@ defmodule StatifierBlocks.Assignability do
   end
 
   @spec held_at(Environment.annotated(), String.t() | nil) ::
-          {type_expr() | :unknown, Block.id() | :slot_entry}
+          {type_expr() | :unknown, upstream_ref()}
   defp held_at(env, path), do: Map.get(env, path, {:unknown, :slot_entry})
 
   # A block's declared reads, or - when it declares none - the one silent row

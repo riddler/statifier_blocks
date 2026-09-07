@@ -34,9 +34,16 @@ defmodule StatifierBlocks.Compiler.DeclaredLabelTest do
   end
 
   defp message(document, palette, opts) do
+    assert [message] = messages(document, palette, opts)
+    message
+  end
+
+  defp messages(document, palette, opts) do
     assert {:error, findings} = Compiler.compile(document, palette, opts)
-    assert [finding] = Enum.filter(findings, &match?({:type_mismatch, _, _, _, _, _}, &1.reason))
-    finding.message
+
+    for finding <- findings,
+        match?({:type_mismatch, _, _, _, _, _}, finding.reason),
+        do: finding.message
   end
 
   describe "a declared pair" do
@@ -90,10 +97,24 @@ defmodule StatifierBlocks.Compiler.DeclaredLabelTest do
           id: "bdoc_opaque"
         )
 
-      message = message(after_settle, palette, datamodel: Cards.datamodel())
+      # Two refusals now, because the datamodel declares the subject path and
+      # ADR-0011 decision 2 as amended 2026-09-06 seeds it: the first block
+      # disagrees with the document's own declaration, and the third with what
+      # the settle step left. The second is this test's subject.
+      messages = messages(after_settle, palette, datamodel: Cards.datamodel())
 
-      assert message =~ ~s(reads "myapp.transaction")
-      assert message =~ ~s(left "myapp.settled_txn")
+      assert Enum.any?(messages, fn message ->
+               message =~ ~s(reads "myapp.transaction") and
+                 message =~ ~s(left "myapp.settled_txn")
+             end)
+
+      # And the seeded one says which of the two sources typed the path, which
+      # is the difference between a block writing the wrong type and the host
+      # declaring something else.
+      assert Enum.any?(messages, fn message ->
+               message =~ ~s(reads "myapp.transaction") and
+                 message =~ ~s(where the datamodel document declares "object")
+             end)
     end
   end
 end

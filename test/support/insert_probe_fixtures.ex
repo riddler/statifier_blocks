@@ -105,7 +105,23 @@ defmodule StatifierBlocks.InsertProbeFixtures do
     Document.new(root, id: "bdoc_insert_probe")
   end
 
-  @doc "The datamodel both spellings resolve through - ADR-0011's worked one."
+  @doc """
+  The datamodel both spellings resolve through - ADR-0011's worked one,
+  with the two `local` entries left out.
+
+  The entries matter from ADR-0011's amendment of 2026-09-06: the
+  environment now seeds the declared path types the document has written,
+  so a document that declares `cards.current_txn` types that path at every
+  position - including the gap ahead of the entry block, which is the one
+  this file's assertions turn on. The declarations this fixture needs are
+  the **types**, which is what `Settled` and `Settleable` resolve through;
+  what the document declares about its own paths is another file's
+  subject.
+  """
   @spec datamodel() :: map()
-  def datamodel, do: CardProcessingFixtures.datamodel()
+  def datamodel do
+    Map.update!(CardProcessingFixtures.datamodel(), "scopes", fn scopes ->
+      Enum.map(scopes, fn scope -> Map.put(scope, "entries", []) end)
+    end)
+  end
 end
