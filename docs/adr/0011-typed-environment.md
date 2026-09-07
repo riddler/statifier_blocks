@@ -1185,7 +1185,7 @@ carries for a refused block, the other widens what a type may spell.
 
 ## Amendment (2026-09-06): decision 1's type expression admits an inline shape, and the environment seeds the declared path types the document has not written
 
-**Status: proposed (2026-09-06, campaign SF035, bead `sb-myt1`, recording the
+**Status: accepted (2026-09-06, campaign SF035, bead `sb-myt1`, recording the
 walk's rulings `RQ-SF035-1` and `RQ-SF035-15`).** A decision record merges at
 proposed under the campaign invariant; flipping it to accepted is a separate
 gated request through the same `docs/adr/` gate, and `sb-wzoa` carries it.
@@ -1710,3 +1710,135 @@ fixture is what `se-yag` changes.
 Filed with `sb-m9eq`, campaign SF036's Lane X. `sb-wzoa` flips the Amendment
 this releases; `se-yag` edits the card-processing fixture; `sd-y3l` lands the
 matching Note on `sd-ADR-0001` decision 8.
+
+## Note (2026-09-07): `sb-myt1`'s amendment is flipped to accepted, as read with the Note of 2026-09-07 that supersedes one sentence of its part 2
+
+The Amendment of 2026-09-06 on decision 1 and decision 2 (`:1186`) reads
+`Status: accepted` from this date. `sb-wzoa` is the separate gated request that
+section's own status paragraph names, and this Note is what the flip checked.
+It is by addition, sits at the foot so that no line a sibling record cites
+moves, edits no clause, and carries no `Status:` line of its own. The only
+line the request removes is the one the status word is on, which is the shape
+`sb-upv0` and the flip of decision 7's amendment in `ADR-0002` both took.
+
+No marker is added beside the status paragraph, because nothing in it is
+falsified by the flip: it says a record of that campaign merges at proposed and
+that flipping it is a separate gated request `sb-wzoa` carries, and both
+sentences are as true after the flip as before. The sentences elsewhere in this
+file that name the section's status are met in section 3 below, where they
+stand.
+
+Every line cite below is a census taken on `main` at `495e8b0`, with
+`deps/statifier_datamodel` resolved at `0.4.0`. It is dated to this Note and is
+to be re-counted by a later reader rather than trusted.
+
+### 1. What released the hold, and what the flip accepts
+
+The Note of 2026-09-07 above (`:1417`) held this flip on one sentence: part 2's
+deciding paragraph (`:1283-1288`) says the environment holds an entry at every
+path `StatifierDatamodel.Index.path_types/1` projects, and the code reads
+`StatifierDatamodel.Index.entries/1` and each entry's declared type. The
+section said one thing in that sentence and another in its own table, and
+picking between them was a decision, not a re-cite, so the flip did not
+proceed.
+
+The operator took that decision on 2026-09-07 as `RQ-SF036-0b`, and the second
+Note of that date above (`:1577`) records it: **the code is right and the
+sentence is superseded**, the seed reads `entries/1` and the declared type, the
+superseded sentence is left standing where it is, and the two halves of this
+package draw two projections of one index on purpose. That Note closes with
+the sentence that releases this request.
+
+**So the flip accepts this section as read with that Note.** Part 2's deciding
+sentence is not repointed, not reworded and not removed: it stands at
+`:1283-1288`, superseded rather than corrected, and a reader who reaches it
+reads the Note of 2026-09-07 with it. The section's decision table
+(`:1295-1300`) and the code's own restatement of decision 2
+(`lib/statifier_blocks/environment.ex:263-273`) are what the accepted decision
+says, and they agreed with the code before this flip and agree with it now.
+
+`RQ-SF036-0a` was ruled on the same date and changed nothing here: seeding is
+root-forward, which is what the first two rows of the table already said.
+
+### 2. What else the flip verified against `main`
+
+Part 1 held in every particular checked.
+`t:StatifierBlocks.Environment.type_expr/0` admits `{:shape, [member()]}` with
+`member/0` beside it
+(`lib/statifier_blocks/environment.ex:104`, `:107`); `inline_shape/1` builds
+the term from a stored member list (`:521-529`);
+`t:StatifierBlocks.BlockType.path_type/0` is still that typespec under a
+second name and its prose names the inline arm and the assembled envelope as
+its third source (`lib/statifier_blocks/block_type.ex:163-176`); the
+`:type_mismatch` tuple did **not** grow
+(`lib/statifier_blocks/assignability.ex:126-127`); and the editor's typed cells
+still read the value-kind projection
+(`lib/statifier_blocks/datamodel.ex:572-578`, reached at
+`lib/statifier_blocks/editor.ex:2098-2101`), which is the one place part 1's
+consumer table cites `path_types/1` correctly.
+
+Part 2 held in every particular except the superseded sentence. The seed is
+applied once, before the walk, in `seed_annotated/3` (`:760-763`) reached from
+`annotated/4` (`:185-206`) and `seed/3` (`:298-301`), and nowhere else in
+`lib/`; decision 2's entry-block subject is applied over it (`subject_seed/3`,
+`:765-771`); a block's write replaces a seeded entry for every position after
+it by decision 1's last-write-wins and by no new rule
+(`seed/3`'s moduledoc, `:279-282`); a parked fragment is still walked from an
+empty environment (`slot_start/4`, `:627-634`); `t:.../annotated/0`'s writer
+member carries the `:declaration` inhabitant the section adds (`:125-127`),
+which `t:StatifierBlocks.Assignability.upstream_ref/0` admits beside
+`:slot_entry` (`lib/statifier_blocks/assignability.ex:112`); and the two
+callers that supply `:datamodel` still supply it
+(`lib/statifier_blocks/compiler.ex:837-845`,
+`lib/statifier_blocks/editor.ex:2038-2040`).
+
+One sentence of part 2 is a reading of the state **before** `sb-1jcr` built the
+seed, and is met rather than falsified: it says the environment's "sole reader
+of `ctx[:datamodel]` is `declarations/1`". That was true when the section was
+drafted and is the property the section exists to change; today
+`declared_seed/1` reads it too (`:788-794`), which is the section's own
+decision in force. The sentence describes the case for the amendment, not the
+state it leaves behind.
+
+### 3. Sentences of the two Notes above that this flip dates
+
+Both Notes of 2026-09-07 above are dated records of the state at their date and
+neither is edited here. Three of their sentences are met by this flip where
+they stand:
+
+| Where | What it says | How the flip meets it |
+|---|---|---|
+| `:1480` | part 2 "stays at `proposed`, and part 1 stays with it: the two parts share one `Status:` line" | The shared `Status:` line is what this request flips, and it flips both parts together, which is what that sentence asks for |
+| `:1566-1567` | "It flips nothing. The amendment at `:1186` still reads `Status: proposed`, and `sb-wzoa` remains the request that carries its flip" | True of that Note, which flipped nothing. `sb-wzoa` is this request, and it has now carried the flip |
+| `:1703` | "It flips nothing. The Amendment at `:1186` still reads `Status: proposed` and `sb-wzoa` still carries its flip" | The same, of the Note of 2026-09-07 that released the hold |
+
+### 4. Cites that moved again since the census of 2026-09-07
+
+The census in the Note at `:1417` was taken at `f750b3b`. Two commits have
+moved lines under it since: `4b0520e` rewrote the comment above
+`declared_seed/1` (prose only, no behaviour), and `495e8b0` shortened
+`editor.ex`. The rows that moved:
+
+| Read at `f750b3b` | Reads at `495e8b0` |
+|---|---|
+| `lib/statifier_blocks/environment.ex:759-762` (`seed_annotated/3`) | `:760-763` |
+| `lib/statifier_blocks/environment.ex:764-770` (`subject_seed/3`) | `:765-771` |
+| `lib/statifier_blocks/environment.ex:781-787` (`declared_seed/1`) | `:788-794` |
+| `lib/statifier_blocks/environment.ex:789-795` (`seeded_entry/1`) | `:796-802` |
+| `lib/statifier_blocks/environment.ex:801-808` (`declared_spelling/1`) | `:808-814` |
+| `lib/statifier_blocks/editor.ex:2053-2055` (`assignability_context/1`) | `:2038-2040` |
+| `lib/statifier_blocks/editor.ex:2113-2116` (`declared_path_types/1`) | `:2098-2101` |
+
+Every other row of that census still reads where it says it reads.
+
+### What this Note does not do
+
+- **It settles nothing new.** The projection question was settled by the second
+  Note of 2026-09-07 above (`:1577`) under `RQ-SF036-0b`; this Note flips
+  a status word on the strength of that settlement and decides nothing itself.
+- **It edits no clause and removes no line but the status word.** The
+  superseded sentence at `:1283-1288` stands, and both Notes above stand.
+- **It changes no code.** The request that carries it touches this file only.
+
+Filed with `sb-wzoa`, campaign SF036's Lane X. `sb-vjjl` is the next request on
+this record.
