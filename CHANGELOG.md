@@ -10,6 +10,245 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.23.0] 2026-09-06
+
+0.23.0 makes a block type's typed surface something an author writes rather
+than only names. `StatifierBlocks.BlockType`'s field-type set gains
+`{:type_expr, opts}`: a field holding the name of a type the datamodel
+document declares, an inline unnamed shape written member by member, or
+nothing at all, with one shared check behind it and an inspector control that
+draws both arms. `core.map`'s `collect_type` and `core.on_event`'s `payload`
+are the first two fields to take it, and the `statifier_datamodel`
+requirement moves to `~> 0.4`, which is where a type expression admits an
+inline shape. Beside that: the typed environment now **seeds** the declared
+path types the datamodel document carries, so a read at a declared path meets
+the declared type rather than an advisory; a compile refusal carries the
+Config and Structure stages' findings together, so a mis-typed field on one
+card no longer hides an unsatisfied read on another; a root block type
+declares a typed child summary that a `child_use` compile emits as `<final>`
+params; drop-time typing fires from a palette entry's new `default_config`
+rather than from `config_schema/1`'s defaults alone; a `:type_mismatch`
+finding carries the `config_key` of the field whose read declared the path;
+and `StatifierBlocks.Palette.manifest/1` gives a host one assertion to pin
+its palette with.
+
+It is a minor, and compiled bytes move for one kind of document: one compiled
+under `child_use: true` whose **root** block type declares a
+`donedata_type/1`, whose top-level `<final>` elements now carry one `<param>`
+per declared field after the two the compiler mints. Every other document
+compiles to the bytes it compiled to at 0.22.0, and each entry below that
+could have moved one says so in its own words. Two changes are worth reading
+before upgrading, neither of them a byte: a stored document that validated
+may refuse once its host supplies a datamodel, because the environment now
+seeds declared path types and a read that found nothing before now meets a
+declared one; and a host that compiles with `terminate:`, `child_use:`,
+`known_invoke_types:` or `datamodel:` must pass its own `compile_options` to
+the editor, or the Source tab, the fixture verdicts and the Run pane's marks
+are each about a chart nobody ran.
+
+### Added
+
+- A palette entry may declare `default_config`, the config the editor's insert
+  probe is built with over `config_schema/1`'s own defaults, so a block type
+  whose read is declared on a path field says which path it will read before
+  anyone has configured one.
+
+- `StatifierBlocks.BlockType`'s closed field-type set gains a ninth member,
+  `{:type_expr, opts}`: a field holding the name of a type the datamodel
+  document declares, or an inline unnamed shape as a list of
+  `"name"` / `"type"` / `"required?"` objects, or nothing at all. `opts`
+  carries `arms:` (which of the two the field admits, both by default) and
+  `allow_empty?:` (whether an empty value is admitted, true by default).
+- `StatifierBlocks.BlockType.type_expr_findings/2` is the one shared check
+  behind that field type, consulted by both the compiler's `:config` stage
+  and the editor's view model: a value that is not an arm the declaration
+  admits is a `:config` finding carrying the field's key, and an undeclared
+  type name is not one.
+- The editor draws a `{:type_expr, opts}` field in the inspector's Config
+  tab: a text input bound to a `<datalist>` of the document's declared type
+  names for the name arm, an ordered member-list form for the inline arm
+  whose member types are the same control recursing, and a toggle when the
+  field admits both. Switching arms replaces the value rather than
+  translating it, and a value the control cannot read is drawn raw with its
+  finding beneath it.
+- `StatifierBlocks.Environment`'s type expression admits an inline unnamed
+  shape, `{:shape, members}`, and `StatifierBlocks.Environment.inline_shape/1`
+  reads a stored member list into one. The read check reaches it through
+  `StatifierDatamodel.Types.satisfies/3` unchanged - this package defines no
+  second one.
+
+- `StatifierBlocks.Environment`'s context accepts `:skip_blocks`, a set of
+  block ids whose declared writes the walk leaves out. Absent, as it is for
+  every editor query, nothing is skipped.
+
+- `StatifierBlocks.Palette.manifest/1` returns a palette as a sorted list of
+  `{name, version}` entries - a block type beside its `current_version/0`, a
+  recipe beside `:recipe` - so a host pins what its palette carries in one
+  assertion that names the entry which moved instead of a count that does not.
+
+- A worked example of the failure propagation 0.22.0 introduced, which the
+  0.22.0 Notes stated as a rule without showing a run. A `core.sequence` body
+  holds a `myapp:authorize` invoke followed by a `myapp:capture` invoke, and
+  authorize ends on its `error` outcome. With the authorize invoke's own
+  `on_error` slot filled - handling is declared by the failing block, never by
+  the sequence around it - the slot's child runs, the invoke ends on `error`,
+  the sequence advances, and the run ends at the document's ordinary completion
+  final with capture having run. With `on_error` empty and the document
+  compiled under `child_use: true` or `terminate: true`, the invoke's `error`
+  final is emitted anyway, the root's transition on
+  `done.outcome.<authorize state id>.error` is selected before the sequence's
+  own `done.state`, and the run ends at the shared top-level failed final
+  carrying the reserved `statifier_persistence:run_status` param with the value
+  `failed` - capture never runs. Compiled under neither option there is no root
+  catch, nothing selects the outcome event, and the sequence advances to
+  capture exactly as it does on success. ADR-0002's amendment of 2026-09-06,
+  section 4 ("The nested-to-root propagation rule") and section 6 ("What this
+  costs a host, and what it does not"), carry the full walk-through.
+
+- `StatifierBlocks.BlockType` declares an optional thirteenth callback,
+  `donedata_type/1`: what a document's `<donedata>` carries when it is
+  compiled for use as a child, as a list of `%{name, path, type}` fields
+  typed in `statifier_datamodel`'s vocabulary.
+  `StatifierBlocks.BlockType.donedata_type/2` is the resolver every consumer
+  reads it through, and it is total - a type that does not export the
+  callback, or exports one returning something else, declares nothing.
+- Compiling with `child_use: true`, each top-level `<final>` now carries one
+  `<param name="<name>" expr="<path>"/>` per entry the **root** block type
+  declares, in declaration order, **after** the `outcome` param and the
+  reserved `statifier_persistence:run_status` param. A root type that
+  declares nothing compiles to exactly the bytes it compiled to before, and
+  a `terminate` compile emits no declared field at all.
+- A declared field name that collides with either of the two names the
+  compiler mints, or that is not a bare lowercase identifier, is refused at
+  compile with an `:invalid_donedata_field` Emit finding against the root
+  block, rather than silently shadowing a param.
+- `core.map` gains an optional seventh config field, `collect_type`: the type
+  name a collected answer's `"donedata"` carries, read through
+  `StatifierDatamodel.Types.parse/2` against the parent document's
+  declarations. It is a type rather than a path, it produces no bytes, and it
+  has no findings of its own. An absent or empty one means what every stored
+  document means today.
+- `StatifierBlocks.BlockType.agrees?/3` answers whether a child's declaration
+  covers what a parent's `collect_type` expects of it, as
+  `StatifierDatamodel.Types`' own read check and in that package's own reason
+  vocabulary. The check is **dormant**: it is not a compile finding and
+  changes no compiled byte, and it answers only where both documents are in
+  hand.
+
+### Changed
+
+- The environment now **seeds** the declared path types the datamodel
+  document carries: before the walk begins it holds an entry at every path
+  the document declares, at the type it declares there, and a type a block
+  writes replaces it from that position on. A read at a declared path that
+  found nothing before, and was an `:info` advisory, now meets the declared
+  type - so a stored document that validated may refuse once its host
+  supplies a datamodel, and the fix is either the block's declaration or the
+  document's. A caller that supplies no datamodel is unaffected in every
+  particular.
+- A seeded entry's writer is `:declaration`, which
+  `StatifierBlocks.Assignability`'s `:type_mismatch` reports as its upstream
+  ref. Such a refusal carries no `{:fixable_by, block_id}` reason - there is
+  no block whose declaration an author would change - and its message says
+  the datamodel document declares the type rather than naming a block.
+- `core.map`'s `collect` writes `{:list, <the ADR-0009 envelope>}` rather
+  than `{:list, :unknown}`: one collected element is a shape of `index`,
+  `status`, an optional `donedata` typed by the block's own `collect_type`,
+  and an optional `failure`. A block after a `core.map` learns this whether
+  or not anything was declared, and no compiled byte moves.
+- The `statifier_datamodel` requirement rises to `~> 0.4`, which is where a
+  type expression admits an inline shape. Raising the floor alone also
+  widens what a document projects: an entry whose `type` names a declaration
+  contributes that declaration's fields as declared paths beneath it.
+
+- `core.map`'s `collect_type` and `core.on_event`'s `payload` are
+  `{:type_expr, opts}` fields admitting both arms, rather than `:string`
+  fields carrying a type name. A stored string is the name arm: the same
+  bytes, the same resolution, the same findings, and no compiled byte moves.
+- `core.map`'s `collect_type` may now be written inline - a list of
+  `"name"` / `"type"` / `"required?"` objects - and the inline shape becomes
+  the `"donedata"` member of the type `collect` writes, one level inside the
+  collected element's envelope.
+- `core.on_event`'s `payload` may now be written inline, and the refusal it
+  buys reads that arm the same way: a `capture` pair whose source path names
+  a member the inline payload does not carry is the same `:config` finding on
+  the `capture` key, walking below the first segment through a member typed by
+  a declared name or by a nested inline shape.
+- `StatifierBlocks.BlockType.agrees?/3` reads an inline `collect_type` as the
+  shape it writes rather than as nothing. The check stays dormant in every
+  other respect.
+- `core.on_event`'s `validate_config/1` no longer reports a finding of its own
+  for `payload`. What a value of a `{:type_expr, opts}` field may be is
+  `StatifierBlocks.BlockType.type_expr_findings/2`'s one check, which the
+  compiler's `:config` stage and the editor both already consult, so bytes that
+  are neither arm are refused once rather than twice on the same key.
+
+- `compile_options` is required of any host that compiles with `terminate:`,
+  `child_use:`, `known_invoke_types:` or `datamodel:`. Leaving it unset is not
+  an error and never was: the editor compiles a different chart than the host
+  does, and a run against that chart is silently unmarked, the Source tab
+  lists a chart nobody runs, and the fixture verdicts are about neither. Pass
+  the host's own option list.
+- `StatifierBlocks.SourceView.build/3` and
+  `StatifierBlocks.Runtime.FixtureRuns.run/4` forward their whole `opts` to
+  the compiler rather than `:declare` alone, less the one key each keeps for
+  itself (`:previous` and `:view_model`).
+
+- A compile refusal now carries the findings of the **Config and Structure
+  stages together**, instead of the first of the two that failed. A mis-typed
+  field on one card no longer hides an unsatisfied read on another, so an
+  author sees both in one refusal rather than one per round trip. Refusal
+  semantics are unchanged: such a document still does not compile, and every
+  stage after Structure still stops the pipeline at its first failure.
+- A block whose config the Config stage refused is skipped by id in the
+  Structure stage: it reports no structure finding of its own, and its
+  declared writes leave no entry in the typed environment, because a write
+  signature is read off the config that was refused. The walk continues past
+  it - its siblings and its children are checked exactly as before.
+
+- The palette an armed "+" opens now filters recipes as well as block types. A
+  recipe whose arrangement cannot land at the armed position - `insert/2`
+  refuses it there, or the commands it answers with reach outside ADR-0005
+  clause 3C's bound - is absent from the list rather than offered and then
+  refused at the click, which wrote nothing and said nothing. The pick still
+  runs both checks, so a stale pick is refused exactly as before.
+
+### Fixed
+
+- Dragging or picking a block type whose read is declared on a config field now
+  greys the slots that would refuse it. The probe carried only the schema's
+  defaults, and a path field defaulting to `""` names no path, so such a type
+  declared no read at insert time and every slot accepted it.
+
+- A block type that declares a datamodel-path field without a `default:` key is
+  now refused at compile, as a `:config` finding naming the field, instead of
+  raising a `FunctionClauseError` out of the view model when something rendered
+  the block. The view model reads a declaration's `default:` permissively, so a
+  field declared without one renders with no default rather than crashing the
+  build.
+
+- The editor's Source tab and its fixture runs now compile with the host's
+  `compile_options`, as the provenance recompile already did. All three
+  compiles pass one option list, so the listing, the fixture verdicts and the
+  Run pane's marks are all about the chart the host actually compiled.
+
+- A **root** block declaring an outcome named `failed` is now refused at
+  compile with a `:config` finding naming the field the name was written in,
+  rather than reaching `Statifier` as a duplicate state id reported against
+  the package. The name is the one the shared final for an unhandled failure
+  below the root already mints; rename the outcome. A block below the root is
+  unaffected, and no other document's compiled bytes move.
+
+- The editor toolbar's `Fit active` now works over a run the editor seated
+  itself: with nothing selected it fits and reveals the innermost block the
+  run's marks name, where before it was enabled only by the host's own
+  `active_marks` list.
+
+- A `:type_mismatch` compiler finding now carries the `config_key` of the field
+  whose read signature declared the path, so an editor can put a refused read
+  on the control the author has to change. Two path fields reading the same
+  path were indistinguishable in a finding, which named the path only.
+
 ## [0.22.0] 2026-09-06
 
 0.22.0 makes failure a first-class outcome across the block vocabulary, and
@@ -2181,6 +2420,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.23.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.23.0
 [0.22.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.22.0
 [0.21.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.21.0
 [0.20.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.20.0
