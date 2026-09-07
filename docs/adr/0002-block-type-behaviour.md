@@ -8089,3 +8089,362 @@ not already taken or pointed at. Items 3 and 4 are implemented by `sb-9w7w`,
 item 6 by `sb-a0xw`, and item 1's decision lands as `sb-ekkt`'s amendment with
 `sb-mulk` behind it. Items 2 and 5 record rulings no request carries yet; each
 names the change it is measured against.
+
+## Amendment (2026-09-07): a composite may declare a pass-through slot - `slots:` on the `use`, a `"slots"` key on a data declaration - and the card draws an interior for it
+
+**Status: proposed (2026-09-07, campaign SF038, bead `sb-nlo5`, recording
+campaign-SF038's ruling `RQ-SF038-5` and the card half of `RQ-SF038-14`).** A
+decision record merges at proposed under the campaign invariant; flipping it to
+accepted is a separate gated request through the same `docs/adr/` gate, and
+`sb-vjvq` carries it once `sb-q183` has landed. Additive: decisions 1-8 stand
+as accepted, the Amendment of this date at `:6360` and the Amendment of this
+date at `:6732` stand as accepted, and no text above this line is edited by
+this section.
+
+An amendment rather than a Note, because this file says four times that a
+composite has no slot of its own and `RQ-SF038-5` gives it one. `:6500`
+("`slots/1` is `[]`, and that is `RQ-SF037-3`"), the worked example's table row
+at `:6702`, `:6721` ("a composite that exposes a slot of its own is a later
+record's") and `:7030` are the four; `:7656`'s claim-table row records the same
+thing for the data kind. This is the later record `:6721` was written for.
+
+A **pass-through slot** is a slot the author fills on the composite's own card,
+whose children the expansion carries into a named slot of a named member. This
+record owns the declaration and nothing else: the spelling, what `slots/1` and
+`io/1` answer, the splice rule, what a broken declaration does, and what the
+card draws. Where the children land in the compile, what ids they carry there
+and who owns a finding on one of them is `ADR-0004`'s amendment of this date
+(`docs/adr/0004-compiler-provenance.md:3241`, `:3286`, `:3318`); where the
+environment walk descends is `ADR-0011`'s amendment of this date
+(`docs/adr/0011-typed-environment.md:2683`). Neither is restated here.
+`sb-q183` builds all three.
+
+### P1. The declaration: `slots:` on `use StatifierBlocks.Composite`
+
+`use StatifierBlocks.Composite`'s five options (`lib/statifier_blocks/composite.ex:226-244`,
+the macro at `:245`) gain a sixth, `:slots`, optional and defaulting to `[]`.
+It is a **list of maps**, each with:
+
+  * `:name` (**required**) - `t:StatifierBlocks.Block.slot_name/0`, the slot
+    name the composite exposes and a stored document keys the author's children
+    under. Unique within one declaration.
+  * `:to` (**required**) - `{local_id, inner_slot}`, the local id of a member
+    of `subtree/1` and the name of a slot on that member.
+  * `:label` - the human label the card's interior draws. Defaults to `:name`.
+  * `:arity` - a `t:StatifierBlocks.BlockType.slot_arity/0`. Defaults to
+    `:any`.
+
+`:label` and `:arity` are **forced, not added**: `c:StatifierBlocks.BlockType.slots/1`
+answers a `[t:StatifierBlocks.BlockType.slot_decl/0]`
+(`lib/statifier_blocks/block_type.ex:321`) and a `slot_decl/0` is the 3-tuple
+`{name, arity, label}` (`:177`). Two of the three have to come from somewhere,
+and the declaration is the only place that knows them.
+
+`:any` is the right default rather than an inherited one, and the reason is
+worth stating. The obvious alternative is to derive the arity from the mapped
+inner slot's own `slots/1`, and it is wrong twice: resolving the member's
+module needs a palette, which `slots/1` is not handed and which the derivation
+behind the callback can only approximate through `StatifierBlocks.Palette.core/0`
+(`composite.ex:497`, the limitation stated at `:154-176`); and the check the
+derivation would be imitating **already runs anyway**. `ADR-0004`'s T1 first bullet says an
+unfilled pass-through slot splices nothing, the mapped inner slot is empty, and
+the member's own arity finding is raised on the expanded tree and re-anchored
+onto the composite. Declaring `:any` therefore loses no check; declaring
+anything narrower is the author's own constraint, stated once, on top of it.
+
+### P2. The same declaration held as data: a declaration-level `"slots"` key
+
+`StatifierBlocks.Composite.Data.declaration/1`
+(`lib/statifier_blocks/composite/data.ex:319`) reads six row keys today -
+`"type_name"`, `"version"`, `"params"`, `"subtree"`, `"palette_entry"`,
+`"sentence"`. It gains a seventh, `"slots"`, optional and defaulting to `%{}`:
+a **map of slot name to `[local_id, inner_slot]`**, a two-element JSON array
+because JSON has no tuple. `:label` and `:arity` from P1 are spelled as the
+optional keys of a map value where an author wants them, so the value is
+either the two-element array or
+`%{"to" => [local_id, inner_slot], "label" => ..., "arity" => ...}`, and the
+array is sugar for the map with the two defaults. The decoded state carries the
+same `slots` list P1's `use` writes, so `slots/2`
+(`composite/data.ex:388`, which answers `[]` today) and `slots/1`
+(`composite.ex:261`, likewise) answer the same thing from the same shape.
+
+**This is a declaration-level key, and the template already has a node-level
+key of the same name.** A template node is a map with string keys
+`"type"`, `"id_suffix"`, `"config"` and `"slots"` (`composite/data.ex:127`),
+where the node's `"slots"` is "optional, defaulting to `%{}`: a slot name to a
+list of nodes" (`:148`), decoded at `:734` and carried into `node_template/0`'s
+`:slots` field. That key is untouched by this section and keeps its meaning
+exactly. The key this section adds is a **sibling of `"subtree"`**, not a key
+inside it: it appears once per declaration, at the top level of the row
+`declaration/1` is handed, and its values are pairs of strings rather than
+lists of nodes. A reader who cannot tell which is meant should read the nesting
+depth: the node-level one is reached only through `"subtree"`.
+
+### P3. What `slots/1` answers, and what `io/1`'s `slot_accepts` answers
+
+`slots/1` answers **the declared slots, in declaration order**, one
+`slot_decl/0` per entry, and `[]` when nothing is declared - which is the whole
+of today's behaviour and why this is an amendment by addition rather than a
+replacement. `RQ-SF037-3`'s answer at `:6500` is the `slots: []` case, and it
+stays the answer for every composite written before this section and every one
+that declares nothing after it.
+
+`io/1`'s `slot_accepts` is `%{}` today, for the reason `:146-147` gives - "the
+composite declares no slots, so there is no slot name to accept into" - and the
+code writes the literal (`composite.ex:521`). It now answers, for each declared
+slot, that slot's name mapped to **the mapped inner slot's accepted kinds**,
+read from the member the local id names. That resolution is the one the
+derivation already runs over the members (`composite.ex:515`, `:519`), and it
+inherits its one limitation unchanged (`composite.ex:154-176`): the **callback**
+resolves members through `StatifierBlocks.Palette.core/0` (`composite.ex:497`),
+so a mapped member whose type is a **host** type falls back exactly as `io/1`
+already falls back for a host expansion root. This section adds no new fallback
+value and no palette argument to the callback. A reader that holds a palette
+reaches the exact answer through `StatifierBlocks.Composite.io/2`
+(`composite.ex:476`, the palette first), the arity-2 function the Note of this
+date at `:7980` decides.
+
+### P4. The splice: the composite block's slot children, ids unchanged
+
+For a composite block whose declaration maps slot `name` to
+`{local_id, inner_slot}`, `Composite.expand/2` (`composite.ex:409`) answers the
+subtree it answers today **with the composite block's own children under
+`name` placed in the `inner_slot` slot of the member minted from `local_id`**,
+in their stored order.
+
+Those children are **not minted**. Minting is what turns a subtree's local ids
+into document ids (`### The ids the subtree mints`, `:6444`); a pass-through
+child arrived carrying a document id already. `mint/3` walks the subtree's own
+blocks and their slot children (`composite.ex:657`); the spliced children are
+placed outside that walk and pass through untouched, ids, configs, slots and
+all. `ADR-0004`'s T2 (`docs/adr/0004-compiler-provenance.md:3286`) is where
+that id's consequences downstream are decided; here it is a property of
+`expand/2`.
+
+An unfilled declared slot splices nothing and the mapped inner slot is left as
+the subtree wrote it - which, by P5's third error, is empty.
+
+### P5. Three declaration errors, and where each is raised
+
+A declaration whose mapping does not fit its own subtree is broken, and this
+section refuses three cases. Each is checked against the subtree's **own**
+blocks and needs no palette:
+
+1. **An unknown local id.** `:to`'s `local_id` names no block in `subtree/1`'s
+   flattened list.
+2. **An unknown inner slot.** The member exists, but its `slots` map has no key
+   `inner_slot`. A subtree that means to receive children therefore writes the
+   empty slot explicitly - `core.group id "blk_GX_then" slots %{"body" => []}`
+   in P8 - and that is deliberate: the declaration author states where the
+   children go, in the subtree, in the one place the mapping can be checked
+   without resolving a type.
+3. **A mapped inner slot the subtree also fills.** The member's `slots` map
+   carries `inner_slot` with a **non-empty** list. This is the question
+   `ADR-0004`'s T1 defers here ("whether such a declaration is admissible at
+   all is `ADR-0002`'s question rather than this one's",
+   `docs/adr/0004-compiler-provenance.md:3241`), and the answer is **no**. T1
+   already fixes that the mapped inner slot "holds them and only them"; a
+   declaration that also wrote children there would be two authors writing one
+   list, with no rule for the order and no way for either to see the other. It
+   is refused rather than merged, and a declaration that wants both writes a
+   second member.
+
+Two declared slots mapping to **one** inner slot is refused for the same
+reason, as is a duplicate `:name`.
+
+**Where each is raised differs by kind, and follows the kind's existing
+practice.** A module composite's `subtree/1` is a function of the params, so
+there is no subtree to check until `expand/2` has one: these refusals raise
+from `expand/2`, beside `check_local_ids!/2` (`composite.ex:628`) and
+`mint_id/3` (`:668`), in the same `ArgumentError` shape and for the same
+reason - "the declaration is broken" is not a finding a document can carry. A
+data composite's subtree is a static template, so `declaration/1` sees all
+three statically and answers `{:error, [...]}` with the other declaration
+errors, which is the moment `composite/data.ex:116-123` calls "the last moment a
+malformed declaration can be refused". The data kind therefore refuses earlier
+and the module kind refuses at the first expansion; neither admits a broken
+mapping.
+
+The one check that is **not** here is the inner slot's own type: whether the
+member's declared type really has a slot by that name is a question about a
+resolved module, and a template's `"type"` "is not checked here - the palette
+is not built yet" (`composite/data.ex:137-140`). That check is the compiler's
+on the expanded tree, exactly as an unresolvable member type already is.
+
+### P6. The card draws an interior for the declared slot only
+
+`ADR-0005`'s 7E (`docs/adr/0005-liveview-editor.md:8601`) reads "**A composite
+draws as an ordinary leaf card.**" That sentence is amended **by addition**, and
+the addition is: *a composite draws as a leaf card unless its declaration names
+a slot, and then it draws one interior per declared slot, in declaration order,
+under the declared label.* 8E (`:8612`) scopes itself to campaign SF037 in its
+own words - "**A composite's `slots/1` is empty, in campaign SF037**" - and
+names pass-through slots "a later campaign's question"; this is that campaign
+and that answer.
+
+Nothing else about 7E changes, and its claim survives intact: the drawing code
+still does not learn the word "composite". A composite that declares a slot
+draws its interior the way **any** type with a slot draws one, from the
+`slot_decl/0` its `slots/1` answers, through the same `ViewModel.Node` path;
+that is precisely what P1's `:label` and `:arity` are for. The card's chips and
+sentence are unchanged. An author drops into that interior the way they drop
+into any slot, and what they may drop is `slot_accepts` (P3), which is the
+mapped inner slot's own answer.
+
+The addition is recorded here rather than in `ADR-0005` because the
+declaration is this record's and campaign SF038's sections on `ADR-0005` belong
+to other requests; 7E and 8E are named, quoted and amended by cross-cite, and
+no text in that file is edited by this section.
+
+`RQ-SF038-14`'s card half is this clause. **No layout mode is added to the
+package editor by it**, and none is implied: a declared slot is a component's
+own declaration, drawn by the drawing code that already exists.
+
+### P7. Expand carries the children
+
+The `Expand` gesture replaces a composite block in the document with its
+expansion. It writes **the same tree `expand/2` answers**, pass-through
+children included, in the mapped inner slot, with their ids unchanged - so the
+gesture moves the author's blocks and rewrites none of them.
+
+The property that buys is the one campaign SF038 is measured on: the compiled
+chart of a document holding a composite with a filled pass-through slot is
+byte-identical to the chart of the same document after `Expand`, because
+`Expand` writes what Resolve would have built and `ADR-0004`'s T4
+(`docs/adr/0004-compiler-provenance.md:3370`) says the compiled bytes are the
+same before and after. A child that was addressable only through the
+composite's card before the gesture is addressable in its own right after it,
+at the same id, which is the same continuity `ADR-0004`'s T2 rests on.
+
+### P8. Worked example: "Guarded section", as a module
+
+The signup domain, and the same composite `ADR-0011`'s worked example
+(`docs/adr/0011-typed-environment.md:2802`) reads the walk against, so the two
+records describe one artefact.
+
+    use StatifierBlocks.Composite,
+      name: "myapp.guarded_section",
+      params: [
+        %{key: "applicant_path", type: :string, label: "Record the applicant at",
+          required?: true, default: "", datamodel_path?: true},
+        %{key: "failure_path",   type: :string, label: "Record the failure at",
+          required?: true, default: "", datamodel_path?: true}
+      ],
+      slots: [
+        %{name: "body", to: {"then", "body"}, label: "Then"}
+      ]
+
+    subtree(params):
+      myapp.signup_step  local id "call"
+        config  %{"assign_to" => params["applicant_path"]}
+        slots   %{"on_error" => [
+          core.assign  local id "guard"
+            config  %{"path" => params["failure_path"], "value" => "failed"}
+        ]}
+      core.group  local id "then"
+        slots   %{"body" => []}
+
+for a composite block whose id is `blk_GX`, which mints `blk_GX_call`,
+`blk_GX_guard` and `blk_GX_then`. `core.group` declares a `body` slot at `:any`
+(`lib/statifier_blocks/core/group.ex:37-41`) and `core.assign` declares `path`
+and `value` (`lib/statifier_blocks/core/assign.ex:64-75`). `"then"` is a local
+id in the subtree and `"body"` is a key of that member's `slots` map written
+empty, so none of P5's three errors fires.
+
+**`:to`'s first element is the LOCAL id, not the minted one**, and this example
+spells it that way deliberately. Two existing worked examples print the
+*minted* id in the position where `subtree/1` writes a local one - `### Worked
+example: "Guarded step"` at `:6665` (`core.invoke id "blk_GS_call"` for a
+`blk_GS` composite) and `ADR-0011`'s at
+`docs/adr/0011-typed-environment.md:2827-2838` (`core.group  id "blk_GX_then"`,
+and
+`to: {"blk_GX_then", "body"}` with it). Neither is edited by this section and
+neither is a decision about the mapping; but a local id spelled that way is not
+merely redundant, it is **refused**: `check_local_ids!/2` raises on a local id
+that starts with `"blk_"` (`composite.ex:628`), and a data declaration's
+`"id_suffix"` must match `~r/\A[a-z0-9]+(_[a-z0-9]+)*\z/`
+(`composite/data.ex:141-146`), which no `blk_GX_then` matches. The mapping
+names what `subtree/1` writes and what `"id_suffix"` spells, which is the same
+string in both kinds, and `sb-q183` builds it that way.
+
+The author's document holds `blk_GX` with one child, `blk_notify`, in its
+`body` slot. What the derived block type answers:
+
+| Callback | Answer | Where it comes from |
+|---|---|---|
+| `config_schema/1` | the two params above | the declaration |
+| `slots/1` | `[{"body", :any, "Then"}]` | P1 and P3 - one entry, the declared label, the default arity |
+| `io/1`'s `slot_accepts` | `%{"body" => the kinds core.group accepts into body}` | P3, resolved the way the derivation already resolves members, and exact here because `core.group` is a core type |
+| `expand/2` | the two members above, with `blk_notify` in `blk_GX_then`'s `body` slot | P4 - `blk_GX_call`, `blk_GX_guard` and `blk_GX_then` are minted, `blk_notify` is not |
+| `emit/2` | raises | no `blk_GX` survives Resolve |
+
+Compared with `### Worked example: "Guarded step"` at `:6665`, exactly one row
+of that example's table moves: `slots/1`, which reads `[]` there at `:6702`.
+"Guarded step" declares no `slots:`, so its row stays right for it.
+
+### P9. The same declaration, held as data
+
+The identical composite, as a row a tenant saved, in the shape
+`### The subtree template's data shape` (`:7090`) fixes, with P2's key added:
+
+```json
+{
+  "type_name": "myapp.guarded_section",
+  "version": 1,
+  "params": [
+    {"key": "applicant_path", "type": "string", "label": "Record the applicant at",
+     "required?": true, "default": "", "datamodel_path?": true},
+    {"key": "failure_path", "type": "string", "label": "Record the failure at",
+     "required?": true, "default": "", "datamodel_path?": true}
+  ],
+  "slots": {"body": {"to": ["then", "body"], "label": "Then"}},
+  "subtree": [
+    {"type": "myapp.signup_step", "id_suffix": "call",
+     "config": {"assign_to": {"$param": "applicant_path"}},
+     "slots": {"on_error": [
+       {"type": "core.assign", "id_suffix": "guard",
+        "config": {"path": {"$param": "failure_path"}, "value": "failed"}}
+     ]}},
+    {"type": "core.group", "id_suffix": "then", "slots": {"body": []}}
+  ]
+}
+```
+
+Both `"slots"` keys are in that row, and the nesting says which is which: the
+declaration-level one is a sibling of `"subtree"` and its value is a mapping;
+the node-level ones are inside `"subtree"` and their values are lists of nodes.
+The plain-array sugar of P2 spells the same mapping as
+`"slots": {"body": ["then", "body"]}`, with the label defaulting to `"body"`.
+
+`declaration/1` refuses this row if `"then"` is not a declared `"id_suffix"`,
+if the node it names carries no `"body"` key in its own `"slots"`, or if that
+key carries a non-empty list - P5's three errors, all three statically visible
+here because the template is static. The mapping and the module kind's are the
+same string in the same position, which is P8's last paragraph.
+
+A tenant who saves this row gets a block type whose card has an interior, from
+data, with no module generated for it - `### Per-instance module generation is
+rejected` (`:7155`) is untouched.
+
+### What this section does not decide
+
+- **Where the children land in the compile, what ids they carry, who owns a
+  finding on one**: `ADR-0004`'s amendment of this date, T1-T4.
+- **Where the environment walk descends and what it reads there**:
+  `ADR-0011`'s amendment of this date, sections 1-3.
+- **A `"migrations"` list on a data declaration**: `sb-ekkt`'s amendment on
+  this file, which the Note at `:7925` points at.
+- **How `Collapse` proposes a pass-through slot.** `RQ-SF038-5` relaxes
+  `ADR-0005`'s 13E so that a selection whose subtree holds an unfilled slot is
+  admissible and proposed as a pass-through slot rather than refused, and the
+  children are not lifted. The gesture is `ADR-0005`'s and `sb-uzly`'s; this
+  section fixes only the declaration such a proposal must produce.
+- **Nesting a composite in a pass-through slot**: it is admitted, and
+  `ADR-0004`'s T1 third bullet says what happens to it. Nothing here limits the
+  depth.
+- **A slot on a composite that is not a pass-through**: there is no such thing.
+  Every slot a composite declares maps to a member, and a composite still
+  carries no interior of its own.
+
+Filed with `sb-nlo5`, campaign SF038. Implemented by `sb-q183`; flipped to
+accepted by `sb-vjvq` once it has landed.
