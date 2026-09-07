@@ -22,7 +22,11 @@ defmodule StatifierBlocks.Compiler do
   2. **Resolve** - every block through
      `StatifierBlocks.Palette.resolve/2`, which also applies an in-memory
      config migration (ADR-0002 decision 8). Nothing is written back.
-  3. **Config** - every block's `validate_config/1`.
+  3. **Config** - every block's `validate_config/1`, the checks beside it
+     that read something a block type cannot see from its own config, and
+     the one name a **root** block may not declare as an outcome (ADR-0002's
+     failure amendment of 2026-09-06, section 4 step 3, and the Note that
+     closes it).
   4. **Structure** - `StatifierBlocks.SlotValidation.validate/2` (slot
      arity, `:undeclared_slot`) and `StatifierBlocks.Assignability.validate/3`
      (may this block land in this slot, by kind tag and by data-flow type -
@@ -535,7 +539,93 @@ defmodule StatifierBlocks.Compiler do
   @spec config_stage(Resolved.t(), keyword()) :: [Finding.t()]
   defp config_stage(node, opts) do
     declarations = opts |> assignability_context() |> Environment.declarations()
-    config_findings(node, declarations)
+    reserved_outcome_findings(node) ++ config_findings(node, declarations)
+  end
+
+  # The one outcome name a **root** block may not declare (RQ-SF035-16;
+  # `sb-ju4d` left the question open on ADR-0002's failure amendment,
+  # section 4 step 3, and the Note of this bead's date closes it there).
+  #
+  # Section 4 step 3 mints the one shared final an unhandled failure below
+  # the root reaches from the root block's id under the role
+  # `<prefix>failed`, and `completion_outcome/6` mints the root's own
+  # completion finals from the same id under `<prefix><outcome>`. A root
+  # block declaring an outcome literally named `failed` therefore asks for
+  # one state id twice.
+  #
+  # Refused unconditionally, not only where the collision would actually
+  # fire. Whether the shared final is emitted at all depends on an
+  # unhandled failure-classed outcome somewhere below the root (step 2), so
+  # a conditional refusal would let a document compile and then stop
+  # compiling after an edit three blocks down that says nothing about the
+  # root's outcome names - and would say so in a sentence about a block the
+  # author was not editing. The name is reserved on the root instead, in
+  # one sentence the author can act on where they wrote it.
+  #
+  # Only on the root, because only the root's id mints `<prefix>failed`: a
+  # block below the root may name an outcome `failed` exactly as it always
+  # could, since its own outcome ids are minted from its own id.
+  #
+  # It is a `:config` finding rather than an `:emit` one because it is the
+  # author's to fix and it is about a value they wrote, which is the split
+  # `StatifierBlocks.Compiler.Finding`'s moduledoc draws; `:emit`'s
+  # `:invalid_outcome` beside it is about a name no author could have
+  # written, minted by a type.
+  @spec reserved_outcome_findings(Resolved.t()) :: [Finding.t()]
+  defp reserved_outcome_findings(%Resolved{block: block, module: module}) do
+    if @failed_role in BlockType.outcome_names(module, block.config) do
+      key = outcome_source_key(block, module)
+
+      [
+        Finding.new(
+          :config,
+          {:invalid_config, key},
+          ~s(declares the outcome "#{@failed_role}" on the root block, whose top-level ) <>
+            "final would take the state id already minted for the one shared final an " <>
+            "unhandled failure below the root reaches (ADR-0002's failure amendment of " <>
+            "2026-09-06, section 4 step 3). The name is reserved on a root block; rename " <>
+            "the outcome",
+          block_id: block.id,
+          config_key: key
+        )
+      ]
+    else
+      []
+    end
+  end
+
+  # Which config field the reserved name came out of, so an editor
+  # underlines that field rather than the whole card: the field whose
+  # removal removes the outcome. No new callback and no per-type knowledge
+  # - `core.subchart` reads its outcomes off `outcomes`, and a host type
+  # reads its own off whatever it likes.
+  #
+  # Keys in sorted order, so a config where more than one field could
+  # answer for the name anchors on the same one every time.
+  #
+  # `nil` when no single field answers for it - a type whose outcome list
+  # is a constant, or one that reads two fields together - and `nil` is
+  # exactly the block anchor every finding that is about a block rather
+  # than one of its fields already carries.
+  @spec outcome_source_key(Block.t(), module()) :: String.t() | nil
+  defp outcome_source_key(%Block{config: config}, module) do
+    config
+    |> Map.keys()
+    |> Enum.sort()
+    |> Enum.find(&(@failed_role not in outcome_names_without(module, config, &1)))
+  end
+
+  # The probe hands a block type a config it did not write, which is the
+  # one place in this stage a well-behaved type could raise where the real
+  # compile would not - a type that fetches a key it declared required. A
+  # type that raises here has answered the question the probe asked with
+  # "not this key", which is what decision 1's "never raises" costs and all
+  # it costs: the finding is produced either way, with the block anchor.
+  @spec outcome_names_without(module(), Block.config(), String.t()) :: [String.t()]
+  defp outcome_names_without(module, config, key) do
+    BlockType.outcome_names(module, Map.delete(config, key))
+  rescue
+    _any -> [@failed_role]
   end
 
   # Decision 10's two stages that run as a pair rather than in sequence. See

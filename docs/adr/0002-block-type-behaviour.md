@@ -5381,3 +5381,82 @@ and its "refuses nothing else, and in particular nothing about N" clause are all
 unaffected, because only the rule behind one field's refusal moved.
 
 Filed with `sb-ctfg`, campaign SF035's Lane A, from `sb-cjou`'s discovery.
+
+## Note (2026-09-06): the open sentence in section 4 step 3 - a root outcome named `failed` is refused at compile
+
+A dated Note rather than an amendment. It edits nothing above this line, and in
+particular it does not touch the failure amendment of this date: section 4's
+four steps stand word for word, the shared final is minted where and how step 3
+says under both prefixes, and the `<donedata>` it carries is unchanged. What
+this Note records is the answer to the one question that amendment left open,
+in the bracketed Note inside its own step 3, and what the answer does and does
+not reach.
+
+**The open sentence.** The failure amendment of this date left one question
+open, in a bracketed Note inside section 4 step 3: `sb-hxs5` mints the one
+shared final an unhandled failure below the root reaches from the root block's
+id under the role
+`<prefix>failed`, and a **root** block declaring an outcome literally named
+`failed` would mint the same id for its own completion final. That Note said
+the choice between a fallback role and a compile refusal was a decision the
+flip it rode on did not take. This Note takes it, and takes it as a refusal.
+
+**The answer.** `failed` is reserved as an outcome name on a **root** block. A
+document whose root block declares it is refused at compile, in the `:config`
+stage, with a finding against the root block that names the reserved name and
+says to rename the outcome. The finding carries the config field the outcome
+name came out of where one field answers for it - `core.subchart`'s `outcomes`,
+for the type most likely to reach this - and the block anchor where none does,
+which is a type whose outcome list is a constant. Ruled `RQ-SF035-16` in
+campaign SF035's walk, with the operator present.
+
+**Why a refusal rather than a fallback role.** A fallback would have to rename
+one of the two finals, and both names are load-bearing in a way a generated
+suffix would spoil. The shared final's role is read by a human looking at the
+compiled chart to tell which compile option produced it (step 3's own
+reasoning), and the completion final's role is the author's own outcome name,
+which is what `done.outcome.<state id>.<outcome>` and the `outcome` `<param>`
+carry across the invoke boundary. Renaming either one to `failed_2` buys a
+document that compiles and produces a chart nobody can read, in exchange for
+allowing one word. The word is worth less than the two readings.
+
+**Why unconditional, rather than only where the collision fires.** Whether the
+shared final is emitted at all depends on step 2: a document with no unhandled
+failure-classed outcome below its root emits nothing extra, so a conditional
+refusal would let a document compile, and then stop compiling after an edit
+three blocks down that says nothing about the root's outcome names - reporting
+it in a sentence about a block the author was not editing. The name is reserved
+on the root instead, where the author wrote it and can act on it.
+
+**Why the root only.** `<prefix>failed` is minted from the root block's id
+alone. A block below the root mints its own outcome ids from its own id, so
+`failed` there collides with nothing and stays the author's word to use; this
+Note reserves nothing below the root.
+
+**What it replaces.** The collision was already refused - by `Statifier`, at
+the `:chart` stage, as a duplicate state id, with `fault: :package` - the
+class `ADR-0004` decision 9 gives a structural finding, which it calls a bug
+in this package or in a host's block type and never the author's doing, and
+which `StatifierBlocks.Compiler.Finding`'s own moduledoc spells "a bug in this
+package or in a host's block type, and no edit to the document will help".
+That was the defect: an author
+who had written one word into one field was told the problem was not theirs to
+fix. Nothing was ever miscompiled, and nothing about the emitted bytes changes
+here. What moves is which stage refuses, whose fault it reports, and which
+field it points at.
+
+**What does not change**, beyond the section this Note answers, which the
+opening paragraph holds fixed. The outcomes amendment A's rules on what a type
+may declare are
+untouched - `failed` is still a well-formed outcome name, still a legal role,
+and still legal on every block that is not the root of the document being
+compiled. Decision 7's field-type set gains no member and no callback is added
+or changed. Every document that does not declare this one name at its root
+compiles to exactly the bytes it compiled to before, which
+`StatifierBlocks.Compiler.ByteCorpusTest` pins against goldens captured before
+the amendment rather than against today's output.
+
+The bracketed Note inside step 3 stays where it is: it is the dated record of
+the question, and this Note is the dated record of the answer.
+
+Filed with `sb-k0dy`, campaign SF035's Lane A, from `sb-hxs5`'s open question.
