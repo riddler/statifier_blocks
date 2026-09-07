@@ -560,7 +560,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     alias StatifierBlocks.{Compiled, Compiler}
     alias StatifierBlocks.Compiler.StateId
     alias StatifierBlocks.Document.DatamodelEntry
-    alias StatifierBlocks.Edit.{History, Targets}
+    alias StatifierBlocks.Edit.{History, Session, Targets}
     alias StatifierBlocks.Runtime.{FixtureRuns, Handled, Marks, RunValues, Selection}
 
     alias StatifierBlocks.Editor.{
@@ -1492,13 +1492,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     def handle_event("undo", _params, socket) do
-      %{history: history, palette: palette, document: document} = socket.assigns
-      {:noreply, replay(socket, History.undo(history, palette, document))}
+      {:noreply, step(socket, :undo)}
     end
 
     def handle_event("redo", _params, socket) do
-      %{history: history, palette: palette, document: document} = socket.assigns
-      {:noreply, replay(socket, History.redo(history, palette, document))}
+      {:noreply, step(socket, :redo)}
     end
 
     # d8: the "+" path. The palette opens filtered by the same predicate a
@@ -1599,18 +1597,45 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # one implementation rather than one per event.
     @spec commit(Phoenix.LiveView.Socket.t(), Edit.t()) :: Phoenix.LiveView.Socket.t()
     defp commit(socket, command) do
-      %{history: history, palette: palette, document: document} = socket.assigns
+      socket |> edit_session() |> Session.commit(command) |> landed(socket)
+    end
 
-      case History.commit(history, palette, document, command) do
-        {:ok, new_history, new_document} ->
-          socket
-          |> assign(history: new_history, document: new_document, last_error: nil)
-          |> notify_change(new_document)
-          |> rebuild()
+    # The socket half of the funnel, and the only half that is this
+    # component's: `StatifierBlocks.Edit.Session` decides what a command does
+    # to the document, the history and the drafts, and this puts the answer
+    # back on the socket. `{:ok, _}` is the tag that says the document moved,
+    # which is exactly when the host is notified.
+    @spec edit_session(Phoenix.LiveView.Socket.t()) :: Session.t()
+    defp edit_session(socket) do
+      %{history: history, palette: palette, document: document, drafts: drafts} = socket.assigns
 
-        {:error, reason} ->
-          socket |> assign(:last_error, reason) |> rebuild()
-      end
+      %Session{
+        palette: palette,
+        document: document,
+        history: history,
+        drafts: drafts,
+        last_error: socket.assigns.last_error
+      }
+    end
+
+    @spec landed({:ok, Session.t()} | {:error, Session.t()}, Phoenix.LiveView.Socket.t()) ::
+            Phoenix.LiveView.Socket.t()
+    defp landed({:ok, session}, socket) do
+      socket
+      |> assign(
+        history: session.history,
+        document: session.document,
+        drafts: session.drafts,
+        last_error: nil
+      )
+      |> notify_change(session.document)
+      |> rebuild()
+    end
+
+    defp landed({:error, session}, socket) do
+      socket
+      |> assign(drafts: session.drafts, last_error: session.last_error)
+      |> rebuild()
     end
 
     # The declarations panel's own funnel (2l). It differs from `commit/2` in
@@ -1677,19 +1702,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # document never accepted, and keeping one across a history move would
     # mean showing the author a value that belongs to a document state they
     # just stepped out of.
-    @spec replay(Phoenix.LiveView.Socket.t(), {:ok, History.t(), Document.t()} | {:error, term()}) ::
-            Phoenix.LiveView.Socket.t()
-    defp replay(socket, result) do
-      case result do
-        {:ok, new_history, new_document} ->
-          socket
-          |> assign(history: new_history, document: new_document, drafts: %{}, last_error: nil)
-          |> notify_change(new_document)
-          |> rebuild()
-
-        {:error, reason} ->
-          socket |> assign(:last_error, reason) |> rebuild()
-      end
+    @spec step(Phoenix.LiveView.Socket.t(), :undo | :redo) :: Phoenix.LiveView.Socket.t()
+    defp step(socket, direction) do
+      socket |> edit_session() |> Session.step(direction) |> landed(socket)
     end
 
     # Ids are minted here, at gesture time, and baked into the `:insert`
@@ -2026,47 +2041,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # This is the probe only. The block a pick or a drop actually inserts
     # still comes from `Palette.new_block/2`: the entry's declaration is what
     # a type would be asked about, not a config the author never wrote.
-    @spec probe(Palette.t(), Block.type_name()) :: {:ok, Block.t()} | :error
-    defp probe(palette, type) do
-      with {:ok, block} <- Palette.new_block(palette, type),
-           {:ok, module} <- Palette.fetch(palette, type) do
-        {:ok, %{block | config: Map.merge(block.config, entry_default_config(module))}}
-      else
-        _error -> :error
-      end
-    end
-
-    # `palette_entry/0` is optional, and a type name can resolve to a module
-    # that is not loadable, so both are checked the way
-    # `Environment.subject_path/2` checks them for the same callback.
-    @spec entry_default_config(module()) :: Block.config()
-    defp entry_default_config(module) do
-      if Code.ensure_loaded?(module) and function_exported?(module, :palette_entry, 0) do
-        BlockType.default_config(module.palette_entry())
-      else
-        %{}
-      end
-    end
-
     @spec change_config(Phoenix.LiveView.Socket.t(), Block.id(), Block.config()) ::
             Phoenix.LiveView.Socket.t()
     defp change_config(socket, id, config) do
-      %{history: history, palette: palette, document: document} = socket.assigns
-
-      case History.commit(history, palette, document, {:update_config, id, config}) do
-        {:ok, new_history, new_document} ->
-          socket
-          |> assign(history: new_history, document: new_document, last_error: nil)
-          |> update(:drafts, &Map.delete(&1, id))
-          |> notify_change(new_document)
-          |> rebuild()
-
-        {:error, {:invalid_config, ^id, _findings}} ->
-          socket |> update(:drafts, &Map.put(&1, id, config)) |> rebuild()
-
-        {:error, reason} ->
-          socket |> assign(:last_error, reason) |> rebuild()
-      end
+      socket |> edit_session() |> Session.change_config(id, config) |> landed(socket)
     end
 
     # `key` arrives from the row's `phx-value-key`, which is the field's
@@ -2085,35 +2063,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       with id when not is_nil(id) <- socket.assigns.selected_id,
            %ViewModel.Field{} = field <-
              Enum.find(ViewModel.fields_for(socket.assigns.view_model, id), &(&1.key == key)) do
-        config = Document.effective_config(socket.assigns.document, id, socket.assigns.drafts)
-        path = ViewModel.Field.value_path(field)
-
-        rows =
-          case BlockType.fetch_value(config, path) do
-            {:ok, value} -> rows_of(field.type, value)
-            :error -> []
-          end
-
-        rows = apply_gesture(rows, member_path(params), gesture, blank_row(field.type))
-
-        change_config(socket, id, BlockType.put_value(config, path, rows))
+        socket
+        |> edit_session()
+        |> Session.update_list(id, field, {member_path(params), gesture})
+        |> landed(socket)
       else
         _none -> socket
       end
     end
-
-    # A `{:list, t}` wraps whatever it finds, which is the behaviour a stored
-    # scalar has always had there. A `{:type_expr, opts}` does not: its
-    # inline arm is a list and its name arm is a string, and wrapping the
-    # string would turn a type name into a nameless member.
-    @spec rows_of(BlockType.field_type(), term()) :: [term()]
-    defp rows_of({:type_expr, _opts}, value) when is_list(value), do: value
-    defp rows_of({:type_expr, _opts}, _not_a_member_list), do: []
-    defp rows_of(_type, value), do: List.wrap(value)
-
-    @spec blank_row(BlockType.field_type()) :: term()
-    defp blank_row({:type_expr, _opts}), do: %{"name" => "", "type" => "", "required?" => false}
-    defp blank_row(_type), do: ""
 
     # Which member list the gesture is about. Empty is the field's own, and
     # each further index steps into that member's own type - the same descent
@@ -2124,29 +2081,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp member_path(_no_path), do: []
-
-    @spec apply_gesture([term()], [non_neg_integer()], :add | {:remove, integer()}, term()) ::
-            [term()]
-    defp apply_gesture(rows, [], :add, blank), do: rows ++ [blank]
-    defp apply_gesture(rows, [], {:remove, index}, _blank), do: List.delete_at(rows, index)
-
-    defp apply_gesture(rows, [index | rest], gesture, blank) do
-      List.update_at(rows, index, fn row ->
-        inner =
-          case row do
-            %{"type" => members} when is_list(members) -> members
-            _no_nested_members -> []
-          end
-
-        row
-        |> member_row()
-        |> Map.put("type", apply_gesture(inner, rest, gesture, blank))
-      end)
-    end
-
-    @spec member_row(term()) :: map()
-    defp member_row(row) when is_map(row), do: row
-    defp member_row(_row), do: %{"name" => "", "required?" => false}
 
     # 2A: the drawer closes on a document switch. A drawer left open across one
     # would be showing the new document's blocks under the old one's subject,
@@ -2505,7 +2439,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec environment_view(map()) :: [%{path: String.t(), type: String.t()}] | nil
     defp environment_view(%{selected_id: id} = assigns) when is_binary(id) do
       %{document: document, palette: palette} = assigns
-      ctx = assignability_context(assigns)
+      ctx = Assignability.context(assigns)
       declarations = Environment.declarations(ctx)
 
       held = held_values(assigns)
@@ -2546,9 +2480,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # decision 2 seeds empty in that case - so this is one key, named once, and
     # the drop check, the walk and the Datamodel tab cannot drift apart by
     # being handed different ones.
-    @spec assignability_context(map()) :: Assignability.context()
-    defp assignability_context(%{datamodel: nil}), do: %{}
-    defp assignability_context(%{datamodel: datamodel}), do: %{datamodel: datamodel}
 
     # What the panel draws: the author's refused list while one is held, and
     # the document's otherwise. The COUNT on the strip stays the document's -
@@ -3432,20 +3363,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             MapSet.t(Block.type_name())
     defp accepted_types(socket, parent_id, slot) do
       %{document: document, palette: palette} = socket.assigns
-      ctx = assignability_context(socket.assigns)
 
-      palette.types
-      |> Map.keys()
-      |> Enum.filter(fn type ->
-        case probe(palette, type) do
-          {:ok, probe} ->
-            {parent_id, slot} in Targets.droppable_slots_for(document, palette, probe, ctx)
-
-          :error ->
-            false
-        end
-      end)
-      |> MapSet.new()
+      Targets.accepted_types(
+        document,
+        palette,
+        {parent_id, slot},
+        Assignability.context(socket.assigns)
+      )
     end
 
     # The same question for the palette's other kind, asked the only way a
@@ -3511,10 +3435,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp insert_drag_session(socket, type) do
       %{document: document, palette: palette} = socket.assigns
 
-      case probe(palette, type) do
+      case Targets.probe(palette, type) do
         {:ok, probe} ->
           document
-          |> Targets.slot_verdicts(palette, probe, assignability_context(socket.assigns))
+          |> Targets.slot_verdicts(palette, probe, Assignability.context(socket.assigns))
           |> session(%{block_id: nil, type: type})
 
         :error ->
@@ -3542,7 +3466,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       with false <- id == view_model.root.block_id,
            block when not is_nil(block) <- find_document_block(document, id) do
-        Targets.slot_verdicts(document, palette, block, assignability_context(socket.assigns))
+        Targets.slot_verdicts(document, palette, block, Assignability.context(socket.assigns))
       else
         _root_or_missing -> []
       end

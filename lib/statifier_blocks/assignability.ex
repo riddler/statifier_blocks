@@ -158,6 +158,30 @@ defmodule StatifierBlocks.Assignability do
           | {:fixable_by, Block.id()}
 
   @doc """
+  The context every data-flow question about a host's document is asked
+  with: the host's datamodel document, and nothing else.
+
+  `:entry_type` is deliberately absent. A surface embedding the editor is
+  not told what enters the document, and ADR-0011 decision 2 seeds empty in
+  that case - so this is one key, named once, and the drop check, the
+  environment walk and a datamodel view cannot drift apart by being handed
+  different ones.
+
+  Takes any map carrying a `:datamodel` key, which is the shape a host's
+  own assigns already have; `nil` there yields the empty context.
+
+  ## Examples
+
+      iex> StatifierBlocks.Assignability.context(%{datamodel: nil})
+      %{}
+      iex> StatifierBlocks.Assignability.context(%{datamodel: %{"types" => []}})
+      %{datamodel: %{"types" => []}}
+  """
+  @spec context(%{optional(:datamodel) => map() | nil, optional(any()) => any()}) :: context()
+  def context(%{datamodel: nil}), do: %{}
+  def context(%{datamodel: datamodel}), do: %{datamodel: datamodel}
+
+  @doc """
   `module.io(config)`, or `%{}` when `io/1` is absent or `module` is not
   loadable (ADR-0003 decision 5). Checked with `Code.ensure_loaded?/1` plus
   `function_exported?/3`, the pattern `StatifierBlocks.Palette.resolve/2`
