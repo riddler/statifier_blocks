@@ -1009,7 +1009,7 @@ this one's.
 
 ## Amendment (2026-09-06): decision 12's `{:list, :unknown}` becomes a reference into the parent's declaration
 
-**Status: proposed (2026-09-06, campaign SF035, bead `sb-jvz3`, recording
+**Status: accepted (2026-09-06, campaign SF035, bead `sb-jvz3`, recording
 campaign-034's ruling `RQ-034-2`).** A decision record merges at proposed under
 the campaign invariant; flipping it to accepted is a separate gated request
 through the same `docs/adr/` gate, and `sb-upv0` carries it. Additive: decision
@@ -1358,3 +1358,58 @@ Filed with `sb-myt1`, campaign SF035, from the walk's rulings `RQ-SF035-1` and
 `RQ-SF035-15`, against `sd-ADR-0001`'s inline-shape amendment as merged in
 `statifier_datamodel` and against this record as `sb-jvz3` and `sb-c9b6` left
 it. `sb-1jcr` builds both parts; `sb-wzoa` flips this section.
+
+## Note (2026-09-06): what the flip of decision 12's amendment checked, and its sequencing sentence met
+
+`sb-upv0` is the separate gated request the amendment of this date on decision
+12 names in its own status paragraph (`:1012-1016`), and it has flipped that
+section's `Status:` word from `proposed` to `accepted`. That word is the only
+text the flip changes in this record. This Note is by addition, sits at the
+foot so that no line a sibling record cites moves, and carries no `Status:`
+line of its own.
+
+The flip is narrow in exactly the way the amendment is: it reaches **that
+section only**. The Note of this date filed with `sb-c9b6` carries no
+`Status:` line and nothing on it is flipped. `sb-myt1`'s amendment to decision
+1 keeps its own status and its own request, `sb-wzoa`, as its closing sentence
+says.
+
+**The sequencing sentence is met rather than falsified.** The amendment says
+the entry "is not spellable until decision 1's `type_expr()` admits an inline
+shape", that `type_expr()` "today is a spelling - a string, `:unknown`, or a
+list of one of those (`lib/statifier_blocks/environment.ex:93`) - and cannot
+carry a structure", and that "until it lands the shipped entry stays
+`{:list, :unknown}`". It landed. `type_expr()` reads
+`String.t() | :unknown | {:list, type_expr()} | {:shape, [member()]}`
+(`lib/statifier_blocks/environment.ex:104`, `member()` at `:107`), built from
+a stored member list by `inline_shape/1` (`:522-529`), and `sb-1jcr` (PR 355,
+`d804062`) is the request that put it there under `sb-myt1`'s amendment. The
+sentence named that sequencing as a constraint and the constraint is
+discharged; the cite it carries moved from `:93` to `:104`. Every cite in this
+Note was read off `main` at `94d1990`. The `0.23.0` release prep
+(`081e426`) landed on `main` while this flip was open; it changes two version
+strings one line for one line and moves no line this Note cites.
+
+**Both rows of the amendment's table are what ships.** `core.map` types
+`collect` as `{:path, %{writes: {:list, envelope(config)}}}`
+(`lib/statifier_blocks/core/map.ex:456-462`), the envelope is assembled at
+`:405-414`, and its `"donedata"` member is `:unknown` on an absent or empty
+`collect_type` and the declared type otherwise (`:416-422`) - the second row
+now reachable by an inline shape as well as by a name, which is `ADR-0002`'s
+Amendment of 2026-09-06 on decision 7, the `{:type_expr, opts}` field type
+(`docs/adr/0002-block-type-behaviour.md:4957`), and `ADR-0013`'s Note filed
+with `sb-268w`, not this record's to restate. Decision 2's rule is what puts
+the entry there and is untouched; only the `T` moved, exactly as the amendment
+says.
+
+**No compiled bytes move**, which the corpus pins
+(`test/statifier_blocks/compiler/byte_corpus_test.exs`): `collect_type`
+produces none.
+
+**The read cites resolve unmoved**: decision 12 at `:520` with its quoted
+sentences at `:522-525` and `:527-529`, the deferred entry this closes at
+`:743-749`, the two Notes that open on the untouched deferred list at `:785`
+and `:950`, and the Note at `:889-896`. `ADR-0009` `:891`, `:921-925` and
+`:927-929` still carry the envelope this decision now references.
+
+Filed with `sb-upv0`, campaign SF035's Lane A.

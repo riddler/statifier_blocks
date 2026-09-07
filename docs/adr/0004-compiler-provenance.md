@@ -2589,7 +2589,7 @@ campaign-034 rulings `RQ-034-1` and `RQ-034-13`.
 
 ## Amendment (2026-09-06): C1's `child_use` final may carry declared summary params after the outcome param
 
-**Status: proposed (2026-09-06, campaign SF035, bead `sb-jvz3`, recording
+**Status: accepted (2026-09-06, campaign SF035, bead `sb-jvz3`, recording
 campaign-034's ruling `RQ-034-2`).** A decision record merges at proposed under
 the campaign invariant; flipping it to accepted is a separate gated request
 through the same `docs/adr/` gate, and `sb-upv0` carries it. Additive: C1
@@ -2793,3 +2793,54 @@ Filed with `sb-c9b6`, campaign-SF035. Code:
 `config_and_structure_stages/4`, `structure_stage/4`); goldens in
 `test/statifier_blocks/compiler/both_stage_findings_test.exs`. Folds
 `sb-lvh1`, which asked this question from the reference embedder's document.
+
+## Note (2026-09-06): what the flip of the C1 amendment checked
+
+`sb-upv0` is the separate gated request the amendment of this date names in
+its own status paragraph (`:2592-2596`), and it has flipped that section's
+`Status:` word from `proposed` to `accepted`. The word is the only text the
+flip changes in this record; this Note is by addition, sits at the foot so no
+line another record cites moves, and carries no `Status:` line of its own, as
+a Note in this family carries none.
+
+`sb-nqfd` (PR 353, `cc841a9`) put the emission on `main`, and the section was
+verified against `main` at `94d1990` - the tip after `sb-1jcr` (PR 355,
+`d804062`) and `sb-268w` (PR 356, `94d1990`) - rather than against the tree it
+was drafted over. The `0.23.0` release prep
+(`081e426`) landed on `main` while this flip was open; it changes two version
+strings one line for one line and moves no line this Note cites.
+
+**The three groups are in the order the amendment fixes, and nothing else
+moved.** `completion_final/5` builds the `outcome` param first, the reserved
+`statifier_persistence:run_status` param second and only on a failure-classed
+outcome, and the declared params third, appended and never sorted
+(`lib/statifier_blocks/compiler.ex:1709-1719`, the list at `:1710-1713`;
+`declared_params/2` at `:1755-1762`, mapping each `donedata_type/1` entry to a
+`<param>` whose `expr` is the declared path). A root type declaring nothing
+produces the same two-group list it produced before the callback existed,
+which is what the byte corpus pins
+(`test/statifier_blocks/compiler/byte_corpus_test.exs`).
+
+**The declared params are on every top-level `child_use` final**, failure
+classed included, because `donedata_type/1` is read once per root config and
+the compiler classes outcomes rather than runs. The `terminate` finals carry
+no `<donedata>` at all, so a declared field reaches them not at all - the
+narrowing this amendment states about the Note of 2026-08-29 is what the code
+does.
+
+**The two reserved names are refused.** A `donedata_type/1` entry named
+`outcome` or `statifier_persistence:run_status`, or not a bare lowercase
+identifier, is an `:invalid_donedata_field` Emit finding against the root
+block rather than a silently shadowed param
+(`lib/statifier_blocks/compiler.ex:1971-1984`).
+
+**Every cite in the amendment resolves unchanged.** C1's heading and its
+"carrying the outcome name as done data" sentence are at `:1262` and `:1267`,
+the drawn `<param>` at `:1272`; the Note of 2026-08-29's sentences are at
+`:1696-1698`, `:1707`, `:1709`, `:1710-1712` and `:1714-1719`; the reserved
+param's Note is at `:2457` and the shared-final Note at `:2522`; `ADR-0013`
+`:293-294` still says the widening is this record's to make; and `ADR-0009`
+`:915-917` and `:921-925` still carry the failed arm. Nothing above the
+amendment was edited by it or by this flip.
+
+Filed with `sb-upv0`, campaign SF035's Lane A.
