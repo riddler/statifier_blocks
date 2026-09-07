@@ -1413,3 +1413,163 @@ and `:950`, and the Note at `:889-896`. `ADR-0009` `:891`, `:921-925` and
 `:927-929` still carry the envelope this decision now references.
 
 Filed with `sb-upv0`, campaign SF035's Lane A.
+
+## Note (2026-09-07): `sb-myt1`'s amendment is **not** flipped - one sentence of part 2 does not hold against the code - and four cites are corrected
+
+`sb-wzoa` is the separate gated request the Amendment of 2026-09-06 on decision
+1 and decision 2 (`:1186`) names in its closing sentence. It has **not** flipped
+that section's `Status:` word, which still reads `proposed`. This Note records
+why, and takes four corrections owed to that section and to the section above
+it. It is by addition, sits at the foot so that no line a sibling record cites
+moves, and carries no `Status:` line of its own. Nothing above this line is
+edited by it, and this request changes no text in this file.
+
+Every line below is a census taken on `main` at `f750b3b`, with
+`deps/statifier_datamodel` resolved at `0.4.0`; it is dated to this Note and is
+to be re-counted by a later reader rather than trusted.
+
+### 1. Why part 2 is not flipped: the projection its *Decided* paragraph names is not the projection the seed reads
+
+Part 2's deciding sentence says the environment "holds an entry at every path
+`StatifierDatamodel.Index.path_types/1` projects from `ctx[:datamodel]` - the
+same projection `StatifierBlocks.Datamodel.path_types/1` wraps and the editor
+already draws - at the type it projects".
+
+That is not what `sb-1jcr` built and it is not what the rest of part 2 asks
+for. `StatifierBlocks.Environment.declared_seed/1`
+(`lib/statifier_blocks/environment.ex:781-787`) reads
+`StatifierDatamodel.Index.entries/1` and takes each entry's **declared type**,
+through `seeded_entry/1` (`:789-795`) and `declared_spelling/1` (`:801-808`).
+`Index.path_types/1` is a different projection with a different job: it answers
+the expression language's **value kinds**, so `integer` and `decimal` both come
+back `:number`, a drawable `one_of` wins over the entry's type, and an
+`object`, a declaration-typed entry, a list with no usable `item_type` and an
+untyped entry are all **absent from its map**
+(`deps/statifier_datamodel/lib/statifier_datamodel/index.ex:380-439`). The two
+therefore disagree about **which paths** carry a seeded entry and about **what
+type** each carries.
+
+Part 2's own decision table says the other thing - "Declared, and no block
+wrote it before this position | The declared type, marked as seeded" - and so
+does the code's own restatement of decision 2, "every path `ctx[:datamodel]`
+declares, at the type it declares there" (`:263-273`). So the section is
+internally inconsistent about the one question, and the sentence a reader would
+cite is the one that does not hold.
+
+**Which of the two the record should say is an open question and not this
+request's to settle**, and it has no bead of its own: the campaign's records
+bead `sb-m9eq` reaches this section from a different direction and covers only
+part of it. That bead asks where a seeded type enters along the **walk** -
+at every position, or from the root forward up to the first write at the path -
+because a position-independent seed erases the only place a blanket refusal and
+a write-following refusal are distinguishable in the reference embedder's drop
+verdict. Its second symptom is this one: it also records that a path declared
+as a bare `object` refuses a record read, which is a path `path_types/1` would
+not have projected at all and `entries/1` seeds as `"object"`. **The projection
+question is therefore adjacent to `sb-m9eq` rather than asked by it**, and both
+belong to whoever settles that bead.
+
+Correcting the citation in place is not open to this request either, and that
+is the whole reason the flip is held rather than cured. The section says one
+thing in its deciding sentence and another in its table; repointing the
+sentence would pick which of the two wins, and picking is a decision this
+record has not taken. What a flip may do is verify a record against `main` and
+move a status word - the practice the Note at `:1362` names in its own heading,
+"what the flip of decision 12's amendment checked" - and it does not extend to
+settling a decision the section left in two minds. So part 2 stays at
+`proposed`, and part 1 stays with it: the two parts share one `Status:` line and
+this Note splits no section.
+
+Nothing else in part 2 failed. The seed is applied **once, before the walk**,
+in `seed_annotated/3` (`:759-762`) reached from `annotated/4` (`:185-206`) and
+`seed/3` (`:298-301`), and nowhere else in `lib/`; decision 2's entry-block
+subject is applied over it (`subject_seed/3`, `:764-770`); a block's write
+replaces a seeded entry for every position after it by decision 1's
+last-write-wins and by no new rule; a parked fragment is still walked from an
+empty environment (`slot_start/4`, `:627-634`); and `annotated/0`'s writer
+member carries the `:declaration` inhabitant the section adds
+(`:125-127`), which `t:StatifierBlocks.Assignability.upstream_ref/0` admits
+beside `:slot_entry` (`lib/statifier_blocks/assignability.ex:112`).
+
+Part 1 held in every particular checked: `type_expr/0` admits `{:shape,
+[member()]}` with `member/0` beside it (`:104`, `:107`), `inline_shape/1`
+builds the term from a stored member list (`:521-529`), the `:type_mismatch`
+tuple did **not** grow (`lib/statifier_blocks/assignability.ex:126-127`), and
+`t:StatifierBlocks.BlockType.path_type/0` is still that typespec under a second
+name (`lib/statifier_blocks/block_type.ex:163-176`).
+
+### 2. The two `editor.ex` cites in part 2 have moved twice
+
+Part 2 cites `assignability_context/1` at `lib/statifier_blocks/editor.ex:1922-1923`
+and `declared_path_types/1` at `:1970-1972`. `sb-pm3k` (`1721a31`) shifted both
+by 66, and `sb-btvx` and `sb-1jcr` moved them again. They read today at
+`:2053-2055` and `:2113-2116`.
+
+### 3. Part 2's `Index.path_types/1` citation is wrong wherever it appears
+
+Item 1 above is the deciding instance. The same citation carries into part 1's
+consumer table, where the editor's typed cells are described as reaching
+`StatifierDatamodel.Index.path_types/1` through
+`StatifierBlocks.Datamodel.path_types/1`. **That one is correct** - the editor's
+cells really do read the value-kind projection
+(`lib/statifier_blocks/datamodel.ex:572-578`, reached at
+`lib/statifier_blocks/editor.ex:2113-2116`) - and it is the seed, not the
+editor, that reads something else. The two halves of this package draw
+different projections of one index, which is the substance `sb-m9eq` has to
+settle.
+
+### 4. Decision 12's `collect_type` table has no inline row
+
+The amendment of 2026-09-06 on decision 12 - accepted by `sb-upv0` - gives
+`collect_type` two rows, "absent or empty" and "a name (a declaration, a
+scalar, or an opaque string)" (`:1057-1060`). The field now admits a third arm:
+`ADR-0002`'s Amendment of 2026-09-06 on decision 7 declares `collect_type` as
+`{:type_expr, opts}` with both arms, its clause 1 names the inline shape as an
+arm of its own, and `core.map` declares it that way
+(`lib/statifier_blocks/core/map.ex:463-469`). The section anticipated exactly
+this at `:1100-1106`, which is why the gap is a missing row and not a changed
+decision.
+
+**Read the table as carrying a third row**, by addition and with no word of the
+two above it changed:
+
+| `core.map`'s `collect_type` | The environment entry at `collect`'s path |
+|---|---|
+| an inline shape (`sd-ADR-0001`'s `{:shape, [member()]}`, per `ADR-0002` decision 7 as amended, clause 1) | `{:list, <the envelope>}`, its `"donedata"` member that shape |
+
+The code already reads it that way: the envelope's `"donedata"` member is
+`:unknown` on an absent or empty `collect_type` and the declared type
+otherwise, whichever arm the stored bytes are
+(`lib/statifier_blocks/core/map.ex:394-422`). Recording the row here rather
+than at `:1060` is the reason the record gives elsewhere for not editing a
+merged section in place: adding a row adds words, which puts it outside the
+formatting-only exemption, and amendments here are additive.
+
+### 5. Cites in `sb-myt1`'s amendment that drifted under the code
+
+| Written in the amendment | Reads today |
+|---|---|
+| `lib/statifier_blocks/environment.ex:93` (`type_expr/0`) | `:104` |
+| `lib/statifier_blocks/environment.ex:103` (`annotated/0`) | `:125-127` |
+| `lib/statifier_blocks/environment.ex:242` (decision 2's seed sentence restated) | `:263-273` |
+| `lib/statifier_blocks/environment.ex:323-331` (`declarations/1`) | `:361-371` |
+| `lib/statifier_blocks/block_type.ex:159-166` (`path_type/0`) | `:163-176` |
+| `lib/statifier_blocks/assignability.ex:116-117` (`:type_mismatch`'s two type members) | `:126-127` |
+| `lib/statifier_blocks/datamodel.ex:572-576` (`path_types/1`) | `:572-578` |
+| `lib/statifier_blocks/editor.ex:1922-1923` (`assignability_context/1`) | `:2053-2055` |
+| `lib/statifier_blocks/editor.ex:1970-1972` (`declared_path_types/1`) | `:2113-2116` |
+| `lib/statifier_blocks/editor/field.ex:367-371` (the `path_types` attribute) | `:419-427` |
+| `lib/statifier_blocks/compiler.ex:682` (the compiler supplying `:datamodel`) | `:837-845` |
+
+### What this Note does not do
+
+- **It flips nothing.** The amendment at `:1186` still reads
+  `Status: proposed`, and `sb-wzoa` remains the request that carries its flip.
+- **It settles neither the projection question nor `sb-m9eq`**, and adds no
+  rule about which paths a seed reaches or where along the walk one enters. It
+  records that the section says one thing in its deciding sentence and another
+  in its table, and that the code follows the table.
+- **It edits no clause and moves no line.** Every correction above is a reading,
+  recorded here.
+
+Filed with `sb-wzoa`, campaign SF035's Lane A.
