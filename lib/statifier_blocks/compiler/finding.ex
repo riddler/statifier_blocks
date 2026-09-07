@@ -13,7 +13,7 @@ defmodule StatifierBlocks.Compiler.Finding do
   | Stage | Errors it produces |
   |---|---|
   | `:document` | `:invalid_document` - `Document.validate/1`'s reason |
-  | `:resolve` | `:unknown_block_type`, `:block_type_too_new`, `:migration_failed` |
+  | `:resolve` | `:unknown_block_type`, `:block_type_too_new`, `:migration_failed`, `:composite_expansion_failed` (ADR-0004's amendment of 2026-09-07, E1: `StatifierBlocks.Composite.expand/2` raises on a broken declaration and on a root expansion with no single root, and decision 1 forbids this pipeline to raise) |
   | `:config` | `validate_config/1` findings, one per `{key, message}` pair, and the one config check that reads the datamodel document: `core.on_event`'s declared-payload refusal (ADR-0002's amendment of 2026-09-06), reported in the same shape; and the one outcome name a **root** block may not declare, `failed`, which would take the state id ADR-0002's failure amendment (section 4 step 3) mints for the shared unhandled-failure final |
   | `:structure` | `:slot_arity_violated`, `:undeclared_slot` (ADR-0002 decision 6); assignability (ADR-0003) |
   | `:emit` | `emit/2` findings, `:invalid_role`, `:reserved_role`, `:invalid_outcome`, `:duplicate_binding` (ADR-0004's foreach amendment, F6), `:unspliced_child`, `:unknown_attribution`, `:conflicting_chart_use`, `:invalid_declaration`, `:duplicate_declaration` (ADR-0004's host-declared-roots note), `:self_reference` (ADR-0004's subchart-src amendment), `:sensitive_path_read` (ADR-0002's secrets-rule amendment), `:invalid_donedata_field` (ADR-0013 decision 2) |
