@@ -6731,7 +6731,7 @@ Filed with `sb-2gdx`, campaign SF037, folding `sb-3ejc`.
 
 ## Amendment (2026-09-07): decisions 1-4, a palette entry may be `{module, state}`, resolved through one call seam, and `Composite.Data` is the stateful composite
 
-**Status: proposed (2026-09-07, campaign SF037, bead `sb-5b7j`, on ruling
+**Status: accepted (2026-09-07, campaign SF037, bead `sb-5b7j`, on ruling
 `RQ-SF037-1`).** A decision record merges at proposed under campaign SF037's
 invariant. This section's status line flips to accepted by `sb-v3ny` **only if
 `sb-5xqr` lands in SF037**; if that request does not land, this section stays
@@ -7595,3 +7595,318 @@ Filed with `sb-v3ny`, campaign SF037, folding the `ADR-0002` half of `sb-cr7e`
 and items 1, 2 and 4 of `sb-ot1x`. This Note changes no code and adds no README
 row; it flips the `Status:` line at `:6362` and nothing else in this file, and
 it leaves the Status line at `:6734` at `proposed`.
+
+## Note (2026-09-07): the data-composite amendment is flipped to accepted, with six corrections by addition, its cites re-counted, and three questions named open
+
+`sb-5xqr` landed on `main` at `592c23b`, **after** `sb-v3ny` had merged at
+`ea2df96` and recorded at `:7521-7531` that it had not. This Note is a reading
+of `main` at `7186b24`. Every claim the Amendment of this date at `:6732` makes
+was checked against that code before its `Status:` line at `:6734` was flipped.
+No text above this line is edited by this Note; everything below corrects by
+addition, which is this file's practice at `:6229-6280`, `:6340-6360` and
+`:7305-7597`.
+
+### 0. The sentences the flip falsifies, met rather than edited
+
+Three sentences were true only of the day they were written, and the landing is
+what makes them false. They stay exactly as written:
+
+- `:6736-6739`, "This section's status line flips to accepted by `sb-v3ny`
+  **only if `sb-5xqr` lands in SF037**; if that request does not land, this
+  section stays at proposed and `sb-v3ny` records that fact as a dated note
+  instead of flipping it." `sb-5xqr` did land in SF037, and later than
+  `sb-v3ny` merged, so the flip is a separate gated request rather than
+  `sb-v3ny`'s work. It is `sb-acf5`, and this is it.
+- `:7282-7284`, "**Whether `Composite.Data` ships in SF037.** `sb-5xqr` is the
+  request that builds it, and it is that campaign's cut line. If it does not
+  land, this section stays at proposed." It landed.
+- `sb-v3ny`'s section 8 at `:7521-7531`, "`sb-5xqr` did not land in campaign
+  SF037 ... **The Status line at `:6734` therefore stays at `proposed`**." That
+  was exact when written, against `main` at `0c39a3c`. It is superseded by
+  addition on the terms it set for itself in its own last sentence: "It flips
+  when `sb-5xqr` lands, by its own terms and through the same gate."
+
+`:6750-6754` dates every code cite in the section to `main` at `d0af5f0`, asks
+to be re-read rather than trusted, and names the **anchor** rather than the line
+as the way to find a site after it has moved. It was re-read on those terms;
+sections 1 to 8 are the re-reading.
+
+### 1. The claim table: what the section decides, and what the code reads today
+
+Every row was checked against `main` at `7186b24`. No row is refuted; the six
+that need narrowing are corrected in sections 2 to 7, and every cite that moved
+is re-counted in section 8.
+
+| The section's claim | Where it says it | What `7186b24` reads | Verdict |
+|---|---|---|---|
+| `Palette.types` admits `module()` or `{module(), state}`, and `state` is opaque to `Palette` | `:6775-6785` | `@type type_ref :: module() \| {module(), state :: term()}` (`palette.ex:92`), `types:` in `@type t` (`:94`) | holds |
+| `registration/0` widens with it, so `from_modules/2` takes a stateful entry | `:6803-6805` | `@type registration :: {Block.type_name(), type_ref()}` (`palette.ex:266`); the second `register/2` clause at `:417-420` | holds |
+| `fetch/2` answers the entry **as stored**, normalizing neither way, and decision 3's one error arm is untouched | `:6787-6794` | `fetch/2` (`palette.ex:453-461`) answers `{:ok, ref}`; the sole error arm at `:459` | holds |
+| `resolve/2` widens the same way and keeps its three error arms | `:6792-6794` | `@spec resolve/2` (`palette.ex:669-673`) answers `{:ok, type_ref(), Block.t()}`; head `:674-678` | holds |
+| `Palette.call/4` is the one seam: two clauses, `state` **prepended**, `default` when the entry does not declare the callback | `:6812-6821` | `call/4` (`palette.ex:510-527`): the pair clause applies `[state \| args]`, the bare clause applies `args`, both fall to `default` | holds |
+| the seam does **not** rescue, does not memoize, and changes no declared arity; fourteen callbacks, five required | `:6876-6884` | no `rescue` and no cache in `call/4`; `block_type.ex` declares 14 `@callback`s and `@optional_callbacks` (`:824-832`) names 9 | holds |
+| `Palette.declares?/3` does the arity arithmetic itself, so no caller writes `arity + 1` | `:6849-6856` | `declares?/3` (`palette.ex:552-561`): the pair clause asks `arity + 1`, the bare clause asks `arity` | holds, widened in section 7 |
+| the census is **38 call sites in 12 files** | `:6888-6892`, table `:6894-6908` | 38 in 12, re-counted per file in section 7 | holds |
+| `manifest/1` and `palette_hash/1` need no new arm; the hash's triples keep the module | `:6985-6991` | `manifest/1` (`palette.ex:247-255`) maps `{name, current_version}`; `palette_hash/1` (`compiler.ex:2504-2516`) keeps the module through a private `module_of/1` (`:2529`, `:2534-2536`) | holds, narrowed in section 6 |
+| the duplicate-`order` check needs the seam, and `ordered_entry/1`'s `is_atom/1` guard is where a stateful entry would drop out **silently** | `:7007-7021` | the guard is gone: `ordered_entry/1` (`palette.ex:400-408`) reads `palette_entry/0` through `call/4`, and the comment at `:370-378` records exactly this reason. Two tests hold it - a stateful entry colliding at a duplicated order is refused, and the refusal names both entries (`test/statifier_blocks/palette/call_test.exs:157-184`) | holds |
+| `Composite.expand/2`'s second argument widens to `type_ref()`; it is still the ONE expansion function, unrenamed and unforked | `:6959-6962` | `@spec expand(Block.t(), Palette.type_ref())` (`composite.ex:375`), head `:376`; the `is_atom/1` guard is now `composite?/1`'s question (`:341-350`, asked at `:377-381`) | holds |
+| `__composite__` and `subtree` are seam calls at one higher arity, and are **not** in the census of 38 | `:6963-6969` | four `Palette.call/4` sites in `composite.ex` (`:385`, `:462`, `:502`, `:510`), none of them a `BlockType` callback; the census total is unmoved | holds |
+| for `Composite.Data` both answers are the state | `:6970-6976` | `__composite__(state)` (`composite/data.ex:331-334`) and `subtree(state, params)` (`:344-347`) | holds, narrowed in section 5 |
+| the declaration is JSON-shaped so a host can store it; `declaration/1` answers `{:ok, state}` or `{:error, [reason]}` and every refusal is at **entry-build** time | `:7042-7043`, `:7080-7088` | `declaration/1` (`composite/data.ex:285-317`) accumulates every error and answers `{:ok, decoded}` or `{:error, errors}` | holds, narrowed in section 5 |
+| `slots/1` is `[]`, `config_schema/1` is the params, `current_version/0` is the declaration's, `emit/2` raises | `:7029-7033` | `slots/2` (`composite/data.ex:355`), `config_schema/2` (`:351`), `current_version/1` (`:359`), `emit/3` (`:401-409`) raising | holds |
+| `validate_config/1` is left as the params alone refuse it, so a cross-param refusal still needs a `use`-composite | `:7054-7065` | `validate_config(_state, _config), do: :ok` (`composite/data.ex:380`), which is `ADR-0007`'s injected answer | holds |
+| `migrate_config/2` is left at `ADR-0007`'s injected refusal, so a version bump with no migration refuses every stored block | `:7259-7268` | `migrate_config(_state, from, _config), do: {:error, {:no_migration_from, from}}` (`composite/data.ex:371`), the same shape `block_type.ex:139` injects, reached down `migrate/3`'s third clause (`palette.ex:692-698`) | holds |
+| the placeholder vocabulary is one arm and one escape: `"$param"` substituted **whole**, `"$literal"` unsubstituted, every other value a literal | `:7120-7128` | `substitute/2` (`composite/data.ex:427-439`), both special clauses guarded `map_size(node) == 1`; `placeholders/1` (`:633-642`) reads the same vocabulary | holds |
+| `"id_suffix"` matches `~r/\A[a-z0-9]+(_[a-z0-9]+)*\z/`, is unique per declaration, and can mint no `__` | `:7106-7112` | `@id_suffix` (`composite/data.ex:213`); the `__` refusal is `mint_id/3`'s (`composite.ex:555-568`), citing `ADR-0004` decision 3 in its own message | holds |
+| per-instance module generation is rejected, on decisions 2 (`:65-70`, `:76-78`), 3 (`:86-88`) and the atom table | `:7155-7190` | those four decision passages read today exactly as cited, and nothing in `palette.ex` or `composite/data.ex` calls `Module.create/3` | holds |
+| the worked example's `param_map` is `%{"blk_AD_call" => "invoke_type", "blk_AD_guard" => "failure_path"}` | `:7249-7253` | reproduced from `param_map/2` (`composite.ex:573-578`) over the example's own config values | holds, by a different derivation - section 4 |
+
+### 2. Correction 1: the sentence placeholder is spelled `{{key}}` here and `{key}` in the code, and is collapsed once at decode
+
+`:7052` gives the `"sentence"` key as "a template string; `{{key}}` is replaced
+by the param's value rendered as a string", and the worked example at `:7206`
+writes `"Call {{invoke_type}}, recording failure at {{failure_path}}"`. A
+`use`-composite's `:sentence` spells the same placeholder `{key}`, and
+`StatifierBlocks.Composite.render_sentence/2` is the renderer for both.
+
+They are one rendering, not two. `decode_sentence/2`
+(`composite/data.ex:683-696`) collapses `{{key}}` to `{key}` **once, at decode,
+for the keys this declaration actually declares**, and the collapsed template is
+what the state carries; `sentence/2` (`:394-395`) hands that to
+`render_sentence/2`. So the record's spelling is what a host writes, the code's
+is what the one renderer reads, and a data composite and a `use`-composite of
+the same shape answer the same line. Nothing else in the section depends on the
+spelling, and a `{{...}}` naming an undeclared key is left alone rather than
+refused - it is a placeholder in neither vocabulary.
+
+### 3. Correction 2: `sensitive?` is not a param key, and an unknown key is refused by name
+
+`:7067-7071` gives `"params"` as decision 7's `field_decl()` in JSON and lists
+`"sensitive?"` among the keys a declaration may write, on `:7070`. It is not a
+`field_decl/0` key: the type's nine keys at `block_type.ex:278-288` are `key`,
+`type`, `label`, `required?`, `default`, `value_path`, `datamodel_path?`,
+`hidden?` and `readonly?`. `sensitive?` is a key on a **datamodel** declaration,
+`Datamodel.declared_row/0` at `datamodel.ex:226`. This file said so at
+`:6276-6280` and `sb-v3ny` said so again at `:7358-7377`; the sentence at
+`:7067-7071` is read with `sensitive?` struck from its list, for the same reason
+and on the third occasion.
+
+The code is not permissive about it. `decode_param/1`
+(`composite/data.ex:477-503`) admits `"key"`, `"type"`, `"label"`, `"default"`
+and the five flags `@param_flags` names (`:223-229` - `required?`, `value_path`,
+`datamodel_path?`, `hidden?`, `readonly?`), and refuses any other key **by
+name**: *param `<key>` declares unknown keys: [...]*. A declaration writing
+`"sensitive?"` is refused at entry-build time rather than silently carried,
+which is the honest reading of the same decision.
+
+### 4. Correction 3: `"default"` is required, and `param_map` is derived by value
+
+Two mechanisms the section presents one way and the code implements another. In
+both cases the decision the section states holds and the mechanism it names is
+not the one built.
+
+**`"default"` is not optional.** `:7069` lists `"default"` among the keys
+"whichever of ... the declaration writes", which reads as optional, while the
+same paragraph says at `:7071-7074` that "every refusal decision 7 and its
+amendments state applies to a param unchanged - including F3's missing-`default:`
+refusal". F3 governs: `decode_param/1` (`composite/data.ex:487-490`) refuses a
+param carrying no `"default"` key at entry-build time, before the entry is in
+the palette, in the words *is declared with no "default", so it has no value to
+read when a config leaves it unset*. The list at `:7067-7071` is read with
+`"key"`, `"type"`, `"label"` and `"default"` as the four required keys and the
+flags as the optional ones - which is what `decode_param/1`'s own head and
+`:7080-7088`'s entry-build placement already say.
+
+**`param_map` is derived by value comparison, not by reading placeholders.**
+`:7147-7153` attributes a node to param key *K* "when the placeholders in **its
+own `"config"`**, not its slots' children, name exactly one distinct param".
+`Composite.expand/2` does not read the template's placeholders when it builds
+the map: `param_map/2` (`composite.ex:573-578`) walks `flatten/1` over the
+**expanded** blocks and blames each on the one param whose **value** its config
+carries (`blamed_param/2` `:580-594`), with `distinguishing?/1` (`:598-600`)
+excluding `nil`, `""`, `[]`, `%{}` and `false` because an empty value would
+match every empty config field in the expansion. Two params matching, or none,
+is `nil`.
+
+The two agree on every case the section states, its own worked example included,
+which is why this is a correction and not a refutation: a whole-value
+substitution puts exactly the param's value into the expanded config, so "the
+placeholders in its own config name exactly one param" and "its own config
+carries exactly one param's value" pick out the same node. The value derivation
+is the more general of the two - it reads no template, which is what lets one
+`param_map/2` serve a `use`-composite and a data composite alike - and it
+differs in one stated way: a param whose value is empty blames nothing, where a
+placeholder count would blame it. `:7147-7153` is read as a description of the
+mechanical result rather than as a second derivation.
+
+### 5. Correction 4: the `state` is the **decoded** declaration, and `__composite__/1` answers five of its keys
+
+`:7042-7043` heads its table "Its `state` is a **declaration map**, JSON-shaped
+throughout", with six string keys at `:7045-7053`, and `:7201` presents the JSON
+row as "the `state` of one palette entry". What a palette entry carries is
+`declaration/1`'s **output**, not its input. The state is a map with atom keys
+(`t:StatifierBlocks.Composite.Data.state/0`, `composite/data.ex:204-211`):
+`:name` (from the row's `"type_name"`), `:params` (decoded into decision 7
+`field_decl()` maps), `:version`, `:sentence` (collapsed, section 2), and
+`:palette_entry` and `:subtree` (decoded into `t:node_template/0`s). The table's
+six rows are the rows of the **row** `declaration/1` takes; the section's own
+worked example writes the conversion out at `:7232` - `{:ok, state} =
+Composite.Data.declaration(row)` - so both readings are already present, and
+this Note names which is which.
+
+The distinction is not cosmetic: it is `:7074-7079`'s decision built.
+`Composite.Data` "**decodes** this list ... once, when the entry is built ...
+because decision 4 makes `config_schema/1` pure and a decode that could fail on
+the hot path is a callback that can fail". The atom-keyed state is that
+sentence's consequence, and `config_schema/2` (`composite/data.ex:351`) returns
+the already-decoded list without work.
+
+`:6973-6974` says `__composite__(state)` "answers the decoded `state`". It
+answers **five of its six keys**: `Map.take(state, [:name, :params, :version,
+:sentence, :palette_entry])` (`composite/data.ex:331-334`), which is
+`t:StatifierBlocks.Composite.declaration/0` - the shape a `use`-composite's
+generated `__composite__/0` answers from a module attribute
+(`composite.ex:224-225`). `:subtree` sits outside it deliberately, because the
+template is read by `subtree/2` and a `use`-composite has no template to hand
+back. The claim the sentence makes - that the declaration **is** the state
+rather than a pointer to one - is what that `Map.take/2` shows.
+
+### 6. Correction 5: only five of the nine field types have a data spelling, and `manifest/1` no longer raises
+
+**Four field types are refused, not spelled.** `:7068` says `"type"` is "the
+field type's name as a string". Only five of
+`t:StatifierBlocks.BlockType.field_type/0`'s nine members
+(`block_type.ex:179-188`) have one: `@field_types` (`composite/data.ex:215-221`)
+maps `"string"`, `"integer"`, `"boolean"`, `"expression"` and `"duration"`. The
+other four - `{:select, opts}`, `{:list, field_type}`, `{:path, opts}` and
+`{:type_expr, opts}` - carry options, have no name, and are **refused** by
+`decode_param/1` (`composite/data.ex:481-485`), whose message lists the five
+spellable names. `:7071`'s "No new key and no new field type is introduced here"
+stays exact - none is - and what this Note adds is that four existing ones
+cannot be reached from a declaration held as data. How an option-carrying field
+type would be spelled in data is a question this Note names and does not decide;
+it is section 9's third.
+
+**`Palette.manifest/1` no longer raises on an uncompiled module.** `:6985-6991`
+is about the manifest needing no new arm, and that holds. What moved beside it:
+`manifest/1` now reads `current_version/0` through `call(ref, :current_version,
+[], nil)` (`palette.ex:250`), and `call/4` answers the default when
+`Code.ensure_loaded?/1` fails, so a palette naming an uncompiled module answers
+`nil` for that entry where it used to raise. Nothing this section decides
+depends on the raise, and the 0.25.0 CHANGELOG records the change. The
+manifest's own moduledoc at `palette.ex:241-243` still describes the old
+behaviour; correcting it is a **code** change, out of scope for this docs-only
+request, and it is named here so it is not lost.
+
+### 7. Correction 6: the census total holds, two files' split moved, and `declares?/3` has more callers than the two named
+
+**The census is still 38 call sites in 12 files**, and every anchor in the table
+at `:6894-6908` resolves to the same function head in the same file, with one
+exception: `entry_default_config/1` moved from `editor.ex` to
+`edit/targets.ex` (`sb-mcs8`), along with `probe/2` and `accepted_types/4`. So
+`editor.ex` reads 2 and `edit/targets.ex` reads 2, where the table has 3 and 1.
+The total is unmoved, which is why the count the section asks to be worked from
+is still its own.
+
+| File | Section's count | Today | Anchors at `7186b24`, with the call-site line |
+|---|---|---|---|
+| `lib/statifier_blocks/block_type.ex` | 7 | 7 | `outcomes/2` `:858`, `failure_outcomes/2` `:900`, `donedata_type/2` `:931`, `type_expr_findings/2` `:1086`, `call_summary/2` `:1798`, `call_sentence/2` `:1827`, `label/1` `:1855` |
+| `lib/statifier_blocks/compiler.ex` | 6 | 6 | `resolve_children/3` `:643`, `config_findings/2` `:947`, `declaration_findings/2` `:1010`, `emit/2` `:1675`, `candidate_findings/2` `:2415`, `entries/1` `:2529` |
+| `lib/statifier_blocks/palette.ex` | 6 | 6 | `manifest/1` `:250`, `ordered_entry/1` `:404`, `new_block/2` `:600` and `:606`, `resolve/2` `:676`, `migrate/3` `:693` |
+| `lib/statifier_blocks/view_model.ex` | 6 | 6 | `head_of_root/2` `:1417`, `chip_label/2` `:1508`, `config_findings/3` `:1645`, `build_resolved_node/4` `:1694` and `:1704`, `palette_entry_with_defaults/2` `:2148` |
+| `lib/statifier_blocks/editor.ex` | 3 | **2** | `fixture_events/1` `:2679`, `draft_findings/3` `:3346` |
+| `lib/statifier_blocks/environment.ex` | 3 | 3 | `subject_of/1` `:1030`, `io/2` `:1125`, `schema/2` `:1130` |
+| `lib/statifier_blocks/assignability.ex` | 2 | 2 | `io/2` `:192`, `target_verdicts/4` `:803` |
+| `lib/statifier_blocks/edit/targets.ex` | 1 | **2** | `entry_default_config/1` `:227`, `full?/4` `:387` |
+| `lib/statifier_blocks/slot_validation.ex` | 1 | 1 | `block_findings/2` `:80` |
+| `lib/statifier_blocks/edit.ex` | 1 | 1 | `check_config/3` `:271` |
+| `lib/statifier_blocks/datamodel.ex` | 1 | 1 | `block_findings/5` `:818` |
+| `lib/statifier_blocks/core/deadline_recipe.ex` | 1 | 1 | `config/2` `:228` |
+| **Total** | **38** | **38** | **12 files** |
+
+**`declares?/3` has four callers on `BlockType` callbacks, not the two the
+section names.** `:6849-6852` gives it "the two sites that need declaredness
+alone" - `ViewModel.declares_sentence?/1` (`view_model.ex:1985-1988`) and the
+editor's `declares_outcomes?/1` (`editor.ex:2862-2865`). Two more are the
+section's own doing rather than a departure from it: `BlockType.sentence/2`
+(`block_type.ex:1548-1555`) and the private `declared_chips/2` (`:1782-1791`)
+each keep a probe, because the call each guards is one level down in
+`call_sentence/2` (`:1825-1833`) and `call_summary/2` (`:1796-1804`) - the two
+sites `:6867-6874` says reach a **rescue**, and which therefore cannot be folded
+into a `call/4` the section forbids to rescue. A fifth caller is
+`Composite.composite?/1` (`composite.ex:341-350`), asking about
+`__composite__/0`, which `:6963-6969` already places in the seam and outside the
+census. `:6849-6852` is read as naming the two sites that need declaredness for
+a **presentation** branch; the arity argument it makes is unaffected, and no
+site anywhere writes `arity + 1` itself.
+
+The probe count at `:6910-6913` - 17 in 6 files - was a count of the
+`function_exported?/3` calls the seam was about to absorb, at `d0af5f0`. It is a
+statement about the code before the request rather than a claim about the code
+after it, and it stands as written.
+
+### 8. The cites that moved
+
+Every cite below resolves to the text it names. Only the numbers move; no claim
+changes. This is `:6750-6754`'s own instruction being followed.
+
+| Cited in the section | Cited as | Reads today at `7186b24` |
+|---|---|---|
+| `fetch/2`'s one error arm (`:6791-6792`) | `palette.ex:405-407` | `:459`, inside `fetch/2` `:453-461` |
+| `resolve/2`'s three error arms (`:6793`) | `palette.ex:517-521` | `@spec` `:669-673`, head `:674-678` |
+| `from_modules/2` (`:6804`) | `palette.ex:311` | `:341` |
+| `manifest/1` (`:6985`) | `palette.ex:224-229` | `:247-255` |
+| the duplicate-`order` check (`:7007`) | `palette.ex:343-373` | `refute_duplicate_orders!/2` `:379-401` |
+| `ordered_entry/1`'s opening guard (`:7015-7016`) | `palette.ex:365` | **gone.** The guard the sentence describes was removed, which is what the sentence asks for; `ordered_entry/1` is `:400-408` and the comment at `:370-378` records the removal in the sentence's own terms |
+| `migrate/3`'s third clause (`:7264`) | `palette.ex:540-549` | `:692-698` |
+| the two maps, quoted from `:6610-6611` (`:6807-6809`) | `palette.ex:70-75` | `@type t`'s `types:` and `recipes:` at `:94-95`; `:70-75` is the validators paragraph. The cite is the accepted amendment's rather than this section's and is recorded, not restated |
+| `palette_hash/1` (`:6986`) | `compiler.ex:2261-2273` | `:2504-2516`, with `module_of/1` `:2534-2536` |
+| the palette-hygiene obligation (`:6996-6998`) | `compilation_record.ex:40-51` | `:40-50` |
+| `expand/2`'s spec and guard (`:6949-6950`) | `composite.ex:368-369` | `@spec` `:375`, head `:376`; the `is_atom/1` guard is now `composite?/1`'s, asked at `:377-381` |
+| `composite?/1` (`:6950-6952`) | `composite.ex:341-346` | `:341-350`, now three clauses and reading `Palette.declares?/3` |
+| the generated `__composite__/0` (`:6952-6953`) | `composite.ex:224-225` | `:224-225` - unmoved |
+| `recipe_insert/3`, `params_of/2`, `probe_block/2` (`:6953-6954`) | `:455`, `:494`, `:501` | `:461`, `:500`, `:509`, each now reading the declaration through `call/4` |
+| the `subtree/1` call (`:6954-6955`) | `composite.ex:378` | `:385`, through `call/4` |
+| `member_module/1` (`:6923`) | `composite.ex:598-603` | `:608-614` |
+| the six `BlockType` wrappers (`:6860-6863`) | `:855-861`, `:901-907`, `:936-942`, `:1560-1566`, `:1795-1802`, `:1866-1875` | `:856-859`, `:898-901`, `:929-932`, `:1548-1555`, `:1782-1791`, `:1853-1859` |
+| `call_sentence/2` and `call_summary/2` (`:6869-6870`) | `:1838-1846`, `:1809-1816` | `:1825-1833`, `:1796-1804` |
+| the absent-`io/1` fallback (`:6834`) | `assignability.ex:166-172` | `io/2` `:190-193`, now the seam's `%{}` default |
+| `ViewModel.declares_sentence?/1` (`:6851`) | `view_model.ex:1984` | `:1985-1988` |
+| the editor's `declares_outcomes?/1` (`:6852`) | `editor.ex:2755` | `:2862-2865` |
+| `ADR-0007`'s injected `migrate_config/2` (`:7266`) | `block_type.ex:137-138` | `:138-139` |
+| `core.invoke`'s config keys and its `on_error` slot (`:7255-7256`) | `invoke.ex:130-153`, `:96` | unmoved |
+| `core.assign`'s config keys (`:7257`) | `assign.ex:64-75` | unmoved |
+| `RunPane.component/1`, named as **not** in the census (`:6931`) | `editor/run_pane.ex:191-196` | unmoved, and still not a callback dispatch: the module it applies comes from `Application.get_env/3` |
+
+**The list at `:6918-6930` of literal `types` reads that are not the census has
+moved with `sb-mcs8`.** `Editor.probe/2` and `Editor.accepted_types/3` are now
+`Targets.probe/2` (`edit/targets.ex:215-223`) and `Targets.accepted_types/4`
+(`:175-190`, reading `palette.types` at `:181`); `Editor.draft_findings/3` is
+`editor.ex:3345`, `Editor.accepted_recipes/2`'s `recipes` read is `:3393`,
+`ViewModel.singleton_specs/2` is `view_model.ex:1339`,
+`ViewModel.palette_groups/1` is `:2174`, and `Composite.member_module/1` is
+`composite.ex:610`. The count is still six plus the one `recipes` read, not one
+of them assumes a `types` value is a module, and the paragraph's claim is
+unchanged.
+
+### 9. Three questions this Note names and does not decide
+
+- **`RQ-SF037-16`, a data composite's migration key.** `:7293-7299` names it
+  open, and `sb-5xqr` built the refusal that paragraph describes rather than
+  papering over it: `migrate_config/3` (`composite/data.ex:371`) answers
+  `{:error, {:no_migration_from, from}}` unconditionally, so a host that bumps
+  `"version"` on a declaration with stored blocks is choosing a refusal,
+  exactly as `:7270-7275` says. The declaration carries no migration key, and
+  `Composite.Data`'s moduledoc says so. Queued.
+- **`RQ-SF037-17`, a member's `current_version` in an expansion.** `sb-v3ny`
+  named it at `:7502-7509` and this request does not touch it: a data composite
+  expands through the same `Composite.expand/2`, and its members carry
+  `Block.new/2`'s default of 1 for the same reason. Queued.
+- **How an option-carrying field type is spelled in a declaration held as
+  data.** Section 6: four of the nine field types are refused by
+  `decode_param/1` rather than spelled. Whether a data declaration should be
+  able to reach them, and in what shape, is not decided here.
+
+Filed with `sb-acf5`, campaign SF037. This Note changes no code and adds no
+README row; it flips the `Status:` line at `:6734` and nothing else in this
+file.
