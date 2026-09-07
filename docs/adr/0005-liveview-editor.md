@@ -7302,7 +7302,7 @@ Filed with `sb-wzoa`, campaign SF035's Lane A.
 
 ## Amendment (2026-09-07): a `profile` assign names which surfaces a mount renders, and one of them is read-only
 
-**Status: proposed (2026-09-07, campaign SF036, bead `sb-qhzl`, on rulings
+**Status: accepted (2026-09-07, campaign SF036, bead `sb-qhzl`, on rulings
 `RQ-SF036-1` and `RQ-SF036-2`).** A decision record merges at proposed under
 campaign SF036's invariant; flipping it to accepted is a separate gated request
 (`sb-xnxw`, after the implementing bead). Additive: 1B, decision 15 and every
@@ -7851,7 +7851,7 @@ Filed with `sb-4m4x`, campaign SF036.
 
 ## Amendment (2026-09-07): decision 10, `ViewModel.Node.sentence`, and `ViewModel.outline/1` - the one walk a list view, an outline pane and a test all consume
 
-**Status: proposed (2026-09-07, campaign SF036, bead `sb-hlut`, on ruling
+**Status: accepted (2026-09-07, campaign SF036, bead `sb-hlut`, on ruling
 `RQ-SF036-5`).** A decision record merges at proposed under campaign SF036's
 invariant; flipping this section's status line to accepted is a separate gated
 request (`sb-xnxw`, after `sb-w37s` lands the code). Additive: decision 10 at
@@ -8320,3 +8320,128 @@ separate gated request in the campaign that lands the code, and it re-reads
 every cite above against `main` as it stands then.
 
 Filed with `sb-gdmw`, campaign SF036, on ruling `RQ-SF036-7`.
+
+## Note (2026-09-07): the `profile` amendment and the `Node.sentence` / `outline/1` amendment are flipped to accepted, and their code cites re-counted
+
+The Amendment of 2026-09-07 on the `profile` assign and the read-only mount
+(`:7303`) and the Amendment of 2026-09-07 on decision 10,
+`ViewModel.Node.sentence` and `ViewModel.outline/1` (`:7852`) both read
+`Status: accepted` from this date. `sb-xnxw` is the separate gated request
+both sections' own status paragraphs name, and this Note is what the flip
+checked.
+
+It is by addition, sits at the **foot** of this record so that no line a
+sibling record cites moves, edits no clause, and carries no `Status:` line of
+its own. The only lines the request removes in this file are the two the
+status words sit on. No marker is inserted beside either status paragraph:
+inserting one mid-file is what this campaign's append-at-the-end rule exists
+to prevent, and every forward sentence those paragraphs carry is met here
+instead, where it stands. The Amendment of 2026-09-07 on `Recipe.members/2`
+(`:8069`) is **not** flipped by this request and its status line is untouched,
+on campaign SF036's ruling `RQ-SF036-7`.
+
+### What was implemented, and where the flip read it
+
+| Section | Implementing request | On `main` at | Read for this flip at |
+|---|---|---|---|
+| the `profile` assign and the read-only mount (`:7303`) | `sb-2bmk`, PR 378 | `8abc655` | `8abc655` |
+| `Node.sentence` and `outline/1` (`:7852`) | `sb-w37s`, PR 377 | `ea2fdee` | `8abc655` |
+
+Both status paragraphs say "Nothing here is built yet" and name their
+implementing request; both are met by those two commits. The `profile`
+section's "Where this lands" says the assigns table gains a `profile` row and
+that `docs/profiles.md` "does not exist yet", both in `sb-2bmk`: the row is at
+`lib/statifier_blocks/editor.ex:525` under the `## Assigns` heading at `:494`,
+and `docs/profiles.md` exists. The outline section's closing sentence - that
+`sb-xnxw` flips it after `sb-w37s` lands - is met by this request.
+
+### What the flip verified, claim by claim
+
+**The `profile` amendment.** The shape is the ruled one, verbatim:
+`t:StatifierBlocks.Editor.toolbar_chip/0` (`editor.ex:586`) is `:history |
+:zoom | :fits | :metrics`, and `t:StatifierBlocks.Editor.profile/0`
+(`:592-598`) carries the five optional keys with `:all` a member of every list
+type. The default is everything (`@default_profile`, `:603-609`): a mount that
+passes no `profile` draws what `0.23.0` drew. There are no named profiles
+anywhere in the package - no preset constructor, no `:operations`, no
+`:reviewer`. There is no `validate_profile/1`: the only occurrence of the name
+in `lib/` is the comment at `editor.ex:2091` recording that the amendment
+refuses one, and an unresolved id is dropped by `Shell.inspector_tabs/1` and
+`Shell.drawer_tabs/1` filtering the listed ids against the package's own
+(`shell.ex:500-503`, `:545-548`) rather than raising. `read_only?`'s six
+clauses each have code: clause 1, the palette column is behind `:if={not
+@read_only?}` (`editor.ex:919`); clause 2, the canvas's drag hook is
+`phx-hook={@drag_hook? && "StatifierBlocksDrag"}` (`editor/canvas.ex:144`)
+with `drag_hook?={not @read_only?}` at `editor.ex:954`, while the measure hook
+(`editor/connector_layer.ex:48`) is untouched; clause 3, the inspector and the
+drawer both take `read_only` (`editor.ex:975`, `:1002`) and the config form
+renders values; clause 4, selection and findings are unbranched - `"select"`
+is not in the refused set; clause 5, `toolbar_items/1` drops `:history` from a
+read-only mount whatever the profile listed (`editor.ex:2142-2146`); clause 6,
+a single `handle_event/3` clause matching `%{profile: %{read_only?: true}}`
+answers every gesture that would reach the document with the socket it was
+given (`:1046-1048`), so `on_change` never fires. And a document is never
+refused for being read-only: nothing on that path declines to draw.
+
+**The `Node.sentence` / `outline/1` amendment.** `Node` carries `sentence:
+nil` in its `defstruct` (`view_model.ex:402`), resolved at build time
+(`:1531`) and not by a function called later. The three-step resolution is
+`sentence/5` (`view_model.ex:1750-1758`): the reader's answer where
+`declares_sentence?/1` (`:1760-1763`) says the type declares one, else the
+author's `title`, else the entry's label falling back to the type name.
+`ViewModel.title/1` is unchanged and keeps both its clauses (`:594-595`).
+`outline/1` (`:941-942`) is public, pure, and returns `[{Node.t(),
+non_neg_integer(), kind()}]` with `kind` typed `:step | :arm | :rail | :tray`
+(`:871`). It is pre-order and the first entry is `{root, 0, :step}`:
+`outline_walk/3` (`:946-954`) prepends the node and appends body, then rails,
+then trays, and `outline_slot/3` (`:958-963`) visits `flow_children/1` then
+`shelf_children/1`, walking each child at `depth + 1` - so every block appears
+exactly once, a slot consumes no level, and reading order is the canvas's
+order. `:step` versus `:arm` is `arrangement/1`'s question asked once
+(`:947`), not re-derived from a slot count. Chips are untouched.
+
+### Cites re-counted
+
+`sb-2bmk` and `sb-w37s` moved code that both sections cite, and both sections
+end by saying their cites are to be re-read rather than trusted. The
+load-bearing ones read, at `8abc655`:
+
+| Cited as, in the section | Reads today, at `8abc655` |
+|---|---|
+| `editor.ex` `:752` (`render/1`), `:817`, `:821`, `:835` | `:831`, the layout div `:914`, `PaletteBrowser.palette_browser` `:918`, `Toolbar.toolbar` `:933` |
+| `editor.ex` `:469-497` (the assigns table), `:467` | `:494` is the `## Assigns` heading; the `profile` row is `:525` |
+| `shell.ex` `:477` / `:166`, `:501` / `:191` | `inspector_tabs/0` `:477` and `@inspector_tabs` `:166` unmoved; `drawer_tabs/0` is `:527`, `@drawer_tabs` `:191` unmoved |
+| `shell.ex` `:551-557` (`host_tabs/1`), doc `:533-549`, `:543` | `host_tabs/1` `:598` |
+| `shell.ex` `:518-530` (`drawer_tab/2`), `:486-492` (`inspector_tab/1`) | `:565-577`, `:512-518` |
+| `view_model.ex` `:403` (the `palette_groups` field), `:1763-1764` | `:451` in `@type t`, `:461` in the `defstruct`; the private builder is `:1953` |
+| `editor/toolbar.ex` `:81` (`toolbar/1`), `:38-46` | `:96` |
+| `editor/canvas.ex` `:132` (the drag hook) | `:144` |
+| `editor/connector_layer.ex` `:48` (the measure hook) | `:48`, unmoved |
+| `editor/palette_browser.ex` `:18` (decision 10's defaults) | `:16-21` |
+| `view_model.ex` `:347-365` (`Node`'s struct), `:446-447` (`build/3`) | `defstruct` `:395-413`, the `sentence` key at `:402`; `build/3` resolves it at `:1531` |
+| `view_model.ex` `:546-547` (`title/1`) | `:594-595` |
+| `view_model.ex` `:1398` (`build_unresolvable_node`) | `:1557` |
+| `view_model.ex` `:700` (`rail?/1`), `:719` (`tray?/1`), `:735` (`shelf?/1`), `:741` (`flow_children/1`), `:748` (`shelf_children/1`) | `:748`, `:767-768`, `:783`, `:789`, `:796` |
+| `view_model.ex` `:797-808` / `:798` (`arrangement/1`), `:814` (`body_slots/1`) | `:846`, `:862` |
+| `view_model.ex` `:637-638` (`summary_chips/1`) | `:685-686`, both clauses unchanged |
+
+The cross-record line citations this file makes into `ADR-0002` and into
+itself are re-baselined by the `mix adr.cites --update` this same request
+runs, so the lines this campaign moved are recorded as a reviewed diff rather
+than found by the next record to be edited.
+
+### One line `ADR-0002`'s Note of this date needs read beside this record
+
+`ADR-0002`'s amendment of this date says a block type that `use`s the
+behaviour and overrides nothing is "indistinguishable from a module that
+declares no `sentence/1`". That holds at **its** reader and not in **this**
+record's chain: the injected default is a real `def sentence/1`, so
+`declares_sentence?/1` (`view_model.ex:1760-1763`) answers `true` for it and
+`Node.sentence` takes the reader's answer - the type's palette label - rather
+than the author's `title`. The full statement, and the cost it carries, is in
+`ADR-0002`'s foot Note of this date. Nothing in this record's three-step table
+changes: the table is written in terms of what the type **declares**, and an
+injected default is declared.
+
+Filed with `sb-xnxw`, campaign SF036, folding the `ADR-0005` half of
+`sb-xtcp`'s residue.
