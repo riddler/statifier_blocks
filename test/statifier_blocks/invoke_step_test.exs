@@ -58,6 +58,52 @@ defmodule StatifierBlocks.InvokeStepTest.Probe do
   def failure_outcomes(_config), do: []
 end
 
+defmodule StatifierBlocks.InvokeStepTest.Notify do
+  @moduledoc """
+  A leaf step that says the same thing `Probe` says, at the `use` site
+  instead of in a body (ADR-0002's Note of 2026-09-07, item 6).
+  """
+
+  use StatifierBlocks.InvokeStep, invoke_type: "myapp:notify", failure_outcomes: []
+end
+
+defmodule StatifierBlocks.InvokeStepTest.SignupStep do
+  @moduledoc """
+  A host wrapper over `StatifierBlocks.InvokeStep` that fixes its family's
+  failure class once, which is the case item 6 names: a host whose steps
+  all fail the same way writes the list here rather than on every member.
+  """
+
+  defmacro __using__(opts) do
+    quote do
+      use StatifierBlocks.InvokeStep,
+          unquote(Keyword.put(opts, :failure_outcomes, ["error", "rejected"]))
+
+      @impl true
+      def outcomes(_config),
+        do: [{"done", "Done"}, {"error", "Error"}, {"rejected", "Rejected"}]
+    end
+  end
+end
+
+defmodule StatifierBlocks.InvokeStepTest.Confirm do
+  @moduledoc "A member of the wrapper's family, declaring nothing about failure."
+
+  use StatifierBlocks.InvokeStepTest.SignupStep, invoke_type: "myapp:confirm"
+end
+
+defmodule StatifierBlocks.InvokeStepTest.Verify do
+  @moduledoc """
+  A member of the same family that disagrees with it, so the declaration
+  and a body are both in play on one module.
+  """
+
+  use StatifierBlocks.InvokeStepTest.SignupStep, invoke_type: "myapp:verify"
+
+  @impl true
+  def failure_outcomes(_config), do: ["error"]
+end
+
 defmodule StatifierBlocks.InvokeStepTest do
   @moduledoc """
   ADR-0007 decision 2: `use StatifierBlocks.InvokeStep` is the leaf step
@@ -71,7 +117,7 @@ defmodule StatifierBlocks.InvokeStepTest do
   use ExUnit.Case, async: true
 
   alias StatifierBlocks.{Block, BlockType, Compiler, Document, InvokeStep, Palette, Provenance}
-  alias StatifierBlocks.InvokeStepTest.{Authorize, Probe, Receipt}
+  alias StatifierBlocks.InvokeStepTest.{Authorize, Confirm, Notify, Probe, Receipt, Verify}
 
   describe "what use declares (ADR-0007 decision 2)" do
     # Sabotage: renamed the injected `invoke_type/0` - the declaration is
@@ -138,6 +184,60 @@ defmodule StatifierBlocks.InvokeStepTest do
     # (verified).
     test "the class is in the overridable list beside the outcomes" do
       assert Probe.__info__(:functions)[:failure_outcomes] == 1
+    end
+
+    # ADR-0002's Note of 2026-09-07, item 6: the fifth `use` option, which
+    # declares the family default once instead of an `@impl` on every
+    # member.
+    #
+    # Sabotage: dropped `:failure_outcomes` from the options the macro
+    # reads, so the injection falls back to the module default - `Notify`
+    # classes `error` after all and this goes red (verified).
+    test "a declared failure class is the step's answer" do
+      assert Notify.failure_outcomes(%{}) == []
+      assert BlockType.failure_outcomes(Notify, %{}) == []
+    end
+
+    # Sabotage: same drop - the wrapper's list stops reaching its members
+    # and `Confirm` answers `["error"]` (verified).
+    test "a host wrapper's use sets the class for its whole family" do
+      assert Confirm.failure_outcomes(%{}) == ["error", "rejected"]
+      assert BlockType.failure_outcomes(Confirm, %{}) == ["error", "rejected"]
+    end
+
+    # The declaration is injected into the same overridable definition the
+    # default was, so a member that disagrees with its family says so the
+    # way it always could.
+    #
+    # Sabotage: removed `failure_outcomes: 1` from `defoverridable` -
+    # `Verify`'s own body no longer replaces the injected declaration and
+    # this goes red (verified).
+    test "a per-type override still wins over the declaration" do
+      assert Verify.failure_outcomes(%{}) == ["error"]
+      assert BlockType.failure_outcomes(Verify, %{}) == ["error"]
+    end
+
+    # Absent, the injection is the call it has always been, so the module
+    # default is still the one place the answer is written down and the
+    # option changed nothing for a step that does not use it.
+    #
+    # Sabotage: made the absent case inject `[]` instead of the call to
+    # `failure_outcomes/0` - a step that declares nothing stops classing
+    # `error` and this goes red (verified).
+    test "absent, the default still arrives through failure_outcomes/0" do
+      assert Receipt.failure_outcomes(%{}) == InvokeStep.failure_outcomes()
+      assert Authorize.failure_outcomes(%{}) == InvokeStep.failure_outcomes()
+    end
+
+    # Sabotage: deleted the `is_binary(value) or is_atom(value)` clause -
+    # the typo is injected as the step's answer and this goes red
+    # (verified).
+    test "a declaration that cannot be a list is refused where it is written" do
+      assert_raise ArgumentError, ~r/failure_outcomes: "error"/, fn ->
+        defmodule Typo do
+          use StatifierBlocks.InvokeStep, invoke_type: "myapp:typo", failure_outcomes: "error"
+        end
+      end
     end
 
     # Sabotage: reversed the merge in `palette_entry/1` so the defaults win
