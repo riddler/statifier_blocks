@@ -77,7 +77,7 @@ defmodule StatifierBlocks.Composite do
   | Callback | The composite's answer | Overridable |
   |---|---|---|
   | `config_schema/1` | `params`, in declaration order | no |
-  | `validate_config/1` | the refusals `params` declare, over the composite's config | **yes** |
+  | `validate_config/1` | **not derived**: `ADR-0007`'s injected `:ok` stands, and the refusals `params` declare are run by the compile over `config_schema/1` (see below) | **yes** |
   | `slots/1` | the declared pass-through slots, in declaration order (`RQ-SF038-5`) | no |
   | `io/1` | see below | no |
   | `current_version/0` | the version the declaration states | no |
@@ -112,8 +112,11 @@ defmodule StatifierBlocks.Composite do
   It is **overridable** for `sentence/1`'s reason - a declaration whose card
   wants to say something the params cannot spell says it itself.
 
-  `validate_config/1` is left at ADR-0007's injected `:ok`, deliberately. The
-  refusals a param declares are declaration-level - F3's missing `default:`,
+  `validate_config/1` is left at ADR-0007's injected `:ok`, deliberately -
+  the macro never redefines it, and the row above states what the compile
+  guarantees rather than a generated function (`ADR-0002`'s Note of
+  2026-09-07, correction 2). The refusals a param declares are
+  declaration-level - F3's missing `default:`,
   F4's empty hidden default, and `{:type_expr, opts}`' `allow_empty?` - and
   the compile already runs every one of them over `config_schema/1`, which for
   a composite is the params. `required?` is a rendering hint and never an

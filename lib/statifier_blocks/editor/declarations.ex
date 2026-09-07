@@ -20,15 +20,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     of the inspector for the same reason it kept Datamodel and Fixtures out:
     those tabs were never about the selected block.
 
-    It fills the place 1A reserved for "the datamodel declared-path view",
-    and it is not that view. The reserved sentence described a read-only
-    report over every declared path, which under the 11k union would mean
-    three sources at once - the host's datamodel, the compile call's
-    `:declare` roots and this key. What ships here is the one source an
-    author can actually change. The report itself shipped afterwards as the
-    drawer's read-only Datamodel tab, which `StatifierBlocks.Editor.Drawer`'s
-    moduledoc records as the view that "took the last reserved place"; this
-    section reserves nothing for it.
+    It fills **no** reserved place. 1A reserved two - "fixture runs and the
+    datamodel view" (ADR-0005's Note of 2026-09-02, "the last reserved
+    place, filled") - and this tab is neither: it arrives through 11i's own
+    door, admitted on 1A's two-word test like any tab that came after the
+    reservations were spent.
+
+    It is easy to mistake for the reserved one, and the mistake is worth
+    naming. The reserved sentence described a read-only report over every
+    declared path, which under the 11k union would mean three sources at
+    once - the host's datamodel, the compile call's `:declare` roots and
+    this key. What ships here is the one source an author can actually
+    change. That report shipped separately, as the drawer's read-only
+    Datamodel tab, and it is the view that took the last reserved place -
+    which `StatifierBlocks.Editor.Drawer`'s moduledoc records in those
+    words. This section reserves nothing behind it.
 
     ## What a row is, and what it is not
 
