@@ -126,18 +126,25 @@ defmodule StatifierBlocks.SourceView do
   @doc """
   Compiles `document` against `palette` and returns the listing.
 
-  `opts`:
+  `opts` is the compiler's own option list, plus one option of this
+  module's own. Every key but `:previous` is forwarded verbatim to
+  `StatifierBlocks.Compiler.compile/3`, because the listing is a read of
+  what one compile produced and a caller reading a chart it did not
+  compile the way its host does is reading the wrong chart: `terminate:`,
+  `child_use:`, `known_invoke_types:` and `datamodel:` each change the
+  emitted bytes, so each changes the listing. Nothing here validates the
+  list - the compiler is the authority on its own options.
 
-    * `:declare` - forwarded verbatim to `StatifierBlocks.Compiler.compile/3`
-      as its own `:declare` option, the host's raw `{id, expr}` declaration
-      list. Defaults to `[]`.
-    * `:previous` - the value this call replaces. When the compile fails and
-      the previous value was `:ready`, that listing comes back with `stale?`
-      set rather than being thrown away - see the moduledoc.
+    * `:declare` - the host's raw `{id, expr}` declaration list, the
+      compiler's own `:declare` option. Defaults to `[]`.
+    * `:previous` - the value this call replaces, and the one key this
+      module keeps for itself. When the compile fails and the previous
+      value was `:ready`, that listing comes back with `stale?` set rather
+      than being thrown away - see the moduledoc.
   """
   @spec build(Document.t(), Palette.t(), keyword()) :: t()
   def build(%Document{} = document, %Palette{} = palette, opts \\ []) when is_list(opts) do
-    case Compiler.compile(document, palette, declare: Keyword.get(opts, :declare, [])) do
+    case Compiler.compile(document, palette, compile_opts(opts)) do
       {:ok, %Compiled{scxml: scxml, provenance: provenance}} ->
         lines = lines(scxml, provenance)
         %__MODULE__{status: :ready, lines: lines, line_count: length(lines)}
@@ -157,6 +164,16 @@ defmodule StatifierBlocks.SourceView do
   @spec spans_of(t(), Block.id()) :: [Span.t()]
   def spans_of(%__MODULE__{lines: lines}, block_id) when is_binary(block_id) do
     for %Line{spans: spans} <- lines, %Span{block_id: ^block_id} = span <- spans, do: span
+  end
+
+  # `:previous` is this module's, and the only key held back. Everything
+  # else goes to the compiler untouched, `:declare` defaulted the way it
+  # always was so a caller that passes nothing compiles exactly as before.
+  @spec compile_opts(keyword()) :: keyword()
+  defp compile_opts(opts) do
+    opts
+    |> Keyword.delete(:previous)
+    |> Keyword.put_new(:declare, [])
   end
 
   @spec stale(t() | nil, [Finding.t()]) :: t()

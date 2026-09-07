@@ -109,16 +109,24 @@ defmodule StatifierBlocks.Runtime.FixtureRuns do
   Compiles `document` against `palette` once and drives every fixture row
   in `fixtures` once, returning a `t()`.
 
-  `opts`:
+  `opts` is the compiler's own option list, plus one option of this
+  module's own. Every key but `:view_model` is forwarded verbatim to
+  `StatifierBlocks.Compiler.compile/3`: a row is driven through the chart
+  the document compiles to, and `terminate:`, `child_use:`,
+  `known_invoke_types:` and `datamodel:` each change what that chart is. A
+  caller that compiles with them and asks for fixture runs without them is
+  asking about a different chart. Nothing here validates the list - the
+  compiler is the authority on its own options.
 
-    * `:declare` - forwarded verbatim to `StatifierBlocks.Compiler.compile/3`
-      as its own `:declare` option. Defaults to `[]`. This is the host's raw
-      `{id, expr}` declaration list, **never** the derived `host_roots`
-      `MapSet` a LiveView editor keeps - see the moduledoc.
-    * `:view_model` - an already-built `%StatifierBlocks.ViewModel{}`. A
-      caller that already has one (an editor always does) should pass it
-      rather than have this function build a second one. When absent, this
-      function builds its own with `ViewModel.build(document, palette, [])`.
+    * `:declare` - the compiler's own `:declare` option. Defaults to `[]`.
+      This is the host's raw `{id, expr}` declaration list, **never** the
+      derived `host_roots` `MapSet` a LiveView editor keeps - see the
+      moduledoc.
+    * `:view_model` - an already-built `%StatifierBlocks.ViewModel{}`, and
+      the one key this module keeps for itself. A caller that already has
+      one (an editor always does) should pass it rather than have this
+      function build a second one. When absent, this function builds its
+      own with `ViewModel.build(document, palette, [])`.
   """
   @spec run(Document.t(), Palette.t(), Shell.fixtures(), keyword()) :: t()
   def run(%Document{} = document, %Palette{} = palette, fixtures, opts \\ [])
@@ -126,9 +134,7 @@ defmodule StatifierBlocks.Runtime.FixtureRuns do
     if no_fixtures?(fixtures) do
       %__MODULE__{status: :no_fixtures}
     else
-      declare = Keyword.get(opts, :declare, [])
-
-      case Compiler.compile(document, palette, declare: declare) do
+      case Compiler.compile(document, palette, compile_opts(opts)) do
         {:error, findings} ->
           %__MODULE__{status: :compile_error, findings: findings}
 
@@ -136,6 +142,16 @@ defmodule StatifierBlocks.Runtime.FixtureRuns do
           build_result(document, palette, fixtures, scxml, provenance, opts)
       end
     end
+  end
+
+  # `:view_model` is this module's, and the only key held back. Everything
+  # else goes to the compiler untouched, `:declare` defaulted the way it
+  # always was so a caller that passes nothing compiles exactly as before.
+  @spec compile_opts(keyword()) :: keyword()
+  defp compile_opts(opts) do
+    opts
+    |> Keyword.delete(:view_model)
+    |> Keyword.put_new(:declare, [])
   end
 
   @spec build_result(

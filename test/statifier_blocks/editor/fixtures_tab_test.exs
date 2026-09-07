@@ -85,6 +85,27 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp fixtures_for(rows), do: %{"blk_BR" => [branch_table(rows)]}
 
+    # The host's update, the way a host that holds its own compile options
+    # delivers them: through `send_update/3` rather than at mount, which is
+    # what `StatifierBlocks.Editor.CompileOptionsTest` does for the same
+    # assign and what keeps the component's own default the thing the
+    # no-options case is about.
+    defp seat(view, document, fixtures, extra) do
+      Phoenix.LiveView.send_update(
+        view.pid,
+        StatifierBlocks.Editor,
+        [
+          {:id, "editor"},
+          {:document, document},
+          {:palette, Palette.core()},
+          {:fixtures, fixtures} | extra
+        ]
+      )
+
+      render(view)
+      view
+    end
+
     describe "a passing row" do
       # Sabotage: swapped the `:pass`/`:fail` branches in
       # `FixtureRuns.resolve_taken/3`'s `if taken == expected` - this went red,
@@ -269,6 +290,61 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert has_element?(view, ~s(tr[data-row="over"] td[data-verdict="pass"]))
         refute view |> element(".sb-drawer__panel") |> render() =~ "does not currently compile"
+      end
+    end
+
+    describe "the host's own compile options" do
+      # A row is driven through the chart the document compiles to, so the
+      # options the host compiles with decide which chart that is. Asserted
+      # with `:datamodel`, whose effect is a refusal and therefore visible in
+      # the panel: the arm's `cond` reads `amount`, and a host that has
+      # declared `amount` sensitive compiles nothing at all.
+      #
+      # Sabotage: restored `FixtureRuns.run(..., declare: ..., view_model:
+      # ...)` in `refresh_fixture_runs/1` - the option never reaches the
+      # compile, the rows drive against a chart the host cannot compile, and
+      # this went red on the compile message (verified).
+      test "reach the compile, so the rows are about the host's chart", %{conn: conn} do
+        fixtures = fixtures_for([expect_row("over", "150", "arm_a")])
+
+        {:ok, view, _html} =
+          mount_editor(conn,
+            document: branch_document(),
+            palette: Palette.core(),
+            fixtures: fixtures
+          )
+
+        view =
+          seat(view, branch_document(), fixtures,
+            compile_options: [datamodel: %{sensitive: ["amount"]}]
+          )
+
+        view |> open() |> pick_fixtures()
+
+        assert view |> element(".sb-drawer__panel") |> render() =~ "does not currently compile"
+        refute has_element?(view, ~s(tr[data-row="over"] td[data-verdict="pass"]))
+      end
+
+      # The default, pinned beside the behaviour it changes: a host that says
+      # nothing gets the runs it got before the assign reached this compile.
+      #
+      # Sabotage: made the component's own `compile_options` mount default
+      # `[datamodel: %{sensitive: ["amount"]}]` - a host that passed nothing
+      # got a refusal it never asked for and this went red (verified).
+      test "and without them the rows are what they were", %{conn: conn} do
+        fixtures = fixtures_for([expect_row("over", "150", "arm_a")])
+
+        {:ok, view, _html} =
+          mount_editor(conn,
+            document: branch_document(),
+            palette: Palette.core(),
+            fixtures: fixtures
+          )
+
+        view = seat(view, branch_document(), fixtures, [])
+        view |> open() |> pick_fixtures()
+
+        assert has_element?(view, ~s(tr[data-row="over"] td[data-verdict="pass"]))
       end
     end
   end
