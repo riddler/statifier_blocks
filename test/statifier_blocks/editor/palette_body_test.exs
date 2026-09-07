@@ -4,6 +4,35 @@
 # guard is what keeps them out of a headless *compile*, which is the earlier
 # of the two problems.
 if Code.ensure_loaded?(Phoenix.LiveView) do
+  defmodule StatifierBlocks.Editor.PaletteBodyTest.Cutoff do
+    @moduledoc """
+    A second recipe for the count line to count, declaring an `order` of its
+    own. It is not `Core.DeadlineRecipe` under a second name because two
+    entries of one group at one `order` are refused when they are not a
+    composite and its own derived recipe (`StatifierBlocks.Palette.new/2`),
+    and a fixture that could not be built is no fixture.
+    """
+
+    @behaviour StatifierBlocks.Recipe
+
+    @impl true
+    def insert(_target, _document), do: {:error, :never}
+
+    @impl true
+    def palette_entry,
+      do: %{
+        label: "Cutoff",
+        group: "Structure",
+        description: "A second recipe, for counting.",
+        icon: "clock",
+        keywords: ["cutoff"],
+        order: 100
+      }
+
+    @impl true
+    def members(_block_id, _document), do: []
+  end
+
   defmodule StatifierBlocks.Editor.PaletteBodyTest do
     @moduledoc """
     The palette's body: the count line, the group headers, and the shape of a
@@ -161,7 +190,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           groups_for(
             Palette.new(Palette.core_types(),
               recipes:
-                Map.put(Palette.core_recipes(), "cutoff", StatifierBlocks.Core.DeadlineRecipe)
+                Map.put(
+                  Palette.core_recipes(),
+                  "cutoff",
+                  StatifierBlocks.Editor.PaletteBodyTest.Cutoff
+                )
             )
           )
 

@@ -68,6 +68,42 @@ defmodule StatifierBlocks.Palette do
   They are a **list**, not a third map. Nothing resolves a validator by
   name, so there is nothing to key on and nothing to collide: every module
   in the list runs, in list order.
+
+  ## Ordering a group
+
+  A `palette_entry/0` declares a `group` and an `order`, and ADR-0005
+  decision 10 sorts a browser group by `order`. Two entries of one group
+  declaring the same number have no answer - the pick between them is
+  whatever the sort happened to do - so `new/2` refuses that palette, and
+  `from_modules/2` refuses it because it builds through `new/2`.
+
+  The numbering convention this package follows, and the one a host
+  extending a group is asked to follow:
+
+    * **One number, one entry - with one exception.** A composite's `types`
+      entry and that same composite's derived `<Module>.Recipe` declare the
+      same card by construction, and a host may register both
+      (`StatifierBlocks.Composite`, "The derived recipe"). That pair is
+      admitted; any other two entries at one number are refused.
+    * **Numbers are append-only.** A new entry takes the next number after
+      the highest one its group already uses. Existing numbers are not
+      renumbered to open a hole in the middle, because an author picks a
+      block by where it sits and a renumber moves every entry below it.
+    * **A group is dense, and that is a consequence, not a rule.** The core
+      `"Structure"` group runs 0 through 17 with no gap: the seventeen
+      `core_types/0` entries and the `"deadline"` recipe, which took 17 as
+      the last one added. There is no free interior number, so the next
+      core entry takes 18.
+    * **A host merging into a core group numbers above the core's last.**
+      `new(Map.merge(core_types(), %{...}))` puts a host's entry into the
+      same `"Structure"` group, where the core numbers are already taken;
+      a host that wants its own numbering from 0 declares its own `group`
+      instead, which is a separate namespace for ordering as much as the
+      browser's headings.
+
+  None of this is enforced beyond the collision refusal: `order` is an
+  optional key, a gap is legal, and an entry that declares no `order` at
+  all is skipped rather than refused.
   """
 
   alias StatifierBlocks.{Block, Core}
@@ -123,12 +159,30 @@ defmodule StatifierBlocks.Palette do
       in list order, and a later entry does not replace an earlier one. That
       is deliberately not `types`/`recipes`' rule, because those are lookups
       and this is not.
+
+  It refuses one thing, and raises `ArgumentError` rather than building a
+  palette a host would misread: two entries of one palette-browser
+  **group** declaring the same `order` (see "Ordering a group" in the
+  moduledoc). Types and recipes are checked together, because the browser
+  draws them into one group. An entry whose module is not loaded, exports
+  no `palette_entry/0`, or declares no `order` is skipped, not refused, and
+  a composite beside its own derived recipe is admitted - that pair is one
+  declaration read twice, not two entries disagreeing about a number.
+
+  The check lives here rather than in `from_modules/2` because a host that
+  merges maps - the shape `core_types/0` documents - never goes through
+  `from_modules/2`, and the collision is the same mount-time programmer
+  error whichever builder produced it.
   """
   @spec new(%{optional(Block.type_name()) => type_ref()}, keyword()) :: t()
   def new(types \\ %{}, opts \\ []) when is_map(types) do
+    recipes = Keyword.get(opts, :recipes, %{})
+
+    refute_duplicate_orders!(types, recipes)
+
     %__MODULE__{
       types: types,
-      recipes: Keyword.get(opts, :recipes, %{}),
+      recipes: recipes,
       assignability: Keyword.get(opts, :assignability),
       validators: Keyword.get(opts, :validators, [])
     }
@@ -241,8 +295,8 @@ defmodule StatifierBlocks.Palette do
   This function calls into the modules a palette names - `current_version/0`
   on each, the same call `resolve/2` makes - so a palette naming a module
   that is not compiled raises here, where `fetch/2` would not.
-  (`from_modules/2`'s duplicate-`order` check also calls a module, but only
-  one it can already load, and it skips the rest rather than raising.)
+  (`new/2`'s duplicate-`order` check also calls a module, but only one it
+  can already load, and it skips the rest rather than raising.)
   """
   @spec manifest(t()) :: [manifest_entry()]
   def manifest(%__MODULE__{types: types, recipes: recipes}) do
@@ -328,14 +382,12 @@ defmodule StatifierBlocks.Palette do
 
     * a registration that is neither a `{type_name, module}` nor a
       `{type_name, {module, state}}` pair - the message names the offending
-      entry;
+      entry. This one is `from_modules/2`'s own, because a map has no
+      registrations to malform;
     * two entries of one palette-browser **group** declaring the same
-      `order` - the message names both, by name and module. ADR-0005
-      decision 10 sorts a group by `order`, so a duplicate leaves the pick
-      between the two to whatever the sort happened to do. Types and recipes
-      are checked together, because the browser draws them into one group.
-      An entry whose module is not loaded, exports no `palette_entry/0`, or
-      declares no `order` is skipped, not refused.
+      `order` - the message names both, by name and module. That one is
+      `new/2`'s, and reaches here because this function builds its palette
+      with `new/2`: both builders refuse the same collision the same way.
   """
   @spec from_modules([registration()], keyword()) :: t()
   def from_modules(registrations, opts \\ []) when is_list(registrations) do
@@ -346,8 +398,6 @@ defmodule StatifierBlocks.Palette do
 
     types = Enum.reduce(registrations, base, &register/2)
 
-    refute_duplicate_orders!(types, recipes)
-
     new(types, Keyword.put(opts, :recipes, recipes))
   end
 
@@ -356,9 +406,16 @@ defmodule StatifierBlocks.Palette do
   # pick between them to whatever the sort happened to do - a host reads a
   # stable-looking palette whose two entries can swap places between
   # releases. There is no degraded reading of "both are seventh", so this is
-  # the second mount-time programmer error `from_modules/2` refuses, beside a
-  # malformed registration, and the message names BOTH entries: the one a
-  # host would have to look for is the one it did not write.
+  # the mount-time programmer error `new/2` refuses - and therefore the one
+  # `from_modules/2` refuses too, since it builds through `new/2` - and the
+  # message names BOTH entries: the one a host would have to look for is the
+  # one it did not write.
+  #
+  # It runs in `new/2` rather than in `from_modules/2` alone because
+  # `core_types/0`'s own doc demonstrates the merge shape
+  # (`new(Map.merge(core_types(), %{...}))`), which never passes through
+  # `from_modules/2`: the builder a host reaches for to extend the core
+  # group was the one builder not checking the collision.
   #
   # Types and recipes are checked TOGETHER because the browser draws them
   # into one group (a recipe carries `group` like a type does) even though
@@ -372,16 +429,32 @@ defmodule StatifierBlocks.Palette do
   # the duplicate-order check and out of every ordering question downstream
   # of it. Reading `palette_entry/0` through `call/4` is what closes that:
   # the guard is the seam's question, not this function's.
+  #
+  # ONE pair is admitted rather than refused: a composite's `types` entry
+  # beside that same composite's own DERIVED recipe. `StatifierBlocks.Composite`
+  # derives a recipe at `<Module>.Recipe` whose `palette_entry/0` *is* the
+  # block type's (see its "The derived recipe" section), and its moduledoc
+  # says a host registering both is choosing to show two. So the two entries
+  # do not disagree about the order - they are one declaration read twice,
+  # and the pick between them is not arbitrary - while any other two entries
+  # at one number still are. The pair is identified by BOTH halves of the
+  # derivation: the recipe's module is `Module.concat(type_module, "Recipe")`
+  # (the name the macro creates) AND its `palette_entry/0` answers the type's
+  # entry. Entry equality alone would admit two unrelated modules that
+  # happened to declare the same card; the module link alone would admit a
+  # hand-written `Foo.Recipe` that is not derived from `Foo` at all.
   @spec refute_duplicate_orders!(
           %{optional(Block.type_name()) => type_ref()},
           %{optional(recipe_name()) => module()}
         ) :: :ok
   defp refute_duplicate_orders!(types, recipes) do
-    (Map.to_list(types) ++ Map.to_list(recipes))
-    |> Enum.flat_map(&ordered_entry/1)
-    |> Enum.group_by(fn {group, order, _name, _module} -> {group, order} end)
+    type_entries = Enum.flat_map(types, &ordered_entry(&1, :type))
+    recipe_entries = Enum.flat_map(recipes, &ordered_entry(&1, :recipe))
+
+    (type_entries ++ recipe_entries)
+    |> Enum.group_by(fn {group, order, _name, _ref, _source} -> {group, order} end)
     |> Enum.sort_by(fn {key, _entries} -> key end)
-    |> Enum.find(fn {_key, entries} -> length(entries) > 1 end)
+    |> Enum.find(fn {_key, entries} -> collision?(entries) end)
     |> case do
       nil ->
         :ok
@@ -390,19 +463,41 @@ defmodule StatifierBlocks.Palette do
         raise ArgumentError,
               "two palette entries in group #{inspect(group)} both declare order #{order}: " <>
                 (entries
-                 |> Enum.sort()
-                 |> Enum.map_join(" and ", fn {_g, _o, name, module} ->
-                   "#{inspect(name)} (#{inspect(module)})"
+                 |> Enum.sort_by(fn {_g, _o, name, _ref, _source} -> name end)
+                 |> Enum.map_join(" and ", fn {_g, _o, name, ref, _source} ->
+                   "#{inspect(name)} (#{inspect(ref)})"
                  end))
     end
   end
 
-  @spec ordered_entry({String.t(), type_ref()}) :: [
-          {String.t(), integer(), String.t(), type_ref()}
+  @spec collision?([{String.t(), integer(), String.t(), type_ref(), :type | :recipe}]) ::
+          boolean()
+  defp collision?([_only_one]), do: false
+
+  defp collision?([first, second]),
+    do: not (derived_pair?(first, second) or derived_pair?(second, first))
+
+  defp collision?(_three_or_more), do: true
+
+  # The composite and its own derived recipe, in that argument order.
+  @spec derived_pair?(
+          {String.t(), integer(), String.t(), type_ref(), :type | :recipe},
+          {String.t(), integer(), String.t(), type_ref(), :type | :recipe}
+        ) :: boolean()
+  defp derived_pair?({_g, _o, _name, module, :type}, {_g2, _o2, _name2, recipe, :recipe})
+       when is_atom(module) and is_atom(recipe) do
+    recipe == Module.concat(module, "Recipe") and
+      recipe.palette_entry() == module.palette_entry()
+  end
+
+  defp derived_pair?(_entry, _other), do: false
+
+  @spec ordered_entry({String.t(), type_ref()}, :type | :recipe) :: [
+          {String.t(), integer(), String.t(), type_ref(), :type | :recipe}
         ]
-  defp ordered_entry({name, ref}) do
+  defp ordered_entry({name, ref}, source) do
     case call(ref, :palette_entry, [], nil) do
-      %{group: group, order: order} when is_integer(order) -> [{group, order, name, ref}]
+      %{group: group, order: order} when is_integer(order) -> [{group, order, name, ref, source}]
       _no_declared_order -> []
     end
   end
