@@ -27,11 +27,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     `Fit active` is disabled when there is no block for it to fit, because
     "fit the active block" with no active block is a control whose only
     outcome is nothing happening. What counts as one is `fittable?`, and it is
-    two things rather than one: the author's selection, and the run marks a
-    host is painting. An observer watching a run selects nothing - the marks
-    are the run's own answer to which block matters - so a toolbar that asked
-    only about the selection left that reader with a control disabled over a
-    canvas with marks on it.
+    two things rather than one: the author's selection, and the marks on the
+    canvas - whether a host named them itself or a seated run resolved them,
+    which is a distinction the canvas draws away and this control has no
+    reason to reintroduce. An observer watching a run selects nothing - the
+    marks are the run's own answer to which block matters - so a toolbar that
+    asked only about the selection left that reader with a control disabled
+    over a canvas with marks on it.
 
     ## It is the canvas panel's header row (parity item 1.2)
 
