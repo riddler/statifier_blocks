@@ -7641,3 +7641,107 @@ character. `on_select` fires on every selection; `on_change` never fires.
   line a sibling record cites moves.
 
 Filed with `sb-qhzl`, campaign SF036.
+
+## Note (2026-09-07): decision 9's table gains the `{:path, opts}` row, and is exhaustive again at nine
+
+A dated Note rather than an amendment. Decision 9's field-type table gains one
+row **by addition**; no clause of decision 9 is edited, its "re-derived after
+every config change" rule stands, the `:update_config` gate is untouched, and
+no line above this one changes. It records a control that already shipped
+rather than proposing one, which is the one way this section differs from the
+2026-09-06 Note on `{:type_expr, opts}` (`:7006`) whose shape it otherwise
+follows.
+
+### The row
+
+| Field type | Rendering |
+|---|---|
+| `{:path, opts}` | single-line text input bound to a `<datalist>` of the declared datamodel paths; the plain input when there are none |
+
+That is the row `StatifierBlocks.Editor.Field`'s own moduledoc table already
+carries, word for word (`lib/statifier_blocks/editor/field.ex:19`), and the
+copy here is deliberately the same wording rather than a paraphrase: the
+renderer's table and this record's table are one mapping stated twice, and two
+spellings of one mapping is how a record and its code start to drift.
+
+**Where the control is defined.** `StatifierBlocks.Editor.Field`'s `control/1`
+has two clauses for the type: the datalist arm, matched when
+`path_candidates` is non-empty (`lib/statifier_blocks/editor/field.ex:687-710`),
+and the plain-input arm it falls to when there are none
+(`lib/statifier_blocks/editor/field.ex:715-726`). The reasoning behind both -
+that the list suggests and never constrains, that `validate_config/1` remains
+the only gate, that an undeclared path stays clause `11e`'s `:info` advisory
+anchored on the field's `key`, that `opts`' `expects` and `writes` are read by
+`StatifierBlocks.Environment` and not by the control, and that a `{:path, opts}`
+inside a `{:list, t}` renders as the row fallback input - is in that module's
+"The `{:path, opts}` control" section
+(`lib/statifier_blocks/editor/field.ex:294-322`). None of it is restated here;
+this section decides the one thing decision 9's table is keyed on, which is how
+the control is drawn.
+
+The feed is the one the 2026-09-01 Note on this decision (`:4410`) describes:
+`StatifierBlocks.Datamodel.candidates/3`, reading the same three declaring
+surfaces `findings/4` reads, so the set an author is offered and the set that
+decides whether they get an advisory cannot drift apart. That Note describes
+the feed on an `:expression` field; this row is the same feed reached by a
+field's **type** instead of by the source it is typing into. The two are the
+same `<datalist>`, and neither is completion.
+
+### The claim in decision 9's own sentence, restored
+
+Decision 9 introduces the table as "the mapping, which is exhaustive by
+construction". The claim has been false since 2026-09-05, and its arithmetic is
+recorded above in three places, each of them true when it was written:
+
+- The 2026-09-06 Note at `:6603` records `ADR-0002`'s closed field-type set
+  reaching **eight** members with `{:path, opts}`, and corrects a stale "seven"
+  in the 2026-09-05 duration amendment's consequences. It corrects the count in
+  the consequences bullet; it does not touch the table.
+- The 2026-09-06 Note at `:7006` adds the `{:type_expr, opts}` row and says so
+  in as many words: "With this section the table holds eight rows of a set of
+  nine", and names repairing that as `{:path, opts}`'s own record debt,
+  deliberately not taken there.
+- The 2026-09-07 Note at `:7253` restates the debt as still owed: it "does not
+  make decision 9's table exhaustive - the `{:path, opts}` row that Note says is
+  still owed is still owed".
+
+With the row above, it is paid. The set `ADR-0002` decision 7 closes has nine
+members, spelled in `StatifierBlocks.BlockType`'s `field_type/0`
+(`lib/statifier_blocks/block_type.ex:152-161`) and enumerated in prose at
+`lib/statifier_blocks/block_type.ex:300-302`: `:string`, `:integer`,
+`:boolean`, `{:select, choices}`, `:expression`, `:duration`,
+`{:list, field_type()}`, `{:path, opts}` and `{:type_expr, opts}`. Decision 9's
+table carries seven of them in its own body; the 2026-09-06 Note carries the
+eighth; this section carries the ninth. Nine of nine, and "exhaustive by
+construction" reads true again - by construction because the set is closed
+where `ADR-0002` decision 7 closes it, and `control/1` dispatches on it clause
+by clause, ending in a fallback that renders a plain text input for anything
+the set does not name (`lib/statifier_blocks/editor/field.ex:923-933`).
+
+### The implementing bead
+
+**None: the control shipped before the row did.** `{:path, opts}` and both of
+its `control/1` clauses landed on `main` in `23d1455` ("Adds the `{:path, opts}`
+field type", 2026-09-05), filed with `sb-2ym4`. This section adds no code, asks
+for none, and changes no behaviour a mount has today; it is the record catching
+up to a member the code has carried for two days. It is filed with `sb-mliu`,
+campaign SF036, under ruling `RQ-SF036-0d`.
+
+### What this Note does not do
+
+- **It adds no field type.** The set is `ADR-0002` decision 7's, and it is
+  unchanged at nine. Nothing here admits a member, retires one, or re-spells
+  what one stores.
+- **It adds no control, no source, no severity and no anchor.** The two
+  `control/1` clauses are already on `main`; the advisory for an undeclared
+  path is clause `11e`'s, unwidened.
+- **It edits nothing above it.** Decision 9's table keeps its seven rows in
+  place, the three Notes above keep their counts as written and dated, and no
+  cite a sibling record takes on this file moves. The table is read as its body
+  plus the two rows its Notes add - which is how a record grows here, and why
+  the count sentences above stay where they are rather than being corrected in
+  place.
+- **It does not flip a status.** This section merges at proposed under campaign
+  SF036's invariant, like every other section filed with it.
+
+Filed with `sb-mliu`, campaign SF036.
