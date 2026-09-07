@@ -11,6 +11,8 @@ defmodule Mix.StatifierBlocks.AdrCitesTest do
 
   defp of_check(findings, check), do: Enum.filter(findings, &(&1.check == check))
 
+  defp of_source(findings, file), do: Enum.filter(findings, &(&1.file == file))
+
   describe "resolving a citation" do
     # Sabotage: dropping the upper-bound clause from resolvable?/2 let a citation
     # past the end of the record pass, and this went red.
@@ -42,7 +44,10 @@ defmodule Mix.StatifierBlocks.AdrCitesTest do
     # Sabotage: inverting the digest comparison passed the moved citation and
     # failed every unmoved one, and this went red.
     test "a citation whose recorded text no longer matches fails" do
-      [finding] = of_check(report().findings, "adr-cite-moved")
+      [finding] =
+        report().findings
+        |> of_check("adr-cite-moved")
+        |> of_source("docs/adr/0001-citing.md")
 
       assert finding.line == 6
       assert finding.severity == "error"
@@ -116,10 +121,65 @@ defmodule Mix.StatifierBlocks.AdrCitesTest do
     end
   end
 
-  describe "this repository's own records" do
+  describe "the documents scanned" do
+    # Sabotage: narrowing the default sources back to `docs/adr/*.md` - the
+    # shape this check had before they were widened - left the plan's citation
+    # unprotected, and this went red.
+    test "a plan's citation into a record is recorded and fails when the text moves" do
+      %{findings: findings, entries: entries} = report()
+      [finding] = of_source(findings, "docs/plans/260907-planning.md")
+
+      assert Map.has_key?(entries, "260907-planning.md|0002-cited.md:5-5")
+      assert finding.check == "adr-cite-moved"
+      assert finding.line == 6
+      assert finding.severity == "error"
+      assert finding.message =~ "0002-cited.md:5-5"
+    end
+
+    # Sabotage: the same narrowing dropped the root instructions file, and its
+    # entry disappeared here.
+    test "an instructions file at the root is scanned too" do
+      %{findings: findings, entries: entries} = report()
+
+      assert Map.has_key?(entries, "CLAUDE.md|0002-cited.md:3-3")
+      assert of_source(findings, "CLAUDE.md") == []
+    end
+
+    # Widening the sources did not widen the targets: a citation out of a source
+    # into something that is no record stays out of scope, and the plan names a
+    # module path and line to prove it.
+    #
+    # Sabotage: letting `target/2` answer `{:adr, base}` for a file no record
+    # matches recorded that module path as a citation, and this went red.
+    test "a citation into a file that is no record is not recorded" do
+      refute Enum.any?(Map.keys(report().entries), &String.contains?(&1, "nothing.ex"))
+    end
+
+    # Sabotage: ignoring the option and always reading the defaults left the
+    # plan's finding and its entry in place, and both this and the empty-glob
+    # test below went red.
+    test "the source globs are configurable" do
+      records_only = AdrCites.analyze(@fixture, sources: ["docs/adr/*.md"])
+      instructions_only = AdrCites.analyze(@fixture, sources: ["CLAUDE.md"])
+
+      assert of_source(records_only.findings, "docs/plans/260907-planning.md") == []
+      refute Map.has_key?(records_only.entries, "260907-planning.md|0002-cited.md:5-5")
+      refute Map.has_key?(records_only.entries, "CLAUDE.md|0002-cited.md:3-3")
+      assert Map.keys(instructions_only.entries) == ["CLAUDE.md|0002-cited.md:3-3"]
+    end
+
+    # Sabotage: the same disregard for the option read the defaults here too,
+    # and the report came back full rather than empty.
+    test "a source glob that matches nothing is not an error" do
+      assert AdrCites.analyze(@fixture, sources: ["docs/nowhere/*.md"]) ==
+               %{findings: [], warnings: [], entries: %{}}
+    end
+  end
+
+  describe "this repository's own documents" do
     # Sabotage: inserting a line above a cited line in a record made this red,
     # which is the drift the stage exists to catch.
-    test "every citation in docs/adr resolves and is unmoved" do
+    test "every citation the default sources make resolves and is unmoved" do
       assert AdrCites.analyze(File.cwd!()).findings == []
     end
   end

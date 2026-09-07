@@ -2,14 +2,15 @@ defmodule Mix.Tasks.Adr.Cites do
   @shortdoc "Resolve the line-number citations decision records make into each other"
 
   @moduledoc """
-  Reports citations in `docs/adr/` that no longer point at the text they were
+  Reports citations into `docs/adr/` that no longer point at the text they were
   written against.
 
   Records cite each other by path and line - `docs/adr/0002-...md:4108`, then
-  `` `:4121-4122` `` for the same file. An insert or a re-wrap above a cited
-  line moves it, and the citing record, untouched on `main`, silently points at
-  different text. This task is the check for that; the reasoning and the three
-  layers it runs are in `Mix.StatifierBlocks.AdrCites`.
+  `` `:4121-4122` `` for the same file - and the plans and `CLAUDE.md` cite the
+  records the same way. An insert or a re-wrap above a cited line moves it, and
+  the citing document, untouched on `main`, silently points at different text.
+  This task is the check for that; the reasoning, the documents it scans and
+  the three layers it runs are in `Mix.StatifierBlocks.AdrCites`.
 
   It runs as the `ADR cites` custom stage of `mix quality`, so the drift is a
   named gate failure rather than something review has to catch.
