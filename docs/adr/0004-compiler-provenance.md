@@ -2844,3 +2844,241 @@ param's Note is at `:2457` and the shared-final Note at `:2522`; `ADR-0013`
 amendment was edited by it or by this flip.
 
 Filed with `sb-upv0`, campaign SF035's Lane A.
+
+## Amendment (2026-09-07): a composite expands at the Resolve stage, and a finding inside an expansion is attributed one level up to the param that produced it
+
+**Status: proposed (2026-09-07, campaign SF037, bead `sb-nzc1`, recording
+campaign-SF037's rulings `RQ-SF037-5` and `RQ-SF037-6`).** A decision record
+merges at proposed under the campaign invariant; flipping it to accepted is a
+separate gated request through the same `docs/adr/` gate, and `sb-v3ny` carries
+it. Additive: decisions 3, 5, 6, 8, 9 and 10 stand as accepted, and no text
+above this line is edited by this section.
+
+An amendment rather than a Note, because the pipeline gains a step it does not
+have today and decision 5's `owner` gains a reporting rule it does not state.
+`ADR-0002` decision 5's amendment filed with `sb-2gdx` - "`use
+StatifierBlocks.Composite` - a block type derived from params plus a pure
+subtree" - declares a block type whose emission is not its own: a composite
+answers `subtree/1` with a tree of other block types, and
+`Composite.expand/2` is the one function that turns a composite block into
+that tree. **Where** in the compile that expansion happens, and **who owns** a
+finding raised inside it, are this record's to say, and this section says them.
+
+### E1. A composite is replaced by its expansion at Resolve, and stages 3-6 run on the expanded tree unchanged
+
+Stage 2 of the pipeline is Resolve, where every block goes through
+`StatifierBlocks.Palette.resolve/2`
+(`lib/statifier_blocks/compiler.ex:22-24`). A resolved node whose module is a
+composite is **replaced, in place, by the subtree `Composite.expand/2`
+returns**, and the replacement is complete before the stage ends. Config,
+Structure, Emit and Chart then read a tree with no composite in it, and need
+no knowledge that one was ever there.
+
+Three consequences, and they are why this stage rather than a later one:
+
+- **Decision 4 is untouched.** `emit/2` receives the block and context it
+  receives today and returns the emission it returns today; nothing in its
+  contract admits a composite. `emit_stage/3`
+  (`lib/statifier_blocks/compiler.ex:1273`) and the `emit/2` beneath it
+  (`:1413`) call the same callback on the same shape.
+- **A composite's own `emit/2` is never reached.** It exists because
+  `StatifierBlocks.BlockType` requires it and the declaration generates it,
+  and it **raises** if it is called. That is the honest spelling of
+  unreachable: a bug in the expansion becomes a crash at the site of the bug
+  rather than silently wrong bytes six stages downstream, where decision 6's
+  determinism guarantee would faithfully reproduce them.
+- **Config and Structure see the members.** An expanded member's
+  `validate_config/1`, its slot arity and its assignability are checked
+  exactly as they would be had an author placed those blocks by hand. That is
+  the property E3 exists to pay for: the block those stages name is a block
+  the author cannot see.
+
+The later alternatives were considered and are worse for this record's own
+reasons. Expanding at Emit would put a second tree-shaped thing inside
+`emit/2` and make decision 4's contract a lie. Expanding at Chart would leave
+the provenance map to be built over a tree the serializer never saw. Resolve
+is already the stage that turns a stored block into the module that will emit
+it; a composite is the case where that answer is a subtree rather than a
+single module.
+
+### E2. State ids derive from the expanded blocks' ids, by decision 3 as it stands
+
+No new id shape is introduced, and decision 3's function is unchanged. Each
+expanded member is an ordinary `Block.t()` with an id minted by the
+declaration, deterministically from the composite block's id and containing no
+`__` (`ADR-0002`'s amendment filed with `sb-2gdx`), so decision 3 derives its
+state id the way it derives every other one - `state_id(block_id) = "s_" <>
+block_id`, with `Context.role_id/2` for anything a member mints below itself.
+
+Decision 3's three properties hold without amendment. **Uniqueness**: the
+composite block's id is document-unique under `ADR-0001` decision 3 and the
+declaration's minting is injective over it, so the members' ids are
+document-unique too, and they contain no `__`, so the role namespace stays
+separate. **Invertibility**: `unstate_id/1` still inverts a generated state id
+without consulting the map. **Totality**: every member is a block, so every
+generated state still carries an id.
+
+A compound id naming the composite and the member was rejected for decision
+3's own reason. It would need a second separator distinguishable from `__`,
+and it would write the composite's identity into SCXML that nothing reads. The
+expansion is not visible in the chart, and it does not need to be.
+
+### E3. Every span inside an expansion is owned by its expanded block, and the finding is reported one level up
+
+Decision 5 stands as written: the map is total over the emission, and its
+`owner` names the block whose emission the span came from. Inside an expansion
+that block is the **expanded member**, never the composite. The map records
+what was emitted, and what was emitted is the members.
+
+Reporting is the other half, and it is where this amendment adds a rule.
+Decision 9 maps a finding to its innermost owning span; decision 10 says every
+finding names a block. A finding whose owner names an expanded member names a
+block the author cannot see, cannot select and cannot edit - so it is
+**re-anchored one level up before it is reported**. Decision 5's `owner` is the
+map at `:586-590`, the prose triple at `:230` written out:
+
+```elixir
+@type owner :: %{
+        block_id: Block.id(),
+        role: String.t() | nil,
+        config_key: String.t() | nil
+      }
+```
+
+and re-anchoring is a rule about the two fields a reported finding takes from
+it - `block_id` becomes the composite block's, and `config_key` becomes the
+param's key or `nil`:
+
+- **A finding with a param to blame is reported against the composite block,
+  with that param's key.** `Composite.expand/2` returns the expanded blocks
+  together with a **param map**: for each expanded member's config key that
+  was filled from a composite param, which param filled it. When a mapped
+  finding's `owner` carries a `config_key` the param map answers for, the
+  reported finding's `block_id` is the composite block's and its `config_key`
+  is that param's key. `ADR-0005` decision 11 ("Findings are anchored, and the
+  anchor decides where they render") then renders it on a
+  `{:config, block_id, key}` anchor - inline beneath a field on the
+  composite's own form, which is the one field the author typed into and the
+  one field they can change.
+- **A finding with no param to blame is reported against the composite block
+  with `config_key: nil`.** This is decision 9's existing precedent applied
+  unchanged rather than a new case: a structural finding is a bug in this
+  package or in a host's block type rather than the author's doing, and its
+  owning span already carries `config_key: nil` (`:411`). A finding inside an
+  expansion that no param produced is that kind of finding from the author's
+  side - there is nothing on their form to point at - so it renders on the
+  composite block's chrome, and "this cannot be fixed here" is again the only
+  honest message.
+- **It is never reported against the expanded block.** There is no third arm.
+  A finding the author cannot act on and cannot even locate is worse than no
+  finding, and decision 10's promise that every finding names a block is only
+  worth anything if the block it names is one the author holds.
+
+**The expanded anchors survive, at the engineer's altitude.** Re-anchoring is
+a rule about the reported finding, not a rewrite of the map. Every span is
+still owned by the member that emitted it, so the Source tab, which reads the
+generated SCXML against the map, still highlights the member's own span, and a
+fixture run still names the member. The author's surface says which param is
+wrong; the engineer's surface says which state, inside which expansion,
+carries the bytes. Both are true at once, and decision 5's totality is what
+makes the second one possible at all.
+
+No typespec in "The contract as typespecs" moves. `owner` keeps the three
+fields it has, and a re-anchored finding is an ordinary
+`StatifierBlocks.Compiler.Finding` with the `block_id` and `config_key`
+decision 10 already gives it.
+
+### E4. The document hash is the stored document's, and expanding by hand moves no compiled byte
+
+Decision 6's triple is `{document canonical bytes, palette, compiler version}`
+and this amendment leaves all three where they are. A document holding a
+composite block is an ordinary `ADR-0001` document - the composite block is
+stored as `{type, id, config, slots}` and nothing else, the expansion is not
+stored, and no member appears in it - so the document hash under `ADR-0001`
+decision 8 is the hash of what the author wrote: the composite block, not its
+members.
+
+The second half is worth stating as an obligation rather than leaving to be
+inferred from decision 6:
+
+> The SCXML a document holding a composite block compiles to is
+> **byte-identical** to the SCXML the same document compiles to after that
+> composite has been expanded in place, and the provenance maps are equal.
+
+Expanding in place is the editor's Expand action, which `ADR-0005`'s amendment
+filed with `sb-mjrt` ("Expand as one compound edit, how a composite card
+draws, and Collapse recorded at proposed") records. It replaces the composite
+block with the same members `Composite.expand/2` produces, in the stored
+document this time. It moves the document hash, because the author changed the
+document; it must move no compiled byte, because the compiler was already
+compiling those members. That equality is what makes Expand a presentational
+choice rather than a semantic one: an author who expands gets an editable tree
+and the same chart, and a chart already identified under st-ADR-0052 is not
+re-identified by the decision to expand.
+
+This record states the obligation. `sb-qxyh` builds the expansion and carries
+the test that proves it, per reference composite.
+
+### Worked example: a bad invoke type on a "Guarded step"
+
+`myapp.guarded_step` is a composite declaring two params, `condition` and
+`invoke_type`. Its `subtree/1` answers a `core.branch` whose taken arm holds a
+`core.invoke`, and the call's `invoke_type` config field is filled from the
+composite's `invoke_type` param. The author types `myapp:capture` into the
+composite's one visible field, and the host has registered no handler for it.
+
+```
+stored document
+  blk_GS  myapp.guarded_step
+          %{"condition" => "...", "invoke_type" => "myapp:capture"}
+
+Resolve, through Composite.expand/2
+  blk_GS_arm   core.branch
+    └── blk_GS_call  core.invoke  %{"invoke_type" => "myapp:capture", ...}
+
+  param map: %{"blk_GS_call" => %{"invoke_type" => "invoke_type"}}
+```
+
+Stages 3-6 run over the two members. Decision 8's invoke lint fires on the
+`<invoke>` the call emitted, decision 9 maps its span to the innermost owner -
+`%{block_id: "blk_GS_call", role: nil, config_key: "invoke_type"}`, correctly,
+because that member emitted the bytes - and E3 re-anchors the finding before it
+is reported:
+
+```elixir
+compiled.warnings
+#=> [%{block_id: "blk_GS", stage: :chart, severity: :warning, fault: :author,
+#      config_key: "invoke_type",
+#      code: :no_registered_invoke_handler,
+#      message: ~s(no handler registered for invoke type "myapp:capture")}]
+```
+
+which is the shape at `:817` with a `config_key` and the composite's own id.
+The editor draws the warning beneath the "Invoke type" field on the "Guarded
+step" card, which is the field the author filled in.
+
+Had the same lint fired on an `<invoke>` the declaration writes itself, with
+no param feeding it, the param map would answer nothing: the finding would
+still carry `block_id: "blk_GS"` and would carry `config_key: nil`, and the
+editor would draw it on the composite's chrome with nothing to point at,
+because there is nothing on that form the author can change. The Source tab,
+in both cases, still highlights the `<invoke>` inside `s_blk_GS_call`, because
+the map was never rewritten.
+
+### What this amendment does not change
+
+Decision 4's `emit/2` contract, decision 6's determinism guarantee and its
+one-way reading, decision 7's join between document identity and chart
+identity, and decision 10's ordering and finding shape all stand exactly as
+accepted. No stage is added to the pipeline and none is removed: Resolve does
+one more thing, and the count stays six. Nothing here decides how a composite
+exposes its members' reads and writes to `ADR-0011`'s environment walk, which
+is a different record's question and is named here only so it is not read into
+this one. Nothing here gives a composite a slot of its own, and nothing here
+puts a marker on an expanded block: an expansion is recognised structurally,
+and a document holding a composite is an `ADR-0001` document at
+`schema_version` 1.
+
+Filed with `sb-nzc1`, campaign SF037, recording campaign-SF037's rulings
+`RQ-SF037-5` and `RQ-SF037-6`. `sb-qxyh` implements it, and `sb-v3ny` carries
+the flip.
