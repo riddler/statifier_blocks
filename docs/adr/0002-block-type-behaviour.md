@@ -5643,7 +5643,7 @@ Filed with `sb-wzoa`, campaign SF035's Lane A.
 
 ## Amendment (2026-09-07): decision 7, optional `hidden?` and `readonly?` keys, and the missing-`default:` refusal widened to every field type
 
-**Status: proposed.** Drafted for `sb-s0jt` under the operator's campaign-SF036
+**Status: proposed (2026-09-07).** Drafted for `sb-s0jt` under the operator's campaign-SF036
 grant, recording that campaign's ruling `RQ-SF036-3` and the two record
 questions carried on `sb-btx0`, and merging at proposed under that campaign's
 invariant like every other section filed with it; flipping it to accepted is a
@@ -5782,7 +5782,7 @@ rather than left to a reader:
 | Field type | Empty value refused under `hidden?: true` |
 |---|---|
 | `:string` | `""` |
-| `:integer` | `""` (the value `Editor.Field.decode/2` returns when `Integer.parse/1` does not consume the whole string, `editor/field.ex:991-996`) |
+| `:integer` | `""` - an empty control posts `""`, and `Editor.Field.decode/2` hands `raw` back unchanged when `Integer.parse/1` does not consume the whole string (`editor/field.ex:991-996`, the `_other -> raw` clause at `:994`), so the stored value is the empty string rather than a number |
 | `:boolean` | *none* - `false` is a value; a hidden boolean defaulting to `false` is legal |
 | `{:select, choices}` | `""` (no choice) |
 | `:expression` | `""` |
@@ -5856,6 +5856,12 @@ key would be decoded through it even though no form ever offered that control.
 key**: the decode takes the `:error` branch for it unconditionally rather than
 reading `params`. That is a decode change, and it is the only one: it defends a
 key the form withheld, and it does not touch the three documented properties.
+
+This paragraph states a rule beyond the ruling the rest of this section records,
+and it is ruled in its own right: campaign-SF036 ruling `RQ-SF036-15`,
+2026-09-07, adds to `RQ-SF036-3` that a `hidden?: true` or `readonly?: true`
+field ignores any posted value for its key and that the decoder takes the
+unposted branch for a flagged field unconditionally.
 
 ### F7. `ViewModel.Field` carries both flags
 
