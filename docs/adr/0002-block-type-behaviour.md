@@ -7910,3 +7910,174 @@ unchanged.
 Filed with `sb-acf5`, campaign SF037. This Note changes no code and adds no
 README row; it flips the `Status:` line at `:6734` and nothing else in this
 file.
+
+## Note (2026-09-07): seven readings the SF038 walk takes on this record - the migration question ruled and pointed at its own amendment, a member's version in an expansion, io/outcomes through a palette, a derived `summary/1`, what `param_map` blames, a declared `failure_outcomes`, and one question named open
+
+The SF038 walk read the questions this file's Notes leave standing and took the
+six rulings the items below record. This Note is a reading of `main` at
+`503ed48`. It edits no text above this line, carries no `Status:` line and
+flips nothing: five of its seven items record what the code already does or
+what a named request will do to it, one points at a decision that lands as its
+own amendment, and one names a question and leaves it open. The walk's rulings
+are labelled `RQ-SF038-<n>` below, which is the form this file already uses for
+the SF037 walk's at `:7894` and `:7901`.
+
+### 1. `RQ-SF037-16` is ruled, and the ruling lands as an amendment rather than here
+
+`:7894-7900` names a data composite's migration key open, and `:7901-7904`
+records that `sb-v3ny` left `RQ-SF037-17` beside it. The walk ruled it: a
+declaration may carry a declarative `"migrations"` list. That is a decision
+about the declaration's shape, so it does not land in a Note - it lands as its
+own dated `## Amendment` on this file (`sb-ekkt`), after the pass-through
+amendment (`sb-nlo5`), with its implementing request `sb-mulk`. **This item
+fixes nothing about that shape**: not the step keys, not the order steps are
+applied in, not what a gap in the chain does, not what an unexpressible change
+answers. It records only that the question is no longer queued.
+
+Until that amendment lands, the standing answer is unchanged.
+`StatifierBlocks.Composite.Data`'s heading reads
+`## What this module does not decide: a migration` (`composite/data.ex:159-169`)
+- this file's earlier Notes and the requests filed against it paraphrase that
+heading with "project" in place of "module"; the module's word is the one
+above. `migrate_config/3` (`composite/data.ex:371`) still answers
+`{:error, {:no_migration_from, from}}` unconditionally, and
+`## The hygiene obligation a bump is for` (`composite/data.ex:171-181`) is
+untouched by this Note.
+
+### 2. `RQ-SF037-17`: an expansion is at each member's current version
+
+The walk ruled it: an expansion is at each member's **current** version, as the
+palette resolves it at expansion time; a template carries no version key; and
+the `Collapse` gesture strips versions from what it lifts.
+
+The clause about templates is already true of the code, and worth stating
+because it is what makes the rest of the ruling reachable. A data declaration's
+node template carries a type, an id suffix, `"config"` and `"slots"` and no
+version, and `instantiate/2` builds each member with
+`StatifierBlocks.Block.new/2` (`composite/data.ex:413-420`), whose
+`:type_version` defaults to `1` (`block.ex:40`, `:49-57`).
+`StatifierBlocks.Composite.expand/2` mints ids and copies each template block
+through untouched (`composite.ex:395`).
+
+The clause about resolution is read against what the compiler does with those
+members: `expand_node/3` hands every member back to `resolve/2`
+(`compiler.ex:576`; `resolve_member/3` at `:595-596`), so a member meets
+`StatifierBlocks.Palette.resolve/2`'s version comparison
+(`palette.ex:646-656`) exactly as a stored block does. Two core types are past
+version 1 today - `core.send` (`core/send.ex:102`) and `core.wait`
+(`core/wait.ex:39`) - so a subtree that names one and takes `Block.new/2`'s
+default reaches that type's `migrate_config/2` rather than being read at the
+type's current version. `StatifierBlocks.Palette.block/2`
+(`palette.ex:596-608`) already builds a block at its type's
+`current_version/0`, and is the shape the ruling points a declaration's
+instantiation at. Making the instantiation say so is the implementing work the
+ruling leaves to the requests that carry it; the ruling is what those requests
+are measured against.
+
+`Collapse` is not built (`sb-uzly` is the request), so the version-stripping
+clause is a requirement on it rather than a description of code.
+
+### 3. `RQ-SF038-13`: the derived callbacks stay core-only, and readers with a palette go through a palette
+
+Section 6 of the Note at `:7464-7481` names this question and leaves it for
+the SF038 walk (`:7479-7481`): whether a composite's derived `io/1` and
+`outcomes/1` should see the host palette. Ruled: **the callbacks stay
+core-only, and say so.**
+`member_module/1` resolves a member's type name through
+`Palette.fetch(Palette.core(), type)` (`composite.ex:608-613`), and
+`### The one limitation in the derived io/1 and outcomes/1`
+(`composite.ex:135-146`) is the moduledoc that states the consequence. No
+`@callback` is added, removed or re-arity'd by this Note, and neither
+derivation gains a palette argument.
+
+What changes is the reader side. Every in-package reader that **has** a palette
+resolves a composite's io and outcomes through it, via two arity-2 functions
+`StatifierBlocks.Composite.io/2` and `StatifierBlocks.Composite.outcomes/2`
+(`sb-9w7w`), which the decision forces rather than adds - they are the only way
+a reader holding a palette can reach the exact answer without widening a
+callback. A composite whose expansion root is a **host** type is therefore
+exact wherever a palette is in hand, and the behaviour's defaults that
+`:7473-7475` describes stay the answer only where none is. The environment walk
+was already unaffected, for the reason `composite.ex:145-146` gives.
+
+### 4. A derived `summary/1`
+
+`sb-9w7w` also derives `summary/1` on a composite: the chips are the
+declaration's `params`, minus those declared `hidden?: true`. `hidden?` is the
+field-declaration flag at `block_type.ex:286` and `:379-398`, so a param the
+author has already said no form renders is not a chip either - the same reading
+`ViewModel` takes at `view_model.ex:160`. Nothing about the behaviour changes:
+`summary/1` is already one of the optional callbacks, where
+`0007-block-type-defaults.md:257-262` reads "seven are optional" and names it.
+The `use StatifierBlocks.Composite` block injects `sentence/1` today
+(`composite.ex:243-244`) and no `summary/1`; the derivation is added there,
+beside it.
+
+### 5. What `param_map` blames a member on, in both kinds
+
+Both kinds attribute, and they attribute differently. Both are stated here
+because the section describes neither.
+
+- **A data composite's is by placeholder, and exact.** A node is attributed to
+  param key *K* when the placeholders in its **own** `"config"`, not its slots'
+  children, name exactly one distinct param, and to `nil` when they name none
+  or more than one (`composite/data.ex:150-157`). It is exact because a
+  template is the only thing that could have put the value there.
+- **A module composite's is by value comparison.** `blamed_param/2`
+  (`composite.ex:580-593`) blames the one param whose *distinguishing* value
+  the member's config carries anywhere, where a value is distinguishing when it
+  is not one of `nil`, `""`, `[]`, `%{}` or `false` (`composite.ex:596-599`).
+
+And the collision, which both readings above reach for: the code answers `nil`
+when none **or more than one** param matches (`composite.ex:589-592`), and the
+comment at `composite.ex:570-572` calls that "no single param is responsible",
+"the honest answer in both directions". The summary this item was drafted from
+said the module side takes the first param in *declaration order* on a
+collision. The code does not, and there is no declaration order at that point
+to take - `params` there is a config map, and `blamed_param/2` comprehends it.
+So this Note **records the code and names the difference rather than settling
+it**: giving the module side a tie-break is a change to `blamed_param/2` and to
+what `param_map` means, and it is for the request that wants one to ask, naming
+the order it would read.
+
+### 6. `use StatifierBlocks.InvokeStep, failure_outcomes: [...]`
+
+The Note at `:3832` added the optional `failure_outcomes/1`, and
+`StatifierBlocks.InvokeStep`'s `__using__` injects
+`def failure_outcomes(_config), do: StatifierBlocks.InvokeStep.failure_outcomes()`
+(`invoke_step.ex:172`), whose module-level default is `["error"]`
+(`invoke_step.ex:236-237`). A family of steps that fails in more ways than that
+has, today, one place to say so: an `@impl` on every member.
+
+The macro's four options - `:invoke_type`, `:produces`, `:fields` and
+`:palette` (`invoke_step.ex:126-136`) - therefore gain a fifth,
+`:failure_outcomes` (`sb-a0xw`), which declares the family default once at the
+`use` site; a host wrapper module over `InvokeStep` may set it for its whole
+family. Absent, the injection is exactly what it is now. This adds a `use`
+option, not a callback, and changes no default.
+
+### 7. Named, not decided: a register-aware `sentence`
+
+`StatifierBlocks.Core.Branch.sentence/1` answers
+`"Decide: <the first arm's label>, otherwise"`, or `"Decide: otherwise"` when
+`otherwise` is first (`core/branch.ex:245-252`). That reads at the block's own
+altitude, which is the altitude the callback has: `sentence/1` is handed a
+config and nothing else, and `StatifierBlocks.BlockType.sentence/2`
+(`block_type.ex:1548-1556`) only chooses between calling it and falling back to
+the type's label.
+
+A reading at a host authoring view's altitude would want the register the
+profile carries, so that `"Decide:"` is the word that host's authors use -
+which is a `sentence/2` on the callback taking the profile beside the config,
+or something in its place.
+The walk declined to treat this as a seam and ruled it wording. Whether the
+callback should gain that arity, whether the profile is the right second
+argument, and whether the register belongs to the profile at all are one
+profile-shaped question for a later record. **Nothing here decides it**, and no
+request is filed for it.
+
+Filed with `sb-uigm`, campaign SF038. This Note changes no code, adds no README
+row and carries no `Status:` line, because it takes no decision this file has
+not already taken or pointed at. Items 3 and 4 are implemented by `sb-9w7w`,
+item 6 by `sb-a0xw`, and item 1's decision lands as `sb-ekkt`'s amendment with
+`sb-mulk` behind it.
