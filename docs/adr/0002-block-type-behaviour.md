@@ -6359,7 +6359,7 @@ Filed with `sb-xnxw`, campaign SF036, folding the residue of `sb-p144`
 
 ## Amendment (2026-09-07): decision 5, `use StatifierBlocks.Composite` - a block type derived from params and a pure subtree
 
-**Status: proposed (2026-09-07, campaign SF037, bead `sb-2gdx`, on epic `R3`'s
+**Status: accepted (2026-09-07, campaign SF037, bead `sb-2gdx`, on epic `R3`'s
 settled direction and rulings `RQ-SF037-3`, `RQ-SF037-6` and `RQ-SF037-8`).** A
 decision record merges at proposed under campaign SF037's invariant; flipping
 this section's status line to accepted is a separate gated request (`sb-v3ny`,
@@ -7301,3 +7301,297 @@ listed below.
   re-arity'd by this section.
 
 Filed with `sb-5b7j`, campaign SF037. The implementing request is `sb-5xqr`.
+
+## Note (2026-09-07): the `use StatifierBlocks.Composite` amendment is flipped to accepted, with five corrections by addition, three questions named, and the data-composite amendment left at proposed
+
+`sb-xio9` landed on `main` at `d0af5f0`, and this Note is a reading of `main` at
+`0c39a3c`. Every claim the Amendment of this date at `:6360` makes was checked
+against that code before its `Status:` line at `:6362` was flipped. No text
+above this line is edited by this Note; everything below corrects by addition,
+which is this file's practice at `:6229-6280` and `:6340-6360`.
+
+### 0. The sentences the flip falsifies, met rather than edited
+
+Three sentences in the section are true only of the day it was written, and the
+flip is what makes them false. They stay exactly as written:
+
+- `:6370-6371`, "Nothing here is built yet - `sb-xio9` is the request that
+  builds it." `sb-xio9` built it.
+- `:6364-6366`, "flipping this section's status line to accepted is a separate
+  gated request (`sb-v3ny`, after `sb-xio9` lands the macro)". `sb-v3ny` is
+  that request and this is it.
+- `:6594-6596`, "**This amendment is proposed with that question open, and it
+  flips to accepted only once the question is ruled and its ruling is
+  implemented.**" That is the precondition this flip had to meet, and section 1
+  below is the record that it is met.
+
+`:6378-6379` dates every code cite in the section to `main` at `c77356b` and
+asks to be re-read rather than trusted. It was, and the re-reading is sections
+1 to 6.
+
+### 1. `RQ-SF037-15` is ruled in shape (A), and built as a branch rather than a walker arm
+
+The open-question paragraph at `:6583-6597` is superseded here. The operator
+ruled `RQ-SF037-15` on 2026-09-07 in shape **(A)**, the shape the paragraph
+lists at `:6586-6588` and `ADR-0011`'s Note lists at `:2465-2468`: a composite's
+read and write signatures are computed at its one position by running the same
+`read_signatures/3` and `write_signatures/3` over `Composite.expand/2`'s subtree
+with the expanded config, with no descent, no new `type_expr()` arm, and
+`config_schema/1` left as the params. Shapes (B) and (C) are declined.
+
+One wording in the paragraph's cost line needs narrowing. `:6592` says of shape
+(A) that it "adds a walker arm and keeps the declaration surface fixed". The
+declaration surface is indeed fixed. Nothing that was built is a walker arm:
+`Environment.read_signatures/3` and `Environment.write_signatures/3` each gained
+an `if Composite.composite?(module)` branch inside the function that was already
+there, and both branches call one private helper,
+`Environment.expansion_signatures/5`, whose body is
+`{members, _param_map} = Composite.expand(block, module)` flattened and mapped
+through the same signature function it was handed. No public function was added,
+no arm of the type-expression vocabulary was opened, and the module declares no
+`@callback` at all. `:6577-6581`'s "**No new arm of the type-expression
+vocabulary is opened here.** `RQ-SF037-8` stands" is exact as written.
+
+`:6714-6715`, "exactly the thing `RQ-SF037-15` has to pick a mechanism for", is
+stale in the same way and is met by this section.
+
+### 2. Correction 1: `sensitive?` is not a param flag
+
+`:6417-6420` lists the flags a param may carry "on the same terms" as any other
+declared field, and `sensitive?` is among them, on `:6418`. It is not a
+`field_decl/0` key. The cite the same sentence gives -
+`t:StatifierBlocks.BlockType.field_decl/0` at `block_type.ex:277-287` - is exact,
+and it is what falsifies the list: the type's nine keys are `key`, `type`,
+`label`, `required?`, `default`, `value_path`, `datamodel_path?`, `hidden?` and
+`readonly?`, and `sensitive?` is not one of them.
+
+`sensitive?` is a key on a **datamodel** declaration, `Datamodel.declared_row/0`
+at `datamodel.ex:226`. `block_type.ex:400-402` says so - "neither implies
+`sensitive?`, which is a key on a **datamodel** declaration rather than on a
+field declaration" - and this file already said so at `:6276-6280`, in the SF036
+correction that left F8 standing. The sentence at `:6417-6420` is read with
+`sensitive?` struck from its list; every other flag in it is a `field_decl/0`
+key and means for a param exactly what the sentence says. Nothing else in the
+section depends on the word: no derivation reads it, and `:6229` already
+records that nothing in the implementation reads, sets or overrides it as a
+field flag.
+
+### 3. Correction 2: `validate_config/1` is not derived; it is left at `ADR-0007`'s injected `:ok`
+
+The derived-callbacks table at `:6469-6479` gives `validate_config/1` the row
+"the refusals `params` declare, over the composite's config", derived from the
+declaration and overridable (`:6472`), and the subsection heading at `:6508`
+says "`validate_config/1` runs over the params". `StatifierBlocks.Composite`
+derives no `validate_config/1` at all. `use StatifierBlocks.BlockType` runs
+first (`composite.ex:217`), `ADR-0007`'s injected `:ok` stands, and
+`composite.ex` never redefines it.
+
+The implementation's reading, stated in its own moduledoc at
+`composite.ex:96-106`, is that the row's **outcome** is already delivered
+without a derivation: the refusals a param declares are declaration-level - F3's
+missing `default:`, F4's empty hidden default, and `{:type_expr, opts}`'
+`allow_empty?` - and the compile already runs every one of them over
+`config_schema/1`, which for a composite is the params. F3 and F4 run from
+`Compiler.declaration_findings/2` (`compiler.ex:1008-1012`, refusals at
+`:1017-1029`) and `allow_empty?` from `BlockType.type_expr_findings/2`
+(`block_type.ex:1093-1098`, called at `compiler.ex:953`) - all three over
+`module.config_schema(config)`. `required?` is a rendering hint and not an
+authority, which is what lets the section's own worked example - two
+`required?: true` params defaulting to `""` - land finding-free.
+
+So the decision the row states holds and the mechanism it names does not. The
+row is read as a statement of what the compile guarantees rather than of a
+generated function. Overridability is unaffected: `validate_config/1` stays
+overridable through `block_type.ex:163-169`, so `:6481-6482`'s "`sentence/1`,
+`palette_entry/0` and `validate_config/1`. Those three and no others" is exactly
+right about what a declaration may override, even though `composite.ex:258`'s
+`defoverridable` names only the two the macro itself defines. `composite.ex:80`
+repeats the table's wording in the module's own doc table and carries the same
+imprecision; correcting it is a code change and is not this request's.
+
+### 4. Correction 3: the `use` takes more than two things
+
+`:6413` says "`use StatifierBlocks.Composite` takes two things and nothing
+else." The two things it then describes - `params` and the `subtree/1` callback
+- are the two the decision turns on, and `subtree/1` is a `@callback`
+(`composite.ex:194`) enforced by `__before_compile__` (`:265-273`) rather than
+an option. The macro's option list is five: `:name` and `:params`, both
+required, plus `:version`, `:sentence` and `:palette_entry`
+(`composite.ex:303-332`).
+
+The section is not wrong about any of the other three; it names all of them
+itself, three rows later, in the same table this Note corrects - `:6475`
+derives `current_version/0` from "the declaration's version", `:6477` derives
+`sentence/1` from a declared template, and `:6478` derives `palette_entry/0`
+from "the declared map". `:6413` is a topic sentence that undercounts what the
+section goes on to describe, and it is read as "two things the decision turns
+on" rather than as a statement of the option list.
+
+### 5. Correction 4: the sugar cite, and the cites the code moved
+
+`:6552-6553` cites `environment.ex:1070-1080` for `ADR-0011` decision 6's sugar.
+That range is `writes?/1` and `written_type/1` today. The sugar is
+`sugar_read/4` at `environment.ex:1102` and `sugar_write/4` at `:1107`. The
+claim the sentence makes - that `io/1` contributes only the sugar, and that
+both sugar keys are single-valued - holds:
+`t:StatifierBlocks.Assignability.io/0` at `assignability.ex:88-93` declares
+`consumes` and `produces` as single values, not lists.
+
+The rest of the section's `lib/` cites resolve to the text they were written
+against, at these lines today. The claims are unchanged; only the numbers move.
+
+| Cited in the section | Cited as | Reads today |
+|---|---|---|
+| `outcomes/1`, `failure_outcomes/1`, `summary/1`, `donedata_type/1`, `sentence/1` (`:6403-6404`) | `:657`, `:690`, `:729`, `:777`, `:813` | `block_type.ex:665`, `:698`, `:737`, `:785`, `:821` |
+| `migrate_config/2`'s injected refusal (`:6492-6493`) | `block_type.ex:135-139` | `:132-138` (comment `:132-136`, clause `:137-138`) |
+| `read_signatures/3` (`:6546`) | `environment.ex:361` | `:363-364` |
+| `write_signatures/3` (`:6547-6548`) | `environment.ex:377` | `:386-387` |
+| `Recipe`'s `insert/2` (`:6601-6602`) | `recipe.ex:53` | `:73` |
+| the sugar (`:6552-6553`) | `environment.ex:1070-1080` | `sugar_read/4` `:1102`, `sugar_write/4` `:1107` |
+
+The count at `:6402-6405` - "fourteen `@callback`s on `main` today ... and five
+are still required" - is exact: `block_type.ex` declares fourteen and
+`@optional_callbacks` at `:823-831` names nine.
+
+Two prose cites are narrow rather than moved. `:6446-6447` says "**The
+declaration** mints the expanded blocks' ids"; `expand/2` mints them
+(`composite.ex:544-557`), from the local ids the declaration writes, and the
+determinism the sentence claims is `expand/2`'s. `:6636-6642` enumerates "one
+function, three callers" for `expand/2`; the environment walk is a fourth
+(`environment.ex:427`), which is section 1's own doing, and the module's two
+derivations are a fifth class the code acknowledges at `composite.ex:337-339`.
+
+### 6. What the code does that the section does not describe
+
+Two behaviours are recorded here because the accepted text should carry them.
+
+**The derived `io/1` and `outcomes/1` resolve members through the core palette
+only.** Both derivations read a member's *module*, and a `Block` carries a type
+*name*; neither `io/1` nor `outcomes/1` is handed a palette, so
+`member_module/1` (`composite.ex:597-603`) resolves through
+`Palette.fetch(Palette.core(), type)`. A composite whose expansion root is a
+**host** type therefore falls back: `outcomes/1` to the behaviour's default
+`[{"done", "Done"}]` (`block_type.ex:836`, `:855-861`), and `io/1` to
+`%{kinds: [:step], slot_accepts: %{}}` with no sugar copied. `composite.ex:135-146`
+documents it. Both reference composites root at `core.*` and are exact, and the
+environment walk is unaffected because it has a palette. Rows `:6474` and
+`:6476` and the worked-example table at `:6703-6704` state the derivations
+unconditionally, and are read with this limitation. **Whether a composite's
+derived `io/1` and `outcomes/1` should see the host palette is a question this
+Note names and does not decide**; it is for the SF038 walk.
+
+**The param map handed to `subtree/1` is the declaration's defaults with the
+stored config merged over them** (`params_of/2`, `composite.ex:492-497`). The
+section does not describe the layering. Nothing in it contradicts the layering.
+
+### 7. `Composite.expand/2` as built
+
+`:6619-6628`'s signature is exact:
+`@spec expand(Block.t(), module()) :: {[Block.t()], param_map()}`
+(`composite.ex:368-369`). The second argument is the composite's own **module**,
+an atom the caller has already resolved through `Palette.fetch/2`
+(`palette.ex:408`), as `:6622-6624` says. `composite?/1` (`composite.ex:341-346`)
+and `flatten/1` (`:401-411`) are public, which the decision forces rather than
+adds: `composite?/1` is how the compiler, the environment walk and the editor
+each ask the question the section makes them ask, and `flatten/1` is how the
+param map and the derivations reach nested members. The `param_map` answers one
+param key or `nil` per expanded block (`composite.ex:173`, built at `:562-583`),
+and it is built over `flatten/1`, so nested members are in it too - which the
+section does not say and which nothing in it contradicts.
+
+`RQ-SF037-17` - where `expand/2` should get a member's `current_version` - is
+named open here and decided nowhere. `mint/3` rewrites a member's `id` and
+`slots` and does not stamp `type_version`, so a member carries `Block.new/2`'s
+default of 1 (`block.ex:54`) and a member type at version 2 would take the
+migration path on every compile. `sb-qxyh` declined to stamp at Resolve to keep
+the byte identity `ADR-0004`'s amendment of this date requires. The question is
+queued for the SF038 walk.
+
+A third question this Note names and does not decide: **nothing derives
+`summary/1` for a composite**, and `:6491-6496` is right that it stays optional
+and absent. The consequence the section does not state is that a composite
+declaring no `summary/1` draws **no chip row at all** - `BlockType.summary/3`
+answers `[]` and `block_node.ex:367` renders the row only when the chip list is
+non-empty. Whether a composite's params should draw as chips by derivation is
+`ADR-0005`'s to say, and its amendment of this date says the chips come from the
+composite's config through the existing reader. The two records are consistent;
+what neither settles is whether a composite with no declared summary should draw
+something. Named for the walk.
+
+### 8. The data-composite amendment stays at proposed
+
+The Amendment at `:6732`, `sb-5b7j`'s, says at `:6735-6739` that its status line
+flips "**only if `sb-5xqr` lands in SF037**", and that if it does not, "this
+section stays at proposed and `sb-v3ny` records that fact as a dated note
+instead of flipping it". `sb-5xqr` did not land in campaign SF037: it was below
+the cut line `RQ-SF037-14` draws, `Palette.call/4` is not defined in
+`palette.ex`, and no `StatifierBlocks.Composite.Data` module exists on `main` at
+`0c39a3c`. **The Status line at `:6734` therefore stays at `proposed`**, exactly
+as that section instructs, and this is the dated note it asks for. It flips when
+`sb-5xqr` lands, by its own terms and through the same gate.
+
+### 9. Folding `sb-cr7e`: the `ADR-0011` amendment is accepted
+
+`:5608-5610`, inside the Note of 2026-09-07 at `:5560`, reads "**That amendment
+is not accepted as of this Note** - `sb-wzoa` does not flip it, and the Note of
+this date at the foot of `docs/adr/0011-typed-environment.md` says why." It was
+true of that Note and is time-bounded by its own words. For the reader who
+arrives later: `sb-wzoa` accepted `ADR-0011`'s amendment on 2026-09-07 at
+`dcf5668`, and `docs/adr/0011-typed-environment.md:1848` reads `accepted` today.
+The sentence at `:5608-5610` is left standing and dated here.
+
+### 10. Folding `sb-ot1x`: four cite ranges and one attribution
+
+Items 1, 2 and 4 of `sb-ot1x` are folded here. Item 3 - the comment at
+`block_type.ex:140-147`, which still carries the unqualified "indistinguishable
+from a type that declares no `sentence/1`" wording that correction 5 at
+`:6303-6326` qualifies - is a change to a **code** file and is out of scope for
+this docs-only request. It is confirmed present at exactly those lines and is
+left for a code request.
+
+**The three ranges, re-located by anchor.** The bead's numbers were themselves
+off by eight to thirteen lines; these are today's.
+
+| Cited in this file | Cited as | Reads today, at `0c39a3c` |
+|---|---|---|
+| `chip_refusal/1` (`:6240`, and the table row at `:6348`) | `:1885-1894` / `:1884-1894` | `@spec` `block_type.ex:1892`, body `:1893-1900`, catch-all clause `:1902`. The `@spec` and the catch-all are both outside the cited range as written |
+| `call_sentence/2` (`:6237`) | `:1829-1832` | `@spec` `:1837`, body `:1838-1845`, which runs to the end of the `rescue`/`catch` the sentence is about; the cited range stops four lines short of the clauses it cites |
+| `call_join_label/2`'s comment (the table row at `:6347`) | comment `:1811-1813`, body `:1814-1822` | comment `:1818-1821`, body `:1822-1830` |
+
+Related and moved with them: `chip/1` (`:6348`) cited `:1872-1878`, today
+`@spec` `:1880` and body `:1881-1886`; `@presentation_cap` cited `:1335`, today
+`:1343`. All resolve to the text they name; only the numbers move.
+
+**The attribution at `:6309-6314`.** The sentence says `ADR-0005`'s amendment of
+this date "puts a **separate** `function_exported?/3` question in the chain",
+and attributes to it a reading in terms of a function `ADR-0005` never names.
+`ADR-0005`'s own words for what it did are at `:8442-8444` of
+`docs/adr/0005-liveview-editor.md`: "the table is written in terms of what the
+type **declares**, and an injected default is declared." That is the exact form,
+and `:6309-6314` is read against it. `ADR-0005`'s three-step table at
+`:7902-7906` speaks only of a type that "declares `sentence/1`"; the function
+`function_exported?/3` is the **implementation's** way of asking that question,
+in `ViewModel.declares_sentence?/1`, and naming it is this file's reading of
+`ADR-0005` rather than a claim about `ADR-0005`'s text. The cite
+`block_type.ex:148-161` on `:6309` still resolves exactly.
+
+**Item 4, the `InvokeStep` caveat.** `StatifierBlocks.InvokeStep.__using__/1`
+emits `use StatifierBlocks.BlockType` (`invoke_step.ex:137-144`, the `use` at
+`:144`), so every type built on `InvokeStep` also carries the injected
+`sentence/1`, answers `true` to `function_exported?(module, :sentence, 1)`, and
+counts as **declared** by `ViewModel.declares_sentence?/1`. Such a type
+therefore sits inside correction 5's cost set at `:6303-6326`: its outline line
+is the palette label and never the author's `title`. `:6322`'s "No shipped
+`core.*` type is in that set" stays true as written - it is scoped to `core.*` -
+and the caveat is that a **host** type built on `InvokeStep` is in it, which is
+the common shape rather than an exotic one. The `use`-injection subsection at
+`:6101` is where this attaches, and specifically the sentence at `:6115-6117`
+about a module that "declares nothing else". Two cites in that subsection have
+moved with the file: `:6103` cites `block_type.ex:107-145` for the `use` macro,
+today `:109-171`, and `:6111` cites `:138-143` for `defoverridable`, today
+`:163-169`; both were already re-counted at `:6349`.
+
+Filed with `sb-v3ny`, campaign SF037, folding the `ADR-0002` half of `sb-cr7e`
+and items 1, 2 and 4 of `sb-ot1x`. This Note changes no code and adds no README
+row; it flips the `Status:` line at `:6362` and nothing else in this file, and
+it leaves the Status line at `:6734` at `proposed`.

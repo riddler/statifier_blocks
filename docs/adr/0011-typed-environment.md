@@ -2560,3 +2560,40 @@ Filed with `sb-uwld`, campaign SF037, folding `sb-kjai`. `sb-xio9`
 the derived block type + recipe") is the bead that implements what section 2
 describes, under whichever of section 3's shapes is ruled. This Note changes
 no code, adds no README row, and flips no status.
+
+## Note (2026-09-07): `RQ-SF037-15` is ruled in section 3's shape (A), and the walk is built that way
+
+Section 3 (`:2457`) named `RQ-SF037-15` open and put three shapes on the
+table, deciding nothing. The operator ruled it on 2026-09-07 in shape **(A)**
+(`:2465-2468`): a composite's read and write signatures are computed at its one
+position by running the same `read_signatures/3` and `write_signatures/3` over
+`Composite.expand/2`'s subtree with the expanded config, with no descent, no
+new `type_expr()` arm, and `config_schema/1` left as the params. Shapes (B) and
+(C) are declined. The ruling's closing clause, "no new block-type callback", is
+the rejection of (C) rather than a fifth clause of (A), which is silent on
+callbacks.
+
+`sb-xio9` built it, and this Note is a reading of `main` at `0c39a3c`. Both
+`Environment.read_signatures/3` and `Environment.write_signatures/3` test
+`Composite.composite?/1` on the resolved module and delegate to one private
+helper, `Environment.expansion_signatures/5`, whose body is
+`{members, _param_map} = Composite.expand(block, module)` flattened through
+`Composite.flatten/1` and mapped with the same signature function it was
+handed. Both public docstrings name that helper, so it is the anchor this Note
+cites rather than a line number. Nothing descends: the flat map runs at the
+composite's own position, which is what section 1 said it must.
+`t:StatifierBlocks.Environment.type_expr/0` keeps the four inhabitants section
+3 counted at `:2477`, and the module declares no `@callback` at all. Section 3
+stands exactly as written - it named a question, and this Note records the
+answer rather than editing the question.
+
+Folding `sb-cr7e`'s `ADR-0011` item: the table row at `:1811` cites `:1480` for
+a sentence that opens at `:1479` ("So part 2 stays at") and closes at `:1481`
+("this Note splits no section."); the words that row actually quotes run
+`:1479-1480`. The cite resolves and the row's reasoning is unaffected, so the
+citation is left standing where it is and corrected here, which is this
+record's practice at `:2552-2556` for a cite that has gone narrow.
+
+Filed with `sb-v3ny`, campaign SF037, folding the `ADR-0011` item of `sb-cr7e`.
+This Note changes no code, adds no README row, and flips no status line in this
+file.

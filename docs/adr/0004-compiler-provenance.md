@@ -2847,7 +2847,7 @@ Filed with `sb-upv0`, campaign SF035's Lane A.
 
 ## Amendment (2026-09-07): a composite expands at the Resolve stage, and a finding inside an expansion is attributed one level up to the param that produced it
 
-**Status: proposed (2026-09-07, campaign SF037, bead `sb-nzc1`, recording
+**Status: accepted (2026-09-07, campaign SF037, bead `sb-nzc1`, recording
 campaign-SF037's rulings `RQ-SF037-5` and `RQ-SF037-6`).** A decision record
 merges at proposed under the campaign invariant; flipping it to accepted is a
 separate gated request through the same `docs/adr/` gate, and `sb-v3ny` carries
@@ -3090,3 +3090,126 @@ and a document holding a composite is an `ADR-0001` document at
 Filed with `sb-nzc1`, campaign SF037, recording campaign-SF037's rulings
 `RQ-SF037-5` and `RQ-SF037-6`. `sb-qxyh` implements it, and `sb-v3ny` carries
 the flip.
+
+## Note (2026-09-07): the composite-expansion amendment is flipped to accepted, with three corrections by addition and one open question named
+
+`sb-qxyh` landed on `main` at `6d17c78`, and this Note is a reading of `main`
+at `0c39a3c`. Every claim the Amendment of this date at `:2848` makes was
+checked against that code before its `Status:` line at `:2850` was flipped to
+accepted. The section's own second sentence - "A decision record merges at
+proposed under the campaign invariant; flipping it to accepted is a separate
+gated request through the same `docs/adr/` gate, and `sb-v3ny` carries it"
+(`:2851-2855`) - is falsified by the flip in the ordinary way a status sentence
+is, and is met here rather than edited: `sb-v3ny` is that request, and this is
+it. No text above this line is edited by this Note.
+
+### 1. What the claims check out to
+
+| The section says | At | Today on `main` | Verdict |
+|---|---|---|---|
+| Resolve is stage 2 and every block goes through `Palette.resolve/2` | `:2869-2871` | `compiler.ex:22-24`, and the stage-2 section opens at `compiler.ex:513` | holds |
+| a resolved node whose module is a composite is replaced in place by `Composite.expand/2`'s subtree | `:2871-2873` | `compiler.ex:545-549` dispatches on `Composite.composite?/1`; `expand_node/3` at `:567-580` splices | holds |
+| the replacement is complete before the stage ends, and stages 3-6 read a tree with no composite in it | `:2873-2875` | `resolve_member/3` (`compiler.ex:595-603`) re-enters `resolve/2` per member, so the splice is finished at the stage boundary; `after_resolve/5` (`:471-487`) has no composite arm | holds |
+| decision 4 is untouched; `emit_stage/3` and the `emit/2` beneath it call the same callback on the same shape | `:2879-2883` | holds, but the two line cites do not: see correction 3 |
+| a composite's own `emit/2` exists because the behaviour requires it, and raises if reached | `:2884-2887` | `composite.ex:249-256`, and it is not in the `defoverridable` list at `:258` | holds |
+| Config and Structure see the members, checked as if an author had placed them | `:2890-2894` | `config_findings/2` (`compiler.ex:941-960`) and `structure_stage/3` (`:891-897`) run per resolved node; but see correction 4 | holds, narrowed |
+| no new id shape: a member's id is minted deterministically from the composite block's id and contains no `__` | `:2906-2909` | `composite.ex:535-543` and `mint_id/3` at `:545-553`, which raises `ArgumentError` on a minted id containing the doubled separator | holds |
+| `unstate_id/1` still inverts a generated state id without consulting the map | `:2917-2918` | `state_id.ex:125`, untouched by this work | holds |
+| the provenance map records the expanded member, never the composite | `:2929-2931` | `reanchor/2` (`compiler.ex:713-721`) rewrites findings only; `test/statifier_blocks/compiler/composite_expansion_test.exs:288-296` asserts the minted member owns the span and the composite does not | holds |
+| a finding raised inside an expansion is re-anchored before it is reported | `:2937` | `compile/3` calls `stages/3` then `in_document_order/2` (`compiler.ex:444-448`), and `reanchor(expansion)` is the last step of `stages/3` (`:461`); the ordering carries a sabotage test at `composite_expansion_test.exs:249-260` | holds, widened by correction 1 |
+| decision 5's `owner` is a map of `block_id`, `role` and `config_key`, and it does not move | `:2938-2946`, `:2989-2992` | `provenance.ex:62-66`, field for field identical to the section's re-quote and to decision 5 at `:586-590` | holds |
+| `block_id` becomes the composite's and `config_key` the param's key or `nil`; there is no third arm | `:2948-2950`, `:2975` | `reanchor_finding/2` (`compiler.ex:726-731`) has exactly two arms | holds |
+| a finding with no param to blame is reported against the composite with `config_key: nil` | `:2970`, `:3069-3071` | `blamed_param/2` (`composite.ex:570-583`) answers `nil` for none and for two-or-more; `composite_expansion_test.exs:236-247` asserts both fields | holds |
+| the compiled chart of a document holding a composite is byte-identical to the chart after Expand, and the provenance maps are equal | `:3007-3012` | `composite_expansion_test.exs:161-171` and `:187-198`, once per reference composite, asserting `scxml`, `provenance` and `invoke_types`; the editor half is `test/statifier_blocks/editor/composite_expand_test.exs:202-216` | holds |
+| no stage is added or removed; the count stays six | `:3081-3082` | `compiler.ex:20-53` and `Finding.stage()` at `finding.ex:95` still name six | holds |
+| nothing puts a marker on an expanded block, and the stored document stays an `ADR-0001` document at `schema_version` 1 | `:3085-3088` | `mint/3` rewrites `id` and `slots` only; the expansion index is a compiler-local `@typep` at `compiler.ex:523`, not a block field | holds |
+
+Nothing in the section is falsified. The four corrections below are additions.
+
+### 2. Correction 1: re-anchoring climbs to the outermost composite, not one level
+
+`:2937` and the paragraph at `:2934-2937` say a finding raised inside an
+expansion is re-anchored "one level up". For a composite whose members are
+themselves ordinary blocks that is the whole story, and it was the only case
+the section had in view. The code generalises it: `anchor/2`
+(`compiler.ex:739-748`) recurses -
+`anchor(expansion, composite_id) || {composite_id, config_key}` - so a finding
+inside a nested expansion is anchored to the **outermost** composite, and it
+carries **that** composite's param key rather than the inner one. `resolve/2`
+recurses through `resolve_member/3` (`compiler.ex:595-603`) so nested
+composites expand at all, and `Map.merge(member_expansion, expansion)` at
+`:598` makes the outer entry win.
+
+This is the section's own principle applied rather than a departure from it:
+`:2977-2978` says the block a finding names must be one the author holds, and
+the author of a document holding one composite holds that composite and no
+block inside it, however deep the nesting goes. The wording at `:2937` is
+narrow, not wrong, and it is widened here.
+
+### 3. Correction 2: `:composite_expansion_failed` belongs in decision 10's table
+
+Decision 10's stage table at `:445-451` lists, in its Resolve row (`:447`),
+`:unknown_block_type` and `:block_type_too_new`. Resolve now also produces
+`:composite_expansion_failed`, in exactly two cases, both raised as ordinary
+`Compiler.Finding`s at stage `:resolve`:
+
+1. `Composite.expand/2` raised - the declaration is broken, or a member's
+   config cannot be built. `compiler.ex:610-620` rescues it and reports
+   `{:composite_expansion_failed, block.id, why}` against the composite block.
+2. the document **root** is a composite whose subtree answers other than one
+   top-level block. `root_expansion_finding/2` (`compiler.ex:628-636`) reports
+   `{:composite_expansion_failed, id, {:root_expansion_not_single, count}}`,
+   because a document has exactly one root and there is nowhere to splice the
+   rest.
+
+The code atom is derived from the reason tuple's head by `Finding.code/1`
+(`finding.ex:178-186`) rather than enumerated, and `finding.ex:16` already
+carries it in that module's own stage table. The table at `:445-451` is left
+standing and corrected here; the row is spelled `Resolve` there and `:resolve`
+in `finding.ex`, which is a difference of table convention and not of stage.
+
+### 4. Correction 3: two line cites in the decision-4 paragraph
+
+`:2879-2883` cites `compiler.ex:1273` for `emit_stage/3` and `:1413` for the
+`emit/2` beneath it. Today they are at `compiler.ex:1530` and `compiler.ex:1670`.
+Both cites were already off when the section was written - at `6d17c78^` the
+two functions were at `:1287` and `:1427` - so this is an authoring slip rather
+than drift `sb-qxyh` caused, and `mix adr.cites` cannot see it because the
+check guards citations into `docs/adr/`, not into `lib/`. The claim the
+paragraph makes is unaffected: both functions still take a `Resolved.t()` and
+call the same callback on the same shape.
+
+### 5. Correction 4: what Structure is handed, and the one asymmetry
+
+`:2890-2894` says an expanded member's `validate_config/1`, slot arity and
+assignability are checked "exactly as they would be had an author placed those
+blocks by hand". That is true of the members. It glosses one difference for the
+blocks around them. `structure_document/3` (`compiler.ex:918-922`) hands
+Structure a **rebuilt** `Document` only when `map_size(expansion) > 0`;
+a composite-free document is passed through untouched. The rebuild
+(`resolved_block/1`, `compiler.ex:929-934`) carries each block's **migrated**
+config, so in a composite-bearing document Structure reads migrated config
+where in a composite-free one it reads stored config. `compiler.ex:914-917`
+records the choice and its reason. Nothing this record decides turns on it -
+Structure asks about arity and assignability, not values - and the narrowing is
+recorded here rather than left to be rediscovered.
+
+### 6. `RQ-SF037-17` is named open, and this record does not decide it
+
+`Composite.expand/2` does not stamp a member's `type_version`. `mint/3`
+(`composite.ex:535-543`) rewrites `id` and `slots` and nothing else, so a member
+carries whatever `subtree/1` gave it, which is `Block.new/2`'s default of `1`
+(`block.ex:54`). That member then goes through `Palette.resolve/2` like any
+block, which migrates against `current_version/0`
+(`palette.ex:522-549`) - so a member whose type is at version 2 takes the
+migration path on every compile, purely because the subtree author passed no
+`type_version:`. The composite block itself is stamped correctly in the derived
+recipe (`composite.ex:454-460`). `sb-qxyh` declined to stamp at Resolve to keep
+the byte identity `:3007-3009` requires. Today the question is latent: every
+shipped type answers `current_version/0` with 1. Where `expand/2` should get a
+member's current version is `RQ-SF037-17`, queued 2026-09-07 for the SF038
+walk. This Note names it and decides nothing.
+
+Filed with `sb-v3ny`, campaign SF037. This Note changes no code and adds no
+README row; it flips the `Status:` line at `:2850` and nothing else in this
+file.

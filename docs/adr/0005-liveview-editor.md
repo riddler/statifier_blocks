@@ -8448,7 +8448,7 @@ Filed with `sb-xnxw`, campaign SF036, folding the `ADR-0005` half of
 
 ## Amendment (2026-09-07): Expand as one compound edit, how a composite block draws, and Collapse recorded at proposed
 
-**Status: proposed (2026-09-07, campaign SF037, bead `sb-mjrt`, on rulings
+**Status: accepted (2026-09-07, campaign SF037, bead `sb-mjrt`, on rulings
 `RQ-SF037-2` and `RQ-SF037-4`).** Parts **(i)** and **(ii)** below are flipped
 to accepted by a separate gated request, `sb-v3ny`, after `sb-hgxl` lands the
 gesture and the card. Part **(iii)**, Collapse, **is at proposed by its own
@@ -8824,7 +8824,7 @@ folding `sb-luo1`.
 
 ## Amendment (2026-09-07): a `selected_id` a host may write, honoured in `update/2` through `rebuild/1`
 
-**Status: proposed (2026-09-07, campaign SF037, bead `sb-2lx1`, on ruling
+**Status: accepted (2026-09-07, campaign SF037, bead `sb-2lx1`, on ruling
 `RQ-SF037-12`).** A decision record merges at proposed under this campaign's
 invariant; flipping it to accepted is a separate gated request, `sb-v3ny`,
 after `sb-gbxt` builds it. Additive. The 2026-09-05 amendment *the host seams,
@@ -9237,3 +9237,326 @@ answers above.
 
 Filed with `sb-yl9f`, campaign SF037, on ruling `RQ-SF037-11`, folding
 `sb-1q2r`.
+
+## Note (2026-09-07): the Expand/card amendment's parts (i) and (ii) and the `selected_id` amendment are flipped to accepted, with seven corrections by addition and three questions named; Collapse stays at proposed
+
+`sb-hgxl` landed the gesture and the card on `main` at `ecc0db4`, and `sb-gbxt`
+landed the `selected_id` input at `0c39a3c`. This Note is a reading of `main` at
+`0c39a3c`. Every claim of the Amendment at `:8449` (parts **(i)** and **(ii)**
+only) and of the Amendment at `:8825` was checked against that code before the
+two `Status:` lines at `:8451` and `:8827` were flipped. No text above this line
+is edited; everything below corrects by addition, which is this file's practice
+at `:8398-8446`.
+
+### 0. What flipped, what did not, and the sentences the flip falsifies
+
+**Part (iii), Collapse, is not flipped.** The section says so three times in its
+own words - at `:8454-8457`, again inside the part at `:8694-8698` ("`sb-v3ny`
+flips parts (i) and (ii) and not this part"), and again at `:8818-8820`. The
+section carries one `Status:` line for all three parts, so that one word now
+reads `accepted`; clauses `11E` to `14E` remain at proposed **by the section's
+own words**, which are the authority on their status and are unedited. Nothing
+in this campaign builds Collapse, and `RQ-SF037-4` rules it record only.
+
+Sentences the flip falsifies, left standing and met here: `:8463-8464`,
+"Nothing in parts (i) and (ii) is built yet, and nothing in part (iii) is
+scheduled" - the first half is now false and the second still holds; `:8834`,
+"Nothing here is built yet"; and the two dating disclaimers at `:8466-8467`
+(`b1c3308`) and `:8836-8837` (`b37cf1d`), which ask to be re-read rather than
+trusted. They were.
+
+### 1. Correction 1: the `Recipe.members/2` amendment is accepted, not proposed
+
+`:8460-8461` says of the Amendment on `Recipe.members/2` at `:8069` that its
+"own status line at `:8071` is untouched and **stays at proposed**". It does
+not. `sb-yl9f` flipped it to accepted on 2026-09-07 at `b4461f5`, after this
+section was written and before this flip, and `:8071` reads `accepted` today.
+
+The claim the sentence was making - that this section edits no text above it and
+leaves that amendment's status alone - is unaffected: `sb-mjrt` did not touch
+`:8071` and neither does this Note. Only the parenthetical statement of what
+that line *said* has gone stale, in the ordinary way a sibling record's landing
+makes a dated cross-reference stale. It is left standing and dated here.
+
+### 2. Correction 2: `2E`'s index walks
+
+`:8512-8513` says each insert names "**the composite's own target** - the same
+parent, the same slot, the same index the composite held". The parent and the
+slot are the composite's. The index is not: `expansion_inserts/5` builds the
+commands with `Enum.with_index(index)` (`editor.ex:1879`), so the n-th member
+lands at the composite's index **plus n**.
+
+This is `1E` chosen over `2E`'s wording rather than a departure from the
+section. `1E` at `:8502-8503` fixes the inserts as "the expansion's blocks ...
+in the order the expansion gives them", and a compound whose every insert names
+one index applies them at that index in turn, which reverses the members. The
+two clauses cannot both be read literally; the code took the reading that keeps
+`1E`'s order, and says so at `editor.ex:1861-1870`. For a one-member expansion -
+which is every case `2E`'s own worked example walks - the two readings are the
+same command. `2E` is read as "the same parent and the same slot, starting at
+the index the composite held".
+
+### 3. Correction 3: `5E` admits every top-level member, not only the root
+
+`:8569-8570` says the editor "asks whether the target slot admits **the
+expansion's root**", and "What this section does not decide" reinforces it at
+`:8745-8749`: "**`5E` tests the root, because the root is what takes the
+composite's position.** Whether an expansion can even contain a second block
+that the same slot would refuse ... is that record's, not this one's."
+
+The code tests **every top-level member**:
+`Enum.all?(members, &admits_expansion?(...))` at `editor.ex:1876`, with
+`admits_expansion?/5` (`:1896-1908`) resolving parent and member through the
+palette and asking `Assignability.admits?/3` (`assignability.ex:196-198`). The
+implementation is therefore strictly stricter than `5E`, and it answers in the
+strict direction the question `:8745-8749` declined to ask. `5E`'s decision -
+that a refused expansion refuses the whole gesture, that nothing is written and
+no command is built (`:8574-8575`, `editor.ex:1884`, `:1827`, `refused/2` at
+`:2002`) - holds exactly as written.
+
+**Whether admission should test the root alone or every top-level member is a
+record question this Note names and does not decide.** The code has taken the
+strict reading; `:8745-8749` says the question belongs to another record. It is
+named here for the SF038 walk so that the next reader is not left to infer the
+answer from the code.
+
+The cite in the same clause has moved and changed function. `:8573-8574` says
+"the editor already reads `Assignability.slot_accepts/3` at
+`lib/statifier_blocks/editor.ex:2595`". `:2595` is a comment inside a
+datamodel-reading helper today. The only `slot_accepts` call in `editor.ex` is
+at `:2903`, inside `body_slot?/3` (`:2901-2907`), which answers whether a slot
+is a body for the outcome-candidate machinery and is **not** the Expand
+admission check. The admission check uses `admits?/3`, a different function, at
+`:1900-1904`.
+
+### 4. Correction 4: the worked example holds five blocks
+
+`:8647-8653` declares an expansion of **five** blocks: a `core.group`, a
+`core.send` and a `myapp:authorize` invoke in its `body`, and on its
+`interrupts` rail a `core.on_event` leading to a `myapp:capture` reversal.
+`:8683` calls them "these four blocks", and the enumeration at `:8677-8678` -
+"an ordinary `core.group` with an ordinary send, invoke and rail handler inside
+it" - omits the `myapp:capture` reversal that `:8653` put under the
+`core.on_event`. The count is five and the omitted block is the reversal.
+
+Nothing the paragraph argues turns on the number: "the document does not
+remember" is true of five blocks exactly as of four. `:8676`'s "one command, one
+undo entry" is `3E`'s claim about the gesture and the compound, not about the
+command count inside the compound, which is six.
+
+### 5. Correction 5: `3D`'s fourth row, and the boundary sentence
+
+`:8640` (clause `10E`) and `:8689` (the worked example) both cite `:8184` for
+"`3D`'s fourth table row". `:8184` is `3D`'s **heading**. The table's header is
+`:8215-8216` and its fourth row is `:8220`:
+"| a **composite block type**, once one exists | not asked - a composite is one
+block | `{:remove, id}`, one block, one command, by construction |". Both cites
+are read as `:8220`.
+
+`10E` at `:8633` and `:8636-8637` attributes the boundary sentence - "So the
+boundary is not 'recipes versus composites' ... written down as one thing" - to
+`:8255`. `:8255` is the heading of that subsection; the sentence is at
+`:8273-8274`.
+
+### 6. Correction 6: what the `selected_id` amendment cites, and two phrasings
+
+`sb-gbxt` built the input as the amendment describes, with one structural
+difference and two phrasings that read wider than the code.
+
+**The guard is extracted, not inline.** `1S` at `:8895-8898` puts "a guarded
+branch **in `update/2`** ... keyed on `Map.has_key?(assigns, :selected_id)`,
+placed with the other guarded branches and before `{:ok, rebuild(socket)}`".
+The guard is in `put_selection/2` (`editor.ex:2957-2971`), called from `update/2`
+at `:783` - between the `active_marks` branch (`:770-777`) and the `invoke_mark`
+branch (`:785-790`), before `{:ok, rebuild(socket)}` at `:801`. So it sits
+exactly where `1S` places it and does what `1S` says; only the branch's body was
+lifted out, for the reason the code records at `:779-782` and `:2949-2951` - one
+more branch inline crosses Credo's complexity bound for `update/2` as a whole.
+`3S`'s normalization is `put_selected_id/2` (`:2981-2990`), and it answers `nil`
+rather than the unknown id exactly as `:8919-8922` requires.
+
+**Expand's selection is written after its commit, through the same input.**
+`expand_composite/2` runs `commit/2` at `editor.ex:1823`, then
+`put_selected_id(first_inserted_id(inserts) || socket.assigns.selected_id)` at
+`:1824`, then `rebuild()` at `:1825`. Reaching the normalizer after the commit
+is what lets it resolve the id against the **new** document, and the fallback
+clears exactly when the composite that was selected has just gone. The
+consequence at `:9023-9024` - "one normalization now answers both paths" - is
+built: `put_selected_id/2` is called from `put_selection/2` and from
+`expand_composite/2` and from nowhere else. The older recipe-insert path at
+`:1750-1757` still writes `selected_id:` in an `assign` **before** its commit;
+Expand deliberately does not.
+
+**`:8865`.** "`update/2` opens with `assign(assigns)`
+(`lib/statifier_blocks/editor.ex:707`)". `:707` is `last_error: nil`, the final
+key of `mount/1`'s assign list. `update/2` opens at `:712`, and `assign(assigns)`
+is at `:720` - the first **write**, after two reads. The point the sentence makes
+- that `update/2` writes every key the caller named, so a host can pass
+`selected_id` through `send_update/3` today and see something happen - is exact.
+
+**`:8878-8881`.** An unnormalized id "survives into `notified_id` ... where it
+silences the next genuine selection of a real block that happens to be compared
+against it". `notify_select/2` (`editor.ex:3586-3597`) returns early only when
+`socket.assigns.selected_id == socket.assigns.notified_id`. So a stale
+`notified_id` silences the next selection **only when the block selected is the
+one whose id it holds** - which is what the sentence's trailing qualifier says
+and what its opening clause reads wider than. It is read as "silences the next
+selection of a real block whose id happens to equal it".
+
+**Rebuild count.** The host-input path costs **no** extra rebuild:
+`put_selection/2` rebuilds nothing and `update/2` ends with the single
+`{:ok, rebuild(socket)}` it always ran, which is what `4S`'s "the branch sits
+before `rebuild/1`" (`:8930-8931`) buys. The **Expand** path costs one extra:
+`commit/2` ends with its own `rebuild()` and `expand_composite/2` calls
+`rebuild()` again at `:1825`, because the selection must be written after the
+commit and `notify_select/2` runs only inside `rebuild/1` (`editor.ex:1819-1820`).
+
+### 7. Correction 7: the cites the code moved
+
+Claims unchanged; numbers only. Cites not listed here resolve exactly as
+written, including `editor.ex:461`, `inspector.ex:338-339`,
+`view_model.ex:309-428`, `view_model.ex:445`,
+`docs/adr/0001-block-document-schema.md:63`, `docs/adr/0003-assignability.md:98-99`,
+and this file's `:5654`, `:7852`, `:8069`, `:8134` and `:8524`.
+
+| Cited in the two sections | Cited as | Reads today, at `0c39a3c` |
+|---|---|---|
+| `selected_id`'s internal default (`:8532`, `:8863-8864`, `:9003`) | `editor.ex:650` | `:662` |
+| `notified_id` (`:8879-8880`) | `editor.ex:651`, `:3372` | `:663`, and the comparison at `:3587` |
+| the fold toggle's "Expand" (`:8586-8587`) | `block_node.ex:496` | `fold_label/1` at `:607` |
+| the assigns table (`:8847-8849`, `:8893-8894`) | `editor.ex:498-525`, `on_select` at `:506` | `:506-536`, `on_select` at `:516`, and the new `selected_id` row at `:517` |
+| `active_marks`' guard and its comment (`:8898-8900`, `:8905-8913`) | `:757-763`, comment `:751-756`, `:758`, `:761`, table row `:513` | `:770-777`, comment `:764-769`, `:771`, `:774`, row `:524` |
+| `update/2`'s guarded branch and its end (`:8895-8898`) | `editor.ex:699`, `:782` | `put_selection/2` at `:2957-2971`, called at `:783`; `{:ok, rebuild(socket)}` at `:801` |
+| `active_list/1` and `switch_document/2`'s resets (`:8905-8913`, `:8877-8878`) | `:2095-2100`, `:2023`, `:2007` | `:2274-2279`, `:2202`, `:2185` |
+| `remove_block/2`, `remove_compound/2` (`:8874-8877`) | `:1737`, `:1749` | `:1770`, `:1782` |
+| `rebuild/1` and `notify_select/2` (`:8930-8931`, `:8935-8936`) | `:2824`, `:2844`, `:3363`, `:3364` | `:3046`, `:3067`, `:3586`, `:3587` |
+| the select handler's assignment (`:8958-8961`) | `editor.ex:1070` | `:1090` |
+| the existing internal write (`:9020-9021`) | `editor.ex:1723` | `:1714` |
+| `slot_accepts` (`:8573-8574`) | `editor.ex:2595` | `:2903`, and it is a different function: see correction 3 |
+| `3D`'s fourth row (`:8640`, `:8689`) | `:8184` | `:8220`: see correction 5 |
+| the boundary sentence (`:8633`, `:8636-8637`) | `:8255` | `:8273-8274` |
+
+### 8. What holds exactly, and what is named as a question
+
+`6E` holds: the implementing bead chose **"Replace with its steps"**
+(`block_node.ex:383`, with the aria-label at `:382` and the visible word
+"steps" at `:388`), which collides with neither the card's fold toggle
+("Expand", `block_node.ex:607`) nor the inspector's control ("Expand the
+inspector", `inspector.ex:338-339`), which is exactly what `:8592-8593` asked of
+it.
+
+`7E` holds on every load-bearing claim. A composite is one node; `ViewModel.Node`
+(`view_model.ex:309-428`) gained no field; the chips come from the composite's
+config through the same `summary_chips/1`; and the drawing code never learned
+the word. The affordance is threaded as `:expandable_ids`, a `MapSet` built in
+`rebuild/1` (`editor.ex:3063`, from `composite_ids/2` at `:1916-1922`) and
+passed `editor.ex:981` to `canvas.ex:117`/`:178` to `slot.ex:223`/`:306`/`:327`/`:344`
+to `block_node.ex:280`/`:378`/`:475`/`:541-545`. `ViewModel` is untouched:
+`ecc0db4` does not touch `lib/statifier_blocks/view_model.ex`, and the file
+contains no occurrence of "composite".
+
+`4E` holds: expanded blocks carry no marker, and `ADR-0001` decision 2 at
+`docs/adr/0001-block-document-schema.md:63` stands. `8E` holds: a composite's
+`slots/1` answers `[]` (`composite.ex:231`). `9E`'s `@type kind :: :type | :recipe`
+is exact at `view_model.ex:445`. `3E` holds: the editor selects the first
+expanded block after the commit.
+
+**Two questions this Note names and does not decide.**
+
+`7E` at `:8602-8603` says a composite "draws the way any type with no slots
+draws - **summary chips and a sentence above them**". No card in this package
+draws `Node.sentence`. `block_node.ex:355-389` draws the title button
+(`ViewModel.title/1`, `:362`), the type subtitle (`:364-366`), the chips
+(`:367-375`) and the invoke type (`:376`); no drawing component reads
+`Node.sentence` at all. The `sentence/1` amendment of this date says as much in
+its own terms - "A card draws what it drew yesterday" (`:7936`) - and speaks of
+a "**drawn** sentence" as a thing that does not yet exist (`:8044-8047`). The
+line a card actually draws above its chips is `ViewModel.title/1`, which
+`:7916-7923` keeps deliberately distinct from `sentence`. `7E`'s claim about a
+composite is true of every card equally, which is its point; **whether the
+canvas card should draw `Node.sentence` at all is undecided by this record**,
+and is named here rather than settled.
+
+**Expand raises rather than refusing when a composite's declaration is broken.**
+`expand_composite/2` handles three refusals through its `with`/`else`
+(`editor.ex:1810-1828`) and the code enumerates them at `:1799-1804` -
+"Nothing is written in any of them and the composite stays exactly where it
+was". A fourth failure is not among them: `expansion_inserts/5` calls
+`Composite.expand(block, module)` unguarded at `editor.ex:1874`, and
+`Composite.expand/2` **raises** on a broken declaration - a `subtree/1`
+answering `[]` or a non-`Block`, or duplicate local ids (`composite.ex:370`,
+`:380`, and `check_local_ids!/2`). The error propagates out of
+`handle_event("expand", ...)` and takes the LiveView process with it. This is
+consistent with `composite.ex`'s own stance that a malformed declaration is a
+programmer error, and it is inconsistent with `2E`'s "an Expand that cannot
+complete leaves the composite exactly where it was" (`:8514-8517`) read as a
+statement about every failure. **Whether the editor should rescue a malformed
+declaration or let it raise is named here as a follow-up**, not decided; nothing
+in parts (i) or (ii) depends on the answer, because a shipped declaration that
+raises fails its own package's tests first.
+
+### 9. `sb-yl9f`'s pending-code paragraph, dated forward
+
+The Note at `:9038` records at `:9172-9196` what it verified "as record and not
+yet as code", and both bullets are scoped to `main` at `e3db9b1`: the Expand
+gesture "has not landed at `e3db9b1`", and the composite card's drawing is
+"likewise unlanded at `e3db9b1`". Both remain true as dated readings, and both
+are now answered: **`sb-hgxl` landed the gesture and the card at `ecc0db4`**,
+five commits later. `10E`'s forward reading - that after Expand, `members/2` is
+what recognises the result - now runs on an expanded document, which
+`:9186` said was `sb-hgxl`'s to demonstrate, and
+`test/statifier_blocks/editor/composite_expand_test.exs` is where it is
+demonstrated.
+
+One phrase inside that paragraph is worth correcting while it is being dated.
+`:9187-9188` quotes `:8258-8259`'s "whose interior the editor draws from the
+type rather than from the document's tree" as the composite card's drawing. As
+built, a composite has **no** interior: `8E` makes its `slots/1` `[]`
+(`composite.ex:231`) and `block_node.ex:530-531` says so in terms - "a
+composite's `slots/1` is empty by clause `8E`, so `container?/1` is false". The
+inherited phrase describes a card that was never built; the card that was built
+is the leaf card `7E` describes.
+
+### 10. Folding `sb-cr7e`: the `ADR-0011` amendment is accepted
+
+`:7285-7290` reads "`ADR-0011`'s amendment of 2026-09-06 on decisions 1 and 2 is
+**not** accepted: `sb-wzoa` left it at `proposed` over an open question about
+which datamodel paths the environment seeds". It was true of that Note and is
+time-bounded by its own words. For the later reader: `sb-wzoa` accepted that
+amendment on 2026-09-07 at `dcf5668`, and
+`docs/adr/0011-typed-environment.md:1848` reads `accepted` today. The open
+question it names, about which paths the environment seeds, was itself answered
+by the Note at `docs/adr/0011-typed-environment.md:1577`. The sentence at
+`:7285-7290` is left standing and dated here.
+
+### 11. Folding `sb-ot1x`: the layout-div cite, and the attribution
+
+`sb-ot1x`'s `ADR-0005` items are folded here.
+
+**The layout div.** The cite lives in the `sb-xnxw` amendment's
+cites-re-counted table, in the row at `:8411` - not at `:8393`, which the bead
+gives. That row was written against `main` at `8abc655` and has drifted again.
+Today, at `0c39a3c`: `render/1` opens at `editor.ex:851` (cited `:831`), the
+layout `div` opens at `:933` with its class attribute on `:934` (cited `:914`),
+`PaletteBrowser.palette_browser` is at `:938` (cited `:918`), and
+`Toolbar.toolbar` is at `:953` (cited `:933`). The bead's proposed correction of
+`:914` to `:913` is wrong in both directions: `:913` is a
+`Shell.insert_target/2` call, and the div's real line is `:933`. The row is
+left standing and corrected here.
+
+**The attribution.** `sb-ot1x` observes that `ADR-0002:6309-6314` attributes to
+this record's amendment "a separate `function_exported?/3` question in the
+chain", while this record's three-step table at `:7902-7906` speaks only of a
+type that "declares `sentence/1`" and never names the function. That is right,
+and the exact form of what this record decided is its own sentence at
+`:8442-8444`: "the table is written in terms of what the type **declares**, and
+an injected default is declared." `function_exported?/3` is how the
+implementation asks that question - in `ViewModel.declares_sentence?/1` - and
+naming it is `ADR-0002`'s reading of this record rather than a quotation of it.
+`ADR-0002`'s foot Note of this date carries the same correction from its side.
+
+Filed with `sb-v3ny`, campaign SF037, folding the `ADR-0005` half of `sb-cr7e`
+and the `ADR-0005` items of `sb-ot1x`. This Note changes no code and adds no
+README row; it flips the `Status:` lines at `:8451` and `:8827` and nothing else
+in this file, and clauses `11E` to `14E` stay at proposed by the words of the
+section that holds them.
