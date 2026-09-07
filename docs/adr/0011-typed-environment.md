@@ -2392,3 +2392,171 @@ Filed with `sb-9paa`, campaign SF036's Lane X, recording the operator's ruling
 `RQ-SF036-17` of 2026-09-07 and folding three items the pass-2 review of
 `sb-vjjl`'s record half raised against this file. `sb-vjjl` is the request this one
 follows on this record.
+
+## Note (2026-09-07): a composite is one block and one position in this walk, and the walk descends nothing
+
+A dated note rather than an amendment: no decision of this record changes, no
+status word moves, and nothing here adds an arm to anything. `sb-2gdx`
+("ADR-0002 decision 5 amendment (proposed): `use StatifierBlocks.Composite` -
+a block type derived from params plus a pure subtree") is in flight as this is
+written and is where a composite is decided. This Note says only what
+decision 1's walk does when it reaches one, so that the walk's reading of a
+composite is written down beside the walk rather than only inside a record
+about block types.
+
+### 1. One block, one position, no descent
+
+A composite is an ordinary `ADR-0001` block in the document - `{type, id,
+config, slots}` and nothing else - and decision 1's pre-order walk carries it
+exactly as it carries any other block: the environment reaches its position,
+the block's read signatures are checked there before its own writes are
+applied, its write signatures put their entries, and the walk moves on.
+
+The walk **descends nothing**. Descent in this walk is descent into a slot:
+`descend/6` (`lib/statifier_blocks/environment.ex:249-251`) takes the next
+`{parent_id, slot, index}` step of the target `at/3` was asked about (`:203`),
+looks the child up in `block.slots`, and `into_slot/7` is what merges a
+container's slots per decision 4. A composite in campaign SF037 exposes no
+slot of its own (`RQ-SF037-3`), so there is no slot to step into and nothing
+in `block.slots` to reach; the expansion is not a slot, is not in the
+document, and this walk never sees it. There is no second walk, no nested
+environment, and no extra position: a document holding one composite has one
+position where the composite is, and it is the composite's.
+
+### 2. What the walk consumes at that one position
+
+At that position the walk asks a composite the same two questions it asks of
+every block, and the answer is the **union of its expansion's**: the reads are
+the members' `{:path, %{expects: T}}` declarations and the writes are their
+`{:path, %{writes: T}}` declarations
+(`lib/statifier_blocks/block_type.ex:211-216`, `@type path_opts` at
+`:232-235`), plus each member's decision 6 sugar, all read over the
+**expanded** config - the config the members actually carry once the
+composite's params are substituted, and not the params themselves. The order
+is the expansion's own pre-order, so decision 1's last-write-wins by position
+holds inside the union exactly as it holds between two ordinary blocks: two
+members writing one path leave the later member's type, and that is what the
+block after the composite reads.
+
+That is the union as the walk **consumes** it, and it is deliberately not
+phrased as a union of `io/1`. The reason is worth writing down, because the
+shorthand "a composite's `io/1` is the union of its members'" cannot be made
+true as stated. `t:StatifierBlocks.Assignability.io/0`
+(`lib/statifier_blocks/assignability.ex:88-93`) is single-valued - one
+optional `:consumes` and one optional `:produces` - and under decision 6 it
+contributes exactly one read and one write, both at the subject path
+(`sugar/5`, `lib/statifier_blocks/environment.ex:1070-1080`, reaching
+`module.io(config)` through the private `io/2` at `:1083-1085`). Per-path
+reads and writes are not in that map at all: they come from `config_schema/1`,
+through `Environment.read_signatures/3` (`:361`) and `write_signatures/3`
+(`:377`), each of which is `field_reads` / `field_writes` over the schema
+first and the `io/1` sugar last. Two members' path declarations therefore do
+not fit in one `io/0` map, and a composite whose own `config_schema/1` is its
+params declares no path at all.
+
+### 3. The mechanism is open, and is named rather than decided: `RQ-SF037-15`
+
+So this Note records **what** the walk must see at a composite's position -
+the union above - and names as **open** the question of **how** the composite
+answers for it. That question is `RQ-SF037-15`, queued 2026-09-07 for the
+operator. A Note may name an open question; it decides nothing, and this one
+decides nothing. The three shapes on the table when it was queued:
+
+- **(A)** the walk computes a composite's read and write signatures at its one
+  position by running the same `read_signatures/3` and `write_signatures/3`
+  over `Composite.expand/2`'s subtree with the expanded config. No descent, no
+  new `type_expr()` arm, and `config_schema/1` stays the params.
+- **(B)** the derived `config_schema/1` re-exports the members' path
+  declarations, with the params substituted, as hidden fields.
+- **(C)** a new optional callback answering the two signature questions
+  directly.
+
+Whichever is ruled, it changes how the answer is **obtained** and not what the
+answer **is**: section 1's one position and no descent, and section 2's union,
+are this walk's reading of a composite either way. None of the three adds an
+inhabitant to `t:StatifierBlocks.Environment.type_expr/0` (`:132`) or an arm
+to decision 8's reason vocabulary.
+
+### 4. A read inside an expansion is the compiler's, and its finding is attributed one level up
+
+Nothing above makes the inside of an expansion invisible to the checks. A read
+a member declares is checked by the **compiler**, on the expanded tree, per
+`sb-nzc1` ("ADR-0004 amendment (proposed): the compiler expands a composite at
+the Resolve stage, and a finding inside an expansion is attributed one level
+up to the param that produced it"), in flight as this is written. What this
+walk does not do is check that read a second time from the outside, at a
+position that does not exist.
+
+A finding from such a check is attributed **one level up**: to the composite
+block the author placed and can see, never to an expanded block the author
+cannot see, and to the param that produced the offending value where one did
+(`RQ-SF037-5`; where no param can be blamed, the finding is reported against
+the composite with `config_key: nil`). Decision 5's anchoring is unchanged by
+that - it says which field a refusal lands on, and for a composite that field
+is a param of the block that is in the document.
+
+### 5. Pass-through slots: named, not decided
+
+A composite exposing no slot is a decision of this campaign (`RQ-SF037-3`) and
+not a property of composites. When a later record gives a composite
+**pass-through slots**, three things in this Note come back into question, and
+none of them is decided here:
+
+- whether "the walk descends nothing" survives, or whether a pass-through slot
+  is a slot `descend/6` steps into like any other and `into_slot/7` merges per
+  decision 4;
+- what the union of section 2 becomes when part of what runs is not fixed by
+  the composite's params but supplied by the author at a slot, and what
+  `{:passthrough, slot}` - already an inhabitant of
+  `t:StatifierBlocks.Assignability.produces/0` (`:85`) - carries through it;
+- where a finding inside the author's own slot content is attributed, given
+  that this is content the author *can* see, and section 4's "one level up"
+  was argued from the fact that an expansion is content the author cannot.
+
+They are named so a later record has them written down, and so nothing above
+is read as having settled them.
+
+### 6. Two spellings in the member-expansion amendment, folding `sb-kjai`
+
+`sb-kjai` raises two spellings in the amendment of 2026-09-07 above. Both are
+answered here by addition; neither text is edited, and neither answer is a
+decision.
+
+- **The worked shape's scalar entries.** The environment display at
+  `:2068-2072` spells four scalar entries `:string`. The environment does not
+  hold that atom: `t:StatifierBlocks.Environment.type_expr/0`
+  (`lib/statifier_blocks/environment.ex:132`) is `String.t() | :unknown |
+  {:list, type_expr()} | {:shape, [member()]}`, so a scalar declared type is
+  the **binary** `"string"` - which is how this record's own earlier worked
+  shape spells it (`:691-693`, "the environment holds as `string`"). Read
+  those four entries as `"string"`. The `:unknown` on the same page is an atom
+  and is spelled correctly. No part of the worked shape's argument turns on
+  which, which is why this is a Note and not an amendment.
+- **`:not_assignable` for a refused member read.** The habit **stands**, and
+  the qualification is worth having. Decision 8 (`:396`, and the paragraph at
+  `:408-415`) puts `:not_assignable` and `{:fixable_by, block_id}` in one
+  vocabulary as the same refusal differently addressed, and `refused/2`
+  (`lib/statifier_blocks/assignability.ex:338-342`) is where the two part: an
+  `upstream_ref` of `:slot_entry` or `:declaration` yields `:not_assignable`,
+  and any other - a block id - yields `{:fixable_by, that_block}`. So at
+  `:2076` and its repeat at `:2193`, where a trigger block's write signature is
+  what put the type at the path, the finding's derived reason is
+  `{:fixable_by, <that block>}`, and `:not_assignable` in those two sentences
+  names the refusal rather than the atom the seam emits. `:2098` is about the
+  vocabulary itself - "a refused member read is `:not_assignable` or
+  `:shape_not_satisfied` exactly as a refused root read is" - and is exact as
+  written.
+
+### 7. One moved cite, corrected by addition
+
+`:1254` cites `lib/statifier_blocks/environment.ex:93` for
+`t:StatifierBlocks.Environment.type_expr/0`. That typespec is at `:132` as of
+2026-09-07; the line moved under the record and the record's sentence is
+otherwise unchanged. The citation is left standing where it is and corrected
+here, which is this record's practice for a cite the code moved.
+
+Filed with `sb-uwld`, campaign SF037, folding `sb-kjai`. `sb-xio9`
+("`use StatifierBlocks.Composite`: the declaration, `Composite.expand/2`, and
+the derived block type + recipe") is the bead that implements what section 2
+describes, under whichever of section 3's shapes is ruled. This Note changes
+no code, adds no README row, and flips no status.
