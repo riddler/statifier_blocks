@@ -158,11 +158,31 @@ defmodule StatifierBlocks.Compiler do
       document compiled without it is byte-identical to what it was before
       the option existed. The parent half is
       `StatifierBlocks.Core.Subchart`.
+
+      Beside those per-outcome finals, one **shared** top-level `<final>`
+      is emitted when a block below the root declares a failure-classed
+      outcome - one `StatifierBlocks.BlockType.failure_outcomes/2` names -
+      that the document did not handle (ADR-0002's failure amendment of
+      2026-09-06, section 4). It is minted from the root block's id under
+      the role `child_failed`, one transition per unhandled pair reaches
+      it from the root block's own state, and it carries
+      `<param name="outcome" expr="'error'"/>` beside the reserved
+      `<param name="statifier_persistence:run_status" expr="'failed'"/>`.
+      The outcome it reports is `error` rather than the failing block's
+      own outcome name, because `StatifierBlocks.Core.Subchart` appends
+      `error` to its outcomes whether or not the author listed it, so it
+      is the one word a parent is guaranteed to have a route for. A
+      document with no unhandled failure below its root gains nothing
+      here, and a root block may not declare an outcome named `failed`:
+      that would ask for this final's state id a second time, and it is
+      refused as a Config-stage finding.
     * `:terminate` - compile this document **as a root document that
       finishes** (ADR-0004's 2026-08-29 root-termination note). The
       emission gains one top-level `<final>` per outcome the root block
       declares, reached from `done.outcome.<root state id>.<outcome>` and
-      carrying **no** `<donedata>`, so the session reaches `:done` when the
+      carrying **no** `<donedata>` - except that a final for a
+      failure-classed outcome carries the one reserved run-status `<param>`
+      described below - so the session reaches `:done` when the
       root block completes. Without it a compiled root document never
       terminates: the root block's own outcome finals are children of the
       root compound state, so completing the root block raises
@@ -170,6 +190,23 @@ defmodule StatifierBlocks.Compiler do
       is what leaves a durable run uncompleted. Defaults to `false`, and a
       document compiled without it is byte-identical to what it was before
       the option existed.
+
+      Beside those per-outcome finals, one **shared** top-level `<final>`
+      is emitted when a block below the root declares a failure-classed
+      outcome the document did not handle, exactly as under `:child_use`
+      (ADR-0002's failure amendment of 2026-09-06, section 4). Here it is
+      minted from the root block's id under the role `root_failed`, one
+      transition per unhandled pair reaches it from the root block's own
+      state, and its `<donedata>` holds only the reserved
+      `<param name="statifier_persistence:run_status" expr="'failed'"/>` -
+      the key `statifier_persistence`'s ADR-0008 amendment of 2026-09-06
+      fixes, which a durable stepper reads to decide that the run failed.
+      So a root document whose nested step fails still reaches `:done`,
+      and says that it failed when it gets there. A document with no
+      unhandled failure below its root gains nothing here, and a root
+      block may not declare an outcome named `failed`: that would ask for
+      this final's state id a second time, and it is refused as a
+      Config-stage finding.
 
       `:terminate` and `:child_use` are the same emission shaped for two
       different uses, and a document is compiled for one or the other:
