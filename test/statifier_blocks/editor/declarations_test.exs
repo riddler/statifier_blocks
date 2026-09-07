@@ -320,7 +320,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     describe "the undo stack" do
       # Sabotage: `set_declarations/2` writing the document straight into the
-      # assigns instead of going through `Edit.History.commit/4` - the edit
+      # assigns instead of going through the `Edit.Session` funnel - the edit
       # lands but is not undoable, and a deleted declaration is document
       # content the author cannot get back.
       test "steps back through a declaration edit like any other", %{conn: conn} do
@@ -343,6 +343,38 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         view |> with_target("#editor") |> render_click("redo", %{})
 
         assert row_ids(view) == []
+      end
+
+      # One funnel, not two (sb-h0nt item 4). This panel used to reach
+      # `Edit.History.commit/4` with a list draft of its own, which made it a
+      # second implementation of the gate, the undo stack and the host
+      # notification beside `Edit.Session`. It goes through the session now,
+      # and what says so from outside is the depth: one panel gesture is one
+      # entry on the same stack every canvas gesture pushes to, so exactly one
+      # undo returns the control to disabled.
+      #
+      # Sabotage: `commit_declarations/2` committing the candidate twice - the
+      # first undo leaves the Undo control live and this goes red on the
+      # control, its neighbour above going red on the rows (verified). The
+      # tests that assert only where the document ended up stay green, which
+      # is why the depth wanted a reader of its own.
+      test "a panel gesture is one entry on the editor's own stack", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: declaring([entry("signup")]))
+
+        open(view)
+
+        assert has_element?(view, ~s(button[phx-click="undo"][disabled]))
+
+        view
+        |> element(~s(.sb-declarations__row[data-index="0"] button.sb-declarations__remove))
+        |> render_click()
+
+        refute has_element?(view, ~s(button[phx-click="undo"][disabled]))
+
+        view |> with_target("#editor") |> render_click("undo", %{})
+
+        assert has_element?(view, ~s(button[phx-click="undo"][disabled]))
+        assert row_ids(view) == ["signup"]
       end
     end
 

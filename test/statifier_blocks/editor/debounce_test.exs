@@ -331,6 +331,53 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # sb-h0nt item 3. The attr above is on `config_form/1`, and until this
+    # bead the only caller who could reach it was a host that composed that
+    # component itself. A host that mounts `StatifierBlocks.Editor` - the
+    # documented way to embed the editor - draws the config form through the
+    # inspector, and the inspector's call passed every other assign and not
+    # this one, so the seam existed and was unreachable from the mount. The
+    # assertions here are on the whole thread, mount to control: what a host
+    # actually has is the value arriving on a rendered input.
+    describe "the Editor mount" do
+      # Sabotage: dropping `debounce={@debounce}` from `editor.ex`'s
+      # `<Inspector.inspector` call - the inspector falls back to its own
+      # `default: nil` and the mount's value never reaches a control, which
+      # is exactly the defect the bead names and which nothing else in the
+      # suite would have caught.
+      test "threads its debounce through the inspector to every control", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, debounce: 300)
+
+        tags = selected_control_tags(view, "blk_email_step")
+
+        assert tags != []
+        assert without_debounce(tags) == []
+        assert Enum.all?(tags, &String.contains?(&1, ~s(phx-debounce="300")))
+      end
+
+      # The default half, and the reason it is safe to add the assign at all:
+      # a mount that names nothing renders no attribute anywhere.
+      test "renders no attribute when the mount names none", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        tags = selected_control_tags(view, "blk_email_step")
+
+        assert tags != []
+        assert without_debounce(tags) == tags
+      end
+
+      # Selecting a block is what puts its config form on the inspector, so
+      # the controls the scan reads are the ones a host's author would type
+      # into.
+      defp selected_control_tags(view, id) do
+        view
+        |> element(~s([data-block-id="#{id}"] > .sb-node__chrome > .sb-node__label))
+        |> render_click()
+
+        view |> element(~s(.sb-form[data-block-id="#{id}"])) |> render() |> control_tags()
+      end
+    end
+
     describe "a read-only form" do
       # A read-only form draws no controls at all (ADR-0005's 2026-09-07
       # profile amendment, `read_only?` clause 3), so there is nothing for a
