@@ -557,4 +557,61 @@ defmodule StatifierBlocks.Environment.MemberExpansionTest do
              ]
     end
   end
+
+  describe "section 4: the drop-check preview and the walk are one codepath" do
+    # sabotage: give `apply_writes/5` a reduce of its own again rather than
+    # delegating -> the walk and the preview stop being one codepath and this
+    # equality goes red
+    test "with_writes/5 answers exactly what the walk holds after the same block" do
+      candidate = assign("blk_A", "signup.contact", "signup.contact")
+      document = document([candidate])
+      declarations = Environment.declarations(ctx())
+
+      before = Environment.annotated(palette(), document, {"blk_ROOT", "body", 0}, ctx())
+
+      assert Environment.with_writes(palette(), document, candidate, before, declarations) ==
+               annotated_after_all([candidate])
+    end
+
+    # sabotage: give `with_writes/5` a plain `Map.put` per signature (its body
+    # before the amendment) -> without the expansion the preview holds no member
+    # entry, so the read at `signup.contact.email` is decision 5's advisory
+    test "the preview refuses a member mismatch the drop would introduce" do
+      downstream =
+        Block.new("myapp.reads",
+          id: "blk_B",
+          config: %{"subject" => "signup.contact.email", "expects" => "integer"}
+        )
+
+      candidate = assign("blk_A", "signup.contact", "signup.contact")
+
+      assert {:error, findings} =
+               Assignability.check(
+                 palette(),
+                 document([downstream]),
+                 {"blk_ROOT", "body", 0},
+                 candidate,
+                 ctx()
+               )
+
+      assert findings == [
+               {:type_mismatch, "blk_B", "blk_A", "string", "integer", "signup.contact.email"}
+             ]
+
+      # and `validate/3` on the document the drop produces says the same
+      assert {:error, ^findings} =
+               Assignability.validate(palette(), document([candidate, downstream]), ctx())
+    end
+
+    # sabotage: default `declarations` to `Environment.declarations(%{})`'s
+    # result computed from a document -> this stops being the empty index
+    test "the declarations argument defaults to the empty index" do
+      candidate = assign("blk_A", "signup.contact", "signup.contact")
+      document = document([candidate])
+
+      assert Environment.with_writes(palette(), document, candidate, %{}) == %{
+               "signup.contact" => {"signup.contact", "blk_A"}
+             }
+    end
+  end
 end

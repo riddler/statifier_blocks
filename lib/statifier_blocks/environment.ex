@@ -400,6 +400,53 @@ defmodule StatifierBlocks.Environment do
     end
   end
 
+  @doc """
+  `env` with `block`'s own writes applied - what the block after it sees.
+
+  One codepath for one rule (ADR-0011's Amendment of 2026-09-07, section 4):
+  the walk applies a block's writes with this function, and so does the
+  editor's drop-check preview through
+  `StatifierBlocks.Assignability.downstream_findings/6`. For any block
+  `block`, environment `env` and declarations `declarations`, the entries the
+  preview holds after `block` and the entries the walk holds after `block`
+  are the same map.
+
+  Three things happen per write signature, in this order. The members the
+  *previous* write at the path derived are cleared, because a stale member
+  entry beneath a path that no longer holds a record would be a claim nobody
+  is making. The signature's own entry is put, annotated with `block.id`.
+  Then the members its type derives are put, skipping every path this block
+  writes explicitly - the explicit signature wins over the derived member,
+  whichever order the two are declared in.
+
+  `block`'s slots are not walked: what its subtree writes is the walk's
+  business once the document holds it.
+
+  `declarations` is what the member expansion is read from
+  (`declarations/1` answers it for a context); it defaults to the empty
+  index, under which a record-typed write puts its own entry and derives no
+  member.
+  """
+  @spec with_writes(Palette.t(), Document.t(), Block.t(), annotated(), Declarations.t()) ::
+          annotated()
+  def with_writes(
+        %Palette{} = palette,
+        %Document{} = document,
+        %Block{} = block,
+        env,
+        declarations \\ %{}
+      ) do
+    signatures = write_signatures(palette, document, block)
+    declared = MapSet.new(signatures, fn {_key, path, _type} -> path end)
+
+    Enum.reduce(signatures, env, fn {_key, path, type}, acc ->
+      acc
+      |> clear_derived(declarations, path)
+      |> Map.put(path, {type, block.id})
+      |> put_derived(declarations, path, type, block.id, declared)
+    end)
+  end
+
   # RQ-SF037-15, ruled 2026-09-07 (shape A): a composite's read and write
   # signatures are computed at its ONE position, by running these same two
   # functions over `Composite.expand/2`'s subtree with the expanded config.
@@ -821,28 +868,12 @@ defmodule StatifierBlocks.Environment do
   end
 
   # Decision 1's last-write-wins, and the Amendment of 2026-09-07's member
-  # expansion applied with it: each signature puts its own entry, and a
-  # record-typed or shape-typed one also puts an entry per member beneath it.
-  #
-  # Three things happen per signature, in this order. The members the
-  # *previous* write at the path derived are cleared, because a stale member
-  # entry beneath a path that no longer holds a record would be a claim
-  # nobody is making. The signature's own entry is put. Then the members its
-  # type derives are put, skipping every path this block writes explicitly -
-  # the explicit signature wins over the derived member, whichever order the
-  # two are declared in.
+  # expansion applied with it. The rule itself is `with_writes/5`'s, which
+  # the drop-check preview calls too (that Amendment's section 4); this is
+  # the walk's spelling of it, reading the declarations out of `ctx`.
   @spec apply_writes(annotated(), Palette.t(), Document.t(), Block.t(), context()) :: annotated()
   defp apply_writes(env, palette, document, %Block{} = block, ctx) do
-    declarations = declarations(ctx)
-    signatures = write_signatures(palette, document, block)
-    declared = MapSet.new(signatures, fn {_key, path, _type} -> path end)
-
-    Enum.reduce(signatures, env, fn {_key, path, type}, acc ->
-      acc
-      |> clear_derived(declarations, path)
-      |> Map.put(path, {type, block.id})
-      |> put_derived(declarations, path, type, block.id, declared)
-    end)
+    with_writes(palette, document, block, env, declarations(ctx))
   end
 
   # What the write already at `path` derived, and only that. An entry a later
