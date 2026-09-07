@@ -8028,17 +8028,24 @@ because the section describes neither.
   the member's config carries anywhere, where a value is distinguishing when it
   is not one of `nil`, `""`, `[]`, `%{}` or `false` (`composite.ex:596-599`).
 
-And the collision, which both readings above reach for: the code answers `nil`
-when none **or more than one** param matches (`composite.ex:589-592`), and the
-comment at `composite.ex:570-572` calls that "no single param is responsible",
-"the honest answer in both directions". The summary this item was drafted from
-said the module side takes the first param in *declaration order* on a
-collision. The code does not, and there is no declaration order at that point
-to take - `params` there is a config map, and `blamed_param/2` comprehends it.
-So this Note **records the code and names the difference rather than settling
-it**: giving the module side a tie-break is a change to `blamed_param/2` and to
-what `param_map` means, and it is for the request that wants one to ask, naming
-the order it would read.
+And the collision, which both readings above reach for. **Ruled
+(`RQ-SF038-14`): the module side takes the first param in *declaration
+order*.** The declaration has an order to take: `:params` is a
+`[t:StatifierBlocks.BlockType.field_decl/0]` (`composite.ex:203`), which is why
+`config_schema/1` answers "`params`, in declaration order" (`composite.ex:79`,
+`:228`).
+
+The code does not take it yet, and this Note records that rather than reading
+the ruling back as description. `blamed_param/2` answers `nil` when none **or
+more than one** param matches (`composite.ex:589-592`), which the comment at
+`composite.ex:570-572` calls "no single param is responsible", "the honest
+answer in both directions". Nor could it take the ruling where it stands:
+`params_of/2` (`composite.ex:500-506`) hands `blamed_param/2` a `Map.new/2`
+over the declaration's list, so the order is already gone by the time the
+comparison runs. The ruling therefore names two changes - carry the
+declaration's order past `params_of/2`, and blame the first match rather than
+refusing - and it is what a request making them is measured against, the way
+item 2's ruling is. No request carries it today.
 
 ### 6. `use StatifierBlocks.InvokeStep, failure_outcomes: [...]`
 
@@ -8080,4 +8087,5 @@ Filed with `sb-uigm`, campaign SF038. This Note changes no code, adds no README
 row and carries no `Status:` line, because it takes no decision this file has
 not already taken or pointed at. Items 3 and 4 are implemented by `sb-9w7w`,
 item 6 by `sb-a0xw`, and item 1's decision lands as `sb-ekkt`'s amendment with
-`sb-mulk` behind it.
+`sb-mulk` behind it. Items 2 and 5 record rulings no request carries yet; each
+names the change it is measured against.
