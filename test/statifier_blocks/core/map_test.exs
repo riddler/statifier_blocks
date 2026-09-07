@@ -224,19 +224,21 @@ defmodule StatifierBlocks.Core.MapTest do
                ["items", "chart", "item_as", "index_as", "collect", "collect_type", "on"]
     end
 
-    # ADR-0013 decision 1: the parent declares what one child's answer is,
-    # by name, in the existing `:string` field type - no ninth field type
-    # is added for it, and it sits beside the `collect` it qualifies.
+    # ADR-0013 decision 1 as ADR-0002's amendment of 2026-09-06 spells it:
+    # the parent declares what one child's answer is, in either arm of a
+    # `{:type_expr, opts}` field, and it sits beside the `collect` it
+    # qualifies. Both arms, because clause 7 says both fields it migrates
+    # want both.
     #
     # sabotage: declared `collect_type` as `{:path, %{}}` - it is offered
     # path candidates and read as a datamodel path it is not, and the
     # `datamodel_path?/1` assertion below goes red (verified)
-    test "collect_type is an optional :string field, and never a path" do
+    test "collect_type is an optional type-expression field, and never a path" do
       declaration = Map.config_schema(@lines) |> Enum.find(&(&1.key == "collect_type"))
 
       assert %{
                key: "collect_type",
-               type: :string,
+               type: {:type_expr, %{arms: [:name, :inline]}},
                label: "Each answer is a",
                required?: false,
                default: ""
@@ -250,7 +252,16 @@ defmodule StatifierBlocks.Core.MapTest do
     # `{:opaque, s}`, so a document naming a type the parent has not
     # declared yet stops validating and this goes red (verified)
     test "collect_type carries no findings of its own, whatever it names" do
-      for value <- ["", "cards.settlement_summary", "not a type name", "integer"] do
+      values = [
+        "",
+        "cards.settlement_summary",
+        "not a type name",
+        "integer",
+        [%{"name" => "amount_minor", "type" => "integer", "required?" => true}],
+        []
+      ]
+
+      for value <- values do
         assert Map.validate_config(%{
                  "items" => "cards.chunks",
                  "chart" => "bdoc_CHUNK",
@@ -351,6 +362,35 @@ defmodule StatifierBlocks.Core.MapTest do
         |> Enum.find(&(&1.key == "collect"))
 
       assert Enum.find(undeclared, &(&1.name == "donedata")).type == :unknown
+    end
+
+    # The inline arm of the same field, reaching the same member. The
+    # envelope is a shape either way, and an inline `collect_type` is a
+    # shape one level inside it.
+    #
+    # sabotage: dropped `declared_summary/1`'s list clause, so an inline
+    # `collect_type` falls through to `:unknown` - the declaration stops
+    # reaching `"donedata"` and this goes red (verified).
+    test "an inline collect_type types the donedata member as the shape it writes" do
+      config =
+        Elixir.Map.put(@lines, "collect_type", [
+          %{"name" => "amount_minor", "type" => "integer", "required?" => true},
+          %{"name" => "note", "type" => "string"}
+        ])
+
+      %{type: {:path, %{writes: {:list, {:shape, members}}}}} =
+        Map.config_schema(config) |> Enum.find(&(&1.key == "collect"))
+
+      assert Enum.find(members, &(&1.name == "donedata")) == %{
+               name: "donedata",
+               required?: false,
+               type:
+                 {:shape,
+                  [
+                    %{name: "amount_minor", type: "integer", required?: true},
+                    %{name: "note", type: "string", required?: false}
+                  ]}
+             }
     end
 
     # sabotage: same revert - `datamodel_path?/1` answers false for the

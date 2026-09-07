@@ -78,24 +78,32 @@ defmodule StatifierBlocks.Core.Map do
   | `item_as` | `:string` | the name a child sees its item under, default `item` |
   | `index_as` | `:string` | the name a child sees its position under, when the author wants one |
   | `collect` | `{:path, %{writes: {:list, envelope}}}` | where the assembled answer is written |
-  | `collect_type` | `:string` | what a collected answer is, as a declared type name |
+  | `collect_type` | `{:type_expr, opts}` | what a collected answer is, as a declared type name or an inline shape |
   | `on` | `{:select, ...}` | the aggregation policy, `all` or `first_error` |
 
   ## `collect_type`, and what it is not
 
-  ADR-0013 decision 1: the parent declares what one child's answer holds,
-  and it declares it by **name** - a name the parent document's datamodel
-  declares, read through `StatifierDatamodel.Types.parse/2`. It is
+  ADR-0013 decision 1: the parent declares what one child's answer holds.
+  It declares it in **two arms** - the name of a type the parent
+  document's datamodel declares, read through
+  `StatifierDatamodel.Types.parse/2`, or an inline shape written where the
+  field is - and the field type is `{:type_expr, opts}`, decision 1's
+  spelling as the ADR-0002 amendment of 2026-09-06 grew it. It is
   meaningful only beside a `collect`, it is optional, and an absent or
-  empty one is what every document stored before it existed carries.
+  empty one is what every document stored before it existed carries. A
+  stored string is the name arm, so no stored document is rewritten and
+  none reads differently.
 
   It is a **type**, never a path and never an expression: it does not
   carry `datamodel_path?`, it is not read through
   `StatifierBlocks.Core.AssignLocation`, and it is offered no path
-  candidates. It has no findings of its own either. `parse/2` is total and
-  answers `{:opaque, s}` for a name it does not recognize, which is the
-  permissiveness ADR-0006 and ADR-0011 already chose: what the document
-  does not say is not thereby wrong.
+  candidates. It has no findings of **this module's** either: what the
+  shared check `StatifierBlocks.BlockType.type_expr_findings/2` refuses is
+  bytes that are no arm at all, and it refuses them for every
+  `{:type_expr, opts}` field in one place rather than here. `parse/2` is
+  total and answers `{:opaque, s}` for a name it does not recognize, which
+  is the permissiveness ADR-0006 and ADR-0011 already chose: what the
+  document does not say is not thereby wrong.
 
   The declaration is the **parent's** because the parent is the document
   being compiled. A `core.map` names its child chart by document id and
@@ -171,7 +179,7 @@ defmodule StatifierBlocks.Core.Map do
   |---|---|---|
   | `index` | yes | `integer` |
   | `status` | yes | `string` - one of `completed`, `failed`, `cancelled` |
-  | `donedata` | no | this block's `collect_type`, or `unknown` when there is none |
+  | `donedata` | no | this block's `collect_type` - the name it holds, or the shape it writes inline - or `unknown` when there is none |
   | `failure` | no | a shape of `reason`, `attempts` and `detail` |
 
   `donedata` and `failure` are optional because no element carries both
@@ -388,6 +396,12 @@ defmodule StatifierBlocks.Core.Map do
   # undeclared row of decision 5's table and still richer than the
   # `{:list, :unknown}` this field wrote before: an element has an index
   # and a status whether or not anything was declared.
+  #
+  # Either arm of the field types it. A name types the member by name, as
+  # it always has; an inline shape becomes the member's own type through
+  # `StatifierBlocks.Environment.inline_shape/1`, which is the one reader
+  # of the stored member list. The envelope is a shape either way, and the
+  # inline case is simply a shape one level inside another.
   @spec envelope(Block.config()) :: Environment.type_expr()
   defp envelope(config) do
     {:shape,
@@ -403,6 +417,7 @@ defmodule StatifierBlocks.Core.Map do
   defp declared_summary(config) do
     case Map.get(config, "collect_type") do
       name when is_binary(name) -> if String.trim(name) == "", do: :unknown, else: name
+      members when is_list(members) -> Environment.inline_shape(members)
       _absent_or_malformed -> :unknown
     end
   end
@@ -447,7 +462,7 @@ defmodule StatifierBlocks.Core.Map do
       },
       %{
         key: "collect_type",
-        type: :string,
+        type: {:type_expr, %{arms: [:name, :inline]}},
         label: "Each answer is a",
         required?: false,
         default: ""
@@ -470,9 +485,13 @@ defmodule StatifierBlocks.Core.Map do
   The six fields with findings, and nothing about N.
 
   `collect_type` is the seventh field and has no check here: it carries a
-  type name rather than a path or an expression, and
-  `StatifierDatamodel.Types.parse/2` is total over any spelling, so there
-  is nothing about it a config finding could say (ADR-0013 decision 1).
+  type rather than a path or an expression, `parse/2` and
+  `StatifierBlocks.Environment.inline_shape/1` are each total over any
+  spelling, and what is left - bytes that are neither arm - is the shared
+  `StatifierBlocks.BlockType.type_expr_findings/2`'s to refuse for every
+  `{:type_expr, opts}` field at once rather than this module's to
+  re-implement (ADR-0013 decision 1, and ADR-0002's amendment of
+  2026-09-06 clause 2).
 
   `on` and `item_as` are read through their defaults, so a config that
   never carried either key validates exactly as it did before the key

@@ -848,10 +848,14 @@ defmodule StatifierBlocks.BlockType do
 
   `declarations` is the **parent's**, because the parent's `collect_type`
   is what is being satisfied; `fields` is the child's `donedata_type/1`;
-  `expected` is the parent's `collect_type` spelling, as stored. The
-  answer is `t:StatifierDatamodel.Types.reason/0`, so a consumer that
-  renders why a pair disagrees renders that package's reason and not a
-  second vocabulary of this one's.
+  `expected` is the parent's `collect_type` spelling, as stored - either
+  arm of it, since that field is a `{:type_expr, opts}` admitting both. A
+  stored member list is read into an inline shape here exactly as
+  `StatifierBlocks.Environment` reads one, so the arm the parent wrote is
+  the arm this answers about. The answer is
+  `t:StatifierDatamodel.Types.reason/0`, so a consumer that renders why a
+  pair disagrees renders that package's reason and not a second vocabulary
+  of this one's.
 
   The child's fields are projected as one more declaration of kind
   `record`, under a name the parent's document does not use, each field
@@ -892,9 +896,25 @@ defmodule StatifierBlocks.BlockType do
     StatifierDatamodel.Types.satisfies(
       projected,
       {:declared, name},
-      StatifierDatamodel.Types.parse(projected, expected)
+      expected_type(projected, expected)
     )
   end
+
+  # The expected side, from either arm of the field. A member list is the
+  # inline arm and is read through the one reader of a stored member list;
+  # everything else is the spelling `StatifierDatamodel.Types.parse/2`
+  # already read, unchanged.
+  @spec expected_type(StatifierDatamodel.Declarations.t(), term()) ::
+          StatifierDatamodel.Types.t()
+  defp expected_type(declarations, members) when is_list(members) do
+    StatifierBlocks.Environment.type_of(
+      declarations,
+      StatifierBlocks.Environment.inline_shape(members)
+    )
+  end
+
+  defp expected_type(declarations, spelling),
+    do: StatifierDatamodel.Types.parse(declarations, spelling)
 
   @spec projected_field(donedata_field()) :: StatifierDatamodel.Declarations.field()
   defp projected_field(%{name: name, type: type}) do

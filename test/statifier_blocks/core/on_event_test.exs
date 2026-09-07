@@ -1,7 +1,7 @@
 defmodule StatifierBlocks.Core.OnEventTest do
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{Block, Compiler, Document, Palette}
+  alias StatifierBlocks.{Block, BlockType, Compiler, Document, Palette}
   alias StatifierBlocks.Compiler.Context
   alias StatifierBlocks.Core.OnEvent
 
@@ -29,6 +29,19 @@ defmodule StatifierBlocks.Core.OnEventTest do
       }
     ]
   }
+
+  # The inline arm of `payload`, written where the payload is declared: a
+  # member typed by a scalar, one typed by a declared record, and one
+  # typed by a nested inline shape, so the walk's three descents are all
+  # reachable without the datamodel document.
+  @inline_payload [
+    %{"name" => "reason", "type" => "string"},
+    %{"name" => "txn", "type" => "cards.credit_txn"},
+    %{
+      "name" => "route",
+      "type" => [%{"name" => "acquirer", "type" => "string", "required?" => true}]
+    }
+  ]
 
   describe "validate_config/1 and the capture map" do
     # sabotage: dropped `check_capture/2` from `validate_config/1`'s pipeline
@@ -264,10 +277,10 @@ defmodule StatifierBlocks.Core.OnEventTest do
     # this went red, and so did the field-order assertion in
     # `core_types_test.exs`, which is the editor's only route to the field
     # (verified)
-    test "declares payload as an optional string carrying a declared type name" do
+    test "declares payload as an optional type-expression field admitting both arms" do
       assert Enum.find(OnEvent.config_schema(%{}), &(&1.key == "payload")) == %{
                key: "payload",
-               type: :string,
+               type: {:type_expr, %{arms: [:name, :inline]}},
                label: "Its payload is",
                required?: false,
                default: ""
@@ -275,21 +288,40 @@ defmodule StatifierBlocks.Core.OnEventTest do
     end
 
     # The name resolving is not this callback's question: an unresolvable
-    # name is the amendment's P4 case, unchanged behaviour, and only a
-    # stored value that is not a string at all is a finding here.
+    # name is the amendment's P4 case, unchanged behaviour. Nor is what an
+    # arm may be - that is the shared check's, asserted below - so this
+    # callback reports nothing about the field at all.
     #
-    # sabotage: made `check_payload/2`'s `nil` clause report a finding ->
-    # this went red, and so did every test that compiles a handler with no
-    # payload (verified)
-    test "accepts an absent, a blank and a named payload, and refuses a non-string" do
+    # sabotage: put a `check_payload/2` back into the pipeline refusing a
+    # value that is not a string -> the inline arm stops validating here
+    # and this goes red (verified)
+    test "accepts an absent, a blank, a named and an inline payload" do
       assert OnEvent.validate_config(%{"event" => "cards.declined", "outcome" => "abandon"}) ==
                :ok
 
       assert OnEvent.validate_config(payload_config("")) == :ok
       assert OnEvent.validate_config(payload_config("cards.declined")) == :ok
       assert OnEvent.validate_config(payload_config("kaboom.not.declared")) == :ok
+      assert OnEvent.validate_config(payload_config(@inline_payload)) == :ok
+      assert OnEvent.validate_config(payload_config(%{})) == :ok
+    end
 
-      assert {:error, [{"payload", _message}]} = OnEvent.validate_config(payload_config(%{}))
+    # The half `validate_config/1` no longer answers for: bytes that are
+    # neither arm are refused, once, by the one check every
+    # `{:type_expr, opts}` field shares - at compile, on the field's key.
+    #
+    # sabotage: declared `payload` as `:string` again -> the shared check
+    # skips the field, the map compiles clean, and this goes red (verified)
+    test "a payload that is neither arm is refused by the shared check, on its own key" do
+      assert [finding] =
+               BlockType.type_expr_findings(OnEvent, payload_config(%{}))
+               |> Enum.map(&elem(&1, 0))
+
+      assert finding == "payload"
+
+      assert BlockType.type_expr_findings(OnEvent, payload_config("cards.declined")) == []
+      assert BlockType.type_expr_findings(OnEvent, payload_config(@inline_payload)) == []
+      assert BlockType.type_expr_findings(OnEvent, payload_config("")) == []
     end
   end
 
@@ -376,6 +408,64 @@ defmodule StatifierBlocks.Core.OnEventTest do
                )
     end
 
+    # The same refusal from the other arm. An inline payload needs no
+    # datamodel document to be read: the members are written where the
+    # payload is.
+    #
+    # sabotage: dropped `declared_payload/2`'s list clause -> an inline
+    # payload resolves to nothing, the refusal stops firing, and the first
+    # assertion goes red (verified)
+    test "refuses a pair reading a member an inline payload does not carry" do
+      assert {:error, [finding]} = inline_compile(%{"card.why" => "code"})
+
+      assert %Compiler.Finding{
+               stage: :config,
+               block_id: "blk_OE",
+               config_key: "capture",
+               severity: :error,
+               fault: :author
+             } = finding
+
+      assert finding.message =~ "card.why"
+      assert finding.message =~ "code"
+      assert finding.message =~ "inline payload"
+
+      assert {:ok, _read} = inline_compile(%{"card.why" => "reason"})
+    end
+
+    # P5's depth rule reaching an inline member, both ways it can descend:
+    # a member typed by a declared name resolves through the datamodel
+    # document, and a member typed by a nested inline shape walks its own
+    # members.
+    #
+    # sabotage: dropped `descend/3`'s `{:shape, members}` clause -> the
+    # nested shape stops the walk instead of descending, and the fourth
+    # assertion goes red (verified)
+    test "walks below an inline member, through a declared name and a nested shape" do
+      assert {:ok, _named} = inline_compile(%{"card.amount" => "txn.amount_minor"})
+      assert {:error, [_named]} = inline_compile(%{"card.amount" => "txn.no_such_field"})
+
+      assert {:ok, _nested} = inline_compile(%{"card.route" => "route.acquirer"})
+      assert {:error, [_nested]} = inline_compile(%{"card.route" => "route.no_such_member"})
+
+      # And a member typed by a scalar stops the walk, as a declared
+      # field typed by one does.
+      assert {:ok, _scalar} = inline_compile(%{"card.why" => "reason.deeper"})
+    end
+
+    # An inline payload writing no well-formed member carries no member,
+    # so every read is a read past it - which is what a payload naming a
+    # declaration with no fields already does.
+    #
+    # sabotage: made `declared_payload/2` answer `:error` for an empty
+    # member list -> the refusal stops firing and this goes red (verified)
+    test "an inline payload with no members carries none" do
+      assert {:error, [finding]} =
+               typed_compile(%{"card.why" => "reason"}, [%{"no" => "name"}])
+
+      assert finding.config_key == "capture"
+    end
+
     # The untyped document, unchanged: no payload, no finding, and the same
     # bytes the handler compiled to before the key existed.
     #
@@ -429,6 +519,8 @@ defmodule StatifierBlocks.Core.OnEventTest do
       config: if(payload == nil, do: config, else: Map.put(config, "payload", payload))
     )
   end
+
+  defp inline_compile(pairs), do: typed_compile(pairs, @inline_payload)
 
   defp typed_compile(pairs, payload) do
     Compiler.compile(

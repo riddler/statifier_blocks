@@ -179,16 +179,19 @@ defmodule StatifierBlocks.Core.OnEvent do
   payloads and neither is thereby wrong, because each governs its own
   `capture`.
 
-  The value is the **name of a type the datamodel document declares** - a
-  `record` or a `shape` in its `types` key, read through
-  `StatifierDatamodel.Declarations`. P2 of that amendment names a second
-  arm, an inline shape written where the payload is declared, and P3
-  defers it: no member of ADR-0002 decision 7's field-type set describes a
-  shape, and inventing one to spell it would be a second proposal riding
-  along with this one. So the field is a `:string` carrying a name, which
-  is the only spelling of a declaration this package has anywhere today
-  (`StatifierBlocks.Environment`'s `type_expr/0`), and no ninth field type
-  is added.
+  P2 of that amendment names **two** arms, and both are spelled today.
+  The value is either the **name of a type the datamodel document
+  declares** - a `record` or a `shape` in its `types` key, read through
+  `StatifierDatamodel.Declarations` - or an **inline shape** written where
+  the payload is declared, a list of members read through
+  `StatifierBlocks.Environment.inline_shape/1`. The field type is
+  `{:type_expr, opts}`, the ninth member of ADR-0002 decision 7's set that
+  its amendment of 2026-09-06 added and whose clause 7 migrated this field
+  onto: P3 deferred the second arm rather than refusing it, and the two
+  arms are told apart by the stored JSON type alone, a string never being
+  a member list. A `payload` stored as text before that date is the name
+  arm, unchanged in every particular - the same bytes, the same
+  resolution, the same findings.
 
   `payload` is a **declaration, not an emission**. Nothing about it
   reaches the compiled SCXML: a handler that gains one compiles to the
@@ -223,6 +226,18 @@ defmodule StatifierBlocks.Core.OnEvent do
   `statifier_datamodel` does not already have - its read check is nominal,
   permissive on the unknown, and descends into no list's element type.
 
+  An **inline** payload is checked by that same rule against the members
+  it writes, and P5 gains nothing else from the second arm: the first
+  segment is checked against the member names, a member typed by a
+  declared name descends into that declaration, a member whose own type is
+  another inline shape descends into its members, and every other member
+  type stops the walk. What the two arms share is that the check needs a
+  set of member names in hand and refuses only a read that is not in it -
+  the arms differ in where those names come from and in nothing else. An
+  inline payload writing no well-formed member carries no member, so every
+  read is a read past it, which is what a payload naming a declaration
+  with no fields already does.
+
   The destination side of a pair is untouched by all of this:
   `StatifierBlocks.Environment.capture_writes/1` still writes `:unknown`
   there. This types the source side at compile, and typing the
@@ -245,7 +260,7 @@ defmodule StatifierBlocks.Core.OnEvent do
   alias StatifierBlocks.Block
   alias StatifierBlocks.Compiler.Context
   alias StatifierBlocks.Core.{Config, Emit}
-  alias StatifierBlocks.Emission
+  alias StatifierBlocks.{Emission, Environment}
   alias StatifierDatamodel.Declarations
 
   @outcomes ["abandon", "resume"]
@@ -253,6 +268,10 @@ defmodule StatifierBlocks.Core.OnEvent do
   # The one spelling of the key, shared by the map's own validation and by
   # the payload refusal that reads the same pairs.
   @capture_key "capture"
+
+  # How an inline payload is named in a message. It has no name of its
+  # own - that is what makes it inline - so the message describes it.
+  @inline_subject "the inline payload"
 
   # A path's shape, in both directions of a `capture` pair: non-empty and
   # carrying no whitespace, and deliberately NOT a dotted-identifier
@@ -286,7 +305,7 @@ defmodule StatifierBlocks.Core.OnEvent do
       },
       %{
         key: "payload",
-        type: :string,
+        type: {:type_expr, %{arms: [:name, :inline]}},
         label: "Its payload is",
         required?: false,
         default: ""
@@ -309,13 +328,25 @@ defmodule StatifierBlocks.Core.OnEvent do
       }
     ]
 
+  @doc """
+  The three fields with checks of their own, and `capture`.
+
+  `payload` is not among them. It is a `{:type_expr, opts}` field, and
+  what a value of one may be is
+  `StatifierBlocks.BlockType.type_expr_findings/2`'s single check for
+  every field of that type - the compiler's `:config` stage and the
+  editor's view model both consult it, so an author is shown the set a
+  compile refuses. Re-implementing the same test here would report the
+  same bytes twice on the same key, and whether the name *resolves* is not
+  a finding on either side: that is ADR-0002's P4 case, the undeclared
+  payload, unchanged behaviour.
+  """
   @impl true
   def validate_config(config) do
     []
     |> check_event(config)
     |> check_cond(config)
     |> check_outcome(config)
-    |> check_payload(config)
     |> check_capture(config)
     |> Config.verdict()
   end
@@ -384,20 +415,6 @@ defmodule StatifierBlocks.Core.OnEvent do
       "to the path inside _event.data it is read from, like reason"
   end
 
-  # The declaration is optional, so only a stored value that is not a
-  # string at all is a finding here. Whether the name *resolves* is not
-  # this function's question: a name the datamodel does not declare is
-  # ADR-0002's P4 case - the undeclared payload, unchanged behaviour - and
-  # a blank string is the field's own default, which is the editor's
-  # spelling of "not declared".
-  defp check_payload(findings, config) do
-    case Map.get(config, "payload") do
-      nil -> findings
-      payload when is_binary(payload) -> findings
-      _other -> [{"payload", "must name a declared type, or be left blank"} | findings]
-    end
-  end
-
   @doc """
   The `capture` pairs this handler's declared `payload` refuses
   (ADR-0002's amendment of 2026-09-06, P5).
@@ -411,6 +428,13 @@ defmodule StatifierBlocks.Core.OnEvent do
   given - the datamodel document's declarations, indexed by
   `StatifierDatamodel.Declarations.from_document/1` - and the compiler
   reads that document once and hands it here.
+
+  Both arms of the field are read here. A `payload` holding a name is
+  resolved through `StatifierDatamodel.Declarations.fetch/2` and checked
+  against that declaration's fields; a `payload` holding an inline shape
+  is read through `StatifierBlocks.Environment.inline_shape/1` and checked
+  against its members. The walk below the first segment is the same rule
+  in both cases.
 
   Total, and empty in every case the amendment says is not a finding: no
   `payload`, a blank one, a name the declarations do not carry, no
@@ -428,73 +452,121 @@ defmodule StatifierBlocks.Core.OnEvent do
       iex> OnEvent.payload_capture_findings(%{config | "capture" => %{"card.why" => "code"}},
       ...>   declarations) |> Enum.map(&elem(&1, 0))
       ["capture"]
+
+      iex> alias StatifierBlocks.Core.OnEvent
+      iex> inline = [%{"name" => "reason", "type" => "string"}]
+      iex> config = %{"event" => "cards.declined", "outcome" => "abandon",
+      ...>   "payload" => inline, "capture" => %{"card.why" => "reason"}}
+      iex> OnEvent.payload_capture_findings(config, %{})
+      []
+      iex> OnEvent.payload_capture_findings(%{config | "capture" => %{"card.why" => "code"}},
+      ...>   %{}) |> Enum.map(&elem(&1, 0))
+      ["capture"]
   """
   @spec payload_capture_findings(Block.config(), StatifierDatamodel.Declarations.t()) :: [
           {String.t(), String.t()}
         ]
   def payload_capture_findings(config, declarations) when is_map(declarations) do
-    with payload when is_binary(payload) and payload != "" <- Map.get(config, "payload"),
-         {:ok, declaration} <- Declarations.fetch(declarations, payload),
+    with {:ok, subject, members} <- declared_payload(Map.get(config, "payload"), declarations),
          pairs when is_map(pairs) <- Map.get(config, @capture_key),
-         [_first | _rest] = offenders <- unread_pairs(pairs, declarations, declaration) do
-      [{@capture_key, payload_message(payload, offenders)}]
+         [_first | _rest] = offenders <- unread_pairs(pairs, declarations, members) do
+      [{@capture_key, payload_message(subject, offenders)}]
     else
       _no_declaration_or_nothing_refused -> []
     end
   end
+
+  # The two arms, read down to the one thing the walk needs: what the
+  # payload's members are called, and how the payload is named in a
+  # message. An inline shape has no name to print, so it is described.
+  @spec declared_payload(term(), Declarations.t()) ::
+          {:ok, String.t(), [map()]} | :error
+  defp declared_payload(name, declarations) when is_binary(name) and name != "" do
+    case Declarations.fetch(declarations, name) do
+      {:ok, %{fields: fields}} -> {:ok, name, fields}
+      _no_declaration -> :error
+    end
+  end
+
+  defp declared_payload(members, _declarations) when is_list(members) do
+    {:shape, read} = Environment.inline_shape(members)
+    {:ok, @inline_subject, read}
+  end
+
+  defp declared_payload(_absent_or_no_arm, _declarations), do: :error
 
   # The pairs whose source path reads a member the payload does not carry,
   # in the destinations' sorted order - the same order the assigns are
   # emitted in, so a message that names several reads in the order the
   # bytes do. A pair `check_capture/2` has already refused is skipped:
   # one malformed pair is one finding, not two.
-  @spec unread_pairs(map(), Declarations.t(), Declarations.declaration()) ::
+  @spec unread_pairs(map(), Declarations.t(), [map()]) ::
           [{String.t(), String.t()}]
-  defp unread_pairs(pairs, declarations, declaration) do
+  defp unread_pairs(pairs, declarations, members) do
     for {destination, source} = pair <- Enum.sort(pairs),
         path?(destination) and path?(source),
-        not carries?(declarations, declaration, String.split(source, ".")),
+        not carries?(declarations, members, String.split(source, ".")),
         do: pair
   end
 
-  # P5's depth rule. The first segment is checked against the declaration's
-  # field names; a deeper one is checked only where the field's own type
-  # resolves to another declaration. A field typed as a scalar, an opaque
-  # string, a list or nothing at all stops the walk and refuses nothing
-  # beyond it, which is the stance `StatifierDatamodel.Types`' own read
-  # check takes.
-  @spec carries?(Declarations.t(), Declarations.declaration(), [String.t()]) :: boolean()
-  defp carries?(declarations, declaration, [segment | rest]) do
-    case field(declaration, segment) do
+  # P5's depth rule. The first segment is checked against the member names
+  # the payload carries; a deeper one is checked only where that member's
+  # own type resolves to something whose members are in hand - another
+  # declaration, or another inline shape. A member typed as a scalar, an
+  # opaque string, a list or nothing at all stops the walk and refuses
+  # nothing beyond it, which is the stance `StatifierDatamodel.Types`' own
+  # read check takes.
+  #
+  # The two arms meet here: a declaration's `fields` and an inline shape's
+  # members are both lists of maps carrying `:name` and `:type`, and the
+  # only thing that differs is how a member's type spells a descent - a
+  # declaration's field carries `{:declared, name}`, an inline member
+  # carries the name itself or a nested `{:shape, members}`.
+  @spec carries?(Declarations.t(), [map()], [String.t()]) :: boolean()
+  defp carries?(declarations, members, [segment | rest]) do
+    case field(members, segment) do
       nil -> false
-      _field when rest == [] -> true
-      field -> descend(declarations, field, rest)
+      _member when rest == [] -> true
+      member -> descend(declarations, member, rest)
     end
   end
 
-  @spec descend(Declarations.t(), Declarations.field(), [String.t()]) :: boolean()
-  defp descend(declarations, %{type: {:declared, name}}, rest) do
+  @spec descend(Declarations.t(), map(), [String.t()]) :: boolean()
+  defp descend(declarations, %{type: {:declared, name}}, rest),
+    do: descend_named(declarations, name, rest)
+
+  defp descend(declarations, %{type: {:shape, members}}, rest),
+    do: carries?(declarations, members, rest)
+
+  defp descend(declarations, %{type: name}, rest) when is_binary(name) and name != "",
+    do: descend_named(declarations, name, rest)
+
+  defp descend(_declarations, _opaque_to_this_walk, _rest), do: true
+
+  @spec descend_named(Declarations.t(), String.t(), [String.t()]) :: boolean()
+  defp descend_named(declarations, name, rest) do
     case Declarations.fetch(declarations, name) do
-      {:ok, declaration} -> carries?(declarations, declaration, rest)
+      {:ok, %{fields: fields}} -> carries?(declarations, fields, rest)
       :error -> true
     end
   end
 
-  defp descend(_declarations, _opaque_to_this_walk, _rest), do: true
+  @spec field([map()], String.t()) :: map() | nil
+  defp field(members, name),
+    do: Enum.find(members, &(Map.get(&1, :name) == name))
 
-  @spec field(Declarations.declaration(), String.t()) :: Declarations.field() | nil
-  defp field(%{fields: fields}, name),
-    do: Enum.find(fields, &(Map.get(&1, :name) == name))
-
+  # `subject` is how the payload is named: the declared name for the name
+  # arm, and the inline description for the other, because an inline shape
+  # has none.
   @spec payload_message(String.t(), [{String.t(), String.t()}]) :: String.t()
-  defp payload_message(payload, offenders) do
+  defp payload_message(subject, offenders) do
     read =
       Enum.map_join(offenders, ", ", fn {destination, source} ->
         ~s("#{destination}" reads #{source})
       end)
 
-    "reads past the declared payload: #{read}, and #{payload} carries no such member. " <>
-      "Declare the member on #{payload}, correct the source path, or drop the payload " <>
+    "reads past the declared payload: #{read}, and #{subject} carries no such member. " <>
+      "Declare the member on #{subject}, correct the source path, or drop the payload " <>
       "declaration to leave the read unchecked"
   end
 

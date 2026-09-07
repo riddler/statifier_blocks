@@ -173,6 +173,30 @@ defmodule StatifierBlocks.BlockType.DonedataTypeTest do
              ) == :not_assignable
     end
 
+    # The expected side is the parent's `collect_type` as stored, and that
+    # field admits an inline shape as well as a name. An inline one is
+    # read here as the environment reads one, so the arm the parent wrote
+    # is the arm this answers about.
+    #
+    # sabotage: dropped `expected_type/2`'s list clause, so the inline arm
+    # falls through to `Types.parse/2` and reads as `:unknown` - the
+    # covering answer disappears and the first assertion goes red
+    # (verified)
+    test "an inline collect_type is the shape the check covers against", ctx do
+      inline = [
+        %{"name" => "settled_count", "type" => "integer", "required?" => true},
+        %{"name" => "failed_count", "type" => "integer", "required?" => true}
+      ]
+
+      assert BlockType.agrees?(ctx.declarations, BlockType.donedata_type(Chunk, %{}), inline) ==
+               :covers
+
+      wider = inline ++ [%{"name" => "refunded_count", "type" => "integer", "required?" => true}]
+
+      assert BlockType.agrees?(ctx.declarations, BlockType.donedata_type(Chunk, %{}), wider) ==
+               {:missing, ["refunded_count"]}
+    end
+
     # Total over the two shapes every stored document is in today: no
     # declaration on either side.
     test "an absent declaration on either side is unknown, not a disagreement", ctx do

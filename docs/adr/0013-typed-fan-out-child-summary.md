@@ -851,3 +851,80 @@ family, as `ADR-0002`'s Note of this date states in as many words
 is untouched and stays `proposed`; `sb-upv0` flips it.
 
 Filed with `sb-jvz3`, as folded residue from `sb-57yc`; campaign-SF035.
+
+## Note (2026-09-06): decision 1's `collect_type` is a `{:type_expr, opts}` field now, and admits the inline arm
+
+A dated Note rather than an amendment, and this record's convention for one:
+by addition, zero removed lines, no `Status:` line of its own. No decision
+above this line moves. Decision 1 still says the parent declares what one
+child's answer holds and that the declaration is the **parent's**; decision 4's
+agreement check is still dormant; decision 5's table still types `"donedata"`
+by `collect_type` and nothing else; and an absent or empty `collect_type` is
+still what every stored document has. What this Note records is that the field
+now has **two ways** to say the thing decision 1 always asked it to say.
+
+**What the record deferred, and where it landed.** Decision 1 chose the name
+arm and left the second one to be decided with three other things it named
+together (`:148-157`): a field type that describes a shape, an inhabitant of
+`StatifierBlocks.Environment`'s `type_expr()` that is one, an editor control
+that renders one, and the migration of `ADR-0002`'s `payload` onto the same
+spelling. All four have landed. `ADR-0002`'s Amendment of 2026-09-06 at
+`docs/adr/0002-block-type-behaviour.md:4957` added `{:type_expr, opts}` as the
+ninth member of decision 7's set and named this field in its clause 7 table
+(`:5201-5206`); its clause 8 fixes what a stored string means (`:5214-5220`).
+This Note is the half of that clause that belongs here.
+
+**The spelling.** `collect_type` is declared `{:type_expr, %{arms: [:name,
+:inline]}}` (`lib/statifier_blocks/core/map.ex:464-465`). The name arm is a
+JSON string, resolved through `StatifierDatamodel.Types.parse/2` exactly as
+decision 1 wrote it. The inline arm is a JSON list of `"name"` / `"type"` /
+`"required?"` objects, read into `{:shape, members}` by
+`StatifierBlocks.Environment.inline_shape/1`
+(`lib/statifier_blocks/environment.ex:522-529`). The two are told apart by the
+stored JSON type alone: a string is never a member list, and no tag key is
+read.
+
+**Decision 5's table is unchanged and gains a reading.** `"donedata"` is still
+typed by this block's `collect_type` and by nothing else, and still `unknown`
+when there is none. What the second arm adds is that the type it carries may
+now be a shape written where the field is rather than a name looked up
+elsewhere - the envelope is a shape either way, and an inline `collect_type` is
+simply a shape one level inside another
+(`lib/statifier_blocks/core/map.ex:406-422`).
+
+**Decision 1's "no findings of its own" holds, with the same care.**
+`Types.parse/2` is total over any spelling and
+`Environment.inline_shape/1` is total over any list, so neither arm produces a
+finding this module could write. What is left - bytes that are neither arm -
+is refused once, by the shared check every `{:type_expr, opts}` field consults
+(`StatifierBlocks.BlockType.type_expr_findings/2`,
+`lib/statifier_blocks/block_type.ex:980`), rather than by a clause this block
+type re-implements. That is a check on the field's **value**, not on what the
+name resolves to: a name the datamodel document does not declare is still not a
+finding, which is the permissiveness decision 1 chose and this Note does not
+narrow.
+
+**Decision 4's dormant check reads the arm the parent wrote.** `agrees?/3`
+takes the `collect_type` spelling as stored, so it now reads a member list into
+an inline shape before asking `statifier_datamodel`'s read check
+(`lib/statifier_blocks/block_type.ex:885-917`). Nothing else about the check
+moves: it is still not a compile finding, still changes no compiled byte, and
+still answers only where both documents are genuinely in hand. The consequence
+decision 4 records - that the covering step answers `:covers` only against a
+`shape`, so a `collect_type` naming a `record` is `:not_assignable` whatever
+the child declares - now has a second reading beside it: an inline
+`collect_type` **is** a shape, so it covers where a name of kind `record` could
+not.
+
+**No stored document changes, and no byte moves.** A `collect_type` holding
+text is the name arm: the same bytes, the same resolution, the same findings.
+`ADR-0001`'s `schema_version` stays at `1`, no `migrate_config/2` is called for
+the field, and the field still produces no compiled output at all - which
+`StatifierBlocks.Core.TypeExprMigrationTest` asserts byte for byte, beside the
+corpus `StatifierBlocks.Compiler.ByteCorpusTest` pins against goldens captured
+before any of this.
+
+The record's head status is untouched and stays `proposed`; the flip is its
+own gated request.
+
+Filed with `sb-268w`, campaign SF035's Lane A.

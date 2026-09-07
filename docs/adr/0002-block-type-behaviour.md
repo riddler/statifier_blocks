@@ -5460,3 +5460,85 @@ The bracketed Note inside step 3 stays where it is: it is the dated record of
 the question, and this Note is the dated record of the answer.
 
 Filed with `sb-k0dy`, campaign SF035's Lane A, from `sb-hxs5`'s open question.
+
+## Note (2026-09-06): the payload amendment's second arm is spelled - `payload` is a `{:type_expr, opts}` field and admits an inline shape
+
+A dated Note rather than an amendment, on this record's convention: by
+addition, zero removed lines, no `Status:` line of its own, and appended at the
+**end of this file** for the reason the Amendment at `:4957` gives about itself
+- `ADR-0013` cites this record by line number, and three of the four lines it
+names sit inside `P3`. Nothing above this line is edited. The payload amendment
+of 2026-09-06 (`:4010`) stands word for word: `P1`'s optional key, `P2`'s
+vocabulary, `P4`'s undeclared case and `P5`'s refusal and its depth rule are
+each unchanged in every particular.
+
+**What `P3` deferred.** `P2` named two arms for a payload - a declared name and
+an inline shape - and `P3` took one: "**No ninth field type is added by it**"
+(`:4121-4122`), the inline arm getting "no field type here, and none is
+invented for it" (`:4133`). The reason given was not that the arm is unwanted
+but that no member of decision 7's set described a shape, and adding one to
+spell a shape nothing stored yet would have been a second proposal riding along
+with the first. The Amendment of 2026-09-06 at `:4957` is that second proposal,
+made on its own: it adds `{:type_expr, opts}` as decision 7's ninth member, its
+clause 7 names `payload` in the table of two fields that migrate onto it
+(`:5201-5206`), and its clause 8 fixes what a stored string means afterwards
+(`:5214-5220`). This Note records the migration for the field, which is the
+half of clause 7 that belongs beside `P3`.
+
+**The spelling.** `payload` is declared `{:type_expr, %{arms: [:name,
+:inline]}}` (`lib/statifier_blocks/core/on_event.ex:307-308`). The name arm is
+a JSON string carrying the name of a `record` or a `shape` the datamodel
+document declares, resolved through `StatifierDatamodel.Declarations.fetch/2`
+exactly as `P2` and `P5` describe. The inline arm is a JSON list of `"name"` /
+`"type"` / `"required?"` objects, read into `{:shape, members}` by
+`StatifierBlocks.Environment.inline_shape/1`. The two are told apart by the
+stored JSON type alone - a string is never a member list - and no tag key is
+read.
+
+**`P5`'s refusal is the same refusal, against the members the other arm
+carries.** The check needs one thing: a set of member names the payload
+carries, and a rule for descending below the first segment. The arms differ in
+where those names come from and in nothing else
+(`lib/statifier_blocks/core/on_event.ex:469-497`). The first segment of a
+source path is checked against the member names; a deeper segment is checked
+only where that member's own type resolves to something whose members are in
+hand - another declaration, or another inline shape - and a member typed as a
+scalar, an opaque spelling, a list or nothing at all stops the walk and refuses
+nothing beyond it (`:526-552`). That is `P5`'s rule kept literally, with one
+descent added for the arm `P3` did not have: a member whose type is itself an
+inline shape walks its own members.
+
+The anchor, the severity and the count are untouched: one `:config` finding of
+severity `:error` on the `"capture"` key, naming the offending pairs in their
+destinations' sorted order, whichever arm the payload is in. An inline payload
+has no name to print, so the message describes it instead of naming it.
+
+**What an inline payload carrying no well-formed member means.** Every read is
+a read past it. That is not a new rule: a `payload` naming a declaration with
+no fields already refuses every pair, and the two cases are the same case.
+
+**`P4` is unchanged, and gains no route.** A handler with no `payload` is
+unchanged in every respect; a `payload` naming a type the datamodel document
+does not declare resolves to nothing and refuses nothing; a compile with no
+`:datamodel` at all resolves no declared name. An inline payload needs no
+datamodel document to be read, which is not an exception to `P4` but a case
+`P4` never reached: it is a declaration that is present rather than one that
+fails to resolve.
+
+**One thing moves in the module, and it is a removal.** `validate_config/1` no
+longer carries a check of its own for the field. Under `P3` the field was a
+`:string` and the callback refused a stored value that was not one; under
+`{:type_expr, opts}` what a value may be is
+`StatifierBlocks.BlockType.type_expr_findings/2`'s single check for every field
+of that type, consulted by the compiler's `:config` stage and by the editor's
+view model both, so keeping a clause here would report the same bytes twice on
+the same key. Whether the name *resolves* is still no finding on either side,
+which is `P4`.
+
+**No stored document changes, and no byte moves.** A `payload` holding text is
+the name arm - the same bytes, the same resolution, the same findings - and the
+key still reaches no compiled SCXML at all, which `P1` states and
+`StatifierBlocks.Core.TypeExprMigrationTest` asserts byte for byte beside the
+corpus `StatifierBlocks.Compiler.ByteCorpusTest` pins.
+
+Filed with `sb-268w`, campaign SF035's Lane A.
