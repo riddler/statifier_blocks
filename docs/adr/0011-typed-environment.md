@@ -1842,3 +1842,290 @@ Every other row of that census still reads where it says it reads.
 
 Filed with `sb-wzoa`, campaign SF036's Lane X. `sb-vjjl` is the next request on
 this record.
+
+## Amendment (2026-09-07): decision 2's record-typed write also yields one entry per member, recursively through shapes
+
+**Status: proposed (2026-09-07, campaign SF036, bead `sb-vjjl`, recording the
+campaign-SF035 walk ruling `RQ-SF035-23`, taken by the operator as "R3").** A
+decision record merges at proposed under the campaign invariant; flipping it to
+accepted is a separate gated request through the same `docs/adr/` gate, and the
+code half of `sb-vjjl` may carry that flip once the environment builds what this
+section decides. Additive: no text above this line is edited by this section,
+and it grows decision 2 rather than taking anything away from a document already
+written.
+
+An amendment rather than a Note, by the test the Amendment at `:1186` applies to
+itself and the section at `:1010` applied to decision 12: decision 2 states what
+a write puts in the environment in as many words - "a `{:path, %{writes: T}}`
+field: the block writes `T` at the path the field's value names" (`:189-192`) -
+and one entry at one path is exactly what that sentence says. This section says
+a record-typed write puts more than one entry, so decision 2's sentence moves,
+and a moved sentence is an amendment.
+
+### Context
+
+`sb-vjjl` was filed against a case an embedder hit: a block whose outcome is a
+map assigned to a root path cannot say what lives under that root. The write
+signature types the root, the environment is keyed by exact path string
+(`t:StatifierBlocks.Environment.t/0`, `lib/statifier_blocks/environment.ex:110`),
+and so a later block reading `<root>.<member>` reads a path nothing put an entry
+at - decision 5's `:info` advisory rather than a verdict. The workaround the
+embedder reached for was a second, declaration-only path field naming the nested
+path directly. It works, it duplicates a path the author already wrote, and it
+covers only the one member the embedder knew to name.
+
+The shape the SF035 walk scheduled for this - a `{:from_field, key}` inhabitant
+of `writes:` - was found self-contradictory before it was built and is
+**withdrawn**: the tuple occupies the `writes:` slot, leaving the declaring
+field no type to supply, and the path it names is the root itself, which a plain
+`{:path, %{writes: T}}` on that field already writes today. `RQ-SF035-23` is
+where that was decided, and it decided against a grammar change: **this section
+adds no inhabitant to `writes:` and changes no write signature spelling.** The
+answer comes from the type system instead.
+
+### 1. Decided: a write of a record or a shape yields its members as entries
+
+A write signature at path `P` whose written type `T` names a `record` or a
+`shape` declaration, or is an inline shape as `sd-ADR-0001`'s amendment of
+2026-09-06 spells it (`{:shape, [member()]}`, admitted into decision 1's
+vocabulary by the Amendment at `:1186`), puts an entry at `P` at type `T` **and**
+an entry at `P.m` for every member `m` of `T`, at the member's own type, spelled
+with the same dotted-path join `sd-ADR-0001` decision 7's projection uses. A
+member whose own type is a record or a shape expands again beneath its own path,
+recursively.
+
+This is deliberately the same expansion the declaration side already performs.
+`sd-ADR-0001`'s amendment of 2026-09-06 admitting a declaration name on a
+scope entry ("a field's `one_of` is a completion hint, a field going required
+-> optional is a break, and a scope entry's `type` may name a declaration"),
+arm (b) point 2, says a
+declaration-typed entry "contributes its own path, and then one path per field
+of the declaration, spelled `<entry path>.<field name>` ... A field that itself
+names a declaration expands again, recursively" - and since the seed reads
+`StatifierDatamodel.Index.entries/1` (the Note of 2026-09-07 at `:1577`), a
+declared record already reaches the environment as member entries. A written
+record did not. That asymmetry is what this section removes, and removing it is
+why the host's duplicated declaration-only field becomes unnecessary rather than
+merely shorter: the author writes the record once and every member is typed,
+including the members the embedder did not think to name.
+
+### 2. Per variant, what a write yields
+
+The claim above is scoped over the whole type vocabulary, so it is stated per
+inhabitant. `P` is the path the write signature names; `T` is what `writes:`
+carries.
+
+| `T` | What the write yields | Why |
+|---|---|---|
+| a **named `record`** declaration | `P` at `T`, plus `P.m` per field of the declaration, at the field's type, in the declaration's field order | Decision 7's declaration table: a record's `fields` are what it is made of, and this is that amendment's arm (b) point 2's expansion on the write side |
+| a **named `shape`** declaration | `P` at `T`, plus `P.m` per field, exactly as for a record | A shape is a constraint on the read side (decision 3 admits only a record on the *held* side), but a block that says it *writes* a shape has said what it leaves there. The expansion is about what the write claims, not about what the check admits, and the two do not interact |
+| an **inline shape** `{:shape, members}` | `P` at `T`, plus `P.m` per member, at the member's `type`, in member order | The members are on the term; nothing has to be resolved. `t:StatifierBlocks.Environment.member/0` (`lib/statifier_blocks/environment.ex:107`) carries `name`, `type`, `required?` and this section reads the first two |
+| `{:list, T}` | `P` at `{:list, T}` and **nothing else** | No expansion through a list, in either direction. the scope-entry amendment's arm (b) point 5 already refuses it on the declaration side - "no record decides an index syntax, and there is no element path to expand" - and the reason is the same here: there is no path to put an entry at. `T` is carried for a fan-out to bind, exactly as decision 14 and `type_of/2`'s own note say |
+| one of the **nine scalars**, an opaque string that names no declaration, or `:unknown` | `P` at that type and nothing else | Nothing to expand. A spelling that names no declaration is `nil`/unknown by that amendment's arm (b) point 1, and an unknown root yields no members rather than guessing any |
+| a **shape or record nested inside a record** (a member whose own type names one) | `P` at `T`, `P.m` at the member's type, **and** `P.m.n` per member of that type, to any depth | Point 1's recursion, and it is that amendment's arm (b) point 2's "expands again, recursively" said on the write side |
+| a **`{:list, T}` member of a record** | `P.m` at `{:list, T}`, and nothing beneath `P.m` | The list row above, reached through a member rather than through the root |
+
+`required?` is read by nobody here. A member's requiredness is decision 3's
+question through `sd-ADR-0001` decision 8's coverage check; an entry either
+exists at a path or does not, and this section puts an entry at every member,
+required or not. An author who writes a record has written the whole record.
+
+### 3. Depth: unbounded through shapes, and a cycle expands once per path
+
+Point 1's recursion is **unbounded** - a record of a record of a record yields
+paths three deep - and it terminates because declarations may reference
+themselves and a chain that re-enters a name is not expanded again beneath the
+same path.
+
+**This is the record's reading rather than a taken ruling**, derived from the
+type system and from the discipline the declaration side already runs under, and
+it is flagged as derived so a reader does not take it for the operator's word.
+The derivation: `sd-ADR-0001` decision 8's coverage check carries a `seen` set
+keyed on a pair of declared names, so that "a declared name re-entered on the
+same chain still discharges as covered" (that record's inline-shape amendment of
+2026-09-06, arm (d)); and the scope-entry amendment's arm (b) point 4 applies that same discipline to
+index expansion in as many words - "a declaration already being expanded on the
+same chain of paths is not expanded again, so `index/1` stays total over every
+document". A write-side expansion that did not do the same would be the one
+place in the family where a cyclic declaration is not total, for no reason
+anybody has argued. So: a declaration already being expanded on the chain of
+paths beneath `P` contributes its own entry and expands no further; the entry at
+the re-entering path is present at the declared name, and a read there is checked
+by identity like any other.
+
+An inline shape adds nothing to this. It is a finite term and cannot reference
+itself (the inline-shape amendment's arm (d), same paragraph as the `seen` set), so
+it puts no name on the chain.
+
+### 4. Precedence: a type the document writes at `P.m` wins over an expanded member
+
+A member entry is the weaker source. Where the document itself says what lives at
+`P.m`, that is what the environment holds.
+
+This is consistent with the seeding rule as accepted - "**A type the document
+writes wins**, by position and with no new rule" (`:1290`) - and it is the same
+argument: an entry derived from a declaration is what is known in the absence of
+a claim, and a block writing a path is a claim. Two cases, and only the first is
+new:
+
+- **Within one block's signatures.** A block with a `{:path, %{writes: T}}`
+  field at `P` and a second write signature at `P.m` puts both at the same
+  position. The explicit signature wins; the member derived from `T` does not
+  overwrite it. Decision 2's "a block with three path fields has three
+  signatures, and they are independent" (`:206-207`) still holds - independence
+  is about the *fields*, and this rule says only which of two entries for one
+  path survives.
+- **Across positions.** Decision 1's last-write-wins by position is untouched. A
+  block after `P`'s writer that writes `P.m` replaces the member entry, and a
+  block that rewrites `P` at a new type replaces `P` and re-derives its members,
+  because the whole write is applied at that position. **A rewrite clears the
+  members the previous write at `P` derived**, and derives the new type's,
+  which for a scalar is none: a stale member entry beneath a path that no
+  longer holds a record would be a claim nobody is making. This is the one
+  place a write reaches a path it does not name, and it reaches only the
+  members its own previous write put there - never a member entry an explicit
+  signature at `P.m` wrote, which section 4's first case already protects.
+
+Two entries derived from the same root at the same position cannot collide: a
+declaration's field names are unique among siblings (decision 7) and an inline
+shape's members are unique by name (`inline_shape/1` at
+`lib/statifier_blocks/environment.ex:521-529` takes `Enum.uniq_by(& &1.name)`).
+
+### 5. A failed member read anchors on the root's declaring field
+
+A read at `P.m` that the environment refuses reports the finding on the
+`config_key` of the field that declared the **write at `P`** - the root - and not
+on any synthesised key.
+
+This is decision 2's own anchoring rule reaching the case it was written before:
+"the finding anchors on the field's `key` (ADR-0005 decision 11), so an author is
+sent to the control they have to change rather than to a card" (`:204-206`). The
+control an author has to change for a wrong member type is the one where they
+chose the record: there is no control for `P.m`, because a member entry is
+derived and not declared. The signature triple the walk already carries is
+`{key, path, type}` (`field_writes/2`,
+`lib/statifier_blocks/environment.ex:852-861`), so a derived signature carries
+the root field's `key` and nothing new has to be threaded to make this true.
+
+The rest of decision 8's tuple reads as it does for any other entry.
+`upstream_ref` names the block whose write signature put the type there, which
+for a member entry is the block that wrote the root; `{:fixable_by, block_id}`
+applies, because that block *is* the declaration an author would change, which is
+the difference between a member entry and a seeded one (a seeded entry's writer
+is `:declaration` and earns no `:fixable_by`, per the Amendment at `:1186`).
+
+### 6. Expansion does not reach the Datamodel tab
+
+**Decided: no.** Member expansion is an environment rule and the Datamodel tab
+does not read the environment.
+
+Decided here from what the tab reads today rather than left open, because the
+question is answerable by looking. `StatifierBlocks.Datamodel.declared_view/3`
+(`lib/statifier_blocks/datamodel.ex:717-731`) builds its rows from three
+surfaces - the datamodel document's declared paths, the editor's `declare` roots,
+and the document's own `datamodel` entries - and types each row from
+`StatifierDatamodel.Index`. `Environment` is not among them, and neither is any
+write signature. The tab draws the **declared** set; this section adds entries to
+the **written** set, and decision 7's sentence that `types` contributes no paths
+is exactly why the two sets are kept apart.
+
+Two consequences worth stating, because they are what a reader will check:
+
+- A path that appears in the environment through this section and is **not**
+  declared does not become a row in the Datamodel tab, and does not become
+  declared. ADR-0005 clause 11e's advisory - a read at a path outside the
+  declared set - is a document-wide question about the declared set, and it is
+  unchanged in every particular.
+- Where the host **has** declared the root as a record, its members are already
+  in the tab and already in the seed, through `Index.entries/1` and
+  the scope-entry amendment's arm (b) point 2. This section does not double them: the seed
+  puts them there before the walk, this section puts them there when a block
+  writes, and section 4 says which survives.
+
+What a surface *draws* for a typed path stays `ADR-0005`'s question, per decision
+9, exactly as the Amendment at `:1186` says for the inline-shape arm.
+
+### Worked shape: a signup document
+
+The signup domain's document declares no `signup.contact` members, and a
+`myapp:signup` trigger writes a contact record at the root:
+
+    contact_capture   {:path, %{writes: "signup.contact"}} on field :assign_to,
+                      the field's value being "signup.contact"
+
+with `signup.contact` a `record` declaring `email` (`string`, required),
+`phone` (`string`) and `address` (the record `postal_address`, itself declaring
+`line1` and `postcode`, both `string`).
+
+Before this section, the environment after that block holds one entry:
+
+    "signup.contact" => "signup.contact"
+
+and a later step reading `signup.contact.email` reads a path with no entry -
+decision 5's `:info`. After this section it holds six:
+
+    "signup.contact"                 => "signup.contact"
+    "signup.contact.email"           => :string
+    "signup.contact.phone"           => :string
+    "signup.contact.address"         => "postal_address"
+    "signup.contact.address.line1"   => :string
+    "signup.contact.address.postcode" => :string
+
+A later step declaring `{:path, %{expects: :string}}` at `signup.contact.email`
+is now **checked** and satisfied. A step expecting `:integer` there is decision
+5's `:error`, `:not_assignable`, anchored on the trigger's `:assign_to` field per
+section 5. A step reading `signup.contact.address.line1` is checked two levels
+down, which is section 3's recursion, and one reading a member of a list-typed
+member is not checked at all, which is section 2's list row.
+
+### Consequences
+
+- **The duplicated declaration-only path field is unnecessary.** The embedder's
+  workaround declared one nested path to buy one typed read; the author now
+  writes the record once and every member is typed. The bead's acceptance
+  criterion - a type declared under a root, and a later read of that nested path
+  checked rather than advisory - is met by the type system rather than by a
+  write-signature grammar.
+- **A document that validated may stop validating.** A read at `P.m` that was
+  decision 5's `:info` becomes decision 5's `:error` when the record's member
+  type does not satisfy it. This is the same honest reading the Amendment at
+  `:1186` gives for seeding, for the same reason - somebody made two claims that
+  cannot both be true - and it is why the code half is a minor-version change
+  and not a patch.
+- **No public spelling changes.** `writes:` gains no inhabitant, no field
+  declaration is edited, `t:StatifierBlocks.Environment.type_expr/0` is
+  unchanged, and decision 8's reason vocabulary gains no arm: a refused member
+  read is `:not_assignable` or `:shape_not_satisfied` exactly as a refused root
+  read is.
+- **The two halves of this package agree about one more thing.** `sb-y4i7` found
+  the projection reaching `StatifierBlocks.Datamodel` and not the `Environment`,
+  and the Amendment at `:1186` closed that gap for declared paths. This section
+  closes it for written ones: a record expands into member paths on both sides
+  of the package now, by the same rule and in the same spelling.
+
+### What this section does not do
+
+- **It does not change a write signature.** `{:from_field, key}` is withdrawn
+  (the first paragraphs of the Context above), `writes:` takes the same type
+  expressions it took yesterday, and no field declaration key is added anywhere.
+- **It does not touch the read check.** Whether a held type satisfies an expected
+  one is `sd-ADR-0001` decision 8's question and decision 3's "this package
+  defines no second one" stands. Expansion decides what the environment *holds*;
+  it says nothing about how a held type is compared.
+- **It does not touch decision 4's merge.** A member entry is an entry like any
+  other: arms that agree on it keep it, arms that disagree drop it to
+  `:unknown`, and an arm that does not hold it leaves it absent.
+- **It does not expand reads.** A `{:path, %{expects: T}}` field with a
+  record-typed `T` reads one path and checks one type, as it does today. A read
+  is a question about a path, not a claim about what is beneath it.
+- **It changes no code and flips no status.** The environment builds none of this
+  until the code half of `sb-vjjl` lands - `field_writes/2` and the environment
+  build in `lib/statifier_blocks/environment.ex`, with a test per row of section
+  2's table - and until then every consumer behaves exactly as it does today,
+  which is the same sequencing the Amendment at `:1186` states for `sb-1jcr`.
+
+Filed with `sb-vjjl`, campaign SF036's Lane X, from the campaign-SF035 walk
+ruling `RQ-SF035-23`, against this record as `sb-m9eq` and `sb-wzoa` left it and
+against `sd-ADR-0001`'s two amendments of 2026-09-06 as merged in
+`statifier_datamodel`. The code half of `sb-vjjl` builds it and may carry its
+flip.
