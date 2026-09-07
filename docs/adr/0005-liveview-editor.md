@@ -7745,3 +7745,106 @@ campaign SF036, under ruling `RQ-SF036-0d`.
   SF036's invariant, like every other section filed with it.
 
 Filed with `sb-mliu`, campaign SF036.
+
+## Note (2026-09-07): the formatting-only exemption this record's edits run under, stated here, and where `:7200`'s attribution of it is quoted from
+
+A dated Note rather than an amendment, in the shape of the 2026-09-06 Note at
+`:7166`: two pieces of apparatus that three sections above use, neither of them
+a decision this record takes. No clause of this record moves, no line above this
+one is edited, and every section named below reads exactly as it did. Every line
+number in it is a census taken on `7775bd6`.
+
+### 1. The exemption, stated inside this record
+
+Three sections of this record invoke **the formatting-only exemption** by name:
+
+| Cite | What it says of the exemption |
+|---|---|
+| `:6963-:6964` | "a change of case is a change to a word, which puts it outside the formatting-only exemption this record's edits run under" |
+| `:7202-:7203` | "adds words, which puts it outside the formatting-only exemption this record's edits run under" |
+| `:7229-:7231` | "the formatting-only exemption a merged record's in-place edit runs under admits whitespace, wrapping, list indentation and separator style only - no word added, removed, or reordered" |
+
+The first two invoke the term and give one instance of what it excludes; only
+the third states any of what it admits, and it does so in passing, inside an
+argument about a transposed cite list, 266 lines after a reader first meets the
+term. A reader arriving at `:6963` cannot resolve it from this record. It is
+stated here in full, in this record's own words, so that they can:
+
+**The formatting-only exemption.** An in-place edit to a merged section of this
+record is permitted when the diff changes **whitespace, wrapping, list
+indentation, or separator style only** - no word added, no word removed, no word
+reordered. A bare separator line may be added or deleted, and the check is a
+word-diff run over the **non-separator** lines: reflowing a paragraph to a
+different column, re-indenting a list, or adding or removing a rule between two
+sections all pass it, because the words on the non-separator lines are the same
+words in the same order. **Any changed word makes the edit an amendment**, and
+an amendment to this record is additive - a new dated section, zero lines
+removed. That is the whole of the rule, and there is no fourth category between
+the two: an edit either changes no word and may be applied in place, or it
+changes a word and is recorded in a new section beneath.
+
+This is not a decision of this record and it decides nothing about the editor.
+It is the campaign convention this record has been edited under since
+2026-09-05, stated here because the record invokes it three times and defines it
+nowhere. It is stated, not narrowed and not widened: each of the three sections
+above reads true against it as written, and each is an instance of the same
+clause. `:6963`'s change of case changes a word; `:7202`'s added cite adds
+words; `:7229`'s swap reorders two. All three are outside the exemption for the
+one reason the rule gives, and all three were correctly recorded rather than
+applied.
+
+### 2. What `:7200-:7203` attributes to the Status-casing Note, quoted on both sides
+
+`:7200-:7203` reads:
+
+> Recording the addition here rather than at `:6957` is the reason that Note
+> gives for not correcting `:6293` in place: adding a cite to a merged sentence
+> adds words, which puts it outside the formatting-only exemption this record's
+> edits run under, and amendments here are additive.
+
+The reason the Status-casing Note actually gives, at `:6962-:6966`, is:
+
+> It is corrected here rather than in place because a change of case is a change
+> to a word, which puts it outside the formatting-only exemption this record's
+> edits run under; correcting `:6293` and `:6601` directly would remove two
+> lines from a merged amendment, and amendments here are additive.
+
+The two are not the same sentence. That Note's ground is **a change of case**;
+`:7200`'s is **an added cite**, which is a different act. What is shared is the
+clause of the exemption both fall under - part 1's "no word added, no word
+removed, no word reordered" - and the additive consequence, whose wording
+`:7203` does carry over verbatim ("and amendments here are additive"). The
+Status-casing Note also gives a second, independent ground that `:7200` does not
+carry across at all: that correcting `:6293` and `:6601` directly **would remove
+two lines from a merged amendment**.
+
+So the generalisation is sound and the attribution is loose. **Read `:7200-:7201`
+as naming the exemption clause that Note's reason falls under, not as quoting
+that Note's reason:** the Status-casing Note gives change-of-case as its ground,
+`:7200`'s ground is that adding a cite adds words, and both are the same clause
+of the rule stated in part 1. Nothing either section concludes changes by the
+distinction - `:6293` and `:6601` are still read as `Lane H`, and `:6145` is
+still a third member of the not-at-issue list.
+
+### The implementing bead
+
+**None: this section is record-only.** It adds no code, asks for none, and
+changes no behaviour a mount has today. It is filed with `sb-4m4x`, campaign
+SF036, under ruling `RQ-SF036-0d`.
+
+### What this Note does not do
+
+- **It edits nothing above it.** `:6963`, `:7202` and `:7229` stand as written,
+  and the three sections that carry them read exactly as their reviews read
+  them. Part 2 records how one sentence is to be read; it does not rewrite it.
+- **It does not change the exemption.** Part 1 states a convention that was
+  already in force over every section of this record; no edit that was
+  permitted before it is refused after, and none that was refused is now
+  permitted.
+- **It takes no decision and adds no clause.** Nothing here is a decision of
+  this record, nothing is numbered, and no clause of any decision gains, loses
+  or re-spells a member.
+- **It does not flip a status.** This section merges at proposed under campaign
+  SF036's invariant, like every other section filed with it.
+
+Filed with `sb-4m4x`, campaign SF036.
