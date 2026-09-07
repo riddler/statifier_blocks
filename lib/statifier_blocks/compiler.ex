@@ -567,10 +567,12 @@ defmodule StatifierBlocks.Compiler do
   defp expand_node(palette, %Block{} = block, module) do
     case expand(block, module) do
       {:ok, members, param_map} ->
-        own =
-          members
-          |> Composite.flatten()
-          |> Map.new(fn %Block{id: id} -> {id, {block.id, Map.get(param_map, id)}} end)
+        # `ADR-0004`'s T3: the index maps expansion MEMBERS only. The param
+        # map is keyed by exactly those - `Composite.expand/2` takes it over
+        # the minted members, before the author's pass-through children are
+        # spliced in - so a child the author placed has no entry here, and
+        # `anchor/2` finds nothing for it and leaves its finding on it.
+        own = Map.new(param_map, fn {id, key} -> {id, {block.id, key}} end)
 
         members
         |> Enum.reduce({[], [], own}, &resolve_member(palette, &1, &2))

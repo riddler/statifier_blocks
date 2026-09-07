@@ -78,7 +78,7 @@ defmodule StatifierBlocks.Composite do
   |---|---|---|
   | `config_schema/1` | `params`, in declaration order | no |
   | `validate_config/1` | the refusals `params` declare, over the composite's config | **yes** |
-  | `slots/1` | `[]` (`RQ-SF037-3`) | no |
+  | `slots/1` | the declared pass-through slots, in declaration order (`RQ-SF038-5`) | no |
   | `io/1` | see below | no |
   | `current_version/0` | the version the declaration states | no |
   | `outcomes/1` | the expansion root's, over its expanded config | no |
@@ -143,8 +143,9 @@ defmodule StatifierBlocks.Composite do
   `t:StatifierBlocks.Assignability.io/0`:
 
     * `kinds` - the members' `kinds` concatenated in expansion order, de-duplicated
-    * `slot_accepts` - `%{}`; the composite declares no slots, so there is no
-      slot name to accept into
+    * `slot_accepts` - one entry per **declared pass-through slot**, at the
+      mapped inner slot's own accepted kinds; `%{}` for a composite that
+      declares none, which is every composite written before `RQ-SF038-5`
     * `consumes` - the expansion root's, or absent when the root declares none
     * `produces` - the expansion root's, or absent when the root declares none
 
@@ -202,13 +203,30 @@ defmodule StatifierBlocks.Composite do
   """
   @type param_map :: %{optional(Block.id()) => String.t() | nil}
 
+  @typedoc """
+  One declared **pass-through slot**: a slot the composite exposes, and the
+  `{local_id, inner_slot}` of the expansion member its children are spliced
+  into (`ADR-0002`'s pass-through amendment, P1).
+
+  `:label` and `:arity` are forced rather than added: a
+  `t:StatifierBlocks.BlockType.slot_decl/0` is the 3-tuple
+  `{name, arity, label}` and two of the three have nowhere else to come from.
+  """
+  @type pass_through_decl :: %{
+          name: Block.slot_name(),
+          to: {String.t(), Block.slot_name()},
+          label: String.t(),
+          arity: BlockType.slot_arity()
+        }
+
   @typedoc "The normalized declaration, as `__composite__/0` answers it."
   @type declaration :: %{
           name: Block.type_name(),
           params: [BlockType.field_decl()],
           version: pos_integer(),
           sentence: String.t() | nil,
-          palette_entry: BlockType.palette_entry()
+          palette_entry: BlockType.palette_entry(),
+          slots: [pass_through_decl()]
         }
 
   @separator "_"
@@ -239,6 +257,10 @@ defmodule StatifierBlocks.Composite do
       Defaults to `%{label: name}`; a map without a `:label` gets `name`.
     * `:version` - the stored `type_version` this declaration is current at.
       Defaults to `1`.
+    * `:slots` - the **pass-through slots** this composite exposes, a list of
+      `t:pass_through_decl/0` maps carrying `:name` and `:to`, with optional
+      `:label` (defaulting to `:name`) and `:arity` (defaulting to `:any`).
+      Defaults to `[]`, which is every composite written before `RQ-SF038-5`.
 
   The using module must define `subtree/1`.
   """
@@ -258,7 +280,7 @@ defmodule StatifierBlocks.Composite do
       def config_schema(_config), do: @composite_declaration.params
 
       @impl StatifierBlocks.BlockType
-      def slots(_config), do: []
+      def slots(_config), do: StatifierBlocks.Composite.derived_slots(@composite_declaration)
 
       @impl StatifierBlocks.BlockType
       def current_version, do: @composite_declaration.version
@@ -362,7 +384,16 @@ defmodule StatifierBlocks.Composite do
 
     entry = opts |> Keyword.get(:palette_entry, %{}) |> Map.put_new(:label, name)
 
-    %{name: name, params: params, version: version, sentence: sentence, palette_entry: entry}
+    slots = opts |> Keyword.get(:slots, []) |> normalize_slots!()
+
+    %{
+      name: name,
+      params: params,
+      version: version,
+      sentence: sentence,
+      palette_entry: entry,
+      slots: slots
+    }
   end
 
   @doc """
@@ -425,10 +456,101 @@ defmodule StatifierBlocks.Composite do
     end
 
     check_local_ids!(subtree, ref)
+    check_mapping!(subtree, declared_slots(ref), ref)
 
     members = Enum.map(subtree, &mint(&1, block.id, ref))
 
-    {members, param_map(members, params)}
+    # `ADR-0004`'s T3: the expansion index maps expansion MEMBERS only, so
+    # the param map - which is what the compiler builds that index from - is
+    # taken over the minted members BEFORE the author's children are spliced
+    # in. A pass-through child has no entry in it and is therefore never
+    # re-anchored onto the composite.
+    param_map = param_map(members, params)
+
+    {splice(members, block, declared_slots(ref)), param_map}
+  end
+
+  @doc """
+  The pass-through slots `block`'s type declares, each resolved to the
+  **minted** id of the member its children are spliced into.
+
+  `%{}` for a composite that declares none, which is every composite written
+  before `ADR-0002`'s pass-through amendment. `ref` is the block's own
+  palette entry, already resolved, exactly as `expand/2` takes it.
+
+  It exists because the environment walk has to find the mapped inner
+  position (`ADR-0011`'s amendment of 2026-09-07, section 2) and minting is
+  this module's rule: a caller deriving the id itself would be a second
+  implementation of `mint_id/3`.
+  """
+  @spec pass_through(Block.t(), Palette.type_ref()) ::
+          %{optional(Block.slot_name()) => {Block.id(), Block.slot_name()}}
+  def pass_through(%Block{} = block, ref) do
+    ref
+    |> declared_slots()
+    |> Map.new(fn %{name: name, to: {local_id, inner_slot}} ->
+      {name, {mint_id(block.id, local_id, ref), inner_slot}}
+    end)
+  end
+
+  @doc false
+  @spec derived_slots(declaration()) :: [BlockType.slot_decl()]
+  def derived_slots(%{slots: slots}),
+    do: Enum.map(slots, fn %{name: name, arity: arity, label: label} -> {name, arity, label} end)
+
+  def derived_slots(_no_slots_key), do: []
+
+  @doc """
+  `subtree`'s three pass-through refusals, as a list of messages, or `[]`.
+
+  `expand/2` raises them for a module composite, whose subtree exists only
+  once it has params; `StatifierBlocks.Composite.Data.declaration/1` answers
+  them as declaration errors, its subtree being a static template. One
+  implementation, so the two kinds cannot disagree about what a broken
+  mapping is (`ADR-0002`'s pass-through amendment, P5).
+  """
+  @spec mapping_errors([Block.t()], [pass_through_decl()]) :: [String.t()]
+  def mapping_errors(subtree, slots) when is_list(subtree) and is_list(slots) do
+    by_id = Map.new(flatten(subtree), &{&1.id, &1})
+
+    Enum.flat_map(slots, &mapping_error(by_id, &1))
+  end
+
+  @spec mapping_error(%{optional(String.t()) => Block.t()}, pass_through_decl()) :: [String.t()]
+  defp mapping_error(by_id, %{name: name, to: {local_id, inner_slot}}) do
+    case Map.fetch(by_id, local_id) do
+      :error ->
+        [
+          "slot #{inspect(name)} maps to #{inspect(local_id)}, which is no local id of the subtree"
+        ]
+
+      {:ok, member} ->
+        inner_slot_error(name, local_id, inner_slot, Map.fetch(member.slots, inner_slot))
+    end
+  end
+
+  @spec inner_slot_error(
+          Block.slot_name(),
+          String.t(),
+          Block.slot_name(),
+          {:ok, [Block.t()]} | :error
+        ) :: [String.t()]
+  defp inner_slot_error(name, local_id, inner_slot, :error) do
+    [
+      "slot #{inspect(name)} maps to slot #{inspect(inner_slot)} of #{inspect(local_id)}, " <>
+        "which the subtree does not write. A member that means to receive children writes " <>
+        "the empty slot explicitly."
+    ]
+  end
+
+  defp inner_slot_error(_name, _local_id, _inner_slot, {:ok, []}), do: []
+
+  defp inner_slot_error(name, local_id, inner_slot, {:ok, _filled}) do
+    [
+      "slot #{inspect(name)} maps to slot #{inspect(inner_slot)} of #{inspect(local_id)}, " <>
+        "which the subtree also fills. The mapped inner slot holds the author's children " <>
+        "and only them."
+    ]
   end
 
   @doc """
@@ -518,9 +640,32 @@ defmodule StatifierBlocks.Composite do
     [root | _rest] = members
     root_io = Assignability.io(member_module(root, palette), root.config)
 
-    %{kinds: kinds, slot_accepts: %{}}
+    %{kinds: kinds, slot_accepts: slot_accepts(members, declared_slots(ref), block.id, palette)}
     |> copy_key(root_io, :consumes)
     |> copy_key(root_io, :produces)
+  end
+
+  # P3: each declared slot answers the MAPPED INNER slot's own accepted kinds,
+  # read from the member the local id names and resolved through the palette
+  # in hand - `Palette.core/0` behind the callback, the caller's own behind
+  # `io/2`, which is the whole of the difference.
+  @spec slot_accepts([Block.t()], [pass_through_decl()], Block.id(), Palette.t()) ::
+          %{optional(Block.slot_name()) => [Assignability.kind()] | :any}
+  defp slot_accepts(_members, [], _composite_id, _palette), do: %{}
+
+  defp slot_accepts(members, slots, composite_id, palette) do
+    by_id = Map.new(flatten(members), &{&1.id, &1})
+
+    Map.new(slots, fn %{name: name, to: {local_id, inner_slot}} ->
+      case Map.fetch(by_id, composite_id <> @separator <> local_id) do
+        {:ok, member} ->
+          {name,
+           Assignability.slot_accepts(member_module(member, palette), member.config, inner_slot)}
+
+        :error ->
+          {name, :any}
+      end
+    end)
   end
 
   @spec outcomes_over(Palette.t(), Block.t(), Palette.type_ref()) :: [BlockType.outcome_decl()]
@@ -601,6 +746,59 @@ defmodule StatifierBlocks.Composite do
 
   defp param?(_other), do: false
 
+  # P1's shape, plus the two refusals that need no subtree: a duplicate
+  # `:name` and two declared slots mapping to one inner slot. The three that
+  # read the subtree are `expand/2`'s, because a module composite has no
+  # subtree until it has params.
+  @spec normalize_slots!(term()) :: [pass_through_decl()]
+  defp normalize_slots!(slots) when is_list(slots) do
+    decls = Enum.map(slots, &normalize_slot!/1)
+
+    refute_duplicates!(Enum.map(decls, & &1.name), ":slots declares the slot name")
+    refute_duplicates!(Enum.map(decls, & &1.to), ":slots maps two slots to the inner slot")
+
+    decls
+  end
+
+  defp normalize_slots!(other) do
+    raise ArgumentError,
+          "use StatifierBlocks.Composite: :slots must be a list of maps carrying " <>
+            ":name and :to, got: #{inspect(other)}"
+  end
+
+  @spec normalize_slot!(term()) :: pass_through_decl()
+  defp normalize_slot!(%{name: name, to: {local_id, inner_slot}} = decl)
+       when is_binary(name) and name != "" and is_binary(local_id) and local_id != "" and
+              is_binary(inner_slot) and inner_slot != "" do
+    %{
+      name: name,
+      to: {local_id, inner_slot},
+      label: Map.get(decl, :label, name),
+      arity: Map.get(decl, :arity, :any)
+    }
+  end
+
+  defp normalize_slot!(other) do
+    raise ArgumentError,
+          "use StatifierBlocks.Composite: each :slots entry is a map with :name (a slot " <>
+            "name) and :to ({local_id, inner_slot}), got: #{inspect(other)}"
+  end
+
+  @spec refute_duplicates!([term()], String.t()) :: :ok
+  defp refute_duplicates!(values, what) do
+    case values -- Enum.uniq(values) do
+      [] ->
+        :ok
+
+      duplicates ->
+        raise ArgumentError,
+              "use StatifierBlocks.Composite: #{what} " <>
+                "#{inspect(Enum.uniq(duplicates))} more than once. A pass-through slot " <>
+                "and the inner slot it maps to are one-to-one: two authors writing one " <>
+                "list has no rule for the order."
+    end
+  end
+
   # -- expansion --------------------------------------------------------
 
   # The params `subtree/1` is handed: the declaration's defaults, with the
@@ -652,6 +850,60 @@ defmodule StatifierBlocks.Composite do
     end
 
     :ok
+  end
+
+  @spec declared_slots(Palette.type_ref()) :: [pass_through_decl()]
+  defp declared_slots(ref) do
+    ref
+    |> Palette.call(:__composite__, [], nil)
+    |> Map.get(:slots, [])
+  end
+
+  @spec check_mapping!([Block.t()], [pass_through_decl()], Palette.type_ref()) :: :ok
+  defp check_mapping!(_subtree, [], _ref), do: :ok
+
+  defp check_mapping!(subtree, slots, ref) do
+    case mapping_errors(subtree, slots) do
+      [] ->
+        :ok
+
+      errors ->
+        raise ArgumentError,
+              "#{inspect(ref)}'s pass-through declaration does not fit its own subtree: " <>
+                Enum.join(errors, "; ") <> "."
+    end
+  end
+
+  # P4: the composite block's own children under the declared slot are placed
+  # in the mapped inner slot of the member minted from the local id, in their
+  # stored order, NOT minted - they arrived carrying a document id already.
+  @spec splice([Block.t()], Block.t(), [pass_through_decl()]) :: [Block.t()]
+  defp splice(members, _block, []), do: members
+
+  defp splice(members, %Block{} = block, slots) do
+    Enum.reduce(slots, members, fn %{name: name, to: {local_id, inner_slot}}, acc ->
+      case Map.get(block.slots, name, []) do
+        [] -> acc
+        children -> put_children(acc, block.id <> @separator <> local_id, inner_slot, children)
+      end
+    end)
+  end
+
+  @spec put_children([Block.t()], Block.id(), Block.slot_name(), [Block.t()]) :: [Block.t()]
+  defp put_children(members, minted_id, inner_slot, children) do
+    Enum.map(members, fn
+      %Block{id: ^minted_id} = member ->
+        %{member | slots: Map.put(member.slots, inner_slot, children)}
+
+      %Block{} = member ->
+        %{
+          member
+          | slots:
+              Map.new(member.slots, fn {name, kids} ->
+                {name, put_children(kids, minted_id, inner_slot, children)}
+              end)
+        }
+    end)
   end
 
   @spec mint(Block.t(), Block.id(), Palette.type_ref()) :: Block.t()
