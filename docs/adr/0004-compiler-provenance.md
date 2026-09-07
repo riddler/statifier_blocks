@@ -3213,3 +3213,267 @@ walk. This Note names it and decides nothing.
 Filed with `sb-v3ny`, campaign SF037. This Note changes no code and adds no
 README row; it flips the `Status:` line at `:2850` and nothing else in this
 file.
+
+## Amendment (2026-09-07): a pass-through slot's children are spliced into the expansion with their ids unchanged, and a finding on one of them is that child's own
+
+**Status: proposed (2026-09-07, campaign SF038, bead `sb-1700`, recording
+campaign-SF038's ruling `RQ-SF038-5`).** A decision record merges at proposed
+under the campaign invariant; flipping it to accepted is a separate gated
+request through the same `docs/adr/` gate, and `sb-vjvq` carries it once
+`sb-q183` has landed. Additive: decisions 3, 5, 6, 8, 9 and 10 stand as
+accepted, the Amendment of this date at `:2848` stands as accepted, and no text
+above this line is edited by this section.
+
+An amendment rather than a Note, because the Amendment at `:2848` says twice
+that a composite has no slot of its own - `:3085-3086`, "Nothing here gives a
+composite a slot of its own" - and `RQ-SF038-5` gives it one. A **pass-through
+slot** is a slot the author fills on the composite's own card, whose children
+the expansion carries into a named slot of a named member. `ADR-0002`'s
+amendment filed with `sb-nlo5` owns the declaration - the `slots:` option, the
+`"slots"` key on a data declaration, the `name -> {local_id, inner_slot}`
+mapping, what `slots/1` answers, and what `declaration/1` refuses - and this
+record does not restate any of it. `ADR-0011`'s amendment filed with `sb-p01u`
+owns where the environment walk descends. **Where** the children land in the
+compile, **what ids** they carry there, **who owns** a finding raised on one of
+them, and **what the compiled bytes must equal** are this record's to say, and
+this section says them. `sb-q183` builds it.
+
+### T1. The children are spliced into the mapped inner slot at Resolve, and the composite is still gone by the end of the stage
+
+E1 (`:2867`) stands unchanged: at Resolve a resolved node whose module is a
+composite is replaced, in place, by the subtree `Composite.expand/2` returns,
+and the replacement is complete before the stage ends. A pass-through slot
+changes what that subtree contains, not when the replacement happens.
+
+For a composite block whose type declares a pass-through slot `name` mapped to
+`{local_id, inner_slot}`, the subtree the splice puts in the composite's place
+is `Composite.expand/2`'s subtree in which **the composite block's own children
+under `name` sit in the `inner_slot` slot of the member minted from
+`local_id`**. They are spliced there in their stored order, after nothing and
+before nothing - the mapped inner slot holds them and only them, because a
+declaration that mapped a slot the subtree also fills would be two authors
+writing one list, and whether such a declaration is admissible at all is
+`ADR-0002`'s question rather than this one's.
+
+Everything E1 buys is bought again here. Config, Structure, Emit and Chart read
+a tree with no composite in it and need no knowledge that one was ever there;
+they also need no knowledge that part of that tree came from the author's own
+hand rather than from the declaration. `emit/2`'s contract is untouched, the
+composite's own `emit/2` is still unreachable and still raises, and Config and
+Structure see a child exactly as they would have seen it had the author placed
+it where the splice puts it - which, for a pass-through child, is the literal
+truth rather than the useful fiction E1 had to argue for.
+
+Three cases the splice does not change:
+
+- **An unfilled pass-through slot splices nothing.** The mapped inner slot is
+  empty, which is the arity Structure then checks against the member's own
+  `slots/1`. A member that requires children and is handed none produces the
+  member's ordinary arity finding, re-anchored by E3 onto the composite, and
+  that is the right surface: the empty slot the author must fill is on the
+  composite's card.
+- **A pass-through child that is itself a composite expands here too.** The
+  splice happens before `resolve/2` re-enters per member, so a composite the
+  author dropped into a pass-through slot is expanded by the same recursion
+  that expands a nested member, and T3 says where its findings land.
+- **The root refusal is unchanged.** A composite at the document root whose
+  subtree answers other than one top-level block is refused with
+  `{:composite_expansion_failed, id, {:root_expansion_not_single, count}}`
+  (Correction 2, `:3160-3161`) whether it declares a pass-through slot or
+  not: the count is a count of the subtree's top-level blocks, and pass-through
+  children land inside one of them.
+
+### T2. A pass-through child keeps its stored id, and its state id is the one it would have had anyway
+
+E2 (`:2904`) says a member's id is minted deterministically from the composite
+block's id. A pass-through child is **not minted**. It keeps the id the stored
+document gave it, unchanged, through the splice and through every stage after
+it.
+
+This is not an exception to E2 so much as the case E2 never reached. Minting
+exists because a subtree writes stable local ids that are not document ids and
+must be made into some; a pass-through child arrived as a document block with a
+document id already. Rewriting it would be an invention, and an expensive one:
+`ADR-0001` decision 3's ids are what a host's saved selections, a trace and a
+provenance highlight are keyed by, and the whole point of T4 is that moving a
+child into the expansion moves nothing.
+
+Decision 3 (`:122-126`) then derives the child's state id the way it derives
+every other one - `state_id(block_id) = "s_" <> block_id`, with
+`Context.role_id/2` for anything the child mints below itself - and its three
+properties hold for the ordinary reason rather than a new one. **Uniqueness**:
+the child's id is document-unique under `ADR-0001` decision 3, and it is
+document-unique in the expanded tree too, because the splice moves it and does
+not copy it. **Invertibility**: `unstate_id/1` inverts its state id, and the
+child's id carries no `__` because no id in a stored document does.
+**Totality**: the child is a block, so every state it generates carries an id.
+
+One consequence is worth naming because it is the thing a reader will look for:
+**a pass-through child's ids do not mention the composite**, where a minted
+member's do. Two blocks that sit side by side in the expanded tree therefore
+carry ids of two different shapes. That is correct and deliberate. The shape of
+an id records where the id came from, and these came from two different places:
+one from the declaration, one from the author.
+
+### T3. A finding on a pass-through child is reported against that child
+
+E3 (`:2926`) re-anchors a finding raised inside an expansion onto the composite
+block, and Correction 1 (`:3129`) climbs to the outermost composite. Neither
+applies to a pass-through child. **A finding whose owner is a pass-through
+child, or any block below one, is reported against that block, with that
+block's own `config_key`, exactly as it would be if no composite were in the
+document.**
+
+E3's argument is what decides this, applied rather than set aside. E3
+re-anchors because a finding naming an expanded member "names a block the
+author cannot see, cannot select and cannot edit" (`:2934-2937`, `:2977-2978`).
+A pass-through child fails every clause of that test: the author placed it, it
+is drawn on the composite's card in the interior `ADR-0005`'s `7E` (`:8601`)
+and its campaign-SF038 amendment give the declared slot, they can select it,
+and they can edit its fields. Re-anchoring it onto the composite would take a
+finding the author can act on directly and point it at a form that has no field
+for it - the exact harm E3's third bullet ("It is never reported against
+the expanded block", `:2975`) exists to prevent, in the other direction.
+
+The mechanism is a single rule about the expansion index, and it is this
+record's to state because the index is what E3's re-anchoring reads:
+
+> The expansion index maps **expansion members only**. A pass-through child,
+> and every block below it that the author placed, has no entry in it.
+
+`anchor/2` (`:3134-3135`) therefore finds nothing for such a block and returns
+it unchanged, and the two arms of E3 stay the two arms they are - no third arm
+is added here either. Three readings follow:
+
+- **A pass-through child that is itself a composite anchors its own members
+  onto itself.** The climb from one of that composite's minted members reaches
+  the child and stops, because the child has no entry. That is Correction 1's
+  own principle: the climb ends at the outermost block the author holds, and
+  here the author holds the child.
+- **A finding on a member that the child's presence caused is still the
+  member's, and so still the composite's.** If the declaration's own member
+  raises a finding because of what it was handed, E3 re-anchors it onto the
+  composite with the param map's key or `nil`. The pass-through slot is not a
+  param and the param map does not name it; a structural finding of this kind
+  lands on the composite's chrome with `config_key: nil`, which is E3's second
+  arm unchanged.
+- **The provenance map is untouched, as before.** Decision 5's `owner` names
+  the block whose emission the span came from; for bytes a pass-through child
+  emitted, that is the child, and the child's own id is what the Source tab
+  highlights. Here the author's surface and the engineer's surface name the
+  same block, where inside a minted expansion they name two.
+
+No typespec moves. A finding reported against a pass-through child is an
+ordinary `StatifierBlocks.Compiler.Finding` with the `block_id` and
+`config_key` decision 10 already gives it.
+
+### T4. The compiled bytes are the same before and after Expand, and here the findings are too
+
+E4 (`:2994`) states the obligation that a document holding a composite compiles
+byte-identically to the same document after that composite has been expanded in
+place. That obligation extends to this case without weakening, and it is stated
+here rather than left to be inferred:
+
+> The SCXML a document holding a composite block with a filled pass-through
+> slot compiles to is **byte-identical** to the SCXML the same document
+> compiles to after that composite has been expanded in place, with the slot's
+> children moved into the mapped inner slot and their ids unchanged.
+
+The provenance maps are equal too, for E4's own reason: the same blocks emit
+the same spans and own them by the same ids on both sides, and T2 is what makes
+that true of the children - an id that was rewritten by the move would move
+every state id below it and the equality would be a coincidence rather than a
+consequence.
+
+This case adds one equality E4 could not claim. **The findings reported on a
+pass-through child are equal on both sides as well.** Before the Expand the
+child sits in the expansion and is not re-anchored, because T3 keeps it out of
+the index; after the Expand there is no expansion and nothing to re-anchor. E4
+had no such claim to make about a minted member, whose findings are re-anchored
+before the Expand and are the member's own after it - that difference is the
+honest price of Expand and E4 names it. For the children the author placed,
+Expand changes nothing they see at all: the same warning, on the same block,
+under the same field.
+
+This record states the obligation. `sb-q183` builds the splice and carries the
+test that proves it, per reference composite, alongside the tests E4's
+obligation already has.
+
+### Worked example: a bad invoke type on a child inside a "Guarded section"
+
+`myapp.guarded_section` is a composite declaring one param, `condition`, and
+one pass-through slot, `body`, mapped to `{"guard", "taken"}`. Its `subtree/1`
+answers a single `core.branch` with the local id `guard`, whose `taken` slot
+the declaration leaves empty. The author fills the composite's one visible
+field, drops a `core.invoke` into the interior the card draws for `body`, and
+types `myapp:signup` into it - for which the host has registered no handler.
+
+```
+stored document
+  blk_GX  myapp.guarded_section
+          %{"condition" => "..."}
+          slots: %{"body" => [
+            blk_CALL  core.invoke  %{"invoke_type" => "myapp:signup", ...}
+          ]}
+
+Resolve, through Composite.expand/2
+  blk_GX_guard   core.branch
+    taken:
+      blk_CALL   core.invoke  %{"invoke_type" => "myapp:signup", ...}
+
+  expansion index: %{"blk_GX_guard" => {"blk_GX", nil}}
+```
+
+`blk_CALL` is absent from the index, and its id is the one the author's
+document already carried. Stages 3-6 run over the branch and the call. Decision
+8's invoke lint fires on the `<invoke>` the call emitted, decision 9 maps its
+span to the innermost owner - `%{block_id: "blk_CALL", role: nil, config_key:
+"invoke_type"}` - and T3 leaves it there:
+
+```elixir
+compiled.warnings
+#=> [%{block_id: "blk_CALL", stage: :chart, severity: :warning, fault: :author,
+#      config_key: "invoke_type",
+#      code: :no_registered_invoke_handler,
+#      message: ~s(no handler registered for invoke type "myapp:signup")}]
+```
+
+The editor draws the warning beneath the "Invoke type" field on the call's own
+card, inside the "Guarded section" interior, which is the field the author
+typed into. Compare the "Guarded step" example at `:3030`, where the same lint
+on a member the declaration wrote is re-anchored onto the composite and drawn
+on the composite's form: the two examples differ in exactly one thing, which is
+who put the bad value there.
+
+Had the branch itself raised a structural finding - an arity refusal because
+the author left `body` empty and `core.branch` requires a taken arm - the
+finding's owner would be `blk_GX_guard`, which the index does name, so E3 would
+re-anchor it onto `blk_GX` with `config_key: nil` and the editor would draw it
+on the composite's chrome. That is T3's second reading, and it is the right
+surface: the empty slot is on the composite's card.
+
+And after an Expand, both readings are unchanged in the first case and changed
+in the ordinary way in the second: `blk_CALL` still carries its own warning
+under its own field, while the branch's arity finding becomes the branch's own,
+because there is no longer a composite to climb to.
+
+### What this amendment does not change
+
+Decision 3's function, decision 4's `emit/2` contract, decision 5's totality
+and its `owner` shape, decision 6's determinism guarantee, decision 7's join
+between document identity and chart identity, and decision 10's ordering and
+finding shape all stand exactly as accepted. E1's stage count is unchanged:
+Resolve still does one more thing than it did before `sb-nzc1`, and the count
+is still six. Correction 1's climb to the outermost composite stands and is
+narrowed by nothing here - T3 says where the climb starts, not how far it goes.
+Nothing here decides the declaration's shape, which is `ADR-0002`'s, or where
+the environment walk descends, which is `ADR-0011`'s, or how the card draws the
+interior, which is `ADR-0005`'s; each is named so it is not read into this one.
+A document holding a composite with a filled pass-through slot is an ordinary
+`ADR-0001` document at `schema_version` 1: the children are stored under the
+composite block's own `slots`, which is where `ADR-0001` decision 2
+(`:63`) and decision 5 (`:110`) already put every block's children, and nothing
+about the expansion is stored.
+
+Filed with `sb-1700`, campaign SF038, recording campaign-SF038's ruling
+`RQ-SF038-5`. `sb-q183` implements it, and `sb-vjvq` carries the flip.
