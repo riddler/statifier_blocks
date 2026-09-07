@@ -67,7 +67,7 @@ defmodule StatifierBlocks.Assignability do
   in both directions.
   """
 
-  alias StatifierBlocks.{Block, Document, Environment, Palette, Shelf}
+  alias StatifierBlocks.{Block, Composite, Document, Environment, Palette, Shelf}
   alias StatifierDatamodel.Declarations
 
   @typedoc """
@@ -465,13 +465,26 @@ defmodule StatifierBlocks.Assignability do
   def produces(%Palette{} = palette, %Document{} = document, %Block{} = block, ctx) do
     case Palette.resolve(palette, block) do
       {:ok, module, resolved} ->
-        module
-        |> io(resolved.config)
+        palette
+        |> io_of(module, resolved)
         |> Map.get(:produces, :unknown)
         |> resolve_produces(palette, document, block, ctx)
 
       {:error, _reason} ->
         :unknown
+    end
+  end
+
+  # ADR-0002's Note of 2026-09-07, item 3: this reader HAS a palette, so a
+  # composite answers exactly here rather than through the core-only fallback
+  # `c:StatifierBlocks.BlockType.io/1` is confined to. Every other type reads
+  # the same way it always did.
+  @spec io_of(Palette.t(), Palette.type_ref(), Block.t()) :: io()
+  defp io_of(%Palette{} = palette, ref, %Block{} = resolved) do
+    if Composite.composite?(ref) do
+      Composite.io(palette, resolved)
+    else
+      io(ref, resolved.config)
     end
   end
 
