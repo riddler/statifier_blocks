@@ -13,6 +13,7 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
 
   alias StatifierBlocks.Block
   alias StatifierBlocks.BlockType
+  alias StatifierBlocks.BlockTypeFixtures.Toy
   alias StatifierBlocks.Core
   alias StatifierBlocks.CoreFixtures
   alias StatifierBlocks.Palette
@@ -46,10 +47,15 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
 
     # Sabotage: made `core_types/0` return a `%Palette{}` - red, because a
     # host could no longer merge its own entries into it.
+    #
+    # The host entry is a fixture rather than a second registration of a core
+    # module: a core module carries a core `order`, and registering one under
+    # two names is two entries of one group at one number, which
+    # `Palette.new/2` refuses.
     test "a host entry sharing a core name wins the merge" do
-      merged = Palette.new(Map.merge(Palette.core_types(), %{"core.wait" => Core.Sequence}))
+      merged = Palette.new(Map.merge(Palette.core_types(), %{"core.wait" => Toy}))
 
-      assert {:ok, Core.Sequence} = Palette.fetch(merged, "core.wait")
+      assert {:ok, Toy} = Palette.fetch(merged, "core.wait")
       assert {:ok, Core.Branch} = Palette.fetch(merged, "core.branch")
     end
   end

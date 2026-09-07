@@ -4,6 +4,107 @@ defmodule StatifierBlocks.PaletteTest do
   alias StatifierBlocks.{Block, BlockTypeFixtures, Document, DocumentFixtures, Palette}
   alias StatifierBlocks.BlockTypeFixtures.{Minimal, Toy}
 
+  defmodule Seventh do
+    @moduledoc """
+    An ordinary block type declaring an `order` in the core `"Structure"`
+    group - the group `core_types/0`'s entries sit in. Pure: nothing here
+    names LiveView.
+    """
+
+    use StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+    @impl true
+    def config_schema(_config), do: []
+    @impl true
+    def palette_entry, do: %{label: "Seventh", group: "Structure", order: 7}
+    @impl true
+    def sentence(_config), do: "seventh"
+    @impl true
+    def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+  end
+
+  defmodule AlsoSeventh do
+    @moduledoc "A second entry declaring the same group and the same order."
+
+    use StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+    @impl true
+    def config_schema(_config), do: []
+    @impl true
+    def palette_entry, do: %{label: "Also seventh", group: "Structure", order: 7}
+    @impl true
+    def sentence(_config), do: "also seventh"
+    @impl true
+    def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+  end
+
+  defmodule Seventh.Recipe do
+    @moduledoc """
+    A hand-written module sitting at the name a composite's derived recipe
+    would take, but declaring a card of its own. The derived-pair exemption
+    reads both halves of the derivation, so this one is still a collision.
+    """
+
+    @behaviour StatifierBlocks.Recipe
+
+    @impl true
+    def insert(_target, _document), do: {:error, :never}
+    @impl true
+    def palette_entry, do: %{label: "Not derived", group: "Structure", order: 7}
+    @impl true
+    def members(_block_id, _document), do: []
+  end
+
+  defmodule SignupStep do
+    @moduledoc """
+    A composite, for the one pair the duplicate-order check admits: its
+    `types` entry beside the `SignupStep.Recipe` its declaration derives,
+    whose `palette_entry/0` is this module's.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "myapp.signup_step",
+      params: [
+        %{key: "invoke_type", type: :string, label: "Call", required?: true, default: ""}
+      ],
+      sentence: "Call {invoke_type}",
+      palette_entry: %{label: "Signup step", group: "Structure", order: 41},
+      version: 1
+
+    @impl StatifierBlocks.Composite
+    def subtree(params) do
+      [
+        Block.new("core.invoke",
+          id: "call",
+          config: %{"invoke_type" => params["invoke_type"], "assign_to" => "", "params" => ""}
+        )
+      ]
+    end
+  end
+
+  defmodule SeventhRecipe do
+    @moduledoc """
+    A recipe declaring the same card as `Seventh` - same label, same group,
+    same order - while being no relation of it. The palette browser draws
+    types and recipes into one group, so this is a collision even though the
+    two names live in two namespaces, and it is what makes card equality
+    alone too loose a test for the derived pair.
+    """
+
+    @behaviour StatifierBlocks.Recipe
+
+    @impl true
+    def insert(_target, _document), do: {:ok, []}
+    @impl true
+    def palette_entry, do: %{label: "Seventh", group: "Structure", order: 7}
+    @impl true
+    def members(_block_id, _document), do: []
+  end
+
   @hostile_type_names [
     "",
     "myapp.retired",
@@ -204,6 +305,107 @@ defmodule StatifierBlocks.PaletteTest do
 
         assert match?({:ok, _module, _block}, Palette.resolve(palette, block)) or
                  match?({:error, _reason}, Palette.resolve(palette, block))
+      end
+    end
+  end
+
+  describe "new/2 refuses a duplicate order, as from_modules/2 does" do
+    # sabotage: drop `refute_duplicate_orders!/2` from new/2 (leaving it in
+    # from_modules/2, where it used to live) -> this goes red: the map
+    # builder mounts both entries at order 7 and the browser's pick between
+    # them is whatever the sort happened to do.
+    test "two entries of one group at one order are refused" do
+      assert_raise ArgumentError, ~r/both declare order 7/, fn ->
+        Palette.new(%{"toy.seventh" => Seventh, "toy.also_seventh" => AlsoSeventh})
+      end
+    end
+
+    # sabotage: as above -> red. This is the shape `core_types/0`'s own doc
+    # demonstrates, and the one that never passes through from_modules/2.
+    test "a merge onto core_types/0 colliding with a core entry is refused" do
+      assert_raise ArgumentError, ~r/both declare order 7/, fn ->
+        Palette.new(Map.merge(Palette.core_types(), %{"toy.seventh" => Seventh}))
+      end
+    end
+
+    # sabotage: raise a bare message naming neither entry -> red. Both
+    # builders must name both entries, because the one a host would have to
+    # look for is the one it did not write.
+    test "the message is the one from_modules/2 raises, naming both entries" do
+      from_new =
+        assert_raise ArgumentError, fn ->
+          Palette.new(%{"toy.seventh" => Seventh, "toy.also_seventh" => AlsoSeventh})
+        end
+
+      from_modules =
+        assert_raise ArgumentError, fn ->
+          Palette.from_modules([{"toy.seventh", Seventh}, {"toy.also_seventh", AlsoSeventh}])
+        end
+
+      assert from_new.message == from_modules.message
+      assert from_new.message =~ ~s("toy.seventh")
+      assert from_new.message =~ ~s("toy.also_seventh")
+      assert from_new.message =~ ~s(group "Structure")
+    end
+
+    # sabotage: check only `types` in new/2, dropping the recipes argument
+    # -> red. The browser draws types and recipes into one group, so the
+    # two maps are checked together here as they are in from_modules/2.
+    test "a recipe colliding with a type is refused through the :recipes option" do
+      assert_raise ArgumentError, ~r/both declare order 7/, fn ->
+        Palette.new(%{"toy.seventh" => Seventh}, recipes: %{"seventh" => SeventhRecipe})
+      end
+    end
+
+    # sabotage: refuse an entry that declares no `order` -> red on
+    # `core/0`, on every fixture palette, and here. `order` is optional and
+    # a gap is legal; only the collision is refused.
+    test "the core palette, and an entry declaring no order, build unrefused" do
+      assert %Palette{} = Palette.core()
+      assert %Palette{} = Palette.new(%{"toy.budget_check" => Toy, "toy.minimal" => Minimal})
+    end
+
+    # The one admitted pair: a composite beside its OWN derived recipe. The
+    # derived recipe's palette_entry/0 IS the block type's, so registering
+    # both - which `StatifierBlocks.Composite` documents as a host's choice
+    # to show two - is one declaration read twice, not two entries
+    # disagreeing about a number.
+    #
+    # sabotage: dropped the derived_pair?/2 arm from collision?/1 -> red on
+    # both builders, and on composite_test.exs's registration test with it.
+    test "a composite beside its own derived recipe is admitted, by both builders" do
+      assert %Palette{} =
+               Palette.new(%{"myapp.signup_step" => SignupStep},
+                 recipes: %{"signup_step" => SignupStep.Recipe}
+               )
+
+      assert %Palette{} =
+               Palette.from_modules([{"myapp.signup_step", SignupStep}],
+                 recipes: [{"signup_step", SignupStep.Recipe}]
+               )
+    end
+
+    # sabotage: identified the pair by palette_entry equality alone -> red,
+    # because two unrelated modules declaring one card would then be
+    # admitted. The exemption is the composite's own derived recipe, and
+    # nothing else at that number.
+    test "an unrelated pair at one order is still refused, by both builders" do
+      assert_raise ArgumentError, ~r/both declare order 7/, fn ->
+        Palette.new(%{"toy.seventh" => Seventh}, recipes: %{"seventh" => SeventhRecipe})
+      end
+
+      assert_raise ArgumentError, ~r/both declare order 7/, fn ->
+        Palette.from_modules([{"toy.seventh", Seventh}], recipes: [{"seventh", SeventhRecipe}])
+      end
+    end
+
+    # sabotage: identified the pair by the module name alone
+    # (`Module.concat(module, "Recipe")`) -> red. `Seventh.Recipe` sits at
+    # the derived name and declares a card of its own, so the name is only
+    # half the question.
+    test "a module at the derived name that declares its own card is refused" do
+      assert_raise ArgumentError, ~r/both declare order 7/, fn ->
+        Palette.new(%{"toy.seventh" => Seventh}, recipes: %{"seventh" => Seventh.Recipe})
       end
     end
   end
