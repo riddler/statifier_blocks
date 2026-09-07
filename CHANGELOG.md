@@ -10,6 +10,127 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.24.0] 2026-09-07
+
+0.24.0 is about drawing less of the editor, and saying more about what is
+drawn. `StatifierBlocks.Editor` takes an optional `profile` assign naming
+which drawer tabs, inspector tabs, palette groups and toolbar chips a mount
+draws, with `read_only?: true` rendering a document that offers no way to
+change it. A config field declaration gains `hidden?` and `readonly?`, so a
+type can hold a value no form shows, or draw one as text beside its label.
+Beside that: block types may declare `sentence/1`, one line of prose for a
+config, which `StatifierBlocks.ViewModel.Node` carries beside the author's
+title; `StatifierBlocks.ViewModel.outline/1` answers the whole document in
+reading order as `{node, depth, kind}`; `StatifierBlocks.Palette.new_block/2`
+builds a block from a palette entry, so a host view no longer reimplements
+what the editor's insert does; and the Datamodel tab draws the values each
+declared path enumerates.
+
+It is a minor, and no compiled chart bytes move. Two changes can refuse a
+document or a block type that was accepted at 0.23.0: a config field
+declared without a `default:` key is now refused at compile whatever its
+field type, where before only a `{:path, opts}` field was; and the typed
+environment now puts an entry at every member beneath a record, shape or
+inline-shape write, so a nested read that previously met the
+nothing-is-known advisory is now checked against the written type.
+
+### Added
+
+- A config field declaration may carry `hidden?: true`, which keeps the field
+  out of every form while the compiler, the Source tab and `validate_config/1`
+  see its value entirely unchanged.
+- A config field declaration may carry `readonly?: true`, which renders the
+  field as its value beside its label rather than as an input.
+- `StatifierBlocks.ViewModel.Field` carries both flags, so a host drawing its
+  own surface filters on the same two booleans the package's own config form
+  reads.
+
+- `StatifierBlocks.Editor` takes an optional `profile` assign naming which of
+  its surfaces a mount draws: `%{drawer_tabs:, inspector_tabs:, palette_groups:,
+  toolbar:, read_only?:}`, every key optional and every list either `:all` or
+  the ids it names. A mount that passes no profile renders exactly what it
+  rendered before, and there is no arrangement of the map, `%{}` included, that
+  removes a surface a host did not name.
+- An id a profile lists that the package cannot resolve is dropped and the
+  mount renders; a key whose value is neither a list nor `:all` resolves to
+  that key's default. There is no `validate_profile/1` and a profile is never
+  checked against the shell's ids at declaration.
+- `profile: %{read_only?: true}` renders the document without offering any way
+  to change it: no palette column, no drag hook on the canvas, config fields
+  and declaration rows drawn as values rather than controls, Undo and Redo
+  hidden rather than disabled, and every gesture that would reach the document
+  answered with the socket unchanged, so `on_change` never fires. Selection,
+  `on_select` and every findings surface are unchanged, and a document is never
+  refused for being read-only.
+- `StatifierBlocks.Shell.drawer_tabs/1` and
+  `StatifierBlocks.Shell.inspector_tabs/1` answer the package's tabs a profile
+  leaves, in the shell's own order; `StatifierBlocks.Shell.drawer_view/1` takes
+  an optional `:profile` key and filters the host's contributed tabs by the
+  same list.
+- `docs/profiles.md` is the host-facing guide: the default, the ids each list
+  draws from, the drop rule, a minimal mount and a read-only one.
+
+- The editor's Datamodel tab draws a **Values** column beside each declared
+  path: the `one_of` enumeration the ADR-0006 document declares there, cut at
+  eight values with the remainder counted ("+3 more"). It reports the
+  declaration and not a host's `value_candidates` override, so a reader can
+  answer "where did this picklist come from" from the table rather than by
+  opening a condition. A path that declares no enumeration draws an empty
+  cell.
+
+- A write signature whose type is a record, a shape, or an inline shape now
+  puts an entry in the environment at every member beneath the path as well as
+  at the path itself, recursively and to any depth, so a later block reading a
+  nested path is checked rather than given the nothing-is-known advisory.
+
+- Block types may declare an optional `sentence/1` callback, which answers the
+  block as one line of prose for a given config. It is read through
+  `StatifierBlocks.BlockType.sentence/2`, which is total: a type that declares
+  none, and one whose callback raises, throws, exits or answers a non-string, a
+  blank string or a multiline one, all read as the type's label. Unlike a chip
+  it carries no length cap.
+- `use StatifierBlocks.BlockType` injects an overridable `sentence/1` answering
+  the type's own palette label, so a type that overrides nothing is
+  indistinguishable from one that declares no `sentence/1` at all.
+- `StatifierBlocks.ViewModel.Node` carries `sentence`: the type's own sentence
+  where it declares a usable one, else the author's `title`, else the type's
+  label falling back to the type name. A block whose type the palette cannot
+  resolve carries the type name, so a list view never draws a blank line.
+- `StatifierBlocks.ViewModel.outline/1` returns the document in reading order:
+  one `{node, depth, kind}` per block, pre-order, `kind` in
+  `:step | :arm | :rail | :tray`. It is pure and reads only the view model.
+  Every block appears exactly once - arms, rails, trays and the drafts shelf
+  are kinds and positions, never omissions - and `depth` is block nesting
+  depth, so a slot never consumes a level.
+- `core.wait`, `core.branch`, `core.subchart`, `core.foreach`, `core.parallel`,
+  `core.send` and `core.assign` declare sentences of their own. Every other
+  `core.*` type answers its label, which is what it answered before.
+
+Cards are unchanged: `sentence` is not a chip, is never capped, and nothing new
+is drawn on a block's card or in the palette browser.
+
+- `StatifierBlocks.Palette.new_block/2` builds a block of a named type from a
+  palette - the type's `config_schema/1` defaults as the config and its
+  `current_version/0` as the stored version - so a host view that inserts from
+  a palette no longer has to reimplement what the editor's insert does.
+
+### Changed
+
+- A config field declared without a `default:` key is now refused at compile
+  whatever its field type; before, only a `{:path, opts}` field was. A block
+  type that omitted the key on another type must add it - the declaration was
+  never well formed, and the value it produced was `nil`.
+- A `hidden?: true` field whose `default:` is its type's empty value is refused
+  at compile: it can carry nothing and no form can ever give it a value. A
+  hidden `:boolean` defaulting to `false` is legal, `false` being a decided
+  value rather than an absence.
+- A form ignores any posted value for a `hidden?` or `readonly?` field, so a
+  crafted payload cannot reach a key the form withheld.
+
+- A document may stop validating where a block reads a nested path the record
+  written above it types differently; the fix is either the reading block's
+  `expects` or the written record.
+
 ## [0.23.0] 2026-09-06
 
 0.23.0 makes a block type's typed surface something an author writes rather
@@ -2420,6 +2541,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.24.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.24.0
 [0.23.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.23.0
 [0.22.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.22.0
 [0.21.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.21.0
