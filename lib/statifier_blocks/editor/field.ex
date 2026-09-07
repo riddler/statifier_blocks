@@ -536,6 +536,41 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:variant, :atom,
+      default: :block,
+      values: [:block, :inline],
+      doc: """
+      How much chrome this one field wears. An attribute on this component,
+      never a mode on the editor: a host that wants a field inside a
+      sentence of its own writing says so per field, and nothing about the
+      package's own forms changes.
+
+      `:block` is the row this component has always drawn - a labelled
+      block with its control beneath it - and it is byte for byte what the
+      component rendered before the attribute existed.
+
+      `:inline` draws the same control, in an inline box, with the label
+      moved out of sight but not out of the accessibility tree: the
+      `<label>` is still there and still bound to the control by `for`, so
+      a screen reader still announces the field's name and a click on the
+      label still focuses the control. It is `sb-field__label--inline` that
+      takes it off the screen, which is a stylesheet rule rather than an
+      omission, so a host restyling the editor can put the label back
+      without the markup changing under it.
+
+      What is drawn is all that differs. The control is the same control,
+      chosen by the same field type; it posts the same event under the same
+      param name, so `StatifierBlocks.Editor.ConfigForm.decode/3` reads an
+      inline field exactly as it reads a block one and the config a form
+      produces cannot depend on how its fields were dressed.
+
+      The declaration's own flags still win. A `hidden?: true` field
+      renders nothing in either variant, and a `readonly?: true` field
+      renders its readonly row, because those flags are statements about
+      the field itself while this is a statement about one placement of it.
+      """
+    )
+
     @doc """
     One field: its label, its control, and its own findings (decision 11).
 
@@ -547,6 +582,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     flags leave the field's findings visible where a row is drawn at all.
     `hidden?` wins when both are set, because a field that is not rendered
     has nothing to render as a value.
+
+    The `variant` attribute chooses how much chrome the row wears and
+    nothing else; the two flags above win over it, and `:inline` posts what
+    `:block` posts. See the attribute's own documentation.
     """
     def field(%{field: %ViewModel.Field{hidden?: true}} = assigns) do
       ~H"""
@@ -570,6 +609,54 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           {finding.message}
         </p>
       </div>
+      """
+    end
+
+    # `:inline` comes after both declaration flags on purpose: a hidden field
+    # is hidden and a readonly field is readonly wherever a host places it,
+    # so the flags win and this clause only ever sees a field that would have
+    # drawn an ordinary row. Everything below it is the general clause's
+    # markup with `span` where it has block elements and the label taken off
+    # the screen by class - same control, same events, same param names.
+    def field(%{variant: :inline} = assigns) do
+      ~H"""
+      <span
+        class={["sb-field", "sb-field--inline", @class]}
+        data-field={@field.key}
+        data-field-type={type_tag(@field.type)}
+        data-field-variant="inline"
+      >
+        <label class="sb-field__label sb-field__label--inline" for={input_id(@field)}>
+          <span class="sb-field__label-text">{@field.label}</span>
+          <span :if={@field.required?} class="sb-field__required">Required</span>
+        </label>
+        <.control
+          field={@field}
+          target={@target}
+          block_id={@block_id}
+          expression_component={resolve_expression_component(@expression_component)}
+          invoke_types={@invoke_types}
+          path_candidates={@path_candidates}
+          value_candidates={@value_candidates}
+          path_types={@path_types}
+          type_candidates={@type_candidates}
+          event_candidates={@event_candidates}
+          outcome_candidates={@outcome_candidates}
+          candidates={@candidates}
+          debounce={@debounce}
+        />
+        <span
+          :if={@fixture_hint}
+          class="sb-field__fixture-hint"
+          data-fixture-hint={@fixture_hint.path}
+          title={hint_title(@fixture_hint)}
+        >
+          From fixtures, {@fixture_hint.path} is {@fixture_hint.value}
+        </span>
+        <span :for={finding <- @field.findings} class={["sb-finding", severity_class(finding)]}>
+          {finding.message}
+        </span>
+      </span>
       """
     end
 
