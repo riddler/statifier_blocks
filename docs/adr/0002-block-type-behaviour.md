@@ -4956,7 +4956,7 @@ campaign-034's ruling `RQ-034-2`. `sb-nqfd` builds the callback.
 
 ## Amendment (2026-09-06): decision 7, the `{:type_expr, opts}` field type
 
-**Status: proposed (2026-09-06).** Drafted for `sb-zvar` under the operator's
+**Status: accepted (2026-09-06).** Drafted for `sb-zvar` under the operator's
 campaign-SF035 grant, recording that campaign's ruling `RQ-SF035-1`, and
 merging at proposed under that campaign's invariant like every other section
 filed with it; flipping it to accepted is a separate gated request, and
@@ -5542,3 +5542,101 @@ key still reaches no compiled SCXML at all, which `P1` states and
 corpus `StatifierBlocks.Compiler.ByteCorpusTest` pins.
 
 Filed with `sb-268w`, campaign SF035's Lane A.
+
+## Note (2026-09-07): what the flip of decision 7's `{:type_expr, opts}` amendment checked, and its forward sentences met
+
+`sb-wzoa` is the separate gated request the Amendment of 2026-09-06 on
+decision 7 (`:4957`) names in its own status paragraph, and it has flipped
+that section's `Status:` word from `proposed` to `accepted`. That word is the
+only text the flip changes in this record. This Note is by addition, sits at
+the **end of this file** for the reason that amendment gives about itself -
+`ADR-0013` cites this record by line number and three of the four lines it
+names sit inside `P3` - and carries no `Status:` line of its own.
+
+The flip reaches **that section only**. The Note of 2026-09-06 filed with
+`sb-jvz3` and the Note of 2026-09-06 filed with `sb-268w` each say in as many
+words that they carry no `Status:` line, which is this file's convention for a
+Note, and nothing on either is flipped. Every cite below was read off `main` at
+`f750b3b`, with `deps/statifier_datamodel` resolved at `0.4.0`.
+
+### What was checked, clause by clause
+
+- **The ninth member is declared.** `field_type/0` lists nine and closes on
+  `| {:type_expr, type_expr_opts()}`
+  (`lib/statifier_blocks/block_type.ex:152-161`).
+- **`opts` carries the two keys clause 2 defines and no third.**
+  `type_expr_opts/0` is `optional(:arms) => [:name | :inline, ...]` and
+  `optional(:allow_empty?) => boolean()` (`:240-243`).
+- **Clause 4's refusal is one shared check with the anchor the clause names.**
+  `StatifierBlocks.BlockType.type_expr_findings/2` (`:979-984`) hands every
+  field of that type to `type_expr_finding/2` (`:986-997`), which defaults `arms`
+  to both and `allow_empty?` to `true`, tells the arms apart by stored JSON
+  type alone with no tag key (`stored_arm/2`, `:1028-1037`), and returns a
+  `{key, message}` the compile's `:config` stage carries with `config_key: key`
+  (`lib/statifier_blocks/compiler.ex:672-681`). No new finding code, no new
+  severity, no new option.
+- **The two cases clause 4 excludes are excluded.** An undeclared name and a
+  compile with no `:datamodel` produce nothing here; the check never resolves a
+  name.
+- **Clause 6 holds without a clause being added.**
+  `StatifierBlocks.BlockType.datamodel_path?/1` is still true for `{:path,
+  _opts}` and the literal `datamodel_path?: true` and false otherwise
+  (`lib/statifier_blocks/block_type.ex:1084-1086`).
+- **Clause 7's two fields migrated, and clause 8's stored string still reads as
+  the name arm.** `payload` on `core.on_event` is declared `{:type_expr,
+  %{arms: [:name, :inline]}}` (`lib/statifier_blocks/core/on_event.ex:306-312`)
+  and `collect_type` is `core.map`'s seventh field
+  (`lib/statifier_blocks/core/map.ex:463-469`).
+  `StatifierBlocks.Core.TypeExprMigrationTest` asserts the bytes, and
+  `ADR-0001`'s `schema_version` did not move.
+- **Clause 9's refusal is where the clause says and is not widened.**
+  `declaration_findings/2` refuses a `{:path, opts}` field declared without
+  `default:` in the `:config` stage
+  (`lib/statifier_blocks/compiler.ex:715-726`), and the comment holding the
+  widening open for the record still reads "which is the record's call and not
+  this stage's" (`:705-707`).
+
+### The sentence that named another record as unmerged, discharged
+
+*What this section does not decide* says of `ADR-0011` decision 1's amendment
+that it is "in flight as this section is written and unmerged - cited as the
+record that takes the question, not as a record whose text this one has read on
+`main`". It merged, as `sb-myt1`, at `0fa760a` and `70f54b2`, before this
+record's own section did. The sentence was true when it was written and the
+reading it asks for is now available: a reader after both have landed reads
+that amendment for the environment's grammar and this section for the field's,
+which is what the sentence itself says to do. **That amendment is not accepted
+as of this Note** - `sb-wzoa` does not flip it, and the Note of this date at
+the foot of `docs/adr/0011-typed-environment.md` says why.
+
+The same paragraph says `StatifierBlocks.Environment`'s `type_expr/0` "has no
+inline-shape inhabitant today". It has one from `sb-1jcr` (PR 355, `d804062`):
+`String.t() | :unknown | {:list, type_expr()} | {:shape, [member()]}`
+(`lib/statifier_blocks/environment.ex:104`). The sentence is dated to its
+section and is met rather than falsified - admitting the field type did not
+admit the inhabitant, and a separate record did.
+
+### Cites that drifted under the code, repointed
+
+Every line below is a census taken on `f750b3b`, dated to this Note and to be
+re-counted by a later reader rather than trusted.
+
+| Written in the amendment | Reads today |
+|---|---|
+| `lib/statifier_blocks/core/on_event.ex:287-292` | `:306-312`, and no longer `:string` |
+| `lib/statifier_blocks/environment.ex:93` | `:104` |
+| `lib/statifier_blocks/block_type.ex:149-157` (`field_type/0`) | `:152-161` |
+| `lib/statifier_blocks/block_type.ex:260-262` ("eight closed `field_type/0` values") | `:300`, and it reads **nine** |
+| `lib/statifier_blocks/block_type.ex:760-762` (`datamodel_path?/1`) | `:1084-1086` |
+| `lib/statifier_blocks/compiler.ex:604-611` | `:705-707` |
+| `lib/statifier_blocks/compiler.ex:619-637` | `:715-726` |
+
+*Where the counts stand after this section* said the `config_schema/1` doc
+sentence counting the set at eight was "accurate as of the day it was written"
+and read forward under the amendment's own convention. `sb-1jcr` moved it, so
+it now counts nine and the convention has nothing left to carry there. The
+third place the union is written out - *The contract as typespecs* above - still
+lists the original seven, which that section also says, and it is not edited
+here.
+
+Filed with `sb-wzoa`, campaign SF035's Lane A.

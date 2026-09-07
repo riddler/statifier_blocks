@@ -7249,3 +7249,53 @@ sentence, and it does not earn a section of its own anywhere else.
   corrected by reading, not in place, for the reason the 2026-09-06 Note gives.
 
 Filed with `sb-x88o`, campaign-SF035's Lane A.
+
+## Note (2026-09-07): decision 9's `{:type_expr, opts}` Note carries no `Status:` line, and its two forward references now read
+
+`sb-wzoa` is the request that flips the Theme 1 records of campaign SF035, and
+it reached this record expecting a status word to move. There is none to move.
+The Note of 2026-09-06 on decision 9 (`:7006`), filed with `sb-j2vp`, carries no
+`Status:` line, which is this family's convention for a Note - `ADR-0002`'s Note
+at its own `:4948-4950` states it in as many words, and `sb-upv0` reached the
+same conclusion about `ADR-0002` decision 5's callback Note. **Nothing in this
+record is flipped and nothing above this line is edited.** This Note is by
+addition, sits at the foot so no line a sibling record cites moves, and carries
+no `Status:` line of its own either.
+
+It records the two sentences of that Note a reader would otherwise read as
+current. Every cite below is a census taken on `main` at `f750b3b`, dated to
+this Note and to be re-counted rather than trusted.
+
+**1. "It merges at proposed under the campaign invariant."** That is the
+section's own account of how it landed and it is accurate as written; it says
+nothing about a status word, because the section has none. What a reader wants
+from it - whether the decision it records is settled - is answered by this
+record's head `Status:` line at `:3`, which reads `accepted`, exactly as it is
+for every other Note in this file.
+
+**2. "`ADR-0002` decision 7 as amended for `{:type_expr, opts}`
+(campaign-SF035, `sb-zvar`, in flight)."** It is no longer in flight. That
+amendment merged as `sb-zvar` (PR 349, `e1d4c52`) and is **accepted** from this
+date, flipped by this same request; the Note at the foot of
+`docs/adr/0002-block-type-behaviour.md` records what the flip checked. So the
+field type this section draws a control for is settled, and the division of
+labour the section states - the field type there, the control here - stands
+unchanged.
+
+**What is not settled, and is not this record's.** `ADR-0011`'s amendment of
+2026-09-06 on decisions 1 and 2 is **not** accepted: `sb-wzoa` left it at
+`proposed` over an open question about which datamodel paths the environment
+seeds, recorded in the Note at the foot of `docs/adr/0011-typed-environment.md`
+and adjacent to the campaign's records bead `sb-m9eq`, which asks where along
+the walk a seeded type enters. Nothing in decision 9's Note depends on it. That
+Note reads the *declared type names* the document's `types` key declares,
+through `StatifierBlocks.Datamodel.declared_types/1`
+(`lib/statifier_blocks/datamodel.ex:635`), and says in terms that this feed and
+`{:path, opts}`'s are disjoint and are never merged. The seeding question is
+about the path feed's side of that line, so it reaches no clause here.
+
+**What this Note does not do.** It adds no decision, no clause, no control and
+no row; it edits nothing; and it does not make decision 9's table exhaustive -
+the `{:path, opts}` row that Note says is still owed is still owed.
+
+Filed with `sb-wzoa`, campaign SF035's Lane A.
