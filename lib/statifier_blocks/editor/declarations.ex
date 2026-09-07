@@ -25,8 +25,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     report over every declared path, which under the 11k union would mean
     three sources at once - the host's datamodel, the compile call's
     `:declare` roots and this key. What ships here is the one source an
-    author can actually change. The report is still unbuilt and this section
-    reserves nothing for it.
+    author can actually change. The report itself shipped afterwards as the
+    drawer's read-only Datamodel tab, which `StatifierBlocks.Editor.Drawer`'s
+    moduledoc records as the view that "took the last reserved place"; this
+    section reserves nothing for it.
 
     ## What a row is, and what it is not
 
