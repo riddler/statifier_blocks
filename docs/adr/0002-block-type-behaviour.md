@@ -5300,3 +5300,84 @@ convention above.
 Filed with `sb-zvar`, campaign-SF035's Lane A, on ruling `RQ-SF035-1` and
 carrying ruling `RQ-SF035-6`. `sb-268w` migrates the two fields; `sb-1jcr`
 builds the type; `sb-wzoa` flips this section.
+
+## Note (2026-09-06): G15's `collect` row and the two sentences beside it, read against `ADR-0009`'s dotted-path amendment
+
+A dated Note rather than an amendment, and it edits nothing above this line.
+It decides nothing, and it cannot: `ADR-0009` decides `core.map`'s `collect`
+grammar, and that record has now decided it differently in its *Amendment
+(2026-09-06): decision 4, `collect` admits a dotted datamodel path through the
+shared location helper*. This Note records which lines here that amendment made
+historical, so that a reader who finds a row above and the code disagreeing is
+reading a dated entry rather than making a discovery. The code is `sb-cjou`.
+
+**What the amendment decided.** `collect` accepts a dotted datamodel path, in
+exactly the grammar the other three `<assign location="...">` fields this
+package writes already accept: `StatifierBlocks.Core.Config.datamodel_path?/1`,
+reached through `StatifierBlocks.Core.AssignLocation`. Both of the field's sites
+moved - the `validate_config/1` check and the `emit/2` re-check - and the
+finding text moved with the rule. A bare lowercase identifier is still a valid
+`collect`, because every one of them is already a datamodel path, so the field
+refuses nothing it accepted before.
+
+**The row it falsifies.** The Note of 2026-09-06 on G15's `collect` sentence
+(`:3734`) carries a per-field table, and its `core.map` row (`:3756`) reads:
+
+| `core.map`'s `collect` | `{:path, %{writes: {:list, :unknown}}}` (`core/map.ex:264`) | `StatifierBlocks.Core.Config.identifier?/1` (`:318`, `:528`) | "must be a bare lowercase identifier, like answers" (`:205`) | `ADR-0009` decision 4 |
+
+Its *Location rule*, *Refusal reads* and *Record that decides the grammar* cells
+are historical. Read forward, the row is:
+
+| Field | Declared as | Location rule | Refusal reads | Record that decides the grammar |
+|---|---|---|---|---|
+| `core.map`'s `collect` | `{:path, %{writes: {:list, :unknown}}}` (`core/map.ex:355`) | `StatifierBlocks.Core.Config.datamodel_path?/1` (`:456-461`, `:682`) | "must be a datamodel path, like cards.answers" (`:256`) | `ADR-0009` decision 4 **as amended 2026-09-06** |
+
+The *Declared as* cell is unchanged in substance; its line number moved only
+because `sb-cjou` edited the same file above it. With that row read forward, the
+table's four rows carry one location rule and one refusal wording rather than
+two of each.
+
+**The two sentences beside it.** Both are that Note's own, and both were true
+when written.
+
+- "So the sentence names three wordings where it once named one, and `collect`
+  alone keeps the bare-identifier grammar" (`:3758-3759`). The wordings are back
+  to one, and `collect` keeps the bare-identifier grammar no longer - it keeps
+  the bare-identifier *values*, which is a different claim and the one that
+  still holds.
+- "**`collect` is now declared a path and refused as an identifier** ...
+  Resolving it is an amendment to `ADR-0009` decision 4 ... and nobody has ruled
+  it. `sb-h6qt` owns that question, with both directions named on it: widen
+  `collect` to a dotted path, or narrow its declaration to match the grammar.
+  This record takes neither, and G15 stands as written until that one is ruled"
+  (`:3779-3788`). The mismatch it names is gone; the amendment is the one it
+  says is owed, taken by the record that owed it, in the widening direction, and
+  it folds `sb-h6qt`'s half of the question. What that paragraph asked for has
+  happened rather than being still open.
+
+One sentence in the Note before it (`:3727-3729`) - "`core.map`'s `collect`
+keeps the bare-identifier wording, because `ADR-0009` decision 4 decides that
+field's grammar outright and widening it is that record's amendment to make" -
+is half historical for the same reason: its first clause no longer holds, and
+its second clause is exactly what happened.
+
+**And one sentence of G15 itself reads better than it did.** G15's prose
+(`:3353-3356`) says `validate_config/1` refuses "a `collect` that is present and
+not a bare lowercase identifier, refused in the same words `core.invoke` and
+`core.subchart` produce for `assign_to`". Its rule clause is historical - the
+refusal is now of a value that is not a datamodel path - while its *same words*
+clause, which the Note at `:3721-3732` had to weaken to "naming the shape",
+is once again true on its own words: the wording under all four fields is the
+one sentence again, because the amendment moved `collect`'s message to it. G15
+is not edited here, and the weakened reading stays safe to hold: the shape is
+shared whether or not the wordings are.
+
+**What does not change.** The writes table of the Note of 2026-09-06 on decision
+10 (`:3531`) still reads `collect`, `{:list, :unknown}`: the amendment widened
+where the one write may land and said nothing about what it holds. Decision 7's
+field-type set gains no member, and `collect`'s declaration is untouched. G15's
+four-field census, its `on` default read through `core.parallel`'s G7a shape,
+and its "refuses nothing else, and in particular nothing about N" clause are all
+unaffected, because only the rule behind one field's refusal moved.
+
+Filed with `sb-ctfg`, campaign SF035's Lane A, from `sb-cjou`'s discovery.
