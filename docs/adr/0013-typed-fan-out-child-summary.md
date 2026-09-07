@@ -1,6 +1,6 @@
 # ADR-0013: A fan-out child's summary is typed by the parent's declaration, with an optional child-side one and a dormant agreement check
 
-Status: proposed (2026-09-06, drafted for `sb-57yc` under the operator's
+Status: accepted (2026-09-06, drafted for `sb-57yc` under the operator's
 campaign-034 grant and finished under campaign-SF035's, recording
 campaign-033's ruling `RQ-033-19` B, campaign-034's rulings `RQ-034-2`,
 `RQ-034-14` and `RQ-034-15` b, and campaign-SF035's `RQ-SF035-1`, all of
@@ -928,3 +928,175 @@ The record's head status is untouched and stays `proposed`; the flip is its
 own gated request.
 
 Filed with `sb-268w`, campaign SF035's Lane A.
+
+## Note (2026-09-06): the flip, and where this record's cites read today
+
+`sb-upv0`, the separate gated request the head status paragraph names
+(`:10-13`). The head `Status:` word is now `accepted`, and that word is the
+only text this flip changes anywhere in this record; no line count moves.
+
+The code this record decides is on `main`. `sb-nqfd` (PR 353, `cc841a9`) built
+decisions 2, 3 and 4 - the `donedata_type/1` callback, the `child_use` params,
+`collect_type` and `agrees?/3`. `sb-1jcr` (PR 355, `d804062`) built decision
+5's environment entry and the inline-shape inhabitant it needs. `sb-268w`
+(PR 356, `94d1990`) migrated `collect_type` onto `{:type_expr, opts}`, which is
+what the Note above this one records. Everything below was read off `main` at
+`94d1990` rather than off the tree any section was drafted over. The
+`0.23.0` release prep
+(`081e426`) landed on `main` while this flip was open; it changes two version
+strings one line for one line and moves no line this Note cites.
+
+This Note sits at the foot rather than beneath the sentences it answers, and
+that placement is deliberate for the reason the Note above gives for its own:
+`ADR-0002` cites this record by line number at `:143-144`, so a paragraph
+inserted higher would move lines another record on `main` names. Amend by
+addition; no `Status:` line of its own, as a Note in this family carries none.
+
+### Every decision, checked against `main` at `94d1990`
+
+- **Decision 1 holds.** `collect_type` is `config_schema/1`'s sixth entry,
+  after `collect` and before `on`, optional, with an empty default, and it
+  produces no compiled bytes (`lib/statifier_blocks/core/map.ex:463-469`). Its
+  field type is no longer the `:string` this decision fixed: it is
+  `{:type_expr, %{arms: [:name, :inline]}}` (`:464-465`), which is the
+  migration the Note above records and which this decision named `sb-268w` as
+  the request that would make. The name arm still resolves through
+  `StatifierDatamodel.Types.parse/2`, still total, and a spelling that names
+  nothing is still not a finding.
+- **Decision 2 holds.** `@callback donedata_type(Block.config()) ::
+  [donedata_field()]` is declared at
+  `lib/statifier_blocks/block_type.ex:708`, the `donedata_field` type at
+  `:673-677`, `donedata_type: 1` on the `@optional_callbacks` list at
+  `:710-717`, and the resolver `donedata_type/2` at `:822`. No shipped `core.*`
+  type exports it. The reserved-name refusal is the
+  `:invalid_donedata_field` Emit finding against the root block
+  (`lib/statifier_blocks/compiler.ex:1971-1984`).
+- **Decision 3 holds, in the order it fixes.** `completion_final/5` builds the
+  `outcome` param, then `run_status_param/0` on a failure-classed outcome only,
+  then the declared params, and never sorts them
+  (`lib/statifier_blocks/compiler.ex:1709-1719`, the list itself at
+  `:1710-1713`, `declared_params/2` at `:1755-1762`). They are emitted on every
+  top-level `child_use` final and on no `terminate` final.
+- **Decision 4 holds.** `agrees?/3` is at
+  `lib/statifier_blocks/block_type.ex:885`, projecting the child's fields under
+  a synthesized name and answering `statifier_datamodel`'s own reason. The
+  consequence this decision states - that the covering step answers `:covers`
+  only where the expected side is a declaration of kind `shape`, so two
+  `record` names are `:not_assignable` by construction - is still what that
+  package does: `covers/4`'s one deciding clause takes a `record` held against
+  a `shape` expected
+  (`deps/statifier_datamodel/lib/statifier_datamodel/types.ex:445-447`), and
+  everything else falls to `:not_assignable` at `:449`. An optional held field
+  still covers no required one (`:500`, the rule stated in the comment at
+  `:497-499`). Those cites moved with the dependency; the section below is
+  where they are repointed.
+- **Decision 5 holds.** `collect` is typed
+  `{:path, %{writes: {:list, envelope(config)}}}`
+  (`lib/statifier_blocks/core/map.ex:456-462`); the envelope is built at
+  `:405-414` with exactly the four members, requiredness and member types this
+  record's table fixes; and `"donedata"` is this block's `collect_type` and
+  nothing else, `:unknown` when there is none (`:416-422`).
+  `StatifierBlocks.Environment`'s `type_expr()` now carries the inline-shape
+  inhabitant this decision needed - `{:shape, [member()]}` at
+  `lib/statifier_blocks/environment.ex:104`, read by `inline_shape/1` at
+  `:522-529`.
+- **Decision 6 holds.** It sets no number, and no number is set in the code.
+
+### Four sentences the flip makes historical
+
+Each was true when it was written, each names the request that would supersede
+it, and each is superseded by that request landing rather than contradicted by
+it. None is edited; this is where they are met.
+
+- `:234-242` says this is the **thirteenth** callback and that "Twelve are
+  declared today". Thirteen are declared today, this record's being the
+  thirteenth: `:292`, `:370`, `:378`, `:385`, `:414`, `:422`, `:429`, `:464`,
+  `:560`, `:588`, `:621`, `:660`, and `donedata_type/1` at `:708`. What the
+  sentence predicted is what shipped. Its "seven of them optional" is eight
+  today, `donedata_type: 1` being the eighth.
+- `:135-136` and `:790` say `ADR-0002` decision 7's field-type set "stays
+  closed at eight" and that no ninth is added here. None was added *here*; the
+  ninth arrived with `sb-1jcr`, and `collect_type` moved onto it with
+  `sb-268w`, which both sentences named as the request that would do it. The
+  set is `:152-161` today, nine members.
+- `:412-414` and `:479-482` say decision 5's entry is unspellable and that the
+  shipped entry stays `ADR-0011` decision 12's `{:list, :unknown}` until the
+  inline-shape inhabitant lands. It landed with `sb-1jcr`; the shipped entry is
+  decision 5's envelope.
+- `:10-13` says the record merges at proposed and that flipping it is a
+  separate request through the same gate. This is that request.
+
+### The dependency moved from 0.3.0 to 0.4.0, and its cites with it
+
+[Cure 2026-09-06, `sb-upv0`, pass 1 of the direction review: this section first
+said the one thing that had moved was the version cite, and that every
+`statifier_datamodel` function this record names was still at the line it names.
+That was read against the `deps/` tree as it stood before it was re-extracted at
+0.4.0, and it was wrong: `types.ex` and `index.ex` both moved, `declarations.ex`
+did not. The table below is the re-reading, and the "Decision 4 holds" bullet
+above carries the two cites the mistake reached. No claim about what the code
+does changed - only where it is.]
+
+`:90` cites `statifier_datamodel` as `mix.exs:143`, `~> 0.3`, `mix.lock:31`
+0.3.0 resolved. It reads `mix.exs:151`, `~> 0.4`, `mix.lock:31` 0.4.0 today,
+and 0.4.0 is the release carrying the inline-shape arm the Note above
+consumes. Every `statifier_datamodel` cite in this record was re-read against
+0.4.0 rather than carried forward from the 0.3.0 tree it was written over.
+
+| Where in this record | What it cites | Printed, against 0.3.0 | Reads in 0.4.0 |
+|---|---|---|---|
+| `:95` | `Types.parse/2` | `types.ex:155` | `:207` |
+| `:95` | `Types.satisfies?/3` | `:211` | `:282` |
+| `:96` | `Types.satisfies/3` | `:266` | `:370` |
+| `:99-100` | `Declarations.from_document/1` and `fetch/2` | `declarations.ex:108`, `:134` | unmoved |
+| `:102` | the private `fields/2` | `:179` | unmoved |
+| `:112` | `Index.path_types/1` | `index.ex:417-430` | `:426` |
+| `:113` | `scalar_kind/1`'s `nil` catch-all | `:542` | `:555` |
+| `:306`, `:751` | the covering step | `types.ex:309-324` | `:445-449` |
+| `:319` | the optional-held-field rule and its comment | `:337`, `:334-336` | `:500`, `:497-499` |
+| `:389` | `t:StatifierDatamodel.Types.t/0` | `:82-86` | `:126-131` |
+
+Two claims those cites carry were re-checked in 0.4.0 rather than assumed, and
+both hold. `t:StatifierDatamodel.Types.t/0` still has **no enumeration
+member**, which is decision 5's reason for typing `"status"` as a string; what
+0.4.0 added to it is the `{:shape, [member()]}` arm (`types.ex:128`), the
+inhabitant decision 5 needed and the one the Note above records - so `:389`'s
+enumeration claim holds while the arms it recites beside it are one short of
+0.4.0's. And the covering step still decides only a `record` read as a
+`shape`, so decision 4's stated consequence - that a `collect_type` naming a
+`record` is `:not_assignable` whatever the child declares - is unchanged.
+
+### Where the code cites read today
+
+The Note at `:802` repointed eight `block_type.ex` cites against `main` at
+`7cb3d28`, reading that tip at `:832`. `sb-nqfd`, `sb-1jcr` and `sb-268w` have
+since grown all four files this record cites, so those eight and the rest
+drifted again. Every claim they support is checked above and holds; only the
+line numbers moved.
+
+| Where in this record | What it cites | Printed | Reads at `94d1990` |
+|---|---|---|---|
+| `:34` | `core.map`'s `collect` field | `map.ex:353-359` | `:456-462` |
+| `:72` | `@run_status_key` | `compiler.ex:263-264` | `:312` |
+| `:73` | `run_status_param/0` | `:1443-1444` | `:1767-1772` |
+| `:73` | where the reserved param is appended | `:1423-1425` | `:1712` |
+| `:82` | `emit/2`'s context carries no other document | `subchart.ex:47-52` | `:47-49`, unmoved |
+| `:136`, `:790`, `:839` | decision 7's field-type set | `block_type.ex:149-157` | `:152-161` |
+| `:183` | `core.map`'s `chart` field | `map.ex:332-338` | `:435-441` |
+| `:225` | the three rules `summary/1` restates | `block_type.ex:598-601` | `:649-653` |
+| `:226` | `outcomes/1`'s stability rule | `:527-531` | `:578-582` |
+| `:238-239` | the twelve `@callback` lines, in order | `:252`, `:330`, `:338`, `:345`, `:374`, `:382`, `:389`, `:424`, `:509`, `:537`, `:570`, `:609` | `:292`, `:370`, `:378`, `:385`, `:414`, `:422`, `:429`, `:464`, `:560`, `:588`, `:621`, `:660` |
+| `:240` | the `@optional_callbacks` list | `:611-617` | `:710-717` |
+| `:245` | `summary/1` as the card's second line | `:609` | `:660` |
+| `:247` | `Context.child_summary()` | `compiler.ex:1164`, `:1169` | `:1438`, `:1443` |
+| `:412` | `type_expr()`'s spelling | `environment.ex:93` | `:104` |
+| `:566` | `config_schema/1`'s entries | `map.ex:322-372`, six | `:426-482`, seven |
+| `:584-585` | `completion_final/4` and its param list | `compiler.ex:1421-1431`, `:1423-1425` | `:1709-1719`, `:1710-1713` |
+| `:586` | `completion_finals/4` and its second clause | `:1361-1374`, `:1378` | `:1637`, `:1652` |
+
+`completion_final` takes five arguments today rather than four: `sb-nqfd` added
+the declared-params argument decision 3 asks for, which is an arity the
+decision implies and does not state. The name and the clause structure are
+otherwise what `:584-585` describes.
+
+Filed with `sb-upv0`, campaign SF035's Lane A.

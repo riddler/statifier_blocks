@@ -1159,7 +1159,7 @@ Filed with `sb-pxkf`, campaign-034 ruling `RQ-034-5`.
 
 ## Amendment (2026-09-06): decision 4 gains `collect_type`, decision 5's element is the envelope this record already fixed, and decision 7's multiplicand is nameable
 
-**Status: proposed (2026-09-06, campaign SF035, bead `sb-jvz3`, recording
+**Status: accepted (2026-09-06, campaign SF035, bead `sb-jvz3`, recording
 campaign-034's ruling `RQ-034-2` and campaign-033's `RQ-033-19` B).** A
 decision record merges at proposed under the campaign invariant; flipping it to
 accepted is a separate gated request through the same `docs/adr/` gate, and
@@ -1320,3 +1320,70 @@ as folded with that record.
 
 Filed with `sb-jvz3`, against `ADR-0013` as merged (PR 319, `b90d40e`);
 campaign-SF035. `sb-nqfd` builds it.
+
+## Note (2026-09-06): what the flip of the `collect_type` amendment checked, and the one sentence it makes historical
+
+`sb-upv0` is the separate gated request the amendment above names in its own
+status paragraph (`:1162-1167`), and it has flipped that section's `Status:`
+word from `proposed` to `accepted`. That word is the only text the flip
+changes in this record; this Note is by addition, sits at the foot, and
+carries no `Status:` line of its own.
+
+`sb-nqfd` (PR 353, `cc841a9`) built the field, `sb-1jcr` (PR 355, `d804062`)
+built the environment entry, and `sb-268w` (PR 356, `94d1990`) migrated the
+field type. The section was verified against `main` at `94d1990`. The
+`0.23.0` release prep
+(`081e426`) landed on `main` while this flip was open; it changes two version
+strings one line for one line and moves no line this Note cites.
+
+### Decision 4's new row is on `main`, and its field type is no longer `:string`
+
+`collect_type` is `config_schema/1`'s sixth entry, after `collect` and before
+`on`, optional, defaulting to the empty string, carrying
+`datamodel_path?` nowhere and producing no compiled bytes
+(`lib/statifier_blocks/core/map.ex:463-469`). All of that is as the amendment
+writes it.
+
+**One sentence of the amendment is historical, and it named the request that
+would make it so.** The row's `Type` column reads `:string`, and the paragraph
+beneath it reads "Its `config_schema/1` field type is the existing `:string`
+and `ADR-0002` decision 7's set stays closed at eight; `sb-268w` migrates it
+and `ADR-0002`'s `payload` together to a `{:type_expr, opts}` spelling when the
+typed-shapes theme settles, and a stored string reads as the name arm unchanged
+when it does." `sb-268w` has landed. The field is declared
+`{:type_expr, %{arms: [:name, :inline]}}` (`:464-465`), the set is closed at
+nine (`lib/statifier_blocks/block_type.ex:152-161`), and a stored string does
+read as the name arm unchanged - which
+`StatifierBlocks.Core.TypeExprMigrationTest` asserts byte for byte. The
+sentence's own condition is met rather than contradicted, and it is left
+standing: the grammar that admits the second arm is `ADR-0002`'s Amendment of
+2026-09-06 on decision 7, the `{:type_expr, opts}` field type
+(`docs/adr/0002-block-type-behaviour.md:4957`, its clause 7 table naming this
+field at `:5201-5206`), and `ADR-0013`'s Note filed with `sb-268w`, and neither
+is this record's to restate. Everything the row decides - that the field exists
+on decision 4's surface, that it is optional, that it is a **type** and never a
+path, and that the declaration is the **parent's** - is unaffected by which
+spelling carries it.
+
+### The rest of the amendment, checked
+
+- The element is the envelope, and `collect_type` types its `"donedata"`
+  member and nothing else. `collect` is typed
+  `{:path, %{writes: {:list, envelope(config)}}}` (`:456-462`); the envelope
+  is built at `:405-414` with `"index"` and `"status"` required and
+  `"donedata"` and `"failure"` optional, exactly as the member table has them;
+  `"donedata"` is `:unknown` when there is no declaration (`:416-422`).
+- Decision 7 keeps every clause. No number is set anywhere in the code, the
+  cap is still the runtime's, and `collect_type` produces no bytes.
+- The read cites resolve unmoved: decision 4's ordered table opener at `:196`,
+  decision 5 at `:286`, decision 7 at `:386` with clause 1 at `:401-408`, the
+  dotted-path amendment at `:967`, and this record's Notes at `:714`, `:754`,
+  `:761`, `:803` and `:891` with its table at `:921-925`, its sentence at
+  `:927-929` and the driver's answer at `:915-917`.
+- The one cite that moved is the shipped surface: the amendment reads
+  "`config_schema/1`'s sixth entry
+  (`lib/statifier_blocks/core/map.ex:322-372`, six entries today)". It is
+  still the sixth entry, and `config_schema/1` is `:426-482` with seven
+  entries today - the sixth of them being the entry this amendment adds.
+
+Filed with `sb-upv0`, campaign SF035's Lane A.
