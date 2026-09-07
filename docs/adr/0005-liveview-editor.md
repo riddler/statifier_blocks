@@ -7848,3 +7848,220 @@ SF036, under ruling `RQ-SF036-0d`.
   SF036's invariant, like every other section filed with it.
 
 Filed with `sb-4m4x`, campaign SF036.
+
+## Amendment (2026-09-07): decision 10, `ViewModel.Node.sentence`, and `ViewModel.outline/1` - the one walk a list view, an outline pane and a test all consume
+
+**Status: proposed (2026-09-07, campaign SF036, bead `sb-hlut`, on ruling
+`RQ-SF036-5`).** A decision record merges at proposed under campaign SF036's
+invariant; flipping this section's status line to accepted is a separate gated
+request (`sb-xnxw`, after `sb-w37s` lands the code). Additive: decision 10 at
+`:389-442`, its amendments `10n` and `10o` at `:2480-2497`, the `on_select`
+descriptor table at `:5156-5164` and every clause above this line stand
+exactly as written, and no text above this line is edited by this section.
+Nothing here is built yet - `sb-w37s` is the request that builds it.
+
+Every code cite below is a reading of `main` at `b08c99a`, dated to this
+section and to be re-read rather than trusted.
+
+### The gap
+
+This record gives a consumer two ways to read a block and no third.
+
+**Chips**, capped and refused rather than truncated (`10n` at `:2480`, `10o`
+at `:2489`). The cap's own reason names what it excludes: 24 characters was
+chosen "so that 'calls the host' and 'timer' fit **and a sentence does not**".
+
+**The canvas**, which is a picture: `arrangement/1`, `body_slots/1`,
+`rail?/1`, `tray?/1`, `flow_children/1` and `shelf_children/1`
+(`lib/statifier_blocks/view_model.ex:798`, `:814`, `:700`, `:719`, `:741`,
+`:748`) are the partition a two-dimensional renderer needs, and each answers
+one question about one node or one slot. There is no function on this module
+that hands a consumer the document **in reading order**.
+
+A host that renders a document as a vertical list of lines therefore has two
+holes to fill by hand: it has no per-block line to draw, and no walk to draw
+it from. Both are filled here, and both are filled **once**, on the view
+model, so the outline pane this package may grow, a host's own list view, and
+a test asserting what a document says are reading the same list rather than
+three re-derivations of it.
+
+`ADR-0002`'s amendment of this date declares the block-type half - an optional
+`sentence/1`, `config -> String.t()`, outside the 24-character arm of that
+record's B3 refusal set. This section is the view-model half.
+
+### `ViewModel.Node` gains `sentence`
+
+`Node`'s struct at `view_model.ex:347-365` gains one key,
+`sentence: nil`, typed `String.t() | nil` - a plain field beside `title`,
+`summary`, `join_label` and `outcome`, resolved by `build/3` (`:446-447`) at
+build time like every one of them, not a function called later.
+
+**It resolves in three steps**, and the claim spans three states, so it
+carries a table:
+
+| The block | `Node.sentence` holds |
+|---|---|
+| its type declares `sentence/1`, and the reader accepts the return | that string |
+| its type declares no usable `sentence/1`, and the author gave a `title` | the author's `title` |
+| neither | the type's label, falling back to the type name |
+
+"The reader" is `StatifierBlocks.BlockType.sentence/2`, whose four cases -
+including a raise, a throw, an exit and a malformed return, each of which
+answers the **type's label** and never the author's `title` - are `ADR-0002`'s
+amendment of this date and are not restated here.
+
+Rows two and three are the rule the `on_select` descriptor table already
+states at `:5162` for `label`:
+
+> what the block's card draws as its first line - the author's title where
+> they gave one, the type's label otherwise
+
+extended by exactly one line at the top: **the type's own sentence, where it
+declares one.** `ViewModel.title/1` (`:546-547`) is that rule in code and is
+**not changed**: `title/1` keeps both its clauses and every consumer of it
+reads what it read before. `sentence` is a fourth thing a node carries, not a
+re-spelling of the third.
+
+**An unresolvable block** - one whose type the palette cannot resolve, built
+by `build_unresolvable_node/*` (`:1398`) - has no callback to ask and no
+label, so it lands on row three's fallback, the type name as the document
+stores it. A list view therefore draws a line for every block in the document
+and never a blank one.
+
+**Chips are unchanged.** `10p`, `10q`, `10r` and `10w`, `summary_chips/1`
+(`:637-638`), `summary_titles`, the cap at `10n` and the refusal discipline at
+`10o` all keep every word they have. In particular `summary_chips/1`'s first
+clause - a node with an author's `title` draws no chips - is untouched, and
+`sentence` does not become a chip, is not capped, and appears in no chip list.
+A card draws what it drew yesterday.
+
+### `ViewModel.outline/1`
+
+```elixir
+@type kind :: :step | :arm | :rail | :tray
+
+@spec outline(t()) :: [{Node.t(), non_neg_integer(), kind()}]
+def outline(%__MODULE__{} = view_model)
+```
+
+Public on `StatifierBlocks.ViewModel`, **pure**, and a pure function of the
+view model alone: it reads `root` and walks the `Node`/`Slot` tree that is
+already there. It resolves nothing, calls no callback, consults no palette and
+reads no findings - everything it needs `build/3` has already put in the
+struct. Calling it twice on one view model returns two identical lists.
+
+**Pre-order.** The document's reading order: a node, then everything under it,
+then the next node. The first entry is always `{root, 0, :step}`.
+
+**Every block appears exactly once.** The four kinds are a partition of how a
+block is *reached*, not a filter on which blocks are listed: arms, rails and
+trays are **kinds**, never omissions. A consumer that wants only the flow
+filters the list it was given; the walk hides nothing, because a walk that
+hides a failure rail is a walk a reviewer cannot trust to be the document.
+
+**The four kinds, per variant:**
+
+| `kind` | The slot the node's parent holds it in | What it says about the node | Depth |
+|---|---|---|---|
+| `:step` | the parent's body, where `arrangement/1` is `:stack` | the next thing that happens | parent's depth + 1 |
+| `:arm` | one of the parent's body slots, where `arrangement/1` is `:fan` or `:lanes` | one alternative, or one concurrent lane | parent's depth + 1 |
+| `:rail` | a slot `rail?/1` accepts: `:secondary` or `:failure` | an attached rule beside the parent's region | parent's depth + 1 |
+| `:tray` | a slot `tray?/1` accepts: `:tray` | beside the document rather than in it | parent's depth + 1 |
+
+and the root, which sits in no slot at all, is `{root, 0, :step}`.
+
+**Depth is block nesting depth and nothing else.** Every child is exactly one
+deeper than the node whose slot holds it, in all four rows. A slot is not an
+entry in the list and never consumes a level: an arm's blocks are one deeper
+than their container, not two, and a rail's blocks are at the same depth as
+that container's body blocks. The slot's identity is carried by the `kind`
+column instead, which is why `kind` exists rather than a second numeric
+column. A consumer that wants to draw a heading per slot draws it at the
+transition between kinds; a consumer that wants indentation reads `depth`.
+
+**`:step` versus `:arm` is `arrangement/1`'s question, asked once.**
+`arrangement/1` (`:797-808`) already answers `:stack`, `:fan` or `:lanes` for
+a node from its `body_slots/1` and its entry's `layout`, and `:fan` is
+documented there as the exclusive arrangement and `:lanes` as the concurrent
+one. The outline reuses that function rather than re-deriving the distinction
+from a slot count, so a type declaring `layout: :columns` reads as arms here
+for the same reason its slots sit side by side on the canvas, and the two
+surfaces cannot drift apart.
+
+**Slot order is the canvas's order, not the declaration's.** For each node the
+walk visits `body_slots/1`'s slots first, in that function's order, then the
+slots `rail?/1` accepts, then the slots `tray?/1` accepts - each group in
+`node.slots` order within itself. `body_slots/1` (`:814`) is already defined
+as "every slot placed in the body flow, in order", and the rail-then-tray tail
+is what `10h`'s placement partition (`:1313`) and `10s` (`:3868`) put beside
+and below the body - `10t` (`:3889`) is the section spelling out that `:tray`
+is deliberately not in the rail partition, which is why the tail has two
+groups rather than one. Reading order matching drawing order is the property that lets
+a list view and the canvas be looked at side by side.
+
+**Child order within a slot is `flow_children/1` then `shelf_children/1`.**
+`flow_children/1` (`:741`) is the slot's children with the drafts shelf
+rejected; `shelf_children/1` (`:748`) is the shelf, at most one by `ADR-0002`
+G12b, and the canvas draws it last so it sits at the foot. The outline visits
+both, in that order, and a shelf takes the kind of the slot holding it like
+any other child. It is visited rather than skipped for the same reason a rail
+is: `flow_children/1` exists so a renderer can draw connectors past the shelf,
+not so a reader can be told the shelf is not in the document. A consumer that
+wants the flow alone has `shelf?/1` (`:735`) and the list.
+
+**A leaf contributes one entry.** A node with no slots, or with slots holding
+no children, appears once and nothing follows it until its parent's next
+child.
+
+### The first consumer
+
+The reference embedder's Plan view (`statifier_examples`) is the first thing
+to consume this: a **host list view** that draws one line per block from
+`Node.sentence`, indents it by `depth`, and uses `kind` to mark the lines that
+are arms, rails and trays. It is a host's own surface, built out of this
+package's components and this walk, and it stays in `statifier_examples`: the
+operator's ruling `D16` (umbrella `docs/decisions.md`) is that components
+promote and layouts do not. That pointer takes the qualified "umbrella" form
+`ADR-0002:717` and `ADR-0004:895` already use for `D13`, because the document
+it names is not in this repository; the principle itself is stated in the
+sentence above and does not depend on reaching it.
+
+Stated once so it cannot be misread: **this section adds no layout mode to the
+package editor**, and nothing here is a mode, a view toggle, a second canvas
+or an editor tab. `outline/1` is a function on the view model. What a host
+draws with the list it returns is the host's.
+
+### What this section does not decide
+
+- **No layout mode, no pane, no tab.** See above; this is a function and a
+  struct key.
+- **Nothing about the canvas.** `arrangement/1`, `body_slots/1`, `rail?/1`,
+  `tray?/1`, `flow_children/1`, `shelf_children/1`, `join_label` and every
+  drawn edge behave exactly as before; `outline/1` reads them and changes
+  none of them.
+- **Nothing about chips.** `10n`, `10o`, `10p`, `10q`, `10r`, `10w` and
+  `summary_chips/1` are untouched, and `sentence` is not a chip.
+- **No cap on `sentence`.** That is `ADR-0002`'s amendment of this date, by
+  `10n`'s own argument about where a presentation number lives; if a maximum
+  is ever wanted for a **drawn** sentence it is this decision's to carry, and
+  it is not carried here.
+- **No selection, no findings, no ids.** `outline/1` returns nodes; a
+  consumer that wants a block's id reads `node.block_id`, and the
+  `on_select` descriptor at `:5156-5164` is unchanged and gains no `sentence`
+  key.
+- **No sort, no filter, no collapse.** The list is the document in reading
+  order. Folding, filtering and searching it are a consumer's, and this
+  package holds no state for them.
+- **It edits nothing.** Decision 10, its amendments, the `on_select` table
+  and every clause above stand as written; this section is additive and sits
+  at the foot of the record so no line a sibling record cites moves.
+
+### Implementing and flipping beads
+
+`sb-w37s` builds `Node.sentence`, `outline/1` and the core types' sentences,
+from this section and `ADR-0002`'s amendment of this date as merged.
+`se-1cl` builds the Plan view against them in `statifier_examples`.
+`sb-xnxw` flips **this section's status line** to accepted after `sb-w37s`
+lands.
+
+Filed with `sb-hlut`, campaign SF036, on ruling `RQ-SF036-5`.
