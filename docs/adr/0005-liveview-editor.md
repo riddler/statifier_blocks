@@ -8068,7 +8068,7 @@ Filed with `sb-hlut`, campaign SF036, on ruling `RQ-SF036-5`.
 
 ## Amendment (2026-09-07): clauses 1C-4C, an optional `Recipe.members/2`, and the compound that deletes an arrangement in one gesture
 
-**Status: proposed (2026-09-07, campaign SF036, bead `sb-gdmw`, on ruling
+**Status: accepted (2026-09-07, campaign SF036, bead `sb-gdmw`, on ruling
 `RQ-SF036-7`).** A decision record merges at proposed under campaign SF036's
 invariant, and **this section does not flip in SF036** - the ruling is record
 only, and the campaign's consent (clause 11) says so in terms. Additive:
@@ -9034,3 +9034,206 @@ flips this section's status line to accepted after `sb-gbxt` lands, and re-reads
 every cite above against `main` as it stands then.
 
 Filed with `sb-2lx1`, campaign SF037, on ruling `RQ-SF037-12`.
+
+## Note (2026-09-07): the `Recipe.members/2` amendment is flipped to accepted, its cites re-counted, and the `3D` tiebreak recorded as ruled
+
+The Amendment of 2026-09-07 on clauses `1C`-`4C`, an optional
+`Recipe.members/2` and the compound that deletes an arrangement (`:8069`)
+reads `Status: accepted` from this date. `sb-yl9f` is the separate gated
+request that section's own closing paragraph leaves to "the campaign that
+lands the code" (`:8319`) without naming a bead, and this Note is what the
+flip checked.
+
+It is by addition, sits at the **foot** of this record so that no line a
+sibling record cites moves, edits no clause, and carries no `Status:` line of
+its own. The only line the request removes in this file is the one the status
+word sits on. No marker is inserted beside the status paragraph: inserting one
+mid-file is what this campaign's append-at-the-end rule exists to prevent, and
+every forward sentence that section carries is met here instead, where it
+stands.
+
+Three of its sentences are answered by this request rather than reworded:
+
+- "**this section does not flip in SF036** - the ruling is record only, and
+  the campaign's consent (clause 11) says so in terms" is unchanged and true:
+  it did not flip in SF036. It flips in **SF037**, the campaign that landed
+  its code, which is what the same section's "Implementing and flipping beads"
+  said would happen.
+- "Nothing here is built yet." is met: `sb-e491` built it, and the
+  claim-by-claim reading below is where this request checked it.
+- "the flip is a separate gated request in the campaign that lands the code,
+  and it re-reads every cite above against `main` as it stands then" is met by
+  this request and by the re-count table below.
+
+### What was implemented, and where the flip read it
+
+| Section | Implementing request | On `main` at | Read for this flip at |
+|---|---|---|---|
+| `1D`, `2D`, `3D` and the per-variant table (`:8069`) | `sb-e491`, PR 388 | `b37cf1d` | `e3db9b1` |
+
+### What the flip verified, claim by claim
+
+**`1D`. The callback, and that it is optional.** `StatifierBlocks.Recipe`
+declares `@callback members(block_id :: Block.id(), document :: Document.t())
+:: [Block.id()]` (`recipe.ex:95`) and `@optional_callbacks members: 2`
+(`:97`), beside `insert/2` (`:73-74`) and `palette_entry/0` (`:80`). It is the
+only optional callback on the module. The optionality is not theoretical: the
+recipe `StatifierBlocks.Composite`'s `__before_compile__` derives for a
+composite type (`composite.ex:277-296`) implements `insert/2` and
+`palette_entry/0` and nothing else, and is a valid recipe. The answer includes
+the asked-about block when the recipe claims it, and `[]` is how a recipe says
+"not mine" - both are stated in the callback's own `@doc` and both are what
+the caller relies on (`3D` below).
+
+**`2D`. Structural recognition, and the three properties.**
+`StatifierBlocks.Core.DeadlineRecipe.members/2` (`deadline_recipe.ex:136-145`)
+takes the last step of the document path for the asked-about block, resolves
+the enclosing group, and dispatches on the slot the block sits in. `pair/3`
+(`:166-187`) reads the shape and nothing else: asked about a `core.send` in
+`body` carrying a non-empty `event` and a non-empty `delay`, it looks for a
+`core.on_event` on that same group's `interrupts` rail whose `event` is equal
+(`partner/4`, `:190-196`) and answers `[send_id, handler_id]`; asked about the
+handler, it looks into the body for the send and answers the same list in the
+same order. The three properties the section derives all hold in that code:
+
+- a **hand-built pair is claimed**, because nothing in `pair/3` or `partner/4`
+  reads provenance - only type, slot, `event` and `delay`;
+- a **renamed event still matches**, because the test is equality between the
+  two halves' `event` values, never equality with `event_name/1`'s generated
+  form (`:248`, `"deadline." <> String.slice(id, -8, 8)`);
+- **nothing outside the enclosing group is named**, because the rail is read
+  off the group the asked-about block sits in and off no other block. The
+  section says the caller refuses an out-of-group answer as it refuses an
+  out-of-reach `insert/2` list; `same_enclosing_block?/3`
+  (`editor.ex:1807-1813`) is that refusal, and `Recipe.within_reach?/2`
+  (`recipe.ex:126-127`) is the `insert/2` one it is modelled on.
+
+**`3D`. Ask every recipe; one claim becomes one compound.** `recipe_claim/2`
+(`editor.ex:1777-1784`) sorts the palette's `recipes` map by name and takes the
+first valid claim; `claim/3` (`:1786-1796`) asks only a module that exports
+`members/2` (`members_exported?/1`, `:1798-1801`). The three cases the section
+names are the three the code has: no claim commits `{:remove, id}` through
+`remove_block/2` (`:1735-1740`, the commit at `:1739`), byte for byte the path
+that existed before; one claim commits `{:compound, [{:remove, a}, {:remove,
+b}]}` through `remove_compound/2` (`:1747-1752`), which by `2n` is one undo
+entry; more than one claim takes the first by name and is not a refusal.
+
+The compound is **offered, not imposed**, as the section requires:
+`handle_event("remove", ...)` (`:1432-1442`) holds the claim as a
+`pending_remove` assign instead of committing, and `handle_event(
+"remove-confirm", ...)` (`:1448-1455`) recomputes the claim before committing
+it, so an offer the document has outgrown falls back to the plain remove. The
+section takes no layout ruling and none is taken by the code beyond the
+smallest presentation that is honest: the block card's own delete control
+draws `x2` where its `x` was, with a `keep` beside it
+(`editor/block_node.ex:394-416`), and `"remove-cancel"` (`:1457-1459`) is
+the way out. No mode is added to the editor.
+
+Two answers the code refuses that the section's `2D` and `1D` require it to:
+an answer naming a block outside the asked-about block's enclosing block, and
+an answer that omits the asked-about block itself (`id in ids`,
+`editor.ex:1790`). A claim of one id takes the unchanged path, which is `1D`'s
+"a compound of one remove and a plain remove are the same gesture".
+
+**The per-variant table.** Row 1 (both halves present) and row 2 (no recipe
+recognises it) are the two paths above. Row 3, the **partial** arrangement, is
+what `pair/3` answers `[]` for - a lone half, or a pair renamed apart - so the
+conservative reading the table records is what the code does. That row is
+recorded as behaviour in the absence of a decision and not as the decision,
+and this flip does **not** settle it: the section's "Whether a partial
+arrangement is anything at all" stays an open question, and nothing in
+`sb-e491` decided it. Row 4, the composite, is verified below.
+
+**"Which recipe-removes survive a composite block type."** `sb-xio9` landed
+composites (`lib/statifier_blocks/composite.ex`, `main` at `d0af5f0`), so the
+section's forward-looking boundary can be read against code for the first
+time, and it holds:
+
+- a composite **is one block**: `slots(_config)` is `[]` for every composite
+  (`composite.ex:231`), so it has no interior in the document's tree to
+  delete piecewise, and its delete is one `{:remove, id}` through
+  `remove_block/2`;
+- **no recipe claims it.** The recipe derived from a composite's declaration
+  implements `insert/2` and `palette_entry/0` only (`composite.ex:277-296`),
+  so `members_exported?/1` answers `false` for it and `claim/3` declines
+  without calling anything. That is `1D`'s "a recipe with no `members/2` says
+  it by omission", arriving for composites by construction rather than by a
+  special case;
+- **`members/2` serves the arrangements that are still plain blocks**, which
+  is the core `"deadline"` recipe - registered in the palette's `recipes` map
+  (`palette.ex:178`, the `defstruct` field at `:77`) rather than in `types`,
+  where a composite's entry sits (`composite.ex:157`).
+
+The boundary sentence this section states - "it is whether the arrangement is
+**written down as one thing**" - is the one the Amendment of this date on
+Expand and the composite card rests its `10E` on (`:8631`), and the two
+records agree.
+
+### What this flip verified as record and not yet as code
+
+`10E` (`:8639-8643`) reads this section's boundary forward one step: after
+Expand, `members/2` is what recognises the result, because after Expand there
+is nothing else to recognise it by. That step is verified here **as record**
+and is noted as pending code:
+
+- the **Expand gesture** is `sb-hgxl`, which has not landed at `e3db9b1`.
+  What can be checked today is that the shape `Composite.expand/2` produces
+  for the reference composite - a group whose `body` holds a `core.send`
+  carrying an event and a `delay`, and whose `interrupts` rail holds a
+  `core.on_event` naming the same event - is exactly the shape
+  `DeadlineRecipe.members/2` recognises, both halves inside the one enclosing
+  group `same_enclosing_block?/3` requires. That the recognition then runs on
+  an expanded document is `sb-hgxl`'s to demonstrate;
+- the composite card's drawing - "whose interior the editor draws from the
+  type rather than from the document's tree" - is `sb-hgxl`'s as well: the
+  Amendment of this date on Expand names it in the same sentence that names
+  the gesture, and it is likewise unlanded at `e3db9b1`. Nothing in this
+  section's delete claims depends on it: `slots/1 = []` is what makes the
+  delete one block, and that is landed.
+
+Neither is falsified. Both are claims about code a later request in this
+campaign lands, recorded here so the next reader is not left to guess which
+half of the section had code behind it on the day it was accepted.
+
+### `RQ-SF037-11`: the `3D` first-by-name tiebreak stands
+
+`3D`'s third case - more than one recipe claims the block, and the editor
+takes the claim of the recipe that sorts first by name rather than refusing -
+was put to the campaign as an open question and ruled on 2026-09-07: the
+tiebreak **stands**, unchanged, as `3D` wrote it. The reason is the record's
+own, and is repeated here so the ruling is legible without the campaign's
+paperwork: a host that registered two recipes recognising one shape gets a
+deterministic pick, not a refusal. Recipes are a host-registered map with a
+later-wins collision rule on names (`1C` at `:5705-5708`); two recipes
+recognising the same shape is a host having registered two, and an author at
+delete time needs an answer rather than an argument. `recipe_claim/2`
+(`editor.ex:1782-1783`) implements it as written - `Enum.sort_by/2` on the
+name, then the first valid claim - and no clause of this record is amended by
+the ruling.
+
+### Cites re-counted
+
+`sb-e491` and the requests beside it moved code this section cites, and the
+section ends by saying its cites are to be re-read rather than trusted. Every
+one, read at `e3db9b1`:
+
+| Cited as, in the section | Reads today, at `e3db9b1` |
+|---|---|
+| `editor.ex:1303-1311` (the two `"remove"` events; `sb-1q2r`) | `def handle_event("remove", %{"block-id" => id}, socket)` is `:1432`, its body `:1433-1442`; the plain path is `remove_block/2` `:1735-1740` |
+| `editor.ex:1309` (where the editor commits `{:remove, id}`) | `commit({:remove, id})` at `:1739`, inside `remove_block/2` |
+| `recipe.ex:53-60` (a module implementing only `insert/2` and `palette_entry/0` is a valid recipe) | the moduledoc sentence is `:33-38`; the callbacks themselves are `insert/2` `:73-74`, `palette_entry/0` `:80`, `members/2` `:95`, `@optional_callbacks members: 2` `:97` |
+| `recipe.ex:89-92` (`within_reach?/2`) | `@spec` and `def` at `:126-127`, its `@doc` `:98-125` |
+| `deadline_recipe.ex:73-85` (the shape the recipe writes and recognises) | `:73-85` is now the moduledoc's closing paragraph and the module attributes; the moduledoc's account of the shape and its three consequences is `:52-74`, and the recognition itself is `members/2` `:136-145`, `pair/3` `:166-187`, `partner/4` `:190-196` |
+| `deadline_recipe.ex:147-148` (`"deadline." <> String.slice(id, -8, 8)`) | `event_name/1` at `:248` |
+| `palette.ex:77` (the `recipes` field), `:223-225` (the recipes map) | `:77` unmoved; `manifest/1` is `:224` with `recipe_entries` at `:226`, `core_recipes/0` `:178`, `fetch_recipe/2` `:479-480` |
+| `environment.ex:132`, `:135` (a shape's members) | both unmoved: `type_expr` with its `{:shape, [member()]}` arm at `:132`, `@type member` at `:135` |
+| `field.ex:1200-1202` (`type_expr_members/1`), `:1259-1266` (`decode_members/1`) | `:1383-1384` and `:1440-1448` |
+
+The `editor.ex:1303-1311` row is the whole of `sb-1q2r`, which is folded into
+this request: the range was a reading of a `main` two campaigns of editor work
+ago, and the handler it names has moved twice since. `sb-1q2r`'s second item -
+whether the `3D` tiebreak should be revisited - is the question `RQ-SF037-11`
+answers above.
+
+Filed with `sb-yl9f`, campaign SF037, on ruling `RQ-SF037-11`, folding
+`sb-1q2r`.
