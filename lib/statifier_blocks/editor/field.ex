@@ -371,6 +371,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:target, :any, required: true)
     attr(:class, :string, default: nil)
 
+    attr(:block_id, :string,
+      default: nil,
+      doc: """
+      The id of the block this field belongs to, sent as `block-id` on the
+      list gestures (`field-list-add`, `field-list-remove`) the way
+      `config-change` and `discard-draft` already carry it. `nil` sends no
+      attribute at all, so a caller that supplies none renders exactly what
+      it rendered before.
+      """
+    )
+
     attr(:expression_component, :any,
       default: nil,
       doc:
@@ -512,6 +523,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <.control
           field={@field}
           target={@target}
+          block_id={@block_id}
           expression_component={resolve_expression_component(@expression_component)}
           invoke_types={@invoke_types}
           path_candidates={@path_candidates}
@@ -539,6 +551,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     attr(:field, ViewModel.Field, required: true)
     attr(:target, :any, required: true)
+    attr(:block_id, :string, default: nil)
     attr(:expression_component, :any, default: nil)
     attr(:invoke_types, :list, default: [])
     attr(:path_candidates, :list, default: [])
@@ -782,6 +795,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         base_id={@base_id}
         path={[]}
         target={@target}
+        block_id={@block_id}
         type_candidates={@type_candidates}
       />
       """
@@ -835,6 +849,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             phx-target={@target}
             phx-value-key={@field.key}
             phx-value-index={index}
+            phx-value-block-id={@block_id}
           >
             remove
           </button>
@@ -846,6 +861,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           phx-click="field-list-add"
           phx-target={@target}
           phx-value-key={@field.key}
+          phx-value-block-id={@block_id}
         >
           add
         </button>
@@ -1048,6 +1064,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:base_id, :string, required: true)
     attr(:path, :list, required: true)
     attr(:target, :any, required: true)
+    attr(:block_id, :string, default: nil)
     attr(:type_candidates, :list, required: true)
 
     # One type expression: the toggle when the value admits both arms, then
@@ -1140,6 +1157,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               base_id={@base_id <> "-#{index}-type"}
               path={@path ++ [index]}
               target={@target}
+              block_id={@block_id}
               type_candidates={@type_candidates}
             />
             <button
@@ -1150,6 +1168,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               phx-value-key={@key}
               phx-value-index={index}
               phx-value-path={type_expr_path_param(@path)}
+              phx-value-block-id={@block_id}
             >
               remove
             </button>
@@ -1161,6 +1180,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             phx-target={@target}
             phx-value-key={@key}
             phx-value-path={type_expr_path_param(@path)}
+            phx-value-block-id={@block_id}
           >
             add
           </button>

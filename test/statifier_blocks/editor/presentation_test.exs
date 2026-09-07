@@ -912,6 +912,37 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert lanes(latest_document()) == ["signup", "sms"]
       end
+
+      # Sabotage: dropped `phx-value-block-id` from either gesture in
+      # `Field.control/1`'s `{:list, inner}` clause, or dropped `block_id`
+      # from `ConfigForm`'s `Field.field` call - red here (verified). A host
+      # with several rows open receives `field-list-add` carrying only a
+      # `key`, and cannot tell which block raised it - the same reason
+      # `config-change` and `discard-draft` carry the id already.
+      test "the {:list, t} gestures name the block they belong to", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, document: lanes_document())
+
+        view
+        |> element(~s([data-block-id="blk_lanes"] > .sb-node__chrome > .sb-node__label))
+        |> render_click()
+
+        assert has_element?(
+                 view,
+                 ~s(button[phx-click="field-list-add"][phx-value-block-id="blk_lanes"])
+               )
+
+        assert has_element?(
+                 view,
+                 ~s(button[phx-click="field-list-remove"][phx-value-block-id="blk_lanes"][phx-value-index="0"])
+               )
+
+        # The id rides beside the key rather than replacing it: a host that
+        # ignores the new attribute reads exactly what it read before.
+        assert has_element?(
+                 view,
+                 ~s(button[phx-click="field-list-add"][phx-value-key="lanes"])
+               )
+      end
     end
 
     describe "slot labels, lane rules and the interrupt region (1.7, campaign 016)" do
