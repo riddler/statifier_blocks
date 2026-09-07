@@ -8065,3 +8065,258 @@ from this section and `ADR-0002`'s amendment of this date as merged.
 lands.
 
 Filed with `sb-hlut`, campaign SF036, on ruling `RQ-SF036-5`.
+
+## Amendment (2026-09-07): clauses 1C-4C, an optional `Recipe.members/2`, and the compound that deletes an arrangement in one gesture
+
+**Status: proposed (2026-09-07, campaign SF036, bead `sb-gdmw`, on ruling
+`RQ-SF036-7`).** A decision record merges at proposed under campaign SF036's
+invariant, and **this section does not flip in SF036** - the ruling is record
+only, and the campaign's consent (clause 11) says so in terms. Additive:
+clauses `1C` to `4C` at `:5698-5788`, their "What this does not decide" at
+`:5790-5802`, their Consequences at `:5804-5832`, clause `2n` at `:5654`,
+clause `11u` at `:6477` and every clause above this line stand exactly as
+written, and no text above this line is edited by this section. Nothing here
+is built yet.
+
+Every code cite below is a reading of `main` at `b57c197`, dated to this
+section and to be re-read rather than trusted.
+
+### The gap this closes, and the sentence that named it
+
+Clause `4C`'s own "What this does not decide" left the hole and dated its own
+answer to a later record (`:5792-5795`):
+
+> **Whether a recipe can edit an existing arrangement.** `insert/2` builds; it
+> is not a refactoring seam, and there is no `remove/2` beside it. Deleting a
+> deadline is deleting two blocks, and it is two gestures until some record
+> says otherwise.
+
+This is that record, and it says otherwise for **delete only**. The wider
+claim in that bullet - that a recipe is not a refactoring seam - is not
+disturbed: nothing here lets a recipe move a block, retype one, or rewrite an
+arrangement in place. It gains one read-only question it can answer about a
+document it is shown, and the editor decides what to do with the answer.
+
+The asymmetry the bullet describes is real and is worth stating plainly before
+it is fixed. `insert/2` makes the deadline **one** gesture: one pick, two
+`:insert`s, one `{:compound, ...}`, one undo entry (`2n` at `:5654`, "a
+compound is **one undo entry**: one gesture in, one gesture out"). Removing it
+is two picks, two `"remove"` events (`lib/statifier_blocks/editor.ex:1303-1311`),
+two commits and **two** undo entries - and, between them, a document in the
+state clause `11u` calls a lone deadline half. The arrangement goes in whole
+and comes out in pieces.
+
+### 1D. `StatifierBlocks.Recipe` gains an optional `members/2`
+
+    @callback members(block_id :: Block.id(), document :: Document.t()) ::
+                [Block.id()]
+
+    @optional_callbacks members: 2
+
+It is **optional**, which is the whole of its cost to an existing recipe: a
+module implementing only `insert/2` and `palette_entry/0`
+(`lib/statifier_blocks/recipe.ex:53-60`) is a valid recipe after this clause
+exactly as it was before it, and a host that never wants a compound delete
+writes nothing.
+
+It is **pure**, on `insert/2`'s terms and for `insert/2`'s reason
+(`:5736-5743`): it is handed a block id and the document as it stands, it
+reads and does not write, it mints nothing, and it raises nothing. It returns
+a list of block ids.
+
+The **answer includes the block it was asked about** when the recipe claims
+it, and is `[]` when it does not. A recipe that answers `[block_id]` and
+nothing else has claimed a one-block arrangement, which is the same shape as
+declining for every purpose the editor has - the compound of one remove and
+the plain remove are the same gesture. `[]` is the way to say "not mine", and
+a recipe with no `members/2` says it by omission.
+
+### 2D. A recipe recognises its arrangement **structurally**, not by a mark
+
+Nothing in the document says "this send is a deadline's send". Clause `11u`
+(`:6477`) settles that as the first of its three reasons, and quotes `4C` for
+it: both halves are ordinary blocks of ordinary core types, "the recipe is the
+knowledge of how they go together and nothing more", and that knowledge lives
+at gesture time and is not written down.
+
+`members/2` does not change that, and the design turns on its not changing it.
+A recipe answers by **recognising a shape in the document it is shown**, using
+the same core knowledge `insert/2` already carries. For the core `"deadline"`
+recipe, the shape is the one ADR-0010 decision 1 spells and
+`StatifierBlocks.Core.DeadlineRecipe` already writes
+(`lib/statifier_blocks/core/deadline_recipe.ex:73-85`):
+
+- a `core.send` in a group's `body` slot, carrying an `event` and a `delay`; and
+- a `core.on_event` on **that same group's** `interrupts` rail, whose `event`
+  is the same string.
+
+Asked about either half, the recipe finds the enclosing group, looks for the
+partner on the other slot with the matching event name, and answers both ids
+when it finds one.
+
+Three properties follow from recognising the shape rather than the origin,
+and each is deliberate.
+
+**A hand-built pair is claimed.** An author who put down a `core.send` and a
+rail `core.on_event` by hand, with matching event names, has built the
+arrangement whether or not they used the palette entry. The recipe cannot tell
+the difference, and should not: `11u`'s "the pair has no representation in the
+document" cuts both ways.
+
+**A renamed event still matches.** `DeadlineRecipe` generates the event name
+(`:147-148`, `"deadline." <> String.slice(id, -8, 8)`), but recognition tests
+that the two halves **agree**, not that either matches the generated form. An
+author who renamed the event to something their domain uses has renamed both
+halves - the config form writes one at a time, and a pair that disagrees is
+not an arrangement - so the pair either still matches or is no longer a pair.
+
+**A recipe never claims a block outside the enclosing group.** `3C`
+(`:5745-5774`) bounds what `insert/2` may write to the armed position and the
+enclosing block's slots, on the argument that an author can see the enclosing
+group and cannot see what is above it. The same bound is the right one for a
+delete a gesture triggers, for the same reason: an author deleting a block
+must not have a block removed from a region they are not looking at. A
+`members/2` answer naming a block that is not in the same enclosing group as
+the asked-about block is refused by the caller before the compound is built,
+exactly as an out-of-reach `insert/2` list is (`within_reach?/2`,
+`lib/statifier_blocks/recipe.ex:89-92`).
+
+### 3D. On delete the editor asks every recipe, and one claim becomes one compound
+
+Where the editor today commits `{:remove, id}`
+(`lib/statifier_blocks/editor.ex:1309`), it first asks each recipe in the
+palette's `recipes` map (`lib/statifier_blocks/palette.ex:77`, `:223-225`)
+that exports `members/2`. Then:
+
+- **no recipe claims the block** - the commit is `{:remove, id}`, byte for
+  byte what it is today;
+- **exactly one recipe claims it** - the commit is the `{:compound, ...}` of
+  a `{:remove, ...}` per claimed id. By `2n` (`:5654-5661`) that is **one undo
+  entry**, so the arrangement comes out the way it went in, and one undo puts
+  it back whole;
+- **more than one recipe claims it** - the editor takes the claim of the
+  recipe that sorts first by name, and the record does not make this a
+  refusal. Recipes are a host-registered map with a later-wins collision rule
+  on names (`1C` at `:5705-5708`); two recipes recognising the same shape is a
+  host having registered two, and the deterministic pick is the property that
+  matters at delete time.
+
+The compound is **offered**, not imposed. An author who asked to delete one
+block and got two removed without being told would learn not to trust the
+delete; the clause is that the editor puts the compound to the author and
+commits it on their word. `2n`'s undo is what makes a mistaken yes cheap, not
+a substitute for asking.
+
+### The claim, per variant
+
+`members/2` is a question about a document, and what a document holds varies.
+The claim is therefore stated per case rather than in general.
+
+| The block the author deletes | What `members/2` answers | What the editor commits |
+|---|---|---|
+| a half of an arrangement a recipe recognises (both halves present, same enclosing group, agreeing event) | both ids, including the asked-about one | one `{:compound, [{:remove, a}, {:remove, b}]}`, offered to the author, one undo entry |
+| a block no recipe recognises - most blocks in most documents | `[]`, or nothing at all where the recipe omits the callback | `{:remove, id}`, unchanged from today |
+| a **partial** arrangement: a lone deadline half, its partner absent or its event renamed apart | not decided here - see below | `{:remove, id}` under the conservative reading, and this section does not settle it |
+| a **composite block type**, once one exists | not asked - a composite is one block | `{:remove, id}`, one block, one command, by construction |
+
+### `members` here are blocks; a shape's members are fields
+
+This package already uses the word `member` for something else, and the two
+must not be read as one vocabulary. A **shape**'s members are the fields of a
+record-shaped type expression: `@type member :: %{name: String.t(), type:
+type_expr(), required?: boolean()}` and `{:shape, [member()]}`
+(`lib/statifier_blocks/environment.ex:132`, `:135`), decoded and rendered by
+the type-expression control (`type_expr_members/1` at
+`lib/statifier_blocks/editor/field.ex:1200-1202`, `decode_members/1` at
+`:1259-1266`). A **recipe**'s members are blocks in a document. There is no
+name collision - `Recipe.members/2` is a new function on a module that has
+neither - but the word is shared, and a reader who carries the shape meaning
+into this section will read it wrong.
+
+### Worked example: a settlement deadline in the card-processing document
+
+A `core.group` named "Settle" holds, in its `body`, a `core.send` with
+`event: "deadline.a1b2c3d4"` and `delay: "1h"`, then a `myapp:capture` invoke;
+on its `interrupts` rail it holds a `core.on_event` with
+`event: "deadline.a1b2c3d4"` leading to a `myapp:authorize` reversal. One
+palette pick put the pair down (`4C`); the author added the rest.
+
+The author now selects the `core.send` and deletes it. The editor asks the
+palette's recipes. `"deadline"` finds the send's enclosing group, finds a
+`core.on_event` on that group's `interrupts` rail whose `event` equals the
+send's, and answers both ids. The editor offers the compound; the author takes
+it; one commit removes both halves and one undo restores both. Today the same
+author gets one block removed, a lone `core.on_event` left on the rail, and -
+correctly, by `11u` - **no finding telling them so**.
+
+Had the author instead deleted the `myapp:capture` invoke, no recipe would
+claim it, and the commit would be the `{:remove, id}` it is today.
+
+### Which recipe-removes survive a composite block type
+
+The next campaign's composites give a host a way to ship an arrangement as a
+**single block type** whose interior the editor draws from the type rather
+than from the document's tree. That changes the delete question completely for
+anything expressed that way, and the boundary between the two mechanisms is
+this record's to name, because it is the reason `members/2` is not made
+redundant by them:
+
+- **A composite deletes as one block by construction.** It is one block id in
+  the document, one `{:remove, id}`, one undo entry, and no recipe is asked
+  anything. It needs no membership because it has the representation `11u`
+  says the deadline pair lacks - the block itself.
+- **`members/2` serves exactly the arrangements that are still plain blocks.**
+  An arrangement a host ships as a recipe stays two or more ordinary blocks in
+  the document, keeps `11u`'s "no representation" property, and therefore
+  keeps needing someone to recognise it at delete time.
+
+So the boundary is not "recipes versus composites" as authoring gestures - it
+is whether the arrangement is **written down as one thing**. The core
+`"deadline"` recipe is the live case on the near side of that line: ADR-0010
+decision 1 rules the clock interrupt is a pair rather than a `core.timeout`
+type, so it is not a composite candidate, and it keeps `members/2` for as long
+as that ruling stands. A host that later converts one of its own recipes into
+a composite drops that recipe's `members/2` with it, and nothing in this
+package has to be told.
+
+### What this section does not decide
+
+- **How the offer is drawn.** Whether the editor asks in a confirm dialog, a
+  toast with an undo affordance, an inline count on the delete control, or
+  something else, is presentation, and this record takes no layout ruling -
+  the same restraint `4C`'s own non-decisions take about where recipe entries
+  sit in the palette browser (`:5796-5799`).
+- **Whether a partial arrangement is anything at all.** Clause `11u`
+  (`:6477`) already answered the **compile-time** half of `sb-5ju0`'s
+  question: a lone deadline half is not a finding and is not an orphan, and
+  this section does not reopen it. The **delete-time** half is a different
+  question and is left open here: whether `members/2` may claim a block whose
+  partner is absent, and what a compound of one would mean. The table above
+  records the conservative reading (a lone half deletes as one block) as the
+  behaviour in the absence of a decision, not as the decision.
+- **Nothing about `insert/2`, `palette_entry/0` or `within_reach?/2`.**
+  Clauses `1C` to `4C` stand as written; `members/2` is a third callback
+  beside two, and the first that is optional.
+- **Nothing about the compiler or the wire format.** `4C`'s third
+  non-decision (`:5800-5802`) holds unchanged: the compiler never sees an
+  `Edit.t()`, and a compound of removes is no more visible outside the editor
+  than a compound of inserts is.
+- **No new finding, anywhere.** A document holding a partial arrangement is a
+  document `11u` blesses. Nothing here adds a lint, a warning, or a view-model
+  finding, and a recipe that declines to claim a block is not reporting
+  anything about it.
+- **No cross-document reach.** `members/2` is bounded by `3C`'s enclosing
+  group (`2D` above); "is this event ever caught anywhere in the chart" stays
+  the whole-document question `11u` routes to a host's `validate_document/1`
+  validator under `11p`.
+
+### Implementing and flipping beads
+
+No bead in campaign SF036 builds this, and none flips it. The code is the
+**SF037 composites campaign**'s: `Recipe.members/2`, the core `"deadline"`
+recipe's implementation of it, the editor's delete path, and the offer.
+**This record does not flip in SF036** (consent clause 11); the flip is a
+separate gated request in the campaign that lands the code, and it re-reads
+every cite above against `main` as it stands then.
+
+Filed with `sb-gdmw`, campaign SF036, on ruling `RQ-SF036-7`.
