@@ -3926,9 +3926,36 @@ button.sb-inspector__group-row:hover {
 }
 
 /* The path is the row's own heading, so it is a `th` and reads as the key
- * rather than as another value beside the four that describe it. */
+ * rather than as another value beside the five that describe it. */
 .sb-datamodel__scroll tbody th {
   font-weight: var(--sb-weight-medium);
+}
+
+/* A declared `one_of`, drawn in the Values column. Each value is a chip so
+ * that an enumeration reads as a set rather than as a sentence, and the
+ * chips wrap rather than widening the column, because the path and the shape
+ * beside them are what a reader scans down. The overflow count is subtler
+ * than the values it stands for: it is a statement about the table's cut and
+ * not one of the document's own values. Nothing here is tinted, for the
+ * reason the section comment above gives - no cell in this table carries a
+ * verdict. */
+
+.sb-datamodel__values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sb-space-half);
+}
+
+.sb-datamodel__value {
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  font-size: var(--sb-text-xs);
+  padding: 0 var(--sb-space-half);
+}
+
+.sb-datamodel__values-more {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-xs);
 }
 
 /* The tab carries three sections since `sb-sy0q` - what is known at the

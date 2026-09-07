@@ -9,8 +9,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     What is asserted here is what only a rendered drawer can show - that the
     tab is on the strip carrying the row count, that the grid draws a row per
-    declared path with the surface that declared it and the shape the ADR-0006
-    projection carries, that a document nothing declares for gets the empty
+    declared path with the surface that declared it, the shape the ADR-0006
+    projection carries and the `one_of` values it declares (cut at eight, with
+    the remainder counted), that a document nothing declares for gets the empty
     state rather than an empty table, and that the panel offers no way to
     change any of it. The projection itself is
     `StatifierBlocks.DatamodelTest`'s claim, headless, where the rule lives.
@@ -50,6 +51,31 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       ]
     }
 
+    # The same shape again, carrying enumerations: two values on one path,
+    # eleven on another so that the eight-value cut has a remainder to count,
+    # and a third path with a type and no `one_of` at all.
+    @enumerated %{
+      "version" => 1,
+      "scopes" => [
+        %{
+          "scope" => "local",
+          "entries" => [
+            %{
+              "path" => "card.brand",
+              "type" => "string",
+              "one_of" => ["visa", "amex"]
+            },
+            %{
+              "path" => "signup.step",
+              "type" => "string",
+              "one_of" => Enum.map(1..11, &"step_#{&1}")
+            },
+            %{"path" => "signup.email", "type" => "string"}
+          ]
+        }
+      ]
+    }
+
     defp open(view) do
       view |> element(".sb-drawer__strip") |> render_click()
       view |> element(~s(.sb-drawer__tab[phx-value-tab="datamodel"])) |> render_click()
@@ -64,6 +90,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       ~r/<tr data-path="([^"]*)"/
       |> Regex.scan(html)
       |> Enum.map(&Enum.at(&1, 1))
+    end
+
+    # The Values cell of one row, as markup: the assertions below are about
+    # which values landed in WHICH row, and a match against the whole panel
+    # would pass on a cell that drew every path's enumeration.
+    defp values_cell(html, path) do
+      case Regex.run(
+             ~r{<tr data-path="#{Regex.escape(path)}".*?<td data-cell="values">(.*?)</td>}s,
+             html
+           ) do
+        [_whole, cell] -> cell
+        nil -> nil
+      end
     end
 
     describe "the tab" do
@@ -190,6 +229,80 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute panel =~ "<input"
         refute panel =~ "<button"
         refute panel =~ "phx-click"
+      end
+    end
+
+    describe "the values column" do
+      # Sabotage: the Values `<td>` reading `@values` rather than
+      # `Map.get(@values, row.path, [])` - every row drew every path's
+      # enumeration and the first assertion caught the brand values on the
+      # step's row.
+      test "lists the values a path's one_of declares", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, datamodel: @enumerated)
+
+        open(view)
+
+        html = render(view)
+
+        assert values_cell(html, "card.brand") =~ "visa"
+        assert values_cell(html, "card.brand") =~ "amex"
+        refute values_cell(html, "card.brand") =~ "more"
+      end
+
+      # Eight is the cut, and the ninth value is what proves it is a cut
+      # rather than a coincidence of this fixture's length.
+      # Sabotage: `Enum.take/2` given the whole list - the count went to
+      # "+0 more", the ninth value appeared, and both halves went red.
+      test "cuts at eight values and counts the rest", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, datamodel: @enumerated)
+
+        open(view)
+
+        cell = values_cell(render(view), "signup.step")
+
+        assert cell =~ "step_1"
+        assert cell =~ "step_8"
+        refute cell =~ "step_9"
+        assert cell =~ "+3 more"
+      end
+
+      # A shape is not an enumeration: the column is empty for a path that
+      # declared a type and nothing else, and for the two declaring surfaces
+      # that carry no shape at all.
+      # Sabotage: the cell's `:if={@shown != []}` dropped - an empty
+      # enumeration drew an empty chip row, and the refutation on the wrapper
+      # class went red.
+      test "is empty for a path that declares no enumeration", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, datamodel: @enumerated, declare: ["host_root"])
+
+        open(view)
+
+        html = render(view)
+
+        refute values_cell(html, "signup.email") =~ "sb-datamodel__values"
+        refute values_cell(html, "host_root") =~ "sb-datamodel__values"
+      end
+
+      # `value_candidates` is a host's correction to the PICKER, and this
+      # table is a report of what the document declared. A host's map reaching
+      # this column would put values in a "Declared paths" grid that no
+      # declaration carries.
+      # Sabotage: `declared_values/1` in the editor calling
+      # `Datamodel.value_candidates/2` with `assigns.value_candidates` - the
+      # host's single value replaced the declaration's two and this went red.
+      test "reports the declaration and not a host's picker override", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn,
+            datamodel: @enumerated,
+            value_candidates: %{"card.brand" => ["diners"]}
+          )
+
+        open(view)
+
+        cell = values_cell(render(view), "card.brand")
+
+        assert cell =~ "visa"
+        refute cell =~ "diners"
       end
     end
   end
