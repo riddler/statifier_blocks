@@ -10414,3 +10414,323 @@ on what the card draws, exactly as this section's "What this section does not
 decide" already says of it.
 
 Filed with `sb-vjvq`, campaign SF038.
+
+## Note (2026-09-08): the collapse tray without `on_collapse`, the chip cap and where a presentation finding draws, no sentence on the card, the reserved control strip, `4C` per-target admission, `last_error` on the surface, four read-only clauses, and `config_form/1` as a call a host composes
+
+A dated Note rather than an amendment: it carries no `Status:` line, it never
+flips, and no text above this line is edited by it. Eight items, each a ruling
+taken with the operator at the campaign-SF039 walk on 2026-09-08 - `RQ-SF039-5`,
+`-6`, `-7`, `-11`, `-12` and `-15` - written down here so that the beads which
+build them have a record to build from rather than a plan to remember.
+
+**Nothing in this Note is built yet.** Each item names the bead that builds it.
+A reader in a later campaign should check the code before trusting any sentence
+here that is written in the present tense about a surface.
+
+**Every code cite below was read at `main` `f9b62c5`** (the `v0.26.0` tag), and
+each is given with its anchor - a function head, a module attribute, an `attr`
+declaration, or a CSS class name - so that a line which a later landing moves is
+re-located by the anchor rather than by the number.
+
+### 1. With `on_collapse` unset, the "Save as a step" control and its tray are not drawn
+
+`16E` (`:9642`) makes the Collapse gesture a pure proposer: it hands a
+declaration to an `on_collapse` host callback, edits nothing and persists
+nothing. `on_collapse` is optional and defaults to `nil` (`editor.ex:703`,
+`on_collapse: nil` in `mount/1`'s assigns), and `notify_collapse/2`
+(`editor.ex:3710`, the `case socket.assigns.on_collapse do` head) answers `:ok`
+and returns the socket unchanged when the assign is not a one-arity function.
+
+The control, however, is drawn without consulting it. `.sb-node__save-step`
+(`block_node.ex:402`, `title="Save as a step"`, `phx-click="save-as-step"`) is
+conditioned on `:if={@node.block_id == @selected_id and not @root?}` and on
+nothing else.
+
+**The ruling.** With `on_collapse` unset, neither the "Save as a step" control
+nor the tray it opens is drawn. A gesture whose only outcome is a callback
+nobody registered offers the author a marking step, a Save, and then silence;
+withholding it is the honest answer, and it is the same answer `read_only?`
+clause 1 already gives (`:7476`) - the palette column is *not rendered*, rather
+than rendered inert.
+
+**"Replace with its steps" stays.** Expand (`.sb-node__expand`,
+`block_node.ex:389`, `title="Replace with its steps"`, the word on the button is
+`steps` at `:397`) needs no host callback: it is an `Edit.t()` the editor
+commits itself. It is unaffected by this item in both directions - it is drawn
+when `on_collapse` is unset, and its own conditions are unchanged.
+
+Built by `sb-59rt`.
+
+### 2. The cap is 32, and a presentation-cap finding draws in the drawer, not on the card face
+
+Three parts, and they are separable.
+
+**The number.** `10n` (`:2480`) fixes the presentation cap at 24 characters and
+says the number is this record's rather than `ADR-0002`'s. It moves to **32**.
+`@presentation_cap` (`block_type.ex:1365`) is the one place it is written, and
+every message that quotes it interpolates it (`block_type.ex:1752-1768`), so the
+messages follow the number.
+
+**The cap is width-independent, and `--sb-card-width` does not move.**
+`--sb-card-width` stays at `14rem` (`assets/css/statifier_blocks.css:394`). The
+cap is a legibility number - what reads as a chip rather than as a sentence -
+and not a measurement of the card. 32 is chosen as what fits one line at the
+card's present width, but the two are not tied: a host that re-tokens the card
+wider does not thereby get a longer cap, and this record takes no layout ruling
+here.
+
+**Where the diagnostic draws.** `summary_findings/4` (`view_model.ex:1717`)
+makes one `:lint` finding per chip the cap refused, at `:warning`, and that is
+`:3068`'s reader - the refusal is made legible rather than silent. But
+`face_findings/1` (`block_node.ex:654`, called at `:469`) draws *every* finding
+a node carries on the card face, so the diagnostics land on top of the card they
+are about. Campaign SF038's capture bead `se-brd` measured what that costs: on
+the card-processing composite fixture, four `.sb-finding` paragraphs filled the
+card body below the chips and their background extended past the card's left and
+right edges; on the signup guarded-section fixture the single one drew as a
+full-width line between the card and its `THEN` slot label, so it read as
+belonging to the slot rather than to the card.
+
+**The ruling, two clauses.** A presentation-cap finding draws **only** in the
+drawer's Findings tab, never on the card face - it is a diagnostic about a
+declaration, and the drawer is where the document's diagnostics are read. And a
+finding that *does* draw on a card face is **contained by that card**: it is
+laid out inside the card's own box and neither overflows its edges nor reads as
+belonging to a neighbouring slot.
+
+**One clause is named here rather than taken here.** `RQ-SF039-6` also rules
+that an over-cap chip draws truncated with an ellipsis instead of being dropped.
+That is not this record's to take. `10o` (`:2489`) adopts `ADR-0002` `B3`'s
+refuse-never-truncate discipline explicitly and says `ADR-0002` keeps ownership
+of the semantics; `B3` itself (`docs/adr/0002-block-type-behaviour.md:831`, its
+refuse-never-truncate bullet at
+`docs/adr/0002-block-type-behaviour.md:846-847`) says "An over-long badge is
+dropped, not clipped to the cap"; and `ADR-0002`'s own test for where such a
+change belongs is stated in that record at
+`docs/adr/0002-block-type-behaviour.md:5976-5981` - narrowing the reach of a
+rule `ADR-0002` states "is a decision this record takes, not a catch-up
+entry". So the ellipsis clause is **recorded here as ruled and queued**, and
+the record that carries it is `ADR-0002`'s to write.
+Nothing in this item depends on it: the number, the width-independence, the
+Findings-tab home and the containment all stand whether the chip that exceeds 32
+is dropped or clipped.
+
+Built by `sb-hwlr`.
+
+### 3. The card draws no sentence, and `se-brd`'s expectation of one was wrong
+
+A card draws its title (`.sb-node__label`, `block_node.ex:366`), its type
+subtitle, its summary chip row (`.sb-node__summary`, `block_node.ex:376`) and,
+for a composite, the interior of the declared slot that `ADR-0002`'s
+pass-through Amendment `P6` governs
+(`docs/adr/0002-block-type-behaviour.md:8274`), which is where `7E` (`:8601`)
+and `8E` (`:8612`) were pointed by the Note of 2026-09-07 (`:10304`). It draws
+no sentence, no clause of this record asks it to, and none is added.
+
+The sentence is the **list** altitude's. `ViewModel.Node.sentence` and
+`ViewModel.outline/1` were built by the Amendment of 2026-09-07 (`:7852`) for
+"the one walk a list view, an outline pane and a test all consume", and that is
+where a block as one line of prose belongs.
+
+`se-brd`, campaign SF038's capture bead, asked for "the composite card with
+chips and sentence and no interior" and reported back that the card carried the
+title and the chips only, with no element of a sentence class anywhere in the
+canvas DOM, while the sentence did appear in the host's list row. **The bead's
+expectation was wrong, and the code was right.** It is recorded here so that the
+next reader of those captures does not read a missing sentence as a defect. No
+card change follows from this item.
+
+### 4. The control strip is reserved beside the title
+
+The card's controls are siblings of the title inside `.sb-node__chrome` and are
+revealed on hover or selection: `.sb-node__expand` (`block_node.ex:389`),
+`.sb-node__save-step` (`:402`), `.sb-node__fold` (`:415`) and `.sb-node__remove`
+(`:432`) each carry `data-reveal="hover-or-selected"`. Because the space is not
+held while they are hidden, the title uses it, and the controls then appear on
+top of the title: `se-brd` reported "steps" and "x" sitting over the last word
+of "Authorize with a deadline".
+
+**The ruling.** The control strip is **reserved** beside the title at all times:
+the space the controls occupy is held whether or not they are revealed, the
+title wraps beside it, and nothing truncates. Reserving is chosen over
+truncating for the reason `B3` gives about chips - a clipped title reads as a
+rendering bug where a wrapped one reads as a long name - and over drawing the
+controls at rest for the reason `data-reveal` exists at all: a card at rest
+should show the document, not the chrome.
+
+This record names the strip **by role**, not by a class: there is no
+`.sb-node__strip` in the markup at `f9b62c5`, and which element holds the
+reservation is the implementing bead's to choose.
+
+Built by `sb-59rt`.
+
+### 5. `4C`: per-target admission beside the sweep
+
+`accepted_types/4` (`edit/targets.ex:200`, `@spec` at `:194`) answers which of a
+palette's block types would be accepted at one `{parent_id, slot}` target, by
+probing **every** type in the palette. `accepted_recipes/4` is its recipe half,
+added by the Note of 2026-09-07 (`:10097`) under clause `4C` (`:5776`) as the
+`1C`-`4C` Amendment (`:8069`) reads it.
+
+A "+" chooser at a gap does not have that question. It has "may *this* type go
+*here*", asked once, and today the only public way to ask it is to build the
+whole set and test membership.
+
+**The ruling.** Two public functions join the module:
+
+- **`Edit.Targets.admits_at?/5`** - `(document, palette, target, type, ctx)`
+  answering a boolean. One probe of `type` and one `Assignability.check/5`
+  (`assignability.ex:586`) at the gap, and nothing else.
+- **`Edit.Targets.accepted_types_at/5`** - the same question over a **candidate
+  list**, defaulting to the palette's own types, so a surface that already knows
+  its shortlist pays for the shortlist rather than for the palette.
+
+`accepted_types/4` **stays** and is the sweep: it is not deprecated, its
+signature does not change, and it remains the right call for a palette browser
+filtering itself against a position. The module's moduledoc says which of the
+three to call, so that a surface writing the filter by hand - the failure the
+`accepted_types/4` doc already warns about, where two views filtering the same
+palette disagree and neither is visibly wrong - has one paragraph to read
+instead of three function docs to compare.
+
+Built by `sb-h5xq`.
+
+### 6. A refused gesture renders `last_error` on the surface
+
+`refused/2` (`editor.ex:2220`) assigns `last_error` and rebuilds. The assign is
+carried across a session round-trip (`editor.ex:1737`, `:1784`) and read by the
+declarations panel for its own refusal sentence (`editor.ex:1860`,
+`Declarations.refusal(session.last_error)`), and it is rendered **nowhere else**:
+no editor component template reads `@last_error` at `f9b62c5`. So a gesture the
+editor refused - `5E`'s three refusals, the broken-declaration one - looks on
+screen exactly like a gesture that did nothing, which is the same
+indistinguishability the emulated-input problem has, arriving from the other
+side.
+
+**The ruling.** A refused gesture renders `last_error` on the surface. What the
+sentence says is the refusal's own vocabulary, and where it is drawn is the
+implementing bead's; this record rules only that the refusal is visible where
+the gesture was made.
+
+Built by `sb-f4r1`.
+
+### 7. Four clauses about a read-only mount
+
+The `profile` Amendment of 2026-09-07 (`:7303`) gives `read_only?` six clauses
+(`:7473`). Four readings are added here; none of them widens what the clauses
+say, and one of them is a bug.
+
+**7a. `expand` joins the refused set.** `@read_only_refused`
+(`editor.ex:683-691`) lists the events a read-only mount answers with the socket
+it was given, and `expand` is not among them. It should be: Expand commits an
+`Edit.t()` and changes the document, which is exactly what clause 6 says never
+happens on such a mount. The paragraph in this record that explains an *absence*
+from that list (`:8371`, and the moduledoc at `editor.ex:513`) is about "Save as
+a step", which reaches nothing a read-only mount withholds because it is a read;
+it is not about Expand and never was. This is a defect, filed as `sb-cqh8`.
+
+**7b. An empty slot on a read-only mount draws a non-interactive placeholder.**
+`gap/1` (`slot.ex:411`) draws its "+" behind `:if={not @read_only}`
+(`slot.ex:428`), so on a read-only mount the gap is an empty `<div class="sb-gap">`
+and an empty slot has nothing in it at all. The visible ring is styled on the
+button, so withholding the button withheld the slot's only mark. Ruled: an empty
+slot on a read-only mount draws a **non-interactive** placeholder - a mark that
+says "this slot is empty", not a control that refuses. Built by `sb-b7i0`.
+
+**7c. Clause 1 withholds the gap "+" as well as the palette column.** Clause 1
+is written in terms of the palette *column* (`:7476`), and a reader could take
+it to leave the gap "+" - which opens the same palette by the same
+`palette-open` event - untouched. It does not. The code already reads it the
+narrow-offering way (`slot.ex:428`, and the `read_only` attr's own doc at
+`slot.ex:245`, "`true` draws the gaps without their '+' buttons"), and that
+reading is the correct one: clause 1 is about a mount offering **no way to add a
+block**, and the column and the gap are two doors to one room. This item records
+the reading; no code changes for it.
+
+**7d. The drawer's package tab set is six, and the Source listing is the
+sixth.** `@drawer_tabs` (`shell.ex:191`) is
+`[:tables, :findings, :declarations, :fixtures, :datamodel, :source]`. The
+drawer's own moduledoc says the same in prose ("The Source listing is the sixth
+and came behind no reservation at all", `drawer.ex:36`), and `1A`'s reserved
+places are spent. Six is the number; a seventh joins only on its own merits
+under `1A`. This item records the count; no code changes for it.
+
+### 8. `Editor.ConfigForm.config_form/1` becomes a call a host composes
+
+The operator's ruling `D16` (umbrella `docs/decisions.md`), already cited by
+this record at `:8023` and `:10052`, is that a host's own authoring surface
+draws package components rather than re-implementing them. A host that wants one
+block's fields under its **own** `handle_event/3` is the case this item is
+about.
+
+`config_form/1` (`config_form.ex:220`) is nearly that component already. Two
+things stop it:
+
+- `phx-change` and `phx-submit` are hard-coded to `"config-change"`
+  (`config_form.ex:229-230`), which is the editor component's own event name.
+- `attr(:target, :any, required: true)` (`config_form.ex:50`) is required, so a
+  host whose form posts to the LiveView itself has no way to omit it.
+
+**The ruling.** `config_form/1` gains an **`event`** attr, defaulting to
+`"config-change"` so that every present caller is unchanged, and its **target
+becomes optional**. A host then composes one call instead of hand-writing a
+field pair.
+
+**The block id is not new.** The form already posts the block it is about as a
+hidden input - `<input type="hidden" name="block-id" value={@node.block_id} ... />`
+at `config_form.ex:239` - and that input is what a host reads the id out of its
+params by. This item does not add it; it names it, because a host composing the
+call needs to know the id arrives without being asked for.
+
+What this item does **not** decide is the look. The field controls, their
+labels and their layout stay the package's; the surrounding chrome stays the
+host's. It adds no layout mode to the package editor.
+
+Built by `sb-ykkl`; the reference embedder deletes its hand-written pair in
+`se-7p1`.
+
+### Cite table
+
+Every line number below was read at `main` `f9b62c5`; the anchor beside each is
+what a later reader matches.
+
+| Cite | Anchor |
+|---|---|
+| `editor.ex:703` | `on_collapse: nil` in `mount/1`'s assigns |
+| `editor.ex:3710` | `notify_collapse/2`, `case socket.assigns.on_collapse do` |
+| `editor.ex:513` | the "Save as a step" moduledoc paragraph, "It is offered on a read-only mount as well" |
+| `editor.ex:683-691` | `@read_only_refused` |
+| `editor.ex:1737`, `:1784` | `last_error` across a session round-trip |
+| `editor.ex:1860` | `Declarations.refusal(session.last_error)` |
+| `editor.ex:2220` | `defp refused(socket, reason)` |
+| `block_node.ex:366` | `class="sb-node__label"` |
+| `block_node.ex:376` | `class="sb-node__summary"` |
+| `block_node.ex:389`, `:397` | `class="sb-node__expand"`, the word `steps` |
+| `block_node.ex:402` | `class="sb-node__save-step"` |
+| `block_node.ex:415` | `class="sb-node__fold"` |
+| `block_node.ex:432` | `class="sb-node__remove"` |
+| `block_node.ex:469`, `:654` | `face_findings/1`, its call and its head |
+| `block_type.ex:1365` | `@presentation_cap 24` |
+| `block_type.ex:1752-1768` | the summary-refusal messages |
+| `view_model.ex:1717` | `defp summary_findings(block_id, module, config, labels)` |
+| `edit/targets.ex:194`, `:200` | `accepted_types/4`, its `@spec` and its head |
+| `assignability.ex:586` | `def check/5` |
+| `slot.ex:245` | the `read_only` attr doc, "draws the gaps without their '+' buttons" |
+| `slot.ex:411`, `:428` | `defp gap(assigns)`, the `:if={not @read_only}` on `.sb-gap__add` |
+| `shell.ex:191` | `@drawer_tabs` |
+| `drawer.ex:36` | "The Source listing is the sixth" |
+| `config_form.ex:50` | `attr(:target, :any, required: true)` |
+| `config_form.ex:220` | `def config_form(assigns)`, the editing head |
+| `config_form.ex:229-230` | `phx-change="config-change"`, `phx-submit="config-change"` |
+| `config_form.ex:239` | the hidden `block-id` input |
+
+The cites into this file - `:2480`, `:2489`, `:3068`, `:5776`, `:7303`,
+`:7471`, `:7473`, `:7476`, `:7852`, `:8023`, `:8069`, `:8371`, `:8601`,
+`:8612`, `:9642`, `:10052`, `:10097`, `:10304` - resolve unchanged; appends land
+at the end of this file, so no line above moved. The cites into `ADR-0002` are
+written in full wherever they appear above -
+`docs/adr/0002-block-type-behaviour.md` at `:831`, `:846-847`, `:5976-5981`
+and `:8274` - so that a bare `:` cite in this file always means a line in
+this file.
+
+Filed with `sb-0xdu`, campaign SF039.
