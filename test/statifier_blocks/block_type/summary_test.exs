@@ -28,9 +28,13 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
   doctest StatifierBlocks.Core.Send, only: [summary: 1]
   doctest StatifierBlocks.Core.Branch, only: [summary: 1]
 
-  # 24 graphemes, the cap itself, and one more.
-  @at_cap "waiting for the operator"
-  @over_cap "waiting for the operators"
+  # 32 graphemes, the cap itself, and one more.
+  @at_cap "waiting for the operator to sign"
+  @over_cap "waiting for the operators to sign"
+
+  # What the cap draws for `@over_cap`: thirty-one graphemes and the
+  # ellipsis, so a drawn chip is never wider than a chip at the cap.
+  @over_cap_clipped "waiting for the operators to si…"
 
   defmodule Silent do
     @moduledoc "A type that exports no `summary/1`, which is every type today."
@@ -150,23 +154,31 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
     # sabotage: changed the cap comparison in `chip/1` to `>=` - red on the
     # at-cap assert, which is what pins the boundary rather than its
     # neighbourhood.
-    test "accepts a chip exactly at the cap and refuses the one past it" do
-      assert String.length(@at_cap) == 24
-      assert String.length(@over_cap) == 25
+    test "accepts a chip exactly at the cap and clips the one past it" do
+      assert String.length(@at_cap) == 32
+      assert String.length(@over_cap) == 33
 
       assert BlockType.summary(Declaring, %{"summary" => @at_cap}) == [@at_cap]
-      assert BlockType.summary(Declaring, %{"summary" => @over_cap}) == []
+      assert BlockType.summary(Declaring, %{"summary" => @over_cap}) == [@over_cap_clipped]
+
+      # The ellipsis is inside the cap, not beside it.
+      assert String.length(@over_cap_clipped) == 32
     end
 
     # This is the section's whole point, so it is asserted as a list rather
-    # than as one chip: the spike clips the joined line, and H3 drops the one
-    # chip that does not fit.
-    # sabotage: made the over-long chip truncate to the cap instead of
-    # answering nil - the first assert then reads a 24-character prefix and
-    # the sibling lanes are indistinguishable from a rendering bug.
-    test "an over-long chip is dropped and its siblings survive" do
-      assert BlockType.summary(Declaring, %{"summary" => ["capture", @over_cap, "receipt"]}) ==
-               ["capture", "receipt"]
+    # than as one chip: an over-long chip costs its own text and nothing
+    # around it.
+    # sabotage: dropped the `:too_long` arm from `drawn_chips/3` back to the
+    # refusal branch - the middle chip disappears and the card is again
+    # indistinguishable from one whose type declared two lanes.
+    test "an over-long chip is clipped and its siblings survive" do
+      declared = %{"summary" => ["capture", @over_cap, "receipt"]}
+
+      assert BlockType.summary(Declaring, declared) ==
+               ["capture", @over_cap_clipped, "receipt"]
+
+      # And the clipped chip's full text is on its title, index-aligned.
+      assert BlockType.summary_titles(Declaring, declared) == [nil, @over_cap, nil]
     end
 
     # sabotage: dropped the whitespace and control-character arms of `chip/1`
@@ -228,15 +240,18 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
     # Sabotage: gave `chip/1` its own copy of the cond instead of delegating
     # to `chip_refusal/1`, then changed one arm - the two readers disagree
     # and this is the only test that notices.
-    test "the refusals are exactly the chips summary/2 dropped" do
+    test "the refusals are exactly the chips summary/2 did not draw as declared" do
       declared = ["capture", @over_cap, "", "a\nb", 7, @at_cap]
       config = %{"summary" => declared}
 
       refused = BlockType.summary_refusals(Declaring, config) |> Enum.map(&elem(&1, 0))
-      kept = Enum.reject(0..(length(declared) - 1), &(&1 in refused))
 
-      assert BlockType.summary(Declaring, config) == Enum.map(kept, &Enum.at(declared, &1))
       assert refused == [1, 2, 3, 4]
+
+      # Every reported position is one the card does not draw as declared:
+      # three of them are gone, and the fourth is there under a clip.
+      assert BlockType.summary(Declaring, config) == ["capture", @over_cap_clipped, @at_cap]
+      assert BlockType.summary_titles(Declaring, config) == [nil, @over_cap, nil]
     end
 
     # Sabotage: made `declared_chips/2`'s no-callback branch read the config
@@ -252,7 +267,7 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
     end
 
     # Sabotage: removed `List.wrap/1` from `declared_chips/2` - a declared
-    # string is enumerated per grapheme, so a 25-character summary reports 25
+    # string is enumerated per grapheme, so a 33-character summary reports 33
     # refusals of a one-character chip instead of one refusal of a long one.
     test "a declared string is the one-chip case here too" do
       assert BlockType.summary_refusals(Declaring, %{"summary" => @at_cap}) == []
@@ -272,11 +287,11 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
           {1, :too_long}
         )
 
-      assert message == "summary chip 2 is 25 characters; the cap is 24, so it is not drawn"
+      assert message == "summary chip 2 is 33 characters; the cap is 32, so it is drawn clipped"
     end
 
     # Sabotage: made every arm answer the `:too_long` sentence - a blank chip
-    # is then reported as being 0 characters against a cap of 24, which reads
+    # is then reported as being 0 characters against a cap of 32, which reads
     # as a cap problem and sends the author to the wrong end of the fix.
     test "each reason has its own sentence" do
       config = %{"summary" => ["", "a\nb", 7]}
@@ -296,7 +311,7 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
     # which is the one thing a total normalizer may never do.
     test "an entry naming a position that is no longer declared still answers" do
       assert BlockType.summary_refusal_message(Silent, %{}, {3, :too_long}) ==
-               "summary chip 4 is longer than the cap of 24 characters, so it is not drawn"
+               "summary chip 4 is longer than the cap of 32 characters, so it is drawn clipped"
     end
   end
 
@@ -392,6 +407,46 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
     end
   end
 
+  describe "summary_refusal_message?/1, the recognizer the card face reads" do
+    # ADR-0005's Note of 2026-09-08 item 2 sends the presentation-cap
+    # diagnostic to the drawer, which means the face has to be able to tell
+    # one from every other finding a block carries. Decision 11's four fields
+    # carry no mark finer than the source, so the recognizer is the sentence -
+    # and it lives here, in the module that writes it, so the pair cannot
+    # drift. This is the test that pins them together.
+    #
+    # Sabotage: reword any arm of `refusal_message/3` to open with something
+    # other than the chip's position - that arm's finding comes back onto the
+    # card face, which is the one place the item forbids it.
+    test "every arm's own sentence is recognized" do
+      config = %{"summary" => ["", "a\nb", 7, @over_cap]}
+
+      for {index, reason} <- [{0, :blank}, {1, :multiline}, {2, :not_a_string}, {3, :too_long}] do
+        message = BlockType.summary_refusal_message(Declaring, config, {index, reason})
+
+        assert BlockType.summary_refusal_message?(message),
+               "#{reason}: #{inspect(message)} was not recognized"
+      end
+
+      # The totality arm too - it is the sentence an entry naming a position
+      # the type no longer declares answers with.
+      assert BlockType.summary_refusal_message?(
+               BlockType.summary_refusal_message(Silent, %{}, {3, :too_long})
+             )
+    end
+
+    # Sabotage: widen the shape to `~r/^summary/` - a host validator writing
+    # "summary of the document is incomplete" stops drawing on the card it is
+    # about, which is a routing change nobody ruled.
+    test "a sentence this module did not write is not recognized" do
+      refute BlockType.summary_refusal_message?("no handler registered for this invoke type")
+      refute BlockType.summary_refusal_message?("summary chip is blank, so it is not drawn")
+      refute BlockType.summary_refusal_message?("this slot wants at least one step")
+      refute BlockType.summary_refusal_message?(nil)
+      refute BlockType.summary_refusal_message?(:too_long)
+    end
+  end
+
   describe "the generated done-event chip (ADR-0005 decision 10w, 10x, 10y)" do
     @labels %{"blk_AUTH" => "Authorize", "blk_SEQ" => "Collect"}
 
@@ -426,37 +481,42 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
     end
 
     # 10x, and the whole reason this section exists. The generated name is
-    # 29 characters against a cap of 24: measured BEFORE translation it is
-    # refused, drawing nothing and raising a lint that names a string the
-    # author cannot shorten because they did not write it.
+    # 37 characters against a cap of 32: measured BEFORE translation it is
+    # clipped mid-identifier and raises a lint naming a string the author
+    # cannot shorten because they did not write it.
     #
     # sabotage: translate AFTER the cap (move `translate_chip/2` out of
-    # `translated_chips/3` and into `drawn_chips/3`, past the filter) ->
+    # `translated_chips/3` and into `drawn_chips/3`, past the clip) ->
     # this goes red on both assertions at once, which is the failure mode
     # 10w exists to prevent arriving exactly as recorded
     test "the cap measures the translated text, not the generated one" do
-      assert String.length("done.outcome.s_blk_AUTH.error") == 29
-      assert chips(["done.outcome.s_blk_AUTH.error"]) == ["Authorize · error"]
-      assert refusals(["done.outcome.s_blk_AUTH.error"]) == []
+      assert String.length("done.outcome.s_blk_AUTH.manual_review") == 37
+      assert chips(["done.outcome.s_blk_AUTH.manual_review"]) == ["Authorize · manual_review"]
+      assert refusals(["done.outcome.s_blk_AUTH.manual_review"]) == []
     end
 
     # 10o, unchanged and unweakened: a translated chip that is STILL over
-    # the cap is refused exactly as any other over-long chip is, and the
+    # the cap is clipped exactly as any other over-long chip is, and the
     # sentence names a length the author can act on, because the length is
     # their own label's.
+    #
+    # The title is the FULL TRANSLATED text rather than the declared event
+    # name: a title that completed neither the visible chip nor the string
+    # behind it would leave a reader with two halves and no whole.
     #
     # sabotage: exempt a translated chip from the cap instead of shortening
     # it before the cap -> 10o loses its one home and an author who named a
     # block a paragraph gets no warning
-    test "a translated chip over the cap is refused like any other" do
+    test "a translated chip over the cap is clipped like any other" do
       long = %{"blk_AUTH" => "Authorize the payment card"}
       summary = ["done.outcome.s_blk_AUTH.error"]
 
-      assert chips(summary, long) == []
+      assert chips(summary, long) == ["Authorize the payment card · er…"]
+      assert titles(summary, long) == ["Authorize the payment card · error"]
       assert refusals(summary, long) == [{0, :too_long}]
 
       assert refusal_message(summary, {0, :too_long}, long) ==
-               "summary chip 1 is 34 characters; the cap is 24, so it is not drawn"
+               "summary chip 1 is 34 characters; the cap is 32, so it is drawn clipped"
     end
 
     # 10w's other half: the translation is lossless because the raw name
@@ -475,7 +535,7 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
     # fall out of step by one and every chip after a refusal carries the
     # wrong block's event name
     test "a refused chip drops out of both lists together" do
-      summary = [@over_cap, "done.outcome.s_blk_AUTH.error"]
+      summary = ["a\nb", "done.outcome.s_blk_AUTH.error"]
 
       assert chips(summary) == ["Authorize · error"]
       assert titles(summary) == ["done.outcome.s_blk_AUTH.error"]
@@ -493,8 +553,10 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
 
       # And the cap still measures the string as written, which is exactly
       # what an untranslated chip has always been held to.
-      assert chips(["done.outcome.s_blk_GONE.error"]) == []
-      assert refusals(["done.outcome.s_blk_GONE.error"]) == [{0, :too_long}]
+      assert chips(["done.outcome.s_blk_GONE.manual_review"]) ==
+               ["done.outcome.s_blk_GONE.manual_…"]
+
+      assert refusals(["done.outcome.s_blk_GONE.manual_review"]) == [{0, :too_long}]
     end
 
     # 10y again, at the two hazards `StatifierBlocks.Validation` leaves open

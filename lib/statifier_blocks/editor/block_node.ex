@@ -55,6 +55,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     config KEY, so a host type that calls a handler gets the same line
     `core.invoke` does by carrying the same key.
 
+    ## A finding on the card face (ADR-0005's Note of 2026-09-08, item 2)
+
+    A finding that draws on a face draws **inside the card's own box** -
+    it is a child of `.sb-node__chrome`, in the same text column the title
+    and the chip row occupy, rather than a sibling of the chrome under it.
+    On a leaf the two positions look alike; on a CONTAINER they do not. A
+    container's node box is as wide as everything it holds and its card is
+    the chrome centred inside that box, so a finding placed under the
+    chrome drew as a full-width line between the card and the first slot
+    label beneath it, reading as the slot's rather than the card's. The
+    Note rules that a face finding is contained by the card it is about,
+    and being a child of the card is what makes that true at every width.
+
+    The presentation diagnostics do not draw here at all - see
+    `face_findings/1`.
+
     ## The unresolvable card's face (campaign-017 ruling D4)
 
     Decision 12's card is the one exception to "the face is four lines", and
@@ -76,11 +92,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     first finding. Two reasons, and neither is about length alone:
 
       * a finding's message is a sentence written for a list, and the only
-        presentation cap this package has (`BlockType`'s 24-character chip)
-        **refuses rather than truncates** under ADR-0002 amendment B3. Fed a
-        finding, it would answer `nil` every time and leave the face blank;
-        truncating one here instead would be a second, contradictory
-        presentation policy on the same card.
+        presentation cap this package has (`BlockType`'s 32-character chip)
+        exists precisely to refuse one: under ADR-0002 amendment B3 it
+        **refuses rather than truncates**, and the summary-chip carve-out
+        ADR-0005's Note of 2026-09-08 item 2 records clips a chip to a
+        prefix that still names a declaration. A sentence has no such
+        prefix, so neither treatment leaves anything worth reading, and a
+        third policy invented here would be a contradictory one on the same
+        card.
       * a phrase chosen from a closed set is bounded by construction. No
         host-authored string reaches this line, so no host can widen the
         card by writing a longer finding - which is the failure D4 is
@@ -234,7 +253,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # and nothing a type would have to correct.
     @default_join_label "continue"
 
-    alias StatifierBlocks.{Block, Connectors}
+    alias StatifierBlocks.{Block, BlockType, Connectors, Finding}
     alias StatifierBlocks.Editor.{Icons, Slot}
     alias StatifierBlocks.ViewModel
 
@@ -383,6 +402,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             </span>
           </div>
           <span :if={@node.invoke_type} class="sb-node__invoke">{@node.invoke_type}</span>
+          <p
+            :for={finding <- face_findings(@node)}
+            class={["sb-finding", severity_class(finding)]}
+          >
+            {finding.message}
+          </p>
           <button
             :if={expandable?(@node, @expandable)}
             type="button"
@@ -465,10 +490,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         </div>
 
         <p :if={unresolvable?(@node)} class="sb-node__reason">{reason_line(@node)}</p>
-
-        <p :for={finding <- face_findings(@node)} class={["sb-finding", severity_class(finding)]}>
-          {finding.message}
-        </p>
 
         <div
           :if={not @collapsed? and ViewModel.fan_label(@node)}
@@ -647,13 +668,44 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     # D4's split, stated once. A resolvable card still reads its findings on
-    # the face - a lint on a `core.wait` is one line and belongs where the
-    # author is looking. An unresolvable card reads the reason line above
-    # instead, and every one of its findings is in the inspector's Findings
-    # tab, counted by the badge the chrome already draws.
-    @spec face_findings(ViewModel.Node.t()) :: [StatifierBlocks.Finding.t()]
+    # the face - a broken `duration` on a `core.wait` is one line and belongs
+    # where the author is looking. An unresolvable card reads the reason line
+    # above instead, and every one of its findings is in the inspector's
+    # Findings tab, counted by the badge the chrome already draws.
+    #
+    # The second clause is ADR-0005's Note of 2026-09-08, item 2: a
+    # presentation diagnostic - a summary chip the cap refused or clipped -
+    # draws ONLY in the drawer's Findings tab. It is a diagnostic about a
+    # DECLARATION rather than about the document, and the card it is about
+    # is the one thing it must not sit on top of. The card-face captures
+    # taken in the 0.26.0 cycle measured four of them filling a composite's
+    # card body, and a single one drawing as a full-width line between a
+    # card and its `THEN` slot label, where it read as belonging to the slot.
+    #
+    # The exclusion is exactly that ruling's own subject and no wider. It is
+    # NOT "the `:lint` source": decision 11 gives `:lint` to a host's
+    # whole-document rule and to an adapted compiler warning as well, and
+    # `11b` reserves `:info` to `:lint`, so a card that dropped the source
+    # would stop drawing every advisory - which is a different ruling, and
+    # one nobody took. `BlockType.summary_refusal_message?/1` is the
+    # recognizer, kept in the module that writes those sentences so the pair
+    # cannot drift; the `:lint` test beside it costs nothing and says that a
+    # finding from any other source is out of scope by construction.
+    #
+    # Nothing is lost from the card: `findings_count` still counts them, the
+    # badge still reads that count, and they are still in the node's own
+    # findings for the drawer to list.
+    @spec face_findings(ViewModel.Node.t()) :: [Finding.t()]
     defp face_findings(%ViewModel.Node{status: {:unresolvable, _reason}}), do: []
-    defp face_findings(%ViewModel.Node{findings: findings}), do: findings
+
+    defp face_findings(%ViewModel.Node{findings: findings}),
+      do: Enum.reject(findings, &presentation_finding?/1)
+
+    @spec presentation_finding?(Finding.t()) :: boolean()
+    defp presentation_finding?(%Finding{source: :lint, message: message}),
+      do: BlockType.summary_refusal_message?(message)
+
+    defp presentation_finding?(%Finding{}), do: false
 
     # The moduledoc says why this is a closed set of phrases rather than a
     # clipped finding. The three shapes are `Palette.resolve/2`'s own error

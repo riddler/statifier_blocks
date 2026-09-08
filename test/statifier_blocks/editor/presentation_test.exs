@@ -1359,6 +1359,51 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "a face finding is contained by its card (the Note of 2026-09-08, item 2)" do
+      @stylesheet "assets/css/statifier_blocks.css"
+
+      # The containment is the PLACEMENT: the row is placed in the card's own
+      # text column, which it can only be as a child of the card element. On a
+      # container the card is the chrome and the node box around it is
+      # `max-content` wide, so the row placed outside drew a full-width tinted
+      # line between the card and the slot label under it.
+      # Sabotage: drop the rule - the row auto-places into column 1, under the
+      # icon tile, and the assertion goes red without waiting for a capture.
+      test "a face finding is placed in the card's own text column" do
+        css = File.read!(@stylesheet)
+
+        body = rule_body!(css, ~r/^\.sb-node__chrome > \.sb-finding\s*\{(.*?)\n\}/ms)
+
+        assert body =~ ~r/grid-column:\s*2/
+      end
+
+      # And the row wraps rather than widening the card, which is the other
+      # half of "contained": the column is `minmax(0, 1fr)`, so a long
+      # sentence has somewhere to go that is not sideways.
+      # Sabotage: `overflow-wrap: normal` - a finding carrying one long
+      # identifier pushes the chrome past the card width again.
+      test "a long message wraps inside the column rather than widening it" do
+        css = File.read!(@stylesheet)
+
+        body = rule_body!(css, ~r/^\.sb-node__chrome > \.sb-finding\s*\{(.*?)\n\}/ms)
+        chrome = rule_body!(css, ~r/^\.sb-node__chrome\s*\{(.*?)\n\}/ms)
+
+        assert body =~ ~r/overflow-wrap:\s*break-word/
+        assert chrome =~ ~r/grid-template-columns:\s*auto minmax\(0, 1fr\) auto/
+      end
+
+      # The item's own sentence: the cap is a legibility number and not a
+      # measurement of the card, so moving it moves nothing here. The token is
+      # a layout metric the connector geometry hangs off, and this is the
+      # assertion that says the chip contract did not quietly take it with it.
+      # Sabotage: change the declaration to any other length - red.
+      test "the card-width token does not move with the cap" do
+        css = File.read!(@stylesheet)
+
+        assert css =~ ~r/^\s*--sb-card-width:\s*14rem;$/m
+      end
+    end
+
     # The space scale in `--sb-space` units, which is what lets a geometry
     # assertion below compare two rules written in different combinations of
     # the same tokens.

@@ -35,8 +35,10 @@ defmodule StatifierBlocks.ViewModel do
       declaring `singleton` (ADR-0005 clause 10z) that the document does not
       satisfy, anchored `{:block, root_id}`, severity `:error`. See "d10's
       cardinality declaration" below.
-    * `:lint` - a summary chip the presentation cap refused, anchored
-      `{:block, id}`, severity `:warning`.
+    * `:lint` - a summary chip the presentation cap refused or clipped,
+      anchored `{:block, id}`, severity `:warning`. It is read in the
+      drawer's Findings tab and never on the card face (ADR-0005's Note of
+      2026-09-08, item 2).
     * `:lint` again, this time from a host's own whole-document rule - a
       `StatifierBlocks.DocumentValidator` in the palette's `validators`
       (ADR-0005 clauses 11p to 11t) - anchored wherever the rule says,
@@ -494,9 +496,9 @@ defmodule StatifierBlocks.ViewModel do
   routes every one of the combined list per the moduledoc's table, and
   groups `palette`'s types into `palette_groups`.
 
-  The `:lint` half is the summary chips the presentation cap refused
-  (`StatifierBlocks.BlockType.summary_refusals/2`), one `:warning` per
-  refusal, and whatever the palette's `validators` return - the derived
+  The `:lint` half is the summary chips the presentation cap refused or
+  clipped (`StatifierBlocks.BlockType.summary_refusals/2`), one `:warning`
+  per entry, and whatever the palette's `validators` return - the derived
   findings that are not errors.
 
   The document-level rules run after the per-block ones and before the
@@ -709,12 +711,14 @@ defmodule StatifierBlocks.ViewModel do
   line. A string summary arrives here as a one-element list, so the one-chip
   case draws one chip and no separator of any kind.
 
-  Nothing is refused here. An over-long or newline-carrying chip was already
-  dropped where the node was built (`StatifierBlocks.BlockType.summary/2`,
-  under ADR-0002 B3's refuse-never-truncate discipline), so this reads what
-  survived. What did not survive is not silent: `build/3` raises a `:lint`
-  warning against the block for each refused chip, so the difference between
-  "declared nothing" and "declared something too long" is readable.
+  Nothing is refused or clipped here. A newline-carrying chip was already
+  dropped, and an over-cap one already clipped, where the node was built
+  (`StatifierBlocks.BlockType.summary/2`, under ADR-0002 B3's discipline and
+  the summary-chip carve-out ADR-0005's Note of 2026-09-08 item 2 records),
+  so this reads the result. Neither is silent: `build/3` raises a `:lint`
+  warning against the block for each entry, so the difference between
+  "declared nothing", "declared something unusable" and "declared something
+  too long" is readable.
 
       iex> alias StatifierBlocks.ViewModel
       iex> ViewModel.summary_chips(%ViewModel.Node{
@@ -1705,13 +1709,24 @@ defmodule StatifierBlocks.ViewModel do
   end
 
   # ADR-0005 decision 10's 2026-08-30 Note, "the cap signals". The
-  # presentation cap refuses a chip rather than truncating it (ADR-0002 B3),
-  # which is the right call for the card and leaves the author with nothing
-  # to look at: a lane name one character too long draws the same card as a
-  # lane nobody declared. `:lint` at `:warning` is the honest severity -
-  # decision 11 reserves every non-error severity to `:lint`, and the
-  # document compiles either way, so this changes no verdict and only says
-  # that something declared is not being drawn.
+  # presentation cap refuses a blank, a multiline and a non-string chip
+  # rather than repairing it (ADR-0002 B3), which is the right call for the
+  # card and leaves the author with nothing to look at: a lane name nobody
+  # can draw makes the same card as a lane nobody declared. `:lint` at
+  # `:warning` is the honest severity - decision 11 reserves every
+  # non-error severity to `:lint`, and the document compiles either way,
+  # so this changes no verdict and only says that something declared is
+  # not being drawn as declared.
+  #
+  # ADR-0005's Note of 2026-09-08 item 2 changed the `:too_long` arm under
+  # this reader without changing this reader: the chip is now drawn
+  # clipped, so the entry is a diagnostic about a chip that IS on the card
+  # rather than about one that is missing from it. Where it is READ moved
+  # with it - the drawer's Findings tab, never the card face, which
+  # `StatifierBlocks.Editor.BlockNode.face_findings/1` is what enforces.
+  # Nothing here moves: the finding is still derived, still counted, and
+  # still in `t().findings`, because a diagnostic the drawer lists is one
+  # this pass has to produce.
   @spec summary_findings(Block.id(), module(), Block.config(), BlockType.chip_labels()) ::
           [Finding.t()]
   defp summary_findings(block_id, module, config, labels) do

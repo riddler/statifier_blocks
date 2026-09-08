@@ -63,7 +63,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert has_element?(
                  view,
-                 ~s([data-block-id="blk_variant"] > .sb-finding.sb-finding--warning),
+                 ~s([data-block-id="blk_variant"] > .sb-node__chrome > .sb-finding.sb-finding--warning),
                  "no handler registered for this invoke type"
                )
       end
