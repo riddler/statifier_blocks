@@ -488,10 +488,10 @@ defmodule StatifierBlocks.CompositeTest do
     end
   end
 
-  describe "Composite.expand/2" do
+  describe "Composite.expand!/2" do
     # Sabotage: returned the subtree unminted - red on the ids.
     test "expands to the members, head first, with ids minted from the composite's" do
-      assert {[call], param_map} = Composite.expand(guarded_step("blk_GS"), GuardedStep)
+      assert {[call], param_map} = Composite.expand!(guarded_step("blk_GS"), GuardedStep)
 
       assert call.id == "blk_GS_call"
       assert call.type == "core.invoke"
@@ -508,8 +508,8 @@ defmodule StatifierBlocks.CompositeTest do
     # Sabotage: minted with a UXID or a document counter - red. The ids are a
     # function of the composite block's id and nothing else.
     test "the ids are stable across two expansions" do
-      {first, _map} = Composite.expand(guarded_step("blk_GS"), GuardedStep)
-      {second, _map} = Composite.expand(guarded_step("blk_GS"), GuardedStep)
+      {first, _map} = Composite.expand!(guarded_step("blk_GS"), GuardedStep)
+      {second, _map} = Composite.expand!(guarded_step("blk_GS"), GuardedStep)
 
       assert ids(Composite.flatten(first)) == ids(Composite.flatten(second))
       assert ids(Composite.flatten(first)) == ["blk_GS_call", "blk_GS_guard"]
@@ -519,8 +519,8 @@ defmodule StatifierBlocks.CompositeTest do
     # reserves "__" for the role separator and its `unstate_id/1` stops
     # inverting when a block id carries one.
     test "no minted id carries \"__\", and each is document-unique" do
-      {members, _map} = Composite.expand(guarded_step("blk_GS"), GuardedStep)
-      {others, _map} = Composite.expand(guarded_step("blk_OTHER"), GuardedStep)
+      {members, _map} = Composite.expand!(guarded_step("blk_GS"), GuardedStep)
+      {others, _map} = Composite.expand!(guarded_step("blk_OTHER"), GuardedStep)
 
       minted = ids(members) ++ ids(others)
 
@@ -534,7 +534,7 @@ defmodule StatifierBlocks.CompositeTest do
     test "a member no single param is responsible for maps to nil" do
       block = Block.new("myapp.two_in_one", id: "blk_X", config: %{"path" => "p", "value" => "v"})
 
-      assert {_members, param_map} = Composite.expand(block, TwoInOne)
+      assert {_members, param_map} = Composite.expand!(block, TwoInOne)
 
       assert param_map == %{"blk_X_both" => nil, "blk_X_neither" => nil}
     end
@@ -544,7 +544,7 @@ defmodule StatifierBlocks.CompositeTest do
     test "subtree/1 is handed the declaration's defaults under the stored config" do
       block = Block.new("myapp.guarded_step", id: "blk_GS", config: %{})
 
-      assert {[call], _map} = Composite.expand(block, GuardedStep)
+      assert {[call], _map} = Composite.expand!(block, GuardedStep)
       assert call.config["invoke_type"] == ""
     end
 
@@ -563,7 +563,7 @@ defmodule StatifierBlocks.CompositeTest do
       end
 
       assert_raise ArgumentError, ~r/UXID/, fn ->
-        Composite.expand(Block.new("myapp.minted", id: "blk_M"), Minted)
+        Composite.expand!(Block.new("myapp.minted", id: "blk_M"), Minted)
       end
     end
 
@@ -586,7 +586,7 @@ defmodule StatifierBlocks.CompositeTest do
       end
 
       assert_raise ArgumentError, ~r/duplicate local ids/, fn ->
-        Composite.expand(Block.new("myapp.doubled", id: "blk_D"), Doubled)
+        Composite.expand!(Block.new("myapp.doubled", id: "blk_D"), Doubled)
       end
     end
 
@@ -605,7 +605,7 @@ defmodule StatifierBlocks.CompositeTest do
       end
 
       assert_raise ArgumentError, ~r/__/, fn ->
-        Composite.expand(Block.new("myapp.separated", id: "blk_S"), Separated)
+        Composite.expand!(Block.new("myapp.separated", id: "blk_S"), Separated)
       end
     end
 
@@ -613,8 +613,131 @@ defmodule StatifierBlocks.CompositeTest do
     # that declared itself a composite has a declaration to expand from.
     test "a module that is not a composite is refused" do
       assert_raise ArgumentError, ~r/not a composite/, fn ->
-        Composite.expand(Block.new("core.assign", id: "blk_A"), StatifierBlocks.Core.Assign)
+        Composite.expand!(Block.new("core.assign", id: "blk_A"), StatifierBlocks.Core.Assign)
       end
+    end
+  end
+
+  # ADR-0002's Note of 2026-09-08, item 3 (RQ-SF039-10): one expansion, two
+  # spellings. Each of the four broken-declaration shapes the record lists is
+  # asserted BOTH ways here - `{:error, _}` through `expand/2` and a raise
+  # through `expand!/2` - because the pair is the ruling, and a shape that
+  # raised through one spelling and answered `:ok` through the other would be
+  # a second implementation, which is what the record forbids.
+  describe "Composite.expand/2 (the tuple spelling)" do
+    defmodule EmptySubtree do
+      @moduledoc false
+      use StatifierBlocks.Composite,
+        name: "myapp.empty_subtree",
+        params: [%{key: "k", type: :string, label: "K", required?: false, default: ""}]
+
+      @impl StatifierBlocks.Composite
+      def subtree(_params), do: []
+    end
+
+    defmodule NotABlock do
+      @moduledoc false
+      use StatifierBlocks.Composite,
+        name: "myapp.not_a_block",
+        params: [%{key: "k", type: :string, label: "K", required?: false, default: ""}]
+
+      @impl StatifierBlocks.Composite
+      def subtree(_params), do: [%{id: "a", type: "core.assign"}]
+    end
+
+    defmodule DuplicateIds do
+      @moduledoc false
+      use StatifierBlocks.Composite,
+        name: "myapp.duplicate_ids",
+        params: [%{key: "k", type: :string, label: "K", required?: false, default: ""}]
+
+      @impl StatifierBlocks.Composite
+      def subtree(_params) do
+        [
+          StatifierBlocks.Block.new("core.assign", id: "a", config: %{}),
+          StatifierBlocks.Block.new("core.assign", id: "a", config: %{})
+        ]
+      end
+    end
+
+    defmodule MintsSeparator do
+      @moduledoc false
+      use StatifierBlocks.Composite,
+        name: "myapp.mints_separator",
+        params: [%{key: "k", type: :string, label: "K", required?: false, default: ""}]
+
+      @impl StatifierBlocks.Composite
+      def subtree(_params), do: [StatifierBlocks.Block.new("core.assign", id: "_x", config: %{})]
+    end
+
+    # Sabotage: had `expand/2` let the raise through instead of rescuing it -
+    # red on all four, because the caller that must not raise is the editor's
+    # click handler. And, the other way: had `expand!/2` become the wrapper
+    # and `expand/2` the raising body - red on every second assertion, because
+    # the compiler's Resolve reads the raising spelling and a broken
+    # declaration must still be a compile-time raise.
+    test "an empty subtree: {:error, _} through expand/2, a raise through expand!/2" do
+      block = Block.new("myapp.empty_subtree", id: "blk_E")
+
+      assert {:error, reason} = Composite.expand(block, EmptySubtree)
+      assert reason =~ "non-empty list"
+
+      assert_raise ArgumentError, fn -> Composite.expand!(block, EmptySubtree) end
+    end
+
+    test "a non-block: {:error, _} through expand/2, a raise through expand!/2" do
+      block = Block.new("myapp.not_a_block", id: "blk_N")
+
+      assert {:error, reason} = Composite.expand(block, NotABlock)
+      assert reason =~ "non-empty list"
+
+      assert_raise ArgumentError, fn -> Composite.expand!(block, NotABlock) end
+    end
+
+    test "a duplicated local id: {:error, _} through expand/2, a raise through expand!/2" do
+      block = Block.new("myapp.duplicate_ids", id: "blk_D")
+
+      assert {:error, reason} = Composite.expand(block, DuplicateIds)
+      assert reason =~ "duplicate local ids"
+
+      assert_raise ArgumentError, fn -> Composite.expand!(block, DuplicateIds) end
+    end
+
+    test "a local id minting \"__\": {:error, _} through expand/2, a raise through expand!/2" do
+      block = Block.new("myapp.mints_separator", id: "blk_S")
+
+      assert {:error, reason} = Composite.expand(block, MintsSeparator)
+      assert reason =~ "__"
+
+      assert_raise ArgumentError, fn -> Composite.expand!(block, MintsSeparator) end
+    end
+
+    # Sabotage: answered the bare pair - red. The ruled return is the tagged
+    # tuple over the pair, and this is the breaking part of the change.
+    test "a declaration that expands answers {:ok, {blocks, param_map}}" do
+      assert {:ok, {[call], param_map}} = Composite.expand(guarded_step("blk_GS"), GuardedStep)
+
+      assert call.id == "blk_GS_call"
+      assert param_map == %{"blk_GS_call" => "invoke_type", "blk_GS_guard" => "failure_path"}
+    end
+
+    # Sabotage: answered `{:ok, ...}` from a second derivation rather than
+    # from `expand!/2` - red, because the two would then be free to disagree.
+    test "the :ok payload is exactly what expand!/2 answers" do
+      assert {:ok, pair} = Composite.expand(guarded_step("blk_GS"), GuardedStep)
+      assert pair == Composite.expand!(guarded_step("blk_GS"), GuardedStep)
+    end
+
+    # Sabotage: rescued only the broken-declaration raises - red, because a
+    # ref that is not a composite reaches this function from the editor too.
+    test "a module that is not a composite is an {:error, _} here" do
+      assert {:error, reason} =
+               Composite.expand(
+                 Block.new("core.assign", id: "blk_A"),
+                 StatifierBlocks.Core.Assign
+               )
+
+      assert reason =~ "not a composite"
     end
   end
 
@@ -658,7 +781,7 @@ defmodule StatifierBlocks.CompositeTest do
     # has no order of its own and last-write-wins by position then depends on
     # the hashing.
     test "the union is taken in the expansion's own pre-order" do
-      {members, _map} = Composite.expand(guarded_step("blk_GS"), GuardedStep)
+      {members, _map} = Composite.expand!(guarded_step("blk_GS"), GuardedStep)
 
       assert ids(Composite.flatten(members)) == ["blk_GS_call", "blk_GS_guard"]
     end

@@ -430,7 +430,7 @@ defmodule StatifierBlocks.Composite.PassThroughTest do
     test "the children land in the mapped inner slot, ids unchanged" do
       block = section("blk_GX", [notify("blk_notify", "signup.applicant.email")])
 
-      {[_call, group], _param_map} = Composite.expand(block, GuardedSection)
+      {[_call, group], _param_map} = Composite.expand!(block, GuardedSection)
 
       assert group.id == "blk_GX_then"
       assert [%Block{id: "blk_notify"}] = group.slots["body"]
@@ -444,7 +444,7 @@ defmodule StatifierBlocks.Composite.PassThroughTest do
       child = notify("blk_notify", "signup.applicant.email")
       block = section("blk_GX", [child])
 
-      {[_call, group], _param_map} = Composite.expand(block, GuardedSection)
+      {[_call, group], _param_map} = Composite.expand!(block, GuardedSection)
 
       assert group.slots == %{"body" => [child], "interrupts" => []}
     end
@@ -453,7 +453,7 @@ defmodule StatifierBlocks.Composite.PassThroughTest do
     # author filled nothing - red. P4: an unfilled slot splices nothing and
     # the mapped inner slot is left as the subtree wrote it.
     test "an unfilled declared slot splices nothing" do
-      {[_call, group], _param_map} = Composite.expand(section("blk_GX", []), GuardedSection)
+      {[_call, group], _param_map} = Composite.expand!(section("blk_GX", []), GuardedSection)
 
       assert group.slots == %{"body" => [], "interrupts" => []}
     end
@@ -464,7 +464,7 @@ defmodule StatifierBlocks.Composite.PassThroughTest do
     test "T3: the param map names the minted members and no spliced child" do
       block = section("blk_GX", [notify("blk_notify", "signup.applicant.email")])
 
-      {_members, param_map} = Composite.expand(block, GuardedSection)
+      {_members, param_map} = Composite.expand!(block, GuardedSection)
 
       assert Map.keys(param_map) |> Enum.sort() == ["blk_GX_call", "blk_GX_guard", "blk_GX_then"]
     end
@@ -504,7 +504,7 @@ defmodule StatifierBlocks.Composite.PassThroughTest do
       end
 
       assert_raise ArgumentError, ~r/no local id of the subtree/, fn ->
-        Composite.expand(Block.new("myapp.unknown_id", id: "blk_U"), UnknownId)
+        Composite.expand!(Block.new("myapp.unknown_id", id: "blk_U"), UnknownId)
       end
     end
 
@@ -527,7 +527,7 @@ defmodule StatifierBlocks.Composite.PassThroughTest do
       end
 
       assert_raise ArgumentError, ~r/which the subtree does not write/, fn ->
-        Composite.expand(Block.new("myapp.unwritten_slot", id: "blk_U"), UnwrittenSlot)
+        Composite.expand!(Block.new("myapp.unwritten_slot", id: "blk_U"), UnwrittenSlot)
       end
     end
 
@@ -557,7 +557,7 @@ defmodule StatifierBlocks.Composite.PassThroughTest do
       end
 
       assert_raise ArgumentError, ~r/which the subtree also fills/, fn ->
-        Composite.expand(Block.new("myapp.also_filled", id: "blk_U"), AlsoFilled)
+        Composite.expand!(Block.new("myapp.also_filled", id: "blk_U"), AlsoFilled)
       end
     end
 
@@ -637,7 +637,7 @@ defmodule StatifierBlocks.Composite.PassThroughTest do
           Block.new("core.send", id: "blk_notify", config: %{"event" => "signup.done"})
         ])
 
-      {members, _param_map} = Composite.expand(block, GuardedSection)
+      {members, _param_map} = Composite.expand!(block, GuardedSection)
 
       assert {:ok, composed} = Compiler.compile(document([block]), module_palette())
       assert {:ok, expanded} = Compiler.compile(document(members), module_palette())
@@ -709,7 +709,7 @@ defmodule StatifierBlocks.Composite.PassThroughTest do
     test "the same expansion, block for block" do
       block = section("blk_GX", [notify("blk_notify", "signup.applicant.email")])
 
-      assert Composite.expand(block, GuardedSection) == Composite.expand(block, data_ref())
+      assert Composite.expand!(block, GuardedSection) == Composite.expand!(block, data_ref())
     end
 
     # Sabotage: registered the data twin's slots under the node-level key -
@@ -738,7 +738,7 @@ defmodule StatifierBlocks.Composite.PassThroughTest do
           Block.new("core.send", id: "blk_notify", config: %{"event" => "signup.done"})
         ])
 
-      {members, _param_map} = Composite.expand(block, data_ref())
+      {members, _param_map} = Composite.expand!(block, data_ref())
 
       assert {:ok, composed} = Compiler.compile(document([block]), data_palette())
       assert {:ok, expanded} = Compiler.compile(document(members), data_palette())

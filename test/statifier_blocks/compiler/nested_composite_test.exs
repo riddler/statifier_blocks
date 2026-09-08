@@ -153,10 +153,10 @@ defmodule StatifierBlocks.Compiler.NestedCompositeTest do
     test "the composite, its one Expand and its two compile to the same bytes" do
       block = confirmed_signup("blk_CS")
 
-      {once, _param_map} = Composite.expand(block, ConfirmedSignup)
+      {once, _param_map} = Composite.expand!(block, ConfirmedSignup)
       assert [%Block{type: "signup.confirm_contact", id: "blk_CS_confirm"} = inner] = once
 
-      {twice, _param_map} = Composite.expand(inner, ConfirmContact)
+      {twice, _param_map} = Composite.expand!(inner, ConfirmContact)
       assert Enum.map(twice, & &1.id) == ["blk_CS_confirm_send", "blk_CS_confirm_record"]
 
       assert {:ok, composed} = Compiler.compile(document([block]), palette())

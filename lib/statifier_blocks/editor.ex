@@ -1976,8 +1976,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # and there is no intermediate document in which the composite is gone and
     # the expansion is not yet there (3E).
     #
-    # `Composite.expand/2` is the one expansion function (ADR-0002's
-    # amendment): the compiler reads it at Resolve and this reads it here, so
+    # `Composite.expand/2` is one expansion in two spellings (ADR-0002's
+    # amendment, as its Note of 2026-09-08 item 3 re-states it): the compiler
+    # reads `expand!/2` at Resolve and this reads `expand/2` here over the
+    # same derivation, so
     # the document after Expand holds exactly the blocks the compiler would
     # have spliced. That is what keeps consent clause 6's byte-identity
     # obligation true on both sides of the gesture rather than by coincidence.
@@ -2073,34 +2075,37 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    # A declaration too broken to expand RAISES out of `Composite.expand/2` -
-    # a `subtree/1` that answers an empty list or something that is not a
-    # block, a duplicated or `blk_`-prefixed local id, a local id that would
-    # mint an id carrying `__`, and (`ADR-0002`'s pass-through amendment) a
-    # declared slot whose mapping does not fit the subtree. This is a click
-    # handler, so an unrescued raise takes the author's LiveView down over a
-    # declaration the author cannot fix from the canvas.
+    # A declaration too broken to expand is `{:error, why}` out of
+    # `Composite.expand/2` - a `subtree/1` that answers an empty list or
+    # something that is not a block, a duplicated or `blk_`-prefixed local id,
+    # a local id that would mint an id carrying `__`, and (`ADR-0002`'s
+    # pass-through amendment) a declared slot whose mapping does not fit the
+    # subtree. This is a click handler, so an unrescued raise would take the
+    # author's LiveView down over a declaration the author cannot fix from the
+    # canvas.
     #
-    # The compiler already answers the same case, and answers it as data:
-    # `StatifierBlocks.Compiler`'s own `expand/2` rescues into a
-    # `{:composite_expansion_failed, id, why}` finding. The gesture answers it
-    # with that same reason in 5E's refusal shape rather than a new one - the
-    # editor writes nothing, the composite stays where it was, and
-    # `last_error` carries the declaration error the exception named, so the
-    # author is told which declaration is broken and why.
+    # `ADR-0002`'s Note of 2026-09-08, item 3 gives this caller the tuple
+    # spelling, so the refusal arrives as data and the `rescue` that used to
+    # stand here is a `case`. The compiler answers the same broken declaration
+    # the same way - `StatifierBlocks.Compiler`'s own `expand/2` makes a
+    # `{:composite_expansion_failed, id, why}` finding out of it - and the
+    # gesture answers it with that same reason in 5E's refusal shape rather
+    # than a new one: the editor writes nothing, the composite stays where it
+    # was, and `last_error` carries the declaration error, so the author is
+    # told which declaration is broken and why.
     #
-    # The arm is deliberately over the whole call and not over one named
-    # exception: every raise the declaration can produce - today's five and
-    # any a later amendment adds - refuses the gesture the same way, and a
-    # narrower rescue would let the next one through to the socket.
+    # The `case` is deliberately over `{:error, _}` and not over one named
+    # reason: every refusal the declaration can produce - today's five and any
+    # a later amendment adds - refuses the gesture the same way.
     @spec expanded_members(Block.t(), module()) :: {:ok, [Block.t()]} | {:error, term()}
     defp expanded_members(%Block{} = block, module) do
-      {members, _param_map} = Composite.expand(block, module)
+      case Composite.expand(block, module) do
+        {:ok, {members, _param_map}} ->
+          {:ok, members}
 
-      {:ok, members}
-    rescue
-      error ->
-        {:error, {:composite_expansion_failed, block.id, Exception.message(error)}}
+        {:error, why} ->
+          {:error, {:composite_expansion_failed, block.id, why}}
+      end
     end
 
     # ADR-0003 decision 3's structural verdict, asked before the compound is

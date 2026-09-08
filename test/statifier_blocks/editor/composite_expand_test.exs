@@ -377,7 +377,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         expand(view, "blk_GS")
         assert_receive {:document, expanded}
 
-        {members, _param_map} = Composite.expand(guarded_step("blk_GS"), GuardedStep)
+        {members, _param_map} = Composite.expand!(guarded_step("blk_GS"), GuardedStep)
 
         assert body(expanded) == members ++ [tail()]
       end
@@ -456,11 +456,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # carries a sentence the author cannot act on.
       test "the message the refusal carries names the declaration error" do
         assert_raise ArgumentError, ~r/duplicate local ids/, fn ->
-          Composite.expand(broken_subtree("blk_BS", "duplicate"), BrokenSubtree)
+          Composite.expand!(broken_subtree("blk_BS", "duplicate"), BrokenSubtree)
         end
 
         assert_raise ArgumentError, ~r/no local id of the subtree/, fn ->
-          Composite.expand(broken_mapping("blk_BM", "no_such_local_id"), BrokenMapping)
+          Composite.expand!(broken_mapping("blk_BM", "no_such_local_id"), BrokenMapping)
         end
       end
     end

@@ -23,7 +23,7 @@ defmodule StatifierBlocks.Compiler do
      `StatifierBlocks.Palette.resolve/2`, which also applies an in-memory
      config migration (ADR-0002 decision 8). Nothing is written back. A
      resolved node whose module is a composite is **replaced, in place, by
-     the subtree `StatifierBlocks.Composite.expand/2` returns** (ADR-0004's
+     the subtree `StatifierBlocks.Composite.expand!/2` returns** (ADR-0004's
      amendment of 2026-09-07, E1), so stages 3-6 read a tree with no
      composite in it and need no knowledge that one was ever there. The
      param map the expansion returns is kept beside the tree, and a finding
@@ -559,7 +559,7 @@ defmodule StatifierBlocks.Compiler do
   end
 
   # E1: the replacement is complete before the stage ends, so a member that is
-  # itself a composite expands here too. `Composite.expand/2` raises on a
+  # itself a composite expands here too. `Composite.expand!/2` raises on a
   # broken declaration and decision 1 forbids this pipeline to raise, so the
   # raise becomes a `:resolve` finding against the composite block - the one
   # block in the neighbourhood an author can see.
@@ -569,7 +569,7 @@ defmodule StatifierBlocks.Compiler do
     case expand(block, module) do
       {:ok, members, param_map} ->
         # `ADR-0004`'s T3: the index maps expansion MEMBERS only. The param
-        # map is keyed by exactly those - `Composite.expand/2` takes it over
+        # map is keyed by exactly those - `Composite.expand!/2` takes it over
         # the minted members, before the author's pass-through children are
         # spliced in - so a child the author placed has no entry here, and
         # `anchor/2` finds nothing for it and leaves its finding on it.
@@ -608,7 +608,7 @@ defmodule StatifierBlocks.Compiler do
   @spec expand(Block.t(), module()) ::
           {:ok, [Block.t()], Composite.param_map()} | {:error, Finding.t()}
   defp expand(%Block{} = block, module) do
-    {members, param_map} = Composite.expand(block, module)
+    {members, param_map} = Composite.expand!(block, module)
     {:ok, members, param_map}
   rescue
     error ->
