@@ -2984,3 +2984,153 @@ The code cites have moved. Read at `d6fb241`:
 | new: the mapping resolver | `composite.ex:486-494` (`Composite.pass_through/2`) |
 
 Filed with `sb-vjvq`, campaign SF038.
+
+## Note (2026-09-08): a `:type_mismatch` whose disagreeing writer is a minted expansion member keeps the minted id in the tuple, and renders as the owning composite's sentence
+
+A dated Note rather than an amendment, and it edits nothing above this line. It
+records `RQ-SF038-24`, ruled by the operator on 2026-09-07 in option **1**, and
+it answers the one question the Amendment of 2026-09-07's section 3 (`:2733`)
+put on the table and left there: "What such a finding *renders* as - the minted
+id, the composite that owns it, or the composite's sentence - is not decided
+here, was not put to the walk, and is left open for the operator"
+(`:2762-2765`). This Note carries no `Status:` line and flips nothing; decision
+8's tuple is not widened, no reason arm is added to `:not_assignable`'s
+vocabulary, and `schema_version` stays at `1`.
+
+The ruling, in the operator's words: *a `{:type_mismatch, ...}` finding whose
+disagreeing writer is a minted expansion member keeps the minted id in the
+tuple; rendering resolves it to the owning composite block (its sentence)*.
+
+Every `lib/` cite below was read at `main` `25c17ee` and is written beside the
+anchor it was found by - a heading, a function head, a `@type` or `@typep`
+line. A cite is re-located by that anchor and not by its number.
+
+### 1. The tuple is unchanged: the minted id stays in it
+
+Decision 8 (`:396`) writes the tuple at `:418-422` as
+`{:type_mismatch, block_id, upstream_ref, produced, consumed}` gaining the
+datamodel path as its sixth member, with `upstream_ref` "naming the block whose
+write signature the read disagrees with, or `:slot_entry` when the seed is what
+it disagrees with". When that writer is a member of a composite's expansion,
+`upstream_ref` is the id `Composite` minted for it. This Note leaves it there:
+no member is added, none is re-typed, and none is rewritten on the way out.
+
+The code writes the tuple in one place and reads it in two, and all three sites
+take `upstream_ref` as it stands. `Assignability.read_findings/5`
+(`assignability.ex`, `defp read_findings(palette, document, env, %Block{} =
+block, declarations)`, `:626-632`) builds
+`{:type_mismatch, block.id, ref, held, expected, path}` at `:630`, where `ref`
+is the second half of `held_at/2`'s answer - the environment's record of which
+block wrote the entry, whatever id that block carries. The `:type_mismatch` arm
+of `@type finding` (`assignability.ex:123-127`) declares it as
+`upstream_ref()`, and the `:type_mismatch` clause of `finding_reason/3`
+(`:390-395`) passes it to `seam_reason/5` unexamined.
+
+Keeping the minted id is what makes the render **resolvable rather than
+guessable**, and that is the whole argument for option 1. The minted id is the
+only thing that says which member of which expansion wrote the entry; the
+owning composite is derivable from it, and it is not derivable from the
+composite, which may hold several members that write to the same path. A tuple
+carrying the composite instead would be lossy at the one point a later reader -
+a message, a jump target, a test - needs the detail, and it would be lossy in
+exactly the way decision 8 refused when it added the path member rather than
+leaving it to be re-derived: "the path is added rather than left to be
+re-derived because under this record it cannot be re-derived" (`:424-425`). The
+same reasoning, applied to the writer half, keeps the minted id.
+
+### 2. Rendering resolves the minted id one level up, to the composite the author placed
+
+The writer half is resolved where a finding's message is built. Today
+`Compiler.structure_finding/3`'s `:type_mismatch` clause (`compiler.ex`,
+`defp structure_finding({:type_mismatch, id, source, held, expected, path} =
+reason, declarations, read_keys)`, `:1225-1238`) writes the sentence an author
+reads, and its second half is the `source_phrase(source)` call at `:1233-1234`.
+`source_phrase/1`'s catch-all (`:1246`) inspects whatever ref it is handed, so
+a minted id reaches the sentence as it stands, which is the state this Note
+ends. Under this ruling that clause resolves a minted `source` to the
+composite that owns it and names **that** block, mirroring `ADR-0004`'s
+provenance amendment, whose `E3` re-anchors a finding whose owner names an
+expanded member "one level up before it is reported" because such a block is
+one "the author cannot see, cannot select and cannot edit".
+
+The material to resolve it is already built and already climbs the right
+distance. The compiler's expansion index (`compiler.ex`,
+`@typep expansion :: %{optional(Block.id()) => {Block.id(), String.t() | nil}}`,
+`:524`) maps every block inside an expansion to the composite it came from, and
+`anchor/2` (`:743-751`) walks it to the **outermost** composite rather than
+stopping at an inner one, which is the block an author holds when composites
+nest. `reanchor_finding/2` (`:727-734`) already performs exactly this
+resolution for a finding's **subject** half, rewriting `block_id` and
+`config_key` through `anchor/2`.
+
+Two facts about where this lands, and they are the reason this Note names the
+site rather than leaving it to the implementing request:
+
+- The subject half is re-anchored **after** the message string exists.
+  `stages/3` calls `reanchor/2` on the result of `after_resolve/5`
+  (`:456-468`, the two `reanchor/2` calls at `:462` and `:465`),
+  and `Finding`'s message is a built string by then. Rewriting the writer half
+  at `reanchor/2` would mean rewriting prose.
+- The message is built by a stage that does not hold the index.
+  `config_and_structure_stages/5` (`:891-906`) passes `expansion` to
+  `structure_document/3` only; `structure_stage/4` (`:1113`) takes
+  `(document, palette, opts, skip)` and hands `structure_finding/3` the
+  declarations and the read keys. Resolving the writer half therefore means the
+  index reaching the site that writes the sentence.
+
+Neither fact is a decision about a signature: which argument carries the index,
+and whether it arrives as the index or as an already-resolved name, is the
+implementing request's, and this Note fixes only the answer the author reads.
+
+### 3. What is shown is the owning composite's sentence
+
+The composite is named by its **sentence**, not by its id:
+`ViewModel.sentence/1` (`view_model.ex`, the `@doc` opening "A node's line of
+prose: its own sentence, else `title/1`" at `:1295`, the `@spec` and the two
+heads at `:1320-1324`) is the one two-clause fallback every surface drawing a
+row already writes, and its
+docstring gives the reason this Note adopts it: "writing it once is what keeps
+two surfaces from naming one block differently". A composite whose type
+declares `sentence/1` reads as the line the author composed; one that declares
+none reads as its title, so the answer is never blank.
+
+This is the writer half only. The drawer's Findings tab draws the finding's
+subject id and its message as separate cells (`editor/findings.ex`, `def
+row(assigns)`, `:206-224`: `sb-findings__id` at `:219`, `sb-findings__message`
+at `:223`), and the subject cell is unaffected by anything here - it already
+shows a re-anchored id.
+
+### 4. The subject half is untouched, and a pass-through child's finding is still the child's
+
+Section 3 of the Amendment of 2026-09-07 (`:2733`) decided the **subject** half:
+a read that fails inside a pass-through child is attributed to the child, "not
+lifted one level to the composite" (`:2735-2739`). Nothing here disturbs it.
+The two halves are independent, exactly as that section says in its own closing
+sentence - "the finding is the child's, whatever the writer half renders as"
+(`:2765-2766`) - and as its paragraph at `:2752-2757` says of the two
+attribution rules it draws: the test is whose block declared the read.
+
+The code makes the separation structural rather than a rule to remember. A
+pass-through child has **no entry** in the expansion index: `Composite.expand/2`
+takes the param map over the minted members before the author's children are
+spliced in (`composite.ex`, the comment "`ADR-0004`'s `T3`: the expansion index
+maps expansion MEMBERS only", `:466-471`), and the compiler builds its index
+from that param map. `anchor/2` therefore answers `nil` for a pass-through
+child and resolves nothing, in the writer half as in the subject half. A child
+that writes an entry a sibling then misreads is named by its own id, which is
+an id the author typed.
+
+### 5. What this Note does not decide
+
+- No new reason arm, and `:shape_not_satisfied` is untouched.
+- No change to `Composite`'s minting: `mint_id/3` (`composite.ex:923`) and
+  `pass_through/2` (`@spec` at `:489`, head at `:491`) keep their spellings
+  and their answers.
+- No `ViewModel` node field is added; the composite is looked up in the model
+  that already holds it.
+- Nothing about a **kind** refusal: `{:kind_not_admitted, ...}` names a slot and
+  a parent, carries no writer, and is unaffected.
+
+Filed with `sb-htds`, campaign SF039, recording `RQ-SF038-24`. `sb-bjt7` builds
+it. This Note changes no code, adds no README row, and flips no status line in
+this file.
