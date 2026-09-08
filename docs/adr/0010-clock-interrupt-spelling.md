@@ -559,3 +559,169 @@ this section supersedes from below, in the form the Note above states for its
 own supersession.
 
 Filed with `sb-bkek`, campaign-031's fill lane D.
+
+---
+
+## Amendment (2026-09-08): decision 8, the rail scopes the interrupt pair per group
+
+**Status: proposed (2026-09-08, campaign SF039, bead `sb-e18p`, recording
+campaign-SF039's rulings `RQ-SF039-3` and `RQ-SF039-9`).** A decision record
+merges at proposed under the campaign invariant; flipping it to accepted is a
+separate gated request through the same `docs/adr/` gate, and `sb-5d9l` carries
+it once `sb-p8lh` has landed. Additive: decisions 1 through 7 stand as
+accepted, every Note above this line stands, and no text above this line is
+edited by this section.
+
+An amendment rather than a Note, because decision 5 is read here for the case
+it does not cover and a new decision is added beside it. Decision 5 stays
+exactly as it reads: the two blocks are coupled by an event name, that coupling
+is the family rule, and nothing below gives the pair an edge. What changes is
+**what the name is** in the emitted chart, which decision 5 never said and the
+code answered by naming one string per outcome for the whole machine.
+
+### 8. The rail scopes the pair
+
+**The defect, stated first.** The interrupt protocol is two strings -
+`statifier_blocks.interrupt.abandon` and `statifier_blocks.interrupt.resume`
+(`lib/statifier_blocks/core/emit.ex:68-69`, the `@abandon` and `@resume`
+module attributes, read at `f9b62c5`) - and every interruptible group emits the
+same two transitions matching them
+(`lib/statifier_blocks/core/emit.ex:258-259`, inside `defp guarded/4` at
+`:238`, reached from `def interruptible/2` at `:221`, read at `f9b62c5`;
+`core.group` calls it at `lib/statifier_blocks/core/group.ex:95` and
+`core.resumable_group` at `lib/statifier_blocks/core/resumable_group.ex:110`).
+One name at every nesting depth means the rails of two nested groups are
+listening for the same event, and only the raise's position in the active
+configuration decides which of them takes it.
+
+This record's own moduledoc reading of that is right about the case it
+describes and silent about the case that bites. "Nesting behaves the way an
+author would expect for free: both groups carry the same two transitions, the
+raise happens inside the inner group's region, and SCXML selects the transition
+whose source is the deepest active state - the inner group's"
+(`lib/statifier_blocks/core/emit.ex:51-55`, read at `f9b62c5`). That is a raise
+from a handler on the **inner** group's rail, and it is correct. The case it
+does not describe is a raise from a handler on the **outer** group's rail while
+a second railed group is active inside the outer group's body: the inner
+group's rail matches the same name and its source sits deeper in the body
+region, which is the region emitted first
+(`lib/statifier_blocks/core/emit.ex:254`, `regions = [body_region | ...]`, read
+at `f9b62c5`). The outer group's own transition - the one the raising handler
+is a sibling region of - is the one the author authored, and it is not the one
+that is reliably taken.
+
+The first production embedder measured this on a resumable outer group, where
+the consequence is worst: the outer group's `resume` targets the history inside
+its body region (`lib/statifier_blocks/core/emit.ex:259`, `history_id || run`,
+read at `f9b62c5`; decision 3 behaviour 2 at `:189`), so the resume that is
+captured by an inner group is a resume whose history re-entry never fires. The
+practical effect is that a railed composite cannot be placed inside a resumable
+body beyond the first without the two rails contending for one name.
+
+Nothing above asks upstream for anything, and neither does the answer below.
+Decision 4's line holds: this record has never needed a `statifier-ex` or
+`statifier_oban` contract change and does not need one here. The answer is
+deliberately one that does **not** depend on which of two same-named
+transitions an engine selects, because a chart whose correctness rests on that
+tie-break is a chart this package should not emit.
+
+**8a. The authored and raised spelling does not change, and decision 5
+stands.** A `core.on_event` block still declares `outcome: "abandon"` or
+`outcome: "resume"` and nothing an author writes in a document mentions an
+event name. A host block type still joins the protocol by raising the two
+package-owned strings, and `ADR-0002`'s reserved-prefix paragraph is
+untouched - "The `statifier_blocks.` event-name prefix is reserved", and "a
+host must not name its own events under the prefix"
+(`docs/adr/0002-block-type-behaviour.md:357-364`). The prefix is still
+reserved, the two names are still the protocol's, and
+`StatifierBlocks.Core.Emit.interrupt_events/0`
+(`lib/statifier_blocks/core/emit.ex:78`, read at `f9b62c5`) is still where they
+are named. The scoping below happens at emit and is invisible above it.
+
+**8b. At emit, a raise inside a group's rail subtree is rewritten to the
+group-salted name, and that group's two transitions match only the salted
+names.** The rail is emitted by `Emit.interruptible/2`'s guarded shape
+(`lib/statifier_blocks/core/emit.ex:221` and `:238`, read at `f9b62c5`), and
+that shape is where the salt is applied. For a group whose emitted state id is
+`<group state id>`:
+
+- every `<raise>` of `statifier_blocks.interrupt.abandon` or
+  `statifier_blocks.interrupt.resume` emitted **anywhere inside that group's
+  rail subtree** - the handler regions, at any depth within a handler - is
+  emitted instead as `statifier_blocks.interrupt.abandon.<group state id>` or
+  `statifier_blocks.interrupt.resume.<group state id>`;
+- the group's own two transitions
+  (`lib/statifier_blocks/core/emit.ex:258-259`) match **only** those two
+  salted names, and no longer match the bare pair.
+
+The two halves move together, which is what makes the rewrite complete rather
+than a rename of one end. A group's rail can then only be reached by a raise
+from that group's own rail, and an inner group's rail can only be reached by
+its own, because no two groups share an emitted state id
+(`StatifierBlocks.Compiler.StateId` mints them, aliased at
+`lib/statifier_blocks/core/emit.ex:65`, read at `f9b62c5`). The names are still
+under the reserved `statifier_blocks.` prefix, so `ADR-0002`'s reservation
+covers them as written.
+
+**8c. A raise outside any rail is not rewritten.** A `<raise>` of the bare pair
+emitted from somewhere that is not inside a group's rail subtree is emitted
+unchanged. It reaches no rail today - every transition matching the pair is a
+rail's - and it reaches none after this decision either. Leaving it alone keeps
+the rewrite a statement about the rail rather than a global rename of two
+strings, and keeps the diff of a document with no group empty (8e).
+
+**8d. A host block type raising the bare pair inside a rail is scoped exactly
+as `core.on_event` is.** The rewrite is a property of the position in the
+emitted chart, not of which block type emitted the raise. A host type placed on
+a group's rail that raises `statifier_blocks.interrupt.resume` -
+`interrupt_events/0` is documented as the way to do it
+(`lib/statifier_blocks/core/emit.ex:71-78`, read at `f9b62c5`) - is rewritten
+to that group's salted name on the same rule that rewrites `core.on_event`'s
+own raise (`lib/statifier_blocks/core/on_event.ex:824-825`, `defp
+outcome_event/1`, read at `f9b62c5`). A host type joins the protocol by raising
+the pair, and this record does not ask it to learn the salt.
+
+**8e. The compiled chart of every document holding an interruptible group
+changes, and the changelog says so; a document with no such group compiles
+byte-identical.** The event strings in the emitted chart are what move, so the
+change is visible to anything holding compiled bytes. Six checked-in compiled
+charts hold the pair today and are re-baselined by the implementing request:
+`test/fixtures/corpus/signup_wizard-plain.scxml`,
+`signup_wizard-terminate.scxml`, `signup_wizard-child_use.scxml`,
+`worked_example-plain.scxml`, `worked_example-terminate.scxml` and
+`worked_example-child_use.scxml` (read at `f9b62c5`). A document with no
+interruptible group emits no rail, so nothing in it is rewritten and its
+compiled bytes are unchanged - which is a claim a test can hold rather than a
+hope. Nothing about the salt is stored in a document: a stored document is an
+ordinary `ADR-0001` document at `schema_version` 1, and the salt exists only in
+the compiled chart.
+
+**8f. What this decision does not do.** No alias of the bare pair is kept on a
+group's rail - a rail matching both the salted name and the bare one would
+re-open the capture this decision closes, and there is no migration window in
+which a stored document names either string. No datamodel marker, no depth
+counter, and no per-depth naming scheme: the salt is the group's own emitted
+state id and nothing else, so it does not encode how deeply the group is
+nested and does not change when a document is re-arranged around it. It gives
+no group a way to catch another group's interrupt: a chart that wants that
+relationship expresses it in the document, with `core.raise` and a
+`core.on_event` naming a string of the author's own, which is what decision 5
+already provides.
+
+**The worked example.** In the card-processing document, "Authorize with a
+deadline" is a `core.resumable_group` whose body arms a delayed `core.send` and
+whose rail carries a `core.on_event` with `outcome: "resume"`. An author places
+a second railed composite inside that body - a guarded step with its own
+`core.on_event`, also `resume` - and the inner group is active when the outer
+deadline fires. Before this decision, both rails are matching
+`statifier_blocks.interrupt.resume` and the outer group's history re-entry is
+not the one an author can rely on. After it, the outer handler raises
+`statifier_blocks.interrupt.resume.<outer group state id>`, which only the
+outer group's rail matches, and the inner handler raises
+`statifier_blocks.interrupt.resume.<inner group state id>`, which only the
+inner group's rail matches. Each group resumes its own body, and the nesting
+the record claimed worked for free now does.
+
+Filed with `sb-e18p`, campaign SF039, recording campaign-SF039's rulings
+`RQ-SF039-3` and `RQ-SF039-9`. `sb-p8lh` implements it, and `sb-5d9l` carries
+the flip.
