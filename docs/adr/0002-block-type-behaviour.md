@@ -9170,3 +9170,305 @@ provenance map the SCXML subtree representation and state-id generation. No sent
 table, is edited for it.
 
 Filed with `sb-0lmk`, campaign SF039.
+
+## Amendment (2026-09-08): a subtree may name a member's outcome - `outcome_of:` on a config value, resolved at expansion and lifted back by Collapse
+
+**Status: proposed (2026-09-08, campaign SF039, bead `sb-gmqx`, recording
+campaign-SF039's ruling `RQ-SF039-4`).** A decision record merges at proposed
+under the campaign invariant, and this one **stays** proposed at that
+campaign's wrap: `RQ-SF039-4` ruled the record first and the code a later
+campaign's, so no bead in campaign SF039 builds any of it and **nothing below
+describes code that exists**. Flipping it to accepted is a separate gated
+request through the same `docs/adr/` gate, filed by the campaign that builds
+it. **No bead carries the code yet**, and that is the one way this section
+differs from the two rulings this file's Note of 2026-09-08 calls "ruled and
+unbuilt" in its item 3: that item names the bead carrying each of them
+(`sb-ij7y` and `sb-gua3`, `:9101-9103`), and this ruling has no carrier to
+name. The bead that builds it is filed when the campaign that builds it is
+walked, and this section is what that bead builds from. Additive:
+every decision above stands exactly as it stands, every Amendment and Note
+above this line stands as it stands, and no text above this line is edited by
+this section.
+
+An amendment rather than a Note, because the data-composite amendment of
+2026-09-07 says in as many words that **"The placeholder vocabulary is one arm,
+and one escape"** (`:7120-7128`) and this section gives it a second arm. That
+same clause names the condition on which a second arm may be added - "A host
+that needs `"prefix-" <> param` writes two params, or waits for the record that
+adds an arm and says which producer emits it" (`:7143-7145`) - and this section
+is that record: the producer is `Collapse`, in `O3` below, exactly as the
+producer of the first arm is. `StatifierBlocks.Composite.Data`'s own heading
+`### The placeholder vocabulary is one arm, and one escape`
+(`lib/statifier_blocks/composite/data.ex:173`) repeats the sentence in the
+code, and the module's private `substitute/2` (`composite/data.ex:610-621`) is
+where the arm it names lives. Nothing else about that vocabulary moves:
+whole-value substitution stays the whole of it, for the reason `:7130-7145`
+gives, and this section adds no interpolation, no expression and no
+conditional.
+
+Every `lib/` cite below was read at `main` `e7dc045` and is written beside the
+anchor it was found by - a heading, a function head, a `@doc` line. A cite is
+re-located by that anchor and not by its number.
+
+### What a subtree cannot say today, and the measurement that asks for it
+
+A subtree's ids are **local**. `expand/2` mints each expanded block's real id
+from the composite block's own, as `composite_id <> "_" <> local_id`
+(`composite.ex`, heading `## The ids the subtree mints`, `:55-69`; `mint_id/3`,
+`:923`), and the composite block's id is the document's - `blk_GD` in one
+document and something else in the next. A member's **compiled** identity is
+therefore unknowable to the template that writes it, and every generated name
+built on that identity is unwritable there: the completion event one declared
+outcome raises, `done.outcome.<state id>.<outcome>`, is built from the member's
+state id (`ADR-0004`'s outcome amendment, `2b` and `2c`;
+`StatifierBlocks.Compiler.StateId.outcome_event/2`, `compiler/state_id.ex:202-203`).
+
+That name is exactly what a rail is written against. A hand-written
+`core.on_event` holds it as a plain string in its `event` config key
+(`core/on_event.ex:300`), and the editor offers the generated names of the
+enclosing body's siblings as a `<datalist>` on that field
+(`editor/field.ex`, under the heading its `event_candidates` section carries, `:186-195`). An
+author writing by hand can pick one. An author writing a **composite** cannot,
+because there is no id yet to pick.
+
+The first production embedder's measurement is the reason this matters enough
+to fix. A guard composite there cannot write a rail against a member's outcome
+state, so it carries its failure reading through the datamodel instead: reset a
+key before the step, branch on a sentinel after it. The two are not equivalent.
+A transport error parks the run; a refusal that the call itself answers arrives
+in `donedata` and does not. To the author both are one fact - the step did not
+succeed - and the member already declares them as two outcomes
+(`core.invoke`'s `done` and `error`, `core/invoke.ex:114`), which a rail can
+tell apart and a sentinel in the datamodel cannot.
+
+### `O1`. The declaration: `outcome_of:`, a config value naming a member and one of its outcomes
+
+A member of `subtree/1` may carry, **as a whole config value**,
+
+    {:outcome_of, local_id, outcome}
+
+where `local_id` is the local id of another member of the same `subtree/1` and
+`outcome` is one of that member's declared outcome names. Both are strings.
+
+It stands in a config value and nowhere else: not in a slot, not in a block's
+`id`, not inside a larger string. That is the vocabulary's existing rule and
+this section keeps it.
+
+**The reference is a pair, not a bare local id.** `ADR-0004`'s outcome
+amendment compiles **one `<final>` per declared outcome** (`2b`), so "the
+member's outcome state" is not one state: a member declaring `done` and `error`
+has two, and a reference that named only the member would have to guess which.
+The pair is the smallest thing that resolves, and it is the shape this file
+already uses for the same kind of reference - the pass-through amendment's
+`:to`, `{local_id, inner_slot}` (`:8131-8132`), which names a member and one of
+its slots for the same reason.
+
+### `O2`. What it resolves to, when, and at which level
+
+At expansion, `expand/2` replaces the value **whole** with the completion event
+that outcome raises:
+
+    {:outcome_of, "call", "error"}   ->   "done.outcome.s_blk_GD_call.error"
+
+for a composite block whose id is `blk_GD`. Three things are fixed by that.
+
+**The member's id is minted first, and minted the way its own id is.** The
+value resolves against `mint_id(composite_id, local_id, ref)` - the same
+function, the same call, at the same level - so the reference lands on the
+member this expansion produced and not on a member of another instance of the
+same type. That is what "one level up" means here, and it is the level
+`ADR-0004`'s Resolve-stage amendment already attributes a finding inside an
+expansion to (`E3`).
+
+**The generated name is spelled once, by the compiler's function for it.**
+`StateId.outcome_event/2` over `StateId.state_id/1` (`compiler/state_id.ex:72`,
+`:202-203`), never by string concatenation, for the reason that function's own
+`@doc` gives - "Spelled once, here, so the event a `<final>` raises and the
+event a parent wires on cannot drift apart" (`:195-196`) - and for the reason
+`ADR-0004` decision `2b` gives about minting an outcome id through
+`Context.outcome_id/2` rather than by hand.
+
+**It answers the event, not the bare state id.** The value a rail holds is an
+event name; no config key this package declares holds a bare state id. Because
+substitution is whole-value, a template that received the state id alone could
+not build the event from it, so a reference that resolved to the state id would
+resolve to something no config value can hold. The state id is inside the
+answer, where the author's hand-written name also carries it.
+
+**Where it happens.** At expansion, which is the compiler's Resolve stage
+(`ADR-0004`'s Resolve-stage amendment, `E1`) and the editor's Expand operation
+- the two callers `expand/2`'s own `@doc` names (`composite.ex:433-437`). It
+therefore happens **before** any block type reads the config, which is what
+keeps `core.on_event`'s "must be an event name" check
+(`core/on_event.ex:355-358`) true of every config that ever reaches it: the
+tagged value lives in the declaration, never in a document and never in a
+compile.
+
+**`param_map` is unchanged.** An `outcome_of:` value names no param, so it
+attributes nothing. A member whose config holds one and no `"$param"` is
+attributed `nil`, exactly as a member with no placeholder at all is, by the
+rule the data-composite amendment states at `:7147-7153`.
+
+### `O3`. Collapse lifts a hand-written rail into `outcome_of:` and strips the compiled id
+
+`ADR-0005`'s part (iii) amendment, clause `18E`, makes the template "the
+subtree with each proposed value replaced by a placeholder", each marked value
+becoming `%{"$param" => key}` and every other value carried across as the
+literal it is. A generated completion-event name is the one class of value for
+which "carried across as the literal it is" is wrong, because the literal
+carries an id minted for the document being collapsed.
+
+So: **a config value that is a generated completion-event name whose block is
+inside the collapsed selection becomes an `outcome_of:` reference**, keyed by
+that block's `"id_suffix"` - the one `18E` mints from the type name - and by the
+outcome the name carries. The compiled id is **stripped**: no `s_blk_...`
+reaches the declaration, and the collapsed composite expands correctly in a
+second document, which is the whole point of collapsing it.
+
+Recognising the name is `StateId.undone_event/1`'s (`compiler/state_id.ex:255-262`),
+which inverts a generated name back to the block it names and the outcome it
+names, or answers `:error` for a string that is not unambiguously one. It is
+the same inversion `ADR-0005` decision `10w` already relies on for a summary
+chip, cited by that function's own `@doc` (`:213-215`), so this clause adds a
+caller and not a mechanism.
+
+A marked value of this kind is **not** a proposed param: a param's default is a
+value the author chose (`18E`), and a compiled id is a value the compiler
+chose. The reference replaces it whether the author marked it or not.
+
+### `O4`. The data spelling: `"$outcome_of"`, the vocabulary's second arm
+
+A `Composite.Data` declaration says the same thing with a map carrying exactly
+the single key `"$outcome_of"`, whose value is the two-element JSON array
+`[local_id, outcome]`:
+
+    {"event": {"$outcome_of": ["call", "error"]}}
+
+A two-element array for the reason the declaration-level `"slots"` key already
+uses one - "a two-element JSON array, because JSON has no tuple"
+(`composite/data.ex:155-157`). It decodes to the same reference the `use`
+kind's tuple writes, so the two kinds expand identically, which is the property
+`expand/2` exists to hold.
+
+What a data composite **may** say is that, and that alone. What it may not:
+
+  * **No interpolation.** `"prefix-{$outcome_of}"` is not a value; the arm is
+    whole-value like the first one, and the clause at `:7130-7145` is
+    unchanged.
+  * **No third element**, and no local id that is not a member of this
+    declaration's own `"subtree"`. A reference reaches inside one declaration
+    and no further.
+  * **No escape from the escape.** A config value that genuinely is a one-key
+    `"$outcome_of"` map is written `{"$literal": {"$outcome_of": ...}}`,
+    exactly as a value that genuinely is a `"$param"` map is - the escape
+    covers the new arm without itself changing.
+
+Two consequences in the code this clause would be built into, named because
+they are the places a builder would otherwise have to rediscover.
+`substitute/2` (`composite/data.ex:610-621`) gains a clause beside its
+`"$param"` one, guarded `map_size(node) == 1` like both existing arms.
+`placeholders/1` (`:960-966`) answers `[]` for the new arm - it names no param
+key - which is what keeps `param_map` attribution exactly what `O2` says it
+stays.
+
+### `O5`. A reference to a local id the subtree does not declare is refused, naming the id
+
+An `outcome_of:` whose `local_id` names no member of `subtree/1` is refused,
+and the refusal names the local id.
+
+For the `use` kind it is raised where the declaration's other structural
+refusals are raised - from `expand/2`, in the `ArgumentError` shape and beside
+`check_local_ids!/2` (`composite.ex:829`) and `check_mapping!/3` (`:868`). For
+the data kind it is a declaration error from `declaration/1`
+(`composite/data.ex:419`), because the template is static and that is the last
+moment a malformed declaration can be refused - the same split, for the same
+reason, as the pass-through amendment's mapping refusals (`:8255-8267`).
+
+The reason a silent miss is not an option is the one the pass-through
+amendment's unknown-`local_id` refusal gives (`:8233-8234`): a reference that
+resolves to nothing would expand to an event name naming a state that is not in
+the chart, and a rail wired to it would simply never fire. That is a failure
+with no symptom, in a feature whose whole purpose is a rail that fires.
+
+### Worked example: "Guarded section" (signup)
+
+A host in the signup domain wraps a step in a section that abandons when the
+step comes back on its error outcome. Written by hand that is a group, a step
+and a rule; as a composite it is one block with one param.
+
+**The declaration.**
+
+    params:
+      %{key: "invoke_type", type: :string, label: "Call",
+        required?: true, default: ""}
+
+    subtree(params):
+      core.group   id "section"
+        slots  %{"body" => [
+                   core.invoke   id "call"
+                     config  %{"invoke_type" => params["invoke_type"],
+                               "assign_to" => ""}
+                 ],
+                 "interrupts" => [
+                   core.on_event   id "on_failure"
+                     config  %{"event" => {:outcome_of, "call", "error"},
+                               "outcome" => "abandon"}
+                 ]}
+
+`core.group` declares exactly those two slots (`core/group.ex:37-40`) and its
+`interrupts` slot admits `:interrupt_handler` alone (`:59`), which
+`core.on_event` is; `core.invoke` declares `done` and `error`
+(`core/invoke.ex:114`), so `"error"` is a name the member answers for.
+
+**The expansion**, for a composite block whose id is `blk_GD` and whose config
+is `%{"invoke_type" => "myapp:signup"}`: three members, `blk_GD_section`,
+`blk_GD_call` and `blk_GD_on_failure`, and the rule's `event` is
+`done.outcome.s_blk_GD_call.error`. Nothing else in the expansion differs from
+what a subtree without the reference produces.
+
+**What could not be written before this section**, stated plainly because it is
+the whole argument: the template would have to spell `s_blk_GD_call` itself,
+and `blk_GD` is this document's block id. The same declaration used in a second
+document would name a state that does not exist there, and the rail would never
+fire. There is no arrangement of params that fixes it either - a param whose
+default is a compiled id is the same document-bound value with a form control
+in front of it.
+
+**And what the example does not change.** This file's worked example "Guarded
+step" (`:6665`) is a card-processing arrangement whose failure path is
+`core.invoke`'s own `on_error` slot, not a rail wired to an outcome event. It
+is untouched by this section, and it is the smaller of the two cases: a slot
+the member declares needs no reference, because the author's block is already
+inside the member.
+
+### What this section does not decide
+
+- **The code.** `RQ-SF039-4` ruled the record first and the code a later
+  campaign's. No bead in campaign SF039 builds any clause above, and the
+  implementing bead is filed when the campaign that builds it is walked. This
+  section is what that campaign builds from.
+- **Whether an outcome the member's type does not declare is refused, and
+  where.** `O5` refuses an unknown **local id** and no more. Checking the
+  outcome name is a read of the member's declared outcomes, which is a
+  palette-holding read - `Composite.outcomes/2` takes a palette
+  (`composite.ex:615`) and `expand/2` takes a `t:StatifierBlocks.Palette.type_ref/0`
+  (`:444`) - so it is a question about where the check lives rather than about
+  whether the answer is obvious. It is left to the record or the campaign that
+  builds `O5`.
+- **Interpolation, and therefore a guard.** A guard that needs the compiled id
+  inside a larger expression - a `core.on_event`'s `cond`
+  (`core/on_event.ex:314`) is the case at hand - is **not** expressible by this
+  section, because substitution is whole-value and this section adds an arm
+  without touching that. A host that needs one waits for the record that adds
+  it and names its producer, which is what the vocabulary clause at
+  `:7143-7145` already says of every arm after the first.
+- **A generated name that names a block outside the collapsed selection.**
+  `18E` carries it across as a literal, which leaves that declaration
+  document-bound. Whether `Collapse` should refuse it instead - the way `19E`
+  refuses a value it cannot spell, naming the block and the field - is a
+  question for `ADR-0005`, not answered here.
+- **How the editor draws an `outcome_of:` value.** A declaration's template is
+  not drawn on any form this file describes; the composite's own card draws its
+  params.
+
+Filed with `sb-gmqx`, campaign SF039.
