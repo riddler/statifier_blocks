@@ -241,9 +241,19 @@ defmodule StatifierBlocks.CompilerTest do
     # element from the new bytes and hashing them reproduces
     # `sha256:9e792393...`, the hash pinned before, so nothing else in this
     # document's emission moved.
+    #
+    # Moved a fourth time, deliberately, by ADR-0010 decision 8 (`sb-p8lh`):
+    # this document holds an interruptible group, so its rail's two
+    # transitions and its handler's `<raise>` are salted with the group's
+    # own state id - `statifier_blocks.interrupt.abandon` became
+    # `statifier_blocks.interrupt.abandon.s_blk_GRP`, and the same for
+    # `resume`. Verified the same way - stripping the salt off exactly
+    # those three event names in the new bytes and hashing them reproduces
+    # `sha256:e89d5b21...`, the hash pinned before, so nothing else in this
+    # document's emission moved.
     test "the worked example's chart identity is pinned" do
       assert compile_worked_example().record.chart_identity.content_hash ==
-               "sha256:e89d5b21d3bd630cdffca06aa9af6e211f4977d42d021fbdb8e2d7dee70bf0ff"
+               "sha256:9e4e9d5ffce8b25dfcbb15cc45edec27863121fb210812b45b7b2bf259bf4dee"
     end
 
     # sabotage: drop `module` from the palette_hash triples -> swapping one

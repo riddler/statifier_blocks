@@ -703,9 +703,13 @@ defmodule StatifierBlocks.Core.OnEvent do
   context on purpose, so the group cannot read `outcome` and must not try.
 
   A raised event is internal, so it is processed before any external event
-  the queue is holding, and a nested group's handler is selected over an
-  outer group's because SCXML prefers the transition whose source is the
-  deepest active state.
+  the queue is holding. Which group the raise reaches is not left to the
+  engine's transition selection: the compiler salts the raise, and the
+  matching transitions, with the state id of the group whose rail this
+  handler sits on (ADR-0010 decision 8), so a handler reaches its own
+  group's rail and no other at any nesting depth. That is why the event
+  name written above is the one this type emits, and the one in the
+  compiled chart carries `.<group state id>` after it.
 
   ## A guarded handler
 

@@ -13,6 +13,14 @@ defmodule StatifierBlocks.Compiler.ByteCorpusTest do
   that names in its own commit message which of section 6's five classes
   the document has joined.
 
+  Six of the fifteen have been replaced once, deliberately, by ADR-0010
+  decision 8 (`sb-p8lh`): `worked_example` and `signup_wizard` each hold an
+  interruptible group, and decision 8e says in as many words that the
+  compiled chart of every such document changes. Their goldens were
+  re-captured on that change; the other nine still carry the 0.21.0 bytes
+  and are what `StatifierBlocks.Compiler.InterruptsTest` cashes 8e's other
+  half against - a document with no such group compiles byte-identical.
+
   Two of the entries are the family's worked examples, whose `myapp.*`
   types declare no outcomes and so class nothing. The other three are the
   three shipped types that class an outcome, each with its failure slot
@@ -29,7 +37,7 @@ defmodule StatifierBlocks.Compiler.ByteCorpusTest do
   # goes red on ten goldens at once (verified)
   for {name, _document, _palette} <- ByteCorpus.entries(),
       {mode, _opts} <- ByteCorpus.modes() do
-    test "#{name} compiles byte-identically to 0.21.0 under #{mode}" do
+    test "#{name} compiles byte-identically to its golden under #{mode}" do
       {name, document, palette} =
         Enum.find(ByteCorpus.entries(), &(elem(&1, 0) == unquote(name)))
 

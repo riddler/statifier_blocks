@@ -322,6 +322,7 @@ defmodule StatifierBlocks.Compiler do
     Context,
     DeclaredRoots,
     Finding,
+    Interrupts,
     InvokeTypes,
     SelfReference,
     SensitivePaths,
@@ -1676,9 +1677,16 @@ defmodule StatifierBlocks.Compiler do
 
       case Palette.call(ref, :emit, [block, context], :never) do
         {:ok, %Emission{} = emission} ->
+          # ADR-0010 decision 8: the rail scopes the interrupt pair. This is
+          # the first point in the pipeline holding both the parent's own
+          # emission - which says where each child sits - and the children's
+          # compiled subtrees, so it is where the raises inside a rail are
+          # salted with the group's state id.
+          compiled = Interrupts.scope(emission, children(compiled_slots))
+
           emission
-          |> Cancels.arm(children(compiled_slots))
-          |> attribute(block, compiled_slots)
+          |> Cancels.arm(compiled)
+          |> attribute(block, compiled)
 
         {:error, reason} ->
           {:error, emit_findings(block, reason)}
@@ -1716,14 +1724,14 @@ defmodule StatifierBlocks.Compiler do
   # subtree arrives already stamped from its own pass. That is what makes
   # the provenance map total by construction (ADR-0004 decision 5) rather
   # than by a later sweep that would have to guess who emitted what.
-  @spec attribute(Emission.t(), Block.t(), [{Block.slot_name(), [{Block.id(), Emission.t()}]}]) ::
+  @spec attribute(Emission.t(), Block.t(), [{Block.id(), Emission.t()}]) ::
           {:ok, Emission.t()} | {:error, [Finding.t()]}
-  defp attribute(emission, block, compiled_slots) do
-    known = MapSet.new([block.id | Enum.map(children(compiled_slots), &elem(&1, 0))])
+  defp attribute(emission, block, compiled_children) do
+    known = MapSet.new([block.id | Enum.map(compiled_children, &elem(&1, 0))])
 
     case Attribution.stamp(emission, block.id, known) do
       {:ok, stamped} ->
-        splice(stamped, compiled_slots, block)
+        splice(stamped, compiled_children, block)
 
       {:error, {:unknown_attribution, other} = reason} ->
         {:error,
@@ -1790,10 +1798,10 @@ defmodule StatifierBlocks.Compiler do
   # emission. A placeholder naming a block that is not a child of this one in
   # a declared slot is a bug in the block type, reported against the parent
   # rather than written into identity-bearing bytes as a hole.
-  @spec splice(Emission.t(), [{Block.slot_name(), [{Block.id(), Emission.t()}]}], Block.t()) ::
+  @spec splice(Emission.t(), [{Block.id(), Emission.t()}], Block.t()) ::
           {:ok, Emission.t()} | {:error, [Finding.t()]}
-  defp splice(emission, compiled_slots, block) do
-    available = Map.new(children(compiled_slots))
+  defp splice(emission, compiled_children, block) do
+    available = Map.new(compiled_children)
 
     case substitute(emission, available) do
       {:ok, spliced} ->
