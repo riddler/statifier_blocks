@@ -161,6 +161,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp without_debounce(tags), do: Enum.reject(tags, &String.contains?(&1, "phx-debounce="))
 
+    # A host `expression_component` that renders nothing but what it was
+    # handed on the seam's `debounce` key, `Map.fetch/2` and all, so a key
+    # that is absent and a key that is `nil` are two different answers here.
+    defp seam_probe do
+      fn assigns ->
+        Phoenix.HTML.raw(
+          ~s(<b data-seam-debounce="#{inspect(Map.fetch(assigns, :debounce))}"></b>)
+        )
+      end
+    end
+
     # The `expression_component` seam, unresolved: `:expression` falls to the
     # plain source input this package renders itself, which is the control the
     # coverage claim is about. The shape is
@@ -307,27 +318,53 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     describe "the expression_component seam" do
       # The boundary, said plainly rather than left for a host to discover.
-      # With `statifier_ui` resolved, an `:expression` field's control is that
-      # package's markup: this component hands the seam the assigns ADR-0005
-      # decision 9 names and renders whatever comes back, so there is no tag
-      # of its own to write the attribute onto. Every OTHER control on the
-      # same form still carries it, which is the half a host can rely on.
+      # An `:expression` field's control is the override's markup: this
+      # component hands the seam the assigns ADR-0005 decision 9 names and
+      # renders whatever comes back, so there is no tag of its own to write
+      # the attribute onto. What it CAN do is hand the value across, which is
+      # what the key below is, and every OTHER control on the same form still
+      # carries the attribute itself.
       #
-      # Sabotage: added a `debounce` key to the seam's assigns map - all 8
-      # tests stayed green (verified), which is the point rather than a gap:
-      # a key the component behind the seam does not read changes no markup
-      # and debounces nothing. Only that package can close this, so the key
-      # is not added - an unread key would read as a promise this side
-      # cannot keep.
-      test "leaves the seam's own controls alone, and every other control carries it" do
-        tags = control_tags(form(debounce: 300, field_candidates: @field_candidates))
+      # The key was withheld while nothing behind the seam read it - an
+      # unread key is a promise this side cannot keep - and
+      # `StatifierUI.Live.ExpressionInput` reads it from 0.10.1 (sui-6fe),
+      # which is what earned it (sb-2bt9, the sb half of the pair).
+      #
+      # An override stands in for that package here rather than the package
+      # itself, and deliberately: this repo's lock holds statifier_ui 0.9.0,
+      # which predates the read, so a scan of ITS markup would be asserting
+      # which version is pinned rather than what this seam hands over. The
+      # sui half's own test is what proves the value is read.
+      # Sabotage: dropped `debounce:` from the seam's assigns map - the probe
+      # reads `:error` and this goes red, together with the default case
+      # below; every scan in this file stays green, because a key handed
+      # across the seam writes none of this component's own markup.
+      test "hands the field's debounce across as the map's own key" do
+        html = form(debounce: 300, expression_component: seam_probe())
 
-        seam = Enum.filter(tags, &String.contains?(&1, "statifier-ui-expression"))
-        ours = tags -- seam
+        assert html =~ ~s(data-seam-debounce="{:ok, 300}")
+      end
 
-        assert seam != []
-        assert Enum.all?(seam, &(not String.contains?(&1, "phx-debounce")))
-        assert without_debounce(ours) == []
+      # The default half. The key is always PRESENT and `nil` when the caller
+      # named no debounce - the shape `candidates` has, which is handed over
+      # as `[]` rather than left out - and `nil` is what makes a LiveView
+      # attribute render as no attribute at all. So an override that writes
+      # the value straight onto its controls gets the package's own default
+      # behaviour for free, with no key check to write.
+      test "hands it across as nil when the caller named none" do
+        html = form(expression_component: seam_probe())
+
+        assert html =~ ~s(data-seam-debounce="{:ok, nil}")
+      end
+
+      # The half a host can rely on regardless: whatever the override does
+      # with the key, every control this component draws itself still carries
+      # the attribute.
+      test "leaves the seam's own markup to the override, and carries the attr everywhere else" do
+        tags = control_tags(form(debounce: 300, expression_component: seam_probe()))
+
+        assert tags != []
+        assert without_debounce(tags) == []
       end
     end
 

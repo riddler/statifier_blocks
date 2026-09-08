@@ -529,10 +529,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       missing it - is worth more than trimming an attribute that does
       nothing.
 
-      A host's own `expression_component` override is not handed this
-      value. It renders its own markup from the assigns ADR-0005 decision
-      9's seam names, and how that markup rate-limits is the override's
-      decision, not this component's.
+      A host's own `expression_component` override is handed this value as
+      the seam map's `debounce` key, and what it does with it is the
+      override's decision rather than this component's - the override
+      renders its own markup, so nothing here can write the attribute onto
+      it. An override that ignores the key rate-limits the way it always
+      did; one that writes it through - `StatifierUI.Live.ExpressionInput`
+      does, from 0.10.1 - debounces the way every other control in the same
+      form does.
       """
     )
 
@@ -925,13 +929,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # machinery than the deferral is worth.
       #
       # `candidates` is additive to that map (sb-0vt), and
-      # `value_candidates` (sb-m6e0) and `path_types` (sb-23e0) are additive
+      # `value_candidates` (sb-m6e0), `path_types` (sb-23e0) and `debounce`
+      # (sb-2bt9) are additive
       # in exactly the same way. An
       # override written before either existed takes a map and ignores a key
       # it does not read, so nothing that worked stops working; an override
       # written after can offer the declared paths, and the host's own value
       # sets for them, without re-deriving either from assigns this component
       # is not handed.
+      #
+      # `debounce` is the field's own attr, carried across unchanged - the
+      # same value this component writes as `phx-debounce` onto every control
+      # it renders itself, and `nil` when the caller named none. It was held
+      # back while nothing behind the seam read it, on the ground that an
+      # unread key is a promise this side cannot keep;
+      # `StatifierUI.Live.ExpressionInput` reads it from 0.10.1 (sui-6fe),
+      # which is what makes it a key rather than a promise. Writing it is
+      # still the override's job: this clause renders whatever comes back and
+      # has no tag of its own to put the attribute on.
       ~H"""
       {@expression_component.(%{
         field: @field,
@@ -940,7 +955,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         value: to_text(@field.value),
         candidates: @path_candidates,
         value_candidates: @value_candidates,
-        path_types: @path_types
+        path_types: @path_types,
+        debounce: @debounce
       })}
       """
     end
