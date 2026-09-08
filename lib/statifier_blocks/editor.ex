@@ -2109,6 +2109,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # `kinds` and its expansion's members declare theirs; nothing makes the
     # two equal, so a slot that admitted the composite need not admit what
     # comes out of it.
+    #
+    # Asked through `Assignability.admits?/4`, the palette-carrying spelling
+    # (ADR-0002's Note of 2026-09-08, item 1): this function holds a palette,
+    # so a member that is itself a composite rooted at a host type is admitted
+    # or refused on the host palette's kinds rather than on the core-only
+    # derivation's fallback.
     @spec admits_expansion?(Palette.t(), Document.t(), Block.id(), Block.slot_name(), Block.t()) ::
             boolean()
     defp admits_expansion?(palette, document, parent_id, slot, %Block{} = member) do
@@ -2116,9 +2122,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
            {:ok, parent_module, resolved_parent} <- Palette.resolve(palette, parent),
            {:ok, member_module, resolved_member} <- Palette.resolve(palette, member) do
         Assignability.admits?(
-          {parent_module, resolved_parent.config},
+          palette,
+          {parent_module, resolved_parent},
           slot,
-          {member_module, resolved_member.config}
+          {member_module, resolved_member}
         )
       else
         _unresolvable -> false
