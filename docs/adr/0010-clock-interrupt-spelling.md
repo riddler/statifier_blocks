@@ -773,7 +773,7 @@ The salt is applied in **two** seats:
    `:275`, reached from `def interruptible/2` at `:258`);
 2. a new compiler pass, `StatifierBlocks.Compiler.Interrupts`, salts the
    raises inside the rail children (`compiler/interrupts.ex:86`,
-   `def scope/2`), called from `Compiler.emit/2` at `compiler.ex:1685` in the
+   `def scope/2`), called from `defp emit/2` at `compiler.ex:1685` in the
    seat beside the existing `Cancels` pass.
 
 The second seat exists because a parent never receives its children's SCXML:

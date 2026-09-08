@@ -25,6 +25,18 @@ decision D8 governs. A bare `ADR-NNNN` cites this repository's own records;
 a cross-repo citation carries the owning repo's beads prefix (`st-ADR-0052`
 is statifier-ex's ADR-0052, `sp-ADR-0003` is statifier_persistence's).
 
+A citation into `lib/` or `test/` is **anchor-qualified and SHA-labelled**.
+`mix adr.cites` checks record-to-record citations only, and a code line
+moves under a record within hours while sibling beads land, so a bare
+number is advisory rather than load-bearing. Write the anchor the reader
+matches on - a heading, a function head with its arity, a test name -
+beside the number, and say which commit the number was read at:
+`core/emit.ex:275` (`defp guarded/4`), read at `6d54afe`. A citation that
+has drifted is re-located **by its anchor** and re-labelled, in a dated
+Note at the foot of the record; a citation that was wrong when it was
+written is corrected in place. The Notes dated 2026-09-08 on ADR-0002 and
+ADR-0010 are the precedent for both.
+
 A `## Note` on a record carries no Status line. Every Status line in these
 records sits on the record's own header or under a `## Amendment`, because an
 amendment changes what the record decides and a note does not: a note records

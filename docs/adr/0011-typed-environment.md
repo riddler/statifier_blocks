@@ -3124,8 +3124,8 @@ an id the author typed.
 ### 5. What this Note does not decide
 
 - No new reason arm, and `:shape_not_satisfied` is untouched.
-- No change to `Composite`'s minting: `mint_id/3` (`composite.ex:923`) and
-  `pass_through/2` (`@spec` at `:489`, head at `:491`) keep their spellings
+- No change to `Composite`'s minting: `mint_id/3` (`composite.ex:958`) and
+  `pass_through/2` (`@spec` at `:524`, head at `:526`) keep their spellings
   and their answers.
 - No `ViewModel` node field is added; the composite is looked up in the model
   that already holds it.
@@ -3135,3 +3135,69 @@ an id the author typed.
 Filed with `sb-htds`, campaign SF039, recording `RQ-SF038-24`. `sb-bjt7` builds
 it. This Note changes no code, adds no README row, and flips no status line in
 this file.
+
+## Note (2026-09-08): the cite-tidy pass - four code cites re-counted at `6d54afe`, section 2's slot-walk sentence read rather than reworded, and section 5's worked example spells minted ids where local ids belong
+
+A dated Note rather than an amendment: no decision, no clause and no
+heading of this record changes, and nothing here is proposed. It is the
+cite-tidy pass campaign SF039 runs once, last on this repository's lane,
+after every record the campaign adds is on `main`. Every `lib/` line below
+was read at `main` `6d54afe`, beside the anchor it is matched by, which is
+the practice `docs/adr/README.md` now states once for every record here.
+
+### 1. Four code cites re-counted
+
+The Note of 2026-09-06, item 7, already says this record's argument does
+not depend on a line number and that no citation in the body is rewritten
+for drift. That stands; these are re-counted here rather than repointed
+above.
+
+| Cited as | Reads at `6d54afe` |
+|---|---|
+| `core/assign.ex:73-79` (`:29`, and decision 2's reading at `:665`), the `path` field declaration | `:66-73`: the field map whose `key: "path"` is `:67` and whose `datamodel_path?: true` is `:72`. The Amendment of 2026-09-07 already cites `:66-73` (`:2844`), so the two halves of the file now agree |
+| `composite.ex:486-494`, `Composite.pass_through/2`, in the flip Note's census at `d6fb241` (`:2937`, `:2984`) | `:524-532`: `@spec` at `:524`, `def pass_through/2` at `:526`, the mint at `:530` |
+| `environment.ex:759-773` (`slot_start/6`) and `pass_through/3` at `:862`, in the same census row | both still resolve exactly: `defp slot_start/6` at `:759`, `defp pass_through/3` at `:862`, its call into `Composite.pass_through/2` at `:865` |
+| `invoke_step.ex:430`, cited three times (`:570`, `:873`, `:926`) | left exactly as written. The Note of 2026-09-06 (`:921-932`) already records that neither line holds one of the deferred refusals any more; repointing them would delete that correction rather than carry it |
+
+The two `pass_through` names want a reader's care and are named here
+rather than renamed. `Composite.pass_through/2` (`composite.ex:526`)
+resolves a declaration's mapping to minted ids;
+`environment.ex`'s **private** `pass_through/3` (`:862`) is the walk's
+dispatch that calls it. The census row that cites both is correct on both.
+
+### 2. Section 2's "the position after `C`" sentence is read, not reworded
+
+The Amendment of 2026-09-07, section 2, says the expansion's inner paths
+"are **scoped to the slot** and do not reach the position after `C`"
+(`:2705-2706`), while section 1's union says the children's own writes do
+reach that position, once (`:2708-2710`). Both hold, and the sentence is
+left as written: the first is about the paths **the slot walk scopes and
+drops on its way out** - the keys `slot_env/7`'s `scoped` set removes - and
+says nothing about the union, which is applied last. A reader who takes the
+first sentence as a claim about the children's writes has read past the
+"paths no block of the document wrote" that opens it.
+
+### 3. Section 5's worked example prints minted ids where local ids belong
+
+`### 5. Worked example: "Guarded section"` writes its mapping as
+`to: {"blk_GX_then", "body"}` (`:2828`) and gives the subtree's members the
+ids `blk_GX_call`, `blk_GX_guard` and `blk_GX_then` (`:2831`, `:2834`,
+`:2837`). Those are **minted** ids printed in the **local**-id position.
+
+The local-id spelling is `ADR-0002`'s, and the code follows it:
+`defp check_local_ids!/2` (`composite.ex:864`) raises on any subtree id
+beginning `blk_` (`:873-878`, whose message is "A subtree writes stable
+LOCAL ids"), and `Composite.pass_through/2` mints from the local id it is
+handed (`composite.ex:530`, `composite_id <> "_" <> local_id`). A
+declaration spelled as the example prints it would be refused at its first
+expansion.
+
+So the example's spelling was a **print, not a decision**: read its
+mapping as `to: {"then", "body"}` and its subtree ids as `call`, `guard`
+and `then`, which mint to exactly the `blk_GX_*` names the rest of the
+section then uses. The example above is left standing rather than
+rewritten, as this file leaves every sentence its later notes correct.
+
+Filed with `sb-dxck`, campaign SF039, from `sb-3ers`, `sb-8031` and
+`sb-d8k4`'s `ADR-0011` half. This Note changes no code, adds no README
+row, and flips no status line in this file.
