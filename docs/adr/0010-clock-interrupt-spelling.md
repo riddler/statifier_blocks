@@ -564,7 +564,7 @@ Filed with `sb-bkek`, campaign-031's fill lane D.
 
 ## Amendment (2026-09-08): decision 8, the rail scopes the interrupt pair per group
 
-**Status: proposed (2026-09-08, campaign SF039, bead `sb-e18p`, recording
+**Status: accepted (2026-09-08, campaign SF039, bead `sb-e18p`, recording
 campaign-SF039's rulings `RQ-SF039-3` and `RQ-SF039-9`).** A decision record
 merges at proposed under the campaign invariant; flipping it to accepted is a
 separate gated request through the same `docs/adr/` gate, and `sb-5d9l` carries
@@ -725,3 +725,148 @@ the record claimed worked for free now does.
 Filed with `sb-e18p`, campaign SF039, recording campaign-SF039's rulings
 `RQ-SF039-3` and `RQ-SF039-9`. `sb-p8lh` implements it, and `sb-5d9l` carries
 the flip.
+
+## Note (2026-09-08): decision 8 is flipped to accepted, and the salt's second seat recorded
+
+The Amendment of 2026-09-08 *decision 8, the rail scopes the interrupt pair
+per group* (`:565`) is flipped to **accepted**. Its status line at `:567` is
+the one word this request changed in this file; no other line of the section,
+and no line above it, is edited. `sb-p8lh` (PR 437, `main` `25c17ee`)
+implemented it.
+
+Read at `main` `616d108`. Every `lib/` and `test/` line cited below was read
+there, and is `25c17ee`'s.
+
+### 1. The sentences the flip falsifies, met here rather than edited
+
+- `:569-571`, "flipping it to accepted is a separate gated request through the
+  same `docs/adr/` gate, and `sb-5d9l` carries it once `sb-p8lh` has landed".
+  Performed rather than pending; the sentence stands.
+- `:725-727`, "`sb-p8lh` implements it, and `sb-5d9l` carries the flip". Both
+  performed.
+- `:687-688`, "Six checked-in compiled charts hold the pair today and are
+  re-baselined by the implementing request". They were, and no seventh was;
+  section 4 names them as landed.
+
+### 2. What the code answers, per clause, at `616d108`
+
+| Clause | Where it is |
+|---|---|
+| 8a, the authored and raised spelling does not change | `emit.ex:85-86`, the `@abandon` and `@resume` attributes, and `emit.ex:95`, `interrupt_events/0`, are what they were before `25c17ee`; `on_event.ex:828-829`, `defp outcome_event/1`, still answers the bare pair, so what a `core.on_event` emits is still bare. `ADR-0002`'s reserved-prefix paragraph (`docs/adr/0002-block-type-behaviour.md:357-364`) is untouched by `25c17ee` |
+| 8b, the group's own two transitions match only the salted names | `emit.ex:292`, `%{abandon: abandon, resume: resume} = interrupt_events(ctx.state_id)`, spent at `:296-297`, inside `defp guarded/4` at `:275`. The bare-pair transitions were replaced there, not added beside |
+| 8b, a raise anywhere inside the rail subtree is rewritten | `StatifierBlocks.Compiler.Interrupts.scope/2` (`compiler/interrupts.ex:86`), called from `compiler.ex:1685`; `defp rewrite/2` (`interrupts.ex:164-167`) recurses a rail child's whole subtree at any depth, and `defp raised/2` (`:169-176`) rewrites the `<raise>`. Section 3 records that this is a second seat, not the one 8b names |
+| 8b, no two rails share a name | the salt is `ctx.state_id` (`emit.ex:292`), minted by `StatifierBlocks.Compiler.StateId` (aliased at `emit.ex:82`); the salted shape is written once, at `emit.ex:112-113`, `interrupt_events/1`, and read back by `defp salted/1` (`interrupts.ex:154-158`), so the two halves cannot drift apart |
+| 8c, a raise outside any rail is not rewritten | `interrupts.ex:86-91`: with no rail in the emission, `scope/2` answers the children it was handed unchanged. Held by the test "is emitted unchanged" under `describe "a raise outside any rail (8c)"` (`test/statifier_blocks/compiler/interrupts_test.exs:230-249`), whose document is a `core.on_event` as the document's own root |
+| 8d, a host type on a rail is scoped on the same rule | `defp salt/1` (`interrupts.ex:121-131`) matches a `<state>` by the salted transitions it carries, and `defp rail_children/1` (`:147-152`) by the `{:child, _}` placeholders sitting directly in that group's `<parallel>`. Nothing in the pass names a block type. Held by `describe "a host block type on a rail (8d)"` (`interrupts_test.exs:196`) |
+| 8e, the chart of a document holding such a group changes, and one with no such group is byte-identical | section 4 |
+| 8f, no alias of the bare pair is kept on a rail | no golden in `test/fixtures/corpus/` carries a bare-pair `event=` any more - fifteen files read at `616d108`, six salted and nine holding no rail at all. No datamodel marker, depth counter or per-depth scheme was added: the salt is the group's own state id and nothing else (`emit.ex:112-113`) |
+
+### 3. 8b names one of the two seats the salt is applied in
+
+8b's second sentence (`:643-645`) reads "The rail is emitted by
+`Emit.interruptible/2`'s guarded shape ... and that shape is where the salt is
+applied". That is true of the half it can see, and narrower than what landed.
+The salt is applied in **two** seats:
+
+1. `Emit.interruptible/2`'s guarded shape salts the group's own two
+   transitions (`emit.ex:292`, spent at `:296-297`, in `defp guarded/4` at
+   `:275`, reached from `def interruptible/2` at `:258`);
+2. a new compiler pass, `StatifierBlocks.Compiler.Interrupts`, salts the
+   raises inside the rail children (`compiler/interrupts.ex:86`,
+   `def scope/2`), called from `Compiler.emit/2` at `compiler.ex:1685` in the
+   seat beside the existing `Cancels` pass.
+
+The second seat exists because a parent never receives its children's SCXML:
+what `guarded/4` places for each handler is a `{:child, block id}` placeholder
+(`emit.ex:291`, `regions = [body_region | ...]`), so a handler's `<raise>` is
+not in the emission `guarded/4` builds and cannot be rewritten there. The
+first point in the pipeline holding both the parent's own emission - which
+says where each child sits - and the children's compiled subtrees is where the
+pass runs; the pass's moduledoc states exactly that and cites `ADR-0004`
+decision 4 for it (`compiler/interrupts.ex:21-29`).
+
+The decision 8b takes is unaffected. **What** is rewritten - every raise of
+the pair anywhere inside a group's rail subtree, and the group's own two
+transitions matching only the salted names and no longer the bare pair - and
+that both halves move together, are exactly what landed. Only the sentence's
+"where" is narrower than the code, so this Note records the second seat rather
+than editing the sentence.
+
+The two halves stay in step at every nesting depth for a reason 8b did not
+have to state, and it is worth writing down: a child's own pass has run before
+its parent's, so an inner group's rail raises arrive at the outer pass already
+salted with the inner group's id. Those names are not the bare pair, so
+`defp raised/2` (`interrupts.ex:169-176`) does not touch them a second time,
+and the outer salt reaches only what is still bare.
+
+### 4. The fixtures, the identity, and the byte-identical proof
+
+8e's six files are the six `25c17ee` re-baselined, and no seventh:
+`test/fixtures/corpus/signup_wizard-plain.scxml`,
+`signup_wizard-terminate.scxml`, `signup_wizard-child_use.scxml`,
+`worked_example-plain.scxml`, `worked_example-terminate.scxml` and
+`worked_example-child_use.scxml`. Each carries the salted pair on both ends
+now - `statifier_blocks.interrupt.abandon.s_blk_GRP` and
+`...resume.s_blk_GRP` in the three `worked_example` charts,
+`...abandon.s_blk_WGRP` and `...resume.s_blk_WGRP` in the three
+`signup_wizard` charts - on the group's two transitions and on the handler's
+`<raise>` alike, read at `616d108`.
+
+The corpus holds fifteen goldens. The other nine - `invoke_handled`,
+`map_handled` and `subchart_handled`, in three compile modes each - are not in
+`25c17ee`'s diff at all, and they are what 8e's second half is cashed against:
+they were captured at 0.21.0, long before this pass existed, so compiling them
+today and getting their bytes back is a real before-and-after rather than a
+restatement of today's output. Two tests hold it.
+`StatifierBlocks.Compiler.InterruptsTest`'s
+`describe "a document with no interruptible group (8e)"`
+(`interrupts_test.exs:308-333`) asserts those nine, and
+`StatifierBlocks.Compiler.ByteCorpusTest` (`byte_corpus_test.exs:37-52`) holds
+all fifteen against their goldens on every run.
+
+The worked example's pinned chart identity moved with its bytes, from
+`sha256:e89d5b21...` to `sha256:9e4e9d5f...`
+(`test/statifier_blocks/compiler_test.exs:254-256`). The comment above that
+test (`:241-253`) records the check that makes the move a re-baseline rather
+than a drift: stripping the salt back off exactly the three salted event names
+in the new bytes and hashing them reproduces `sha256:e89d5b21...`, the hash
+pinned before, so nothing else in that document's emission moved.
+
+### 5. The amendment's code cites, re-located at `616d108`
+
+The amendment's code cites are labelled `read at f9b62c5`, and `25c17ee`
+edited two of the three files they name. The same anchors, for a later reader,
+at `616d108`:
+
+| The amendment's cite, at `f9b62c5` | The same anchor at `616d108` |
+|---|---|
+| `emit.ex:68-69`, `@abandon` and `@resume` | `emit.ex:85-86` |
+| `emit.ex:71-78`, `interrupt_events/0` and its doc | `emit.ex:88-95` |
+| `emit.ex:221`, `def interruptible/2` | `emit.ex:258` |
+| `emit.ex:238`, `defp guarded/4` | `emit.ex:275` |
+| `emit.ex:254`, `regions = [body_region ...]` | `emit.ex:291` |
+| `emit.ex:258-259`, the group's two transitions | `emit.ex:296-297` |
+| `emit.ex:259`, `history_id || run` | `emit.ex:297` |
+| `emit.ex:65`, the `StateId` alias | `emit.ex:82` |
+| `on_event.ex:824-825`, `defp outcome_event/1` | `on_event.ex:828-829` |
+| `group.ex:95` and `resumable_group.ex:110`, the `interruptible/2` calls | unmoved; neither file is in `25c17ee` |
+
+One cite has no anchor left to move to, and that is worth stating plainly.
+`:598-602` quotes this record's own moduledoc reading of nesting - "Nesting
+behaves the way an author would expect for free ..." at `emit.ex:51-55`, read
+at `f9b62c5` - as the reading that is right about the case it describes and
+silent about the case that bites. `25c17ee` rewrote that moduledoc paragraph,
+so the quoted sentence is no longer in the file. The quotation is accurate as
+of the SHA it is labelled with, which is the state of the code the defect was
+measured against, and that is the only state it was ever a claim about. The
+paragraph that replaced it states the salt and the case that used to bite
+instead (`emit.ex:57-73`). Nothing in 8a-8f rests on the sentence still being
+in the file.
+
+The amendment's cites into records resolve unchanged at `616d108`:
+`docs/adr/0002-block-type-behaviour.md:357-364`, the reserved-prefix
+paragraph, and this file's `:189`, decision 3 behaviour 2. Both files have
+taken only appends since, so no line above either cite moved. `mix adr.cites`
+is green over this request.
+
+Filed with `sb-5d9l`, campaign SF039.
