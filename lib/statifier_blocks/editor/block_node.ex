@@ -309,6 +309,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:collapsible, :boolean,
+      default: false,
+      doc: """
+      Whether this mount registered an `on_collapse` callback - a one-arity
+      function - and therefore whether the "Save as a step" control is drawn
+      (ADR-0005's Note of 2026-09-08, item 1). Threaded rather than derived
+      because the callback is the editor's assign and a node has no way of
+      asking what the mount was given. `false` (the default) draws no Save
+      control on any card: the gesture's only outcome is a callback nobody
+      registered, so offering it would offer the author a marking step, a
+      Save, and then silence. "Replace with its steps" is unaffected in
+      both directions - it commits an `Edit.t()` the editor makes itself.
+      """
+    )
+
     attr(:read_only, :boolean,
       default: false,
       doc: """
@@ -408,85 +423,92 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           >
             {finding.message}
           </p>
-          <button
-            :if={expandable?(@node, @expandable)}
-            type="button"
-            class="sb-node__expand"
-            data-reveal="hover-or-selected"
-            aria-label={"Replace " <> ViewModel.title(@node) <> " with its steps"}
-            title="Replace with its steps"
-            phx-click="expand"
-            phx-target={@target}
-            phx-value-block-id={@node.block_id}
-          >
-            steps
-          </button>
-          <button
-            :if={@node.block_id == @selected_id and not @root?}
-            type="button"
-            class="sb-node__save-step"
-            data-reveal="hover-or-selected"
-            aria-label={"Save " <> ViewModel.title(@node) <> " as a step"}
-            title="Save as a step"
-            phx-click="save-as-step"
-            phx-target={@target}
-            phx-value-block-id={@node.block_id}
-          >
-            save
-          </button>
-          <button
-            :if={container?(@node)}
-            type="button"
-            class="sb-node__fold"
-            data-reveal={if @collapsed?, do: "always", else: "hover-or-selected"}
-            aria-expanded={to_string(not @collapsed?)}
-            aria-label={fold_label(@collapsed?) <> " " <> ViewModel.title(@node)}
-            title={fold_label(@collapsed?)}
-            phx-click="collapse-toggle"
-            phx-target={@target}
-            phx-value-block-id={@node.block_id}
-          >
-            {if @collapsed?, do: "+", else: "-"}
-          </button>
           <span :if={@collapsed? and @node.findings_count > 0} class="sb-badge">
             {@node.findings_count}
           </span>
-          <button
-            :if={not @root? and not offered?(@node, @pending_remove)}
-            type="button"
-            class="sb-node__remove"
-            data-reveal="hover-or-selected"
-            aria-label={"Delete " <> ViewModel.title(@node)}
-            title="Delete"
-            phx-click="remove"
-            phx-target={@target}
-            phx-value-block-id={@node.block_id}
-          >
-            x
-          </button>
-          <span :if={offered?(@node, @pending_remove)} class="sb-node__offer" data-reveal="always">
+          <div class="sb-node__strip">
             <button
+              :if={@collapsible and @node.block_id == @selected_id and not @root?}
               type="button"
-              class="sb-node__offer-keep"
-              aria-label={"Keep " <> ViewModel.title(@node)}
-              title="Keep"
-              phx-click="remove-cancel"
-              phx-target={@target}
-            >
-              keep
-            </button>
-            <button
-              type="button"
-              class="sb-node__offer-confirm"
-              aria-label={offer_label(@node, @pending_remove)}
-              title={offer_label(@node, @pending_remove)}
-              phx-click="remove-confirm"
+              class="sb-node__save-step"
+              data-collapse-save="control"
+              data-reveal="hover-or-selected"
+              aria-label={"Save " <> ViewModel.title(@node) <> " as a step"}
+              title="Save as a step"
+              phx-click="save-as-step"
               phx-target={@target}
               phx-value-block-id={@node.block_id}
             >
-              x{offer_count(@pending_remove)}
+              save
             </button>
-          </span>
+            <button
+              :if={expandable?(@node, @expandable)}
+              type="button"
+              class="sb-node__expand"
+              data-reveal="hover-or-selected"
+              aria-label={"Replace " <> ViewModel.title(@node) <> " with its steps"}
+              title="Replace with its steps"
+              phx-click="expand"
+              phx-target={@target}
+              phx-value-block-id={@node.block_id}
+            >
+              steps
+            </button>
+            <button
+              :if={container?(@node)}
+              type="button"
+              class="sb-node__fold"
+              data-reveal={if @collapsed?, do: "always", else: "hover-or-selected"}
+              aria-expanded={to_string(not @collapsed?)}
+              aria-label={fold_label(@collapsed?) <> " " <> ViewModel.title(@node)}
+              title={fold_label(@collapsed?)}
+              phx-click="collapse-toggle"
+              phx-target={@target}
+              phx-value-block-id={@node.block_id}
+            >
+              {if @collapsed?, do: "+", else: "-"}
+            </button>
+            <button
+              :if={not @root? and not offered?(@node, @pending_remove)}
+              type="button"
+              class="sb-node__remove"
+              data-reveal="hover-or-selected"
+              aria-label={"Delete " <> ViewModel.title(@node)}
+              title="Delete"
+              phx-click="remove"
+              phx-target={@target}
+              phx-value-block-id={@node.block_id}
+            >
+              x
+            </button>
+            <span
+              :if={offered?(@node, @pending_remove)}
+              class="sb-node__offer"
+              data-reveal="always"
+            >
+              <button
+                type="button"
+                class="sb-node__offer-keep"
+                aria-label={"Keep " <> ViewModel.title(@node)}
+                title="Keep"
+                phx-click="remove-cancel"
+                phx-target={@target}
+              >
+                keep
+              </button>
+              <button
+                type="button"
+                class="sb-node__offer-confirm"
+                aria-label={offer_label(@node, @pending_remove)}
+                title={offer_label(@node, @pending_remove)}
+                phx-click="remove-confirm"
+                phx-target={@target}
+                phx-value-block-id={@node.block_id}
+              >
+                x{offer_count(@pending_remove)}
+              </button>
+            </span>
+          </div>
         </div>
 
         <p :if={unresolvable?(@node)} class="sb-node__reason">{reason_line(@node)}</p>
@@ -516,6 +538,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             armed={@armed}
             pending_remove={@pending_remove}
             expandable={@expandable}
+            collapsible={@collapsible}
             read_only={@read_only}
             target={@target}
             icon={@icon}

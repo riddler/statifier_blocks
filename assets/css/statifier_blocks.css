@@ -847,7 +847,6 @@
   border: var(--sb-border-width) solid var(--sb-border);
   border-radius: var(--sb-radius);
   padding: var(--sb-space);
-  padding-right: var(--sb-space-3);
   background: var(--sb-bg);
 }
 
@@ -1056,19 +1055,49 @@
  * selectors - the editor's own tests, and any host's - reading the same card
  * they always did.
  *
- * Columns are tile / text / count. The action sits OUTSIDE the grid, absolutely
- * placed in the padding reserved for it on the right, because it appears and
- * disappears with hover: a control in the flow would re-wrap the title the
- * moment a pointer came near the card, and an interface that moves when you
- * approach it reads as unstable.
+ * Columns are tile / text / count / control strip.
+ *
+ * The strip is the fourth column, and it is RESERVED (ADR-0005's Note of
+ * 2026-09-08, item 4). The controls used to sit outside the grid, absolutely
+ * placed in a `--sb-space-3` right padding, on the reasoning that a control in
+ * the flow would re-wrap the title the moment a pointer came near the card.
+ * That reasoning holds only for a strip whose width appears with the controls:
+ * `.sb-node__strip` is drawn on every card whether or not anything inside it
+ * is revealed, and the reveal is `opacity`, which changes no box. So the space
+ * is held at rest, the title column stops where the strip begins, and nothing
+ * moves when a pointer arrives.
+ *
+ * What that buys is the ruling: the title's box EXCLUDES the strip's, by being
+ * a different grid column rather than by a padding wide enough to guess at, so
+ * a two-line title wraps beside the controls instead of under them and nothing
+ * truncates. The reservation is exact because the controls themselves are what
+ * size the column - a word control whose label changes length carries its own
+ * reservation with it.
  */
 .sb-node__chrome {
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   column-gap: var(--sb-space);
-  padding-right: var(--sb-space-3);
+}
+
+/* The reserved control strip. `align-self: start` rather than the chrome's own
+ * `center`: the controls sat at `top: 0` while they were absolute and a card
+ * whose text grew to three lines would otherwise centre them against it.
+ *
+ * `--sb-space-half` between them, which is the gap the absolute offsets used
+ * to spell as the difference between two `right` calculations. The controls
+ * are in DOM order left to right - Save, Expand or the fold, then the `x` -
+ * which is the order they were drawn in before and is now also the order a
+ * keyboard reaches them in. */
+.sb-node__chrome > .sb-node__strip {
+  grid-column: 4;
+  grid-row: 1;
+  align-self: start;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--sb-space-half);
 }
 
 /* The tile spans whatever the text column grew to. `span 3` rather than
@@ -1263,9 +1292,6 @@
  * presentation test asserts, so the test and this rule cannot drift apart
  * without one of them going red. */
 .sb-node__remove[data-reveal="hover-or-selected"] {
-  position: absolute;
-  top: 0;
-  right: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1283,9 +1309,9 @@
   transition: opacity 120ms ease-out;
 }
 
-.sb-node__chrome:hover > .sb-node__remove,
+.sb-node__chrome:hover .sb-node__remove,
 .sb-node__remove:focus-visible,
-.sb-node--selected > .sb-node__chrome > .sb-node__remove {
+.sb-node--selected > .sb-node__chrome .sb-node__remove {
   opacity: 1;
 }
 
@@ -1306,14 +1332,11 @@
  * appears because they clicked, and the next click of either button takes
  * it away. An offer nobody can see is not an offer.
  *
- * One absolutely positioned group rather than two absolutely positioned
- * buttons, so the two controls lay themselves out beside each other and
- * neither has to know how wide the other became when the count reached
- * two digits. */
+ * One group rather than two loose buttons, so the two controls lay themselves
+ * out beside each other and neither has to know how wide the other became
+ * when the count reached two digits. It is the strip's child in the `x`'s
+ * place, so the reservation it inherits is the one the `x` had. */
 .sb-node__offer[data-reveal="always"] {
-  position: absolute;
-  top: 0;
-  right: 0;
   display: inline-flex;
   align-items: center;
   gap: var(--sb-space);
@@ -1364,18 +1387,15 @@
  * replaces a composite with the blocks it stands for. It sits on the same
  * chrome as the delete control and obeys the same R2 reveal contract - a
  * gesture that rewrites the card is not one to leave sitting at rest - and
- * it is offset one control's width to the left of the `x` so the two never
- * overlap. A composite has no interior (clause 8E), so the fold toggle is
- * absent from this card and there is no third control to make room for.
+ * it sits beside the `x` in the reserved strip, which is what keeps the two
+ * from overlapping now that neither is placed by an offset. A composite has
+ * no interior (clause 8E), so the fold toggle is absent from this card.
  *
  * A word rather than a glyph, for the same reason the delete offer's Keep
  * is a word: there is no single character that says "this card is about to
  * be replaced by several", and a glyph the author has to learn is worse
  * than a short label they can read. */
 .sb-node__expand[data-reveal="hover-or-selected"] {
-  position: absolute;
-  top: 0;
-  right: calc(var(--sb-space-2) + var(--sb-space));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1392,9 +1412,9 @@
   transition: opacity 120ms ease-out;
 }
 
-.sb-node__chrome:hover > .sb-node__expand,
+.sb-node__chrome:hover .sb-node__expand,
 .sb-node__expand:focus-visible,
-.sb-node--selected > .sb-node__chrome > .sb-node__expand {
+.sb-node--selected > .sb-node__chrome .sb-node__expand {
   opacity: 1;
 }
 
@@ -1410,9 +1430,6 @@
  * different word from it: the two gestures are inverses and a reader has to
  * be able to tell them apart at a glance. */
 .sb-node__save-step[data-reveal="hover-or-selected"] {
-  position: absolute;
-  top: 0;
-  right: calc(var(--sb-space-2) * 2 + var(--sb-space-2));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1429,9 +1446,9 @@
   transition: opacity 120ms ease-out;
 }
 
-.sb-node__chrome:hover > .sb-node__save-step,
+.sb-node__chrome:hover .sb-node__save-step,
 .sb-node__save-step:focus-visible,
-.sb-node--selected > .sb-node__chrome > .sb-node__save-step {
+.sb-node--selected > .sb-node__chrome .sb-node__save-step {
   opacity: 1;
 }
 
@@ -1498,9 +1515,6 @@
 }
 
 .sb-node__fold {
-  position: absolute;
-  top: 0;
-  right: calc(var(--sb-space-2) + var(--sb-space-half));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1517,18 +1531,13 @@
   transition: opacity 120ms ease-out;
 }
 
-/* The root carries no `x`, so its fold takes the square the `x` would have. */
-.sb-node[data-root="true"] > .sb-node__chrome > .sb-node__fold {
-  right: 0;
-}
-
 .sb-node__fold[data-reveal="hover-or-selected"] {
   opacity: 0;
 }
 
-.sb-node__chrome:hover > .sb-node__fold,
+.sb-node__chrome:hover .sb-node__fold,
 .sb-node__fold:focus-visible,
-.sb-node--selected > .sb-node__chrome > .sb-node__fold {
+.sb-node--selected > .sb-node__chrome .sb-node__fold {
   opacity: 1;
 }
 
@@ -1553,27 +1562,14 @@
   margin-bottom: 0;
 }
 
-/* The badge's column and the fold's square are the same corner, and only one
- * of them is in the flow. The fold is absolutely placed in the chrome's
- * reserved right padding, starting `--sb-space-2 + --sb-space-half` in from
- * the border box and running `--sb-space-2` wide; the badge is the grid's
- * third column, so it ends where the content box does - at
- * `--sb-space-3`. Three space units of reservation is less than the four and
- * a half the fold needs, so on the one face that draws both the count slid
- * under the `+`.
- *
- * Widening the reservation rather than moving either control: the fold's
- * offset is shared with the `x` it lines up beside, and the badge is a grid
- * cell whose whole point is that the chrome already expects it. What was
- * wrong was the padding, on the cards that carry a badge and on no others.
- *
- * The two attributes are the badge's own render condition - collapsed, and a
- * subtree rollup above zero - read off what the node already stamps.
- * `data-*` rather than `:has(> .sb-badge)`, for the reason the container
- * rule gives above: the state is declared, not inferred from the markup. */
-.sb-node[data-collapsed="true"]:not([data-findings-count="0"]) > .sb-node__chrome {
-  padding-right: calc(var(--sb-space-2) + var(--sb-space-3));
-}
+/* The badge's column and the fold's square used to be the same corner with
+ * only one of them in the flow, so on a collapsed container carrying findings
+ * the count slid under the `+` and the fix was a wider right padding on that
+ * one face. Both are in the flow now - the badge is the grid's third column
+ * and the strip is its fourth - so the widened padding has nothing left to
+ * reserve and the rule that carried it is gone (ADR-0005's Note of
+ * 2026-09-08, item 4). The collision it answered cannot come back while the
+ * two sit in columns of their own. */
 
 /* D4: the whole of an unresolvable card's face below its chrome - one line,
  * in the editor's own words. Muted rather than in the error family: the

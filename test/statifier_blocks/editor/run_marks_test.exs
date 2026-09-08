@@ -187,7 +187,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {:ok, view, _html} = mount_editor(conn)
 
         view
-        |> element(~s(.sb-node[data-block-id="blk_wizard"] > .sb-node__chrome > .sb-node__fold))
+        |> element(
+          ~s(.sb-node[data-block-id="blk_wizard"] > .sb-node__chrome > .sb-node__strip > .sb-node__fold)
+        )
         |> render_click()
 
         mark(view, active_marks: ["blk_wizard"], invoke_mark: {"blk_wizard", "error"})

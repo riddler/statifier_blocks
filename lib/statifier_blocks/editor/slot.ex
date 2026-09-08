@@ -238,6 +238,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:collapsible, :boolean,
+      default: false,
+      doc: """
+      Whether the mount registered an `on_collapse` callback, threaded to
+      `BlockNode` so a card draws the "Save as a step" control only where
+      there is a host to hand the declaration to (ADR-0005's Note of
+      2026-09-08, item 1).
+      """
+    )
+
     attr(:read_only, :boolean,
       default: false,
       doc: """
@@ -325,6 +335,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           armed={@armed}
           pending_remove={@pending_remove}
           expandable={@expandable}
+          collapsible={@collapsible}
           read_only={@read_only}
           target={@target}
           icon={@icon}
@@ -347,6 +358,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:armed, :any, default: nil)
     attr(:pending_remove, :any, default: nil)
     attr(:expandable, :any, default: nil)
+    attr(:collapsible, :boolean, default: false)
     attr(:read_only, :boolean, default: false)
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
@@ -365,6 +377,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         armed={@armed}
         pending_remove={@pending_remove}
         expandable={@expandable}
+        collapsible={@collapsible}
         read_only={@read_only}
         target={@target}
         icon={@icon}

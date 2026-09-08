@@ -31,7 +31,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp remove(view, id) do
       view
-      |> element(~s([data-block-id="#{id}"] > .sb-node__chrome > .sb-node__remove))
+      |> element(
+        ~s([data-block-id="#{id}"] > .sb-node__chrome > .sb-node__strip > .sb-node__remove)
+      )
       |> render_click()
 
       view

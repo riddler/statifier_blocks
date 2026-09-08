@@ -35,7 +35,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp fold(view, block_id) do
       view
-      |> element(~s(.sb-node[data-block-id="#{block_id}"] > .sb-node__chrome > .sb-node__fold))
+      |> element(
+        ~s(.sb-node[data-block-id="#{block_id}"] > .sb-node__chrome > .sb-node__strip > .sb-node__fold)
+      )
       |> render_click()
     end
 
@@ -198,7 +200,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         leaf = ~s(.sb-node[data-block-id="blk_email_step"])
 
         assert has_element?(view, leaf <> ~s([data-container="false"]))
-        refute has_element?(view, leaf <> " > .sb-node__chrome > .sb-node__fold")
+
+        refute has_element?(
+                 view,
+                 leaf <> " > .sb-node__chrome > .sb-node__strip > .sb-node__fold"
+               )
+
         assert has_element?(view, leaf <> ~s([data-collapsed="false"]))
       end
     end
@@ -305,7 +312,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert has_element?(
                  view,
-                 ~s(.sb-node[data-block-id="blk_wizard"] > .sb-node__chrome > button.sb-node__fold[aria-expanded="false"])
+                 ~s(.sb-node[data-block-id="blk_wizard"] > .sb-node__chrome > .sb-node__strip > button.sb-node__fold[aria-expanded="false"])
                )
       end
 
@@ -320,7 +327,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
            %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn)
 
-        open = ~s(.sb-node[data-block-id="blk_wizard"] > .sb-node__chrome > .sb-node__fold)
+        open =
+          ~s(.sb-node[data-block-id="blk_wizard"] > .sb-node__chrome > .sb-node__strip > .sb-node__fold)
 
         assert has_element?(view, open <> ~s([data-reveal="hover-or-selected"]))
 

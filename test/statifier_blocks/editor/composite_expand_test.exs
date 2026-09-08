@@ -513,6 +513,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute card(html, "blk_TAIL") =~ ~s(phx-click="expand")
       end
 
+      # ADR-0005's Note of 2026-09-08, item 1 withholds "Save as a step" from
+      # a mount that registered no `on_collapse`, and says Expand is
+      # unaffected in both directions: it needs no host callback, because it
+      # commits an edit the editor makes itself.
+      # Sabotage: guarding Expand on the same assign - red here, and the
+      # gesture disappears from every mount that only reads declarations.
+      test "the Expand control is drawn without an on_collapse host", %{conn: conn} do
+        {:ok, _view, html} =
+          mount_editor(conn, document: document(), palette: palette(), on_collapse: false)
+
+        assert card(html, "blk_GS") =~ ~s(phx-click="expand")
+        refute card(html, "blk_GS") =~ ~s(phx-click="save-as-step")
+      end
+
       # Sabotage: labelled the control "Expand" - red, because clause 6E
       # forbids exactly the word the fold toggle already answers with.
       test "6E: the control's label is not the fold toggle's word", %{conn: conn} do

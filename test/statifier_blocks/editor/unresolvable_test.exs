@@ -255,7 +255,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {:ok, view, _html} = mount_editor(conn)
 
         view
-        |> element(~s([data-block-id="blk_email_step"] > .sb-node__chrome > .sb-node__remove))
+        |> element(
+          ~s([data-block-id="blk_email_step"] > .sb-node__chrome > .sb-node__strip > .sb-node__remove)
+        )
         |> render_click()
 
         after_edit = track(latest_document())

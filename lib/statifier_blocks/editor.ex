@@ -515,6 +515,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     nothing a read-only mount withholds. Reading a document is the whole
     point of such a mount, and this gesture is a read.
 
+    **With no `on_collapse` registered, neither the control nor the tray is
+    drawn** (ADR-0005's Note of 2026-09-08, item 1). A gesture whose only
+    outcome is a callback nobody registered offers the author a marking step,
+    a Save, and then silence; withholding it is the honest answer, and it is
+    the same answer `read_only?` clause 1 gives about the palette column -
+    *not rendered*, rather than rendered inert. The four events the gesture
+    is made of are answered with the socket unchanged on such a mount, the
+    way `@read_only_refused`'s are, so a crafted payload opens no tray. The
+    condition is `notify_collapse/2`'s: a one-arity function. "Replace with
+    its steps" is untouched in both directions - it commits an
+    `StatifierBlocks.Edit` the editor makes itself and needs no host.
+
     `Collapse.replacement/4` - the compound that swaps the arrangement for a
     composite of the name the host registered - is a separate public
     function, and **nothing in this component calls it** (`17E`). A host that
@@ -563,7 +575,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `compile_options` | no | the rest of the option list the host compiles this document with - `terminate:`, `child_use:`, `known_invoke_types:`, `datamodel:` - forwarded to **every** compile this component runs: the provenance recompile behind the Run pane's marks, the Source tab's listing, and the fixture runs. Without it those three describe a chart the host does not have, silently. `:declare` is taken from the `declare` assign whatever this list says, and `[]` (the default) compiles exactly as it did before |
     | `on_change` | no | one-argument function called with each new document |
     | `on_select` | no | one-argument function called with each new selection: a `%{id:, type:, label:}` descriptor, or `nil` for no selection |
-    | `on_collapse` | no | one-argument function called with each declaration the "Save as a step" gesture proposes, in `on_select`'s shape. The gesture edits no document and this package persists nothing: what the host does with the map - which table, which tenant, whether it is saved at all - is the host's |
+    | `on_collapse` | no | one-argument function called with each declaration the "Save as a step" gesture proposes, in `on_select`'s shape. The gesture edits no document and this package persists nothing: what the host does with the map - which table, which tenant, whether it is saved at all - is the host's. **It is also what draws the gesture**: unset (the default), no card carries the "Save as a step" control, no tray is drawn, and the gesture's four events are answered with the socket unchanged (ADR-0005's Note of 2026-09-08, item 1) |
     | `selected_id` | no | the block the editor is about, written by a host that has a selection surface of its own; honoured only on an update that carries it, and an id the open document does not hold clears the selection instead of naming it. Held as editor state, and cleared when the host opens a different document. Not a command: it moves the selection, it does not edit the document |
     | `icon` | no | function component resolving an icon *name* to markup |
     | `expression_component` | no | override for `:expression` fields (sui-bob's seam); with it unset, an `:expression` renders statifier-ui's own expression editor when that package is on the host's load path, and the package's plain source input when it is not |
@@ -686,6 +698,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       palette-open palette-close palette-pick
       config-change discard-draft field-list-add field-list-remove
       declaration-add declaration-remove declaration-move declaration-change
+    )
+
+    # The four events the "Save as a step" gesture is made of, refused on a
+    # mount that registered no `on_collapse` (ADR-0005's Note of 2026-09-08,
+    # item 1). The list is `@read_only_refused`'s sibling and is here for the
+    # same reason: the control is not drawn on such a mount, so these events
+    # exist only for a crafted payload, and the guard is a match on the
+    # assigns rather than a check inside each clause so a fifth event added
+    # later is refused by being named here.
+    #
+    # The condition is `notify_collapse/2`'s own - a one-arity function, not
+    # merely a non-`nil` assign - so the control is drawn exactly where the
+    # callback would fire and nowhere else.
+    @collapse_refused ~w(
+      save-as-step save-as-step-mark save-as-step-cancel save-as-step-confirm
     )
 
     @impl Phoenix.LiveComponent
@@ -1037,6 +1064,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 armed={@palette_position}
                 pending_remove={@pending_remove}
                 expandable={@expandable_ids}
+                collapsible={is_function(@on_collapse, 1)}
                 target={@myself}
                 icon={@icon}
                 theme={@theme}
@@ -1132,6 +1160,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @impl Phoenix.LiveComponent
     def handle_event(event, _params, %{assigns: %{profile: %{read_only?: true}}} = socket)
         when event in @read_only_refused,
+        do: {:noreply, socket}
+
+    # A mount with no `on_collapse` draws no "Save as a step" control and no
+    # tray, so it answers the gesture's events with the socket it was given.
+    # Above the four clauses below for `@read_only_refused`'s reason: they
+    # stay the registered mount's, unbranched.
+    def handle_event(event, _params, %{assigns: %{on_collapse: on_collapse}} = socket)
+        when event in @collapse_refused and not is_function(on_collapse, 1),
         do: {:noreply, socket}
 
     def handle_event("select", %{"block-id" => id, "config-key" => key}, socket) do
