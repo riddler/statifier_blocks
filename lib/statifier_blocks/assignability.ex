@@ -54,7 +54,10 @@ defmodule StatifierBlocks.Assignability do
 
   This module ships more public functions than the records list, and none of
   them is a second implementation of the relation: `io/2`, `kinds/2`,
-  `slot_accepts/3` and `admits?/3` are the structural gate's primitives,
+  `slot_accepts/3` and `admits?/3` are the structural gate's core-only
+  primitives, `kinds/3`, `slot_accepts/4` and `admits?/4` are the same three
+  questions asked with a palette in hand (ADR-0002's Note of 2026-09-08,
+  item 1),
   `produces/4` resolves a declared `produces` including `{:passthrough,
   slot}`, and `seam_reason/4`, `finding_reason/2`, `seam_reasons/3` and
   `target_verdicts/4` read verdicts the deciding functions have already
@@ -192,13 +195,42 @@ defmodule StatifierBlocks.Assignability do
     Palette.call(ref, :io, [config], %{})
   end
 
-  @doc "The block's `kinds`, defaulting to `[:step]` (ADR-0003 decision 5)."
+  @doc """
+  The block's `kinds`, defaulting to `[:step]` (ADR-0003 decision 5).
+
+  **Core-only.** This reads `io/2`, which is the `c:StatifierBlocks.BlockType.io/1`
+  callback, and a composite's derivation of that callback resolves its members
+  through `StatifierBlocks.Palette.core/0` alone (`StatifierBlocks.Composite`,
+  under "The callbacks are core-only, and a reader with a palette is not"). A
+  caller that holds a palette wants `kinds/3` instead: ADR-0002's Note of
+  2026-09-08, item 1, is the reason, and no palette argument is added to the
+  callback itself.
+  """
   @spec kinds(module(), Block.config()) :: [kind()]
   def kinds(module, config), do: Map.get(io(module, config), :kinds, [:step])
 
   @doc """
+  `kinds/2` asked with a palette in hand: `block`'s kinds with a composite's
+  members resolved through `palette`, exactly as `produces/4` resolves them
+  (ADR-0002's Note of 2026-09-08, item 1).
+
+  `ref` is `block`'s own palette entry and `block` the block as `resolve/2`
+  answered it, which is the pair `produces/4` already carries. A type that is
+  not a composite reads the same `io/1` callback it always did, so this
+  differs from `kinds/2` only where the difference is the point: a composite
+  whose expansion is rooted at a host type answers on the host palette's kinds
+  rather than falling back to `[:step]`.
+  """
+  @spec kinds(Palette.t(), Palette.type_ref(), Block.t()) :: [kind()]
+  def kinds(%Palette{} = palette, ref, %Block{} = block),
+    do: Map.get(io_of(palette, ref, block), :kinds, [:step])
+
+  @doc """
   The accepted kinds for `slot` on `module`, defaulting to `:any` when the
   slot has no entry in `io/1`'s `:slot_accepts` map (ADR-0003 decision 5).
+
+  **Core-only**, for the reason `kinds/2` gives. With a palette in hand, ask
+  `slot_accepts/4`.
   """
   @spec slot_accepts(module(), Block.config(), Block.slot_name()) :: [kind()] | :any
   def slot_accepts(module, config, slot) do
@@ -209,9 +241,25 @@ defmodule StatifierBlocks.Assignability do
   end
 
   @doc """
+  `slot_accepts/3` asked with a palette in hand, on the `{ref, block}` pair
+  `kinds/3` takes (ADR-0002's Note of 2026-09-08, item 1).
+  """
+  @spec slot_accepts(Palette.t(), Palette.type_ref(), Block.t(), Block.slot_name()) ::
+          [kind()] | :any
+  def slot_accepts(%Palette{} = palette, ref, %Block{} = block, slot) do
+    palette
+    |> io_of(ref, block)
+    |> Map.get(:slot_accepts, %{})
+    |> Map.get(slot, :any)
+  end
+
+  @doc """
   ADR-0003 decision 3's structural verdict for placing `child` in `slot` of
   `parent`: `:any` admits everything, otherwise the slot's accepted kinds
   and the child's own kinds must intersect.
+
+  **Core-only**, for the reason `kinds/2` gives. With a palette in hand, ask
+  `admits?/4`.
   """
   @spec admits?({module(), Block.config()}, Block.slot_name(), {module(), Block.config()}) ::
           boolean()
@@ -219,6 +267,29 @@ defmodule StatifierBlocks.Assignability do
     case slot_accepts(parent, parent_config, slot) do
       :any -> true
       accepted -> Enum.any?(kinds(child, child_config), &(&1 in accepted))
+    end
+  end
+
+  @doc """
+  `admits?/3` asked with a palette in hand: the same intersection, over
+  `slot_accepts/4` and `kinds/3` rather than their core-only spellings
+  (ADR-0002's Note of 2026-09-08, item 1).
+
+  Each side is the `{ref, block}` pair `kinds/3` takes. There is still one
+  implementation of decision 3's intersection; this is the spelling of it a
+  caller holding a palette reaches, so admission refuses on the same kinds the
+  compiler compiles on.
+  """
+  @spec admits?(
+          Palette.t(),
+          {Palette.type_ref(), Block.t()},
+          Block.slot_name(),
+          {Palette.type_ref(), Block.t()}
+        ) :: boolean()
+  def admits?(%Palette{} = palette, {parent_ref, parent}, slot, {child_ref, child}) do
+    case slot_accepts(palette, parent_ref, parent, slot) do
+      :any -> true
+      accepted -> Enum.any?(kinds(palette, child_ref, child), &(&1 in accepted))
     end
   end
 
@@ -698,22 +769,23 @@ defmodule StatifierBlocks.Assignability do
   # `{module, config}` for `block` through `palette`, or `{nil, %{}}` when
   # `Palette.resolve/2` fails - the same permissive shape `io/2` already
   # gives a module that is not loadable.
-  @spec resolve_module_config(Palette.t(), Block.t()) :: {module() | nil, Block.config()}
-  defp resolve_module_config(palette, block) do
+  @spec resolve_ref_block(Palette.t(), Block.t()) :: {Palette.type_ref() | nil, Block.t()}
+  defp resolve_ref_block(palette, block) do
     case Palette.resolve(palette, block) do
-      {:ok, module, resolved} -> {module, resolved.config}
-      {:error, _reason} -> {nil, %{}}
+      {:ok, ref, resolved} -> {ref, resolved}
+      {:error, _reason} -> {nil, %Block{block | config: %{}}}
     end
   end
 
-  # `parent_id`'s `{module, config}`, or `{nil, %{}}` when no block in
-  # `document` carries it (a permissive default: `admits?/3` then sees
-  # `:any`).
-  @spec resolve_parent(Palette.t(), Document.t(), Block.id()) :: {module() | nil, Block.config()}
+  # `parent_id`'s `{ref, block}`, or a `nil` ref over a placeholder block when
+  # no block in `document` carries it (a permissive default: `admits?/4` then
+  # sees `:any`, since a `nil` ref answers `%{}` for `io`).
+  @spec resolve_parent(Palette.t(), Document.t(), Block.id()) ::
+          {Palette.type_ref() | nil, Block.t()}
   defp resolve_parent(palette, document, parent_id) do
     case find_block(document, parent_id) do
-      nil -> {nil, %{}}
-      parent -> resolve_module_config(palette, parent)
+      nil -> {nil, %Block{id: parent_id, type: nil, config: %{}}}
+      parent -> resolve_ref_block(palette, parent)
     end
   end
 
@@ -726,17 +798,17 @@ defmodule StatifierBlocks.Assignability do
         ) ::
           finding() | nil
   defp kind_admission_finding(palette, document, parent_id, slot, candidate) do
-    parent_mc = resolve_parent(palette, document, parent_id)
-    candidate_mc = resolve_module_config(palette, candidate)
+    parent_rb = resolve_parent(palette, document, parent_id)
+    candidate_rb = resolve_ref_block(palette, candidate)
 
     if shelf_at_root_body?(document, parent_id, slot, candidate) or
-         admits?(parent_mc, slot, candidate_mc) do
+         admits?(palette, parent_rb, slot, candidate_rb) do
       nil
     else
-      {parent_module, parent_config} = parent_mc
-      {candidate_module, candidate_config} = candidate_mc
-      accepts = slot_accepts(parent_module, parent_config, slot)
-      candidate_kinds = kinds(candidate_module, candidate_config)
+      {parent_ref, parent} = parent_rb
+      {candidate_ref, candidate_block} = candidate_rb
+      accepts = slot_accepts(palette, parent_ref, parent, slot)
+      candidate_kinds = kinds(palette, candidate_ref, candidate_block)
       {:kind_not_admitted, candidate.id, parent_id, slot, candidate_kinds, accepts}
     end
   end
@@ -801,9 +873,9 @@ defmodule StatifierBlocks.Assignability do
           [{target(), :ok | {:error, [finding()]}}]
   def target_verdicts(%Palette{} = palette, %Document{} = document, %Block{} = candidate, ctx) do
     for block <- Document.blocks(document),
-        {ref, config} = resolve_module_config(palette, block),
+        {ref, resolved} = resolve_ref_block(palette, block),
         ref != nil,
-        {slot, _arity, _label} <- Palette.call(ref, :slots, [config], []),
+        {slot, _arity, _label} <- Palette.call(ref, :slots, [resolved.config], []),
         index <- 0..length(Map.get(block.slots, slot, [])) do
       target = {block.id, slot, index}
       {target, check(palette, document, target, candidate, ctx)}
