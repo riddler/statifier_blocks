@@ -9612,3 +9612,213 @@ and is read the same way, in that record's Note of this date.
 Filed with `sb-dxck`, campaign SF039, from `sb-8031`, `sb-d8k4`, `sb-sbb0`
 and `sb-tv0y`. This Note changes no code and flips no status line in this
 file.
+
+## Amendment (2026-09-08): `B3`'s length arm gains a face carve-out - an over-cap summary chip is drawn clipped with an ellipsis, and the finding that says so is read in the drawer
+
+**Status: proposed (2026-09-08, campaign SF039, bead `sb-tx1b`, recording
+campaign-SF039's ruling `RQ-SF039-6`).** A decision record merges at proposed
+under the campaign invariant; flipping it to accepted is a separate gated
+request through the same `docs/adr/` gate, and campaign SF039 names no bead
+that files one. Unusually for a section at proposed, **the code this section
+describes is already on `main`**: `sb-hwlr` built it and it merged at
+`040b4ee`, which is why every clause below is written in the present tense and
+every one of them is cited. The order is deliberate - `RQ-SF039-6` was ruled
+before either record was written, `ADR-0005` took the half it owns first, and
+this section takes the half that is this record's. Additive: every decision
+above stands exactly as it stands, every Amendment and Note above this line
+stands as it stands, and no text above this line is edited by this section.
+
+An amendment rather than a Note, by this record's own test. The Note at
+`:5976-5981` states it in as many words - narrowing the reach of a rule this
+record states "is a decision this record takes, not a catch-up entry" - and
+that is exactly what this section does: it places one arm of `B3`'s refusal
+set (`:831`, its refuse-never-truncate bullet at `:846-847`) outside the
+refusal while keeping the other three inside it. `ADR-0005` says the same
+thing from the other side. Its `10o`
+(`docs/adr/0005-liveview-editor.md:2489-2497`) adopts `B3`'s discipline over
+the presentation strings and says in as many words that `ADR-0002` "keeps
+ownership of the semantics", and its Note of 2026-09-08 item 2
+(`docs/adr/0005-liveview-editor.md:10464`) takes the cap number, the
+width-independence, the Findings-tab home and the containment rule while
+recording the ellipsis clause as **ruled and queued rather than taken**
+(`docs/adr/0005-liveview-editor.md:10501`), naming this record as the one
+that must write it. This section is that record.
+
+Every `lib/` and `test/` cite below was read at `main` `040b4ee` and is written
+beside the anchor it was found by - a module attribute, a function head, a
+`@type`, a test name. A cite is re-located by that anchor and not by its
+number.
+
+### The rule as it stands, and the one arm this section narrows
+
+`B3` (`:831`) gives every presentation string one total normalizer and one
+refusal set, and states two properties. The first is **refuse, never truncate**
+(`:846-847`): "An over-long badge is dropped, not clipped to the cap". Amendment
+`H3` (`:1828`) extended that same set, unchanged, to a summary chip, and gave
+the reason: "a clipped string reads as a rendering bug a host files against the
+editor, where a missing chip reads as the declaration it is".
+
+That reasoning holds for a badge and it does not hold for a chip, and the
+difference is what `RQ-SF039-6` was ruled on. A badge is one chip in the card's
+header: dropping it leaves a header that looks like the header of a type that
+declared no badge, which is a real card. A summary chip is one member of a row
+the author wrote, and `H3`'s own promise is that "a lane name longer than the
+cap costs its own chip and nothing else: the sibling lanes still draw". Under a
+drop, the lane that ran one grapheme over is not distinguishable on the card
+from a lane nobody declared - the card is quietly wrong about how many things
+the author named. A clipped prefix of a name an author typed says which
+declaration the chip is; nothing said it at all while it was dropped.
+
+`H3`'s "reads as a rendering bug" answer has a second half now that it did not
+have in 2026-08-30: the full text is carried on the chip's `title`
+(`summary_titles/3`, `block_type.ex:1694`), so the clipped chip is not a dead
+end for the reader who wants the whole string, and the `:lint` entry that says
+the declaration is over the cap is still produced. Neither of those existed
+when `H3` chose the drop.
+
+### `C1`. The length arm draws, clipped to the cap, with an ellipsis in the last position
+
+A declared summary chip longer than the presentation cap is **drawn**, clipped
+to the cap, with an ellipsis in its last position. It is no longer dropped.
+
+- The cap is `@presentation_cap`, one number in one place
+  (`block_type.ex:1372`), which `ADR-0005`'s Note of 2026-09-08 item 2 moved to
+  32. The clip's mark is `@chip_ellipsis` (`block_type.ex:1383`), beside it.
+- The ellipsis is counted **inside** the cap: `clip/1` (`block_type.ex:1895`)
+  slices to `@presentation_cap - String.length(@chip_ellipsis)` and appends the
+  mark, so a drawn chip is never wider than a chip that sits exactly at the cap.
+  A declaration cannot grow the card's chip row by running one grapheme over.
+- The cap is measured in graphemes on both sides - `chip_refusal/1` (`block_type.ex:2028`) measures
+  with `String.length/1` and `clip/1` slices with `String.slice/3` - so the
+  measurement and the cut cannot disagree about where the cap falls.
+- The clip runs where the chip is built: `drawn_chips/3`
+  (`block_type.ex:1876`) is the single list that both `summary/3` and
+  `summary_titles/3` read, so the drawn chip and its `title` are the same chip
+  by construction, index-aligned, rather than by two passes that could drift.
+  `test/statifier_blocks/block_type/summary_test.exs:174` ("an over-long chip is
+  clipped and its siblings survive") pins the pair.
+
+### `C2`. The other three arms keep `B3`'s discipline, and `badge` and `join_label` are not touched
+
+The refusal set is unchanged except for its length arm.
+
+| Arm | `summary_refusal_reason` | On a summary chip | On `badge` / a `join_label` return |
+|---|---|---|---|
+| not a string | `:not_a_string` | refused, dropped | refused |
+| empty or all-whitespace | `:blank` | refused, dropped | refused |
+| newline, carriage return or tab | `:multiline` | refused, dropped | refused |
+| longer than the cap | `:too_long` | **drawn, clipped (`C1`)** | refused, dropped |
+
+The three that still drop have no prefix worth drawing: a prefix of a blank
+string is a blank string, a prefix of a non-string is not a string, and a
+prefix of a multiline string can still carry the control character that made it
+unusable. The carve-out is exactly the arm where a prefix carries the author's
+own words, and no wider.
+
+`badge/1` and the `join_label` return are **outside** this section entirely.
+`B3`'s bullet at `:846-847` is about the badge and it stays true of the badge;
+`test/statifier_blocks/block_type/presentation_metadata_test.exs:53` ("an
+over-long chip is dropped, not clipped") is the badge's own test and it still
+asserts the drop. The reason the two part company is the one `H3` gave and
+`C1` re-reads: the badge's drop produces an ordinary card, a chip's drop
+produces a card that miscounts what the author declared.
+
+The vocabulary keeps the name `:too_long` rather than widening to a second word
+(`@type summary_refusal_reason`, `block_type.ex:1717`). The arm is still
+`chip_refusal/1`'s, and `summary_refusals/3` (`block_type.ex:1756`) is still
+the one reader that says why a card is not drawing what a type declared as
+declared.
+
+### `C3`. The diagnostic is still produced, unchanged in kind; only where it is read moves
+
+Nothing about the `:lint` finding's existence, severity or derivation changes
+with the clip.
+
+- `summary_findings/4` (`view_model.ex:1732`) still makes one `:lint` finding at
+  `:warning` per chip the cap caught, still counts it in the node's rollup, and
+  still leaves it in `t().findings` for the drawer's Findings tab to list.
+- Its **sentence** changes, because the fact it reports changed: the `:too_long`
+  arms of `refusal_message/3` (`block_type.ex:1846-1854`) now end "so it is
+  drawn clipped" where the other three arms end "so it is not drawn".
+- Where it draws is `ADR-0005`'s ruling, taken in that record's Note of
+  2026-09-08 item 2, and this section only records that it is satisfied by a
+  recognizer this record's module owns: `face_findings/1`
+  (`block_node.ex:701`) rejects a presentation finding from the card face, and
+  `presentation_finding?/1` (`block_node.ex:705`) decides that by asking
+  `BlockType.summary_refusal_message?/1` (`block_type.ex:1840`).
+
+The recognizer lives in `BlockType` rather than in the renderer for a reason
+that is this record's rather than `ADR-0005`'s: the module that **writes** the
+sentences is the module that can be pinned to recognize them. Every arm of
+`refusal_message/3` opens by numbering the chip, `@refusal_message_shape`
+(`block_type.ex:1813`) is that opening, and
+`test/statifier_blocks/block_type/summary_test.exs:410` holds the two together
+so the pair cannot drift. Deciding it at the renderer instead would have meant
+rejecting the whole `:lint` source, which decision 11's presentation shape has
+no field finer than - and `:lint` is also a host's whole-document rule and an
+adapted compiler warning, so a card that dropped the source would stop drawing
+advisories no ruling touched.
+
+### Worked example
+
+A `core.parallel` in the card-processing example declares three lanes, the
+second of which the author named `waiting for the operators to sign off on the
+review`.
+
+Before this section, its card drew two chips - `capture` and `receipt` - and
+the author had no way to tell that card from one declaring two lanes; a
+`:lint` paragraph reading "summary chip 2 is 51 characters; the cap is 32, so
+it is not drawn" sat on the card face, on top of the card it was about.
+
+Under this section the card draws three chips. The second is
+`waiting for the operators to si…` - 32 graphemes including the mark - and its
+`title` carries the full 51. The `:lint` entry is still produced, now reading
+"so it is drawn clipped", and it is read in the drawer's Findings tab. The
+badge in the same card's header, if the type declared one over the cap, is
+still absent: `C2`.
+
+### Consequences
+
+- **`B3`'s two properties become one property and one carve-out.** "A callback
+  that raises degrades to the default" is untouched. "Refuse, never truncate" is
+  now stated per arm rather than per string: three arms refuse, one clips, and
+  the table in `C2` is where a reader looks rather than the bullet at `:846-847`.
+- **The consequences bullet at `:1910` still counts three readers of the cap** -
+  the badge, the join marker and a summary chip - and this section adds none.
+  What it changes is that the three readers no longer behave identically at the
+  length arm, which is a fact that bullet did not have to carry before.
+- **`H3`'s promise is met rather than approximated.** "A lane name longer than
+  the cap costs its own chip and nothing else" was, under the drop, a promise
+  about the sibling lanes only; under `C1` it is also true of the lane itself.
+- **Nothing serializes.** A summary is presentation, read at render time from
+  config that is already stored. No compiled byte moves, and `schema_version`
+  stays at `1`.
+- **No `@callback` moves.** Decision 5's table is neither longer nor shorter,
+  `summary/1` keeps its arity and its optionality, and a type that declares no
+  summary is unaffected by every clause above.
+
+### What this section does not decide
+
+- **The cap's value, or whether it is tied to the card's width.** 32 and the
+  width-independence are `ADR-0005` decision 10's, taken in that record's Note
+  of 2026-09-08 item 2. `10n` (`docs/adr/0005-liveview-editor.md:2480-2487`) is
+  where the cap was placed and it still reads 24 there, unedited by that Note
+  in the way a Note leaves the text above it alone; the operative number is the
+  Note's 32, and `@presentation_cap` is where the code carries it. This section
+  reads the number and takes none.
+- **Where a finding draws, and what contains it.** Both clauses of that ruling
+  are `ADR-0005`'s (`docs/adr/0005-liveview-editor.md:10494`). `C3` records
+  only which recognizer the card face asks, because the module that writes the
+  sentences is this record's.
+- **The clip mark itself.** Whether the ellipsis is one grapheme or three dots,
+  and whether a host may re-token it, is not asked here; `@chip_ellipsis` is a
+  private attribute and no clause above makes it a surface.
+- **Whether the `:too_long` reason name should widen.** `C2` keeps it and gives
+  the reason. A later record that finds `summary_refusals/3` reading as a list
+  of refusals when one of its entries is not a refusal may rename it; nothing
+  above depends on the word.
+- **The badge and the join marker.** They keep `B3` whole (`C2`). Whether a
+  host-facing badge would be better clipped too is a question with a different
+  answer on the header, and no bead asks it.
+
+Filed with `sb-tx1b`, campaign SF039.
