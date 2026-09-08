@@ -160,7 +160,7 @@ defmodule StatifierBlocks.Compiler.CompositeExpansionTest do
     # generated `emit/2` then raises rather than emitting the members.
     test "a document holding a composite compiles to the same bytes as the expanded one" do
       block = guarded_step("blk_GS")
-      {members, _param_map} = Composite.expand(block, GuardedStep)
+      {members, _param_map} = Composite.expand!(block, GuardedStep)
 
       assert {:ok, composed} = Compiler.compile(document([block]), palette())
       assert {:ok, expanded} = Compiler.compile(document(members), palette())
@@ -186,7 +186,7 @@ defmodule StatifierBlocks.Compiler.CompositeExpansionTest do
     # signup wizard silently loses the step that records the confirmation.
     test "a composite standing for two blocks splices both, in document order" do
       block = confirm_contact("blk_CC")
-      {members, _param_map} = Composite.expand(block, ConfirmContact)
+      {members, _param_map} = Composite.expand!(block, ConfirmContact)
 
       assert Enum.map(members, & &1.id) == ["blk_CC_send", "blk_CC_record"]
 

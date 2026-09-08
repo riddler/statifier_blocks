@@ -449,7 +449,7 @@ defmodule StatifierBlocks.Environment do
 
   # RQ-SF037-15, ruled 2026-09-07 (shape A): a composite's read and write
   # signatures are computed at its ONE position, by running these same two
-  # functions over `Composite.expand/2`'s subtree with the expanded config.
+  # functions over `Composite.expand!/2`'s subtree with the expanded config.
   #
   # No descent, and no second walk: `descend/6` steps into a slot, a composite
   # in this campaign exposes none (RQ-SF037-3), and the expansion is not in the
@@ -471,7 +471,7 @@ defmodule StatifierBlocks.Environment do
           (Palette.t(), Document.t(), Block.t() -> [signature()])
         ) :: [signature()]
   defp expansion_signatures(palette, document, block, module, signatures) do
-    {members, _param_map} = Composite.expand(block, module)
+    {members, _param_map} = Composite.expand!(block, module)
 
     members
     |> Composite.flatten()
@@ -796,7 +796,7 @@ defmodule StatifierBlocks.Environment do
           context()
         ) :: annotated()
   defp mapped_start(palette, document, block, ref, inner_id, inner_slot, env, ctx) do
-    {members, _param_map} = Composite.expand(block, ref)
+    {members, _param_map} = Composite.expand!(block, ref)
 
     members
     |> Enum.reduce_while(env, fn member, acc ->

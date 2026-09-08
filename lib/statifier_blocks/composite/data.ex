@@ -44,7 +44,7 @@ defmodule StatifierBlocks.Composite.Data do
 
   `slots/1` is `[]`, `config_schema/1` is the params, `emit/2` raises, the
   expansion root is the subtree's head, ids are minted deterministically
-  from the composite block's id, and `StatifierBlocks.Composite.expand/2` is
+  from the composite block's id, and `StatifierBlocks.Composite.expand!/2` is
   the one expansion function - a data composite is expanded by the *same*
   function over the *same* subtree, which is why it answers the environment
   walk the same way and compiles to the same bytes.

@@ -54,14 +54,14 @@ defmodule StatifierBlocks.Composite do
 
   ## The ids the subtree mints
 
-  The ids a `subtree/1` writes are **local**: `expand/2` mints each expanded
+  The ids a `subtree/1` writes are **local**: `expand!/2` mints each expanded
   block's real id from the composite block's own id, as
   `composite_id <> "_" <> local_id`. They are not fresh UXIDs and not a
   counter over the document, and two properties follow:
 
     * **No `__`.** `ADR-0004` decision 3 derives a state id as `"s_" <> block_id`
       or `"s_" <> block_id <> "__" <> role`, and its invertibility rests on a
-      block id containing no `__`. `expand/2` refuses a local id that would
+      block id containing no `__`. `expand!/2` refuses a local id that would
       put one there.
     * **Document-unique, for free.** The composite block's id is
       document-unique, opaque and never reused (`ADR-0001` decision 3), and
@@ -138,7 +138,7 @@ defmodule StatifierBlocks.Composite do
   expanded config, at the composite's **one** position in the document
   (`RQ-SF037-15`, ruled 2026-09-07: shape (A)). That union is computed by
   `StatifierBlocks.Environment.read_signatures/3` and `write_signatures/3` -
-  the same two functions, run over `expand/2`'s subtree - and not by `io/1`,
+  the same two functions, run over `expand!/2`'s subtree - and not by `io/1`,
   which is single-valued in `consumes` and `produces` and carries no per-path
   read or write at all.
 
@@ -239,7 +239,7 @@ defmodule StatifierBlocks.Composite do
 
   Pure in ADR-0002 decision 4's sense: same params in, same subtree out,
   forever, no I/O, no clock, no process dictionary. The list is **non-empty**
-  and its **head is the expansion root**. The ids are **local** - `expand/2`
+  and its **head is the expansion root**. The ids are **local** - `expand!/2`
   mints the document's ids from the composite block's own id.
   """
   @callback subtree(Block.config()) :: [Block.t()]
@@ -402,9 +402,10 @@ defmodule StatifierBlocks.Composite do
   @doc """
   Whether `module` is a composite block type.
 
-  The three callers of `expand/2` - the compiler at Resolve, the editor's
-  Expand operation and this module's own derivations - each have to ask
-  before they expand, so the question is answered once and here.
+  The three callers of the expansion - the compiler at Resolve and this
+  module's own derivations through `expand!/2`, the editor's Expand operation
+  through `expand/2` - each have to ask before they expand, so the question is
+  answered once and here.
   """
   @spec composite?(Palette.type_ref()) :: boolean()
   def composite?({module, _state}) when is_atom(module) do
@@ -416,6 +417,38 @@ defmodule StatifierBlocks.Composite do
   end
 
   def composite?(_ref), do: false
+
+  @doc """
+  The blocks `block` stands for, and the param each one is blamed on, as a
+  tuple.
+
+  `{:ok, {blocks, param_map}}` for a declaration that expands - the same pair
+  `expand!/2` answers - and `{:error, reason}` for one too broken to, which is
+  every case `expand!/2` raises on. `reason` is the term the raise carries
+  where it carries one, and the raise's message otherwise; every refusal this
+  module raises today is an `ArgumentError` carrying a message.
+
+  This is the spelling for a caller that must not raise. The editor's Expand
+  operation reads it: a broken declaration is a refusal the author is told
+  about, not a crash of the LiveView they were clicking in. A caller that
+  wants the raise - the compiler's Resolve, the environment walk - reads
+  `expand!/2`, and this function calls it, so there is still one expansion
+  and one place the answer is derived.
+
+  `ADR-0002`'s Note of 2026-09-08, item 3 rules the two spellings. Changing
+  this function's return from the bare pair is **breaking**.
+  """
+  @spec expand(Block.t(), Palette.type_ref()) ::
+          {:ok, {[Block.t()], param_map()}} | {:error, term()}
+  def expand(%Block{} = block, ref) do
+    {:ok, expand!(block, ref)}
+  rescue
+    error -> {:error, reason(error)}
+  end
+
+  @spec reason(Exception.t()) :: term()
+  defp reason(%{reason: reason}), do: reason
+  defp reason(error), do: Exception.message(error)
 
   @doc """
   The blocks `block` stands for, and the param each one is blamed on.
@@ -430,18 +463,20 @@ defmodule StatifierBlocks.Composite do
   together with the `t:param_map/0` over every block in the expansion,
   nested members included.
 
-  This is the **one** expansion function. The compiler reads it at Resolve,
-  the editor's Expand operation reads it to replace a composite block with
-  its expansion in the document, and nothing else answers "what does this
-  composite stand for" - three implementations would be three chances for the
-  compiled chart and the expanded document to disagree.
+  This is **one expansion, two spellings**: one derivation of what a composite
+  stands for, and two return shapes over it. The compiler reads this one at
+  Resolve, the environment walk reads it, the editor's Expand operation reads
+  `expand/2` for the same derivation as a tuple, and nothing else answers
+  "what does this composite stand for" - three implementations would be three
+  chances for the compiled chart and the expanded document to disagree, and a
+  second spelling that calls the first is not a second implementation.
 
   Raises when the declaration is broken: a `subtree/1` that answers an empty
   list, a non-block, a duplicated local id, or a local id that would mint an
   id carrying `__`.
   """
-  @spec expand(Block.t(), Palette.type_ref()) :: {[Block.t()], param_map()}
-  def expand(%Block{} = block, ref) do
+  @spec expand!(Block.t(), Palette.type_ref()) :: {[Block.t()], param_map()}
+  def expand!(%Block{} = block, ref) do
     unless composite?(ref) do
       raise ArgumentError,
             "#{inspect(ref)} is not a composite block type: it does not " <>
@@ -506,7 +541,7 @@ defmodule StatifierBlocks.Composite do
   @doc """
   `subtree`'s three pass-through refusals, as a list of messages, or `[]`.
 
-  `expand/2` raises them for a module composite, whose subtree exists only
+  `expand!/2` raises them for a module composite, whose subtree exists only
   once it has params; `StatifierBlocks.Composite.Data.declaration/1` answers
   them as declaration errors, its subtree being a static template. One
   implementation, so the two kinds cannot disagree about what a broken
@@ -594,7 +629,7 @@ defmodule StatifierBlocks.Composite do
   config is read **as handed** - `resolve/2`'s migration, if the caller ran
   one, is already on the block it passes.
 
-  Raises for a `block` whose type is not a composite, for `expand/2`'s reason:
+  Raises for a `block` whose type is not a composite, for `expand!/2`'s reason:
   there is nothing to derive from. Ask `composite?/1` first, which is what
   every routed reader does.
   """
@@ -632,7 +667,7 @@ defmodule StatifierBlocks.Composite do
   # palette the members are resolved through and in nothing else.
   @spec io_over(Palette.t(), Block.t(), Palette.type_ref()) :: Assignability.io()
   defp io_over(%Palette{} = palette, %Block{} = block, ref) do
-    {members, _param_map} = expand(block, ref)
+    {members, _param_map} = expand!(block, ref)
 
     kinds =
       members
@@ -673,7 +708,7 @@ defmodule StatifierBlocks.Composite do
 
   @spec outcomes_over(Palette.t(), Block.t(), Palette.type_ref()) :: [BlockType.outcome_decl()]
   defp outcomes_over(%Palette{} = palette, %Block{} = block, ref) do
-    {[root | _rest], _param_map} = expand(block, ref)
+    {[root | _rest], _param_map} = expand!(block, ref)
 
     BlockType.outcomes(member_module(root, palette), root.config)
   end
@@ -751,7 +786,7 @@ defmodule StatifierBlocks.Composite do
 
   # P1's shape, plus the two refusals that need no subtree: a duplicate
   # `:name` and two declared slots mapping to one inner slot. The three that
-  # read the subtree are `expand/2`'s, because a module composite has no
+  # read the subtree are `expand!/2`'s, because a module composite has no
   # subtree until it has params.
   @spec normalize_slots!(term()) :: [pass_through_decl()]
   defp normalize_slots!(slots) when is_list(slots) do
@@ -838,7 +873,7 @@ defmodule StatifierBlocks.Composite do
       if String.starts_with?(id, "blk_") do
         raise ArgumentError,
               "#{inspect(module)}.subtree/1 answered a block whose id #{inspect(id)} looks like " <>
-                "a freshly minted UXID. A subtree writes stable LOCAL ids; expand/2 mints the " <>
+                "a freshly minted UXID. A subtree writes stable LOCAL ids; expand!/2 mints the " <>
                 "document's ids from the composite block's own id."
       end
     end)

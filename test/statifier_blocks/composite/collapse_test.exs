@@ -543,9 +543,9 @@ defmodule StatifierBlocks.Composite.CollapseTest do
     # expansion is the whole of what the two declarations have to agree
     # about, because everything downstream reads it and nothing else.
     test "expand to the same blocks, id for id", %{ref: ref, composite: composite} do
-      assert Composite.expand(composite, GuardedStep) == Composite.expand(composite, ref)
+      assert Composite.expand!(composite, GuardedStep) == Composite.expand!(composite, ref)
 
-      {[root], _param_map} = Composite.expand(composite, ref)
+      {[root], _param_map} = Composite.expand!(composite, ref)
       assert root.id == "blk_AD_invoke"
       assert [%Block{id: "blk_AD_assign"}] = root.slots["on_error"]
     end
@@ -579,7 +579,7 @@ defmodule StatifierBlocks.Composite.CollapseTest do
       ref: ref,
       composite: composite
     } do
-      {[root], _param_map} = Composite.expand(composite, ref)
+      {[root], _param_map} = Composite.expand!(composite, ref)
       original = guarded_step_arrangement()
 
       assert root.type == original.type
@@ -666,9 +666,9 @@ defmodule StatifierBlocks.Composite.CollapseTest do
     # map, which is ADR-0004 T3's mechanism, and green everywhere else, which
     # is why the assertion names it explicitly.
     test "the same expansion, block for block", %{ref: ref, composite: composite} do
-      assert Composite.expand(composite, GuardedSection) == Composite.expand(composite, ref)
+      assert Composite.expand!(composite, GuardedSection) == Composite.expand!(composite, ref)
 
-      {[root], param_map} = Composite.expand(composite, ref)
+      {[root], param_map} = Composite.expand!(composite, ref)
 
       assert root.id == "blk_AD_invoke"
       assert [%Block{id: "blk_notify"}] = root.slots["on_error"]

@@ -153,14 +153,14 @@ defmodule StatifierBlocks.Composite.DataTest do
     # The expansion is the whole of what the two declarations have to agree
     # about, because everything downstream reads it and nothing else.
     test "the same expansion, block for block" do
-      assert Composite.expand(block(), GuardedStep) == Composite.expand(block(), ref())
+      assert Composite.expand!(block(), GuardedStep) == Composite.expand!(block(), ref())
     end
 
     # Sabotage: minted the id as `composite_id <> "__" <> suffix` - red, both
     # here and in `expand/2`'s own refusal. The record's `blk_GS_call` shape
     # is what keeps ADR-0004 decision 3's `unstate_id/1` invertible.
     test "the ids are the composite block's own, minted from the suffixes" do
-      {[root], param_map} = Composite.expand(block(), ref())
+      {[root], param_map} = Composite.expand!(block(), ref())
 
       assert root.id == "blk_AD_call"
       assert [%Block{id: "blk_AD_guard"}] = root.slots["on_error"]
@@ -293,7 +293,7 @@ defmodule StatifierBlocks.Composite.DataTest do
       assert {:ok, state} = Data.declaration(row)
 
       block = Block.new("myapp.flagged", id: "blk_F", config: %{"on?" => true})
-      {[member], _param_map} = Composite.expand(block, {Data, state})
+      {[member], _param_map} = Composite.expand!(block, {Data, state})
 
       assert member.config["value"] === true
     end
@@ -320,7 +320,7 @@ defmodule StatifierBlocks.Composite.DataTest do
       assert {:ok, state} = Data.declaration(row)
 
       block = Block.new("myapp.literal", id: "blk_L", config: %{"p" => "substituted"})
-      {[member], _param_map} = Composite.expand(block, {Data, state})
+      {[member], _param_map} = Composite.expand!(block, {Data, state})
 
       assert member.config["value"] == %{"$param" => "p"}
     end
@@ -348,7 +348,7 @@ defmodule StatifierBlocks.Composite.DataTest do
       assert {:ok, state} = Data.declaration(row)
 
       block = Block.new("myapp.two_key", id: "blk_T", config: %{"p" => "x"})
-      {[member], _param_map} = Composite.expand(block, {Data, state})
+      {[member], _param_map} = Composite.expand!(block, {Data, state})
 
       assert member.config["value"] == %{"$param" => "p", "other" => 1}
     end
