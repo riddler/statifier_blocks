@@ -3328,12 +3328,13 @@ E3's argument is what decides this, applied rather than set aside. E3
 re-anchors because a finding naming an expanded member "names a block the
 author cannot see, cannot select and cannot edit" (`:2934-2937`, `:2977-2978`).
 A pass-through child fails every clause of that test: the author placed it, it
-is drawn on the composite's card in the interior `ADR-0005`'s `7E` (`:8601`)
-and its campaign-SF038 amendment give the declared slot, they can select it,
-and they can edit its fields. Re-anchoring it onto the composite would take a
-finding the author can act on directly and point it at a form that has no field
-for it - the exact harm E3's third bullet ("It is never reported against
-the expanded block", `:2975`) exists to prevent, in the other direction.
+is drawn on the composite's card, in the interior that `ADR-0005`'s `7E`
+(`:8601`) and its campaign-SF038 amendment give the declared slot, they can
+select it, and they can edit its fields. Re-anchoring it onto the composite
+would take a finding the author can act on directly and point it at a form
+that has no field for it - the exact harm E3's third bullet ("It is never
+reported against the expanded block", `:2975`) exists to prevent, in the
+other direction.
 
 The mechanism is a single rule about the expansion index, and it is this
 record's to state because the index is what E3's re-anchoring reads:

@@ -3091,8 +3091,8 @@ outcome `done`, while `emit/2` writes an `error` final only when its
 `on_error` slot is filled (`error_parts/1`,
 `lib/statifier_blocks/core/invoke.ex:261-271`) - emitted but never declared.
 `StatifierBlocks.InvokeStep`, the ADR-0007 host base, is the third shape: it
-declares both `done` and `error` (`lib/statifier_blocks/invoke_step.ex:212`)
-and emits both finals unconditionally (`:405-421`), with no `on_error` slot to
+declares both `done` and `error` (`lib/statifier_blocks/invoke_step.ex:248`)
+and emits both finals unconditionally (`:483-484`), with no `on_error` slot to
 make either conditional.
 
 The second option's cost is not discharged by anything. Clearing the `timeout`
@@ -4666,15 +4666,15 @@ this Note is that acceptance. Nothing above this Note is edited by it.
 `[{"done", "Done"}, {"error", "Error"}]`, fixed rather than config-derived
 (`lib/statifier_blocks/core/invoke.ex:114`), which is the pair
 `StatifierBlocks.InvokeStep.outcomes/0` already returned
-(`lib/statifier_blocks/invoke_step.ex:217`). The `on_error` slot is one
+(`lib/statifier_blocks/invoke_step.ex:248`). The `on_error` slot is one
 `zero_or_one` slot still.
 
 **Section 3 holds, in both halves.**
 `StatifierBlocks.Core.Invoke.failure_outcomes/1` returns `["error"]`
 (`:127`). The `use` macro defines `failure_outcomes/1` from
 `StatifierBlocks.InvokeStep.failure_outcomes/0`
-(`lib/statifier_blocks/invoke_step.ex:172`, `:237`) and `failure_outcomes: 1`
-is in the `defoverridable` list beside `outcomes: 1` (`:186`), so a host type
+(`lib/statifier_blocks/invoke_step.ex:181`, `:269`) and `failure_outcomes: 1`
+is in the `defoverridable` list beside `outcomes: 1` (`:195`), so a host type
 built on the macro is classed by inheritance and overrides in one line.
 
 **Section 2 holds in all three types, and the unconditional final is the
@@ -7576,8 +7576,8 @@ in `ViewModel.declares_sentence?/1`, and naming it is this file's reading of
 `block_type.ex:148-161` on `:6309` still resolves exactly.
 
 **Item 4, the `InvokeStep` caveat.** `StatifierBlocks.InvokeStep.__using__/1`
-emits `use StatifierBlocks.BlockType` (`invoke_step.ex:137-144`, the `use` at
-`:144`), so every type built on `InvokeStep` also carries the injected
+emits `use StatifierBlocks.BlockType` (`invoke_step.ex:145-153`, the `use` at
+`:153`), so every type built on `InvokeStep` also carries the injected
 `sentence/1`, answers `true` to `function_exported?(module, :sentence, 1)`, and
 counts as **declared** by `ViewModel.declares_sentence?/1`. Such a type
 therefore sits inside correction 5's cost set at `:6303-6326`: its outline line
@@ -8052,12 +8052,12 @@ item 2's ruling is. No request carries it today.
 The Note at `:3832` added the optional `failure_outcomes/1`, and
 `StatifierBlocks.InvokeStep`'s `__using__` injects
 `def failure_outcomes(_config), do: StatifierBlocks.InvokeStep.failure_outcomes()`
-(`invoke_step.ex:172`), whose module-level default is `["error"]`
-(`invoke_step.ex:236-237`). A family of steps that fails in more ways than that
+(`invoke_step.ex:181`), whose module-level default is `["error"]`
+(`invoke_step.ex:268-269`). A family of steps that fails in more ways than that
 has, today, one place to say so: an `@impl` on every member.
 
 The macro's four options - `:invoke_type`, `:produces`, `:fields` and
-`:palette` (`invoke_step.ex:126-136`) - therefore gain a fifth,
+`:palette` (`invoke_step.ex:130-137`) - therefore gain a fifth,
 `:failure_outcomes` (`sb-a0xw`), which declares the family default once at the
 `use` site; a host wrapper module over `InvokeStep` may set it for its whole
 family. Absent, the injection is exactly what it is now. This adds a `use`
@@ -8440,7 +8440,7 @@ rejected` (`:7155`) is untouched.
   children are not lifted. The gesture is `ADR-0005`'s and `sb-uzly`'s; this
   section fixes only the declaration such a proposal must produce.
 - **Nesting a composite in a pass-through slot**: it is admitted, and
-  `ADR-0004`'s T1 third bullet says what happens to it. Nothing here limits the
+  `ADR-0004`'s T1 second bullet says what happens to it. Nothing here limits the
   depth.
 - **A slot on a composite that is not a pass-through**: there is no such thing.
   Every slot a composite declares maps to a member, and a composite still
@@ -8725,11 +8725,11 @@ the version-1 shape, every step named a key its shape had, and `declaration/1`
 answers `{:ok, state}`.
 
 A block stored at `type_version` 1 with
-`%{"limit" => 500, "deadline" => "PT30S"}` resolves through
+`%{"limit" => 500, "deadline" => "30s"}` resolves through
 `StatifierBlocks.Palette.resolve/2`, which calls `migrate_config` once with
 `from` 1. Both steps run, ascending:
 
-    %{"amount_limit" => 500, "currency" => "USD", "deadline" => "PT30S"}
+    %{"amount_limit" => 500, "currency" => "USD", "deadline" => "30s"}
 
 The returned block's `type_version` is left **as stored**, in memory only, and
 nothing is written back - `resolve/2`'s existing rule (`palette.ex:659-664`),
@@ -8988,7 +8988,7 @@ The code cites have moved. Read at `d6fb241`:
 | `block_type.ex:507-508` (`c:migrate_config/2`), `:139` (the injected refusal), `:46` (the optional-callback row) | all unmoved |
 | `core/group.ex:37-41`, `core/assign.ex:64-75` | `:37-41` unmoved; assign's `config_schema/1` at `:63-75`, `path` at `:65-73` |
 | `core/send.ex:112-113`, `core/wait.ex:60-61` | both unmoved |
-| `palette.ex:652-657` (never a ladder), `:693` (the call), `:648-651` (`:block_type_too_new`), `:659-664` (in-memory only) | `:747-752`, `:788`, `:741-746`, `:755-760` |
+| `palette.ex:652-657` (never a ladder), `:693` (the call), `:648-651` (`:block_type_too_new`), `:659-664` (in-memory only) | `:747-752`, `:788`, `:743-746`, `:755-760` |
 | `assignability.ex:661-667`, `:654` | see the `ADR-0011` foot Note of this date |
 
 Filed with `sb-vjvq`, campaign SF038.
@@ -9005,9 +9005,12 @@ decision above: this Note carries no `Status:` line and flips nothing, no
 `schema_version` stays at `1`. The `RQ-SF039-<n>` label is the form this file
 already uses for the SF037 and SF038 walks' rulings.
 
-Every `lib/` cite below was read at `main` `f9b62c5` and is written beside the
-anchor it was found by - a heading, a function head, a `@doc` line. A cite is
-re-located by that anchor and not by its number.
+Every `lib/` cite below is written beside the anchor it was found by - a
+heading, a function head, a `@doc` line - and was **re-counted at `main`
+`6d54afe`** by `sb-dxck`, once campaign SF039's code beads had landed and
+moved the lines this Note first read at `f9b62c5`. A cite is re-located by
+that anchor and not by its number, which is why re-counting is the whole of
+what changed.
 
 ### 1. Admission resolves a composite's member kinds through the palette (`RQ-SF039-14`)
 
@@ -9016,23 +9019,24 @@ as their **first** argument and resolve a composite's members through it,
 exactly as `produces/4` already does.
 
 What they do today is the whole of the reason. `kinds/2` (`assignability.ex`,
-`@doc "The block's `kinds`, defaulting to `[:step]`"`, `:195-197`) and
-`slot_accepts/3` (`:203-204`) both read `io/2` (`:190-191`), which is
+`@doc "The block's `kinds`, defaulting to `[:step]`"`, `:199-210`) and
+`slot_accepts/3` (`:235-236`) both read `io/2` (`:193-194`), which is
 `Palette.call(ref, :io, [config], %{})` - the **core-only** callback, whose
 composite derivation resolves members through `StatifierBlocks.Palette.core/0`
 and falls back to `[:step]` kinds with no sugar for a composite rooted at a
 host type (`composite.ex`, heading `### The callbacks are core-only, and a
-reader with a palette is not`, `:158-180`). `produces/4` (`:464-465`) does not
-have that problem, because it goes through `io_of/3` (`:482-483`), whose
-composite arm is `Composite.io(palette, resolved)` (`:485`) - `Composite.io/2`
-(`:601-602`) and `outcomes/2` (`:614-615`) being the palette-holding readers
-this record's Note of 2026-09-07, item 3, named. Admission is a reader holding
+reader with a palette is not`, `:158-180`). `produces/4` (`:535-536`) does not
+have that problem, because it goes through `io_of/3` (`:553-554`), whose
+composite arm is `Composite.io(palette, resolved)` (`:556`) - `Composite.io/2`
+(`:636-637`) and `outcomes/2` (`:649-650`) being the palette-holding readers
+this record's Note of 2026-09-07 on the SF038 walk's seven readings (`:7914`),
+item 3, named. Admission is a reader holding
 a palette and has been reading with none.
 
 Three consequences, and no more than three:
 
-- `admits?/3` (`:216-218`) and `kind_admission_finding/5` (`:720-741`, which
-  calls `admits?/3` at `:733`, `slot_accepts` at `:738` and `kinds` at `:739`)
+- `admits?/4` (`:283-289`) and `kind_admission_finding/5` (`:800-814`, which
+  calls `admits?/4` at `:805`, `slot_accepts` at `:810` and `kinds` at `:811`)
   route through the palette-carrying arities. Every caller that already holds a
   palette therefore admits and refuses on the same kinds the compiler compiles
   on.
@@ -9048,14 +9052,14 @@ Three consequences, and no more than three:
   target it is **refused**, because `body` declares `slot_accepts` `[:step]`
   (`core/group.ex:59`, `core/resumable_group.ex:74`) and `ADR-0003` decision
   3's intersection is empty. That is the refusal the compiler already reaches -
-  `{:kind_not_admitted, ...}` (`assignability.ex:124`), handled at
-  `compiler.ex:1211` - so the editor refuses at drop what the compiler would
+  `{:kind_not_admitted, ...}` (`assignability.ex:127`), handled at
+  `compiler.ex:1212` - so the editor refuses at drop what the compiler would
   have refused at compile, which is the whole point of routing them through one
   function.
 
 This item **answers `sb-28gm`**, which asked whether a palette-carrying
 `admits` form was a record question. It was, and this is the answer: the
-editor's `admits_expansion?/5` (`editor.ex:2112-2114`, called at `:2064`) holds
+editor's `admits_expansion?/5` (`editor.ex:2123-2125`, called at `:2066`) holds
 a palette and calls the same functions, so a nested composite rooted at a host
 type is admitted or refused on the host palette's kinds rather than on the
 core-only derivation's. No separate palette-carrying `admits` spelling is
@@ -9067,18 +9071,20 @@ Built by `sb-x903`.
 
 The editor's per-target admission form - one probe and one check at a gap,
 rather than a sweep - is `StatifierBlocks.Edit.Targets`'s and therefore
-`ADR-0005`'s. It is recorded there by `sb-0xdu` under clause `4C`. Nothing
+`ADR-0005`'s. It is recorded there by `sb-0xdu`, in that record's Note of
+2026-09-08, item 5, `### 5. `4C`: per-target admission beside the sweep`,
+under clause `4C`. Nothing
 about its arities, its defaults or its candidate list is stated here; this item
 exists so a reader of item 1 knows where the target side lives and does not
 look for it in this record.
 
 ### 3. `Composite.expand/2` answers a tuple; `expand!/2` keeps the raise (`RQ-SF039-10`)
 
-`Composite.expand/2` (`composite.ex:443-444`) answers
+`Composite.expand/2` (`composite.ex:441-443`) answers
 `{:ok, {blocks, param_map}} | {:error, reason}`.
 
 `expand!/2` keeps today's raising body - the broken-declaration raises listed at
-`composite.ex:439-441` ("Raises when the declaration is broken: a `subtree/1`
+`composite.ex:474-476` ("Raises when the declaration is broken: a `subtree/1`
 that answers an empty list, a non-block, a duplicated local id, or a local id
 that would mint an id carrying `__`") - and it is what the compiler's Resolve
 and the editor's Expand call. A broken declaration is therefore still a
@@ -9097,7 +9103,8 @@ the changelog of the release it lands in.
 Two rulings this file already carries are untouched by the new return, and are
 named here only so that a reader of `expand/2` finds all three together: an
 expansion's members are built at each member type's `current_version/0`
-(`RQ-SF037-17`, this file's Note of 2026-09-07, item 2), and `param_map` blames
+(`RQ-SF037-17`, this file's Note of 2026-09-07 on the SF038 walk's seven
+readings, `:7914`, item 2), and `param_map` blames
 the **first** param in declaration order when more than one distinguishing
 value matches (`RQ-SF038-14`, item 5 of that same Note). Both are ruled and
 unbuilt; `sb-ij7y` and `sb-gua3` carry them, and the change here neither
@@ -9107,14 +9114,14 @@ Built by `sb-671e`.
 
 ### 4. `assignable?/4` gains a strict form (`RQ-SF039-16`)
 
-`Assignability.assignable?/4` (`assignability.ex:253-255`) gains a
+`Assignability.assignable?/4` (`assignability.ex:324-326`) gains a
 `strict: true` form under which either side resolving to `:unknown` answers
 `false`.
 
-The default does not move. The clause at `:256-258` -
+The default does not move. The clause at `:328` -
 `satisfied when satisfied in [:unknown, :identical, :covers] -> true` - admits
 an unknown in both directions, and that is the floor of the ordered relation
-`assignability.ex` names in `assignable?/4`'s `@doc` at `:229` - "`ADR-0003`
+`assignability.ex` names in `assignable?/4`'s `@doc` at `:300` - "`ADR-0003`
 decision 6's ordered relation as `ADR-0011` decision 3 narrows it" - whose
 first step decides either side unknown before the host is asked. A value
 nothing has typed is not a value that relation may refuse. `strict: true` is the opt-in for the caller that must not
@@ -9157,7 +9164,7 @@ Built by `sb-xudv`.
 
 The reserved-prefix paragraph of decision 10 stands, unedited.
 `statifier_blocks.interrupt.abandon` and `statifier_blocks.interrupt.resume`
-(`core/emit.ex:68-69`, named by `interrupt_events/0` at `:77-78`) remain both
+(`core/emit.ex:85-86`, named by `interrupt_events/0` at `:94-95`) remain both
 the **authored** and the **raised** spelling: a host block type joins the
 protocol by raising exactly those two names, and a host must not name its own
 events under the prefix.
@@ -9472,3 +9479,136 @@ inside the member.
   params.
 
 Filed with `sb-gmqx`, campaign SF039.
+
+## Note (2026-09-08): the cite-tidy pass - the Note of this date re-counted at `6d54afe`, four census rows re-counted rather than rewritten, the migrations example's duration read in the accepted grammar, and `ADR-0004`'s T1 bullet named by its position
+
+A dated Note rather than an amendment, and it edits no decision, no clause
+and no heading. It is the cite-tidy pass campaign SF039 runs once, last on
+this repository's lane, after every record the campaign adds is on `main`,
+so that no number it re-counts moves again in the same week. It records
+what changed and why, so that a reader who followed one of these numbers
+last week can see it move.
+
+Every `lib/` line below was read at `main` `6d54afe`, beside the anchor it
+is matched by; the two `lib/` files this same request edits -
+`composite/data.ex`'s declaration table and `editor/config_form.ex`'s
+moduledoc - are counted after that edit. That practice - an
+anchor-qualified, SHA-labelled code cite,
+re-located by its anchor rather than by its number - is now written down
+once, in `docs/adr/README.md`, rather than restated per record.
+
+### 1. What was corrected in place, and what was not
+
+Two kinds of stale number are treated differently here, and the difference
+is the whole of this section.
+
+A citation in **ordinary prose** points at code as it is now, so a
+drifted one is repointed where it stands - the shape `b6cb251` used. A
+citation inside a **dated census** - a table headed "as they stand on
+`main`" or "cites re-counted at `<sha>`" - is a *measurement*, and
+rewriting a measurement destroys the record of what was measured. Those
+are re-counted below instead, exactly as `### 3. Cites re-counted at
+d6fb241` re-counts rather than rewrites.
+
+Repointed in place, all into `lib/statifier_blocks/invoke_step.ex`, whose
+lines moved by roughly `+32` when `sb-a0xw` added the fifth `use` option:
+`:212` and `:217` for `outcomes/0` are `:248`; the two finals `emit/4`
+writes unconditionally are `:483-484`; the injected `failure_outcomes/1`
+is `:181` and its module-level default `:268-269`; `failure_outcomes: 1`
+in the `defoverridable` list is `:195`; `__using__/1`'s body is `:145-153`
+with the `use` at `:153`; the four documented options are `:130-137`, the
+fifth `:138-143` beside them.
+
+Also repointed in place, in this file's Note of 2026-09-08, every cite the
+campaign's own code beads moved: `sb-x903` moved `assignability.ex`
+(`kinds/2` to `:199-210`, `slot_accepts/3` to `:235-236`, `io/2` to
+`:193-194`, `produces/4` to `:535-536`, `io_of/3` to `:553-554`,
+`kind_admission_finding/5` to `:800-814`, the `:kind_not_admitted` tuple
+to `:127`) and added `admits?/4` at `:283-289` beside `admits?/3`, which
+is the arity that item's bullet means and now names; `sb-671e` moved
+`Composite.io/2` to `:636-637`, `outcomes/2` to `:649-650`, `expand/2` to
+`:441-443` and the raise list to `:474-476`; `sb-p8lh` moved the interrupt
+pair's attributes to `core/emit.ex:85-86` and `interrupt_events/0` to
+`:94-95`. Two references to "this record's Note of 2026-09-07" now name
+the Note by its subject and line (`:7914`), because seven Notes carry that
+date.
+
+Not repointed, on purpose: item 3 quotes the sentence
+"This is the **one** expansion function" at `composite.ex:433`. `sb-671e`
+has since replaced that sentence with "This is **one expansion, two
+spellings**" (`composite.ex:466-472`), which is the change the item ruled.
+Repointing the quotation would make the item cite its own outcome as its
+premise.
+
+### 2. Four census rows re-counted
+
+| Measured as | Reads at `6d54afe` |
+|---|---|
+| the `assign_to` grammar table's `StatifierBlocks.InvokeStep` row: the moduledoc example's `{:path, %{}}` at `invoke_step.ex:20`, `datamodel_path?/1` at `:301` and `:435` | `:21` for the field's `type:`, and `:361` and `:494` for the two `&Config.datamodel_path?/1` arguments. The refusal sentence at `:115` is unmoved |
+| the data-composite claim table's `slots/2` (`composite/data.ex:355`), `config_schema/2` (`:351`), `current_version/1` (`:359`), `emit/3` (`:401-409`) | `:502`, `:493`, `:506`, and `:586-593` |
+| the same table's `@id_suffix` (`composite/data.ex:213`) and `mint_id/3`'s `__` refusal (`composite.ex:555-568`) | `:336` and `:957-970` |
+| the same table's `migrate_config/3` refusal (`composite/data.ex:371`), and the two Notes that repeat it at `:7896` and `:7942` | superseded rather than moved, as `### 3. Cites re-counted at d6fb241` already records: `sb-5xqr`'s chain walk answers at `:528-537`. The three passages describe the refusal as unconditional, which it was when they were written and is not now |
+
+### 3. `sb-sbb0`'s three readings, answered
+
+**The worked example's deadline is spelled in the accepted grammar.** The
+migrations amendment's example stored `"PT30S"`, and the one accepted
+`:duration` spelling is `30s` / `15m` / `1h30m` / `2d`
+(`core/duration.ex`, `## One grammar in, one attribute out`, `:6-15`),
+which this file's Note of 2026-09-05 (`:2536`) settled with "there is no
+pivot and no second spelling". The example's block would have met
+decision 7's refusal at compile. One token in each of the two places it
+appears now reads `30s`; the migration mechanics the example demonstrates
+are untouched, because `M4` passes step values through untyped.
+
+**The optional `deadline` param's `"default" => ""` is correct and stays.**
+Decision 7 admits it: `core.send`'s `delay` is the shipped case - "a
+`:duration`, `required?: false`, default `""`" (`:1472`) - and the Note of
+2026-09-05 names it again at `:2541`. Nothing to change.
+
+**The two `migrate_config/3` cites are the census row above**, not a
+repoint.
+
+### 4. `sb-d8k4`'s bullet, and one number in the flip Note's own table
+
+`ADR-0004`'s `T1` closes on three cases (`0004:3269`, `:3275`, `:3279`),
+and the one about a composite nested in a pass-through slot is the
+**second**. The pass-through amendment's "What this section does not
+decide" called it the third; it now calls it the second.
+
+In `### 3. Cites re-counted at d6fb241`, the palette row gave `:741-746`
+for `:block_type_too_new`. That bullet begins at `:743`; `:741-742` is the
+bullet above it. The row now reads `:743-746`.
+
+### 5. The "Guarded step" example prints minted ids under a `subtree` heading
+
+`sb-d8k4`'s second reading is about this file too. The "Guarded step"
+declaration at `:6673-6686` heads its members `subtree(params):` and then
+gives them the ids `blk_GS_call` and `blk_GS_guard` (`:6680`, `:6683`),
+which are **minted** names: `blk_GS` is the composite block's own id
+(`:6688`), and the paragraph below the example already calls them "The two
+minted ids" (`:6692-6694`). A `subtree/1` writes **local** ids - `call` and
+`guard` here - and `defp check_local_ids!/2` (`composite.ex:864`) raises on
+any subtree id beginning `blk_` (`:873-878`).
+
+The example is therefore a print of the **expansion**, correctly labelled
+by the prose under it and mislabelled by the heading above it. It is left
+standing rather than rewritten, and this is the reading: where a member of
+a `subtree` is shown with a `blk_`-prefixed id, what is shown is the minted
+result, and the id the declaration holds is the suffix after the composite
+block's own id. `ADR-0011`'s "Guarded section" example has the same shape
+and is read the same way, in that record's Note of this date.
+
+### 6. What this Note does not do
+
+- It moves no decision, edits no heading, and adds no clause.
+- It does not touch the Amendment of 2026-09-08 (`outcome_of:`), which
+  stays **proposed** with its cites as its own preamble labels them, read
+  at `e7dc045`. Those cites have drifted under `sb-671e` and `sb-p8lh`;
+  re-counting a proposed section is the work of the campaign that builds
+  it.
+- It does not regenerate `docs/adr/.cite-baseline.json`; `sb-u4wf` does.
+
+Filed with `sb-dxck`, campaign SF039, from `sb-8031`, `sb-d8k4`, `sb-sbb0`
+and `sb-tv0y`. This Note changes no code and flips no status line in this
+file.

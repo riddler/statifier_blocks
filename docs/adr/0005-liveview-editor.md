@@ -10566,11 +10566,12 @@ Built by `sb-59rt`.
 
 ### 5. `4C`: per-target admission beside the sweep
 
-`accepted_types/4` (`edit/targets.ex:200`, `@spec` at `:194`) answers which of a
+`accepted_types/4` (`edit/targets.ex:227`, `@spec` at `:221`) answers which of a
 palette's block types would be accepted at one `{parent_id, slot}` target, by
 probing **every** type in the palette. `accepted_recipes/4` is its recipe half,
-added by the Note of 2026-09-07 (`:10097`) under clause `4C` (`:5776`) as the
-`1C`-`4C` Amendment (`:8069`) reads it.
+added by the Note of 2026-09-07 (`:10073`, whose `@spec` for the promoted
+arity is at `:10106-10111`) under clause `4C` (`:5776`) as the `1C`-`4C`
+Amendment (`:8069`) reads it.
 
 A "+" chooser at a gap does not have that question. It has "may *this* type go
 *here*", asked once, and today the only public way to ask it is to build the
@@ -10580,7 +10581,7 @@ whole set and test membership.
 
 - **`Edit.Targets.admits_at?/5`** - `(document, palette, target, type, ctx)`
   answering a boolean. One probe of `type` and one `Assignability.check/5`
-  (`assignability.ex:586`) at the gap, and nothing else.
+  (`assignability.ex:657`) at the gap, and nothing else.
 - **`Edit.Targets.accepted_types_at/5`** - the same question over a **candidate
   list**, defaulting to the palette's own types, so a surface that already knows
   its shortlist pays for the shortlist rather than for the palette.
@@ -10734,3 +10735,64 @@ and `:8274` - so that a bare `:` cite in this file always means a line in
 this file.
 
 Filed with `sb-0xdu`, campaign SF039.
+
+## Note (2026-09-08): the cite-tidy pass - `16E`'s citation of an epic ruling stands as quoted content, item 5's two code cites re-counted at `6d54afe`, and `11n`'s attribution to `ADR-0003` decision 8 verified
+
+A dated Note rather than an amendment: no decision, no clause and no
+heading of this record changes. It is the cite-tidy pass campaign SF039
+runs once, last on this repository's lane. Every `lib/` line below was read
+at `main` `6d54afe`, beside the anchor it is matched by, which is the
+practice `docs/adr/README.md` now states once for every record here.
+
+### 1. `16E` cites the epic ruling by its quoted content, and that is enough
+
+`### `16E`` names the ruling it turns on as "epic ruling `R5`" followed by
+the ruling's own words - "a saved composite lives in the host's own table;
+the package never persists" (`:9657-9659`) - and the not-decided list
+repeats the reference as "epic `R5`, quoted under `16E`" (`:10048-10049`).
+This file's other `R`-labels are **campaign**-qualified: "campaign-021
+rulings R2 and R3" (`:3452`, `:3589`).
+
+The two forms are not in competition, and `16E`'s is correct as it stands.
+A campaign-qualified label resolves against a campaign this repository's
+records name elsewhere; an epic's `R`-labels have no campaign to qualify
+them by and no record in this repository that enumerates them, so the
+quoted content is what makes the reference resolvable to a reader who has
+only this file. Where a label is an epic's, quote the ruling; where it is a
+campaign's, qualify it. Nothing changes in `16E`.
+
+### 2. Item 5's two code cites, re-counted
+
+The Note of 2026-09-08's item 5 was written before `sb-h5xq` and `sb-x903`
+landed, and both of its `lib/` cites moved.
+
+| Cited as | Reads at `6d54afe` |
+|---|---|
+| `accepted_types/4` at `edit/targets.ex:200`, `@spec` at `:194` | `def accepted_types` at `:227`, `@spec` at `:221`. `sb-h5xq` added `admits_at?/5` at `:300` and `accepted_types_at/5` at `:337` beside it, exactly as the item rules |
+| `Assignability.check/5` at `assignability.ex:586` | `def check` at `:657`, `@spec` at `:655` |
+
+Item 5 also cited the Note of 2026-09-07 at `:10097` for where
+`accepted_recipes/4` was added. `:10097` is the line naming the
+**editor's** private `accepted_recipes/2`, not the promoted arity. The
+citation now names that Note by its head (`:10073`) and its `@spec` for the
+promoted arity (`:10106-10111`). Both were corrected in place, because a
+citation in ordinary prose points at code and at text as they are now.
+
+### 3. `11n`'s attribution to `ADR-0003` decision 8 is correct
+
+A reading raised against `:6635-6636` - that the validation-`:error`
+standing of `{:type_mismatch, ...}` belongs to `ADR-0011` decision 8 rather
+than to `ADR-0003` decision 8 - does not hold, and the sentence is left
+exactly as written. `ADR-0003` decision 8 is what gives an assignability
+failure its finding and its shape (`0003:268`, and the 2026-08-29
+amendment's own context at `0003:554-556`). `ADR-0011` decision 5 says the
+same thing in the same words - "with the standing `ADR-0003` decision 8
+gave `{:type_mismatch, ...}`" (`0011:305-306`) - and `ADR-0011` decision 8
+is about `:shape_not_satisfied` joining that vocabulary, closing with
+"`ADR-0003` decision 8's `{:kind_not_admitted, ...}` tuple is unchanged"
+(`0011:417`). The attribution is recorded here as verified so the reading
+is not re-raised.
+
+Filed with `sb-dxck`, campaign SF039, from `sb-x9xr` and the campaign's own
+cite residue. This Note changes no code and flips no status line in this
+file.

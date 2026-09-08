@@ -63,6 +63,8 @@ defmodule StatifierBlocks.Composite.Data do
   | `"subtree"` | yes | a non-empty list of template nodes (below); the head is the expansion root |
   | `"palette_entry"` | no | the map `palette_entry/0` answers, with string keys |
   | `"sentence"` | no | a template string; `{{key}}` is replaced by the param's value rendered as a string |
+  | `"slots"` | no | defaults to `%{}`; the pass-through slots this composite exposes, each mapped to the `[local_id, inner_slot]` it stands for (below) |
+  | `"migrations"` | no | defaults to `[]`; the ordered migration steps `migrate_config/3` walks from a stored version to the declaration's current one (below) |
 
   **Two of the three overridables have a key here; the third cannot.** A
   `use`-composite may override `sentence/1`, `palette_entry/0` and

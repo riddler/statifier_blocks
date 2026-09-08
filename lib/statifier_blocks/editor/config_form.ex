@@ -28,7 +28,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     form calls the same function - so a change to what counts as shown
     reaches both surfaces at once, with no second copy of the predicate here
     to fall behind it. `Field.field/1` renders nothing for a hidden field
-    either; the two agree, and neither is load-bearing alone.
+    either; the two agree, and neither is load-bearing alone. A node
+    carrying no form at all is the same shape rather than a special case:
+    `shown_fields/1` answers `[]` for one, so a host that calls this
+    component directly with an unresolvable block's node draws an empty
+    form instead of raising.
 
     **A host composes this call rather than re-writing it.** Two attrs are
     what make that possible: `event` names what the form posts under, and
