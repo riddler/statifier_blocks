@@ -896,7 +896,8 @@ defmodule StatifierBlocks.Compiler do
         structure_document(document, node, expansion),
         palette,
         opts,
-        refused_block_ids(config)
+        refused_block_ids(config),
+        writer_sentences(document, palette, expansion)
       )
 
     case config ++ structure do
@@ -923,6 +924,61 @@ defmodule StatifierBlocks.Compiler do
 
   defp structure_document(document, node, _expansion),
     do: %{document | root: resolved_block(node)}
+
+  # Every block a `:type_mismatch` could name as the disagreeing WRITER and
+  # that an author never typed, to the line of prose that names the composite
+  # they did type (ADR-0011's Note of 2026-09-08).
+  #
+  # The subject half of a finding is re-anchored by `reanchor/2` after the
+  # message string exists, so the writer half cannot ride along with it: by
+  # then the id is prose. It is resolved here instead, where the message has
+  # not been built yet, and it is resolved to a NAME rather than to an id
+  # because this is the only place both halves of the answer are in hand -
+  # the ORIGINAL document, which still holds the composite block, and the
+  # palette. The document `structure_stage/5` walks is the spliced one, in
+  # which the composite has been replaced by its members and cannot be looked
+  # up at all, so handing that stage the index rather than this map would hand
+  # it something it could not resolve.
+  #
+  # A pass-through child has no entry in the expansion index (ADR-0004's T3,
+  # `Composite.expand/2`), so it is absent from this map and its own finding
+  # keeps naming the child - which is an id the author typed. `anchor/2` does
+  # the climbing, so a composite nested in another composite's subtree names
+  # the OUTERMOST composite here exactly as it does for the subject half.
+  @typep writers :: %{optional(Block.id()) => String.t()}
+
+  @spec writer_sentences(Document.t(), Palette.t(), expansion()) :: writers()
+  defp writer_sentences(_document, _palette, expansion) when map_size(expansion) == 0, do: %{}
+
+  defp writer_sentences(document, palette, expansion) do
+    blocks = Map.new(Document.blocks(document), &{&1.id, &1})
+
+    Enum.reduce(expansion, %{}, fn {member_id, _owner}, writers ->
+      with {composite_id, _config_key} <- anchor(expansion, member_id),
+           %Block{} = composite <- Map.get(blocks, composite_id) do
+        Map.put(writers, member_id, writer_sentence(palette, composite))
+      else
+        _unanchored_or_absent -> writers
+      end
+    end)
+  end
+
+  # The composite's own line, else its type's label, else the type name -
+  # `ADR-0005`'s chain as `StatifierBlocks.BlockType.sentence/2` writes it,
+  # which is the same two rungs `StatifierBlocks.ViewModel.sentence/1` draws
+  # a row with. The compiler asks the block type rather than the view model
+  # because it holds no view model and building one to name one block would
+  # be a second answer to a question the type already answers; the rung the
+  # two do not share is the author's `title` override, which is reachable
+  # only for a type declaring no `sentence/1` at all and is the view model's
+  # own (`ViewModel`'s private `sentence/5`).
+  @spec writer_sentence(Palette.t(), Block.t()) :: String.t()
+  defp writer_sentence(palette, %Block{type: type, config: config}) do
+    case Palette.fetch(palette, type) do
+      {:ok, ref} -> BlockType.sentence(ref, config) || type
+      {:error, _unknown} -> type
+    end
+  end
 
   # The resolved tree carries only the slots the block's type *declares*, so
   # the stored map is merged under it rather than replaced: a slot no type
@@ -1108,9 +1164,9 @@ defmodule StatifierBlocks.Compiler do
   # `SlotValidation` and `Shelf` compute per block and are filtered on the way
   # out. Both are the same rule - a refused block contributes nothing to this
   # stage - and neither shortens the walk for anybody else.
-  @spec structure_stage(Document.t(), Palette.t(), keyword(), MapSet.t(Block.id())) ::
+  @spec structure_stage(Document.t(), Palette.t(), keyword(), MapSet.t(Block.id()), writers()) ::
           [Finding.t()]
-  defp structure_stage(document, palette, opts, skip) do
+  defp structure_stage(document, palette, opts, skip, writers) do
     slot_findings =
       case SlotValidation.validate(palette, document) do
         :ok -> []
@@ -1127,7 +1183,7 @@ defmodule StatifierBlocks.Compiler do
 
         {:error, findings} ->
           read_keys = read_keys(palette, document)
-          Enum.map(findings, &structure_finding(&1, declarations, read_keys))
+          Enum.map(findings, &structure_finding(&1, declarations, read_keys, writers))
       end
 
     shelf_findings =
@@ -1203,15 +1259,23 @@ defmodule StatifierBlocks.Compiler do
   # wide), so the key is looked back up here, where the palette and the
   # document are both in hand, instead of being re-derived by every consumer
   # that wants to underline something.
+  #
+  # `writers` is the writer half of ADR-0011's Note of 2026-09-08: the map
+  # `writer_sentences/3` built, from every id inside an expansion to the
+  # sentence of the composite the author placed. It arrives resolved rather
+  # than as the expansion index because the document this stage holds is the
+  # spliced one, in which the composite is not there to be looked up.
   @spec structure_finding(
           Assignability.finding(),
           StatifierDatamodel.Declarations.t(),
-          read_keys()
+          read_keys(),
+          writers()
         ) :: Finding.t()
   defp structure_finding(
          {:kind_not_admitted, id, parent_id, slot, kinds, accepts} = reason,
          _declarations,
-         _read_keys
+         _read_keys,
+         _writers
        ) do
     Finding.new(
       :structure,
@@ -1225,13 +1289,14 @@ defmodule StatifierBlocks.Compiler do
   defp structure_finding(
          {:type_mismatch, id, source, held, expected, path} = reason,
          declarations,
-         read_keys
+         read_keys,
+         writers
        ) do
     Finding.new(
       :structure,
       reason,
       "this block reads #{named(declarations, expected)} at #{path}, " <>
-        "where #{source_phrase(source)} #{named(declarations, held)}",
+        "where #{source_phrase(source, writers)} #{named(declarations, held)}",
       block_id: id,
       config_key: Map.get(read_keys, {id, path, expected})
     )
@@ -1240,10 +1305,25 @@ defmodule StatifierBlocks.Compiler do
   # Which of the two sources typed the path, which is the difference between
   # "your block writes the wrong type here" and "the host declares this path
   # as something else" - and what the environment marks a seeded entry for.
-  # A block and the slot entry read exactly as they always did.
-  @spec source_phrase(Assignability.upstream_ref()) :: String.t()
-  defp source_phrase(:declaration), do: "the datamodel document declares"
-  defp source_phrase(source), do: "#{inspect(source)} left"
+  # A block the author typed and the slot entry read exactly as they always
+  # did.
+  #
+  # A writer that is a MINTED expansion member is the one that does not: the
+  # id in the tuple is one the author cannot see, cannot select and cannot
+  # edit, so the sentence names the composite block they did place instead
+  # (ADR-0011's Note of 2026-09-08, mirroring ADR-0004's E3 for the subject
+  # half). The tuple itself is untouched - the minted id is what a fixture
+  # run and the Source tab still name, and it is the only thing that says
+  # WHICH member wrote the entry - so this is the render and nothing else.
+  @spec source_phrase(Assignability.upstream_ref(), writers()) :: String.t()
+  defp source_phrase(:declaration, _writers), do: "the datamodel document declares"
+
+  defp source_phrase(source, writers) do
+    case Map.fetch(writers, source) do
+      {:ok, sentence} -> "#{inspect(sentence)} left"
+      :error -> "#{inspect(source)} left"
+    end
+  end
 
   @typedoc false
   @type read_keys :: %{{Block.id(), String.t(), term()} => String.t()}
