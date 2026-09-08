@@ -671,6 +671,115 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # ADR-0005's 2026-09-08 Note, item 8: the form is a call a host composes.
+    # `event` names what it posts under, `target` may be omitted, and the
+    # block the params are about arrives as a hidden input that was already
+    # there. What is asserted here is the markup a browser reads - the two
+    # posting attributes on the `<form>` tag, the absence of `phx-target`
+    # when nothing named one, and the hidden input beside them.
+    describe "a call a host composes" do
+      defp composed_node do
+        Document.new(
+          Block.new("core.send",
+            id: "blk_notify",
+            config: %{"event" => "signup.abandoned"}
+          ),
+          id: "bdoc_composed"
+        )
+        |> ViewModel.build(Palette.new(Palette.core_types()), [])
+        |> Elixir.Map.fetch!(:root)
+      end
+
+      defp form_tag(html) do
+        ~r/<form\b[^>]*>/ |> Regex.run(html) |> hd()
+      end
+
+      # Sabotage: reverted `phx-change={@event}` to the hard-coded
+      # `"config-change"` -> this test alone went red on the first assertion,
+      # with the target and hidden-input assertions still green (verified).
+      test "a host's own event name is what both posting attributes carry" do
+        html =
+          render_component(&ConfigForm.config_form/1,
+            node: composed_node(),
+            event: "plan-change",
+            target: nil
+          )
+
+        tag = form_tag(html)
+
+        assert tag =~ ~s(phx-change="plan-change")
+        assert tag =~ ~s(phx-submit="plan-change")
+        refute tag =~ "config-change"
+      end
+
+      # Sabotage: gave `target` a `default: "#editor"` instead of `nil` -> a
+      # `phx-target` appeared on the form and on every control and this test
+      # went red, which is the whole point of the omission (verified).
+      test "an omitted target renders no phx-target anywhere" do
+        html =
+          render_component(&ConfigForm.config_form/1,
+            node: composed_node(),
+            event: "plan-change"
+          )
+
+        refute html =~ "phx-target"
+      end
+
+      # The id is not new and this item does not add it; it is asserted here
+      # because a host composing the call reads the block out of its params
+      # by this input and nothing else tells it the input is there.
+      test "the block id posts as a hidden input without being asked for" do
+        html =
+          render_component(&ConfigForm.config_form/1,
+            node: composed_node(),
+            event: "plan-change"
+          )
+
+        assert html =~
+                 ~s(<input type="hidden" name="block-id" value="blk_notify")
+      end
+
+      # The default half: a caller that names neither attr renders what this
+      # component rendered before they existed.
+      test "a caller naming neither attr posts config-change to its target" do
+        tag =
+          render_component(&ConfigForm.config_form/1,
+            node: composed_node(),
+            target: "#editor"
+          )
+          |> form_tag()
+
+        assert tag =~ ~s(phx-change="config-change")
+        assert tag =~ ~s(phx-submit="config-change")
+        assert tag =~ ~s(phx-target="#editor")
+      end
+
+      # The editor's own mount is the caller that names neither, and it is
+      # byte-identical across this change: the `<form>` tag it renders is
+      # asserted whole rather than by fragments, so any attribute added,
+      # dropped or reordered on it has to come past this line.
+      test "the editor's own mount renders the same form tag as before", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+        view = select(view, "blk_email_step")
+
+        tag =
+          view
+          |> element(~s(.sb-form[data-block-id="blk_email_step"]))
+          |> render()
+          |> form_tag()
+
+        assert tag ==
+                 ~s(<form id="sb-form-blk_email_step" class="sb-form " ) <>
+                   ~s(data-block-id="blk_email_step" phx-change="config-change" ) <>
+                   ~s(phx-submit="config-change" phx-target="1">)
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-form input[type="hidden"][name="block-id"][value="blk_email_step"])
+               )
+      end
+    end
+
     # A `core.send` whose delay the author edits. `core.send` is the block
     # type that already reads both stored spellings, so it is where a
     # predicator string can be committed without waiting on `core.wait`.

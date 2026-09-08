@@ -30,6 +30,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     to fall behind it. `Field.field/1` renders nothing for a hidden field
     either; the two agree, and neither is load-bearing alone.
 
+    **A host composes this call rather than re-writing it.** Two attrs are
+    what make that possible: `event` names what the form posts under, and
+    `target` may be omitted for a host whose form posts to the LiveView
+    itself. Neither changes what is drawn, and both default to what
+    `StatifierBlocks.Editor` already passes, so a caller that names neither
+    renders exactly what it rendered before they existed. The block the
+    params are about arrives without being asked for: the form posts it as
+    a hidden `block-id` input, which is where a host reads the id out of
+    its params. The field controls, their labels and their layout stay this
+    package's; the chrome around the form stays the host's.
+
     `form.unrouted` renders at the head. That bucket exists because
     `Core.Branch.config_schema/1` keys one field per arm by the arm's own
     slot name while `validate_config/1` also emits findings keyed `"arms"` -
@@ -47,7 +58,35 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     alias StatifierBlocks.ViewModel
 
     attr(:node, ViewModel.Node, required: true)
-    attr(:target, :any, required: true)
+
+    attr(:target, :any,
+      default: nil,
+      doc: """
+      What `phx-target` this form and its controls carry, or `nil` for none.
+
+      `nil` is a host whose form posts to the LiveView it is mounted in
+      rather than to a component inside it, and it renders no `phx-target`
+      attribute anywhere - not on the form, not on a control, not on the
+      Discard button. The editor passes its own component target and is
+      unchanged by the default.
+      """
+    )
+
+    attr(:event, :string,
+      default: "config-change",
+      doc: """
+      The event name this form posts under, written to both `phx-change`
+      and `phx-submit`.
+
+      The default is the name `StatifierBlocks.Editor` handles, so every
+      caller that names nothing is byte for byte what this component
+      rendered before the attr existed. A host that draws one block's
+      fields under its **own** `handle_event/3` names its own event here
+      and reads the block the params are about out of the hidden
+      `block-id` input the form already posts.
+      """
+    )
+
     attr(:class, :string, default: nil)
     attr(:expression_component, :any, default: nil)
 
@@ -226,8 +265,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         id={"sb-form-" <> @node.block_id}
         class={["sb-form", @class]}
         data-block-id={@node.block_id}
-        phx-change="config-change"
-        phx-submit="config-change"
+        phx-change={@event}
+        phx-submit={@event}
         phx-target={@target}
       >
         <span
