@@ -17,6 +17,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     It is a presentation module in the sense every other file beside it is:
     it renders what it is handed and decides nothing. Which rows exist, which
     boxes are ticked, and what Save does are `StatifierBlocks.Editor`'s.
+
+    A mount that registered no `on_collapse` never opens this tray: the control
+    that opens it is not drawn and the four events the gesture is made of are
+    refused, so the editor holds no open gesture for this component to render
+    (ADR-0005's Note of 2026-09-08, item 1). The `data-collapse-save`
+    attribute this section carries is the selector that contract is asserted
+    on, and the "Save as a step" control on the card carries it too.
     """
 
     use Phoenix.Component
@@ -37,7 +44,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec save_step_tray(map()) :: Phoenix.LiveView.Rendered.t()
     def save_step_tray(assigns) do
       ~H"""
-      <section class="sb-save-step" aria-label="Save as a step">
+      <section class="sb-save-step" data-collapse-save="tray" aria-label="Save as a step">
         <p class="sb-save-step__hint">
           Tick the values this step should ask for. Tick none and every value
           that differs from its default is asked for.

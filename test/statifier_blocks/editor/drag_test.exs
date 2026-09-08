@@ -168,7 +168,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         refute has_element?(
                  view,
-                 ~s([data-block-id="blk_wizard"] > .sb-node__chrome > .sb-node__remove)
+                 ~s([data-block-id="blk_wizard"] > .sb-node__chrome > .sb-node__strip > .sb-node__remove)
                ),
                "the root is not deletable, so the affordance is absent"
 

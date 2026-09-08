@@ -813,13 +813,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert has_element?(
                  view,
-                 ~s([data-block-id="blk_wait"] > .sb-node__chrome > ) <>
+                 ~s([data-block-id="blk_wait"] > .sb-node__chrome > .sb-node__strip > ) <>
                    ~s(.sb-node__remove[data-reveal="hover-or-selected"])
                )
 
         refute has_element?(
                  view,
-                 ~s([data-block-id="blk_named_root"] > .sb-node__chrome > .sb-node__remove)
+                 ~s([data-block-id="blk_named_root"] > .sb-node__chrome > .sb-node__strip > .sb-node__remove)
                ),
                "the root is not deletable, so the affordance is absent"
       end
@@ -842,9 +842,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert rest_declarations =~ "opacity: 0"
 
         for selector <- [
-              ".sb-node__chrome:hover > .sb-node__remove",
+              ".sb-node__chrome:hover .sb-node__remove",
               ".sb-node__remove:focus-visible",
-              ".sb-node--selected > .sb-node__chrome > .sb-node__remove"
+              ".sb-node--selected > .sb-node__chrome .sb-node__remove"
             ] do
           assert css =~ selector, "the reveal rule lost #{selector}"
         end
@@ -873,13 +873,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert has_element?(
                  view,
-                 ~s([data-block-id="blk_deadline"] > .sb-node__chrome > ) <>
+                 ~s([data-block-id="blk_deadline"] > .sb-node__chrome > .sb-node__strip > ) <>
                    ~s(.sb-node__offer[data-reveal="always"])
                )
 
         refute has_element?(
                  view,
-                 ~s([data-block-id="blk_deadline"] > .sb-node__chrome > .sb-node__remove)
+                 ~s([data-block-id="blk_deadline"] > .sb-node__chrome > .sb-node__strip > .sb-node__remove)
                ),
                "the offer stands in for the control it came from, it does not sit beside it"
       end
@@ -1404,29 +1404,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    # The space scale in `--sb-space` units, which is what lets a geometry
-    # assertion below compare two rules written in different combinations of
-    # the same tokens.
-    @space_units %{
-      "--sb-space" => 1.0,
-      "--sb-space-half" => 0.5,
-      "--sb-space-2" => 2.0,
-      "--sb-space-3" => 3.0
-    }
-
     defp rule_body!(css, regex) do
       match = Regex.run(regex, css)
       assert match, "the scan actually found #{inspect(regex.source)}"
       Enum.at(match, 1)
-    end
-
-    defp space_units(body, property) do
-      [_, value] = Regex.run(~r/^\s*#{property}:\s*(.*?);/m, body)
-
-      ~r/var\((--sb-space(?:-half|-2|-3)?)\)/
-      |> Regex.scan(value)
-      |> Enum.map(fn [_, token] -> Map.fetch!(@space_units, token) end)
-      |> Enum.sum()
     end
 
     describe "the fold's stylesheet (ADR-0005's amendment to decision 2)" do
@@ -1463,9 +1444,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       test "hover, focus and selection reveal it while the container is open" do
         css = File.read!(@stylesheet)
 
-        assert css =~ ~r/^\.sb-node__chrome:hover > \.sb-node__fold,$/m
+        assert css =~ ~r/^\.sb-node__chrome:hover \.sb-node__fold,$/m
         assert css =~ ~r/^\.sb-node__fold:focus-visible,$/m
-        assert css =~ ~r/^\.sb-node--selected > \.sb-node__chrome > \.sb-node__fold \{$/m
+        assert css =~ ~r/^\.sb-node--selected > \.sb-node__chrome \.sb-node__fold \{$/m
       end
 
       # Every collapsed selector names the element it is about. THREE elements
@@ -1493,38 +1474,139 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         """
       end
 
-      # The fold and the findings badge are the same corner of the chrome and
-      # only one of them is in the flow: the fold is absolutely placed inside
-      # the reserved right padding, so that reservation is the only thing
-      # keeping the count out from under the `+`. Measured in `--sb-space`
-      # units off both rules rather than asserted as a literal, so moving
-      # either control has to be answered here instead of quietly putting the
-      # two back on top of each other (screen `e6-11-drafts-folded-1280`,
-      # campaign 027).
-      # Sabotage: dropping the badged-card rule - the badge's grid column ends
-      # at the 3-unit content edge, the fold's square reaches 4.5, and this
-      # goes red by the 1.5 units the two would share.
-      test "a card that draws a badge reserves the padding the fold occupies" do
+      # The fold and the findings badge were the same corner of the chrome
+      # with only one of them in the flow, so a reserved right padding was
+      # the only thing keeping the count out from under the `+`. Both are in
+      # the flow now (ADR-0005's Note of 2026-09-08, item 4): the badge is
+      # the grid's third column and the control strip its fourth, so the two
+      # cannot share a cell whatever either one's width becomes, and the
+      # padding that used to hold them apart is gone.
+      # Sabotage: giving the strip `grid-column: 3` - it lands in the badge's
+      # cell, the count draws under the `+` again on the one face that has
+      # both, and this goes red on the column rather than on a screenshot.
+      test "the badge and the control strip are different grid columns" do
         css = File.read!(@stylesheet)
 
-        fold = rule_body!(css, ~r/^\.sb-node__fold\s*\{(.*?)\n\}/ms)
+        badge = rule_body!(css, ~r/^\.sb-node__chrome > \.sb-badge\s*\{(.*?)\n\}/ms)
+        strip = rule_body!(css, ~r/^\.sb-node__chrome > \.sb-node__strip\s*\{(.*?)\n\}/ms)
 
-        badged =
-          rule_body!(
-            css,
-            ~r/^\.sb-node\[data-collapsed="true"\]:not\(\[data-findings-count="0"\]\) > \.sb-node__chrome\s*\{(.*?)\n\}/ms
-          )
+        [_, badge_column] = Regex.run(~r/grid-column:\s*(\d+)/, badge)
+        [_, strip_column] = Regex.run(~r/grid-column:\s*(\d+)/, strip)
 
-        needed = space_units(fold, "right") + space_units(fold, "width")
-        reserved = space_units(badged, "padding-right")
+        refute badge_column == strip_column, """
+        The badge and the control strip occupy one cell, so the count draws
+        under whichever control lands on it.
 
-        assert reserved >= needed, """
-        The fold reaches #{needed} `--sb-space` units in from the chrome's
-        right border, and the badge's grid column ends at the content edge, so
-        a card carrying both reserves at least that much on the right.
-
-        Reserved: #{reserved}
+        Both are in column #{badge_column}.
         """
+      end
+    end
+
+    describe "the reserved control strip (the Note of 2026-09-08, item 4)" do
+      @stylesheet "assets/css/statifier_blocks.css"
+
+      # The strip is drawn on every card, whatever it holds, because a strip
+      # that appeared with its contents would reserve nothing: the space has
+      # to be held while the controls are hidden, which is the whole ruling.
+      # Sabotage: `:if={not @root?}` on the strip - the root card loses its
+      # reservation, its title runs under the fold again, and this goes red.
+      test "every card carries the strip beside its title", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: named_document(), palette: named_palette())
+
+        for id <- ["blk_named_root", "blk_wait"] do
+          assert has_element?(
+                   view,
+                   ~s([data-block-id="#{id}"] > .sb-node__chrome > .sb-node__strip)
+                 ),
+                 "#{id} draws no control strip"
+        end
+      end
+
+      # Every control the card carries is inside it, which is what makes the
+      # reservation exact: the column is sized by the controls themselves, so
+      # a word control whose label changes length carries its own reservation.
+      # Sabotage: leaving one control a direct child of the chrome - it lands
+      # in the title's own column and this goes red on that control.
+      test "the card's controls are the strip's children", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: named_document(), palette: named_palette())
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_named_root"] > .sb-node__chrome > ) <>
+                   ~s(.sb-node__strip > .sb-node__fold)
+               ),
+               "the fold is not in the strip"
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_wait"] > .sb-node__chrome > ) <>
+                   ~s(.sb-node__strip > .sb-node__remove)
+               ),
+               "the delete control is not in the strip"
+      end
+
+      # The ruling's own sentence, and the one a LiveView test cannot see: the
+      # title's box EXCLUDES the strip's. It is a different grid column rather
+      # than a padding wide enough to guess at, so a two-line title wraps
+      # beside the controls instead of under them however long either grows.
+      # Sabotage: giving the strip `grid-column: 2` - it shares the title's
+      # cell, the controls sit on the last word of a wrapped name again, and
+      # this goes red on the column.
+      test "the title and the strip are different grid columns" do
+        css = File.read!(@stylesheet)
+
+        label = rule_body!(css, ~r/^\.sb-node__chrome > \.sb-node__label\s*\{(.*?)\n\}/ms)
+        strip = rule_body!(css, ~r/^\.sb-node__chrome > \.sb-node__strip\s*\{(.*?)\n\}/ms)
+        chrome = rule_body!(css, ~r/^\.sb-node__chrome\s*\{(.*?)\n\}/ms)
+
+        assert label =~ ~r/grid-column:\s*2/
+        assert strip =~ ~r/grid-column:\s*4/
+
+        assert chrome =~ ~r/grid-template-columns:\s*auto minmax\(0, 1fr\) auto auto/,
+               "the chrome declares no fourth column for the strip to sit in"
+      end
+
+      # The reservation is only a reservation while the controls are in the
+      # flow. Absolutely placed, they take no space and the title runs under
+      # them again, which is the defect the item was taken from.
+      # Sabotage: putting `position: absolute` back on any one control - the
+      # strip stops being sized by it and this goes red naming it.
+      test "no control is placed outside the flow" do
+        css = File.read!(@stylesheet)
+
+        for selector <- [
+              ~S(.sb-node__remove[data-reveal="hover-or-selected"]),
+              ~S(.sb-node__expand[data-reveal="hover-or-selected"]),
+              ~S(.sb-node__save-step[data-reveal="hover-or-selected"]),
+              ~S(.sb-node__offer[data-reveal="always"]),
+              ".sb-node__fold"
+            ] do
+          body =
+            rule_body!(
+              css,
+              ~r/^#{Regex.escape(selector)}\s*\{(.*?)\n\}/ms
+            )
+
+          refute body =~ ~r/position:\s*absolute/,
+                 "#{selector} is placed outside the flow, so it reserves nothing"
+        end
+      end
+
+      # And nothing truncates: a wrapped title reads as a long name where a
+      # clipped one reads as a rendering bug, which is B3's reasoning about
+      # chips reaching the title.
+      # Sabotage: `white-space: nowrap` with an ellipsis on the label - the
+      # card stops growing and the name is cut instead.
+      test "the title wraps rather than clipping" do
+        css = File.read!(@stylesheet)
+
+        body = rule_body!(css, ~r/^\.sb-node__label\s*\{(.*?)\n\}/ms)
+
+        assert body =~ ~r/overflow-wrap:\s*anywhere/
+        refute body =~ ~r/text-overflow:\s*ellipsis/
+        refute body =~ ~r/white-space:\s*nowrap/
       end
     end
 

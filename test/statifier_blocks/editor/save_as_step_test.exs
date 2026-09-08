@@ -33,7 +33,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp open_tray(view, id) do
       view
-      |> element(~s([data-block-id="#{id}"] > .sb-node__chrome > .sb-node__save-step))
+      |> element(
+        ~s([data-block-id="#{id}"] > .sb-node__chrome > .sb-node__strip > .sb-node__save-step)
+      )
       |> render_click()
 
       view
@@ -191,16 +193,74 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # ADR-0005's Note of 2026-09-08, item 1. The gesture's only outcome is a
+    # callback, so a mount that registered none is offered no gesture: the
+    # control is not drawn, the tray is unreachable, and the four events it
+    # is made of are answered with the socket unchanged. `data-collapse-save`
+    # is the one selector both halves carry, so "nothing of it is drawn" is
+    # one assertion rather than two that could drift apart.
     describe "a host that does not pass on_collapse" do
-      # The record's "the host acquires no obligation": the gesture is still
-      # offered, still refuses nothing, and still writes nothing.
-      test "takes the gesture and is told nothing", %{conn: conn} do
+      # Sabotage: dropped the `@collapsible` guard from the control - red on
+      # the second assertion, which is the whole of the item's ruling.
+      test "is drawn no Save control, on any card", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn, on_collapse: false)
 
-        view |> select("blk_email_step") |> open_tray("blk_email_step") |> save()
+        refute has_element?(view, "[data-collapse-save]")
+
+        select(view, "blk_email_step")
+
+        refute has_element?(view, "[data-collapse-save]")
+
+        refute has_element?(
+                 view,
+                 ~s([data-block-id="blk_email_step"] .sb-node__save-step)
+               )
+      end
+
+      # The control is not there to send them, so these arrive only from a
+      # crafted payload. Sabotage: inverting the guard on the refusing clause
+      # so it never matches - "save-as-step" reaches its own handler, the tray
+      # opens on a mount that draws no control, and this goes red on it.
+      test "refuses the four events the gesture is made of", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn, on_collapse: false)
+
+        select(view, "blk_email_step")
+
+        for {event, params} <- [
+              {"save-as-step", %{"block-id" => "blk_email_step"}},
+              {"save-as-step-mark",
+               %{"block-id" => "blk_email_step", "field-key" => "to_address"}},
+              {"save-as-step-confirm", %{}},
+              {"save-as-step-cancel", %{}}
+            ] do
+          view |> with_target("#editor") |> render_click(event, params)
+
+          refute has_element?(view, "[data-collapse-save]"),
+                 "#{event} drew something the mount withholds"
+        end
 
         assert collapses() == []
         assert is_nil(latest_document())
+      end
+    end
+
+    describe "a host that does pass on_collapse" do
+      # The other side of the same contract, so neither half can be read as
+      # "nothing is ever drawn". Sabotage: dropped `data-collapse-save` from
+      # the tray section - red on the second assertion.
+      test "is drawn the control, and the tray it opens", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        select(view, "blk_email_step")
+
+        assert has_element?(
+                 view,
+                 ~s([data-block-id="blk_email_step"] .sb-node__save-step[data-collapse-save])
+               )
+
+        open_tray(view, "blk_email_step")
+
+        assert has_element?(view, ~s(.sb-save-step[data-collapse-save]))
       end
     end
   end

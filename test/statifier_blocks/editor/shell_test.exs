@@ -73,7 +73,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {:ok, view, _html} = mount_editor(conn)
 
         view
-        |> element(~s([data-block-id="blk_email_step"] > .sb-node__chrome > .sb-node__remove))
+        |> element(
+          ~s([data-block-id="blk_email_step"] > .sb-node__chrome > .sb-node__strip > .sb-node__remove)
+        )
         |> render_click()
 
         refute has_element?(view, ~s([data-block-id="blk_email_step"]))
@@ -87,7 +89,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         view
         |> element(
-          ~s([data-block-id="blk_track_conversion"] > .sb-node__chrome > .sb-node__remove)
+          ~s([data-block-id="blk_track_conversion"] > .sb-node__chrome > .sb-node__strip > .sb-node__remove)
         )
         |> render_click()
 
@@ -106,7 +108,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  ~s(<button type="button" class="sb-button sb-toolbar__button" phx-click="undo")
 
         view
-        |> element(~s([data-block-id="blk_email_step"] > .sb-node__chrome > .sb-node__remove))
+        |> element(
+          ~s([data-block-id="blk_email_step"] > .sb-node__chrome > .sb-node__strip > .sb-node__remove)
+        )
         |> render_click()
 
         view |> element(~s(button[phx-click="undo"])) |> render_click()
@@ -139,7 +143,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert has_element?(view, ~s(button[phx-click="undo"][disabled]))
 
         view
-        |> element(~s([data-block-id="blk_email_step"] > .sb-node__chrome > .sb-node__remove))
+        |> element(
+          ~s([data-block-id="blk_email_step"] > .sb-node__chrome > .sb-node__strip > .sb-node__remove)
+        )
         |> render_click()
 
         refute has_element?(view, ~s(button[phx-click="undo"][disabled]))

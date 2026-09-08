@@ -123,6 +123,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:collapsible, :boolean,
+      default: false,
+      doc: """
+      Whether the mount registered an `on_collapse` callback, threaded down
+      the tree so a card draws the "Save as a step" control only where there
+      is a host to hand the declaration to (ADR-0005's Note of 2026-09-08,
+      item 1). `false` is the default for the reason the callback's own
+      default is: a gesture whose only outcome is a callback nobody
+      registered has nothing to offer.
+      """
+    )
+
     attr(:target, :any, required: true)
     attr(:icon, :any, default: nil)
     attr(:theme, :map, default: %{})
@@ -188,6 +200,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               armed={@armed}
               pending_remove={@pending_remove}
               expandable={@expandable}
+              collapsible={@collapsible}
               read_only={@read_only}
               target={@target}
               icon={@icon}
