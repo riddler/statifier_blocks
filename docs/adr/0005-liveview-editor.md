@@ -10624,10 +10624,10 @@ say, and one of them is a bug.
 (`editor.ex:683-691`) lists the events a read-only mount answers with the socket
 it was given, and `expand` is not among them. It should be: Expand commits an
 `Edit.t()` and changes the document, which is exactly what clause 6 says never
-happens on such a mount. The paragraph in this record that explains an *absence*
-from that list (`:8371`, and the moduledoc at `editor.ex:513`) is about "Save as
-a step", which reaches nothing a read-only mount withholds because it is a read;
-it is not about Expand and never was. This is a defect, filed as `sb-cqh8`.
+happens on such a mount. The passage that explains an *absence* from that list
+is the moduledoc at `editor.ex:513`, and it is about "Save as a step", which
+reaches nothing a read-only mount withholds because it is a read; it is not
+about Expand and never was. This is a defect, filed as `sb-cqh8`.
 
 **7b. An empty slot on a read-only mount draws a non-interactive placeholder.**
 `gap/1` (`slot.ex:411`) draws its "+" behind `:if={not @read_only}`
@@ -10725,7 +10725,7 @@ what a later reader matches.
 | `config_form.ex:239` | the hidden `block-id` input |
 
 The cites into this file - `:2480`, `:2489`, `:3068`, `:5776`, `:7303`,
-`:7471`, `:7473`, `:7476`, `:7852`, `:8023`, `:8069`, `:8371`, `:8601`,
+`:7471`, `:7473`, `:7476`, `:7852`, `:8023`, `:8069`, `:8601`,
 `:8612`, `:9642`, `:10052`, `:10097`, `:10304` - resolve unchanged; appends land
 at the end of this file, so no line above moved. The cites into `ADR-0002` are
 written in full wherever they appear above -
