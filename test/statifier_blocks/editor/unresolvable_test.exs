@@ -120,7 +120,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert view |> render() |> then(&Regex.scan(~r{class="sb-node__reason"}, &1)) |> length() ==
                  1
 
-        refute has_element?(view, ~s([data-block-id="blk_track_conversion"] > .sb-finding)),
+        refute has_element?(
+                 view,
+                 ~s([data-block-id="blk_track_conversion"] > .sb-node__chrome > .sb-finding)
+               ),
                "D4: an unresolvable card's findings are the inspector's, all of them"
 
         refute has_element?(view, ~s([data-block-id="blk_track_conversion"] > pre)),

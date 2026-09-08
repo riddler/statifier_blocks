@@ -1362,10 +1362,25 @@ defmodule StatifierBlocks.BlockType do
   # "calls the host" and "timer" fit and a sentence does not. Decision 10
   # carries no number today, so it lives here, named once, and this is the
   # value proposed to that record rather than a second opinion about it.
-  @presentation_cap 24
+  #
+  # ADR-0005's Note of 2026-09-08, item 2, moves the number from 24 to 32
+  # and says why it is not a measurement of the card: the cap is a
+  # legibility number, what reads as a chip rather than as a sentence, and
+  # the stylesheet's card-width custom property does not move with it.
+  # Every message that quotes the cap interpolates this attribute, so the
+  # sentences follow the number and there is still one place it is written.
+  @presentation_cap 32
 
   # ADR-0005 decision 10w draws a translated chip as `<block label> · <outcome>`.
   @chip_separator " · "
+
+  # The one grapheme an over-cap chip ends in. ADR-0005's Note of
+  # 2026-09-08 item 2 records the clause as ruled and queued, and names
+  # ADR-0002 `B3` as the record that owns the semantics and writes them
+  # down. The grapheme is counted INSIDE the cap - a drawn chip is never
+  # longer than `@presentation_cap` graphemes - so the number keeps meaning
+  # what it says on the card as well as in the declaration.
+  @chip_ellipsis "…"
 
   # The role `StatifierBlocks.Compiler.Context.done_id/1` mints a block's
   # completion `<final>` under, which is what a bare `done.state` event
@@ -1385,6 +1400,12 @@ defmodule StatifierBlocks.BlockType do
   carrying a newline is dropped rather than collapsed to a space: a
   truncated chip reads as a rendering bug a host files against the editor,
   where a missing chip reads as the declaration it is.
+
+  The carve-out ADR-0005's Note of 2026-09-08 item 2 records is `summary/3`'s
+  alone: a **summary chip** over the cap is drawn clipped, a **badge** over
+  it is still dropped. A badge is one word a type declares once for every
+  card of that type and a host can shorten it in the registry; a summary
+  chip is derived from one block's config, so there is nobody to ask.
 
   `nil` means no chip, which is the card every block type had before the
   declaration existed. A malformed declaration in one host's registry
@@ -1596,13 +1617,21 @@ defmodule StatifierBlocks.BlockType do
   list; a list comes back filtered. Absence is decided by
   `StatifierBlocks.Palette.declares?/3`, the seam's own predicate.
 
-  Each chip is held to `badge/1`'s refusal set, unchanged: a non-string,
-  an empty or all-whitespace string, one carrying a newline, carriage
-  return or tab, and one longer than #{@presentation_cap} characters are
-  **refused, never truncated** (amendment H3). A refused chip is dropped
-  and its siblings survive, so one over-long lane name costs its own chip
-  and nothing else. A summary whose every chip is refused is `[]`, which
-  is the card that type had before it declared one.
+  Each chip is held to `badge/1`'s refusal set with one carve-out. A
+  non-string, an empty or all-whitespace string, and one carrying a
+  newline, carriage return or tab are **refused, never truncated**
+  (amendment H3): a refused chip is dropped and its siblings survive, so
+  one unusable lane name costs its own chip and nothing else. A summary
+  whose every chip is refused is `[]`, which is the card that type had
+  before it declared one.
+
+  A chip longer than #{@presentation_cap} characters is the carve-out
+  (ADR-0005's Note of 2026-09-08 item 2): it is **drawn,
+  clipped to the cap** with an ellipsis in the last position, and
+  `summary_titles/3` carries its full text. A prefix of a name an author
+  wrote says which declaration this chip is; nothing said it at all while
+  it was dropped. The other three arms have no prefix worth drawing and
+  keep B3's discipline.
 
   A callback that raises, throws or exits answers `[]` on the grounds
   `join_label/2` documents: this is host code on the editor's layout
@@ -1645,6 +1674,15 @@ defmodule StatifierBlocks.BlockType do
   against generated SCXML still has the exact event name. `nil` for every
   chip that was not translated, which is every chip an author wrote.
 
+  A **clipped** chip is the second thing that says less than the string
+  behind it, so it answers here too: its entry is the chip's full text,
+  unclipped. Where a chip is both translated and over the cap the entry is
+  the full **translated** text rather than the declared event name - a
+  `title` that neither completes the visible chip nor matches it would
+  leave a reader with two half-strings and no whole one, and completing
+  what is on the card is what ADR-0005's Note of 2026-09-08 item 2 asks
+  for.
+
   Alignment is not maintained, it is derived: this and `summary/3` read
   the same one pass and apply the same refusal filter, so a chip cannot be
   drawn by one and dropped by the other.
@@ -1658,8 +1696,9 @@ defmodule StatifierBlocks.BlockType do
   end
 
   @typedoc """
-  Why one declared summary chip is not drawn, in the vocabulary of
-  ADR-0002 amendment B3's refusal set as `chip/1` applies it.
+  Why one declared summary chip is not drawn **as declared**, in the
+  vocabulary of ADR-0002 amendment B3's refusal set as `chip/1` applies
+  it.
 
   `:not_a_string` is anything that is not a binary, `:blank` an empty or
   all-whitespace string, `:multiline` one carrying a newline, carriage
@@ -1667,19 +1706,34 @@ defmodule StatifierBlocks.BlockType do
   characters. The order is `chip/1`'s own: a string that is both
   newline-carrying and over-long reads as `:multiline`, because that is
   the arm that refused it.
+
+  Three of the four arms drop the chip. `:too_long` no longer does
+  (ADR-0005's Note of 2026-09-08 item 2): the chip is drawn clipped, and
+  the entry says the declaration is longer than what the card can show.
+  The name is kept rather than widened to a second word because the arm
+  is still `chip_refusal/1`'s, and `summary_refusals/3` is still the one
+  reader that says why a card is not drawing what a type declared.
   """
   @type summary_refusal_reason :: :too_long | :blank | :multiline | :not_a_string
 
   @doc """
-  The chips `summary/2` dropped, as `{index, reason}` in declaration order.
+  The chips `summary/2` did not draw as declared, as `{index, reason}` in
+  declaration order.
 
   ADR-0005 decision 10's 2026-08-30 Note, "the cap signals". Refusing a
   chip removes the evidence that anything was declared, so the card of a
-  block whose lane name is one character too long is indistinguishable
-  from the card of a block that declared no lane at all. This is the
-  reader that says which - the editor turns each entry into a `:lint`
-  warning against the block (`StatifierBlocks.ViewModel`), and nothing
-  about the card, the cap or `summary/2` moves to make that possible.
+  block whose lane name is blank is indistinguishable from the card of a
+  block that declared no lane at all. This is the reader that says which -
+  the editor turns each entry into a `:lint` warning against the block
+  (`StatifierBlocks.ViewModel`), and nothing about the card, the cap or
+  `summary/2` moves to make that possible.
+
+  A `:too_long` entry is now a diagnostic about a chip the card **does**
+  draw, clipped. It is still worth an author's attention - the card is
+  showing a prefix of what they wrote - and ADR-0005's Note of 2026-09-08
+  item 2 rules where it is read: the drawer's Findings tab, never the card
+  face, which is the one card the diagnostic would otherwise sit on top
+  of.
 
   `index` is the zero-based position in the list the type declared, so it
   survives a refusal in front of it - `summary/2`'s output has already
@@ -1688,7 +1742,7 @@ defmodule StatifierBlocks.BlockType do
   that does not exist, and a callback that raises all answer `[]`, which
   is "nothing was refused" and is honest in each case.
 
-      iex> StatifierBlocks.BlockType.summary_refusals(StatifierBlocks.Core.Parallel, %{"lanes" => ["capture", "balance_check_and_fraud_review"]})
+      iex> StatifierBlocks.BlockType.summary_refusals(StatifierBlocks.Core.Parallel, %{"lanes" => ["capture", "capture_and_balance_check_and_fraud_review"]})
       [{1, :too_long}]
 
       iex> StatifierBlocks.BlockType.summary_refusals(StatifierBlocks.Core.Wait, %{"duration" => "30s"})
@@ -1717,9 +1771,15 @@ defmodule StatifierBlocks.BlockType do
 
   The message names the chip's position, its length and the cap, because
   those are the three facts an author needs to fix the declaration and
-  none of them is visible on a card that simply drew nothing. Position is
-  one-based here and zero-based in the tuple: the tuple indexes a list and
-  the sentence counts chips.
+  none of them is visible on a card that drew nothing - or that drew a
+  prefix, which says a chip was shortened and never says by how much.
+  Position is one-based here and zero-based in the tuple: the tuple
+  indexes a list and the sentence counts chips.
+
+  The `:too_long` sentence ends "so it is drawn clipped" rather than "so
+  it is not drawn": ADR-0005's Note of 2026-09-08 item 2 changed what
+  happens to the chip, and a message still saying the chip is absent
+  would send an author looking for a card that is in front of them.
 
   The cap lives in this module (ADR-0002 amendment H's Consequences: one
   number in one place), so the sentence is built here rather than by the
@@ -1727,8 +1787,8 @@ defmodule StatifierBlocks.BlockType do
   Total: an entry naming a position the type no longer declares still
   answers a sentence.
 
-      iex> StatifierBlocks.BlockType.summary_refusal_message(StatifierBlocks.Core.Parallel, %{"lanes" => ["capture", "balance_check_and_fraud_review"]}, {1, :too_long})
-      "summary chip 2 is 30 characters; the cap is 24, so it is not drawn"
+      iex> StatifierBlocks.BlockType.summary_refusal_message(StatifierBlocks.Core.Parallel, %{"lanes" => ["capture", "capture_and_balance_check_and_fraud_review"]}, {1, :too_long})
+      "summary chip 2 is 42 characters; the cap is 32, so it is drawn clipped"
   """
   @spec summary_refusal_message(
           module(),
@@ -1747,15 +1807,50 @@ defmodule StatifierBlocks.BlockType do
     |> refusal_message(index, reason)
   end
 
+  # Every arm below opens with the chip's one-based position, because the
+  # position is the one fact all four share and the only one an author can
+  # act on without reading further.
+  @refusal_message_shape ~r/^summary chip \d+ /
+
+  @doc """
+  Whether `message` is one this module's `summary_refusal_message/4` wrote.
+
+  ADR-0005's Note of 2026-09-08 item 2 rules that a presentation-cap
+  diagnostic is read in the drawer's Findings tab and never on the card
+  face. Deciding that at the face needs a way to tell one of these
+  findings from every other finding a block carries, and decision 11's
+  presentation shape has no field finer than `source` - which is `:lint`
+  for a host's whole-document rule and an adapted compiler warning too, so
+  a card that dropped the whole source would stop drawing advisories that
+  ruling never touched.
+
+  The recognizer therefore lives here, in the module that WRITES the
+  sentences, rather than as a prefix a renderer knows about: every arm of
+  `summary_refusal_message/4` opens by numbering the chip, that opening is
+  the thing this matches, and a test pins the two together so the pair
+  cannot drift.
+
+      iex> StatifierBlocks.BlockType.summary_refusal_message?("summary chip 2 is blank, so it is not drawn")
+      true
+
+      iex> StatifierBlocks.BlockType.summary_refusal_message?("no handler registered for this invoke type")
+      false
+  """
+  @spec summary_refusal_message?(term()) :: boolean()
+  def summary_refusal_message?(message) when is_binary(message),
+    do: Regex.match?(@refusal_message_shape, message)
+
+  def summary_refusal_message?(_not_a_message), do: false
+
   @spec refusal_message(term(), non_neg_integer(), summary_refusal_reason()) :: String.t()
   defp refusal_message(declared, index, :too_long) when is_binary(declared) do
     "summary chip #{index + 1} is #{String.length(declared)} characters; " <>
-      "the cap is #{@presentation_cap}, so it is not drawn"
+      "the cap is #{@presentation_cap}, so it is drawn clipped"
   end
 
   defp refusal_message(_declared, index, :too_long) do
     "summary chip #{index + 1} is longer than the cap of #{@presentation_cap} " <>
-      "characters, so it is not drawn"
+      "characters, so it is drawn clipped"
   end
 
   defp refusal_message(_declared, index, :blank),
@@ -1770,11 +1865,35 @@ defmodule StatifierBlocks.BlockType do
   # The chips that survive the cap, each with the raw text behind it.
   # `summary/3` and `summary_titles/3` are both this list read one way, so
   # the drawn chip and its `title` are the same chip by construction.
+  #
+  # `:too_long` is the ONE arm that no longer drops (ADR-0005's Note of
+  # 2026-09-08 item 2, and `RQ-SF039-6`): an over-cap chip is DRAWN,
+  # clipped to the cap with `@chip_ellipsis` in its last position, and the
+  # full text goes on the `title`. The other three arms are unchanged -
+  # a blank, a multiline and a non-string chip have no prefix worth
+  # drawing, so B3's refuse-never-truncate discipline still governs them.
   @spec drawn_chips(module(), Block.config(), chip_labels()) :: [{String.t(), String.t() | nil}]
   defp drawn_chips(module, config, labels) do
     module
     |> translated_chips(config, labels)
-    |> Enum.filter(fn {drawn, _raw} -> chip_refusal(drawn) == nil end)
+    |> Enum.flat_map(fn {drawn, raw} ->
+      case chip_refusal(drawn) do
+        nil -> [{drawn, raw}]
+        :too_long -> [{clip(drawn), drawn}]
+        _refused -> []
+      end
+    end)
+  end
+
+  # The clip itself. The ellipsis is counted inside the cap, so a drawn
+  # chip is never wider than a chip at the cap: the card's row cannot grow
+  # a line because a declaration ran one grapheme over.
+  #
+  # `String.slice/3` counts graphemes, which is what `chip_refusal/1`
+  # measured, so the two cannot disagree about where the cap falls.
+  @spec clip(String.t()) :: String.t()
+  defp clip(text) do
+    String.slice(text, 0, @presentation_cap - String.length(@chip_ellipsis)) <> @chip_ellipsis
   end
 
   # ADR-0005 decision 10x: the translation runs where the chip is BUILT,

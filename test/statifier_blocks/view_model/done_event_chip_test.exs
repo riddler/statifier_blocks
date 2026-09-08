@@ -130,19 +130,19 @@ defmodule StatifierBlocks.ViewModel.DoneEventChipTest do
     assert ViewModel.summary_chips(watching) == ["Charge · done"]
   end
 
-  # 10x, end to end. The generated name is 29 characters against a cap of
-  # 24, so before this section the chip drew nothing AND raised a lint
-  # naming a string the author cannot shorten.
+  # 10x, end to end. The generated name is 37 characters against a cap of
+  # 32, so before this section the chip drew a clipped identifier AND
+  # raised a lint naming a string the author cannot shorten.
   #
   # Sabotage: build the lint findings from `summary_refusals/2` without the
   # labels - the chip draws (the node is built with them) while the card
   # simultaneously warns that it does not, which is the two readings of one
   # callback the shared pass exists to prevent.
   test "the cap lint does not fire for a name no author wrote" do
-    {vm, watching} = watcher(["done.outcome.s_blk_AUTH.error"])
+    {vm, watching} = watcher(["done.outcome.s_blk_AUTH.manual_review"])
 
     assert vm.findings == []
-    assert ViewModel.summary_chips(watching) == ["Authorize · error"]
+    assert ViewModel.summary_chips(watching) == ["Authorize · manual_review"]
   end
 
   # 10o keeps its home: an author who names a block a paragraph is told so,
@@ -150,15 +150,16 @@ defmodule StatifierBlocks.ViewModel.DoneEventChipTest do
   # theirs to fix.
   #
   # Sabotage: exempt every translated chip from the cap - the warning
-  # disappears and the card silently drops a chip again.
+  # disappears and the card silently draws the whole paragraph again.
   test "a translated chip over the cap warns about the author's own label" do
     {vm, watching} =
       watcher(["done.outcome.s_blk_AUTH.error"], %{"label" => "Authorize the payment card"})
 
-    assert ViewModel.summary_chips(watching) == []
+    assert ViewModel.summary_chips(watching) == ["Authorize the payment card · er…"]
+    assert ViewModel.summary_chip_titles(watching) == ["Authorize the payment card · error"]
 
     assert Enum.map(vm.findings, & &1.message) == [
-             "summary chip 1 is 34 characters; the cap is 24, so it is not drawn"
+             "summary chip 1 is 34 characters; the cap is 32, so it is drawn clipped"
            ]
 
     assert [%{source: :lint, severity: :warning}] = vm.findings

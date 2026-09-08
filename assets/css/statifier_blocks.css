@@ -1103,6 +1103,26 @@
   grid-row: 3;
 }
 
+/* A face finding, contained by the card it is about (ADR-0005's Note of
+ * 2026-09-08, item 2).
+ *
+ * The containment is the PLACEMENT: the row is a child of the card element
+ * and sits in the card's own text column, so it is inside the card's border
+ * and padding on a leaf and on a container alike. Under the chrome instead -
+ * where it used to be - a container's node box is `max-content` wide and the
+ * row spanned it, drawing a full-width tinted line between the card and the
+ * slot label under it. The row that read as the slot's was the measurement
+ * that ruling was taken from.
+ *
+ * No explicit `grid-row`: rows 1 to 3 are the title, the second line and the
+ * invoke line, and a card may carry several findings, so auto-placement
+ * stacks them after whichever of those exist. `minmax(0, 1fr)` on the column
+ * is what lets a long sentence wrap rather than widen the card. */
+.sb-node__chrome > .sb-finding {
+  grid-column: 2;
+  overflow-wrap: break-word;
+}
+
 /* The chrome cell the badge occupies. It renders on a collapsed container
  * with findings in its subtree and on nothing else - see `.sb-badge` below -
  * and the placement sits beside every other chrome placement so the grid

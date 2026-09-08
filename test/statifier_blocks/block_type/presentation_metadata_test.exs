@@ -23,9 +23,9 @@ defmodule StatifierBlocks.BlockType.PresentationMetadataTest do
 
   doctest StatifierBlocks.BlockType, only: [badge: 1, join_label: 2]
 
-  # 24 graphemes, the cap itself, and one more.
-  @at_cap "calls the host and waits"
-  @over_cap "calls the host and waited"
+  # 32 graphemes, the cap itself, and one more.
+  @at_cap "calls the host and waits for it."
+  @over_cap "calls the host and waited for it."
 
   describe "badge/1" do
     # Sabotage: made `badge/1` read `Map.get(entry, :label)` - red here,
@@ -39,8 +39,8 @@ defmodule StatifierBlocks.BlockType.PresentationMetadataTest do
     # assert, which is what pins the boundary rather than its neighbourhood
     # (verified).
     test "accepts a chip exactly at the cap and refuses the one past it" do
-      assert String.length(@at_cap) == 24
-      assert String.length(@over_cap) == 25
+      assert String.length(@at_cap) == 32
+      assert String.length(@over_cap) == 33
 
       assert BlockType.badge(%{badge: @at_cap}) == @at_cap
       assert BlockType.badge(%{badge: @over_cap}) == nil
@@ -54,7 +54,7 @@ defmodule StatifierBlocks.BlockType.PresentationMetadataTest do
       refused = BlockType.badge(%{badge: @over_cap})
 
       assert refused == nil
-      refute refused == String.slice(@over_cap, 0, 24)
+      refute refused == String.slice(@over_cap, 0, 32)
     end
 
     # Sabotage: dropped the whitespace and control-character arms from

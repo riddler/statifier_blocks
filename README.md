@@ -645,7 +645,7 @@ immediately:
 | `join_label` | a one-argument function of config, phrasing the join marker under a side-by-side arrangement | the editor's own word |
 
 All three are read through a total normalizer that **refuses rather than
-repairs**: a badge longer than 24 characters is dropped, not clipped, and one
+repairs**: a badge longer than 32 characters is dropped, not clipped, and one
 carrying a newline is dropped rather than collapsed to a space, because a
 truncated chip reads as a bug in the editor where a missing one reads as the
 declaration it is. An accent that is not an anchored `--sb-*` name never
@@ -1178,7 +1178,7 @@ the theme - rather than a callback the editor calls back into:
 | `payload` | `core.on_event` config, an optional `:string` field | the name of a type the datamodel document declares (`StatifierDatamodel.Declarations`), saying what `_event.data` carries **for the event this handler names**. Two handlers for one event may declare different payloads; each governs its own `capture`. With one declared, a `capture` pair whose source path reads a member the payload does not carry is a `:config` refusal on the `capture` key - the first segment against the payload's fields, deeper segments only where the field's own type resolves to another declaration, and a scalar, list or opaque field stops the walk. Absent, blank, naming a type the document does not declare, or compiled with no `:datamodel`: nothing is refused and nothing changes. `payload` emits no SCXML of its own (ADR-0002's amendment of 2026-09-06) |
 
 The metadata readers are total and refuse rather than repair: a badge that is
-blank, carries a newline, or runs past 24 characters is dropped rather than
+blank, carries a newline, or runs past 32 characters is dropped rather than
 clipped, an accent that is not an anchored `--sb-*` name never reaches a style
 attribute, and a `join_label` that raises degrades to the editor's own word.
 Assignability answers with reason-carrying refusals (sb-ue7, in flight).

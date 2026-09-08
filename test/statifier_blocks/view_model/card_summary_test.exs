@@ -19,6 +19,11 @@ defmodule StatifierBlocks.ViewModel.CardSummaryTest do
 
   doctest StatifierBlocks.ViewModel, only: [summary_chips: 1]
 
+  # Thirty-three graphemes against the cap of thirty-two, and what the
+  # cap draws for it: thirty-one graphemes and the ellipsis.
+  @over_cap "waiting for the operators to sign"
+  @over_cap_clipped "waiting for the operators to si…"
+
   defmodule NamedAndSummarising do
     @moduledoc """
     A host type that both names its instances and summarises them, which is
@@ -224,7 +229,7 @@ defmodule StatifierBlocks.ViewModel.CardSummaryTest do
     # card is byte-for-byte identical either way, so nothing else in the
     # suite notices and the author is back to a blank second line.
     test "an over-cap chip raises one lint warning against its block" do
-      vm = view_model("host.overlong", Overlong, %{"summary" => ["waiting for the operators"]})
+      vm = view_model("host.overlong", Overlong, %{"summary" => [@over_cap]})
 
       assert [finding] = vm.findings
       assert finding.source == :lint
@@ -232,14 +237,14 @@ defmodule StatifierBlocks.ViewModel.CardSummaryTest do
       assert finding.anchor == {:block, "blk_1"}
 
       assert finding.message ==
-               "summary chip 1 is 25 characters; the cap is 24, so it is not drawn"
+               "summary chip 1 is 33 characters; the cap is 32, so it is drawn clipped"
     end
 
     # Sabotage: anchored the finding at `{:config, id, "summary"}` - there is
     # no summary key in any config schema, so the finding routes to a field
     # the form never draws and the block panel never shows it.
     test "the warning routes onto the block, beside the card it explains" do
-      vm = view_model("host.overlong", Overlong, %{"summary" => ["waiting for the operators"]})
+      vm = view_model("host.overlong", Overlong, %{"summary" => [@over_cap]})
 
       assert vm.orphan_findings == []
       assert [%{source: :lint}] = vm.root.findings
@@ -252,13 +257,13 @@ defmodule StatifierBlocks.ViewModel.CardSummaryTest do
     test "one warning per refused chip, and none for the chips that drew" do
       vm =
         view_model("host.overlong", Overlong, %{
-          "summary" => ["capture", "waiting for the operators", 7]
+          "summary" => ["capture", @over_cap, 7]
         })
 
-      assert vm.root.summary == ["capture"]
+      assert vm.root.summary == ["capture", @over_cap_clipped]
 
       assert Enum.map(vm.findings, & &1.message) == [
-               "summary chip 2 is 25 characters; the cap is 24, so it is not drawn",
+               "summary chip 2 is 33 characters; the cap is 32, so it is drawn clipped",
                "summary chip 3 is not a string, so it is not drawn"
              ]
     end
