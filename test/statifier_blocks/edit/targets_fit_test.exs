@@ -23,10 +23,53 @@ defmodule StatifierBlocks.Edit.TargetsFitTest do
   alias StatifierBlocks.{
     Assignability,
     Block,
+    CardProcessingFixtures,
     Document,
     InsertProbeFixtures,
     Palette
   }
+
+  defmodule Counted do
+    @moduledoc """
+    A leaf that counts the times its `io/1` is asked, so a test can say how
+    many `Assignability.check/5` calls a reader made about it.
+
+    `check/5` consults a candidate's `io/1` a fixed number of times - kind
+    admission, then the read signatures - and nothing else in this module's
+    path does, so the count divided by that fixture is the number of checks.
+    """
+
+    @behaviour StatifierBlocks.BlockType
+
+    @counter :sb_h5xq_io_calls
+
+    @doc "Zero the counter and answer what it held."
+    def reset do
+      Process.put(@counter, 0)
+      :ok
+    end
+
+    @doc "The count since the last `reset/0`."
+    def calls, do: Process.get(@counter, 0)
+
+    @impl true
+    def current_version, do: 1
+    @impl true
+    def slots(_config), do: []
+    @impl true
+    def config_schema(_config), do: []
+    @impl true
+    def validate_config(_config), do: :ok
+
+    @impl true
+    def io(_config) do
+      Process.put(@counter, Process.get(@counter, 0) + 1)
+      %{kinds: [:step]}
+    end
+
+    @impl true
+    def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+  end
 
   defmodule Plain do
     @moduledoc "A leaf that declares no palette entry at all."
@@ -98,6 +141,53 @@ defmodule StatifierBlocks.Edit.TargetsFitTest do
         {:ok, module, resolved} = Palette.resolve(palette, block),
         {slot, _arity, _label} <- module.slots(resolved.config),
         do: {block.id, slot}
+  end
+
+  # Four card-processing documents, including one whose only step already
+  # fails its own read - the shape that separates a check at a slot's first
+  # gap from a check at its append gap.
+  defp card_documents do
+    open = CardProcessingFixtures.open()
+
+    [
+      {"an empty root", CardProcessingFixtures.document([])},
+      {"the entry block alone", CardProcessingFixtures.document([open])},
+      {"entry and settle", CardProcessingFixtures.document([open, settle()])},
+      {"settle with no entry", CardProcessingFixtures.document([settle()])},
+      {"a branch beside the entry",
+       CardProcessingFixtures.document([
+         open,
+         CardProcessingFixtures.branch("blk_BR", [{"a", []}, {"b", [settle("blk_S2")]}])
+       ])}
+    ]
+  end
+
+  defp settle(id \\ "blk_S"), do: CardProcessingFixtures.settle(id)
+
+  # A document whose `core.invoke` holds `children` in its `zero_or_one`
+  # `on_error` slot - rule 3's shape.
+  defp invoke_document(children) do
+    call =
+      Block.new("core.invoke",
+        id: "blk_CALL",
+        config: %{"invoke_type" => "myapp:authorize", "assign_to" => "", "params" => ""},
+        slots: %{"on_error" => children}
+      )
+
+    CardProcessingFixtures.document([CardProcessingFixtures.open(), call])
+  end
+
+  # The card palette with three names for one counting type, so a candidate
+  # list of three is three candidates rather than three copies of one.
+  defp counted_palette do
+    palette = CardProcessingFixtures.palette()
+
+    types =
+      Enum.reduce(["myapp.counted_a", "myapp.counted_b", "myapp.counted_c"], palette.types, fn
+        name, acc -> Map.put(acc, name, Counted)
+      end)
+
+    %{palette | types: types}
   end
 
   # The filter a surface writes when it does not know about the probe: the
@@ -214,6 +304,161 @@ defmodule StatifierBlocks.Edit.TargetsFitTest do
                document,
                palette,
                {"blk_ROOT", "body"},
+               ctx
+             )
+    end
+  end
+
+  describe "admits_at?/5 and accepted_types_at/5, the per-target pair" do
+    # Sabotage: `admits_at?/5` dropping its `append_gap/3` guard and checking
+    # at index 0 - the settle-only document's whole palette goes dark,
+    # because the block already first in the slot fails its own read.
+    test "the pair and the sweep answer the same set at every target of the card fixtures" do
+      palette = CardProcessingFixtures.palette()
+      ctx = CardProcessingFixtures.ctx()
+
+      for {label, document} <- card_documents(),
+          target <- targets(document, palette) do
+        sweep = Targets.accepted_types(document, palette, target, ctx)
+
+        assert Targets.accepted_types_at(document, palette, target, nil, ctx) == sweep,
+               "#{label}: the per-target reader and the sweep disagree at #{inspect(target)}"
+
+        for type <- Map.keys(palette.types) do
+          assert Targets.admits_at?(document, palette, target, type, ctx) ==
+                   MapSet.member?(sweep, type),
+                 "#{label}: #{type} at #{inspect(target)}"
+        end
+      end
+    end
+
+    # Sabotage: `accepted_types_at/5` ignoring `candidates` and walking
+    # `palette.types` - the shortlist stops bounding the answer.
+    test "a candidate list is paid for instead of the palette" do
+      palette = CardProcessingFixtures.palette()
+      ctx = CardProcessingFixtures.ctx()
+      document = CardProcessingFixtures.document([CardProcessingFixtures.open()])
+      target = {"blk_ROOT", "body"}
+
+      shortlist = ["cards.settle", "core.assign"]
+
+      assert Targets.accepted_types_at(document, palette, target, shortlist, ctx) ==
+               MapSet.intersection(
+                 Targets.accepted_types(document, palette, target, ctx),
+                 MapSet.new(shortlist)
+               )
+
+      assert Targets.accepted_types_at(document, palette, target, [], ctx) == MapSet.new()
+
+      assert Targets.accepted_types_at(document, palette, target, ["cards.nope"], ctx) ==
+               MapSet.new()
+    end
+
+    # Sabotage: `admits_at?/5` skipping the `declares_slot?/3` clause - a
+    # slot the parent never declared starts answering the check's verdict.
+    test "an unknown type, a parent that names nothing and an undeclared slot are all false" do
+      palette = CardProcessingFixtures.palette()
+      ctx = CardProcessingFixtures.ctx()
+      document = CardProcessingFixtures.document([CardProcessingFixtures.open()])
+
+      refute Targets.admits_at?(document, palette, {"blk_ROOT", "body"}, "cards.nope", ctx)
+      refute Targets.admits_at?(document, palette, {"blk_NOPE", "body"}, "cards.settle", ctx)
+      refute Targets.admits_at?(document, palette, {"blk_ROOT", "nope"}, "cards.settle", ctx)
+    end
+
+    # Sabotage: `append_gap/3` dropping its `full?/4` clause - the occupied
+    # `zero_or_one` slot starts admitting a second child.
+    test "rule 3 refuses an occupied zero_or_one slot" do
+      palette = CardProcessingFixtures.palette()
+      ctx = CardProcessingFixtures.ctx()
+
+      empty = invoke_document([])
+      occupied = invoke_document([CardProcessingFixtures.assign("blk_IN", "cards.settlement")])
+      target = {"blk_CALL", "on_error"}
+
+      assert Targets.admits_at?(empty, palette, target, "core.assign", ctx)
+      refute Targets.admits_at?(occupied, palette, target, "core.assign", ctx)
+    end
+
+    # Sabotage: `accepted_types_at/5` calling `accepted_types/4` and taking
+    # the intersection - the answer is unchanged and the call count is not.
+    test "one check/5 per candidate, where the sweep pays one per gap of the document" do
+      palette = counted_palette()
+      ctx = CardProcessingFixtures.ctx()
+
+      document =
+        CardProcessingFixtures.document([
+          CardProcessingFixtures.open(),
+          CardProcessingFixtures.settle("blk_S"),
+          CardProcessingFixtures.assign("blk_A", "cards.settlement")
+        ])
+
+      target = {"blk_ROOT", "body"}
+      {:ok, probe} = Targets.probe(palette, "myapp.counted_a")
+
+      Counted.reset()
+      Assignability.check(palette, document, {"blk_ROOT", "body", 3}, probe, ctx)
+      per_check = Counted.calls()
+      assert per_check > 0, "the premise: check/5 asks the candidate's io/1"
+
+      Counted.reset()
+      assert Targets.admits_at?(document, palette, target, "myapp.counted_a", ctx)
+      assert Counted.calls() == per_check
+
+      Counted.reset()
+
+      assert Targets.accepted_types_at(
+               document,
+               palette,
+               target,
+               ["myapp.counted_a", "myapp.counted_b", "myapp.counted_c"],
+               ctx
+             ) == MapSet.new(["myapp.counted_a", "myapp.counted_b", "myapp.counted_c"])
+
+      assert Counted.calls() == 3 * per_check
+
+      Counted.reset()
+      Targets.accepted_types(document, palette, target, ctx)
+      sweep_calls = Counted.calls()
+
+      assert sweep_calls > 3 * per_check,
+             "the sweep asks the whole document per candidate; #{sweep_calls} is not more than one check each"
+    end
+
+    # Sabotage: `admits_at?/5` building the candidate with
+    # `Palette.new_block/2` instead of `probe/2` - the declared path never
+    # reaches the config, the read goes silent, and the slot admits it.
+    test "the probe's default_config decides the answer, and the sweep's gap 0 does not" do
+      document = InsertProbeFixtures.document()
+      palette = InsertProbeFixtures.palette()
+      ctx = %{datamodel: InsertProbeFixtures.datamodel()}
+
+      refute Targets.admits_at?(
+               document,
+               palette,
+               {"blk_ROOT", "body"},
+               "cards.settle_final",
+               ctx
+             ),
+             "appending the configured step after the entry block reads a record that is not Settled"
+
+      assert naive_fit(document, palette, {"blk_ROOT", "body"}, ctx, "cards.settle_final"),
+             "the premise: the unconfigured block declares no read and is admitted"
+
+      assert "cards.settle_final" in Targets.accepted_types(
+               document,
+               palette,
+               {"blk_ROOT", "body"},
+               ctx
+             ),
+             "and the sweep accepts the slot because its gap 0 sits ahead of that write"
+
+      refute Targets.admits_at?(document, palette, {"blk_GRP", "body"}, "cards.settle_final", ctx)
+
+      refute "cards.settle_final" in Targets.accepted_types(
+               document,
+               palette,
+               {"blk_GRP", "body"},
                ctx
              )
     end

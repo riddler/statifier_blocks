@@ -118,6 +118,33 @@ defmodule StatifierBlocks.Edit.Targets do
 
   The editor keeps the half that does not generalise: assigning, minting a
   selection, and committing the `{:compound, commands}` as one undo entry.
+
+  ## Which of the three type readers a "+" chooser calls
+
+  There are three, and a surface picks by the question it has rather than by
+  the answer's shape (ADR-0005's Note of 2026-09-08, item 5):
+
+    * `admits_at?/5` - "may *this* type go *here*". One probe and one
+      `StatifierBlocks.Assignability.check/5` at the target's append gap.
+      This is what a "+" chooser drawing a single type's row asks, and what
+      a host filtering its own shortlist should call once per row.
+    * `accepted_types_at/5` - the same question over a **candidate list**,
+      defaulting to the palette's types. A surface that already knows its
+      shortlist - one palette group, a recently-used row - pays for the
+      shortlist rather than for the palette.
+    * `accepted_types/4` - the **sweep**. Every palette type against the
+      whole document, at slot granularity, which is the right call for a
+      palette browser filtering itself against a position and for anything
+      that wants the slot-level over-approximation the reduction above
+      argues for.
+
+  All three are the same predicate, so the answer does not depend on which
+  is asked, with the one documented exception `admits_at?/5` names: the
+  sweep's per-slot verdict accepts a slot when *any* gap accepts, and the
+  per-target pair asks at the slot's append gap. What none of them is, is a
+  filter a surface writes by hand - that is the failure `accepted_types/4`'s
+  own doc warns about, where two views filtering the same palette disagree
+  and neither is visibly wrong.
   """
 
   alias StatifierBlocks.{
@@ -212,6 +239,135 @@ defmodule StatifierBlocks.Edit.Targets do
       end
     end)
     |> MapSet.new()
+  end
+
+  @doc """
+  Whether `type` would be accepted at `target`, asked with one probe and one
+  `StatifierBlocks.Assignability.check/5` (ADR-0005's Note of 2026-09-08,
+  item 5, under clause `4C`).
+
+  This is the question a "+" chooser at a gap actually has - "may *this*
+  type go *here*" - where `accepted_types/4` answers the palette-wide one.
+  Both are the same predicate; the difference is how much of the palette is
+  paid for. `accepted_types/4` probes every type in the palette and runs
+  `droppable_slots_for/4` for each, and `droppable_slots_for/4` walks every
+  block and every gap of the whole document; this function resolves one
+  parent, picks one gap and checks once.
+
+  ## Which gap, and why the answer is the slot's
+
+  `target` is a `{parent_id, slot}` pair, the granularity this module
+  answers at, so this function picks the gap: the slot's **append** gap,
+  the index one past its last child. It is the gap a "+" at the end of a
+  slot arms, it is the only gap an empty slot has, and it is the one gap of
+  a slot that has no block after it - so `check/5`'s downstream seam is
+  empty there, and the verdict is about the candidate rather than about a
+  read some block already in the slot already fails. A slot whose first
+  child is broken today does not thereby refuse the whole palette.
+
+  Rules 1 and 3 are applied first and without a check: a `parent_id` that
+  names nothing, a `slot` the parent's `c:StatifierBlocks.BlockType.slots/1`
+  does not declare, and a full `:exactly_one` or `:zero_or_one` slot are all
+  `false` before `check/5` is asked anything. Rule 4 cannot fire - a probe
+  block is not in `document`, so no target is inside its subtree.
+
+  What is left is `check/5`'s own verdict at that one gap, which is rule 2.
+  Its index-free half - kind admission, ADR-0003 decision 3's structural
+  gate - is the half the moduledoc's reduction argues is the real
+  admission, and it gives the same answer at gap `0` as at any other. Its
+  index-dependent half is the seam check, and there one check is an
+  approximation of the sweep's existential over the gaps rather than an
+  equal, in one direction: a slot with an earlier gap that accepts a type
+  the append gap refuses on a seam is `true` from `accepted_types/4` and
+  `false` here. That direction is the sweep's own documented
+  over-approximation not being made - a slot's gap `0` sits ahead of every
+  write the slot's children make, so it accepts what nothing upstream has
+  contradicted yet, and the existential then spreads that over the slot.
+  What this function answers instead is what appending would find, which
+  is the question a "+" at the end of a slot is asking. Either way the
+  drop is checked again at the position the author actually chose.
+
+  A type that does not resolve through `palette` is `false` rather than a
+  raise, the way every other palette walk in this package treats one.
+  """
+  @spec admits_at?(
+          Document.t(),
+          Palette.t(),
+          {Block.id(), Block.slot_name()},
+          Block.type_name(),
+          Assignability.context()
+        ) :: boolean()
+  def admits_at?(
+        %Document{} = document,
+        %Palette{} = palette,
+        {parent_id, slot} = target,
+        type,
+        ctx \\ %{}
+      ) do
+    with {:ok, block} <- probe(palette, type),
+         {:ok, index} <- append_gap(document, palette, target) do
+      Assignability.check(palette, document, {parent_id, slot, index}, block, ctx) == :ok
+    else
+      _unresolved_or_refused -> false
+    end
+  end
+
+  @doc """
+  `admits_at?/5` over a candidate list: which of `candidates` would be
+  accepted at `target`, defaulting to the palette's own type names.
+
+  The default makes this `accepted_types/4`'s answer computed the per-target
+  way - one probe and one `check/5` per candidate rather than a whole-document
+  walk per candidate - and the argument exists so that a surface which
+  already knows its shortlist pays for the shortlist rather than for the
+  palette: a "+" inside one palette group, a recently-used row, a host's own
+  five favourites.
+
+  A candidate that does not resolve through `palette` is left out, and a
+  candidate that is not in `palette` at all is the same case - `probe/2`
+  answers `:error` for both.
+  """
+  @spec accepted_types_at(
+          Document.t(),
+          Palette.t(),
+          {Block.id(), Block.slot_name()},
+          [Block.type_name()] | nil,
+          Assignability.context()
+        ) :: MapSet.t(Block.type_name())
+  def accepted_types_at(
+        %Document{} = document,
+        %Palette{} = palette,
+        target,
+        candidates \\ nil,
+        ctx \\ %{}
+      ) do
+    (candidates || Map.keys(palette.types))
+    |> Enum.filter(&admits_at?(document, palette, target, &1, ctx))
+    |> MapSet.new()
+  end
+
+  # The gap `admits_at?/5` asks about - one past `slot`'s last child - or
+  # `:error` when rule 1 or rule 3 has already refused the slot: an
+  # unresolvable or missing parent, a slot the parent does not declare, or a
+  # single-child slot that is occupied.
+  @spec append_gap(Document.t(), Palette.t(), {Block.id(), Block.slot_name()}) ::
+          {:ok, non_neg_integer()} | :error
+  defp append_gap(document, palette, {parent_id, slot}) do
+    with parent when not is_nil(parent) <- find_block(document, parent_id),
+         {:ok, ref, resolved} <- Palette.resolve(palette, parent),
+         true <- declares_slot?(ref, resolved, slot),
+         false <- full?(document, palette, parent_id, slot) do
+      {:ok, length(Map.get(parent.slots, slot, []))}
+    else
+      _refused -> :error
+    end
+  end
+
+  @spec declares_slot?(Palette.type_ref(), Block.t(), Block.slot_name()) :: boolean()
+  defp declares_slot?(ref, %Block{config: config}, slot) do
+    ref
+    |> Palette.call(:slots, [config], [])
+    |> Enum.any?(fn {name, _arity, _label} -> name == slot end)
   end
 
   @doc """
