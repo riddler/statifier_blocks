@@ -8992,3 +8992,168 @@ The code cites have moved. Read at `d6fb241`:
 | `assignability.ex:661-667`, `:654` | see the `ADR-0011` foot Note of this date |
 
 Filed with `sb-vjvq`, campaign SF038.
+
+## Note (2026-09-08): admission resolves a composite's member kinds through the palette, `expand/2` answers a tuple beside a raising `expand!/2`, a strict `assignable?/4`, an unknown `use` option refused, and where the interrupt pair is scoped
+
+This Note records campaign SF039's rulings `RQ-SF039-9`, `RQ-SF039-10`,
+`RQ-SF039-14` and `RQ-SF039-16`, taken by the operator on 2026-09-08. Six
+items, each with the bead that builds it. No line above this Note is edited,
+no `@callback` in decision 5's table is added, removed or re-arity'd, and
+`schema_version` stays at `1`.
+
+Every `lib/` cite below was read at `main` `f9b62c5` and is written beside the
+anchor it was found by - a heading, a function head, a `@doc` line. A cite is
+re-located by that anchor and not by its number.
+
+### 1. Admission resolves a composite's member kinds through the palette (`RQ-SF039-14`)
+
+`StatifierBlocks.Assignability.kinds/3` and `slot_accepts/4` take the palette
+as their **first** argument and resolve a composite's members through it,
+exactly as `produces/4` already does.
+
+What they do today is the whole of the reason. `kinds/2` (`assignability.ex`,
+`@doc "The block's `kinds`, defaulting to `[:step]`"`, `:196-197`) and
+`slot_accepts/3` (`:203-204`) both read `io/2` (`:190-191`), which is
+`Palette.call(ref, :io, [config], %{})` - the **core-only** callback, whose
+composite derivation resolves members through `StatifierBlocks.Palette.core/0`
+and falls back to `[:step]` kinds with no sugar for a composite rooted at a
+host type (`composite.ex`, heading `### The callbacks are core-only, and a
+reader with a palette is not`, `:158-181`). `produces/4` (`:464-465`) does not
+have that problem, because it goes through `io_of/3` (`:482-483`), whose
+composite arm is `Composite.io(palette, resolved)` (`:485`) - `Composite.io/2`
+(`:601-602`) and `outcomes/2` (`:614-615`) being the palette-holding readers
+this record's Note of 2026-09-07, item 3, named. Admission is a reader holding
+a palette and has been reading with none.
+
+Three consequences, and no more than three:
+
+- `admits?/3` (`:216-218`) and `kind_admission_finding/5` (`:720-741`, which
+  calls `admits?/3` at `:733`, `slot_accepts` at `:738` and `kinds` at `:739`)
+  route through the palette-carrying arities. Every caller that already holds a
+  palette therefore admits and refuses on the same kinds the compiler compiles
+  on.
+- **The `io/1` callback stays core-only.** No palette argument is added to
+  `c:StatifierBlocks.BlockType.io/1` or to `c:StatifierBlocks.BlockType.outcomes/1`,
+  and neither derivation gains one. The fallback described at
+  `composite.ex:158-181` is still the callbacks' answer and still their answer
+  alone; what changes is which of the two spellings admission calls.
+- A composite whose expansion holds an interrupt handler carries
+  `:interrupt_handler` among its kinds, because the derived `io/1` concatenates
+  the members' `kinds` in expansion order and de-duplicates them (`composite.ex`,
+  under `## What a composite reads and writes`, `:146`). Dropped at a `body`
+  target it is **refused**, because `body` declares `slot_accepts` `[:step]`
+  (`core/group.ex:59`, `core/resumable_group.ex:74`) and `ADR-0003` decision
+  3's intersection is empty. That is the refusal the compiler already reaches -
+  `{:kind_not_admitted, ...}` (`assignability.ex:124`), handled at
+  `compiler.ex:1211` - so the editor refuses at drop what the compiler would
+  have refused at compile, which is the whole point of routing them through one
+  function.
+
+This item **answers `sb-28gm`**, which asked whether a palette-carrying
+`admits` form was a record question. It was, and this is the answer: the
+editor's `admits_expansion?/5` (`editor.ex:2112-2114`, called at `:2064`) holds
+a palette and calls the same functions, so a nested composite rooted at a host
+type is admitted or refused on the host palette's kinds rather than on the
+core-only derivation's. No separate palette-carrying `admits` spelling is
+minted; the existing one takes the palette.
+
+Built by `sb-x903`.
+
+### 2. Per-target admission is `ADR-0005`'s, recorded there (`RQ-SF039-15`)
+
+The editor's per-target admission form - one probe and one check at a gap,
+rather than a sweep - is `StatifierBlocks.Edit.Targets`'s and therefore
+`ADR-0005`'s. It is recorded there by `sb-0xdu` under clause `4C`. Nothing
+about its arities, its defaults or its candidate list is stated here; this item
+exists so a reader of item 1 knows where the target side lives and does not
+look for it in this record.
+
+### 3. `Composite.expand/2` answers a tuple; `expand!/2` keeps the raise (`RQ-SF039-10`)
+
+`Composite.expand/2` (`composite.ex:443-444`) answers
+`{:ok, {blocks, param_map}} | {:error, reason}`.
+
+`expand!/2` keeps today's raising body - the broken-declaration raises listed at
+`composite.ex:439-441` ("Raises when the declaration is broken: a `subtree/1`
+that answers an empty list, a non-block, a duplicated local id, or a local id
+that would mint an id carrying `__`") - and it is what the compiler's Resolve
+and the editor's Expand call. A broken declaration is therefore still a
+compile-time raise, and no caller learns to swallow one.
+
+The sentence at `composite.ex:433`, "This is the **one** expansion function",
+becomes **one expansion, two spellings**: one derivation of what a composite
+stands for, two return shapes over it, and still no second implementation. The
+argument that sentence makes - that three implementations would be three
+chances for the compiled chart and the expanded document to disagree - is
+unchanged by a second spelling that calls the first.
+
+This is a **breaking** change to a public function's return, and it is named in
+the changelog of the release it lands in.
+
+Built by `sb-671e`.
+
+### 4. `assignable?/4` gains a strict form (`RQ-SF039-16`)
+
+`Assignability.assignable?/4` (`assignability.ex:253-255`) gains a
+`strict: true` form under which either side resolving to `:unknown` answers
+`false`.
+
+The default does not move. The clause at `:256-258` -
+`satisfied when satisfied in [:unknown, :identical, :covers] -> true` - admits
+an unknown in both directions, and that is the floor of the ordered relation
+`assignability.ex` names in `assignable?/4`'s `@doc` at `:229` - "`ADR-0003`
+decision 6's ordered relation as `ADR-0011` decision 3 narrows it" - whose
+first step decides either side unknown before the host is asked. A value
+nothing has typed is not a value that relation may refuse. `strict: true` is the opt-in for the caller that must not
+admit one, and it is opt-in precisely so the floor stays where every existing
+caller found it.
+
+How the flag reaches the function - an option on the fourth argument or a
+fifth - is `sb-v3c5`'s to choose and is not decided here. What is decided here
+is the answer: under it, `:unknown` on either side is `false`, and nothing else
+about the ordered relation changes.
+
+Built by `sb-v3c5`.
+
+### 5. `use StatifierBlocks.Composite` refuses an unknown option, by name
+
+`use StatifierBlocks.Composite` refuses an unknown option at the **use site**,
+naming the option it did not recognize.
+
+Today it does not. `__declaration__/1` (`composite.ex:361-362`) reads `:name`
+and `:params` through `required_option/2` and `:version`, `:sentence`,
+`:palette_entry` and `:slots` through `Keyword.get/3`, and never looks at the
+rest of the keyword list. A misspelled option is silently dropped and the
+composite compiles carrying the default the author was trying to replace - a
+`:verison` that leaves the type at version `1`, a `:slot` that leaves it with
+no pass-through slot. It is the one class of declaration error
+`__declaration__/1`'s existing refusals cannot catch, because nothing is wrong
+with the declaration that results - it is simply not the one that was
+written.
+
+The recognized set is exactly the option list documented at
+`composite.ex:250-268` - `:name`, `:params`, `:sentence`, `:palette_entry`,
+`:version`, `:slots` - and the refusal is an `ArgumentError` raised where the
+existing option refusals are raised, at declaration-build time, naming the
+unknown key. A later amendment that adds an option adds it to that list and to the
+recognized set together; the two are the same list.
+
+Built by `sb-xudv`.
+
+### 6. The interrupt pair's spelling does not change; its scoping is `ADR-0010`'s (`RQ-SF039-9`)
+
+The reserved-prefix paragraph of decision 10 stands, unedited.
+`statifier_blocks.interrupt.abandon` and `statifier_blocks.interrupt.resume`
+(`core/emit.ex:68-69`, named by `interrupt_events/0` at `:77-78`) remain both
+the **authored** and the **raised** spelling: a host block type joins the
+protocol by raising exactly those two names, and a host must not name its own
+events under the prefix.
+
+Scoping the pair per enclosing group is the **compiler's**, at emit, and is
+decided in `ADR-0010` decision 8 by `sb-e18p`. It is recorded there rather than
+here because it is a property of what the compiler emits, not of what a block
+type declares, and decision 11 above already hands the compiler and its
+provenance map the SCXML subtree representation and state-id generation. No sentence of decision 10, and no row of its
+table, is edited for it.
+
+Filed with `sb-0lmk`, campaign SF039.
