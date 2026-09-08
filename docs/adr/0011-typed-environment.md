@@ -2997,9 +2997,10 @@ here, was not put to the walk, and is left open for the operator"
 8's tuple is not widened, no reason arm is added to `:not_assignable`'s
 vocabulary, and `schema_version` stays at `1`.
 
-The ruling, in the operator's words: *a `{:type_mismatch, ...}` finding whose
-disagreeing writer is a minted expansion member keeps the minted id in the
-tuple; rendering resolves it to the owning composite block (its sentence)*.
+The ruling, as put to the operator and taken in option **1**: *a
+`{:type_mismatch, ...}` finding whose disagreeing writer is a minted expansion
+member keeps the minted id in the tuple; rendering resolves it to the owning
+composite block (its sentence)*.
 
 Every `lib/` cite below was read at `main` `25c17ee` and is written beside the
 anchor it was found by - a heading, a function head, a `@type` or `@typep`
@@ -3086,7 +3087,7 @@ implementing request's, and this Note fixes only the answer the author reads.
 
 The composite is named by its **sentence**, not by its id:
 `ViewModel.sentence/1` (`view_model.ex`, the `@doc` opening "A node's line of
-prose: its own sentence, else `title/1`" at `:1295`, the `@spec` and the two
+prose: its own `sentence`, else `title/1`" at `:1295`, the `@spec` and the two
 heads at `:1320-1324`) is the one two-clause fallback every surface drawing a
 row already writes, and its
 docstring gives the reason this Note adopts it: "writing it once is what keeps
