@@ -9012,13 +9012,13 @@ as their **first** argument and resolve a composite's members through it,
 exactly as `produces/4` already does.
 
 What they do today is the whole of the reason. `kinds/2` (`assignability.ex`,
-`@doc "The block's `kinds`, defaulting to `[:step]`"`, `:196-197`) and
+`@doc "The block's `kinds`, defaulting to `[:step]`"`, `:195-197`) and
 `slot_accepts/3` (`:203-204`) both read `io/2` (`:190-191`), which is
 `Palette.call(ref, :io, [config], %{})` - the **core-only** callback, whose
 composite derivation resolves members through `StatifierBlocks.Palette.core/0`
 and falls back to `[:step]` kinds with no sugar for a composite rooted at a
 host type (`composite.ex`, heading `### The callbacks are core-only, and a
-reader with a palette is not`, `:158-181`). `produces/4` (`:464-465`) does not
+reader with a palette is not`, `:158-180`). `produces/4` (`:464-465`) does not
 have that problem, because it goes through `io_of/3` (`:482-483`), whose
 composite arm is `Composite.io(palette, resolved)` (`:485`) - `Composite.io/2`
 (`:601-602`) and `outcomes/2` (`:614-615`) being the palette-holding readers
@@ -9035,12 +9035,12 @@ Three consequences, and no more than three:
 - **The `io/1` callback stays core-only.** No palette argument is added to
   `c:StatifierBlocks.BlockType.io/1` or to `c:StatifierBlocks.BlockType.outcomes/1`,
   and neither derivation gains one. The fallback described at
-  `composite.ex:158-181` is still the callbacks' answer and still their answer
+  `composite.ex:158-180` is still the callbacks' answer and still their answer
   alone; what changes is which of the two spellings admission calls.
 - A composite whose expansion holds an interrupt handler carries
   `:interrupt_handler` among its kinds, because the derived `io/1` concatenates
   the members' `kinds` in expansion order and de-duplicates them (`composite.ex`,
-  under `## What a composite reads and writes`, `:146`). Dropped at a `body`
+  under `## What a composite reads and writes`, `:148`). Dropped at a `body`
   target it is **refused**, because `body` declares `slot_accepts` `[:step]`
   (`core/group.ex:59`, `core/resumable_group.ex:74`) and `ADR-0003` decision
   3's intersection is empty. That is the refusal the compiler already reaches -
@@ -9132,7 +9132,7 @@ with the declaration that results - it is simply not the one that was
 written.
 
 The recognized set is exactly the option list documented at
-`composite.ex:250-268` - `:name`, `:params`, `:sentence`, `:palette_entry`,
+`composite.ex:250-266` - `:name`, `:params`, `:sentence`, `:palette_entry`,
 `:version`, `:slots` - and the refusal is an `ArgumentError` raised where the
 existing option refusals are raised, at declaration-build time, naming the
 unknown key. A later amendment that adds an option adds it to that list and to the
