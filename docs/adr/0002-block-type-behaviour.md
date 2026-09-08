@@ -8995,11 +8995,15 @@ Filed with `sb-vjvq`, campaign SF038.
 
 ## Note (2026-09-08): admission resolves a composite's member kinds through the palette, `expand/2` answers a tuple beside a raising `expand!/2`, a strict `assignable?/4`, an unknown `use` option refused, and where the interrupt pair is scoped
 
-This Note records campaign SF039's rulings `RQ-SF039-9`, `RQ-SF039-10`,
-`RQ-SF039-14` and `RQ-SF039-16`, taken by the operator on 2026-09-08. Six
-items, each with the bead that builds it. No line above this Note is edited,
-no `@callback` in decision 5's table is added, removed or re-arity'd, and
-`schema_version` stays at `1`.
+A dated Note rather than an amendment, and it edits nothing above this line.
+It records campaign SF039's rulings `RQ-SF039-9`, `RQ-SF039-10`, `RQ-SF039-14`
+and `RQ-SF039-16`, taken by the operator on 2026-09-08, as six items, each
+naming the bead that builds it. Every one of them names an arity, a return or
+a refusal on a function this record already places, so none of them moves a
+decision above: this Note carries no `Status:` line and flips nothing, no
+`@callback` in decision 5's table is added, removed or re-arity'd, and
+`schema_version` stays at `1`. The `RQ-SF039-<n>` label is the form this file
+already uses for the SF037 and SF038 walks' rulings.
 
 Every `lib/` cite below was read at `main` `f9b62c5` and is written beside the
 anchor it was found by - a heading, a function head, a `@doc` line. A cite is
@@ -9089,6 +9093,15 @@ unchanged by a second spelling that calls the first.
 
 This is a **breaking** change to a public function's return, and it is named in
 the changelog of the release it lands in.
+
+Two rulings this file already carries are untouched by the new return, and are
+named here only so that a reader of `expand/2` finds all three together: an
+expansion's members are built at each member type's `current_version/0`
+(`RQ-SF037-17`, this file's Note of 2026-09-07, item 2), and `param_map` blames
+the **first** param in declaration order when more than one distinguishing
+value matches (`RQ-SF038-14`, item 5 of that same Note). Both are ruled and
+unbuilt; `sb-ij7y` and `sb-gua3` carry them, and the change here neither
+implements nor disturbs either.
 
 Built by `sb-671e`.
 
