@@ -43,17 +43,34 @@ defmodule StatifierBlocks.Core.Emit do
   group cannot read it and must not try.
 
   So the group wires **both** outcomes unconditionally and the handler picks
-  one by raising an event:
+  one by raising an event. A handler raises the bare pair, and the compiler
+  **salts** both halves with the group's own state id as it emits them
+  (ADR-0010 decision 8), so the group's own state carries:
 
-      <transition event="statifier_blocks.interrupt.abandon" target="s_G__done"/>
-      <transition event="statifier_blocks.interrupt.resume"  target="s_G__run"/>
+      <transition event="statifier_blocks.interrupt.abandon.s_G" target="s_G__done"/>
+      <transition event="statifier_blocks.interrupt.resume.s_G"  target="s_G__run"/>
 
-  The handler `<raise>`s whichever its config names. Nesting behaves the way
-  an author would expect for free: both groups carry the same two
-  transitions, the raise happens inside the inner group's region, and SCXML
-  selects the transition whose source is the deepest active state - the
-  inner group's. A host interrupt handler joins the protocol by raising the
-  same two events; `interrupt_events/0` is where they are named.
+  and the `<raise>` a handler on that rail wrote as
+  `statifier_blocks.interrupt.resume` is emitted as
+  `statifier_blocks.interrupt.resume.s_G`.
+
+  That salt is what makes nesting reliable. Two nested groups used to carry
+  the *same* two transitions, and only the raise's position in the active
+  configuration decided which of them took it - which is right for a raise
+  from the inner group's own rail and wrong for a raise from the outer
+  group's rail while an inner group is active, where the outer group's
+  resume was captured by the inner group's rail and the outer group's
+  history re-entry never fired. After the salt each group's rail matches
+  only its own pair, so a rail can only be reached by a raise from that
+  group's own rail, at any nesting depth and whichever transition an engine
+  would otherwise have preferred.
+
+  Nothing an author or a host type writes moves: a host interrupt handler
+  still joins the protocol by raising the same two bare events, and
+  `interrupt_events/0` is still where they are named. The salt is applied at
+  emit and is invisible above it -
+  `StatifierBlocks.Compiler.Interrupts` rewrites the raises inside a rail,
+  and a raise outside any rail is left exactly as it was written.
 
   `core.group` has nothing to remember, so its resume target is the
   `<parallel>` itself and the body restarts. `core.resumable_group` targets
@@ -76,6 +93,24 @@ defmodule StatifierBlocks.Core.Emit do
   """
   @spec interrupt_events() :: %{abandon: String.t(), resume: String.t()}
   def interrupt_events, do: %{abandon: @abandon, resume: @resume}
+
+  @doc """
+  The same two events, salted with the emitted state id of the group whose
+  rail they belong to (ADR-0010 decision 8).
+
+  This is the pair a group's own two transitions match, and the pair a
+  `<raise>` inside that group's rail is emitted as.
+  `StatifierBlocks.Compiler.Interrupts` reads it back to rewrite the raises,
+  so the salt's shape is written down once, here, rather than in each half
+  of the convention.
+
+  No two groups share an emitted state id
+  (`StatifierBlocks.Compiler.StateId` mints them), so no two rails share a
+  name.
+  """
+  @spec interrupt_events(String.t()) :: %{abandon: String.t(), resume: String.t()}
+  def interrupt_events(state_id) when is_binary(state_id),
+    do: %{abandon: @abandon <> "." <> state_id, resume: @resume <> "." <> state_id}
 
   @doc "A `<state>`; `initial` is dropped when `nil`, which is how an atomic state is written."
   @spec state(String.t(), String.t() | nil, [Emission.node_t()]) :: Emission.t()
@@ -211,7 +246,9 @@ defmodule StatifierBlocks.Core.Emit do
 
   @doc """
   The interruptible shape: the body in one region, each handler in its own,
-  and the two-event protocol wired on the group's own state.
+  and the two-event protocol wired on the group's own state - salted with
+  that state's id, so this group's rail is the only rail its handlers can
+  reach (ADR-0010 decision 8; see the moduledoc).
 
   `history` is `nil` for a group with nothing to remember, or `"shallow"` /
   `"deep"` for one that resumes where it left off.
@@ -252,11 +289,12 @@ defmodule StatifierBlocks.Core.Emit do
         )
 
       regions = [body_region | Enum.map(handlers, &Emission.child_ref(&1.block_id))]
+      %{abandon: abandon, resume: resume} = interrupt_events(ctx.state_id)
 
       children = [
         transition(event: "done.state." <> body_id, target: done, internal: true),
-        transition(event: @abandon, target: done, internal: true),
-        transition(event: @resume, target: history_id || run, internal: true),
+        transition(event: abandon, target: done, internal: true),
+        transition(event: resume, target: history_id || run, internal: true),
         Emission.element("parallel", [{"id", run}], regions),
         final(done)
       ]
