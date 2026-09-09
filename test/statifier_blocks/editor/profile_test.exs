@@ -38,6 +38,32 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp editor(view), do: view |> element("#editor") |> render()
 
+    # The A/B split with its variant arm emptied: one empty slot and one
+    # filled one under the same parent, so a rule that drew the placeholder
+    # in every gap and a rule that drew it in the right one are told apart by
+    # the same mount. `EditorFixtures` has none - the wizard's two arms are
+    # both filled, and an empty arm is exactly what item 7b is about.
+    defp empty_arm_document do
+      Document.new(
+        Block.new("core.sequence",
+          id: "blk_flow",
+          slots: %{
+            "body" => [
+              Block.new("core.branch",
+                id: "blk_variant",
+                config: %{"arms" => [%{"slot" => "arm_variant_b", "cond" => "variant == 'b'"}]},
+                slots: %{
+                  "arm_variant_b" => [],
+                  "otherwise" => [EditorFixtures.wait("blk_control_pause", "2h")]
+                }
+              )
+            ]
+          }
+        ),
+        id: "doc_empty_arm"
+      )
+    end
+
     defp select(view, id) do
       view
       |> element(~s([data-block-id="#{id}"] > .sb-node__chrome > .sb-node__label))
@@ -310,6 +336,57 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert html =~ "sb-gap__add"
         assert html =~ ~s(phx-click="palette-open")
+      end
+
+      # sb-b7i0 (ADR-0005's Note of 2026-09-08, item 7b). The ring that says
+      # "nothing is here yet" is styled on the "+", so the mount that draws no
+      # "+" drew an empty arm as a header and nothing else. The placeholder is
+      # what the ring's sentence moves onto, and the two assertions below are
+      # the item's two halves: the empty arm has a mark, and it is a mark and
+      # not a control.
+      #
+      # Sabotage: `and @empty?` dropped from the placeholder's `:if` in
+      # `Slot.gap/1` - every gap on a read-only mount grows a ring, and the
+      # filled arm's refute below goes red while the assert above stays green,
+      # which is what says the pair covers both halves.
+      test "an empty slot draws a non-interactive placeholder", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: empty_arm_document(), profile: %{read_only?: true})
+
+        assert has_element?(
+                 view,
+                 ~s([data-parent-id="blk_variant"][data-slot="arm_variant_b"] > .sb-gap__placeholder)
+               )
+
+        refute has_element?(
+                 view,
+                 ~s([data-parent-id="blk_variant"][data-slot="otherwise"] > .sb-gap__placeholder)
+               )
+
+        refute has_element?(view, "button.sb-gap__placeholder")
+        refute has_element?(view, ~s(.sb-gap__placeholder[phx-click]))
+      end
+
+      # The other half of the item: an editing mount renders what it rendered
+      # before the placeholder existed. The suite's byte-identity oracle for
+      # the unprofiled editor covers the default document; this covers the one
+      # document that has an empty arm at all, which is the only place the new
+      # markup could have leaked into an editing render.
+      #
+      # Sabotage: `@read_only and` dropped from the same `:if` - the editing
+      # mount grows a placeholder beside its "+" and this goes red.
+      test "an editing mount's empty slot draws no placeholder", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: empty_arm_document(), profile: %{read_only?: false})
+
+        html = render(view)
+
+        refute html =~ "sb-gap__placeholder"
+
+        assert has_element?(
+                 view,
+                 ~s([data-parent-id="blk_variant"][data-slot="arm_variant_b"] > .sb-gap__add)
+               )
       end
 
       test "hides Undo and Redo whatever the toolbar list says", %{conn: conn} do

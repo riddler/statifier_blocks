@@ -1906,6 +1906,25 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         base = Enum.at(Regex.run(~r/^\.sb-gap__add\s*\{(.*?)\n\}/ms, css), 1)
         refute base =~ "dashed"
       end
+
+      # The read-only half of the same mark (sb-b7i0, ADR-0005's Note of
+      # 2026-09-08, item 7b). The markup half is asserted in `profile_test`;
+      # what only the stylesheet can say is that the span is VISIBLE at all
+      # and that it is not a control - a placeholder with no rule renders as
+      # nothing, and the read-only mount is back where the item found it.
+      # Sabotage: deleting the `.sb-gap__placeholder` rule - the span is still
+      # in the markup, `profile_test` still passes, and the empty arm draws
+      # blank; this goes red naming the rule.
+      test "the read-only placeholder wears the ring and refuses the pointer" do
+        css = File.read!(@stylesheet)
+
+        rule = Regex.run(~r/^\.sb-gap__placeholder\s*\{(.*?)\n\}/ms, css)
+        assert rule, "the scan actually found the placeholder rule"
+
+        body = Enum.at(rule, 1)
+        assert body =~ "dashed"
+        assert body =~ ~r/pointer-events:\s*none/
+      end
     end
 
     describe "the container's own width (campaign-021 ruling R7)" do
