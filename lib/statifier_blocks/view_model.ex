@@ -1419,6 +1419,15 @@ defmodule StatifierBlocks.ViewModel do
   `nil` in, `nil` out, so a caller that has not resolved a selection yet
   can pipe through it.
 
+  This is also where `validate_config/1`'s declared findings shape is
+  enforced. `findings` must be a list of `{key, message}` string pairs -
+  `t:StatifierBlocks.BlockType.finding/0`, which ADR-0002 decision 7 states
+  as each finding naming a config key and a message. Anything else raises an
+  `ArgumentError` **naming the block type** that answered with it: the map
+  spelling some type could once slip past every `Enum.group_by/3` consumer is
+  refused rather than normalized, and the message points at the type rather
+  than at this function.
+
   ## Examples
 
       iex> alias StatifierBlocks.ViewModel
@@ -1435,11 +1444,10 @@ defmodule StatifierBlocks.ViewModel do
   def overlay_findings(nil, _findings), do: nil
   def overlay_findings(%Node{form: nil} = node, _findings), do: node
 
-  def overlay_findings(%Node{block_id: id, form: %Form{} = form} = node, findings)
-      when is_list(findings) do
+  def overlay_findings(%Node{block_id: id, type: type, form: %Form{} = form} = node, findings) do
     by_key =
       Enum.group_by(
-        findings,
+        checked_findings(type, id, findings),
         fn {key, _message} -> key end,
         fn {key, message} -> Finding.new({:config, id, key}, :config, message) end
       )
@@ -1459,6 +1467,37 @@ defmodule StatifierBlocks.ViewModel do
 
     %{node | form: %{form | fields: fields, unrouted: unrouted}}
   end
+
+  # `c:StatifierBlocks.BlockType.validate_config/1` declares
+  # `{:error, [finding()]}` - a list of `{key, message}` string pairs, which
+  # ADR-0002 decision 7 states as "each finding naming a config key and a
+  # message". Nothing between the callback and here enforced it: every
+  # consumer reached the findings through `Enum.group_by/3`, which accepts a
+  # map by accident, so a type answering `{:error, %{key => message}}` passed
+  # unnoticed until the refusal itself was kept - a refused
+  # `StatifierBlocks.Edit.Session.change_config/3` stores what the gate handed
+  # it, and the map arrived here and failed the clause head, naming this
+  # function rather than the type that broke the contract.
+  #
+  # So the shape is refused HERE, with the type named. The map spelling is not
+  # admissible: decision 7 is unchanged, and widening the callback's contract
+  # to admit it would be a decision this function is not the place to take.
+  @spec checked_findings(Block.type_name(), Block.id(), term()) :: [BlockType.finding()]
+  defp checked_findings(type, id, findings) do
+    if is_list(findings) and Enum.all?(findings, &finding_pair?/1) do
+      findings
+    else
+      raise ArgumentError,
+            "block type #{inspect(type)} answered validate_config/1 with findings this " <>
+              "view model cannot route for block #{inspect(id)}: expected a list of " <>
+              "{key, message} string pairs (t:StatifierBlocks.BlockType.finding/0, " <>
+              "ADR-0002 decision 7), got #{inspect(findings)}"
+    end
+  end
+
+  @spec finding_pair?(term()) :: boolean()
+  defp finding_pair?({key, message}) when is_binary(key) and is_binary(message), do: true
+  defp finding_pair?(_other), do: false
 
   @spec derived_findings(Document.t(), Palette.t(), BlockType.chip_labels()) :: [Finding.t()]
   defp derived_findings(%Document{} = document, %Palette{} = palette, labels) do
