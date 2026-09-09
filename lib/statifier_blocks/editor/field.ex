@@ -159,8 +159,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     it is read ahead of the key-chosen lists: a list keyed on this field is
     the narrower claim than the document's declarations. An `:expression`
     served by an `expression_component` is the host's own control and is
-    not decorated here; it is handed `path_candidates` as `:candidates`, as
-    it always was.
+    still not decorated here, but the same precedence reaches it: the seam's
+    `:candidates` is the host's own offers ahead of `path_candidates`,
+    merged into one de-duplicated list. Drawing them is the override's job;
+    what it no longer has to do is re-derive a list from an assign it was
+    never handed.
 
     Three properties, and none of them is this component's choice to make:
 
@@ -947,13 +950,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # which is what makes it a key rather than a promise. Writing it is
       # still the override's job: this clause renders whatever comes back and
       # has no tag of its own to put the attribute on.
+      #
+      # `candidates` is no longer `path_candidates` verbatim (sb-3xub): it is
+      # the host's own offers for THIS field ahead of the document's declared
+      # paths, merged into one de-duplicated list. The precedence is the
+      # datalist branch's above, and for the same reason - a list keyed on
+      # this field is the narrower claim than the document's declarations -
+      # so an override and this component's own control offer a host's values
+      # first, rather than one of them offering them and the other never
+      # seeing them. Both spellings of a host list flatten to the same offer
+      # here: a suggestion list is all an override can be handed, and a
+      # closed list on an `:expression` never constrained anything anyway.
       ~H"""
       {@expression_component.(%{
         field: @field,
         id: input_id(@field),
         name: input_name(@field),
         value: to_text(@field.value),
-        candidates: @path_candidates,
+        candidates: merged_candidates(@candidates, @path_candidates),
         value_candidates: @value_candidates,
         path_types: @path_types,
         debounce: @debounce
@@ -1675,6 +1689,30 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       if Enum.any?(candidates, fn {offered, _label} -> offered == value end), do: nil, else: text
     end
+
+    # The one list the `expression_component` seam is handed (sb-3xub): a
+    # host's own offers for this field first, then the document's declared
+    # paths, de-duplicated. Built once, in one place, so the order is a
+    # property of this function rather than of the call site that happens to
+    # build it.
+    #
+    # It answers strings because that is what the far side draws: the seam's
+    # `:candidates` binds a `<datalist>`, whose options are values, and a
+    # label has nowhere to go through a map key documented as a list of
+    # paths. `to_text/1` is the same projection the controls here render a
+    # value with, so a host's offer reads the same on both sides of the seam.
+    @spec merged_candidates(term(), [String.t()]) :: [String.t()]
+    defp merged_candidates(candidates, path_candidates) do
+      (offered_values(candidates) ++ path_candidates) |> Enum.uniq()
+    end
+
+    @spec offered_values(term()) :: [String.t()]
+    defp offered_values({:open, offered}) when is_list(offered), do: offered_values(offered)
+
+    defp offered_values(offered) when is_list(offered),
+      do: Enum.map(offered, fn {value, _label} -> to_text(value) end)
+
+    defp offered_values(_other), do: []
 
     @spec type_tag(StatifierBlocks.BlockType.field_type()) :: String.t()
     defp type_tag({tag, _inner}), do: Atom.to_string(tag)
