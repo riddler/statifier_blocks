@@ -2060,6 +2060,36 @@
   padding: var(--sb-space-half) var(--sb-space-2);
 }
 
+/* The read-only half of the same placeholder (ADR-0005's Note of 2026-09-08,
+ * item 7b). The ring above is styled ON THE BUTTON, and a read-only mount
+ * draws no button, so an empty arm on such a mount lost its only mark - the
+ * one thing the rule above exists to give it. `Slot.gap/1` draws this span in
+ * the button's place, and only where the mount is read-only and the slot is
+ * empty, so the selector needs no `data-empty` qualifier: the element's
+ * presence IS the condition, and an editing mount renders byte-identically to
+ * what it rendered before this rule existed.
+ *
+ * The ring, the border colour and the muted family are the rule above's, so
+ * the two mounts say "nothing is here yet" in one vocabulary. What is not the
+ * rule above's is everything that makes a control a control: no hover, no
+ * focus, no `aria-pressed`, and `pointer-events: none` so a pointer crossing
+ * the arm gets no cursor change and no target. It is a mark, not a control
+ * that refuses.
+ *
+ * Sized rather than padded around a glyph, because there is no glyph: the "+"
+ * is what gave the button above its box, and a span with only padding would
+ * draw as a flat line. The box is the smaller radius on purpose - a rounded
+ * rectangle at the "+"'s scale, which reads as a slot-shaped hole rather than
+ * as a button someone disabled. */
+.sb-gap__placeholder {
+  display: inline-block;
+  min-width: var(--sb-space-3);
+  min-height: var(--sb-space-2);
+  border: var(--sb-border-width) dashed var(--sb-border-strong);
+  border-radius: var(--sb-radius-sm);
+  pointer-events: none;
+}
+
 /* ---- slot labels --------------------------------------------------------
  *
  * Parity item 1.7 (`sb-5p2`, campaign 016). Everything below is about what a

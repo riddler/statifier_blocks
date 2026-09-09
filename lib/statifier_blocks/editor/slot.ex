@@ -50,6 +50,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     position, which a reader needs, and the button is the affordance, which
     a reader does not.
 
+    An EMPTY slot is the case where withholding the button withheld more than
+    the affordance. The dashed ring that says "nothing is here yet" was styled
+    on the button, and an empty slot has no other content to carry it, so a
+    read-only mount drew a header and then nothing at all - which reads as a
+    rendering that ran out rather than as an arm with nothing in it, and an
+    empty arm is a real arm (ADR-0002's `10d` draws a fan edge into one). So
+    the gap draws a `.sb-gap__placeholder` span when the mount is read-only
+    AND its slot is empty: a mark, not a control that refuses (ADR-0005's Note
+    of 2026-09-08, item 7b). It carries no event, no `phx-` attribute and no
+    tab stop, and `empty?` is threaded to it from the slot rather than derived
+    in CSS for the same reason `data-empty` is stamped rather than derived -
+    the view model already knows.
+
     ## The gap IS the insertion marker (R3, operator ruling 2026-08-29)
 
     The ruling asks for "a marker on the edge between siblings, subtle at
@@ -254,7 +267,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Whether this mount edits (ADR-0005's 2026-09-07 profile amendment,
       `read_only?`). `true` draws the gaps without their "+" buttons, the way
       the palette column is not drawn at all: the position stays legible, the
-      affordance goes.
+      affordance goes. An empty slot's gap draws a non-interactive placeholder
+      in the button's place, so the mark the ring carried is not lost with it
+      (ADR-0005's Note of 2026-09-08, item 7b).
       """
     )
 
@@ -318,6 +333,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           index={0}
           armed={@armed}
           read_only={@read_only}
+          empty?={@slot.children == []}
           target={@target}
         />
         <.child
@@ -419,6 +435,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:index, :integer, required: true)
     attr(:armed, :any, default: nil)
     attr(:read_only, :boolean, default: false)
+
+    # Whether the slot this gap belongs to has no children. Only the gap a
+    # slot draws before its first child can be the gap of an EMPTY slot, so
+    # the interleaved gaps `child/1` draws keep the default and never carry
+    # the placeholder.
+    attr(:empty?, :boolean, default: false)
+
     attr(:target, :any, required: true)
 
     defp gap(assigns) do
@@ -450,6 +473,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         >
           +
         </button>
+        <span :if={@read_only and @empty?} class="sb-gap__placeholder" aria-hidden="true"></span>
       </div>
       """
     end
