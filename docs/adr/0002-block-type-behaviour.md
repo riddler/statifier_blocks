@@ -9822,3 +9822,175 @@ still absent: `C2`.
   answer on the header, and no bead asks it.
 
 Filed with `sb-tx1b`, campaign SF039.
+
+## Note (2026-09-08): the Note of 2026-09-07's items 2 and 5 are built - a member is stamped at its type's current version on the compiler path, and `param_map` blames the first declared param
+
+This file's Note of 2026-09-07 on the SF038 walk's seven readings (`:7914`)
+closed by saying its items 2 and 5 "record rulings no request carries yet".
+Both requests have since landed. This Note is a reading of `main` at
+`570669f`. It edits no text above this line, carries no `Status:` line, flips
+nothing and takes no decision: it records which code met each ruling, at which
+anchor and which SHA, which part of each ruling is still unbuilt and which
+request carries it, and it names the sentences above that said "unbuilt" so
+that a reader who reaches one of them by search finds this Note beside it.
+Nothing above is edited - the sentences are met by addition, which is the
+discipline this file's flip Notes already use (`:8903`).
+
+### 1. Item 5 is built: the module side blames the first declared param (`sb-gua3`, PR 456, `a1c11b5`)
+
+Item 5 named exactly two changes and measured a request against them: "carry
+the declaration's order past `params_of/2`, and blame the first match rather
+than refusing" (`:8045-8047`). `sb-gua3` made both, and `lib/statifier_blocks/composite.ex`
+is unchanged between `a1c11b5` and `570669f`, so every line below reads the
+same at either.
+
+- **The declaration's order is carried past `params_of/2`.** `params_of/2`
+  (`composite.ex:883`, at `a1c11b5`) no longer reaches the declaration itself;
+  it calls a new private `param_decls/1` (`composite.ex:895`), which answers
+  the declaration's `:params` **list**, order intact. `params_of/2` still
+  answers the merged map it always did, and `param_decls/1` is what carries
+  the order to the comparison.
+- **The first match is blamed rather than refused.** `param_map/3`
+  (`composite.ex:1024`) takes the declarations beside the params, builds an
+  order through `param_order/2` (`composite.ex:1038`), and `blamed_param/3`
+  (`composite.ex:1045`) walks that order with `Enum.find/2` instead of
+  collecting every match and answering `nil` unless there was exactly one.
+
+Two things the ruling did not name, recorded because the code takes a position
+on each and a reader of the ruling would otherwise not know it:
+
+- **A config key the declaration does not declare sorts after the declared
+  ones.** `params_of/2` merges the block's stored config over the declared
+  defaults, so the map handed to the comparison can carry a key that outlived
+  its param. `param_order/2` (`composite.ex:1038-1043`) appends those after the
+  declared keys - `declared ++ (Map.keys(params) -- declared)` - so such a key
+  is still reachable as a blame, and a declared param always outranks it. That
+  is the standing behaviour preserved, not a new rule.
+- **`nil` is unchanged for a member no param fed.** `distinguishing?/1`
+  (`composite.ex:1058`) is untouched, and a member carrying only empty param
+  values still answers `nil`. What narrowed is only the *collision* arm: the
+  map's `nil` now means the no-match case alone.
+
+The tie-break is tested from both directions, so that a reading of the stored
+config's own key order cannot pass for a reading of the declaration:
+`test/statifier_blocks/composite_test.exs:567` ("a member carrying two params'
+values is blamed on the first declared") over the `TwoInOne` declaration
+(`:261`), and `:583` ("the tie-break follows the declaration, not the stored
+config") over `ValueFirst` (`:292`), which declares `TwoInOne`'s two params the
+other way round; `:599` keeps the empty-value case at `nil`. All at `a1c11b5`.
+
+### 2. Item 2 is built on the compiler path (`sb-ij7y`, PR 458, `25a8c82`)
+
+Item 2 ruled that "an expansion is at each member's **current** version, as the
+palette resolves it at expansion time" (`:7949-7950`). `sb-ij7y` built that on
+the compiler's expansion seam. `lib/statifier_blocks/compiler.ex` is unchanged
+between `25a8c82` and `570669f`.
+
+`expand_node/3` (`compiler.ex:568`, at `25a8c82`) maps each member through a
+new private `at_current_version/3` (`compiler.ex:618`) before handing it to
+`resolve_member/3` (`compiler.ex:579`). The stamp reads the member's type
+through the palette the expansion is resolved against and writes that type's
+`current_version/0` onto the member, so the member no longer meets
+`StatifierBlocks.Palette.resolve/2`'s version comparison the way a stored block
+does, and `core.send` and `core.wait` - the two core types past version 1 that
+item 2 names - no longer reach their `migrate_config/2` on this path.
+
+**The stamp is over the minted members only.** `at_current_version/3` stamps a
+member exactly when `param_map` holds its id, which is `ADR-0004`'s `T3` - the
+same fact the `own` index two lines above it already relies on. A pass-through
+child the author placed arrived from the document with its own stored version
+and keeps it, migration and all. A type the palette does not carry, and a ref
+declaring no `current_version/0`, are both left alone.
+
+**The seam moved, and the ruling's own prose pointed elsewhere.** Item 2 read
+`StatifierBlocks.Palette.block/2` as "the shape the ruling points a
+declaration's instantiation at" (`:7970-7973`). The code does not stamp at the
+instantiation: `Composite.expand!/2` (`composite.ex:498`, at `a1c11b5`) still
+mints every member through `StatifierBlocks.Block.new/2` at its default of `1`,
+because an expansion carries no palette and there is nothing there to resolve a
+current version against. The stamp sits at the one seam that **does** hold the
+palette. That is a change of location, not of ruling: the compiled chart is at
+each member's current version, which is what item 2 decided. Where it leaves
+the other callers is section 3.
+
+Tested at `test/statifier_blocks/compiler/composite_expansion_test.exs:339`
+(`describe "a member is expanded at its type's current version"`, at
+`25a8c82`), over a `myapp.deadline` composite whose subtree names `core.send`
+(`:159`): a retired duration spelling is now refused by name rather than
+silently rewritten (`:351`), an accepted spelling compiles unchanged (`:367`),
+and a member the *document* stores at version 1 still migrates (`:379`).
+
+### 3. What of the two rulings is still unbuilt, and which request carries it
+
+Item 2's ruling is about an expansion, not about one caller of it, and only the
+compiler's caller is stamped today. Said plainly, at `570669f`:
+
+- **The editor's Expand gesture writes members at version 1.**
+  `expanded_members/2` (`lib/statifier_blocks/editor.ex:2157`) takes what
+  `Composite.expand/2` answers and the Edit compound writes it into the
+  document, with no stamp, so a member whose type is past version 1 is stored
+  as though authored at version 1. `sb-y1d7` carries it. The consequence for
+  `ADR-0004`'s `E4` byte-identity - a document holding a composite against the
+  same document with it expanded in place, which now diverges for a retired
+  duration spelling - is that record's to read; nothing here decides it.
+- **`StatifierBlocks.Environment`'s two expansion sites take no stamp.**
+  `expansion_signatures/5` (`lib/statifier_blocks/environment.ex:473`) and
+  `mapped_start/8` (`:798`) both call `Composite.expand!/2` and walk what comes
+  back unstamped. `sb-04p8` carries it.
+
+Item 2's **third** clause is not among them: it is met, and `:7977-7978` is
+stale. That sentence reads "`Collapse` is not built (`sb-uzly` is the
+request), so the version-stripping clause is a requirement on it rather than
+a description of code". `Collapse` landed in campaign SF038 - `sb-uzly`, PR
+412, `7fa35a2`, an ancestor of `570669f` - and the clause is a description of
+code today: `template/3`
+(`lib/statifier_blocks/composite/collapse.ex:627-636`, at `570669f`) builds
+each lifted node from `"type"`, `"id_suffix"`, `"config"` and an optional
+`"slots"`, and from nothing else, so there is no version key for a lifted
+member's version to survive in. The `"version"` the proposed declaration
+carries (`collapse.ex:619`, from `@version` at `:138`) is the
+**declaration's** own version, not a member's. Read `:7977-7978` as true on
+the day it was written and superseded here.
+
+Item 5 has no unbuilt remainder: the data composite's attribution is by
+placeholder and was already exact (`:8021-8025`), and the module side is
+section 1.
+
+### 4. The sentences that said "unbuilt", met here rather than edited
+
+Each stands where it is. This is how to read it.
+
+- **`:6626-6628`**, in the `use StatifierBlocks.Composite` amendment of
+  2026-09-07: `param_map` maps an expanded block's id to the param key that
+  produced it, "or to `nil` for a block no single param is" responsible for.
+  Read "no single param" as the **no-match** case alone from `a1c11b5` on: a
+  member carrying more than one param's distinguishing value is blamed on the
+  first declared, and `nil` is left to the member no param fed. The typedoc for
+  `t:param_map/0` (`composite.ex:198-211`) carries the narrowed wording.
+- **`:8038`**, in item 5: "The code does not take it yet". It takes it now, at
+  `a1c11b5`, by the two changes the same paragraph named.
+- **`:8048`**, closing item 5: "No request carries it today". `sb-gua3` carried
+  it and merged as PR 456.
+- **`:9109-9111`**, in this file's Note of 2026-09-08 (`:8996`), item 3
+  (`:9081`), which named both rulings so a reader of `expand/2` would find all
+  three together: "unbuilt; `sb-ij7y` and `sb-gua3` carry them". Both have
+  landed - `sb-gua3` at `a1c11b5`, `sb-ij7y` at `25a8c82` - with the scope
+  section 3 gives. That item's other claim is untouched by this Note:
+  `sb-671e`'s new `expand/2` return neither implemented nor disturbed either
+  ruling.
+
+### 5. What this Note does not do
+
+- It takes no decision, moves no decision, edits no heading and adds no clause.
+  Every Amendment and Note above this line stands exactly as it stands.
+- It does not re-count any cite above this line; that is `sb-dxck`'s pass and
+  the campaign's own re-count work.
+- It does not touch the Amendment of 2026-09-08 (`outcome_of:`, `:9181`), which
+  stays **proposed**.
+- It does not regenerate `docs/adr/.cite-baseline.json`; `sb-u4wf` does.
+- It does not rule on the two unbuilt callers in section 3, or on `ADR-0004`'s
+  `E4` divergence. Those are `sb-y1d7` and `sb-04p8`, and each is measured
+  against item 2 as it stands.
+
+Filed with `sb-dzqm`, campaign SF039. This Note changes no code, adds no README
+row and flips no status line in this file.
