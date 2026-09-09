@@ -197,12 +197,17 @@ defmodule StatifierBlocks.Composite do
 
   @typedoc """
   Each expanded block's id to the **param key** that produced it, or to `nil`
-  for a block no *single* param is responsible for.
+  for a block no param is responsible for.
+
+  A member carrying more than one param's value is blamed on the **first**
+  param in declaration order (`ADR-0002`'s Note of 2026-09-07, item 5, ruling
+  `RQ-SF038-14`): the declaration has an order and an author reading a
+  finding needs one field to open, not none.
 
   `ADR-0004`'s amendment (`sb-nzc1`) re-anchors a finding raised inside an
   expansion against the composite block, carrying the key this map names -
-  and `config_key: nil` when it names none, which is the honest answer both
-  when no param fed the block and when two did.
+  and `config_key: nil` when it names none, which is the honest answer when
+  no param fed the block.
   """
   @type param_map :: %{optional(Block.id()) => String.t() | nil}
 
@@ -517,7 +522,7 @@ defmodule StatifierBlocks.Composite do
     # taken over the minted members BEFORE the author's children are spliced
     # in. A pass-through child has no entry in it and is therefore never
     # re-anchored onto the composite.
-    param_map = param_map(members, params)
+    param_map = param_map(members, params, param_decls(ref))
 
     {splice(members, block, declared_slots(ref)), param_map}
   end
@@ -877,10 +882,20 @@ defmodule StatifierBlocks.Composite do
   @spec params_of(Palette.type_ref(), Block.config()) :: Block.config()
   defp params_of(ref, config) do
     ref
-    |> Palette.call(:__composite__, [], nil)
-    |> Map.fetch!(:params)
+    |> param_decls()
     |> Map.new(fn %{key: key, default: default} -> {key, default} end)
     |> Map.merge(config)
+  end
+
+  # The declaration's params, in the order they were written. `params_of/2`
+  # merges them into a map and the order is gone; `param_map/3` needs it,
+  # because a member carrying two params' values is blamed on the first one
+  # declared (`ADR-0002`'s Note of 2026-09-07, item 5).
+  @spec param_decls(Palette.type_ref()) :: [BlockType.field_decl()]
+  defp param_decls(ref) do
+    ref
+    |> Palette.call(:__composite__, [], nil)
+    |> Map.fetch!(:params)
   end
 
   @spec probe_block(Palette.type_ref(), Block.config()) :: Block.t()
@@ -999,30 +1014,42 @@ defmodule StatifierBlocks.Composite do
     minted
   end
 
-  # A block is blamed on the one param whose value it carries. Two params
-  # feeding one member, or none, is `nil` - "no single param is responsible",
-  # which is the map's own wording and the honest answer in both directions.
-  @spec param_map([Block.t()], Block.config()) :: param_map()
-  defp param_map(members, params) do
+  # A block is blamed on a param whose value it carries. Where it carries more
+  # than one, the FIRST in declaration order takes the blame (`ADR-0002`'s
+  # Note of 2026-09-07, item 5, ruling `RQ-SF038-14`): an author following a
+  # re-anchored finding needs one field to open, and the declaration has an
+  # order to pick it by. A member carrying no distinguishing param value is
+  # still `nil` - no param fed it, and there is nothing to name.
+  @spec param_map([Block.t()], Block.config(), [BlockType.field_decl()]) :: param_map()
+  defp param_map(members, params, decls) do
+    order = param_order(params, decls)
+
     members
     |> flatten()
-    |> Map.new(fn %Block{id: id, config: config} -> {id, blamed_param(config, params)} end)
+    |> Map.new(fn %Block{id: id, config: config} -> {id, blamed_param(config, params, order)} end)
   end
 
-  @spec blamed_param(Block.config(), Block.config()) :: String.t() | nil
-  defp blamed_param(config, params) do
+  # The keys of `params` in declaration order. `params_of/2` merges the
+  # block's stored config over the declared defaults, so it can carry a key
+  # the declaration does not - a config that outlived a param. Those keep the
+  # standing behaviour by sitting after the declared ones: they are reachable,
+  # but a declared param always outranks them.
+  @spec param_order(Block.config(), [BlockType.field_decl()]) :: [String.t()]
+  defp param_order(params, decls) do
+    declared = Enum.map(decls, & &1.key)
+
+    declared ++ (Map.keys(params) -- declared)
+  end
+
+  @spec blamed_param(Block.config(), Block.config(), [String.t()]) :: String.t() | nil
+  defp blamed_param(config, params, order) do
     carried = values(config)
 
-    blamed =
-      for {key, value} <- params,
-          distinguishing?(value),
-          Enum.any?(carried, &(&1 === value)),
-          do: key
+    Enum.find(order, fn key ->
+      value = Map.get(params, key)
 
-    case blamed do
-      [one] -> one
-      _none_or_many -> nil
-    end
+      distinguishing?(value) and Enum.any?(carried, &(&1 === value))
+    end)
   end
 
   # An empty param value carries nothing and would match every empty config
