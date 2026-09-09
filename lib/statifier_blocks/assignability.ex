@@ -320,12 +320,32 @@ defmodule StatifierBlocks.Assignability do
   caller that has no datamodel to hand passes - the check reduces to unknown
   and identity, which is exactly what it decided before there were
   declarations to read.
+
+  `opts` carries the strict switch and nothing else. `strict: true` - the
+  default is `false` - refuses a pair either side of which resolves to
+  `:unknown`: step 1's first decision answers `false` where it otherwise
+  answers `true`, and the host is **not** asked, because a host relation has
+  never been offered an unknown side and this option is not the place to
+  start offering it. No other step moves, so the strict relation is a subset
+  of the default one and reflexivity still holds for every typed pair.
+
+  The option is opt-in so that the floor stays exactly where every existing
+  caller found it; it exists for the caller that must not admit a value
+  nothing has typed - a pre-fill reading a datamodel document that declares
+  neither the record nor the shape it names (ADR-0002's Note of 2026-09-08,
+  item 4).
   """
-  @spec assignable?(Palette.t(), type_expr() | :unknown, type_expr() | :unknown, Declarations.t()) ::
-          boolean()
-  def assignable?(%Palette{} = palette, held, expected, declarations \\ %{}) do
+  @spec assignable?(
+          Palette.t(),
+          type_expr() | :unknown,
+          type_expr() | :unknown,
+          Declarations.t(),
+          keyword()
+        ) :: boolean()
+  def assignable?(%Palette{} = palette, held, expected, declarations \\ %{}, opts \\ []) do
     case Environment.satisfies(declarations, held, expected) do
-      satisfied when satisfied in [:unknown, :identical, :covers] -> true
+      :unknown -> not Keyword.get(opts, :strict, false)
+      satisfied when satisfied in [:identical, :covers] -> true
       _not_satisfied -> host_widens?(palette, held, expected)
     end
   end
