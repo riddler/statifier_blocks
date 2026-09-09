@@ -66,6 +66,21 @@ defmodule StatifierBlocks.Composite.CollapseTest do
   defp propose(document, ids, opts \\ []),
     do: Collapse.propose(document, Palette.core(), ids, opts)
 
+  # One whole host round trip over the Guarded step arrangement: collapse it,
+  # name the row, register it, commit the compound `replacement/4` answers,
+  # compile. What comes back is the chart's bytes.
+  defp round_trip(document) do
+    {:ok, row} = propose(document, ["blk_7", "blk_9"])
+    {:ok, state} = Data.declaration(Map.put(row, "type_name", "myapp.guarded_step"))
+    palette = Palette.from_modules([{"myapp.guarded_step", {Data, state}}], core: true)
+
+    {:ok, compound} = Collapse.replacement(document, "blk_7", "myapp.guarded_step", row)
+    {:ok, swapped, _inverse} = Edit.apply(document, compound)
+    {:ok, compiled} = Compiler.compile(swapped, palette)
+
+    compiled.scxml
+  end
+
   # -- 15E: the storable row, minus its name -----------------------------
 
   describe "propose/3 answers the storable row without its name" do
@@ -730,6 +745,47 @@ defmodule StatifierBlocks.Composite.CollapseTest do
                "invoke_type" => "myapp:signup",
                "path" => "signup.verification.failure"
              }
+    end
+
+    # Sabotage: put `Block.new(type_name, config: config)` back - red here on
+    # the id and red on the case below on the chart. A composite's expansion
+    # mints its members' ids as `composite_id <> "_" <> local_id`, so the id
+    # this block carries is the prefix of every state id the chart grows
+    # where the arrangement stood; minting one would put a fresh UXID there.
+    test "the composite carries the arrangement's own id, not a minted one" do
+      document = document(guarded_step_arrangement())
+
+      {:ok, row} = propose(document, ["blk_7", "blk_9"])
+
+      assert {:ok, {:compound, [{:remove, "blk_7"}, {:insert, _target, block}]}} =
+               Collapse.replacement(document, "blk_7", "myapp.guarded_step", row)
+
+      assert block.id == "blk_7"
+    end
+
+    # The round trip a host actually runs: collapse the arrangement, name the
+    # row, register it, commit the compound, compile. Twice, from the same
+    # document, with nothing between the two runs but the clock - which is
+    # exactly what a minted id is a function of. The two charts are the same
+    # bytes, and the state ids in them are the ones the arrangement's own
+    # root id implies rather than ids nobody can predict.
+    #
+    # Sabotage: put `Block.new(type_name, config: config)` back - red on the
+    # first assertion, because two runs a millisecond apart mint two ids and
+    # `Id.block/0` is a timestamp with 80 bits of entropy after it.
+    test "the chart after the replacement is byte-identical run after run" do
+      document = document(guarded_step_arrangement())
+
+      first = round_trip(document)
+      second = round_trip(document)
+
+      assert first == second
+
+      # And anchored where the arrangement was: `blk_7` is the id the author's
+      # own arrangement carried, and it is still the prefix of every state the
+      # composite expands to.
+      assert first =~ "s_blk_7_invoke"
+      assert first =~ "s_blk_7_assign"
     end
 
     # Sabotage: raised on a missing id - red. `replacement/4` is a public

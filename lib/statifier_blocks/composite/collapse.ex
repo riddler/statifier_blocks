@@ -103,6 +103,11 @@ defmodule StatifierBlocks.Composite.Collapse do
   thing, and the swap can only happen after the host has stored the
   declaration, named it and rebuilt its palette with it - until then the
   `:insert` names a type the document cannot resolve.
+
+  The composite it inserts takes the collapsed root's own id. An expansion
+  mints member ids as `composite_id <> "_" <> local_id`, so the id given
+  here is the prefix of every state id the chart grows where the arrangement
+  was, and a minted one would put a fresh UXID there on every commit.
   """
 
   alias StatifierBlocks.{Block, BlockType, Document, Edit, Palette}
@@ -225,6 +230,18 @@ defmodule StatifierBlocks.Composite.Collapse do
   (`2n`, `3E`), so the author sees one gesture and no intermediate document
   in which the arrangement is gone and the composite is not yet there.
 
+  The inserted block carries the **arrangement's own id**, not a minted one.
+  A composite's expansion mints its members' ids as
+  `composite_id <> "_" <> local_id`, so whatever id this block is given is
+  the prefix of every state id the compiled chart grows where the
+  arrangement stood. A minted id would make those ids a function of the
+  millisecond the host committed rather than of the document, and two hosts
+  committing the same replacement on the same document would get two
+  different charts. Taking `root_id` keeps the swap deterministic and the
+  ids anchored where the arrangement was; the `{:remove, root_id}` ahead of
+  it in the compound has already freed the id, so the insert is not a
+  duplicate.
+
   The host commits it through `StatifierBlocks.Edit.Session.commit/2`. It
   is answered rather than committed here, and refused rather than raised
   where the document cannot carry it: `{:error, {:no_such_block, id}}` for
@@ -245,7 +262,13 @@ defmodule StatifierBlocks.Composite.Collapse do
           |> Map.get("params", [])
           |> Map.new(fn param -> {param["key"], param["default"]} end)
 
-        block = Block.new(type_name, config: config)
+        # The composite takes the arrangement's own id, not a minted one. The
+        # remove ahead of it in the compound has already freed that id, and an
+        # expansion's member ids are `composite_id <> "_" <> local_id`
+        # (`StatifierBlocks.Composite`), so a minted id would make every state
+        # id under the composite a function of the millisecond the host
+        # pressed the button rather than of the document.
+        block = Block.new(type_name, id: root_id, config: config)
 
         {:ok, {:compound, [{:remove, root_id}, {:insert, List.last(path), block}]}}
 
