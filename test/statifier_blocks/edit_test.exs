@@ -550,4 +550,73 @@ defmodule StatifierBlocks.EditTest do
       assert Edit.check_config(palette, document, {:set_datamodel, "nonsense"}) == :ok
     end
   end
+
+  # ADR-0002 decision 7 as amended 2026-09-06: `payload` on `core.on_event`
+  # is a `{:type_expr, opts}` field, and what its value may be is
+  # `BlockType.type_expr_findings/2`'s single check rather than a clause of
+  # the type's own `validate_config/1`. The gate consults it, so a value
+  # that is no arm the field admits is refused by the edit algebra rather
+  # than passing it and being refused first at compile.
+  describe "check_config/3 and a {:type_expr, opts} field" do
+    # Sabotage: dropped `BlockType.type_expr_findings/2` from `Edit`'s
+    # private `config_findings/2` - the non-arm value passes the gate as
+    # `:ok` and the first assertion goes red (verified).
+    test "refuses an update writing a value that is no arm of the field" do
+      assert {:error, {:invalid_config, "blk_OE", findings}} =
+               Edit.check_config(
+                 StatifierBlocks.Palette.core(),
+                 handler_document(),
+                 {:update_config, "blk_OE", handler_config(%{"payload" => 42})}
+               )
+
+      assert [{"payload", message}] = findings
+      assert message =~ "payload"
+    end
+
+    # The other half of the same clause: the name arm and the inline arm
+    # are both admitted, and an absent value is the arm every document
+    # written before the field type existed carries.
+    test "passes an update writing an arm the field admits" do
+      palette = StatifierBlocks.Palette.core()
+      document = handler_document()
+
+      for value <- ["cards.declined", [%{"name" => "reason", "type" => "string"}], ""] do
+        assert Edit.check_config(
+                 palette,
+                 document,
+                 {:update_config, "blk_OE", handler_config(%{"payload" => value})}
+               ) == :ok
+      end
+
+      assert Edit.check_config(
+               palette,
+               document,
+               {:update_config, "blk_OE", handler_config(%{})}
+             ) == :ok
+    end
+  end
+
+  # A handler in a group's `interrupts` slot, the placement
+  # `StatifierBlocks.Core.TypeExprMigrationTest` uses for the same field.
+  defp handler_document do
+    root =
+      Block.new("core.group",
+        id: "blk_GRP",
+        slots: %{
+          "body" => [Block.new("core.sequence", id: "blk_SEQ")],
+          "interrupts" => [
+            Block.new("core.on_event", id: "blk_OE", config: handler_config(%{}))
+          ]
+        }
+      )
+
+    Document.new(root, id: "bdoc_HANDLER")
+  end
+
+  defp handler_config(extra) do
+    Map.merge(
+      %{"event" => "cards.declined", "outcome" => "abandon"},
+      extra
+    )
+  end
 end
