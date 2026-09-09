@@ -692,8 +692,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # mount draws no control that could have sent one of these: the events
     # exist for a crafted payload, and a sentence rendered at a control that
     # is not there has no reader.
+    #
+    # Two members do have a drawn control on such a mount, because the card's
+    # control strip is conditioned on the node rather than on `read_only`: the
+    # Delete "x" (`block_node.ex`, `class="sb-node__remove"`) and `expand`,
+    # which joins the list under ADR-0005's Note of 2026-09-08, item 7a -
+    # Expand commits an `Edit.t()` and changes the document, which is exactly
+    # what `read_only?` clause 6 says never happens here. Whether such a mount
+    # should also withhold the strip, the way clause 1 withholds the palette
+    # column and the gap "+", is not ruled: item 7a rules the event, and only
+    # the event.
     @read_only_refused ~w(
-      drop insert-drop remove remove-confirm remove-cancel undo redo
+      drop insert-drop remove remove-confirm remove-cancel expand undo redo
       dragstart dragend insert-dragstart
       palette-open palette-close palette-pick
       config-change discard-draft field-list-add field-list-remove

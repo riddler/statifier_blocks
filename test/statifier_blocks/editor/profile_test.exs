@@ -59,6 +59,56 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       view
     end
 
+    # The smallest composite that makes Expand reachable: one member, in the
+    # card-processing domain. `EditorFixtures` has none, and Expand needs a
+    # block the palette resolves to a `Composite` before the gesture is drawn
+    # at all.
+    defmodule Authorize do
+      @moduledoc false
+
+      use StatifierBlocks.Composite,
+        name: "myapp.authorize",
+        params: [
+          %{key: "invoke_type", type: :string, label: "Call", required?: true, default: ""}
+        ],
+        sentence: "Call {invoke_type}",
+        palette_entry: %{label: "Authorize", group: "Structure"},
+        version: 1
+
+      alias StatifierBlocks.Block
+
+      @impl StatifierBlocks.Composite
+      def subtree(params) do
+        [
+          Block.new("core.invoke",
+            id: "call",
+            config: %{"invoke_type" => params["invoke_type"], "assign_to" => "", "params" => ""}
+          )
+        ]
+      end
+    end
+
+    defp composite_palette do
+      Palette.new(Map.merge(Palette.core_types(), %{"myapp.authorize" => Authorize}))
+    end
+
+    defp composite_document do
+      Document.new(
+        Block.new("core.sequence",
+          id: "blk_ROOT",
+          slots: %{
+            "body" => [
+              Block.new("myapp.authorize",
+                id: "blk_AUTH",
+                config: %{"invoke_type" => "myapp:authorize"}
+              )
+            ]
+          }
+        ),
+        id: "bdoc_READ_ONLY_EXPAND"
+      )
+    end
+
     defp fixtures do
       [
         {"signup_wizard", EditorFixtures.signup_wizard()},
@@ -338,6 +388,56 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         crafted(view, "remove", %{"block-id" => "blk_email_step"})
 
         assert editor(view) == before
+      end
+
+      # ADR-0005's Note of 2026-09-08, item 7a. Expand commits an `Edit.t()`
+      # and changes the document, which is exactly what clause 6 says never
+      # happens on such a mount, and `expand` was not on `@read_only_refused`.
+      # It arrives here as an ordinary click rather than through `crafted/3`,
+      # because the control IS drawn on a read-only mount: `.sb-node__expand`
+      # is conditioned on the node being expandable and on nothing else. That
+      # is the second half of what makes this a bug a reader could reach.
+      #
+      # Sabotage: `expand` removed from `@read_only_refused` again. Ran red on
+      # all three assertions below - the composite is replaced by its member,
+      # `on_change` fires, and the render moves - and red on nothing else in
+      # the suite, so this test is the only cover for the clause.
+      test "answers Expand with the socket it was given", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn,
+            document: composite_document(),
+            palette: composite_palette(),
+            profile: %{read_only?: true}
+          )
+
+        before = editor(view)
+
+        view
+        |> element(~s([phx-click="expand"][phx-value-block-id="blk_AUTH"]))
+        |> render_click()
+
+        assert latest_document() == nil
+        assert editor(view) == before
+        refute editor(view) =~ "sb-editor__refusal"
+      end
+
+      # The other side of the same clause: the gesture is refused because the
+      # mount is read-only, not because this document or this palette cannot
+      # expand. Without it a fix that broke Expand outright would read green.
+      test "an editing mount still takes Expand", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn,
+            document: composite_document(),
+            palette: composite_palette(),
+            profile: %{read_only?: false}
+          )
+
+        view
+        |> element(~s([phx-click="expand"][phx-value-block-id="blk_AUTH"]))
+        |> render_click()
+
+        assert_receive {:document, document}
+        refute Enum.any?(Document.blocks(document), &(&1.id == "blk_AUTH"))
       end
     end
   end
