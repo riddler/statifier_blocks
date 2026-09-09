@@ -18,7 +18,7 @@ defmodule StatifierBlocks.Composite.DataTest do
 
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{Block, Compiler, Composite, Document, Palette}
+  alias StatifierBlocks.{Block, BlockType, Compiler, Composite, Document, Palette}
   alias StatifierBlocks.Composite.Data
 
   # -- the same composite, declared twice --------------------------------
@@ -197,6 +197,28 @@ defmodule StatifierBlocks.Composite.DataTest do
 
       assert Data.sentence(state(), config) ==
                "Call myapp:authorize, recording failure at cards.authorization.failure"
+    end
+
+    # Sabotage: dropped `Data.summary/2` - red on both assertions, because
+    # the seam then finds no `summary` declared on the pair and the card
+    # draws nothing where its module twin draws two chips. `sb-7gm9`.
+    test "the same summary chips, on the card as well as at the callback" do
+      config = %{
+        "invoke_type" => "myapp:authorize",
+        "failure_path" => "cards.authorization.failure"
+      }
+
+      assert Data.summary(state(), config) == GuardedStep.summary(config)
+
+      assert Data.summary(state(), config) == [
+               "Call: myapp:authorize",
+               "Record the failure at: cards.authorization.failure"
+             ]
+
+      # Through the resolver every consumer reads chips by, which reaches a
+      # stateful entry through `Palette.call/4`.
+      assert BlockType.summary(ref(), config) == BlockType.summary(GuardedStep, config)
+      assert BlockType.summary(ref(), config) != []
     end
 
     # Sabotage: dropped the `Composite.derived_io/2` delegation - red. The
