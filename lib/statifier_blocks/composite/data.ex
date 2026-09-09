@@ -579,6 +579,17 @@ defmodule StatifierBlocks.Composite.Data do
   def sentence(state, config), do: Composite.render_sentence(__composite__(state), config)
 
   @doc """
+  The declaration's chips: one per param the config gives a value to, minus
+  those declared `hidden?: true`.
+
+  The same derivation the `use` block injects (ADR-0002's Note of
+  2026-09-07, item 4), reached at one higher arity like every other callback
+  here - so a data composite's card draws the summary its module twin draws.
+  """
+  @spec summary(state(), Block.config()) :: [String.t()]
+  def summary(state, config), do: Composite.derived_summary(__composite__(state), config)
+
+  @doc """
   Raises. A composite is replaced by its expansion at Resolve, so no
   composite block survives to Emit; reaching this means the expansion did
   not run.
