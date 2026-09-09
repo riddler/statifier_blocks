@@ -24,7 +24,10 @@ defmodule StatifierBlocks.Edit.Session do
       wrong by keeping the keystrokes it should drop or dropping the ones
       it should keep;
     * a refusal that is not about a config lands in `last_error` and moves
-      nothing else;
+      nothing else, and `refusal/1` is what a surface draws from it: the
+      reason is a tuple aimed at a caller, and the sentence for it is the
+      funnel's decision rather than each surface's (ADR-0005's Note of
+      2026-09-08, item 6);
     * an undo or a redo drops **every** draft: a draft is by definition
       config the document never accepted, and carrying one across a
       history move shows the author a value belonging to a document state
@@ -69,7 +72,7 @@ defmodule StatifierBlocks.Edit.Session do
   `drafts` and `draft_findings` default to `%{}` and `last_error` to `nil`.
   """
 
-  alias StatifierBlocks.{Block, BlockType, Document, Edit, Palette, ViewModel}
+  alias StatifierBlocks.{Block, BlockType, Declarations, Document, Edit, Palette, ViewModel}
   alias StatifierBlocks.Edit.History
 
   @typedoc "Per-block config the document refused, keyed by block id."
@@ -322,6 +325,106 @@ defmodule StatifierBlocks.Edit.Session do
     |> rows_of(value)
     |> descend(path, bare, blank_row(type))
   end
+
+  @doc """
+  What is in `last_error`, as one sentence for a surface to draw.
+
+  `commit/2`, `change_config/3` and `step/2` each answer a refusal by
+  putting its reason in `last_error` and moving nothing else, and a
+  reason is a tuple aimed at a caller rather than at an author. This is
+  the other half: the same vocabulary said once, in the words the editor
+  uses for the gesture that was refused, so that a refused gesture reads
+  on screen as a refusal rather than as a gesture that did nothing
+  (ADR-0005's Note of 2026-09-08, item 6).
+
+  The sentence never names a block by its id. Ids under `blk_` are minted
+  by the package and an author never sees one, so a sentence that quoted
+  one would name the block in a language the author does not read; what
+  it quotes instead is what the author typed or picked - a slot name, a
+  type name, a recipe name, a config key.
+
+  A term this function does not recognize gets the generic sentence
+  rather than an inspected tuple, for the reason
+  `StatifierBlocks.Declarations.refusal/1` gives about its own: a term a
+  surface cannot phrase is a term the author cannot act on either. A
+  datamodel envelope is handed to that function rather than re-phrased
+  here, so the declarations panel and this surface say one thing about
+  one refusal.
+
+      iex> StatifierBlocks.Edit.Session.refusal(:nothing_to_undo)
+      "There is nothing to undo."
+
+      iex> StatifierBlocks.Edit.Session.refusal({:unknown_block_type, "myapp.nope"})
+      ~s(The palette has no block type "myapp.nope".)
+
+      iex> StatifierBlocks.Edit.Session.refusal({:composite_expansion_failed, "blk_GS", :empty})
+      "That block's declaration cannot be expanded, so nothing was replaced."
+
+      iex> StatifierBlocks.Edit.Session.refusal(:something_a_later_amendment_adds)
+      "That change was refused."
+  """
+  @spec refusal(term()) :: String.t()
+  def refusal(:nothing_to_undo), do: "There is nothing to undo."
+  def refusal(:nothing_to_redo), do: "There is nothing to redo."
+
+  # The gate's structural refusals (`StatifierBlocks.Edit`).
+  def refusal({:no_such_block, _id}), do: "That block is no longer in the document."
+
+  def refusal({:no_such_slot, _id, slot}),
+    do: ~s(That block has no "#{slot}" slot.)
+
+  def refusal({:index_out_of_range, _target}),
+    do: "That position is no longer in the slot."
+
+  def refusal({:would_cycle, _id}), do: "A block cannot be moved inside itself."
+
+  def refusal({:duplicate_block_id, _id}),
+    do: "That change would give two blocks the same id."
+
+  def refusal({:cannot_remove_root, _id}), do: "The outermost block cannot be removed."
+
+  def refusal({:invalid_config, _id, _findings}), do: "Those settings were refused."
+
+  def refusal({:malformed_envelope, {:datamodel, _reason}} = envelope),
+    do: Declarations.refusal(envelope)
+
+  def refusal({:malformed_envelope, _term}), do: "That change was refused."
+
+  # A pick out of the palette (clauses 2C and 3C).
+  def refusal({:unknown_block_type, type}), do: ~s(The palette has no block type "#{type}".)
+
+  def refusal({:unknown_recipe, name}), do: ~s(The palette has no arrangement "#{name}".)
+
+  def refusal({:recipe_out_of_reach, name}),
+    do: ~s(The arrangement "#{name}" does not fit where it was placed.)
+
+  # `5E`'s refusals, and the broken-declaration one beside them. None of
+  # them says "composite": clause 1E's whole point is that the author
+  # learns the Expand affordance and never the word.
+  def refusal({:not_a_composite, _id}),
+    do: "That block is not made of steps, so there is nothing to replace it with."
+
+  def refusal({:cannot_expand_root, _id}),
+    do: "The outermost block cannot be replaced with its steps."
+
+  def refusal({:expansion_not_admitted, _target}),
+    do: "This slot does not accept the steps that block is made of, so nothing was replaced."
+
+  def refusal({:composite_expansion_failed, _id, _why}),
+    do: "That block's declaration cannot be expanded, so nothing was replaced."
+
+  # The proposing half of "Save as a step" (`Composite.Collapse.propose/4`).
+  def refusal({:not_one_subtree, _ids}),
+    do:
+      "A step is saved from one block and everything inside it, and that is not what is selected."
+
+  def refusal({:cannot_collapse_root, _id}),
+    do: "The outermost block cannot be saved as a step."
+
+  def refusal({:unspellable_field, _id, key}),
+    do: ~s(The setting "#{key}" cannot be carried into a step.)
+
+  def refusal(_other), do: "That change was refused."
 
   @spec addressed(list_gesture()) :: {[non_neg_integer()], gesture()}
   defp addressed({path, gesture}) when is_list(path), do: {path, gesture}

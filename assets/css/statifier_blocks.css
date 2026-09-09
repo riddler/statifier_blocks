@@ -2955,6 +2955,27 @@
   gap: var(--sb-space);
 }
 
+/* The refused-gesture sentence, in the canvas column under the toolbar
+ * (ADR-0005's Note of 2026-09-08, item 6). It is where it is because that is
+ * where the gestures it reports on are made - a card's Expand and its "Save as
+ * a step", a pick dropped out of the palette, the toolbar's own Undo and Redo -
+ * and a refusal read in the inspector or the drawer would be a sentence about
+ * the canvas drawn somewhere the author was not looking.
+ *
+ * The error family, borrowed rather than extended: a refusal is not a
+ * `%Finding{}` and must not be restyled with one by a host, but it is the same
+ * severity to a reader, and a third red would be a third red. It is a flex
+ * child of `.sb-editor__main`, so it takes the column's gap and pushes the
+ * canvas down by exactly its own height while it is there. */
+.sb-editor__refusal {
+  margin: 0;
+  padding: var(--sb-space-half) var(--sb-space);
+  border-radius: var(--sb-radius-sm);
+  font-size: var(--sb-text-sm);
+  background: var(--sb-error-bg);
+  color: var(--sb-error);
+}
+
 .sb-palette {
   grid-area: palette;
   position: relative;

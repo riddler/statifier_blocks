@@ -395,6 +395,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         refute_receive {:document, _document}
         assert render(view) =~ ~s(id="sb-block-blk_GS")
+
+        # ADR-0005's Note of 2026-09-08, item 6: the refusal is not only
+        # written into `last_error`, it is drawn. Sabotage: dropped the
+        # `@gesture_refusal` paragraph from the editor's template - red here,
+        # because the refused gesture then looks like one that did nothing.
+        assert has_element?(
+                 view,
+                 ~s([data-refusal="gesture"]),
+                 "This slot does not accept the steps that block is made of, " <>
+                   "so nothing was replaced."
+               )
       end
 
       # Sabotage: made the refusal commit an empty compound - red, because
@@ -652,6 +663,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       refute_receive {:document, _document}
       assert render(view) =~ ~s(id="sb-block-#{id}")
       assert has_element?(view, ~s(button[phx-click="undo"][disabled]))
+
+      assert has_element?(
+               view,
+               ~s([data-refusal="gesture"]),
+               "That block's declaration cannot be expanded, so nothing was replaced."
+             )
     end
 
     defp broken_subtree_document(break) do
