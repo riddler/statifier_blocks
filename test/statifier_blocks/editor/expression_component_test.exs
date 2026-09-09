@@ -55,6 +55,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       )
     end
 
+    # An override that renders nothing but the seam's `:candidates`, joined
+    # in the order it was handed them, because the order is half the claim.
+    defp candidates_probe do
+      fn assigns ->
+        Phoenix.HTML.raw(~s(<b data-seam-candidates="#{Enum.join(assigns.candidates, ",")}"></b>))
+      end
+    end
+
     defp without_statifier_ui(fun) do
       previous = Application.get_env(:statifier_blocks, :expression_component_module)
       Application.put_env(:statifier_blocks, :expression_component_module, NoSuchModule)
@@ -211,6 +219,64 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         html = render_field("step == 'payment'", %{expression_component: component})
 
         assert html =~ ~s(data-seen="plan,step")
+      end
+
+      # sb-3xub: a host that named values for THIS field gets them at the
+      # seam too, ahead of the document's declared paths, in the one list the
+      # far side binds as its datalist. The first production embedder
+      # measured the opposite - the rendered control carried the package's
+      # own completions and never the host's - and re-typed its params as
+      # `{:path, opts}` to get around it.
+      #
+      # Sabotage: put `candidates: @path_candidates` back on the seam's map
+      # -> the host's offers are missing from the probe and this goes red
+      # with the open-spelling test below, and nothing else in the file
+      # notices (verified).
+      test "is handed the host's own offers ahead of the declared paths" do
+        html =
+          render_field("step == 'payment'", %{
+            expression_component: candidates_probe(),
+            candidates: [{"step == 'payment'", "Paying"}, {"plan", "The plan"}]
+          })
+
+        assert html =~ ~s(data-seam-candidates="step == 'payment',plan,step")
+      end
+
+      # Both spellings flatten to the same offer here, and a value the paths
+      # already declare is offered once. A closed list on an `:expression`
+      # never constrained anything - `validate_config/1` is the authority -
+      # so there is nothing for the difference between them to mean on this
+      # side of the seam, where all an override can be handed is a list.
+      #
+      # Sabotage: dropped the `{:open, offered}` clause of `offered_values/1`
+      # -> the open spelling falls to the catch-all, the host's offers vanish
+      # and this alone goes red (verified).
+      test "reads the open spelling the same way, and offers a path once" do
+        html =
+          render_field("step == 'payment'", %{
+            expression_component: candidates_probe(),
+            candidates: {:open, [{"plan", "The plan"}, {"amount", "The amount"}]}
+          })
+
+        assert html =~ ~s(data-seam-candidates="plan,amount,step")
+      end
+
+      # The default half, and the behaviour every override written before
+      # this relied on: a host that named no list for the field is handed the
+      # declared paths, in their own order, exactly as it always was.
+      #
+      # Sabotage: made `merged_candidates/2` answer `offered_values/1` alone
+      # -> the declared paths disappear from the seam and this goes red, with
+      # the two above and with condition_candidates_test.exs's parity test
+      # (verified: 4 failures, all four of them). No mutation reds this one
+      # alone, which is the point of it: what it holds down is that adding
+      # the host's offers took nothing away, and the old behaviour is exactly
+      # what the other three would still let through if the paths were kept
+      # only when a host offered nothing.
+      test "hands the declared paths alone when the host named no list" do
+        html = render_field("step == 'payment'", %{expression_component: candidates_probe()})
+
+        assert html =~ ~s(data-seam-candidates="step,plan")
       end
     end
 
