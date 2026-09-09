@@ -576,6 +576,7 @@ defmodule StatifierBlocks.Compiler do
         own = Map.new(param_map, fn {id, key} -> {id, {block.id, key}} end)
 
         members
+        |> Enum.map(&at_current_version(palette, &1, param_map))
         |> Enum.reduce({[], [], own}, &resolve_member(palette, &1, &2))
         |> then(fn
           {nodes, [], expansion} -> {:ok, nodes, expansion}
@@ -584,6 +585,50 @@ defmodule StatifierBlocks.Compiler do
 
       {:error, finding} ->
         {:error, [finding], %{}}
+    end
+  end
+
+  # `ADR-0002`'s Note of 2026-09-07, item 2 (`RQ-SF037-17`): an expansion is
+  # at each member's **current** version, as the palette resolves it at
+  # expansion time.
+  #
+  # A subtree carries no version. A `use`-composite writes its members with
+  # `StatifierBlocks.Block.new/2` and a data declaration's template is
+  # instantiated through the same function, so every minted member arrives
+  # here at that function's default of `1`. Two core types are past version 1
+  # today - `core.send` and `core.wait` - and a member naming one would meet
+  # `StatifierBlocks.Palette.resolve/2`'s version comparison exactly as a
+  # STORED block does and reach that type's `migrate_config/2`. It is not a
+  # stored block: no author wrote its config at an older version, so there is
+  # no older spelling to migrate and the migration would rewrite a
+  # declaration's own literal. Stamping the current version here is what
+  # `StatifierBlocks.Palette.new_block/2` already does for an inserted block,
+  # at the one seam that holds the palette the expansion is resolved against.
+  #
+  # The stamp is over the MINTED members only, and `param_map` is keyed by
+  # exactly those - `ADR-0004`'s T3, the same fact `own` above relies on - so
+  # a pass-through child the author placed arrived from the document carrying
+  # its own stored version and keeps it, migration and all.
+  #
+  # A type this palette does not carry, and a ref that declares no
+  # `current_version/0`, are both left alone: `resolve/2` makes the `:resolve`
+  # finding for the first, and there is no current version to stamp for
+  # either.
+  @spec at_current_version(Palette.t(), Block.t(), Composite.param_map()) :: Block.t()
+  defp at_current_version(palette, %Block{} = member, param_map) do
+    slots =
+      Map.new(member.slots, fn {name, children} ->
+        {name, Enum.map(children, &at_current_version(palette, &1, param_map))}
+      end)
+
+    member = %{member | slots: slots}
+
+    with true <- Map.has_key?(param_map, member.id),
+         {:ok, ref} <- Palette.fetch(palette, member.type),
+         version when is_integer(version) <- Palette.call(ref, :current_version, [], nil) do
+      %{member | type_version: version}
+    else
+      _unstamped -> member
     end
   end
 

@@ -154,6 +154,36 @@ defmodule StatifierBlocks.Compiler.CompositeExpansionTest do
     end
   end
 
+  # -- a composite whose member names a type past version 1 --------------
+
+  defmodule Deadline do
+    @moduledoc """
+    A card-processing deadline: one `core.send`, which is one of the two core
+    types past version 1, so its member is the case `ADR-0002`'s Note of
+    2026-09-07, item 2 rules on.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "myapp.deadline",
+      params: [
+        %{key: "event", type: :string, label: "Send this event", required?: true, default: ""},
+        %{key: "delay", type: :duration, label: "After", required?: false, default: ""}
+      ],
+      version: 1
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(params) do
+      [
+        Block.new("core.send",
+          id: "tick",
+          config: %{"event" => params["event"], "delay" => params["delay"]}
+        )
+      ]
+    end
+  end
+
   describe "E1/E4: a composite compiles to the bytes its expansion compiles to" do
     # Sabotage: made `Compiler.resolve/2` fall through to `resolve_children/3`
     # for a composite - red at the first assertion, because the composite's
@@ -306,6 +336,56 @@ defmodule StatifierBlocks.Compiler.CompositeExpansionTest do
     end
   end
 
+  describe "a member is expanded at its type's current version" do
+    # `ADR-0002`'s Note of 2026-09-07, item 2 (`RQ-SF037-17`): an expansion is
+    # at each member's CURRENT version, as the palette resolves it at
+    # expansion time. `core.send` is at version 2 and `Block.new/2` defaults
+    # `:type_version` to 1, so before the compiler stamped the expansion this
+    # member met `Palette.resolve/2` as a stored block does and reached
+    # `core.send`'s `migrate_config/2`.
+    #
+    # Sabotage: dropped the stamp from `expand_node/3` - red here, because
+    # the member is then read at version 1 and the duration migration rewrites
+    # the declaration's own value into the accepted spelling, so this compile
+    # succeeds instead of naming the value the author has to fix.
+    test "a subtree naming core.send enters no migration path" do
+      document = document([deadline("blk_D", "PT30S")])
+
+      assert {:error, [%Finding{} = finding]} = Compiler.compile(document, palette())
+
+      assert finding.stage == :config
+      assert finding.code == :invalid_config
+      assert finding.reason == {:invalid_config, "delay"}
+      assert finding.message == "must be a duration like 30s or 1h30m - or empty to send now"
+      assert finding.block_id == "blk_D"
+    end
+
+    # The ordinary case, which the stamp must leave exactly where it was: a
+    # value written in the accepted spelling has nothing to migrate, and it
+    # reaches the chart unchanged whether the member is read at version 1 or
+    # at version 2.
+    test "a member written in the accepted spelling compiles unchanged" do
+      assert {:ok, compiled} = Compiler.compile(document([deadline("blk_D", "30s")]), palette())
+
+      assert compiled.scxml =~ ~s(delay="30s")
+    end
+
+    # The other half of the seam, and the reason the stamp is taken over the
+    # param map rather than over every block in the expansion: a block the
+    # document STORES is untouched by it. `Composite.expand!/2` still mints at
+    # `Block.new/2`'s default - the expansion carries no palette - so a member
+    # the editor's Expand has written into a document is an ordinary stored
+    # block at version 1, and it migrates like one.
+    test "a stored block at version 1 still migrates" do
+      {members, _param_map} = Composite.expand!(deadline("blk_D", "PT30S"), Deadline)
+
+      assert Enum.all?(members, &(&1.type_version == 1))
+
+      assert {:ok, compiled} = Compiler.compile(document(members), palette())
+      assert compiled.scxml =~ ~s(delay="30s")
+    end
+  end
+
   # -- helpers -----------------------------------------------------------
 
   defp palette do
@@ -313,6 +393,7 @@ defmodule StatifierBlocks.Compiler.CompositeExpansionTest do
       Map.merge(Palette.core_types(), %{
         "myapp.guarded_step" => GuardedStep,
         "myapp.crowded" => Crowded,
+        "myapp.deadline" => Deadline,
         "signup.confirm_contact" => ConfirmContact
       })
     )
@@ -342,6 +423,13 @@ defmodule StatifierBlocks.Compiler.CompositeExpansionTest do
         "invoke_type" => "myapp:signup",
         "confirmed_path" => "signup.contact.confirmed"
       }
+    )
+  end
+
+  defp deadline(id, delay) do
+    Block.new("myapp.deadline",
+      id: id,
+      config: %{"event" => "cards.authorization.expired", "delay" => delay}
     )
   end
 
