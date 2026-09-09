@@ -260,9 +260,9 @@ defmodule StatifierBlocks.CompositeTest do
 
   defmodule TwoInOne do
     @moduledoc """
-    One member carrying both params, and one member carrying neither. Both
-    answer `nil` in the param map, which is the map's own "no *single* param
-    is responsible" in each direction.
+    One member carrying both params, and one member carrying neither. The
+    first is blamed on `"path"`, the first param in declaration order
+    (`RQ-SF038-14`); the second answers `nil`, because no param fed it.
     """
 
     use StatifierBlocks.Composite,
@@ -284,6 +284,33 @@ defmodule StatifierBlocks.CompositeTest do
         Block.new("core.assign",
           id: "neither",
           config: %{"path" => "cards.audit", "value" => "1"}
+        )
+      ]
+    end
+  end
+
+  defmodule ValueFirst do
+    @moduledoc """
+    `TwoInOne`'s params, declared the other way round. One member carries
+    both, so it proves the tie-break reads the declaration and not the
+    stored config's own key order.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "myapp.value_first",
+      params: [
+        %{key: "value", type: :string, label: "Value", required?: true, default: ""},
+        %{key: "path", type: :string, label: "Path", required?: true, default: ""}
+      ]
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(params) do
+      [
+        Block.new("core.assign",
+          id: "both",
+          config: %{"path" => params["path"], "value" => params["value"]}
         )
       ]
     end
@@ -321,6 +348,7 @@ defmodule StatifierBlocks.CompositeTest do
         "myapp.guarded_step" => GuardedStep,
         "myapp.reviews" => Reviews,
         "myapp.two_in_one" => TwoInOne,
+        "myapp.value_first" => ValueFirst,
         "signup.confirm_contact" => ConfirmContact,
         "signup.reads" => Reads
       })
@@ -529,14 +557,51 @@ defmodule StatifierBlocks.CompositeTest do
       assert Enum.all?(ids(members), &String.starts_with?(&1, "blk_GS_"))
     end
 
-    # Sabotage: blamed a member on the first param whose value it carries -
-    # red on `blk_X_both`, which carries two and is nobody's single fault.
-    test "a member no single param is responsible for maps to nil" do
+    # `ADR-0002`'s Note of 2026-09-07, item 5 rules `RQ-SF038-14`: the module
+    # side blames the FIRST param in declaration order when more than one
+    # matches, rather than refusing to blame at all.
+    #
+    # Sabotage: blamed the LAST match, or went back to `nil` for a member
+    # carrying two - red on `blk_X_both`, which is `"path"`, the first param
+    # `TwoInOne` declares.
+    test "a member carrying two params' values is blamed on the first declared" do
       block = Block.new("myapp.two_in_one", id: "blk_X", config: %{"path" => "p", "value" => "v"})
 
       assert {_members, param_map} = Composite.expand!(block, TwoInOne)
 
-      assert param_map == %{"blk_X_both" => nil, "blk_X_neither" => nil}
+      assert param_map == %{"blk_X_both" => "path", "blk_X_neither" => nil}
+    end
+
+    # The tie-break is the DECLARATION's order, not the config map's or the
+    # alphabet's: `TwoInOne` declares `"path"` then `"value"`, and a config
+    # written the other way round blames `"path"` all the same. A map of two
+    # binary keys iterates sorted, so a sabotage that reads `params` directly
+    # passes the test above and fails here.
+    #
+    # Sabotage: ordered by `Map.keys(params)` - red, `"value"` sorts after
+    # `"path"` but a reversed declaration would not.
+    test "the tie-break follows the declaration, not the stored config" do
+      block =
+        Block.new("myapp.value_first", id: "blk_V", config: %{"path" => "p", "value" => "v"})
+
+      assert {_members, param_map} = Composite.expand!(block, ValueFirst)
+
+      assert param_map == %{"blk_V_both" => "value"}
+    end
+
+    # The first production embedder's shape: a wrapped member re-anchoring
+    # with `config_key: nil`. Blaming the first match does not widen what is
+    # blamed - a member carrying several param values that are not
+    # *distinguishing* still answers `nil`, because no param fed it.
+    #
+    # Sabotage: dropped `distinguishing?/1` from the search - red, `""` is
+    # carried by `blk_E_both` and would blame `"path"`.
+    test "a member carrying only empty param values still maps to nil" do
+      block = Block.new("myapp.two_in_one", id: "blk_E", config: %{"path" => "", "value" => ""})
+
+      assert {_members, param_map} = Composite.expand!(block, TwoInOne)
+
+      assert param_map == %{"blk_E_both" => nil, "blk_E_neither" => nil}
     end
 
     # Sabotage: read `block.config` directly - red on a config that predates
