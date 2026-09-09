@@ -244,6 +244,11 @@ defmodule StatifierBlocks.Composite do
   """
   @callback subtree(Block.config()) :: [Block.t()]
 
+  # The recognized set of `use StatifierBlocks.Composite` options. It is the
+  # same list the `__using__/1` doc below writes: an option added to one is
+  # added to the other, because they are the same list.
+  @declaration_options [:name, :params, :sentence, :palette_entry, :version, :slots]
+
   @doc """
   Declares a composite block type from `opts`.
 
@@ -264,6 +269,13 @@ defmodule StatifierBlocks.Composite do
       `t:pass_through_decl/0` maps carrying `:name` and `:to`, with optional
       `:label` (defaulting to `:name`) and `:arity` (defaulting to `:any`).
       Defaults to `[]`, which is every composite written before `RQ-SF038-5`.
+
+  That list is also the **recognized set**: an option outside it is refused at
+  the use site, naming the key it did not recognize, the way `:params` refuses
+  a param that declares a key it cannot spell. A misspelled option is the one
+  declaration error the refusals below cannot catch, because nothing is wrong
+  with the declaration that results - it is simply not the one that was
+  written.
 
   The using module must define `subtree/1`.
   """
@@ -360,6 +372,8 @@ defmodule StatifierBlocks.Composite do
   @doc false
   @spec __declaration__(keyword()) :: declaration()
   def __declaration__(opts) when is_list(opts) do
+    refute_unknown_options!(opts)
+
     name = required_option(opts, :name)
     params = required_option(opts, :params)
 
@@ -765,6 +779,22 @@ defmodule StatifierBlocks.Composite do
   end
 
   # -- declaration ------------------------------------------------------
+
+  # Refused BY NAME, which is the practice `decode_param/1` already follows:
+  # every other refusal here answers a declaration that is wrong, and this one
+  # answers a declaration that is merely not the one that was written.
+  @spec refute_unknown_options!(keyword()) :: :ok
+  defp refute_unknown_options!(opts) do
+    case opts |> Keyword.keys() |> Enum.uniq() |> Enum.reject(&(&1 in @declaration_options)) do
+      [] ->
+        :ok
+
+      unknown ->
+        raise ArgumentError,
+              "use StatifierBlocks.Composite: unknown options #{inspect(Enum.sort(unknown))}; " <>
+                "the recognized options are #{inspect(@declaration_options)}"
+    end
+  end
 
   @spec required_option(keyword(), atom()) :: term()
   defp required_option(opts, key) do

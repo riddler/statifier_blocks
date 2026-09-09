@@ -996,6 +996,70 @@ defmodule StatifierBlocks.CompositeTest do
         Composite.__declaration__(name: "myapp.x", params: [], version: 0)
       end
     end
+
+    # ADR-0002's Note of 2026-09-08, item 5. Sabotage: dropped the unknown-key
+    # check - red on both of these, because a misspelling then compiles to the
+    # default the author was trying to replace.
+    test "an unknown option is refused, naming the key" do
+      error =
+        assert_raise ArgumentError, fn ->
+          Composite.__declaration__(name: "myapp.x", params: [], verison: 2)
+        end
+
+      assert error.message =~ ":verison"
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Composite.__declaration__(name: "myapp.x", params: [], slot: [])
+        end
+
+      assert error.message =~ ":slot"
+    end
+
+    # Sabotage: named a recognized option in the refused set - red here, since
+    # every documented option must still build a declaration.
+    test "every documented option is still accepted" do
+      declaration =
+        Composite.__declaration__(
+          name: "myapp.x",
+          params: [],
+          sentence: "does a thing",
+          palette_entry: %{label: "Does a thing"},
+          version: 3,
+          slots: [%{name: "body", to: {"inner", "body"}}]
+        )
+
+      assert declaration.name == "myapp.x"
+      assert declaration.sentence == "does a thing"
+      assert declaration.palette_entry.label == "Does a thing"
+      assert declaration.version == 3
+      assert [%{name: "body", to: {"inner", "body"}}] = declaration.slots
+    end
+
+    # The refusal a host actually meets is at the `use` site, where the
+    # declaration is built at compile time. Sabotage: dropped the unknown-key
+    # check - red, the misspelled module compiled.
+    test "the refusal is raised at the use site" do
+      error =
+        assert_raise ArgumentError, fn ->
+          Code.eval_quoted(
+            quote do
+              defmodule MisspelledComposite do
+                use StatifierBlocks.Composite,
+                  name: "myapp.x",
+                  params: [],
+                  verison: 2
+
+                @impl StatifierBlocks.Composite
+                def subtree(_config), do: []
+              end
+            end
+          )
+        end
+
+      assert error.message =~ ":verison"
+      refute Code.ensure_loaded?(MisspelledComposite)
+    end
   end
 
   defp ids(blocks), do: Enum.map(blocks, & &1.id)
