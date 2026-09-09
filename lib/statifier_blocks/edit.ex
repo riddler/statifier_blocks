@@ -217,9 +217,18 @@ defmodule StatifierBlocks.Edit do
   `:ok` for the three commands that are not `:update_config` - they never
   touch a block's config, so there is nothing for a block type to validate.
   For an `:update_config`, resolves the named block's current type through
-  `palette` and runs its `validate_config/1` against the **candidate**
-  config the command carries (not the block's current config - that one
-  already validated, or the block would not exist in a valid document).
+  `palette` and asks it the same two questions the compiler's `:config`
+  stage and the editor's view model ask, against the **candidate** config
+  the command carries (not the block's current config - that one already
+  validated, or the block would not exist in a valid document): the type's
+  own `validate_config/1`, and
+  `StatifierBlocks.BlockType.type_expr_findings/2`, the one implementation
+  of what a `{:type_expr, opts}` field's value may be (ADR-0002 decision 7,
+  amended 2026-09-06). A value that is no arm the field admits is refused
+  here, at the edit gate, rather than passing the edit algebra and being
+  refused first at compile. The findings of both are reported together on
+  one `{:invalid_config, id, findings}`, `type_expr_findings/2`'s first, in
+  the order the compiler and the view model already use.
 
   Also `:ok` when the block does not resolve through `palette` at all -
   unknown type, too-new version, or a failed migration. There is no
@@ -268,13 +277,30 @@ defmodule StatifierBlocks.Edit do
   def check_config(%Palette{} = palette, %Document{} = document, {:update_config, id, config}) do
     with {:ok, block} <- find_block(document, id),
          {:ok, ref, _resolved_block} <- Palette.resolve(palette, block) do
-      case Palette.call(ref, :validate_config, [config], :ok) do
-        :ok -> :ok
-        {:error, findings} -> {:error, {:invalid_config, id, findings}}
+      case config_findings(ref, config) do
+        [] -> :ok
+        findings -> {:error, {:invalid_config, id, findings}}
       end
     else
       _error -> :ok
     end
+  end
+
+  # The two questions a block type answers about a candidate config, in the
+  # order `Compiler.config_findings/2` and `ViewModel.config_findings/3`
+  # already put them: the shared `{:type_expr, opts}` check first, then the
+  # type's own callback. One order in three places means the set an author
+  # is shown, the set a compile refuses on and the set this gate refuses on
+  # cannot drift apart.
+  @spec config_findings(Palette.type_ref(), Block.config()) :: [BlockType.finding()]
+  defp config_findings(ref, config) do
+    own =
+      case Palette.call(ref, :validate_config, [config], :ok) do
+        :ok -> []
+        {:error, findings} -> findings
+      end
+
+    BlockType.type_expr_findings(ref, config) ++ own
   end
 
   @spec check_leaf(Palette.t(), t(), {:ok, Document.t()}) ::
