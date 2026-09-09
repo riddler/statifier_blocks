@@ -10,6 +10,249 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.27.0] 2026-09-08
+
+0.27.0 is a minor, and its two breaking changes come first. **The compiled
+chart of every document holding an interruptible group moves**: a group's two
+interrupt transitions and the `<raise>` of the interrupt pair inside its rail
+now carry that group's own emitted state id, so a stored compiled chart or a
+pinned chart identity for such a document must be re-captured. The spelling an
+author configures and the pair a host block type raises do not change - the
+salt is applied at emit, and a raise outside any rail is emitted unchanged.
+And **`StatifierBlocks.Composite.expand/2` answers a tuple**,
+`{:ok, {blocks, param_map}} | {:error, reason}` instead of the bare
+`{blocks, param_map}` pair, and no longer raises; `expand!/2` is the raising
+spelling the compiler's Resolve and the editor call, and a caller that wants
+the old return and the old raise adds one character.
+
+Beside those, this release is about **admission** and **the card face**.
+Admission now resolves a composite's members through the palette it is asked
+about - `Assignability.kinds/3`, `slot_accepts/4` and `admits?/4` take the
+palette first - so a host-rooted composite is admitted on the kinds that host
+declares and a drop is refused exactly where a compile would refuse it. Beside
+the `Edit.Targets.accepted_types/4` sweep there is now a per-target fast path,
+`admits_at?/5` and `accepted_types_at/5`: one probe and one check at the
+slot's append gap, which is the call a "+" chooser at a gap should make.
+`Assignability.assignable?/5` takes a `strict: true` that refuses a pair
+either side of which resolves to `:unknown`.
+
+On the card, the summary-chip presentation cap is 32 characters rather than
+24, and a chip past it is drawn clipped with an ellipsis and its full text on
+the chip's `title` instead of being dropped. A presentation-cap `:lint`
+finding is read in the drawer's Findings tab rather than on the card face, and
+a finding that does draw on a face is laid out inside the card's own box. The
+card's controls moved into a reserved strip beside the title, so a title that
+wrapped to two lines is never covered and nothing truncates; "Save as a step"
+and its marking tray are no longer drawn on a mount that registered no
+`on_collapse`. Two class contracts moved with those:
+`.sb-node__chrome > .sb-node__strip > ...` for the controls, and
+`.sb-node__chrome > .sb-finding` for a face finding.
+
+For a host drawing its own surface, `Editor.ConfigForm.config_form/1` takes an
+`event` attr defaulting to `"config-change"` and posts the block id as a
+hidden input, so one call replaces a hand-written field pair, and
+`Edit.Session.refusal/1` says what a refused gesture refused in one sentence -
+the same sentence the editor now draws under its own toolbar.
+
+### Added
+
+- `StatifierBlocks.Composite.expand!/2` is the raising spelling of the
+  expansion: it keeps the return and the broken-declaration raises
+  `expand/2` had, and it is what the compiler's Resolve, the environment
+  walk and this module's own derivations call.
+
+- A data composite draws the summary chips its `use`-composite twin draws:
+  one chip per param the config gives a value to, minus those declared
+  `hidden?: true`.
+
+- `StatifierBlocks.Edit.Session.refusal/1` says what is in a session's
+  `last_error` as one sentence, so a host driving the same commit funnel
+  draws the same words for the same refusal.
+
+- `StatifierBlocks.Edit.Targets.admits_at?/5` answers whether one block type
+  would be accepted at one `{parent_id, slot}` target, with one probe and one
+  `StatifierBlocks.Assignability.check/5` at the slot's append gap instead of
+  the whole-document walk `accepted_types/4` runs per candidate - the call a
+  "+" chooser at a gap should make.
+- `StatifierBlocks.Edit.Targets.accepted_types_at/5` asks that question over a
+  candidate list, defaulting to the palette's own types, so a surface with a
+  shortlist pays for the shortlist. `accepted_types/4` is unchanged and stays
+  the sweep; the module's moduledoc says which of the three to call.
+
+- `StatifierBlocks.BlockType.summary_refusal_message?/1` says whether a
+  message is one `summary_refusal_message/4` wrote, which is how a surface
+  tells a presentation-cap diagnostic from every other `:lint` finding.
+
+- `StatifierBlocks.Assignability.assignable?/5` takes an options keyword whose
+  `strict: true` refuses a pair either side of which resolves to `:unknown`,
+  for the caller that must not admit a value nothing has typed. The host
+  relation is not asked about an unknown side.
+- The option defaults to `strict: false`, so `assignable?/3` and
+  `assignable?/4` decide exactly what they decided before.
+
+- `StatifierBlocks.Assignability.kinds/3`, `slot_accepts/4` and `admits?/4`
+  take a palette as their first argument and resolve a composite's members
+  through it, so a composite whose expansion is rooted at a host type is
+  admitted on the kinds that host declares rather than on the `[:step]`
+  fallback the core-only `kinds/2`, `slot_accepts/3` and `admits?/3` reach.
+  The `c:StatifierBlocks.BlockType.io/1` callback is unchanged and gains no
+  palette argument.
+
+- `StatifierBlocks.Editor.ConfigForm.config_form/1` takes an `event` attr,
+  defaulting to `"config-change"`, which is written to both `phx-change` and
+  `phx-submit`, so a host can draw one block's fields under its own
+  `handle_event/3` instead of hand-writing the field pair. The block the
+  params are about still arrives as the hidden `block-id` input the form
+  already posted.
+
+### Changed
+
+- The card's controls moved into a `.sb-node__strip` element inside
+  `.sb-node__chrome`. A host stylesheet or test selecting
+  `.sb-node__chrome > .sb-node__remove`, `> .sb-node__expand`,
+  `> .sb-node__save-step`, `> .sb-node__fold` or `> .sb-node__offer` should
+  select `.sb-node__chrome > .sb-node__strip > ...` instead. The classes, the
+  `data-reveal` contract and the events are unchanged, and the strip is drawn
+  on every card. Within it the controls are in left-to-right order, so a
+  keyboard now reaches Save before Expand.
+- `StatifierBlocks.Editor.Canvas.canvas/1`, `.Slot.slot/1` and
+  `.BlockNode.block_node/1` take a `collapsible` attr, threaded the way
+  `expandable` is; it is `false` by default and the editor passes whether its
+  `on_collapse` assign is a one-arity function.
+
+- **Breaking.** `StatifierBlocks.Composite.expand/2` now answers
+  `{:ok, {blocks, param_map}} | {:error, reason}` instead of the bare
+  `{blocks, param_map}` pair, and it no longer raises on a broken
+  declaration. A caller that wants the old return and the old raise calls
+  `expand!/2` and needs no other change; a caller that would rather be told
+  than raised at matches on the tuple.
+
+- A read-check `:type_mismatch` whose disagreeing writer is a block a
+  composite minted for its own expansion now names the composite the author
+  placed, by that composite's sentence, instead of naming an id the author
+  cannot see, select or edit. A writer the author did place - including a
+  block dropped into a composite's pass-through slot - is still named by its
+  own id.
+- The finding's reason tuple is unchanged: it still carries the minted id, so
+  a fixture run and the Source tab still say which member of the expansion
+  wrote the entry.
+
+- `StatifierBlocks.Composite.expand/2` blames a member carrying more than one
+  param's value on the first param in declaration order, instead of answering
+  `nil` for it; a finding re-anchored onto the composite now names a field to
+  open. A member carrying no param value still answers `nil`.
+
+- The summary-chip presentation cap is 32 characters, up from 24. Every
+  message that quotes the cap follows the number; `--sb-card-width` is
+  unchanged, because the cap is a legibility number rather than a
+  measurement of the card.
+- A summary chip past the cap is now drawn clipped, with an ellipsis in its
+  last position and its full text on the chip's `title`, instead of being
+  dropped. A blank, multiline or non-string chip is still refused. The
+  `:lint` finding that reports the length stays, and its sentence now ends
+  "so it is drawn clipped".
+- `StatifierBlocks.BlockType.badge/1` is unaffected: an over-long badge is
+  still dropped rather than clipped.
+- A presentation-cap `:lint` finding no longer draws on the card face; it is
+  read in the drawer's Findings tab, and still counts toward a card's
+  findings rollup. Every other finding a card carries draws where it did.
+- A finding that does draw on a card face is laid out inside the card's own
+  box. On a container it previously drew full-width between the card and the
+  slot label below it, where it read as belonging to the slot. A host
+  stylesheet targeting `.sb-node > .sb-finding` should target
+  `.sb-node__chrome > .sb-finding` instead.
+
+- The compiled chart of every document holding an interruptible group changes:
+  a group's two interrupt transitions, and the `<raise>` of the interrupt pair
+  inside its rail, now carry that group's own emitted state id
+  (`statifier_blocks.interrupt.resume.<group state id>`), so a stored compiled
+  chart or a pinned chart identity for such a document must be re-captured. The
+  spelling an author configures and the pair a host block type raises do not
+  change: the salt is applied at emit, and a raise outside any rail is emitted
+  unchanged. A railed composite can now be nested inside a resumable group's
+  body without the two rails contending for one event name.
+
+- `StatifierBlocks.ViewModel.overlay_findings/2` enforces the findings shape
+  `validate_config/1` declares: a block type answering with anything but a list
+  of `{key, message}` string pairs is refused with an error naming that type,
+  rather than failing a clause head that named the view model.
+
+- Kind admission inside `check/5`, `valid_targets/4` and `validate/3`, and the
+  editor's expansion check, now route through the palette-carrying arities, so
+  a drop is refused exactly where a compile would be refused. A host-rooted
+  composite that was wrongly admitted at a step slot, or wrongly refused at an
+  interrupts slot, now gets the verdict the compiler gives it.
+
+- `config_form/1`'s `target` attr is optional and defaults to `nil`, which
+  renders no `phx-target` anywhere - the case of a host whose form posts to
+  the LiveView it is mounted in. Every present caller passes a target and is
+  unchanged.
+
+### Fixed
+
+- The assigns map an `:expression` field hands a host's `expression_component`
+  carries a `debounce` key - the field's own `debounce` value, and `nil` when
+  the caller named none - so an override can rate-limit the way every other
+  control in the same form does instead of posting per keystroke. Overrides
+  that ignore the key are unchanged.
+
+- An `:expression` field served through the `expression_component` seam is
+  handed the values the host offered for that field ahead of the document's
+  declared paths - one de-duplicated `candidates` list - instead of the
+  declared paths alone. A host that named values for the field now sees them
+  in its own control, the way the plain input this package renders itself has
+  always shown them; a host that named none sees the declared paths exactly as
+  before.
+
+- The "Save as a step" control and its marking tray are no longer drawn on a
+  mount that registered no `on_collapse` callback, and the four events the
+  gesture is made of are answered with the socket unchanged there. The
+  gesture's only outcome is that callback, so a mount without one offered a
+  marking step, a Save, and then silence. "Replace with its steps" is
+  unaffected in both directions: it commits an edit the editor makes itself.
+- The card's controls no longer draw on top of a title that wrapped to two
+  lines. They sit in a reserved control strip beside the title - a grid
+  column of its own, held whether or not the controls are revealed - so a
+  long name wraps beside them and nothing truncates.
+
+- The edit algebra's config gate refuses a `{:update_config, id, config}`
+  whose value for a `{:type_expr, opts}` field is no arm that field admits,
+  so the editor reports it where the edit is made rather than only at
+  compile.
+
+- An empty slot on a read-only editor mount now draws a non-interactive
+  placeholder. The mark that says "nothing is here yet" was styled on the gap's
+  "+" button, which a read-only mount does not draw, so an empty arm rendered as
+  a slot header and nothing else.
+
+- A read-only editor mount now refuses the Expand gesture. "Replace with its
+  steps" reached the document and fired `on_change` on a mount whose profile
+  said `read_only?: true`, which every other gesture that changes the document
+  already refused.
+
+- A gesture the editor refuses now draws the refusal as one sentence in the
+  canvas column, under the toolbar. Every refusal already recorded its reason
+  and nothing read it, so a gesture the editor refused looked on screen
+  exactly like a gesture that did nothing.
+
+- A composite's expansion is compiled at each member type's **current**
+  version, so a config value a subtree writes reaches the chart as written
+  rather than through that type's `migrate_config/2`. A subtree naming
+  `core.send` or `core.wait` - the two core types past version 1 - used to
+  have its `delay` or `duration` read as a stored value at version 1 and
+  silently rewritten; such a value is now the author's to write in the
+  accepted spelling, and one that is not is refused by name. A block the
+  document stores is untouched: it still migrates.
+
+- `StatifierBlocks.Composite.Collapse.replacement/4` gives the composite it
+  inserts the collapsed arrangement's own block id instead of a freshly
+  minted one, so the state ids of the chart a host gets back after committing
+  the swap are the ones the document implies rather than a new UXID each time.
+
+- `use StatifierBlocks.Composite` refuses an option it does not recognize,
+  naming the key, instead of dropping it and compiling the composite with the
+  default the declaration was trying to replace.
+
 ## [0.26.0] 2026-09-07
 
 0.26.0 is about what a host does **around** a composite.
@@ -2877,6 +3120,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.27.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.27.0
 [0.26.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.26.0
 [0.25.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.25.0
 [0.24.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.24.0
