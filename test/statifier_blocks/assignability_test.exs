@@ -10,7 +10,15 @@ defmodule StatifierBlocks.AssignabilityTest do
 
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{Assignability, AssignabilityFixtures, Block, Document, Palette}
+  alias StatifierBlocks.{
+    Assignability,
+    AssignabilityFixtures,
+    Block,
+    CardProcessingFixtures,
+    Document,
+    Palette
+  }
+
   alias StatifierBlocks.AssignabilityFixtures.{Deny, Widens}
   alias StatifierBlocks.BlockTypeFixtures.Minimal
 
@@ -281,6 +289,138 @@ defmodule StatifierBlocks.AssignabilityTest do
       # this isn't a vacuous inclusion.
       assert Assignability.assignable?(with_module, "myapp.settled_txn", "myapp.card_txn")
       refute Assignability.assignable?(without, "myapp.settled_txn", "myapp.card_txn")
+    end
+  end
+
+  describe "assignable?/5 - the strict form (ADR-0002's Note of 2026-09-08, item 4)" do
+    @strict_types [
+      :unknown,
+      "myapp.transaction",
+      "myapp.credit_card_txn",
+      "myapp.settled_txn",
+      "myapp.card_txn"
+    ]
+
+    defp strict_palettes do
+      [
+        Palette.new(%{}),
+        Palette.new(%{}, assignability: Widens),
+        Palette.new(%{}, assignability: Deny)
+      ]
+    end
+
+    # sabotage: change the `:unknown` arm's `not Keyword.get(opts, :strict,
+    # false)` to `true` -> both assertions go red
+    test "an :unknown held side is refused under strict: true" do
+      palette = Palette.new(%{})
+
+      refute Assignability.assignable?(palette, :unknown, "myapp.card_txn", %{}, strict: true)
+      assert Assignability.assignable?(palette, :unknown, "myapp.card_txn", %{}, strict: false)
+    end
+
+    # sabotage: as above
+    test "an :unknown expected side is refused under strict: true" do
+      palette = Palette.new(%{})
+
+      refute Assignability.assignable?(palette, "myapp.card_txn", :unknown, %{}, strict: true)
+      assert Assignability.assignable?(palette, "myapp.card_txn", :unknown, %{}, strict: false)
+    end
+
+    # sabotage: same arm - an unknown pair is the both-sides case and must
+    # not slip through on some "identical unknowns" reading
+    test ":unknown against :unknown is refused under strict: true" do
+      refute Assignability.assignable?(Palette.new(%{}), :unknown, :unknown, %{}, strict: true)
+      assert Assignability.assignable?(Palette.new(%{}), :unknown, :unknown)
+    end
+
+    # sabotage: make the `:unknown` arm fall through to `host_widens?/3`
+    # instead of answering `false` -> a relation that widens everything
+    # would re-admit the pair and this goes red
+    test "the host relation is not asked about an unknown side under strict: true" do
+      for module <- [Widens, Deny, RaisingRelation] do
+        palette = Palette.new(%{}, assignability: module)
+
+        refute Assignability.assignable?(palette, :unknown, "myapp.card_txn", %{}, strict: true)
+        refute Assignability.assignable?(palette, "myapp.card_txn", :unknown, %{}, strict: true)
+      end
+    end
+
+    # sabotage: move the `strict` check out of the `:unknown` arm into the
+    # head so it refuses everything -> this goes red, since identity and the
+    # host's widening both survive strict
+    test "strict: true narrows nothing but the unknown step" do
+      for palette <- strict_palettes(), type <- tl(@strict_types) do
+        assert Assignability.assignable?(palette, type, type, %{}, strict: true),
+               "#{inspect(palette.assignability)} refused #{type} against itself under strict"
+      end
+
+      widens = Palette.new(%{}, assignability: Widens)
+
+      assert Assignability.assignable?(
+               widens,
+               "myapp.settled_txn",
+               "myapp.card_txn",
+               %{},
+               strict: true
+             )
+    end
+
+    # sabotage: change the option's default in `Keyword.get/3` to `true` ->
+    # every unknown pair flips and this goes red
+    test "the default path is unchanged: /4, /5 with no opts, and strict: false agree" do
+      for palette <- strict_palettes(), held <- @strict_types, expected <- @strict_types do
+        default = Assignability.assignable?(palette, held, expected, %{})
+
+        assert Assignability.assignable?(palette, held, expected, %{}, []) == default,
+               "an empty opts list moved #{inspect(held)} -> #{inspect(expected)}"
+
+        assert Assignability.assignable?(palette, held, expected, %{}, strict: false) == default,
+               "strict: false moved #{inspect(held)} -> #{inspect(expected)}"
+
+        assert Assignability.assignable?(palette, held, expected, %{}, other: :ignored) ==
+                 default,
+               "an unrelated option moved #{inspect(held)} -> #{inspect(expected)}"
+      end
+    end
+
+    # sabotage: as above - this is the same property stated as a set
+    # relation, and it is the one that pins strict as a *subset*
+    test "the strict accepted set is exactly the default set minus the unknown pairs" do
+      for palette <- strict_palettes(), held <- @strict_types, expected <- @strict_types do
+        strict = Assignability.assignable?(palette, held, expected, %{}, strict: true)
+        default = Assignability.assignable?(palette, held, expected, %{})
+
+        if held == :unknown or expected == :unknown do
+          refute strict, "strict admitted #{inspect(held)} -> #{inspect(expected)}"
+          assert default
+        else
+          assert strict == default,
+                 "strict moved the typed pair #{inspect(held)} -> #{inspect(expected)}"
+        end
+      end
+    end
+
+    # sabotage: put the `strict` check ahead of the `Environment.satisfies/3`
+    # case -> coverage stops being reached and this goes red
+    test "coverage still admits a record read as a shape it covers under strict: true" do
+      declarations =
+        StatifierDatamodel.Declarations.from_document(CardProcessingFixtures.datamodel())
+
+      assert Assignability.assignable?(
+               Palette.new(%{}),
+               "cards.credit_txn",
+               "Settleable",
+               declarations,
+               strict: true
+             )
+
+      refute Assignability.assignable?(
+               Palette.new(%{}),
+               "cards.credit_txn",
+               "Settled",
+               declarations,
+               strict: true
+             )
     end
   end
 
