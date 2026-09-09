@@ -2,7 +2,41 @@ defmodule StatifierBlocks.ViewModelTest do
   use ExUnit.Case, async: true
 
   alias StatifierBlocks.{Block, BlockTypeFixtures, Document, Finding, Palette, ViewModel}
+  alias StatifierBlocks.Edit.{History, Session}
   alias StatifierBlocks.ViewModel.{Field, Form, Node, PaletteGroup, Slot}
+
+  defmodule MapAnswering do
+    @moduledoc """
+    A leaf whose `validate_config/1` answers `{:error, %{key => message}}`
+    instead of the declared list of pairs - the shape every `Enum.group_by/3`
+    consumer used to accept by accident, written down here so the refusal has
+    something real to refuse.
+    """
+
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+
+    @impl true
+    def slots(_config), do: []
+
+    @impl true
+    def config_schema(_config) do
+      [%{key: "label", type: :string, label: "Label", required?: true, default: ""}]
+    end
+
+    @impl true
+    def validate_config(config) do
+      case Map.get(config, "label") do
+        label when is_binary(label) -> :ok
+        _refused -> {:error, %{"label" => "must be a string"}}
+      end
+    end
+
+    @impl true
+    def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+  end
 
   # The palette every test in this file builds from: the real `core.*`
   # vocabulary plus `BlockTypeFixtures.Minimal`, a type that implements only
@@ -353,6 +387,57 @@ defmodule StatifierBlocks.ViewModelTest do
 
       assert ViewModel.overlay_findings(nil, [{"k", "m"}]) == nil
       assert ViewModel.overlay_findings(formless, [{"k", "m"}]) == formless
+    end
+
+    # The session, holding a refusal from a type that answered with a map:
+    # `change_config/3` stores whatever the gate handed it, so this is exactly
+    # the value a surface pipes into `overlay_findings/2`.
+    defp map_answering_refusal do
+      palette = Palette.new(Map.put(Palette.core_types(), "myapp.map_answering", MapAnswering))
+
+      block = Block.new("myapp.map_answering", id: "blk_MAP", config: %{"label" => "Name"})
+
+      document =
+        Document.new(Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [block]}),
+          id: "bdoc_map"
+        )
+
+      session = %Session{palette: palette, document: document, history: History.new()}
+
+      {:error, refused} = Session.change_config(session, "blk_MAP", %{"label" => 42})
+
+      node =
+        document
+        |> ViewModel.build(palette, [])
+        |> find_node("blk_MAP")
+
+      {node, Map.fetch!(refused.draft_findings, "blk_MAP")}
+    end
+
+    # Sabotage: `checked_findings/3` returning `findings` unchanged - the map
+    # reaches `Enum.group_by/3`, which takes it, and the author reads findings
+    # a type produced in a shape the callback never declared.
+    test "a map-answering type is refused with the type named" do
+      {node, findings} = map_answering_refusal()
+
+      assert is_map(findings) and not is_list(findings)
+
+      message =
+        assert_raise ArgumentError, fn -> ViewModel.overlay_findings(node, findings) end
+
+      assert message.message =~ ~s(block type "myapp.map_answering")
+      assert message.message =~ "validate_config/1"
+      assert message.message =~ ~s(block "blk_MAP")
+      assert message.message =~ "{key, message} string pairs"
+    end
+
+    # Sabotage: dropping `finding_pair?/1` from the check - a list whose
+    # elements are not pairs passes `is_list/1` and dies inside
+    # `Enum.group_by/3` naming this function rather than the type.
+    test "a list of non-pairs is refused the same way" do
+      assert_raise ArgumentError, ~r/block type "core.resumable_group"/, fn ->
+        ViewModel.overlay_findings(drafted_group(), [%{key: "history", message: "no"}])
+      end
     end
   end
 
