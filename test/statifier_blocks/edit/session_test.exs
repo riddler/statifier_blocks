@@ -321,4 +321,81 @@ defmodule StatifierBlocks.Edit.SessionTest do
              ]
     end
   end
+
+  describe "refusal/1" do
+    # Item 6 of ADR-0005's Note of 2026-09-08 rules that a refused gesture
+    # renders `last_error` on the surface, and leaves the sentence to the
+    # refusal's own vocabulary. The vocabulary is this module's, because
+    # `last_error` is: a host driving the same funnel refuses the same
+    # gestures for the same reasons, and a sentence kept in the package
+    # editor would be one the host had to write again.
+    #
+    # Every reason a gesture can leave in `last_error` is here, one per
+    # case, and each is asserted to be a sentence of its own rather than to
+    # be the fallback - which is the whole claim: a refusal an author cannot
+    # act on is what item 6 is about.
+    #
+    # Sabotage: deleted the `{:cannot_expand_root, id}` clause - red, because
+    # the reason falls through to "That change was refused." and the author
+    # is told that something was refused without being told what.
+    for {reason, sentence} <- [
+          {:nothing_to_undo, "There is nothing to undo."},
+          {:nothing_to_redo, "There is nothing to redo."},
+          {{:no_such_block, "blk_NOPE"}, "That block is no longer in the document."},
+          {{:no_such_slot, "blk_ROOT", "rail"}, ~s(That block has no "rail" slot.)},
+          {{:index_out_of_range, {"blk_ROOT", "body", 9}},
+           "That position is no longer in the slot."},
+          {{:would_cycle, "blk_ROOT"}, "A block cannot be moved inside itself."},
+          {{:duplicate_block_id, "blk_A"}, "That change would give two blocks the same id."},
+          {{:cannot_remove_root, "blk_ROOT"}, "The outermost block cannot be removed."},
+          {{:invalid_config, "blk_A", []}, "Those settings were refused."},
+          {{:unknown_block_type, "myapp.nope"}, ~s(The palette has no block type "myapp.nope".)},
+          {{:unknown_recipe, "nope"}, ~s(The palette has no arrangement "nope".)},
+          {{:recipe_out_of_reach, "authorize_with_a_deadline"},
+           ~s(The arrangement "authorize_with_a_deadline" does not fit where it was placed.)},
+          {{:not_a_composite, "blk_A"},
+           "That block is not made of steps, so there is nothing to replace it with."},
+          {{:cannot_expand_root, "blk_ROOT"},
+           "The outermost block cannot be replaced with its steps."},
+          {{:expansion_not_admitted, {"blk_G", "rail", 0}},
+           "This slot does not accept the steps that block is made of, so nothing was replaced."},
+          {{:composite_expansion_failed, "blk_GS", "duplicate local ids"},
+           "That block's declaration cannot be expanded, so nothing was replaced."},
+          {{:not_one_subtree, ["blk_A", "blk_B"]},
+           "A step is saved from one block and everything inside it, " <>
+             "and that is not what is selected."},
+          {{:cannot_collapse_root, "blk_ROOT"}, "The outermost block cannot be saved as a step."},
+          {{:unspellable_field, "blk_A", "deadline"},
+           ~s(The setting "deadline" cannot be carried into a step.)}
+        ] do
+      # Sabotage: deleted the arm this case names from `refusal/1` - red,
+      # because the reason falls through to the generic sentence.
+      test "#{inspect(reason)} reads as its own sentence" do
+        assert Session.refusal(unquote(Macro.escape(reason))) == unquote(sentence)
+      end
+    end
+
+    # One refusal that is not this module's to phrase. A datamodel envelope
+    # is `StatifierBlocks.Declarations.refusal/1`'s, and is handed to it
+    # rather than re-phrased here, so the declarations panel and the canvas
+    # say one thing about one refusal.
+    #
+    # Sabotage: gave the envelope its own sentence here - green until the
+    # two wordings drift, which is the defect, and red the moment either
+    # side is edited without the other.
+    test "a datamodel envelope keeps the declarations panel's own wording" do
+      reason = {:malformed_envelope, {:datamodel, {:duplicate_id, "signup"}}}
+
+      assert Session.refusal(reason) == StatifierBlocks.Declarations.refusal(reason)
+      assert Session.refusal(reason) =~ "signup"
+    end
+
+    # Sabotage: made the fallback `inspect/1` the term - red, because the
+    # author is then shown a tuple, which is exactly what item 6's ruling
+    # about the panel's own sentence rules out.
+    test "a reason a later amendment adds falls back to the generic sentence" do
+      assert Session.refusal({:something_new, "blk_A"}) == "That change was refused."
+      assert Session.refusal(:nothing_recognisable) == "That change was refused."
+    end
+  end
 end

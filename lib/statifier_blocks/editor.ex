@@ -985,6 +985,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:run_events, run_events(assigns))
         |> assign(:run_sendable?, run_sendable?(assigns))
         |> assign(:declaration_refusal, declaration_refusal(assigns))
+        |> assign(:gesture_refusal, gesture_refusal(assigns))
         |> assign(:marks, run_marks)
         |> assign(:fit_target, fit_target(assigns, run_marks))
         |> assign(:depth, Shell.depth(assigns.view_model.root))
@@ -1045,6 +1046,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               fittable?={@fit_target != nil}
               target={@myself}
             />
+
+            <p
+              :if={@gesture_refusal != nil}
+              class="sb-editor__refusal"
+              role="status"
+              data-refusal="gesture"
+            >
+              {@gesture_refusal}
+            </p>
 
             <RunPane.run_pane
               id={"#{@id}-run"}
@@ -3209,6 +3219,28 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec declaration_entries(map()) :: [DatamodelEntry.t()]
     defp declaration_entries(%{declaration_draft: %{entries: entries}}), do: entries
     defp declaration_entries(assigns), do: assigns.document.datamodel
+
+    # The last refused gesture, as the one sentence the canvas column draws
+    # (ADR-0005's Note of 2026-09-08, item 6). Every refusal that has nowhere
+    # else to go is in `last_error` - `5E`'s four, the history's two ends, a
+    # pick the palette cannot resolve, the proposing half of "Save as a step"
+    # - and until this line was drawn none of them reached the author: a
+    # gesture the editor refused looked exactly like a gesture that did
+    # nothing.
+    #
+    # `nil` when nothing was refused, which is also what clears it: `landed/3`
+    # writes `last_error: nil` on every commit that moves the document, so the
+    # sentence is gone by the author's next successful gesture rather than
+    # needing a dismissal of its own.
+    #
+    # The vocabulary is `Edit.Session`'s, not this component's. `last_error`
+    # is the session's field and its reasons are the funnel's, so the sentence
+    # for one belongs where a host driving the same funnel can reach it; what
+    # is decided here is only WHERE it draws, which is what the record leaves
+    # to this bead.
+    @spec gesture_refusal(map()) :: String.t() | nil
+    defp gesture_refusal(%{last_error: nil}), do: nil
+    defp gesture_refusal(%{last_error: reason}), do: Session.refusal(reason)
 
     @spec declaration_refusal(map()) :: String.t() | nil
     defp declaration_refusal(%{declaration_draft: %{refusal: refusal}}), do: refusal
