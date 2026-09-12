@@ -3534,3 +3534,95 @@ The functions it describes, for a later reader, are at `composite.ex:441`
 and `:468` (the `param_map/2` call `T3` rests on).
 
 Filed with `sb-vjvq`, campaign SF038.
+
+## Note (2026-09-12): `emit/2`'s return type does not widen; a non-SCXML target is a separate optional callback, named and not built
+
+RQ-SF041-2, ruled by the operator on 2026-09-12, answers the record question
+the SF040 element-editor spike raised against **decision 4** at `:169`. This
+section records the ruling. It changes no decision, edits no line above it,
+and nothing in `lib/` changes with it.
+
+Read at `main` `d9f4896`.
+
+### 1. The question, and where it came from
+
+`docs/spikes/SF040-element-editor.md` **section 4, "Ask R"** (`:427`) states
+the question: *should a block type be able to emit for a non-SCXML target, and
+if so by what shape?* It offers two candidates - widen `emit/2`'s return, or
+add a separate optional callback - and prefers the second. Section 3's
+recommendation (`:365`) is the half that rules on the editor and defers the
+seam: its part (b) says the in-compiler emit "turns on a record decision" and
+should not be taken until SF041 rules it.
+
+The spike is correct that the narrowing is this record's. Read at `d9f4896`:
+
+- **decision 4** (`:169`) fixes
+  `{:ok, Emission.t()} | {:error, [finding()]}` and glosses `Emission.t()` as
+  "a structural representation of one SCXML subtree" (`:194`);
+- `ADR-0002` types the same callback loosely -
+  `@callback emit(Block.t(), context :: term()) :: {:ok, term()} | {:error, term()}`
+  at `docs/adr/0002-block-type-behaviour.md:481` - and delegates the signature
+  here in terms (`:385`, "The compiler and provenance map (sb-iwz) own
+  `emit/2`'s signature"), with its own row note at `:123`;
+- the shipped behaviour matches this record, not `ADR-0002`'s loose gloss:
+  `lib/statifier_blocks/block_type.ex:505-506` at `d9f4896` types the callback
+  `@callback emit(Block.t(), StatifierBlocks.Compiler.Context.t()) :: {:ok,
+  StatifierBlocks.Emission.t()} | {:error, emit_error()}`, with `:501` saying
+  "The return is structural, never a string".
+
+### 2. The ruling
+
+1. **`emit/2`'s return type does not widen.** Decision 4's sentence stands as
+   written. A `map()` arm would not narrow that sentence, it would replace it:
+   a type answering `{:ok, %{}}` would pass the callback's own spec and fail
+   downstream in the SCXML pass with no finding naming the cause, and a widened
+   return cannot let one block type serve two targets at once.
+2. **A non-SCXML target, when it is wanted, is a SEPARATE optional callback.**
+   Its name is `emit_node/2`. It answers **one** node of the target document -
+   not a subtree, not a document - and it carries the **same provenance tuple**
+   decision 5 fixes at `:230`, `{block_id, role_or_nil, config_key_or_nil}`, so
+   that a finding over a non-SCXML artifact routes by the map this record
+   already specifies rather than by a second, parallel one. It is **optional**:
+   a block type that declares neither callback is refused at Resolve, as
+   `ADR-0002` decision 8 already resolves through the palette, rather than at
+   Emit. Being a callback on the block-type behaviour, it is **`ADR-0002`'s to
+   declare**, and it is declared there when it is built, not here and not now.
+   (The spike's candidate 2 spells the same shape `emit_json/2`, "or an
+   emitter-keyed callback", at `docs/spikes/SF040-element-editor.md:465`. The
+   ruled name is `emit_node/2`, and the difference is the name only: one node,
+   not one subtree, is the part the name is carrying.)
+3. **The emit seam stays as it is.** No function on the SCXML path changes
+   shape for this. At `d9f4896`: `emit_stage/3` at
+   `lib/statifier_blocks/compiler.ex:1658`, the private `emit/2` at `:1798`,
+   and `chart_stage/5` at `:2503` each assume an SCXML emission, and each is
+   correct to. A second target arrives beside them, never through them.
+4. **The interim route is a host walk.** Until such a callback is built, a host
+   that wants a non-SCXML artifact walks `Document.blocks/1` plus
+   `committed_config/2` itself. That is the route the spike measured, at "under
+   about 120 lines with zero package change and zero record cost"
+   (`docs/spikes/SF040-element-editor.md:390`), and it is the answer for anyone
+   asking today.
+
+### 3. What is NOT built
+
+`emit_node/2` is **not built in this campaign** and no bead carries it. There
+is no `emit_node` in this repository at `d9f4896`: `grep -rn emit_node lib/
+docs/ test/` answers nothing, and this section is the first text in the
+repository to use the name. It is named here so that a later request has a
+fixed shape to build to and a fixed record to amend - `ADR-0002` for the
+declaration, this record for the provenance tuple it must carry - rather than
+re-deriving the question. Whoever takes it should read section 3(c) of the
+spike first: the spike's own conclusion is that the blocking work under either
+answer is the element vocabulary, which is larger than either seam and
+independent of this ruling.
+
+### 4. Cites
+
+Cites into this file: `:169` (decision 4), `:194`, `:230` (decision 5's owner
+tuple). Cites into `ADR-0002`: `:123`, `:385`, `:481`. Code cites, all read at
+`main` `d9f4896` and re-verified by anchor: `block_type.ex:501`, `:505-506`;
+`compiler.ex:1658`, `:1798`, `:2503`. Spike cites, read at `d9f4896`:
+`docs/spikes/SF040-element-editor.md:365`, `:390`, `:427`, `:465`. This section
+appends at the end of the file, so no line above it moved.
+
+Filed with `sb-xbn9`, campaign SF041.
