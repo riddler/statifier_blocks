@@ -25,7 +25,7 @@ defmodule StatifierBlocks.Compiler.FailureOutcomeTest do
   alias StatifierBlocks.{Block, BlockType, Compiler, Document, Palette, Provenance}
   alias StatifierBlocks.Core.{Invoke, Map, Subchart}
 
-  @tag_param ~s(<param expr="'failed'" name="statifier_persistence:run_status"/>)
+  @tag_param ~s(<param expr="'failed'" name="statifier_persistence:execution_status"/>)
 
   @map_config %{
     "items" => "signup.invitees",
@@ -234,7 +234,7 @@ defmodule StatifierBlocks.Compiler.FailureOutcomeTest do
       assert finished.status == :done
 
       assert [done: %Statifier.Effect.Done{donedata: donedata}] = effects
-      assert donedata == %{"statifier_persistence:run_status" => "failed"}
+      assert donedata == %{"statifier_persistence:execution_status" => "failed"}
     end
   end
 
@@ -450,7 +450,7 @@ defmodule StatifierBlocks.Compiler.FailureOutcomeTest do
 
       assert finished.status == :done
       assert [done: %Statifier.Effect.Done{donedata: donedata}] = effects
-      assert donedata == %{"statifier_persistence:run_status" => "failed"}
+      assert donedata == %{"statifier_persistence:execution_status" => "failed"}
     end
 
     # Section 4's definition of handling is a property of the failing

@@ -176,7 +176,7 @@ defmodule StatifierBlocks.Compiler do
       the role `child_failed`, one transition per unhandled pair reaches
       it from the root block's own state, and it carries
       `<param name="outcome" expr="'error'"/>` beside the reserved
-      `<param name="statifier_persistence:run_status" expr="'failed'"/>`.
+      `<param name="statifier_persistence:execution_status" expr="'failed'"/>`.
       The outcome it reports is `error` rather than the failing block's
       own outcome name, because `StatifierBlocks.Core.Subchart` appends
       `error` to its outcomes whether or not the author listed it, so it
@@ -207,9 +207,10 @@ defmodule StatifierBlocks.Compiler do
       minted from the root block's id under the role `root_failed`, one
       transition per unhandled pair reaches it from the root block's own
       state, and its `<donedata>` holds only the reserved
-      `<param name="statifier_persistence:run_status" expr="'failed'"/>` -
-      the key `statifier_persistence`'s ADR-0008 amendment of 2026-09-06
-      fixes, which a durable stepper reads to decide that the run failed.
+      `<param name="statifier_persistence:execution_status" expr="'failed'"/>` -
+      the key `statifier_persistence`'s ADR-0011 decision 4 (proposed,
+      SF041) fixes, which a durable stepper reads to decide that the
+      execution failed.
       So a root document whose nested step fails still reaches `:done`,
       and says that it failed when it gets there. A document with no
       unhandled failure below its root gains nothing here, and a root
@@ -357,8 +358,20 @@ defmodule StatifierBlocks.Compiler do
   # may not mint.
   @outcome_param_name "outcome"
 
-  @run_status_key "statifier_persistence:run_status"
-  @run_status_failed "failed"
+  @execution_status_key "statifier_persistence:execution_status"
+  @execution_status_failed "failed"
+
+  # The key this package emitted and reserved before
+  # `statifier_persistence`'s ADR-0011 decision 4 renamed it. It is never
+  # minted again. It stays on the reserved list beside the new key so that
+  # a `donedata_type/1` entry naming either one is refused *by name* - both
+  # are already refused by `Config.identifier?/1`, since a namespaced name
+  # is not a bare lowercase identifier, so what the list adds is the
+  # finding message, which tells the host type's author which of the two
+  # collisions it walked into rather than only that the shape is wrong.
+  # The old name earns that for as long as `statifier_persistence` 0.12's
+  # transitional reader reads it; 0.13.0 drops that reader.
+  @legacy_execution_status_key "statifier_persistence:run_status"
 
   # ADR-0002's amendment of 2026-09-06, section 4: the role the one shared
   # top-level final for an unhandled failure below the root is minted
@@ -2118,10 +2131,11 @@ defmodule StatifierBlocks.Compiler do
   # noted on both records: a final for a **failure-classed** outcome - one
   # `BlockType.failure_outcomes/2` names - carries a reserved `<donedata>`
   # `<param>` under **both** options. The key is
-  # `statifier_persistence:run_status` and its value is `'failed'`, spelled
-  # here exactly as `statifier_persistence`'s ADR-0008 amendment of
-  # 2026-09-06 fixes it, and a durable stepper reads it to decide that the
-  # run failed. Under `:terminate` it is the only `<param>` the final
+  # `statifier_persistence:execution_status` and its value is `'failed'`,
+  # spelled here exactly as `statifier_persistence`'s ADR-0011 decision 4
+  # (proposed, SF041) fixes it, and a durable stepper reads it to decide
+  # that the execution failed. Under `:terminate` it is the only `<param>`
+  # the final
   # carries, because the root shape still says nothing about which outcome
   # was reached; under `:child_use` it rides beside the `outcome` param
   # that shape already emits. The colon separator is the record's: a dotted
@@ -2219,7 +2233,7 @@ defmodule StatifierBlocks.Compiler do
   defp completion_final(final_id, outcome, donedata?, failure?, declared) do
     params =
       if(donedata?, do: [outcome_param(outcome)], else: []) ++
-        if(failure?, do: [run_status_param()], else: []) ++
+        if(failure?, do: [execution_status_param()], else: []) ++
         declared
 
     case params do
@@ -2271,13 +2285,14 @@ defmodule StatifierBlocks.Compiler do
     end)
   end
 
-  # The failure seam's reserved key, spelled as `statifier_persistence`'
-  # ADR-0008 amendment of 2026-09-06 fixes it: one key, one closed value.
-  @spec run_status_param() :: Emission.t()
-  defp run_status_param do
+  # The failure seam's reserved key, spelled as `statifier_persistence`'s
+  # ADR-0011 decision 4 (proposed, SF041) fixes it: one key, one closed
+  # value. The key it replaces is never minted again, only reserved.
+  @spec execution_status_param() :: Emission.t()
+  defp execution_status_param do
     Emission.element(
       "param",
-      [{"expr", "'" <> @run_status_failed <> "'"}, {"name", @run_status_key}]
+      [{"expr", "'" <> @execution_status_failed <> "'"}, {"name", @execution_status_key}]
     )
   end
 
@@ -2479,7 +2494,8 @@ defmodule StatifierBlocks.Compiler do
 
   @spec declarable_param?(BlockType.donedata_field()) :: boolean()
   defp declarable_param?(%{name: name}) do
-    Config.identifier?(name) and name not in [@outcome_param_name, @run_status_key]
+    Config.identifier?(name) and
+      name not in [@outcome_param_name, @execution_status_key, @legacy_execution_status_key]
   end
 
   @spec donedata_finding(BlockType.donedata_field(), Block.id()) :: Finding.t()
@@ -2487,9 +2503,10 @@ defmodule StatifierBlocks.Compiler do
     Finding.new(
       :emit,
       {:invalid_donedata_field, name},
-      ~s(declares the done-data field "#{name}", which is either one of the two names the ) <>
-        ~s(compiler mints - "#{@outcome_param_name}" and "#{@run_status_key}" - or not a ) <>
-        "bare lowercase identifier",
+      ~s(declares the done-data field "#{name}", which is either one of the names the ) <>
+        ~s(compiler mints or reserves - "#{@outcome_param_name}", "#{@execution_status_key}" ) <>
+        ~s(and the retired "#{@legacy_execution_status_key}" - or not a bare lowercase ) <>
+        "identifier",
       block_id: root_id
     )
   end

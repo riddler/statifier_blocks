@@ -71,4 +71,45 @@ defmodule StatifierBlocks.Compiler.ByteCorpusTest do
              "missing golden for #{name}/#{mode}"
     end
   end
+
+  # `sb-hykt` (SF041): the donedata key the failure seam mints moved to
+  # `statifier_persistence:execution_status` (`statifier_persistence`
+  # ADR-0011 decision 4), and the four goldens of the two documents that
+  # DO mint a failure-classed final were re-baselined in that same
+  # request. This pins the complement the campaign consent asks a test to
+  # prove: a document with no failure-classed final compiles byte for
+  # byte to what it compiled to before the key moved.
+  #
+  # The proof is that these three entries' nine goldens were NOT touched
+  # by that request - they still carry the bytes captured at 0.21.0 (and,
+  # for the two worked examples, at ADR-0010 decision 8) - so the
+  # assertion below reads pre-rename bytes out of the tree and compares
+  # them against today's compiler. The `refute` is the second half: no
+  # key in the `statifier_persistence:` namespace appears at all, so the
+  # entries are genuinely the no-failure-classed-final case and the
+  # comparison is not passing because both sides moved together.
+  #
+  # `invoke_handled` is the one of the three whose type classes an
+  # outcome; its failure slot is occupied, so nothing propagates to the
+  # root and no reserved param is minted. The two worked examples declare
+  # no outcomes and class nothing.
+  #
+  # sabotage: minted the reserved param unconditionally rather than on
+  # `failure?` -> all nine of these compiles gain a param their golden
+  # does not have and this goes red (verified)
+  test "a document with no failure-classed final compiles byte-identically across the rename" do
+    for name <- ["worked_example", "signup_wizard", "invoke_handled"],
+        {mode, opts} <- ByteCorpus.modes() do
+      {^name, document, palette} =
+        Enum.find(ByteCorpus.entries(), &(elem(&1, 0) == name))
+
+      assert {:ok, compiled} = Compiler.compile(document, palette, opts)
+
+      refute compiled.scxml =~ "statifier_persistence:",
+             "#{name}/#{mode} mints a reserved persistence param"
+
+      assert compiled.scxml == File.read!(ByteCorpus.golden_path(name, mode)),
+             "#{name}/#{mode} moved"
+    end
+  end
 end
