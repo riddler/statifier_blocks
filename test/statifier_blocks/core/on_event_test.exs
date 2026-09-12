@@ -887,24 +887,33 @@ defmodule StatifierBlocks.Core.OnEventTest do
     end
 
     # A nested source is guarded by one condition over the whole path, not
-    # by a chain of them, because an access whose target is not a map
-    # answers the marker too. An absent intermediate has to be as quiet as
-    # an absent leaf: no write, and no `error.execution` beside it.
+    # by a chain of them, because an access whose target is neither map nor
+    # list answers the marker too. An absent intermediate has to be as
+    # quiet as an absent leaf, and a present one still has to write.
+    #
+    # What this does NOT assert is that no `error.execution` is raised
+    # beside the skip. That event is not observable here: a non-boolean
+    # `cond` accumulates into the context's `pending_errors` and is drained
+    # through `raise_platform/4`, which `enqueue_internal`s it rather than
+    # answering it as an effect, so `send_event/2`'s effects list never
+    # carries it and a `refute` over that list would pass whatever the
+    # guard did. The `!==`-not-`!=` argument that turns on it is a code
+    # reading, cited hop by hop in `guarded/2`'s comment, and the `!=`
+    # mutation below is what actually holds the spelling in place.
     #
     # sabotage: guarded only the first segment (`_event.data.meta !==
     # undefined`) -> the `%{"meta" => %{}}` case selected the branch and
     # wrote the marker at `order.at`, taking the loop's `refute` red
-    # (verified)
-    test "covers an absent intermediate segment, and raises nothing" do
+    # (verified). A second mutation spelling the operator `!=` took the
+    # final `assert` red, because the non-strict comparison answers the
+    # marker on either side and no branch is ever selected (verified).
+    test "covers an absent intermediate segment, and writes a present one" do
       for payload <- [%{}, %{"meta" => %{}}, %{"meta" => 7}] do
-        {machine_state, effects} =
+        {machine_state, _effects} =
           run(%{"order.at" => "meta.at"}, %{"order" => %{}}, data: payload)
 
         refute Map.has_key?(Map.fetch!(machine_state.datamodel, "order"), "at"),
                "#{inspect(payload)} wrote something"
-
-        refute Enum.any?(effects, &match?({:raise, %{name: "error.execution"}}, &1)),
-               "#{inspect(payload)} raised error.execution"
       end
 
       {machine_state, _effects} =
