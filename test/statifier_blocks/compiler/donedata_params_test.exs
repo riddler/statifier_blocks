@@ -98,8 +98,30 @@ defmodule StatifierBlocks.Compiler.DonedataParamsTest do
     end
   end
 
-  defmodule MintsRunStatus do
+  defmodule MintsExecutionStatus do
     @moduledoc "A host type declaring the failure seam's reserved key."
+
+    use StatifierBlocks.BlockType
+
+    @impl true
+    def donedata_type(_config),
+      do: [%{name: "statifier_persistence:execution_status", path: "settled", type: :string}]
+
+    @impl true
+    def emit(%Block{}, context) do
+      with {:ok, done} <- Context.outcome_id(context, "done") do
+        {:ok, Emit.state(context.state_id, done, [Emit.final(done)])}
+      end
+    end
+  end
+
+  defmodule MintsRetiredExecutionStatus do
+    @moduledoc """
+    A host type declaring the key the failure seam used before
+    `statifier_persistence`'s ADR-0011 decision 4 renamed it. The compiler
+    no longer mints it, and it stays reserved for as long as
+    `statifier_persistence` 0.12's transitional reader reads it.
+    """
 
     use StatifierBlocks.BlockType
 
@@ -139,7 +161,8 @@ defmodule StatifierBlocks.Compiler.DonedataParamsTest do
             "myapp:settlement_chunk" => Chunk,
             "myapp:flat_chunk" => Flat,
             "myapp:mints_outcome" => MintsOutcome,
-            "myapp:mints_run_status" => MintsRunStatus,
+            "myapp:mints_execution_status" => MintsExecutionStatus,
+            "myapp:mints_retired_execution_status" => MintsRetiredExecutionStatus,
             "myapp:mints_shouting" => MintsShouting
           })
         )
@@ -163,14 +186,14 @@ defmodule StatifierBlocks.Compiler.DonedataParamsTest do
     end
 
     # sabotage: emitted the declared params between the two compiler-minted
-    # ones - the reserved run-status param moves on every failure-classed
-    # final, which is the byte a durable stepper reads, and this goes red
-    # (verified)
-    test "on a failure-classed outcome they follow the reserved run-status param too", ctx do
+    # ones - the reserved execution-status param moves on every
+    # failure-classed final, which is the byte a durable stepper reads,
+    # and this goes red (verified)
+    test "on a failure-classed outcome they follow the reserved status param too", ctx do
       assert compile!(ctx, "myapp:settlement_chunk", child_use: true).scxml =~
                ~s(<final id="s_blk_ROOT__child_failed_chunk"><donedata>) <>
                  ~s(<param expr="'failed_chunk'" name="outcome"/>) <>
-                 ~s(<param expr="'failed'" name="statifier_persistence:run_status"/>) <>
+                 ~s(<param expr="'failed'" name="statifier_persistence:execution_status"/>) <>
                  ~s(<param expr="chunk.settled" name="settled_count"/>) <>
                  ~s(<param expr="chunk.failed" name="failed_count"/>) <>
                  ~s(</donedata></final>)
@@ -253,9 +276,37 @@ defmodule StatifierBlocks.Compiler.DonedataParamsTest do
       assert finding.message =~ "outcome"
     end
 
-    test "a field named for the reserved run-status key is refused too", ctx do
-      assert {:error, [finding]} = compile(ctx, "myapp:mints_run_status", child_use: true)
+    test "a field named for the reserved execution-status key is refused too", ctx do
+      assert {:error, [finding]} = compile(ctx, "myapp:mints_execution_status", child_use: true)
       assert finding.code == :invalid_donedata_field
+    end
+
+    # `statifier_persistence` 0.12 reads BOTH keys for one release
+    # (ADR-0011 decision 4), so a document that hand-declared the retired
+    # key would still be read by a durable stepper - and would collide
+    # with the param the compiler mints. The name stays on the reserved
+    # list until 0.13.0 drops the transitional reader.
+    #
+    # The refusal itself does not come from the reserved list: a
+    # namespaced name is not a bare lowercase identifier, so
+    # `Config.identifier?/1` refuses both status keys on shape alone, and
+    # dropping either from the list leaves this refusal green (verified -
+    # which is why the assertion below is on the message, not only on the
+    # code). What the list buys is the finding naming the collision.
+    #
+    # sabotage: dropped the retired key from the reserved list AND from
+    # the finding message - the author of a host type that declares it is
+    # told only that the shape is wrong, and this goes red (verified)
+    test "the retired run-status key the rename replaced stays reserved", ctx do
+      assert {:error, [finding]} =
+               compile(ctx, "myapp:mints_retired_execution_status", child_use: true)
+
+      assert finding.code == :invalid_donedata_field
+      # Not a bare `=~ "statifier_persistence:run_status"`: the message
+      # opens by quoting the declared name, so that would pass on the
+      # interpolation alone. This is the phrase the reserved list builds.
+      assert finding.message =~
+               ~s(and the retired "statifier_persistence:run_status")
     end
 
     # The record fixes the name as a bare lowercase identifier, the shape

@@ -757,9 +757,10 @@ defmodule StatifierBlocks.BlockType do
   in `statifier_datamodel`'s vocabulary.
 
   `name` is a bare lowercase identifier, the shape every other `<param>`
-  name this package mints has, and it may be neither `outcome` nor
-  `statifier_persistence:run_status` - those two are the compiler's,
-  reserved by ADR-0004's C1 and by the failure seam.
+  name this package mints has, and it may be none of `outcome`,
+  `statifier_persistence:execution_status`, or the retired
+  `statifier_persistence:run_status` that key replaced - those three are
+  the compiler's, reserved by ADR-0004's C1 and by the failure seam.
   """
   @type donedata_field :: %{
           name: String.t(),
@@ -780,7 +781,7 @@ defmodule StatifierBlocks.BlockType do
   The declared fields are emitted as `<param>`s on every top-level
   `child_use` final, **after** both compiler-minted params - the `outcome`
   param and, on a failure-classed outcome, the reserved
-  `statifier_persistence:run_status` param. That ordering is ADR-0004's C1
+  `statifier_persistence:execution_status` param. That ordering is ADR-0004's C1
   as widened on 2026-09-06, and it is what keeps a document declaring
   nothing byte-identical to what it compiled to before.
 

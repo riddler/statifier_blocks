@@ -3634,3 +3634,95 @@ cites, read at `d9f4896`: `docs/spikes/SF040-element-editor.md:365`, `:390`,
 line above it moved.
 
 Filed with `sb-xbn9`, campaign SF041.
+
+## Note (2026-09-12): the reserved failure-seam key is renamed to `statifier_persistence:execution_status`, and the name it replaces stays reserved
+
+Premise surface: `statifier_persistence`'s `ADR-0011: execution is the durable
+noun` (**proposed**, campaign SF041, on `statifier_persistence` `main` at
+`84ba7cf`), decision 4. That record owns the key - this one owns where the
+compiler mints it - and decision 4 renames it. This Note records the rename
+against every place this file names the old spelling; no line above it moves.
+
+### 1. What the key is now
+
+- The reserved `<donedata>` `<param>` the compiler mints on a failure-classed
+  final is named **`statifier_persistence:execution_status`**. Its value
+  vocabulary is unchanged: `'failed'`, one closed value.
+- `statifier_persistence` **0.12.0 reads both keys for one release** - the new
+  key wins where both are present, and reading the old one logs a deprecation
+  line - and **0.13.0 reads only the new key**. `statifier_persistence >= 0.12`
+  is therefore the floor for a durable host running charts this package
+  compiles from now on.
+- Nothing else about the failure seam moves. The mechanism this file's C1
+  amendment of 2026-09-06 and its 2026-09-06 flip Note describe - which finals
+  carry the param, that it is minted second and only on a failure-classed
+  outcome, and that the params serialize in the order they are built - is
+  exactly as recorded. Only the name of the key changes.
+
+### 2. Where this file names the old spelling
+
+Every mention below is read at `main` `e990ad7` and is to be read as naming
+`statifier_persistence:execution_status` from this Note on. None of them is
+edited; this Note is the correction.
+
+`:2475` (the worked `<donedata>` block), `:2541` (the C1 amendment's sentence
+on what a failure-classed final carries), `:2609` (item 2 of the two
+compiler-minted params), `:2647` (the reserved-name sentence), `:2815` (the
+ordering rule: the reserved param second), `:2832` (the refusal's wording).
+
+The same is true of the two other records in this repository that name the old
+spelling, which this Note reaches rather than edits: `ADR-0002`
+(`0002-block-type-behaviour.md:3868`, `:4499`, `:4703`, `:4906`, @`e990ad7`)
+and `ADR-0013` (`0013-typed-fan-out-child-summary.md:71-73`, `:209`, `:258`,
+`:519`, `:665`, `:975`, `:1080-1081`, @`e990ad7`). `ADR-0013`'s cite table at
+`:1080-1081` points at compiler.ex line numbers that predate this request; it
+is historical and is left as it is, as this repository's ADR-cite ruling of
+2026-09-07 says merged records are.
+
+### 3. Both names are reserved, and why
+
+A `donedata_type/1` entry may declare neither `statifier_persistence:execution_status`
+nor the `statifier_persistence:run_status` it replaces. The second half is new
+here and is not something decision 4 states: it follows from decision 4's own
+transitional reader. For as long as `statifier_persistence` 0.12 reads the old
+key, a host type that hand-declared that name would emit a `<param>` a durable
+stepper reads as the execution's status, beside - and possibly disagreeing
+with - the one the compiler mints. Refusing the name costs nothing (no shipped
+type declares it) and removes the collision for the one release it can happen
+in. When `statifier_persistence` 0.13.0 drops the transitional reader the
+reservation may be dropped with it; that is a later request's call and this
+Note does not pre-decide it.
+
+One correction to how C1's refusal is described, found while proving the test
+for this: **neither status key was ever reachable through the reserved-name
+list**. `declarable_param?/1` refuses on `Config.identifier?/1` first, and a
+namespaced name - anything carrying a `:` - is not a bare lowercase identifier,
+so both keys are refused on shape whichever list they are on. Dropping either
+from the list leaves every refusal green. What the list actually buys is the
+**finding message**: it names the collision the author walked into rather than
+reporting only that the shape is wrong. That is worth keeping and is why both
+names stay on it, but this file's sentences at `:2647` and `:2832`, and
+`ADR-0013`'s at `:209`, should be read as describing an over-determined
+refusal, not the only lock on the name. The test that cashes this asserts the
+message phrase rather than the finding code, because asserting the code alone
+passes on the shape check and proves nothing about the reservation.
+
+### 4. Cites
+
+Cites into this file: `:2475`, `:2541`, `:2609`, `:2647`, `:2815`, `:2832`, all
+@`e990ad7`. Code cites, read in the tree of the request this Note lands in and
+re-verified by anchor; the spelling `@... @e990ad7` gives the line the same
+anchor had on `main` before this request moved it:
+
+- `@execution_status_key "statifier_persistence:execution_status"` at
+  `lib/statifier_blocks/compiler.ex:361` (was `@run_status_key` at `:360`
+  @`e990ad7`)
+- `@legacy_execution_status_key` at `compiler.ex:374` (new in this request)
+- `execution_status_param/0` at `compiler.ex:2292` (was `run_status_param/0`
+  at `:2277` @`e990ad7`)
+- the reserved-name check `declarable_param?/1` at `compiler.ex:2496-2498`
+  (was `:2481-2483` @`e990ad7`) and its finding message at `:2506-2509` (was `:2490-2492` @`e990ad7`)
+
+This section appends at the end of the file, so no line above it moved.
+
+Filed with `sb-hykt`, campaign SF041.
