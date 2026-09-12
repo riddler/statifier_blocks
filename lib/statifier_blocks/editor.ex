@@ -553,6 +553,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     outlives its tab has to leave a surface missing rather than a mount that
     crashes at render.
 
+    `run?: false` mounts an editor that watches no run: it seats none whatever
+    the host passes in `run` and `run_session`, so there is no run pane, no run
+    marks on the canvas and no *Held here* column in the Datamodel tab. It
+    addresses the run rather than the pane because a seated run decides the
+    canvas's marks outright, so hiding the pane alone would ring cards out of a
+    stream the reader has been given no surface to read (ADR-0005's Note of
+    2026-09-12). It does not reach `active_marks` and `invoke_mark`: those are
+    marks a host paints itself, and a mount that asks for no run and then names
+    blocks by hand still draws the blocks it named.
+
     `read_only?: true` renders the document without offering any way to change
     it: no palette column, no drag hook on the canvas, no "+" button on the
     gaps between blocks, config fields drawn as values rather than controls,
@@ -596,7 +606,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `on_drawer_resize` | no | one-argument function called with each new drawer height, which is how the host comes to have one to remember |
     | `class` | no | appended to the root element's own classes |
     | `history_limit` | no | bound on the undo stack; `:infinity` by default |
-    | `profile` | no | which surfaces this mount draws, and whether it edits: `%{drawer_tabs:, inspector_tabs:, palette_groups:, toolbar:, read_only?:}`, every key optional and every list `:all` by default. An id a list names that the package cannot resolve is dropped. See *Profiles, and a read-only mount* above and `docs/profiles.md` |
+    | `profile` | no | which surfaces this mount draws, and whether it edits: `%{drawer_tabs:, inspector_tabs:, palette_groups:, toolbar:, read_only?:, run?:}`, every key optional and every list `:all` by default. An id a list names that the package cannot resolve is dropped. See *Profiles, and a read-only mount* above and `docs/profiles.md` |
     """
 
     use Phoenix.LiveComponent
@@ -662,15 +672,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @type toolbar_chip :: :history | :zoom | :fits | :metrics
 
     @typedoc """
-    Which surfaces a mount renders, and whether it edits (ADR-0005's
-    2026-09-07 amendment). Every key is optional and every list may be `:all`.
+    Which surfaces a mount renders, whether it edits, and whether it watches a
+    run (ADR-0005's 2026-09-07 amendment, and its 2026-09-12 Note for `run?`).
+    Every key is optional and every list may be `:all`.
     """
     @type profile :: %{
             optional(:drawer_tabs) => [Shell.tab_id()] | :all,
             optional(:inspector_tabs) => [Shell.inspector_tab()] | :all,
             optional(:palette_groups) => [String.t()] | :all,
             optional(:toolbar) => [toolbar_chip()] | :all,
-            optional(:read_only?) => boolean()
+            optional(:read_only?) => boolean(),
+            optional(:run?) => boolean()
           }
 
     # The profile a mount that names none gets, spelled out rather than left
@@ -681,7 +693,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       inspector_tabs: :all,
       palette_groups: :all,
       toolbar: :all,
-      read_only?: false
+      read_only?: false,
+      run?: true
     }
 
     # The events a read-only mount answers with the socket unchanged: every
@@ -882,7 +895,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           socket
         end
 
-      socket = socket |> put_run(assigns) |> put_run_session(assigns) |> put_profile(assigns)
+      # `put_profile/2` leads, which is ADR-0005's 2026-09-12 Note, clause 1:
+      # the key is resolved before the run assigns are taken. What that buys
+      # here is narrower than the Note's own sentence for it, and the narrower
+      # reading is the one to keep: `assign(assigns)` at the top of this
+      # function has already written the host's *raw* profile onto the socket,
+      # so the guards below would match a raw `%{run?: false}` in either order.
+      # Leading with `put_profile/2` is what makes them read the map
+      # `normalize_profile/1` returned instead - the only value every other
+      # reader of the profile takes.
+      socket = socket |> put_profile(assigns) |> put_run(assigns) |> put_run_session(assigns)
 
       socket =
         if Map.has_key?(assigns, :history_limit) and socket.assigns.history.undo == [] do
@@ -2624,11 +2646,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             inspector_tabs: [Shell.inspector_tab()] | :all,
             palette_groups: [String.t()] | :all,
             toolbar: [toolbar_chip()] | :all,
-            read_only?: boolean()
+            read_only?: boolean(),
+            run?: boolean()
           }
     # Normalized on the way in, behind the same `send_update/3` guard the
     # host's other inputs use: what a profile means is decided once here, and
-    # every reader below takes a map with all five keys in it.
+    # every reader below takes a map with all six keys in it.
     @spec put_profile(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
     defp put_profile(socket, assigns) do
       if Map.has_key?(assigns, :profile) do
@@ -2644,7 +2667,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         inspector_tabs: profile_list(profile, :inspector_tabs),
         palette_groups: profile_list(profile, :palette_groups),
         toolbar: profile_list(profile, :toolbar),
-        read_only?: Map.get(profile, :read_only?) == true
+        read_only?: Map.get(profile, :read_only?) == true,
+        run?: Map.get(profile, :run?) != false
       }
     end
 
@@ -3437,7 +3461,23 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # it makes for an unrelated reason must not put the run away. It is a
     # function rather than another `if` inline in `update/2` because that
     # function is at its complexity budget.
+    #
+    #
+    # A mount at `run?: false` holds no run at all (ADR-0005's 2026-09-12
+    # Note, clause 1). The clause below **assigns `nil`** rather than
+    # returning the socket untouched, and that is the load-bearing half:
+    # `update/2` opens with `assign(assigns)`, so the host's `run` is already
+    # on the socket by the time this runs and a clause that only declined to
+    # write would leave it seated. It is also why the profile is resolved
+    # first in that pipeline - this guard reads the profile the update just
+    # brought, not the one the socket was holding - and why the key governs
+    # every render rather than the one that carried it: the profile is sticky
+    # and this runs unconditionally, so a run arriving later, a profile
+    # arriving later, and both arriving together all end in the same place.
     @spec put_run(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
+    defp put_run(%{assigns: %{profile: %{run?: false}}} = socket, _assigns),
+      do: assign(socket, :run, nil)
+
     defp put_run(socket, assigns) do
       if Map.has_key?(assigns, :run) do
         assign(socket, :run, assigns.run)
@@ -3449,7 +3489,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # `run_session` is the host's input the same way `run` is: a `send_update`
     # that says nothing about it must leave whatever session is seated alone,
     # which is why this checks `Map.has_key?/2` rather than reading a default.
+    # A mount at `run?: false` holds no session either, and puts it back to
+    # `nil` for the reason `put_run/2` gives: there is no pane to send from,
+    # so a session held here would be a seat nothing can reach.
     @spec put_run_session(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
+    defp put_run_session(%{assigns: %{profile: %{run?: false}}} = socket, _assigns),
+      do: assign(socket, :run_session, nil)
+
     defp put_run_session(socket, assigns) do
       if Map.has_key?(assigns, :run_session) do
         assign(socket, :run_session, assigns.run_session)
