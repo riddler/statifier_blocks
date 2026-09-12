@@ -112,14 +112,44 @@ defmodule StatifierBlocks.Core.OnEvent do
 
   ## The optional `capture` map
 
-  `capture` writes values out of the firing event's payload into the
-  datamodel. It is a map, and the direction is worth stating twice
+  `capture` writes values into the datamodel on the transition this
+  handler emits. It is a map, and the direction is worth stating twice
   because a path-to-path map reads either way: **the key is the
-  destination** - a datamodel path - and **the value is the source**, a
-  path inside `_event.data`. A `capture` of
-  `%{"order.cancel_reason" => "reason"}` on a handler for
+  destination** - a datamodel path - and **the value is the source**. A
+  `capture` of `%{"order.cancel_reason" => "reason"}` on a handler for
   `order.cancelled` writes that event's `reason` into
   `order.cancel_reason`.
+
+  A source takes either of two forms, and they are told apart by
+  **shape**, never by content (ADR-0002's Note of 2026-09-12, `N1`):
+
+    * a **string** is a path inside `_event.data`, which is what a source
+      has always been and means exactly what it has always meant. No
+      string is reinterpreted as a literal because of what it happens to
+      spell;
+    * a **two-element array tagged `"const"`** - `["const", value]` in the
+      stored document, `{"const", value}` as this module reads it - is the
+      literal `value`, read from the document rather than from the
+      payload. `value` is taken as it stands: it is not parsed, not
+      evaluated, and not resolved against the datamodel.
+
+  The literal form is what lets two handlers on one screen record which of
+  them fired - each writes its own value - rather than depending on the
+  host to put different values in the payload, a contract neither document
+  states.
+
+  A literal is emitted as a predicator literal expression: a string
+  double-quoted with `\\` and `"` escaped, an integer as its digits, a
+  negative integer behind the `-` predicator reads as a unary minus,
+  `true` / `false` / `null` as themselves, an array as `[a,b]` and an
+  object as `{"k":v}` with its keys in sorted order. A value this module
+  cannot spell so that the engine reads back what the document carried is
+  a **malformed pair** - `validate_config/1` refuses it on the `capture`
+  key like any other. That is one restriction beyond type: a string
+  carrying a character outside printable ASCII, because predicator's
+  string lexer has no escape for one and writes what it reads back a byte
+  at a time. Tab, newline and carriage return are in; a float never
+  arises, because a block document may not carry one at all.
 
   One `<assign>` is emitted per pair, on the transition the handler
   already emits and **before** the `<raise>` that carries the outcome.
@@ -209,6 +239,12 @@ defmodule StatifierBlocks.Core.OnEvent do
   (P5). The other reading - a declared member no pair reads - is not a
   finding: a payload may legitimately carry more than one handler wants.
 
+  P5 is a rule about a source **path**, so a literal pair is not reached
+  by it at all: a `["const", value]` source has no path to read past the
+  payload, and `unread_pairs/3` walks only the pairs whose source is a
+  path. Nothing about that refusal changes, and a handler may declare a
+  payload and capture a literal beside a path from it.
+
   The check needs the datamodel document, which `validate_config/1` does
   not get, so it is a function of its own that the compiler's config stage
   calls with the declarations it has already indexed. One finding is
@@ -268,6 +304,12 @@ defmodule StatifierBlocks.Core.OnEvent do
   # The one spelling of the key, shared by the map's own validation and by
   # the payload refusal that reads the same pairs.
   @capture_key "capture"
+
+  # The tag of a literal capture source (ADR-0002's Note of 2026-09-12,
+  # N1). In the stored document the form is the two-element JSON array
+  # `["const", value]`; `{"const", value}` is that array as this package
+  # reads it, and ADR-0001 owns the bytes.
+  @const_tag "const"
 
   # How an inline payload is named in a message. It has no name of its
   # own - that is what makes it inline - so the message describes it.
@@ -403,8 +445,19 @@ defmodule StatifierBlocks.Core.OnEvent do
     end
   end
 
-  defp pair?({destination, source}), do: path?(destination) and path?(source)
+  defp pair?({destination, source}), do: path?(destination) and source?(source)
   defp pair?(_other), do: false
+
+  # ADR-0002's Note of 2026-09-12, N1: the value position of a pair takes
+  # either form, and the two are told apart by SHAPE and never by content.
+  # A string is a path - no string is reinterpreted as a literal because of
+  # what it happens to spell - and a two-element list tagged `"const"` is a
+  # literal. Everything else is malformed, including a list of any other
+  # length and a tagged pair whose value this package cannot spell as a
+  # literal expression (`spellable?/1`).
+  defp source?(source) when is_binary(source), do: path?(source)
+  defp source?([@const_tag, value]), do: spellable?(value)
+  defp source?(_other), do: false
 
   defp path?(value) do
     Config.non_empty_string?(value) and not Regex.match?(@whitespace, value)
@@ -412,7 +465,9 @@ defmodule StatifierBlocks.Core.OnEvent do
 
   defp capture_message do
     "must map each datamodel path written, like order.cancel_reason, " <>
-      "to the path inside _event.data it is read from, like reason"
+      "to its source: either the path inside _event.data it is read from, " <>
+      ~s(like reason, or the literal ["const", value], whose value is a ) <>
+      "JSON value carrying no characters outside printable ASCII"
   end
 
   @doc """
@@ -813,7 +868,7 @@ defmodule StatifierBlocks.Core.OnEvent do
         |> Enum.map(fn {destination, source} ->
           Emission.element(
             "assign",
-            [{"expr", "_event.data." <> source}, {"location", destination}]
+            [{"expr", source_expr(source)}, {"location", destination}]
           )
         end)
 
@@ -824,6 +879,114 @@ defmodule StatifierBlocks.Core.OnEvent do
   end
 
   defp captures(_other), do: {:error, [{"capture", capture_message()}]}
+
+  # The `expr` of one pair's `<assign>`, told apart by the source's SHAPE
+  # (`source?/1`): a string is a path inside the firing event's payload and
+  # compiles exactly as it always has, and a `["const", value]` pair
+  # compiles to `value` spelled as a literal expression. Only pairs
+  # `pair?/1` has already admitted reach here.
+  @spec source_expr(String.t() | [term()]) :: String.t()
+  defp source_expr(source) when is_binary(source), do: "_event.data." <> source
+  defp source_expr([@const_tag, value]), do: literal(value)
+
+  # A document value spelled as a predicator literal expression - the
+  # decision ADR-0002's Note of 2026-09-12 delegates to this request, taken
+  # against `predicator` 9.4.0 (the resolved version; `mix.exs` requires
+  # `~> 9.0`) and against `Statifier.Compiler.Expressions.compile/3`, which
+  # is what an `<assign expr=...>` is read by.
+  #
+  # The spelling is predicator's own literal grammar rather than the
+  # value's JSON encoding, because the two differ in exactly one place
+  # that matters: JSON escapes a character it cannot write literally as
+  # `\uXXXX`, and predicator's lexer has no such escape - it decodes an
+  # unrecognised `\X` to the bare `X` (`take_string/6`), so a JSON-encoded
+  # string would arrive at the datamodel with the escape's own letters in
+  # it. The grammar this emits, per type:
+  #
+  #   * a string  - double-quoted, with `\` escaped and then `"` escaped,
+  #     which is the order predicator's own writer uses; the three control
+  #     characters its lexer decodes (`\n`, `\t`, `\r`) are written as
+  #     those escapes rather than raw, because a raw newline or tab in an
+  #     XML attribute value is normalised to a space before any lexer sees
+  #     it;
+  #   * an integer - its digits, a negative one with the `-` that
+  #     predicator reads as a unary minus over the positive literal and
+  #     evaluates to the negative integer;
+  #   * `true` / `false` - themselves;
+  #   * `null` - JSON's null and predicator's, which both evaluate to
+  #     Elixir's `nil`;
+  #   * an array - `[` the elements by this same rule, comma-separated `]`;
+  #   * an object - `{` its pairs as `"key": value`, comma-separated, in
+  #     the keys' sorted order `}`. Sorted for the reason the pairs
+  #     themselves are sorted: a map has no order of its own and a compile
+  #     has to be deterministic.
+  #
+  # There is no float clause, and there needs to be none: a float is not a
+  # value a block document may carry at all
+  # (`StatifierBlocks.Validation`'s `{:float, path}` problem).
+  @spec literal(term()) :: String.t()
+  defp literal(value) when is_binary(value), do: ~s(") <> escape(value) <> ~s(")
+  defp literal(value) when is_integer(value), do: Integer.to_string(value)
+  defp literal(true), do: "true"
+  defp literal(false), do: "false"
+  defp literal(nil), do: "null"
+
+  defp literal(value) when is_list(value),
+    do: "[" <> Enum.map_join(value, ",", &literal/1) <> "]"
+
+  defp literal(value) when is_map(value) and not is_struct(value) do
+    inner =
+      value
+      |> Enum.sort_by(&elem(&1, 0))
+      |> Enum.map_join(",", fn {key, member} -> literal(key) <> ":" <> literal(member) end)
+
+    "{" <> inner <> "}"
+  end
+
+  @spec escape(String.t()) :: String.t()
+  defp escape(value) do
+    value
+    |> String.replace("\\", "\\\\")
+    |> String.replace(~s("), ~s(\\"))
+    |> String.replace("\n", "\\n")
+    |> String.replace("\t", "\\t")
+    |> String.replace("\r", "\\r")
+  end
+
+  # Whether `literal/1` can spell this value so that the engine reads back
+  # what the document carried. Total, and the gate `source?/1` puts in
+  # front of `literal/1`, so a value that cannot be spelled is a malformed
+  # pair rather than bytes that only look like the author's value.
+  #
+  # The one restriction that is not a matter of type is on a string:
+  # predicator 9.4.0's lexer reads a string literal codepoint by codepoint
+  # and writes each one back as a single BYTE, so any character above
+  # ASCII arrives at the datamodel as one mangled byte, and it has no
+  # escape by which such a character could be written instead. A control
+  # character is out for the same lack of an escape, and XML 1.0 would
+  # refuse most of them in an attribute value anyway. The three the lexer
+  # does decode - tab, newline, carriage return - are in.
+  @spec spellable?(term()) :: boolean()
+  defp spellable?(value) when is_binary(value), do: spellable_string?(value)
+  defp spellable?(value) when is_integer(value), do: true
+  defp spellable?(value) when is_boolean(value), do: true
+  defp spellable?(nil), do: true
+  defp spellable?(value) when is_list(value), do: Enum.all?(value, &spellable?/1)
+
+  defp spellable?(value) when is_map(value) and not is_struct(value) do
+    Enum.all?(value, fn {key, member} ->
+      is_binary(key) and spellable_string?(key) and spellable?(member)
+    end)
+  end
+
+  defp spellable?(_other), do: false
+
+  @spec spellable_string?(String.t()) :: boolean()
+  defp spellable_string?(value) do
+    value
+    |> :binary.bin_to_list()
+    |> Enum.all?(&(&1 in 0x20..0x7E or &1 in [0x09, 0x0A, 0x0D]))
+  end
 
   defp outcome_event("abandon"), do: {:ok, Emit.interrupt_events().abandon}
   defp outcome_event("resume"), do: {:ok, Emit.interrupt_events().resume}
