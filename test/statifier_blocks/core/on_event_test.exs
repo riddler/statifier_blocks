@@ -62,6 +62,40 @@ defmodule StatifierBlocks.Core.OnEventTest do
                       ~s(<raise event="done.outcome.s_blk_OE.done"/>) <>
                       ~s(</onentry></final></state></scxml>)
 
+  # The same document as `@path_only_golden`, compiled on this branch: the
+  # bytes `N2` re-baselines them to. The delta is one `<if>` wrapper per
+  # path pair and nothing else, which the test below proves by stripping
+  # the wrappers back out and comparing with the constant above.
+  @path_only_guarded_golden ~s(<scxml initial="s_blk_OE" name="bdoc_T" version="1.0" ) <>
+                              ~s(xmlns="http://www.w3.org/2005/07/scxml">) <>
+                              ~s(<state id="s_blk_OE" initial="s_blk_OE__armed">) <>
+                              ~s(<state id="s_blk_OE__armed">) <>
+                              ~s(<transition event="order.cancelled" target="s_blk_OE__o_done">) <>
+                              ~s(<if cond="_event.data.meta.at !== undefined">) <>
+                              ~s(<assign expr="_event.data.meta.at" location="order.at"/>) <>
+                              ~s(</if>) <>
+                              ~s(<if cond="_event.data.reason !== undefined">) <>
+                              ~s(<assign expr="_event.data.reason" location="order.cancel_reason"/>) <>
+                              ~s(</if>) <>
+                              ~s(<raise event="statifier_blocks.interrupt.abandon"/>) <>
+                              ~s(</transition></state><final id="s_blk_OE__o_done"><onentry>) <>
+                              ~s(<raise event="done.outcome.s_blk_OE.done"/>) <>
+                              ~s(</onentry></final></state></scxml>)
+
+  # The same handler with no `capture` at all, captured by compiling it on
+  # `main` at `bbb91e0` - the commit this branch is built on. `N2` leaves
+  # it byte-identical, which is the half of the fragment's claim that says
+  # only a document which captures by a path recompiles differently.
+  @no_capture_golden ~s(<scxml initial="s_blk_OE" name="bdoc_T" version="1.0" ) <>
+                       ~s(xmlns="http://www.w3.org/2005/07/scxml">) <>
+                       ~s(<state id="s_blk_OE" initial="s_blk_OE__armed">) <>
+                       ~s(<state id="s_blk_OE__armed">) <>
+                       ~s(<transition event="order.cancelled" target="s_blk_OE__o_done">) <>
+                       ~s(<raise event="statifier_blocks.interrupt.abandon"/>) <>
+                       ~s(</transition></state><final id="s_blk_OE__o_done"><onentry>) <>
+                       ~s(<raise event="done.outcome.s_blk_OE.done"/>) <>
+                       ~s(</onentry></final></state></scxml>)
+
   describe "validate_config/1 and the capture map" do
     # sabotage: dropped `check_capture/2` from `validate_config/1`'s pipeline
     # -> every rejected map below went green, taking this red (verified)
@@ -359,20 +393,33 @@ defmodule StatifierBlocks.Core.OnEventTest do
   end
 
   describe "what the interpreter does with a captured path" do
-    # The record's run-time claim, pinned against the engine rather than
-    # against the record: a source path the payload does not carry is
-    # written as the engine's explicit unbound marker, and that marker is
-    # not `nil`. A consumer of a captured path tests for it; the
-    # `error.execution` the record's bullet describes is upstream work and
-    # is deliberately NOT asserted here, because it does not happen today.
+    # The premise ADR-0002's Note of 2026-09-12 rests on, pinned against
+    # the engine rather than against the record: an UNGUARDED `<assign>`
+    # over a path the payload does not carry still writes, and what it
+    # writes is the engine's explicit unbound marker rather than `nil`.
+    # That is the engine's behaviour, not this package's, and it has not
+    # moved - what moved is that `core.on_event` no longer emits an
+    # unguarded assign for a path pair (`N2`; the describe block near the
+    # foot of this file). The chart here is hand-written for exactly that
+    # reason: the compiler can no longer produce one.
     #
     # sabotage: none available in this package - the behaviour under test is
     # the engine's, and this test is here to go red if a version bump
     # changes it. Its own construction was verified instead by asserting
     # `nil` in place of the marker, which went red on the real engine.
     test "writes the unbound marker, not nil, for a payload key that is not there" do
-      {machine_state, _effects} =
-        run(%{"order.cancel_reason" => "reason"}, %{"order" => %{}})
+      scxml =
+        ~s(<scxml initial="s_a" name="bdoc_T" version="1.0" ) <>
+          ~s(xmlns="http://www.w3.org/2005/07/scxml"><state id="s_a">) <>
+          ~s(<transition event="order.cancelled" target="s_b">) <>
+          ~s(<assign expr="_event.data.reason" location="order.cancel_reason"/>) <>
+          ~s(</transition></state><final id="s_b"/></scxml>)
+
+      {:ok, machine} = Statifier.compile(scxml)
+      {machine_state, _effects} = Statifier.initialize(machine, datamodel: %{"order" => %{}})
+
+      {:ok, machine_state, _effects} =
+        Statifier.send_event(machine_state, Statifier.Event.external("order.cancelled", []))
 
       captured = machine_state.datamodel |> Map.fetch!("order") |> Map.fetch!("cancel_reason")
 
@@ -726,16 +773,23 @@ defmodule StatifierBlocks.Core.OnEventTest do
 
     # Consent clause 8's additivity proof, as bytes: a document whose every
     # capture uses the path form compiles to exactly what it compiled to
-    # before this request existed. The expected bytes were captured by
-    # compiling this same document on `main` at `da10e05`, which is the
-    # commit this branch is built on and the last one before the const arm.
+    # before the const arm existed. The expected bytes were captured by
+    # compiling this same document on `main` at `da10e05`, the last commit
+    # before that arm.
+    #
+    # `N2` of the same Note has since wrapped each path pair's `<assign>`
+    # in an `<if>`, so the comparison is made with those wrappers stripped:
+    # the claim this test carries is the const arm's - that a path source
+    # still compiles to `_event.data.<source>` at the same location in the
+    # same order - and it is `N2`'s own test below that pins the wrapper as
+    # the only difference.
     #
     # sabotage: made `source_expr/1`'s path clause prefix `_event.` rather
     # than `_event.data.` -> this went red (verified)
     test "compiles a path-only document to the bytes it compiled to before the const arm" do
       pairs = %{"order.cancel_reason" => "reason", "order.at" => "meta.at"}
 
-      assert compile!(handler(pairs)) == @path_only_golden
+      assert strip_guards(compile!(handler(pairs))) == @path_only_golden
     end
 
     # Advisory (a) on this bead, built rather than written down: P5 is a
@@ -763,6 +817,160 @@ defmodule StatifierBlocks.Core.OnEventTest do
       assert finding.config_key == "capture"
       assert finding.message =~ "nope"
       refute finding.message =~ "card.mark"
+    end
+  end
+
+  describe "an absent capture source (ADR-0002's Note of 2026-09-12, N2)" do
+    # The measurement that asked for the clause (campaign SF040's capture
+    # `k3`, the signup Journey loop), asserted the way it was found: one
+    # handler, two pairs, and a payload that carries one source and not the
+    # other. `Map.has_key?/2` rather than a comparison with `:undefined` is
+    # the whole point - the destination is not there at all, so "not
+    # answered" and "answered with nothing" stop being one value.
+    #
+    # sabotage: dropped `guarded/2`'s `is_binary` clause so a path pair
+    # emitted its bare `<assign>` again -> `answers` came back with
+    # `"seats" => :undefined` and both `refute`s went red (verified)
+    test "leaves a destination whose source the payload omits unwritten" do
+      {machine_state, _effects} =
+        run(
+          %{"answers.plan" => "plan", "answers.seats" => "seats"},
+          %{"answers" => %{}},
+          data: %{"plan" => "pro"}
+        )
+
+      answers = Map.fetch!(machine_state.datamodel, "answers")
+
+      assert Map.fetch!(answers, "plan") == "pro"
+      refute Map.has_key?(answers, "seats")
+      refute answers["seats"] == :undefined
+    end
+
+    # The other half of the same sentence: an absent source writes nothing,
+    # and a source that IS carried writes whatever it carries, including
+    # the values a reader most easily confuses with absence. A payload key
+    # holding `null` or `""` is an answer - it came from the reader - and
+    # the clause is only about the key not being there.
+    #
+    # sabotage: spelled the guard `!== null` rather than `!== undefined` ->
+    # the `nil` case stopped writing and this went red (verified); a second
+    # mutation spelling it `!=` rather than `!==` took this red too, along
+    # with the absent-source test above and the "writes the payload value
+    # when the source path is there" test - the non-strict operator
+    # propagates the marker rather than answering a boolean, so no branch
+    # is ever selected and nothing is written at all (verified)
+    test "writes a source the payload carries, including null and the empty string" do
+      for value <- [nil, "", 0, false, [], %{}] do
+        {machine_state, _effects} =
+          run(%{"answers.seats" => "seats"}, %{"answers" => %{}}, data: %{"seats" => value})
+
+        answers = Map.fetch!(machine_state.datamodel, "answers")
+
+        assert Map.has_key?(answers, "seats"), "#{inspect(value)} did not write"
+        assert Map.fetch!(answers, "seats") == value
+      end
+    end
+
+    # A destination that already carries a value keeps it, which is the
+    # clause's own wording: "absent if nothing wrote it before, and
+    # carrying its previous value if something did". A guard that skipped
+    # by writing something - a `null`, the marker - would fail this.
+    #
+    # sabotage: had `guarded/2` emit an `<else>` branch assigning `null`
+    # beside the `<if>` -> the prior value was overwritten and this went
+    # red (verified)
+    test "leaves a destination that already carries a value alone" do
+      {machine_state, _effects} =
+        run(%{"answers.seats" => "seats"}, %{"answers" => %{"seats" => 4}}, data: %{})
+
+      assert machine_state.datamodel |> Map.fetch!("answers") |> Map.fetch!("seats") == 4
+    end
+
+    # A nested source is guarded by one condition over the whole path, not
+    # by a chain of them, because an access whose target is not a map
+    # answers the marker too. An absent intermediate has to be as quiet as
+    # an absent leaf: no write, and no `error.execution` beside it.
+    #
+    # sabotage: guarded only the first segment (`_event.data.meta !==
+    # undefined`) -> the `%{"meta" => %{}}` case selected the branch and
+    # wrote the marker at `order.at`, taking the loop's `refute` red
+    # (verified)
+    test "covers an absent intermediate segment, and raises nothing" do
+      for payload <- [%{}, %{"meta" => %{}}, %{"meta" => 7}] do
+        {machine_state, effects} =
+          run(%{"order.at" => "meta.at"}, %{"order" => %{}}, data: payload)
+
+        refute Map.has_key?(Map.fetch!(machine_state.datamodel, "order"), "at"),
+               "#{inspect(payload)} wrote something"
+
+        refute Enum.any?(effects, &match?({:raise, %{name: "error.execution"}}, &1)),
+               "#{inspect(payload)} raised error.execution"
+      end
+
+      {machine_state, _effects} =
+        run(%{"order.at" => "meta.at"}, %{"order" => %{}}, data: %{"meta" => %{"at" => "t0"}})
+
+      assert machine_state.datamodel |> Map.fetch!("order") |> Map.fetch!("at") == "t0"
+    end
+
+    # `N2` says a literal pair "has no source to be absent, and always
+    # writes". As bytes: a document whose every pair is a literal compiles
+    # to exactly what `N1` gave it, with no `<if>` anywhere in it, whatever
+    # the payload does or does not carry.
+    #
+    # sabotage: dropped `guarded/2`'s const clause so the catch-all wrapped
+    # a literal too -> the `refute` went red (verified)
+    test "never guards a literal pair" do
+      scxml = compile!(handler(%{"order.mark" => ["const", "cancelled"]}))
+
+      assert scxml =~ ~s(<assign expr="&quot;cancelled&quot;" location="order.mark"/>)
+      refute scxml =~ "<if "
+
+      {machine_state, _effects} =
+        run(%{"order.mark" => ["const", "cancelled"]}, %{"order" => %{}}, data: %{})
+
+      assert machine_state.datamodel |> Map.fetch!("order") |> Map.fetch!("mark") == "cancelled"
+    end
+
+    # The clause changes the compiled chart of a document that captures by
+    # a path, and this is that change as bytes: the guard, and nothing
+    # else. Stripping the `<if>` wrappers out of what this branch compiles
+    # gives back `@path_only_golden` - the bytes captured on `main` at
+    # `da10e05`, before either half of this Note existed - which is what
+    # makes the delta exactly one wrapper per path pair and keeps `N1`'s
+    # own additivity proof readable inside it.
+    #
+    # sabotage: had `guarded/2` emit the `<if>` around the `<raise>` as
+    # well as the assigns -> the strip left the raise inside a wrapper, the
+    # equality went red (verified)
+    test "wraps each path pair and changes nothing else about the bytes" do
+      pairs = %{"order.cancel_reason" => "reason", "order.at" => "meta.at"}
+      scxml = compile!(handler(pairs))
+
+      assert scxml == @path_only_guarded_golden
+      assert strip_guards(scxml) == @path_only_golden
+      assert length(Regex.scan(~r{<if cond=}, scxml)) == map_size(pairs)
+    end
+
+    # The byte-identity half of what the changelog fragment claims, pinned
+    # against bytes captured on `main` at `bbb91e0` rather than against
+    # this branch's own other outputs (which is what the additivity test
+    # further up this file compares): a handler that captures nothing
+    # recompiles to the same chart, guard or no guard, because `captures/1`
+    # answers `[]` and there is nothing to wrap.
+    #
+    # sabotage: had `captures/1`'s `nil` clause answer a childless `<if>`
+    # rather than `[]` -> this went red, and so did the additivity test
+    # further up (verified). Wrapping the `<raise>` instead does NOT reach
+    # this test - there is no wrapper to reach when nothing is captured -
+    # which is why the mutation is on `captures/1` rather than `guarded/2`.
+    test "leaves a handler that captures nothing byte-identical" do
+      assert compile!(handler(%{})) == @no_capture_golden
+
+      assert compile!(block(%{"event" => "order.cancelled", "outcome" => "abandon"})) ==
+               @no_capture_golden
+
+      refute @no_capture_golden =~ "<if "
     end
   end
 
@@ -804,6 +1012,15 @@ defmodule StatifierBlocks.Core.OnEventTest do
   defp compile!(%Block{} = root) do
     {:ok, compiled} = Compiler.compile(Document.new(root, id: "bdoc_T"), Palette.core())
     compiled.scxml
+  end
+
+  # `N2`'s `<if>` wrappers taken back out of a compiled chart, so a test
+  # about what the assigns themselves say can be written against the bytes
+  # that carried them before the guard existed.
+  defp strip_guards(scxml) do
+    scxml
+    |> String.replace(~r{<if cond="[^"]*">}, "")
+    |> String.replace("</if>", "")
   end
 
   defp index(haystack, needle) do

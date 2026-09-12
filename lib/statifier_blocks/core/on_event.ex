@@ -138,6 +138,18 @@ defmodule StatifierBlocks.Core.OnEvent do
   host to put different values in the payload, a contract neither document
   states.
 
+  From `0.28.0` on, a pair whose source is a **path the firing payload
+  does not carry writes nothing at all** (ADR-0002's Note of 2026-09-12,
+  `N2`): the destination is left as it was - absent if nothing wrote it
+  before, and carrying its previous value if something did. So a reader
+  tests a captured destination the way it tests any other datamodel path,
+  by asking whether it is there, and a guard on a path a screen never
+  wrote reads an absence rather than a value. A payload that carries the
+  source with a JSON `null` still writes: "not answered" and "answered
+  with nothing" are different values, which is the whole of what the
+  clause decides. There is no per-pair opt-in to the old behaviour. A
+  literal source has no path to be absent and always writes.
+
   A literal is emitted as a predicator literal expression: a string
   double-quoted with `\\` and `"` escaped, an integer as its digits, a
   negative integer behind the `-` predicator reads as a unary minus,
@@ -796,11 +808,18 @@ defmodule StatifierBlocks.Core.OnEvent do
   ## A capturing handler
 
   Each `capture` pair becomes one `<assign>` on that same transition,
-  ahead of the `<raise>`:
+  ahead of the `<raise>`. A pair whose source is a **path** carries that
+  assign inside an `<if>` that tests the path for presence, so a payload
+  that does not carry it leaves the destination alone (ADR-0002's Note of
+  2026-09-12, `N2`); a pair whose source is a **literal** has no path to
+  be absent and is written bare:
 
       <state id="s_INT__armed">
         <transition event="order.cancelled" target="s_INT__done">
-          <assign expr="_event.data.reason" location="order.cancel_reason"/>
+          <if cond="_event.data.reason !== undefined">
+            <assign expr="_event.data.reason" location="order.cancel_reason"/>
+          </if>
+          <assign expr="&quot;cancelled&quot;" location="order.mark"/>
           <raise event="statifier_blocks.interrupt.abandon"/>
         </transition>
       </state>
@@ -867,9 +886,12 @@ defmodule StatifierBlocks.Core.OnEvent do
         capture
         |> Enum.sort_by(fn {destination, _source} -> destination end)
         |> Enum.map(fn {destination, source} ->
-          Emission.element(
-            "assign",
-            [{"expr", source_expr(source)}, {"location", destination}]
+          guarded(
+            source,
+            Emission.element(
+              "assign",
+              [{"expr", source_expr(source)}, {"location", destination}]
+            )
           )
         end)
 
@@ -880,6 +902,72 @@ defmodule StatifierBlocks.Core.OnEvent do
   end
 
   defp captures(_other), do: {:error, [{"capture", capture_message()}]}
+
+  # ADR-0002's Note of 2026-09-12, `N2`: from `0.28.0` on, a pair whose
+  # source is a PATH and whose path the firing event's payload does not
+  # carry writes nothing at its destination, so that "not answered" and
+  # "answered with nothing" stop being the same value. The Note decides the
+  # behaviour and leaves the mechanism here; this is the mechanism, and the
+  # four facts it rests on are cited below against the resolved dependency
+  # versions (`statifier` 2.5.0, `predicator` 9.4.0), which are what an
+  # emitted chart is read by.
+  #
+  # The assign is wrapped in an `<if>` whose `cond` tests the very path the
+  # assign reads, spelled once by `source_expr/1` so the guard and the read
+  # cannot drift apart:
+  #
+  #     <if cond="_event.data.reason !== undefined">
+  #       <assign expr="_event.data.reason" location="order.cancel_reason"/>
+  #     </if>
+  #
+  #   1. `<if>` is executable content the engine supports inside a
+  #      `<transition>`, end to end: it is in the lowering table
+  #      (`statifier/lowering.ex:75`, `"if" => &Builders.build_if/2`), it is
+  #      placed into a transition like any other content node
+  #      (`lowering/builders.ex`, `place({:content_node, node}, %Transition{}
+  #      = parent, _)`), and it executes by selecting the first matching
+  #      branch (`machine/content/if.ex:107`, `def execute(%If{branches:
+  #      branches}, ...)`). With no branch selected it runs nothing and
+  #      answers the context unchanged (`if.ex:112`, `nil -> {:ok, context,
+  #      []}`), which is precisely "leaves its destination unwritten".
+  #   2. A bare `<assign>` cannot express this: it always writes. `_event`
+  #      is a bound root whatever the payload carries, and an access that
+  #      does not resolve answers the unbound marker rather than failing
+  #      (`predicator/evaluator.ex:1230`, `Map.get(object, key,
+  #      Undefined.value())`), so the assign succeeds and stores
+  #      `:undefined`. That is the behaviour `N2` retires, and it is the
+  #      engine's, not this package's.
+  #   3. `!==` is the operator, not `!=`. Every non-strict comparison
+  #      propagates the marker rather than answering a boolean
+  #      (`predicator/evaluator.ex:787`, `:791`, guarded `when operator not
+  #      in ["STRICT_EQ", "STRICT_NE"]`); the strict pair compares the terms
+  #      themselves (`:795`, `compare_values(left, right, "STRICT_EQ"), do:
+  #      left === right`). A `cond` that answers a non-boolean is treated as
+  #      false AND raises a spurious `error.execution`
+  #      (`machine/content/if.ex:152`, `{:non_boolean_cond, other}`), so
+  #      `!=` would skip the assign and dirty the run at the same time. This
+  #      is the same reading `core.subchart` took for its routing
+  #      conditions, where `==` against an absent `_event.data.outcome` cost
+  #      a spurious `error.execution` (statifier-ex `st-iz97`).
+  #   4. A nested source needs no chain of guards: an access whose target is
+  #      not a map answers the marker too (`predicator/evaluator.ex:788`,
+  #      `:792`), so one `!== undefined` over the whole path covers an
+  #      absent intermediate as well as an absent leaf.
+  #
+  # A LITERAL pair is never guarded (`N2`: "a literal pair has no source to
+  # be absent, and always writes"), which is also what keeps a document
+  # whose every pair is a literal compiling to the bytes `N1` gave it.
+  #
+  # `null` is not absence. A payload that carries the source with a JSON
+  # `null` writes `null`, because the marker and `null` are distinct terms
+  # under `===` - which is the whole of what `N2` decides: "not answered"
+  # and "answered with nothing" are different values.
+  @spec guarded(String.t() | [term()], Emission.t()) :: Emission.t()
+  defp guarded(source, assign) when is_binary(source) do
+    Emission.element("if", [{"cond", source_expr(source) <> " !== undefined"}], [assign])
+  end
+
+  defp guarded([@const_tag, _value], assign), do: assign
 
   # The `expr` of one pair's `<assign>`, told apart by the source's SHAPE
   # (`source?/1`): a string is a path inside the firing event's payload and
