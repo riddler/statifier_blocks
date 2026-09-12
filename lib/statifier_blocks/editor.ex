@@ -3492,6 +3492,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # A mount at `run?: false` holds no session either, and puts it back to
     # `nil` for the reason `put_run/2` gives: there is no pane to send from,
     # so a session held here would be a seat nothing can reach.
+    #
+    # Unlike every other clause this bead added, **no test fails when this one
+    # is weakened to `do: socket`** - the whole suite stays green (verified).
+    # Recorded rather than covered, because the assertions in this package are
+    # render-based and a held `run_session` reaches no markup: with no run
+    # there is no pane and no send control, and `run_sendable?/1` refuses on
+    # `run == nil` besides, so even a crafted `run-send` is a no-op without
+    # this clause. It stays because clause 1 of the Note names both assigns,
+    # and a mount that says it holds no run should not be holding the session
+    # that run was being sent into.
     @spec put_run_session(Phoenix.LiveView.Socket.t(), map()) :: Phoenix.LiveView.Socket.t()
     defp put_run_session(%{assigns: %{profile: %{run?: false}}} = socket, _assigns),
       do: assign(socket, :run_session, nil)
