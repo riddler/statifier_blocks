@@ -33,7 +33,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       inspector_tabs: :all,
       palette_groups: :all,
       toolbar: :all,
-      read_only?: false
+      read_only?: false,
+      run?: true
     }
 
     defp editor(view), do: view |> element("#editor") |> render()
