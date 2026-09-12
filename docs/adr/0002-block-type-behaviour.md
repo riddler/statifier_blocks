@@ -10079,7 +10079,11 @@ strings, in the order the composite declares them.
 - On the `use` form it is the option `outcomes:`, taking its place beside the
   six of `@declaration_options` (`composite.ex:255`) and in the `declaration`
   type (`composite.ex:231-238`). Absent, it is the empty list, which `C3` reads
-  as "not declared".
+  as "not declared". **An explicit empty list is deliberately the same as an
+  absent key**, and not an oversight: "this composite declares no outcomes at
+  all" is not a thing a block type can say - every block type answers at least
+  the default `done` (`block_type.ex:850`) - so there is nothing for the empty
+  list to mean that the absent case does not already mean.
 - The value is a list of names, not of `t:StatifierBlocks.BlockType.outcome_decl/0`
   pairs (`block_type.ex:315`, `{name :: String.t(), label :: String.t()}`). The
   **label of a declared name is the label the member that raises it already
@@ -10100,7 +10104,14 @@ When `outcomes` is present and non-empty:
    (with `C1`'s labels) and *not* the expansion root's list. Replace, not
    merge: a composite that declares `outcomes` has said what it can finish as,
    and silently re-adding the root's `done` would make the declaration
-   unable to *remove* an outcome, which is half of what it is for.
+   unable to *remove* an outcome, which is half of what it is for. **Only the
+   declared list narrows; the expansion's compiled finals are untouched.** The
+   members still compile the finals they always did and each still raises its
+   own completion event; what changes is which of those names the composite
+   *presents* as its own outcomes to the body that encloses it. Whether a
+   composite whose declaration drops a name its root still raises deserves a
+   finding of its own is not decided here: `sb-5ee4` reports it if building the
+   check forces the question, and holds rather than deciding it.
 2. **Every declared name is checked against what the expansion can raise.** The
    raisable set is the union, over **every** member of the expansion - not the
    root alone - of that member's declared outcome names, resolved through the
@@ -10110,6 +10121,19 @@ When `outcomes` is present and non-empty:
    that is itself a composite contributes the names *it* declares under this
    section, which is what makes the check compositional; `flatten/1`
    (`composite.ex:621`) is the existing walk this reads over.
+
+   **"Every member" means the declaration's own members, not the author's.**
+   `expand!/2` answers `splice(members, block, declared_slots(ref))`
+   (`composite.ex:518-527`), so the blocks it returns already carry whatever
+   the author placed in a pass-through slot (the Amendment of 2026-09-07,
+   `:8093`), and a `flatten/1` over that return would reach them. The check
+   does **not**: the raisable set is the minted members alone - the ones
+   `param_map` is keyed by, which is the existing index of exactly that set
+   (`composite.ex:520-525`, `ADR-0004`'s `T3`). A composite's `outcomes/1` is a
+   property of its type over its config, and it must not vary with what an
+   author drops into one of its slots; a declaration that were checked against
+   the filling would compile in one document and fail in the next with the same
+   declaration untouched.
 3. **A declared name the expansion cannot raise is a compile finding, never a
    raise.** The check lives in the compiler's **Resolve** stage, where the
    expansion already happens - `expand_node/3` (`compiler.ex:568`), reached
@@ -10153,9 +10177,9 @@ Two facts about that module this section does **not** change. Its
 refusal, where the `use` form has `refute_unknown_options!/1`
 (`composite.ex:791-802`); adding `"outcomes"` neither adds such a refusal nor
 relies on one. And the moduledoc's sentence that two of the three overridables
-have a key here and the third cannot (`composite/data.ex:69-70`) is about
-`sentence/1`, `palette_entry/0` and `summary/1`; `outcomes/1` was never
-overridable on either form (`composite.ex:334`), and this key is a
+have a key here and the third cannot (`composite/data.ex:69-72`) is about
+`sentence/1`, `palette_entry/0` and `validate_config/1` - the three it names;
+`outcomes/1` was never overridable on either form (`composite.ex:334`), and this key is a
 **declaration** key, not an overridable callback - it is available to both
 forms equally, which is the point of writing it as a declaration key.
 
