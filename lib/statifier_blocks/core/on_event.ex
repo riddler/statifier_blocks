@@ -943,16 +943,23 @@ defmodule StatifierBlocks.Core.OnEvent do
   #      in ["STRICT_EQ", "STRICT_NE"]`); the strict pair compares the terms
   #      themselves (`:795`, `compare_values(left, right, "STRICT_EQ"), do:
   #      left === right`). A `cond` that answers a non-boolean is treated as
-  #      false AND raises a spurious `error.execution`
-  #      (`machine/content/if.ex:152`, `{:non_boolean_cond, other}`), so
-  #      `!=` would skip the assign and dirty the run at the same time. This
+  #      false (`machine/content/if.ex:152`, `{:non_boolean_cond, other}`,
+  #      accumulated into the context's `pending_errors` rather than
+  #      selecting the branch) AND raises a spurious `error.execution` -
+  #      three hops on: `interpreter/content.ex:241` (`drain_pending/2`
+  #      over a non-empty `pending_errors`), `:295`
+  #      (`raise_execution_error/4`), and `machine_state.ex:811`, where
+  #      `raise_platform/4` `enqueue_internal`s the event. So `!=` would
+  #      skip the assign and dirty the run at the same time. This
   #      is the same reading `core.subchart` took for its routing
   #      conditions, where `==` against an absent `_event.data.outcome` cost
   #      a spurious `error.execution` (statifier-ex `st-iz97`).
   #   4. A nested source needs no chain of guards: an access whose target is
-  #      not a map answers the marker too (`predicator/evaluator.ex:788`,
-  #      `:792`), so one `!== undefined` over the whole path covers an
-  #      absent intermediate as well as an absent leaf.
+  #      neither map nor list answers the marker too
+  #      (`predicator/evaluator.ex:1244`, `defp access_value(object, _key,
+  #      _operation) when not is_map(object) and not is_list(object)`), so
+  #      one `!== undefined` over the whole path covers an absent
+  #      intermediate as well as an absent leaf.
   #
   # A LITERAL pair is never guarded (`N2`: "a literal pair has no source to
   # be absent, and always writes"), which is also what keeps a document
