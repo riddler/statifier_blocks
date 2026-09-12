@@ -10221,3 +10221,216 @@ inside its own request.
 
 This Amendment changes no code, adds no changelog fragment (`changelog.d/README.md`
 gives ADRs none), adds no README row, and flips no status line in this file.
+
+## Note (2026-09-12): `core.on_event` capture semantics - a `{"const", value}` source arm, and a pair whose source is absent leaves its destination unwritten
+
+A dated Note rather than an amendment, recorded for `sb-p3fn` under campaign
+SF041's ruling `RQ-SF041-2` (operator, 2026-09-12), in the same form the Note
+of 2026-09-05 used when it first gave `core.on_event` its `capture` key
+(`:3118`). It takes two decisions about that one key. No section above this
+line is edited, no heading is moved, no decision is reopened, no status line in
+this file is flipped, and no row is added to decision 10's table or to the
+projection beside it (`:3534`) - `core.on_event` keeps the four config fields
+it has and gains no fifth.
+
+**Nothing below describes code that exists today.** Recorded ahead of the code,
+as this record's campaign invariant has it: `sb-m6ru` is the code half of
+`N1`, `sb-j0cz` the code half of `N2`, both depend on this Note being on `main`
+and neither waits on anything else in this file. This Note takes no changelog
+fragment (`changelog.d/README.md` gives ADRs none); the behaviour change `N2`
+decides is named in `sb-j0cz`'s fragment, under Changed.
+
+Every `lib/` cite below was read at `main` `a7fa236` and is written beside the
+anchor it was found by - a function head, a clause, a table row. A cite is
+re-located by that anchor and not by its number. The one cite outside this
+package is read at `statifier_examples` `ccf391e` and is labelled there.
+
+### The premise: a capture source is always a payload path, and a missing one arrives as the interpreter's unbound marker
+
+This Note rests on two facts about the code as it stands, stated here so a
+reader can check them before reading anything it decides.
+
+**The value position of a `capture` pair is a path, and only a path.**
+`StatifierBlocks.Core.OnEvent`'s private `captures/1` (`core/on_event.ex`,
+heads at `:806` (`captures(nil)`), `:808` (`captures(capture) when is_map`)
+and `:826` (`captures(_other)`), at `a7fa236`) builds every pair the one way:
+
+    Emission.element(
+      "assign",
+      [{"expr", "_event.data." <> source}, {"location", destination}]
+    )
+
+(`core/on_event.ex:814-817`), over the pairs sorted by destination
+(`:812`), with a malformed map answering `{:error, [{"capture", capture_message()}]}`
+(`:822`, `:826`). The source is concatenated onto `"_event.data."`
+unconditionally: there is no arm in which a pair's value is anything but a path
+inside the firing event's payload. That is the whole of what the Note of
+2026-09-05 documented (`:3118`) and the whole of what `N1` widens.
+
+**`:undefined` is the interpreter's, not this package's.** The string
+`undefined` does not occur anywhere in `core/on_event.ex` at `a7fa236` (zero
+hits), and nothing in this package writes that value. What happens is what the
+Note of 2026-09-05's own correction already records (`### Note (2026-09-05):
+what the run-time branch actually does`, `:3207`): the emitted
+`<assign expr="_event.data.reason" .../>` is evaluated by the engine, whose
+split is on whether the expression's *root* is bound rather than on whether the
+whole path resolves, and `_event` is always bound - so the row that governs a
+capture is "payload lacks `reason` -> writes the explicit unbound marker;
+raises nothing" (`:3223`). The marker is `:undefined`. The destination is
+written either way; only the value differs.
+
+The measurement that puts a number on the consequence is campaign SF040's
+capture `k3`, the signup Journey loop in `statifier_examples` against
+`statifier_blocks` 0.27.0 as pinned there: `test/statifier_examples/signup/journey_test.exs:281-285`
+at `ccf391e` asserts `moved.answers["seats"] == :undefined` after a reader
+presses Back without typing a seat count, with the comment "a capture map's
+destination is written whether or not the payload carries its source". Two
+lines above it the same test writes `refute Map.has_key?(moved.answers, "plan")`
+for a path no handler touched - so one screen's own test has both readings of
+"the reader did not answer" in it, spelled two different ways.
+
+### `N1`. A capture source may be a literal, spelled `{"const", value}`, beside today's path form
+
+The value position of a `capture` pair takes **either** of two forms:
+
+- a **string**, which is what it is today and means exactly what it means
+  today: a path inside `_event.data`, compiled to `"_event.data." <> source`
+  (`core/on_event.ex:814-817`, `a7fa236`);
+- a **two-element form tagged `"const"`**, `{"const", value}`, which means the
+  literal `value`, read from the document and not from the payload.
+
+The two are told apart by shape and never by content: a string is a path, a
+tagged pair is a literal, and no string is reinterpreted as a literal because
+of what it happens to spell. This is what makes the arm additive - every
+document authored before it exists carries strings in every value position and
+compiles to the bytes it compiled to before, which is the same test `cond` and
+`capture` itself each had to pass.
+
+- **The stored spelling.** `ADR-0001` owns the stored bytes and JSON has no
+  tuples, so in the block document the tagged form is the two-element array
+  `["const", value]`; `{"const", value}` is that array as this package reads
+  it. `schema_version` does not move: an optional widening of a value already
+  inside a block's `config` is not a change to the document's shape, for the
+  reason the Note of 2026-09-05 gives for `capture` itself.
+- **`value` is a document value, not an expression.** It is JSON, and it is
+  taken as it stands. It is not parsed, not evaluated, and not resolved against
+  the datamodel - a pair that wants a datamodel value is not this arm.
+- **What is emitted is still one `<assign>` per pair**, on the transition the
+  handler already emits, before the `<raise>` that carries the outcome, in the
+  pairs' destination-sorted order (`core/on_event.ex:812`, `:814-817`). The
+  `expr` of a literal pair is a literal expression rather than a payload path;
+  **how each JSON type is spelled as such an expression is `sb-m6ru`'s to
+  decide and to cite**, and if a type this arm admits cannot be spelled as one,
+  that bead holds and reports rather than narrowing this Note from inside its
+  own request.
+- **Why the key and not a `core.assign` after it.** Unchanged, and the same
+  argument as for the path form: the assigns sit on the transition because by
+  the time control is anywhere else the raise has happened and `_event` is out
+  of scope (the Note of 2026-09-05's "Why the assigns are on the transition and
+  before the raise"). A literal does not need the payload, but it needs the
+  *moment* - it records that **this** handler fired - and a `core.assign` after
+  the raise is on the wrong side of an abandon.
+- **The measurement that asks for it.** Campaign SF040's capture `k2` found
+  that a multi-button screen cannot record which button was pressed: every pair
+  reads the payload, so two buttons that should write different values must
+  rely on the host putting different values in the payload, a contract neither
+  the block document nor the element document states or can check. With this
+  arm, each handler writes its own literal and the document says what it means.
+
+**The element-document side is the element package's, not this record's.** How
+an element format spells the value a pressed control records - and whether it
+does - is `riddler_spec`'s question, under Riddler's ruling `R12.3` (the word
+is `outcome`, never `action`). This Note decides the block document's `capture`
+and nothing about an element document; the two owners meet at the payload, and
+`N1` is what lets the block document stop depending on that meeting.
+
+### `N2`. A pair whose source is absent from `_event.data` leaves its destination unwritten
+
+From `0.28.0` on, a `capture` pair whose **source is a path** (`N1`'s first
+form) and whose path is not carried by the firing event's payload **writes
+nothing at its destination**. The destination is left as it was: absent if
+nothing wrote it before, and carrying its previous value if something did.
+
+- **By default, and with no per-pair opt-in in this wave.** There is no key,
+  no option and no second spelling by which an author asks for the old
+  behaviour on one pair. Whether a per-pair declaration ("write the marker
+  here") is ever wanted is left open and is nobody's bead in campaign SF041.
+- **"Not answered" and "answered with nothing" are different values.** That is
+  the whole of what this decides. A downstream reader tests a captured
+  destination the way it tests any other datamodel path - is it there - instead
+  of testing it for the engine's marker as well; and a guard on a path a screen
+  never wrote reads an absence rather than a value.
+- **`N1`'s literal arm is untouched by this clause.** A literal pair has no
+  source to be absent, and always writes.
+- **The red line of 2026-09-05 is met more directly, not retired.** That Note
+  opens by refusing to let a captured value quietly not be there
+  (`:3182`), and its correction settled for "the marker is a value a reader can
+  test for" (`:3247-3254`). This clause removes the proviso: there is nothing to
+  test for, because there is nothing there. The clause that Note carried as a
+  target rather than a guarantee - an `error.execution` on an unresolvable
+  `expr`, carried upstream as `st-fwsh` - is neither needed by this one nor
+  retired by it, and `N2` waits on nothing upstream.
+- **Nothing is asked of `statifier-ex`.** The engine's evaluation is unchanged,
+  its unbound marker is unchanged, and `N2` is a statement about what this
+  package **compiles**, not about what the interpreter does with what it is
+  given.
+
+**The mechanism is `sb-j0cz`'s, and this Note does not fix it.** A guarded
+assign, a per-pair skip, or another construct the compiler can emit - whichever
+that bead picks, it cites it and proves the behaviour with a test over a
+handler whose payload omits one source. This Note decides the behaviour and
+names the bead; it prescribes no SCXML shape beyond that, and no arrangement
+here is a decision about `ADR-0004`'s emitted bytes.
+
+**This changes the compiled chart of a document that captures.** A document
+whose every `capture` is absent or empty compiles byte-identical - the
+`captures(nil)` clause (`core/on_event.ex:806`, `a7fa236`) and the empty map
+already emit no `<assign>` at all - but a document with a non-empty `capture`
+does not, and `sb-j0cz` carries the consequences of that in its own request:
+the changelog fragment under Changed leading with the behaviour change, and
+whatever fixture re-baselining the change forces, with the diff quoted in its
+request.
+
+### `N3`. What this Note is not
+
+- **Not a new field, and not a new type.** `core.on_event` gains no config key
+  here; `capture` is widened in its value position and `payload` is untouched.
+  No block type is added, decision 10's table is not edited, and the
+  projection's `core.on_event` row (`:3534`) still reads "one per `capture`
+  pair, at the pair's key, `:unknown`".
+- **Not a change to `Environment.capture_writes/1`.** A capture pair still
+  writes `:unknown` at its destination path in the compile-time environment,
+  exactly as the Amendment of 2026-09-06 says it does (`:4250`). That walk
+  records which paths a document **may** write; `N2` is about what happens at
+  run when one of them is not fed, and a path that may be written is still a
+  path that may be written. `N1`'s literal arm writes `:unknown` there too -
+  typing the destination from a literal's own JSON type is a widening of
+  `ADR-0011` decision 2's write forms that no ruling has asked for and that is
+  not taken here.
+- **Not a change to decision 7's field-type set.** Eight members, closed,
+  unwidened. `capture` still has no field in `config_schema/1` - the Note of
+  2026-09-05 records why - and how an author writes a literal pair in an
+  editing surface is `ADR-0005`'s question and `ADR-0011` decision 10's
+  repeated two-control row, not this one's.
+- **Not a waking of the dormant compile-time branch.** The `:config` finding
+  for a source the declared `payload` does not carry stays exactly as the
+  Amendment of 2026-09-06 left it (`P5`, `:4174`), and `P4`'s undeclared case
+  (`:4150`) keeps its shape: what changes there is only the sentence `P4` bases
+  on the Note of 2026-09-05's measurement - a pair whose source the payload
+  lacks writes the marker - which `N2` supersedes for the run-time behaviour
+  from `0.28.0`, without editing that section's text or its other clauses.
+- **Not about `cond`, and not about the outcome words.** A guarded handler that
+  does not fire captures nothing, whichever form its pairs take; the raise
+  still carries `"abandon"` or `"resume"`; neither is reopened.
+- **Not a flip, and not a widening of any return.** No function's arity or
+  return shape is decided here, and no status line in this file moves.
+
+### What builds this, and what a builder must not do
+
+`sb-m6ru` builds `N1` and `sb-j0cz` builds `N2`. Each depends on this Note
+being on `main` and neither waits for a flip - a Note has none. If building
+either shows any claim above to be wrong, that bead **holds and reports**; it
+does not amend this Note from inside its own request.
+
+This Note changes no code, adds no changelog fragment, adds no README row and
+flips no status line in this file.
