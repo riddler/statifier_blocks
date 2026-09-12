@@ -200,13 +200,24 @@ defmodule StatifierBlocks.Core.OnEventTest do
     # `capture` has no field to anchor a per-pair finding on - so it has to
     # name both.
     #
+    # It also has to describe the one restriction beyond shape correctly:
+    # `spellable_string?/1` admits tab, newline and carriage return beside
+    # printable ASCII, and a message that named printable ASCII alone would
+    # tell an author a literal is refused that this module accepts.
+    #
     # sabotage: reverted `capture_message/0` to its path-only wording ->
-    # this went red (verified)
-    test "names both source forms in the one message it has" do
+    # this went red; a second, narrower mutation restoring the message's
+    # first wording ("carrying no characters outside printable ASCII") took
+    # the last assertion red on its own (verified)
+    test "names both source forms, and what a literal may carry, in the one message it has" do
       {:error, [{"capture", message}]} = OnEvent.validate_config(capture(%{"d" => ["const"]}))
 
       assert message =~ "_event.data"
       assert message =~ ~s(["const", value])
+
+      for admitted <- ["printable ASCII", "tab", "newline", "carriage return"] do
+        assert message =~ admitted, admitted
+      end
     end
 
     # The finding order is the order the editor renders, and `capture` is
