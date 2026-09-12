@@ -10796,3 +10796,136 @@ is not re-raised.
 Filed with `sb-dxck`, campaign SF039, from `sb-x9xr` and the campaign's own
 cite residue. This Note changes no code and flips no status line in this
 file.
+
+## Note (2026-09-12): the run pane is one of the surfaces a profile names, and `run?` unseats the run rather than hiding the pane
+
+A dated Note rather than an amendment: no decision, no clause and no heading
+of this record is edited, and no status line moves. It records what the
+2026-09-07 `profile` amendment's own decision already reaches, the one surface
+that amendment could not name, and the ruling that settles how the key behaves.
+The key is a sixth entry in the `@type profile` the amendment printed, and that
+addition is recorded here rather than argued afresh: rulings `RQ-SF041-2` and
+`RQ-SF041-10` (operator, campaign SF041) decided it, and this Note is where the
+record carries them.
+
+Every `lib/` line below was read at `main` `a7fa236`, beside the anchor it is
+matched by, which is the practice `docs/adr/README.md` states once for every
+record here.
+
+### 1. The surface the amendment could not name
+
+The amendment decides that "**A `profile` assign names which of this editor's
+surfaces a mount renders, and whether that mount edits**" (`:7357-7358`) and
+prints five optional keys (`:7364-7370`). The run pane is one of this editor's
+surfaces and no key names it.
+
+That is not an omission from a list. "The ids a profile may list" (`:7405-7408`)
+says each list draws from ids the package already has, and the run pane has no
+id to draw from: every other profile key names a surface the editor renders out
+of its own state, while the run pane is drawn because a **host seated a run in
+it**. `RunPane.run_pane` wraps the canvas unconditionally - `<RunPane.run_pane
+id={...} state={@run} ...>` with `Canvas.canvas` as its slot
+(`lib/statifier_blocks/editor.ex:1069-1097`, read at `a7fa236`) - and draws a
+pane only when a run is seated: `def run_pane(%{state: nil} = assigns)` renders
+the slot alone (`lib/statifier_blocks/editor/run_pane.ex:99-103`
+(`def run_pane(%{state: nil} = assigns)`), read at `a7fa236`).
+
+Campaign SF040's q1 spike found the same thing from the outside, mounting this
+editor for an operations audience: two thirds of the asked-for profile needed no
+code, and the run pane needed a key
+(`docs/spikes/SF040-element-editor.md:116-127`).
+
+### 2. The key
+
+**`run?`, a sixth optional key on `@type profile`, `boolean()`, defaulting to
+`true`.** Under `run?: false` the editor seats no run, whatever the host passes.
+Four consequences, and they are a set:
+
+1. **No run is seated.** `put_run/2` (`lib/statifier_blocks/editor.ex:3440-3448`
+   (`defp put_run(socket, assigns)`), called at `:885`) leaves `run` at its
+   `nil` default (`:760`), and `put_run_session/2` (`:3452-3459`
+   (`defp put_run_session(socket, assigns)`)) leaves `run_session` the same way,
+   so the pane's send control has nothing to write into.
+2. **No pane.** With `state: nil` the run pane renders its slot and nothing else
+   (`run_pane.ex:99-103`), so the canvas draws in the seat it drew in before a
+   run was ever passed.
+3. **No run marks on the canvas.** `marks/1`'s seated-run clause -
+   `defp marks(%{run: run, run_provenance: provenance}) when run != nil and
+   provenance != nil`, resolving `Marks.from_trace(run, provenance)`
+   (`lib/statifier_blocks/editor.ex:2527-2530`) - never fires, and neither does
+   the `fit_target/2` clause that reads its result (`:2565-2571`
+   (`defp fit_target(%{run: run, run_provenance: provenance} = assigns, marks)`)).
+4. **No "Held here" column.** The drawer is passed `run?={@run != nil}`
+   (`lib/statifier_blocks/editor.ex:1148`) into `attr(:run?, :boolean, ...)`
+   (`lib/statifier_blocks/editor/drawer.ex:252`, and the datamodel table's own
+   at `:885`), which is what draws the column header (`drawer.ex:938`) and its
+   cells (`:946`, `:950`). With no run there is no column.
+
+### 3. Why it unseats rather than hides
+
+**Hiding the pane while a run still decided the marks is not a mode.** A seated
+run decides the canvas's marks outright and does not merge with the host's, and
+the reason is recorded in the code that does it: "A run decides the marks
+outright, and does not merge with the host's [...] a union of them would draw a
+configuration no point in the run was ever at"
+(`lib/statifier_blocks/editor.ex:2518-2522`). The same seated run decides what
+`Fit active` acts on (`:2565-2571`) and what the Datamodel tab holds beside the
+declared values.
+
+So a mount that hid the pane and left the run seated would ring cards, move the
+fit and hold values out of a stream the reader has been given no surface to
+read. That is an editor marking states for a reason the reader cannot see, which
+is a defect rather than an audience. The key therefore addresses the run, not
+the pane.
+
+This is the shape `read_only?` already has in the same amendment: it is a set of
+clauses that withhold a capability, not one control hidden while the capability
+stays live.
+
+### 4. What `run?` does not address
+
+`active_marks` and `invoke_mark` - the marks a **host paints itself**, held as
+editor state and documented under "The run marks a host paints"
+(`lib/statifier_blocks/editor.ex:144` (`## The run marks a host paints`); the assign rows at `:587-588`) - are a
+different seam, and `run?` does not reach them. They are already addressed at
+their own assigns: a host that does not want them does not pass them, and there
+is no run to unseat there. With `run?: false` `marks/1` falls to its second
+clause (`:2532-2538`) and draws exactly what the host named.
+
+That is why this Note's phrase is "no **run** marks" rather than "no marks". A
+mount that asks for no run and then paints marks by hand has asked for both, and
+gets both.
+
+### 5. The default keeps the amendment's constraint
+
+A mount that passes no `profile`, and a profile that does not mention `run?`,
+draw what they draw today, byte for byte. `@default_profile`
+(`lib/statifier_blocks/editor.ex:679-685`) gains `run?: true`;
+`normalize_profile/1` (`@spec` at `:2622`, clauses at `:2641` and `:2651`)
+resolves an unmentioned key and a malformed value to that default, the way it
+already does for the other five. The amendment's constraint - "There is no
+arrangement of this map, including `%{}`, that removes a surface a host did not
+name" (`:7389-7390`) - is preserved rather than weakened: `run?: false` is a host
+naming it.
+
+### 6. "Run" in this editor is a fixture replay
+
+Recorded once, because the family now has two nouns near each other. "Run" here
+names a **fixture replay** over a compiled chart - statifier-ui's
+`StatifierUI.Live.State`, live or persisted, seated by a host
+(`lib/statifier_blocks/editor.ex:589`) - and it is distinct from
+statifier_persistence's **execution**, the durable noun recorded in that
+package's `sp-ADR-0011`. The two are not renamed into each other: this editor
+keeps the word `run`, and the key is spelled `run?`.
+
+### 7. There are no named shipped profiles
+
+Correcting the wording this Note's request arrived with. This package ships no
+named profile - "**There are no named profiles.**" (`:7392-7394`, restated at
+`:8365-8366` and in `docs/profiles.md:33`) - so what gains `run?` is the profile
+**type** and the default map, not a set of shipped profiles.
+
+Filed with `sb-t4rt`, campaign SF041, on rulings `RQ-SF041-2` and
+`RQ-SF041-10`. `sb-ij80` is the request that builds it, with a test that a
+seated run marks nothing under the key. This Note changes no code and flips no
+status line in this file.

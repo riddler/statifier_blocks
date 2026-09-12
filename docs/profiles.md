@@ -8,7 +8,8 @@ who want the whole editor, and staff who should see a canvas, some findings
 and nothing else - or a rendering they cannot type into. The `profile` assign
 is how a mount says which of the two it is.
 [`docs/adr/0005-liveview-editor.md`](adr/0005-liveview-editor.md)'s 2026-09-07
-amendment is the record; everything below is the moves.
+amendment is the record, with its 2026-09-12 Note for `run?`; everything below
+is the moves.
 
 ## The default
 
@@ -21,7 +22,8 @@ have got before the assign existed:
   inspector_tabs: :all,
   palette_groups: :all,
   toolbar: :all,
-  read_only?: false
+  read_only?: false,
+  run?: true
 }
 ```
 
@@ -189,3 +191,41 @@ what a mount *offers*, never what it *accepts*.
 **It is not an authorization boundary.** A read-only mount withholds
 affordances; it is not a permission check. If you must prevent a write, enforce
 that where you handle the write, not by trusting a rendering.
+
+## A mount with no run
+
+`run?` says whether this mount watches a run at all. It defaults to `true`,
+which is a mount that seats whatever run you pass and behaves exactly as it
+did before the key existed.
+
+```elixir
+profile: %{run?: false}
+```
+
+**`run?: false` unseats the run; it does not hide the pane.** The editor seats
+no run whatever you pass in `run` and `run_session`, and four things follow
+together:
+
+- the run pane is not drawn, and the canvas draws in the seat it draws in with
+  no run passed;
+- the canvas carries no run marks - no ringed cards, and `Fit active` falls
+  back to the selection;
+- the Datamodel tab drops its **Held here** column, because there are no held
+  values to put in it;
+- the pane's send control is not there, so nothing writes into `run_session`.
+
+The reason it is the run and not the pane is what a seated run decides. A run
+decides the canvas's marks outright rather than merging with any you painted
+yourself, and it decides what `Fit active` acts on and what the Datamodel tab
+holds. A mount that hid the pane and left the run seated would ring cards and
+move the fit out of a stream the reader has no surface to read.
+
+**It does not touch `active_marks` and `invoke_mark`.** Those are marks you
+paint yourself, and they have their own assigns: a mount that wants none does
+not pass them. So `run?: false` removes the *run's* marks, and a mount that
+asks for no run and then names blocks by hand still draws the blocks it named.
+
+One word about the word. "Run" here means a **fixture replay** over the
+compiled chart - `StatifierUI.Live.State`, live or persisted - and not
+`statifier_persistence`'s durable *execution*. The two are different things
+with different lifetimes, and this editor keeps the shorter word.
