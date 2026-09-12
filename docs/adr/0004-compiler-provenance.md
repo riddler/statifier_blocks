@@ -3582,11 +3582,18 @@ The spike is correct that the narrowing is this record's. Read at `d9f4896`:
    not a subtree, not a document - and it carries the **same provenance tuple**
    decision 5 fixes at `:230`, `{block_id, role_or_nil, config_key_or_nil}`, so
    that a finding over a non-SCXML artifact routes by the map this record
-   already specifies rather than by a second, parallel one. It is **optional**:
-   a block type that declares neither callback is refused at Resolve, as
-   `ADR-0002` decision 8 already resolves through the palette, rather than at
-   Emit. Being a callback on the block-type behaviour, it is **`ADR-0002`'s to
-   declare**, and it is declared there when it is built, not here and not now.
+   already specifies rather than by a second, parallel one. It is **optional**,
+   and a block type that declares neither callback is refused at Resolve rather
+   than at Emit - which is where `ADR-0002` decision 3 (`:86`, "Resolution is
+   total and returns typed errors") already puts a resolution failure, as an
+   ordinary typed arm rather than a raise. That refusal point is carried from
+   the spike's candidate 2 as the operator adopted it
+   (`docs/spikes/SF040-element-editor.md:467-468`, "a type that declares
+   neither is refused at resolve rather than at emit"); it is recorded here as
+   part of the adopted shape, not decided here, and a later request building
+   the callback may find it wants a different point and say so. Being a
+   callback on the block-type behaviour, it is **`ADR-0002`'s to declare**, and
+   it is declared there when it is built, not here and not now.
    (The spike's candidate 2 spells the same shape `emit_json/2`, "or an
    emitter-keyed callback", at `docs/spikes/SF040-element-editor.md:465`. The
    ruled name is `emit_node/2`, and the difference is the name only: one node,
@@ -3619,10 +3626,11 @@ independent of this ruling.
 ### 4. Cites
 
 Cites into this file: `:169` (decision 4), `:194`, `:230` (decision 5's owner
-tuple). Cites into `ADR-0002`: `:123`, `:385`, `:481`. Code cites, all read at
-`main` `d9f4896` and re-verified by anchor: `block_type.ex:501`, `:505-506`;
-`compiler.ex:1658`, `:1798`, `:2503`. Spike cites, read at `d9f4896`:
-`docs/spikes/SF040-element-editor.md:365`, `:390`, `:427`, `:465`. This section
-appends at the end of the file, so no line above it moved.
+tuple). Cites into `ADR-0002`: `:86` (decision 3), `:123`, `:385`, `:481`. Code
+cites, all read at `main` `d9f4896` and re-verified by anchor:
+`block_type.ex:501`, `:505-506`; `compiler.ex:1658`, `:1798`, `:2503`. Spike
+cites, read at `d9f4896`: `docs/spikes/SF040-element-editor.md:365`, `:390`,
+`:427`, `:465`, `:467-468`. This section appends at the end of the file, so no
+line above it moved.
 
 Filed with `sb-xbn9`, campaign SF041.
