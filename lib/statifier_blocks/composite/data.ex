@@ -65,6 +65,7 @@ defmodule StatifierBlocks.Composite.Data do
   | `"sentence"` | no | a template string; `{{key}}` is replaced by the param's value rendered as a string |
   | `"slots"` | no | defaults to `%{}`; the pass-through slots this composite exposes, each mapped to the `[local_id, inner_slot]` it stands for (below) |
   | `"migrations"` | no | defaults to `[]`; the ordered migration steps `migrate_config/3` walks from a stored version to the declaration's current one (below) |
+  | `"outcomes"` | no | defaults to `[]`; a JSON array of outcome **names** this composite declares, which replaces the expansion root's derived list and is checked against what the `"subtree"`'s members can raise (ADR-0002's Amendment of 2026-09-12, `C4`) |
 
   **Two of the three overridables have a key here; the third cannot.** A
   `use`-composite may override `sentence/1`, `palette_entry/0` and
@@ -330,7 +331,8 @@ defmodule StatifierBlocks.Composite.Data do
           palette_entry: BlockType.palette_entry(),
           subtree: [node_template(), ...],
           slots: [Composite.pass_through_decl()],
-          migrations: [migration_step()]
+          migrations: [migration_step()],
+          outcomes: [String.t()]
         }
 
   @id_suffix ~r/\A[a-z0-9]+(_[a-z0-9]+)*\z/
@@ -431,11 +433,14 @@ defmodule StatifierBlocks.Composite.Data do
     {migrations, migration_errors} =
       decode_migrations(row["migrations"], version, params, param_errors)
 
+    {outcomes, outcome_errors} = decode_outcomes(row["outcomes"])
+
     errors =
       name_errors(name) ++
         version_errors(version) ++
         param_errors ++
-        subtree_errors ++ entry_errors ++ sentence_errors ++ slot_errors ++ migration_errors
+        subtree_errors ++
+        entry_errors ++ sentence_errors ++ slot_errors ++ migration_errors ++ outcome_errors
 
     case errors do
       [] ->
@@ -448,7 +453,8 @@ defmodule StatifierBlocks.Composite.Data do
            palette_entry: entry,
            subtree: subtree,
            slots: slots,
-           migrations: migrations
+           migrations: migrations,
+           outcomes: outcomes
          }}
 
       errors ->
@@ -472,7 +478,7 @@ defmodule StatifierBlocks.Composite.Data do
   """
   @spec __composite__(state()) :: Composite.declaration()
   def __composite__(state) do
-    Map.take(state, [:name, :params, :version, :sentence, :palette_entry, :slots])
+    Map.take(state, [:name, :params, :version, :sentence, :palette_entry, :slots, :outcomes])
   end
 
   @doc """
@@ -567,7 +573,14 @@ defmodule StatifierBlocks.Composite.Data do
   @spec io(state(), Block.config()) :: StatifierBlocks.Assignability.io()
   def io(state, config), do: Composite.derived_io({__MODULE__, state}, config)
 
-  @doc "The expansion root's outcomes, over its expanded config."
+  @doc """
+  The declaration's `"outcomes"` names, or - for a declaration that writes
+  none - the expansion root's outcomes, over its expanded config.
+
+  `ADR-0002`'s Amendment of 2026-09-12, `C4`: the data spelling of the same
+  declaration key, read through the same derivation, so a data composite and
+  the module composite of the same shape answer the same list.
+  """
   @spec outcomes(state(), Block.config()) :: [BlockType.outcome_decl()]
   def outcomes(state, config), do: Composite.derived_outcomes({__MODULE__, state}, config)
 
@@ -1379,6 +1392,38 @@ defmodule StatifierBlocks.Composite.Data do
 
   defp decode_entry(entry, _name),
     do: {%{}, [~s("palette_entry" must be a map, got: #{inspect(entry)})]}
+
+  # `C4`: a JSON array of outcome NAMES. The row is read by named key beside
+  # the keys `declaration/1` already reads, and adding it neither adds a
+  # row-level unknown-key refusal nor relies on one - this module has never
+  # had the `use` form's `refute_unknown_options!/1`.
+  @spec decode_outcomes(term()) :: {[String.t()], [String.t()]}
+  defp decode_outcomes(nil), do: {[], []}
+
+  defp decode_outcomes(names) when is_list(names) do
+    cond do
+      not Enum.all?(names, &(is_binary(&1) and &1 != "")) ->
+        {[],
+         [
+           ~s("outcomes" must be a list of non-empty outcome name strings, got: ) <>
+             inspect(names)
+         ]}
+
+      names -- Enum.uniq(names) != [] ->
+        {[],
+         [
+           ~s("outcomes" declares ) <>
+             inspect(Enum.uniq(names -- Enum.uniq(names))) <>
+             " more than once; an outcome name is declared exactly once"
+         ]}
+
+      true ->
+        {names, []}
+    end
+  end
+
+  defp decode_outcomes(names),
+    do: {[], [~s("outcomes" must be a list of outcome names, got: #{inspect(names)})]}
 
   @spec label_for(term()) :: String.t()
   defp label_for(name) when is_binary(name), do: name

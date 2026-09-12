@@ -577,7 +577,10 @@ defmodule StatifierBlocks.Compiler do
 
         members
         |> Enum.map(&at_current_version(palette, &1, param_map))
-        |> Enum.reduce({[], [], own}, &resolve_member(palette, &1, &2))
+        |> Enum.reduce(
+          {[], outcome_findings(palette, block, module, members, param_map), own},
+          &resolve_member(palette, &1, &2)
+        )
         |> then(fn
           {nodes, [], expansion} -> {:ok, nodes, expansion}
           {_nodes, findings, expansion} -> {:error, findings, expansion}
@@ -586,6 +589,39 @@ defmodule StatifierBlocks.Compiler do
       {:error, finding} ->
         {:error, [finding], %{}}
     end
+  end
+
+  # `ADR-0002`'s Amendment of 2026-09-12, `C2` item 3: a composite that declares
+  # its own `outcomes` has every declared name checked against what its
+  # expansion can raise, and a name nothing in the expansion raises is a
+  # `:resolve` finding against the composite block - never a raise, which
+  # decision 1 forbids this pipeline. Resolve is the stage because `subtree/1`
+  # is a callback over the block's config (`C2` item 4): what a composite can
+  # raise is knowable only where a particular block is expanded, which is here.
+  #
+  # The findings seed the member reduction rather than short-circuiting it, so
+  # a document with both a bad declared name and a broken member reports both:
+  # within a stage every finding is reported, because those are siblings rather
+  # than consequences.
+  @spec outcome_findings(
+          Palette.t(),
+          Block.t(),
+          Palette.type_ref(),
+          [Block.t()],
+          Composite.param_map()
+        ) :: [Finding.t()]
+  defp outcome_findings(palette, %Block{} = block, module, members, param_map) do
+    palette
+    |> Composite.unraisable_outcomes(module, members, param_map)
+    |> Enum.map(fn name ->
+      Finding.new(
+        :resolve,
+        {:outcome_not_raisable, block.id, name},
+        "the composite declares the outcome #{inspect(name)}, which nothing in its " <>
+          "expansion can raise",
+        block_id: block.id
+      )
+    end)
   end
 
   # `ADR-0002`'s Note of 2026-09-07, item 2 (`RQ-SF037-17`): an expansion is

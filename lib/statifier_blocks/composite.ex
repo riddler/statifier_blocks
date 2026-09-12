@@ -81,7 +81,7 @@ defmodule StatifierBlocks.Composite do
   | `slots/1` | the declared pass-through slots, in declaration order (`RQ-SF038-5`) | no |
   | `io/1` | see below | no |
   | `current_version/0` | the version the declaration states | no |
-  | `outcomes/1` | the expansion root's, over its expanded config | no |
+  | `outcomes/1` | the declaration's `outcomes` names, or - absent - the expansion root's, over its expanded config | no |
   | `sentence/1` | the declaration's template rendered over the config | **yes** |
   | `summary/1` | one chip per visible param (`RQ-SF038-14`) | **yes** |
   | `palette_entry/0` | the map the declaration states | **yes** |
@@ -234,7 +234,8 @@ defmodule StatifierBlocks.Composite do
           version: pos_integer(),
           sentence: String.t() | nil,
           palette_entry: BlockType.palette_entry(),
-          slots: [pass_through_decl()]
+          slots: [pass_through_decl()],
+          outcomes: [String.t()]
         }
 
   @separator "_"
@@ -252,7 +253,7 @@ defmodule StatifierBlocks.Composite do
   # The recognized set of `use StatifierBlocks.Composite` options. It is the
   # same list the `__using__/1` doc below writes: an option added to one is
   # added to the other, because they are the same list.
-  @declaration_options [:name, :params, :sentence, :palette_entry, :version, :slots]
+  @declaration_options [:name, :params, :sentence, :palette_entry, :version, :slots, :outcomes]
 
   @doc """
   Declares a composite block type from `opts`.
@@ -274,6 +275,16 @@ defmodule StatifierBlocks.Composite do
       `t:pass_through_decl/0` maps carrying `:name` and `:to`, with optional
       `:label` (defaulting to `:name`) and `:arity` (defaulting to `:any`).
       Defaults to `[]`, which is every composite written before `RQ-SF038-5`.
+    * `:outcomes` - the **outcome names** this composite declares, a list of
+      strings in the order it declares them (`ADR-0002`'s Amendment of
+      2026-09-12, `C1`). Present and non-empty, the list **replaces** the
+      expansion root's derived outcomes, and every name in it is checked at
+      Resolve against what the expansion can raise (`C2`). Absent it is `[]`,
+      which reads as "not declared" and leaves the derivation exactly as it
+      was (`C3`); an explicit empty list is deliberately the same thing, since
+      every block type answers at least the default `done`. The label of a
+      declared name is the label the member that raises it already declares
+      for it, so there is no second way to spell a label here.
 
   That list is also the **recognized set**: an option outside it is refused at
   the use site, naming the key it did not recognize, the way `:params` refuses
@@ -408,14 +419,41 @@ defmodule StatifierBlocks.Composite do
 
     slots = opts |> Keyword.get(:slots, []) |> normalize_slots!()
 
+    outcomes = opts |> Keyword.get(:outcomes, []) |> normalize_outcomes!()
+
     %{
       name: name,
       params: params,
       version: version,
       sentence: sentence,
       palette_entry: entry,
-      slots: slots
+      slots: slots,
+      outcomes: outcomes
     }
+  end
+
+  # `C1`: a list of outcome NAMES, not of `t:BlockType.outcome_decl/0` pairs -
+  # the label of a declared name is the one the raising member already wrote.
+  # An explicit empty list is the absent case, which `C1` states outright: no
+  # block type can declare no outcomes at all, so there is nothing else for it
+  # to mean.
+  @spec normalize_outcomes!(term()) :: [String.t()]
+  defp normalize_outcomes!(names) do
+    unless is_list(names) and Enum.all?(names, &(is_binary(&1) and &1 != "")) do
+      raise ArgumentError,
+            "use StatifierBlocks.Composite: :outcomes must be a list of non-empty outcome " <>
+              "name strings, got: #{inspect(names)}"
+    end
+
+    duplicates = names -- Enum.uniq(names)
+
+    if duplicates != [] do
+      raise ArgumentError,
+            "use StatifierBlocks.Composite: :outcomes declares #{inspect(Enum.uniq(duplicates))} " <>
+              "more than once; an outcome name is declared exactly once."
+    end
+
+    names
   end
 
   @doc """
@@ -682,6 +720,37 @@ defmodule StatifierBlocks.Composite do
     outcomes_over(Palette.core(), probe_block(ref, config), ref)
   end
 
+  @doc """
+  The declared outcome names of `ref`'s expansion that **nothing in it can
+  raise**, in declaration order, and `[]` for a composite that declares none.
+
+  `ADR-0002`'s Amendment of 2026-09-12, `C2` item 3: the check lives in the
+  compiler's Resolve stage, where the expansion has already been taken, and it
+  is reported as a `StatifierBlocks.Compiler.Finding` rather than raised. The
+  expansion is handed in rather than re-taken so that the stage checks the
+  members it is about to resolve and not a second expansion of the same block.
+
+  `members` and `param_map` are `expand!/2`'s own return: `param_map` is keyed
+  by exactly the **minted** members (`ADR-0004`'s `T3`), which is what `C2`
+  item 2 means by "the declaration's own members, not the author's" - a block
+  an author dropped into a pass-through slot has no entry there and does not
+  widen what the composite may declare.
+  """
+  @spec unraisable_outcomes(Palette.t(), Palette.type_ref(), [Block.t()], param_map()) :: [
+          String.t()
+        ]
+  def unraisable_outcomes(%Palette{} = palette, ref, members, param_map) do
+    case declared_outcomes(ref) do
+      [] ->
+        []
+
+      names ->
+        raisable = palette |> raisable_labels(members, param_map) |> Map.keys() |> MapSet.new()
+
+        Enum.reject(names, &MapSet.member?(raisable, &1))
+    end
+  end
+
   # The one derivation both the callback and `io/2` run; they differ in the
   # palette the members are resolved through and in nothing else.
   @spec io_over(Palette.t(), Block.t(), Palette.type_ref()) :: Assignability.io()
@@ -725,11 +794,47 @@ defmodule StatifierBlocks.Composite do
     end)
   end
 
+  # `ADR-0002`'s Amendment of 2026-09-12: a declared `outcomes` list stands in
+  # front of the derivation. Absent - which is every composite written before
+  # that section, and an explicit `[]` besides - the three lines this function
+  # has always been run unchanged, which is what makes `C3`'s byte-identical
+  # compiled chart true by construction rather than by test.
   @spec outcomes_over(Palette.t(), Block.t(), Palette.type_ref()) :: [BlockType.outcome_decl()]
   defp outcomes_over(%Palette{} = palette, %Block{} = block, ref) do
-    {[root | _rest], _param_map} = expand!(block, ref)
+    {members, param_map} = expand!(block, ref)
 
-    BlockType.outcomes(member_module(root, palette), root.config)
+    case declared_outcomes(ref) do
+      [] ->
+        [root | _rest] = members
+
+        BlockType.outcomes(member_module(root, palette), root.config)
+
+      names ->
+        labels = raisable_labels(palette, members, param_map)
+
+        Enum.map(names, fn name -> {name, Map.get(labels, name, name)} end)
+    end
+  end
+
+  # `C2` item 2: the union of the declared outcome names of every MINTED member
+  # of the expansion, each resolved through the palette in hand, carrying the
+  # label of the FIRST member in the expansion's own order that raises the name
+  # (`C1`). A member that is itself a composite answers whatever it declares
+  # under this same section, which is what makes the set compositional.
+  @spec raisable_labels(Palette.t(), [Block.t()], param_map()) :: %{String.t() => String.t()}
+  defp raisable_labels(%Palette{} = palette, members, param_map) do
+    members
+    |> flatten()
+    |> Enum.filter(&Map.has_key?(param_map, &1.id))
+    |> Enum.flat_map(&BlockType.outcomes(member_module(&1, palette), &1.config))
+    |> Enum.reduce(%{}, fn {name, label}, acc -> Map.put_new(acc, name, label) end)
+  end
+
+  @spec declared_outcomes(Palette.type_ref()) :: [String.t()]
+  defp declared_outcomes(ref) do
+    ref
+    |> Palette.call(:__composite__, [], nil)
+    |> Map.get(:outcomes, [])
   end
 
   @spec composite_ref!(Palette.t(), Block.t()) :: Palette.type_ref()
