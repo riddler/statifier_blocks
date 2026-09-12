@@ -466,8 +466,9 @@ defmodule StatifierBlocks.Core.OnEvent do
   defp capture_message do
     "must map each datamodel path written, like order.cancel_reason, " <>
       "to its source: either the path inside _event.data it is read from, " <>
-      ~s(like reason, or the literal ["const", value], whose value is a ) <>
-      "JSON value carrying no characters outside printable ASCII"
+      ~s(like reason, or the literal ["const", value], whose value is JSON ) <>
+      "carrying no text outside printable ASCII, tab, newline and " <>
+      "carriage return"
   end
 
   @doc """
@@ -924,6 +925,17 @@ defmodule StatifierBlocks.Core.OnEvent do
   # There is no float clause, and there needs to be none: a float is not a
   # value a block document may carry at all
   # (`StatifierBlocks.Validation`'s `{:float, path}` problem).
+  #
+  # Two of the facts this rests on - the escape set the lexer decodes, and
+  # the byte-at-a-time write-back `spellable?/1` refuses a string for - are
+  # that lexer's behaviour rather than a documented grammar, and `mix.exs`
+  # requires `~> 9.0` rather than the 9.4.0 they were measured at. What
+  # holds them honest is the round trip in
+  # `test/statifier_blocks/core/on_event_test.exs`, which asserts the value
+  # read back rather than the bytes emitted and therefore goes red against
+  # whichever 9.x is actually resolved. Whether the floor should be raised
+  # to the version this decision was taken against is a question for the
+  # dependency, not for this function.
   @spec literal(term()) :: String.t()
   defp literal(value) when is_binary(value), do: ~s(") <> escape(value) <> ~s(")
   defp literal(value) when is_integer(value), do: Integer.to_string(value)
