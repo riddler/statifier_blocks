@@ -9994,3 +9994,206 @@ Each stands where it is. This is how to read it.
 
 Filed with `sb-dzqm`, campaign SF039. This Note changes no code, adds no README
 row and flips no status line in this file.
+
+## Amendment (2026-09-12): a composite declares its own outcomes - an optional `outcomes` key that replaces the derived list, checked against what the expansion can raise
+
+**Status: proposed (2026-09-12, campaign SF041, bead `sb-ndw1`, recording
+campaign-SF041's ruling `RQ-SF041-2`).** A decision record merges at proposed
+under the campaign invariant, and this one **stays** proposed at that
+campaign's wrap: `RQ-SF041-2` ruled the record first and named `sb-5ee4` as the
+bead that builds it, in the same campaign but as a separate request. **Nothing
+below describes code that exists today.** Flipping this section to accepted is
+a separate gated request through the same `docs/adr/` gate, filed by the
+campaign that flips it, and it is `sb-5ee4` - not this bead - that carries the
+code. That is the one way this section differs from the Amendment of
+2026-09-08 (`outcome_of:`, `:9181`), which is also proposed and unbuilt but
+had, at the time it was written, no carrier to name.
+
+Additive: every decision above stands exactly as it stands, every Amendment and
+Note above this line stands as it stands, and no text above this line is edited
+by this section.
+
+Every `lib/` cite below was read at `main` `b39c023` and is written beside the
+anchor it was found by - a heading, a function head, a module attribute, a
+`@doc` line, a table row. A cite is re-located by that anchor and not by its
+number.
+
+### The premise: a composite's outcomes are its expansion **root's**, and nothing else's
+
+This section rests on one fact about the code as it stands, stated here so that
+a reader can check it before reading anything the section decides.
+
+`StatifierBlocks.Composite.derived_outcomes/2` (`composite.ex`, head at
+`:680-683`, at `b39c023`) is the whole of a composite's `outcomes/1`: the
+`__using__` macro (`composite.ex:287`) generates
+
+    def outcomes(config), do: StatifierBlocks.Composite.derived_outcomes(__MODULE__, config)
+
+(`composite.ex:311-312`), and `StatifierBlocks.Composite.Data` answers the same
+function - `def outcomes(state, config), do: Composite.derived_outcomes({__MODULE__, state}, config)`
+(`composite/data.ex`, under the `@doc "The expansion root's outcomes, over its
+expanded config."`, `:570-572`). Both land in the private `outcomes_over/3`
+(`composite.ex:728-733`), whose body is three lines:
+
+    {[root | _rest], _param_map} = expand!(block, ref)
+    BlockType.outcomes(member_module(root, palette), root.config)
+
+`_rest` is discarded. The expansion's members below the head are never asked,
+and the walk does not descend: its sibling derivation `io_over/3`
+(`composite.ex:687-702`) does reach every member, through `flatten/1`
+(`composite.ex:621`), which is the comparison that makes the omission visible
+rather than accidental. The public `Composite.outcomes/2`
+(`composite.ex:668-670`) and its `@doc` say the same in as many words -
+"`block`'s outcomes - its expansion root's".
+
+A composite therefore answers whatever its expansion root answers, and a
+structurally-rooted composite - one whose subtree head is `core.group`,
+`core.resumable_group`, `core.sequence` or `core.branch` - answers that type's
+default `done` and nothing else, however many failure-classed outcomes its
+members declare below.
+
+**No callback lets the author say otherwise.** `__using__` ends
+`defoverridable sentence: 1, summary: 1, palette_entry: 0`
+(`composite.ex:334`): `outcomes/1` is not in that list, so a use-form composite
+cannot override it. `Composite.Data` is not a way round it either - the
+delegation cited above is the same function - and the declaration itself has no
+key for it: `@declaration_options [:name, :params, :sentence, :palette_entry, :version, :slots]`
+(`composite.ex:255`), enforced by `refute_unknown_options!/1`
+(`composite.ex:791-802`), and the declaration type
+(`@type declaration`, `composite.ex:231-238`) carries exactly those six fields.
+
+**The measurement that asks for it.** Campaign SF040's capture `k2` (the signup
+screen composite in `statifier_examples`, against `statifier_blocks` 0.27.0 as
+pinned there) found the consequence in a running document: every use-form
+composite there raises `done` and only `done`, so a `went_back` outcome the
+subtree does raise reaches no outcome slot in the enclosing body, and pressing
+Back moves the path forward instead of back. A composite is the unit a host
+puts in front of an author, and it is the one block type that cannot say how it
+finished.
+
+### `C1`. The declaration takes an optional `outcomes` key, a list of outcome names
+
+A composite declaration may carry `outcomes`, a list of **outcome names**,
+strings, in the order the composite declares them.
+
+- On the `use` form it is the option `outcomes:`, taking its place beside the
+  six of `@declaration_options` (`composite.ex:255`) and in the `declaration`
+  type (`composite.ex:231-238`). Absent, it is the empty list, which `C3` reads
+  as "not declared".
+- The value is a list of names, not of `t:StatifierBlocks.BlockType.outcome_decl/0`
+  pairs (`block_type.ex:315`, `{name :: String.t(), label :: String.t()}`). The
+  **label of a declared name is the label the member that raises it already
+  declares for it**, found by the resolution `C2` performs; a name raised by
+  more than one member takes the label of the first such member in the
+  expansion's own order. There is no second way to spell a label here, and this
+  key adds none: the labels a document shows stay the ones the raising block
+  types wrote (`core/invoke.ex:114`, `core/await.ex:123` and their kind).
+- The names are the composite's own completion vocabulary. Nothing about how an
+  outcome compiles moves: it is still one completion event per outcome, built
+  from the raising state's id as `ADR-0004`'s outcome amendment builds it.
+
+### `C2`. Present, the key **replaces** the derived list, and the compiler checks every name against what the subtree can raise
+
+When `outcomes` is present and non-empty:
+
+1. **It replaces the derived list.** `outcomes/1` answers the declared names
+   (with `C1`'s labels) and *not* the expansion root's list. Replace, not
+   merge: a composite that declares `outcomes` has said what it can finish as,
+   and silently re-adding the root's `done` would make the declaration
+   unable to *remove* an outcome, which is half of what it is for.
+2. **Every declared name is checked against what the expansion can raise.** The
+   raisable set is the union, over **every** member of the expansion - not the
+   root alone - of that member's declared outcome names, resolved through the
+   palette the expansion is resolved against, exactly as the Amendment of
+   2026-09-08 resolves an `outcome_of:` reference through the same expansion
+   (`:9181`; its refusal of a `local_id` naming no member, `:9383`). A member
+   that is itself a composite contributes the names *it* declares under this
+   section, which is what makes the check compositional; `flatten/1`
+   (`composite.ex:621`) is the existing walk this reads over.
+3. **A declared name the expansion cannot raise is a compile finding, never a
+   raise.** The check lives in the compiler's **Resolve** stage, where the
+   expansion already happens - `expand_node/3` (`compiler.ex:568`), reached
+   from `resolve/2`'s composite arm (`compiler.ex:549-553`) - and it is
+   reported the way that stage already reports a broken declaration: a
+   `StatifierBlocks.Compiler.Finding` of stage `:resolve` carrying the
+   composite's own `block_id`, in the shape `expand/2`'s rescue arm builds
+   (`compiler.ex:653-669`) and `root_expansion_finding/2` builds
+   (`compiler.ex:675-684`). Decision 1 forbids this pipeline to raise, and this
+   check takes no exception to it.
+4. **Resolve is the right stage because the subtree is config-dependent.**
+   `subtree/1` is a callback over the block's config (`composite.ex:250`), so
+   what a composite can raise is not knowable at the module's own compile time,
+   only at the point a particular block is expanded. The check is therefore
+   per block, not per module, and a declaration whose names are raisable for
+   one config and not another is caught on the document that carries the
+   second.
+
+### `C3`. Absent, the derived list stands, byte-identical
+
+A composite that writes no `outcomes` key behaves exactly as it does at
+`b39c023`: `outcomes/1` answers `derived_outcomes/2`'s expansion-root list, no
+check runs, and **the compiled chart of a document containing no `outcomes` key
+is byte-identical before and after**. `sb-5ee4` proves that with a test rather
+than asserting it; it is the condition on which this section may land inside a
+release that is not otherwise breaking for such documents.
+
+### `C4`. `Composite.Data` takes the same key
+
+The data spelling is the string key `"outcomes"`, a JSON array of strings, a
+sibling of `"subtree"` and `"slots"` in the declaration row - one more row in
+the declaration table `StatifierBlocks.Composite.Data`'s moduledoc carries
+(`composite/data.ex:58-67`), optional, defaulting to `[]`, read by
+`declaration/1` (`composite/data.ex:420-421`) beside the keys it already reads
+and carried into the state map it answers (`:443-452`). Everything `C1` and
+`C2` say holds for it unchanged; a data composite's names are checked against
+its own `"subtree"`'s members the same way.
+
+Two facts about that module this section does **not** change. Its
+`declaration/1` reads its row by named key and has no row-level unknown-key
+refusal, where the `use` form has `refute_unknown_options!/1`
+(`composite.ex:791-802`); adding `"outcomes"` neither adds such a refusal nor
+relies on one. And the moduledoc's sentence that two of the three overridables
+have a key here and the third cannot (`composite/data.ex:69-70`) is about
+`sentence/1`, `palette_entry/0` and `summary/1`; `outcomes/1` was never
+overridable on either form (`composite.ex:334`), and this key is a
+**declaration** key, not an overridable callback - it is available to both
+forms equally, which is the point of writing it as a declaration key.
+
+### `C5`. What this section is not
+
+- **Not a new slot vocabulary.** The umbrella's decision `D13` (2026-08-28,
+  "Outcome paths are slots, never ports") stands untouched: a block still has
+  one inlet and one outlet, alternative outcomes are still slots declared by
+  the block type, and each outcome still compiles to a distinct completion
+  event. This section changes *which list a composite answers as its declared
+  outcomes*, and nothing about what an outcome is, how it is drawn, or how it
+  compiles.
+- **Not a change to `derived_outcomes/2`'s arity.** `derived_outcomes/2`
+  (`composite.ex:680-683`), `outcomes_over/3` (`composite.ex:728-733`) and the
+  public `Composite.outcomes/2` (`composite.ex:668-670`) keep the arities and
+  the return type they have. `derived_outcomes/2` keeps its meaning too: it is
+  the *derivation*, which is what `C3`'s absent case answers, and it is a
+  declared list that stands in front of it rather than a rewrite of it.
+- **Not a change to `failure_outcomes/1`.** The failure axis
+  (`block_type.ex:712`, this file's Note of 2026-09-06 at `:3832`) is a second,
+  independent question about the same names. This section decides which names a
+  composite declares; which of them are failure-classed is not decided here and
+  no bead in campaign SF041 decides it.
+- **Not a flip, and not a widening of any existing return.** No callback is
+  added to `t:StatifierBlocks.BlockType`'s list, no function's return shape
+  changes, and `outcomes/1` still answers `[outcome_decl()]`.
+- **Not the `outcome_of:` amendment.** That section (`:9181`) lets a member of
+  a subtree *name* another member's outcome inside a config value. This one
+  lets the composite *declare its own*. They share the resolution through the
+  expansion, which is why `C2` cites it, and neither builds the other; both
+  are proposed and unbuilt at `b39c023`.
+
+### What builds this, and what a builder must not do
+
+`sb-5ee4` is the code half. It depends on this section being on `main` at
+proposed and does not wait for a flip. If building it shows any claim above to
+be wrong, that bead **holds and reports**; it does not amend this section from
+inside its own request.
+
+This Amendment changes no code, adds no changelog fragment (`changelog.d/README.md`
+gives ADRs none), adds no README row, and flips no status line in this file.
