@@ -10841,11 +10841,20 @@ code, and the run pane needed a key
 `true`.** Under `run?: false` the editor seats no run, whatever the host passes.
 Four consequences, and they are a set:
 
-1. **No run is seated.** `put_run/2` (`lib/statifier_blocks/editor.ex:3440-3448`
-   (`defp put_run(socket, assigns)`), called at `:885`) leaves `run` at its
-   `nil` default (`:760`), and `put_run_session/2` (`:3452-3459`
-   (`defp put_run_session(socket, assigns)`)) leaves `run_session` the same way,
-   so the pane's send control has nothing to write into.
+1. **No run is seated.** `run` and `run_session` are held at their `nil`
+   defaults (`lib/statifier_blocks/editor.ex:760-761`) however they arrive, so
+   the pane's send control has nothing to write into. **The key is resolved
+   before the run assigns are taken**, and that ordering is decided here
+   rather than left to the builder, because today it runs the other way:
+   `put_run/2` (`lib/statifier_blocks/editor.ex:3440-3448`
+   (`defp put_run(socket, assigns)`)) and `put_run_session/2` (`:3452-3459`
+   (`defp put_run_session(socket, assigns)`)) are piped *before*
+   `put_profile/2` in the same `update/2` (`:885`), so a mount at
+   `run?: false` that took the assigns first would seat a run for one render
+   and drop it on the next. What this record fixes is that a `run?: false`
+   mount never holds a run, on any render; whether `sb-ij80` meets that by
+   reordering the `:885` pipeline or by guarding inside the two `put_*`
+   functions is the builder's.
 2. **No pane.** With `state: nil` the run pane renders its slot and nothing else
    (`run_pane.ex:99-103`), so the canvas draws in the seat it drew in before a
    run was ever passed.
@@ -10907,6 +10916,11 @@ already does for the other five. The amendment's constraint - "There is no
 arrangement of this map, including `%{}`, that removes a surface a host did not
 name" (`:7389-7390`) - is preserved rather than weakened: `run?: false` is a host
 naming it.
+
+One earlier reading is dated by this Note rather than contradicted by it. The
+2026-09-07 flip verification records the type as carrying "the five optional
+keys" (`:8360-8363`). That was a true reading of `main` when it was written,
+and this Note is what makes it a dated one: the count is six from here.
 
 ### 6. "Run" in this editor is a fixture replay
 
