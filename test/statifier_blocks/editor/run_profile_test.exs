@@ -209,8 +209,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     describe "the default" do
       # Sabotage: made `normalize_profile/1` resolve `run?` with
       # `Map.get(profile, :run?) == true`, which turns an unmentioned key
-      # into `false` - all three tests in this describe block went red and
-      # none of the six above them moved (verified).
+      # into `false` - three of the four tests in this describe block went
+      # red and none of the six above them moved (verified). The fourth,
+      # *a profile that is not a map at all still seats the run*, stays green
+      # under it, and that is not a gap: `normalize_profile(_other)` answers
+      # `@default_profile` whole and never reaches the expression the
+      # sabotage changes.
       test "run?: true renders byte-identically to the unprofiled editor", %{
         conn: conn,
         run: run
