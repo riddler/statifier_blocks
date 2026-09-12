@@ -27,6 +27,13 @@ have got before the assign existed:
 }
 ```
 
+**`run?` is not built yet.** It is decided in ADR-0005's 2026-09-12 Note and
+built by `sb-ij80`. Until that request lands, `normalize_profile/1` rebuilds
+the map out of the other five keys and a `run?` a mount passes is dropped in
+silence, so a mount asking for `run?: false` on today's package still seats
+whatever run it is given. The section *A mount with no run* below is what
+`sb-ij80` builds, written here so the guide and the record land together.
+
 Every key is optional, and `:all` is a member of every list type rather than a
 separate flag, so a key you do not mention resolves to the default. There is no
 arrangement of this map - `%{}` included - that removes a surface you did not
@@ -194,6 +201,10 @@ that where you handle the write, not by trusting a rendering.
 
 ## A mount with no run
 
+**Not built yet** - `sb-ij80` builds it; see the note under *The default*.
+Everything in this section describes the key as ADR-0005's 2026-09-12 Note
+decides it.
+
 `run?` says whether this mount watches a run at all. It defaults to `true`,
 which is a mount that seats whatever run you pass and behaves exactly as it
 did before the key existed.
@@ -209,7 +220,7 @@ together:
 - the run pane is not drawn, and the canvas draws in the seat it draws in with
   no run passed;
 - the canvas carries no run marks - no ringed cards, and `Fit active` falls
-  back to the selection;
+  back to the selection, and then to any marks you painted yourself;
 - the Datamodel tab drops its **Held here** column, because there are no held
   values to put in it;
 - the pane's send control is not there, so nothing writes into `run_session`.
