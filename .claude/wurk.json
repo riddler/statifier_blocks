@@ -3,6 +3,7 @@
 
   "beads": {
     "prefix": "sb",
+    "sync": "dolthub",
     "topology": "beads",
     "areas": {
       "labels": [
