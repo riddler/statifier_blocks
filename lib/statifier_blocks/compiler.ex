@@ -2135,12 +2135,12 @@ defmodule StatifierBlocks.Compiler do
   # spelled here exactly as `statifier_persistence`'s ADR-0011 decision 4
   # (proposed, SF041) fixes it, and a durable stepper reads it to decide
   # that the execution failed. Under `:terminate` it is the only `<param>`
-  # the final
-  # carries, because the root shape still says nothing about which outcome
-  # was reached; under `:child_use` it rides beside the `outcome` param
-  # that shape already emits. The colon separator is the record's: a dotted
-  # key would be indistinguishable from a nested map in a predicator path
-  # expression, and a colon is not a predicator identifier character.
+  # the final carries, because the root shape still says nothing about
+  # which outcome was reached; under `:child_use` it rides beside the
+  # `outcome` param that shape already emits. The colon separator is the
+  # record's: a dotted key would be indistinguishable from a nested map in
+  # a predicator path expression, and a colon is not a predicator
+  # identifier character.
   #
   # In both cases the root block's own outcome finals and the raises inside
   # them are untouched - what is added here is what turns that internal

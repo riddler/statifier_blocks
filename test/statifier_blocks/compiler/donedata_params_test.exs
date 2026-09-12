@@ -297,7 +297,7 @@ defmodule StatifierBlocks.Compiler.DonedataParamsTest do
     # sabotage: dropped the retired key from the reserved list AND from
     # the finding message - the author of a host type that declares it is
     # told only that the shape is wrong, and this goes red (verified)
-    test "the retired run-status key the rename replaced stays reserved", ctx do
+    test "the refusal names the retired run-status key the rename replaced", ctx do
       assert {:error, [finding]} =
                compile(ctx, "myapp:mints_retired_execution_status", child_use: true)
 
