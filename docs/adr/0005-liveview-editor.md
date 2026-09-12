@@ -10944,3 +10944,110 @@ Filed with `sb-t4rt`, campaign SF041, on rulings `RQ-SF041-2` and
 `RQ-SF041-10`. `sb-ij80` is the request that builds it, with a test that a
 seated run marks nothing under the key. This Note changes no code and flips no
 status line in this file.
+
+## Note (2026-09-12): a chip that is both translated and over the cap - the declared event name is the `title`, the clipped translation is the visible label
+
+A dated Note rather than an amendment: no decision, clause or heading of this
+record is edited, no status line moves, and `10n`, `10o`, `10w`, `10x` and
+`10y` stand exactly as they stand. It records the precedence `10w` and
+`ADR-0002`'s length carve-out leave colliding, which nobody had ruled and
+which `sb-fhxc` reported against the landed code. Campaign SF041's ruling
+`RQ-SF041-5` (operator, 2026-09-12) seated it; this Note is where the record
+carries it.
+
+Every `lib/` and `test/` cite below was read at `main` `da10e05`, beside the
+anchor it was matched by, and is re-located by that anchor and not by its
+number.
+
+### 1. The collision, as the code has it today
+
+Two clauses reach one attribute for one chip.
+
+`10w` (`:4930`) gives a chip whose text has the shape of a generated
+done-event name a drawn form of `<block label> · <outcome>` and puts the raw
+name on `title`: "The raw event name goes on `title`, verbatim and
+untruncated. That is the half that keeps the translation lossless" (`:4949-4953`).
+`10x` (`:4958`) then orders the passes - the translation runs where the chip is
+built, ahead of the cap, and the translated text is what the cap measures.
+
+`ADR-0002`'s Amendment of 2026-09-08
+(`docs/adr/0002-block-type-behaviour.md:9616`, at proposed), `C1`, narrows
+`B3`'s length arm so an over-cap chip is drawn clipped rather than dropped, and
+carries the chip's **full text** on the same `title`
+(`docs/adr/0002-block-type-behaviour.md:9673-9674`).
+
+A chip that is **both** translated and over the cap therefore has two
+candidates for one attribute, and neither record contemplated the other's
+case. The code resolves it silently in favour of the clipped chip's completion:
+`drawn_chips/3` (`block_type.ex:1876`) matches `:too_long ->
+[{clip(drawn), drawn}]` (`block_type.ex:1882`), where `drawn` is the
+**translated** text and the declared event name that `translate_chip/2`
+returned beside it (`block_type.ex:1919`) is discarded. `summary_titles/3`
+(`block_type.ex:1694`) then reads that entry, and its `@doc` says so in as many
+words: "Where a chip is both translated and over the cap the entry is the full
+**translated** text rather than the declared event name"
+(`block_type.ex:1679-1682`). The test
+`"a translated chip over the cap is clipped like any other"`
+(`test/statifier_blocks/block_type/summary_test.exs:510`) pins it, asserting the
+full translated text as the title at `:515`.
+
+The consequence is the one `10w` was written to prevent: the declared event
+name - the string an author debugging a chart against generated SCXML, or a
+support engineer reading a screenshot beside a trace, needs exactly - is
+present on no surface at all for that chip.
+
+### 2. The ruling: the declared event name wins the `title`; the translation is the visible label
+
+For a chip that is both translated and over the cap, the **declared event
+name** is what goes on `title`, verbatim and untruncated, and the **clipped
+translation** is the visible label. `10w`'s losslessness half is the one that
+holds; `C1`'s "full text" is read as the full text of the chip **as declared**,
+which for a translated chip is the generated name.
+
+The cost is real and is named rather than discovered later: the `title` then
+neither completes nor matches the visible string, and a reader who hovers a
+clipped chip sees a different string from the one on the card. That cost is
+accepted because the two strings are not symmetric. The translated text is
+**derivable** - it is `<block label> · <outcome>` over a name and the
+document's labels, and `ViewModel` builds those labels once per document
+(`block_type.ex:1655-1665`, the `chip_labels` typedoc) - while the declared
+event name is derivable from nothing once it is gone. Between a `title` that
+repeats what the card already shows and a `title` that is the only place a
+fact survives, the record takes the fact.
+
+Three things this does **not** move:
+
+- **`10x`'s order stands.** The translation still runs ahead of the cap and the
+  translated text is still what the cap measures, so a generated name is still
+  not refused for a length the author cannot fix. This Note rules what is kept
+  beside the drawn chip, not what is measured.
+- **A chip that is clipped but not translated is unchanged.** Its `title` is its
+  own full text, which is `C1`'s clause, and nothing here touches it.
+- **A chip that is translated but under the cap is unchanged.** Its `title` is
+  the declared event name already (`block_type.ex:1919-1926`), which is `10w`.
+
+**This answers `sb-fhxc`.** The code half is not built and no bead carries it:
+today's behaviour is the opposite of this clause on exactly one arm
+(`block_type.ex:1882`), so the bead that builds this carries that arm, the
+`@doc` sentence at `block_type.ex:1679-1682`, and the assertion at
+`test/statifier_blocks/block_type/summary_test.exs:515` with the comment above
+it at `:498-509` that chose the other way. Until it lands, the
+code is what a reader will find and this record is what it should be.
+
+### 3. One attribution in the code is to the wrong item
+
+`summary_titles/3`'s `@doc` closes the sentence quoted above with "completing
+what is on the card is what `ADR-0005`'s Note of 2026-09-08 item 2 asks for"
+(`block_type.ex:1681-1682`). Item 2 of that Note (`:10463`) takes the cap
+number, its width-independence, the Findings-tab home for a presentation-cap
+finding and the containment rule, and records the ellipsis clause as **ruled
+and queued rather than taken**, naming `ADR-0002` as the record that must write
+it (`:10501-10512`). It asks for nothing about a `title`. The "full text on the
+`title`" clause is `ADR-0002`'s
+(`docs/adr/0002-block-type-behaviour.md:9673-9674`). The attribution is a code
+comment and not a clause of any record, so nothing above is edited for it; it
+is named here so the next reader of that `@doc` does not follow it to a
+paragraph that does not contain what it promises. It is corrected by the same
+bead that builds item 2.
+
+Filed with `sb-ykpe`, campaign SF041.

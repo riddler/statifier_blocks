@@ -10434,3 +10434,109 @@ does not amend this Note from inside its own request.
 
 This Note changes no code, adds no changelog fragment, adds no README row and
 flips no status line in this file.
+
+## Note (2026-09-12): the editor's Expand reads `expand/2`'s tuple while the raising callers are Resolve and the environment walk, and the `outcome_of:` amendment's three undecided questions are named open with a recommendation each
+
+A dated Note rather than an amendment, and it edits nothing above this line.
+It carries two items from campaign SF041's ruling `RQ-SF041-5` (operator,
+2026-09-12, which seated them as one bundle): a correction **by addition** to
+this file's Note of 2026-09-08 (`:8996`) item 3 (`:9081`), and the questions
+the Amendment of 2026-09-08 (`:9181`) left undecided, listed as **open** with
+the walk's recommendation beside each. No decision, Amendment or Note above
+this line is edited; no `@callback` in decision 5's table is added, removed or
+re-arity'd; `schema_version` stays at `1`; this Note carries no `Status:` line
+and flips nothing. The `outcome_of:` Amendment stays at **proposed** and
+nothing here moves it.
+
+Every `lib/` cite below was read at `main` `da10e05` and is written beside the
+anchor it was found by - a function head, a `@spec`, a quoted line. A cite is
+re-located by that anchor and not by its number.
+
+### 1. The editor's Expand reads `expand/2` in a `case`; the raising callers are the compiler's Resolve and the environment walk (`sb-33es`)
+
+Item 3 of this file's Note of 2026-09-08 says of `expand!/2` that "it is what
+the compiler's Resolve and the editor's Expand call" (`:9088-9089`). The
+compiler half of that sentence holds. The editor half does not, and has not
+since the code that item ruled was built: `RQ-SF039-10`'s own clause gave the
+editor the tuple spelling precisely so a broken declaration would not take an
+author's LiveView down, and that is what landed.
+
+Corrected by addition. The sentence above stands as written; what follows is
+what the code does, and where the two disagree the code is what a reader
+should expect to find.
+
+- **The editor's Expand reads `expand/2`, in a `case`.**
+  `expanded_members/2` (`editor.ex:2156-2157`, `@spec expanded_members(Block.t(),
+  module()) :: {:ok, [Block.t()]} | {:error, term()}`) is the editor's **one**
+  call site, and it reads `case Composite.expand(block, module) do`
+  (`editor.ex:2158`), answering `{:ok, members}` for the pair and
+  `{:error, {:composite_expansion_failed, block.id, why}}` for the refusal. The
+  comment above it (`editor.ex:2143-2145`) states the reason in the record's own
+  terms: "`ADR-0002`'s Note of 2026-09-08, item 3 gives this caller the tuple
+  spelling, so the refusal arrives as data and the `rescue` that used to stand
+  here is a `case`."
+- **The compiler's Resolve reads `expand!/2` and rescues.** `Compiler`'s private
+  `expand/2` (`compiler.ex:691`) calls `Composite.expand!(block, module)`
+  (`compiler.ex:692`) and turns a raise into a
+  `{:composite_expansion_failed, block.id, why}` finding in its `rescue`. The
+  raise is still the compile-time answer; it is caught where findings are made.
+- **The environment walk is the second raising caller, and the sentence did not
+  name it.** `expansion_signatures/5` (`environment.ex:473`) and
+  `mapped_start/8` (`environment.ex:798`) both read `Composite.expand!`
+  (`environment.ex:474`, `:799`). `expand/2`'s own `@doc` already says so - "A
+  caller that wants the raise - the compiler's Resolve, the environment walk -
+  reads `expand!/2`" (`composite.ex:490-492`) - so the correction here is to
+  item 3's sentence and not to the function's documentation.
+
+Nothing about the two spellings moves. `Composite.expand/2`
+(`composite.ex:500`) is still `{:ok, expand!(block, ref)}` with a `rescue`
+(`composite.ex:501-503`) over `expand!/2` (`composite.ex:536`), so there is
+still one expansion and one place the answer is derived, which is the whole of
+what item 3 decided. Only the list of who calls which spelling is corrected.
+
+This **answers `sb-33es`**, which asked for exactly this correction or the
+operator's word that the sentence stood as intent.
+
+### 2. The `outcome_of:` amendment's three undecided questions, named open, with a recommendation each
+
+The Amendment of 2026-09-08 (`:9181`) is at **proposed** and no bead carries
+its code. Its own "What this section does not decide" (`:9451`) names five
+things it leaves; three of them are live questions that a later campaign has to
+answer before `outcome_of:` is built, and they are listed here so a reader of
+this record finds them together rather than inside a section's closing bullets.
+
+Each carries **a recommendation and not a decision**. The recommendations are
+campaign SF041's walk's, quoted here for the operator's ruling at that
+campaign's wrap (`RQ-SF041-5`); until that ruling each question is open, and
+this Note takes none of them.
+
+- **An outcome name the member's type does not declare** (`:9457-9464`). `O5`
+  (`:9381`) refuses an unknown **local id** and no more; whether an unknown
+  **outcome** is refused, and where, is left to the record or campaign that
+  builds `O5`. *Recommendation: refuse it at expansion, where a palette is
+  already held - `expand/2` takes a `t:StatifierBlocks.Palette.type_ref/0`
+  (`composite.ex:498-499`) and `Composite.outcomes/2` takes a palette
+  (`composite.ex:706-707`) - naming the outcome the way `O5` names an unknown
+  local id.*
+- **A guard that needs the compiled id inside a larger expression**
+  (`:9465-9471`). Substitution is whole-value, so a `core.on_event` `cond`
+  (its declared field key at `core/on_event.ex:314`) cannot carry one.
+  *Recommendation: leave it unexpressible here and let the record that adds a
+  non-whole-value arm name its producer, as the vocabulary clause at
+  `:7143-7145` already requires of every arm after the first; do not widen
+  `outcome_of:` to substitute inside an expression.*
+- **A generated name that names a block outside the collapsed selection**
+  (`:9472-9476`). `18E` (`docs/adr/0005-liveview-editor.md:9707`) carries it
+  across as a literal, which leaves the declaration document-bound; whether
+  `Collapse` should refuse it instead is `ADR-0005`'s question. *Recommendation:
+  refuse it by name, the way `19E`
+  (`docs/adr/0005-liveview-editor.md:9767`) refuses a value it cannot spell -
+  a declaration that silently depends on a block outside itself is the failure
+  `19E` exists to prevent - and record the refusal in `ADR-0005`.*
+
+The two bullets that section also names - that no bead builds the code, and
+how the editor draws an `outcome_of:` value - are not repeated here: the first
+is the amendment's own status and the second is a drawing question this record
+does not own.
+
+Filed with `sb-ykpe`, campaign SF041. `sb-33es` is answered by item 1.
