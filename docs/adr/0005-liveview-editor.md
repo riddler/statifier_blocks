@@ -10936,8 +10936,9 @@ keeps the word `run`, and the key is spelled `run?`.
 
 Correcting the wording this Note's request arrived with. This package ships no
 named profile - "**There are no named profiles.**" (`:7392-7394`, restated at
-`:8365-8366` and in `docs/profiles.md:33`) - so what gains `run?` is the profile
-**type** and the default map, not a set of shipped profiles.
+`:8365-8366`, and in `docs/profiles.md:42`, where this request moves the
+sentence to from `:33`) - so what gains `run?` is the profile **type** and the
+`@default_profile` map, not a set of shipped profiles.
 
 Filed with `sb-t4rt`, campaign SF041, on rulings `RQ-SF041-2` and
 `RQ-SF041-10`. `sb-ij80` is the request that builds it, with a test that a
