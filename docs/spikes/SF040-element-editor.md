@@ -493,4 +493,54 @@ recorded here so they are not lost. Neither is this package's to fix.
 
 ## 5. Reviewer qualifications
 
-None recorded.
+Cold direction review, pass 1. Every line number, every count and every
+record quotation above was re-derived independently and resolves as
+written, including both corrections this document makes to its own inputs
+(`splice/3` at `compiler.ex:1928`, and the "emits this block's SCXML
+subtree" gloss belonging to ADR-0002 rather than ADR-0004 decision 4).
+Six qualifications, none blocking.
+
+1. The sentence attributed to `docs/decisions.md` D16 - "a second way to
+   lay a document out is a host's page, not a mode inside the package
+   editor" - is not in D16. D16's own words are "nothing promotes as a
+   layout mode" (and the epic's R4, "never as a layout mode"). The quoted
+   sentence is `PlanLive`'s moduledoc paraphrasing D16. The claim is
+   right; the quotation marks belong to statifier_examples, not to the
+   umbrella record.
+
+2. `Document.blocks/1` plus `committed_config/2` cannot produce the nested
+   document `sb-q8sw-emitted.json` holds. `blocks/1` returns a flat
+   pre-order list and flattens every slot together, discarding nesting and
+   slot name (`document.ex:110-118`). A host emit walk would recurse
+   `%Block{}.slots` directly. The estimate and the recommendation stand;
+   the two APIs named in section 2 and section 3(b) do not, on their own,
+   do what is claimed.
+
+3. "a table of the seventeen public APIs" is seventeen table rows naming
+   roughly two dozen functions; several rows carry two or three.
+
+4. The line counts beside `ConfigForm.config_form/1` (655) and
+   `Editor.Field.field/1` (1,727) are the module files' sizes, not the
+   functions'.
+
+5. Every input this document cites resolves only on one machine - two
+   never-pushed local branches and six artifacts under the private
+   umbrella's `.claude/fleet/pending/` - and D16 is a private record cited
+   unqualified. No terminology-firewall hit; a reference-hygiene question
+   for the operator, given that this file lands in a public repo.
+
+6. The 60-to-120-line JSON emit walk was never built or measured, unlike
+   the page-view estimate that is anchored on `PlanLive`'s measured 860.
+   Section 2 says "estimated"; section 3(b) hedges with "about". Read with
+   qualification 2, it is the least-evidenced number in the argument.
+
+Recorded rather than cured: campaign SF040 consent clause 6 merges a spike
+findings doc on a QUALIFIED verdict with its qualifications written here.
+Qualifications 1 and 2 were independently re-verified against `fa61fd7`
+before being recorded and both hold: the quoted sentence is at
+`statifier_examples/lib/statifier_examples_web/live/plan_live.ex:6-8` and
+appears nowhere in `docs/decisions.md`, and `Document.walk/1`
+(`document.ex:109-118`) sorts the slot map by name and `flat_map`s the
+children together, so the list it returns carries neither nesting nor slot
+name. A reader taking recommendation (b) should read qualification 2 with
+it.
