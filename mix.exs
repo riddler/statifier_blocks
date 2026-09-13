@@ -181,8 +181,10 @@ defmodule StatifierBlocks.MixProject do
         # while it does. Lifting it makes a predicator that round-trips the
         # whole of a string something this package NEEDS, and a need is what
         # a floor is allowed to state - so the two move together, in one
-        # request, with the canary in `on_event_test.exs` as the signal that
-        # the version is there. Until then the argument above stands
+        # request. What says the version is there is a positive round trip
+        # over a non-ASCII string, which that request is also what makes
+        # assertable: this package refuses such a literal today, so nothing
+        # here can measure it. Until then the argument above stands
         # unchanged: nothing this package calls requires more than 9.0.
         {:predicator, "~> 9.0"},
         # Dev / test

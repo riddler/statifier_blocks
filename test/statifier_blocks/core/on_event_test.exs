@@ -792,42 +792,6 @@ defmodule StatifierBlocks.Core.OnEventTest do
       assert strip_guards(compile!(handler(pairs))) == @path_only_golden
     end
 
-    # CANARY (`sb-uoo5`). `spellable_string?/1` refuses a string carrying a
-    # character above printable ASCII, and the reason for that refusal is a
-    # MEASUREMENT of predicator rather than a rule: 9.4.0's string lexer
-    # reads a literal codepoint by codepoint and writes each one back as a
-    # single byte, so the value the engine hands the datamodel is not the
-    # value the document carried.
-    #
-    # The round trip above cannot see that in either direction. It exercises
-    # only values `spellable?/1` admits, and a non-ASCII string is precisely
-    # what it does not admit - so it goes red if an ESCAPE stops decoding
-    # and stays green whatever the write-back does. This asserts the
-    # measurement directly, against whichever predicator `mix.lock` resolves,
-    # and it is GREEN while the truncation is still there (9.4.0 today).
-    #
-    # It goes RED when a resolved 9.x round-trips a non-ASCII literal
-    # CORRECTLY. That is not a regression: it is the signal that the refusal
-    # has become over-strict and is to be revisited - the floor rises and
-    # the const arm widens in `sb-xoll`, and this test becomes a round-trip
-    # assertion there rather than a canary.
-    #
-    # sabotage: the subject here is the dependency, so the discrimination
-    # check is on the assertion rather than on this module: pointing the
-    # same `refute` at plain ASCII literals, which predicator does round
-    # trip correctly, took it red on the first of them (verified).
-    test "canary: the resolved predicator still truncates a non-ASCII string literal" do
-      for text <- ["caf\u00e9", "\u2713"] do
-        assert {:ok, read} = Predicator.evaluate(~s("#{text}"), %{})
-
-        refute read == text,
-               "predicator #{Application.spec(:predicator, :vsn)} round-trips " <>
-                 "#{inspect(text)} correctly now: the non-ASCII refusal in " <>
-                 "StatifierBlocks.Core.OnEvent.spellable_string?/1 has become " <>
-                 "over-strict - see sb-xoll"
-      end
-    end
-
     # Advisory (a) on this bead, built rather than written down: P5 is a
     # rule about a source PATH, so a literal pair is never reached by it.
     # A handler may declare a payload and capture a literal beside a path

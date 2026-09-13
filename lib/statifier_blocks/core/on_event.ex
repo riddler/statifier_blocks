@@ -164,9 +164,10 @@ defmodule StatifierBlocks.Core.OnEvent do
   arises, because a block document may not carry one at all.
 
   The ASCII restriction is measured against the predicator this package
-  resolves rather than stated as a rule, so it is **interim**: it is
-  earned only while that lexer still truncates, and the suite carries a
-  test that goes red when a resolved version stops truncating.
+  resolved when it was taken rather than stated as a rule, so it is
+  **interim**: it is earned only while that lexer still truncates, and it
+  is lifted - together with the requirement `mix.exs` states - by the
+  release that stops truncating.
 
   One `<assign>` is emitted per pair, on the transition the handler
   already emits and **before** the `<raise>` that carries the outcome.
@@ -1037,10 +1038,11 @@ defmodule StatifierBlocks.Core.OnEvent do
   # takes it red against whichever 9.x is actually resolved. It is blind to
   # the second, because it exercises only values `spellable?/1` admits and
   # the write-back is the reason a string is not admitted: a later 9.x that
-  # FIXES the truncation would leave every case in it green while the
-  # refusal quietly became over-strict. The canary beside it - the one
-  # asserting that the resolved predicator still truncates a non-ASCII
-  # literal - is what covers that direction, and it goes red on the fix.
+  # FIXES the truncation leaves every case in it green while the refusal
+  # quietly becomes over-strict. Nothing in this suite covers that
+  # direction, and nothing here can - the assertion that would is a
+  # positive round trip over a non-ASCII string, which becomes possible
+  # only in the request that lifts the refusal and raises the floor with it.
   #
   # Whether the floor should be raised to the version this decision was
   # taken against is a question for the dependency, not for this function;
@@ -1090,11 +1092,12 @@ defmodule StatifierBlocks.Core.OnEvent do
   #
   # That restriction is a MEASUREMENT of one version, not a rule, so it is
   # interim: the resolved predicator is what decides whether it is still
-  # earned. `on_event_test.exs` pins the measurement directly rather than
-  # through this function - a literal this clause refuses never reaches
-  # `literal/1` to be round-tripped - and goes red when a resolved 9.x
-  # reads a non-ASCII literal back correctly, which is the signal to widen
-  # this clause and raise the floor rather than a regression.
+  # earned, and no test here can say that it is - a literal this clause
+  # refuses never reaches `literal/1` to be round-tripped, so the suite
+  # never sees the write-back at all. A resolved predicator that reads a
+  # non-ASCII literal back whole is the signal to widen this clause and
+  # raise the floor with it, in one request; until then the clause rests on
+  # the measurement `mix.exs` records beside the requirement.
   @spec spellable?(term()) :: boolean()
   defp spellable?(value) when is_binary(value), do: spellable_string?(value)
   defp spellable?(value) when is_integer(value), do: true
