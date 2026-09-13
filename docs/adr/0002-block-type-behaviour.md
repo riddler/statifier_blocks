@@ -10540,3 +10540,173 @@ is the amendment's own status and the second is a drawing question this record
 does not own.
 
 Filed with `sb-ykpe`, campaign SF041. `sb-33es` is answered by item 1.
+
+## Note (2026-09-13): the four outcome questions the declared-`outcomes` build left open are decided - no finding for a dropped name, the name is its own fallback label, the duplicate refusal is adopted, and an unresolvable member contributes nothing
+
+Campaign SF044, bead `sb-k7nf`, recording the operator's ruling `RQ-SF044-8`.
+This is a Note: it carries no status of its own and nothing here flips.
+
+The Amendment of 2026-09-12 (`:9998`) was built by `sb-5ee4`, and building it
+raised four questions the section did not answer. Two of them the section
+names itself - `C2` item 1 delegates the dropped-name finding outright
+(`:10111-10114`) and `C5` (`:10186`) says what the section is not; the other
+two the code answered by hand, without a record line to answer to. Each is
+decided below as a **rule**. A rule is what the code must be true of; this
+Note deliberately enumerates no call sites and claims no complete list over
+the codebase, because a list in a record goes stale the first time a caller
+moves. Where a decision changes behaviour, the enumeration is a **test**, and
+the bead that writes it is named.
+
+Every code cite below was **read at `55aeac1`** and is written as an anchor
+first, the line second: the anchor is what a later reader re-locates by.
+
+### 1. A composite whose declaration drops a name its expansion root still raises gets **no** compile finding
+
+`C2` item 1 left this open in terms - "Whether a composite whose declaration
+drops a name its root still raises deserves a finding of its own is not
+decided here" (`:10110-10113`) - and asked `sb-5ee4` to report it rather than
+decide it. It reported; the ruling is **no finding**.
+
+The declared list is the composite's word on how it finishes. `C2` item 1
+already decided **replace, not merge**, precisely so that a declaration can
+*remove* an outcome ("silently re-adding the root's `done` would make the
+declaration unable to *remove* an outcome, which is half of what it is for",
+`:10105-10107`). A finding on the removal would give back, as a diagnostic,
+the thing replacement exists to permit: an author who narrows a composite's
+presented outcomes would have to silence a warning to do the supported thing.
+
+**The rule: dropping a raisable name from the declaration is well-formed, and
+no stage reports it.** This is the negative of `C2` item 3, which keeps its
+finding: a declared name the expansion **cannot** raise is still a Resolve
+finding (`:10137-10138`). Narrowing is allowed; inventing is not.
+
+No code changes for this item. It is recorded because `C2` item 1 asked for a
+record line, and because the absence of a check is otherwise indistinguishable
+from an oversight.
+
+### 2. A declared-but-unraisable name's fallback label is **the name itself**
+
+`C1` gives the label rule for a declared name - it "is the one the raising
+member already wrote" (`normalize_outcomes!/1`'s comment says the same,
+`composite.ex:435-439`, read at `55aeac1`) - and says nothing about a declared
+name that no member raises. That case is reachable before any compile:
+`outcomes/1` is answered for the palette and the editor's drawing, which run
+with no compiler stage in front of them, so `C2` item 3's Resolve finding is
+not yet in hand when a label is needed.
+
+The code resolves it by falling back to the name:
+
+```elixir
+Enum.map(names, fn name -> {name, Map.get(labels, name, name)} end)
+```
+
+(`outcomes_over/3`'s declared arm, `composite.ex:815`, read at `55aeac1`,
+where `labels` is `raisable_labels/3`'s map, `composite.ex:813`.)
+
+**The rule: where a declared outcome name has no raising member to take a
+label from, its label is the name itself.** Three reasons, in the order they
+bind:
+
+- It is total. `outcomes/1` must answer for any declaration, including one
+  `C2` item 3 will later refuse, and a label is a `t:BlockType.outcome_decl/0`
+  field that has no absent spelling.
+- It is honest. The name is what the author wrote and what the compiler mints
+  the id and event from; showing it is showing the declaration, not inventing
+  a prettier one.
+- It keeps the refusal in one place. A second spelling here - a placeholder
+  label, or a raise - would put a judgement about an unraisable name into a
+  drawing path, where `C2` item 3 has already placed the judgement in Resolve.
+
+The behaviour is the code's today. Recording it makes it a rule rather than an
+accident of a `Map.get/3` default, so a later reader who changes the arm knows
+what they are changing.
+
+### 3. The duplicate-outcome-name refusal is **adopted**
+
+`C1` is silent on duplicates, so both decoders refuse them unforced: the `use`
+form raises `ArgumentError` at module compile time (`normalize_outcomes!/1`,
+`composite.ex:441`, read at `55aeac1`) and the data form answers an error
+string through its decode tuple (`decode_outcomes/1`, `composite/data.ex:1401`,
+read at `55aeac1`). The two spellings differ because the two declaration
+surfaces differ - `C4` gives the data form the same key (`:10164`), and that
+form reports rather than raises, through the tuple `decode_outcomes/1`'s own
+comment describes (`composite/data.ex:1396-1399`, read at `55aeac1`) and the
+error list `declaration/1` accumulates (`composite/data.ex:436`, read at
+`55aeac1`) - and that difference is intended.
+
+**The rule: an outcome name is declared exactly once; a declaration that names
+one twice is refused at the surface that reads it - a raise for the `use`
+form, a reported error for a data declaration.**
+
+A duplicate has no meaning that the single declaration does not already have.
+`C1`'s labels come from the raising member, so a repeated name cannot even
+carry a second label to distinguish it; the second occurrence is either a typo
+or a merge artefact. Refusing it at the declaration is cheaper than any later
+stage, and it is the only place the author's own text is still in hand.
+
+This item adopts what is already there. It changes no behaviour, and it is
+recorded so the refusal is not removed as unforced by a reader who checks `C1`
+and finds nothing.
+
+### 4. An unresolvable minted member contributes **nothing** to the raisable set
+
+This is the one item that changes behaviour.
+
+`member_module/2` answers `nil` for a member whose type the palette does not
+carry (`composite.ex:1177`, read at `55aeac1`) - deliberately, so an
+unresolvable member degrades rather than raising (its comment cites `ADR-0003`
+decision 5, `composite.ex:1172-1175`). `BlockType.outcomes/2` is total over
+that `nil` through the one call seam and answers its documented default
+(`block_type.ex:871`, read at `55aeac1`; the default is `[{"done", "Done"}]`,
+`block_type.ex:851`). The two compose into an answer neither of them chose: on
+the raisable-set path, an unresolvable member **contributes `done`**
+(`raisable_labels/3`'s flat_map over the minted members, `composite.ex:829`,
+read at `55aeac1`).
+
+That default is right where it stands. `BlockType.outcomes/2` answers for a
+block type whose module declares no `outcomes/1`, and every block type
+finishes; `done` is the floor. It is wrong when it is read as evidence that a
+member *can* raise a name, which is exactly what `C2` item 2 reads the set for
+("the union, over **every** member of the expansion ... of that member's
+declared outcome names", `:10116-10117`). A member the palette cannot resolve
+has declared nothing. Letting it supply `done` would make `C2` item 3's check
+pass on a `"done"` no member is known to raise, so a declaration would be
+accepted on the strength of a missing palette entry - the failure mode being
+accepted is caused by the same missing entry that hides it.
+
+**The rule: a minted member whose type the palette cannot resolve contributes
+no outcome names to the raisable set. The raisable set is the union over the
+minted members the palette *can* resolve; an unresolvable member is absent
+from it, not defaulted into it.**
+
+Three things this rule does **not** say, because each is a different decision:
+
+- It does not change `member_module/2`. Answering `nil` for an unresolvable
+  type stays, and so does every other consumer of that `nil` - assignability,
+  io, slots - each of which reads the documented default for its own reasons.
+  Only the raisable set is narrowed.
+- It does not make an unresolvable member a finding here. An unresolvable type
+  is already the palette's and the compiler's business, reported where they
+  report it; this rule is about what the set contains, not about who complains.
+- It does not touch `C3`. A composite that declares no `outcomes` key derives
+  from the expansion **root** (`outcomes_over/3`'s absent arm,
+  `composite.ex:808-810`, read at `55aeac1`), not from the raisable set, so the
+  byte-identical guarantee `C3` makes (`:10159-10160`) is untouched by this item.
+
+**The enumeration is a test, not a list in this record.** The code half is
+bead `sb-o1gz`, filed by campaign SF044's walk and depending on this Note. It
+carries the change and the test that exercises it: a composite declaring an
+outcome whose only would-be raiser is a member the palette cannot resolve, and
+which therefore draws `C2` item 3's Resolve finding rather than compiling. A
+code half that finds this item wrong reports and holds; it does not amend this
+Note.
+
+### What this Note does not decide
+
+It decides nothing about `outcome_of:` (the Amendment of 2026-09-08, `:9181`),
+whose three open questions stand as the Note of 2026-09-12 (`:10438`) left
+them. It adds no key to a declaration, changes no spelling of a finding, and
+takes no position on whether the Amendment of 2026-09-12 is ready to flip -
+that remains the operator's, on its own request.
+
+Filed with `sb-k7nf`, campaign SF044. `sb-o1gz` carries item 4's code.
