@@ -10,6 +10,74 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.28.0] 2026-09-12
+
+0.28.0 is a minor, and its two behaviour changes come first. **The compiled
+chart of a document with a failure-classed final moves**: the reserved
+`<donedata>` param the compiler mints on such a final is now named
+`statifier_persistence:execution_status` rather than
+`statifier_persistence:run_status`, so a durable host that reads that key
+needs `statifier_persistence >= 0.12`, which is the floor for the new name.
+And **a `core.on_event` capture pair whose source is absent from the event
+payload no longer writes `:undefined`** - the destination is left unwritten,
+so a document that captures by a path compiles to a different chart and a
+stored compiled document has to be recompiled. A document with no
+failure-classed final, and a handler that captures nothing or captures only
+literals, compile byte for byte to what they compiled to before.
+
+Beside those, this release is about what a capture and a composite may say
+for themselves. A capture pair may take a literal source, written
+`["const", value]`, so a handler records a value the document states rather
+than one the event's payload has to carry. A composite may declare its own
+`outcomes`, checked at Resolve against what its expansion can raise. And the
+editor's `profile` assign takes a `run?` key that seats no run at all when it
+is false, rather than merely hiding the run pane.
+
+### Added
+
+- A composite declaration may carry `outcomes`, a list of outcome names it
+  declares for itself, on both the `use` form and the data form. Present, the
+  list replaces the expansion root's derived outcomes - each name labelled by
+  the member that raises it - and the compiler checks at Resolve that the
+  expansion can raise every declared name, reporting an
+  `:outcome_not_raisable` finding against the composite block when it cannot.
+  Absent, nothing changes: a document that writes no `outcomes` key compiles
+  to the same bytes as before.
+
+- The editor's `profile` assign takes a `run?` key: `run?: false` mounts an
+  editor that seats no run at all, so there is no run pane, no run marks on the
+  canvas and no **Held here** column, whatever the host passes in `run` and
+  `run_session`. It defaults to `true`, and it does not touch the marks a host
+  paints itself through `active_marks` and `invoke_mark`.
+
+- A `core.on_event` capture pair may take a literal source, written
+  `["const", value]` in the block document, so a handler records a value the
+  document states rather than one the firing event's payload has to carry; a
+  string source is still the payload path it has always been, and the two are
+  told apart by shape.
+
+### Changed
+
+- The compiled chart of a document with a failure-classed final changes: the
+  reserved `<donedata>` param the compiler mints on such a final is now named
+  `statifier_persistence:execution_status` instead of
+  `statifier_persistence:run_status`. Upgrade a durable host to
+  `statifier_persistence >= 0.12`, which is the floor for reading the new key;
+  0.12 reads both keys for one release and 0.13.0 reads only the new one. A
+  document with no failure-classed final compiles byte for byte to what it
+  compiled to before. Both names stay refused for a `donedata_type/1`
+  declaration while the old one is still read.
+
+- A `core.on_event` capture pair whose source is absent from the event payload
+  no longer writes `:undefined`; the destination is left unwritten, so "not
+  answered" and "answered with nothing" are different values and a reader tests
+  a captured path by asking whether it is there. A document that captures by a
+  path compiles to a different chart - each such pair's `<assign>` is now
+  wrapped in an `<if>` that tests the path - so recompile stored documents; a
+  handler that captures nothing, and a pair whose source is a literal, compile
+  byte-identically. A reader that tested a captured path for `:undefined`
+  should test it for presence instead.
+
 ## [0.27.0] 2026-09-08
 
 0.27.0 is a minor, and its two breaking changes come first. **The compiled
@@ -3120,6 +3188,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.28.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.28.0
 [0.27.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.27.0
 [0.26.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.26.0
 [0.25.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.25.0
