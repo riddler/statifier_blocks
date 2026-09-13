@@ -167,6 +167,10 @@ defmodule StatifierBlocks.Core.OnEventTest do
             ~s(he said "hi"),
             "back\\slash",
             "line\nbreak",
+            "café",
+            "✓",
+            "𝄞",
+            <<"ctrl", 1, "char">>,
             0,
             42,
             -42,
@@ -175,8 +179,10 @@ defmodule StatifierBlocks.Core.OnEventTest do
             nil,
             [],
             [1, "two", nil],
+            ["ok", "café"],
             %{},
-            %{"a" => 1, "b" => [true, "x"]}
+            %{"a" => 1, "b" => [true, "x"]},
+            %{"café" => 1}
           ] do
         assert OnEvent.validate_config(capture(%{"order.mark" => ["const", value]})) == :ok,
                inspect(value)
@@ -196,15 +202,21 @@ defmodule StatifierBlocks.Core.OnEventTest do
 
     # The malformed tagged forms, which are the whole of what the shape
     # rule has to refuse: a wrong length, a wrong tag, a map rather than an
-    # array, a nested tag in the tag's own position, and the two value
-    # cases `literal/1` cannot spell so that the engine reads back what the
-    # document carried - a string outside printable ASCII, and a float,
-    # which reaches this key only on a document that never validated.
+    # array, a nested tag in the tag's own position, and the value cases
+    # `literal/1` cannot spell so that the engine reads back what the
+    # document carried. Since ADR-0002's Note of 2026-09-13 those last are
+    # a matter of TYPE alone - a float (which reaches this key only on a
+    # document that never validated), an atom, a tuple, a non-string map
+    # key - and no string is among them: the printable-ASCII restriction
+    # `spellable?/1` declared interim ended with the predicator `~> 9.4.1`
+    # floor, and the strings it used to refuse are asserted ACCEPTED above
+    # and round-tripped below.
     #
     # sabotage: widened `source?/1`'s clause to `[_tag, value]` -> the
     # wrong-tag cases went green, taking this red; a second mutation
-    # dropping `spellable?/1`'s string clause took the ASCII cases red on
-    # their own (verified)
+    # restoring `spellable?/1`'s old `spellable_string?/1` string clause
+    # left this green and took the acceptance test above red instead,
+    # which is the direction that matters now (verified)
     test "rejects a tagged source that is not the two-element const form" do
       for bad <- [
             ["const"],
@@ -214,13 +226,9 @@ defmodule StatifierBlocks.Core.OnEventTest do
             [1, "a"],
             %{"const" => "a"},
             {"const", "a"},
-            ["const", "café"],
-            ["const", "✓"],
-            ["const", <<"ctrl", 1, "char">>],
             ["const", 1.5],
             ["const", :undefined],
-            ["const", ["ok", "café"]],
-            ["const", %{"café" => 1}],
+            ["const", ["ok", 1.5]],
             ["const", %{"ok" => 1.5}],
             ["const", %{1 => "a"}]
           ] do
@@ -234,22 +242,25 @@ defmodule StatifierBlocks.Core.OnEventTest do
     # `capture` has no field to anchor a per-pair finding on - so it has to
     # name both.
     #
-    # It also has to describe the one restriction beyond shape correctly:
-    # `spellable_string?/1` admits tab, newline and carriage return beside
-    # printable ASCII, and a message that named printable ASCII alone would
-    # tell an author a literal is refused that this module accepts.
+    # It also has to describe what a literal may carry correctly, and since
+    # ADR-0002's Note of 2026-09-13 that is the JSON types and nothing
+    # else. A message still naming the printable-ASCII restriction would
+    # tell an author a literal is refused that this module now accepts,
+    # which is the failure this last loop is here to catch.
     #
     # sabotage: reverted `capture_message/0` to its path-only wording ->
     # this went red; a second, narrower mutation restoring the message's
-    # first wording ("carrying no characters outside printable ASCII") took
-    # the last assertion red on its own (verified)
+    # interim wording ("carrying no text outside printable ASCII, tab,
+    # newline and carriage return") took the type loop red on its own, and
+    # the refusal assertion red with it (verified)
     test "names both source forms, and what a literal may carry, in the one message it has" do
       {:error, [{"capture", message}]} = OnEvent.validate_config(capture(%{"d" => ["const"]}))
 
       assert message =~ "_event.data"
       assert message =~ ~s(["const", value])
+      refute message =~ "ASCII"
 
-      for admitted <- ["printable ASCII", "tab", "newline", "carriage return"] do
+      for admitted <- ["string", "integer", "true", "false", "null", "array", "object"] do
         assert message =~ admitted, admitted
       end
     end
@@ -706,6 +717,58 @@ defmodule StatifierBlocks.Core.OnEventTest do
       assert machine_state.datamodel |> Map.fetch!("answer") |> Map.fetch!("choice") == "yes"
     end
 
+    # The positive round trip that closes the interim `core/on_event.ex`
+    # declared when it narrowed a string literal to printable ASCII
+    # (RQ-SF041-17, 2026-09-12), and the reason `mix.exs` requires predicator
+    # `~> 9.4.1` rather than `~> 9.0`. ADR-0002's Note of 2026-09-13 records
+    # that the narrowing is gone and that `N1`'s every-JSON-type reading of
+    # the arm is what the code now does.
+    #
+    # It is written as the two-button screen the const arm was asked for in
+    # the first place, because that is where a non-ASCII label actually
+    # arrives: the button's own text is the literal, and no payload is sent,
+    # so what the datamodel ends up holding came out of the document and
+    # nowhere else. The signup domain is the canonical one.
+    #
+    # This is the assertion the suite could not carry while the refusal
+    # stood - `spellable?/1` turned such a literal away before `literal/1`
+    # ever saw it - and it is the one that answers for the FLOOR rather
+    # than for this module: against predicator 9.4.0, whose string lexer
+    # wrote a literal's codepoints back one byte at a time, it goes red.
+    #
+    # A 4-byte codepoint is in it deliberately. A byte-at-a-time write-back
+    # mangles a 2-byte "café" and a 4-byte emoji alike, but only the second
+    # also rules out a lexer that learned Latin-1 and stopped there.
+    #
+    # sabotage: pinned `mix.exs` back to `{:predicator, "9.4.0",
+    # override: true}` and ran `MIX_ENV=test mix deps.compile predicator
+    # --force` before and after the revert -> this went red with
+    # `"Café inscrit"` read back as its bytes, and the type round trip
+    # above went red on `"café"` for the same reason. Those two, and only
+    # those two, which is the point: nothing else in the suite answers for
+    # the floor (verified)
+    test "round-trips a non-ASCII literal, which is what the 9.4.1 floor is for" do
+      machine_state =
+        run_two(
+          {"signup.accept", %{"answer.choice" => ["const", "Café inscrit"]}},
+          {"signup.decline", %{"answer.choice" => ["const", "Non merci 🙂"]}},
+          "signup.accept"
+        )
+
+      assert machine_state.datamodel |> Map.fetch!("answer") |> Map.fetch!("choice") ==
+               "Café inscrit"
+
+      machine_state =
+        run_two(
+          {"signup.accept", %{"answer.choice" => ["const", "Café inscrit"]}},
+          {"signup.decline", %{"answer.choice" => ["const", "Non merci 🙂"]}},
+          "signup.decline"
+        )
+
+      assert machine_state.datamodel |> Map.fetch!("answer") |> Map.fetch!("choice") ==
+               "Non merci 🙂"
+    end
+
     # The spelling decision this request takes, pinned end to end rather
     # than as bytes: whatever `literal/1` writes, the engine has to read
     # back the value the document carried. Run against the real engine, so
@@ -726,6 +789,9 @@ defmodule StatifierBlocks.Core.OnEventTest do
             "a\\\"b",
             "line\nbreak",
             "tab\there",
+            "café",
+            "🙂",
+            "日本語",
             0,
             42,
             -42,
