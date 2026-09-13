@@ -164,6 +164,9 @@ character.
    blocks is not drawn either, so the canvas offers no insertion point. The
    gaps themselves stay, because a gap is also where an empty arm says it is
    an arm, and that is a reading.
+   The same never-draw-a-refused-gesture reading reaches the card's own
+   control strip, which withholds "Replace with its steps" and Delete on such
+   a mount rather than drawing them to refuse (ADR-0005's Note of 2026-09-13).
 2. **No drag hook.** The canvas does not mount the drag hook. The measurement
    hook is unaffected: it reads nothing you can change.
 3. **Config fields render as values.** The inspector's Config tab draws each
