@@ -10,6 +10,70 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.29.0] 2026-09-13
+
+0.29.0 is a minor, and its one consumer-visible requirement comes first:
+**the `predicator` floor moves from `~> 9.0` to `~> 9.4.1`**. That is the
+version whose string lexer reads a literal back whole, and it is what the
+release's one behaviour change needs - a `core.on_event` capture pair's
+literal source now accepts a string carrying any character, so the interim
+restriction that kept a literal inside printable ASCII is lifted and a
+handler may capture a label such as `"Café inscrit"`.
+
+Beside that, this release is about an editor that tells the truth about
+what it will accept. A literal capture pair draws a read-only row rather
+than going missing from the form that cannot author it, and editing a
+`core.on_event` block no longer drops one. A read-only mount withholds the
+card controls it refuses and names the arm behind an empty slot. And two
+composite-facing reports are corrected: a member the palette cannot
+resolve no longer lends the composite a raisable outcome, and a summary
+chip that is both translated and over the cap still carries its declared
+event name.
+
+### Added
+
+- A literal capture pair - `["const", value]` - draws a read-only row in the
+  editor's capture section, so a pair the two controls cannot author is
+  visible rather than absent.
+
+### Changed
+
+- A `core.on_event` capture pair's literal source - `["const", value]` - now
+  accepts a string carrying any character. The interim restriction that a
+  literal string stay inside printable ASCII, tab, newline and carriage
+  return is lifted: it was earned only while predicator 9.4.0's string lexer
+  wrote a literal's codepoints back one byte at a time, and 9.4.1 fixed that
+  lexer. A handler may now capture a label such as `"Café inscrit"` and the
+  datamodel reads it back whole.
+
+- Dependency floor: `predicator` moves from `~> 9.0` to `~> 9.4.1`. That is
+  the version whose string lexer reads a literal back whole, which is what
+  the lifted restriction above needs; 9.4.0 and below are excluded.
+
+### Fixed
+
+- A read-only editor mount no longer draws the card controls it refuses:
+  "Replace with its steps" and Delete are withheld, the way the palette
+  column and the gap "+" already were.
+
+- A composite member whose block type the palette cannot resolve no longer
+  contributes the default `done` outcome to the composite's raisable set, so a
+  declared outcome name is no longer accepted on the strength of a missing
+  palette entry.
+
+- A summary chip that is both translated and over the presentation cap now
+  carries its declared event name on the chip's `title`, rather than the
+  clipped chip's own full translated text, so the generated event name is
+  still on the card for a reader debugging against the compiled chart.
+
+- Editing a `core.on_event` block no longer drops its literal capture pairs:
+  a pair the form could not draw was previously replaced away by the next
+  change the form posted.
+
+- A read-only editor mount's empty slot now names the arm it draws the
+  placeholder for, so a screen reader hears which arm is empty instead of
+  hearing the slot header and nothing.
+
 ## [0.28.0] 2026-09-12
 
 0.28.0 is a minor, and its two behaviour changes come first. **The compiled
@@ -3188,6 +3252,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.29.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.29.0
 [0.28.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.28.0
 [0.27.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.27.0
 [0.26.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.26.0
