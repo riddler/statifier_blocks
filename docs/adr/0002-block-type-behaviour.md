@@ -11255,3 +11255,169 @@ assertions there; this section names the test and does not dictate its lines.
 None of that happens here: this request touches `docs/adr/` and nothing else.
 
 Filed with `sb-3vug`, campaign RF046.
+
+## Note (2026-09-13): a second cite tidy by addition - six advisories the first tidy already answered, the two cites it left unlabelled, `sb-o2p2`'s pointer line re-attributed to the amendment's preamble, `C2` item 2 pointed at the raisable-set narrowing, and `emit/2`'s return type is `ADR-0004`'s
+
+Campaign RF046, bead `sb-suao`, folding `sb-yr8c` and `sb-mqmv`, and taking the
+operator's ruling `RQ-RF046-3`.
+
+Nothing above this line is edited. Every correction below is a later dated line:
+no rule, decision, clause or heading changes, this Note carries no `Status:`
+line, it flips nothing, and it adds no changelog fragment. Every code cite below
+was **read at `55d31c1`** and is written anchor first, line second; a later
+reader re-locates by the anchor and not by the number.
+
+This file carries three Notes and one Amendment dated 2026-09-13, so none of
+them is named below by its date. The two named here are the **outcome-questions
+Note** ("the four outcome questions the declared-`outcomes` build left open are
+decided", `:10544`, `sb-k7nf`) and the **cite-tidy Note** ("a cite tidy by
+addition - the item 3 quote's range, the capture Note's `core/on_event.ex` and
+`statifier_examples` anchors, the two supersession anchors `N3` left at heading
+level, and five re-anchorings on this file's other Note of today", `:10723`,
+`sb-l2jn`).
+
+### 1. Six of the eight advisories `sb-yr8c` carries were already answered here, and each answer holds
+
+`sb-yr8c` was filed from two review passes that ran in parallel, and the
+cite-tidy Note answered six of its eight items before it was filed. They are not
+re-answered; each is named with where it was answered and re-verified at
+`55d31c1`, because three of the six cite code that has moved again since.
+
+- **`composite/data.ex:436` is the binding, not the accumulation.** Answered in
+  the cite-tidy Note's item 6, first bullet (`:10829-10833`). At `55d31c1` the
+  binding `{outcomes, outcome_errors} = decode_outcomes(row["outcomes"])` is
+  `:446` and the `errors =` pipeline the sentence describes is `:448-453`, its
+  last line appending `outcome_errors`.
+- **`composite/data.ex:1396-1399` is the `C4` key comment, not the tuple.**
+  Answered in the same item's second bullet (`:10834-10838`). At `55d31c1` the
+  comment whose opening line names `C4` and reads "a JSON array of outcome
+  NAMES" is `:1406-1409`, the `@spec` the sentence's tuple belongs to -
+  `decode_outcomes(term()) :: {[String.t()], [String.t()]}` - is `:1410`, and
+  the reporting clauses run from `:1411`.
+- **`composite.ex:1172-1175` carries the read-at label `55aeac1`.** Answered in
+  the same item's third bullet (`:10839-10843`), which re-located it to
+  `:1190-1193` at `b02909f`. It has moved once more: at `55d31c1` the comment
+  ending "an unresolvable member degrades rather than raising (ADR-0003 decision
+  5)" is `:1206-1209`, with `member_module/2`'s `@spec` at `:1210` and its head
+  at `:1211`. No word of the comment changed.
+- **`C2` item 1's sentence is `:10111-10114`, not `:10110-10113`.** Answered in
+  the same item's fourth bullet (`:10844-10847`), and both advisories that
+  raised it - the off-by-one and the quote's closing line - are the one
+  correction. It holds at `55d31c1`: "Whether a composite whose declaration
+  drops a name its root still raises deserves a finding of its own is not
+  decided here" begins on `:10111` and ends on `:10114`.
+- **Item 1's rule is quoted in the ruling's own words.** Answered in the same
+  item's fifth bullet (`:10848-10852`): the Note spells the rule "no stage
+  reports it", `RQ-SF044-8` spells it **no compile finding**, the two say the
+  same thing, and the ruling's wording is the one to quote.
+
+### 2. The two cites the first tidy left unlabelled: `composite.ex:813` and `block_type.ex:851`
+
+Three cites in the outcome-questions Note carry no read-at label of their own.
+One is `composite.ex:1172-1175`, answered above. The other two sit **inside**
+parentheses that label a neighbouring cite, so the label reads as covering them
+and does not:
+
+- `composite.ex:813`, in item 2 (`:10605`), where the paragraph's own cite
+  `composite.ex:815` is labelled `55aeac1` and `:813` follows the comma. The
+  label is `55aeac1` too. At `55d31c1` the anchor
+  `labels = raisable_labels(palette, members, param_map)` is `:829`, and the
+  declared arm `:815` quotes -
+  `Enum.map(names, fn name -> {name, Map.get(labels, name, name)} end)` - is
+  `:830`. `sb-o1gz` inserted the skip comment above `raisable_labels/3` and
+  moved both; neither line's text changed.
+- `block_type.ex:851`, in item 4 (`:10662`), where `block_type.ex:871` is
+  labelled `55aeac1` and `:851` follows the semicolon. The label is `55aeac1`
+  too. At `55d31c1` both are unmoved: `@default_outcomes [{"done", "Done"}]` is
+  still `:851` and `def outcomes(ref, config) do` still `:871`.
+
+Neither re-anchoring touches what item 2 or item 4 decides.
+
+### 3. `sb-o2p2`'s pointer line attributes the clause to `C1`; it belongs to the amendment's preamble
+
+The pointer line filed with `sb-o2p2` (`:10714-10721`) opens "`C1`'s 'full text
+on the chip's `title`' clause above is narrowed for one case by `ADR-0005`'s
+Note of 2026-09-12". `ADR-0005`'s own cite tidy of today ("a cite tidy by
+addition - item 2's heading line, where the 'full text on the `title`' clause
+sits in `ADR-0002`, ...", `docs/adr/0005-liveview-editor.md:11055`) settled the
+other half of that attribution in its item 2
+(`docs/adr/0005-liveview-editor.md:11075-11097`): the cited words "the full text
+is carried on the chip's `title`" (`:9673-9674`) sit inside the paragraph that
+re-reads `H3` in the Amendment of 2026-09-08 (`:9672-9677`), which is **above**
+the `### C1` heading at `:9679`.
+
+**The clause the pointer line points from is the amendment's preamble, not
+`C1`.** `C1` decides that an over-cap chip is drawn clipped with an ellipsis;
+the `title` half is the preamble's argument for why dropping the chip is no
+longer the right answer. Everything else the pointer line says is unchanged and
+correct: the narrowing is real, it is `ADR-0005`'s Note of 2026-09-12's, and it
+reaches only a chip that is **both** translated and over the cap. The pointer
+line is not edited; this paragraph is where a reader who follows it learns which
+section above it means.
+
+### 4. `C2` item 2's raisable set reads with the outcome-questions Note's item 4
+
+`C2` item 2 (`:10115-10123`) says the raisable set is "the union, over **every**
+member of the expansion - not the root alone - of that member's declared outcome
+names", and nothing there points at the narrowing it has since taken. The
+outcome-questions Note's item 4 ("An unresolvable minted member contributes
+**nothing** to the raisable set", `:10651`) narrows that union: the set is the
+union over the minted members the palette **can** resolve, and an unresolvable
+member is absent from it rather than defaulted into it. `sb-o1gz` carries the
+code and the test; at `55d31c1` the comment naming this narrowing is
+`composite.ex:841-849` and the skip itself is `member_outcomes/2`'s `nil -> []`
+arm (`:861-862`).
+
+The Amendment of 2026-09-12 (`:9998`) is still `proposed`, and this line does
+not flip it or edit item 2. It is here so that a reader of item 2 - including a
+reader of it after it flips - finds the narrowing without having to know that a
+later Note exists.
+
+### 5. `emit/2`'s return type is `ADR-0004`'s, and `ADR-0004` has already ruled it (`RQ-RF046-3`)
+
+Two places in this file gloss `emit/2` and neither is its specification. The
+callback-row note (`:123-125`) says "Only the first four rows are this record's
+own contract. `emit/2` is listed because the callback has to live somewhere and
+this is the module it lives on; its signature is `sb-iwz`'s", and the delegation
+list says the same outright (`:385-387`: "**The compiler and provenance map
+(`sb-iwz`)** own `emit/2`'s signature, the emit context, the SCXML subtree
+representation, state-id generation, and how emission is keyed back to block
+ids"). The `@callback` gloss this file carries (`:481`) is therefore a
+placeholder for a spec kept elsewhere:
+
+    @callback emit(Block.t(), context :: term()) :: {:ok, term()} | {:error, term()}
+
+**The typing is `ADR-0004`'s, and `ADR-0004` has ruled it.** Its Note "`emit/2`'s
+return type does not widen; a non-SCXML target is a separate optional callback,
+named and not built" (`docs/adr/0004-compiler-provenance.md:3538`) rules in its
+item 1 (`:3575-3579`) that the return type does **not** widen, and in its item 2
+(`:3580`) names the separate optional callback `emit_node/2` (`:3581`), which its
+item 3 ("What is NOT built", `:3613`) records as not built and carried by no
+bead (`:3615-3616`). `ADR-0004`'s own cite tidy of 2026-09-13 (`:3730`) re-reads
+that ruling and leaves both standing: the ruled name is still `emit_node/2`
+(`:3746-3748`), and there is still no `emit_node/2` anywhere in `lib/`
+(`:3756`).
+
+The shipped specification is narrower than this file's gloss in both positions,
+which is what the delegation means rather than a divergence
+(`lib/statifier_blocks/block_type.ex:505-506`, read at `55d31c1`):
+
+    @callback emit(Block.t(), StatifierBlocks.Compiler.Context.t()) ::
+                {:ok, StatifierBlocks.Emission.t()} | {:error, emit_error()}
+
+No word of `:123`, `:385` or `:481` is edited, and no new record is opened for
+this: the ruling exists, and this line is the pointer from the module's own
+record to it. Whether a non-SCXML target is wanted at all is not answered here
+and is not scheduled; it stays where `ADR-0004`'s item 3 leaves it.
+
+### What this Note does not do
+
+It decides nothing. It edits no line above it, adds no key, no callback, no
+field type and no finding, moves no status line, changes no code and adds no
+changelog fragment. It takes no position on whether the Amendment of 2026-09-12
+(`:9998`) or `C6` (`:11014`) is ready to flip, which remains the operator's on
+each one's own request. Where a record sentence and the code disagree above, the
+code is what a reader will find; each such place is dated here rather than
+rewritten there.
+
+Filed with `sb-suao`, campaign RF046.
