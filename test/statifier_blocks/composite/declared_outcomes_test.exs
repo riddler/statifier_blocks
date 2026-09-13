@@ -305,6 +305,100 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     def subtree(_params), do: [Block.new("core.sequence", id: "body", slots: %{"body" => []})]
   end
 
+  defmodule AwaitsWithSlot do
+    @moduledoc """
+    A well-formed member for the item 4 fixtures below: it declares the two
+    names its own `core.await` raises - so it draws no finding of its own -
+    and it exposes a pass-through slot, so the composite that mints it can
+    mint a child into it. Its declaration removes the root's `done`, which is
+    what leaves `done` with no resolvable raiser in the expansion below.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "signup.awaits_with_slot",
+      params: [
+        %{key: "event", type: :string, label: "Confirmed by", required?: true, default: ""}
+      ],
+      slots: [%{name: "body", to: {"then", "body"}, label: "Then"}],
+      outcomes: ["received", "timed_out"],
+      palette_entry: %{label: "Await, then"},
+      version: 1
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(params) do
+      [
+        Block.new("core.sequence",
+          id: "body",
+          slots: %{
+            "body" => [
+              Block.new("core.await",
+                id: "wait",
+                config: %{"event" => params["event"], "timeout" => "10m"}
+              ),
+              Block.new("core.group", id: "then", slots: %{"body" => []})
+            ]
+          }
+        )
+      ]
+    end
+  end
+
+  defmodule ConfirmStepGhost do
+    @moduledoc """
+    The Note of 2026-09-13's item 4: a composite one of whose MINTED members
+    carries a type the palette does not carry. The expansion root declares
+    `received` and `timed_out` and so raises no `done` of its own; the only
+    member that could supply `done` is the ghost, and the palette cannot
+    resolve it. The declaration names `done`, so the rule is observable twice
+    - in the raisable set, and in the Resolve finding the declaration draws.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "signup.confirm_step_ghost",
+      params: [
+        %{key: "event", type: :string, label: "Confirmed by", required?: true, default: ""}
+      ],
+      outcomes: ["done"],
+      palette_entry: %{label: "Confirm the contact"},
+      version: 1
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(params) do
+      [
+        Block.new("signup.awaits_with_slot",
+          id: "step",
+          config: %{"event" => params["event"]},
+          slots: %{"body" => [Block.new("signup.not_in_this_palette", id: "ghost")]}
+        )
+      ]
+    end
+  end
+
+  defmodule ConfirmStepGhostQuiet do
+    @moduledoc """
+    The same subtree declaring no `outcomes` key: the case that shows the rule
+    adds no signal of its own. The unresolvable member is the palette's and
+    the compiler's business, and the finding it already draws is the only one.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "signup.confirm_step_ghost_quiet",
+      params: [
+        %{key: "event", type: :string, label: "Confirmed by", required?: true, default: ""}
+      ],
+      palette_entry: %{label: "Confirm the contact"},
+      version: 1
+
+    alias StatifierBlocks.Composite.DeclaredOutcomesTest.ConfirmStepGhost
+
+    @impl StatifierBlocks.Composite
+    def subtree(params), do: ConfirmStepGhost.subtree(params)
+  end
+
   # -- helpers -----------------------------------------------------------
 
   defp palette do
@@ -318,7 +412,10 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
         "signup.confirm_step_maybe" => ConfirmStepMaybe,
         "signup.confirm_step_twice" => ConfirmStepTwice,
         "signup.receives_first" => ReceivesFirst,
-        "signup.receives_second" => ReceivesSecond
+        "signup.receives_second" => ReceivesSecond,
+        "signup.awaits_with_slot" => AwaitsWithSlot,
+        "signup.confirm_step_ghost" => ConfirmStepGhost,
+        "signup.confirm_step_ghost_quiet" => ConfirmStepGhostQuiet
       })
     )
   end
@@ -538,6 +635,62 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
       assert Composite.outcomes(palette(), block("signup.confirm_and_record", "blk_CAR")) == [
                {"timed_out", "Timed out"}
              ]
+    end
+  end
+
+  # -- the Note of 2026-09-13, item 4 -------------------------------------
+
+  describe "an unresolvable minted member contributes nothing to the raisable set" do
+    # Sabotage: restored the flat_map straight through `BlockType.outcomes/2`
+    # - red. `member_module/2` answers `nil` for the ghost and that function is
+    # total over `nil`, so the member would supply the documented `done`
+    # default and the set would carry a name no member is known to raise.
+    test "the raisable set is the union over the members the palette can resolve" do
+      {members, param_map} = expansion(ConfirmStepGhost)
+
+      assert Enum.any?(
+               Composite.flatten(members),
+               &(&1.type == "signup.not_in_this_palette")
+             )
+
+      assert Composite.unraisable_outcomes(palette(), ConfirmStepGhost, members, param_map) ==
+               ["done"]
+    end
+
+    # Sabotage: the same restoration - red. The declared `done` would take the
+    # ghost's `"Done"`; with the ghost absent from the set there is no member
+    # to take a label from, so the Note's item 2 fallback answers the name.
+    test "a declared name only the unresolvable member could supply takes no label from it" do
+      assert Composite.outcomes(palette(), block("signup.confirm_step_ghost", "blk_GHOST")) ==
+               [{"done", "done"}]
+    end
+
+    # Sabotage: the same restoration - red. `C2` item 3's check would pass on
+    # the strength of the missing palette entry, which is the failure mode
+    # this item exists to stop.
+    test "the declaration draws C2 item 3's finding beside the unknown-type one" do
+      assert {:error, findings} =
+               Compiler.compile(document("signup.confirm_step_ghost", "blk_GHOST"), palette())
+
+      assert [%Finding{} = unknown] = Enum.filter(findings, &(&1.code == :unknown_block_type))
+      assert unknown.stage == :resolve
+      assert unknown.reason == {:unknown_block_type, "signup.not_in_this_palette"}
+
+      assert Enum.filter(findings, &(&1.code == :outcome_not_raisable))
+             |> Enum.map(& &1.reason) == [{:outcome_not_raisable, "blk_GHOST", "done"}]
+    end
+
+    # Sabotage: raised a finding of its own for the unresolvable member - red.
+    # The Note's item 4 narrows the set and complains about nothing; the
+    # unknown type is already reported where it is reported.
+    test "the unresolvable member raises nothing new of its own" do
+      assert {:error, findings} =
+               Compiler.compile(
+                 document("signup.confirm_step_ghost_quiet", "blk_QUIET"),
+                 palette()
+               )
+
+      assert findings |> Enum.map(& &1.code) |> Enum.uniq() == [:unknown_block_type]
     end
   end
 
