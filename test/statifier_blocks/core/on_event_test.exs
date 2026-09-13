@@ -157,6 +157,11 @@ defmodule StatifierBlocks.Core.OnEventTest do
     # value a block document may carry at all - `Validation`'s `{:float,
     # path}` problem refuses it before this key is ever read.
     #
+    # A raw C0 control character is NOT among the strings admitted here
+    # since ADR-0002's line of 2026-09-13: it has its own refusal below.
+    # Tab, line feed and carriage return are the three that stay admitted,
+    # and all three are asserted here.
+    #
     # sabotage: dropped `source?/1`'s `["const", value]` clause so every
     # tagged source fell through to `_other` -> every case here went red
     # (verified)
@@ -170,7 +175,8 @@ defmodule StatifierBlocks.Core.OnEventTest do
             "café",
             "✓",
             "𝄞",
-            <<"ctrl", 1, "char">>,
+            "tab\there",
+            "cr\rhere",
             0,
             42,
             -42,
@@ -236,6 +242,75 @@ defmodule StatifierBlocks.Core.OnEventTest do
                  OnEvent.validate_config(capture(%{"order.mark" => bad})),
                inspect(bad)
       end
+    end
+
+    # ADR-0002's line of 2026-09-13, taken on this request: a literal's
+    # characters reach an `<assign expr=...>` attribute value raw, and XML
+    # 1.0 admits no character below `U+0020` in an attribute value other
+    # than tab, line feed and carriage return. Saxy parses one back today,
+    # but a parser's tolerance is not the wire format's contract, so the
+    # document is refused at compile instead. The now-closed
+    # predicator-truncation ground is not the reason: predicator 9.4.1
+    # round-trips these bytes fine, which is exactly why nothing else
+    # catches them.
+    #
+    # Every nesting `literal/1` walks is covered, including an object's
+    # KEYS, because `literal/1` spells a key with the same function it
+    # spells a string with. The three admitted control characters are
+    # asserted accepted in the acceptance loop above and, nested, here.
+    #
+    # sabotage: made `control?/1` answer `false` for every codepoint ->
+    # this test and the message test below went red (2 failures) while the
+    # acceptance loop above stayed green; a second mutation dropping `?\t`
+    # from the admitted set took 3 red - the tab case of the acceptance
+    # loop, the tab cases here, and the tab round trip below - which is the
+    # direction that says the three admitted characters are pinned by more
+    # than this test's own wording (verified)
+    test "refuses a raw control character inside a literal, and admits tab, LF and CR" do
+      for bad <- [
+            ["const", <<"ctrl", 1, "char">>],
+            ["const", <<0>>],
+            ["const", <<0x1F>>],
+            ["const", ["ok", <<"x", 7, "y">>]],
+            ["const", %{"k" => <<11>>}],
+            ["const", %{<<12>> => "v"}]
+          ] do
+        assert {:error, [{"capture", _message}]} =
+                 OnEvent.validate_config(capture(%{"order.mark" => bad})),
+               inspect(bad)
+      end
+
+      for fine <- [
+            ["const", "a\tb"],
+            ["const", "a\nb"],
+            ["const", "a\rb"],
+            ["const", ["a\tb"]],
+            ["const", %{"k\r" => "v\n"}]
+          ] do
+        assert OnEvent.validate_config(capture(%{"order.mark" => fine})) == :ok, inspect(fine)
+      end
+    end
+
+    # The message an author is shown has to name the offending codepoint -
+    # the character itself prints as nothing, so the position in the string
+    # is all there is to go on - and the reason, which is the wire format's
+    # and not predicator's.
+    #
+    # sabotage: had `control_message/1` drop the `hex/1` call and print a
+    # fixed wording -> the codepoint assertions went red (verified)
+    test "names the offending codepoint, and the XML ground, in the control-character message" do
+      {:error, [{"capture", message}]} =
+        OnEvent.validate_config(capture(%{"order.mark" => ["const", <<"ctrl", 1, "char">>]}))
+
+      assert message =~ "U+0001"
+      assert message =~ "XML 1.0"
+      assert message =~ "U+0020"
+      refute message =~ "predicator"
+
+      {:error, [{"capture", other}]} =
+        OnEvent.validate_config(capture(%{"order.mark" => ["const", <<0x1F>>]}))
+
+      assert other =~ "U+001F"
     end
 
     # The message is the only thing an author is shown for either form -
