@@ -11324,7 +11324,7 @@ and does not:
   `labels = raisable_labels(palette, members, param_map)` is `:829`, and the
   declared arm `:815` quotes -
   `Enum.map(names, fn name -> {name, Map.get(labels, name, name)} end)` - is
-  `:830`. `sb-o1gz` inserted the skip comment above `raisable_labels/3` and
+  `:831`. `sb-o1gz` inserted the skip comment above `raisable_labels/3` and
   moved both; neither line's text changed.
 - `block_type.ex:851`, in item 4 (`:10662`), where `block_type.ex:871` is
   labelled `55aeac1` and `:851` follows the semicolon. The label is `55aeac1`
