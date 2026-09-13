@@ -157,9 +157,15 @@ defmodule StatifierBlocks.Core.OnEvent do
   object as `{"k":v}` with its keys in sorted order. A value this module
   cannot spell so that the engine reads back what the document carried is
   a **malformed pair** - `validate_config/1` refuses it on the `capture`
-  key like any other. What is refused is a matter of TYPE alone: a string
-  is admitted whatever it carries, and a float never arises, because a
-  block document may not carry one at all.
+  key like any other. What is refused is very nearly a matter of TYPE
+  alone: a float never arises, because a block document may not carry one
+  at all, and a string is admitted whatever it carries with one exception.
+  A **raw C0 control character** other than tab, line feed and carriage
+  return is refused on the `capture` key (ADR-0002's line of 2026-09-13):
+  a literal's characters reach an XML attribute value raw, and XML 1.0
+  admits no control character below `U+0020` there. The three that are
+  admitted are the three `escape/1` already writes as predicator string
+  escapes rather than raw.
 
   The one restriction beyond type this key used to carry - a string had
   to stay inside printable ASCII, tab, newline and carriage return - was
@@ -454,7 +460,7 @@ defmodule StatifierBlocks.Core.OnEvent do
 
       capture when is_map(capture) ->
         if Enum.all?(capture, &pair?/1) do
-          findings
+          control_finding(findings, capture)
         else
           [{"capture", capture_message()} | findings]
         end
@@ -466,6 +472,77 @@ defmodule StatifierBlocks.Core.OnEvent do
 
   defp pair?({destination, source}), do: path?(destination) and source?(source)
   defp pair?(_other), do: false
+
+  # The one restriction on a literal that is not a question of type
+  # (ADR-0002's line of 2026-09-13, taken on this request). `literal/1`
+  # writes a string's characters into an `<assign expr=...>` attribute
+  # value, and `escape/1` rewrites exactly three control characters - tab,
+  # line feed and carriage return - as the escapes predicator's lexer
+  # decodes. Every other C0 control reaches the attribute RAW, and XML 1.0
+  # admits no character below `U+0020` in an attribute value other than
+  # those three (XML 1.0 5th ed., the `Char` production). Saxy reads one
+  # back today, but a parser's tolerance is not the wire format's contract,
+  # so the document is refused at compile instead.
+  #
+  # The finding lands on the `capture` key for the reason `check_capture/2`
+  # gives: the key is the only anchor an editor has. The message names the
+  # offending codepoint so an author can find it in a string whose damage
+  # is invisible on screen.
+  #
+  # The walk is `literal/1`'s own: into a list, and into a map's KEYS as
+  # well as its members, because `literal/1` spells a key with the same
+  # function it spells a string value with. Pairs and object keys are
+  # sorted first so a document with more than one offender reports the same
+  # codepoint on every compile.
+  #
+  # A control character in the PATH form is not this clause's business: a
+  # path is refused for containing whitespace already, and what an
+  # otherwise-shaped path spells is `path?/1`'s question.
+  defp control_finding(findings, capture) do
+    case control_codepoint(capture) do
+      nil -> findings
+      codepoint -> [{"capture", control_message(codepoint)} | findings]
+    end
+  end
+
+  @spec control_codepoint(map()) :: non_neg_integer() | nil
+  defp control_codepoint(capture) do
+    capture
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.find_value(fn
+      {_destination, [@const_tag, value]} -> control_in(value)
+      {_destination, _source} -> nil
+    end)
+  end
+
+  defp control_in(value) when is_binary(value) do
+    value |> String.to_charlist() |> Enum.find(&control?/1)
+  end
+
+  defp control_in(value) when is_list(value), do: Enum.find_value(value, &control_in/1)
+
+  defp control_in(value) when is_map(value) and not is_struct(value) do
+    value
+    |> Enum.sort_by(&elem(&1, 0))
+    |> Enum.find_value(fn {key, member} -> control_in(key) || control_in(member) end)
+  end
+
+  defp control_in(_other), do: nil
+
+  defp control?(codepoint), do: codepoint < 0x20 and codepoint not in [?\t, ?\n, ?\r]
+
+  defp control_message(codepoint) do
+    ~s(must not carry the control character ) <>
+      hex(codepoint) <>
+      ~s( inside a ["const", value] literal: a literal is written into an ) <>
+      "XML attribute value raw, and XML 1.0 admits no character below " <>
+      "U+0020 there other than tab (U+0009), line feed (U+000A) and " <>
+      "carriage return (U+000D)"
+  end
+
+  defp hex(codepoint) do
+    "U+" <> (codepoint |> Integer.to_string(16) |> String.pad_leading(4, "0"))
+  end
 
   # ADR-0002's Note of 2026-09-12, N1: the value position of a pair takes
   # either form, and the two are told apart by SHAPE and never by content.
