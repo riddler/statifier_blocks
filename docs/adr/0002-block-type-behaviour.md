@@ -10868,7 +10868,7 @@ JSON type a block document may carry, and it left one thing to the code that
 built it: "**how each JSON type is spelled as such an expression is `sb-m6ru`'s
 to decide and to cite**, and if a type this arm admits cannot be spelled as
 one, that bead holds and reports rather than narrowing this Note from inside
-its own request" (`:10322-10326`).
+its own request" (`:10322-10325`).
 
 That bead did narrow it, and it narrowed it in the code rather than here. This
 Note dates the end of that narrowing. It decides no rule `N1` does not already
