@@ -821,13 +821,31 @@ defmodule StatifierBlocks.Composite do
   # label of the FIRST member in the expansion's own order that raises the name
   # (`C1`). A member that is itself a composite answers whatever it declares
   # under this same section, which is what makes the set compositional.
+  #
+  # `ADR-0002`'s Note of 2026-09-13, item 4: a member whose type the palette
+  # cannot resolve is SKIPPED here rather than defaulted into the set.
+  # `member_module/2` answers `nil` for it and `BlockType.outcomes/2` is total
+  # over that `nil`, so without the skip an unresolvable member would supply
+  # the documented `done` default - and `C2` item 3's check would then pass on
+  # a name no member is known to raise, accepted on the strength of the same
+  # missing palette entry that hides it. The unresolvable type is the
+  # palette's and the compiler's business, reported where they report it;
+  # nothing new is raised here.
   @spec raisable_labels(Palette.t(), [Block.t()], param_map()) :: %{String.t() => String.t()}
   defp raisable_labels(%Palette{} = palette, members, param_map) do
     members
     |> flatten()
     |> Enum.filter(&Map.has_key?(param_map, &1.id))
-    |> Enum.flat_map(&BlockType.outcomes(member_module(&1, palette), &1.config))
+    |> Enum.flat_map(&member_outcomes(&1, palette))
     |> Enum.reduce(%{}, fn {name, label}, acc -> Map.put_new(acc, name, label) end)
+  end
+
+  @spec member_outcomes(Block.t(), Palette.t()) :: [BlockType.outcome_decl()]
+  defp member_outcomes(%Block{} = member, %Palette{} = palette) do
+    case member_module(member, palette) do
+      nil -> []
+      ref -> BlockType.outcomes(ref, member.config)
+    end
   end
 
   @spec declared_outcomes(Palette.type_ref()) :: [String.t()]
