@@ -171,6 +171,19 @@ defmodule StatifierBlocks.MixProject do
         # the editor is driven to 9.2 by statifier-ui's own requirement,
         # which is how a transitive requirement is supposed to work. Raising
         # the floor here would overstate what this package needs.
+        #
+        # Decision, 2026-09-13: the floor stays `~> 9.0` today and rises to
+        # `~> 9.4.1` when, and only when, the non-ASCII capture-literal
+        # refusal in `StatifierBlocks.Core.OnEvent` is lifted. That refusal
+        # is the one thing here measured against a version rather than
+        # against a module: 9.4.0's string lexer writes a literal's
+        # codepoints back a byte at a time, and the refusal is earned only
+        # while it does. Lifting it makes a predicator that round-trips the
+        # whole of a string something this package NEEDS, and a need is what
+        # a floor is allowed to state - so the two move together, in one
+        # request, with the canary in `on_event_test.exs` as the signal that
+        # the version is there. Until then the argument above stands
+        # unchanged: nothing this package calls requires more than 9.0.
         {:predicator, "~> 9.0"},
         # Dev / test
         {:ex_quality, "~> 0.14", only: :dev, runtime: false},

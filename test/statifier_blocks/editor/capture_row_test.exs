@@ -109,6 +109,84 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "a literal pair (ADR-0005's Note of 2026-09-13)" do
+      # The two controls a capture row offers are a datamodel path and a
+      # path in the payload, and a literal is neither - so the pair is
+      # rendered rather than offered. Before this bead it drew nothing at
+      # all: `capture_pairs/1` filtered the source position for a binary.
+      #
+      # Sabotage: dropped `capture_row/1`'s const clause, so a literal pair
+      # drew nothing again -> the literal row is absent and this test and
+      # the carry-over one below both go red (verified).
+      test "draws a read-only row spelling the value the document holds", %{conn: conn} do
+        view = view(conn, capture: %{"answer.choice" => ["const", "yes"]})
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-capture__row--literal[data-capture-literal="answer.choice"])
+               )
+
+        assert render(view) =~ "the literal &quot;yes&quot;"
+      end
+
+      # It is a rendering and not a control, so it posts nothing: the two
+      # inputs a path row draws are not there for it, and the trailing
+      # blank row is still index 0 because the literal takes no index.
+      #
+      # Sabotage: routed the literal through the same two-control row a
+      # path pair draws -> its target appears in an input and the blank row
+      # no longer sits at index 0, taking this test and the two beside it
+      # red (verified).
+      test "offers no control for the literal, and takes no row index", %{conn: conn} do
+        view = view(conn, capture: %{"answer.choice" => ["const", "yes"]})
+
+        refute has_element?(view, ~s(input[value="answer.choice"]))
+        assert has_element?(view, ~s(.sb-capture__row[data-capture-row="0"] input[value=""]))
+      end
+
+      # The defect this row is half of: the posted rows ARE the map, so a
+      # form that drew no control for a pair replaced it away on the next
+      # change the author made anywhere in the block.
+      #
+      # Sabotage: dropped `carried_literals/1` from `decode_capture/2`'s
+      # merge -> the literal pair is gone after one keystroke and this goes
+      # red (verified).
+      test "survives an edit to the rest of the block", %{conn: conn} do
+        view =
+          conn
+          |> view(capture: %{"answer.choice" => ["const", "yes"], "order.why" => "reason"})
+          |> change(%{
+            "config" => %{"event" => "order.cancelled", "outcome" => "resume"},
+            "capture" => %{"0" => %{"target" => "order.why", "source" => "reason"}}
+          })
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-capture__row--literal[data-capture-literal="answer.choice"])
+               )
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-capture__row[data-capture-row="0"] input[value="order.why"])
+               )
+      end
+
+      # A source in neither form is malformed, which `validate_config/1`
+      # refuses and no control here could repair - so it draws no row, and
+      # it is not carried over either: carrying it would make a refusal the
+      # author cannot see permanent.
+      #
+      # Sabotage: widened `capture_row/1`'s tagged clause to `[_tag, value]`
+      # -> the wrong-tag source drew a literal row and the first assertion
+      # went red (verified).
+      test "a malformed source draws no row", %{conn: conn} do
+        view = view(conn, capture: %{"answer.choice" => ["konst", "yes"]})
+
+        refute has_element?(view, ".sb-capture__row--literal")
+        assert has_element?(view, ~s(.sb-capture[data-capture-rows="0"]))
+      end
+    end
+
     describe "the source control's candidates" do
       # ADR-0011 decision 10: a handler's fixture payload is the only place
       # in the package that knows what an event of that name carries.

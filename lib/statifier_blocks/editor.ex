@@ -655,6 +655,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # and the chip it will become read alike.
     @on_event_type "core.on_event"
 
+    # The tag a literal capture source carries in the stored document -
+    # `["const", value]` (ADR-0002's Note of 2026-09-12, `N1`). Spelled here
+    # rather than reached for, because `StatifierBlocks.Core.OnEvent` holds
+    # it as a private attribute and this package does not publish it.
+    @const_tag "const"
+
     # The one type whose `outcomes` field is offered the finals a host says
     # the referenced chart emits (sb-r4w7).
     @subchart_type "core.subchart"
@@ -2942,12 +2948,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # is one - so a half-typed row survives the round trip that refuses it.
     # Sorted by target, which is the order the emission already fixes,
     # because a map has none of its own.
-    @spec capture_pairs(map()) :: [{String.t(), String.t()}] | nil
+    #
+    # A pair whose source is a LITERAL - `["const", value]`, told apart by
+    # shape and never by content (ADR-0002's Note of 2026-09-12, `N1`) - is
+    # carried out as `{target, {:const, value}}` and drawn as a read-only
+    # row (ADR-0005's Note of 2026-09-13). It is not authored here: the two
+    # controls a capture row draws are a datamodel path and a path in the
+    # payload, and a literal is neither. What the row buys is that the pair
+    # is visible at all, and - with `decode_capture/2` carrying it over -
+    # that a form which cannot draw its controls no longer replaces it away
+    # on the next post.
+    #
+    # Anything else in the source position is malformed and still draws no
+    # row: `validate_config/1` is the authority that refuses it, and there
+    # is no control here that could repair it.
+    @spec capture_pairs(map()) :: [{String.t(), String.t() | {:const, term()}}] | nil
     defp capture_pairs(%{selected_node: %ViewModel.Node{type: @on_event_type} = node} = assigns) do
       case Map.get(selected_config(assigns, node.block_id), "capture") do
         pairs when is_map(pairs) ->
           pairs
-          |> Enum.filter(fn {target, source} -> is_binary(target) and is_binary(source) end)
+          |> Enum.flat_map(&capture_row/1)
           |> Enum.sort_by(fn {target, _source} -> target end)
 
         _absent_or_not_a_map ->
@@ -2956,6 +2976,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp capture_pairs(_takes_no_capture), do: nil
+
+    @spec capture_row({term(), term()}) :: [{String.t(), String.t() | {:const, term()}}]
+    defp capture_row({target, source}) when is_binary(target) and is_binary(source),
+      do: [{target, source}]
+
+    defp capture_row({target, [@const_tag, value]}) when is_binary(target),
+      do: [{target, {:const, value}}]
+
+    defp capture_row(_malformed), do: []
 
     # The source keys a capture row offers: the payload of the event this
     # handler waits for, out of its own type's `fixtures/0` (ADR-0011
