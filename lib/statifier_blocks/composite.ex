@@ -864,11 +864,26 @@ defmodule StatifierBlocks.Composite do
     end
   end
 
+  # The ref reaching here is `expand!/2`'s own second argument, already
+  # resolved through the palette, so a ref that declares no `__composite__/0`
+  # is a caller error rather than an input. It is refused with this package's
+  # own `ArgumentError`, in the shape `composite_ref!/2` uses for the same
+  # caller error on the two routes that resolve the ref themselves, rather
+  # than left to surface as a `BadMapError` from reading `:outcomes` off the
+  # `nil` `Palette.call/4` answers for a module with no `__composite__/0`.
   @spec declared_outcomes(Palette.type_ref()) :: [String.t()]
   defp declared_outcomes(ref) do
-    ref
-    |> Palette.call(:__composite__, [], nil)
-    |> Map.get(:outcomes, [])
+    case Palette.call(ref, :__composite__, [], nil) do
+      %{} = declaration ->
+        Map.get(declaration, :outcomes, [])
+
+      _not_a_composite ->
+        raise ArgumentError,
+              "#{inspect(ref)} declares no __composite__/0, so it is not a " <>
+                "composite and its declared outcomes cannot be read by " <>
+                "StatifierBlocks.Composite.unraisable_outcomes/4. Hand it the " <>
+                "ref expand!/2 was given."
+    end
   end
 
   @spec composite_ref!(Palette.t(), Block.t()) :: Palette.type_ref()

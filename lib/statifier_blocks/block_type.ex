@@ -152,10 +152,11 @@ defmodule StatifierBlocks.BlockType do
       # `StatifierBlocks.Palette.declares?/3` answers `true` for it, and a
       # reader that asks the declaration question separately gets a
       # different answer than the reader above does -
-      # `StatifierBlocks.ViewModel`'s `declares_sentence?/1` counts a
-      # `use`-ing type as **declared** and hands it the reader's answer, so
-      # its outline line is the type's palette label even where the author
-      # gave a `title` that would otherwise have won. That cost is a host's
+      # `StatifierBlocks.SentenceChain.sentence/5` asks
+      # `StatifierBlocks.Palette.declares?/3` and so counts a `use`-ing type
+      # as **declared**, handing it the reader's answer, so its outline line
+      # is the type's palette label even where the author gave a `title` that
+      # would otherwise have won. That cost is a host's
       # to meet, by overriding `sentence/1` (ADR-0002's Note of 2026-09-07,
       # correction 5, which is where the word "indistinguishable" is
       # bounded).

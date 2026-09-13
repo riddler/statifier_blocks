@@ -639,30 +639,29 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
       assert Composite.unraisable_outcomes(palette(), ConfirmStep, members, param_map) == []
     end
 
-    # `sb-51lv`: the precondition, pinned rather than guarded. `ref` is
-    # `expand!/2`'s own second argument and the Resolve stage only ever
-    # reaches this function for a block `composite?/1` answered for
-    # (`compiler.ex`'s `unraisable_outcomes` call site), so a non-composite
-    # ref here is a caller error and not an input. `io/2` and `outcomes/2`
-    # resolve the ref themselves and so can refuse in `composite_ref!/2`;
-    # this one takes the ref already resolved and has nothing to refuse
-    # against. The raise is `declared_outcomes/1` reading `:outcomes` off the
-    # `nil` that `Palette.call/4` answers for a module with no
-    # `__composite__/0`, which is what makes it a `BadMapError` rather than
-    # this package's own error.
+    # The precondition, now guarded. `ref` is `expand!/2`'s own second
+    # argument and the Resolve stage only ever reaches this function for a
+    # block `composite?/1` answered for (`compiler.ex`'s
+    # `unraisable_outcomes` call site), so a non-composite ref here is a
+    # caller error and not an input. `io/2` and `outcomes/2` resolve the ref
+    # themselves and refuse in `composite_ref!/2`; this one takes the ref
+    # already resolved, and `declared_outcomes/1` refuses it in that same
+    # shape - this package's own `ArgumentError`, naming what was handed in
+    # and what to hand in instead. It used to surface as a `BadMapError`
+    # from `Map.get/3` reading `:outcomes` off the `nil` `Palette.call/4`
+    # answers for a module with no `__composite__/0`, which named neither.
     #
-    # This test exists so that a later change to the raise - a guard, a
-    # documented refusal, a different exception - is a diff against a
+    # This test exists so that a later change to the refusal - a different
+    # exception, a documented tolerance, a silent `[]` - is a diff against a
     # recorded expectation rather than a silent move.
     #
-    # Sabotage: put a clause in front that answers `[]` for a ref exporting
-    # `__composite__/0` and raises `ArgumentError` otherwise - this went red
-    # on the `BadMapError` expectation (verified), which is what it is here
-    # to notice.
+    # Sabotage: put the unguarded `Palette.call |> Map.get` pipeline back in
+    # `declared_outcomes/1` - this went red, raising `BadMapError` where the
+    # test expects `ArgumentError` (verified).
     test "a ref that is not a composite is a caller error, not an input" do
       {members, param_map} = expansion(ConfirmStep)
 
-      assert_raise BadMapError, fn ->
+      assert_raise ArgumentError, ~r/declares no __composite__\/0/, fn ->
         Composite.unraisable_outcomes(
           palette(),
           StatifierBlocks.Core.Sequence,

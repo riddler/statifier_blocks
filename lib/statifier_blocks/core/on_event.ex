@@ -916,7 +916,7 @@ defmodule StatifierBlocks.Core.OnEvent do
   # "answered with nothing" stop being the same value. The Note decides the
   # behaviour and leaves the mechanism here; this is the mechanism, and the
   # four facts it rests on are cited below against the resolved dependency
-  # versions (`statifier` 2.5.0, `predicator` 9.4.0), which are what an
+  # versions (`statifier` 2.5.0, `predicator` 9.4.1), which are what an
   # emitted chart is read by.
   #
   # The assign is wrapped in an `<if>` whose `cond` tests the very path the
@@ -994,8 +994,8 @@ defmodule StatifierBlocks.Core.OnEvent do
 
   # A document value spelled as a predicator literal expression - the
   # decision ADR-0002's Note of 2026-09-12 delegates to this request, taken
-  # against `predicator` 9.4.0 (the resolved version; `mix.exs` requires
-  # `~> 9.0`) and against `Statifier.Compiler.Expressions.compile/3`, which
+  # against `predicator` 9.4.1 (the resolved version; `mix.exs` requires
+  # `~> 9.4.1`) and against `Statifier.Compiler.Expressions.compile/3`, which
   # is what an `<assign expr=...>` is read by.
   #
   # The spelling is predicator's own literal grammar rather than the
@@ -1084,12 +1084,11 @@ defmodule StatifierBlocks.Core.OnEvent do
   # datamodel mangled. That restriction was never a rule this package's
   # records state - `N1` of ADR-0002's Note of 2026-09-12 admits every JSON
   # type and left the spelling to the code - so it was declared interim
-  # here and in `mix.exs`, and it ended with ADR-0002's Note of
-  # 2026-09-13: predicator
-  # 9.4.1 reads a string literal back whole, `mix.exs` requires `~> 9.4.1`
-  # for that reason and no other, and `escape/1` plus the round trip in
-  # `test/statifier_blocks/core/on_event_test.exs` are now the whole of
-  # what a string has to satisfy.
+  # here and in `mix.exs`, and it ended with ADR-0002's Note of 2026-09-13:
+  # predicator 9.4.1 reads a string literal back whole, `mix.exs` requires
+  # `~> 9.4.1` for that reason and no other, and `escape/1` plus the round
+  # trip in `test/statifier_blocks/core/on_event_test.exs` are now the whole
+  # of what a string has to satisfy.
   #
   # So a string is admitted whatever it carries, and what is left here is
   # the types a block document may not carry into a predicator literal at
