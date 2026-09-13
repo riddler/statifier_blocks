@@ -11235,3 +11235,109 @@ a source path and never reaches a literal.
 
 It edits no line above it, moves no status line, and adds no decision to this
 record's numbered list.
+
+## Note (2026-09-13): the drawing side of the read-only ruling of 2026-09-12 - the card's refused controls are withheld, and the empty arm's placeholder is named
+
+Campaign RF046, bead `sb-1xjd`. A dated Note: it edits no line above it, adds
+no decision to this record's numbered list, adds no key to `t:profile/0`,
+carries no `Status:` line and flips nothing. Every `lib/` and `test/` cite
+below was read at `19728d0`, anchor first and line second.
+
+The operator's ruling of 2026-09-12 (`RQ-SF041-5`) was built by two requests,
+PR 483 (`sb-7n1h`) and PR 484 (`sb-z6vv`), and the four read-only clauses of
+the Note of 2026-09-08 (`:10618`) rule only part of what those two draw. Item
+7a (`:10624`) rules that `expand` joins the refused event set, which is a rule
+about the event. Item 7c (`:10641`) rules that clause 1 withholds the gap "+".
+Item 7b (`:10633`) rules that an empty slot on a read-only mount draws "a
+non-interactive placeholder", a mark rather than "a control that refuses", and
+names nothing. So the drawing side of the ruling
+reached the code with a date to cite and no record, which is what the two
+rules below are. Neither widens what the six clauses say.
+
+### 1. A read-only mount withholds a refused card control rather than drawing it to refuse
+
+**Rule.** Where a card's control strip offers a gesture that a read-only mount
+answers with the socket it was given, such a mount draws no control at all.
+The refusal is not rendered, because the control that would carry it is not
+drawn.
+
+This is item 7a read from the drawing side. 7a puts `expand` in
+`@read_only_refused` (`editor.ex:683-691`, cited by 7a at `:10625-10626`), and
+a control whose only outcome on this mount is the socket unchanged is a
+control that should not have been offered - the same reading clause 1 makes
+for the palette column and 7c makes for the gap "+": never draw a gesture the
+mount refuses.
+
+At `19728d0` the code follows it. `BlockNode`'s `read_only` attr
+(`block_node.ex:327`) says so in its own doc (`:331-343`, "Withholding, rather
+than drawing the control and rendering a refusal, is the operator ruling of
+2026-09-12" at `:337-338`), and the two guards are
+`:if={not @read_only and expandable?(@node, @expandable)}` on
+`.sb-node__expand` (`block_node.ex:456`) and
+`:if={not @read_only and not @root? and not offered?(@node, @pending_remove)}`
+on `.sb-node__remove` (`block_node.ex:483`).
+
+**Which controls the rule reaches is the code's and the suite's, not this
+record's.** The strip draws more than these two, and two of them are
+deliberately outside the rule for the reason the attr doc gives at
+`block_node.ex:341-343`: the fold toggle changes no document, and "Save as a
+step" is conditioned on the `on_collapse` callback rather than on
+`read_only`. The `read_only?` describe block in
+`test/statifier_blocks/editor/profile_test.exs:296` is what asserts each arm.
+
+### 2. An empty arm's placeholder carries a name, and the name is the arm's own label
+
+**Rule.** The non-interactive placeholder item 7b rules is a **named** mark:
+it exposes an accessible name built from the arm's own label, and it is not an
+`aria-hidden` decoration. It stays non-interactive - no event, no `phx-`
+attribute, no tab stop - which is 7b's other half, unchanged.
+
+The reason is that 7b's mark has to do the work the "+" did on an editing
+mount. An editing mount announces the gap's button; a read-only mount that
+drew an unnamed decoration announced a slot header and then nothing, so a
+reader who cannot see the ring could not tell an empty arm from an arm whose
+rendering had been cut short. An `aria-hidden` element cannot carry a name at
+all, which is why the decoration could not be the answer.
+
+At `19728d0` the mark is a `.sb-gap__placeholder` span drawn behind
+`:if={@read_only and @empty?}` with `role="img"` (`slot.ex:499`) and
+`aria-label={"#{@label} is empty"}` (`slot.ex:500`); `slot.ex`'s moduledoc
+carries the reasoning (`:66-77`, "The mark is also what SAYS the arm is empty,
+not only what draws it" at `:66`). The spelling of the name - what is
+concatenated, and which gap of a slot carries it - is the code's and the
+suite's: only the gap a slot draws before its first child can be an empty
+slot's gap (`slot.ex:453-456`, the `empty?` attr's comment), and
+`profile_test.exs`'s `read_only?` block asserts the `role`, the label and the
+absence of `aria-hidden`.
+
+### 3. Item 7b's and 7c's `slot.ex` cites, re-located at `19728d0`
+
+Item 7b and item 7c were written at a `slot.ex` that has since moved under
+them, and `mix adr.cites` reads record-to-record rather than record-to-`lib/`,
+so nothing reported it. Re-located here by addition; 7b's and 7c's own text is
+untouched.
+
+| The item's cite | Anchor | At `19728d0` |
+|---|---|---|
+| `slot.ex:411` (7b, `:10634`) | `defp gap(assigns) do` | `:467` |
+| `slot.ex:428` (7b, `:10635`; 7c, `:10645`) | `:if={not @read_only}` on `.sb-gap__add` | `:484` |
+| `slot.ex:245` (7c, `:10646`) | `attr(:read_only, :boolean,` on `slot/1`, and its doc | `:277`, doc `:279-286` |
+| `slot.ex:245` (the cite table, `:10719`) | the same declaration | `:277` |
+| `slot.ex:411`, `:428` (the cite table, `:10720`) | the same two | `:467`, `:484` |
+
+Two other `attr(:read_only, :boolean, default: false)` declarations sit in this
+file at `:392` and `:451`, on the private `child/1` and `gap/1` components.
+Neither is the one 7c means: 7c quotes "draws the gaps without their '+'
+buttons", which is the public `slot/1` declaration's doc (`slot.ex:281`), and
+the two private ones carry no doc at all.
+
+### What this Note does not decide
+
+It does not touch item 7b's or 7c's text, the six clauses of the `profile`
+amendment (`:7473`), or `@read_only_refused`'s membership, which is item 7a's
+and the code's. It adds no control to the strip and takes none away. It does
+not make `read_only?` an authorization boundary - `:7632-7636` left that where
+decision 15 put it, and this Note is about what is drawn, not about who may
+write. It adds no changelog fragment and changes no code.
+
+Filed with `sb-1xjd`, campaign RF046.
