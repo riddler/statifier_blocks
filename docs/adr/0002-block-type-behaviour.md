@@ -11010,3 +11010,192 @@ once it reaches an XML attribute is a compiler-emission question this Note does
 not reach.
 
 Filed with `sb-xoll`, campaign SF044.
+
+## Amendment (2026-09-13): a composite's declared outcomes are routable by the enclosing body - `C6`
+
+**Status: proposed (2026-09-13, campaign RF046, bead `sb-3vug`, recording
+`RQ-RF046-2`).** A decision record merges at proposed under the campaign
+invariant, and this one **stays** proposed at that campaign's wrap. **Nothing
+below describes code that exists today.** `RQ-RF046-2` ruled the record first
+and named `sb-t74x` as the bead that builds it, in the same campaign but as a
+separate request; flipping this section to accepted is a later gated request
+through the same `docs/adr/` gate. If the code half finds this section wrong,
+it holds and reports rather than amending it here.
+
+Additive: every decision, Amendment and Note above this line stands exactly as
+it stands, and no text above this line is edited by this section. In
+particular `C5` (`:10186`) is not edited. Two of its bullets are **narrowed by
+addition** below, which is a thing this section says about them and not a thing
+it does to them.
+
+Every `lib/` and `test/` cite below was read at `main` `19728d0` and is written
+anchor first, line second - a heading, a function head, a module attribute, a
+`describe` or `test` name. A cite is re-located by that anchor and not by its
+number. Cites into this file and into `ADR-0004` are written the same way.
+
+### The gap, and the measurement that asks for it
+
+The Amendment of 2026-09-12 (`:9998`) let a composite **declare** its outcomes
+(`C1`, `:10074`). It decided nothing about what those names compile to, and
+said so (`C5`, `:10186`). So today a declared name is an authoring answer and
+nothing more:
+
+- A composite block is replaced by its members before Emit. `expand_node/3`
+  (`compiler.ex:582`, `defp expand_node(palette, %Block{} = block, module) do`,
+  called at `compiler.ex:564`) splices the expansion in, and the composite
+  block's own id is gone from the chart by the end of the stage - which is
+  `ADR-0004`'s `T1`, "The children are spliced into the mapped inner slot at
+  Resolve, and the composite is still gone by the end of the stage"
+  (`docs/adr/0004-compiler-provenance.md:3241`).
+- What the enclosing body therefore routes on is the **expansion root's**
+  completion. The rule is stated in the handled-outcome comment at
+  `compiler.ex:2330-2331`: "`Emit.chain/2` wires a container's children on
+  `done.state.<child>`, which fires for every final a child can reach, and no
+  core container emits a transition selected by
+  `done.outcome.<child>.<outcome>`" (`Emit.chain/2` is
+  `core/emit.ex:220`, `def chain(summaries, exit_target) do`).
+- The declared names do appear in the compiled chart, but only on the member
+  that raises them, on that member's own state id.
+
+**The measurement.** Campaign SF040's capture `k2` found the consequence in a
+running document, and this file already records it under the Amendment of
+2026-09-12: "every use-form composite there raises `done` and only `done`, so a
+`went_back` outcome the subtree does raise reaches no outcome slot in the
+enclosing body, and pressing Back moves the path forward instead of back"
+(`:10068-10070`). Riddler's ruling `R12.3` names the same shape from the other
+side: a Back button records `went_back` as an outcome the enclosing body can
+route. A composite is the unit a host puts in front of an author, and it is the
+one block type that cannot say how it finished. `C6` decides that it can.
+
+### `C6`. A composite that declares `outcomes` compiles to a state of its own, with one `<final>` per declared name
+
+**1. The composite becomes a state.** A composite whose declaration carries the
+`outcomes` key of `C1` (`:10074`) compiles to a state of its own, enclosing its
+expansion, rather than being replaced by that expansion outright. The state id
+is the composite **block's** own - `state_id(block_id)`, derived as
+`ADR-0004`'s decision 3 derives every other, `"s_" <> block_id`
+(`docs/adr/0004-compiler-provenance.md:126`). It is the id the provenance map
+already stamps for that block, so nothing about keying changes: `ADR-0004`'s
+decision 5, "The provenance map is keyed two ways, because it answers two
+different questions" (`docs/adr/0004-compiler-provenance.md:206-211`), keeps
+`by_state_id: %{state_id => owner}` (`:211`) total over the states this section
+adds, and a composite that declares no `outcomes` compiles exactly as it
+compiles today (`C3`, `:10155`).
+
+**2. One `<final>` per declared name, minted through the context.** That state
+carries one `<final>` per name in the declared list, minted the way `ADR-0004`'s
+`2b` mints a block's own finals - "One `<final>` per declared outcome, minted
+through the context", and at `outcome_id(block_id, outcome) = state_id(block_id,
+"o_" <> outcome)`, minted "through `Context.outcome_id/2` rather than by string
+concatenation" (`docs/adr/0004-compiler-provenance.md:940`, `:946`, `:950`). Each
+such final raises `done.outcome.<composite state id>.<name>` from its
+`<onentry>`, which is the vocabulary this file has used for an outcome's
+completion event throughout (`:3876`). The enclosing body then routes the
+composite exactly as it routes any other block that declares more than one way
+to finish.
+
+**3. A declared member outcome transitions to the matching composite final.** A
+member final that raises `done.outcome.<member state id>.<name>` for a name the
+composite **declares** transitions to that composite final. The member keeps its
+own final and its own event; the composite final is reached from it. This is
+what wires the `on_<name>` slot the editor already draws for a declared name:
+`outcomes/1` has answered the declared list since 0.28.0 by way of
+`outcomes_over/3` (`composite.ex:819`,
+`defp outcomes_over(%Palette{} = palette, %Block{} = block, ref) do`, spec at
+`:818`, called from `:724` and `:736`), and after this section that slot is
+wired exactly as a non-composite block's slot is. No new slot vocabulary
+appears; `D13` (`:725`, "**D13: outcome paths are slots, never ports.**")
+stands.
+
+**4. A completion the declaration does not name does not finish the composite.**
+The declared list is the composite's complete set of ways to finish. A member
+completion whose name the declaration does not carry reaches no composite final
+and therefore does not complete the composite; whether anything else in the
+expansion carries the execution onward is the document's business, not this
+section's. This is the compiled consequence of a decision already taken and it
+does **not** reopen it: item 1 of the Note of 2026-09-13 at `:10544`, "A
+composite whose declaration drops a name its expansion root still raises gets
+**no** compile finding" (`:10563`), stands as written. `C6` adds no finding, of
+that kind or any other. The consequence is a routing fact, stated here so that
+a reader of that item finds it, not a diagnostic.
+
+**5. Provenance and the version.** The composite's own bytes - its state, its
+finals, their `<onentry>` raises - are stamped to the **composite block**. The
+members' bytes keep the stamps they have: `ADR-0004`'s `T2`, `T3` and `T4`
+(`docs/adr/0004-compiler-provenance.md:3286`, `:3318`, `:3371`) are unchanged by
+this section - "A pass-through child keeps its stored id, and its state id is
+the one it would have had anyway" - and so is `T1`
+(`docs/adr/0004-compiler-provenance.md:3241`) in everything except the one
+clause this section narrows: a declaring composite is no longer "gone by the end
+of the stage", because it is now a state. Emission moves bytes for every
+declaring composite, so `@compiler_version` (`compiler.ex:409`, `@compiler_version "0.29.0"`) bumps when
+the code half lands, under `ADR-0004`'s own obligation: "any change to emission
+that moves bytes bumps it - a release-discipline obligation this record creates
+on itself" (`docs/adr/0004-compiler-provenance.md:259-261`). In campaign RF046
+the bump is the `0.30.0` release prep's, not this record's and not the code
+half's.
+
+### What `C6` narrows in `C5`, by addition
+
+`C5`'s first bullet (`:10188-10194`) ends "This section changes *which list a
+composite answers as its declared outcomes*, and nothing about what an outcome
+is, how it is drawn, or how it compiles." **How it compiles** is now decided,
+by this section. The rest of that bullet is untouched: `D13` stands, a block
+still has one inlet and one outlet, alternative outcomes are still slots
+declared by the block type, and each outcome still compiles to a distinct
+completion event - which is precisely what item 2 above mints.
+
+`C5`'s fourth bullet (`:10206-10208`), "Not a flip, and not a widening of any
+existing return. No callback is added to `t:StatifierBlocks.BlockType`'s list,
+no function's return shape changes, and `outcomes/1` still answers
+`[outcome_decl()]`", **still holds unamended**. `C6` adds no callback, changes
+no callback's shape, widens no return, and `outcomes/1` still answers
+`[outcome_decl()]`. What `C6` changes is what the compiler does with the list
+that function already answers.
+
+Nothing else in `C5` is narrowed. Its second and third bullets
+(`derived_outcomes/2`'s arity, `failure_outcomes/1`) and its fifth (the
+`outcome_of:` amendment, `:9181`) read as written.
+
+### What `C6` does not decide
+
+- It adds no compile finding. Item 1 of the Note of 2026-09-13 (`:10544`)
+  stands, and the duplicate-outcome refusal of item 3 (`:10624`) and the
+  unresolvable-member rule of item 4 (`:10651`) are untouched.
+- It does not decide which of a composite's declared names are
+  failure-classed. That is the second axis `C5`'s third bullet names, and it is
+  still undecided.
+- It does not change any `t:StatifierBlocks.BlockType` callback's shape, add a
+  callback, or widen a return.
+- It does not reach the `outcome_of:` amendment (`:9181`), which lets a member
+  name another member's outcome inside a config value. Both remain proposed and
+  neither builds the other.
+- It states no rule for a composite that declares **no** `outcomes`: `C3`
+  (`:10155`) holds, and such a composite compiles byte-identically to today.
+
+### What builds this, and the pin that flips
+
+`sb-t74x` carries the code. This section asserts rules and delegates every
+enumeration to the tests that bead writes; it names no count of call sites and
+claims no complete list over the package. Those tests are named here by intent,
+not by file: one final per declared name; a declared member outcome routes to
+the matching composite final; a completion the declaration does not name does
+not finish the composite; and the provenance map stays total over the bytes
+this section adds.
+
+One existing test is the pin that flips, and it was written to flip. The
+`describe` "C5: the declared list is an authoring answer, not a compiled route"
+(`test/statifier_blocks/composite/declared_outcomes_test.exs:972`) holds a
+single test, "the enclosing body routes the expansion root's completion, not
+the declared names" (`:996`), over the fixture
+`document("signup.confirm_step_declaring")` (`:998`). Its own comment says what
+it is for: "this test is what will go red when one is" - when a decision closing
+`k2`'s gap is taken. Three of its lines move when `sb-t74x` lands: the two
+refutes on `done.outcome.s_blk_CS_body.received` and `.timed_out`
+(`:1009-1010`), which become asserts, and the assert on
+`event="done.state.s_blk_CS_body"` reaching `s_blk_ROOT__o_done` (`:1011`),
+which is the routing this section replaces. The comment above the `describe` is
+rewritten in that same request to cite `C6`. None of that happens here: this
+request touches `docs/adr/` and nothing else.
+
+Filed with `sb-3vug`, campaign RF046.
