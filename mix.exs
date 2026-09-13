@@ -161,32 +161,34 @@ defmodule StatifierBlocks.MixProject do
         # string. It already resolves through statifier, so naming it here
         # records the call rather than moving the lock.
         #
-        # The floor is 9.0 and not 9.2 deliberately. Every predicator module
-        # this package names - `Predicator.Duration`, `Predicator.evaluate/2`,
-        # `Predicator.Errors.*`, `Predicator.Lexer` - shipped in 9.0.0. The
-        # 9.2 module is `Predicator.Simple`, and nothing here calls it:
-        # statifier-ui does, statifier-ui requires `~> 9.2` itself, and
-        # statifier-ui is *optional* here. So a host that takes this package
-        # without the expression editor needs only 9.0, and a host that takes
-        # the editor is driven to 9.2 by statifier-ui's own requirement,
-        # which is how a transitive requirement is supposed to work. Raising
-        # the floor here would overstate what this package needs.
+        # The floor is 9.4.1, and the reason is this package's own capture
+        # literals rather than a module it names. Every predicator module
+        # named here - `Predicator.Duration`, `Predicator.evaluate/2`,
+        # `Predicator.Errors.*`, `Predicator.Lexer` - shipped in 9.0.0, and
+        # by modules alone 9.0 would still be enough: the 9.2 module is
+        # `Predicator.Simple`, nothing here calls it, statifier-ui does and
+        # requires `~> 9.2` itself, and statifier-ui is *optional* here.
         #
-        # Decision, 2026-09-13: the floor stays `~> 9.0` today and rises to
-        # `~> 9.4.1` when, and only when, the non-ASCII capture-literal
-        # refusal in `StatifierBlocks.Core.OnEvent` is lifted. That refusal
-        # is the one thing here measured against a version rather than
-        # against a module: 9.4.0's string lexer writes a literal's
-        # codepoints back a byte at a time, and the refusal is earned only
-        # while it does. Lifting it makes a predicator that round-trips the
-        # whole of a string something this package NEEDS, and a need is what
-        # a floor is allowed to state - so the two move together, in one
-        # request. What says the version is there is a positive round trip
-        # over a non-ASCII string, which that request is also what makes
-        # assertable: this package refuses such a literal today, so nothing
-        # here can measure it. Until then the argument above stands
-        # unchanged: nothing this package calls requires more than 9.0.
-        {:predicator, "~> 9.0"},
+        # What raises the floor is a behaviour. `StatifierBlocks.Core.OnEvent`
+        # emits a `capture` literal as a predicator string literal and the
+        # engine reads it back into the datamodel, so this package needs a
+        # lexer that returns the whole of a string. 9.4.0's did not: it wrote
+        # a literal's codepoints back a byte at a time, which mangled every
+        # character above ASCII. 9.4.1 fixed that lexer.
+        #
+        # Decision, 2026-09-13 (ADR-0002, the Note of this date): the interim
+        # of 2026-09-12 ended here. `OnEvent` refused a non-ASCII capture
+        # literal for exactly as long as the resolved predicator truncated
+        # one; the refusal is lifted and the floor rises with it, in one
+        # request, because round-tripping the whole of a string is now
+        # something this package NEEDS and a need is what a floor is allowed
+        # to state. `~> 9.4.1` admits 9.4.1 and later 9.x and excludes the
+        # 9.4.0 that truncates. What says the version is there is a positive
+        # round trip over a non-ASCII literal, in
+        # `test/statifier_blocks/core/on_event_test.exs`: it goes red against
+        # a resolved predicator that truncates, which is the whole of what
+        # this requirement is for.
+        {:predicator, "~> 9.4.1"},
         # Dev / test
         {:ex_quality, "~> 0.14", only: :dev, runtime: false},
         {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

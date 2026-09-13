@@ -157,17 +157,18 @@ defmodule StatifierBlocks.Core.OnEvent do
   object as `{"k":v}` with its keys in sorted order. A value this module
   cannot spell so that the engine reads back what the document carried is
   a **malformed pair** - `validate_config/1` refuses it on the `capture`
-  key like any other. That is one restriction beyond type: a string
-  carrying a character outside printable ASCII, because predicator's
-  string lexer has no escape for one and writes what it reads back a byte
-  at a time. Tab, newline and carriage return are in; a float never
-  arises, because a block document may not carry one at all.
+  key like any other. What is refused is a matter of TYPE alone: a string
+  is admitted whatever it carries, and a float never arises, because a
+  block document may not carry one at all.
 
-  The ASCII restriction is measured against the predicator this package
-  resolved when it was taken rather than stated as a rule, so it is
-  **interim**: it is earned only while that lexer still truncates, and it
-  is lifted - together with the requirement `mix.exs` states - by the
-  release that stops truncating.
+  The one restriction beyond type this key used to carry - a string had
+  to stay inside printable ASCII, tab, newline and carriage return - was
+  **interim** and ended on 2026-09-13 (ADR-0002's Note of that date). It
+  was earned only while predicator 9.4.0's string lexer wrote a literal's
+  codepoints back a byte at a time; 9.4.1 fixed that lexer, `mix.exs`
+  requires `~> 9.4.1`, and a positive round trip over a non-ASCII literal
+  in the suite is what says the resolved version is one that reads a
+  string back whole.
 
   One `<assign>` is emitted per pair, on the transition the handler
   already emits and **before** the `<raise>` that carries the outcome.
@@ -484,9 +485,9 @@ defmodule StatifierBlocks.Core.OnEvent do
   defp capture_message do
     "must map each datamodel path written, like order.cancel_reason, " <>
       "to its source: either the path inside _event.data it is read from, " <>
-      ~s(like reason, or the literal ["const", value], whose value is JSON ) <>
-      "carrying no text outside printable ASCII, tab, newline and " <>
-      "carriage return"
+      ~s(like reason, or the literal ["const", value], whose value is any ) <>
+      "JSON a block document may carry: a string, an integer, true, " <>
+      "false, null, an array or an object"
   end
 
   @doc """
@@ -1027,26 +1028,20 @@ defmodule StatifierBlocks.Core.OnEvent do
   # value a block document may carry at all
   # (`StatifierBlocks.Validation`'s `{:float, path}` problem).
   #
-  # Two of the facts this rests on - the escape set the lexer decodes, and
-  # the byte-at-a-time write-back `spellable?/1` refuses a string for - are
-  # that lexer's behaviour rather than a documented grammar, and `mix.exs`
-  # requires `~> 9.0` rather than the 9.4.0 they were measured at.
+  # The facts this rests on - the escape set the lexer decodes, and that a
+  # string literal is written back whole rather than a byte at a time - are
+  # that lexer's behaviour rather than a documented grammar, so `mix.exs`
+  # requires the version they were measured at: `~> 9.4.1`.
   #
-  # The round trip in `test/statifier_blocks/core/on_event_test.exs` holds
-  # the FIRST of them honest, and only the first. It asserts the value read
-  # back rather than the bytes emitted, so an escape that stops decoding
-  # takes it red against whichever 9.x is actually resolved. It is blind to
-  # the second, because it exercises only values `spellable?/1` admits and
-  # the write-back is the reason a string is not admitted: a later 9.x that
-  # FIXES the truncation leaves every case in it green while the refusal
-  # quietly becomes over-strict. Nothing in this suite covers that
-  # direction, and nothing here can - the assertion that would is a
-  # positive round trip over a non-ASCII string, which becomes possible
-  # only in the request that lifts the refusal and raises the floor with it.
-  #
-  # Whether the floor should be raised to the version this decision was
-  # taken against is a question for the dependency, not for this function;
-  # `mix.exs` carries the argument and the condition under which it rises.
+  # The round trips in `test/statifier_blocks/core/on_event_test.exs` hold
+  # BOTH of them honest, and the same way: they assert the value read back
+  # rather than the bytes emitted, against the real engine, so they answer
+  # for whichever 9.x is actually resolved. An escape that stops decoding
+  # takes the escape cases red; a lexer that goes back to writing a
+  # string's codepoints one byte at a time takes the non-ASCII case red.
+  # That second direction is the one nothing in this suite could cover
+  # while the refusal stood, because a literal the refusal turned away
+  # never reached this function to be round-tripped at all.
   @spec literal(term()) :: String.t()
   defp literal(value) when is_binary(value), do: ~s(") <> escape(value) <> ~s(")
   defp literal(value) when is_integer(value), do: Integer.to_string(value)
@@ -1081,44 +1076,38 @@ defmodule StatifierBlocks.Core.OnEvent do
   # front of `literal/1`, so a value that cannot be spelled is a malformed
   # pair rather than bytes that only look like the author's value.
   #
-  # The one restriction that is not a matter of type is on a string:
-  # predicator 9.4.0's lexer reads a string literal codepoint by codepoint
-  # and writes each one back as a single BYTE, so any character above
-  # ASCII arrives at the datamodel as one mangled byte, and it has no
-  # escape by which such a character could be written instead. A control
-  # character is out for the same lack of an escape, and XML 1.0 would
-  # refuse most of them in an attribute value anyway. The three the lexer
-  # does decode - tab, newline, carriage return - are in.
+  # This is a question of TYPE and nothing else. Until 2026-09-13 a string
+  # carried one restriction beyond type - it had to stay inside printable
+  # ASCII, tab, newline and carriage return - because predicator 9.4.0's
+  # lexer read a string literal codepoint by codepoint and wrote each one
+  # back as a single BYTE, so any character above ASCII arrived at the
+  # datamodel mangled. That restriction was never a rule this package's
+  # records state - `N1` of ADR-0002's Note of 2026-09-12 admits every JSON
+  # type and left the spelling to the code - so it was declared interim
+  # here and in `mix.exs`, and it ended with ADR-0002's Note of
+  # 2026-09-13: predicator
+  # 9.4.1 reads a string literal back whole, `mix.exs` requires `~> 9.4.1`
+  # for that reason and no other, and `escape/1` plus the round trip in
+  # `test/statifier_blocks/core/on_event_test.exs` are now the whole of
+  # what a string has to satisfy.
   #
-  # That restriction is a MEASUREMENT of one version, not a rule, so it is
-  # interim: the resolved predicator is what decides whether it is still
-  # earned, and no test here can say that it is - a literal this clause
-  # refuses never reaches `literal/1` to be round-tripped, so the suite
-  # never sees the write-back at all. A resolved predicator that reads a
-  # non-ASCII literal back whole is the signal to widen this clause and
-  # raise the floor with it, in one request; until then the clause rests on
-  # the measurement `mix.exs` records beside the requirement.
+  # So a string is admitted whatever it carries, and what is left here is
+  # the types a block document may not carry into a predicator literal at
+  # all: a float (`StatifierBlocks.Validation` refuses one before this key
+  # is read), an atom other than `true` / `false` / `nil`, a tuple, a
+  # struct, and a map with a key that is not a string.
   @spec spellable?(term()) :: boolean()
-  defp spellable?(value) when is_binary(value), do: spellable_string?(value)
+  defp spellable?(value) when is_binary(value), do: true
   defp spellable?(value) when is_integer(value), do: true
   defp spellable?(value) when is_boolean(value), do: true
   defp spellable?(nil), do: true
   defp spellable?(value) when is_list(value), do: Enum.all?(value, &spellable?/1)
 
   defp spellable?(value) when is_map(value) and not is_struct(value) do
-    Enum.all?(value, fn {key, member} ->
-      is_binary(key) and spellable_string?(key) and spellable?(member)
-    end)
+    Enum.all?(value, fn {key, member} -> is_binary(key) and spellable?(member) end)
   end
 
   defp spellable?(_other), do: false
-
-  @spec spellable_string?(String.t()) :: boolean()
-  defp spellable_string?(value) do
-    value
-    |> :binary.bin_to_list()
-    |> Enum.all?(&(&1 in 0x20..0x7E or &1 in [0x09, 0x0A, 0x0D]))
-  end
 
   defp outcome_event("abandon"), do: {:ok, Emit.interrupt_events().abandon}
   defp outcome_event("resume"), do: {:ok, Emit.interrupt_events().resume}
