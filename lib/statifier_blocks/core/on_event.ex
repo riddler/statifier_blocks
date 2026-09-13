@@ -163,6 +163,11 @@ defmodule StatifierBlocks.Core.OnEvent do
   at a time. Tab, newline and carriage return are in; a float never
   arises, because a block document may not carry one at all.
 
+  The ASCII restriction is measured against the predicator this package
+  resolves rather than stated as a rule, so it is **interim**: it is
+  earned only while that lexer still truncates, and the suite carries a
+  test that goes red when a resolved version stops truncating.
+
   One `<assign>` is emitted per pair, on the transition the handler
   already emits and **before** the `<raise>` that carries the outcome.
   The pairs are emitted in their datamodel paths' sorted order: a map has
@@ -1024,13 +1029,22 @@ defmodule StatifierBlocks.Core.OnEvent do
   # Two of the facts this rests on - the escape set the lexer decodes, and
   # the byte-at-a-time write-back `spellable?/1` refuses a string for - are
   # that lexer's behaviour rather than a documented grammar, and `mix.exs`
-  # requires `~> 9.0` rather than the 9.4.0 they were measured at. What
-  # holds them honest is the round trip in
-  # `test/statifier_blocks/core/on_event_test.exs`, which asserts the value
-  # read back rather than the bytes emitted and therefore goes red against
-  # whichever 9.x is actually resolved. Whether the floor should be raised
-  # to the version this decision was taken against is a question for the
-  # dependency, not for this function.
+  # requires `~> 9.0` rather than the 9.4.0 they were measured at.
+  #
+  # The round trip in `test/statifier_blocks/core/on_event_test.exs` holds
+  # the FIRST of them honest, and only the first. It asserts the value read
+  # back rather than the bytes emitted, so an escape that stops decoding
+  # takes it red against whichever 9.x is actually resolved. It is blind to
+  # the second, because it exercises only values `spellable?/1` admits and
+  # the write-back is the reason a string is not admitted: a later 9.x that
+  # FIXES the truncation would leave every case in it green while the
+  # refusal quietly became over-strict. The canary beside it - the one
+  # asserting that the resolved predicator still truncates a non-ASCII
+  # literal - is what covers that direction, and it goes red on the fix.
+  #
+  # Whether the floor should be raised to the version this decision was
+  # taken against is a question for the dependency, not for this function;
+  # `mix.exs` carries the argument and the condition under which it rises.
   @spec literal(term()) :: String.t()
   defp literal(value) when is_binary(value), do: ~s(") <> escape(value) <> ~s(")
   defp literal(value) when is_integer(value), do: Integer.to_string(value)
@@ -1073,6 +1087,14 @@ defmodule StatifierBlocks.Core.OnEvent do
   # character is out for the same lack of an escape, and XML 1.0 would
   # refuse most of them in an attribute value anyway. The three the lexer
   # does decode - tab, newline, carriage return - are in.
+  #
+  # That restriction is a MEASUREMENT of one version, not a rule, so it is
+  # interim: the resolved predicator is what decides whether it is still
+  # earned. `on_event_test.exs` pins the measurement directly rather than
+  # through this function - a literal this clause refuses never reaches
+  # `literal/1` to be round-tripped - and goes red when a resolved 9.x
+  # reads a non-ASCII literal back correctly, which is the signal to widen
+  # this clause and raise the floor rather than a regression.
   @spec spellable?(term()) :: boolean()
   defp spellable?(value) when is_binary(value), do: spellable_string?(value)
   defp spellable?(value) when is_integer(value), do: true

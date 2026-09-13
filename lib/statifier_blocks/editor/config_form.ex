@@ -155,6 +155,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       The block's capture pairs as ordered `{target, source}` rows, or
       `nil` for a block that takes no capture map. `[]` is a block that
       takes one and has none yet, which still draws the row.
+
+      A `source` is a binary - the path inside the firing event's payload -
+      or `{:const, value}` for a literal pair (`["const", value]` in the
+      stored document, ADR-0002's Note of 2026-09-12, `N1`). A literal row
+      is drawn read-only: its value is not a path and neither of the two
+      controls a capture row offers can author it (ADR-0005's Note of
+      2026-09-13).
       """
     )
 
@@ -253,7 +260,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <div :if={@capture_pairs not in [nil, []]} class="sb-capture sb-capture--readonly">
           <p class="sb-capture__label">Capture from the event</p>
           <p :for={{target, source} <- @capture_pairs} class="sb-capture__row sb-field__value">
-            {target} &larr; {source}
+            {target} &larr; {capture_source_text(source)}
           </p>
         </div>
       </div>
@@ -352,6 +359,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     A stored map has no order of its own, so the rows before the blank one
     are in their targets' sorted order - the order the emission already
     fixes, for the same reason.
+
+    A **literal** pair - `{:const, value}` in the source position,
+    `["const", value]` in the stored document - draws a read-only row
+    instead of the two controls (ADR-0005's Note of 2026-09-13). Neither
+    control can author it: one takes a datamodel path and the other a path
+    inside the payload, and a literal is read from the document rather than
+    from either. Drawing it read-only is what makes the pair visible at
+    all, and `decode_capture/2` carries it over the wholesale replace so a
+    form that cannot draw its controls no longer deletes it on the next
+    post. The value is spelled with `inspect/1`, which is a rendering of
+    what the document holds and not the predicator literal `emit/2` writes.
     """
     def capture_rows(assigns) do
       assigns = assign(assigns, :list_id, "sb-capture-sources-" <> assigns.block_id)
@@ -359,8 +377,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       ~H"""
       <div class="sb-capture" data-capture-rows={length(@rows)}>
         <p class="sb-capture__label">Capture from the event</p>
+        <p
+          :for={{target, value} <- literal_rows(@rows)}
+          class="sb-capture__row sb-capture__row--literal sb-field__value"
+          data-capture-literal={target}
+        >
+          {target} &larr; {capture_source_text({:const, value})}
+        </p>
         <div
-          :for={{{target, source}, index} <- Enum.with_index(@rows ++ [{"", ""}])}
+          :for={{{target, source}, index} <- Enum.with_index(path_rows(@rows) ++ [{"", ""}])}
           class="sb-capture__row"
           data-capture-row={index}
         >
@@ -394,6 +419,31 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       </div>
       """
     end
+
+    # The two kinds of row, split by the shape of the source. The literal
+    # rows are drawn first and read-only; the path rows keep the indices the
+    # posted payload is keyed by, so a literal between them never shifts a
+    # control's name.
+    @spec literal_rows([{String.t(), String.t() | {:const, term()}}]) ::
+            [{String.t(), term()}]
+    defp literal_rows(rows) do
+      for {target, {:const, value}} <- rows, do: {target, value}
+    end
+
+    @spec path_rows([{String.t(), String.t() | {:const, term()}}]) ::
+            [{String.t(), String.t()}]
+    defp path_rows(rows) do
+      for {target, source} when is_binary(source) <- rows, do: {target, source}
+    end
+
+    # How a source reads where a row shows it rather than offering it in a
+    # control. A literal is spelled with `inspect/1`: it is a rendering of
+    # the value the document carries, not the predicator literal
+    # `StatifierBlocks.Core.OnEvent.emit/2` writes, and it is total over
+    # every value a block document may hold.
+    @spec capture_source_text(String.t() | {:const, term()}) :: String.t()
+    defp capture_source_text({:const, value}), do: "the literal " <> inspect(value)
+    defp capture_source_text(source) when is_binary(source), do: source
 
     @doc """
     Decodes a `phx-change` payload into a config map, one field at a time
@@ -492,6 +542,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # written rather than the key dropped, which is the value
     # `validate_config/1` and `emit/2` both already read as "captures
     # nothing".
+    #
+    # A pair the form drew READ-ONLY is carried over from the config the
+    # block already has, because the wholesale replace is otherwise a
+    # deletion: a literal pair (`["const", value]`) posts no controls, so a
+    # decode built from the posted rows alone would drop one the author
+    # never touched (ADR-0005's Note of 2026-09-13). A posted row whose
+    # target collides with a carried literal wins - the author typed that
+    # target, and `validate_config/1` is the authority on what the result
+    # means.
     @spec decode_capture(StatifierBlocks.Block.config(), map()) ::
             StatifierBlocks.Block.config()
     defp decode_capture(config, %{"capture" => rows}) when is_map(rows) do
@@ -502,10 +561,29 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> Enum.reject(fn {target, source} -> target == "" and source == "" end)
         |> Map.new()
 
-      Map.put(config, "capture", pairs)
+      Map.put(config, "capture", Map.merge(carried_literals(config), pairs))
     end
 
     defp decode_capture(config, _no_capture_posted), do: config
+
+    # The literal pairs the config already carries, by shape and never by
+    # content: a two-element list tagged `"const"` (ADR-0002's Note of
+    # 2026-09-12, `N1`). A malformed source is NOT carried - it drew no row
+    # either, and carrying it would make a refusal the author cannot see
+    # permanent.
+    @spec carried_literals(StatifierBlocks.Block.config()) :: %{String.t() => list()}
+    defp carried_literals(config) do
+      case Map.get(config, "capture") do
+        pairs when is_map(pairs) ->
+          Map.filter(pairs, fn
+            {target, ["const", _value]} -> is_binary(target)
+            _other -> false
+          end)
+
+        _absent_or_not_a_map ->
+          %{}
+      end
+    end
 
     @spec row_text(term(), String.t()) :: String.t()
     defp row_text(row, key) when is_map(row) do

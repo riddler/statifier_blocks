@@ -11170,3 +11170,68 @@ re-anchoring or a dating; where a record sentence and the code disagree, the
 code is what a reader will find.
 
 Filed with `sb-l2jn`, campaign SF044.
+
+## Note (2026-09-13): a literal capture pair draws a read-only row, and a form that cannot draw a pair's controls no longer deletes it
+
+`ADR-0002`'s Note of 2026-09-12 (`N1`) gave a `core.on_event` capture pair a
+second source form - a two-element array tagged `"const"`, told apart by shape
+and never by content - and left the editing surface to this record. This is
+that line. It decides nothing about the document model, the compile, or the
+refusal `N1` already set; it says what the editor draws for a pair it cannot
+author, and why drawing nothing was a defect rather than a gap.
+
+### 1. The rule
+
+**A capture pair whose source is a literal draws a read-only row.** The two
+controls a capture row offers are a datamodel path written and a path inside
+the firing event's payload read; a literal is neither, so neither control can
+author one. The row is therefore a rendering of the pair rather than an
+editing control for it, and the value is spelled as the document holds it
+rather than as the predicator literal the compile writes.
+
+**A source position holding anything else still draws no row.** A malformed
+source is `validate_config/1`'s to refuse, and no control here could repair
+it.
+
+The enumeration of which shapes take which arm is the code's and the suite's,
+not this record's: `StatifierBlocks.Editor`'s `capture_pairs/1` splits the
+source position, and the capture-row test file asserts each arm.
+
+### 2. Why a row at all, when the editor cannot author one
+
+Two reasons, and the second is the one that made this a defect.
+
+A literal pair was **invisible**. An author opening a handler that captures a
+literal saw a capture section that did not mention it, so the document said
+one thing and the surface said another - the failure ADR-0005 decision 9's
+projection rule exists to prevent.
+
+A literal pair was also **deleted**. The capture rows have no
+`config_schema/1` declaration to decode through, so the posted rows *are* the
+map: `StatifierBlocks.Editor.ConfigForm`'s `decode_capture/2` replaces
+`config["capture"]` wholesale with what the form drew. A form that never drew
+the literal pair therefore posted a map without it, and the next keystroke
+anywhere in the block's config removed a pair the author never touched. That
+is the same class of loss the decode's own three properties were written
+against - "an `:update_config` replaces a block's whole config" - reaching a
+key that has no schema to be keyed off.
+
+So the read-only row is half of the fix and the carry-over is the other half:
+a pair the form draws read-only is carried over from the config the block
+already has, and a posted row whose target collides with a carried literal
+wins, because the author typed that target and `validate_config/1` is the
+authority on what the result means.
+
+### 3. What this Note does not decide
+
+It does not give the editor a way to **author** a literal. Doing that needs a
+third control and a value editor typed by what the document may carry, and
+neither is asked for here; a host that wants one today writes the pair into
+the document, which is how every literal pair in existence got there.
+
+It does not touch `N1`'s shape rule, the compile, the refusal of a source
+this package cannot spell, or the payload refusal `P5`, which is a rule about
+a source path and never reaches a literal.
+
+It edits no line above it, moves no status line, and adds no decision to this
+record's numbered list.
