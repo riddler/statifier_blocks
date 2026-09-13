@@ -330,6 +330,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Whether this mount edits (ADR-0005's 2026-09-07 profile amendment,
       `read_only?`), threaded on to this node's slots so their gaps draw no
       "+" button.
+
+      `true` also withholds the two controls on the card's own strip whose
+      events such a mount refuses: "Replace with its steps"
+      (`.sb-node__expand`) and Delete (`.sb-node__remove`), both members of
+      the editor's `@read_only_refused`. Withholding, rather than drawing the
+      control and rendering a refusal, is the operator ruling of 2026-09-12,
+      and it follows the precedent already set by clause 1's palette
+      column and by the Note of 2026-09-08 item 7c's gap "+": never draw a
+      gesture the mount refuses. The fold toggle and "Save as a step" are
+      untouched - folding changes no document, and Save is conditioned on the
+      `on_collapse` callback, not on `read_only`.
       """
     )
 
@@ -442,7 +453,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               save
             </button>
             <button
-              :if={expandable?(@node, @expandable)}
+              :if={not @read_only and expandable?(@node, @expandable)}
               type="button"
               class="sb-node__expand"
               data-reveal="hover-or-selected"
@@ -469,7 +480,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               {if @collapsed?, do: "+", else: "-"}
             </button>
             <button
-              :if={not @root? and not offered?(@node, @pending_remove)}
+              :if={not @read_only and not @root? and not offered?(@node, @pending_remove)}
               type="button"
               class="sb-node__remove"
               data-reveal="hover-or-selected"

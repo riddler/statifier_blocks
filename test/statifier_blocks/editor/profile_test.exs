@@ -471,10 +471,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # ADR-0005's Note of 2026-09-08, item 7a. Expand commits an `Edit.t()`
       # and changes the document, which is exactly what clause 6 says never
       # happens on such a mount, and `expand` was not on `@read_only_refused`.
-      # It arrives here as an ordinary click rather than through `crafted/3`,
-      # because the control IS drawn on a read-only mount: `.sb-node__expand`
-      # is conditioned on the node being expandable and on nothing else. That
-      # is the second half of what makes this a bug a reader could reach.
+      # It arrives here through `crafted/3` like every other member of that
+      # list: since the 2026-09-12 ruling on sb-7n1h the control is withheld
+      # on a read-only mount (the test below), so a crafted payload is the
+      # only way the event can still reach the component.
       #
       # Sabotage: `expand` removed from `@read_only_refused` again. Ran red on
       # all three assertions below - the composite is replaced by its member,
@@ -490,13 +490,62 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         before = editor(view)
 
-        view
-        |> element(~s([phx-click="expand"][phx-value-block-id="blk_AUTH"]))
-        |> render_click()
+        crafted(view, "expand", %{"block-id" => "blk_AUTH"})
 
         assert latest_document() == nil
         assert editor(view) == before
         refute editor(view) =~ "sb-editor__refusal"
+      end
+
+      # sb-7n1h (RQ-SF041-5, ruled 2026-09-12). The drawing side of item 7a:
+      # a read-only mount refuses `expand` and `remove`, so it draws neither
+      # control. Withholding is the precedent clause 1 set for the palette
+      # column and item 7c for the gap "+" - never draw a gesture the mount
+      # refuses - and it is what makes the sentence beside
+      # `@read_only_refused` true without exception.
+      #
+      # The document is the composite one so that `.sb-node__expand` would be
+      # drawn but for `read_only`: on `EditorFixtures` nothing is expandable
+      # and that refute would pass for the wrong reason. The fold toggle is
+      # asserted present in the same breath, because withholding every
+      # control would also pass the two refutes and would be a different -
+      # and wrong - rule: folding reaches no document.
+      #
+      # Sabotage: `not @read_only and` removed from the `.sb-node__expand`
+      # condition in `block_node.ex`, then from `.sb-node__remove`. Each ran
+      # red on its own refute here; the writable test below is what keeps a
+      # blanket withholding from reading green.
+      test "draws neither Expand nor Delete on the card", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn,
+            document: composite_document(),
+            palette: composite_palette(),
+            profile: %{read_only?: true}
+          )
+
+        html = render(view)
+
+        refute html =~ "sb-node__expand"
+        refute html =~ "sb-node__remove"
+        refute html =~ ~s(phx-click="expand")
+        refute html =~ ~s(phx-click="remove")
+        assert html =~ "sb-node__fold"
+      end
+
+      test "an editing mount draws both", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn,
+            document: composite_document(),
+            palette: composite_palette(),
+            profile: %{read_only?: false}
+          )
+
+        html = render(view)
+
+        assert html =~ "sb-node__expand"
+        assert html =~ "sb-node__remove"
+        assert html =~ ~s(phx-click="expand")
+        assert html =~ ~s(phx-click="remove")
       end
 
       # The other side of the same clause: the gesture is refused because the
