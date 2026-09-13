@@ -63,6 +63,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     in CSS for the same reason `data-empty` is stamped rather than derived -
     the view model already knows.
 
+    The mark is also what SAYS the arm is empty, not only what draws it
+    (`sb-z6vv`, the operator's ruling of 2026-09-12). An editing mount
+    announces the gap's "+", so the read-only mount that draws no "+" was
+    announcing a slot header and then nothing, and a reader who cannot see
+    the ring could not tell an empty arm from an arm the rendering had cut
+    short. So the span is a labelled `role="img"` - the arm's own label
+    followed by "is empty" - rather than an `aria-hidden` decoration, since
+    an `aria-hidden` element cannot carry a name at all. The label names WHICH
+    arm, which is the half a header two lines up does not supply once a
+    reader has moved past it. `role="img"` and not a `button`, because the
+    name is all that is restored - the mark still carries no event, no
+    `phx-` attribute and no tab stop, which is item 7b's other half.
+
     ## The gap IS the insertion marker (R3, operator ruling 2026-08-29)
 
     The ruling asks for "a marker on the edge between siblings, subtle at
@@ -334,6 +347,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           armed={@armed}
           read_only={@read_only}
           empty?={@slot.children == []}
+          label={@slot.label}
           target={@target}
         />
         <.child
@@ -442,6 +456,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # the placeholder.
     attr(:empty?, :boolean, default: false)
 
+    # The arm's own label, as its header draws it. Only the placeholder reads
+    # it - it is the half of the empty arm's accessible name that says WHICH
+    # arm is empty - so the interleaved gaps, which can never be empty, keep
+    # the default and pass nothing.
+    attr(:label, :string, default: nil)
+
     attr(:target, :any, required: true)
 
     defp gap(assigns) do
@@ -473,7 +493,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         >
           +
         </button>
-        <span :if={@read_only and @empty?} class="sb-gap__placeholder" aria-hidden="true"></span>
+        <span
+          :if={@read_only and @empty?}
+          class="sb-gap__placeholder"
+          role="img"
+          aria-label={"#{@label} is empty"}
+        ></span>
       </div>
       """
     end
