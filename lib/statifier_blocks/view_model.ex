@@ -1306,11 +1306,12 @@ defmodule StatifierBlocks.ViewModel do
   fallback, and writing it once is what keeps two surfaces from naming one
   block differently.
 
-  It is the arity that separates it from the two other `sentence`s in the
-  package, and the three are deliberately distinct: this one takes a node
-  and answers what to draw, `StatifierBlocks.BlockType.sentence/2` asks a
-  block type for its own line, and this module's private `sentence/5` is
-  where a built node's `sentence` field came from in the first place.
+  It is the arity and the module that separate it from the two other
+  `sentence`s in the package, and the three are deliberately distinct: this
+  one takes a node and answers what to draw,
+  `StatifierBlocks.BlockType.sentence/2` asks a block type for its own line,
+  and `StatifierBlocks.SentenceChain.sentence/5` is where a built node's
+  `sentence` field came from in the first place.
 
       iex> alias StatifierBlocks.{Block, Document, Palette, ViewModel}
       iex> root =

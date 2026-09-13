@@ -134,11 +134,25 @@ defmodule StatifierBlocks.Composite.OverridablesTest do
   # generated one and applies it. A non-overridable callback answers the
   # generated clause; `:shadowed` would mean the module's `def` won.
   #
-  # The compile is quoted rather than written out because redefining a
-  # function the module has already defined and not marked overridable is a
-  # compiler warning, and a warning in `test/` is a gate failure.
-  # `Code.with_diagnostics/1` collects it instead of printing it, which is
-  # what keeps the gate green over a file whose whole point is that warning.
+  # The compile is quoted rather than written out so that one helper builds
+  # a shadowing module per callback from `name` and `arity`, instead of the
+  # file spelling six near-identical composites.
+  #
+  # `Code.with_diagnostics/1` collects whatever the compile emits instead of
+  # letting it print, and a warning printed from `test/` is a gate failure.
+  # What it collects is asserted EMPTY rather than described, because empty
+  # is what this compile actually produces (verified): the redefinition
+  # warning a hand-written shadow earns - "this clause for name/arity cannot
+  # match because a previous clause always matches" - does not fire here,
+  # since the shadowing `def` comes out of a `quote` and the compiler does
+  # not raise that warning against a generated clause. The assertions below
+  # are the signal, and this one pins the silence they run in: an Elixir
+  # that starts warning here turns this test red rather than the gate red
+  # somewhere else.
+  #
+  # Sabotage: dropped the `assert` and let the helper discard the return,
+  # as it did before - the five `may not override` assertions stayed green,
+  # which is why the silence needs its own assertion (verified).
   defp shadow(name, arity, args) do
     module = Module.concat([__MODULE__, :"Shadow#{Macro.camelize(to_string(name))}#{arity}"])
     shadow_args = Enum.map(1..arity//1, fn i -> Macro.var(:"arg#{i}", __MODULE__) end)
@@ -174,7 +188,11 @@ defmodule StatifierBlocks.Composite.OverridablesTest do
         end
       end
 
-    Code.with_diagnostics(fn -> Code.compile_quoted(body) end)
+    {_compiled, diagnostics} = Code.with_diagnostics(fn -> Code.compile_quoted(body) end)
+
+    assert diagnostics == [],
+           "the shadow compile for #{name}/#{arity} emitted a diagnostic: " <>
+             inspect(diagnostics)
 
     apply(module, name, args)
   end
