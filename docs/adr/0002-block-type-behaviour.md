@@ -10956,9 +10956,11 @@ names"). It is a requirement stated for a *behaviour* rather than for a module
 it names: by modules alone `~> 9.0` would still suffice, because every
 predicator module named here shipped in 9.0.0. It is not the first such
 requirement in this file - the `{:statifier_datamodel, "~> 0.4"}` floor
-(`mix.exs:158`, argument from `:135`) is raised the same way, on what 0.4.0's
-`{:shape, members}` term can do rather than on a module the package names
-("0.3 resolves and then has no such inhabitant at all").
+(`mix.exs:158`, the requirement line itself, with the argument for that floor
+opening at `:148`, "# The floor is 0.4 and not 0.3") is raised the same way,
+on what 0.4.0's `{:shape, members}` term can do rather than on a module the
+package names: "0.3 resolves and then has no such inhabitant at all"
+(`:152-153`).
 What raises it is that `OnEvent` emits a `capture` literal as a predicator
 string literal and the engine reads it back into the datamodel, so a lexer that
 returns the whole of a string is now something this package **needs** - and a
@@ -10984,10 +10986,11 @@ Pinned back to predicator 9.4.0, with the dependency recompiled for
 `MIX_ENV=test` before and after the revert, that test goes red with the literal
 read back as its bytes, and the type round trip at `:783`
 (`test "reads back the document's own value, for each type it admits"`) goes
-red on `"café"` for the same reason. Those two, and only those two: nothing else in the suite
-answers for the floor. The 4-byte codepoint is in it deliberately - a
-byte-at-a-time write-back mangles a 2-byte and a 4-byte character alike, but
-only the second also rules out a lexer that learned Latin-1 and stopped there.
+red on `"café"` for the same reason. Those two, and only those two: nothing
+else in the suite answers for the floor. The 4-byte codepoint is in it
+deliberately - a byte-at-a-time write-back mangles a 2-byte and a 4-byte
+character alike, but only the second also rules out a lexer that learned
+Latin-1 and stopped there.
 
 `:163` (`test "accepts a literal source in each JSON type a document may carry"`)
 now asserts the strings the narrowing refused, and `:220`
