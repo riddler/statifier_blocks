@@ -13,6 +13,14 @@ defmodule StatifierBlocks.Compiler.MintedWriterSentenceTest do
   index at all - is named by its own id, because that is an id the author
   typed.
 
+  The writer half and the card draw that line out of one chain
+  (`StatifierBlocks.SentenceChain`, which `ViewModel.sentence/1` and
+  `Compiler.writer_sentence/2` both read), so "Titled section" is here to
+  hold the two together: a composite carrying an author's `label` param is
+  named by its type's line on both surfaces, while the card's FIRST line -
+  `ViewModel.title/1` - stays the author's title, which is `ADR-0005`'s own
+  distinction and not a drift between them.
+
   The types here are never compiled: the walk is what reads them, the
   structure stage refuses before `emit`, and `emit/2` refuses if it is ever
   reached.
@@ -22,7 +30,7 @@ defmodule StatifierBlocks.Compiler.MintedWriterSentenceTest do
 
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{Block, Compiler, Document, Palette}
+  alias StatifierBlocks.{Block, Compiler, Document, Palette, ViewModel}
   alias StatifierBlocks.Compiler.Finding
 
   # -- the leaves --------------------------------------------------------
@@ -232,6 +240,52 @@ defmodule StatifierBlocks.Compiler.MintedWriterSentenceTest do
     end
   end
 
+  defmodule TitledSection do
+    @moduledoc """
+    The same arrangement again, declaring no `sentence/1` and declaring a
+    `label` string param, which is the seam an author's title comes through.
+    It is the third rung of `ADR-0005`'s chain: a type with no line of its
+    own is named by the author's title where they gave one, and only by the
+    type's label where they did not.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "myapp.titled_section",
+      params: [
+        %{
+          key: "applicant_path",
+          type: :string,
+          label: "Record the applicant at",
+          required?: true,
+          default: "",
+          datamodel_path?: true
+        },
+        %{
+          key: "label",
+          type: :string,
+          label: "Name this section",
+          required?: false,
+          default: ""
+        }
+      ],
+      slots: [%{name: "body", to: {"then", "body"}, label: "Then"}],
+      palette_entry: %{label: "Titled section", group: "Structure"},
+      version: 1
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(params) do
+      [
+        Block.new("myapp.signup_step",
+          id: "call",
+          config: %{"assign_to" => params["applicant_path"]}
+        ),
+        Block.new("core.group", id: "then", slots: %{"body" => []})
+      ]
+    end
+  end
+
   @datamodel %{
     "version" => 1,
     "scopes" => [],
@@ -255,6 +309,7 @@ defmodule StatifierBlocks.Compiler.MintedWriterSentenceTest do
       [
         {"myapp.guarded_section", GuardedSection},
         {"myapp.plain_section", PlainSection},
+        {"myapp.titled_section", TitledSection},
         {"myapp.signup_step", SignupStep},
         {"myapp.notify", Notify},
         {"myapp.marker", Marker},
@@ -268,6 +323,14 @@ defmodule StatifierBlocks.Compiler.MintedWriterSentenceTest do
     Block.new(type,
       id: id,
       config: %{"applicant_path" => "signup.applicant"},
+      slots: %{"body" => children}
+    )
+  end
+
+  defp titled_section(type, id, title, children) do
+    Block.new(type,
+      id: id,
+      config: %{"applicant_path" => "signup.applicant", "label" => title},
       slots: %{"body" => children}
     )
   end
@@ -357,6 +420,71 @@ defmodule StatifierBlocks.Compiler.MintedWriterSentenceTest do
 
       assert finding.message =~ ~s("Plain section" left)
       refute finding.message =~ "blk_PS_call"
+    end
+
+    # Sabotage: have `writer_sentence/2` answer the bare `type` instead of
+    # calling the chain - red on both assertions, which is what they are for:
+    # the writer half and the card read one chain, so neither can drift into
+    # naming the block something the other does not.
+    test "names the composite exactly as its card's line does" do
+      children = [
+        titled_section("myapp.titled_section", "blk_TS", "Applicant guard", [
+          Block.new("myapp.notify",
+            id: "blk_notify",
+            config: %{"to" => "signup.applicant.invited_at"}
+          )
+        ])
+      ]
+
+      finding = finding_for(children, :type_mismatch)
+
+      node =
+        children
+        |> document()
+        |> ViewModel.build(palette(), [])
+        |> ViewModel.find_node("blk_TS")
+
+      assert ViewModel.sentence(node) == "Titled section"
+      assert finding.message =~ ~s("#{ViewModel.sentence(node)}" left)
+    end
+
+    # The rung the two halves used to draw differently, pinned as the record
+    # actually decides it. `ADR-0005`'s chain reaches the author's `title`
+    # only for a type that declares NO `sentence/1`, and a composite always
+    # declares one (`StatifierBlocks.Composite`'s generated `sentence/1`,
+    # which answers the palette label where the declaration composed no
+    # template), so the title never wins here - on either surface.
+    #
+    # `ViewModel.title/1` is the other thing, and stays the other thing: the
+    # card's FIRST line is the author's title, and `ADR-0005` says in as many
+    # words that `sentence` is a fourth thing a node carries rather than a
+    # re-spelling of the third.
+    #
+    # Sabotage: drop the `title ||` from `SentenceChain.sentence/5`'s
+    # non-declaring arm - green here, and red in
+    # `test/statifier_blocks/view_model/sentence_test.exs`, which is where the
+    # rung is reachable and is the test that proves the chain moved intact.
+    test "the author's title names the card's first line and not either sentence" do
+      children = [
+        titled_section("myapp.titled_section", "blk_TS", "Applicant guard", [
+          Block.new("myapp.notify",
+            id: "blk_notify",
+            config: %{"to" => "signup.applicant.invited_at"}
+          )
+        ])
+      ]
+
+      finding = finding_for(children, :type_mismatch)
+
+      node =
+        children
+        |> document()
+        |> ViewModel.build(palette(), [])
+        |> ViewModel.find_node("blk_TS")
+
+      assert ViewModel.title(node) == "Applicant guard"
+      refute ViewModel.sentence(node) == "Applicant guard"
+      refute finding.message =~ "Applicant guard"
     end
   end
 

@@ -191,6 +191,7 @@ defmodule StatifierBlocks.ViewModel do
     DocumentValidator,
     Finding,
     Palette,
+    SentenceChain,
     Shelf
   }
 
@@ -1805,7 +1806,7 @@ defmodule StatifierBlocks.ViewModel do
       {:ok, ref, resolved} ->
         entry = palette_entry_with_defaults(ref, block.type)
 
-        title_override(Palette.call(ref, :config_schema, [resolved.config], []), resolved.config) ||
+        SentenceChain.title(ref, resolved.config) ||
           Map.get(entry, :label) || block.type
 
       # An unresolvable block draws its type name and nothing else
@@ -2044,7 +2045,7 @@ defmodule StatifierBlocks.ViewModel do
 
     slots = declared_slots ++ extra_slots
     form = %Form{fields: build_fields(schema, config, config_findings), unrouted: unrouted}
-    title = title_override(schema, config)
+    title = SentenceChain.title_override(schema, config)
 
     %Node{
       block_id: block.id,
@@ -2053,7 +2054,7 @@ defmodule StatifierBlocks.ViewModel do
       status: :ok,
       entry: entry,
       title: title,
-      sentence: sentence(ref, config, entry, title, block.type),
+      sentence: SentenceChain.sentence(ref, config, entry, title, block.type),
       summary: BlockType.summary(ref, config, labels),
       summary_titles: BlockType.summary_titles(ref, config, labels),
       invoke_type: invoke_type(config),
@@ -2240,60 +2241,6 @@ defmodule StatifierBlocks.ViewModel do
         findings: Map.get(config_findings, key, [])
       }
     end)
-  end
-
-  # The author's own name for this block, or `nil`.
-  #
-  # A declared `:string` field keyed `label` is the seam, and it is the whole
-  # of it: a block type that wants its instances named says so the same way it
-  # declares any other field, and a type that declares none has no title
-  # override rather than a special case. Read through `BlockType.value_path/1`
-  # like every other field's value, so a type that stores its name somewhere
-  # other than `config["label"]` is read where it actually put it.
-  #
-  # No block type in the `core.*` vocabulary declares one. That is the
-  # intended shape rather than a gap: "Wait" is what a wait is called, and a
-  # type whose steps are worth naming individually is a host's.
-  @spec title_override([BlockType.field_decl()], Block.config()) :: String.t() | nil
-  # ADR-0005's 2026-09-07 three-way chain. `declares?/1` is asked
-  # separately from the reader's answer because the two records draw the
-  # line in different places and both lines matter: a type that declares
-  # NOTHING may land on the author's `title` (ADR-0005 row two), while a
-  # declared callback that raises, throws, exits or answers something
-  # unusable lands on the type's label and never on the title (ADR-0002
-  # row three, restated in ADR-0005 as "never the author's `title`"). The
-  # reader answers a string in both cases, so declaredness is the only
-  # thing that separates them.
-  @spec sentence(
-          module(),
-          Block.config(),
-          BlockType.palette_entry(),
-          String.t() | nil,
-          Block.type_name()
-        ) ::
-          String.t()
-  defp sentence(module, config, entry, title, type) do
-    label = Map.get(entry, :label) || type
-
-    if declares_sentence?(module) do
-      BlockType.sentence(module, config) || label
-    else
-      title || label
-    end
-  end
-
-  @spec declares_sentence?(Palette.type_ref()) :: boolean()
-  defp declares_sentence?(ref) do
-    Palette.declares?(ref, :sentence, 1)
-  end
-
-  defp title_override(schema, config) do
-    with %{} = field <- Enum.find(schema, &(&1.key == "label" and &1.type == :string)),
-         {:ok, value} <- BlockType.fetch_value(config, BlockType.value_path(field)) do
-      non_empty_string(value)
-    else
-      _undeclared_or_absent -> nil
-    end
   end
 
   # The invoke type on the card's third line. A config key, never a type name:

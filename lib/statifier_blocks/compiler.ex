@@ -310,6 +310,7 @@ defmodule StatifierBlocks.Compiler do
     Environment,
     Palette,
     Provenance,
+    SentenceChain,
     Shelf,
     SlotValidation
   }
@@ -1057,20 +1058,31 @@ defmodule StatifierBlocks.Compiler do
     end)
   end
 
-  # The composite's own line, else its type's label, else the type name -
-  # `ADR-0005`'s chain as `StatifierBlocks.BlockType.sentence/2` writes it,
-  # which is the same two rungs `StatifierBlocks.ViewModel.sentence/1` draws
-  # a row with. The compiler asks the block type rather than the view model
-  # because it holds no view model and building one to name one block would
-  # be a second answer to a question the type already answers; the rung the
-  # two do not share is the author's `title` override, which is reachable
-  # only for a type declaring no `sentence/1` at all and is the view model's
-  # own (`ViewModel`'s private `sentence/5`).
+  # The composite's own line, else the author's title, else its type's label,
+  # else the type name - `ADR-0005`'s three-way chain, the one
+  # `StatifierBlocks.ViewModel.sentence/1` draws a card's line with. Both
+  # halves read the chain out of `StatifierBlocks.SentenceChain` rather than
+  # each writing their own: a composite named one way on its card and another
+  # way in a `:type_mismatch` sentence is the hazard `ViewModel.sentence/1`'s
+  # docstring exists to prevent, and the rung the compiler's own copy used to
+  # skip was the author's `title` override. The compiler cannot call
+  # `ViewModel.sentence/1` itself - it holds no view model, and building one
+  # to name a single block would be a second answer to a question the chain
+  # already answers.
   @spec writer_sentence(Palette.t(), Block.t()) :: String.t()
   defp writer_sentence(palette, %Block{type: type, config: config}) do
     case Palette.fetch(palette, type) do
-      {:ok, ref} -> BlockType.sentence(ref, config) || type
-      {:error, _unknown} -> type
+      {:ok, ref} ->
+        SentenceChain.sentence(
+          ref,
+          config,
+          SentenceChain.palette_entry(ref),
+          SentenceChain.title(ref, config),
+          type
+        )
+
+      {:error, _unknown} ->
+        type
     end
   end
 
