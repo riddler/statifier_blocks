@@ -11262,14 +11262,16 @@ The refusal is not rendered, because the control that would carry it is not
 drawn.
 
 This is item 7a read from the drawing side. 7a puts `expand` in
-`@read_only_refused` (`editor.ex:683-691`, cited by 7a at `:10625-10626`), and
-a control whose only outcome on this mount is the socket unchanged is a
-control that should not have been offered - the same reading clause 1 makes
+`@read_only_refused`, which at `19728d0` is the `~w(` sigil at
+`editor.ex:726-732` with `expand` on `:727`; 7a's own cite of it
+(`editor.ex:683-691`, at `:10625`) has drifted onto the `profile` typedoc and
+is re-located in section 3 below. A control whose only outcome on this mount
+is the socket unchanged is a control that should not have been offered - the same reading clause 1 makes
 for the palette column and 7c makes for the gap "+": never draw a gesture the
 mount refuses.
 
 At `19728d0` the code follows it. `BlockNode`'s `read_only` attr
-(`block_node.ex:327`) says so in its own doc (`:331-343`, "Withholding, rather
+(`block_node.ex:327`) says so in its own doc (`:330-343`, "Withholding, rather
 than drawing the control and rendering a refusal, is the operator ruling of
 2026-09-12" at `:337-338`), and the two guards are
 `:if={not @read_only and expandable?(@node, @expandable)}` on
@@ -11278,8 +11280,8 @@ than drawing the control and rendering a refusal, is the operator ruling of
 on `.sb-node__remove` (`block_node.ex:483`).
 
 **Which controls the rule reaches is the code's and the suite's, not this
-record's.** The strip draws more than these two, and two of them are
-deliberately outside the rule for the reason the attr doc gives at
+record's.** The strip draws more than these two, and the attr doc names two of
+them as deliberately outside the rule, for the reason it gives at
 `block_node.ex:341-343`: the fold toggle changes no document, and "Save as a
 step" is conditioned on the `on_collapse` callback rather than on
 `read_only`. The `read_only?` describe block in
@@ -11310,18 +11312,19 @@ slot's gap (`slot.ex:453-456`, the `empty?` attr's comment), and
 `profile_test.exs`'s `read_only?` block asserts the `role`, the label and the
 absence of `aria-hidden`.
 
-### 3. Item 7b's and 7c's `slot.ex` cites, re-located at `19728d0`
+### 3. Items 7a, 7b and 7c's `lib/` cites, re-located at `19728d0`
 
-Item 7b and item 7c were written at a `slot.ex` that has since moved under
-them, and `mix adr.cites` reads record-to-record rather than record-to-`lib/`,
-so nothing reported it. Re-located here by addition; 7b's and 7c's own text is
-untouched.
+The three items were written at a `slot.ex` and an `editor.ex` that have since
+moved under them, and `mix adr.cites` reads record-to-record rather than
+record-to-`lib/`, so nothing reported it. Re-located here by addition; 7a's,
+7b's and 7c's own text is untouched.
 
 | The item's cite | Anchor | At `19728d0` |
 |---|---|---|
+| `editor.ex:683-691` (7a, `:10625`) | `@read_only_refused ~w(`, `expand` in it | `:726-732`, `expand` on `:727` |
 | `slot.ex:411` (7b, `:10634`) | `defp gap(assigns) do` | `:467` |
 | `slot.ex:428` (7b, `:10635`; 7c, `:10645`) | `:if={not @read_only}` on `.sb-gap__add` | `:484` |
-| `slot.ex:245` (7c, `:10646`) | `attr(:read_only, :boolean,` on `slot/1`, and its doc | `:277`, doc `:279-286` |
+| `slot.ex:245` (7c, `:10646`) | `attr(:read_only, :boolean,` on `slot/1`, and its doc | `:277`, doc `:280-285` |
 | `slot.ex:245` (the cite table, `:10719`) | the same declaration | `:277` |
 | `slot.ex:411`, `:428` (the cite table, `:10720`) | the same two | `:467`, `:484` |
 
