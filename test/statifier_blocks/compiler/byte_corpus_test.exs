@@ -52,8 +52,19 @@ defmodule StatifierBlocks.Compiler.ByteCorpusTest do
   # the ones the moduledoc names, so a golden quietly deleted or an entry
   # quietly dropped fails here rather than passing vacuously.
   #
+  # `sb-51lv`: the directory is asserted to hold **exactly** the goldens
+  # the entries name, in both directions. An existence check alone cannot
+  # see a file in the corpus directory that no entry compiles - which is
+  # what `composite_no_outcomes-plain.scxml` was until it moved to
+  # `test/fixtures/composite/`, a golden that followed this directory's
+  # naming, was read only by `declared_outcomes_test.exs`, and made the
+  # sentence in this test's name understate what was on disk.
+  #
   # sabotage: dropped `invoke_handled` from the corpus -> the occupied
-  # `core.invoke` case stops being pinned and this goes red (verified)
+  # `core.invoke` case stops being pinned and this goes red (verified);
+  # added a `stray-plain.scxml` to the directory -> nothing compiles it and
+  # this goes red on the directory assertion, which the existence check on
+  # its own could not see (verified)
   test "the corpus is the five documents, in three modes each" do
     assert Enum.map(ByteCorpus.entries(), &elem(&1, 0)) == [
              "worked_example",
@@ -65,11 +76,20 @@ defmodule StatifierBlocks.Compiler.ByteCorpusTest do
 
     assert Enum.map(ByteCorpus.modes(), &elem(&1, 0)) == ["plain", "terminate", "child_use"]
 
-    for {name, _document, _palette} <- ByteCorpus.entries(),
-        {mode, _opts} <- ByteCorpus.modes() do
-      assert File.exists?(ByteCorpus.golden_path(name, mode)),
-             "missing golden for #{name}/#{mode}"
+    goldens =
+      for {name, _document, _palette} <- ByteCorpus.entries(),
+          {mode, _opts} <- ByteCorpus.modes(),
+          do: ByteCorpus.golden_path(name, mode)
+
+    for path <- goldens do
+      assert File.exists?(path), "missing golden for #{path}"
     end
+
+    directory = goldens |> List.first() |> Path.dirname()
+
+    assert Enum.sort(File.ls!(directory)) ==
+             goldens |> Enum.map(&Path.basename/1) |> Enum.sort(),
+           "#{directory} holds a file no corpus entry compiles, or is missing one it does"
   end
 
   # `sb-hykt` (SF041): the donedata key the failure seam mints moved to

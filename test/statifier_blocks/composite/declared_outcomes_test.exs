@@ -81,6 +81,29 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     def subtree(params), do: ConfirmSubtree.build(params)
   end
 
+  defmodule ConfirmStepEmpty do
+    @moduledoc """
+    `C1`'s explicit empty list: byte for byte `ConfirmStep`'s declaration with
+    `outcomes: []` written out. `C1` says the explicit list is deliberately the
+    same as the absent key, so this module and `ConfirmStep` must answer the
+    same derived list.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "signup.confirm_step_empty",
+      params: [
+        %{key: "event", type: :string, label: "Confirmed by", required?: true, default: ""}
+      ],
+      outcomes: [],
+      palette_entry: %{label: "Confirm the contact"},
+      version: 1
+
+    alias StatifierBlocks.Composite.DeclaredOutcomesTest.ConfirmSubtree
+
+    @impl StatifierBlocks.Composite
+    def subtree(params), do: ConfirmSubtree.build(params)
+  end
+
   defmodule ConfirmStepDeclaring do
     @moduledoc """
     The `C1`/`C2` case: byte for byte the subtree above, plus the two names the
@@ -405,6 +428,7 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     Palette.new(
       Map.merge(Palette.core_types(), %{
         "signup.confirm_step" => ConfirmStep,
+        "signup.confirm_step_empty" => ConfirmStepEmpty,
         "signup.confirm_step_declaring" => ConfirmStepDeclaring,
         "signup.confirm_step_dreaming" => ConfirmStepDreaming,
         "signup.confirm_and_record" => ConfirmAndRecord,
@@ -504,13 +528,16 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     # Sabotage: read the root's outcomes rather than the union over every
     # minted member - red. `timed_out` is raised by the `core.await` two levels
     # below the root, and the root cannot raise it at all.
+    #
+    # `sb-51lv`: one expansion, destructured once. Calling `expansion/1` twice
+    # paired the members of one expansion with the `param_map` of a second,
+    # which is exactly the pairing `unraisable_outcomes/4`'s doc forbids a
+    # caller to make - true here only because `expand!/2` is deterministic.
     test "the raisable set is the union over the expansion, not the root alone" do
-      assert Composite.unraisable_outcomes(
-               palette(),
-               ConfirmStepDeclaring,
-               expansion(ConfirmStepDeclaring) |> elem(0),
-               expansion(ConfirmStepDeclaring) |> elem(1)
-             ) == []
+      {members, param_map} = expansion(ConfirmStepDeclaring)
+
+      assert Composite.unraisable_outcomes(palette(), ConfirmStepDeclaring, members, param_map) ==
+               []
     end
 
     # Sabotage: reduced with `Map.put/3` rather than `Map.put_new/3` - red. `C1`
@@ -578,6 +605,30 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
 
       assert Composite.unraisable_outcomes(palette(), ConfirmStepOpen, members, param_map) ==
                ["received"]
+
+      # `sb-51lv`: the same document through the compiler, which is where the
+      # rule is cashed. The assertion above is over the function the Resolve
+      # stage calls; this one is over the stage.
+      #
+      # Sabotage: had `outcome_findings/5` answer `[]` unconditionally - the
+      # function above still answered `["received"]`, so the first assertion
+      # stayed green and this one went red on the `{:error, findings}` match
+      # (six of the file's thirty-two went red in all, verified).
+      assert {:error, findings} =
+               Compiler.compile(
+                 Document.new(
+                   Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [filled]}),
+                   id: "bdoc_declaredoutcomes"
+                 ),
+                 palette()
+               )
+
+      assert [%Finding{} = finding] =
+               Enum.filter(findings, &(&1.code == :outcome_not_raisable))
+
+      assert finding.stage == :resolve
+      assert finding.block_id == "blk_OPEN"
+      assert finding.reason == {:outcome_not_raisable, "blk_OPEN", "received"}
     end
 
     # Sabotage: ran the check for a composite that declares nothing - red, and
@@ -586,6 +637,39 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
       {members, param_map} = expansion(ConfirmStep)
 
       assert Composite.unraisable_outcomes(palette(), ConfirmStep, members, param_map) == []
+    end
+
+    # `sb-51lv`: the precondition, pinned rather than guarded. `ref` is
+    # `expand!/2`'s own second argument and the Resolve stage only ever
+    # reaches this function for a block `composite?/1` answered for
+    # (`compiler.ex`'s `unraisable_outcomes` call site), so a non-composite
+    # ref here is a caller error and not an input. `io/2` and `outcomes/2`
+    # resolve the ref themselves and so can refuse in `composite_ref!/2`;
+    # this one takes the ref already resolved and has nothing to refuse
+    # against. The raise is `declared_outcomes/1` reading `:outcomes` off the
+    # `nil` that `Palette.call/4` answers for a module with no
+    # `__composite__/0`, which is what makes it a `BadMapError` rather than
+    # this package's own error.
+    #
+    # This test exists so that a later change to the raise - a guard, a
+    # documented refusal, a different exception - is a diff against a
+    # recorded expectation rather than a silent move.
+    #
+    # Sabotage: put a clause in front that answers `[]` for a ref exporting
+    # `__composite__/0` and raises `ArgumentError` otherwise - this went red
+    # on the `BadMapError` expectation (verified), which is what it is here
+    # to notice.
+    test "a ref that is not a composite is a caller error, not an input" do
+      {members, param_map} = expansion(ConfirmStep)
+
+      assert_raise BadMapError, fn ->
+        Composite.unraisable_outcomes(
+          palette(),
+          StatifierBlocks.Core.Sequence,
+          members,
+          param_map
+        )
+      end
     end
   end
 
@@ -701,21 +785,42 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     # against these bytes, which were recorded from this document compiled at
     # `d9f4896`, the commit before the key existed. This is the condition on
     # which this section lands inside a release that is not otherwise breaking.
+    #
+    # `sb-51lv`: the golden lives under `test/fixtures/composite/` rather than
+    # in `test/fixtures/corpus/`, which is `StatifierBlocks.ByteCorpus`'s own
+    # directory and now holds exactly the goldens its entries name. This one
+    # is read here and nowhere else, so it was never a corpus document.
     test "the bytes match the ones recorded before the key existed" do
       assert {:ok, compiled} = Compiler.compile(document("signup.confirm_step"), palette())
 
       assert compiled.scxml ==
-               File.read!("test/fixtures/corpus/composite_no_outcomes-plain.scxml")
+               File.read!("test/fixtures/composite/composite_no_outcomes-plain.scxml")
     end
 
     # Sabotage: read an explicit `[]` as a declaration - red. `C1` says an
     # explicit empty list is deliberately the absent case: every block type
     # answers at least the default `done`, so there is nothing else it could
     # mean.
+    #
+    # `sb-51lv`: the declaration assertion alone cannot separate the two
+    # paths, because `outcomes_over/3` branches on the declared list rather
+    # than on the key's presence. The second assertion is the one that does:
+    # `ConfirmStepEmpty` writes the key explicitly and still answers the
+    # expansion root's derived list, which is `C3`'s absent case. Under the
+    # sabotage the declared branch runs over an empty name list and the
+    # answer is `[]` rather than the root's `done` (verified).
     test "an explicit empty list is the absent case" do
       declaration = Composite.__declaration__(name: "signup.x", params: [], outcomes: [])
 
       assert declaration.outcomes == []
+
+      assert ConfirmStepEmpty.__composite__().outcomes == []
+
+      assert Composite.outcomes(palette(), block("signup.confirm_step_empty", "blk_EMPTY")) ==
+               [{"done", "Done"}]
+
+      assert ConfirmStepEmpty.outcomes(%{"event" => "signup.confirmed"}) ==
+               ConfirmStep.outcomes(%{"event" => "signup.confirmed"})
     end
   end
 
@@ -794,6 +899,35 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
 
       assert Enum.any?(errors, &(&1 =~ ~s("outcomes" must be a list of non-empty)))
     end
+
+    # `sb-51lv`: `C2` item 3 through the data door. Every other assertion for
+    # the unraisable-name finding above compiles a USE-form composite, so a
+    # Resolve stage that reached the declaration through something only the
+    # `use` form has would leave the data form unchecked and every one of
+    # them green. `C4` says everything `C1` and `C2` say holds here unchanged,
+    # and this is the half of `C2` with a Finding in it.
+    #
+    # Sabotage: had the Resolve stage run the check for module refs only
+    # (`when not is_atom(module) -> []` in front of `outcome_findings/5`) -
+    # this was the only one of the file's thirty-two that went red, every
+    # use-form sibling included (verified).
+    test "a data composite naming an unraisable outcome draws C2 item 3's finding" do
+      assert {:ok, state} = Data.declaration(row(%{"outcomes" => ["received", "went_back"]}))
+
+      palette =
+        Palette.new(Map.put(Palette.core_types(), "signup.confirm_step_data", {Data, state}))
+
+      assert {:error, findings} =
+               Compiler.compile(document("signup.confirm_step_data", "blk_DATA"), palette)
+
+      assert [%Finding{} = finding] =
+               Enum.filter(findings, &(&1.code == :outcome_not_raisable))
+
+      assert finding.stage == :resolve
+      assert finding.block_id == "blk_DATA"
+      assert finding.reason == {:outcome_not_raisable, "blk_DATA", "went_back"}
+      assert finding.message =~ ~s(declares the outcome "went_back")
+    end
   end
 
   # -- C5: nothing else moves ---------------------------------------------
@@ -802,7 +936,13 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     # Sabotage: changed `derived_outcomes/2`'s arity to carry the declaration -
     # red. `C5` says the three functions keep the arities and the return type
     # they have.
-    test "derived_outcomes/2, outcomes_over/3 and Composite.outcomes/2 keep their arities" do
+    #
+    # `sb-51lv`: the name says the two functions the body can see.
+    # `outcomes_over/3` is private, so `function_exported?/3` answers `false`
+    # for it at every arity and an assertion about it here would pin nothing;
+    # `C5`'s third function is checked through `Composite.outcomes/2`, which
+    # is the only door it has.
+    test "derived_outcomes/2 and Composite.outcomes/2 keep their arities" do
       assert function_exported?(Composite, :derived_outcomes, 2)
       assert function_exported?(Composite, :outcomes, 2)
     end
@@ -824,6 +964,51 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
       assert_raise ArgumentError, ~r/the recognized options are.*:outcomes/s, fn ->
         Composite.__declaration__(name: "signup.x", params: [], nonesuch: true)
       end
+    end
+  end
+
+  # -- the compiled chart, and what `C5` says this section does not move ---
+
+  describe "C5: the declared list is an authoring answer, not a compiled route" do
+    # `sb-51lv`, `sb-qmm3` item 8. The item asked for an end-to-end pin that a
+    # declared non-default outcome reaches an enclosing body's outcome slot.
+    # It does not, and `C5` is why: "This section changes *which list a
+    # composite answers as its declared outcomes*, and nothing about what an
+    # outcome is, how it is drawn, or how it compiles."
+    #
+    # The expansion is what compiles. A composite block is replaced by its
+    # members before Emit, so the state the enclosing body routes on is the
+    # EXPANSION ROOT's - a `core.sequence` here, which raises `done` and
+    # nothing else - and the declared names appear in the chart only where a
+    # member raises them, on that member's own state. So the assertion below
+    # is the measurement SF040's capture `k2` made (ADR-0002, "The
+    # measurement that asks for it"), pinned as a fact about today's
+    # compiler rather than left as a one-off reading of a running document.
+    #
+    # It is deliberately not an assertion that this is right. Closing k2's
+    # gap - making a declared outcome routable by the enclosing body - is a
+    # decision no section of this record has taken, and this test is what
+    # will go red when one is.
+    #
+    # Sabotage: not applicable in the usual direction - there is no code path
+    # to weaken. Its discriminating power is the reverse: an implementation
+    # that started routing the declared names would fail both refutes.
+    test "the enclosing body routes the expansion root's completion, not the declared names" do
+      assert {:ok, compiled} =
+               Compiler.compile(document("signup.confirm_step_declaring"), palette(),
+                 child_use: true
+               )
+
+      # The declared names are raised, but on the `core.await` that raises
+      # them - a member two levels below the composite block's own id.
+      assert compiled.scxml =~ "done.outcome.s_blk_CS_wait.received"
+      assert compiled.scxml =~ "done.outcome.s_blk_CS_wait.timed_out"
+
+      # Nothing carries them at the composite's own expansion root, and the
+      # enclosing body's only transition out of it is the root's `done`.
+      refute compiled.scxml =~ "done.outcome.s_blk_CS_body.received"
+      refute compiled.scxml =~ "done.outcome.s_blk_CS_body.timed_out"
+      assert compiled.scxml =~ ~s(event="done.state.s_blk_CS_body" target="s_blk_ROOT__o_done")
     end
   end
 
