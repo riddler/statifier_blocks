@@ -368,6 +368,32 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute has_element?(view, ~s(.sb-gap__placeholder[phx-click]))
       end
 
+      # sb-z6vv (the operator's ruling of 2026-09-12, RQ-SF041-5): the mark
+      # above had no accessible name, so a reader heard the slot header and
+      # nothing about the arm being empty. The name is the arm's own label
+      # plus "is empty", carried by a `role="img"` span - which is why the
+      # `aria-hidden` the mark shipped with is gone: an `aria-hidden` element
+      # has no accessible name to give.
+      #
+      # Sabotage: `aria-label` dropped from the placeholder in `Slot.gap/1`
+      # (the span keeps `role="img"`). The name assertion below goes red and
+      # the test above stays green, which is what says this test alone covers
+      # the name.
+      test "an empty slot's placeholder is named for its arm", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: empty_arm_document(), profile: %{read_only?: true})
+
+        assert has_element?(
+                 view,
+                 ~s([data-slot="arm_variant_b"] > .sb-gap__placeholder[role="img"])
+               )
+
+        assert render(view) =~
+                 ~s(role="img" aria-label="When &quot;variant_b&quot; is empty")
+
+        refute has_element?(view, ~s(.sb-gap__placeholder[aria-hidden]))
+      end
+
       # The other half of the item: an editing mount renders what it rendered
       # before the placeholder existed. The suite's byte-identity oracle for
       # the unprofiled editor covers the default document; this covers the one
