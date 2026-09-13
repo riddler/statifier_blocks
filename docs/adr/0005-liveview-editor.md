@@ -11344,3 +11344,91 @@ decision 15 put it, and this Note is about what is drawn, not about who may
 write. It adds no changelog fragment and changes no code.
 
 Filed with `sb-1xjd`, campaign RF046.
+
+## Note (2026-09-13): the writer's sentence and the card's sentence are one chain, so the author's-title rung is unreachable for a composite - and `put_run/2`'s comment opens above the line the cite tidy quoted
+
+Campaign RF046, bead `sb-suao`, folding `sb-yr8c`, and recording the operator's
+ruling `RQ-SF044-18`.
+
+Nothing above this line is edited. Both items below are later dated lines: no
+rule, decision, clause or heading changes, this Note carries no `Status:` line,
+it flips nothing, it changes no code and it adds no changelog fragment. Every
+code cite below was **read at `55d31c1`** and is written anchor first, line
+second; a later reader re-locates by the anchor and not by the number.
+
+### 1. One chain, and the author's-title rung a composite cannot reach (`RQ-SF044-18`)
+
+`sb-6ykd` described a divergence between the sentence the compiler's minted
+writer produces and the sentence the editor's card draws, and `RQ-SF044-18`
+rules what the fill turned out to be: **the divergence did not exist, and the
+fill was a de-duplication.**
+
+The two halves read one chain. `StatifierBlocks.SentenceChain` carries it
+(`lib/statifier_blocks/sentence_chain.ex`), its rungs are
+`def sentence(ref, config, entry, title, type) do` (`:46`), and both callers go
+through that one function: the compiler's writer half at
+`lib/statifier_blocks/compiler.ex:1076` - under its own comment saying the two
+halves read the chain out of `StatifierBlocks.SentenceChain` rather than each
+carrying one (`:1064`) - and the card's half at
+`lib/statifier_blocks/view_model.ex:2057`. `sb-6ykd`'s PR 485, `a4ce039`
+("Draws one sentence chain for writer and card"), is the request that moved
+them onto it; before it, `view_model.ex` carried the rungs alone.
+
+The chain's last rung, `title || label`, is the **author's title**, and for a
+composite it is unreachable. `sentence/5` reaches it only when
+`Palette.declares?(ref, :sentence, 1)` is false (`sentence_chain.ex:49`), and
+every `use StatifierBlocks.Composite` module generates a `sentence/1` - the
+macro defines it (`composite.ex:342`) and then marks it overridable
+(`defoverridable sentence: 1, summary: 1, palette_entry: 0`, `composite.ex:361`),
+so the predicate is true for a composite whether or not its author wrote one.
+A composite therefore takes the declared-sentence rung or the palette label
+rung, never the author's title.
+
+**The rule: the writer's sentence and the card's sentence are the same chain,
+read from one module, and the ordering this record gives - a declared sentence
+above the author's title - stands as written.** Nothing about that ordering is
+narrowed by the rung being unreachable for one kind of block: the rungs below a
+composite's reach are what a non-composite block type takes, and the ordering is
+the record's statement about the chain, not about which blocks exercise which
+rung.
+
+`sentence_chain` is named in this file for the first time here, and so is
+`RQ-SF044-18`; nothing above is being re-read or contradicted. The enumeration
+of which callers read the chain is the compiler's own test, not a list in this
+record.
+
+### 2. `put_run/2`'s comment opens above the range the cite tidy of today quoted
+
+Item 4 of this file's cite tidy of today ("a cite tidy by addition - item 2's
+heading line, where the 'full text on the `title`' clause sits in `ADR-0002`,
+the run-pane Note's `lib/` and guide anchors re-located, and clause 1's
+rationale narrowed to what the ordering buys", `:11055`; the item is `:11134`)
+cites `put_run/2`'s comment for "the same reason for the clause rather than a
+`Map.has_key?/2` branch" and gives the range `:3470-3476` (`:11150`).
+
+That range is the **second half** of one comment block. The comment opens above
+it: at `b02909f` it opened at `editor.ex:3466`, and at `55d31c1` it opens at
+`editor.ex:3489`, on "The run is the host's input too, and it arrives the same
+way the marks do". The half item 4 quotes - which begins "A mount at
+`run?: false` holds no run at all" and carries the reason for assigning `nil`
+rather than leaving the socket untouched - is `:3497-3506` at `55d31c1`, with
+`put_run/2`'s `@spec` at `:3508` and its first clause head at `:3509`. The cite
+beside it in the same sentence, `editor.ex:898-906`, is `:906-914` at `55d31c1`
+- opening on "`put_profile/2` leads, which is `ADR-0005`'s 2026-09-12 Note,
+clause 1" and standing above the pipeline it argues for (`:915`).
+
+Nothing item 4 narrows changes: clause 1's decision is unchanged and is what
+landed, and the comment still gives the reason item 4 says it gives. Only where
+the comment starts is named here, so a reader who follows the cite reads the
+whole of it.
+
+### What this Note does not do
+
+It decides nothing about what the editor draws. It edits no line above it, adds
+no assign, no clause and no control, moves no status line, changes no code and
+adds no changelog fragment. It takes no position on any open question this file
+carries, and none on whether any section above it is ready to flip, which
+remains the operator's. Where a record sentence and the code disagree above, the
+code is what a reader will find.
+
+Filed with `sb-suao`, campaign RF046.
