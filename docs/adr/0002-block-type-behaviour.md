@@ -11478,3 +11478,360 @@ is the code half's, for the compile refusal a user could notice, not this
 line's.
 
 Filed with `sb-9j5e`, campaign RF046.
+
+## Amendment (2026-09-13): an enclosing body selects on a declaring composite's outcome through a derived `on_<name>` slot - `C7`
+
+**Status: proposed (2026-09-13, campaign RF046, bead `sb-gu5q`, recording
+`RQ-RF046-17`).** A decision record merges at proposed under the campaign
+invariant, and this one **stays** proposed at that campaign's wrap. **Nothing
+below describes code that exists today.** `RQ-RF046-17` ruled this record
+first and named `sb-t74x` - already `C6`'s carrier - as the request that
+builds the mint half and this half together, after this section is on `main`.
+If that request finds this section wrong, it holds and reports rather than
+amending it here.
+
+**The half this section decides.** `C6` (`:11014`) decides that a declaring
+composite compiles to a state of its own and raises
+`done.outcome.<composite state id>.<name>`, and its "What `C6` does not
+decide" section says in terms, "It does not decide how an enclosing body
+selects on a composite's outcome" (`:11209-11210`), naming the shape it
+expects: "most likely an `on_<name>` slot on the declaring composite, of the
+kind `core.subchart` derives at `core/subchart.ex:227`" (`:11209-11220`).
+This section is the answer to that bullet, and it takes the shape the bullet
+named. Together the two sections close the gap campaign SF040's capture `k2`
+measured; neither closes it alone.
+
+Additive: every decision, Amendment and Note above this line stands exactly as
+it stands, and no text above this line is edited by this section. `C6` is not
+edited. One of its items is **narrowed by addition** below, which is a thing
+this section says about it and not a thing it does to it.
+
+Every `lib/` and `test/` cite below was **read at `main` `c1c1894`** and is
+written anchor first, line second - a function head, a module attribute, a
+`describe` or `test` name, a heading. A cite is re-located by that anchor and
+not by its number. Cites into this file and into `ADR-0004` are written the
+same way.
+
+### The premise this section rests on, and what is true of the code today
+
+The premise is `C6` as it landed on `main` (`1706a1d`, proposed). This
+repository lands a request by rebase, so `C6` has no merge commit: its own
+titled commit is `5af8456` and `1706a1d` is the last of that request's
+commits. Everything this section decides is stated **on top of** `C6`'s five
+items and changes none of them except item 3, which it narrows by addition.
+
+What is true of the package at `c1c1894`, and which this section changes:
+
+- Nothing derives a slot from a composite's declared outcomes.
+  `Composite.derived_slots/1` (`composite.ex:609-612`,
+  `def derived_slots(%{slots: slots})`) maps the declaration's `slots:` key
+  and reads `outcomes` not at all. It is reached from the two places a
+  composite's slot list is answered: the injected callback
+  (`composite.ex:330`, `def slots(_config), do: StatifierBlocks.Composite.derived_slots(@composite_declaration)`)
+  and the data-form's (`composite/data.ex:518`,
+  `def slots(state, _config), do: Composite.derived_slots(__composite__(state))`).
+- The only slot **derived from a config-listed outcome name** is
+  `core.subchart`'s, from that block's own config (`core/subchart.ex:192`,
+  `@slot_prefix "on_"`, used at `:224-228`, `def slots(config)`), which is
+  the precedent `RQ-RF046-17` names. `on_`-prefixed slots that a block type
+  declares outright, fed by no config, are older and are untouched by this
+  section: `core.invoke`'s (`core/invoke.ex:96`,
+  `def slots(_config), do: [{"on_error", :zero_or_one, "If it fails"}]`) and
+  `core.map`'s (`core/map.ex:299-300`, `@done_slot "on_done"` and
+  `@error_slot "on_error"`, answered at `:352-356`). `C6` states the same
+  premise without that narrowing (`:11135-11137`); the sentence is `C6`'s
+  and is not edited here.
+- The compiler read this section rests on is `unhandled?/2`
+  (`compiler.ex:2411-2416`, `defp unhandled?(%Resolved{slots: slots}, outcome) do`),
+  reached from `node_failures/1` (`compiler.ex:2398-2408`,
+  `defp node_failures(%Resolved{block: block, module: module, slots: slots} = node) do`)
+  and consumed by `propagation_transitions/2` (`compiler.ex:2424`,
+  `defp propagation_transitions(pairs, final_id) do`). It is not a claim
+  about every place the package names an `on_`-prefixed slot.
+- The handled-outcome comment (`compiler.ex:2326-2336`,
+  `# **Handled** is a property of the failing block`) still reads as `C6`
+  quotes it: "`Emit.chain/2` wires a container's children on
+  `done.state.<child>`, which fires for every final a child can reach, and no
+  core container emits a transition selected by
+  `done.outcome.<child>.<outcome>`" (`compiler.ex:2330-2332`). `Emit.chain/2`
+  is `core/emit.ex:220-232`, `def chain(summaries, exit_target) do`.
+
+### `C7`. A composite that declares `outcomes` derives one `on_<name>` slot per declared name, and the declared outcome's continuation runs in it
+
+**1. The slot, and where it sits in the list.** A composite whose declaration
+carries the `outcomes` key of `C1` (`:10074`) derives one slot per declared
+name: named `on_` followed by the outcome name, arity `zero_or_one`, labelled
+from the outcome's own label. That is `core.subchart`'s entry verbatim in
+kind - `config |> outcome_names() |> Enum.map(&{@slot_prefix <> &1, :zero_or_one, slot_label(&1)})`
+(`core/subchart.ex:224-228`) - and `zero_or_one` is taken for that block's
+stated reason: an outcome path is one continuation, not a list of them, and an
+author who wants several steps there puts a `core.sequence` in it.
+
+The list a composite answers is the declaration's `slots:` entries **first**,
+in declaration order, then the derived `on_<name>` entries, in the order
+`outcomes` declares them. The structural slots are what the composite is made
+of and are what an author reading the block sees first; the outcome slots are
+what happens after it finishes. Fixing the order here rather than leaving it
+to the builder is what keeps an existing declaring composite's drawn slots
+where they were: every entry that exists today keeps its position, and the new
+ones are appended.
+
+The surface that grows is `Composite.derived_slots/1` or a sibling derivation
+beside it, reached from the two call sites named above; which of the two it is
+belongs to the request that builds this. `outcomes/1` is untouched and still
+answers `[outcome_decl()]` (`composite.ex:339`,
+`def outcomes(config), do: StatifierBlocks.Composite.derived_outcomes(__MODULE__, config)`),
+no `t:StatifierBlocks.BlockType` callback changes shape, none is added, no
+return widens, and `D13` (`:725`, "**D13: outcome paths are slots, never
+ports.**") stands: what this section adds is a slot.
+
+**2. A declaration that names a pass-through slot after one of its own
+declared outcomes is refused.** A composite's `slots:` entries are not slots
+of the composite's compiled state, and this section's derived slots are. Each
+`slots:` entry is a **pass-through slot**: the declaration type forces a
+`to: {local_id, inner_slot}` (`composite.ex:239-244`,
+`@type pass_through_decl :: %{`, documented at `:231-233` as "a slot the
+composite exposes, and the `{local_id, inner_slot}` of the expansion member
+its children are spliced into"), `check_mapping!/3` (`composite.ex:1102`,
+`defp check_mapping!(subtree, slots, ref) do`) refuses a declaration whose
+mapping does not fit its own subtree, and `splice/3` (`composite.ex:1120`,
+`defp splice(members, %Block{} = block, slots) do`) moves the author's
+children into the mapped member's inner slot at Resolve. By the end of that
+stage those children are a **member's** children, chained by the container
+that holds them - `ADR-0004`'s `T1`, "The children are spliced into the
+mapped inner slot at Resolve"
+(`docs/adr/0004-compiler-provenance.md:3241`).
+
+So the two kinds of slot are not interchangeable and one name cannot mean
+both. A slot this section derives holds a continuation that runs **inside the
+composite's own state** and is reached from a declared outcome; a
+pass-through slot holds children that are spliced **into a member** before
+the composite's state exists. Routing a declared outcome into a pass-through
+slot's children would point into a member's subtree, and the completion
+transition item 3 puts on that child would be a second one on a block
+`Emit.chain/2` has already wired.
+
+The rule is therefore a **refusal, not a precedence**: a declaration whose
+`slots:` names an entry `on_<name>` for a name its own `outcomes` declares is
+refused where the declaration is checked against itself, in the manner
+`check_mapping!/3` already refuses a pass-through declaration that does not
+fit its subtree - a raise naming the colliding slot, against the declaration.
+It is **not** a finding on a document: this section adds no chart finding,
+and the person who can fix this is the one writing the composite, not the one
+drawing with it. Where that check sits is the building request's to place.
+
+Two things this does not reach. A pass-through slot named `on_<something>`
+for a name the declaration does **not** carry in `outcomes` is untouched and
+keeps its pass-through meaning; and a composite that declares no `outcomes`
+is untouched entirely (`C3`, `:10155`). The refusal is also what keeps the
+answered slot list free of a repeated name, which both the editor's slot
+build (`view_model.ex:1996`,
+`declared = Palette.call(ref, :slots, [config], [])`, through
+`view_model.ex:2016` and `:2047`, `slots = declared_slots ++ extra_slots`)
+and the compiler's `List.keyfind/3` read (`compiler.ex:2411-2416`) assume.
+
+**3. An occupied slot's child runs inside the composite's own state, before
+that outcome's final.** The route this section decides is `core.subchart`'s,
+which is what `RQ-RF046-17` named:
+
+- With the slot **empty**, the declared member outcome reaches the matching
+  composite final directly and the enclosing body continues on the composite's
+  completion, exactly as `C6` item 3 (`:11113`) says. Nothing changes for an
+  author who fills no outcome slot.
+- With the slot **occupied**, the declared member outcome reaches the child
+  filling that outcome's slot instead, and that child's completion reaches the
+  same composite final. The final is reached either way, so the composite's own
+  `done.outcome.<composite state id>.<name>` is raised either way, after the
+  continuation rather than instead of it.
+
+That is `core.subchart`'s shape line for line: `route/4`
+(`core/subchart.ex:474-483`, `defp route(context, name, final, declared) do`)
+targets `child.state_id` when the outcome's slot holds a child and the
+outcome's own `final` when it does not, and `slot_children/1`
+(`core/subchart.ex:534`, `defp slot_children(routes) do`) emits, per occupied
+slot, a transition on the child's own done event to that same final. The slot
+child is a child of the block's own state there, and it is a child of the
+composite's state here, for the reason the shape exists: a continuation that
+ran beside the composite rather than inside it would run after the composite
+had already finished, and the enclosing body would have moved on.
+
+**This narrows `C6` item 3 by addition.** Item 3 reads "A member final that
+raises `done.outcome.<member state id>.<name>` for a name the composite
+**declares** transitions to that composite final" (`:11113`). Read with this section: to that composite final, or, when that outcome's slot
+is occupied, to the child filling it, whose completion then reaches that
+final. Item 3's next sentence, "The member keeps its own final and its own
+event; the composite final is reached from it" (`:11115-11116`), reads with
+this one the same way: the member keeps its own final and its own event
+either way, and the composite final is reached from the member directly when
+the slot is empty and from the slot child when it is not. No word of item 3
+is edited. Its preemption of the chain is untouched: a declared member
+outcome finishes the composite, through the slot when there is one in the
+way, and it does not carry the expansion onward.
+
+**Why the route is taken before the final and not on the composite's own
+outcome event.** A transition on the composite's state selected by
+`done.outcome.<composite state id>.<name>` is selectable - the composite's
+state is still in the configuration when its final child is entered - and it
+is still the wrong place to route. Two reasons. The composite final for
+`<name>` is where that outcome **ends**, so a route that ran a continuation
+and then returned to that final would raise the outcome's event again, and
+again after that. And the precedent `RQ-RF046-17` names routes before the
+final rather than after it (`core/subchart.ex:474-483`), which is what makes
+an occupied slot and an empty one reach the same final and makes the
+composite's completion mean the same thing either way.
+
+**How this section reads the ruling.** `RQ-RF046-17` says "the enclosing body
+routes `done.outcome.<composite state>.<name>` through it". This section
+reads that as naming the **route**, not its emitter: under it the composite
+routes the declared member outcome through the slot itself, and its own
+outcome event fires after the continuation rather than being what the route
+selects on. The reading is stated here so that a later reader finds it rather
+than reconstructs it. The ruling's other clause, "of the kind
+`core.subchart` derives", is the shape this section takes, and `C6` item 2 is
+unchanged: the event it mints through `Context.outcome_id/2`
+(`compiler/context.ex:244-245`,
+`def outcome_id(%__MODULE__{block_id: block_id}, outcome)`) is still raised
+and stays the composite's addressable completion, for a host or an enclosing
+document that wants to select on it directly. What this section adds is the
+slot the package routes it through, so that an author does not have to.
+
+**4. Provenance, and whose bytes are whose.** The slot child's own bytes are
+the child block's and keep the stamps `ADR-0004`'s `T2`, `T3` and `T4`
+(`docs/adr/0004-compiler-provenance.md:3286`, `:3318`, `:3371`) give them; `T1`
+(`:3241`) is narrowed no further here than `C6` item 5 (`:11156`) already
+narrowed it. The transition out of the slot child to the composite final is
+stamped to the **slot child**, following `Emit.chain/2`'s rule and
+`core.subchart`'s own (`core/subchart.ex:534`, where that transition is
+attributed to the child). The transition this section retargets - the one
+`C6` item 3 puts on the declared member outcome - keeps whatever stamp `C6`'s
+code half gives it; only its target moves. `ADR-0004`'s decision 5,
+"The provenance map is keyed two ways, because it answers two different
+questions" (`docs/adr/0004-compiler-provenance.md:206-211`), stays total over
+the bytes this section adds.
+
+**5. The failure propagation reads these slots like any other block's, and
+this section classes nothing.** `unhandled?/2` (`compiler.ex:2411-2416`) asks
+whether the block's slots hold a child under `"on_" <> outcome`. Once a
+declaring composite answers `on_<name>` slots, that read covers a composite
+without a line of change: a declared outcome whose slot is occupied is
+handled, and one whose slot is empty is not, which is the rule every other
+block type already follows.
+
+What that reaches, and what it does not. `node_failures/1`
+(`compiler.ex:2398-2408`) reaches `unhandled?/2` only for a name
+`BlockType.failure_outcomes/2` (`block_type.ex:933`,
+`def failure_outcomes(ref, config) do`) returns, and the composite macro
+derives no `failure_outcomes/1`: "`fixtures/0`, `failure_outcomes/1` and
+`donedata_type/1` are not derived - they stay optional and absent unless a
+declaration writes them by hand" (`composite.ex:104-105`). A composite whose
+module writes none classes nothing, and for it this rule is inert.
+
+A composite whose module **does** write `failure_outcomes/1` by hand is the
+case this section gives an effect, and it is stated here rather than left to
+be found: once these slots exist, such a composite's declared failure-classed
+name is handled when its slot is occupied and unhandled when it is empty,
+where today it has no such slot and is unhandled always. That is the rule
+every other block type already follows, reaching a composite for the first
+time.
+
+What stays open is the **derivation**: whether a composite's declared
+`outcomes` may class a name as a failure without the module writing
+`failure_outcomes/1` by hand, and whether such a slot takes the `:failure`
+slot style `core.subchart` gives `on_error` (`core/subchart.ex:379`,
+`slot_style: %{(@slot_prefix <> @error_outcome) => :failure}`). `C6`'s second
+"does not decide" bullet (`:11194`) leaves that open and this section leaves
+it open too.
+
+**6. A name the declaration does not carry gets no slot and no route.** A
+member completion whose name the declaration does not name mints no
+`on_<name>` slot, is routed nowhere by this section, and raises no finding:
+`C6` item 4 (`:11144`) and item 1 of the Note of 2026-09-13 (`:10563`) stand
+exactly as written.
+
+**7. The version moves at the release, not in the request that builds this.**
+An occupied outcome slot moves emitted bytes, so `@compiler_version`
+(`compiler.ex:409`, `@compiler_version "0.29.0"`) bumps under `ADR-0004`'s
+obligation on itself, "any change to emission that moves bytes bumps it - a
+release-discipline obligation this record creates on itself"
+(`docs/adr/0004-compiler-provenance.md:260-261`). In campaign RF046 that bump
+is the `0.30.0` release prep's, as it is for `C6`: not this record's, and not
+the building request's.
+
+### What this changes in the handled-outcome comment, and who changes it
+
+The clause `C6` quotes and this section makes false is the last one:
+"no core container emits a transition selected by
+`done.outcome.<child>.<outcome>`" (`compiler.ex:2330-2332`). `C6`'s item 3
+already emits such a transition for a declaring composite, and this section
+decides where it points; a declaring composite is the first thing in the
+package that a container selects on by a child's outcome. The sentence above
+it - "the block's type declares an `on_<outcome>` slot for that outcome and
+the document put a child in it" - stays true and now covers a composite as
+well. Rewriting that comment belongs to the request that builds this, in that
+same request, not to this section: this one touches `docs/adr/` and nothing
+else.
+
+### The measurement this closes
+
+`C6` names it (`:11049`): campaign SF040's capture `k2` found that "every
+use-form composite there raises `done` and only `done`, so a `went_back`
+outcome the subtree does raise reaches no outcome slot in the enclosing body,
+and pressing Back moves the path forward instead of back" (`:10069-10072`),
+and Riddler's ruling `R12.3` names the same shape from the other side. With
+`C6` the outcome is raised on the composite's own state; with this section
+there is a slot for it and the package routes it. The examples app's screen
+composite declares `went_back`, an author drops the blocks that go back into
+its `on_went_back` slot, and Back goes back. In this package the same is true
+of the `k2` fixture's `on_received` and `on_timed_out`. Neither half is a
+measurement on its own; the pair is.
+
+### What builds this, and what it is asked to prove
+
+`sb-t74x` carries the code for both halves. This section asserts rules and
+delegates every enumeration to the tests that request writes; it names no
+count of call sites and claims no complete list over the package. Those tests
+are named here by intent, not by file:
+
+- a declaring composite's answered slot list carries the derived `on_<name>`
+  entries, after the entries its `slots:` declares;
+- a declaration whose `slots:` names a pass-through slot `on_<name>` for a
+  name its own `outcomes` declares is refused, and one naming a name its
+  `outcomes` does not declare is not;
+- a declared outcome whose slot is **occupied** routes into the child, and the
+  child's completion reaches the composite final for that name;
+- a declared outcome whose slot is **empty** reaches that final directly, and
+  such a composite compiles as `C6` alone would compile it;
+- a member completion the declaration does not name mints no slot;
+- the provenance map stays total over the bytes an occupied outcome slot adds.
+
+The pin `C6` names - the `describe` "C5: the declared list is an authoring
+answer, not a compiled route"
+(`test/statifier_blocks/composite/declared_outcomes_test.exs:971`), over the
+fixture `document("signup.confirm_step_declaring")` (`:450-455`, `defp document(type, id \\ "blk_CS")`,
+whose composite is declared at `:115-127` with `outcomes: ["timed_out", "received"]`) -
+is the same pin here, and it is `sb-t74x`'s to move. This section names it and
+does not dictate its lines.
+
+### What `C7` does not decide
+
+- It does not decide which of a composite's declared names are
+  failure-classed, or the slot style such a name's slot takes. Item 5 above
+  says so; `C6`'s second "does not decide" bullet (`:11194`) is unchanged.
+- It adds no finding on a **document**, of any kind. Item 6 says so where a
+  reader would look for one, and item 2's refusal is against a
+  **declaration**, which is the composite author's error and not the document
+  author's.
+- It does not change any `t:StatifierBlocks.BlockType` callback's shape, add a
+  callback, or widen a return. `D13` (`:725`) stands.
+- It changes nothing for a composite that declares **no** `outcomes`: `C3`
+  (`:10155`) holds, and such a composite compiles byte-identically to today.
+- It does not decide how an `on_<name>` slot is **drawn** beyond "as any slot
+  the type's slot list answers is drawn". The editor builds a slot per
+  answered entry already (`view_model.ex:1989`, `defp build_resolved_node(`,
+  through `:1996` and `:2016`), and `outcome_names/3` (`editor.ex:3211`,
+  `defp outcome_names(%Palette{} = palette, ref, %Block{} = resolved) do`) is
+  already composite-aware, so no editor change is asked for by this section.
+- It does not reach the examples app's own composite declaration, which is
+  that repository's request, nor the `outcome_of:` amendment (`:9181`).
+
+Filed with `sb-gu5q`, campaign RF046.
