@@ -11421,3 +11421,60 @@ code is what a reader will find; each such place is dated here rather than
 rewritten there.
 
 Filed with `sb-suao`, campaign RF046.
+
+## Note (2026-09-13): a raw C0 control character in a `{"const", value}` capture literal is refused at compile, on XML 1.0 grounds
+
+The Note above this one ("the printable-ASCII narrowing of a `{"const", value}`
+string was never this record's, and it has ended", `:10864`) ended the interim
+narrowing and took no position on control characters. This line records the
+position now taken, and it is the whole of what it does.
+
+**A `core.on_event` `capture` literal carrying a raw C0 control character - any
+codepoint below `U+0020` other than tab (`U+0009`), line feed (`U+000A`) and
+carriage return (`U+000D`) - is refused by `validate_config/1` as a finding on
+the `capture` key, and the ground is XML 1.0 and nothing else.** A literal is
+emitted as a predicator literal expression inside an `<assign expr=...>`
+attribute value, and `escape/1` rewrites exactly those three characters as the
+escapes predicator's lexer decodes
+(`lib/statifier_blocks/core/on_event.ex:1142`, `defp escape(value) do`, read at
+`cbc26d2`, the code half of this request, which lands in the same pull request
+as this line). Every other C0 control reaches the attribute raw, and XML 1.0
+admits no character below `U+0020` in an attribute value at all (5th edition,
+the `Char` production). Saxy parses one back today; a parser's tolerance is not
+the wire format's contract, so the document is refused rather than emitted.
+
+The now-closed predicator-truncation ground is **not** the reason. Predicator
+`9.4.1` round-trips these bytes whole, which is exactly why nothing else
+catches them, and `N1` of the Note of 2026-09-12 (`:10292`) is not narrowed by
+type: every JSON type it admits is still admitted, and a string is still
+admitted whatever it carries apart from this one class of character.
+
+The code, read at `cbc26d2` and written beside the anchor each was found by:
+the refusal is `control_finding/2` (`:501`, `defp control_finding(findings,
+capture) do`), reached from `check_capture/2`'s map arm (`:463`,
+`control_finding(findings, capture)`); the walk is `control_codepoint/1`
+(`:509`) and follows `literal/1`'s own, into a list and into a map's **keys** as
+well as its members, because `literal/1` spells a key with the same function it
+spells a string with; the test is `control?/1` (`:532`, `defp
+control?(codepoint), do: codepoint < 0x20 and codepoint not in [?\t, ?\n,
+?\r]`); the message is `control_message/1` (`:534`) and names the offending
+codepoint, because the character prints as nothing and its position is all an
+author has to go on. The enumeration of what is refused and what is admitted is
+the suite's, not this file's:
+`test/statifier_blocks/core/on_event_test.exs:269` ("refuses a raw control
+character inside a literal, and admits tab, LF and CR") and `:301` ("names the
+offending codepoint, and the XML ground, in the control-character message"),
+both read at `cbc26d2`.
+
+Two things this line does not do. It takes no position on a control character
+in the **path** form of a capture source: a path is already refused for
+carrying whitespace, and what an otherwise-shaped path spells is `path?/1`'s
+question. And it decides nothing about `U+007F` or the C1 range, which XML 1.0
+admits in an attribute value and which this refusal therefore leaves alone.
+
+It edits no line above it, adds no config key, no callback, no field type and
+no status line, and flips nothing. The changelog fragment this request carries
+is the code half's, for the compile refusal a user could notice, not this
+line's.
+
+Filed with `sb-9j5e`, campaign RF046.
