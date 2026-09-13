@@ -11011,16 +11011,29 @@ not reach.
 
 Filed with `sb-xoll`, campaign SF044.
 
-## Amendment (2026-09-13): a composite's declared outcomes are routable by the enclosing body - `C6`
+## Amendment (2026-09-13): a composite's declared outcomes are raised by the composite itself, which is what makes them reachable by the enclosing body - `C6`
 
 **Status: proposed (2026-09-13, campaign RF046, bead `sb-3vug`, recording
 `RQ-RF046-2`).** A decision record merges at proposed under the campaign
 invariant, and this one **stays** proposed at that campaign's wrap. **Nothing
 below describes code that exists today.** `RQ-RF046-2` ruled the record first
-and named `sb-t74x` as the bead that builds it, in the same campaign but as a
-separate request; flipping this section to accepted is a later gated request
+and named `sb-t74x` as the request that builds it, in the same campaign but
+separately - the way the Amendment of 2026-09-12 (`:9998`) names its own
+carrier; flipping this section to accepted is a later gated request
 through the same `docs/adr/` gate. If the code half finds this section wrong,
 it holds and reports rather than amending it here.
+
+**The half this section decides, said plainly.** `k2`'s gap has two halves: a
+declared outcome must be **raised by the composite**, and something in the
+enclosing body must **select on** it. `C6` decides the first half only. After
+it, a declared outcome is raised on the composite's own state id, in the same
+`done.outcome.<state id>.<name>` shape every other block type's outcome
+already has, instead of appearing only on the member that reaches it. What
+selects on that event - an `on_<name>` slot on the declaring composite, of the
+kind `core.subchart` derives, or a container rule - is **not decided here**,
+and no such slot is derived for a composite today. The last section of this
+Amendment names that as the open half. A reader who wants the whole of `k2`
+closed needs this section and the record that answers the selection half.
 
 Additive: every decision, Amendment and Note above this line stands exactly as
 it stands, and no text above this line is edited by this section. In
@@ -11049,7 +11062,7 @@ nothing more:
   (`docs/adr/0004-compiler-provenance.md:3241`).
 - What the enclosing body therefore routes on is the **expansion root's**
   completion. The rule is stated in the handled-outcome comment at
-  `compiler.ex:2330-2331`: "`Emit.chain/2` wires a container's children on
+  `compiler.ex:2330-2332`: "`Emit.chain/2` wires a container's children on
   `done.state.<child>`, which fires for every final a child can reach, and no
   core container emits a transition selected by
   `done.outcome.<child>.<outcome>`" (`Emit.chain/2` is
@@ -11062,7 +11075,7 @@ running document, and this file already records it under the Amendment of
 2026-09-12: "every use-form composite there raises `done` and only `done`, so a
 `went_back` outcome the subtree does raise reaches no outcome slot in the
 enclosing body, and pressing Back moves the path forward instead of back"
-(`:10068-10070`). Riddler's ruling `R12.3` names the same shape from the other
+(`:10067-10070`). Riddler's ruling `R12.3` names the same shape from the other
 side: a Back button records `went_back` as an outcome the enclosing body can
 route. A composite is the unit a host puts in front of an author, and it is the
 one block type that cannot say how it finished. `C6` decides that it can.
@@ -11090,22 +11103,43 @@ through the context", and at `outcome_id(block_id, outcome) = state_id(block_id,
 concatenation" (`docs/adr/0004-compiler-provenance.md:940`, `:946`, `:950`). Each
 such final raises `done.outcome.<composite state id>.<name>` from its
 `<onentry>`, which is the vocabulary this file has used for an outcome's
-completion event throughout (`:3876`). The enclosing body then routes the
-composite exactly as it routes any other block that declares more than one way
-to finish.
+completion event throughout - "is reached from `done.outcome.<root state id>.<outcome>`
+like any other" (`:3876`). That event is what makes the composite's completion
+addressable in the chart the way any other block type's outcome is, on the
+block's own state id rather than on whichever member happened to reach it.
+What selects on it in an enclosing body is the half this section does not
+decide.
 
 **3. A declared member outcome transitions to the matching composite final.** A
 member final that raises `done.outcome.<member state id>.<name>` for a name the
 composite **declares** transitions to that composite final. The member keeps its
-own final and its own event; the composite final is reached from it. This is
-what wires the `on_<name>` slot the editor already draws for a declared name:
-`outcomes/1` has answered the declared list since 0.28.0 by way of
-`outcomes_over/3` (`composite.ex:819`,
+own final and its own event; the composite final is reached from it. The
+declared list this reads is the one `outcomes/1` has answered since 0.28.0 -
+`def outcomes(config), do: StatifierBlocks.Composite.derived_outcomes(__MODULE__, config)`
+(`composite.ex:339`), through `outcomes_over/3` (`composite.ex:819`,
 `defp outcomes_over(%Palette{} = palette, %Block{} = block, ref) do`, spec at
-`:818`, called from `:724` and `:736`), and after this section that slot is
-wired exactly as a non-composite block's slot is. No new slot vocabulary
-appears; `D13` (`:725`, "**D13: outcome paths are slots, never ports.**")
-stands.
+`:818`, called from `:724` and `:736`).
+
+That transition **preempts the chain**. `Emit.chain/2` wires a member's final
+onward to the next member of its container; for a member final that raises a
+name the composite declares, the transition to the composite final is the one
+emitted and the chain transition out of that member is not. A declared member
+outcome **finishes the composite**; it does not carry the expansion onward.
+That is the same thing item 4 says from the other side, and it is a change in
+emitted bytes, which is why item 5 moves the version.
+
+**No slot is minted here, and none exists today.** `C6` mints the event, not a
+slot. No composite derives an `on_<name>` slot from its declared outcomes:
+`Composite.derived_slots/1` (`composite.ex:609-612`,
+`def derived_slots(%{slots: slots})`) maps the `slots:` declaration key and
+mints nothing from `outcomes`, and the only `on_`-prefixed slot minting in
+`lib/` is `core.subchart`'s, from that block's **own** config
+(`core/subchart.ex:192`, `@slot_prefix "on_"`, used at `:227`); the compiler
+reads such a slot at `compiler.ex:2412`,
+`case List.keyfind(slots, "on_" <> outcome, 0) do`. No new slot vocabulary
+appears, and `D13` (`:725`, "**D13: outcome paths are slots, never ports.**")
+stands untouched - which is also why the selection half, when it is decided,
+is expected to be a slot.
 
 **4. A completion the declaration does not name does not finish the composite.**
 The declared list is the composite's complete set of ways to finish. A member
@@ -11170,32 +11204,54 @@ Nothing else in `C5` is narrowed. Its second and third bullets
 - It does not reach the `outcome_of:` amendment (`:9181`), which lets a member
   name another member's outcome inside a config value. Both remain proposed and
   neither builds the other.
-- It states no rule for a composite that declares **no** `outcomes`: `C3`
+- It changes nothing for a composite that declares **no** `outcomes`: `C3`
   (`:10155`) holds, and such a composite compiles byte-identically to today.
+- **It does not decide how an enclosing body selects on a composite's
+  outcome.** That is the other half of `k2`'s gap, and it is open. No
+  `on_<name>` slot is derived for a declaring composite today, and the
+  handled-outcome comment this Amendment quotes (`compiler.ex:2330-2332`)
+  still reads as written: no core container emits a transition selected by
+  `done.outcome.<child>.<outcome>`. So after `C6` and its code half, a
+  declared outcome is raised on the composite's own state and an author may
+  address it, but nothing in this package selects on it for them. Deciding
+  the selection mechanism - most likely an `on_<name>` slot on the declaring
+  composite, of the kind `core.subchart` derives at `core/subchart.ex:227` -
+  adds public surface this section is not scoped to add, and it is named here
+  as the record question that must follow.
 
-### What builds this, and the pin that flips
+### What builds this, and the pin that moves
 
-`sb-t74x` carries the code. This section asserts rules and delegates every
-enumeration to the tests that bead writes; it names no count of call sites and
-claims no complete list over the package. Those tests are named here by intent,
-not by file: one final per declared name; a declared member outcome routes to
-the matching composite final; a completion the declaration does not name does
-not finish the composite; and the provenance map stays total over the bytes
-this section adds.
+The code half named in the status line above carries the code. This section
+asserts rules and delegates every enumeration to the tests that request writes;
+it names no count of call sites and claims no complete list over the package.
+Those tests are named here by intent, not by file: one final per declared name;
+a declared member outcome reaches the matching composite final and not the
+chain; a completion the declaration does not name does not finish the
+composite; and the provenance map stays total over the bytes this section adds.
 
-One existing test is the pin that flips, and it was written to flip. The
-`describe` "C5: the declared list is an authoring answer, not a compiled route"
+One existing test is the pin, and it was written to move. The `describe`
+"C5: the declared list is an authoring answer, not a compiled route"
 (`test/statifier_blocks/composite/declared_outcomes_test.exs:972`) holds a
 single test, "the enclosing body routes the expansion root's completion, not
 the declared names" (`:996`), over the fixture
 `document("signup.confirm_step_declaring")` (`:998`). Its own comment says what
-it is for: "this test is what will go red when one is" - when a decision closing
-`k2`'s gap is taken. Three of its lines move when `sb-t74x` lands: the two
-refutes on `done.outcome.s_blk_CS_body.received` and `.timed_out`
-(`:1009-1010`), which become asserts, and the assert on
+it is for: "this test is what will go red when one is" - when a decision
+closing `k2`'s gap is taken.
+
+**Which of its lines move, exactly.** The fixture's composite block id is
+`blk_CS` and its expansion members carry ids minted beneath it, so the test's
+`s_blk_CS_body` is the **expansion root's** state and `s_blk_CS_wait` the
+awaiting member's. `C6` mints on the composite **block's** id - `s_blk_CS` -
+so the two refutes on `done.outcome.s_blk_CS_body.received` and `.timed_out`
+(`:1009-1010`) stay **true**: the expansion root still raises no declared name.
+What stops holding is the assert on
 `event="done.state.s_blk_CS_body"` reaching `s_blk_ROOT__o_done` (`:1011`),
-which is the routing this section replaces. The comment above the `describe` is
-rewritten in that same request to cite `C6`. None of that happens here: this
-request touches `docs/adr/` and nothing else.
+because after this section the enclosing body's transition leaves the
+composite's own state and not the expansion root's, and the two asserts above
+it on `done.outcome.s_blk_CS_wait.*` (`:1004-1005`) are joined by the
+composite's own `done.outcome.s_blk_CS.*`. The code half rewrites the
+`describe`'s comment to cite `C6` in that same request and settles the exact
+assertions there; this section names the test and does not dictate its lines.
+None of that happens here: this request touches `docs/adr/` and nothing else.
 
 Filed with `sb-3vug`, campaign RF046.
