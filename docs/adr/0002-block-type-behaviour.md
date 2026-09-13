@@ -10886,20 +10886,38 @@ that anchor and never by its number.
 `StatifierBlocks.Core.OnEvent`'s private `spellable?/1` is the gate `source?/1`
 puts in front of `literal/1` (`core/on_event.ex`, `@spec` at `:1099`, the
 binary head at `:1100`, the catch-all at `:1110`, called from
-`defp source?([@const_tag, value]), do: spellable?(value)` at `:478`). Before
-this request its binary clause read `spellable_string?(value)`, and that
-private predicate admitted a byte only in `0x20..0x7E` or in `[0x09, 0x0A,
-0x0D]` - printable ASCII, tab, newline, carriage return. A `capture` pair whose
-literal carried anything else was a **malformed pair**, refused on the
-`capture` key by `capture_message/0` (`:485`), whose text named the restriction.
+`defp source?([@const_tag, value]), do: spellable?(value)` at `:478`).
+
+The before-state cites in the rest of this section are read at `f4b4425`, the
+commit this request is built on, and are labelled so rather than at the code
+commit above: the text they describe is gone from that commit by construction.
+At `f4b4425` `spellable?/1`'s binary clause read
+`defp spellable?(value) when is_binary(value), do: spellable_string?(value)`
+(`core/on_event.ex:1102`), and the private `spellable_string?/1` it called
+(`@spec` at `:1116`, head at `:1117`) admitted a byte only in `0x20..0x7E` or
+in `[0x09, 0x0A, 0x0D]` - printable ASCII, tab, newline, carriage return. A
+`capture` pair whose literal carried anything else was a **malformed pair**,
+refused on the `capture` key by `capture_message/0` (`:484` at `f4b4425`,
+`defp capture_message do`), whose text then read "carrying no text outside
+printable ASCII, tab, newline and carriage return".
 
 The restriction was a measurement of one dependency version, not a rule. It was
 earned while predicator 9.4.0's string lexer read a string literal codepoint by
 codepoint and wrote each one back as a single **byte**: a literal spelling
 `café` reached the datamodel as `<<99, 97, 102, 233>>`. Emitting such a literal
 would have written a value the document did not carry, which is the one thing
-`N1` says the spelling must never do, so the narrowing was the conservative
-reading of `N1`'s own escape clause rather than a defiance of it.
+`N1` says the spelling must never do.
+
+That is why the narrowing was taken, and it is not a reading `N1`'s escape
+clause licensed. The clause covers "a type this arm admits [that] cannot be
+spelled as one", and it permits exactly one response: "that bead holds and
+reports rather than narrowing this Note from inside its own request"
+(`:10322-10325`). `sb-m6ru` neither held nor reported, and what it narrowed was
+not a type but a subset *within* the string type - which is the case the
+clause's last words name outright. The motive was sound and the alternative
+was worse, but the clause said to report and the request shipped instead. That
+is precisely why the narrowing needed a dated Note to end it rather than a
+silent widening of the code.
 
 It was also invisible to the suite in one direction, and that is the part worth
 recording. Every round trip the code carried exercised only values
@@ -10919,7 +10937,8 @@ predicator 9.4.1 reads a string literal back whole. As of `f62e866`:
 - `capture_message/0` (`:485`) names the JSON types and says nothing about
   ASCII.
 - The moduledoc paragraph that carried the restriction says instead that what
-  is refused is a matter of **type** alone.
+  is refused is a matter of **type** alone (`core/on_event.ex:160`, "What is
+  refused is a matter of TYPE alone").
 
 So the arm is what `N1` says it is: a string literal is admitted whatever it
 carries, and what `spellable?/1` still refuses is a float (which reaches this
@@ -10930,10 +10949,16 @@ escape clause it wrote for `sb-m6ru` is spent.
 
 ### 3. The floor is `~> 9.4.1`, and it is a requirement stated for a behaviour
 
-`mix.exs:191` requires `{:predicator, "~> 9.4.1"}`, with the argument beside it
-from `:164`. This is the first requirement this package states for a
-*behaviour* rather than for a module it names: by modules alone `~> 9.0` would
-still suffice, because every predicator module named here shipped in 9.0.0.
+`mix.exs:191` requires `{:predicator, "~> 9.4.1"}` (the requirement line
+itself), with the argument beside it from `:164` ("# The floor is 9.4.1, and
+the reason is this package's own capture literals rather than a module it
+names"). It is a requirement stated for a *behaviour* rather than for a module
+it names: by modules alone `~> 9.0` would still suffice, because every
+predicator module named here shipped in 9.0.0. It is not the first such
+requirement in this file - the `{:statifier_datamodel, "~> 0.4"}` floor
+(`mix.exs:158`, argument from `:135`) is raised the same way, on what 0.4.0's
+`{:shape, members}` term can do rather than on a module the package names
+("0.3 resolves and then has no such inhabitant at all").
 What raises it is that `OnEvent` emits a `capture` literal as a predicator
 string literal and the engine reads it back into the datamodel, so a lexer that
 returns the whole of a string is now something this package **needs** - and a
@@ -10957,16 +10982,19 @@ resolved rather than for a documented grammar.
 
 Pinned back to predicator 9.4.0, with the dependency recompiled for
 `MIX_ENV=test` before and after the revert, that test goes red with the literal
-read back as its bytes, and the type round trip at `:783` goes red on `"café"`
-for the same reason. Those two, and only those two: nothing else in the suite
+read back as its bytes, and the type round trip at `:783`
+(`test "reads back the document's own value, for each type it admits"`) goes
+red on `"café"` for the same reason. Those two, and only those two: nothing else in the suite
 answers for the floor. The 4-byte codepoint is in it deliberately - a
 byte-at-a-time write-back mangles a 2-byte and a 4-byte character alike, but
 only the second also rules out a lexer that learned Latin-1 and stopped there.
 
-`:163` ("accepts a literal source in each JSON type a document may carry") now
-asserts the strings the narrowing refused, and `:220` (the malformed-form
-refusals) no longer lists any string at all; `:256` refutes `ASCII` in the
-message.
+`:163` (`test "accepts a literal source in each JSON type a document may carry"`)
+now asserts the strings the narrowing refused, and `:220`
+(`test "rejects a tagged source that is not the two-element const form"`, the
+malformed-form refusals) no longer lists any string at all; `:261`
+(`refute message =~ "ASCII"`, inside the message test whose head is `:256`)
+holds the message to it.
 
 ### What this Note does not do
 
