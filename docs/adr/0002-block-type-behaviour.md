@@ -10719,3 +10719,144 @@ rather than the chip's own full translated text, and `C1`'s clause governs
 unchanged for every chip that is clipped but not translated. Nothing of `C1`
 is edited for it; this line is the pointer so a reader of `C1` finds the
 narrowing.]
+
+## Note (2026-09-13): a cite tidy by addition - the item 3 quote's range, the capture Note's `core/on_event.ex` and `statifier_examples` anchors, the two supersession anchors `N3` left at heading level, and five re-anchorings on this file's other Note of today
+
+Campaign SF044, bead `sb-l2jn`, folding `sb-3lxm`, `sb-vag4` and `sb-aqde`, and
+taking item 1 of `sb-uoo5`. It also answers the five cite advisories the
+direction review of `sb-k7nf` left on this file's Note of 2026-09-13 (`:10544`).
+
+Nothing above this line is edited. Every correction below is a later dated line:
+no rule, decision, clause or heading changes, this Note carries no `Status:`
+line, and it flips nothing. Every cite below was read at `b02909f` - and the one
+`statifier_examples` cite at that package's `20ae6fb` - and is written anchor
+first, line second; a later reader re-locates by the anchor and not by the
+number.
+
+### 1. The Note of 2026-09-12's quote of item 3 spans `:9089-9090`
+
+Item 1 of the Note of 2026-09-12 (`:10438`) quotes item 3 of the Note of
+2026-09-08 - "it is what the compiler's Resolve and the editor's Expand call" -
+and cites `:9088-9089` (`:10457-10458`). The quoted words begin on `:9089`, in
+the half-line that follows the `expand!/2` raise list, and end on `:9090`;
+`:9088` carries the middle of that raise list, quoted from `composite.ex:474-476`
+and not part of the sentence being corrected. The range is **`:9089-9090`**.
+Nothing about the correction that item makes changes: the compiler half of the
+sentence holds and the editor half does not, exactly as it says.
+
+### 2. The capture Note's `core/on_event.ex` cites, re-located at `b02909f`
+
+The Note of 2026-09-12 on capture semantics (`:10225`) labels its
+`core/on_event.ex` cites "read at `a7fa236`", which is honest as written. The
+arm has moved twice since - `sb-m6ru` built `N1` and `sb-j0cz` built `N2` - so
+the numbers are dated rather than wrong. Re-located by anchor:
+
+| The Note's cite (`a7fa236`) | Anchor | At `b02909f` |
+|---|---|---|
+| `:806` | `defp captures(nil), do: {:ok, []}` | `:881` |
+| `:808` | `defp captures(capture) when is_map(capture) do` | `:883` |
+| `:812` | the destination sort, `Enum.sort_by(fn {destination, _source} -> destination end)` | `:887` |
+| `:814-817` | the emitted `Emission.element("assign", ...)` | `:891-894` |
+| `:822`, `:826` | the two malformed arms, `{:error, [{"capture", capture_message()}]}` | `:900`, `:904` |
+
+One of those five reads differently now, and the difference is the two builds
+rather than a drift. The emitted element's attributes are
+`[{"expr", source_expr(source)}, {"location", destination}]` (`:893`) rather
+than the `"_event.data." <> source` the Note quotes - that concatenation
+survives as `source_expr/1`'s string clause (`:985`) - and the element is
+wrapped by `guarded/2` (`:889-895`, with `guarded/2` itself at `:972-977`).
+Both moves are `N1` and `N2` built. No word of what the Note decided is
+disturbed by either.
+
+### 3. The `statifier_examples` measurement, re-anchored - and dated by `N2`'s own build
+
+The same Note's one out-of-package cite (`:10282-10290`) reads
+`test/statifier_examples/signup/journey_test.exs:281-285` at `ccf391e`,
+asserting `moved.answers["seats"] == :undefined`, with
+`refute Map.has_key?(moved.answers, "plan")` two lines above it. At
+`statifier_examples` `20ae6fb` the map is spelled `responses` rather than
+`answers`, and the `:undefined` assertion is gone: `:302` is
+`refute Map.has_key?(moved.responses, "plan")` and `:311` is
+`refute Map.has_key?(moved.responses, "seats")`, the second carrying a comment
+that names this record's `N2` and `statifier_blocks` `0.28.0` as the reason it
+changed.
+
+So the paragraph's closing observation - that one screen's own test held both
+readings of "the reader did not answer", spelled two different ways - is
+**dated by the decision the Note went on to take**. `N2` removed the second
+spelling; the two lines now read alike, as absence. The measurement stands as
+taken at `ccf391e`, and it is what `N2` was decided against.
+
+### 4. `N3`'s two supersession anchors, at line rather than heading level
+
+`N3` names `P4` by line (`:4150`) while pointing at the Note of 2026-09-05's
+measurement by heading only (`:10417-10421`). The two anchors it left implicit:
+
+- the run-time sub-Note, `### Note (2026-09-05): what the run-time branch
+  actually does`, at `:3207`, and its table at `:3220-3226`;
+- the three rows `N2` supersedes for a `capture` pair: `:3223`, `:3224` and
+  `:3225`, each of which reads "writes the explicit unbound marker; raises
+  nothing". `:3222` (the payload carries the source) and `:3226` (an unbound
+  root) are untouched by `N2`.
+
+And the supersession is narrower than "those rows are wrong". The table
+measures what the engine does with a bare `<assign>`, and it is still true of
+one. What changed from `0.28.0` is that a `capture` pair no longer compiles to a
+bare `<assign>`: `guarded/2` wraps it in an `<if>` over
+`"... !== undefined"` (`core/on_event.ex:974`, read at `b02909f`), so those
+three rows no longer describe the compiled result of a capture. No row is
+edited and no measurement is withdrawn.
+
+### 5. `Environment.capture_writes/1`, re-anchored, and it is private
+
+The Amendment of 2026-09-06 cites `lib/statifier_blocks/environment.ex:662-`
+for `Environment.capture_writes/1` (`:4250-4252`), and `N3` repeats the clause
+by reference (`:10401-10403`). At `b02909f` the `@spec` is `environment.ex:1250`
+and the head `defp capture_writes(config) do` is `:1251`, reached from the
+walk's one call site at `:394`.
+
+It is a `defp`. The name as both sections spell it,
+`Environment.capture_writes/1`, is not callable from outside the module; the
+spelling is a reader's convenience and is named here rather than edited above.
+What the clause claims is unchanged: a capture pair still writes `:unknown` at
+its destination path in the compile-time environment (`:1255`).
+
+### 6. Five re-anchorings on this file's Note of 2026-09-13 (`:10544`)
+
+Each is answered by addition. No rule that Note states changes, and its four
+decisions stand exactly as written.
+
+- **`composite/data.ex:436` is the binding, not the accumulation** (`:10634`).
+  At `b02909f` `:436` is
+  `{outcomes, outcome_errors} = decode_outcomes(row["outcomes"])`, the call that
+  binds the error list. The accumulation the sentence describes is the
+  `errors =` pipeline at `:438-443`, whose last line appends `outcome_errors`.
+- **`composite/data.ex:1396-1399` is the `C4` key comment, not the tuple**
+  (`:10633`). The subject of that comment is the row key `C4` gives the data
+  form and how it is read. The tuple the sentence names is the `@spec` at
+  `:1400`, `{[String.t()], [String.t()]}`, with the reporting clauses from
+  `:1401`.
+- **`composite.ex:1172-1175` was read at `55aeac1` too** (`:10658`). It is the
+  one cite in that Note carrying no read-at label; the label is `55aeac1`, the
+  same as every cite beside it. At `b02909f` the comment is `:1190-1193`,
+  with `member_module/2`'s `@spec` at `:1194` and its head at `:1195`; `sb-o1gz`
+  moved it and changed no word of it.
+- **`C2` item 1's sentence is `:10111-10114`** (`:10567`). The cite reads
+  `:10110-10113`. The quoted sentence - "Whether a composite whose declaration
+  drops a name its root still raises deserves a finding of its own is not
+  decided here" - begins on `:10111` and ends on `:10114`.
+- **Item 1's rule, in the ruling's own words** (`:10579`). The rule is spelled
+  "no stage reports it"; `RQ-SF044-8` spells it **no compile finding**. The two
+  say the same thing - no stage of the compiler reports a dropped name, at any
+  severity - and the ruling's wording is the one to quote.
+
+### What this Note does not do
+
+It decides nothing. It edits no line above it, adds no config key, no field
+type and no finding, moves no status line, and adds no changelog fragment. It
+takes no position on whether the Amendment of 2026-09-12 (`:9998`) is ready to
+flip, which remains the operator's. Where a record sentence and the code
+disagree above, the code is what a reader will find; each such place is dated
+here rather than rewritten there.
+
+Filed with `sb-l2jn`, campaign SF044.

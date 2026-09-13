@@ -3726,3 +3726,40 @@ anchor had on `main` before this request moved it:
 This section appends at the end of the file, so no line above it moved.
 
 Filed with `sb-hykt`, campaign SF041.
+
+## Note (2026-09-13): a cite tidy by addition - the spike's candidate 2 spans two lines, and the second error arm stays with the request that builds `emit_node/2`
+
+Campaign SF044, bead `sb-l2jn`, folding `sb-aqde`. A dated Note: it edits no
+line above it, decides nothing, carries no `Status:` line and flips nothing.
+Both cites below were read at `b02909f`, anchor first.
+
+### 1. `docs/spikes/SF040-element-editor.md:465` is `:465-466`
+
+Item 2 of the Note of 2026-09-12 (`:3538`) closes with a parenthesis
+(`:3597-3600`) citing `docs/spikes/SF040-element-editor.md:465` for the spike's
+own spelling of the shape, "`emit_json/2`, or an emitter-keyed callback". The
+phrase spans two lines: `:465` is the numbered item and the opening of the
+parenthesis, ending on "or an emitter-keyed", and `:466` opens with
+"callback)." and carries the rest of the sentence. The range is
+**`:465-466`**.
+
+Nothing else in that item moves. The spike's candidate 2 is the shape the
+operator adopted, the ruled name is still `emit_node/2`, and the difference
+between the two names is still the name only.
+
+### 2. `sb-aqde`'s second error arm is not recorded yet, and that is the decision
+
+`sb-aqde` also asked whether decision 3's enumerated failure -
+`{:error, {:unknown_block_type, type_name}}`, a type absent from the palette -
+should grow a second arm for a **resolvable** module that declares neither emit
+callback. Campaign SF044's walk **declined to record it now**: at `b02909f`
+there is no `emit_node/2` anywhere in `lib/` (zero hits), so there is nothing
+yet for a second arm to be an arm of, and a record line written ahead of the
+callback would be a decision about code no request has shaped.
+
+It belongs beside the request that builds the callback, which is where item 2 of
+the Note of 2026-09-12 already puts the callback's own declaration: being a
+callback on the block-type behaviour it is `ADR-0002`'s to declare, "when it is
+built, not here and not now" (`:3595-3596`). The second error arm goes with it.
+
+Filed with `sb-l2jn`, campaign SF044.
