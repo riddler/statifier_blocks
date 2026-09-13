@@ -142,26 +142,50 @@ Whether the release is major, minor or patch is not decided here - the version
 is explicit input to the skill. The fragments' headings are evidence for that
 judgement, not a rule that computes it.
 
-## The README install pin needs no step here
+## The README install pin
 
-`release.readme_pin` is `true`, and the skill's own step covers this repo's
-pin without help: `README.md` carries a `{:statifier_blocks, "~> X.Y"}` pin in
-its `def deps` snippet - exactly the major/minor form with the patch component
-dropped that the skill bumps. It is named here only so that the carriers a
-release moves are all listed in one place.
+`release.readme_pin` is `true`. `README.md` carries a
+`{:statifier_blocks, "~> X.Y.0"}` pin in its `def deps` snippet, and the
+skill's own step is what bumps it, so the pin needs no step of its own here.
+What this section adds is the **form**, which the skill leaves to the project:
+"the exact form of the project's install pin" is the first thing its Project
+extension section names an extension for.
+
+The form is the exact-minor one - `~> X.Y.0`, with a literal `0` in the patch
+position - because that is what this package tells its consumers to use. The
+pre-1.0 banner at the top of `README.md` says pinning to an exact minor,
+`~> X.Y.0`, is the recommended way to consume the package until 1.0, and a
+snippet a host copies out of the same file should not recommend one thing and
+demonstrate another.
+
+Two consequences a prep should not have to derive:
+
+- The patch component is always the literal `0`, never the release's own patch
+  number. A patch release leaves the pin reading `~> X.Y.0`, which already
+  admits that patch; only a major or minor release moves it.
+- The skill's own wording for this step - the constraint bumps to the new
+  major/minor, dropping the patch component, "in whatever form previous
+  releases used", checked against a previous release commit - is answered here
+  instead. The form changed outside a release, in the commit that moved the
+  pin to it (2026-09-13), so every release commit older than that one shows
+  the earlier `~> X.Y` form and is not evidence for this question. Read this
+  section, not the history.
+
+It is also named here, as it always was, so that the carriers a release moves
+are all listed in one place.
 
 The pin's current value is not written down here, for the same reason no
 current version is. Read it and check it against the version file instead:
 
 ```bash
-grep 'statifier_blocks, "~>' README.md   # the pin
-grep '@version "' mix.exs                # the version it should track
+grep -n 'statifier_blocks, "~>' README.md   # the pin, ~> X.Y.0
+grep -n '@version "' mix.exs                # the version it should track
 ```
 
-They should agree on major and minor. If they ever do not, the pin edit
-repairs the drift in one move rather than stepping one release at a time: it
-goes straight to the current major/minor, and that is the recipe working, not
-a mistake to correct back.
+They should agree on major and minor, with the pin in the `~> X.Y.0` form. If
+they ever do not, the pin edit repairs the drift in one move rather than
+stepping one release at a time: it goes straight to the current major/minor,
+and that is the recipe working, not a mistake to correct back.
 
 ## The files a release commit touches
 
