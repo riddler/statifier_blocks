@@ -11266,9 +11266,9 @@ This is item 7a read from the drawing side. 7a puts `expand` in
 `editor.ex:726-732` with `expand` on `:727`; 7a's own cite of it
 (`editor.ex:683-691`, at `:10625`) has drifted onto the `profile` typedoc and
 is re-located in section 3 below. A control whose only outcome on this mount
-is the socket unchanged is a control that should not have been offered - the same reading clause 1 makes
-for the palette column and 7c makes for the gap "+": never draw a gesture the
-mount refuses.
+is the socket unchanged is a control that should not have been offered - the
+same reading clause 1 makes for the palette column and 7c makes for the gap
+"+": never draw a gesture the mount refuses.
 
 At `19728d0` the code follows it. `BlockNode`'s `read_only` attr
 (`block_node.ex:327`) says so in its own doc (`:330-343`, "Withholding, rather
