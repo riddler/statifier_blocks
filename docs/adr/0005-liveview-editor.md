@@ -11051,3 +11051,122 @@ paragraph that does not contain what it promises. It is corrected by the same
 bead that builds item 2.
 
 Filed with `sb-ykpe`, campaign SF041.
+
+## Note (2026-09-13): a cite tidy by addition - item 2's heading line, where the "full text on the `title`" clause sits in `ADR-0002`, the run-pane Note's `lib/` and guide anchors re-located, and clause 1's rationale narrowed to what the ordering buys
+
+Campaign SF044, bead `sb-l2jn`, folding `sb-3lxm` and `sb-vag4`. A dated Note:
+it edits no line above it, decides nothing, adds no key to `t:profile/0`,
+carries no `Status:` line and flips nothing. Every cite below was read at
+`b02909f`, anchor first and line second.
+
+### 1. Item 2 of the Note of 2026-09-08 is `:10464`
+
+Item 3 of the Note of 2026-09-12 on the translated over-cap chip (`:10948`)
+cites "Item 2 of that Note (`:10463`)" (`:11041`). `:10463` is a blank line. The
+heading is `:10464`: `### 2. The cap is 32, and a presentation-cap finding draws
+in the drawer, not on the card face`.
+
+The clause it goes on to cite in the same sentence runs one line further than
+written. `:10501-10512` is given; the ruled-and-queued clause ends with "and the
+record that carries it is `ADR-0002`'s to write" on `:10513`, so the range is
+`:10501-10513`. Neither correction touches what item 3 says, which is that the
+`@doc`'s attribution points at an item asking nothing about a `title`.
+
+### 2. The "full text on the `title`" clause is above `C1`, not inside it
+
+Two paragraphs cite `docs/adr/0002-block-type-behaviour.md:9673-9674` - "the
+full text is carried on the chip's `title`" - for that clause: `:10977`, which
+introduces it as `C1`'s (`:10973-10977`), and `:11047`, which names it as
+`ADR-0002`'s. The lines cited are right and the substance is right; the section
+named is a section too narrow.
+
+At `b02909f` the cited words - "the full text is carried on the chip's `title`"
+(`docs/adr/0002-block-type-behaviour.md:9673-9674`) - sit inside the paragraph
+that re-reads `H3` in the Amendment of 2026-09-08
+(`docs/adr/0002-block-type-behaviour.md:9672-9677`), and that paragraph is
+**above** the `### C1` heading at
+`docs/adr/0002-block-type-behaviour.md:9679`. `C1` decides that an over-cap chip
+is drawn clipped with an ellipsis; the `title` half is the argument the
+amendment's preamble makes for why the drop is no longer the right answer. The
+attribution to the amendment stands; the attribution to `C1` in particular does
+not.
+
+`mix adr.cites` reads the same thing from the other side, reporting
+`adr-cite-phrase-unmatched` on `:11039` against that range: the paragraph's
+quoted phrases are the `@doc`'s, not the cited lines'.
+
+### 3. The run-pane Note's `lib/` cites, re-located at `b02909f`
+
+The Note of 2026-09-12 on the run pane (`:10800`) says every `lib/` line below
+it was read at `main` `a7fa236` (`:10811-10813`), which is honest as written.
+`sb-ij80` built the key and moved most of them. Re-located by anchor:
+
+| The Note's cite (`a7fa236`) | Anchor | At `b02909f` |
+|---|---|---|
+| `editor.ex:144` | `## The run marks a host paints` | `:144`, unmoved |
+| `editor.ex:587-588` | the `active_marks` and `invoke_mark` assign rows | `:597-598` |
+| `editor.ex:589` | the `run` assign row | `:599` |
+| `editor.ex:679-685` | `@default_profile %{` | `:691-698` |
+| `editor.ex:760-761` | `run: nil,` and `run_session: nil,` in the mount defaults | `:773-774` |
+| `editor.ex:885` | the `update/2` pipeline over `put_profile/2`, `put_run/2`, `put_run_session/2` | `:907` |
+| `editor.ex:1069-1097` | `<RunPane.run_pane` through `</RunPane.run_pane>` | `:1091-1119` |
+| `editor.ex:1148` | `run?={@run != nil}` | `:1170` |
+| `editor.ex:2518-2522` | the "A run decides the marks outright" comment | `:2540-2544` |
+| `editor.ex:2527-2530` | `defp marks(%{run: run, run_provenance: provenance})` | `:2549-2551` |
+| `editor.ex:2532-2538` | `defp marks(%{active_ids: active, invoking: invoking})` | `:2554-2560` |
+| `editor.ex:2565-2571` | `defp fit_target(%{run: run, run_provenance: provenance} = assigns, marks)` | `:2587-2593` |
+| `editor.ex:2622` | `@spec normalize_profile(term())` | `:2644` |
+| `editor.ex:2641`, `:2651` | `normalize_profile/1`'s map clause and its catch-all | `:2664`, `:2675` |
+| `editor.ex:3440-3448` | `defp put_run(socket, assigns) do` | `:3481-3487` |
+| `editor.ex:3452-3459` | `defp put_run_session(socket, assigns) do` | `:3509-3515` |
+| `editor/run_pane.ex:99-103` | `def run_pane(%{state: nil} = assigns) do` | `:99-103`, unmoved |
+
+The Note's `editor/drawer.ex` cites are unmoved: `:252`, `:885`, `:938`, `:946`
+and `:950`.
+
+Three of those rows are dated rather than merely moved, and the difference is
+clause 1 built. `put_run/2` and `put_run_session/2` each gained a leading clause
+matching `%{assigns: %{profile: %{run?: false}}}` and assigning `nil`
+(`:3478-3479` and `:3506-3507`), and `put_profile/2` now **leads** the `update/2`
+pipeline at `:907` rather than following the two `put_*` calls. That is what
+clause 1 asked for.
+
+### 4. Clause 1's rationale sentence, narrowed to what the ordering buys
+
+Clause 1 argues for resolving the key before the run assigns are taken by saying
+that a mount at `run?: false` "that took the assigns first would seat a run for
+one render and drop it on the next" (`:10853-10854`). That is more than the
+ordering buys, and the narrower reading is the one to keep.
+
+`update/2` writes the host's raw assigns - the raw `profile` among them - onto
+the socket before that pipeline runs, so a raw `%{run?: false}` map would match
+both guards in either order, and no render would seat a run either way. What
+leading with `put_profile/2` buys is that the guards read the map
+`normalize_profile/1` returned rather than the host's raw one, which is the
+value every other reader of the profile takes.
+
+The code that was built says exactly this, in its own comment above the pipeline
+(`editor.ex:898-906`, read at `b02909f`), and `put_run/2`'s comment gives the
+same reason for the clause rather than a `Map.has_key?/2` branch (`:3470-3476`).
+Clause 1's **decision** - the key is resolved before the run assigns are taken,
+and a `run?: false` mount never holds a run on any render - is unchanged, and is
+what landed. Only the sentence arguing for it is narrowed here, by addition.
+
+### 5. `docs/profiles.md:42` is `:35`
+
+Item 7 cites `docs/profiles.md:42` for "**There are no named profiles.**",
+"where this request moves the sentence to from `:33`" (`:10937-10941`).
+`sb-ij80` landed the move and also removed the marker paragraph that stood above
+it, so the sentence came to rest higher than the request predicted: at `b02909f`
+it is `docs/profiles.md:35`. The two in-record cites beside it, `:7392-7394` and
+`:8365-8366`, are unmoved.
+
+### What this Note does not do
+
+It decides nothing. It edits no line above it, adds and removes no `@type` key,
+moves no status line, changes no code and adds no changelog fragment. It takes
+no position on any open question this file carries. Each correction above is a
+re-anchoring or a dating; where a record sentence and the code disagree, the
+code is what a reader will find.
+
+Filed with `sb-l2jn`, campaign SF044.
