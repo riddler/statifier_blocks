@@ -87,12 +87,28 @@ defmodule StatifierBlocks.Composite do
   | `palette_entry/0` | the map the declaration states | **yes** |
   | `emit/2` | generated, and raises if reached (`RQ-SF037-6`) | no |
 
-  `sentence/1`, `summary/1`, `palette_entry/0` and `validate_config/1` and
-  **no others** are overridable: they are the four whose answers are about
-  presentation and refusal rather than about the expansion. `migrate_config/2`
-  keeps ADR-0007's injected refusal unchanged, and `fixtures/0`,
+  Five callbacks are overridable, and they reach that state by two different
+  routes. The macro's own `defoverridable` re-marks the three it **redefines**
+  whose answers are about presentation rather than about the expansion:
+  `sentence/1`, `summary/1` and `palette_entry/0`. Two more are overridable
+  without appearing there, because `use StatifierBlocks.BlockType` already
+  marked them and this macro never redefines them: `validate_config/1`, which
+  keeps ADR-0007's injected `:ok` (below), and `migrate_config/2`, which keeps
+  ADR-0007's injected refusal unchanged.
+
+  Every other derived callback - `config_schema/1`, `slots/1`,
+  `current_version/0`, `io/1`, `outcomes/1` and `emit/2` - is **not**
+  overridable: the macro redefines it and does not re-mark it, so a module
+  that writes its own `def` adds a clause **after** the generated one instead
+  of replacing it, and the generated clause still answers. `fixtures/0`,
   `failure_outcomes/1` and `donedata_type/1` are not derived - they stay
   optional and absent unless a declaration writes them by hand.
+
+  The set is the one `test/statifier_blocks/composite/overridables_test.exs`
+  pins, by overriding each callback in a composite and asking which answer
+  comes back; a change to either `defoverridable` line turns it red, and this
+  paragraph and `StatifierBlocks.Composite.Data`'s cannot drift from it
+  silently (`sb-rhb8`).
 
   ### The derived `summary/1`
 
@@ -125,7 +141,7 @@ defmodule StatifierBlocks.Composite do
   worked example - two `required?: true` params defaulting to `""` - land
   finding-free out of `StatifierBlocks.Palette.new_block/2`. A composite with
   a cross-param refusal its params cannot state as a single field's flag
-  overrides the callback, which is why it is one of the three that may be.
+  overrides the callback, which is why it is one of the five that may be.
 
   `emit/2` exists because the behaviour requires it and ADR-0007 deliberately
   injects no default for it. It **raises**, because the compiler expands a

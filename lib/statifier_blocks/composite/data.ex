@@ -67,14 +67,24 @@ defmodule StatifierBlocks.Composite.Data do
   | `"migrations"` | no | defaults to `[]`; the ordered migration steps `migrate_config/3` walks from a stored version to the declaration's current one (below) |
   | `"outcomes"` | no | defaults to `[]`; a JSON array of outcome **names** this composite declares, which replaces the expansion root's derived list and is checked against what the `"subtree"`'s members can raise (ADR-0002's Amendment of 2026-09-12, `C4`) |
 
-  **Two of the three overridables have a key here; the third cannot.** A
-  `use`-composite may override `sentence/1`, `palette_entry/0` and
-  `validate_config/1`. The first two are values, so they are the
-  `"sentence"` and `"palette_entry"` keys. The third is a **function**, and
-  a declaration held as data cannot hold one - the same ground the subtree
-  is a template rather than a `subtree/1`. So a data composite gets
-  `validate_config/1` as its params alone refuse it, and a cross-param
-  refusal is one of the two things a host must still write a
+  **Two of the five overridables have a key here; the other three are met
+  another way, and one of those is met only in part.** A `use`-composite may
+  override `sentence/1`, `summary/1`, `palette_entry/0`, `validate_config/1`
+  and `migrate_config/2` (`StatifierBlocks.Composite`, "What the `use`
+  derives"; the set is pinned by
+  `test/statifier_blocks/composite/overridables_test.exs`). Two of them are
+  values, so they are the `"sentence"` and `"palette_entry"` keys. `summary/1`
+  needs no key of its own: a data composite takes the derived chips over its
+  own `"params"`, which is what a module composite overriding `summary/1`
+  would be replacing. `migrate_config/2` is met by the `"migrations"` key,
+  which states the chain `migrate_config/3` walks (below), and a declaration
+  needing more than the declared steps writes a `use`-composite module.
+
+  `validate_config/1` is the one a declaration cannot reach at all. It is a
+  **function**, and a declaration held as data cannot hold one - the same
+  ground the subtree is a template rather than a `subtree/1`. So a data
+  composite gets `validate_config/1` as its params alone refuse it, and a
+  cross-param refusal is one of the two things a host must still write a
   `use`-composite module for (the other being a sentence that is not a
   substitution). That is a cost of the data shape, not an oversight.
 
