@@ -276,9 +276,25 @@ defmodule StatifierBlocks.Compiler.DonedataParamsTest do
       assert finding.message =~ "outcome"
     end
 
+    # `sb-51lv`, from `sb-48h5`: the code assertion alone proved nothing about
+    # the reserved-name list. A namespaced name is never a bare lowercase
+    # identifier, so `Config.identifier?/1` refuses this field on shape alone
+    # and the finding arrives with or without the key on the list - the same
+    # reading the sibling test below records for the retired key. What the
+    # list buys is the finding MESSAGE, so the message is what is asserted,
+    # and on the phrase the list builds rather than on the declared name the
+    # message opens by quoting.
+    #
+    # sabotage: dropped `@execution_status_key` from `declarable_param?/1`'s
+    # list AND from `donedata_finding/1`'s message - the refusal stayed (the
+    # shape check still fires) and this went red on the message assertion
+    # (verified)
     test "a field named for the reserved execution-status key is refused too", ctx do
       assert {:error, [finding]} = compile(ctx, "myapp:mints_execution_status", child_use: true)
       assert finding.code == :invalid_donedata_field
+
+      assert finding.message =~
+               ~s(mints or reserves - "outcome", "statifier_persistence:execution_status")
     end
 
     # `statifier_persistence` 0.12 reads BOTH keys for one release

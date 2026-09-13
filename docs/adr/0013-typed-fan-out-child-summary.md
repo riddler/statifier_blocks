@@ -1100,3 +1100,39 @@ decision implies and does not state. The name and the clause structure are
 otherwise what `:584-585` describes.
 
 Filed with `sb-upv0`, campaign SF035's Lane A.
+
+## Correction of 2026-09-13 (`sb-51lv`)
+
+Two of the names this record cites no longer exist under those names. The
+lines above stand exactly as printed - the 2026-09-07 ruling keeps a merged
+record's line numbers and its text, which is what keeps them honest - so this
+correction is **added at the foot** and rewrites nothing above it.
+
+**The rule.** Campaign SF041 renamed the reserved done-data key and the
+private function that mints it, to the spelling `statifier_persistence`'s
+ADR-0011 decision 4 fixes. Wherever this record writes `@run_status_key`, read
+`@execution_status_key`; wherever it writes `run_status_param/0`, read
+`execution_status_param/0`. The rename moves nothing this record decides:
+decision 3's order is still the `outcome` param, then the reserved key on a
+failure-classed outcome only, then the declared fields in declaration order,
+never sorted.
+
+Both names were read in `lib/statifier_blocks/compiler.ex` at `a4ce039`, by
+the anchor beside each line:
+
+| Where in this record | What it says, as printed | Reads today | Anchor read at `a4ce039` |
+|---|---|---|---|
+| `:72`, `:1080` | `@run_status_key`, `compiler.ex:263-264` | `compiler.ex:362` | `@execution_status_key "statifier_persistence:execution_status"` |
+| `:73`, `:975`, `:1081` | `run_status_param/0`, `:1443-1444` | `:2304` | `defp execution_status_param do` |
+| `:73`, `:1082` | where the reserved param is appended, `:1423-1425` | `:2248` | `if(failure?, do: [execution_status_param()], else: []) ++`, inside `defp completion_final(final_id, outcome, donedata?, failure?, declared) do` at `:2245` |
+
+The retired spelling is not gone, only retired: it stays a **reserved** name,
+`@legacy_execution_status_key` at `:375`, so a host type that declares either
+key is refused and told which collision it walked into. Which names are
+reserved, and what the refusal says about each, is a question for a test
+rather than for a table in a record:
+`test/statifier_blocks/compiler/donedata_params_test.exs` answers it, and
+asserts the phrase the reserved list builds for each of the two keys.
+
+This correction rests on the compiler's done-data surface and on nothing
+wider. It repoints citations and states no new decision; no status changes.
