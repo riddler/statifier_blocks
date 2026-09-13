@@ -228,6 +228,40 @@ Precedent: `test/statifier_blocks/editor/drop_reason_test.exs`.
 LiveView-cased test file that carried the tag but not the wrapper cost a CI
 cure.)
 
+### The headless job resolves an unlocked tree
+
+`STATIFIER_BLOCKS_HEADLESS=1` redirects the lockfile along with the deps and
+build paths, and the job caches nothing. What it resolves is therefore a fresh
+resolution against the registry as it stands at that minute, not the versions
+the committed `mix.lock` pins. That is deliberate: the job's whole worth is a
+genuinely Phoenix-free tree it resolved itself, and it must not be able to
+rewrite the ordinary build's lock to get one.
+
+The cost is that a dependency release lands in that job the moment it is
+published, with no commit here. So an assertion whose outcome depends on
+**which version resolved** can be green locally and on the locked job while it
+is red on the headless one, on a branch that changed nothing: a test pinned to
+`predicator` 9.4.0's truncating lexer went red the instant 9.4.1 was
+published, while `mix.lock` still read 9.4.0.
+
+For any assertion whose outcome depends on a dependency's version:
+
+- **Name the resolved version.** Read it from the running tree -
+  `Application.spec(:predicator, :vsn)` - rather than trusting what `mix.lock`
+  pins. An assertion that cannot say which version it is describing has no way
+  to be right in both trees.
+- **Guard or skip when the resolved version differs** from the one the
+  assertion was written against, so the headless job reports the difference
+  instead of failing on it.
+- **Never write a canary whose trigger is an operator publish.** A test
+  designed to go red when a new version appears turns someone else's release
+  into this repo's CI failure, and the branch that pays for it is whichever
+  one runs next.
+
+(Recorded 2026-09-13 by the operator's campaign consent: the job is left
+unlocked by ruling - it resolves a deliberately different dependency set and
+must not disturb `mix.lock` - and this rule, not a lockfile, is the remedy.)
+
 <!-- usage-rules-start -->
 ## ExQuality (`mix quality`)
 
