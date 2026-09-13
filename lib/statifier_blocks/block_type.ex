@@ -1677,12 +1677,15 @@ defmodule StatifierBlocks.BlockType do
 
   A **clipped** chip is the second thing that says less than the string
   behind it, so it answers here too: its entry is the chip's full text,
-  unclipped. Where a chip is both translated and over the cap the entry is
-  the full **translated** text rather than the declared event name - a
-  `title` that neither completes the visible chip nor matches it would
-  leave a reader with two half-strings and no whole one, and completing
-  what is on the card is what ADR-0005's Note of 2026-09-08 item 2 asks
-  for.
+  unclipped - which is ADR-0002's `C1` amendment, the clause that carries
+  a clipped chip's full text on the same attribute. Where a chip is both
+  translated and over the cap the entry is the **declared event name**
+  rather than the full translated text: ADR-0005's Note of 2026-09-12
+  rules that `10w`'s losslessness wins the attribute there, because the
+  translated text is derivable from the declared name and the document's
+  labels while the declared name is derivable from nothing once it is
+  gone. The cost is named in that Note and accepted - the `title` then
+  neither completes nor matches the visible chip.
 
   Alignment is not maintained, it is derived: this and `summary/3` read
   the same one pass and apply the same refusal filter, so a chip cannot be
@@ -1867,12 +1870,20 @@ defmodule StatifierBlocks.BlockType do
   # `summary/3` and `summary_titles/3` are both this list read one way, so
   # the drawn chip and its `title` are the same chip by construction.
   #
-  # `:too_long` is the ONE arm that no longer drops (ADR-0005's Note of
-  # 2026-09-08 item 2, and `RQ-SF039-6`): an over-cap chip is DRAWN,
-  # clipped to the cap with `@chip_ellipsis` in its last position, and the
-  # full text goes on the `title`. The other three arms are unchanged -
-  # a blank, a multiline and a non-string chip have no prefix worth
-  # drawing, so B3's refuse-never-truncate discipline still governs them.
+  # `:too_long` is the ONE arm that no longer drops (ADR-0002's `C1`
+  # amendment, and `RQ-SF039-6`): an over-cap chip is DRAWN, clipped to
+  # the cap with `@chip_ellipsis` in its last position, and the full text
+  # goes on the `title`. The other three arms are unchanged - a blank, a
+  # multiline and a non-string chip have no prefix worth drawing, so B3's
+  # refuse-never-truncate discipline still governs them.
+  #
+  # Where the chip was ALSO translated, `raw` is already the declared
+  # event name `translate_chip/2` kept beside it, and that is what the
+  # `title` carries: ADR-0005's Note of 2026-09-12 rules the declared name
+  # wins the attribute over the chip's own full translated text, because
+  # the translation is derivable from the name and the labels and the name
+  # is derivable from nothing. `raw` is `nil` for an untranslated chip, so
+  # `C1`'s own clause - the chip's full text - is what it falls back to.
   @spec drawn_chips(module(), Block.config(), chip_labels()) :: [{String.t(), String.t() | nil}]
   defp drawn_chips(module, config, labels) do
     module
@@ -1880,7 +1891,7 @@ defmodule StatifierBlocks.BlockType do
     |> Enum.flat_map(fn {drawn, raw} ->
       case chip_refusal(drawn) do
         nil -> [{drawn, raw}]
-        :too_long -> [{clip(drawn), drawn}]
+        :too_long -> [{clip(drawn), raw || drawn}]
         _refused -> []
       end
     end)

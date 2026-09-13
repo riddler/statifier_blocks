@@ -149,6 +149,10 @@ defmodule StatifierBlocks.ViewModel.DoneEventChipTest do
   # in the vocabulary the lint has always used, about a length that is
   # theirs to fix.
   #
+  # The title is the DECLARED event name, not the clipped chip's own full
+  # translated text: ADR-0005's Note of 2026-09-12 rules 10w's losslessness
+  # wins the attribute where a chip is both translated and over the cap.
+  #
   # Sabotage: exempt every translated chip from the cap - the warning
   # disappears and the card silently draws the whole paragraph again.
   test "a translated chip over the cap warns about the author's own label" do
@@ -156,7 +160,7 @@ defmodule StatifierBlocks.ViewModel.DoneEventChipTest do
       watcher(["done.outcome.s_blk_AUTH.error"], %{"label" => "Authorize the payment card"})
 
     assert ViewModel.summary_chips(watching) == ["Authorize the payment card · er…"]
-    assert ViewModel.summary_chip_titles(watching) == ["Authorize the payment card · error"]
+    assert ViewModel.summary_chip_titles(watching) == ["done.outcome.s_blk_AUTH.error"]
 
     assert Enum.map(vm.findings, & &1.message) == [
              "summary chip 1 is 34 characters; the cap is 32, so it is drawn clipped"

@@ -500,10 +500,6 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
     # sentence names a length the author can act on, because the length is
     # their own label's.
     #
-    # The title is the FULL TRANSLATED text rather than the declared event
-    # name: a title that completed neither the visible chip nor the string
-    # behind it would leave a reader with two halves and no whole.
-    #
     # sabotage: exempt a translated chip from the cap instead of shortening
     # it before the cap -> 10o loses its one home and an author who named a
     # block a paragraph gets no warning
@@ -512,11 +508,40 @@ defmodule StatifierBlocks.BlockType.SummaryTest do
       summary = ["done.outcome.s_blk_AUTH.error"]
 
       assert chips(summary, long) == ["Authorize the payment card · er…"]
-      assert titles(summary, long) == ["Authorize the payment card · error"]
       assert refusals(summary, long) == [{0, :too_long}]
 
       assert refusal_message(summary, {0, :too_long}, long) ==
                "summary chip 1 is 34 characters; the cap is 32, so it is drawn clipped"
+    end
+
+    # ADR-0005's Note of 2026-09-12. A chip that is BOTH translated and over
+    # the cap has two candidates for one attribute, and the declared event
+    # name wins it: the clipped translation is the visible label, and the
+    # generated name - derivable from nothing once it is gone - is the
+    # title, verbatim and untruncated.
+    #
+    # sabotage: return the clipped chip's own full text as the title
+    # (`{clip(drawn), drawn}`) -> the declared event name is present on no
+    # surface at all for this chip, which is the loss 10w exists to prevent
+    test "a chip that is both translated and over the cap titles the declared name" do
+      long = %{"blk_AUTH" => "Authorize the payment card"}
+      summary = ["done.outcome.s_blk_AUTH.error"]
+
+      assert chips(summary, long) == ["Authorize the payment card · er…"]
+      assert titles(summary, long) == ["done.outcome.s_blk_AUTH.error"]
+    end
+
+    # C1's own clause, untouched by the Note above: a chip that is clipped
+    # but NOT translated still carries its own full text.
+    #
+    # sabotage: title an untranslated over-cap chip with `nil` -> the
+    # clipped chip becomes a dead end for a reader who wants the whole
+    # string, which is the half C1 added to H3
+    test "a clipped chip that was not translated keeps its own full text" do
+      declared = "capture_and_balance_check_and_fraud_review"
+
+      assert chips([declared]) == ["capture_and_balance_check_and_f…"]
+      assert titles([declared]) == [declared]
     end
 
     # 10w's other half: the translation is lossless because the raw name

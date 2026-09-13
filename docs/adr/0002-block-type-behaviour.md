@@ -10710,3 +10710,12 @@ takes no position on whether the Amendment of 2026-09-12 is ready to flip -
 that remains the operator's, on its own request.
 
 Filed with `sb-k7nf`, campaign SF044. `sb-o1gz` carries item 4's code.
+
+[Note 2026-09-13, `sb-o2p2`: `C1`'s "full text on the chip's `title`" clause
+above is narrowed for one case by `ADR-0005`'s Note of 2026-09-12
+(`docs/adr/0005-liveview-editor.md:10948`): where a chip is **both**
+translated and over the cap, the `title` carries the **declared event name**
+rather than the chip's own full translated text, and `C1`'s clause governs
+unchanged for every chip that is clipped but not translated. Nothing of `C1`
+is edited for it; this line is the pointer so a reader of `C1` finds the
+narrowing.]
