@@ -10,6 +10,30 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.31.0] 2026-09-14
+
+0.31.0 is a minor, because a core block type takes a new public key and
+what a named handler compiles to changes. A `core.on_event` handler may
+now name the outcome it finishes its group with, so an enclosing
+composite can declare that outcome and route it through its derived
+`on_<name>` slot (ADR-0002 C8). Beside that, a slot written on a
+declaring composite under the name the compiler reserves for that
+composite's expansion members is now reported instead of silently
+dropping the children.
+
+### Added
+
+- `core.on_event` takes an optional `finish_as` key naming the outcome the
+  handler finishes with when it abandons its group, so an enclosing composite
+  can declare that outcome and route it through its derived `on_<name>` slot.
+
+### Changed
+
+- A slot written on a composite that declares outcomes, under the name the
+  compiler keeps that composite's expansion members under, is reported as a
+  compile finding instead of being replaced with its children silently
+  dropped.
+
 ## [0.30.0] 2026-09-13
 
 0.30.0 is a minor, because what a composite compiles to changes. A
@@ -3275,6 +3299,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.31.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.31.0
 [0.30.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.30.0
 [0.29.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.29.0
 [0.28.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.28.0
