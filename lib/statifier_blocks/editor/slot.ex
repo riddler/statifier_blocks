@@ -64,7 +64,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     the view model already knows.
 
     The mark is also what SAYS the arm is empty, not only what draws it
-    (`sb-z6vv`, the operator's ruling of 2026-09-12). An editing mount
+    (the operator's ruling of 2026-09-12). An editing mount
     announces the gap's "+", so the read-only mount that draws no "+" was
     announcing a slot header and then nothing, and a reader who cannot see
     the ring could not tell an empty arm from an arm the rendering had cut
