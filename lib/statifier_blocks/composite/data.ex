@@ -512,13 +512,14 @@ defmodule StatifierBlocks.Composite.Data do
   def config_schema(%{params: params}, _config), do: params
 
   @doc """
-  The declared pass-through slots, in declaration order, and `[]` for a
-  declaration that names none - the same answer, from the same shape, that
-  a `use`-composite's `slots/1` gives (`ADR-0002`'s pass-through amendment,
-  P2).
+  The declared pass-through slots, in declaration order, then one
+  `on_<name>` slot per declared outcome (`ADR-0002`'s Amendment of
+  2026-09-13, `C7` item 1), and `[]` for a declaration that names neither -
+  the same answer, from the same shape, that a `use`-composite's `slots/1`
+  gives (`ADR-0002`'s pass-through amendment, P2).
   """
   @spec slots(state(), Block.config()) :: [BlockType.slot_decl()]
-  def slots(state, _config), do: Composite.derived_slots(__composite__(state))
+  def slots(state, config), do: Composite.derived_slots({__MODULE__, state}, config)
 
   @doc "The version the declaration states."
   @spec current_version(state()) :: pos_integer()

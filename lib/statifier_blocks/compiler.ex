@@ -402,12 +402,19 @@ defmodule StatifierBlocks.Compiler do
   @document_role ":datamodel"
 
   # Where a declaring composite's expansion members sit in its resolved node
-  # (ADR-0002's `C6`). It is not a slot any `slots/1` answers and no author
-  # can write it: the leading colon fails `StateId.role?/1` for the same
-  # reason `@document_role` above does, and `Block.slot_name/0` values that
-  # reach a document come from a block type's own declaration. The members
-  # are children of the composite's state now, so they have to be children of
-  # its resolved node too - this is the name they are children under.
+  # (ADR-0002's `C6`). The members are children of the composite's state now,
+  # so they have to be children of its resolved node too, and this is the
+  # name they are children under.
+  #
+  # The leading colon follows `@document_role` above as a spelling
+  # convention and **nothing more**: no validation rejects it, because a
+  # stored slot key is not a role and passes through no role check
+  # (`StatifierBlocks.Validation` admits any non-empty slot name, and Decode
+  # passes the key through). A document CAN therefore carry a slot with this
+  # name, and one that does still gets its ordinary `:undeclared_slot`
+  # finding - `declaring_block_ids/1` below scopes the one place this key is
+  # exempt to the composite whose resolved node the compiler itself put it
+  # on.
   @expansion_slot ":expansion"
 
   # Decision 6's third determinism input. It is the package version, and it
@@ -1062,6 +1069,21 @@ defmodule StatifierBlocks.Compiler do
   # itself. A block with no `block_id` on its finding - there is no such
   # config finding today, since every one of them anchors on a card, but the
   # struct allows it - skips nothing, which is the permissive answer.
+  # The block ids of the resolved nodes the compiler put an `@expansion_slot`
+  # on - every declaring composite in the tree, and nothing else. It is read
+  # off the resolved tree rather than off the document, because the document
+  # cannot say which of its blocks resolved to a declaring composite, and
+  # because a slot key an AUTHOR wrote with the same name is exactly what
+  # must stay reportable.
+  @spec declaring_block_ids(Resolved.t()) :: MapSet.t(Block.id())
+  defp declaring_block_ids(%Resolved{block: block, slots: slots, declaring: declaring}) do
+    own = if declaring, do: [block.id], else: []
+
+    slots
+    |> Enum.flat_map(fn {_name, children} -> children end)
+    |> Enum.reduce(MapSet.new(own), &MapSet.union(declaring_block_ids(&1), &2))
+  end
+
   @spec config_and_structure_stages(
           Document.t(),
           Palette.t(),
@@ -1078,7 +1100,8 @@ defmodule StatifierBlocks.Compiler do
         palette,
         opts,
         refused_block_ids(config),
-        writer_sentences(document, palette, expansion)
+        writer_sentences(document, palette, expansion),
+        declaring_block_ids(node)
       )
 
     case config ++ structure do
@@ -1356,16 +1379,22 @@ defmodule StatifierBlocks.Compiler do
   # `SlotValidation` and `Shelf` compute per block and are filtered on the way
   # out. Both are the same rule - a refused block contributes nothing to this
   # stage - and neither shortens the walk for anybody else.
-  @spec structure_stage(Document.t(), Palette.t(), keyword(), MapSet.t(Block.id()), writers()) ::
-          [Finding.t()]
-  defp structure_stage(document, palette, opts, skip, writers) do
+  @spec structure_stage(
+          Document.t(),
+          Palette.t(),
+          keyword(),
+          MapSet.t(Block.id()),
+          writers(),
+          MapSet.t(Block.id())
+        ) :: [Finding.t()]
+  defp structure_stage(document, palette, opts, skip, writers, declaring) do
     slot_findings =
       case SlotValidation.validate(palette, document) do
         :ok ->
           []
 
         {:error, findings} ->
-          findings |> Enum.reject(&compiler_slot?/1) |> Enum.map(&slot_finding/1)
+          findings |> Enum.reject(&compiler_slot?(&1, declaring)) |> Enum.map(&slot_finding/1)
       end
 
     ctx = opts |> assignability_context() |> Map.put(:skip_blocks, skip)
@@ -1391,17 +1420,26 @@ defmodule StatifierBlocks.Compiler do
       assignability_findings ++ Enum.reject(shelf_findings, &refused?(&1, skip))
   end
 
-  # `@expansion_slot` is the compiler's own, not a slot any type declares and
-  # not one an author wrote: it is where a declaring composite's expansion
-  # members hang off its resolved node (`C6`), and the spliced document
-  # Structure walks is rebuilt from that node. `:undeclared_slot` is about a
-  # slot the DOCUMENT uses that its block type does not declare, so reporting
-  # this one would blame an author for bytes the compiler put there.
-  # Everything under it is still walked, which is what E1's third consequence
-  # - "Config and Structure see the members" - asks for.
-  @spec compiler_slot?(SlotValidation.finding()) :: boolean()
-  defp compiler_slot?({:undeclared_slot, _block_id, @expansion_slot, _count}), do: true
-  defp compiler_slot?(_finding), do: false
+  # The one `:undeclared_slot` finding this stage does not report: the
+  # `@expansion_slot` key ON A DECLARING COMPOSITE'S OWN BLOCK. That key is
+  # bytes the compiler put there - it is where the expansion members hang off
+  # the composite's resolved node (`C6`), and the spliced document Structure
+  # walks is rebuilt from that node - and `:undeclared_slot` is about a slot
+  # the DOCUMENT uses that its block type does not declare, so reporting it
+  # would blame an author for the compiler's own work. Everything under the
+  # slot is still walked, which is what E1's third consequence - "Config and
+  # Structure see the members" - asks for.
+  #
+  # `declaring` is the exact set of blocks the compiler put that key on. The
+  # name is not reserved anywhere a stored document passes through, so an
+  # author CAN write a slot called `":expansion"` on a block of their own;
+  # that one is not in this set and keeps its ordinary finding, rather than
+  # compiling green while its children are silently dropped.
+  @spec compiler_slot?(SlotValidation.finding(), MapSet.t(Block.id())) :: boolean()
+  defp compiler_slot?({:undeclared_slot, block_id, @expansion_slot, _count}, declaring),
+    do: MapSet.member?(declaring, block_id)
+
+  defp compiler_slot?(_finding, _declaring), do: false
 
   @spec refused?(Finding.t(), MapSet.t(Block.id())) :: boolean()
   defp refused?(%Finding{block_id: nil}, _skip), do: false
@@ -1962,7 +2000,7 @@ defmodule StatifierBlocks.Compiler do
          :ok <- validate_outcomes(block, ref) do
       context = Context.new(block.id, document_id, summaries(slots))
 
-      case emit_node(node, context) do
+      case emit_own(node, context) do
         {:ok, %Emission{} = emission} ->
           # ADR-0010 decision 8: the rail scopes the interrupt pair. This is
           # the first point in the pipeline holding both the parent's own
@@ -1987,12 +2025,17 @@ defmodule StatifierBlocks.Compiler do
   # is made of is the expansion the compiler took, not anything the
   # declaration wrote. So its bytes are emitted here, beside the Resolve
   # stage that kept it.
-  @spec emit_node(Resolved.t(), Context.t()) ::
+  #
+  # The name deliberately avoids `emit_node/2`, which `ADR-0004`'s "What is
+  # NOT built" section reserves for an optional block-type callback and says
+  # has no definition anywhere in this repository. This is a private dispatch
+  # helper and not that callback, and the record's claim stays true to a grep.
+  @spec emit_own(Resolved.t(), Context.t()) ::
           {:ok, Emission.t()} | {:error, term()}
-  defp emit_node(%Resolved{block: block, module: ref, declaring: nil}, context),
+  defp emit_own(%Resolved{block: block, module: ref, declaring: nil}, context),
     do: Palette.call(ref, :emit, [block, context], :never)
 
-  defp emit_node(%Resolved{declaring: declaring}, context),
+  defp emit_own(%Resolved{declaring: declaring}, context),
     do: emit_declaring(context, declaring)
 
   # `C6` items 1-3 and `C7` items 1 and 3, as one state:
@@ -2075,13 +2118,24 @@ defmodule StatifierBlocks.Compiler do
     end
   end
 
-  # `C6` item 3's preemption. A member that raises a name the composite
-  # declares is carried out of the expansion by the routing transition above,
-  # so no `done.state.<member>` transition is emitted for it: a declared
-  # member outcome finishes the composite rather than carrying the expansion
-  # onward. Every other adjacent pair chains as `Emit.chain/2` chains it, and
-  # the LAST member gets no transition at all - there is nowhere for an
-  # undeclared completion to go, which is `C6` item 4 in bytes.
+  # `C6` item 3's preemption, over the chain THIS state owns. A top-level
+  # member that raises a name the composite declares is carried out of the
+  # expansion by the routing transition above, so this function emits no
+  # `done.state.<member>` transition for it: a declared member outcome
+  # finishes the composite rather than carrying the expansion onward. Every
+  # other adjacent pair chains as `Emit.chain/2` chains it, and the LAST
+  # member gets no transition at all - there is nowhere for an undeclared
+  # completion to go, which is `C6` item 4 in bytes.
+  #
+  # What this cannot preempt, and does not claim to: a raiser NESTED inside a
+  # member container keeps that container's own `Emit.chain/2` transition,
+  # which that container emitted on its own pass and which no other block may
+  # edit. Both fire, on different events, and the composite's routing
+  # transition targets a state outside the container, so the composite's
+  # final is reached either way; which is processed first is the internal
+  # queue's FIFO order, the same ordering the propagation comment below
+  # documents for a failure's two transitions. The bytes are what `C6` and
+  # `C7` decide; the preemption above is about this container's own chain.
   @spec member_chain([Block.id()], [route()]) :: [Emission.t()]
   defp member_chain(members, routes) do
     preempted = routes |> Enum.flat_map(& &1.raisers) |> MapSet.new()
