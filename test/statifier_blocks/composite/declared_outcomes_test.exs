@@ -422,6 +422,245 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     def subtree(params), do: ConfirmStepGhost.subtree(params)
   end
 
+  defmodule ScreenWithBackButton do
+    @moduledoc """
+    The `C8` case, and the sibling of the `k2` fixture above: a composite
+    whose expansion is a `core.group` with an `interrupts` rail, and whose
+    declared outcome is raised by nothing but the handler on that rail.
+
+    This is the signup wizard's screen in miniature - a step the visitor
+    waits on, and a Back button that abandons it. Before `C8` the handler
+    answered `A1`'s default `done`, so `went_back` was raisable by nothing
+    in the expansion and `C2` item 3 refused the declaration.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "signup.screen_with_back",
+      params: [
+        %{key: "event", type: :string, label: "Confirmed by", required?: true, default: ""}
+      ],
+      outcomes: ["went_back"],
+      palette_entry: %{label: "A screen with a Back button"},
+      version: 1
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(params) do
+      [
+        Block.new("core.group",
+          id: "body",
+          slots: %{
+            "body" => [
+              Block.new("core.await",
+                id: "wait",
+                config: %{"event" => params["event"], "timeout" => "10m"}
+              )
+            ],
+            "interrupts" => [
+              Block.new("core.on_event",
+                id: "back",
+                config: %{
+                  "event" => "signup.back_pressed",
+                  "outcome" => "abandon",
+                  "finish_as" => "went_back"
+                }
+              )
+            ]
+          }
+        )
+      ]
+    end
+  end
+
+  # -- C8: a handler's named outcome is what the composite declares -------
+
+  describe "C8: an interrupt handler names the outcome it abandons its group with" do
+    # The routing proof `C8` item 8 asks for, and the third half of the gap
+    # `C6` and `C7` close the other two of. The declared name is raisable by
+    # exactly one thing in this expansion - the `core.on_event` on the
+    # group's `interrupts` rail - so `C2` item 3's refusal is what this
+    # compile would draw without the handler's `finish_as`, and the
+    # unnamed sibling below pins that.
+    #
+    # Sabotage: had `finish_id/2` answer `Context.done_id/1` for a named
+    # handler - red, and the compile refuses with `:outcome_not_raisable`
+    # before the assertions, which is the walk's own measurement.
+    test "a declared name a named handler raises draws no finding" do
+      assert {:ok, compiled} =
+               Compiler.compile(with_back_slot_child(), palette(), child_use: true)
+
+      # The handler's own final carries the name, which is `C8` item 3.
+      assert compiled.scxml =~
+               ~s(<final id="s_blk_CS_back__o_went_back"><onentry>) <>
+                 ~s(<raise event="done.outcome.s_blk_CS_back.went_back"/></onentry></final>)
+
+      # And the group is abandoned first, on the watcher's own transition,
+      # which `C8` item 3 keeps unchanged.
+      assert compiled.scxml =~
+               ~s(<transition event="signup.back_pressed" target="s_blk_CS_back__o_went_back">) <>
+                 ~s(<raise event="statifier_blocks.interrupt.abandon.s_blk_CS_body"/></transition>)
+    end
+
+    # `C7` item 3's occupied arm over a handler-raised name: the routing
+    # transition reaches the slot child, the child's completion reaches the
+    # composite's final, and the composite raises its own outcome for the
+    # enclosing body. These are the three bytes the record's measurement
+    # prints.
+    #
+    # Sabotage: had `finish_id/2` answer `Context.done_id/1` for a named
+    # handler - red, the compile refusing with `:outcome_not_raisable`
+    # before the assertions.
+    test "an occupied on_<name> slot runs its child before the composite's final" do
+      assert {:ok, compiled} =
+               Compiler.compile(with_back_slot_child(), palette(), child_use: true)
+
+      # The event that route selects on is one the handler actually raises,
+      # which is the byte `C8` item 3 adds and what makes the route live
+      # rather than dead.
+      assert compiled.scxml =~
+               ~s(<final id="s_blk_CS_back__o_went_back"><onentry>) <>
+                 ~s(<raise event="done.outcome.s_blk_CS_back.went_back"/></onentry></final>)
+
+      # In, from the handler that raised the declared name.
+      assert compiled.scxml =~
+               ~s(<transition event="done.outcome.s_blk_CS_back.went_back" ) <>
+                 ~s(target="s_blk_GOBACK" type="internal"/>)
+
+      # Out, from the child to the composite's own final for that name.
+      assert compiled.scxml =~
+               ~s(<transition event="done.state.s_blk_GOBACK" ) <>
+                 ~s(target="s_blk_CS__o_went_back" type="internal"/>)
+
+      # And the composite finishes as the name, which is what the enclosing
+      # body routes on.
+      assert compiled.scxml =~
+               ~s(<final id="s_blk_CS__o_went_back"><onentry>) <>
+                 ~s(<raise event="done.outcome.s_blk_CS.went_back"/></onentry></final>)
+
+      assert compiled.scxml =~ ~s(event="done.state.s_blk_CS" target="s_blk_ROOT__o_done")
+    end
+
+    # `C7` item 3's empty arm over the same name: with no child in the
+    # derived slot the handler's completion reaches the composite's final
+    # directly, and the slot child's two transitions are simply absent.
+    #
+    # Sabotage: had `finish_id/2` answer `Context.done_id/1` for a named
+    # handler - red, the compile refusing with `:outcome_not_raisable`.
+    test "an empty on_<name> slot reaches the composite final directly" do
+      assert {:ok, compiled} =
+               Compiler.compile(document("signup.screen_with_back"), palette(), child_use: true)
+
+      assert compiled.scxml =~
+               ~s(<final id="s_blk_CS_back__o_went_back"><onentry>) <>
+                 ~s(<raise event="done.outcome.s_blk_CS_back.went_back"/></onentry></final>)
+
+      assert compiled.scxml =~
+               ~s(<transition event="done.outcome.s_blk_CS_back.went_back" ) <>
+                 ~s(target="s_blk_CS__o_went_back" type="internal"/>)
+
+      refute compiled.scxml =~ "s_blk_GOBACK"
+
+      assert compiled.scxml =~
+               ~s(<final id="s_blk_CS__o_went_back"><onentry>) <>
+                 ~s(<raise event="done.outcome.s_blk_CS.went_back"/></onentry></final>)
+    end
+
+    # The negative half, and the measurement `C8` records: the same
+    # composite whose handler carries no name is exactly the refusal the
+    # walk measured, because the handler then answers `A1`'s default and
+    # the declared name is raisable by nothing. This is what makes the
+    # three tests above the key's doing rather than the fixture's.
+    #
+    # Sabotage: had `outcomes/1`'s blank arm answer `[{"went_back",
+    # "went_back"}]` - red: the unnamed handler then makes the name raisable
+    # and the refusal this pins disappears.
+    test "the same composite whose handler is unnamed is refused, as it was before" do
+      assert {:error, findings} =
+               Compiler.compile(document("signup.screen_with_back_unnamed"), palette(),
+                 child_use: true
+               )
+
+      assert [%Finding{} = finding] =
+               Enum.filter(
+                 findings,
+                 &(&1.reason == {:outcome_not_raisable, "blk_CS", "went_back"})
+               )
+
+      assert finding.stage == :resolve
+      assert finding.severity == :error
+      assert finding.block_id == "blk_CS"
+    end
+
+    # `C6` item 5 and `C7` item 4's totality claim over the bytes this
+    # request adds: the handler's own final moved to a new id, so the
+    # provenance map has to answer for that id too. It reads the ids out of
+    # the emitted chart rather than listing them, so a state this request
+    # forgot to stamp fails it.
+    #
+    # Sabotage: had `finish_id/2` answer `Context.done_id/1` for a named
+    # handler - red on the first assertion, the handler's named final having
+    # no id in the chart to stamp.
+    test "provenance stays total over the bytes a named handler adds" do
+      assert {:ok, compiled} =
+               Compiler.compile(with_back_slot_child(), palette(), child_use: true)
+
+      emitted =
+        ~r/ id="(s_[^"]+)"/
+        |> Regex.scan(compiled.scxml)
+        |> Enum.map(fn [_whole, id] -> id end)
+
+      assert "s_blk_CS_back__o_went_back" in emitted
+      assert "s_blk_CS__o_went_back" in emitted
+
+      assert Enum.all?(emitted, &Map.has_key?(compiled.provenance.by_state_id, &1)),
+             "unstamped: #{inspect(emitted -- Map.keys(compiled.provenance.by_state_id))}"
+
+      # The handler's final is the handler block's, not the composite's.
+      assert compiled.provenance.by_state_id["s_blk_CS_back__o_went_back"].block_id ==
+               "blk_CS_back"
+
+      assert compiled.provenance.by_state_id["s_blk_CS__o_went_back"].block_id == "blk_CS"
+    end
+  end
+
+  defmodule ScreenWithBackButtonUnnamed do
+    @moduledoc """
+    Byte for byte the module above with the handler's `finish_as` left out,
+    which is the state of the world the walk measured: the handler answers
+    `A1`'s default `done`, nothing in the expansion raises `went_back`, and
+    `C2` item 3 refuses the declaration.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "signup.screen_with_back_unnamed",
+      params: [
+        %{key: "event", type: :string, label: "Confirmed by", required?: true, default: ""}
+      ],
+      outcomes: ["went_back"],
+      palette_entry: %{label: "A screen with a Back button"},
+      version: 1
+
+    alias StatifierBlocks.Block
+    alias StatifierBlocks.Composite.DeclaredOutcomesTest.ScreenWithBackButton
+
+    @impl StatifierBlocks.Composite
+    def subtree(params) do
+      [group] = ScreenWithBackButton.subtree(params)
+      [handler] = group.slots["interrupts"]
+
+      [
+        %{
+          group
+          | slots: %{
+              group.slots
+              | "interrupts" => [%{handler | config: Map.delete(handler.config, "finish_as")}]
+            }
+        }
+      ]
+    end
+  end
+
   # -- helpers -----------------------------------------------------------
 
   defp palette do
@@ -439,7 +678,9 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
         "signup.receives_second" => ReceivesSecond,
         "signup.awaits_with_slot" => AwaitsWithSlot,
         "signup.confirm_step_ghost" => ConfirmStepGhost,
-        "signup.confirm_step_ghost_quiet" => ConfirmStepGhostQuiet
+        "signup.confirm_step_ghost_quiet" => ConfirmStepGhostQuiet,
+        "signup.screen_with_back" => ScreenWithBackButton,
+        "signup.screen_with_back_unnamed" => ScreenWithBackButtonUnnamed
       })
     )
   end
@@ -1405,6 +1646,21 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     composite = %{
       block("signup.confirm_step_declaring")
       | slots: %{"on_received" => [Block.new("core.sequence", id: "blk_GOBACK")]}
+    }
+
+    Document.new(
+      Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [composite]}),
+      id: "bdoc_declaredoutcomes"
+    )
+  end
+
+  # The `C8` fixture with a child in the composite's derived `on_went_back`
+  # slot - the blocks an author drops in to go back when the Back button is
+  # what finished the screen.
+  defp with_back_slot_child do
+    composite = %{
+      block("signup.screen_with_back")
+      | slots: %{"on_went_back" => [Block.new("core.sequence", id: "blk_GOBACK")]}
     }
 
     Document.new(

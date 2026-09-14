@@ -1139,6 +1139,205 @@ defmodule StatifierBlocks.Core.OnEventTest do
     )
   end
 
+  # -- C8: the outcome a handler finishes with ----------------------------
+
+  describe "finish_as: the outcome this handler finishes with (C8)" do
+    # `C8` item 1: the key rides beside the `outcome` select, optional, with
+    # a blank default, and the select itself is untouched - it keeps both
+    # of its values, its label and its default.
+    #
+    # Sabotage: dropped the `finish_as` entry from `config_schema/1` - red on
+    # the first four assertions (verified).
+    test "the key is an optional string field beside the outcome select" do
+      schema = OnEvent.config_schema(%{})
+      field = Enum.find(schema, &(&1.key == "finish_as"))
+
+      assert field.type == :string
+      assert field.label == "Finishing as"
+      assert field.required? == false
+      assert field.default == ""
+
+      # It is declared after the select it sits beside, which is where an
+      # editor draws it.
+      assert index_of(schema, "outcome") < index_of(schema, "finish_as")
+
+      # And the select is not touched.
+      outcome = Enum.find(schema, &(&1.key == "outcome"))
+
+      assert outcome.type ==
+               {:select,
+                [
+                  {"abandon", "Abandon - leave the group"},
+                  {"resume", "Resume - re-enter the group"}
+                ]}
+
+      assert outcome.label == "Then"
+      assert outcome.required? == true
+      assert outcome.default == "abandon"
+    end
+
+    # `C8` item 2, the named arm: the name is its own label. That single
+    # return is the whole of the change's reach into a declaring composite's
+    # raisable set.
+    #
+    # Sabotage: had `outcomes/1` answer `[{name, "Done"}]` - red on the
+    # label (verified).
+    test "outcomes/1 answers the name, labelled with the name" do
+      assert OnEvent.outcomes(named("went_back")) == [{"went_back", "went_back"}]
+    end
+
+    # `C8` item 2, the unnamed arm: ADR-0002 A1's default, byte for byte
+    # what a type implementing no `outcomes/1` answers. `BlockType.outcomes/2`
+    # is asserted beside the direct call because the default this has to
+    # match is that function's, not this module's.
+    #
+    # Sabotage: had the blank arm answer `[]` - red on all four (verified).
+    test "outcomes/1 answers A1's default when the key is blank or absent" do
+      assert OnEvent.outcomes(%{"event" => "order.cancelled", "outcome" => "abandon"}) ==
+               [{"done", "Done"}]
+
+      assert OnEvent.outcomes(named("")) == [{"done", "Done"}]
+
+      # The default is A1's, read where A1 keeps it: a type that implements
+      # no `outcomes/1` at all, answered through the same function a
+      # composite's raisable set reads its members through.
+      assert BlockType.outcomes(StatifierBlocks.Core.Sequence, %{}) == [{"done", "Done"}]
+      assert BlockType.outcomes(OnEvent, named("")) == [{"done", "Done"}]
+      assert BlockType.outcomes(OnEvent, named("went_back")) == [{"went_back", "went_back"}]
+    end
+
+    # `C8` item 3: named, the handler's final is minted at its outcome id,
+    # so `Emit.final/1` sees an `o_` id and raises the completion event a
+    # declaring composite routes on. The watcher's own abandon raise is
+    # unchanged and still precedes the final, which is what keeps the name a
+    # completion rather than a second way to leave the group.
+    #
+    # Sabotage: had `finish_id/2` answer `Context.done_id/1` for a named
+    # handler - red on the final's id, on the raise and on the transition
+    # target (verified).
+    test "a named handler's final carries the outcome id and raises its completion" do
+      scxml = compile!(block(named("went_back")))
+
+      assert scxml =~
+               ~s(<final id="s_blk_OE__o_went_back"><onentry>) <>
+                 ~s(<raise event="done.outcome.s_blk_OE.went_back"/></onentry></final>)
+
+      # The watcher's transition targets that final rather than the `done`
+      # one, because the final it reaches is the only one emitted.
+      assert scxml =~ ~s(target="s_blk_OE__o_went_back")
+      refute scxml =~ "s_blk_OE__o_done"
+
+      # The group's own abandon raise is untouched, and still ahead of the
+      # final's own raise in the emitted bytes.
+      assert scxml =~ ~s(<raise event="statifier_blocks.interrupt.abandon"/>)
+
+      assert index(scxml, ~s(event="statifier_blocks.interrupt.abandon")) <
+               index(scxml, ~s(event="done.outcome.s_blk_OE.went_back"))
+    end
+
+    # `C8` item 5's condition and the release's: an unnamed handler's bytes
+    # are the bytes it emitted before the key existed. Asserted as a byte
+    # comparison against a config that carries no such key at all rather
+    # than as prose about it.
+    #
+    # Sabotage: had `finish_id/2` route a blank name through
+    # `Context.outcome_id(context, "done")` - the ids happen to match, but
+    # making the blank arm answer `outcome_id(context, "finished")` instead
+    # took all three comparisons red (verified).
+    test "an unnamed handler compiles byte-identically to a handler without the key" do
+      without = compile!(block(%{"event" => "order.cancelled", "outcome" => "abandon"}))
+      absent = compile!(block(named(nil)))
+      blank = compile!(block(named("")))
+
+      assert absent == without
+      assert blank == without
+
+      # And those bytes are the ones 0.30.0 emitted: the final is the `done`
+      # one, with no outcome name in it.
+      assert without =~ ~s(<final id="s_blk_OE__o_done">)
+      refute without =~ "finish_as"
+    end
+
+    # `C8` item 5: an additive key is not a document schema change, and this
+    # type already records the precedent for it on `cond`.
+    #
+    # Sabotage: bumped `current_version/0` to 2 - red (verified).
+    test "current_version/0 does not bump for the key" do
+      assert OnEvent.current_version() == 1
+    end
+
+    # `C8`'s closing clause and ADR-0002 `D13`: this type gains an
+    # implementation of a callback the behaviour already declares optional,
+    # and no callback changes shape.
+    #
+    # Sabotage: removed the `outcomes/1` implementation - red on the first
+    # assertion (verified).
+    test "outcomes/1 is an optional callback this type now implements" do
+      assert function_exported?(OnEvent, :outcomes, 1)
+      assert {:outcomes, 1} in BlockType.behaviour_info(:optional_callbacks)
+    end
+  end
+
+  describe "finish_as: the three refusals (C8 item 4)" do
+    # A name that is not role-shaped becomes neither a state id segment nor
+    # an event segment, so it takes the shape every outcome name takes.
+    #
+    # Sabotage: dropped the `check_finish_as_shape/2` call - red (verified).
+    test "a name that is not role-shaped is a finding on the key" do
+      assert {:error, findings} = OnEvent.validate_config(named("Went Back"))
+      assert {"finish_as", "must be an outcome name, like went_back"} in findings
+
+      assert {:error, findings} = OnEvent.validate_config(named("went__back"))
+      assert {"finish_as", "must be an outcome name, like went_back"} in findings
+    end
+
+    # `done` is the name the blank arm already answers, so naming it is
+    # either a no-op written as a decision or a request for two outcomes
+    # with one name.
+    #
+    # Sabotage: dropped the `@default_outcome` clause of `check_finish_as/2`
+    # - red: `"done"` is role-shaped, so nothing else refuses it (verified).
+    test "the name done is a finding on the key" do
+      assert {:error, findings} = OnEvent.validate_config(named("done"))
+
+      assert {"finish_as", ~s(cannot be "done" - that is what a handler with no name finishes as)} in findings
+    end
+
+    # A resuming handler re-enters the group and finishes nothing, so
+    # honouring the name would compile a final it never reaches.
+    #
+    # Sabotage: dropped the `check_finish_as_resumes/2` call - red (verified).
+    test "a name beside outcome resume is a finding on the key" do
+      config = %{
+        "event" => "order.cancelled",
+        "outcome" => "resume",
+        "finish_as" => "went_back"
+      }
+
+      assert {:error, findings} = OnEvent.validate_config(config)
+
+      assert {"finish_as", ~s(only a handler that abandons its group finishes with a name)} in findings
+
+      # The same name abandoning its group is accepted, which is what makes
+      # the finding the `resume` pairing's and not the name's.
+      assert OnEvent.validate_config(named("went_back")) == :ok
+    end
+
+    # The key is optional, so absence and the schema's own default are both
+    # silent. This is the negative half of all three refusals at once.
+    #
+    # Sabotage: made `check_finish_as/2`'s blank clause fall through to the
+    # shape check - red, because `nil` and `""` are not role-shaped
+    # (verified).
+    test "absent or blank, the key draws no finding" do
+      assert OnEvent.validate_config(%{"event" => "order.cancelled", "outcome" => "abandon"}) ==
+               :ok
+
+      assert OnEvent.validate_config(named("")) == :ok
+      assert OnEvent.validate_config(named(nil)) == :ok
+    end
+  end
+
   defp inline_compile(pairs), do: typed_compile(pairs, @inline_payload)
 
   defp typed_compile(pairs, payload) do
@@ -1158,6 +1357,12 @@ defmodule StatifierBlocks.Core.OnEventTest do
   end
 
   defp block(config), do: Block.new("core.on_event", id: "blk_OE", config: config)
+
+  # A handler that abandons its group, finishing as `name`.
+  defp named(name),
+    do: %{"event" => "order.cancelled", "outcome" => "abandon", "finish_as" => name}
+
+  defp index_of(schema, key), do: Enum.find_index(schema, &(&1.key == key))
 
   defp compile!(%Block{} = root) do
     {:ok, compiled} = Compiler.compile(Document.new(root, id: "bdoc_T"), Palette.core())
