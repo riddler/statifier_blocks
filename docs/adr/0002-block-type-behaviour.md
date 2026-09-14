@@ -12289,3 +12289,355 @@ carries no changelog fragment: it changes no public API and no observable
 behaviour.
 
 Filed with `sb-pj0o`, campaign RF047.
+
+## Note (2026-09-14): a third cite tidy by addition - `C6`'s `on_`-minting sentence narrowed, the `C7` advisories answered by anchor, `ADR-0004`'s `E4`/`T4` narrowed to a non-declaring composite, and eleven re-anchorings across this file and `ADR-0005`
+
+Campaign RF047, bead `sb-pk04`, folding `sb-2wa7`, `sb-58gr` and `sb-s0v5`.
+
+Nothing above this line is edited. Every correction below is a later dated
+line: no rule, decision, clause or heading changes, this Note carries no
+`Status:` line, it flips nothing, it changes no code and it adds no changelog
+fragment. Every `lib/` and `docs/adr/` cite below was **read at `003bc36`** and
+is written anchor first, line second; a later reader re-locates by the anchor
+and not by the number. This Note asserts no count over the package: where it
+names a set it names the query that answers it, and the enumeration belongs to
+that query and to the tests, not to this line.
+
+This file carries three Notes and one Amendment dated 2026-09-13 and two more
+records dated 2026-09-14, so none of them is named below by its date alone.
+The ones named here are the **outcome-questions Note** ("the four outcome
+questions the declared-`outcomes` build left open are decided", `:10544`,
+`sb-k7nf`), the **first cite-tidy Note** ("a cite tidy by addition - the item 3
+quote's range, ...", `:10723`, `sb-l2jn`), the **second cite-tidy Note** ("a
+second cite tidy by addition - six advisories the first tidy already answered,
+...", `:11259`, `sb-suao`), `C6` (`:11014`), `C7` (`:11482`), `C8` (`:11839`)
+and the **failure-classing Note** ("a declaring composite's outcomes are
+failure-classed by hand only, and a derived `on_<name>` slot takes no
+`:failure` slot style", `:12200`, `sb-pj0o`).
+
+The request carrying this Note was rebased onto `23718fa` before it opened.
+Every file cited below is byte-identical at `003bc36` and at `23718fa` - that
+commit touches `core/on_event.ex` and four test files, none of them cited here
+- so every line number below holds at both, and `003bc36` is the SHA they were
+read at.
+
+### 1. `C6`'s "the only `on_`-prefixed slot minting in `lib/`" sentence, narrowed by addition
+
+`C6` item 3 says "the only `on_`-prefixed slot minting in `lib/` is
+`core.subchart`'s, from that block's **own** config" (`:11135-11137`). As a
+claim about **every** `on_`-prefixed slot in the package that is false, and it
+was false when it was written: `core.invoke` declares a fixed `on_error`
+outright (`core/invoke.ex:96`,
+`def slots(_config), do: [{"on_error", :zero_or_one, "If it fails"}]`) and
+`core.map` declares a fixed pair (`core/map.ex:299-300`, `@done_slot "on_done"`
+and `@error_slot "on_error"`).
+
+**The rule the sentence states, narrowed: the slot minting `C6` speaks of is a
+slot derived from a config-listed outcome name.** `C7`'s premise already
+carries the sentence in that narrowed form - "The only slot **derived from a
+config-listed outcome name** is `core.subchart`'s" (`:11533-11534`), with the
+outright declarations named beside it (`:11536-11541`) - and says the
+unnarrowed copy is `C6`'s own (`:11542-11543`). This line is where a reader of
+`C6` finds the same narrowing without having to reach `C7` first. Nothing
+`C6` decides changes: item 3 is about what is derived from `outcomes`, and no
+fixed `on_error` or `on_done` slot is derived from anything.
+
+**The query, rather than a count.** At `003bc36`,
+`grep -rn '"on_" <>\|on_#{\|@slot_prefix' lib/` answers `compiler.ex:2730`,
+`composite.ex:262`, `:265`, `:683`, and `core/subchart.ex:192`, `:227`, `:379`,
+`:475`; the two outright declarations above carry no prefix constant and are
+outside that query. The set is the query's answer at a SHA, not a list this
+record keeps.
+
+**Two cites in the same paragraph, re-anchored.** `C6` cites
+`compiler.ex:2412` for `case List.keyfind(slots, "on_" <> outcome, 0) do`
+(`:11138`); at `003bc36` that line is `compiler.ex:2730`, inside `unhandled?/2`
+(`@spec` `:2728`, head `:2729`). `C7` cites the same read block as
+`compiler.ex:2411-2416` (`:11713`) with `node_failures/1` at
+`compiler.ex:2398-2408` (`:11721`) and `propagation_transitions/2` at
+`compiler.ex:2424` (`:11548`); at `003bc36` those are `:2728-2734`,
+`:2715-2716` and `:2740-2742`, which is how the failure-classing Note already
+cites them (`:12253-12256`). No word of either section changes; the block moved
+beneath them.
+
+`C6` also cites `Composite.derived_slots/1` at `composite.ex:609-612`
+(`:11133-11134`); at `003bc36` the two clauses are `:645-646` and `:648`, with
+the `@spec` at `:644`. `outcomes/1`'s injected clause, cited
+`composite.ex:339` (`:11119`), is `:347` and its text is unchanged.
+
+**And the sentence's second half is now dated rather than wrong.** `C6` says
+"No composite derives an `on_<name>` slot from its declared outcomes"
+(`:11131-11133`). That was true of the package `C6` was written against. `C7`'s
+code half has since landed: `Composite.outcome_slot/1` (`composite.ex:683`,
+`def outcome_slot(name) when is_binary(name), do: @slot_prefix <> name`) mints
+one, `outcome_slots/3` answers the derived list, and `derived_slots/2`
+(`composite.ex:652`, `def derived_slots(ref, config) do`) appends it to the
+declaration's `slots:` entries (`:655`). `C6` is not edited: it reads as the
+statement of the package before `C7`, which is what its own premise says it
+is, and `C7` (`:11482`, proposed) is where the derivation is decided.
+
+### 2. `C6` item 3's two completeness claims, read at `003bc36`
+
+`C6` item 3 carries two enumerations that sit in tension with the same
+section's closing sentence, "it names no count of call sites and claims no
+complete list over the package" (`:11226`). They are hedged here rather than
+rewritten there.
+
+- **The `on_`-minting claim** is section 1 above: read as a claim about
+  slots derived from a config-listed outcome name, and not as a list over
+  `lib/`.
+- **"`outcomes_over/3` (`composite.ex:819`, ..., spec at `:818`, called from
+  `:724` and `:736`)"** (`:11119-11121`). The anchor is what holds: at
+  `003bc36` the `@spec` is `composite.ex:921` and the head
+  `defp outcomes_over(%Palette{} = palette, %Block{} = block, ref) do` is
+  `:922`. The two call sites are `:827` (inside `outcomes/2`) and `:839`
+  (inside `derived_outcomes/2`); that pair is what the function's `defp`
+  scope and the `@spec` anchor give a reader, and it is the compiler's and the
+  composite tests' to pin, not this record's to keep current.
+
+### 3. `ADR-0004`'s `E4`/`T4` narrows to a non-declaring composite, and `T4` joins `C6` item 5's narrowed-by list
+
+`C6` item 5 says `ADR-0004`'s `T2`, `T3` and `T4`
+(`docs/adr/0004-compiler-provenance.md:3286`, `:3318`, `:3371`) are unchanged
+by that section, and narrows `T1` (`docs/adr/0004-compiler-provenance.md:3241`)
+in one clause only: a declaring composite is no longer "gone by the end of the
+stage" (`:11156-11164`).
+
+**`T4` takes the same narrowing `T1` takes, for the same reason, and it is
+added to that list here by addition.** `T4`, "The compiled bytes are the same
+before and after Expand, and here the findings are too"
+(`docs/adr/0004-compiler-provenance.md:3371`), restates `E4`'s obligation
+(`E4` at `docs/adr/0004-compiler-provenance.md:2994`, cited from `T4`'s body at
+`:3373`): a document holding a composite with a filled pass-through slot
+compiles byte-identically to the same document after that composite has been
+expanded in place. Under `C6` a **declaring** composite gains a state of its
+own and one final per declared name, which the hand-expanded form does not
+have, so byte-identity does not survive for it.
+
+**The rule: `E4` and `T4` hold for a composite that declares no `outcomes`,
+and are narrowed for one that does.** `C6` already says the non-declaring case
+compiles byte-identically to today (`:11207-11208`, citing `C3` at `:10155`),
+which is exactly the case `E4` and `T4` keep. This is a line on this file
+pointing at `ADR-0004`; **no line of `ADR-0004` is edited by it**, and the
+obligation it narrows is `ADR-0004`'s to restate in its own record if it
+chooses to. No test pins `E4` over a declaring composite today, which is why
+no gate reports the narrowing; naming it here is what keeps a reader of `T4`
+from taking it as unqualified.
+
+### 4. The five advisories `sb-2wa7` carries on `C7`, answered by anchor
+
+Each is answered by addition; no word of `C7` changes.
+
+- **Item 5's "today" reads under `C6`.** `C7` item 5 says a composite that
+  writes `failure_outcomes/1` by hand "has no such slot and is unhandled
+  always" today (`:11732-11733`). Read strictly, "today" is the package before
+  `C6` as well as before `C7`, and there a composite node is replaced by its
+  expansion at Resolve, so `node_failures/1` never reaches a composite's **own**
+  declared names at all. The sentence is true as a statement of what `C7`
+  changes **under `C6`** - once the composite is a state with its own names -
+  and that is how it is to be read.
+- **The bullet `C7` cites as `:11194` is the heading.** `C7` cites `:11194`
+  for `C6`'s second "does not decide" bullet, twice (`:11742`, `:11819`), and
+  `:11194` is the `### What `C6` does not decide` heading; the bullet that
+  says which of a composite's declared names are failure-classed is undecided
+  is `:11199-11201`. The failure-classing Note quotes it from the same heading
+  anchor (`:12203`). See section 5: this is the file's habit, and both cites
+  resolve.
+- **`C7`'s cite of `C6`'s selection bullet is exact.** The advisory reads that
+  the bullet cited `:11209-11220` (`:11499`) runs through `:11221`. It does
+  not: at `c1c1894`, the SHA `C7` was written against, and at `003bc36`, the
+  bullet's last line is `:11220` ("as the record question that must follow.")
+  and `:11221` is blank. The cite stands as written and nothing is re-anchored
+  for it.
+- **The derived slot's label source.** `C7` item 1 says the derived slot is
+  "labelled from the outcome's own label" and that this is `core.subchart`'s
+  entry "verbatim in kind" (`:11561-11566`), and `core.subchart`'s own
+  `slot_label/1` composes a label from the outcome **name**
+  (`core/subchart.ex:647-648`). The two are the same **in kind** - each block
+  labels its derived slot from what its config names - and not the same
+  derivation. As built, `C7`'s is the outcome declaration's label:
+  `outcome_slots/3` maps `derived_outcomes/2`'s `{name, label}` pairs
+  (`composite.ex:676`,
+  `|> Enum.map(fn {name, label} -> {outcome_slot(name), :zero_or_one, label} end)`).
+  `C7` item 1 holds as built; the choice is `C7`'s own and is named as such
+  here.
+- **"The two places a composite's slot list is answered".** That phrase is in
+  `C7`'s premise (`:11528-11532`), not in item 1, and it is a count of call
+  sites in a section that also closes by claiming none. Read as the premise's
+  statement about the two call sites it names and quotes, both of which have
+  since moved and changed text under `C7`'s code half: at `003bc36` the
+  injected callback is `composite.ex:338`,
+  `def slots(config), do: StatifierBlocks.Composite.derived_slots(__MODULE__, config)`,
+  and the data form's is `composite/data.ex:522`,
+  `def slots(state, config), do: Composite.derived_slots({__MODULE__, state}, config)`.
+  Both now pass the config through to `derived_slots/2`, which is `C7` built.
+
+### 5. This file anchors some quoted bullets at their section heading
+
+Two cites above quote a bullet and give the heading's line: the failure-classing
+Note cites `:11194` for `C6`'s bullet at `:11199-11201` (`:12203`), and cites
+`:12178` for `C8`'s bullet at `:12180-12183` (`:12207`); `C7` cites `:11194` the
+same way (`:11742`, `:11819`). That is this file's established habit, it
+resolves - the heading names the list the bullet is in - and `mix adr.cites` is
+green over it. It is stated here as the habit rather than corrected: a reader
+who follows such a cite lands on the heading and reads down. No cite is
+re-anchored for it, and nothing above is edited.
+
+### 6. The `composite.ex` hand-written rule begins at `:103`
+
+Two sections quote the composite macro's moduledoc rule - "`fixtures/0`,
+`failure_outcomes/1` and `donedata_type/1` are not derived - they stay optional
+and absent unless a declaration writes them by hand" - and anchor it
+`composite.ex:104-105`: `C7` item 5 (`:11726`) and the failure-classing Note
+(`:12224`). At `003bc36` the sentence begins on `composite.ex:103`, with
+"`fixtures/0`," closing that line, and runs to `:105`; `:104-105` is the
+sentence minus its first three words. The range is **`composite.ex:103-105`**,
+and the two cites move together because they quote the same sentence. What
+either section says about the rule is unchanged.
+
+### 7. The failure-classing Note's `view_model.ex:2387` cite covers one arm of two
+
+The failure-classing Note says a slot the palette entry's `slot_style` does not
+name "resolves to `:primary` in the editor by `slot_style/2`'s own default
+(`view_model.ex:2387`, `Map.get(styles, name, :primary)`)" (`:12243-12245`).
+That line is the `Map.get/3` default route, and it is one of two ways the
+`:primary` answer is reached. At `003bc36` `slot_style/2` is `@spec`
+`view_model.ex:2383`, head `:2384`, and its body is `:2385-2390`: `:2385` reads
+the `:slot_style` key, `:2387` is the `case is_map(styles) and Map.get(styles,
+name, :primary) do` line, `:2388` admits a style in `@slot_styles`
+(`view_model.ex:541`), and `:2389`'s `_unrecognized_or_malformed` arm answers
+`:primary` for an entry whose `slot_style` is absent or is not a map at all -
+which is the case a composite's entry is in. The range that carries the whole
+answer is **`view_model.ex:2385-2390`**. The Note's rule is unchanged: a
+derived `on_<name>` slot takes no `:failure` style, by either arm.
+
+### 8. The failure-classing Note's three `:failure` declarations, read as three named cases
+
+The same Note says "three block types declare it, each for its own hand-named
+error slot", naming `core.invoke` (`core/invoke.ex:212`), `core.subchart`
+(`core/subchart.ex:379`) and `core.map` (`core/map.ex:625`), and continues "All
+three are fixed, hand-declared cases naming one literal slot apiece"
+(`:12232-12238`). The three cites hold at `003bc36`, and each is pinned by a
+test of its own (`test/statifier_blocks/core/invoke_test.exs:128`,
+`subchart_test.exs:237`, `map_test.exs:443`). The **count** is pinned by no
+test, and a complete list over `lib/` is what that section's own closing
+sentence declines to keep.
+
+**Read as three named cases, not as a census.** The rule the Note states - a
+`:failure` slot style is declared by hand on a `palette_entry/0`, and a derived
+`on_<name>` slot inherits none - does not depend on how many types declare one;
+a fourth declaring type would be a fourth instance of the rule, not a
+contradiction of it. `grep -rn 'slot_style' lib/` is what answers the question
+at a SHA.
+
+### 9. Eleven re-anchorings on the second cite tidy and the outcome-questions Note
+
+Each is answered by addition. No rule either Note states changes.
+
+- **`composite.ex:813` is cited at `:10603-10604`, not `:10605`.** The second
+  cite-tidy Note's item 2 first bullet (`:11321`) gives `:10605` for where the
+  outcome-questions Note cites `composite.ex:813`; `:10605` is blank, and the
+  parenthesis carrying both `composite.ex:815` and `:813` is `:10603-10604`.
+- **`block_type.ex:851` is cited at `:10660-10661`, not `:10662`.** Same item,
+  second bullet (`:11329`). `:10662` opens the following sentence; the
+  parenthesis carrying `block_type.ex:871` and `:851` is `:10660-10661`.
+- **The second cite tidy's item 1 fifth bullet ends `:10851`.** It cites the
+  first cite tidy's fifth bullet as `:10848-10852` (`:11310`); the bullet's
+  last line is `:10851` and `:10852` is blank.
+- **`member_outcomes/2`'s skip arm is one line.** The second cite tidy's item 4
+  cites `(:861-862)` for `member_outcomes/2`'s `nil -> []` arm (`:11369`); at
+  `55d31c1` the arm was `:862` and `:861` was the `case` head. At `003bc36` the
+  function is `@spec` `composite.ex:962`, head `:963`, the `case` head `:964`
+  and the arm `nil -> []` is `:965`. The comment naming the narrowing, cited
+  `composite.ex:841-849`, is `:944-952`.
+- **`raisable_labels/3` is `composite.ex:954` at `003bc36`.** This file cites
+  it at four places, and every one of them is dated rather than wrong - the
+  function has moved three times under `sb-o1gz` and the `C7` code half, and no
+  word of it changed:
+
+  | The cite | Anchor | At `003bc36` |
+  |---|---|---|
+  | `composite.ex:813` (`:10604`) | `labels = raisable_labels(palette, members, param_map)` | `:932` |
+  | `composite.ex:815` (`:10603`) | `Enum.map(names, fn name -> {name, Map.get(labels, name, name)} end)` | `:934` |
+  | `composite.ex:829` (`:10663`) | `raisable_labels/3`'s `flat_map` over the minted members | `:958`, inside `raisable_labels/3` (`@spec` `:953`, head `:954`) |
+  | `composite.ex:829` (`:11324`) | the `labels =` binding, as above | `:932` |
+  | `composite.ex:831` (`:11327`) | the declared arm's `Enum.map`, as above | `:934` |
+
+  The commit `8e84578` re-anchored the last of those from `:830` to `:831`
+  before the second cite tidy opened for review; that was right at `55d31c1`
+  and is dated by the same moves. The `@spec` at `:953` is the anchor to
+  re-locate from.
+
+### 10. `ADR-0005`'s "Note of 2026-09-12", named by its heading
+
+The second cite-tidy Note's item 3 points at "`ADR-0005`'s Note of 2026-09-12"
+(`:11339-11340`, and again at `:11353`). `ADR-0005` carries two Notes of that
+date: the run-pane Note ("the run pane is one of the surfaces a profile names,
+and `run?` unseats the run rather than hiding the pane",
+`docs/adr/0005-liveview-editor.md:10800`) and the chip Note. **The one item 3
+means is the chip Note**, whose heading reads in full:
+
+> ## Note (2026-09-12): a chip that is both translated and over the cap - the
+> declared event name is the `title`, the clipped translation is the visible
+> label
+
+at `docs/adr/0005-liveview-editor.md:10948`. Nothing item 3 says changes: the
+narrowing it describes - reaching only a chip that is both translated and over
+the cap - is that Note's.
+
+### 11. `ADR-0005`'s Note of 2026-09-13, item 2: where `put_run/2`'s comment opens
+
+That Note's item 2 ("the writer's sentence and the card's sentence are one
+chain, ... and `put_run/2`'s comment opens above the line the cite tidy
+quoted", `docs/adr/0005-liveview-editor.md:11348`) says the comment "opened at
+`editor.ex:3466`" at `b02909f` (`docs/adr/0005-liveview-editor.md:11410`). At
+`b02909f` `:3466` is where the **quoted half** opens ("A mount at
+`run?: false` holds no run at all"); the comment **block** opens at
+`editor.ex:3458`, on "The run is the host's input too, and it arrives the same
+way the marks do" - the same line the item names at `55d31c1`. The `55d31c1`
+half of that item is right as written: the block opens at `:3489`.
+
+The quoted half's range in the same item, `:3497-3506`, ends one line early:
+at `55d31c1` it runs `:3497-3507`, closing on "arriving later, and both
+arriving together all end in the same place." At `003bc36` all three anchors
+are unmoved - the block opens at `editor.ex:3489`, the quoted half is
+`:3497-3507`, `put_run/2`'s `@spec` is `:3508` and its first clause head
+`:3509` - and the sibling cite in the same sentence, `editor.ex:906-914`,
+opens at `:906` on "`put_profile/2` leads, which is `ADR-0005`'s 2026-09-12
+Note, clause 1". Nothing that item narrows changes.
+
+### 12. The author's-title rung is unreachable for a data composite too
+
+The same Note's item 1 argues that the chain's last rung, `title || label`, is
+unreachable for a composite, and argues it over the
+`use StatifierBlocks.Composite` form: the macro generates `sentence/1` and
+marks it overridable, so `Palette.declares?(ref, :sentence, 1)`
+(`sentence_chain.ex:49`) is true whether or not the author wrote one
+(`docs/adr/0005-liveview-editor.md:11377-11385`).
+
+**The data form reaches the same conclusion by a different route, and the
+reason widens to cover it.** A data composite's ref is a `{module, state}`
+pair, which `Palette.declares?/3` answers on its stateful clause
+(`palette.ex:648-651`, `def declares?({module, _state}, callback, arity)`) by
+asking `function_exported?(module, callback, arity + 1)` - and
+`StatifierBlocks.Composite.Data` exports `sentence/2`
+(`composite/data.ex:606`,
+`def sentence(state, config), do: Composite.render_sentence(__composite__(state), config)`).
+So the predicate is true for the data form as well, and a data composite takes
+the declared-sentence rung or the palette label rung, never the author's title.
+The rule item 1 states is unchanged; only the reason is widened, and it is
+widened here rather than edited there.
+
+### What this Note does not do
+
+It decides nothing. It edits no line above it, in this file or in any other
+record: `ADR-0004`'s `E4` and `T4` and `ADR-0005`'s three Notes are pointed at
+from here and are untouched there. It adds no key, no callback, no field type,
+no slot and no finding, moves no status line, changes no code and adds no
+changelog fragment. It takes no position on whether the Amendment of 2026-09-12
+(`:9998`), `C6` (`:11014`), `C7` (`:11482`) or `C8` (`:11839`) is ready to
+flip, which remains the operator's on each one's own request. Where a record
+sentence and the code disagree above, the code is what a reader will find; each
+such place is dated here rather than rewritten there.
+
+Filed with `sb-pk04`, campaign RF047.
