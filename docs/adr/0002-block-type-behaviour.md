@@ -12196,3 +12196,96 @@ files, and the enumeration is the tests' to carry:
   section does not reach.
 
 Filed with `sb-algi`, campaign RF047.
+
+## Note (2026-09-14): a declaring composite's outcomes are failure-classed by hand only, and a derived `on_<name>` slot takes no `:failure` slot style
+
+`C6` left this open in as many words - "It does not decide which of a
+composite's declared names are failure-classed" (`:11194`) - and `C7` item 5
+left it open again, deliberately and by name: "What stays open is the
+**derivation**: whether a composite's declared `outcomes` may class a name as
+a failure without the module writing `failure_outcomes/1` by hand, and whether
+such a slot takes the `:failure` slot style" (`:11737`). `C8` (`:12178`)
+declined it a third time for an interrupt handler's named outcome and pointed
+here. This line takes the position, and taking it is the whole of what it does.
+
+**A declaring composite's outcome is failure-classed only where the module
+writes `failure_outcomes/1` by hand, and a derived `on_<name>` slot takes no
+`:failure` slot style.** No declaration key classes a name, no naming rule
+classes a name - not `"error"`, not `"failure"`, not any spelling - and the
+slot `C7` derives for a declared name is an ordinary body slot to every reader
+of the palette entry. The question is reopenable on a host's ask; the
+reopening condition is stated at the end of this line.
+
+### The surfaces this rests on, read at `3b8a9aa`
+
+The hand-written rule is already the composite macro's, stated in its own
+moduledoc: "`fixtures/0`, `failure_outcomes/1` and `donedata_type/1` are not
+derived - they stay optional and absent unless a declaration writes them by
+hand" (`composite.ex:104-105`). The behaviour's own default table says what
+absence means - "`failure_outcomes/1` | no | none of the block's outcomes is
+failure-classed" (`block_type.ex:50`), the callback at `block_type.ex:713`
+(`@callback failure_outcomes(Block.config()) :: [String.t()]`) - and
+`BlockType.failure_outcomes/2` (`block_type.ex:933`, `def failure_outcomes(ref,
+config) do`) answers `[]` for a module that writes none. This line changes none
+of that; it declines to add a second route to it.
+
+The `:failure` slot style is a `palette_entry/0` key, and three block types
+declare it, each for its own hand-named error slot: `core.invoke`
+(`core/invoke.ex:212`, `slot_style: %{"on_error" => :failure}`), `core.subchart`
+(`core/subchart.ex:379`, `slot_style: %{(@slot_prefix <> @error_outcome) =>
+:failure}`) and `core.map` (`core/map.ex:625`, `slot_style: %{@error_slot =>
+:failure}`). All three are fixed, hand-declared cases naming one literal slot
+apiece. A derived `on_<name>` slot joins none of them: the composite macro
+declares no `slot_style` at all, its `palette_entry/0` answering the map the
+declaration states (`composite.ex:442`, `entry = opts |>
+Keyword.get(:palette_entry, %{}) |> Map.put_new(:label, name)`; the derived
+callback is `composite.ex:358`), and a slot the entry's `slot_style` does not
+name resolves to `:primary` in the editor by `slot_style/2`'s own default
+(`view_model.ex:2387`, `Map.get(styles, name, :primary)`; the closed set is
+`@slot_styles` at `view_model.ex:541`). An author who writes
+`slot_style: %{"on_<name>" => :failure}` into a declaration's own
+`palette_entry` map has written it by hand, which is this rule, not an
+exception to it.
+
+### What the position reaches, and what it leaves untouched
+
+`C7` item 5 (`:11712`) already put the failure propagation's read on these
+slots, and this line neither widens nor narrows it. `unhandled?/2`
+(`compiler.ex:2729-2734`) is reached for a name only through `node_failures/1`
+(`compiler.ex:2715-2716`), which asks `BlockType.failure_outcomes/2` first, so
+for a composite that writes no `failure_outcomes/1` it is never reached for a
+declared name and `propagation_transitions/2` (`compiler.ex:2740-2742`) mints
+nothing for one. The composite that **does** write `failure_outcomes/1` by
+hand keeps exactly the effect `C7` item 5 gives it, and that case is pinned by
+a test the code half of this record's sibling request carries, not enumerated
+here.
+
+`D13` (`:725`, "**D13: outcome paths are slots, never ports.**") stands either
+way: nothing here adds a port, a slot vocabulary, or a route. No
+`t:StatifierBlocks.BlockType` callback changes shape, none is added, no return
+widens, no config key is added, no compile finding is added, and
+`@compiler_version` does not move - a refusal to derive emits the same bytes
+as no derivation.
+
+### The reopening condition
+
+A host asking for a failure-classed composite outcome reopens this, and such an
+ask has to decide three things before a line of code is written. **How the name
+is classed**: a declaration key naming the failure-classed subset of
+`outcomes`, or a naming rule over the names themselves - the first is explicit
+and the second is a reserved-word rule this line declines to create. **What the
+classing then means for the propagation**: whether `unhandled?/2`
+(`compiler.ex:2729-2734`) and `propagation_transitions/2`
+(`compiler.ex:2740-2742`) apply to a composite's **own** declared outcome as
+they apply to a member's, which is a change in what an unoccupied slot on a
+declaring composite means. **What the editor draws**: whether the derived slot
+takes the `:failure` style out of the closed set `@slot_styles`
+(`view_model.ex:541`) through `slot_presentation/2` (`view_model.ex:2366-2368`),
+and if so how the entry carries it, since a derived slot's name is the
+declaration's and no hand-written `slot_style` map has it today.
+
+This line edits no line above it, adds no status line, and flips nothing. It
+carries no changelog fragment: it changes no public API and no observable
+behaviour.
+
+Filed with `sb-pj0o`, campaign RF047.
