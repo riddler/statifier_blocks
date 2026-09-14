@@ -661,6 +661,34 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     end
   end
 
+  defmodule ConfirmStepClassing do
+    @moduledoc """
+    The `C7` item 5 case: byte for byte the `k2` fixture's declaration, plus a
+    hand-written `failure_outcomes/1` naming one of the two declared names.
+    `failure_outcomes/1` is not derived - "they stay optional and absent unless
+    a declaration writes them by hand" - so a composite reaches the
+    nested-to-root failure catch only by writing it, and only then does the
+    derived `on_<name>` slot decide whether the name is handled.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "signup.confirm_step_classing",
+      params: [
+        %{key: "event", type: :string, label: "Confirmed by", required?: true, default: ""}
+      ],
+      outcomes: ["timed_out", "received"],
+      palette_entry: %{label: "Confirm the contact"},
+      version: 1
+
+    alias StatifierBlocks.Composite.DeclaredOutcomesTest.ConfirmSubtree
+
+    @impl StatifierBlocks.Composite
+    def subtree(params), do: ConfirmSubtree.build(params)
+
+    @impl StatifierBlocks.BlockType
+    def failure_outcomes(_config), do: ["timed_out"]
+  end
+
   # -- helpers -----------------------------------------------------------
 
   defp palette do
@@ -680,7 +708,8 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
         "signup.confirm_step_ghost" => ConfirmStepGhost,
         "signup.confirm_step_ghost_quiet" => ConfirmStepGhostQuiet,
         "signup.screen_with_back" => ScreenWithBackButton,
-        "signup.screen_with_back_unnamed" => ScreenWithBackButtonUnnamed
+        "signup.screen_with_back_unnamed" => ScreenWithBackButtonUnnamed,
+        "signup.confirm_step_classing" => ConfirmStepClassing
       })
     )
   end
@@ -1637,6 +1666,91 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
       assert compiled.provenance.by_state_id["s_blk_CS_body"].block_id == "blk_CS_body"
       assert compiled.provenance.by_state_id["s_blk_CS_wait"].block_id == "blk_CS_wait"
     end
+  end
+
+  # -- C7 item 5: the hand-written failure class, read through the slot --
+
+  describe "C7 item 5: a hand-written failure_outcomes/1 on a declaring composite" do
+    # `C7` item 5: "once these slots exist, such a composite's declared
+    # failure-classed name is handled when its slot is occupied and unhandled
+    # when it is empty, where today it has no such slot and is unhandled
+    # always. That is the rule every other block type already follows,
+    # reaching a composite for the first time."
+    #
+    # The two arms are one test because the pin is the DIFFERENCE between
+    # them: the same composite, the same class, the same document, and the
+    # slot child is the only thing that moves. `unhandled?/2` reads
+    # `"on_" <> outcome` off the failing block's own slots, and a declaring
+    # composite now answers such a slot, so the composite reaches
+    # `propagation_transitions/2`'s catch exactly when the slot is empty.
+    #
+    # The neighbouring question - whether a declaring composite's outcomes
+    # are failure-classed by DERIVATION - is not this test's: the Note of
+    # 2026-09-14 rules that they are not, and `ConfirmStepDeclaring` beside
+    # this fixture is the same declaration without the hand-written
+    # `failure_outcomes/1` and classes nothing.
+    #
+    # Sabotage, empty arm: returned `[]` from `node_failures/1`'s
+    # `BlockType.failure_outcomes/2` call - red, no catch transition and no
+    # `root_failed` final (verified).
+    # Sabotage, occupied arm: removed `unhandled?/2`'s occupied-slot clause,
+    # so every declared name reads as unhandled - red, the handled document
+    # gains the catch transition the second half refutes (verified).
+    test "the derived slot decides it: empty propagates to the root, occupied handles it" do
+      # Empty: no child in the derived `on_timed_out` slot, so the classed
+      # name is unhandled and reaches the document's shared failure final.
+      assert {:ok, empty} =
+               Compiler.compile(document("signup.confirm_step_classing"), palette(),
+                 terminate: true
+               )
+
+      assert empty.scxml =~
+               ~s(<transition event="done.outcome.s_blk_CS.timed_out" ) <>
+                 ~s(target="s_blk_ROOT__root_failed"/>)
+
+      assert empty.scxml =~
+               ~s(<final id="s_blk_ROOT__root_failed"><donedata>) <>
+                 ~s(<param expr="'failed'" name="statifier_persistence:execution_status"/>) <>
+                 ~s(</donedata></final>)
+
+      # The class is per name: the other declared outcome is not classed and
+      # draws no catch of its own.
+      refute empty.scxml =~
+               ~s(event="done.outcome.s_blk_CS.received" ) <>
+                 ~s(target="s_blk_ROOT__root_failed")
+
+      # Occupied: the author has said what the classed outcome means, so
+      # nothing reaches the root - and the slot child is wired as `C7` item 3
+      # wires any other outcome slot's.
+      assert {:ok, occupied} =
+               Compiler.compile(with_timed_out_slot_child(), palette(), terminate: true)
+
+      refute occupied.scxml =~ "root_failed"
+      refute occupied.scxml =~ "statifier_persistence"
+
+      assert occupied.scxml =~
+               ~s(<transition event="done.outcome.s_blk_CS_wait.timed_out" ) <>
+                 ~s(target="s_blk_ONFAIL" type="internal"/>)
+
+      assert occupied.scxml =~
+               ~s(<transition event="done.state.s_blk_ONFAIL" ) <>
+                 ~s(target="s_blk_CS__o_timed_out" type="internal"/>)
+    end
+  end
+
+  # The `C7` item 5 fixture with a child in the composite's derived
+  # `on_timed_out` slot - the blocks an author drops in to say what the
+  # failure-classed outcome means, which is what handles it.
+  defp with_timed_out_slot_child do
+    composite = %{
+      block("signup.confirm_step_classing")
+      | slots: %{"on_timed_out" => [Block.new("core.sequence", id: "blk_ONFAIL")]}
+    }
+
+    Document.new(
+      Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [composite]}),
+      id: "bdoc_declaredoutcomes"
+    )
   end
 
   # The `k2` fixture with a child in the composite's derived `on_received`
