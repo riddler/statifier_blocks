@@ -664,7 +664,7 @@ defmodule StatifierBlocks.Compiler do
         {slots, findings, slot_expansion} = outcome_slots(palette, block, names)
         merged = Map.merge(expansion, slot_expansion)
 
-        case findings do
+        case reserved_slot_findings(block) ++ findings do
           [] ->
             node = %Resolved{
               block: block,
@@ -681,6 +681,49 @@ defmodule StatifierBlocks.Compiler do
           findings ->
             {:error, findings, merged}
         end
+    end
+  end
+
+  # The author's half of `@expansion_slot`'s exemption. `compiler_slot?/2`
+  # lets the reserved key past `:undeclared_slot` on exactly the blocks the
+  # compiler put it on, because on those it is the compiler's own bytes. A
+  # declaring composite's block IS one of those, so a slot an author spelled
+  # the same way on that block used to ride the exemption out of the
+  # structure stage entirely: the node above is built with
+  # `[{@expansion_slot, nodes} | slots]`, which is the expansion members and
+  # never the author's children, so the children were dropped here and the
+  # compile stayed green with nothing to read.
+  #
+  # Only this ONE placement is reported. `@expansion_slot`'s own comment says
+  # the name is reserved nowhere a stored document passes through, and a slot
+  # of that name on any other block keeps its ordinary `:undeclared_slot`
+  # finding - so what this narrows is the exemption, to the key the compiler
+  # actually writes, and not the name.
+  #
+  # The key is reported whether or not it has children: it is overwritten
+  # either way, and an author who wrote it meant something by it.
+  #
+  # `fault: :author` rather than this stage's `:package` default.
+  # `StatifierBlocks.Compiler.Finding`'s rule is "a document edit fixes it",
+  # and one does - rename the slot, or move its children into a declared one.
+  # The stage's default is about the palette being the host's; this finding is
+  # about a key an author typed.
+  @spec reserved_slot_findings(Block.t()) :: [Finding.t()]
+  defp reserved_slot_findings(%Block{id: id, slots: slots}) do
+    if Map.has_key?(slots, @expansion_slot) do
+      [
+        Finding.new(
+          :resolve,
+          {:reserved_slot_name, id, @expansion_slot},
+          "the slot #{inspect(@expansion_slot)} is the name this composite's own expansion " <>
+            "members are kept under, so a slot of that name written here is replaced and its " <>
+            "children never compile; rename it or move them into a declared slot",
+          block_id: id,
+          fault: :author
+        )
+      ]
+    else
+      []
     end
   end
 
@@ -1139,10 +1182,14 @@ defmodule StatifierBlocks.Compiler do
   # not been built yet, and it is resolved to a NAME rather than to an id
   # because this is the only place both halves of the answer are in hand -
   # the ORIGINAL document, which still holds the composite block, and the
-  # palette. The document `structure_stage/5` walks is the spliced one, in
-  # which the composite has been replaced by its members and cannot be looked
-  # up at all, so handing that stage the index rather than this map would hand
-  # it something it could not resolve.
+  # palette. The document `structure_stage/6` walks is the spliced one, in
+  # which a composite that declares no outcomes has been replaced by its
+  # members and cannot be looked up at all. One that DOES declare them
+  # survives Resolve as its own node (`ADR-0002`'s `C6`) and can be looked up
+  # there - but its minted members still cannot, because the name an author
+  # typed is on the composite and never on them. Handing that stage the index
+  # rather than this map would hand it something it could not resolve in
+  # either shape.
   #
   # A pass-through child has no entry in the expansion index (ADR-0004's T3,
   # `Composite.expand/2`), so it is absent from this map and its own finding
@@ -1490,7 +1537,7 @@ defmodule StatifierBlocks.Compiler do
   # `declarations` is what turns a nominal type name into the label ADR-0011
   # decision 9 asks a finding to carry. It is read from the same `:datamodel`
   # the check itself ran against - one document, read once in
-  # `structure_stage/4` - so the sentence an author reads and the verdict it
+  # `structure_stage/6` - so the sentence an author reads and the verdict it
   # explains cannot come from two different documents. With no datamodel to
   # hand the declarations are empty, every spelling renders as itself, and the
   # message is word for word the one this stage produced before the labels
@@ -2026,10 +2073,13 @@ defmodule StatifierBlocks.Compiler do
   # declaration wrote. So its bytes are emitted here, beside the Resolve
   # stage that kept it.
   #
-  # The name deliberately avoids `emit_node/2`, which `ADR-0004`'s "What is
-  # NOT built" section reserves for an optional block-type callback and says
-  # has no definition anywhere in this repository. This is a private dispatch
-  # helper and not that callback, and the record's claim stays true to a grep.
+  # The name is deliberate. `ADR-0004`'s "What is NOT built" section reserves
+  # a node-emitting name for an optional block-type callback, says no
+  # definition of it exists anywhere in this repository, and backs that claim
+  # with a grep over `lib/`. This is a private dispatch helper and not that
+  # callback, so it is spelled `emit_own/2` - and the reserved name is not
+  # written here either, because a comment that spells it is a hit like any
+  # other and would make the record's grep answer.
   @spec emit_own(Resolved.t(), Context.t()) ::
           {:ok, Emission.t()} | {:error, term()}
   defp emit_own(%Resolved{block: block, module: ref, declaring: nil}, context),
