@@ -1075,15 +1075,17 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     end
 
     # `C7` item 1: one derived slot per declared name, named `on_<name>`,
-    # arity `zero_or_one`, AFTER the entries `slots:` declares. Both doors
-    # answer it: the injected callback and the data form's `slots/2`.
+    # arity `zero_or_one`, AFTER the entries `slots:` declares, and "labelled
+    # from the outcome's own label" - which is the label the raising member
+    # declares for that name and which the sibling `outcomes/1` callback
+    # already answers from the same config.
     #
-    # Sabotage: dropped the `outcomes` half of `derived_slots/1` - red on
-    # both, the list then carries the pass-through entry alone.
+    # Sabotage: dropped the `outcome_slots/3` half of `derived_slots/2` - red,
+    # the list then carries the pass-through entry alone.
     test "a declaring composite answers one on_<name> slot per declared outcome" do
       assert ConfirmStepDeclaring.slots(%{}) == [
-               {"on_timed_out", :zero_or_one, "If it finishes timed out"},
-               {"on_received", :zero_or_one, "If it finishes received"}
+               {"on_timed_out", :zero_or_one, "Timed out"},
+               {"on_received", :zero_or_one, "Received"}
              ]
 
       # The pass-through entries come first, in declaration order, and the
@@ -1093,6 +1095,75 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
                "body",
                "on_received",
                "on_timed_out"
+             ]
+    end
+
+    # `C7` item 1's label clause, said as an identity rather than as two
+    # strings that happen to match: the slot's label IS the label the
+    # sibling `outcomes/1` callback answers for the same name, from the same
+    # config, because both come from `derived_outcomes/2`. A member that
+    # relabels an outcome relabels its slot with it, and there is no second
+    # place a label can be spelled.
+    #
+    # Sabotage: derived the label from the name (`"If it finishes " <> name`,
+    # `core.subchart`'s wording) instead of from the outcome decl - red, the
+    # two callbacks then disagree.
+    test "the derived slot's label is the outcome's own label" do
+      config = %{"event" => "signup.confirmed"}
+
+      labels = Map.new(ConfirmStepDeclaring.outcomes(config))
+
+      for {slot, _arity, label} <- ConfirmStepDeclaring.slots(config) do
+        "on_" <> name = slot
+        assert label == Map.fetch!(labels, name)
+      end
+    end
+
+    # The other door `C7` item 1 names. A data-declared composite answers the
+    # derived entries through the same `Composite.derived_slots/2`, with the
+    # same labels, so the two declaration forms of one composite are one
+    # composite - which is `P2`'s claim reaching the outcome slots.
+    #
+    # Sabotage: left `Composite.Data.slots/2` on the declaration-only
+    # `derived_slots/1` - red, the data form then answers its pass-through
+    # entry alone.
+    test "the data declaration form answers the derived slots too" do
+      assert {:ok, state} =
+               Composite.Data.declaration(%{
+                 "type_name" => "signup.confirm_step_data",
+                 "version" => 1,
+                 "params" => [
+                   %{
+                     "key" => "event",
+                     "type" => "string",
+                     "label" => "Confirmed by",
+                     "required?" => true,
+                     "default" => ""
+                   }
+                 ],
+                 "subtree" => [
+                   %{
+                     "type" => "core.sequence",
+                     "id_suffix" => "body",
+                     "slots" => %{
+                       "body" => [
+                         %{
+                           "type" => "core.await",
+                           "id_suffix" => "wait",
+                           "config" => %{"event" => "{{event}}", "timeout" => "10m"}
+                         }
+                       ]
+                     }
+                   }
+                 ],
+                 "outcomes" => ["timed_out", "received"]
+               })
+
+      config = %{"event" => "signup.confirmed"}
+
+      assert Composite.Data.slots(state, config) == [
+               {"on_timed_out", :zero_or_one, "Timed out"},
+               {"on_received", :zero_or_one, "Received"}
              ]
     end
 
@@ -1190,12 +1261,37 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
       assert Enum.any?(errors, &(&1 =~ ~s("on_received")))
     end
 
+    # `C7` item 2's other side, which "What builds this" names as its own
+    # test: "one naming a name its `outcomes` does not declare is not"
+    # refused. A pass-through slot called `on_<something>` for a name the
+    # declaration does not carry keeps its pass-through meaning, builds, and
+    # is answered.
+    #
+    # Sabotage: had `outcome_slot_collisions/2` match on the `"on_"` prefix
+    # rather than on the declared names - red, this declaration is then
+    # refused too.
+    test "a slots: entry named for an outcome the declaration does not declare is not refused" do
+      declaration =
+        Composite.__declaration__(
+          name: "signup.not_colliding",
+          params: [],
+          outcomes: ["received"],
+          slots: [%{name: "on_abandoned", to: {"body", "body"}, label: "If abandoned"}]
+        )
+
+      assert Composite.derived_slots(declaration) == [
+               {"on_abandoned", :any, "If abandoned"}
+             ]
+
+      assert Composite.outcome_slot_collisions(declaration.slots, declaration.outcomes) == []
+    end
+
     # `C7` item 2's other half, said where a reader would look for it: the
     # refusal is what keeps a repeated name out of the answered list, which
     # both the editor's slot build and the compiler's `List.keyfind/3` read
     # assume. Nothing a declaration can write reaches `slots/1` twice.
     #
-    # Sabotage: appended the derived entries twice in `derived_slots/1` - red,
+    # Sabotage: appended the derived entries twice in `derived_slots/2` - red,
     # which is the property this pins. (Making the collision a precedence
     # rule rather than a refusal is red on the test above instead: the
     # declaration then builds, and it is that build the refusal prevents.)
@@ -1205,6 +1301,54 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
 
       with_slot = Enum.map(AwaitsWithSlot.slots(%{}), &elem(&1, 0))
       assert with_slot == Enum.uniq(with_slot)
+    end
+
+    # The expansion members hang off a declaring composite's resolved node
+    # under a slot name the compiler mints, and the spliced document the
+    # Structure stage walks is rebuilt from that node - so that one key is
+    # exempt from `:undeclared_slot`, which is about a slot the DOCUMENT uses
+    # that its type does not declare.
+    #
+    # The exemption is scoped to the blocks the compiler put the key on, and
+    # this pins that it is: the name is not reserved anywhere a stored
+    # document passes through, so an author can write a slot with it, and one
+    # who does must still be told their blocks would be dropped rather than
+    # getting a green compile that silently drops them. The declaring
+    # composite sits in the same document so the exemption is live while this
+    # runs.
+    #
+    # Sabotage: dropped the `MapSet.member?(declaring, block_id)` guard from
+    # `compiler_slot?/2`, which is the narrowing as it was first written -
+    # red: the compile then answers `{:ok, _}` and `blk_W` is gone from the
+    # chart.
+    test "an author's slot of the same name still draws its undeclared-slot finding" do
+      plain =
+        Block.new("core.sequence",
+          id: "blk_P",
+          slots: %{
+            ":expansion" => [Block.new("core.wait", id: "blk_W", config: %{"for" => "1m"})]
+          }
+        )
+
+      document =
+        Document.new(
+          Block.new("core.sequence",
+            id: "blk_ROOT",
+            slots: %{"body" => [block("signup.confirm_step_declaring"), plain]}
+          ),
+          id: "bdoc_declaredoutcomes"
+        )
+
+      assert {:error, findings} = Compiler.compile(document, palette(), child_use: true)
+
+      assert Enum.any?(findings, fn finding ->
+               finding.stage == :structure and
+                 finding.reason == {:undeclared_slot, "blk_P", ":expansion", 1}
+             end)
+
+      # And nothing is reported against the composite, whose key is the
+      # compiler's own.
+      refute Enum.any?(findings, &match?({:undeclared_slot, "blk_CS", _slot, _count}, &1.reason))
     end
 
     # `C6` item 5 and `C7` item 4, and the test both records delegate their

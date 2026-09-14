@@ -335,7 +335,7 @@ defmodule StatifierBlocks.Composite do
       def config_schema(_config), do: @composite_declaration.params
 
       @impl StatifierBlocks.BlockType
-      def slots(_config), do: StatifierBlocks.Composite.derived_slots(@composite_declaration)
+      def slots(config), do: StatifierBlocks.Composite.derived_slots(__MODULE__, config)
 
       @impl StatifierBlocks.BlockType
       def current_version, do: @composite_declaration.version
@@ -642,35 +642,45 @@ defmodule StatifierBlocks.Composite do
 
   @doc false
   @spec derived_slots(declaration()) :: [BlockType.slot_decl()]
-  def derived_slots(%{} = declaration) do
-    pass_through =
-      declaration
-      |> Map.get(:slots, [])
-      |> Enum.map(fn %{name: name, arity: arity, label: label} -> {name, arity, label} end)
+  def derived_slots(%{slots: slots}),
+    do: Enum.map(slots, fn %{name: name, arity: arity, label: label} -> {name, arity, label} end)
 
-    outcome_slots =
-      declaration
-      |> Map.get(:outcomes, [])
-      |> Enum.map(&{outcome_slot(&1), :zero_or_one, outcome_slot_label(&1)})
+  def derived_slots(_no_slots_key), do: []
 
-    pass_through ++ outcome_slots
+  @doc false
+  @spec derived_slots(Palette.type_ref(), Block.config()) :: [BlockType.slot_decl()]
+  def derived_slots(ref, config) do
+    declaration = Palette.call(ref, :__composite__, [], %{})
+
+    derived_slots(declaration) ++ outcome_slots(declaration, ref, config)
   end
 
-  def derived_slots(_not_a_declaration), do: []
+  # `ADR-0002`'s Amendment of 2026-09-13, `C7` item 1: one slot per declared
+  # outcome, named `on_` followed by the name, arity `zero_or_one`, "labelled
+  # from the outcome's own label". A declared name carries no label in the
+  # declaration - `C1` says so outright, "the label of a declared name is the
+  # label the member that raises it already declares for it" - so the label
+  # comes from the same place the sibling `outcomes/1` callback gets it,
+  # `derived_outcomes/2` over the block's own config, and the two answer the
+  # same label for the same name by construction rather than by test.
+  #
+  # That derivation expands the composite, which is why it is reached only
+  # for a declaration that carries `outcomes`: a composite that declares none
+  # answers its pass-through entries from the declaration alone, exactly as
+  # it did before this section, and gains no new way to fail (`C3`).
+  @spec outcome_slots(declaration(), Palette.type_ref(), Block.config()) ::
+          [BlockType.slot_decl()]
+  defp outcome_slots(%{outcomes: [_first | _rest]}, ref, config) do
+    ref
+    |> derived_outcomes(config)
+    |> Enum.map(fn {name, label} -> {outcome_slot(name), :zero_or_one, label} end)
+  end
+
+  defp outcome_slots(_declares_no_outcomes, _ref, _config), do: []
 
   @doc false
   @spec outcome_slot(String.t()) :: Block.slot_name()
   def outcome_slot(name) when is_binary(name), do: @slot_prefix <> name
-
-  # `core.subchart`'s own wording, verbatim in kind
-  # (`lib/statifier_blocks/core/subchart.ex`, `slot_label/1`). A declared
-  # name carries no label of its own in the declaration - the label an
-  # outcome shows is the raising member's, and that is knowable only with a
-  # palette in hand, which neither of `derived_slots/1`'s two call sites has.
-  # So the slot's label is derived from the name here, the way the precedent
-  # this shape was taken from derives it.
-  @spec outcome_slot_label(String.t()) :: String.t()
-  defp outcome_slot_label(name), do: "If it finishes " <> String.replace(name, "_", " ")
 
   @doc false
   @spec outcome_slot_collisions([pass_through_decl()], [String.t()]) :: [Block.slot_name()]
