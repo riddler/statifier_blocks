@@ -79,6 +79,38 @@ defmodule StatifierBlocks.Core.OnEvent do
   `config_schema/1` change plus a `current_version/0` bump, not a document
   schema change.
 
+  ## Naming the outcome this handler finishes with
+
+  `finish_as` is an optional free-text field beside the `outcome` select,
+  and it says *what this handler's own completion is called* when it
+  abandons its group. The two keys answer different questions: `outcome`
+  says what the arrival does to the group, `finish_as` names the
+  completion this handler reaches, and the select above keeps exactly its
+  two values.
+
+  | `finish_as` | This handler finishes as |
+  |---|---|
+  | blank, or absent | `done`, exactly as it always has |
+  | a role-shaped name | that name |
+
+  Named, `outcomes/1` answers `[{name, name}]` - the name is its own
+  label, because the author's words for a button live on the button and
+  not on the watcher - and `emit/2` mints the handler's final at its
+  outcome id, so the final raises `done.outcome.<handler state>.<name>`.
+  That is the event an enclosing declaring composite routes on, which is
+  what lets a composite declare an outcome one of its interrupt handlers
+  reaches. The abandon raise on the watcher's transition is unchanged and
+  still comes first, so the group is abandoned and only then is the named
+  completion routed.
+
+  A name is honoured with `outcome: "abandon"` only, must be role-shaped,
+  and may not be `done`; each is a `validate_config/1` finding on the key.
+
+  Blank or absent, every emitted byte is the byte that was emitted before
+  this key existed - which is what keeps it an additive key rather than a
+  document schema change, exactly as `cond` below and `capture` are. See
+  ADR-0002's Amendment of 2026-09-14, `C8`.
+
   ## The optional `cond` guard
 
   `cond` is an optional `:expression` field, and when it is set it becomes
@@ -319,12 +351,31 @@ defmodule StatifierBlocks.Core.OnEvent do
   @behaviour StatifierBlocks.BlockType
 
   alias StatifierBlocks.Block
-  alias StatifierBlocks.Compiler.Context
+  alias StatifierBlocks.Compiler.{Context, StateId}
   alias StatifierBlocks.Core.{Config, Emit}
   alias StatifierBlocks.{Emission, Environment}
   alias StatifierDatamodel.Declarations
 
   @outcomes ["abandon", "resume"]
+
+  # The one spelling of the optional name a handler finishes with
+  # (ADR-0002's Amendment of 2026-09-14, `C8`). It is spelled `finish_as`
+  # and not `outcome_name` because `StatifierBlocks.BlockType` already has
+  # a public `outcome_name/2` with a neighbouring meaning - it reads an
+  # outcome name out of a config at whatever key a container nominates,
+  # while this is one type's own field.
+  #
+  # The key is OPTIONAL with a blank default, and a handler that carries
+  # none emits exactly the bytes it emitted before the key existed, which
+  # is what keeps it an additive key rather than a document schema change
+  # and why `current_version/0` stays 1. `cond` below records the same
+  # precedent for the same reason, and `capture` is the same shape.
+  @finish_as_key "finish_as"
+
+  # The name the default outcome carries, which `outcomes/1` answers for a
+  # handler with no `finish_as` - ADR-0002 A1's default, byte for byte -
+  # and which a named handler may therefore not ask for.
+  @default_outcome "done"
 
   # The one spelling of the key, shared by the map's own validation and by
   # the payload refusal that reads the same pairs.
@@ -392,8 +443,31 @@ defmodule StatifierBlocks.Core.OnEvent do
         label: "Then",
         required?: true,
         default: "abandon"
+      },
+      %{
+        key: @finish_as_key,
+        type: :string,
+        label: "Finishing as",
+        required?: false,
+        default: ""
       }
     ]
+
+  @doc """
+  The outcome this handler finishes with.
+
+  Named, the single outcome `finish_as` carries, labelled with the name
+  itself. Unnamed, ADR-0002 A1's default - which is what this type
+  answered before it implemented this callback at all, and answering it
+  here byte for byte is what keeps the key additive.
+  """
+  @impl true
+  def outcomes(config) do
+    case finish_as(config) do
+      nil -> [{@default_outcome, "Done"}]
+      name -> [{name, name}]
+    end
+  end
 
   @doc """
   The three fields with checks of their own, and `capture`.
@@ -414,6 +488,7 @@ defmodule StatifierBlocks.Core.OnEvent do
     |> check_event(config)
     |> check_cond(config)
     |> check_outcome(config)
+    |> check_finish_as(config)
     |> check_capture(config)
     |> Config.verdict()
   end
@@ -444,6 +519,57 @@ defmodule StatifierBlocks.Core.OnEvent do
       findings
     else
       [{"outcome", ~s(pick "abandon" or "resume")} | findings]
+    end
+  end
+
+  # The three refusals `C8` item 4 names, each a finding on the new key.
+  #
+  # The name becomes a state id segment and an event segment, so it takes
+  # the shape every outcome name takes - `StatifierBlocks.Compiler.StateId.role?/1`
+  # is that predicate, and it is the same judgement the compiler already
+  # makes for a declared name.
+  #
+  # `done` is refused because it is the name the blank arm already
+  # answers, so writing it is either a no-op spelled as a decision or a
+  # request for two outcomes with one name.
+  #
+  # A name beside `outcome: "resume"` is refused because a resuming
+  # handler re-enters the group and finishes nothing: honouring the name
+  # would compile a final the handler never reaches.
+  defp check_finish_as(findings, config) do
+    case Map.get(config, @finish_as_key) do
+      blank when blank in [nil, ""] ->
+        findings
+
+      @default_outcome ->
+        [
+          {@finish_as_key, ~s(cannot be "done" - that is what a handler with no name finishes as)}
+          | findings
+        ]
+
+      name ->
+        findings
+        |> check_finish_as_shape(name)
+        |> check_finish_as_resumes(config)
+    end
+  end
+
+  defp check_finish_as_shape(findings, name) do
+    if StateId.role?(name) do
+      findings
+    else
+      [{@finish_as_key, "must be an outcome name, like went_back"} | findings]
+    end
+  end
+
+  defp check_finish_as_resumes(findings, config) do
+    if Map.get(config, "outcome") == "resume" do
+      [
+        {@finish_as_key, ~s(only a handler that abandons its group finishes with a name)}
+        | findings
+      ]
+    else
+      findings
     end
   end
 
@@ -915,22 +1041,56 @@ defmodule StatifierBlocks.Core.OnEvent do
   """
   @impl true
   def emit(%Block{config: config}, context) do
-    done = Context.done_id(context)
-
     with {:ok, armed} <- Context.role_id(context, "armed"),
+         {:ok, finish} <- finish_id(context, config),
          {:ok, outcome} <- outcome_event(Map.get(config, "outcome")),
          {:ok, event} <- event_name(Map.get(config, "event")),
          {:ok, assigns} <- captures(Map.get(config, "capture")) do
       watcher =
         Emit.state(armed, nil, [
           Emit.transition(
-            [event: event, cond: guard(config), cond_key: "cond", target: done],
+            [event: event, cond: guard(config), cond_key: "cond", target: finish],
             assigns ++ [Emission.element("raise", [{"event", outcome}])]
           )
         ])
 
-      {:ok, Emit.state(context.state_id, armed, [watcher, Emit.final(done)])}
+      {:ok, Emit.state(context.state_id, armed, [watcher, Emit.final(finish)])}
     end
+  end
+
+  # The id of the final this handler reaches, and so - through
+  # `StatifierBlocks.Core.Emit.final/1` - the completion event it raises.
+  #
+  # Named, that is the handler's own outcome id, which puts the id in the
+  # `o_` namespace and makes `Emit.final/1` wrap it in an `<onentry>`
+  # raise of `done.outcome.<handler state>.<name>`. Unnamed, it is
+  # `Context.done_id/1` exactly as before.
+  #
+  # This is a threading and not a substitution: the two functions answer
+  # different shapes - `done_id/1` a bare id, `outcome_id/2` the tagged
+  # `{:ok, id} | {:error, {:invalid_outcome, ...}}` that is ratified
+  # precisely because ADR-0004 decision 1 forbids `emit/2` to raise - so
+  # the named call belongs inside the `with` above, where every other
+  # caller of `outcome_id/2` puts it.
+  @spec finish_id(Context.t(), Block.config()) ::
+          {:ok, StateId.t()} | {:error, {:invalid_outcome, Block.id(), String.t()}}
+  defp finish_id(context, config) do
+    case finish_as(config) do
+      nil -> {:ok, Context.done_id(context)}
+      name -> Context.outcome_id(context, name)
+    end
+  end
+
+  # The stored name, or `nil` for a handler that carries none. Blank
+  # counts as none: `""` is the schema's default and what the editor
+  # leaves behind when an author clears the field. A stored value that is
+  # not a string at all is a `validate_config/1` finding, and reading it
+  # as "no name" here keeps `outcomes/1` total.
+  @spec finish_as(Block.config()) :: String.t() | nil
+  defp finish_as(config) do
+    name = Map.get(config, @finish_as_key)
+
+    if Config.non_empty_string?(name), do: name, else: nil
   end
 
   # The stored condition, or `nil` for a handler that carries none.
