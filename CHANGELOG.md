@@ -10,6 +10,29 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.30.0] 2026-09-13
+
+0.30.0 is a minor, because what a composite compiles to changes. A
+composite that declares `outcomes` now compiles to a state of its own
+with one `<final>` per declared name, and the enclosing body routes its
+completion through a derived `on_<name>` slot per declared outcome
+(ADR-0002 C6 and C7). Beside that, a `core.on_event` `capture` literal
+carrying a raw control character is now refused at compile.
+
+### Changed
+
+- A `core.on_event` `capture` literal carrying a raw control character other
+  than tab, line feed or carriage return is now refused at compile, on the
+  `capture` key, because the value reaches an XML attribute raw and XML 1.0
+  admits no such character there.
+- A composite that declares `outcomes` now compiles to a state of its own with
+  one `<final>` per declared name, so an enclosing body can route its
+  completion, and it derives one `on_<name>` slot per declared outcome for the
+  blocks that run when it finishes that way.
+- A composite declaration whose `slots:` names a pass-through slot after one of
+  its own declared outcomes is now refused, because the two kinds of slot
+  cannot share a name; rename one of them.
+
 ## [0.29.0] 2026-09-13
 
 0.29.0 is a minor, and its one consumer-visible requirement comes first:
@@ -3252,6 +3275,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.30.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.30.0
 [0.29.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.29.0
 [0.28.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.28.0
 [0.27.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.27.0
