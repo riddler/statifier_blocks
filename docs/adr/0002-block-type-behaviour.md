@@ -12655,14 +12655,19 @@ The Note of 2026-09-13 on the control-character refusal ("a raw C0 control
 character in a `{"const", value}` capture literal is refused at compile, on
 XML 1.0 grounds", `:11425`) restates its XML ground in one sentence as "XML
 1.0 admits no character below `U+0020` in an attribute value at all (5th
-edition, the `Char` production)" (`:11442-11443`). **Read that clause with the
-qualifier the rule above it already carries: XML 1.0 admits no character below
-`U+0020` in an attribute value other than tab (`U+0009`), line feed
-(`U+000A`) and carriage return (`U+000D`).** The 5th edition's `Char`
-production admits `#x9`, `#xA` and `#xD` and no other codepoint below
-`U+0020`, so an attribute value may carry those three; a parser that reads one
-back is not being tolerant, and the unqualified reading would make the three
-characters `escape/1` exists to rewrite unspellable.
+edition, the `Char` production)" (`:11441-11443`, the sentence opening on the
+first of those lines). **Read that clause with the qualifier the rule above it
+already carries: XML 1.0 admits no character below `U+0020` in an attribute
+value other than tab (`U+0009`), line feed (`U+000A`) and carriage return
+(`U+000D`).** The 5th edition's `Char` production admits `#x9`, `#xA` and
+`#xD` and no other codepoint below `U+0020`, so an attribute value may legally
+carry those three and a parser that accepts one is not being tolerant. What a
+parser hands *back* is a separate question and is not what this line restores:
+§3.3.3's attribute-value normalization turns a literal `#x9`, `#xA` or `#xD`
+in an attribute value into a space, which is exactly why `escape/1` writes the
+three as references rather than raw. Legality is the half the qualifier is
+about, and the unqualified reading would make the three characters `escape/1`
+exists to rewrite unspellable.
 
 **Nothing the Note decides changes, because the decision never rested on the
 unqualified reading.** The Note's own bold rule already names the carve-out -
@@ -12670,10 +12675,10 @@ unqualified reading.** The Note's own bold rule already names the carve-out -
 and carriage return (`U+000D`)" (`:11432-11435`) - and so does the code it
 cites: `control?/1` (`core/on_event.ex:667`, `defp control?(codepoint), do:
 codepoint < 0x20 and codepoint not in [?\t, ?\n, ?\r]`, read at `2a0aa2a`)
-carves the three out, and `control_message/1` (`:669`, read at the same
-commit) spells them out to the author. The restating sentence is the only
-place the qualifier went missing, and this line is where a reader who stops at
-it finds it again.
+carves the three out, and `control_message/1` (`:669`, `defp
+control_message(codepoint) do`, read at the same commit) spells them out to
+the author. The restating sentence is the only place the qualifier went
+missing, and this line is where a reader who stops at it finds it again.
 
 ### What this line does not do
 
@@ -12683,13 +12688,14 @@ whether any Amendment above is ready to flip, which remains the operator's on
 each one's own request.
 
 The request carrying this line also carries a code half in `core/on_event.ex`:
-`control_in/1`'s binary clause (`:653`, read at `2a0aa2a`) now asks
-`String.valid?/1` before reading a literal as characters, so a **direct**
-`validate_config/1` caller handing an invalid-UTF-8 binary gets the shape
-answer rather than a raise out of `String.to_charlist/1`. No rule this file
-states changes for it: the refusal `control?/1` performs is untouched, and a
-non-UTF-8 literal is still refused through the compiler by
-`Validation.canonical_json_check/2`'s binary clause (`validation.ex:351`, read
-at `2a0aa2a`), which runs before this walk.
+`control_in/1`'s binary clause (`:653`, `defp control_in(value) when
+is_binary(value) do`, read at `2a0aa2a`) now asks `String.valid?/1` before
+reading a literal as characters, so a **direct** `validate_config/1` caller
+handing an invalid-UTF-8 binary gets the shape answer rather than a raise out
+of `String.to_charlist/1`. No rule this file states changes for it: the
+refusal `control?/1` performs is untouched, and a non-UTF-8 literal is still
+refused through the compiler by `Validation.canonical_json_check/2`'s binary
+clause (`validation.ex:351`, `defp canonical_json_check(value, _path) when
+is_binary(value) do`, read at `2a0aa2a`), which runs before this walk.
 
 Filed with `sb-oa0y`, campaign RF047.
