@@ -11835,3 +11835,364 @@ does not dictate its lines.
   that repository's request, nor the `outcome_of:` amendment (`:9181`).
 
 Filed with `sb-gu5q`, campaign RF046.
+
+## Amendment (2026-09-14): an interrupt handler names the outcome it abandons its group with - `C8`
+
+**Status: proposed (2026-09-14, campaign RF047, bead `sb-algi`, recording
+`RQ-RF047-2` and `RQ-RF047-3`).** A decision record merges at proposed under
+the campaign invariant, and this one **stays** proposed at that campaign's
+wrap. **Nothing below describes code that exists today.** `RQ-RF047-2` ruled
+the surface and `RQ-RF047-3` ruled this record first; `sb-r6ln` is the request
+that builds it, dispatched only after this section is on `main`. If that
+request finds this section wrong, it holds and reports rather than amending it
+here.
+
+**The half this section decides.** `C6` (`:11014`) decides that a declaring
+composite raises `done.outcome.<composite state id>.<name>`, and `C7`
+(`:11482`) decides that the enclosing body selects on that name through a
+derived `on_<name>` slot. Together they close the raising and routing halves of
+the gap campaign SF040's capture `k2` measured. They do not close the half a
+screen composite needs: **nothing lets one interrupt handler say which of the
+composite's outcomes its arrival is.** A screen expands to a `core.group` whose
+`interrupts` slot holds one `core.on_event` per button; every such handler
+answers `A1`'s default single outcome `done` (`:750`), that default is the one
+thing `Composite.raisable_labels/3` reads, and so `C2` item 3 (`:10137`)
+refuses every button name the composite declares. This section is the third
+half, and the three close the gap together; none closes it alone.
+
+Additive: every decision, Amendment and Note above this line stands exactly as
+it stands, and no text above this line is edited by this section. `C2`, `C6`
+and `C7` are not edited; this section is stated **on top of** them and narrows
+none of them. `D13` (`:725`) stands: the name this section adds is an
+*outcome*, it compiles to a distinct completion event, and it is selected on
+through `C7`'s slot and never through a port.
+
+Every `lib/` and `test/` cite below was **read at `main` `f1bf10c`** (the
+`v0.30.0` release commit) and is written anchor first, line second - a function
+head, a module attribute, a `describe` or `test` name, a heading. A cite is
+re-located by that anchor and not by its number. Cites into this file and into
+`ADR-0004` and `ADR-0007` are written the same way.
+
+### The premise this section rests on, and what is true of the code today
+
+- **`core.on_event` implements no `outcomes/1`.** `grep 'outcomes('
+  lib/statifier_blocks/core/on_event.ex` is empty at `f1bf10c`, and the module
+  declares `@behaviour StatifierBlocks.BlockType` (`core/on_event.ex:319`) with
+  no `use` and no `defoverridable`, so `A1`'s default holds: the type has
+  exactly one outcome, named `done`, and answers `[{"done", "Done"}]`. The
+  callback is optional and takes the config: `@callback
+  outcomes(Block.config()) :: [outcome_decl()]` (`block_type.ex:680`), listed
+  in the optional-callback set at `block_type.ex:33` and `:843`. Adding an
+  `outcomes/1` implementation to this type therefore changes no callback's
+  shape and adds no callback to the behaviour.
+- **The `outcome` key is a two-value `:select`.** `config_schema/1`
+  (`core/on_event.ex:364`, `def config_schema(_config),`) declares `event`,
+  `payload`, `cond` and `outcome`; the `outcome` entry is `:387-395` (`key:
+  "outcome",` at `:388`), `label: "Then"`, `required?: true`, `default:
+  "abandon"`. The two values are `@outcomes ["abandon", "resume"]` (`:327`),
+  and `check_outcome/2` (`:442`, `defp check_outcome(findings, config) do`)
+  refuses anything else with `pick "abandon" or "resume"` (`:446`), reached
+  from `validate_config/1` (`:412`).
+- **`raisable_labels/3` reads exactly one thing per member.**
+  `Composite.raisable_labels/3` (`composite.ex:954`, `defp
+  raisable_labels(%Palette{} = palette, members, param_map) do`) flattens the
+  minted members and `flat_map`s `member_outcomes/2` (`:963`, `defp
+  member_outcomes(%Block{} = member, %Palette{} = palette) do`), which is
+  `BlockType.outcomes(ref, member.config)` and nothing else. That map is what
+  `C2` item 2's raisable set is, and `outcome_raisers/4` (`composite.ex:703`,
+  `def outcome_raisers(%Palette{} = palette, names, members, param_map) do`) is
+  what routes it. `C7`'s slot derivation is `Composite.outcome_slot/1`
+  (`composite.ex:683`, `def outcome_slot(name) when is_binary(name), do:
+  @slot_prefix <> name`). The compiler's halves are `declaring_node/7`
+  (`compiler.ex:658`), `routes/2` (`compiler.ex:2094`), `routing_transitions/1`
+  (`compiler.ex:2162`) and `validate_outcomes/2` (`compiler.ex:2201`) - all of
+  them in `compiler.ex` and none of them in `composite.ex`.
+- **`emit/2` mints one final, on the `done` id.** `core/on_event.ex:917` (`def
+  emit(%Block{config: config}, context) do`) binds `done =
+  Context.done_id(context)` at `:918`, **outside** the `with` that follows
+  (`:920-923`), raises the interrupt outcome event on the watcher's transition
+  (`:928`, `assigns ++ [Emission.element("raise", [{"event", outcome}])]`) and
+  closes with `Emit.final(done)` (`:932`). The function body ends `:934`.
+- **The two id functions answer different shapes.** `Context.done_id/1`
+  (`compiler/context.ex:204`, `def done_id(%__MODULE__{block_id: block_id})`)
+  answers a bare `StateId.t()`; `Context.outcome_id/2` (`:244`, `def
+  outcome_id(%__MODULE__{block_id: block_id}, outcome),`) answers `{:ok, id} |
+  {:error, {:invalid_outcome, block_id, outcome}}`. The tagged shape is the
+  ratified one and `context.ex:222-240` records why - decision 1 forbids
+  `emit/2` to raise - and every caller threads it through a `with`
+  (`core/invoke.ex:283`, `core/map.ex:663`, `core/await.ex:274-275`,
+  `core/subchart.ex:462`).
+- **`Emit.final/1` already raises an outcome event for an `o_` id.**
+  `core/emit.ex:150` (`def final(id) do`): it calls `StateId.unoutcome_id(id)`
+  and, on `{:ok, {state_id, outcome}}`, wraps the final in an
+  `<onentry><raise event={StateId.outcome_event(state_id, outcome)}/></onentry>`;
+  on `:error` it emits a bare `<final>`. **This is the mechanism item 3 below
+  rests on and it needs no change.** The group's own abandon transition
+  (`core/emit.ex:296`, `transition(event: abandon, target: done, internal:
+  true),`) is likewise untouched.
+- **The group cannot read the handler's config, by record.** The comment at
+  `core/group.ex:62-67`, opening "`slot_outcome_key` names where a rule in
+  `interrupts` says what it does to this group", says that "the compiler still
+  cannot read it, and must not", for `ADR-0004` decision 4's reason. The
+  declaration itself is `slot_outcome_key: %{"interrupts" => "outcome"}`
+  (`core/group.ex:79`), and it points the editor - not the compiler - at the
+  select.
+- **The version numbers.** `core.on_event`'s `current_version/0` is `1`
+  (`core/on_event.ex:358`, `def current_version, do: 1`) and the package's
+  `@compiler_version` is `"0.30.0"` (`compiler.ex:425`).
+
+### The measurement this closes
+
+Run twice - at the RF047 walk on 2026-09-13 and again by this campaign's `W0`
+probe on 2026-09-14 - in a throwaway `statifier_examples` worktree at `35bb23e`
+against `statifier_blocks` `0.30.0` and `predicator` `9.4.1`, both times with
+the same result.
+
+With `outcomes: ["account_submitted", "personal_chosen", "business_chosen",
+"went_back", "signup_confirmed", "timed_out"]` declared on the examples app's
+screen composite, `Compiler.compile` over the app's document answers `{:error,
+15 findings}`. Every one of the fifteen carries `stage: :resolve, severity:
+:error, code: :outcome_not_raisable, fault: :package` - five per screen block,
+across the three screen blocks - and `timed_out` draws none, because the
+group's `core.await` member raises it. Per minted member, `BlockType.outcomes/2`
+answers `core.group` `[{"done", "Done"}]`, `core.send` `[{"done", "Done"}]`,
+`core.await` `[{"received", "Received"}, {"timed_out", "Timed out"}]` and
+`core.on_event` `[{"done", "Done"}]` - the last being `A1`'s default for a type
+that implements no `outcomes/1`. The button names are raisable by nothing, so
+`C2` item 3 refuses them and no `on_<name>` slot can exist.
+
+The probe then simulated the fix rather than guessing at it. A handler type
+whose `outcomes/1` answered an outcome named by its own config, placed on the
+`interrupts` rail of a declaring composite with an occupied `on_went_back`
+slot, compiled `{:ok, _}` with **zero** findings, and the chart carried all
+three bytes `C6` and `C7` promise:
+
+```xml
+<transition event="done.outcome.<handler state>.went_back"
+            target="<slot child>" type="internal"/>
+<transition event="done.state.<slot child>" target="<composite>__o_went_back"/>
+<final id="<composite>__o_went_back">
+  <onentry><raise event="done.outcome.<composite>.went_back"/></onentry>
+</final>
+```
+
+For the examples fixture those ids printed as `s_blk_PS_button_1`, `s_blk_W`
+and `s_blk_PS__o_went_back`. **The one wrong byte was the handler's own final**,
+still `<final id="<handler>__o_done">` raising `.done`, because `emit/2` mints
+`Context.done_id/1` (`core/on_event.ex:918`) and knows no other name. That one
+byte is what item 3 below decides.
+
+The measurement that asks for this is the Riddler ruling `R12.3`: a Back button
+records `went_back` as an outcome the enclosing body can route. `R10d` - Back
+navigation and re-asks overwrite - is not contradicted by anything here;
+nothing in this section builds `context`, a resolve verdict, or validation.
+
+### `C8`. A `core.on_event` handler may name the outcome it finishes with when it abandons its group, through an optional free-text key beside the `outcome` select
+
+**1. The key, its spelling, and what it means.** `core.on_event`'s
+`config_schema/1` gains one **optional** field beside `outcome`:
+
+| `key` | `type` | `label` | `required?` | `default` |
+|---|---|---|---|---|
+| `"finish_as"` | `:string` | `"Finishing as"` | `false` | `""` |
+
+Its meaning is: *the outcome this handler completes with when it abandons its
+group.* Absent or blank, the handler finishes as it always has.
+
+**The spelling is `finish_as` and not the `outcome_name` the ruling
+recommended.** `RQ-RF047-2` left the record free to respell, and it should:
+`outcome_name` is already a **public function** in this package with a
+neighbouring meaning - `BlockType.outcome_name/2` (`block_type.ex:1350`, `def
+outcome_name(config, key) when is_map(config) and is_binary(key) do`, `@spec`
+`:1349`), documented as "The outcome `config` declares at `key`, or `nil`" -
+beside a private `outcome_name/1` (`:916`) and the regex guard `@outcome_name
+~r/\A[a-z][a-z0-9_]*\z/` (`:1298`). A config key spelled `"outcome_name"`
+sitting next to a function that means "read an outcome name out of a config at
+a key" is a reviewable confusion and a grep hazard, and the two are not the
+same thing: `BlockType.outcome_name/2` reads *whatever key a container
+nominates* through `slot_outcome_key/2`, while this key is one type's own
+field. `finish_as` and the label `Finishing as` have zero prior art in `lib/`,
+`test/` and `docs/` at `f1bf10c`, so the spelling is free.
+
+The `outcome` select is **not** touched: it keeps exactly its two values
+(`core/on_event.ex:327`, `:387-395`), its `"Then"` label and its `abandon`
+default. The two keys answer different questions - `outcome` says *what the
+arrival does to the group*, `finish_as` says *what the handler's own completion
+is called* - and that separation is what keeps this an additive key rather than
+a third select value. `D13` holds throughout: `finish_as` names an outcome, the
+outcome compiles to a distinct completion event, and the enclosing body selects
+on it through the slot `C7` derives.
+
+**2. Named, `outcomes/1` answers the name; unnamed, it answers `A1`'s
+default.** `core.on_event` gains an `outcomes/1` implementation - a callback it
+does not implement today, which `A1` makes optional and which `block_type.ex:680`
+declares at arity 1. It answers:
+
+- with a non-blank `finish_as` of value `name`: `[{name, name}]`. The label is
+  the name. The Note of 2026-09-13 (`:10544`) already decided that a name is
+  its own fallback label for a declaring composite, and a handler has no better
+  human text to offer: the author's words for the button live on the button,
+  not on the watcher.
+- absent or blank: `[{"done", "Done"}]`, **byte for byte** what `A1`'s default
+  answers today.
+
+That single return is the whole of the change's reach into `C2` and `C7`,
+because `raisable_labels/3` (`composite.ex:954`) reads `member_outcomes/2` and
+nothing else. `C2` item 2's raisable set therefore admits the name with no line
+of change, `C2` item 3 stops refusing it, `C7` derives `on_<name>` through
+`Composite.outcome_slot/1` (`composite.ex:683`) with no line of change, and
+`outcome_raisers/4` (`composite.ex:703`) routes it. The probe proved exactly
+this by simulation, and it is why the surface ruled out `core.group` and a new
+type: a group that read its child's config would breach `ADR-0004` decision 4
+and the sentence at `core/group.ex:62-67`, and a new type would duplicate
+`core.on_event`'s five keys, its `emit/2`, its kind tag and its editor face.
+
+**3. Named, the handler's final is minted at its outcome id, and the call is
+threaded rather than swapped.** Named, `emit/2` mints the handler's final at
+`Context.outcome_id(context, name)` instead of `Context.done_id(context)`, so
+`Emit.final/1` (`core/emit.ex:150`) sees an id in the `o_` namespace and raises
+`done.outcome.<handler state>.<name>` from its `onentry` - which is the event
+`C7`'s routing transition selects on.
+
+**This is not a substitution at `core/on_event.ex:918`.** The two functions
+answer different shapes: `done_id/1` a bare `StateId.t()`, `outcome_id/2` a
+tagged `{:ok, id} | {:error, {:invalid_outcome, block_id, outcome}}` whose
+tagging is ratified precisely because decision 1 forbids `emit/2` to raise
+(`compiler/context.ex:222-240`). The named call therefore moves **inside** the
+existing `with` at `core/on_event.ex:920-923`, in the shape every other caller
+uses (`core/invoke.ex:283`, `core/map.ex:663`, `core/await.ex:274-275`,
+`core/subchart.ex:462`), and `Emit.final/1` at `:932` takes the bound id. The
+unnamed arm keeps `done_id/1` as it is.
+
+The abandon raise on the watcher's transition (`core/on_event.ex:928`) is
+**unchanged**, and it precedes the final's `onentry` in the internal queue. So
+a named handler's queue holds `[abandon, <name>]` in that order: the group is
+abandoned first, by the group's own transition (`core/emit.ex:296`), and only
+then does the composite route the named completion. That order is what keeps
+the handler's name a *completion* and not a second way to leave the group.
+
+**4. A name is honoured with `abandon` only, must be role-shaped, and may not
+be `done`.** Three refusals, all of them `validate_config/1` findings on the
+new key, in the shape `check_outcome/2` (`core/on_event.ex:442`) already uses
+and reached from `validate_config/1` (`:412`):
+
+- `finish_as` set on a handler whose `outcome` is `"resume"` is a finding. A
+  resuming handler re-enters the group and finishes nothing, so there is no
+  completion for the name to be the name of; honouring it would compile a final
+  the handler never reaches.
+- a `finish_as` that is not role-shaped is a finding. The name becomes a state
+  id segment and an event segment, so it takes the same shape every outcome
+  name takes: `StateId.role?/1` (`compiler/state_id.ex:106`) is the existing
+  predicate, and `validate_outcomes/2` (`compiler.ex:2201`) is where the same
+  judgement already lives for a declaration.
+- `finish_as: "done"` is a finding. `done` is the name the unnamed arm already
+  answers, so naming it is either a no-op written as a decision or a request
+  for two outcomes with one name.
+
+Each of these **narrows an existing refusal by adding an exemption's mirror
+image** - a new finding on a new key, not a widened return and not a new public
+function - which is exactly the surface this section names; `sb-r6ln` pins each
+of the three with a negative test.
+
+**5. `current_version/0` does not bump, and there is no migration.**
+`core.on_event`'s `current_version/0` stays `1` (`core/on_event.ex:358`). An
+**optional** key with an empty default, whose absence leaves a document's
+compiled bytes exactly as they were, is an additive key and not a document
+schema change - and this very type already records that precedent for its
+`cond` key: "A handler with no `cond` - the key absent, or blank - emits
+exactly the bytes it emitted before the key existed, which is what keeps it an
+additive key rather than a document schema change" (`core/on_event.ex:86-89`,
+the heading "The optional `cond` guard" at `:82`). `capture` is the same
+shape. `finish_as` meets that test by item 2's second arm: unnamed, `outcomes/1`
+answers `A1`'s default byte for byte, and `emit/2` takes the `done_id/1` path
+unchanged.
+
+The moduledoc sentence a reader will reach for says the opposite of what it
+looks like it says here. "A third value is a `config_schema/1` change plus a
+`current_version/0` bump, not a document schema change"
+(`core/on_event.ex:78-80`, under the heading "The `outcome` values" at
+`:66`) is about **changing the select's values** - adding a third thing an
+existing document's `outcome` field may hold. `C8` adds no value to that
+select; it adds a sibling field. The sentence stands as written and this
+section does not amend it; `sb-r6ln` extends the moduledoc beside it.
+
+`ADR-0007` is the lineage that makes the alternative unavailable rather than
+merely unattractive. Its defaults table gives `current_version/0` the value `1`
+"ADR-0001 decision 4's starting version"
+(`docs/adr/0007-block-type-defaults.md:64-66`), and it records that
+"`migrate_config/2` refuses rather than answering `{:ok, config}`" because a
+no-op migration reads as harmless and is not (`:78-83`). A bump with nothing to
+migrate is therefore not an option one may choose for safety's sake: it would
+oblige a `migrate_config/2` that has no work to do and must refuse.
+
+**6. The compiler version moves at the release, not in the request that builds
+this.** A **named** handler's emitted bytes change - a differently-named final,
+an `onentry` raise where there was none. An **unnamed** handler's bytes do not
+change at all, which is item 5's condition. Because emission moves for some
+documents, `@compiler_version` (`compiler.ex:425`, `"0.30.0"`) bumps under
+`ADR-0004`'s own obligation - "any change to emission that moves bytes bumps it
+- a release-discipline obligation this record creates on itself"
+(`docs/adr/0004-compiler-provenance.md:259-261`) - **at the `0.31.0` release
+prep**, and not in this section and not in `sb-r6ln`. That is the same division
+`C7` item 7 took.
+
+**7. The editor draws a named handler as `abandon`, and that is a known gap
+this section names rather than decides.** `core.group` declares
+`slot_outcome_key: %{"interrupts" => "outcome"}` (`core/group.ex:79`), which
+points the canvas at the `outcome` **select**, and the view model reads the
+node's outcome badge through it: `view_model.ex:2212` (`%{node | outcome:
+BlockType.outcome_name(block.config, outcome_key)}`), whose regex guard
+`@outcome_name` (`block_type.ex:1298`) admits `abandon`. So a `C8`-named
+handler still draws as `abandon` on the canvas, and `finish_as` draws as any
+optional string field draws.
+
+Nothing breaks, and nothing in `sb-r6ln`'s scope changes it: the badge showing
+`abandon` where an author wrote `went_back` is a **gap this section records as
+a follow-up for the conductor to file**, not a decision this section takes. How
+the badge should read - the name, the select value, or both - is an editor
+question with an editor's judgement in it, and `C8` does not answer it.
+
+**8. What builds this, and what it is asked to prove.** `sb-r6ln` is the
+request. This section asserts rules; it counts no call sites and enumerates no
+files, and the enumeration is the tests' to carry:
+
+- the **unnamed pin**: a document of `core.on_event` handlers with no
+  `finish_as` compiles byte-identically to `0.30.0`. This is item 5's condition
+  and the release's.
+- the **named emission pin**: a named handler's final carries the outcome id
+  and raises `done.outcome.<handler state>.<name>`, and the abandon raise is
+  still on the watcher's transition and still first in the queue.
+- `outcomes/1` **named and unnamed**: `[{name, name}]` and `[{"done", "Done"}]`.
+- the **three refusals** of item 4, one negative test each. `core.on_event`'s
+  test file has no `describe` for `outcome` or `check_outcome/2` at `f1bf10c`,
+  so they need a home of their own.
+- the **routing proof**: a declaring composite whose `interrupts` rail holds a
+  named handler and whose `on_<name>` slot is occupied compiles with **zero**
+  `:outcome_not_raisable` findings for that name, and the chart carries `C7`'s
+  routing transition. The sibling fixture belongs with the existing declaring
+  fixture, which lives inside
+  `test/statifier_blocks/composite/declared_outcomes_test.exs` rather than in
+  `test/support/`.
+- the **provenance totality test** stays green.
+
+### What `C8` does not decide
+
+- **Whether an interrupt handler's named outcome may be failure-classed**, or
+  what slot style its `on_<name>` slot takes. That is the question `sb-pj0o`
+  carries for a declaring composite's names generally, and this section takes
+  no position on it in either direction.
+- **How the canvas draws a named handler.** Item 7 states the gap and stops.
+- **Whether `core.group` should ever see its children's outcome names.** It
+  should not, by `ADR-0004` decision 4 and `core/group.ex:62-67`, and this
+  section keeps the group's own `outcomes/1` untouched.
+- **Any callback's shape.** No `t:StatifierBlocks.BlockType` callback changes
+  shape, no callback is added to the behaviour, and no return widens.
+  `core.on_event` gains an implementation of a callback the behaviour already
+  declares optional (`block_type.ex:680`). `D13` (`:725`) stands.
+- **Anything about a `resume` handler** beyond item 4's refusal. Resume keeps
+  every byte it has.
+- **The examples app's own composite declaration**, which is that
+  repository's request, and the `outcome_of:` amendment (`:9181`), which this
+  section does not reach.
+
+Filed with `sb-algi`, campaign RF047.
