@@ -256,6 +256,14 @@ defmodule StatifierBlocks.Composite do
 
   @separator "_"
 
+  # `ADR-0002`'s Amendment of 2026-09-13, `C7` item 1: one slot per declared
+  # outcome, named `on_` followed by the name. The prefix is
+  # `core.subchart`'s (`lib/statifier_blocks/core/subchart.ex`,
+  # `@slot_prefix`), which is the precedent that Amendment takes its shape
+  # from; it is spelled again here rather than read from there because a
+  # composite is not a `core.subchart` and neither owns the other's slots.
+  @slot_prefix "on_"
+
   @doc """
   The blocks this composite stands for, given its params.
 
@@ -437,6 +445,8 @@ defmodule StatifierBlocks.Composite do
 
     outcomes = opts |> Keyword.get(:outcomes, []) |> normalize_outcomes!()
 
+    refute_outcome_slot_collisions!(slots, outcomes)
+
     %{
       name: name,
       params: params,
@@ -470,6 +480,32 @@ defmodule StatifierBlocks.Composite do
     end
 
     names
+  end
+
+  # `C7` item 2: a `slots:` entry is a **pass-through** slot, whose children
+  # are spliced into an expansion member before the composite's own state
+  # exists; a derived outcome slot holds a continuation that runs inside that
+  # state. One name cannot mean both, so a declaration that names a
+  # pass-through slot after one of its own declared outcomes is refused
+  # against the declaration - the composite's author is who can fix it - in
+  # the manner `check_mapping!/3` already refuses a pass-through declaration
+  # that does not fit its subtree. A `slots:` entry named `on_<something>`
+  # for a name `outcomes` does not carry keeps its pass-through meaning and
+  # is untouched.
+  @spec refute_outcome_slot_collisions!([pass_through_decl()], [String.t()]) :: :ok
+  defp refute_outcome_slot_collisions!(slots, outcomes) do
+    case outcome_slot_collisions(slots, outcomes) do
+      [] ->
+        :ok
+
+      collisions ->
+        raise ArgumentError,
+              "use StatifierBlocks.Composite: :slots declares " <>
+                inspect(collisions) <>
+                ", which :outcomes already derives as an outcome slot. A pass-through slot " <>
+                "splices its children into an expansion member; an outcome slot holds what " <>
+                "runs when the composite finishes that way. Rename one of them."
+    end
   end
 
   @doc """
@@ -606,10 +642,67 @@ defmodule StatifierBlocks.Composite do
 
   @doc false
   @spec derived_slots(declaration()) :: [BlockType.slot_decl()]
-  def derived_slots(%{slots: slots}),
-    do: Enum.map(slots, fn %{name: name, arity: arity, label: label} -> {name, arity, label} end)
+  def derived_slots(%{} = declaration) do
+    pass_through =
+      declaration
+      |> Map.get(:slots, [])
+      |> Enum.map(fn %{name: name, arity: arity, label: label} -> {name, arity, label} end)
 
-  def derived_slots(_no_slots_key), do: []
+    outcome_slots =
+      declaration
+      |> Map.get(:outcomes, [])
+      |> Enum.map(&{outcome_slot(&1), :zero_or_one, outcome_slot_label(&1)})
+
+    pass_through ++ outcome_slots
+  end
+
+  def derived_slots(_not_a_declaration), do: []
+
+  @doc false
+  @spec outcome_slot(String.t()) :: Block.slot_name()
+  def outcome_slot(name) when is_binary(name), do: @slot_prefix <> name
+
+  # `core.subchart`'s own wording, verbatim in kind
+  # (`lib/statifier_blocks/core/subchart.ex`, `slot_label/1`). A declared
+  # name carries no label of its own in the declaration - the label an
+  # outcome shows is the raising member's, and that is knowable only with a
+  # palette in hand, which neither of `derived_slots/1`'s two call sites has.
+  # So the slot's label is derived from the name here, the way the precedent
+  # this shape was taken from derives it.
+  @spec outcome_slot_label(String.t()) :: String.t()
+  defp outcome_slot_label(name), do: "If it finishes " <> String.replace(name, "_", " ")
+
+  @doc false
+  @spec outcome_slot_collisions([pass_through_decl()], [String.t()]) :: [Block.slot_name()]
+  def outcome_slot_collisions(slots, outcomes) when is_list(slots) and is_list(outcomes) do
+    derived = MapSet.new(outcomes, &outcome_slot/1)
+
+    slots
+    |> Enum.map(& &1.name)
+    |> Enum.filter(&MapSet.member?(derived, &1))
+    |> Enum.uniq()
+  end
+
+  @doc false
+  @spec declared_outcome_names(Palette.type_ref()) :: [String.t()]
+  def declared_outcome_names(ref), do: declared_outcomes(ref)
+
+  @doc false
+  @spec outcome_raisers(Palette.t(), [String.t()], [Block.t()], param_map()) ::
+          [{String.t(), [Block.id()]}]
+  def outcome_raisers(%Palette{} = palette, names, members, param_map) do
+    raised =
+      members
+      |> flatten()
+      |> Enum.filter(&Map.has_key?(param_map, &1.id))
+      |> Enum.flat_map(fn %Block{id: id} = member ->
+        member |> member_outcomes(palette) |> Enum.map(fn {name, _label} -> {name, id} end)
+      end)
+
+    Enum.map(names, fn name ->
+      {name, for({raised_name, id} <- raised, raised_name == name, do: id)}
+    end)
+  end
 
   @doc """
   `subtree`'s three pass-through refusals, as a list of messages, or `[]`.

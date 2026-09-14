@@ -966,49 +966,307 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     end
   end
 
-  # -- the compiled chart, and what `C5` says this section does not move ---
+  # -- C6 and C7: the declared list is a compiled route after all ---------
 
-  describe "C5: the declared list is an authoring answer, not a compiled route" do
-    # `sb-51lv`, `sb-qmm3` item 8. The item asked for an end-to-end pin that a
-    # declared non-default outcome reaches an enclosing body's outcome slot.
-    # It does not, and `C5` is why: "This section changes *which list a
-    # composite answers as its declared outcomes*, and nothing about what an
-    # outcome is, how it is drawn, or how it compiles."
+  describe "C6 and C7: a declaring composite compiles to a state of its own" do
+    # `sb-51lv`, `sb-qmm3` item 8 asked for an end-to-end pin that a declared
+    # non-default outcome reaches an enclosing body. `C5` refused to give one
+    # - "This section changes *which list a composite answers as its declared
+    # outcomes*, and nothing about what an outcome is, how it is drawn, or how
+    # it compiles" - and said the test below "is what will go red when one
+    # is". `C6` and `C7` are that decision, and this is the same test,
+    # re-pinned to them.
     #
-    # The expansion is what compiles. A composite block is replaced by its
-    # members before Emit, so the state the enclosing body routes on is the
-    # EXPANSION ROOT's - a `core.sequence` here, which raises `done` and
-    # nothing else - and the declared names appear in the chart only where a
-    # member raises them, on that member's own state. So the assertion below
-    # is the measurement SF040's capture `k2` made (ADR-0002, "The
-    # measurement that asks for it"), pinned as a fact about today's
-    # compiler rather than left as a one-off reading of a running document.
+    # What did NOT move: the two refutes. `s_blk_CS_body` is the EXPANSION
+    # ROOT's state, a `core.sequence` that raises `done` and nothing else, and
+    # `C6` mints on the composite BLOCK's id - `s_blk_CS`. The expansion root
+    # still raises no declared name.
     #
-    # It is deliberately not an assertion that this is right. Closing k2's
-    # gap - making a declared outcome routable by the enclosing body - is a
-    # decision no section of this record has taken, and this test is what
-    # will go red when one is.
+    # What moved is the enclosing body's transition. `C6` item 1 makes the
+    # composite a state enclosing its expansion, so what the body routes on is
+    # `done.state.s_blk_CS` and not the expansion root's completion, and the
+    # composite's own `done.outcome.s_blk_CS.*` is raised from the finals
+    # `C6` item 2 mints.
     #
-    # Sabotage: not applicable in the usual direction - there is no code path
-    # to weaken. Its discriminating power is the reverse: an implementation
-    # that started routing the declared names would fail both refutes.
-    test "the enclosing body routes the expansion root's completion, not the declared names" do
+    # Sabotage: dropped the `declaring` arm of `expand_node/3`, so a declaring
+    # composite is replaced by its expansion as before - red on the composite
+    # state, on both new outcome events, and on the body's transition.
+    test "the enclosing body routes the composite's own completion" do
       assert {:ok, compiled} =
                Compiler.compile(document("signup.confirm_step_declaring"), palette(),
                  child_use: true
                )
 
-      # The declared names are raised, but on the `core.await` that raises
+      # The declared names are still raised by the `core.await` that reaches
       # them - a member two levels below the composite block's own id.
       assert compiled.scxml =~ "done.outcome.s_blk_CS_wait.received"
       assert compiled.scxml =~ "done.outcome.s_blk_CS_wait.timed_out"
 
-      # Nothing carries them at the composite's own expansion root, and the
-      # enclosing body's only transition out of it is the root's `done`.
+      # And still not by the expansion root, which is what `C6` narrows in
+      # `C5` and what makes minting on the composite's own id the change.
       refute compiled.scxml =~ "done.outcome.s_blk_CS_body.received"
       refute compiled.scxml =~ "done.outcome.s_blk_CS_body.timed_out"
-      assert compiled.scxml =~ ~s(event="done.state.s_blk_CS_body" target="s_blk_ROOT__o_done")
+
+      # `C6` item 1: the composite is a state enclosing its expansion.
+      assert compiled.scxml =~ ~s(<state id="s_blk_CS" initial="s_blk_CS_body">)
+
+      # `C6` item 2: one `<final>` per declared name, each raising the
+      # composite's own completion event from its `<onentry>`.
+      assert compiled.scxml =~
+               ~s(<final id="s_blk_CS__o_received"><onentry>) <>
+                 ~s(<raise event="done.outcome.s_blk_CS.received"/></onentry></final>)
+
+      assert compiled.scxml =~
+               ~s(<final id="s_blk_CS__o_timed_out"><onentry>) <>
+                 ~s(<raise event="done.outcome.s_blk_CS.timed_out"/></onentry></final>)
+
+      # And the line that moved: the enclosing body routes the composite.
+      refute compiled.scxml =~ ~s(event="done.state.s_blk_CS_body" target="s_blk_ROOT__o_done")
+      assert compiled.scxml =~ ~s(event="done.state.s_blk_CS" target="s_blk_ROOT__o_done")
     end
+
+    # `C6` item 3: a member final raising a declared name transitions to the
+    # matching composite final. The `core.await` is the raiser here and the
+    # transition sits on the composite's own compound state, which is what
+    # lets it fire for a member any depth below.
+    #
+    # Sabotage: pointed `routing_transitions/1` at the member's own final
+    # instead of the route's target - red, the event then targets a state
+    # inside the expansion.
+    test "a declared member outcome transitions to the matching composite final" do
+      assert {:ok, compiled} =
+               Compiler.compile(document("signup.confirm_step_declaring"), palette(),
+                 child_use: true
+               )
+
+      assert compiled.scxml =~
+               ~s(<transition event="done.outcome.s_blk_CS_wait.received" ) <>
+                 ~s(target="s_blk_CS__o_received" type="internal"/>)
+
+      assert compiled.scxml =~
+               ~s(<transition event="done.outcome.s_blk_CS_wait.timed_out" ) <>
+                 ~s(target="s_blk_CS__o_timed_out" type="internal"/>)
+    end
+
+    # `C6` item 4: "A completion the declaration does not name does not
+    # finish the composite." The expansion root raises `done`, which the
+    # declaration does not carry, so nothing leaves the composite's state on
+    # it and the composite rests there.
+    #
+    # Sabotage: gave `member_chain/2` an exit target - the first route's final
+    # - so the expansion's last member is chained onward the way
+    # `Emit.chain/2` chains one. Red: the expansion root's completion then
+    # leaves the composite.
+    test "an undeclared completion leaves the composite state resting" do
+      assert {:ok, compiled} =
+               Compiler.compile(document("signup.confirm_step_declaring"), palette(),
+                 child_use: true
+               )
+
+      # The expansion root's own completion is raised...
+      assert compiled.scxml =~ "done.outcome.s_blk_CS_body.done"
+
+      # ...and no transition anywhere selects on it or on the root's
+      # `done.state`, so it reaches no composite final. (The raise inside the
+      # root's own final carries the same event name, which is why these are
+      # written as `<transition event=`.)
+      refute compiled.scxml =~ ~s(<transition event="done.outcome.s_blk_CS_body.done")
+      refute compiled.scxml =~ ~s(<transition event="done.state.s_blk_CS_body")
+    end
+
+    # `C7` item 1: one derived slot per declared name, named `on_<name>`,
+    # arity `zero_or_one`, AFTER the entries `slots:` declares. Both doors
+    # answer it: the injected callback and the data form's `slots/2`.
+    #
+    # Sabotage: dropped the `outcomes` half of `derived_slots/1` - red on
+    # both, the list then carries the pass-through entry alone.
+    test "a declaring composite answers one on_<name> slot per declared outcome" do
+      assert ConfirmStepDeclaring.slots(%{}) == [
+               {"on_timed_out", :zero_or_one, "If it finishes timed out"},
+               {"on_received", :zero_or_one, "If it finishes received"}
+             ]
+
+      # The pass-through entries come first, in declaration order, and the
+      # derived ones are appended - so every slot that exists today keeps its
+      # position.
+      assert Enum.map(AwaitsWithSlot.slots(%{}), &elem(&1, 0)) == [
+               "body",
+               "on_received",
+               "on_timed_out"
+             ]
+    end
+
+    # `C7` item 6: a name the declaration does not carry mints no slot.
+    #
+    # Sabotage: appended the expansion root's `done` to the declared list
+    # before deriving, the way a derivation reading what the expansion can
+    # raise would - red, `on_done` is then minted.
+    test "an undeclared name mints no slot" do
+      assert ConfirmStep.slots(%{}) == []
+      refute Enum.any?(ConfirmStepDeclaring.slots(%{}), &(elem(&1, 0) == "on_done"))
+    end
+
+    # `C7` item 3, the empty slot: the declared member outcome reaches the
+    # matching composite final directly, and such a composite compiles as
+    # `C6` alone would compile it.
+    #
+    # Sabotage: targeted the slot child unconditionally in `route/1`'s target
+    # - red, `route.target` would be `nil` with no child.
+    test "an empty outcome slot reaches the composite final directly" do
+      assert {:ok, compiled} =
+               Compiler.compile(document("signup.confirm_step_declaring"), palette(),
+                 child_use: true
+               )
+
+      assert compiled.scxml =~
+               ~s(<transition event="done.outcome.s_blk_CS_wait.received" ) <>
+                 ~s(target="s_blk_CS__o_received" type="internal"/>)
+    end
+
+    # `C7` item 3, the occupied slot: the declared member outcome reaches the
+    # child filling that outcome's slot instead, and that child's completion
+    # reaches the same composite final - so the composite's own
+    # `done.outcome.s_blk_CS.received` fires AFTER the continuation rather
+    # than instead of it, and the enclosing body still continues on the
+    # composite's completion. This is the end-to-end case `k2` measured.
+    #
+    # Sabotage: dropped `slot_child/1`'s completion transition - red, the
+    # continuation then runs and the composite never finishes.
+    test "an occupied outcome slot runs its child before that outcome's final" do
+      assert {:ok, compiled} = Compiler.compile(with_slot_child(), palette(), child_use: true)
+
+      # In, from the member that raised the declared name.
+      assert compiled.scxml =~
+               ~s(<transition event="done.outcome.s_blk_CS_wait.received" ) <>
+                 ~s(target="s_blk_GOBACK" type="internal"/>)
+
+      # The child is a child of the composite's own state.
+      assert compiled.scxml =~ ~s(<state id="s_blk_GOBACK")
+
+      # Out, to the same final the empty slot would have reached.
+      assert compiled.scxml =~
+               ~s(<transition event="done.state.s_blk_GOBACK" ) <>
+                 ~s(target="s_blk_CS__o_received" type="internal"/>)
+
+      # The final is reached either way, so the composite's own outcome event
+      # is raised either way, and the body routes the composite's completion.
+      assert compiled.scxml =~ ~s(<raise event="done.outcome.s_blk_CS.received"/>)
+      assert compiled.scxml =~ ~s(event="done.state.s_blk_CS" target="s_blk_ROOT__o_done")
+
+      # The other declared name's slot is empty and still reaches its final.
+      assert compiled.scxml =~
+               ~s(<transition event="done.outcome.s_blk_CS_wait.timed_out" ) <>
+                 ~s(target="s_blk_CS__o_timed_out" type="internal"/>)
+    end
+
+    # `C7` item 2: a `slots:` entry named after one of the declaration's own
+    # declared outcomes is refused against the DECLARATION - the composite's
+    # author is who can fix it - and never as a finding on a document. Both
+    # declaration forms refuse, each in its own idiom.
+    #
+    # Sabotage: dropped the `refute_outcome_slot_collisions!/2` call from
+    # `__declaration__/1` - red, the declaration then builds and answers a
+    # duplicated slot name.
+    test "a slots: entry named after a declared outcome is refused" do
+      assert_raise ArgumentError, ~r/"on_received".*already derives as an outcome slot/s, fn ->
+        Composite.__declaration__(
+          name: "signup.colliding",
+          params: [],
+          outcomes: ["received"],
+          slots: [%{name: "on_received", to: {"body", "body"}}]
+        )
+      end
+
+      assert {:error, errors} =
+               Composite.Data.declaration(%{
+                 "type_name" => "signup.colliding_data",
+                 "version" => 1,
+                 "params" => [],
+                 "subtree" => [%{"type" => "core.sequence", "id_suffix" => "body"}],
+                 "outcomes" => ["received"],
+                 "slots" => %{"on_received" => ["body", "body"]}
+               })
+
+      assert Enum.any?(errors, &(&1 =~ ~s("on_received")))
+    end
+
+    # `C7` item 2's other half, said where a reader would look for it: the
+    # refusal is what keeps a repeated name out of the answered list, which
+    # both the editor's slot build and the compiler's `List.keyfind/3` read
+    # assume. Nothing a declaration can write reaches `slots/1` twice.
+    #
+    # Sabotage: appended the derived entries twice in `derived_slots/1` - red,
+    # which is the property this pins. (Making the collision a precedence
+    # rule rather than a refusal is red on the test above instead: the
+    # declaration then builds, and it is that build the refusal prevents.)
+    test "no name is reachable twice in the answered slot list" do
+      names = Enum.map(ConfirmStepDeclaring.slots(%{}), &elem(&1, 0))
+      assert names == Enum.uniq(names)
+
+      with_slot = Enum.map(AwaitsWithSlot.slots(%{}), &elem(&1, 0))
+      assert with_slot == Enum.uniq(with_slot)
+    end
+
+    # `C6` item 5 and `C7` item 4, and the test both records delegate their
+    # totality claim to. `ADR-0004`'s decision 5 keeps `by_state_id` total
+    # over every state the compile emits; `C6` adds a state and two finals
+    # and `C7` adds a slot child, so this asserts the map answers for EVERY
+    # state id in the generated chart and that the new ones name the blocks
+    # the records say they do - the composite's own bytes to the composite
+    # block, the slot child's to the child, and the members' stamps
+    # unchanged (`T2`-`T4`).
+    #
+    # It reads the ids out of the emitted SCXML rather than listing them, so
+    # a state this request forgot to stamp fails it rather than going
+    # unnoticed.
+    #
+    # Sabotage: stamped the routing transitions to the raising member instead
+    # of to the composite - red before the assertions: the compile refuses
+    # with `:unknown_attribution`, because a raiser deep in the expansion is
+    # not a child of the composite's own node.
+    test "provenance stays total over the bytes C6 and C7 add" do
+      assert {:ok, compiled} = Compiler.compile(with_slot_child(), palette(), child_use: true)
+
+      emitted =
+        Regex.scan(~r/ id="(s_[^"]+)"/, compiled.scxml)
+        |> Enum.map(fn [_whole, id] -> id end)
+
+      # Every state and final the compile emitted is keyed, including the
+      # three `C6` and `C7` add.
+      assert "s_blk_CS" in emitted
+      assert "s_blk_CS__o_received" in emitted
+      assert "s_blk_CS__o_timed_out" in emitted
+      assert "s_blk_GOBACK" in emitted
+
+      assert Enum.all?(emitted, &Map.has_key?(compiled.provenance.by_state_id, &1)),
+             "unstamped: #{inspect(emitted -- Map.keys(compiled.provenance.by_state_id))}"
+
+      # The composite's own state and finals are the composite block's.
+      for id <- ["s_blk_CS", "s_blk_CS__o_received", "s_blk_CS__o_timed_out"] do
+        assert compiled.provenance.by_state_id[id].block_id == "blk_CS"
+      end
+
+      # The slot child's bytes are the child block's, and the members keep
+      # the stamps `ADR-0004`'s `T2`-`T4` give them.
+      assert compiled.provenance.by_state_id["s_blk_GOBACK"].block_id == "blk_GOBACK"
+      assert compiled.provenance.by_state_id["s_blk_CS_body"].block_id == "blk_CS_body"
+      assert compiled.provenance.by_state_id["s_blk_CS_wait"].block_id == "blk_CS_wait"
+    end
+  end
+
+  # The `k2` fixture with a child in the composite's derived `on_received`
+  # slot - the blocks an author drops in to go back when the step finishes
+  # that way.
+  defp with_slot_child do
+    composite = %{
+      block("signup.confirm_step_declaring")
+      | slots: %{"on_received" => [Block.new("core.sequence", id: "blk_GOBACK")]}
+    }
+
+    Document.new(
+      Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [composite]}),
+      id: "bdoc_declaredoutcomes"
+    )
   end
 
   defp expansion(module) do

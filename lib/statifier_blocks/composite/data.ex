@@ -450,7 +450,10 @@ defmodule StatifierBlocks.Composite.Data do
         version_errors(version) ++
         param_errors ++
         subtree_errors ++
-        entry_errors ++ sentence_errors ++ slot_errors ++ migration_errors ++ outcome_errors
+        entry_errors ++
+        sentence_errors ++
+        slot_errors ++
+        migration_errors ++ outcome_errors ++ outcome_slot_errors(slots, outcomes)
 
     case errors do
       [] ->
@@ -1434,6 +1437,27 @@ defmodule StatifierBlocks.Composite.Data do
 
   defp decode_outcomes(names),
     do: {[], [~s("outcomes" must be a list of outcome names, got: #{inspect(names)})]}
+
+  # `ADR-0002`'s Amendment of 2026-09-13, `C7` item 2, in this form's own
+  # idiom: a `use`-composite raises the collision, and a data declaration
+  # reports it as one more message, because `declaration/1` refuses by
+  # answering `{:error, messages}` and never by raising.
+  @spec outcome_slot_errors([Composite.pass_through_decl()], [String.t()]) :: [String.t()]
+  defp outcome_slot_errors(slots, outcomes) do
+    case Composite.outcome_slot_collisions(slots, outcomes) do
+      [] ->
+        []
+
+      collisions ->
+        [
+          ~s("slots" declares ) <>
+            inspect(collisions) <>
+            ~s(, which "outcomes" already derives as an outcome slot; a pass-through slot ) <>
+            "splices its children into an expansion member, and an outcome slot holds what " <>
+            "runs when the composite finishes that way"
+        ]
+    end
+  end
 
   @spec label_for(term()) :: String.t()
   defp label_for(name) when is_binary(name), do: name
