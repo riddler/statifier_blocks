@@ -12641,3 +12641,55 @@ sentence and the code disagree above, the code is what a reader will find; each
 such place is dated here rather than rewritten there.
 
 Filed with `sb-pk04`, campaign RF047.
+
+## Note (2026-09-14): the control-character Note's "at all" clause carries the tab/LF/CR qualifier
+
+Campaign RF047, bead `sb-oa0y`.
+
+Nothing above this line is edited. This is a later dated line: no rule,
+decision, clause or heading changes, it carries no `Status:` line, it flips
+nothing, it changes no rule this file states and it adds no changelog
+fragment.
+
+The Note of 2026-09-13 on the control-character refusal ("a raw C0 control
+character in a `{"const", value}` capture literal is refused at compile, on
+XML 1.0 grounds", `:11425`) restates its XML ground in one sentence as "XML
+1.0 admits no character below `U+0020` in an attribute value at all (5th
+edition, the `Char` production)" (`:11442-11443`). **Read that clause with the
+qualifier the rule above it already carries: XML 1.0 admits no character below
+`U+0020` in an attribute value other than tab (`U+0009`), line feed
+(`U+000A`) and carriage return (`U+000D`).** The 5th edition's `Char`
+production admits `#x9`, `#xA` and `#xD` and no other codepoint below
+`U+0020`, so an attribute value may carry those three; a parser that reads one
+back is not being tolerant, and the unqualified reading would make the three
+characters `escape/1` exists to rewrite unspellable.
+
+**Nothing the Note decides changes, because the decision never rested on the
+unqualified reading.** The Note's own bold rule already names the carve-out -
+"any codepoint below `U+0020` other than tab (`U+0009`), line feed (`U+000A`)
+and carriage return (`U+000D`)" (`:11432-11435`) - and so does the code it
+cites: `control?/1` (`core/on_event.ex:667`, `defp control?(codepoint), do:
+codepoint < 0x20 and codepoint not in [?\t, ?\n, ?\r]`, read at `2a0aa2a`)
+carves the three out, and `control_message/1` (`:669`, read at the same
+commit) spells them out to the author. The restating sentence is the only
+place the qualifier went missing, and this line is where a reader who stops at
+it finds it again.
+
+### What this line does not do
+
+It decides nothing, adds no key, callback, field type, slot or finding, and
+edits no line in this file or in any other record. It takes no position on
+whether any Amendment above is ready to flip, which remains the operator's on
+each one's own request.
+
+The request carrying this line also carries a code half in `core/on_event.ex`:
+`control_in/1`'s binary clause (`:653`, read at `2a0aa2a`) now asks
+`String.valid?/1` before reading a literal as characters, so a **direct**
+`validate_config/1` caller handing an invalid-UTF-8 binary gets the shape
+answer rather than a raise out of `String.to_charlist/1`. No rule this file
+states changes for it: the refusal `control?/1` performs is untouched, and a
+non-UTF-8 literal is still refused through the compiler by
+`Validation.canonical_json_check/2`'s binary clause (`validation.ex:351`, read
+at `2a0aa2a`), which runs before this walk.
+
+Filed with `sb-oa0y`, campaign RF047.
