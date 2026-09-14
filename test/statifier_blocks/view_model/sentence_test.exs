@@ -201,8 +201,11 @@ defmodule StatifierBlocks.ViewModel.SentenceTest do
                "Charge $40"
     end
 
-    # sabotage: drop the `declares_sentence?/1` arm -> the reader's label
-    # comes back instead of the author's title -> red
+    # sabotage: take the declared arm unconditionally in
+    # `SentenceChain.sentence/5` - drop the `Palette.declares?(ref,
+    # :sentence, 1)` test and always answer `BlockType.sentence(ref, config)
+    # || label` -> the reader's label comes back instead of the author's
+    # title -> red (verified)
     test "is the author's title where the type declares no sentence" do
       assert node_sentence(Silent, %{"label" => "Take the money"}) == "Take the money"
     end

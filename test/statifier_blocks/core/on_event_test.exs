@@ -313,6 +313,30 @@ defmodule StatifierBlocks.Core.OnEventTest do
       assert other =~ "U+001F"
     end
 
+    # The control walk reads a binary as characters, and `String.to_charlist/1`
+    # raises on a binary that is not valid UTF-8. Through the compiler that
+    # binary never arrives - `Validation.canonical_json_check/2` refuses it
+    # first - but `validate_config/1` is public surface, and a host calling
+    # it directly asks a question about SHAPE. So the walk answers the shape
+    # question and leaves the encoding refusal where it already lives, rather
+    # than turning a direct call into a raise.
+    #
+    # sabotage: dropped the `String.valid?/1` guard from `control_in/1`'s
+    # binary clause -> this test went red with an `UnicodeConversionError`
+    # raised out of `validate_config/1` (verified)
+    test "answers a direct caller's invalid-UTF-8 literal rather than raising on it" do
+      for value <- [
+            <<0xFF>>,
+            <<"ok", 0xC3>>,
+            ["ok", <<0xFF>>],
+            %{"k" => <<0xFF>>},
+            %{<<0xFF>> => "v"}
+          ] do
+        assert OnEvent.validate_config(capture(%{"order.mark" => ["const", value]})) == :ok,
+               inspect(value)
+      end
+    end
+
     # The message is the only thing an author is shown for either form -
     # `capture` has no field to anchor a per-pair finding on - so it has to
     # name both.
