@@ -1350,8 +1350,8 @@ defmodule StatifierBlocks.Core.OnEventTest do
     # either a no-op written as a decision or a request for two outcomes
     # with one name.
     #
-    # Sabotage: dropped the `@default_outcome` clause of `check_finish_as/2`
-    # - red: `"done"` is role-shaped, so nothing else refuses it (verified).
+    # Sabotage: dropped the `check_finish_as_done/2` call - red: `"done"` is
+    # role-shaped, so nothing else refuses it (verified).
     test "the name done is a finding on the key" do
       assert {:error, findings} = OnEvent.validate_config(named("done"))
 
@@ -1376,6 +1376,26 @@ defmodule StatifierBlocks.Core.OnEventTest do
       # The same name abandoning its group is accepted, which is what makes
       # the finding the `resume` pairing's and not the name's.
       assert OnEvent.validate_config(named("went_back")) == :ok
+    end
+
+    # `done` beside `outcome: "resume"` trips two of item 4's three
+    # refusals at once, and item 4 makes each refusal its own finding on
+    # the key, so both are reported rather than the first one alone.
+    #
+    # Sabotage: restored the early-returning `@default_outcome` clause in
+    # `check_finish_as/2` - red on the resume assertion (verified).
+    test "a name that trips two refusals draws both findings on the key" do
+      config = %{
+        "event" => "order.cancelled",
+        "outcome" => "resume",
+        "finish_as" => "done"
+      }
+
+      assert {:error, findings} = OnEvent.validate_config(config)
+
+      assert {"finish_as", ~s(cannot be "done" - that is what a handler with no name finishes as)} in findings
+
+      assert {"finish_as", ~s(only a handler that abandons its group finishes with a name)} in findings
     end
 
     # The key is optional, so absence and the schema's own default are both

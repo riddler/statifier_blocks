@@ -523,6 +523,10 @@ defmodule StatifierBlocks.Core.OnEvent do
   end
 
   # The three refusals `C8` item 4 names, each a finding on the new key.
+  # They are three independent conditions and not a first-match ladder:
+  # item 4 calls them "three refusals, all of them `validate_config/1`
+  # findings on the new key", so a name that trips two of them draws two
+  # findings on the key rather than the first one alone.
   #
   # The name becomes a state id segment and an event segment, so it takes
   # the shape every outcome name takes - `StatifierBlocks.Compiler.StateId.role?/1`
@@ -541,18 +545,22 @@ defmodule StatifierBlocks.Core.OnEvent do
       blank when blank in [nil, ""] ->
         findings
 
-      @default_outcome ->
-        [
-          {@finish_as_key, ~s(cannot be "done" - that is what a handler with no name finishes as)}
-          | findings
-        ]
-
       name ->
         findings
+        |> check_finish_as_done(name)
         |> check_finish_as_shape(name)
         |> check_finish_as_resumes(config)
     end
   end
+
+  defp check_finish_as_done(findings, @default_outcome) do
+    [
+      {@finish_as_key, ~s(cannot be "done" - that is what a handler with no name finishes as)}
+      | findings
+    ]
+  end
+
+  defp check_finish_as_done(findings, _name), do: findings
 
   defp check_finish_as_shape(findings, name) do
     if StateId.role?(name) do
