@@ -13463,3 +13463,201 @@ the record of the gap at the time it was written; nothing in this file is
 changed by this line, which is why it is a Note and not an amendment.
 
 Filed with `sb-hjcd`, campaign RF055.
+
+## Note (2026-09-18): the minted-member exclusion rests on the author not writing an id the expansion will mint, and such an id is refused a stage later rather than by that exclusion
+
+Campaign RF055, bead `sb-v731`.
+
+Nothing above this line is edited. This is a later dated line: no rule,
+decision, clause or heading changes, it carries no `Status:` line, it flips
+nothing, it changes no code and it adds no changelog fragment. Every `lib/`
+and `docs/adr/` cite below was **read at `0ea602d`** and is written anchor
+first, line second; a later reader re-locates by the anchor and not by the
+number.
+
+**Why a note and not an amendment.** `docs/adr/README.md` puts the test this
+way: "an amendment changes what the record decides and a note does not: a note
+records where something already decided renders, or what a sentence already
+accepted was about". This line changes nothing this record decides. `C2` item
+2 already decides that the raisable set is the minted members alone; what
+follows records how that decision renders when an author's own id happens to
+equal a minted one, and it adds no refusal and asks for no code. It is
+therefore a note.
+
+### 1. The exclusion is keyed by id, and id is all it is keyed by
+
+`C2` item 2 decides that "Every member" means the declaration's own members,
+not the author's (`:10125`), and that "the raisable set is the minted members
+alone - the ones `param_map` is keyed by" (`:10130-10131`). The Note of this
+date on `C8`'s reach (`:12933`) reads the built code as exactly that decision
+and nothing more.
+
+The built filter is a membership test on the block id and on nothing else. At
+`0ea602d`, `raisable_labels/3` (`@spec` `composite.ex:1075`, head `:1076`,
+`defp raisable_labels(%Palette{} = palette, members, param_map) do`) flattens
+the expansion and filters it with `Enum.filter(&Map.has_key?(param_map, &1.id))`
+(`:1079`) before reading any member's outcomes. The spliced children are the
+author's blocks unchanged: `splice/3` (`@spec` `composite.ex:1455`, head
+`:1458`) hands each declared slot's children to `put_children/4` (`@spec`
+`:1467`, head `:1468`), and the comment above `splice/3` (`:1452-1454`) says
+they are placed in the mapped inner slot of the member minted from the local
+id, "NOT minted - they arrived carrying a document id already" (`:1454`).
+
+So a spliced child is excluded because its id is absent from `param_map`, not
+because anything marks it as the author's. A child whose id is *present* is
+kept, whatever placed it there.
+
+### 2. What is guaranteed, and what is not
+
+Guaranteed, and unchanged by this line:
+
+- **Author ids are unique within one document.**
+  `Validation.validate_unique_ids/1` (`@spec` `validation.ex:312`, head
+  `:313`) answers `{:error, {:duplicate_block_id, id}}` (`:317`) for a repeat
+  in `Document.blocks/1`'s walk.
+- **Two different composite blocks never mint the same id.** `mint_id/3`
+  (`@spec` `composite.ex:1494`, head `:1495`) builds
+  `minted = composite_id <> @separator <> local_id` (`:1496`) from the
+  composite block's own id, and those ids are themselves unique by the check
+  above.
+
+Not guaranteed:
+
+- **That an author id differs from an id the expansion will mint.** Uniqueness
+  is checked over the *authored* document, in the compiler's first stage:
+  `document_stage/1` (`@spec` `compiler.ex:543`, head `:544`) calls
+  `Document.validate/1` (`:545`; `document.ex:255`), which is
+  `Validation.validate/1` (`validation.ex:49`). Minting happens later, in
+  Resolve - `resolve_stage/2` (`compiler.ex:575`) reaching `expand_node/3`
+  (`compiler.ex:615`) and so `expand!/2` (`composite.ex:652`), whose
+  `param_map` is bound at `:679` and whose return splices at `:681`. The
+  minted ids are not in the authored document, so the uniqueness check has
+  nothing to compare them with. Block-id uniqueness as
+  `Validation.validate_unique_ids/1` spells it is never re-run over the
+  expansion either. What *is* checked later is the emitted chart's own ids, in
+  the Chart stage - `chart_stage/5` (`@spec` `compiler.ex:3088`, head `:3090`)
+  calls `Chart.validate(scxml, provenance, document)` (`:3094`;
+  `Compiler.Chart.validate/3`, `@spec` `compiler/chart.ex:138`, head `:140`) -
+  and that is where the collision surfaces, as section 3 shows. The delegation
+  is the one `declared_roots.ex` already names for its own case: two roots of
+  one name that are not nested are "still refused, one stage later and by the
+  delegated check" (`compiler/declared_roots.ex:64`).
+- **That a minted id is recognisable as one.** `@separator` is `"_"`
+  (`composite.ex:257`), so a minted id is an ordinary id that happens to
+  contain an underscore. The one shape rule `mint_id/3` enforces is a refusal
+  of a minted id carrying `"__"` (`:1498-1503`), which protects `ADR-0004`
+  decision 3's role separator and says nothing about author ids.
+
+### 3. What a run shows
+
+Run at `0ea602d` against a composite declaring one outcome its own subtree
+cannot raise, with one declared pass-through slot mapped into a member minted
+as `w_then`, and an author-placed child in that slot whose type declares that
+outcome:
+
+- With the child's id written as anything else, `Validation.validate/1`
+  answers `:ok` and the compile reports the expected
+  `{:outcome_not_raisable, "w", ...}` finding at the Resolve stage.
+- With the child's id written as `w_then`, `Validation.validate/1` still
+  answers `:ok` - there is no duplicate among the authored ids - and that
+  Resolve finding is **gone**. The author's block passed the `param_map`
+  filter on the minted member's key, and its declared outcome entered the
+  raisable set.
+
+**The document is nonetheless refused, one stage later.** With member and
+child types that emit, the same colliding document compiles no further than
+the Chart stage, which answers a single finding, `{:duplicate_id, "s_w_then"}`
+- the two blocks sharing one id emit two states of one name, and the delegated
+id-uniqueness pass over the emitted chart reports them.
+
+So the borrow does defeat `C2` item 3's check, in the shape `C2` item 2 rules
+out in words, and it does not buy a compiled chart. What an author loses by it
+is the accurate diagnostic: instead of a Resolve finding naming the composite
+and the outcome its expansion cannot raise, the compile answers a Chart-stage
+duplicate id on a minted name. Neither case is reachable by accident: it takes
+an author choosing, for a child of a composite block, exactly the id that
+composite's declaration mints for one of its own members.
+
+### 4. The alternative declined, and why
+
+The alternative is a new `Validation` refusal: a finding on an author-written
+block id that some composite in the same document will mint. That refusal is
+not adopted here. Two reasons:
+
+- **It refuses documents the released package admits.** Minted ids carry no
+  reserved shape, so the refusal has to be document-relative: resolve every
+  composite block through a palette, mint its member ids, and compare. That
+  makes `Validation` - which "Never consults a block-type registry"
+  (`validation.ex:45`) - palette-dependent, and it makes a document's validity
+  depend on which palette validates it. That is the objection `C2` item 2
+  already raises against checking a declaration against its filling: such a
+  declaration "would compile in one document and fail in the next with the
+  same declaration untouched" (`:10135-10136`).
+- **The exposure is a worse diagnostic, not an admitted chart.** The borrow
+  suppresses `C2` item 3's Resolve finding, but the document it produces is
+  refused at the Chart stage all the same (section 3). So what a new
+  `Validation` refusal would buy is a better message for a document that is
+  already rejected, which is not enough to justify refusing documents the
+  released package admits. A cheaper answer, if this is ever worth answering,
+  is a Resolve-stage finding on the collision itself, where the expansion and
+  its `param_map` are both in hand and no palette-free check has to be made
+  palette-dependent; that is named here and not adopted, and remains open.
+
+### What this line does not do
+
+It decides nothing, adds no key, callback, field type, slot or finding, and
+edits no line in this file or in any other record. It does **not** decide
+whether the collision should be refused, reported as a finding, or left as it
+is; that question is open and is the operator's on its own request. It takes
+no position on whether any Amendment above is ready to flip, which remains the
+operator's on each one's own request.
+
+Filed with `sb-v731`, campaign RF055.
+
+## Note (2026-09-18): two cite ranges in the fourth cite tidy and in the XML-ground line are re-measured against their own quotes
+
+Campaign RF055, bead `sb-f3iq`.
+
+Nothing above this line is edited. Every correction below is a later dated
+line: no rule, decision, clause or heading changes, this Note carries no
+`Status:` line, it flips nothing, it changes no code and it adds no changelog
+fragment. Both ranges below were re-measured at `0ea602d` by locating each
+quotation's own characters; a later reader re-locates the same way.
+
+**Why a note and not an amendment.** `docs/adr/README.md`'s test is that "an
+amendment changes what the record decides and a note does not: a note records
+where something already decided renders, or what a sentence already accepted
+was about". Both corrections below are about where a sentence already accepted
+sits in this file. Neither sentence's text changes, and neither does anything
+either sentence says. They are notes, and a note is the instrument the tidies
+they correct already use.
+
+1. **The `C8` "unchanged" quote spans two lines.** The fourth cite tidy
+   (`:12703`) quotes `C8` item 3 as "The abandon raise on the watcher's
+   transition (`core/on_event.ex:928`) is **unchanged**" and cites it as
+   `:12067` (the citing sentence, `:12745-12746`). The quotation begins on
+   `:12067`, which ends at "is", and its closing bolded word sits on `:12068`.
+   The range is **`:12067-12068`**. The citing sentence is unchanged, and so
+   is what it concludes about the transition's `target:`; the companion cite
+   beside it, `:12064` for "takes the bound id", is right as written.
+
+2. **The attribute-value normalization quote ends one line before its cite
+   does.** The Note of this date on the tab/LF/CR line's XML ground (`:12891`)
+   quotes the Note of 2026-09-14 as "§3.3.3's attribute-value normalization
+   turns a literal `#x9`, `#xA` or `#xD` in an attribute value into a space"
+   and cites it as `:12666-12668` (the citing sentence, `:12900-12904`). The
+   quotation opens on `:12666` and closes part way through `:12667`; `:12668`
+   carries none of it. The range is **`:12666-12667`**. Nothing either Note
+   says about §2.11 or §3.3.3 changes.
+
+Both are one defect class: a range measured against the sentence a reader has
+in mind rather than against the lines the quoted characters occupy.
+
+### What this line does not do
+
+It decides nothing, adds no key, callback, field type, slot or finding, and
+edits no line in this file or in any other record. It takes no position on
+whether any Amendment above is ready to flip, which remains the operator's on
+each one's own request.
+
+Filed with `sb-f3iq`, campaign RF055.
