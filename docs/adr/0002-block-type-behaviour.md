@@ -13464,7 +13464,7 @@ changed by this line, which is why it is a Note and not an amendment.
 
 Filed with `sb-hjcd`, campaign RF055.
 
-## Note (2026-09-18): the minted-member exclusion rests on the author not writing an id the expansion will mint, and such an id is refused a stage later rather than by that exclusion
+## Note (2026-09-18): the minted-member exclusion rests on the author not writing an id the expansion will mint, and such an id is refused at the Chart stage rather than by that exclusion
 
 Campaign RF055, bead `sb-v731`.
 
@@ -13514,7 +13514,14 @@ Guaranteed, and unchanged by this line:
 - **Author ids are unique within one document.**
   `Validation.validate_unique_ids/1` (`@spec` `validation.ex:312`, head
   `:313`) answers `{:error, {:duplicate_block_id, id}}` (`:317`) for a repeat
-  in `Document.blocks/1`'s walk.
+  in the block list it is handed, which is the one `validate_tree/1`
+  accumulates as it walks (`@spec` `validation.ex:210`, head `:211`, the child
+  recursion at `:303`) and which `Validation.validate/1` passes straight on
+  (`:51-52`). The comment above `validate_tree/1` says it "Returns the
+  pre-order block list on success" (`:208`) precisely so that the caller can
+  run the id-uniqueness pass without a second walk (`:209`).
+  `Document.blocks/1` (`document.ex:107`) is a separate walk and is not what
+  this check reads.
 - **Two different composite blocks never mint the same id.** `mint_id/3`
   (`@spec` `composite.ex:1494`, head `:1495`) builds
   `minted = composite_id <> @separator <> local_id` (`:1496`) from the
@@ -13564,11 +13571,16 @@ outcome:
   filter on the minted member's key, and its declared outcome entered the
   raisable set.
 
-**The document is nonetheless refused, one stage later.** With member and
+**The document is nonetheless refused, at the Chart stage.** With member and
 child types that emit, the same colliding document compiles no further than
 the Chart stage, which answers a single finding, `{:duplicate_id, "s_w_then"}`
 - the two blocks sharing one id emit two states of one name, and the delegated
-id-uniqueness pass over the emitted chart reports them.
+id-uniqueness pass over the emitted chart reports them. The suppressed finding
+and the one that replaces it are four stages apart rather than adjacent:
+`Finding.stage` enumerates `:document | :resolve | :config | :structure |
+:emit | :chart` (`compiler/finding.ex:97`), and the compiler numbers the same
+run in its own section comments, `# -- Stage 2: resolve` (`compiler.ex:561`)
+and `# -- Stage 6: chart` (`:3086`).
 
 So the borrow does defeat `C2` item 3's check, in the shape `C2` item 2 rules
 out in words, and it does not buy a compiled chart. What an author loses by it
