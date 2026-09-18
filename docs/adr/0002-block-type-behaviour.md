@@ -13049,10 +13049,20 @@ config, and `C2`'s raisability check and `C7`'s slot derivation both read
 Additive: every decision, Amendment and Note above this line stands exactly as
 it stands, and no text above this line is edited by this section. `C1`, `C2`,
 `C3`, `C6`, `C7` and `C8` are not edited; this section is stated **on top of**
-them. Three of their clauses are **narrowed by addition** below - `C1`'s "list
-of outcome names" option, `C1`'s empty-list rule, and `C2` item 4's per-block
-reasoning extended from the subtree to the declaration over it - which is a
-thing this section says about them and not a thing it does to them. `C2` item
+them. Four of their clauses are **narrowed by addition** below - `C1`'s "list
+of outcome names" option, `C1`'s empty-list rule, `C2` item 4's per-block
+reasoning extended from the subtree to the declaration over it, and **`C3`'s
+condition**, which is stated as "a composite that writes no `outcomes` key"
+(`:10157`) and after this section reads "a composite that declares no outcomes,
+by either spelling, for the instance in hand". That fourth one is named here
+rather than left implicit because a per-instance declarer writes no `outcomes`
+key and is nevertheless **not** a `C3` composite: `C9b` decides that its
+instances divide, and a declaring instance's `outcomes/1` answers the declared
+names, its check runs, and its compiled chart is not the chart `C3` promises.
+`C3`'s byte-identity claim itself is untouched and holds for every composite it
+was written about; only the sentence that says which composites those are is
+widened, and each of the four is a thing this section says about the clause and
+not a thing it does to it. `C2` item
 2's rule that the raisable set is the **minted** members alone is not touched,
 and the Note of 2026-09-18 (`:12933`) that records `C8` inheriting that limit
 is not touched either.
@@ -13188,8 +13198,11 @@ third is the one that decides it:
 **The static list stays valid and unchanged.** A composite that writes
 `outcomes: [...]` on its `use` and implements no `declared_outcomes/1` behaves
 exactly as it does at `6ea2afe`, at every one of the sites above and in both
-refusals. A composite that writes neither is `C3`, byte-identical, also
-exactly as it does at `6ea2afe`. Nothing in this section changes what any
+refusals. A composite that writes **neither the key nor the callback** is a
+`C3` composite, byte-identical, also exactly as it does at `6ea2afe`; that is
+`C3`'s condition as this section widens it in the Additive paragraph above, and
+it is the condition the code half proves, not the literal "writes no `outcomes`
+key" that `C3` states (`:10157`). Nothing in this section changes what any
 existing declaration compiles to.
 
 **Precedence, stated once.** A type that both writes the `outcomes:` option
@@ -13251,10 +13264,20 @@ Both of the sites the ruling names read the list of the block in hand:
   and the enclosing body's routing is `C6`'s and `C7`'s, unchanged in kind.
 
 The threading this forces is stated as a rule and not as a patch: the
-instance's config must reach every site above. `outcomes_over/3`,
-`outcome_slots/3` (the composite's) and `unraisable_outcomes/4`'s caller
-already hold the block or its config; `declared_outcome_names/1` and
-`declaring_node/7` do not, and gain it. Widening an `@doc false` helper's arity
+instance's config must reach every site above. Most of them already hold it.
+`outcomes_over/3` and `outcome_slots/3` (the composite's) take the block or the
+config outright; `declaring_node/7` takes the block as its second argument
+(`compiler.ex:660`, `defp declaring_node(palette, %Block{} = block, module,
+...`) and a `%Block{}` carries `config` (`block.ex:40`, `defstruct [:id, :type,
+type_version: 1, config: %{}, slots: %{}]`, `@type config` at `:30`); and
+`unraisable_outcomes/4`'s caller `outcome_findings/5` (`compiler.ex:826`, `defp
+outcome_findings(palette, %Block{} = block, module, members, param_map) do`)
+holds the block as well. **The one function with no config anywhere in reach is
+`declared_outcome_names/1`** (`composite.ex:698`), which takes a ref and
+nothing else, and the private `declared_outcomes/1` behind it. So what the
+threading actually adds is a config-carrying route from those callers into that
+one function; the callers are not short of the config, the function is.
+Widening an `@doc false` helper's arity
 to carry a config this section's decision requires is not new surface; adding a
 public function, option, key or finding this section does not name would be.
 
