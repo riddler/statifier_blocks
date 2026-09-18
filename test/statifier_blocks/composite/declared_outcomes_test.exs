@@ -484,8 +484,13 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     # unnamed sibling below pins that.
     #
     # Sabotage: had `finish_id/2` answer `Context.done_id/1` for a named
-    # handler - red, and the compile refuses with `:outcome_not_raisable`
-    # before the assertions, which is the walk's own measurement.
+    # handler - red on the first assertion (verified 2026-09-18, four tests
+    # in this file). The compile still answers `{:ok, compiled}`:
+    # `outcomes/1` is untouched, so the name stays raisable and no
+    # `:outcome_not_raisable` finding is drawn. What the mutation removes is
+    # the bytes - the handler mints `s_blk_CS_back__o_done` in place of the
+    # named final - so this test reddens on the MISSING final, not on a
+    # refusal.
     test "a declared name a named handler raises draws no finding" do
       assert {:ok, compiled} =
                Compiler.compile(with_back_slot_child(), palette(), child_use: true)
@@ -509,8 +514,11 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     # prints.
     #
     # Sabotage: had `finish_id/2` answer `Context.done_id/1` for a named
-    # handler - red, the compile refusing with `:outcome_not_raisable`
-    # before the assertions.
+    # handler - red on the first assertion (verified 2026-09-18). The
+    # compile still answers `{:ok, compiled}`; the named final is not
+    # minted, so the routing transition below is still emitted but has no
+    # source that raises it - a dead route - and the byte assertions fail
+    # on what is missing rather than on a refusal.
     test "an occupied on_<name> slot runs its child before the composite's final" do
       assert {:ok, compiled} =
                Compiler.compile(with_back_slot_child(), palette(), child_use: true)
@@ -546,7 +554,10 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     # directly, and the slot child's two transitions are simply absent.
     #
     # Sabotage: had `finish_id/2` answer `Context.done_id/1` for a named
-    # handler - red, the compile refusing with `:outcome_not_raisable`.
+    # handler - red on the first assertion (verified 2026-09-18). The
+    # compile still answers `{:ok, compiled}` and draws no finding; the
+    # handler's named final is simply never minted, so the byte this test
+    # reads for is absent.
     test "an empty on_<name> slot reaches the composite final directly" do
       assert {:ok, compiled} =
                Compiler.compile(document("signup.screen_with_back"), palette(), child_use: true)
@@ -600,7 +611,9 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     #
     # Sabotage: had `finish_id/2` answer `Context.done_id/1` for a named
     # handler - red on the first assertion, the handler's named final having
-    # no id in the chart to stamp.
+    # no id in the chart to stamp (verified 2026-09-18). The compile still
+    # answers `{:ok, compiled}`; it is the missing id, not a refusal, that
+    # reddens this.
     test "provenance stays total over the bytes a named handler adds" do
       assert {:ok, compiled} =
                Compiler.compile(with_back_slot_child(), palette(), child_use: true)

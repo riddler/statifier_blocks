@@ -3763,3 +3763,52 @@ callback on the block-type behaviour it is `ADR-0002`'s to declare, "when it is
 built, not here and not now" (`:3595-3596`). The second error arm goes with it.
 
 Filed with `sb-l2jn`, campaign SF044.
+
+## Note (2026-09-18): the Structure stage's arity is `structure_stage/6`, and the two spellings this file prints are read as history
+
+A dated Note by addition; it edits nothing above this line, and the cites it
+corrects keep the text they were written against.
+
+### 1. What the code spells now
+
+Read at `4ddc99c`: the Structure stage is
+**`structure_stage/6`** - `defp structure_stage(document, palette, opts, skip, writers, declaring)`
+at `lib/statifier_blocks/compiler.ex:1500`, above a matching six-argument
+`@spec` at `:1492-1499`. Its caller is **`config_and_structure_stages/5`** -
+`defp config_and_structure_stages(document, palette, node, expansion, opts)` at
+`:1200`, `@spec` at `:1193`, called from `compile/3`'s `with` at `:520`.
+
+The stage reached six arguments at `7493dfc` (2026-09-13, "Labels outcome
+slots, scopes the slot exemption"), which is where `writers` and `declaring`
+were threaded into it: `declaring` is the set the slot exemption is scoped to,
+and both are the arguments that let the stage filter a refused block's
+contribution rather than shorten anybody else's walk.
+
+### 2. Where this file prints an older spelling
+
+Two places, both left standing rather than rewritten, as this file leaves every
+sentence its later Notes correct:
+
+| This file's line | What it prints | At `4ddc99c` |
+|---|---|---|
+| `:2793` | `config_and_structure_stages/4`, `structure_stage/4` | `config_and_structure_stages/5` (`compiler.ex:1200`), `structure_stage/6` (`compiler.ex:1500`) |
+| `:3115` | `structure_stage/3` (`compiler.ex:891-897`) | `structure_stage/6` (`compiler.ex:1500`) |
+
+Both are the same function the surrounding sentence describes, and neither
+sentence's claim depends on the count: `:2793` names the stage among the
+`with`'s steps, and `:3115` says Config and Structure see a composite's members
+as if an author had placed them. The arity is the only thing that moved.
+
+This is the reading `ADR-0011`'s Note of 2026-09-08 section 3 already records
+for this repo - "one arity spelling, recorded as the code's" - applied to this
+file's two prints.
+
+### 3. What this Note does not decide
+
+Nothing about the stage's behaviour, its ordering in `compile/3`'s `with`, or
+decision 4's provenance claims. It changes no code, adds no README row, and
+flips no status line in this file. The nine stale `structure_stage/4` comment
+mentions under `test/` - in nine comments across six files - were corrected in
+place in the same request, comments being neither a record nor a cite.
+
+Filed with `sb-k0xe`, campaign RF050.
