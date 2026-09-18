@@ -10,6 +10,66 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.32.0] 2026-09-18
+
+0.32.0 is a minor, because a public function's arity changes. A composite
+block type may now implement an optional `declared_outcomes/1` callback and
+have its outcomes read from each instance's own config, so one type can
+stand for blocks that finish in different ways. Breaking:
+`StatifierBlocks.Composite.unraisable_outcomes/4` is now
+`unraisable_outcomes/5`, and a caller passes the config of the block it
+expanded, between the type ref and the expansion members. Beside that, this
+release carries fixes to the compiler's slot findings and their wording, to
+a `capture` literal that is not valid UTF-8, to the refusals a handler that
+finishes with `done` while it resumes reports, and to an editor card that
+reflowed when it was selected.
+
+### Added
+
+- `StatifierBlocks.BlockType.finishing_outcome_name/2` answers the outcome a
+  block in a declared slot finishes with: the name it carries under
+  `finish_as` when that name is well formed, and the outcome its config
+  declares at the given key otherwise.
+- A composite block type may implement an optional `declared_outcomes/1`
+  callback and have its outcomes read from each instance's own config, so one
+  type can stand for blocks that finish in different ways.
+
+### Changed
+
+- The editor view model reads a `core.on_event` handler that names the
+  outcome it finishes with under `finish_as` as that name; a handler naming
+  none still reads as its `outcome` select value.
+- Every reader of a composite's declared outcome list now reads the list of the
+  block in hand. A composite declaring `outcomes:` statically, and one
+  declaring nothing at all, behave exactly as before.
+- **Breaking:** `StatifierBlocks.Composite.unraisable_outcomes/4` is now
+  `unraisable_outcomes/5`, taking the block's config as its third argument;
+  a caller passes the config of the block it expanded, between the type ref
+  and the expansion members.
+
+### Fixed
+
+- A declared slot whose child count violates its declared arity now draws a
+  `:slot_arity_violated` finding even when the composite carrying it declares
+  no outcomes; it used to compile green with the declaration's refusal lost.
+- Selecting an editor card no longer reflows it: the control strip reserves
+  the widest set of controls the card can show, so the "Save as a step"
+  control arriving on selection no longer narrows the title column or
+  re-wraps the title.
+- The compiler's slot findings no longer read "holds 1 blocks": the
+  undeclared-slot and slot-arity messages now count in blocks or in one
+  block, to agree with the number they report.
+- A child placed in a slot a composite's type does not declare now draws an
+  `:undeclared_slot` finding even when that composite declares no outcomes;
+  it used to compile green and be dropped with nothing to read.
+- `StatifierBlocks.Core.OnEvent.validate_config/1` answers `:ok` instead of
+  raising `UnicodeConversionError` when a direct caller passes a `capture`
+  literal that is not valid UTF-8; the encoding refusal stays with the
+  compiler, which already refuses such a literal before the walk runs.
+- A `core.on_event` handler that names a finishing outcome of `done` while
+  it resumes its group now reports both of the refusals that apply, instead
+  of only the first.
+
 ## [0.31.0] 2026-09-14
 
 0.31.0 is a minor, because a core block type takes a new public key and
@@ -3299,6 +3359,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.32.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.32.0
 [0.31.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.31.0
 [0.30.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.30.0
 [0.29.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.29.0
