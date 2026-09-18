@@ -668,12 +668,16 @@ defmodule StatifierBlocks.Core.OnEvent do
   # read, and the byte that would offend is visible only to something
   # reading raw bytes instead. The layering is what makes it harmless -
   # such a binary is outside `ADR-0001`'s decision 6 value grammar
-  # altogether, so the only way it arrives is a direct call (this
-  # callback, or a hand-built `t:StatifierBlocks.Document.t/0` handed to
-  # `StatifierBlocks.Compiler.compile/3`), and a direct call gets the
-  # encoding refusal from `canonical_json_check/2`, at the door, rather
-  # than a second copy of it phrased as a control-character finding
-  # here.
+  # altogether, so the only way it arrives is a direct call - this
+  # callback, or a host-built config on any in-memory path that reaches
+  # it: a hand-built `t:StatifierBlocks.Document.t/0` handed to
+  # `StatifierBlocks.Compiler.compile/3`, the editor's
+  # `{:update_config, id, config}` gate in
+  # `StatifierBlocks.Edit.check_config/3`, or the per-block config check
+  # behind `StatifierBlocks.ViewModel.build/3` - and a direct call gets
+  # the encoding refusal from `canonical_json_check/2`, at the door,
+  # rather than a second copy of it phrased as a control-character
+  # finding here.
   defp control_in(value) when is_binary(value) do
     if String.valid?(value), do: value |> String.to_charlist() |> Enum.find(&control?/1)
   end

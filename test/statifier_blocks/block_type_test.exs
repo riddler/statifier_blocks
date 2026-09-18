@@ -451,6 +451,21 @@ defmodule StatifierBlocks.BlockTypeTest do
     # everything else of this shape is an id. (A future bead whose id happened
     # to spell one of these nine words would slip through - the price of
     # letting the stylesheet keep its names.)
+    #
+    # [Note 2026-09-18: that price is a probability, not an impossibility.
+    # Every letter is also a base36 digit, so a minted id CAN spell an
+    # English word, and this exclusion would read it as a class name. The
+    # shape below accepts `[a-z0-9]{3,4}`, 36 symbols over three or four
+    # positions: 36^3 = 46_656 and 36^4 = 1_679_616. Seven of the nine words
+    # are four characters (type, slot, save, node, form, edge, drag) and two
+    # are three (gap, run), so a newly minted four-character id spells one of
+    # the seven with probability 7/1_679_616, about 1 in 240_000, and a
+    # three-character id spells one of the two with probability 2/46_656,
+    # about 1 in 23_000. What bounds the exposure is the tracker's own id
+    # uniqueness at filing time rather than this test: an id is minted once,
+    # so each word can ever be spelled by at most one issue per prefix, and
+    # the blind spot is those few ids rather than an open-ended leak. This
+    # test would not report them.]
     @bead_or_pr_id ~r/\bs(?:b|t|ui|p|ob)-(?!(?:type|slot|save|node|form|edge|gap|drag|run)\b)[a-z0-9]{3,4}\b|PR #[0-9]/
 
     # Every `.ex` file under lib/, globbed at run time rather than listed, so
@@ -464,7 +479,7 @@ defmodule StatifierBlocks.BlockTypeTest do
       |> Enum.sort()
     end
 
-    defp process_artifacts(path) do
+    defp bead_or_pr_ids(path) do
       live = path |> File.read!() |> String.replace(@dated_block, "")
 
       @bead_or_pr_id
@@ -477,10 +492,11 @@ defmodule StatifierBlocks.BlockTypeTest do
     # sabotage: plant a bead-id-shaped token in shell.ex's moduledoc, outside
     # any dated block -> red, naming the file and the token (verified).
     test "no lib/ file carries a bead id or pull-request number outside a dated block" do
-      offenders = Enum.flat_map(all_lib_files(), &process_artifacts/1)
+      offenders = Enum.flat_map(all_lib_files(), &bead_or_pr_ids/1)
 
       assert offenders == [],
-             "process artifacts in shipped lib/ prose:\n" <> Enum.join(offenders, "\n")
+             "bead ids and pull-request numbers in shipped lib/ prose:\n" <>
+               Enum.join(offenders, "\n")
     end
   end
 end
