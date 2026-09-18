@@ -11649,7 +11649,7 @@ reservation in full, the Save stand-in included, and a member that is transient
 but ADDS to the strip rather than replacing a member is not admitted here and
 would be a further request against this section.
 
-Every code cite below was **read at `df38fc3`** and is written anchor first,
+Every code cite below was **read at `274cab1`** and is written anchor first,
 line second; a later reader re-locates by the anchor and not by the number.
 
 ### 1. The sentence being qualified, and the member excepted from it
@@ -11720,7 +11720,7 @@ save.** The measurement and its method are item 3.
 
 The numbers below are **arithmetic from this repository's own stylesheet
 tokens, not a browser reading**. Each token is given with its anchor, read at
-`df38fc3` in `assets/css/statifier_blocks.css`, and evaluated at a 16px root:
+`274cab1` in `assets/css/statifier_blocks.css`, and evaluated at a 16px root:
 `--sb-card-width: 14rem` (`:394`) = 224px; `--sb-space: 0.5rem` (`:353`) = 8px;
 `--sb-space-half` (`:354`) = 4px; `--sb-space-2` (`:355`) = 16px; `--sb-space-3`
 (`:356`) = 24px; `--sb-border-width: 1px` (`:285`); `--sb-text-xs: 0.6875rem`
@@ -11757,8 +11757,11 @@ title still, so the figures below are the widest case, not the typical one.
   section cites a stylesheet RULE it names the rule's head; where it cites a
   token or a single declaration it names that declaration's own line and gives
   the head of the block holding it beside it - `:254` for the token block,
-  `:178` for the reset, `:1200` for the label. Both are anchors a later reader
-  matches on.
+  `:178` for the reset, `:1200` for the label, `:254` again for
+  `--sb-font: inherit` below; and where it cites a COMMENT it names that
+  comment's own line or range and identifies the line the comment opens on.
+  Each of the three is an anchor a later reader matches on, and the section
+  makes no stylesheet cite of a fourth kind.
 - **Title column at rest = 158 - (18 + w("save")) - 4 - 16 = 120px - w("save"),
   about 98px.**
 
@@ -11786,8 +11789,8 @@ per delete gesture on one card.
 
 **The only estimated term is the glyph advance** of the three short words
 `save`, `keep` and `x2` at `--sb-text-xs` = 11px in the host's inherited font
-(`--sb-font: inherit`, `:367`: this package sets no family, so the advance
-depends on the host page). Taken at roughly 22px, 23px and 11px for a system
+(`--sb-font: inherit`, `:367`, in the `.sb-editor` token block at `:254`: this
+package sets no family, so the advance depends on the host page). Taken at roughly 22px, 23px and 11px for a system
 sans, which is where the "about" figures above come from. Nothing in the ruling
 rests on them: the font-independent statement is that the reservation removes
 48px from a title column that is at most 120px.
@@ -11821,7 +11824,7 @@ The confirm button's visible label is the literal `x` followed by the number of
 blocks the claim names (`lib/statifier_blocks/editor/block_node.ex:541`, the
 `x{offer_count(@pending_remove)}` interpolation; `offer_count/1` is
 `length(ids)` at `:654`). A claim of ten or more blocks therefore draws a label
-one character wider than any this vocabulary can produce at `df38fc3`, and the
+one character wider than any this vocabulary can produce at `274cab1`, and the
 unreserved difference item 1 describes is that much larger again. It is
 unreachable with the core vocabulary: `core_recipes/0` holds exactly one entry,
 `%{"deadline" => Core.DeadlineRecipe}`
