@@ -11637,10 +11637,9 @@ all times" (`assets/css/statifier_blocks.css:1487`, in the comment above
 the set a card can show, and its presence varies. So the rule as it stands
 reaches it, and carving it out narrows what item 4 decided rather than
 recording where item 4 already renders. A section that changes an answer this
-record gave carries a status line and a flip. An earlier form of this section
-argued itself a Note on the ground that item 4 took no position because no such
-member existed when it was written; that is a reason the change is *narrow*, and
-it is not the README's test.
+record gave carries a status line and a flip. That item 4 took no position on
+such a member, because none existed when it was written, is a reason the change
+is *narrow*; it is not the README's test.
 
 **Exactly what exception this admits, and what it does not.** One class: a strip
 member that is TRANSIENT and USER-INITIATED, and that REPLACES a resting member
@@ -11754,9 +11753,12 @@ title still, so the figures below are the widest case, not the typical one.
   (`:1502`, `.sb-node__strip-reserve`; the control it stands in for, `:1439`,
   declares the same), so it is 18px + w("save"). The delete control is
   `width: var(--sb-space-2)` (`:1301`, the
-  `.sb-node__remove[data-reveal="hover-or-selected"]` rule) = 16px. Every
-  stylesheet cite in this section names a rule by its head, which is the anchor
-  a later reader matches on.
+  `.sb-node__remove[data-reveal="hover-or-selected"]` rule) = 16px. Where this
+  section cites a stylesheet RULE it names the rule's head; where it cites a
+  token or a single declaration it names that declaration's own line and gives
+  the head of the block holding it beside it - `:254` for the token block,
+  `:178` for the reset, `:1200` for the label. Both are anchors a later reader
+  matches on.
 - **Title column at rest = 158 - (18 + w("save")) - 4 - 16 = 120px - w("save"),
   about 98px.**
 
@@ -11803,7 +11805,12 @@ and the average advance, which is the estimate.
 **The reservation was built in full and measured under this bead, and it is not
 shipped.** A reservation of one of the two boxes rather than both does not close
 the gap either: the open state would then hold two boxes where the rest state
-held one, and the reflow returns at half the width. The alternatives the
+held one. By the same arithmetic the rest strip becomes
+(18 + w("save")) + 4 + 16 + 4 + (18 + w("keep")) and the open strip
+(18 + w("save")) + 4 + (44 + w("keep") + w("x2")), so a residual reflow of
+6px + w("x2") - about 17px - remains, about a quarter of the 62px the
+unreserved case costs, bought at a resting cost of 22px + w("keep") on every
+card. The alternatives the
 measurement leaves open - drawing the offer outside the strip's flow, or
 widening the card - are layout decisions above this section, and it takes
 neither.
