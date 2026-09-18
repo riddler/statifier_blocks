@@ -2205,10 +2205,14 @@ defmodule StatifierBlocks.ViewModel do
   # supply: which outcome this block produces for the slot it sits in. The
   # config read happens here, where the block is still in hand, so nothing
   # downstream needs a block's config to answer it.
+  #
+  # `finishing_outcome_name/2` and not `outcome_name/2`: a handler that names
+  # the outcome it finishes with carries that name here, and the select value
+  # only when it names none (ruled 2026-09-18).
   @spec build_child(Block.t(), String.t() | nil, ctx()) :: Node.t()
   defp build_child(%Block{} = block, outcome_key, ctx) do
     node = build_node(block, ctx)
-    %{node | outcome: BlockType.outcome_name(block.config, outcome_key)}
+    %{node | outcome: BlockType.finishing_outcome_name(block.config, outcome_key)}
   end
 
   # `default:` is required of a declaration and read permissively anyway. The

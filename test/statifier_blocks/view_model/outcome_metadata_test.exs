@@ -56,6 +56,17 @@ defmodule StatifierBlocks.ViewModel.OutcomeMetadataTest do
     )
   end
 
+  # The same rule, naming the outcome it finishes its group with
+  # (`ADR-0002`'s `C8`). `nil` leaves the key off entirely, so one helper
+  # writes the named, the unnamed and the blank cases.
+  defp named_rule(id, outcome, finish_as) do
+    config = %{"event" => "payment.cancelled", "outcome" => outcome}
+
+    config = if is_nil(finish_as), do: config, else: Map.put(config, "finish_as", finish_as)
+
+    Block.new("core.on_event", id: id, config: config)
+  end
+
   defp step(id) do
     Block.new("core.wait", id: id, config: %{"duration" => "1s"})
   end
@@ -216,6 +227,49 @@ defmodule StatifierBlocks.ViewModel.OutcomeMetadataTest do
 
       assert [%Node{outcome: nil}] = slot(vm, "interrupts").children
       assert Enum.any?(vm.findings, &(&1.anchor == {:config, "blk_RULE", "outcome"}))
+    end
+  end
+
+  describe "a handler that names the outcome it finishes with (the ruling of 2026-09-18)" do
+    # Sabotage: have `build_child/3` call `BlockType.outcome_name/2` again
+    # instead of `finishing_outcome_name/2` - the node reads `abandon` for a
+    # handler whose compiled outcome is `went_back`, which is the gap
+    # `ADR-0002`'s `C8` item 7 recorded.
+    test "a named handler carries the name, not the select value" do
+      vm = build(document_with("core.group", named_rule("blk_RULE", "abandon", "went_back")))
+
+      assert [%Node{block_id: "blk_RULE", outcome: "went_back"}] =
+               slot(vm, "interrupts").children
+    end
+
+    # Sabotage: drop `outcome_name/2`'s `Regex.match?/2` check - the blank
+    # default reaches the node as an outcome no consumer has a route for,
+    # and an unnamed handler stops drawing as `abandon`.
+    test "an absent or blank name falls back to the select value" do
+      for finish_as <- [nil, ""] do
+        vm = build(document_with("core.group", named_rule("blk_RULE", "abandon", finish_as)))
+
+        assert [%Node{block_id: "blk_RULE", outcome: "abandon"}] =
+                 slot(vm, "interrupts").children
+      end
+    end
+
+    # Sabotage: as above - a name outside the outcome-name alphabet is
+    # refused rather than repaired, so the select value is what is left.
+    test "a malformed name falls back to the select value" do
+      vm = build(document_with("core.group", named_rule("blk_RULE", "abandon", "Went Back")))
+
+      assert [%Node{block_id: "blk_RULE", outcome: "abandon"}] =
+               slot(vm, "interrupts").children
+    end
+
+    # Sabotage: same mutation as the first test - a slot whose container
+    # declares no outcome key reads no name either, so the name never leaks
+    # into a body card.
+    test "a handler in a slot with no declared key still carries no outcome" do
+      vm = build(document_with("toy.rail", named_rule("blk_RULE", "abandon", "went_back")))
+
+      assert [%Node{block_id: "blk_RULE", outcome: nil}] = slot(vm, "interrupts").children
     end
   end
 end
