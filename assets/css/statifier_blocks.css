@@ -1073,6 +1073,13 @@
  * truncates. The reservation is exact because the controls themselves are what
  * size the column - a word control whose label changes length carries its own
  * reservation with it.
+ *
+ * That exactness is also the reason a control whose PRESENCE depends on the
+ * card's state cannot simply be left out while the state is off: the column
+ * would then be sized by a narrower set and every other column would move
+ * when the state arrived. "Save as a step" is the one such member, and
+ * `.sb-node__strip-reserve` below is how it reserves its box on the cards
+ * that are not selected.
  */
 .sb-node__chrome {
   position: relative;
@@ -1455,6 +1462,54 @@
 .sb-node__save-step:hover {
   border-color: var(--sb-border-strong);
   color: var(--sb-fg);
+}
+
+/* The Save control's RESERVATION, and the second half of the item-4 ruling.
+ *
+ * `opacity` holds the reservation across a REVEAL - a hidden control is still
+ * a box, so the strip's column is the same width at rest and on hover, which
+ * is what the reveal rules above buy. It cannot hold it across a change in
+ * WHICH controls are PRESENT, and Save is the one strip member whose presence
+ * is a function of the SELECTION rather than of the card: it is drawn on the
+ * selected card and nowhere else, because its subject IS a selection. So
+ * selecting a card used to add a member to its strip, the strip's column -
+ * sized by its own children - grew by that member, the title's `1fr` column
+ * gave up the difference, and the title re-wrapped and the card grew taller.
+ * The ruling says the space is held "whether or not they are revealed" and
+ * that "nothing truncates"; held for hover and broken for selection is not
+ * held.
+ *
+ * The fix keeps the reservation EXACT in the way the item-4 comment above
+ * insists on - sized by the control itself, never by a padding wide enough to
+ * guess at - by drawing the control's own box in its place: same display,
+ * same height, same padding, same border and same type, carrying the same
+ * label, on every card that could ever show Save while it is not the selected
+ * one. So the strip holds the WIDEST set the card can show at all times and
+ * selecting one moves no other column.
+ *
+ * `visibility: hidden`, and deliberately not the `opacity: 0` the controls
+ * use: those stay focusable on purpose, because a keyboard user has to be
+ * able to reach a real gesture. This is not a gesture - it is the shape of
+ * one - so it has to leave the tab order and the accessibility tree while
+ * keeping the box, and `visibility` is the one of the three that does exactly
+ * that. `display: none` would take the box with it and reserve nothing.
+ *
+ * The declarations are the Save control's own, repeated rather than shared,
+ * because the rule above is matched by name in the presentation tests and a
+ * selector list would break that match. The presentation test asserts the two
+ * boxes agree declaration for declaration instead: a padding or a border that
+ * moves on one and not the other puts the reflow straight back. */
+.sb-node__strip-reserve {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--sb-space-2);
+  padding: 0 var(--sb-space);
+  border: var(--sb-border-width) solid var(--sb-border);
+  border-radius: var(--sb-radius-sm);
+  font-size: var(--sb-text-xs);
+  line-height: 1;
+  visibility: hidden;
 }
 
 /* The marking tray. It is a list and a pair of buttons and nothing else:
