@@ -3776,12 +3776,21 @@ Read at `4ddc99c`: the Structure stage is
 at `lib/statifier_blocks/compiler.ex:1500`, above a matching six-argument
 `@spec` at `:1492-1499`. Its caller is **`config_and_structure_stages/5`** -
 `defp config_and_structure_stages(document, palette, node, expansion, opts)` at
-`:1200`, `@spec` at `:1193`, called from `compile/3`'s `with` at `:520`.
+`:1200`, `@spec` at `:1193`, called from the `with` at `:520`.
 
-The stage reached six arguments at `7493dfc` (2026-09-13, "Labels outcome
-slots, scopes the slot exemption"), which is where `writers` and `declaring`
-were threaded into it: `declaring` is the set the slot exemption is scoped to,
-and both are the arguments that let the stage filter a refused block's
+That `with` is **`after_resolve/5`**'s (`defp after_resolve` at `:519`, `@spec`
+at `:517-518`), not `compile/3`'s. `compile/3` (`:492`) holds no `with` at all
+- it is `document |> stages(palette, opts) |> in_document_order(document)` -
+and `stages/3` (`:503`) holds the outer one and calls `after_resolve/5` at
+`:508`. So `:2793` spells the owner of that `with` from an older tree as well
+as the arity; both are read as history here.
+
+The stage reached six arguments in two steps, not one. `writers` was threaded
+in at `06d9908` (2026-09-08, "Names the composite a minted writer belongs to"),
+which took it from `/4` to `/5`; `declaring` was threaded in at `7493dfc`
+(2026-09-13, "Labels outcome slots, scopes the slot exemption"), which took it
+from `/5` to `/6`. `declaring` is the set the slot exemption is scoped to, and
+the two together are the arguments that let the stage filter a refused block's
 contribution rather than shorten anybody else's walk.
 
 ### 2. Where this file prints an older spelling
@@ -3799,14 +3808,15 @@ sentence's claim depends on the count: `:2793` names the stage among the
 `with`'s steps, and `:3115` says Config and Structure see a composite's members
 as if an author had placed them. The arity is the only thing that moved.
 
-This is the reading `ADR-0011`'s Note of 2026-09-08 section 3 already records
-for this repo - "one arity spelling, recorded as the code's" - applied to this
-file's two prints.
+This is the reading `ADR-0011`'s Note of 2026-09-07 *the pass-through-walk amendment is
+flipped to accepted, its cites re-counted, and one arity spelling recorded as
+the code's* (`:2902`), section 3 (`:2941`) already records for this repo - "one arity
+spelling, recorded as the code's" - applied to this file's two prints.
 
 ### 3. What this Note does not decide
 
-Nothing about the stage's behaviour, its ordering in `compile/3`'s `with`, or
-decision 4's provenance claims. It changes no code, adds no README row, and
+Nothing about the stage's behaviour, its ordering in `after_resolve/5`'s
+`with`, or decision 4's provenance claims. It changes no code, adds no README row, and
 flips no status line in this file. The nine stale `structure_stage/4` comment
 mentions under `test/` - in nine comments across six files - were corrected in
 place in the same request, comments being neither a record nor a cite.
