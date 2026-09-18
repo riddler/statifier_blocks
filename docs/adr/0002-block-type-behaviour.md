@@ -13453,10 +13453,13 @@ Filed with `sb-rkna`, campaign RF055.
 
 `C8` item 7 (`:12139`) records that a handler named through `finish_as` still
 draws as `abandon`, and hands the question - the name, the select value, or
-both - to an editor record. It is answered there: `ADR-0005`'s Note of
-2026-09-18 (`docs/adr/0005-liveview-editor.md:11436`) rules the name when the
-handler names one and the select value otherwise. Item 7's own text stands as
+both - to an editor record. It is answered there: `ADR-0005`'s **Amendment**
+of 2026-09-18 (`docs/adr/0005-liveview-editor.md:11436`, "a handler that
+names the outcome it finishes with draws under that name"), which rules the
+name when the handler names one and the select value otherwise, and which
+sits at **proposed** - so the flip is that record's, on its own request, and
+this line follows it rather than anticipating it. Item 7's own text stands as
 the record of the gap at the time it was written; nothing in this file is
-changed by this line.
+changed by this line, which is why it is a Note and not an amendment.
 
 Filed with `sb-hjcd`, campaign RF055.
