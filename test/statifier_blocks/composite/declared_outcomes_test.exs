@@ -814,12 +814,18 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     #
     # `sb-51lv`: one expansion, destructured once. Calling `expansion/1` twice
     # paired the members of one expansion with the `param_map` of a second,
-    # which is exactly the pairing `unraisable_outcomes/4`'s doc forbids a
+    # which is exactly the pairing `unraisable_outcomes/5`'s doc forbids a
     # caller to make - true here only because `expand!/2` is deterministic.
     test "the raisable set is the union over the expansion, not the root alone" do
       {members, param_map} = expansion(ConfirmStepDeclaring)
 
-      assert Composite.unraisable_outcomes(palette(), ConfirmStepDeclaring, members, param_map) ==
+      assert Composite.unraisable_outcomes(
+               palette(),
+               ConfirmStepDeclaring,
+               %{},
+               members,
+               param_map
+             ) ==
                []
     end
 
@@ -886,7 +892,7 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
 
       assert Enum.any?(Composite.flatten(members), &(&1.id == "blk_FILL"))
 
-      assert Composite.unraisable_outcomes(palette(), ConfirmStepOpen, members, param_map) ==
+      assert Composite.unraisable_outcomes(palette(), ConfirmStepOpen, %{}, members, param_map) ==
                ["received"]
 
       # `sb-51lv`: the same document through the compiler, which is where the
@@ -919,7 +925,7 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     test "a composite that declares nothing has nothing to check" do
       {members, param_map} = expansion(ConfirmStep)
 
-      assert Composite.unraisable_outcomes(palette(), ConfirmStep, members, param_map) == []
+      assert Composite.unraisable_outcomes(palette(), ConfirmStep, %{}, members, param_map) == []
     end
 
     # The precondition, now guarded. `ref` is `expand!/2`'s own second
@@ -928,7 +934,7 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     # `unraisable_outcomes` call site), so a non-composite ref here is a
     # caller error and not an input. `io/2` and `outcomes/2` resolve the ref
     # themselves and refuse in `composite_ref!/2`; this one takes the ref
-    # already resolved, and `declared_outcomes/1` refuses it in that same
+    # already resolved, and the static declaration read refuses it in that same
     # shape - this package's own `ArgumentError`, naming what was handed in
     # and what to hand in instead. It used to surface as a `BadMapError`
     # from `Map.get/3` reading `:outcomes` off the `nil` `Palette.call/4`
@@ -939,7 +945,7 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
     # recorded expectation rather than a silent move.
     #
     # Sabotage: put the unguarded `Palette.call |> Map.get` pipeline back in
-    # `declared_outcomes/1` - this went red, raising `BadMapError` where the
+    # the static declaration read - this went red, raising `BadMapError` where the
     # test expects `ArgumentError` (verified).
     test "a ref that is not a composite is a caller error, not an input" do
       {members, param_map} = expansion(ConfirmStep)
@@ -948,6 +954,7 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
         Composite.unraisable_outcomes(
           palette(),
           StatifierBlocks.Core.Sequence,
+          %{},
           members,
           param_map
         )
@@ -1019,7 +1026,7 @@ defmodule StatifierBlocks.Composite.DeclaredOutcomesTest do
                &(&1.type == "signup.not_in_this_palette")
              )
 
-      assert Composite.unraisable_outcomes(palette(), ConfirmStepGhost, members, param_map) ==
+      assert Composite.unraisable_outcomes(palette(), ConfirmStepGhost, %{}, members, param_map) ==
                ["done"]
     end
 
