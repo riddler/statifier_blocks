@@ -12699,3 +12699,233 @@ clause (`validation.ex:351`, `defp canonical_json_check(value, _path) when
 is_binary(value) do`, read at `2a0aa2a`), which runs before this walk.
 
 Filed with `sb-oa0y`, campaign RF047.
+
+## Note (2026-09-18): a fourth cite tidy by addition - `C8`'s `with`-threading sentence narrowed, the named arm moves the watcher transition's target too, and two cite ranges re-measured
+
+Campaign RF050, bead `sb-kmho`.
+
+Nothing above this line is edited. Every correction below is a later dated
+line: no rule, decision, clause or heading changes, this Note carries no
+`Status:` line, it flips nothing, it changes no code and it adds no changelog
+fragment. Every `lib/` and `docs/adr/` cite below was **read at `cdfbc6c`**
+and is written anchor first, line second; a later reader re-locates by the
+anchor and not by the number. `C8` is the Amendment of 2026-09-14 (`:11839`),
+and its code half has since landed, so where `C8` describes a change this
+line reads the built form.
+
+### 1. "every caller threads it through a `with`", narrowed
+
+`C8`'s two-id-functions bullet says the tagged return "is the ratified one
+... and every caller threads it through a `with`" (`:11921-11922`), naming
+four call sites (`:11923-11924`); item 3 repeats the same four "in the shape
+every other caller uses" (`:12062-12063`).
+
+**Three of the four are `with` clauses and the fourth is a `case`.** At
+`cdfbc6c`, `core/invoke.ex:283`
+(`{:ok, done_final} <- Context.outcome_id(context, "done"),`),
+`core/map.ex:663` (the same clause text) and `core/await.ex:274-275`
+(`{:ok, received} <- Context.outcome_id(context, @received),` and
+`{:ok, timed_out} <- Context.outcome_id(context, @timed_out),`) are clauses of
+a `with`. `core/subchart.ex:462` is not: it is
+`case Context.outcome_id(context, name) do`, inside an `Enum.reduce_while/3`
+in `defp routes(context, config) do` (`@spec` `core/subchart.ex:454`, head
+`:456`), whose `{:error, _reason} = error -> {:halt, error}` arm (`:464`)
+carries the tagged error out of the reduction.
+
+**The rule the sentence states is unchanged, and it is about the shape rather
+than the form.** What both places rest on is that `outcome_id/2`'s error is
+threaded through a return value and never raised, which decision 1 requires;
+`core/subchart.ex` threads the same tagged shape through a `case` that halts
+the reduction. Read "threads it through a `with`" as "threads the tagged
+return rather than raising" - the form is a `with` at three of the four sites
+and a halting `case` at the fourth.
+
+### 2. The named arm moves the watcher transition's target too, not only the final
+
+`C8` item 3 says "The abandon raise on the watcher's transition
+(`core/on_event.ex:928`) is **unchanged**" (`:12067`), and names `Emit.final/1`
+as what "takes the bound id" (`:12064`). That is true of the raise **element**
+and silent about the transition's `target:`.
+
+**As built, the id is bound once and used twice.** At `cdfbc6c`, `emit/2`
+(`core/on_event.ex:1052`, `def emit(%Block{config: config}, context) do`)
+binds the id inside the `with`, at `:1054`
+(`{:ok, finish} <- finish_id(context, config),`), and uses it in two places:
+as the watcher transition's target (`:1061`,
+`[event: event, cond: guard(config), cond_key: "cond", target: finish]`) and
+in `Emit.final(finish)` (`:1066`). The raise element beside the target
+(`:1062`, `assigns ++ [Emission.element("raise", [{"event", outcome}])]`) is
+what is unchanged, and that is how `C8`'s sentence is to be read. `finish_id/2`
+(`@spec` `:1084`, head `:1086`, `defp finish_id(context, config) do`) is the
+arm selector: unnamed it answers `{:ok, Context.done_id(context)}` (`:1088`),
+named it answers `Context.outcome_id(context, name)` (`:1089`).
+
+**The identifier and the line numbers are dated, not wrong.** `C8` spells the
+bound id `done` and gives `emit/2`'s lines as `:917`, `:918`, `:920-923`,
+`:928`, `:932` and `:934`; those were read before the code half landed. At
+`cdfbc6c` the binding is named `finish` and the function is
+`core/on_event.ex:1052-1068`. Nothing `C8` decides changes: the key is
+`finish_as`, as `C8` itself already spells it (`:11997`, `:12002`).
+
+### 3. Two cite ranges re-measured
+
+- **`compiler/context.ex:222-240` is the ratification's `@doc`, not the
+  ratification.** That range is cited twice, at `:11921` and at `:12061`, for
+  the sentence that the tagged shape is ratified because decision 1 forbids
+  `emit/2` to raise. At `cdfbc6c`, `compiler/context.ex:222` opens "This is
+  the **only** home for an outcome final's id.", which is a different claim in
+  the same `@doc`. The ratification is the admonition block that follows:
+  `compiler/context.ex:232` opens
+  `> #### The tagged return is the ratified shape {: .info}` and it closes at
+  `:240`. The range that carries what both sentences cite is
+  **`compiler/context.ex:232-240`**. Neither sentence changes.
+- **`ADR-0007`'s `current_version/0` row is one line.** The alternatives
+  section cites `docs/adr/0007-block-type-defaults.md:64-66` (`:12122`) for
+  the defaults table giving `current_version/0` the value `1` for
+  "decision 4's starting version". At `cdfbc6c` that row is
+  `docs/adr/0007-block-type-defaults.md:64` alone; `:65` is the `io/1` row and
+  `:66` the `migrate_config/2` row, and neither is what the sentence quotes.
+  The range is **`docs/adr/0007-block-type-defaults.md:64`**. What the section
+  argues from that row is unchanged.
+
+### What this line does not do
+
+It decides nothing, adds no key, callback, field type, slot or finding, and
+edits no line in this file or in any other record. It takes no position on
+whether `C8` or any Amendment above is ready to flip, which remains the
+operator's on each one's own request. A fourth correction in the same set
+concerns a line range quoted in a request body rather than in this file, and
+takes no line here.
+
+Filed with `sb-kmho`, campaign RF050.
+
+## Note (2026-09-18): six one-line corrections to the third cite tidy, by addition
+
+Campaign RF050, bead `sb-s972`.
+
+Nothing above this line is edited. Every correction below is a later dated
+line: no rule, decision, clause or heading changes, this Note carries no
+`Status:` line, it flips nothing, it changes no code and it adds no changelog
+fragment. Every `lib/`, `docs/adr/` and commit cite below was **read at
+`cdfbc6c`** and is written anchor first, line second. The record corrected is
+the **third cite tidy** ("a third cite tidy by addition - `C6`'s
+`on_`-minting sentence narrowed, ...", `:12293`, `sb-pk04`), which was itself
+read at `003bc36`; the **failure-classing Note** named beside it is "a
+declaring composite's outcomes are failure-classed by hand only, and a derived
+`on_<name>` slot takes no `:failure` slot style" (`:12200`, `sb-pj0o`).
+
+1. **`unhandled?/2` is spelled two ways by two records of the same day.** The
+   third cite tidy re-anchors it `compiler.ex:2728-2734` (`:12358`); the
+   failure-classing Note spells the same block `compiler.ex:2729-2734`
+   (`:12254`). The difference is one line, and it is the `@spec`. The block
+   `C7` cited (`compiler.ex:2411-2416`, `:11713`) is six lines, head to `end`,
+   so `:2729-2734` is the spelling that preserves what `C7` named and
+   `:2728-2734` is that block with its `@spec`. At `cdfbc6c` the block has
+   moved again: `@spec unhandled?(Resolved.t(), String.t()) :: boolean()` is
+   `compiler.ex:2778`, `defp unhandled?(%Resolved{slots: slots}, outcome) do`
+   is `:2779`, and the `end` is `:2784` - head to `end` is
+   **`compiler.ex:2779-2784`**. Neither record's rule changes; re-locate by
+   the head.
+2. **`node_failures/1`'s re-anchor is an anchor pair, not the block.** The
+   third cite tidy gives `compiler.ex:2715-2716` (`:12359`), which at
+   `003bc36` was the `@spec` and the head, where the sentence it re-anchors
+   reads the function as a whole ("is reached for a name only through
+   `node_failures/1`", `:12254-12255`). At `cdfbc6c` the function is
+   `@spec node_failures(Resolved.t()) :: [{Block.id(), StateId.t(), String.t()}]`
+   at `compiler.ex:2765`, head
+   `defp node_failures(%Resolved{block: block, module: module, slots: slots} = node) do`
+   at `:2766`, `end` at `:2776` - eleven lines head to `end`, twelve with the
+   `@spec`. Where the block is meant the range is
+   **`compiler.ex:2765-2776`**. The third member of that same sentence,
+   `propagation_transitions/2`, is `@spec` `compiler.ex:2790-2791` and head
+   `:2792` at `cdfbc6c`.
+3. **The rebase paragraph counts a changelog fragment among the test files.**
+   The third cite tidy says the request was rebased onto `23718fa` and that
+   "commit touches `core/on_event.ex` and four test files, none of them cited
+   here" (`:12320`). `23718fa` ("Names the outcome a handler finishes with")
+   touches five files: `lib/statifier_blocks/core/on_event.ex`, **three** test
+   files (`test/statifier_blocks/composite/declared_outcomes_test.exs`,
+   `test/statifier_blocks/core/core_types_test.exs`,
+   `test/statifier_blocks/core/on_event_test.exs`) and one changelog fragment,
+   `changelog.d/sb-r6ln.md`. **The load-bearing half holds**: none of the five
+   is cited in that Note, so every line number in it does hold at both
+   `003bc36` and `23718fa`, which is what the paragraph is for.
+4. **Section 9's "four places" sits above a five-row table.** The
+   `raisable_labels/3` bullet opens "This file cites it at four places, and
+   every one of them is dated rather than wrong" (`:12553-12554`) above a
+   table whose rows are `:12560-12564` - five of them. Three name
+   `raisable_labels/3` itself (`:12560`, `:12562`, `:12563`) and two name the
+   `Enum.map` line beside its binding (`:12561`, `:12564`). **The table is what
+   holds**; read the sentence as introducing it rather than counting it. No
+   re-anchoring follows from this, and the bullet's point - that every one of
+   those cites is dated rather than wrong - is unchanged.
+5. **A quoted sentence cited `:11131-11133` lies wholly on `:11132`.** Section
+   1's closing paragraph quotes `C6`'s "No composite derives an `on_<name>`
+   slot from its declared outcomes" and gives `:11131-11133` (`:12370`). At
+   `cdfbc6c` `:11131` closes the sentence before it ("`C6` mints the event,
+   not a") and `:11133` opens the one after
+   ("`Composite.derived_slots/1` (`composite.ex:609-612`,"). The range is
+   **`:11132`**. What section 1 argues from the quote is unchanged.
+6. **The third cite tidy does not name its own baseline side effect.**
+   `mix adr.cites --update` was run in the same request, because one new
+   record-to-record cite had never been in `docs/adr/.cite-baseline.json`, and
+   that file was rewritten by it. The Note says it "changes no code and it
+   adds no changelog fragment" (`:12299-12300`) and names no other artefact.
+   Recorded here: a record request that adds a cite the baseline has never
+   seen carries `docs/adr/.cite-baseline.json` with it, and that is a fourth
+   thing such a request may touch beside the record, the code and a fragment.
+   The request carrying this Note is itself such a request: section 3 of the
+   Note above cites one line of `ADR-0007` the baseline had not seen, so
+   `mix adr.cites --update` ran here too and its one added entry is in this
+   request's diff.
+
+### What this line does not do
+
+It decides nothing, adds no key, callback, field type, slot or finding, and
+edits no line in this file or in any other record. Every correction above is
+a measurement, and where a record and the code disagree the code is what a
+reader will find.
+
+Filed with `sb-s972`, campaign RF050.
+
+## Note (2026-09-18): the tab/LF/CR line's XML ground names §2.11's CR-to-LF step beside §3.3.3
+
+Campaign RF050, bead `sb-lnj2`.
+
+Nothing above this line is edited. This is a later dated line: no rule,
+decision, clause or heading changes, it carries no `Status:` line, it flips
+nothing, it changes no rule this file states and it adds no changelog
+fragment. Cites read at `cdfbc6c`.
+
+The Note of 2026-09-14 on the control-character refusal's "at all" clause
+(`:12645`) gives one step of XML 1.0's handling of a literal `#x9`, `#xA` or
+`#xD` in an attribute value: "§3.3.3's attribute-value normalization turns a
+literal `#x9`, `#xA` or `#xD` in an attribute value into a space"
+(`:12666-12668`).
+
+**There is an earlier step, and a raw carriage return never reaches §3.3.3 as
+itself.** XML 1.0 (5th edition) §2.11, end-of-line handling, requires a
+parser to normalize a literal `#xD` and the two-character sequence
+`#xD#xA` to a single `#xA` before the rest of the parse sees them. So of the
+three characters, only `#x9` and `#xA` reach attribute-value normalization as
+themselves; a raw `#xD` reaches it already as `#xA`, and a raw CRLF reaches it
+as one `#xA` rather than two characters.
+
+**Nothing the Note concludes changes.** All three still end as a space in the
+parsed attribute value - `#x9` and `#xA` by §3.3.3, `#xD` by §2.11 and then
+§3.3.3 - so the reason that line gives for `escape/1` writing the three rather
+than leaving them raw holds exactly as written. The legality half the
+qualifier restores (`:12659-12662`) is untouched: §2.11 is a normalization and
+not a refusal, and the `Char` production still admits `#x9`, `#xA` and `#xD`.
+The carve-out the code makes is also unchanged at `cdfbc6c`:
+`defp control?(codepoint), do: codepoint < 0x20 and codepoint not in [?\t, ?\n, ?\r]`
+is `core/on_event.ex:667`.
+
+### What this line does not do
+
+It decides nothing, adds no key, callback, field type, slot or finding, and
+edits no line in this file or in any other record. It takes no position on
+whether any Amendment above is ready to flip, which remains the operator's on
+each one's own request.
+
+Filed with `sb-lnj2`, campaign RF050.
