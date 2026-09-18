@@ -11437,7 +11437,8 @@ Filed with `sb-suao`, campaign RF046.
 
 `ADR-0002`'s `C8` (`docs/adr/0002-block-type-behaviour.md:11839`) let a
 `core.on_event` handler name the outcome it finishes its group with, under an
-optional `finish_as`, and its item 7 (`:12139`) recorded - deliberately
+optional `finish_as`, and its item 7
+(`docs/adr/0002-block-type-behaviour.md:12139`) recorded - deliberately
 without deciding it - that the canvas still draws such a handler as `abandon`,
 because the `slot_outcome_key` amendment above (`:1490`, table row `:1521`)
 points the read at the `outcome` **select**. `C8` item 7 called that an editor
@@ -11450,7 +11451,24 @@ container declared an outcome key is the name the block carries under
 `finish_as`, when it carries a well-formed one, and the value at the declared
 key otherwise. A handler that abandons its group under the name `went_back`
 carries `went_back`; the same handler with no name, or a blank one, carries
-`abandon` exactly as it did before; a `resume` handler carries `resume`.
+`abandon` exactly as it did before; a `resume` handler that names nothing
+carries `resume`.
+
+**The rule is flat, and it does not re-apply `C8`'s refusals.** The read is
+the name when a well-formed one is there and the declared key's value
+otherwise, with no third clause. So a handler whose `outcome` select is
+`resume` and which *also* carries a name reports the name, and one carrying
+`finish_as: "done"` reports `done` - two configurations `C8` refuses at
+compile (`lib/statifier_blocks/core/on_event.ex:573`, `defp
+check_finish_as_resumes/2`, and `:556`, `defp check_finish_as_done/2`, both
+read at `9e3a220`), but which the editor still builds a view model for, because it
+builds one for documents that never reach a compile at all. The finding that
+says the config is wrong is `C8`'s and is already reported on the same card;
+a second, quieter refusal here would say it again in a place an author cannot
+read it, and would put the reader in the business of re-deciding what `C8`
+decided. The alphabet the read admits stays decision 10's
+(`lib/statifier_blocks/block_type.ex:1298`, `9e3a220`), so a name outside it
+is no name and the select value is what is left.
 
 ### Why the name and not the select value
 
@@ -11487,8 +11505,10 @@ the `slot_outcome_key` declaration this amendment introduced:
 (`lib/statifier_blocks/block_type.ex:1362-1401` in this request), which
 answers `outcome_name(config, "finish_as") || outcome_name(config, key)`. The
 container's declaration keeps the shape this amendment gave it - a slot name
-to one config key, one string - so `core.group:79` and
-`core.resumable_group:91` are unchanged, every host type that declared the
+to one config key, one string - so `lib/statifier_blocks/core/group.ex:79`
+and `lib/statifier_blocks/core/resumable_group.ex:91` (each the
+`slot_outcome_key: %{"interrupts" => "outcome"}` line in `palette_entry/0`,
+read at `9e3a220`) are unchanged, every host type that declared the
 key keeps meaning what it meant, and the normalizer discipline `11r` chains
 to (`:6968`) is untouched.
 
@@ -11515,7 +11535,9 @@ removes no behaviour, and leaves every unnamed handler's value byte for byte
 what it was. It edits no line above it and moves no status line. It decides
 nothing about **drawing**: at `9e3a220` nothing under
 `lib/statifier_blocks/editor/` reads `Node.outcome` at all - the value is
-resolved into the view model at `view_model.ex:2213-2216` and stops there -
+resolved into the view model at `lib/statifier_blocks/view_model.ex:2213-2216`
+(`defp build_child/3`, in this request; `:2209-2212` at `9e3a220`) and stops
+there -
 so what a canvas paints with it stays `10a` to `10e`'s and is not asked for
 here. It takes no position on whether any section above it is ready to flip,
 which remains the operator's.
