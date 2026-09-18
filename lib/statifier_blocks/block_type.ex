@@ -1359,6 +1359,47 @@ defmodule StatifierBlocks.BlockType do
 
   def outcome_name(_config, _key), do: nil
 
+  # `ADR-0002`'s `C8` spelling of the optional name a handler finishes with.
+  # It lives here rather than in the one core type that carries the field
+  # because `finishing_outcome_name/2` below reads it the way decision 10
+  # reads everything: as a key, never as a type name.
+  @finish_as_key "finish_as"
+
+  @doc """
+  The outcome a block in a declared slot finishes with: the name it carries
+  under `finish_as`, when it carries a well-formed one, else the outcome
+  `config` declares at `key`.
+
+  `outcome_name/2` answers what the container's `slot_outcome_key/2`
+  declaration points at - the `outcome` **select** on a `core.on_event`
+  handler, which says what the arrival does to the group. `ADR-0002`'s `C8`
+  then let a handler name the outcome it actually finishes with, under
+  `finish_as`, and `outcomes/1` returns that name, so the select value is no
+  longer what the compiled chart emits. Ruled 2026-09-18: a consumer reads the
+  name when the handler names one and the select value otherwise, so
+  `Node.outcome` and a handler's compiled outcome agree.
+
+  The name is read as a key and never as a type name, which is decision 10's
+  property: a host type whose blocks carry a `finish_as` of the same alphabet
+  gets the same answer. A `nil` `key` - the slot whose container declared no
+  outcome key, and the malformed declaration `slot_outcome_key/2` refuses -
+  reads as no outcome here too, and the name is NOT consulted: a declaration
+  that does not exist means the uniform rendering every consumer did before
+  the declaration existed, and a name reaching a card the container never
+  asked to route on would be that rendering broken rather than restored.
+
+  Total for `outcome_name/2`'s reason, and the fallback is what makes it so:
+  the blank default `C8` gives the field, a name outside the outcome-name
+  alphabet, and a non-binary value all read as no name, which leaves exactly
+  the value this returned before the key existed.
+  """
+  @spec finishing_outcome_name(Block.config(), String.t() | nil) :: String.t() | nil
+  def finishing_outcome_name(config, key) when is_binary(key) do
+    outcome_name(config, @finish_as_key) || outcome_name(config, key)
+  end
+
+  def finishing_outcome_name(_config, _key), do: nil
+
   # ADR-0002 amendment B3 leaves the badge and join-marker length cap to
   # ADR-0005 decision 10 and notes the spike's number, chosen so that
   # "calls the host" and "timer" fit and a sentence does not. Decision 10

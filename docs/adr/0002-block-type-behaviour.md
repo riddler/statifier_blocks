@@ -13448,3 +13448,15 @@ to prove four things:
    a test, and the ten findings quoted above are gone.
 
 Filed with `sb-rkna`, campaign RF055.
+
+## Note (2026-09-18): `C8` item 7's open question is answered in `ADR-0005`, by addition
+
+`C8` item 7 (`:12139`) records that a handler named through `finish_as` still
+draws as `abandon`, and hands the question - the name, the select value, or
+both - to an editor record. It is answered there: `ADR-0005`'s Note of
+2026-09-18 (`docs/adr/0005-liveview-editor.md:11436`) rules the name when the
+handler names one and the select value otherwise. Item 7's own text stands as
+the record of the gap at the time it was written; nothing in this file is
+changed by this line.
+
+Filed with `sb-hjcd`, campaign RF055.
