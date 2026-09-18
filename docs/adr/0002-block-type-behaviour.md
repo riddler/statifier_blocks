@@ -12929,3 +12929,91 @@ whether any Amendment above is ready to flip, which remains the operator's on
 each one's own request.
 
 Filed with `sb-lnj2`, campaign RF050.
+
+## Note (2026-09-18): `C8`'s reach is the minted members, and an author-placed handler in a pass-through slot is out of scope
+
+Campaign RF050, bead `sb-63wg`.
+
+Nothing above this line is edited. This is a later dated line: no rule,
+decision, clause or heading changes, it carries no `Status:` line, it flips
+nothing, it changes no rule this file states, it changes no code and it adds
+no changelog fragment. Every `lib/` and `docs/adr/` cite below was **read at
+`b68815f`** and is written anchor first, line second; a later reader
+re-locates by the anchor and not by the number.
+
+`C8` is the Amendment of 2026-09-14 (`:11839`), and its subject is a
+`core.on_event` handler that names, through `finish_as`, the outcome it
+abandons its group with. Its `raisable_labels/3` bullet (`:11896`) describes
+the function as flattening "the minted members" and `flat_map`ping
+`member_outcomes/2`. The arrangement it argues over is a screen composite
+whose `interrupts` slot holds one handler per button, and a screen's buttons
+vary per screen - so the case a reader will ask about is the handler an
+**author** drops into a pass-through `interrupts` slot rather than one the
+declaration mints. `C8` does not say whether such a handler's `finish_as`
+name reaches `C2` item 2's raisable set.
+
+**It does not, and `C2` item 2 is the reason.** That item already decides
+that "Every member" means the declaration's own members, not the author's
+(`:10125`), and that "the raisable set is the minted members alone - the ones
+`param_map` is keyed by" (`:10130-10131`). The built code is that decision
+and nothing more:
+
+- **`param_map` is taken before the splice.** `expand!/2` (`composite.ex:588`,
+  `def expand!(%Block{} = block, ref) do`) binds
+  `param_map = param_map(members, params, param_decls(ref))` (`:615`) over the
+  minted subtree, and only then answers
+  `{splice(members, block, declared_slots(ref)), param_map}` (`:617`). Its own
+  comment above the binding (`:610-614`) names the order and its consequence:
+  the map "is taken over the minted members BEFORE the author's children are
+  spliced in. A pass-through child has no entry in it".
+- **The spliced children are never given one.** `splice/3` (`:1223`,
+  `defp splice(members, %Block{} = block, slots) do`) hands each declared
+  slot's children to `put_children/4` (`@spec` `:1232`, head `:1233`), which
+  places them in the mapped inner slot of the member minted from the local id
+  and leaves them otherwise untouched. They are not minted and no second
+  `param_map` pass runs over them, which is `P4`'s "Those children are **not
+  minted**" (`:8215`) read from the other end.
+- **`raisable_labels/3` drops them before it reads anything.**
+  `Composite.raisable_labels/3` (`composite.ex:954`, `defp
+  raisable_labels(%Palette{} = palette, members, param_map) do`) flattens the
+  expansion and filters it with `Enum.filter(&Map.has_key?(param_map, &1.id))`
+  (`:957`) *before* the `Enum.flat_map(&member_outcomes(&1, palette))` (`:958`)
+  that reads each surviving member's declared outcomes through
+  `member_outcomes/2` (`@spec` `:962`, head `:963`). An author-placed handler
+  fails the filter, so its `finish_as` name is never read at all - it is not
+  read and rejected, it is dropped one step earlier.
+- **Both readers of the set read it the same way.** `unraisable_outcomes/4`
+  (`@spec` `composite.ex:858`, head `:861`) takes the set through
+  `raisable = palette |> raisable_labels(members, param_map) |> Map.keys() |>
+  MapSet.new()` (`:867`), and `outcome_raisers/4` (`:703`,
+  `def outcome_raisers(%Palette{} = palette, names, members, param_map) do`)
+  applies the same `Enum.filter(&Map.has_key?(param_map, &1.id))` (`:707`) for
+  `C7`'s routing. `unraisable_outcomes/4`'s own `@doc` already states the
+  conclusion in this file's words (`:852-856`): a block an author dropped into
+  a pass-through slot "has no entry there and does not widen what the
+  composite may declare".
+
+**So `C8`'s reach is the minted members, and the author-placed case is out of
+scope of it.** `finish_as` on a minted `core.on_event` member widens what the
+enclosing composite may declare, exactly as `C8` describes. `finish_as` on a
+handler an author places in a pass-through slot does not, because `C2` item 2
+keeps a composite's `outcomes/1` a property of its type over its config rather
+than of the document that fills it - the reason that item gives is that a
+declaration checked against its filling "would compile in one document and
+fail in the next with the same declaration untouched" (`:10135-10136`). This
+line records that `C8` inherits that limit; it does not add one.
+
+### What this line does not do
+
+It decides nothing, adds no key, callback, field type, slot or finding, and
+edits no line in this file or in any other record. It does **not** decide what
+an author-placed `finish_as` handler *should* do - whether that case wants a
+record, a finding, or nothing at all is open, and is the operator's on its own
+request. It takes no position on whether a composite may declare its outcomes
+as a function of its own config, which is the separate record question `C6`,
+`C7` and `C8` leave open and which is filed as its own request; nothing above
+narrows or answers it. It takes no position on whether `C8` or any Amendment
+above is ready to flip, which remains the operator's on each one's own
+request.
+
+Filed with `sb-63wg`, campaign RF050.
