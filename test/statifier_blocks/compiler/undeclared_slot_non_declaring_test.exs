@@ -1,26 +1,34 @@
 defmodule StatifierBlocks.Compiler.UndeclaredSlotNonDeclaringTest do
   @moduledoc """
-  A child an author placed in a slot a NON-declaring composite's type does
-  not declare.
+  What a NON-declaring composite's own slots are never asked.
 
   `ADR-0002`'s `C3` replaces a composite that declares no `outcomes` by its
   expansion outright, so the spliced document the Structure stage walks no
-  longer contains that block. `:undeclared_slot` is a Structure finding, so
-  it had nothing to fire against: the child compiled green, emitted nothing,
-  and the author got zero findings back. That is the same class of silently
-  lost authoring work `StatifierBlocks.Compiler.ReservedExpansionSlotTest`
-  pins for the DECLARING half, one step wider - there the block survives
-  Resolve and only one reserved key was swallowed, here the whole block is
-  gone and every undeclared key goes with it.
+  longer contains that block. Both of that stage's slot findings then have
+  nothing to fire against, and the document compiles green with zero findings
+  for the author to read:
 
-  Resolve reports it now, against the composite block, carrying
-  `StatifierBlocks.SlotValidation`'s own `{:undeclared_slot, id, slot,
-  count}` reason unchanged - the same reason the declaring half draws from
-  Structure, because it is the same authoring mistake.
+    * `:undeclared_slot` - a child placed in a slot the type does not
+      declare, which emitted nothing; and
+    * `:slot_arity_violated` - a slot the type DOES declare whose child count
+      violates the arity it declared it at. Those children do reach the bytes
+      through the member the declaration names; what was lost is the
+      declaration's own refusal.
 
-  The negative half matters as much: a child in a slot the type DOES declare
-  is spliced into a member by `StatifierBlocks.Composite.expand!/2` and must
-  draw nothing.
+  That is the same class of silently lost authoring work
+  `StatifierBlocks.Compiler.ReservedExpansionSlotTest` pins for the DECLARING
+  half, one step wider - there the block survives Resolve and only one
+  reserved key was swallowed, here the whole block is gone.
+
+  Resolve reports both now, against the composite block, carrying
+  `StatifierBlocks.SlotValidation`'s own reason tuples unchanged - the same
+  reasons the declaring half draws from Structure, because they are the same
+  authoring mistakes. Since `C9b` the same path carries a non-declaring
+  INSTANCE of a per-instance declarer, and that is pinned here too.
+
+  The negative halves matter as much: a child in a declared slot whose count
+  satisfies its arity is spliced into a member by
+  `StatifierBlocks.Composite.expand!/2` and must draw nothing.
 
   The fixtures are the signup wizard's confirmation step, the same shape
   `StatifierBlocks.Composite.DeclaredOutcomesTest` uses.
@@ -115,6 +123,34 @@ defmodule StatifierBlocks.Compiler.UndeclaredSlotNonDeclaringTest do
     def subtree(params), do: ConfirmSubtree.build(params)
   end
 
+  defmodule ConfirmStepPerInstance do
+    @moduledoc """
+    `C9`'s shape over the same subtree: no `:outcomes` option, and a
+    `declared_outcomes/1` that reads the instance's own `buttons` param. The
+    same type is a declaring instance for one config and a NON-declaring one
+    for another (`C9b`), and the non-declaring one arrives on exactly the
+    path this file is about.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "signup.confirm_step_per_instance",
+      params: [
+        %{key: "event", type: :string, label: "Confirmed by", required?: true, default: ""},
+        %{key: "buttons", type: :string, label: "Buttons", required?: true, default: ""}
+      ],
+      slots: [%{name: "then", to: {"tail", "body"}, arity: :exactly_one, label: "Then"}],
+      palette_entry: %{label: "Confirm the contact, per instance"},
+      version: 1
+
+    alias StatifierBlocks.Compiler.UndeclaredSlotNonDeclaringTest.ConfirmSubtree
+
+    @impl StatifierBlocks.Composite
+    def subtree(params), do: ConfirmSubtree.build(params)
+
+    @impl StatifierBlocks.Composite
+    def declared_outcomes(config), do: String.split(config["buttons"] || "", ",", trim: true)
+  end
+
   describe "a child in an undeclared slot on a composite that declares no outcomes" do
     # Sabotage: restored `declaring_node/7`'s `[] -> {:ok, nodes, expansion}`
     # branch, which is what this bead found - green compile, zero findings,
@@ -200,23 +236,136 @@ defmodule StatifierBlocks.Compiler.UndeclaredSlotNonDeclaringTest do
     end
   end
 
-  describe "what this stage does not answer" do
-    # Moved in from the unit tests the first review's cure removed. Resolve
-    # asks about undeclared KEYS; arity on a non-declaring composite is the
-    # same blind spot but a separate question, and answering it here would
-    # decide it. Sabotage: dropped the reason-tag filter from
-    # `undeclared_slot_findings/2`, leaving only the block-id one - red with
-    # a FunctionClauseError, because the arity tuple reaches the clause that
-    # only matches `{:undeclared_slot, _, _, _}`.
-    test "an arity violation on a declared pass-through slot draws nothing here" do
+  describe "an arity violation on a declared pass-through slot of a non-declaring composite" do
+    # The blind spot this file's undeclared-slot half found, one slot kind
+    # wider: `C3` takes the block out of the spliced document, so the
+    # Structure stage never counts the children of a slot the type DOES
+    # declare either, and an author who emptied an `:exactly_one` slot
+    # compiled green. Sabotage: restored the reason-tag filter
+    # `Enum.filter(&match?({:undeclared_slot, ^id, _slot, _count}, &1))` on
+    # `non_declaring_slot_findings/2` - red, because the arity tuple is then
+    # dropped again and the document compiles `{:ok, _}`.
+    test "draws a :slot_arity_violated finding at Resolve against the composite block" do
+      assert {:error, findings} =
+               Compiler.compile(document(strict_block(%{"then" => []})), palette())
+
+      assert [%Finding{} = finding] =
+               Enum.filter(findings, &(&1.code == :slot_arity_violated))
+
+      assert finding.stage == :resolve
+      assert finding.block_id == "blk_CS"
+      assert finding.reason == {:slot_arity_violated, "blk_CS", "then", :exactly_one, 0}
+    end
+
+    # The same argument the undeclared half makes: `:package` renders as
+    # "this cannot be fixed here", and a document edit fixes this one.
+    # Sabotage: passed no `:fault` to `Finding.new/4` in
+    # `non_declaring_slot_finding/1`'s arity clause - red, because the
+    # `:resolve` stage's own default is `:package`.
+    test "is the author's fault, not the palette's" do
+      assert {:error, findings} =
+               Compiler.compile(document(strict_block(%{"then" => []})), palette())
+
+      assert [%Finding{fault: :author}] =
+               Enum.filter(findings, &(&1.code == :slot_arity_violated))
+    end
+
+    # The two stages report one authoring mistake, so they say the same
+    # sentence: `non_declaring_slot_finding/1`'s arity clause is
+    # `slot_finding/1`'s word for word. Sabotage: dropped `arity_phrase(arity)`
+    # from the Resolve clause - red, because the message then stops before
+    # naming what the type declared.
+    test "reads as the Structure stage's own sentence for the same reason tuple" do
+      assert {:error, findings} =
+               Compiler.compile(document(strict_block(%{"then" => []})), palette())
+
+      assert [%Finding{message: message}] =
+               Enum.filter(findings, &(&1.code == :slot_arity_violated))
+
+      assert message ==
+               ~s(the "then" slot holds 0 blocks, and this block type declares it as holding exactly one)
+    end
+
+    # `C9b`: "non-declaring" is a question about the BLOCK. An instance of a
+    # per-instance declarer whose `declared_outcomes/1` answers `[]` for its
+    # own config takes `C3`'s path, so it is blind in exactly the same way
+    # and draws exactly the same finding. Sabotage: made
+    # `ConfirmStepPerInstance.declared_outcomes/1` answer `["confirmed"]`
+    # whatever the config - red, because the block is then a DECLARING
+    # instance, leaves this path entirely, and the filter below answers `[]`.
+    test "draws there for a non-declaring INSTANCE of a per-instance declarer too" do
       block =
-        Block.new("signup.confirm_step_strict",
+        Block.new("signup.confirm_step_per_instance",
           id: "blk_CS",
-          config: %{"event" => "contact.confirmed"},
+          config: %{"event" => "contact.confirmed", "buttons" => ""},
           slots: %{"then" => []}
         )
 
-      assert {:ok, _compiled} = Compiler.compile(document(block), palette())
+      assert {:error, findings} = Compiler.compile(document(block), palette())
+
+      assert [%Finding{stage: :resolve, block_id: "blk_CS"} = finding] =
+               Enum.filter(findings, &(&1.code == :slot_arity_violated))
+
+      assert finding.reason == {:slot_arity_violated, "blk_CS", "then", :exactly_one, 0}
+    end
+
+    # The negative half: a slot whose count SATISFIES the declared arity
+    # draws nothing, and its child still reaches the bytes through the
+    # member the declaration names. Sabotage: made
+    # `StatifierBlocks.SlotValidation.arity_satisfied?/2`'s `:exactly_one`
+    # clause read `count == 0` - red here, because the one child this
+    # document places then reads as a violation and the compile errors.
+    test "a declared pass-through slot whose count satisfies its arity draws nothing" do
+      block = strict_block(%{"then" => [dropped_child("blk_W")]})
+
+      assert {:ok, compiled} = Compiler.compile(document(block), palette())
+
+      assert compiled.scxml =~ "s_blk_W"
+    end
+  end
+
+  describe "the finding messages count in English" do
+    # `holds 1 blocks` is what this message read before. Sabotage: made the
+    # compiler's `block_count/1` a single clause `"#{count} blocks"` - red
+    # here, on the singular half; the plural half is what keeps the fix from
+    # being a swap of one wrong number-word for another.
+    test "the undeclared-slot message says one block for one and two blocks for two" do
+      assert {:error, [%Finding{message: singular}]} =
+               Compiler.compile(document_with("mystery"), palette())
+
+      assert singular =~ ~s(the "mystery" slot holds 1 block but this block type)
+      refute singular =~ "1 blocks"
+
+      two =
+        block()
+        |> Map.put(:slots, %{"mystery" => [dropped_child("blk_W"), dropped_child("blk_X")]})
+        |> document()
+
+      assert {:error, [%Finding{message: plural}]} = Compiler.compile(two, palette())
+
+      assert plural =~ ~s(the "mystery" slot holds 2 blocks but this block type)
+    end
+
+    # The arity message counts through the same helper, and its own two
+    # reachable counts are zero and two-or-more: ADR-0002 decision 6's four
+    # arities are `:any`, `:at_least_one`, `:exactly_one` and `:zero_or_one`,
+    # and a count of one satisfies every one of them, so no arity finding can
+    # carry a count of 1. That is why the helper is shared rather than
+    # inlined at each site - the singular branch is reachable only from the
+    # undeclared-slot message above, and an inlined fix would have left this
+    # site free to drift. Sabotage: made the compiler's `block_count/1` a
+    # single clause `"#{count} block"` - red here.
+    test "the arity message counts in blocks at the counts an arity can carry" do
+      assert {:error, [%Finding{message: none}]} =
+               Compiler.compile(document(strict_block(%{"then" => []})), palette())
+
+      assert none =~ ~s(the "then" slot holds 0 blocks, and this block type)
+
+      two = strict_block(%{"then" => [dropped_child("blk_W"), dropped_child("blk_X")]})
+
+      assert {:error, [%Finding{message: plural}]} = Compiler.compile(document(two), palette())
+
+      assert plural =~ ~s(the "then" slot holds 2 blocks, and this block type)
     end
   end
 
@@ -227,8 +376,17 @@ defmodule StatifierBlocks.Compiler.UndeclaredSlotNonDeclaringTest do
       Palette.core_types()
       |> Map.put("signup.confirm_step_plain", ConfirmStepPlain)
       |> Map.put("signup.confirm_step_strict", ConfirmStepStrict)
+      |> Map.put("signup.confirm_step_per_instance", ConfirmStepPerInstance)
     )
   end
+
+  defp strict_block(slots),
+    do:
+      Block.new("signup.confirm_step_strict",
+        id: "blk_CS",
+        config: %{"event" => "contact.confirmed"},
+        slots: slots
+      )
 
   defp block,
     do:

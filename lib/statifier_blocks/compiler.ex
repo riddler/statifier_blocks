@@ -660,7 +660,7 @@ defmodule StatifierBlocks.Compiler do
   defp declaring_node(palette, %Block{} = block, module, members, param_map, nodes, expansion) do
     case Composite.declared_outcome_names(module, block.config) do
       [] ->
-        case undeclared_slot_findings(palette, block) do
+        case non_declaring_slot_findings(palette, block) do
           [] -> {:ok, nodes, expansion}
           findings -> {:error, findings, expansion}
         end
@@ -689,13 +689,26 @@ defmodule StatifierBlocks.Compiler do
     end
   end
 
-  # The children a NON-declaring composite drops. `C3` replaces such a block
-  # by its expansion outright, so it is not in the spliced document the
-  # Structure stage walks and `StatifierBlocks.SlotValidation` never gets to
-  # ask it anything: a child an author placed in a slot the composite's TYPE
-  # does not declare compiled green and emitted nothing, with zero findings
-  # for the author to read. A child in a slot the type DOES declare is spliced
-  # into a member by `StatifierBlocks.Composite.expand!/2` and is not this.
+  # What a NON-declaring composite's own slots are never asked. `C3` replaces
+  # such a block by its expansion outright, so it is not in the spliced
+  # document the Structure stage walks and `StatifierBlocks.SlotValidation`
+  # never gets to ask it anything - and since `C9b`, "non-declaring" is a
+  # question about the BLOCK: an instance of a per-instance declarer whose
+  # `declared_outcomes/1` answers `[]` for that instance's config arrives on
+  # exactly this path and is equally invisible.
+  #
+  # Two authoring mistakes go silent there, and both are reported here:
+  #
+  #   * a child an author placed in a slot the composite's TYPE does not
+  #     declare, which compiled green and emitted nothing
+  #     (`{:undeclared_slot, id, slot, count}`); and
+  #   * a slot the type DOES declare whose child count violates the arity it
+  #     declared it at (`{:slot_arity_violated, id, slot, arity, count}`).
+  #     Those children are spliced into a member by
+  #     `StatifierBlocks.Composite.expand!/2` and reach the bytes, so nothing
+  #     is dropped - what is lost is the declaration's own refusal, which on
+  #     a DECLARING composite the Structure stage makes and on this one
+  #     nobody did.
   #
   # Resolve is the stage because this is the last place the block and the
   # slots an author wrote on it both exist - the same argument
@@ -703,47 +716,72 @@ defmodule StatifierBlocks.Compiler do
   # same one `reserved_slot_findings/1` below makes for the declaring half of
   # this shape.
   #
-  # The reason tuple is `StatifierBlocks.SlotValidation`'s own
-  # `{:undeclared_slot, id, slot, count}`, unchanged, and the rule is asked of
-  # that module rather than re-derived here: a DECLARING composite survives
-  # Resolve and draws exactly this finding from the Structure stage, and the
-  # two halves of one authoring mistake reporting two different reasons would
-  # be a difference an author cannot act on. What does differ is the stage,
-  # and with it `StatifierBlocks.Finding`'s stage-derived source
-  # (`:resolution` rather than `:assignability`) - that mapping is by rule and
-  # never by code, so it stays correct by construction.
+  # The reason tuples are `StatifierBlocks.SlotValidation`'s own, unchanged,
+  # and the rule is asked of that module rather than re-derived here: a
+  # DECLARING composite survives Resolve and draws exactly these findings from
+  # the Structure stage, and the two halves of one authoring mistake reporting
+  # two different reasons would be a difference an author cannot act on. What
+  # does differ is the stage, and with it `StatifierBlocks.Finding`'s
+  # stage-derived source (`:resolution` rather than `:assignability`) - that
+  # mapping is by rule and never by code, so it stays correct by construction.
   #
   # It is asked through `StatifierBlocks.SlotValidation.validate/2`, that
   # module's existing public entry point, over a document rooted at this one
-  # block (`StatifierBlocks.Document.new/2` takes any root block). Two filters
-  # make a whole-document answer into this block's: the block id, because the
+  # block (`StatifierBlocks.Document.new/2` takes any root block). ONE filter
+  # makes a whole-document answer into this block's: the block id, because the
   # walk descends into the author's children and those are Structure's to
-  # report on the documents that keep them; and the reason tag, because this
-  # stage asks about undeclared keys and not about arity, whose gap on a
-  # non-declaring composite is its own question and is not decided here.
+  # report on the documents that keep them. Both of that module's reason tags
+  # are kept - it computes exactly the two properties `ADR-0002` decision 6
+  # names, and a non-declaring composite is blind to both.
+  #
+  # The order is `validate/2`'s own, which is arity findings first in
+  # `slots/1`'s declaration order and undeclared-slot findings after in sorted
+  # slot-name order.
   #
   # `fault: :author` rather than this stage's `:package` default, for
   # `reserved_slot_findings/1`'s reason: a document edit fixes it.
-  @spec undeclared_slot_findings(Palette.t(), Block.t()) :: [Finding.t()]
-  defp undeclared_slot_findings(palette, %Block{id: id} = block) do
+  @spec non_declaring_slot_findings(Palette.t(), Block.t()) :: [Finding.t()]
+  defp non_declaring_slot_findings(palette, %Block{id: id} = block) do
     palette
     |> SlotValidation.validate(Document.new(block))
     |> case do
       :ok -> []
       {:error, findings} -> findings
     end
-    |> Enum.filter(&match?({:undeclared_slot, ^id, _slot, _count}, &1))
-    |> Enum.map(fn {:undeclared_slot, id, slot, count} = reason ->
-      Finding.new(
-        :resolve,
-        reason,
-        ~s(the "#{slot}" slot holds #{count} blocks but this block type declares no such slot, ) <>
-          "so they are dropped where this composite is replaced by its expansion; move them " <>
-          "into a slot it declares, or rename the slot",
-        block_id: id,
-        fault: :author
-      )
+    |> Enum.filter(fn
+      {:undeclared_slot, ^id, _slot, _count} -> true
+      {:slot_arity_violated, ^id, _slot, _arity, _count} -> true
+      _other_block -> false
     end)
+    |> Enum.map(&non_declaring_slot_finding/1)
+  end
+
+  # The message halves. The undeclared one names what `C3` does to those
+  # children; the arity one is `slot_finding/1`'s sentence for the same reason
+  # tuple, word for word, because the mistake and the fix are the same and
+  # only the stage that noticed differs.
+  @spec non_declaring_slot_finding(SlotValidation.finding()) :: Finding.t()
+  defp non_declaring_slot_finding({:undeclared_slot, id, slot, count} = reason) do
+    Finding.new(
+      :resolve,
+      reason,
+      ~s(the "#{slot}" slot holds #{block_count(count)} but this block type declares no such ) <>
+        "slot, so they are dropped where this composite is replaced by its expansion; move " <>
+        "them into a slot it declares, or rename the slot",
+      block_id: id,
+      fault: :author
+    )
+  end
+
+  defp non_declaring_slot_finding({:slot_arity_violated, id, slot, arity, count} = reason) do
+    Finding.new(
+      :resolve,
+      reason,
+      ~s(the "#{slot}" slot holds #{block_count(count)}, and this block type declares it ) <>
+        arity_phrase(arity),
+      block_id: id,
+      fault: :author
+    )
   end
 
   # The author's half of `@expansion_slot`'s exemption. `compiler_slot?/2`
@@ -1761,7 +1799,7 @@ defmodule StatifierBlocks.Compiler do
     Finding.new(
       :structure,
       reason,
-      ~s(the "#{slot}" slot holds #{count} blocks, and this block type declares it ) <>
+      ~s(the "#{slot}" slot holds #{block_count(count)}, and this block type declares it ) <>
         arity_phrase(arity),
       block_id: id
     )
@@ -1771,11 +1809,21 @@ defmodule StatifierBlocks.Compiler do
     Finding.new(
       :structure,
       reason,
-      ~s(the "#{slot}" slot holds #{count} blocks but this block type declares no such slot, ) <>
-        "so they would be dropped",
+      ~s(the "#{slot}" slot holds #{block_count(count)} but this block type declares no such ) <>
+        "slot, so they would be dropped",
       block_id: id
     )
   end
+
+  # "holds 1 blocks" is a sentence no author should have to read. Every slot
+  # message in this module counts children through here, so the two stages
+  # that report the same reason tuple stay word for word identical; the
+  # inline precedent is `StatifierBlocks.Editor.BlockNode`'s own `plural`.
+  # Zero is plural in English, and a zero count is what an `:at_least_one` or
+  # `:exactly_one` violation usually carries.
+  @spec block_count(non_neg_integer()) :: String.t()
+  defp block_count(1), do: "1 block"
+  defp block_count(count), do: "#{count} blocks"
 
   @spec arity_phrase(StatifierBlocks.BlockType.slot_arity()) :: String.t()
   defp arity_phrase(:any), do: "as holding any number"

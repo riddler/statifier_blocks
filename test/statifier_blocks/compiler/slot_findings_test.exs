@@ -227,6 +227,81 @@ defmodule StatifierBlocks.Compiler.SlotFindingsTest do
     assert Enum.map(findings, &{&1.stage, &1.block_id}) == [{:config, "blk_BRANCH"}]
   end
 
+  # Both of this stage's slot messages used to read "holds 1 blocks". They
+  # count through the compiler's own `block_count/1` now, which is the same
+  # helper the Resolve-stage message for the same reason tuple uses, so the
+  # two stages cannot drift apart on the sentence they say about one
+  # authoring mistake.
+  #
+  # The arity message's own counts are zero and two-or-more: ADR-0002
+  # decision 6's four arities are all satisfied by a count of one, so no
+  # arity finding can carry a singular count and only the undeclared-slot
+  # message reaches that branch.
+  #
+  # Sabotage: made `block_count/1` a single clause `"#{count} blocks"` - red
+  # here, on the singular assertion below.
+  test "the slot messages count in English at both of this stage's sites" do
+    assert {:error, [%Finding{message: one}]} =
+             Compiler.compile(stray_document(1), CoreFixtures.palette())
+
+    assert one =~ ~s(the "stray" slot holds 1 block but this block type)
+    refute one =~ "1 blocks"
+
+    assert {:error, [%Finding{message: two}]} =
+             Compiler.compile(stray_document(2), CoreFixtures.palette())
+
+    assert two =~ ~s(the "stray" slot holds 2 blocks but this block type)
+
+    document =
+      Document.new(
+        Block.new("core.sequence",
+          id: "blk_ROOT",
+          slots: %{
+            "body" => [
+              Block.new("core.branch",
+                id: "blk_BRANCH",
+                config: %{"arms" => [%{"slot" => "arm_review", "cond" => "true"}]}
+              )
+            ]
+          }
+        ),
+        id: "bdoc_cards"
+      )
+
+    assert {:error, [%Finding{message: none}]} =
+             Compiler.compile(document, CoreFixtures.palette())
+
+    assert none =~ ~s(the "arm_review" slot holds 0 blocks, and this block type)
+  end
+
+  # One `myapp.notify` carrying `count` children under a slot its type does
+  # not declare.
+  defp stray_document(count) do
+    strays =
+      for n <- 1..count do
+        Block.new("myapp.notify",
+          id: "blk_STRAY_" <> Integer.to_string(n),
+          config: %{"invoke_type" => "cards:notify"}
+        )
+      end
+
+    Document.new(
+      Block.new("core.sequence",
+        id: "blk_ROOT",
+        slots: %{
+          "body" => [
+            Block.new("myapp.notify",
+              id: "blk_NOTIFY",
+              config: %{"invoke_type" => "cards:notify"},
+              slots: %{"stray" => strays}
+            )
+          ]
+        }
+      ),
+      id: "bdoc_cards"
+    )
+  end
+
   # Sabotage: made `structure_stage/6` return a one-element list whenever
   # its concatenated finding list was empty - red on both fixtures, since
   # neither compiles at all once Structure always fails.
