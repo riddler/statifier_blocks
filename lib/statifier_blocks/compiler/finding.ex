@@ -45,10 +45,12 @@ defmodule StatifierBlocks.Compiler.Finding do
       `:structure` finding (an author placed the block), and every `:chart`
       finding whose owning span carries a config key.
     * `:package` - a bug in this package or in a host's block type, and no
-      edit to the document will help. `:resolve` findings (the palette is
-      the host's, not the author's), every `:emit` finding that names no
-      config key, and every `:chart` finding whose owning span carries no
-      config key: an author cannot express `{:unresolved_target, id}`,
+      edit to the document will help. Every `:resolve` finding except
+      `:reserved_slot_name` (the palette is the host's, not the author's;
+      the one exception, in the table above, is a slot key an author
+      typed, and renaming it fixes it), every `:emit` finding that names
+      no config key, and every `:chart` finding whose owning span carries
+      no config key: an author cannot express `{:unresolved_target, id}`,
       because the block vocabulary has no way to name a state id.
 
   The editor renders the two differently, and "this cannot be fixed here"
