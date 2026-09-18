@@ -713,12 +713,26 @@ defmodule StatifierBlocks.Compiler do
   # (`:resolution` rather than `:assignability`) - that mapping is by rule and
   # never by code, so it stays correct by construction.
   #
+  # It is asked through `StatifierBlocks.SlotValidation.validate/2`, that
+  # module's existing public entry point, over a document rooted at this one
+  # block (`StatifierBlocks.Document.new/2` takes any root block). Two filters
+  # make a whole-document answer into this block's: the block id, because the
+  # walk descends into the author's children and those are Structure's to
+  # report on the documents that keep them; and the reason tag, because this
+  # stage asks about undeclared keys and not about arity, whose gap on a
+  # non-declaring composite is its own question and is not decided here.
+  #
   # `fault: :author` rather than this stage's `:package` default, for
   # `reserved_slot_findings/1`'s reason: a document edit fixes it.
   @spec undeclared_slot_findings(Palette.t(), Block.t()) :: [Finding.t()]
-  defp undeclared_slot_findings(palette, %Block{} = block) do
+  defp undeclared_slot_findings(palette, %Block{id: id} = block) do
     palette
-    |> SlotValidation.undeclared_slots(block)
+    |> SlotValidation.validate(Document.new(block))
+    |> case do
+      :ok -> []
+      {:error, findings} -> findings
+    end
+    |> Enum.filter(&match?({:undeclared_slot, ^id, _slot, _count}, &1))
     |> Enum.map(fn {:undeclared_slot, id, slot, count} = reason ->
       Finding.new(
         :resolve,

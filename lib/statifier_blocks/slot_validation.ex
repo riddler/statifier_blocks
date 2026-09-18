@@ -5,9 +5,6 @@ defmodule StatifierBlocks.SlotValidation do
   (`:undeclared_slot`), and a slot's child count must satisfy the arity
   its type declares for it (`:slot_arity_violated`).
 
-  `undeclared_slots/2` answers the first of those for ONE block, for the
-  compiler's Resolve stage - see its own doc for why that caller exists.
-
   One implementation, consulted by both the editor and the compiler
   (`sb-iwz`), the same way `StatifierBlocks.Assignability` is - both are
   passed the same palette and the same document, and neither owns a
@@ -73,41 +70,6 @@ defmodule StatifierBlocks.SlotValidation do
     case findings do
       [] -> :ok
       findings -> {:error, findings}
-    end
-  end
-
-  @doc """
-  Every `:undeclared_slot` finding `block` alone draws against `palette`,
-  in the same UTF-8-sorted slot-name order `validate/2` reports them in.
-
-  `validate/2` answers for a whole document. This answers for ONE block,
-  for the one caller that cannot wait for that walk: a composite declaring
-  no `outcomes` is replaced by its expansion outright at the compiler's
-  Resolve stage (`ADR-0002`'s `C3`), so the spliced document the Structure
-  stage walks no longer contains that block, and a child an author placed
-  in a slot its type does not declare was dropped with the compile green
-  and nothing to read. Resolve is where the block and its slots are last
-  visible, so Resolve asks - here, rather than keeping a private second
-  copy of the rule, which is this module's whole point.
-
-  Arity is deliberately not answered. `validate/2`'s arity half is a
-  separate finding, and a composite's arity gap is the same shape but not
-  the same question; widening this function to carry it would make one
-  caller's fix decide the other's.
-
-  A block whose type `Palette.resolve/2` refuses draws nothing, exactly as
-  in `validate/2` and for the same reason.
-  """
-  @spec undeclared_slots(Palette.t(), Block.t()) :: [finding()]
-  def undeclared_slots(%Palette{} = palette, %Block{} = block) do
-    case Palette.resolve(palette, block) do
-      {:ok, ref, resolved} ->
-        ref
-        |> Palette.call(:slots, [resolved.config], [])
-        |> undeclared_findings(block)
-
-      {:error, _reason} ->
-        []
     end
   end
 
