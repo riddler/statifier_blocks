@@ -63,18 +63,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     in CSS for the same reason `data-empty` is stamped rather than derived -
     the view model already knows.
 
-    The mark is also what SAYS the arm is empty, not only what draws it
-    (the operator's ruling of 2026-09-12). An editing mount
-    announces the gap's "+", so the read-only mount that draws no "+" was
-    announcing a slot header and then nothing, and a reader who cannot see
-    the ring could not tell an empty arm from an arm the rendering had cut
-    short. So the span is a labelled `role="img"` - the arm's own label
-    followed by "is empty" - rather than an `aria-hidden` decoration, since
-    an `aria-hidden` element cannot carry a name at all. The label names WHICH
-    arm, which is the half a header two lines up does not supply once a
-    reader has moved past it. `role="img"` and not a `button`, because the
-    name is all that is restored - the mark still carries no event, no
-    `phx-` attribute and no tab stop, which is item 7b's other half.
+    The mark is also what SAYS the arm is empty, not only what draws it (the
+    operator's ruling of 2026-09-12). An editing mount announces the gap's
+    "+", so the read-only mount that draws no "+" was announcing a slot header
+    and then nothing, and a reader who cannot see the ring could not tell an
+    empty arm from an arm the rendering had cut short. So the span is a
+    labelled `role="img"` - the arm's own label followed by "is empty" -
+    rather than an `aria-hidden` decoration, since an `aria-hidden` element
+    cannot carry a name at all. The label names WHICH arm, which is the half a
+    header two lines up does not supply once a reader has moved past it.
+    `role="img"` and not a `button`, because the name is all that is
+    restored - the mark still carries no event, no `phx-` attribute and no tab
+    stop, which is item 7b's other half.
 
     ## The gap IS the insertion marker (R3, operator ruling 2026-08-29)
 

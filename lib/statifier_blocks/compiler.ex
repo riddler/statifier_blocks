@@ -411,10 +411,12 @@ defmodule StatifierBlocks.Compiler do
   # stored slot key is not a role and passes through no role check
   # (`StatifierBlocks.Validation` admits any non-empty slot name, and Decode
   # passes the key through). A document CAN therefore carry a slot with this
-  # name, and one that does still gets its ordinary `:undeclared_slot`
-  # finding - `declaring_block_ids/1` below scopes the one place this key is
-  # exempt to the composite whose resolved node the compiler itself put it
-  # on.
+  # name. On a block of the author's own it still gets its ordinary
+  # `:undeclared_slot` finding; on a DECLARING composite's own block - the
+  # blocks `declaring_block_ids/1` below exempts, because on those the
+  # compiler itself put the key on the resolved node - it draws
+  # `:reserved_slot_name` at `:resolve` instead, which is what
+  # `reserved_slot_findings/1` reports.
   @expansion_slot ":expansion"
 
   # Decision 6's third determinism input. It is the package version, and it
@@ -716,8 +718,9 @@ defmodule StatifierBlocks.Compiler do
           :resolve,
           {:reserved_slot_name, id, @expansion_slot},
           "the slot #{inspect(@expansion_slot)} is the name this composite's own expansion " <>
-            "members are kept under, so a slot of that name written here is replaced and its " <>
-            "children never compile; rename it or move them into a declared slot",
+            "members are kept under, so a slot of that name written here is replaced " <>
+            "and any children it carries never compile; rename it or move them into " <>
+            "a declared slot",
           block_id: id,
           fault: :author
         )
