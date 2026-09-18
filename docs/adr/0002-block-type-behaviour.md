@@ -13017,3 +13017,401 @@ above is ready to flip, which remains the operator's on each one's own
 request.
 
 Filed with `sb-63wg`, campaign RF050.
+
+## Amendment (2026-09-18): a composite may declare its outcomes as a function of its own config, and every reader of the declared list reads that instance's - `C9`
+
+**Status: proposed (2026-09-18, campaign RF055, bead `sb-rkna`, recording the
+operator's ruling of 2026-09-18, "Yes, per-instance declaration").** A decision
+record merges at proposed under the campaign invariant, and this one **stays**
+proposed at that campaign's wrap. **Nothing below describes code that exists
+today.** The ruling ruled the record first: `sb-rkna`'s second half is the
+request that builds this, dispatched only after this section is on `main`, the
+way `C6` (`:11014`) and `C7` (`:11482`) name `sb-t74x` and `C8` (`:11839`)
+names `sb-r6ln`. If that request finds this section wrong, it holds and reports
+rather than amending it here.
+
+**The half this section decides.** `C6` decides that a declaring composite
+raises `done.outcome.<composite state id>.<name>`; `C7` decides that the
+enclosing body selects on that name through a derived `on_<name>` slot; `C8`
+decides that an interrupt handler may name the outcome it abandons its group
+with. All three rest on `C1` (`:10074`), whose `outcomes` key is a **property
+of the type**: it is an option on the `use`, normalized once into the module
+attribute `__composite__/0` answers, and read back through a route that carries
+no config at all. So a composite type whose members are derived per config from
+a second document - one screen type standing for every screen in an element
+document - cannot say what any one of its instances finishes as. It can only
+declare the union, and then `C2` item 3 (`:10137`) refuses, **per instance**,
+every name that instance cannot raise. This section decides that half: a
+composite type may declare that its outcomes are read from the instance's
+config, and `C2`'s raisability check and `C7`'s slot derivation both read
+**that instance's** list.
+
+Additive: every decision, Amendment and Note above this line stands exactly as
+it stands, and no text above this line is edited by this section. `C1`, `C2`,
+`C3`, `C6`, `C7` and `C8` are not edited; this section is stated **on top of**
+them. Three of their clauses are **narrowed by addition** below - `C1`'s "list
+of outcome names" option, `C1`'s empty-list rule, and `C2` item 4's per-block
+reasoning extended from the subtree to the declaration over it - which is a
+thing this section says about them and not a thing it does to them. `C2` item
+2's rule that the raisable set is the **minted** members alone is not touched,
+and the Note of 2026-09-18 (`:12933`) that records `C8` inheriting that limit
+is not touched either.
+
+Every `lib/` cite below was **read at `main` `6ea2afe`** and is written anchor
+first, line second - a function head, a `@spec`, a module attribute, a
+`@callback`. A cite is re-located by that anchor and not by its number. Cites
+into this file are written the same way.
+
+### The gap, and what is true of the code today
+
+The declared list is reached through one private function, and that function
+takes a **ref and nothing else**:
+
+- `declared_outcomes/1` (`composite.ex:978`, `defp declared_outcomes(ref) do`,
+  `@spec` `:977`) calls `Palette.call(ref, :__composite__, [], nil)` and reads
+  `Map.get(declaration, :outcomes, [])` off the answer. `__composite__/0` is
+  arity **zero** (`composite.ex:332`, `def __composite__, do:
+  @composite_declaration`), and `@composite_declaration` is bound once at the
+  using module's own compile time from the `use` options
+  (`composite.ex:328`). There is no config on this route, at any point.
+- The value is normalized by `normalize_outcomes!/1` (`composite.ex:467`,
+  `defp normalize_outcomes!(names) do`, `@spec` `:466`), which refuses
+  anything that is not a list of non-empty strings and refuses a duplicate
+  name, both with an `ArgumentError` raised as the using module compiles. A
+  function is not a list, so the key cannot hold one today.
+- The declaration type says so in one line: `@type declaration`
+  (`composite.ex:247-255`) carries `outcomes: [String.t()]` (`:254`), and
+  `@declaration_options` (`composite.ex:280`) lists `:outcomes` among the
+  seven recognized `use` options.
+
+**The rule this section states, before the sites.** Every read of a
+composite's declared outcome list is a read of **that instance's** list. The
+sites below are the ones this section was written against at `6ea2afe`; they
+are a reading, not a census, and the request that builds this section
+enumerates them **by grep over `lib/`** - every caller of
+`declared_outcomes/1` and of `declared_outcome_names/1`, and every match on
+the declaration's `:outcomes` key - and pins that enumeration with a test,
+rather than working from this list. A site this section failed to name is a
+site the rule still reaches.
+
+The reads at `6ea2afe`, and what each one decides:
+
+- **`declared_outcome_names/1`** (`composite.ex:698`, `def
+  declared_outcome_names(ref), do: declared_outcomes(ref)`, `@spec` `:697`,
+  `@doc false`) - the ref-only pass-through the compiler calls. It carries no
+  config parameter, which is the whole of the gap in one line.
+- **`declaring_node/7`** (`compiler.ex:660`, `defp declaring_node(palette,
+  %Block{} = block, module, members, param_map, nodes, expansion) do`, `@spec`
+  `:651`) - `case Composite.declared_outcome_names(module) do` (`:661`) is
+  `C6`'s gate: the `[]` arm treats the block as non-declaring and the `names`
+  arm builds the declaring `Resolved` node with its `on_<name>` slots and its
+  `declaring: %{outcomes: ..., members: ...}` map.
+- **`outcome_slots/3`, the compiler's** (`compiler.ex:795`, `defp
+  outcome_slots(palette, %Block{} = block, names) do`, `@spec` `:793`) - takes
+  the names `declaring_node/7` already read and resolves each `on_<name>`
+  slot's children. It is a reader of the list at one remove.
+- **`outcome_slots/3`, the composite's** (`composite.ex:673`, `defp
+  outcome_slots(%{outcomes: [_first | _rest]}, ref, config) do`, second clause
+  `:679`, `@spec` `:671`) - the compile-side `on_` slot declarations. Note
+  that this one **already takes the config**: it guards on the declaration's
+  static list and then calls `derived_outcomes(ref, config)` (`:675`) for the
+  labels. Only its guard is type-level.
+- **`outcomes_over/3`** (`composite.ex:922`, `defp outcomes_over(%Palette{} =
+  palette, %Block{} = block, ref) do`, `@spec` `:921`) - what an enclosing
+  body sees as the composite's outcomes. Its `case declared_outcomes(ref) do`
+  (`:925`) is `C2` item 1's replacement and `C3`'s byte-identical fallback in
+  one expression. It has the block, so it has the config.
+- **`unraisable_outcomes/4`** (`composite.ex:861`, `def
+  unraisable_outcomes(%Palette{} = palette, ref, members, param_map) do`,
+  `@spec` `:858`) - `C2` item 3's raisability check, `case
+  declared_outcomes(ref) do` at `:862`. It has the expanded members, so the
+  config that produced them is in reach of its caller.
+
+Two **refusals** read the list as well, and they are the reason this section
+needs `C9d`:
+
+- `refute_outcome_slot_collisions!/2` raises an `ArgumentError`
+  (`composite.ex:502-507`, "which `:outcomes` already derives as an outcome
+  slot") over `outcome_slot_collisions/2` (`composite.ex:687`, `@spec` `:686`)
+  as the using module compiles.
+- `normalize_outcomes!/1`'s duplicate-name refusal (`composite.ex:474-480`)
+  does the same, and is the adopted duplicate rule of the Note of 2026-09-13
+  (`:10624`) in its module-compile-time form.
+
+And the data side reads it at registration: `Composite.Data`'s declaration
+table documents `"outcomes"` as an optional key defaulting to `[]`
+(`composite/data.ex`, the `## The declaration` table's `"outcomes"` row),
+`data.ex:1448` runs `Composite.outcome_slot_collisions/2` over it as the entry
+is built, and `data.ex:599` (`def outcomes(state, config), do:
+Composite.derived_outcomes({__MODULE__, state}, config)`) is the callback.
+
+### `C9`. The declaration: an optional `declared_outcomes/1` callback on the composite behaviour, over the block's config
+
+A composite type says "read my outcomes from the instance's config" by
+**implementing a callback**, not by putting a function in its declaration:
+
+    @callback declared_outcomes(Block.config()) :: [String.t()]
+
+on `StatifierBlocks.Composite`, optional, taking the block's config and
+answering the same thing `C1`'s key answers - a list of outcome **names**,
+strings, in the order the instance declares them, not
+`t:StatifierBlocks.BlockType.outcome_decl/0` pairs. `C1`'s label rule is
+unchanged and is not restated: the label of a declared name is still the one
+the member that raises it already wrote, found by the resolution `C2`
+performs.
+
+**Why a callback and not a value in the declaration.** Three grounds, and the
+third is the one that decides it:
+
+1. The file already has exactly this shape for exactly this reason.
+   `subtree/1` (`@callback subtree(Block.config()) :: [Block.t()]`,
+   `composite.ex:275`) is the one callback `StatifierBlocks.Composite` declares
+   today, and it is a callback *because* what a composite stands for depends
+   on the instance's config. `C2` item 4 (`:10147`) already argues from that
+   fact - "so what a composite can raise is not knowable at the module's own
+   compile time, only at the point a particular block is expanded". This
+   section extends that argument one step, from the subtree to the declaration
+   over it, and takes the same shape the argument already produced once.
+2. The declaration is **data**. `@composite_declaration` is a map bound at
+   module compile time, `__composite__/0` hands it out whole, and
+   `Composite.Data` mirrors every key of it as JSON. A key holding a function
+   would fork the two shapes on the one thing they are supposed to share,
+   which is the ground `validate_config/1` is already refused a data spelling
+   on (`composite/data.ex`: "`validate_config/1` is the one a declaration
+   cannot reach at all. It is a **function**, and a declaration held as data
+   cannot hold one"). The same ground refuses it here.
+3. A value in the declaration would have to be normalized by
+   `normalize_outcomes!/1` at module compile time, and there is nothing there
+   to normalize: the whole content of a per-instance declaration is a function
+   of a config that does not exist yet.
+
+**The static list stays valid and unchanged.** A composite that writes
+`outcomes: [...]` on its `use` and implements no `declared_outcomes/1` behaves
+exactly as it does at `6ea2afe`, at every one of the sites above and in both
+refusals. A composite that writes neither is `C3`, byte-identical, also
+exactly as it does at `6ea2afe`. Nothing in this section changes what any
+existing declaration compiles to.
+
+**Precedence, stated once.** A type that both writes the `outcomes:` option
+and implements `declared_outcomes/1` is a **declaration error**, refused by
+name as the using module compiles, in the shape `composite.ex:1050` already
+refuses an unrecognized `use` option. The two spellings are two ways to say
+one thing and there is no reading under which both apply; letting the callback
+win silently would make the static list's presence invisible.
+
+**The callback's own arity, and the name collision it does not have.**
+`StatifierBlocks.Composite` holds a **private** `declared_outcomes/1` over a
+ref (`composite.ex:978`). The callback this section adds is on the **using
+module** and is a different function in a different module. The private helper
+takes the instance's config as a second argument under `C9c` below and becomes
+`declared_outcomes/2`, so the two do not even share an arity. The behaviour
+gains its first `@optional_callbacks` attribute for this; optional callbacks
+are already this package's practice on the other behaviour
+(`block_type.ex:33`).
+
+### `C9b`. An instance whose declared list is empty is a non-declaring instance
+
+`C1` decides that an explicit empty `outcomes` list is deliberately the same as
+an absent key, on the ground that "this composite declares no outcomes at all"
+is not a thing a block type can say. That rule is **not narrowed; it is read
+per instance**. A type that implements `declared_outcomes/1` is a *possibly*
+declaring type; whether a given block is a declaring block is decided by what
+the callback answers for **that block's config**:
+
+- **A non-empty list**: that block is a declaring composite, with exactly those
+  names. `C6`'s state of its own, `C7`'s `on_<name>` slots, `C2` item 3's
+  check - all of it, on that list.
+- **An empty list**: that block is a **non-declaring** composite, and `C3` is
+  its rule - `outcomes/1` answers the expansion root's derived list, no
+  raisability check runs, and the compiled chart is what it would be if the
+  type declared nothing. It is not "a declaring composite with no outcomes",
+  which `C1` has already decided is not a thing.
+
+So the `[]` arm of `declaring_node/7` (`compiler.ex:661`) keeps its exact
+meaning and only its input changes: it asks the question per block instead of
+per module. This is the one clause of this section a reader of `C6` must hold
+onto - after it, "is this composite declaring?" is a question about a block,
+and two blocks of the same type may answer it differently in the same
+document.
+
+### `C9c`. `C2` item 3's check and `C7`'s slot derivation both read that instance's list
+
+Both of the sites the ruling names read the list of the block in hand:
+
+- `unraisable_outcomes/4` checks **that instance's** declared names against
+  the raisable set of **that instance's** expansion. `C2` item 2 is unchanged:
+  the raisable set is still the minted members alone, still keyed by
+  `param_map`, still resolved through the palette in hand. What moves is only
+  which names are on the left of the comparison.
+- `C7`'s slot derivation derives one `on_<name>` slot per name **that
+  instance** declares. Two blocks of the same type in one document may
+  therefore expose different `on_` slots, and that is the intended reading:
+  the slots a screen offers are the buttons that screen has.
+- `outcomes_over/3` answers **that instance's** names to the enclosing body,
+  and the enclosing body's routing is `C6`'s and `C7`'s, unchanged in kind.
+
+The threading this forces is stated as a rule and not as a patch: the
+instance's config must reach every site above. `outcomes_over/3`,
+`outcome_slots/3` (the composite's) and `unraisable_outcomes/4`'s caller
+already hold the block or its config; `declared_outcome_names/1` and
+`declaring_node/7` do not, and gain it. Widening an `@doc false` helper's arity
+to carry a config this section's decision requires is not new surface; adding a
+public function, option, key or finding this section does not name would be.
+
+**What does not move.** The finding's identity does not move: a declared name
+that instance cannot raise is still one `:resolve`-stage
+`StatifierBlocks.Compiler.Finding` against that composite block, same code,
+same `fault`, reported where `C2` item 3 puts it and never raised. The compiled
+shape of a declared outcome does not move: `C6`'s state, its one `<final>` per
+declared name, and `C7`'s two transitions are byte for byte what those sections
+decide. Nothing here builds a new event, id or slot spelling.
+
+### `C9d`. The two declaration-time refusals become per-instance Resolve findings, for a per-instance declarer only
+
+A type whose list is a function of config cannot have that list checked as its
+module compiles, so the two `ArgumentError`s above have nowhere to stand for
+it. For a per-instance declarer they are re-sited, unchanged in substance:
+
+- **A duplicate name** in the callback's answer for a block is a `:resolve`
+  finding against that block, saying what `normalize_outcomes!/1`'s refusal
+  says (`composite.ex:474-480`). The duplicate-outcome-name refusal itself is
+  the adopted item 3 of the Note of 2026-09-13 (`:10624`) and is not reopened
+  here; only where it is reported moves.
+- **A collision between a derived `on_<name>` slot and a declared pass-through
+  slot** is likewise a `:resolve` finding against that block, saying what
+  `composite.ex:502-507` says. The pass-through slots are the type's, the
+  outcome slots are the instance's, and only a particular config can bring the
+  two into collision.
+- **A non-list, or a list holding a non-string or an empty string**, is a
+  `:resolve` finding against that block too. This is the one arm with a real
+  choice in it, because a callback answering rubbish is a package-author error
+  rather than a document-author error, and this file's rule is that a finding
+  says whose fault it is rather than changing kind. It is reported as a finding
+  with the `fault` the code half determines from `Compiler.Finding`'s existing
+  vocabulary, and that request records which it chose and why. It is **not** an
+  `ArgumentError`: decision 1 forbids this pipeline to raise, `C2` item 3 takes
+  no exception to it, and neither does this.
+
+For a type that writes the static `outcomes:` option, both refusals stay
+exactly where they are, at module compile time, with their existing text. This
+section adds a second home for them; it does not move the first.
+
+### `C9e`. Module composites only; a data composite is unchanged, and its case is not decided here
+
+`Composite.Data`'s `"outcomes"` is a **per-registration** declaration key: it
+sits in the declaration table beside `"subtree"` and `"slots"`, it is checked
+for slot collisions as the entry is built (`data.ex:1448`), and the entry's
+state is the decoded declaration. A data declaration cannot hold a function,
+for the reason `C9`'s second ground gives, so there is no per-instance spelling
+for it in this section and none is invented. A data composite's declared
+outcomes stay a property of its registration, its behaviour is byte-identical,
+and **whether a data composite should gain a per-instance spelling at all, and
+what a JSON one would even look like, is not decided here.** It is named as
+open below.
+
+This is the conservative arm deliberately: the data shape's whole discipline is
+that a declaration is data, and the first spelling that breaks it should be
+ruled on its own request rather than carried in on the back of this one.
+
+### `C9f`. What the editor and the view model see
+
+An instance of a per-instance declarer is, to every reader downstream of
+Resolve, an ordinary declaring composite with the list that instance declares:
+
+- **The palette keeps one card per type.** `palette_entry/0` is arity zero and
+  is not touched by anything here. This is the point of the ruling: the
+  declined alternative multiplies the palette per screen, and nothing in this
+  section adds an entry, a card or a chip row per instance.
+- **The editor's slots are that instance's.** `slots/1` is already a callback
+  over config (`composite.ex:338`, `def slots(config), do:
+  StatifierBlocks.Composite.derived_slots(__MODULE__, config)`), and the
+  composite's `outcome_slots/3` (`composite.ex:673`) already resolves its
+  labels through `derived_outcomes(ref, config)`. So the editor draws the
+  `on_<name>` interiors of the block in front of it, with `C7`'s slot arity
+  and labels, and needs no new question to ask.
+- **The outcome chips are that instance's.** `outcomes/1` is already a callback
+  over config (`composite.ex:347`), answering through `derived_outcomes/2`
+  (`composite.ex:838`) and `outcomes_over/3`. A view model reading a block's
+  outcomes therefore reads that block's, through the route it already uses.
+- **The failure classing does not move.** The Note of 2026-09-14 (`:12200`) - a
+  declaring composite's outcomes are failure-classed by hand only, and a
+  derived `on_<name>` slot takes no `:failure` slot style - reads unchanged
+  over a per-instance list.
+
+### The alternative declined, and its reason
+
+**One composite type per screen**, each with its own static `outcomes:` list,
+was considered and **declined**. It works, and it needs no record and no
+package change at all. It was declined because it multiplies the palette per
+screen: a host with thirty screens registers thirty composite types and shows
+thirty cards for what an author thinks of as one kind of thing, and the screen
+composite exists precisely so that one type stands for every screen in an
+element document. A second variant, a declared **superset** with a per-instance
+allow-list, was declined with it: it keeps the type-level list honest only by
+making every instance's real vocabulary invisible at the type, and `C7` would
+then have to derive slots the instance cannot raise, or derive none at all.
+
+### A dated line on `C8`'s measurement: its zero-findings simulation was a one-screen arrangement
+
+`C8` is the Amendment of 2026-09-14 (`:11839`). Nothing in it is edited by this
+line and nothing in it is found wrong. `C8`'s own probe is reproducible as
+written: a request working `sb-rkna`'s discovery re-ran it against
+`statifier_blocks` `0.31.0` and reproduced the zero-findings case - a composite
+declaring one screen's four names, over that screen's handlers, with an
+occupied `on_went_back` slot, compiling `{:ok, _}`.
+
+What this line records is the **scope** of that simulation, which `C8`'s
+measurement section (`:11944`) describes accurately and a later reader may
+generalize past. The zero-findings arrangement was a **one-screen**
+arrangement. `C8`'s preamble closes with "This section is the third half, and
+the three close the gap together; none closes it alone", and that sentence
+holds for the arrangement it was measured on. It does **not** hold for a
+composite whose declared names are config-derived: with all three of `C6`, `C7`
+and `C8` in force and the union of three screens' names declared at the type,
+the same document still answers `{:error, 10 findings}`, every one of them
+`stage: :resolve`, `code: :outcome_not_raisable`, `fault: :package`, four and
+two and four across the three screen blocks - `C8` having closed five of the
+fifteen that measurement began with. The remaining ten are what this section
+closes, and they are not a defect in `C6`, `C7` or `C8`. They are one
+type-level declaration meeting three instances.
+
+The measurements in this paragraph are the `sb-rkna` discovery's, taken in a
+throwaway `statifier_examples` worktree against `statifier_blocks` `0.31.0`;
+this record does not re-run them, and the request that builds this section
+re-measures rather than quoting them.
+
+### What this section does not decide
+
+- **The data composite's spelling.** `C9e` names it open: whether a data
+  composite gains a per-instance declaration at all, and in what shape, is its
+  own question on its own request.
+- **What a screen composite's callback should compute.** How a host derives
+  outcome names from an element document is the host's, and this file mints no
+  vocabulary for it.
+- **The finding's `fault` for a malformed callback answer.** `C9d` names that
+  one arm and leaves the choice to the request that builds it, recorded there.
+- **`C2` item 2's minted-members rule**, `C8`'s reach (the Note of 2026-09-18,
+  `:12933`), the failure-classing position (the Note of 2026-09-14, `:12200`),
+  and the duplicate-name refusal itself: all unchanged, none reopened.
+- **Whether `C1` through `C8` are ready to flip.** That remains the operator's
+  on each one's own request, and this section, like them, merges at proposed.
+
+### What builds this, and what it is asked to prove
+
+`sb-rkna`'s code half, dispatched after this section is on `main`. It is asked
+to prove four things:
+
+1. **Enumeration, not transcription.** It greps `lib/` for every reader of the
+   declared list and pins the enumeration with a test, rather than working from
+   this section's six sites. A site this section missed is threaded and
+   reported, not left.
+2. **`C3` still byte-identical.** A document containing no per-instance
+   declarer compiles to the same bytes before and after, proved by a test.
+3. **The static list unchanged.** A composite declaring `outcomes:` statically
+   behaves identically at every site and keeps both module-compile-time
+   refusals, proved by a test.
+4. **The measurement closes.** The examples app's signup Path, with a screen
+   composite declaring per instance, compiles with **zero** findings, pinned by
+   a test, and the ten findings quoted above are gone.
+
+Filed with `sb-rkna`, campaign RF055.
