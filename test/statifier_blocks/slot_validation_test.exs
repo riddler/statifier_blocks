@@ -266,63 +266,6 @@ defmodule StatifierBlocks.SlotValidationTest do
     end
   end
 
-  describe "undeclared_slots/2, one block at a time" do
-    # The compiler's Resolve stage asks this for a composite that declares no
-    # outcomes: `ADR-0002`'s `C3` replaces it by its expansion outright, so
-    # the document `validate/2` later walks no longer contains it.
-    #
-    # sabotage: drop the `Enum.sort/1` from undeclared_findings/2 -> this
-    # assertion goes red, because the two keys below arrive from a map in no
-    # order of their own
-    test "answers every undeclared key of one block, in sorted order, with its child count" do
-      block =
-        Block.new("test.leaf",
-          id: "blk_1",
-          slots: %{"zeta" => [leaf("blk_z")], "alpha" => [leaf("blk_a"), leaf("blk_b")]}
-        )
-
-      assert SlotValidation.undeclared_slots(palette(), block) == [
-               {:undeclared_slot, "blk_1", "alpha", 2},
-               {:undeclared_slot, "blk_1", "zeta", 1}
-             ]
-    end
-
-    # sabotage: drop the `{:error, _reason} -> []` clause -> this goes red
-    # with a CaseClauseError, and the compiler's Resolve stage would raise on
-    # a document `validate/2` degrades over quietly
-    test "a block whose type the palette does not carry draws nothing" do
-      block = Block.new("test.absent", id: "blk_1", slots: %{"mystery" => [leaf("blk_2")]})
-
-      assert SlotValidation.undeclared_slots(palette(), block) == []
-    end
-
-    # sabotage: answer `block_findings/2` instead -> this goes red, because
-    # the arity half would report the unfilled `exactly_one_slot` and the
-    # caller asked for one kind of finding
-    test "arity is not answered here" do
-      block = Block.new("test.four_arities", id: "blk_1", slots: %{"any_slot" => []})
-
-      assert SlotValidation.undeclared_slots(palette(), block) == []
-    end
-
-    # sabotage: answer `block.slots |> Map.keys()` unfiltered -> this goes
-    # red, because `any_slot` is declared
-    test "a declared key draws nothing" do
-      block =
-        Block.new("test.four_arities",
-          id: "blk_1",
-          slots: %{
-            "any_slot" => [leaf("blk_2")],
-            "at_least_one_slot" => [leaf("blk_3")],
-            "exactly_one_slot" => [leaf("blk_4")],
-            "zero_or_one_slot" => [leaf("blk_5")]
-          }
-        )
-
-      assert SlotValidation.undeclared_slots(palette(), block) == []
-    end
-  end
-
   describe "the shipped corpus stays clean" do
     # sabotage: make arity_findings/2 report a finding for `:any` slots too
     # (drop the arity_satisfied?/2 gate entirely and always report) -> this

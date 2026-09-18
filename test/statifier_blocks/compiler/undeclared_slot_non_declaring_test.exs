@@ -94,6 +94,27 @@ defmodule StatifierBlocks.Compiler.UndeclaredSlotNonDeclaringTest do
     def subtree(params), do: ConfirmSubtree.build(params)
   end
 
+  defmodule ConfirmStepStrict do
+    @moduledoc """
+    The same, declaring its pass-through slot at `:exactly_one`, so a
+    document can violate that arity without carrying an undeclared key.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "signup.confirm_step_strict",
+      params: [
+        %{key: "event", type: :string, label: "Confirmed by", required?: true, default: ""}
+      ],
+      slots: [%{name: "then", to: {"tail", "body"}, arity: :exactly_one, label: "Then"}],
+      palette_entry: %{label: "Confirm the contact, strictly"},
+      version: 1
+
+    alias StatifierBlocks.Compiler.UndeclaredSlotNonDeclaringTest.ConfirmSubtree
+
+    @impl StatifierBlocks.Composite
+    def subtree(params), do: ConfirmSubtree.build(params)
+  end
+
   describe "a child in an undeclared slot on a composite that declares no outcomes" do
     # Sabotage: restored `declaring_node/7`'s `[] -> {:ok, nodes, expansion}`
     # branch, which is what this bead found - green compile, zero findings,
@@ -157,9 +178,9 @@ defmodule StatifierBlocks.Compiler.UndeclaredSlotNonDeclaringTest do
   describe "what still compiles" do
     # The negative test. Sabotage: built the findings from `block.slots`'
     # keys directly instead of asking
-    # `StatifierBlocks.SlotValidation.undeclared_slots/2` - red, because
-    # this slot IS declared and `StatifierBlocks.Composite.expand!/2`
-    # splices its children into the member the declaration names.
+    # `StatifierBlocks.SlotValidation.validate/2` - red, because this slot IS
+    # declared and `StatifierBlocks.Composite.expand!/2` splices its children
+    # into the member the declaration names.
     test "a child in a declared pass-through slot draws nothing and reaches the bytes" do
       assert {:ok, compiled} = Compiler.compile(document_with("then"), palette())
 
@@ -179,10 +200,35 @@ defmodule StatifierBlocks.Compiler.UndeclaredSlotNonDeclaringTest do
     end
   end
 
+  describe "what this stage does not answer" do
+    # Moved in from the unit tests the first review's cure removed. Resolve
+    # asks about undeclared KEYS; arity on a non-declaring composite is the
+    # same blind spot but a separate question, and answering it here would
+    # decide it. Sabotage: dropped the reason-tag filter from
+    # `undeclared_slot_findings/2`, leaving only the block-id one - red with
+    # a FunctionClauseError, because the arity tuple reaches the clause that
+    # only matches `{:undeclared_slot, _, _, _}`.
+    test "an arity violation on a declared pass-through slot draws nothing here" do
+      block =
+        Block.new("signup.confirm_step_strict",
+          id: "blk_CS",
+          config: %{"event" => "contact.confirmed"},
+          slots: %{"then" => []}
+        )
+
+      assert {:ok, _compiled} = Compiler.compile(document(block), palette())
+    end
+  end
+
   # -- fixtures ------------------------------------------------------------
 
-  defp palette,
-    do: Palette.new(Map.put(Palette.core_types(), "signup.confirm_step_plain", ConfirmStepPlain))
+  defp palette do
+    Palette.new(
+      Palette.core_types()
+      |> Map.put("signup.confirm_step_plain", ConfirmStepPlain)
+      |> Map.put("signup.confirm_step_strict", ConfirmStepStrict)
+    )
+  end
 
   defp block,
     do:
