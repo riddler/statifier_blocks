@@ -11433,17 +11433,43 @@ code is what a reader will find.
 
 Filed with `sb-suao`, campaign RF046.
 
-## Note (2026-09-18): a handler that names the outcome it finishes with draws under that name - `Node.outcome` reads `finish_as` when present, the `outcome` select otherwise
+## Amendment (2026-09-18): a handler that names the outcome it finishes with draws under that name - `Node.outcome` reads `finish_as` when present, the `outcome` select otherwise
 
-`ADR-0002`'s `C8` (`docs/adr/0002-block-type-behaviour.md:11839`) let a
+**Status: proposed (2026-09-18, campaign RF055, bead `sb-hjcd`, recording the
+operator's ruling of 2026-09-18, "the `finish_as` name when present, else the
+select value").** A decision record merges at proposed under the campaign
+invariant; flipping it to accepted is a separate gated request. Additive by
+addition: the 2026-08-29 `slot_outcome_key` amendment (`:1490`), its table row
+(`:1521`), decision 10 and every clause above this line stand exactly as
+written. **No text above this line is edited by this section**, and no line
+above it is removed.
+
+**Why this is an Amendment and not a Note.** The test is
+`docs/adr/README.md:40-43`: "an amendment changes what the record decides and
+a note does not: a note records where something already decided renders, or
+what a sentence already accepted was about." This section does neither of
+those two things. It changes what `ViewModel.Node.outcome` holds for a class
+of blocks - a value shipped in `0.31.0` - and it widens the reach of `C8`'s
+`finish_as` spelling on its own authority, installing a second key that takes
+precedence over the one the container declared. Both are decisions inside
+this record's own subject matter, so they carry a status line and a flip.
+That `C8` item 7 parked the question, and that nothing an author drew before
+this section draws differently now, are reasons the change is *safe* and
+*additive*; they are not the README's test, and an earlier draft of this
+section wrongly argued itself a Note on them.
+
+`ADR-0002`'s `C8` (`docs/adr/0002-block-type-behaviour.md:11839`, "an
+interrupt handler names the outcome it abandons its group with") let a
 `core.on_event` handler name the outcome it finishes its group with, under an
 optional `finish_as`, and its item 7
-(`docs/adr/0002-block-type-behaviour.md:12139`) recorded - deliberately
-without deciding it - that the canvas still draws such a handler as `abandon`,
-because the `slot_outcome_key` amendment above (`:1490`, table row `:1521`)
-points the read at the `outcome` **select**. `C8` item 7 called that an editor
+(`docs/adr/0002-block-type-behaviour.md:12139`, "The editor draws a named
+handler as `abandon`, and that is a known gap this section names rather than
+decides") recorded - deliberately without deciding it - that the canvas still
+draws such a handler as `abandon`, because the `slot_outcome_key` amendment
+above (`:1490`, "decision 10, `slot_outcome_key`", table row `:1521`) points
+the read at the `outcome` **select**. `C8` item 7 called that an editor
 question with an editor's judgement in it and handed it to this file. This
-Note answers it.
+section answers it.
 
 **The decision, ruled by the operator 2026-09-18: the `finish_as` name when
 present, else the select value.** `Node.outcome` for a block in a slot whose
@@ -11467,8 +11493,23 @@ says the config is wrong is `C8`'s and is already reported on the same card;
 a second, quieter refusal here would say it again in a place an author cannot
 read it, and would put the reader in the business of re-deciding what `C8`
 decided. The alphabet the read admits stays decision 10's
-(`lib/statifier_blocks/block_type.ex:1298`, `9e3a220`), so a name outside it
-is no name and the select value is what is left.
+(`lib/statifier_blocks/block_type.ex:1298`, `@outcome_name`, read at
+`9e3a220`), so a name outside it is no name and the select value is what is
+left.
+
+**And `C8`'s own shape check is narrower than that alphabet, which makes a
+third such configuration.** `C8` tests a name with
+`StatifierBlocks.Compiler.StateId.role?/1`
+(`lib/statifier_blocks/core/on_event.ex:565`, `defp check_finish_as_shape/2`,
+read at `9e3a220`), which requires the role alphabet **and** refuses the `__`
+separator (`lib/statifier_blocks/compiler/state_id.ex:106`, `def role?/1`,
+with `@role` at `:50` and `@separator` at `:49`, same commit). The reader
+tests only `@outcome_name`. So a name such as `went__back` is refused at
+compile by `C8` and is nonetheless *inside* decision 10's alphabet, and the
+reader reports it as the outcome. That is the same trade as the two above and
+is taken for the same reason: `validate_config/1` draws the finding on the
+same card, and a reader that re-derived `C8`'s shape rule would own a copy of
+it that could drift.
 
 ### Why the name and not the select value
 
@@ -11482,7 +11523,7 @@ the chart never emits, which is the one thing the badge exists to avoid: an
 author reading the picture is asking what a rule *does to the group*, and
 after `C8` the honest answer to that is the name. The select value stays the
 answer for every handler that names nothing, which is every handler that
-existed before `C8`, so nothing an author drew before this Note draws
+existed before `C8`, so nothing an author drew before this section draws
 differently now.
 
 The two alternatives the proposal of this morning put beside it are recorded
@@ -11517,7 +11558,27 @@ this inside decision 10's property: a host type whose blocks carry a
 `finish_as` of the same alphabet gets the same answer, and no reader branches
 on `core.on_event`. `C8`'s spelling therefore becomes a convention this file
 reads rather than one type's private field, and that widening of its reach is
-this Note's, not `C8`'s.
+this Amendment's authority, once accepted, and not `C8`'s.
+
+**The consequence, stated rather than left to be discovered.** Decision 10's
+whole shape is that the **container declares** the key its slot's blocks
+carry an outcome under - that is what the `slot_outcome_key` row at `:1521`
+buys, and why the amendment at `:1490` says it "names a KEY and never an
+outcome value, so a renderer routes on the value without knowing which type
+declared it". This section introduces a **second** key that no container
+declares and that no host type can rename or decline: it is the literal
+`finish_as`, held once at `lib/statifier_blocks/block_type.ex:1366`
+(`@finish_as_key`, in this request), and it takes precedence over the
+declared one wherever a block carries a well-formed value at it. So a host
+type that wants a different spelling has no declaration to reach for, and a
+host type that wants the declared key to win for its own blocks has no way to
+say so. Changing that literal is therefore a change to **this record**, not a
+local edit, and a host that needs either freedom is a request that amends
+this section rather than one that works around it. The cost is accepted here
+because one spelling is what makes the read type-blind at all: a declared
+name key would be a second declaration for a fact that has exactly one
+spelling in the whole vocabulary, and the reader would still have to pick a
+winner between two keys.
 
 **A `nil` key reads as no outcome and the name is not consulted.** A slot
 whose container declared no outcome key, and a malformed declaration
@@ -11527,12 +11588,14 @@ declaration that does not exist means the uniform rendering every consumer
 did before the declaration existed; a name arriving on a card the container
 never asked to route on would be that rendering broken rather than restored.
 
-### What this Note does not do
+### What this Amendment does not do
 
-It is a Note and not an Amendment because it takes nothing away: it answers a
-question `C8` item 7 left open and `10f` never reached, adds no declaration,
-removes no behaviour, and leaves every unnamed handler's value byte for byte
-what it was. It edits no line above it and moves no status line. It decides
+It answers a question `C8` item 7 left open and `10f` never reached; it adds
+no declaration, removes no behaviour, and leaves every unnamed handler's
+value byte for byte what it was. It edits no line above it, removes no line
+above it, and moves no status line - including its own file's head `Status:`
+line at `:3`, which lists the amendments accepted so far and is not extended
+by a section that merges at proposed. It decides
 nothing about **drawing**: at `9e3a220` nothing under
 `lib/statifier_blocks/editor/` reads `Node.outcome` at all - the value is
 resolved into the view model at `lib/statifier_blocks/view_model.ex:2213-2216`
