@@ -274,6 +274,35 @@ defmodule StatifierBlocks.Composite do
   """
   @callback subtree(Block.config()) :: [Block.t()]
 
+  @doc """
+  The outcome names **this instance** declares, read from its own config.
+
+  Optional, and the per-instance spelling of the `:outcomes` option
+  (`ADR-0002`'s Amendment of 2026-09-18, `C9`). A composite type whose members
+  are derived per config - one screen type standing for every screen in an
+  element document - cannot say at its own compile time what any one of its
+  instances finishes as. Implementing this callback says the list is read from
+  the block's config instead, and every reader of the declared list reads that
+  instance's.
+
+  It answers outcome **names**, strings, in the order the instance declares
+  them, exactly as the `:outcomes` option does: the label of a declared name is
+  still the one the member that raises it already wrote (`C1`).
+
+  A type implements this **or** writes `:outcomes`, never both - the two are
+  two ways to say one thing, and writing both is refused as the module
+  compiles. An instance whose list is empty is a **non-declaring** instance and
+  `C3` is its rule (`C9b`), so two blocks of one type may answer the question
+  "is this composite declaring?" differently in the same document.
+
+  An answer that is not a list of distinct non-empty strings, and one whose
+  derived `on_<name>` slots collide with the type's pass-through slots, are
+  `:resolve`-stage findings against that block (`C9d`) rather than raises.
+  """
+  @callback declared_outcomes(Block.config()) :: [String.t()]
+
+  @optional_callbacks declared_outcomes: 1
+
   # The recognized set of `use StatifierBlocks.Composite` options. It is the
   # same list the `__using__/1` doc below writes: an option added to one is
   # added to the other, because they are the same list.
@@ -383,6 +412,8 @@ defmodule StatifierBlocks.Composite do
             "A composite is params plus a pure subtree; there is nothing to expand without it."
     end
 
+    refute_both_outcome_spellings!(env)
+
     owner = env.module
 
     Module.create(
@@ -407,6 +438,39 @@ defmodule StatifierBlocks.Composite do
     )
 
     nil
+  end
+
+  # `C9`'s precedence clause, stated once and refused by name, in the shape
+  # `refute_unknown_options!/1` already refuses an option this module does not
+  # recognize. The static list and the callback are two ways to say one thing
+  # and there is no reading under which both apply; letting the callback win
+  # silently would make the static list's presence invisible.
+  #
+  # The test is a NON-EMPTY static list, not the presence of the key. `C1`
+  # decides that an explicit `outcomes: []` is deliberately the same thing as
+  # an absent key - "this composite declares no outcomes at all" is not a thing
+  # a block type can say - and `__declaration__/1` has already collapsed the
+  # two by the time this runs. So a type whose static list says nothing is not
+  # a type that says the same thing twice, and there is no invisible list for
+  # the callback to hide.
+  @spec refute_both_outcome_spellings!(Macro.Env.t()) :: :ok
+  defp refute_both_outcome_spellings!(env) do
+    declaration = Module.get_attribute(env.module, :composite_declaration)
+    static = Map.get(declaration || %{}, :outcomes, [])
+
+    if static != [] and Module.defines?(env.module, {:declared_outcomes, 1}) do
+      raise CompileError,
+        file: env.file,
+        line: env.line,
+        description:
+          "#{inspect(env.module)} both writes the :outcomes option and defines " <>
+            "declared_outcomes/1. Those are the two spellings of one declaration - a list " <>
+            "fixed at this module's compile time, and a list read from each instance's " <>
+            "config - and a type declares its outcomes one way or the other. Drop the " <>
+            ":outcomes option, or drop declared_outcomes/1."
+    end
+
+    :ok
   end
 
   @doc false
@@ -668,15 +732,28 @@ defmodule StatifierBlocks.Composite do
   # for a declaration that carries `outcomes`: a composite that declares none
   # answers its pass-through entries from the declaration alone, exactly as
   # it did before this section, and gains no new way to fail (`C3`).
+  #
+  #
+  # `C9b`: the question this asks is per INSTANCE from `C9`'s date. It was a
+  # guard on the declaration's own static list, which is still what
+  # `declared_outcomes/2` reads for a type that writes one; for a per-instance
+  # declarer it is that block's config that decides, so two blocks of one type
+  # in a document may open different `on_` interiors. The declaration stays the
+  # first argument because `derived_slots/2` hands it to this function's two
+  # siblings.
   @spec outcome_slots(declaration(), Palette.type_ref(), Block.config()) ::
           [BlockType.slot_decl()]
-  defp outcome_slots(%{outcomes: [_first | _rest]}, ref, config) do
-    ref
-    |> derived_outcomes(config)
-    |> Enum.map(fn {name, label} -> {outcome_slot(name), :zero_or_one, label} end)
-  end
+  defp outcome_slots(_declaration, ref, config) do
+    case declared_outcomes(ref, config) do
+      [] ->
+        []
 
-  defp outcome_slots(_declares_no_outcomes, _ref, _config), do: []
+      _names ->
+        ref
+        |> derived_outcomes(config)
+        |> Enum.map(fn {name, label} -> {outcome_slot(name), :zero_or_one, label} end)
+    end
+  end
 
   @doc false
   @spec outcome_slot(String.t()) :: Block.slot_name()
@@ -694,8 +771,45 @@ defmodule StatifierBlocks.Composite do
   end
 
   @doc false
-  @spec declared_outcome_names(Palette.type_ref()) :: [String.t()]
-  def declared_outcome_names(ref), do: declared_outcomes(ref)
+  @spec declared_outcome_names(Palette.type_ref(), Block.config()) :: [String.t()]
+  def declared_outcome_names(ref, config), do: declared_outcomes(ref, config)
+
+  @doc false
+  @spec per_instance_declarer?(Palette.type_ref()) :: boolean()
+  def per_instance_declarer?(module) when is_atom(module) do
+    composite?(module) and Palette.declares?(module, :declared_outcomes, 1)
+  end
+
+  # `C9e`: module composites only. A `{module, state}` ref is a
+  # `StatifierBlocks.Composite.Data` registration, whose declaration is data
+  # and cannot hold a function; whether the data shape gains a per-instance
+  # spelling at all is named open there and is not decided here.
+  def per_instance_declarer?(_data_ref), do: false
+
+  @doc """
+  The `C9d` refusals of `ref`'s per-instance outcome declaration for `config`,
+  as a list of messages, or `[]`.
+
+  `[]` for every composite that is not a per-instance declarer: a type that
+  writes the static `:outcomes` option keeps both refusals at its own compile
+  time, with their existing text, and this function is not what reports them.
+
+  A type whose list is a function of config cannot have that list checked as
+  its module compiles, so the two `ArgumentError`s that stand over a static
+  declaration are re-sited here, unchanged in substance, plus the one a static
+  list cannot produce - a callback answering something that is not a list of
+  names at all. The compiler reports each as one `:resolve`-stage
+  `StatifierBlocks.Compiler.Finding` against that block; decision 1 forbids
+  this pipeline to raise.
+  """
+  @spec declared_outcome_problems(Palette.type_ref(), Block.config()) :: [String.t()]
+  def declared_outcome_problems(ref, config) do
+    case per_instance_outcomes(ref, config) do
+      :static -> []
+      {:ok, _names} -> []
+      {:error, problems} -> problems
+    end
+  end
 
   @doc false
   @spec outcome_raisers(Palette.t(), [String.t()], [Block.t()], param_map()) ::
@@ -855,11 +969,15 @@ defmodule StatifierBlocks.Composite do
   an author dropped into a pass-through slot has no entry there and does not
   widen what the composite may declare.
   """
-  @spec unraisable_outcomes(Palette.t(), Palette.type_ref(), [Block.t()], param_map()) :: [
-          String.t()
-        ]
-  def unraisable_outcomes(%Palette{} = palette, ref, members, param_map) do
-    case declared_outcomes(ref) do
+  @spec unraisable_outcomes(
+          Palette.t(),
+          Palette.type_ref(),
+          Block.config(),
+          [Block.t()],
+          param_map()
+        ) :: [String.t()]
+  def unraisable_outcomes(%Palette{} = palette, ref, config, members, param_map) do
+    case declared_outcomes(ref, config) do
       [] ->
         []
 
@@ -922,7 +1040,7 @@ defmodule StatifierBlocks.Composite do
   defp outcomes_over(%Palette{} = palette, %Block{} = block, ref) do
     {members, param_map} = expand!(block, ref)
 
-    case declared_outcomes(ref) do
+    case declared_outcomes(ref, block.config) do
       [] ->
         [root | _rest] = members
 
@@ -974,8 +1092,8 @@ defmodule StatifierBlocks.Composite do
   # caller error on the two routes that resolve the ref themselves, rather
   # than left to surface as a `BadMapError` from reading `:outcomes` off the
   # `nil` `Palette.call/4` answers for a module with no `__composite__/0`.
-  @spec declared_outcomes(Palette.type_ref()) :: [String.t()]
-  defp declared_outcomes(ref) do
+  @spec static_declared_outcomes(Palette.type_ref()) :: [String.t()]
+  defp static_declared_outcomes(ref) do
     case Palette.call(ref, :__composite__, [], nil) do
       %{} = declaration ->
         Map.get(declaration, :outcomes, [])
@@ -984,8 +1102,88 @@ defmodule StatifierBlocks.Composite do
         raise ArgumentError,
               "#{inspect(ref)} declares no __composite__/0, so it is not a " <>
                 "composite and its declared outcomes cannot be read by " <>
-                "StatifierBlocks.Composite.unraisable_outcomes/4. Hand it the " <>
+                "StatifierBlocks.Composite.unraisable_outcomes/5. Hand it the " <>
                 "ref expand!/2 was given."
+    end
+  end
+
+  # `C9`'s rule, in the one function every reader of the declared list goes
+  # through: the list of a composite is the list of the INSTANCE in hand.
+  #
+  # For a type that writes the static `:outcomes` option, and for one that
+  # writes neither spelling, this is the declaration read it has always been
+  # and the config is not looked at - which is what keeps `C3`'s byte-identity
+  # and the static list's behaviour true by construction rather than by test.
+  # For a per-instance declarer it is the callback's answer for that config.
+  #
+  # An answer `C9d` refuses reads as `[]` here - a NON-DECLARING instance -
+  # and the refusal is reported by `declared_outcome_problems/2` as a Resolve
+  # finding. The two are split because this route is also reached from the
+  # editor and the view model, which must be total and have no stage to report
+  # a finding to; degrading to `C3`'s path is the only answer available there
+  # that draws nothing an instance cannot raise.
+  @spec declared_outcomes(Palette.type_ref(), Block.config()) :: [String.t()]
+  defp declared_outcomes(ref, config) do
+    case per_instance_outcomes(ref, config) do
+      :static -> static_declared_outcomes(ref)
+      {:ok, names} -> names
+      {:error, _problems} -> []
+    end
+  end
+
+  # `:static` for every composite reading its list off its own declaration,
+  # which is the whole of the package before `C9`.
+  @spec per_instance_outcomes(Palette.type_ref(), Block.config()) ::
+          :static | {:ok, [String.t()]} | {:error, [String.t()]}
+  defp per_instance_outcomes(ref, config) do
+    if per_instance_declarer?(ref) do
+      ref |> Palette.call(:declared_outcomes, [config], []) |> check_instance_outcomes(ref)
+    else
+      :static
+    end
+  end
+
+  @spec check_instance_outcomes(term(), Palette.type_ref()) ::
+          {:ok, [String.t()]} | {:error, [String.t()]}
+  defp check_instance_outcomes(names, ref) do
+    cond do
+      not (is_list(names) and Enum.all?(names, &(is_binary(&1) and &1 != ""))) ->
+        {:error,
+         [
+           "declared_outcomes/1 must answer a list of non-empty outcome name strings for " <>
+             "this block's config, got: #{inspect(names)}"
+         ]}
+
+      names -- Enum.uniq(names) != [] ->
+        {:error,
+         [
+           "declared_outcomes/1 declares " <>
+             inspect(Enum.uniq(names -- Enum.uniq(names))) <>
+             " more than once for this block's config; an outcome name is declared exactly once."
+         ]}
+
+      true ->
+        collision_problems(ref, names)
+    end
+  end
+
+  @spec collision_problems(Palette.type_ref(), [String.t()]) ::
+          {:ok, [String.t()]} | {:error, [String.t()]}
+  defp collision_problems(ref, names) do
+    case outcome_slot_collisions(declared_slots(ref), names) do
+      [] ->
+        {:ok, names}
+
+      collisions ->
+        {:error,
+         [
+           "the pass-through slots declare " <>
+             inspect(collisions) <>
+             ", which declared_outcomes/1 already derives as an outcome slot for this " <>
+             "block's config. A pass-through slot splices its children into an expansion " <>
+             "member; an outcome slot holds what runs when the composite finishes that way. " <>
+             "Rename one of them."
+         ]}
     end
   end
 

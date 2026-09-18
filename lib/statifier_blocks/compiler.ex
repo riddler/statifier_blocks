@@ -658,7 +658,7 @@ defmodule StatifierBlocks.Compiler do
           expansion()
         ) :: {:ok, [Resolved.t()], expansion()} | {:error, [Finding.t()], expansion()}
   defp declaring_node(palette, %Block{} = block, module, members, param_map, nodes, expansion) do
-    case Composite.declared_outcome_names(module) do
+    case Composite.declared_outcome_names(module, block.config) do
       [] ->
         case undeclared_slot_findings(palette, block) do
           [] -> {:ok, nodes, expansion}
@@ -824,15 +824,58 @@ defmodule StatifierBlocks.Compiler do
           Composite.param_map()
         ) :: [Finding.t()]
   defp outcome_findings(palette, %Block{} = block, module, members, param_map) do
-    palette
-    |> Composite.unraisable_outcomes(module, members, param_map)
-    |> Enum.map(fn name ->
+    case outcome_declaration_findings(block, module) do
+      [] ->
+        palette
+        |> Composite.unraisable_outcomes(module, block.config, members, param_map)
+        |> Enum.map(fn name ->
+          Finding.new(
+            :resolve,
+            {:outcome_not_raisable, block.id, name},
+            "the composite declares the outcome #{inspect(name)}, which nothing in its " <>
+              "expansion can raise",
+            block_id: block.id
+          )
+        end)
+
+      findings ->
+        findings
+    end
+  end
+
+  # `ADR-0002`'s Amendment of 2026-09-18, `C9d`: the two refusals that stand
+  # over a STATIC `:outcomes` list as the using module compiles have nowhere to
+  # stand for a list that is a function of config, so for a per-instance
+  # declarer they are re-sited here, unchanged in substance, beside the one a
+  # static list cannot produce - a callback answering something that is not a
+  # list of names. A raise is not available: decision 1 forbids this pipeline
+  # to raise, and `C2` item 3's own check takes no exception to that.
+  #
+  # `fault: :package`. A composite's `declared_outcomes/1` is package-author
+  # code - the callback is written in the block type's own module, and a
+  # document author who deleted the offending block would still be looking at
+  # a type whose callback answers rubbish. It is the same reason
+  # `:outcome_not_raisable` above takes `Finding.new/4`'s `:resolve` default of
+  # `:package`, and the fault of the findings the request that built this
+  # section measured. `C9d` asks the request to record which arm it chose;
+  # this comment and the pull request are where it is recorded.
+  #
+  # These findings REPLACE the raisability check for that block rather than
+  # joining it: a declaration this refuses has no usable list of names, so
+  # `declared_outcomes/2` reads it as `[]` and a raisability check over `[]`
+  # would report nothing and read as a pass. Reporting the refusal alone is
+  # what says the list was never checked.
+  @spec outcome_declaration_findings(Block.t(), Palette.type_ref()) :: [Finding.t()]
+  defp outcome_declaration_findings(%Block{} = block, module) do
+    module
+    |> Composite.declared_outcome_problems(block.config)
+    |> Enum.map(fn message ->
       Finding.new(
         :resolve,
-        {:outcome_not_raisable, block.id, name},
-        "the composite declares the outcome #{inspect(name)}, which nothing in its " <>
-          "expansion can raise",
-        block_id: block.id
+        {:outcome_declaration_invalid, block.id},
+        message,
+        block_id: block.id,
+        fault: :package
       )
     end)
   end
