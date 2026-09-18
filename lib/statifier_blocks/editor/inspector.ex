@@ -21,9 +21,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         13 names. That panel still exists, still lists every finding in the
         document, and still lives beside the canvas. This tab is the selected
         block's own findings, which is the distinction the campaign-014 polish
-        pass filed as `sb-3l1` item a.
+        pass drew.
 
-    ## The Findings tab with nothing selected (sb-dbqq)
+    ## The Findings tab with nothing selected
 
     3A's rule decides what a tab is **about**; it does not say what a tab
     does when its subject is missing. With no selection the Findings tab has
@@ -59,7 +59,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     edited, so there is exactly one form in the editor and one place a draft
     can live (decision 9).
 
-    ## The Fixtures tab is the selected block's rows (sb-0l36)
+    ## The Fixtures tab is the selected block's rows
 
     ADR-0005's 2026-09-05 amendment, "3A admits a Fixtures tab in the
     inspector". A fixture row attaches to one block - the `fixtures` assign is

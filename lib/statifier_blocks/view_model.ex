@@ -49,7 +49,7 @@ defmodule StatifierBlocks.ViewModel do
   `:assignability` findings are never produced here, and the two `:lint`
   producers above are the only ones that are; the rest live elsewhere -
   `StatifierBlocks.SlotValidation` (palette-aware slot arity and
-  undeclared-slot checks; landed under `sb-da9`, was described here as "not
+  undeclared-slot checks; landed 2026-08-26, was described here as "not
   yet built") and `Assignability.validate/3` for `:assignability`, the
   compiler's invoke-type lint for a `:lint` this module has never derived -
   and this module does not
@@ -57,7 +57,7 @@ defmodule StatifierBlocks.ViewModel do
   to manufacture them. That adapter is a real, mechanical possibility
   (`Compiler.Finding` carries `block_id` and `config_key`, which map onto
   `{:config, id, key}` / `{:block, id}` cleanly), and it landed instead as
-  `StatifierBlocks.Finding.from_compiler/2` (`sb-kmk`) - `ViewModel` still
+  `StatifierBlocks.Finding.from_compiler/2` - `ViewModel` still
   derives no findings from it; callers adapt compiler findings themselves
   and pass the result to `build/3` as caller-supplied findings. Derived
   and caller-supplied findings are concatenated - derived first - into one
@@ -859,7 +859,7 @@ defmodule StatifierBlocks.ViewModel do
 
   @doc """
   Which edge vocabulary a slot's exit is drawn in (amendment 10h's exit-edge
-  row, as ruled on `sb-67s`, 2026-08-29).
+  row, as the operator ruled 2026-08-29).
 
   `:interrupt` for the interrupt rail alone. A `:failure` rail's exit is
   `:flow`, the same edge an ordinary body slot leaves by: ADR-0004's
@@ -1828,8 +1828,7 @@ defmodule StatifierBlocks.ViewModel do
 
   @doc """
   The disagreements between what a `core.subchart` declares in `outcomes`
-  and what the host says the chart it names actually finishes with
-  (sb-r4w7).
+  and what the host says the chart it names actually finishes with.
 
   It is a **separate pass** rather than part of `build/3` for the reason
   `StatifierBlocks.Datamodel.findings/4` is: `chart_outcomes` is the

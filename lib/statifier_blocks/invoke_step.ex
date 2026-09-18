@@ -110,7 +110,7 @@ defmodule StatifierBlocks.InvokeStep do
   # purpose: an author who meets `assign_to` on a core block and on a host
   # step is meeting one field, and two spellings of its complaint would
   # suggest otherwise. Both widened to the datamodel-path rule on
-  # `sb-r313`, for ADR-0011 decision 13's reason - the two emit the same
+  # 2026-09-06, for ADR-0011 decision 13's reason - the two emit the same
   # `<assign>` element into the same datamodel.
   @assign_to_message "must be a datamodel path, like cards.authorization"
 
@@ -344,7 +344,7 @@ defmodule StatifierBlocks.InvokeStep do
 
   What it accepts is `core.assign`'s and `core.invoke`'s datamodel path -
   any non-empty value with no whitespace, dotted or not (ADR-0011 decision
-  13, widened here on `sb-r313`). A step that requires the key instead -
+  13, widened here on 2026-09-06). A step that requires the key instead -
   because a decision nobody keeps is not a decision - declares the field
   `required?: true` and adds a refusal of the blank of its own; this check
   stays blank-permissive either way, so the two compose rather than

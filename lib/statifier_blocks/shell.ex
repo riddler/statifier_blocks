@@ -591,7 +591,7 @@ defmodule StatifierBlocks.Shell do
   tabular, and about the whole document - and the host applies it to its own
   content the same way this package applies it to its own.
 
-  The reserved names now include `"fixtures"` (`sb-4yze`): a host tab with
+  The reserved names now include `"fixtures"` (added 2026-09-02): a host tab with
   that id is dropped the same way one named `"declarations"` already is.
   """
   @spec host_tabs([host_tab()]) :: [host_tab()]

@@ -60,7 +60,7 @@ defmodule StatifierBlocks.Edit.Targets do
   gets.
 
   A caller that *does* have the datamodel document passes it, and this is
-  the seam `sb-sy0q` closed rather than a widening it introduced. The
+  a seam closed rather than a widening introduced. The
   editor holds the document the compiler's `:datamodel` option carries; the
   check the editor runs and the check the compiler runs are one
   implementation by ADR-0002 decision 6 and ADR-0003 decision 6, and a call

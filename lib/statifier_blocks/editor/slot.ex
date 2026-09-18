@@ -99,9 +99,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     CSS from the absence of a child, because "this slot is empty" is a fact
     the view model already has and `:has()` would be re-deriving.
 
-    ## The armed gap (sb-dfyk)
+    ## The armed gap
 
-    A gap is also where an insertion is *aimed*, and until sb-dfyk it said so
+    A gap is also where an insertion is *aimed*, and until 2026-08-29 it said so
     nowhere. Clicking a "+" opened the palette against that one position and
     left forty other plus signs looking exactly like the one that had just
     become the destination of the next pick, so the mode the editor was now in
@@ -135,7 +135,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     ## The exit edge
 
     A rail's exit is the second question 10h asks of the style, and the
-    operator ruled it on `sb-67s`: a failure rail leaves by the **ordinary
+    operator ruled it on 2026-08-29: a failure rail leaves by the **ordinary
     flow edge**, and the dashed exit channel stays interrupt vocabulary.
     `ViewModel.exit_edge/1` is that derivation and `data-exit-edge` is it in
     the markup, stamped on the rails and nowhere else: a rail is the only
@@ -185,7 +185,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     chips because its arms declare an `:expression` field keyed by the arm's
     slot, and a host type that declares the same gets the same.
 
-    ## Depth, and why it is threaded (sb-d7g)
+    ## Depth, and why it is threaded
 
     `data-sb-depth` is this slot's ROOT-RELATIVE nesting depth, and it is the
     counter the recursion carries down rather than a number looked up. The
@@ -295,7 +295,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: """
       This slot's ROOT-RELATIVE nesting depth: the root block's own slots are
       0, the slots of a block inside one of those are 1, and so on. Stamped as
-      `data-sb-depth` and banded on by the stylesheet (sb-d7g).
+      `data-sb-depth` and banded on by the stylesheet.
       """
     )
 

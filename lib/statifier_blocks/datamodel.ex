@@ -48,7 +48,7 @@ defmodule StatifierBlocks.Datamodel do
       projected to its declared-path set.
 
   It accepts nothing else. The document arm is the one 11f promised and
-  `sb-oiq` built: ADR-0006 (accepted 2026-08-29) defines the shape and its
+  this module now builds: ADR-0006 (accepted 2026-08-29) defines the shape and its
   decision 6 gives the projection, and the `statifier_datamodel` package
   implements both, so this module reads a document through that one total
   function rather than growing a second reader of a schema. ADR-0006's
@@ -126,7 +126,7 @@ defmodule StatifierBlocks.Datamodel do
   question about something outside the block entirely. This is the
   document-level pass it names.
 
-  ## The same set, offered forwards (sb-0vt)
+  ## The same set, offered forwards
 
   `candidates/3` and `candidates_under/2` read these very surfaces to
   answer the other question an author has about them: not "is the path I
@@ -357,7 +357,7 @@ defmodule StatifierBlocks.Datamodel do
 
   @doc """
   The declared datamodel paths an expression control offers as candidates,
-  sorted and deduplicated - the data half of sb-0vt, and nothing else.
+  sorted and deduplicated - the data half of the `:expression` path suggestions, and nothing else.
 
   This reads the same three declaring surfaces `findings/4` does, by the
   same normalizers, so the set an author is offered and the set that

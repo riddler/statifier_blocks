@@ -48,7 +48,7 @@ defmodule StatifierBlocks.Core.Foreach do
   would re-run the `<onentry>` above on every pass - re-snapshotting the
   list and resetting the cursor to `0` - and the loop would never end.
   F4's "re-targets the head" is only true of the internal form. This is
-  pinned upstream by statifier-ex's `st-wlrx` and by a runtime test here.
+  pinned upstream in statifier-ex and by a runtime test here.
 
   ## The cursor and the snapshot are the compiler's roots (F2)
 

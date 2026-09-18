@@ -157,7 +157,7 @@ defmodule StatifierBlocks.Core.Map do
   `<assign location="...">` from - `core.invoke`'s and
   `StatifierBlocks.InvokeStep`'s `assign_to`, and `core.subchart`'s -
   read the same `StatifierBlocks.Core.Config.datamodel_path?/1` since
-  ADR-0011 decision 13 and `sb-r313`, so all four now agree: the same
+  ADR-0011 decision 13 and its widening of 2026-09-06, so all four now agree: the same
   `<assign>` element writes the same datamodel, so there is one location
   rule to have. The shape of all four refusals is shared in
   `StatifierBlocks.Core.AssignLocation`, and now the rule is shared too. A

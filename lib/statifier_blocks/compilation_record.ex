@@ -23,8 +23,8 @@ defmodule StatifierBlocks.CompilationRecord do
   Hashes do not invert, so the compiler emits the join as a fact. The
   record is the artifact's primary key: given a running session, which
   names a chart identity, look up by `chart_identity` and get back the
-  document, the revision, and (once sb-qz0 lands it) the provenance map
-  that explains it.
+  document, the revision, and - once the provenance work lands - the
+  provenance map that explains it.
 
   ## `chart_name` carries the document id and `chart_version` stays `nil`
 

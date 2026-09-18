@@ -36,7 +36,7 @@ defmodule StatifierBlocks.Core.Subchart do
 
   Statifier's `==` against an absent `_event.data.outcome` is non-boolean
   and raises a spurious `error.execution` beside the default arm's routing
-  (statifier-ex `st-iz97`); `===` is clean, and an explicit `nil` donedata
+  (pinned upstream in statifier-ex); `===` is clean, and an explicit `nil` donedata
   reads as `null` rather than as undefined. So the conditioned transitions
   are written `_event.data.outcome === '<outcome>'`. The record fixes the
   routing, not the operator; this is the campaign's recorded ruling on
@@ -56,7 +56,7 @@ defmodule StatifierBlocks.Core.Subchart do
   an outcome it calls `error`, and then the two are one outcome with one
   final and one slot rather than two spellings of the same thing.
 
-  ## What the host knows that this type cannot (sb-r4w7)
+  ## What the host knows that this type cannot
 
   The paragraph above is a statement about what a *compile of one
   document* can see. A **host** sees more: it holds every stored document,

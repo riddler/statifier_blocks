@@ -1077,8 +1077,8 @@ defmodule StatifierBlocks.Compiler do
   end
 
   # The one outcome name a **root** block may not declare (RQ-SF035-16;
-  # `sb-ju4d` left the question open on ADR-0002's failure amendment,
-  # section 4 step 3, and the Note of this bead's date closes it there).
+  # the question was left open on ADR-0002's failure amendment,
+  # section 4 step 3, and the Note of 2026-09-06 closes it there).
   #
   # Section 4 step 3 mints the one shared final an unhandled failure below
   # the root reaches from the root block's id under the role
@@ -1429,7 +1429,7 @@ defmodule StatifierBlocks.Compiler do
 
   # `nil` is an empty hidden default for EVERY row, not only the
   # `{:type_expr, opts}` one whose prose happened to enumerate its arms
-  # (ADR-0002's Composite amendment of 2026-09-07, folding sb-3ejc). F4's own
+  # (ADR-0002's Composite amendment of 2026-09-07). F4's own
   # reason applies unchanged to every row - a hidden field's `default:` is the
   # only value it will ever have, and `nil` carries nothing in exactly the
   # sense an empty string does - so the literal reading, under which a hidden
@@ -1889,7 +1889,7 @@ defmodule StatifierBlocks.Compiler do
   # It is deliberately **not** added to `StatifierBlocks.Compiler.Finding`'s
   # stage table, whose column is "Errors it produces" - the three warning
   # codes the `:emit` stage already raises are absent from that row for the
-  # same reason. `sb-1m2`'s complaint about that row is about a missing
+  # same reason. The open complaint about that row is about a missing
   # *error* code and is not touched here.
   @spec deadline_warnings(Resolved.t()) :: [Finding.t()]
   defp deadline_warnings(%Resolved{module: module, block: block, slots: slots}) do

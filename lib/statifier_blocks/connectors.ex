@@ -163,7 +163,7 @@ defmodule StatifierBlocks.Connectors do
     than from any type name (ADR-0005 decision 10h).
 
     There are four kinds and there is deliberately no fifth for a failure
-    rail. `sb-67s` ruled that a failure exit leaves by the ORDINARY flow
+    rail. The operator ruled 2026-08-29 that a failure exit leaves by the ORDINARY flow
     edge, and the spike's own assertion of that ruling is the sentence
     "a failure exit takes no class of its own": it shares one stylesheet
     rule with the edge between two adjacent steps, so it can never pick up
@@ -386,7 +386,7 @@ defmodule StatifierBlocks.Connectors do
     * **rail exits**, one per attached rule, in the vocabulary
       `ViewModel.exit_edge/1` derives from the slot's style: a `:failure`
       rail leaves by the ordinary flow edge, in the ordinary `:flow`
-      vocabulary (the `sb-67s` ruling), and an
+      vocabulary (the operator's ruling of 2026-08-29), and an
       `:secondary` rail leaves out of band, through a channel outside the
       container's own box so it crosses nothing at any depth.
 
@@ -567,7 +567,7 @@ defmodule StatifierBlocks.Connectors do
     # From the rule's OUTLET, the same anchor an ordinary flow edge leaves
     # any block from, so a failure subtree that is itself a container leaves
     # from its bottom rather than from its header. `:flow` rather than a kind
-    # of its own is the `sb-67s` ruling itself: a failure exit takes no class
+    # of its own is the operator's ruling of 2026-08-29 itself: a failure exit takes no class
     # of its own, so it cannot pick up the dashes or the hue that mark an
     # out-of-band way out.
     case flow_edge(:flow, outlet_anchor(id), exit_key, m) do

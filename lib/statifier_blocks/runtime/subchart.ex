@@ -1,7 +1,7 @@
 defmodule StatifierBlocks.Runtime.Subchart do
   @moduledoc """
   The canonical `statifier_blocks:subchart` invoke handler - the runtime
-  half of `StatifierBlocks.Core.Subchart`'s specification (sb-6edf).
+  half of `StatifierBlocks.Core.Subchart`'s specification.
 
   `core.subchart` compiles an `<invoke>` and fully specifies its contract
   (ADR-0004's 2026-08-29 amendment, C1-C3): a child compiled with

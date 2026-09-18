@@ -300,7 +300,7 @@ defmodule StatifierBlocks.Core.Branch do
   An arm's `cond` is the author's `:expression` config passed through
   verbatim into predicator's datamodel - the compiler ships no expression
   checking of its own (ADR-0004 decision 9), so a typo there surfaces as an
-  upstream compile error routed back through provenance by sb-qz0.
+  upstream compile error routed back through provenance.
 
   Each arm's steps are sequenced the same way a `core.sequence`'s are, and
   every arm's last step transitions to the block's own `<final>`, so a
