@@ -13272,11 +13272,21 @@ config outright; `declaring_node/7` takes the block as its second argument
 type_version: 1, config: %{}, slots: %{}]`, `@type config` at `:30`); and
 `unraisable_outcomes/4`'s caller `outcome_findings/5` (`compiler.ex:826`, `defp
 outcome_findings(palette, %Block{} = block, module, members, param_map) do`)
-holds the block as well. **The one function with no config anywhere in reach is
-`declared_outcome_names/1`** (`composite.ex:698`), which takes a ref and
-nothing else, and the private `declared_outcomes/1` behind it. So what the
-threading actually adds is a config-carrying route from those callers into that
-one function; the callers are not short of the config, the function is.
+holds the block as well. **What lacks the config is the ref-only route itself,
+not the callers.** The private `declared_outcomes/1` (`composite.ex:978`) takes
+a ref and nothing else, and it has three call sites at `6ea2afe`:
+`declared_outcome_names/1` (`composite.ex:698`, `def declared_outcome_names(ref),
+do: declared_outcomes(ref)`), which is equally ref-only and is what
+`declaring_node/7` calls; `unraisable_outcomes/4` (`composite.ex:861`, `case
+declared_outcomes(ref) do` at `:862`), whose own four arguments are
+`(%Palette{}, ref, members, param_map)` and carry no block either; and
+`outcomes_over/3` (`composite.ex:925`), which does hold the block. So two of
+the three - `declared_outcome_names/1` and `unraisable_outcomes/4` - have no
+config in their own reach, and both are called from functions that do hold the
+block (`declaring_node/7` at `compiler.ex:661`, `outcome_findings/5` at
+`compiler.ex:826-828`). What the threading actually adds is a config-carrying
+route from those callers through those two functions into `declared_outcomes/1`;
+the callers are not short of the config, the route is.
 Widening an `@doc false` helper's arity
 to carry a config this section's decision requires is not new surface; adding a
 public function, option, key or finding this section does not name would be.
