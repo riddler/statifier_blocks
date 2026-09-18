@@ -1410,6 +1410,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Enum.at(match, 1)
     end
 
+    defp declaration!(body, property) do
+      match = Regex.run(~r/^\s*#{Regex.escape(property)}:\s*(.*?);/m, body)
+      assert match, "the rule declares no `#{property}`"
+      String.trim(Enum.at(match, 1))
+    end
+
+    defp strip_member?(view, id, class) do
+      has_element?(
+        view,
+        ~s([data-block-id="#{id}"] > .sb-node__chrome > .sb-node__strip > #{class})
+      )
+    end
+
+    defp select_card(view, id) do
+      view
+      |> element(~s([data-block-id="#{id}"] > .sb-node__chrome > .sb-node__label))
+      |> render_click()
+
+      view
+    end
+
+    defp text_of(html) do
+      html
+      |> String.replace(~r/<[^>]*>/, "")
+      |> String.trim()
+    end
+
     describe "the fold's stylesheet (ADR-0005's amendment to decision 2)" do
       # The rest state is opacity, not `display: none` and not
       # `visibility: hidden`: both of those take a button out of the tab
@@ -1607,6 +1634,198 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert body =~ ~r/overflow-wrap:\s*anywhere/
         refute body =~ ~r/text-overflow:\s*ellipsis/
         refute body =~ ~r/white-space:\s*nowrap/
+      end
+    end
+
+    describe "the reservation holds across SELECTION too (the Note of 2026-09-08, item 4)" do
+      @stylesheet "assets/css/statifier_blocks.css"
+
+      # The width-determining declarations. Colour, cursor and transition do
+      # not size a box; these do.
+      @box_declarations [
+        "display",
+        "height",
+        "padding",
+        "border",
+        "border-radius",
+        "font-size",
+        "line-height"
+      ]
+
+      # The ruling's sentence is that the space is held "whether or not they
+      # are revealed". `opacity` buys that for a REVEAL and nothing else: a
+      # control that is not in the DOM is not a box at any opacity. Save is
+      # the one strip member whose PRESENCE is a function of the selection
+      # rather than of the card, so before this fix selecting a card added a
+      # member, the strip's column grew and every other column moved.
+      # Sabotage (run): dropped the placeholder `<span>` from the strip - the
+      # unselected card carries nothing where Save will be, and this goes red
+      # on the first assertion, taking the label test below with it.
+      test "a card that can show Save reserves its box while it is not selected",
+           %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        assert strip_member?(view, "blk_email_step", ".sb-node__strip-reserve"),
+               "the unselected card holds no box where Save will be drawn"
+
+        refute strip_member?(view, "blk_email_step", ".sb-node__save-step")
+
+        select_card(view, "blk_email_step")
+
+        assert strip_member?(view, "blk_email_step", ".sb-node__save-step"),
+               "the selected card draws no Save control"
+
+        refute strip_member?(view, "blk_email_step", ".sb-node__strip-reserve"),
+               "the placeholder and the control are both drawn, so the strip grew"
+      end
+
+      # The rest of the strip is untouched by the swap, which is what makes it
+      # a swap rather than a rearrangement: the same members in the same order
+      # either side of a selection, with one box standing in for the other.
+      # Sabotage: rendered the placeholder outside the strip - the member set
+      # is still equal but the box left the column that reserves it, and the
+      # assertion above goes red first.
+      test "every other strip member is present in both states", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        assert strip_member?(view, "blk_email_step", ".sb-node__remove")
+        refute strip_member?(view, "blk_email_step", ".sb-node__fold")
+
+        select_card(view, "blk_email_step")
+
+        assert strip_member?(view, "blk_email_step", ".sb-node__remove")
+        refute strip_member?(view, "blk_email_step", ".sb-node__fold")
+      end
+
+      # The reservation is only exact while the two boxes are the same box.
+      # The stand-in carries the control's own label for the same reason the
+      # item-4 comment gives about a word control: the text is part of the
+      # width, so a reservation with different text reserves a different
+      # column.
+      # Sabotage: changed the placeholder's text - the two labels differ, the
+      # reserved column is not the one Save needs, and this goes red.
+      test "the stand-in carries the Save control's own label", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+
+        reserved =
+          view
+          |> element(
+            ~s([data-block-id="blk_email_step"] > .sb-node__chrome > ) <>
+              ~s(.sb-node__strip > .sb-node__strip-reserve)
+          )
+          |> render()
+
+        select_card(view, "blk_email_step")
+
+        control =
+          view
+          |> element(
+            ~s([data-block-id="blk_email_step"] > .sb-node__chrome > ) <>
+              ~s(.sb-node__strip > .sb-node__save-step)
+          )
+          |> render()
+
+        assert text_of(reserved) == text_of(control),
+               """
+               The reservation's label is not the control's, so the column it
+               reserves is not the column the control needs.
+
+               reserved: #{inspect(text_of(reserved))}
+               control:  #{inspect(text_of(control))}
+               """
+      end
+
+      # ... and the same box rules. Repeated declarations rather than a
+      # selector list, because the control's rule is matched BY NAME by the
+      # tests above and a list breaks that match - so this test is what keeps
+      # the copy from drifting.
+      # Sabotage: changed the placeholder's `padding` to `0 var(--sb-space-2)`
+      # - the reserved column is wider than the control, the title's column
+      # shrinks on every unselected card, and this goes red naming `padding`.
+      test "the stand-in's box is the Save control's box, declaration for declaration" do
+        css = File.read!(@stylesheet)
+
+        control =
+          rule_body!(
+            css,
+            ~r/^\.sb-node__save-step\[data-reveal="hover-or-selected"\]\s*\{(.*?)\n\}/ms
+          )
+
+        reserve = rule_body!(css, ~r/^\.sb-node__strip-reserve\s*\{(.*?)\n\}/ms)
+
+        for property <- @box_declarations do
+          assert declaration!(reserve, property) == declaration!(control, property),
+                 "`#{property}` differs between the reservation and the Save control"
+        end
+      end
+
+      # The stand-in is not a gesture, it is the shape of one, so unlike the
+      # controls it has to leave the tab order and the accessibility tree as
+      # well as the paint. `visibility` is the one of the three that keeps the
+      # box while doing that; `display: none` would take the box with it and
+      # reserve nothing, and `opacity: 0` would leave a focusable control that
+      # does nothing on arrival.
+      # Sabotage: `display: none` on the rule - the box goes with it, the
+      # strip narrows on every unselected card, and this goes red.
+      test "the stand-in hides by visibility, so it keeps its box and leaves the tab order" do
+        css = File.read!(@stylesheet)
+
+        reserve = rule_body!(css, ~r/^\.sb-node__strip-reserve\s*\{(.*?)\n\}/ms)
+
+        assert reserve =~ ~r/visibility:\s*hidden/
+        refute reserve =~ ~r/display:\s*none/
+        refute reserve =~ ~r/position:\s*absolute/
+      end
+
+      # The acceptance's own sentence: the chrome's grid template is EQUAL at
+      # rest, on hover and when selected. The template is declared once, on
+      # `.sb-node__chrome` itself, and no state selector redeclares it - so
+      # the three states cannot differ in the template, and with the member
+      # boxes equal they cannot differ in the tracks the template resolves to
+      # either.
+      # Sabotage: added `.sb-node--selected > .sb-node__chrome {
+      # grid-template-columns: ... }` - a second declaration appears and this
+      # goes red naming the selector.
+      test "the chrome's grid template is declared once and no state redeclares it" do
+        css = File.read!(@stylesheet)
+
+        declaring =
+          ~r/^([^\n{}]*\.sb-node__chrome[^\n{}]*)\{[^{}]*grid-template-columns:/ms
+          |> Regex.scan(css)
+          |> Enum.map(fn [_, selector] -> String.trim(selector) end)
+
+        assert declaring == [".sb-node__chrome"], """
+        The chrome's grid template is declared by more than the base rule, so
+        a state can move a column without any control changing width.
+
+        Declaring selectors: #{inspect(declaring)}
+        """
+      end
+
+      # And hovering still changes nothing but paint, which is the half of the
+      # ruling that already held: every reveal rule on a strip control sets
+      # `opacity` and nothing else, so no box moves when a pointer arrives.
+      # Sabotage: added `padding` to any one reveal rule - the control grows
+      # on hover, the strip's column with it, and this goes red naming the
+      # rule.
+      test "a reveal changes opacity and nothing else" do
+        css = File.read!(@stylesheet)
+
+        for selector <- [
+              ~S(.sb-node--selected > .sb-node__chrome .sb-node__remove),
+              ~S(.sb-node--selected > .sb-node__chrome .sb-node__expand),
+              ~S(.sb-node--selected > .sb-node__chrome .sb-node__save-step)
+            ] do
+          body = rule_body!(css, ~r/^#{Regex.escape(selector)}\s*\{(.*?)\n\}/ms)
+
+          properties =
+            ~r/^\s*([a-z-]+):/m
+            |> Regex.scan(body)
+            |> Enum.map(fn [_, property] -> property end)
+
+          assert properties == ["opacity"],
+                 "#{selector} changes more than paint: #{inspect(properties)}"
+        end
       end
     end
 

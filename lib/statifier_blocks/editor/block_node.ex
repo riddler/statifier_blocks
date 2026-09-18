@@ -321,6 +321,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       registered, so offering it would offer the author a marking step, a
       Save, and then silence. "Replace with its steps" is unaffected in
       both directions - it commits an `Edit.t()` the editor makes itself.
+
+      A mount that registered the callback draws the Save control's BOX on
+      every card that could ever carry it, selected or not: selected, the
+      control itself; unselected, an `aria-hidden` placeholder of the same
+      box (`.sb-node__strip-reserve`). The strip is a reserved grid column
+      sized by its own children (ADR-0005's Note of 2026-09-08, item 4), and
+      the reveal the other controls use - `opacity`, which changes no box -
+      holds that reservation across a REVEAL but not across a change in
+      WHICH controls are PRESENT. Without the placeholder, selecting a card
+      added a member to its strip, the strip's column grew, the title's
+      column shrank and the title re-wrapped: the reservation held for hover
+      and broke for selection. The placeholder is `visibility: hidden`
+      rather than `opacity: 0` because unlike the controls it must leave the
+      tab order and the accessibility tree as well as the paint, while
+      keeping the box that is the whole point of it.
       """
     )
 
@@ -452,6 +467,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             >
               save
             </button>
+            <span
+              :if={@collapsible and @node.block_id != @selected_id and not @root?}
+              class="sb-node__strip-reserve"
+              aria-hidden="true"
+            >
+              save
+            </span>
             <button
               :if={not @read_only and expandable?(@node, @expandable)}
               type="button"
