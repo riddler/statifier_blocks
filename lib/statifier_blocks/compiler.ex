@@ -660,7 +660,10 @@ defmodule StatifierBlocks.Compiler do
   defp declaring_node(palette, %Block{} = block, module, members, param_map, nodes, expansion) do
     case Composite.declared_outcome_names(module) do
       [] ->
-        {:ok, nodes, expansion}
+        case undeclared_slot_findings(palette, block) do
+          [] -> {:ok, nodes, expansion}
+          findings -> {:error, findings, expansion}
+        end
 
       names ->
         {slots, findings, slot_expansion} = outcome_slots(palette, block, names)
@@ -684,6 +687,49 @@ defmodule StatifierBlocks.Compiler do
             {:error, findings, merged}
         end
     end
+  end
+
+  # The children a NON-declaring composite drops. `C3` replaces such a block
+  # by its expansion outright, so it is not in the spliced document the
+  # Structure stage walks and `StatifierBlocks.SlotValidation` never gets to
+  # ask it anything: a child an author placed in a slot the composite's TYPE
+  # does not declare compiled green and emitted nothing, with zero findings
+  # for the author to read. A child in a slot the type DOES declare is spliced
+  # into a member by `StatifierBlocks.Composite.expand!/2` and is not this.
+  #
+  # Resolve is the stage because this is the last place the block and the
+  # slots an author wrote on it both exist - the same argument
+  # `outcome_findings/5` above makes for its own `:resolve` finding, and the
+  # same one `reserved_slot_findings/1` below makes for the declaring half of
+  # this shape.
+  #
+  # The reason tuple is `StatifierBlocks.SlotValidation`'s own
+  # `{:undeclared_slot, id, slot, count}`, unchanged, and the rule is asked of
+  # that module rather than re-derived here: a DECLARING composite survives
+  # Resolve and draws exactly this finding from the Structure stage, and the
+  # two halves of one authoring mistake reporting two different reasons would
+  # be a difference an author cannot act on. What does differ is the stage,
+  # and with it `StatifierBlocks.Finding`'s stage-derived source
+  # (`:resolution` rather than `:assignability`) - that mapping is by rule and
+  # never by code, so it stays correct by construction.
+  #
+  # `fault: :author` rather than this stage's `:package` default, for
+  # `reserved_slot_findings/1`'s reason: a document edit fixes it.
+  @spec undeclared_slot_findings(Palette.t(), Block.t()) :: [Finding.t()]
+  defp undeclared_slot_findings(palette, %Block{} = block) do
+    palette
+    |> SlotValidation.undeclared_slots(block)
+    |> Enum.map(fn {:undeclared_slot, id, slot, count} = reason ->
+      Finding.new(
+        :resolve,
+        reason,
+        ~s(the "#{slot}" slot holds #{count} blocks but this block type declares no such slot, ) <>
+          "so they are dropped where this composite is replaced by its expansion; move them " <>
+          "into a slot it declares, or rename the slot",
+        block_id: id,
+        fault: :author
+      )
+    end)
   end
 
   # The author's half of `@expansion_slot`'s exemption. `compiler_slot?/2`
