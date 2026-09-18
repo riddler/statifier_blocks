@@ -11612,37 +11612,48 @@ carrying none.
 
 Filed with `sb-hjcd`, campaign RF055.
 
-## Note (2026-09-18): the delete offer is a deliberate exception to the reserved control strip, and its width is not held at rest
+## Amendment (2026-09-18): decision 14's control strip, the delete offer is a deliberate exception to the reservation and its width is not held at rest
 
-Campaign RF055, bead `sb-tw8m`.
+**Status: proposed (2026-09-18, campaign RF055, bead `sb-tw8m`, recording the
+campaign's ruling of 2026-09-18 that the delete offer's width is not reserved
+and that this is intended).** A decision record merges at proposed under the
+campaign invariant; flipping it to accepted is a separate gated request.
+Additive by addition: the Note of 2026-09-08, item 4 (`:10543`, "The control
+strip is reserved beside the title"), the Save control's reservation it was
+extended by, and every clause above this line stand exactly as written. **No
+text above this line is edited by this section**, and no line above it is
+removed.
 
-A dated Note rather than an amendment: it carries no `Status:` line, it never
-flips, no text above this line is edited by it and no line above it is removed.
-It records a status quo - what the canvas draws today, and why that is intended
-rather than a defect - and it takes nothing away. The Note of 2026-09-08, item
-4 ("The control strip is reserved beside the title", `:10543`) governs every
-resting member of the strip exactly as it did before this section, with the one
-member named below excepted for the reasons given.
-
-**Why this is a Note and not an Amendment.** The test is
+**Why this is an Amendment and not a Note.** The test is
 `docs/adr/README.md:42-44`, which says that an amendment "changes what the
 record decides and a note does not", a note being one that records "where
 something already decided renders, or what a sentence already accepted" was
-about. Item 4 decided the reservation for
-controls whose presence is constant and whose *reveal* varies - the four
-`data-reveal="hover-or-selected"` members it enumerates - and the Save control's
-reservation (`sb-ct1l`) extended it to a member whose presence varies with the
-SELECTION, on item 4's own words. Item 4 took no position on a member that
-exists only while an interaction the author started is unanswered, because no
-such member existed when it was written. This section names where that case
-lands and why; it withdraws no reservation, admits no new class of exception,
-and changes no answer item 4 gives. It is the second kind of note the README
-names: what a sentence already accepted was about.
+about. This section does the first. Item 4 rules the strip reserved "at all
+times", and the reservation was already carried past a control's REVEAL to a
+control's PRESENCE when the Save control's stand-in shipped: the stylesheet
+states the principle as the strip holding "the WIDEST set the card can show at
+all times" (`assets/css/statifier_blocks.css:1487`, in the comment above
+`.sb-node__strip-reserve` opening at `:1467`). The delete offer is a member of
+the set a card can show, and its presence varies. So the rule as it stands
+reaches it, and carving it out narrows what item 4 decided rather than
+recording where item 4 already renders. A section that changes an answer this
+record gave carries a status line and a flip. An earlier form of this section
+argued itself a Note on the ground that item 4 took no position because no such
+member existed when it was written; that is a reason the change is *narrow*, and
+it is not the README's test.
 
-Every code cite below was **read at `20db999`** and is written anchor first,
+**Exactly what exception this admits, and what it does not.** One class: a strip
+member that is TRANSIENT and USER-INITIATED, and that REPLACES a resting member
+rather than joining the strip beside one. The delete offer is the only such
+member this record knows of. Every resting member of the strip keeps item 4's
+reservation in full, the Save stand-in included, and a member that is transient
+but ADDS to the strip rather than replacing a member is not admitted here and
+would be a further request against this section.
+
+Every code cite below was **read at `df38fc3`** and is written anchor first,
 line second; a later reader re-locates by the anchor and not by the number.
 
-### 1. The sentence being qualified, and the member that excepts itself from it
+### 1. The sentence being qualified, and the member excepted from it
 
 Item 4's ruling sentence reads, character for character (`:10553-10555`,
 following its `**The ruling.**` lead-in):
@@ -11676,8 +11687,9 @@ That is the same class of reflow the Save control's reservation closed for the
 selection: a rendered stand-in of the control's own box, `.sb-node__strip-reserve`
 (`assets/css/statifier_blocks.css:1502`), drawn on every card that could ever
 carry Save (`lib/statifier_blocks/editor/block_node.ex:472`, the
-`class="sb-node__strip-reserve"` span). The offer is deliberately left without
-one.
+`class="sb-node__strip-reserve"` span). **The decision here is that the offer is
+deliberately left without one**, for the three reasons in item 2 and the
+measurement in item 3.
 
 ### 2. Why the exception is taken
 
@@ -11709,19 +11721,24 @@ save.** The measurement and its method are item 3.
 
 The numbers below are **arithmetic from this repository's own stylesheet
 tokens, not a browser reading**. Each token is given with its anchor, read at
-`20db999` in `assets/css/statifier_blocks.css`, and evaluated at a 16px root:
+`df38fc3` in `assets/css/statifier_blocks.css`, and evaluated at a 16px root:
 `--sb-card-width: 14rem` (`:394`) = 224px; `--sb-space: 0.5rem` (`:353`) = 8px;
 `--sb-space-half` (`:354`) = 4px; `--sb-space-2` (`:355`) = 16px; `--sb-space-3`
 (`:356`) = 24px; `--sb-border-width: 1px` (`:285`); `--sb-text-xs: 0.6875rem`
-(`:369`) = 11px. All of these sit in the `.sb-editor` token block (`:254`).
-Every box below is `border-box` (`:182`, the declaration in the `.sb-editor *`
-reset opening at `:178`).
+(`:369`) = 11px; `--sb-text-md: 0.875rem` (`:371`) = 14px. All of these sit in
+the `.sb-editor` token block (`:254`). Every box below is `border-box` (`:182`,
+the declaration in the `.sb-editor *` reset opening at `:178`).
 
-The card measured is a leaf at rest - not selected, not hovered, no badge - on a
-mount that registered `on_collapse`, which is the mount that draws the Save box
-at all (`lib/statifier_blocks/editor/block_node.ex:455`, the
-`<div class="sb-node__strip">` head, and the two `@collapsible` conditions at
-`:457` and `:471`).
+The card measured is a LEAF, at rest and in full: not the root, not selected,
+not hovered, carrying no badge, not read-only, not expandable, on a mount that
+registered `on_collapse`. Those are the conditions the strip's own markup reads
+(`lib/statifier_blocks/editor/block_node.ex:455`, the
+`<div class="sb-node__strip">` head; `:457` and `:471`, the two `@collapsible`
+and `not @root?` conditions on the Save control and its stand-in; `:478`, the
+`expandable?(@node, @expandable)` condition on "Replace with its steps"; `:505`,
+the delete control's), and they are the card whose strip holds exactly two boxes.
+A card that also draws the expand control or the fold toggle has a narrower
+title still, so the figures below are the widest case, not the typical one.
 
 - The card is `--sb-card-width` wide (`assets/css/statifier_blocks.css:836`,
   `.sb-node[data-container="false"]`), with the base node box's 1px border and
@@ -11736,9 +11753,12 @@ at all (`lib/statifier_blocks/editor/block_node.ex:455`, the
   The Save box is `padding: 0 var(--sb-space)` plus a 1px border either side
   (`:1502`, `.sb-node__strip-reserve`; the control it stands in for, `:1439`,
   declares the same), so it is 18px + w("save"). The delete control is
-  `width: var(--sb-space-2)` (`:1301`) = 16px.
-- **Title column at rest today = 158 - (18 + w("save")) - 4 - 16 = 120px -
-  w("save"), about 98px.**
+  `width: var(--sb-space-2)` (`:1301`, the
+  `.sb-node__remove[data-reveal="hover-or-selected"]` rule) = 16px. Every
+  stylesheet cite in this section names a rule by its head, which is the anchor
+  a later reader matches on.
+- **Title column at rest = 158 - (18 + w("save")) - 4 - 16 = 120px - w("save"),
+  about 98px.**
 
 With an offer open on that same card, the `x` is withheld and the pair is drawn.
 Each of the pair's two boxes is `padding: 0 var(--sb-space)` plus a 1px border
@@ -11746,7 +11766,7 @@ either side (`:1353`), and they sit in an `inline-flex` with
 `gap: var(--sb-space)` (`:1346`), so the pair is 2x18 + 8 = 44px + w("keep") +
 w("x2"). **Title column while an offer is open = 158 - (18 + w("save")) - 4 -
 (44 + w("keep") + w("x2")) = 92px - w("save") - w("keep") - w("x2"), about
-36px.** That collapse is what this Note records as accepted, and it is the
+36px.** That collapse is what this section decides to accept, and it is the
 transient state item 2 describes.
 
 Reserving the pair at rest means drawing a stand-in for it on every card, the
@@ -11768,8 +11788,17 @@ per delete gesture on one card.
 depends on the host page). Taken at roughly 22px, 23px and 11px for a system
 sans, which is where the "about" figures above come from. Nothing in the ruling
 rests on them: the font-independent statement is that the reservation removes
-48px from a title column that is at most 120px, leaving a title that wraps at
-about one character a line at rest on every card.
+48px from a title column that is at most 120px.
+
+**What that leaves the title, in characters.** The title draws at
+`--sb-text-md` = 14px (`assets/css/statifier_blocks.css:1200`, the
+`.sb-node__label` rule, `font-size: var(--sb-text-md)` at `:1206`) and breaks
+mid-word (`overflow-wrap: anywhere`, `:1210`), so the character count is the
+column divided by one glyph advance. At an average advance of about half the em
+- about 7px at this size, the same estimate the 11px figures above use - a 16px
+column takes about **two** characters a line, where the 98px column it replaces
+takes about **fourteen**. The terms are the column width, which is arithmetic,
+and the average advance, which is the estimate.
 
 **The reservation was built in full and measured under this bead, and it is not
 shipped.** A reservation of one of the two boxes rather than both does not close
@@ -11785,23 +11814,26 @@ The confirm button's visible label is the literal `x` followed by the number of
 blocks the claim names (`lib/statifier_blocks/editor/block_node.ex:541`, the
 `x{offer_count(@pending_remove)}` interpolation; `offer_count/1` is
 `length(ids)` at `:654`). A claim of ten or more blocks therefore draws a label
-one character wider than any this vocabulary can produce today, and the
+one character wider than any this vocabulary can produce at `df38fc3`, and the
 unreserved difference item 1 describes is that much larger again. It is
 unreachable with the core vocabulary: `core_recipes/0` holds exactly one entry,
 `%{"deadline" => Core.DeadlineRecipe}`
-(`lib/statifier_blocks/palette.ex:256`, `def core_recipes`, the map at `:257`), and that recipe's
-`members/2` (`lib/statifier_blocks/core/deadline_recipe.ex:137`) answers through
-`pair/3` (`:166` and `:176`), whose two matching clauses each return a
-two-element list and whose fallback (`:187`) returns none. Reachable the day a
-host registers a wider recipe, and recorded here so that day is not a surprise.
+(`lib/statifier_blocks/palette.ex:256`, `def core_recipes`, the map at `:257`),
+and that recipe's `members/2`
+(`lib/statifier_blocks/core/deadline_recipe.ex:137`) answers through `pair/3`
+(`:166` and `:176`), whose two matching clauses each return a two-element list
+and whose fallback (`:187`) returns none. Reachable the day a host registers a
+wider recipe, and recorded here so that day is not a surprise.
 
-### What this Note does not do
+### What this Amendment does not do
 
-It withdraws nothing from item 4: the reservation stands for every resting
-member of the strip, the Save box's stand-in stands, and no control gains or
-loses a reveal contract. It edits no line above it, removes no line above it,
-adds no assign, clause, control or class, moves no status line - including this
-file's head `Status:` line - changes no code and adds no changelog fragment. It
+It narrows item 4 by exactly the one class named above and by nothing else: the
+reservation stands for every resting member of the strip, the Save box's
+stand-in stands, and no control gains or loses a reveal contract. It edits no
+line above it, removes no line above it, adds no assign, clause, control or
+class, changes no code and adds no changelog fragment. It moves no status line,
+including this file's head `Status:` line at `:3`, which lists the amendments
+accepted so far and is not extended by a section that merges at proposed. It
 takes no layout decision on the card's width, on where the offer is drawn, or on
 what a host recipe of ten members should look like, and it takes no position on
 whether any section above it is ready to flip, which remains the operator's.
