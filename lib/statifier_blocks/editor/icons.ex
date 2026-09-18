@@ -171,7 +171,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # with no `__changed__` key, so any host component that derived a value
     # the ordinary way - `assign/3`, `assign_new/3`, anything expecting a
     # tracked assigns map - raised on a seam that renders straight from its
-    # arguments in every example we ship (sb-b8g).
+    # arguments in every example we ship.
     def glyph(assigns) do
       ~H"""
       {Phoenix.LiveView.TagEngine.component(

@@ -626,7 +626,7 @@ defmodule StatifierBlocks.Composite.Data do
     raise RuntimeError,
           "#{inspect(__MODULE__)}.emit/2 was reached for block #{inspect(id)} of type " <>
             "#{inspect(type)}. A composite is replaced by its expansion at Resolve " <>
-            "(ADR-0004, sb-nzc1), so no composite block survives to Emit; reaching this " <>
+            "(ADR-0004), so no composite block survives to Emit; reaching this " <>
             "means the expansion did not run."
   end
 

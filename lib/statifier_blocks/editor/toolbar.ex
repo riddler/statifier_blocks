@@ -21,7 +21,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     *which* fit the author asked for, the canvas carries it as `data-fit`, and
     a stylesheet does what a stylesheet can do with it. The measured form
     arrives with the read-only measurement hook the decision 7 amendment
-    records (`sb-k7r`); until then a mode is the honest half, and it is the
+    records; until then a mode is the honest half, and it is the
     half a server can test.
 
     `Fit active` is disabled when there is no block for it to fit, because

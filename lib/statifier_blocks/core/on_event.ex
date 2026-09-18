@@ -34,7 +34,7 @@ defmodule StatifierBlocks.Core.OnEvent do
   different notion of interrupt handler mints its own kind and its own
   group without touching this package.
 
-  ## Candidates for `event` (sb-82mu)
+  ## Candidates for `event`
 
   `event` is a plain `:string` and this type validates it the way it always
   has - the event-name shape rule, and nothing else. What the editor adds is
@@ -1230,7 +1230,7 @@ defmodule StatifierBlocks.Core.OnEvent do
   #      skip the assign and dirty the run at the same time. This
   #      is the same reading `core.subchart` took for its routing
   #      conditions, where `==` against an absent `_event.data.outcome` cost
-  #      a spurious `error.execution` (statifier-ex `st-iz97`).
+  #      a spurious `error.execution` (pinned upstream in statifier-ex).
   #   4. A nested source needs no chain of guards: an access whose target is
   #      neither map nor list answers the marker too
   #      (`predicator/evaluator.ex:1244`, `defp access_value(object, _key,

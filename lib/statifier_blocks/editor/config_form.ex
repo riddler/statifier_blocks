@@ -185,7 +185,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       default: nil,
       doc: """
       One-shot: the `config_key` of the field the source tab's click-through
-      (`sb-rd29`) just asked to be focused, or `nil` for "leave focus alone".
+      just asked to be focused, or `nil` for "leave focus alone".
       `StatifierBlocks.Editor` sets it on a click into a config-emitted span
       and clears it on every other route, the same discipline
       `StatifierBlocks.Editor.Drawer`'s `focus_tab` keeps for the tab strip.
@@ -685,7 +685,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "#{if length(fields) == 1, do: "is", else: "are"} not accepted yet."
     end
 
-    # `sb-rd29`'s resolution step: a `config_key` off a source span is a
+    # The click-through's resolution step: a `config_key` off a source span is a
     # string that crossed a click, not a proof that this block's form still
     # has a field by that name - the selection could have moved to a
     # different block's span between the click and this render, or the

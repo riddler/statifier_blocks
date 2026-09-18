@@ -438,12 +438,49 @@ defmodule StatifierBlocks.BlockTypeTest do
       refute read_files(@lib_and_support_files) =~ forbidden
     end
 
-    # sabotage: put a bead id back into a block_type.ex @doc, as ADR-0002's
-    # own sketch spells it -> red
-    test "lib/ carries no bead ids or pull-request numbers" do
-      forbidden = ~r/\bs(b|t|ui|p|ob)-[a-z0-9]{3,4}\b|PR #[0-9]/
+    # A dated `[Correction <date>, <id>: ...]` or `[Note <date>, <id>: ...]`
+    # block is a record of an edit rather than a live claim, and CLAUDE.md
+    # exempts it by name: the id is the only trace of why the paragraph moved.
+    # Strip those blocks before scanning; the ban binds every live sentence
+    # around them.
+    @dated_block ~r/\[(?:Correction|Note) \d{4}-\d{2}-\d{2},.*?\]/s
 
-      refute read_files(@lib_files) =~ forbidden
+    # A bead id is `sb-`/`st-`/`sui-`/`sp-`/`sob-` plus three or four base36
+    # characters. The editor's CSS class prefixes have the same shape but an
+    # English word in place of the id, so they are named here and excluded;
+    # everything else of this shape is an id. (A future bead whose id happened
+    # to spell one of these nine words would slip through - the price of
+    # letting the stylesheet keep its names.)
+    @bead_or_pr_id ~r/\bs(?:b|t|ui|p|ob)-(?!(?:type|slot|save|node|form|edge|gap|drag|run)\b)[a-z0-9]{3,4}\b|PR #[0-9]/
+
+    # Every `.ex` file under lib/, globbed at run time rather than listed, so
+    # a file added later is enforced the moment it exists.
+    defp all_lib_files do
+      __DIR__
+      |> Path.join("../../lib")
+      |> Path.expand()
+      |> Path.join("**/*.ex")
+      |> Path.wildcard()
+      |> Enum.sort()
+    end
+
+    defp process_artifacts(path) do
+      live = path |> File.read!() |> String.replace(@dated_block, "")
+
+      @bead_or_pr_id
+      |> Regex.scan(live)
+      |> Enum.map(&hd/1)
+      |> Enum.uniq()
+      |> Enum.map(&(Path.basename(path) <> ": " <> &1))
+    end
+
+    # sabotage: plant a bead-id-shaped token in shell.ex's moduledoc, outside
+    # any dated block -> red, naming the file and the token (verified).
+    test "no lib/ file carries a bead id or pull-request number outside a dated block" do
+      offenders = Enum.flat_map(all_lib_files(), &process_artifacts/1)
+
+      assert offenders == [],
+             "process artifacts in shipped lib/ prose:\n" <> Enum.join(offenders, "\n")
     end
   end
 end

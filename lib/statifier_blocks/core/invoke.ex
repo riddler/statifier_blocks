@@ -67,8 +67,8 @@ defmodule StatifierBlocks.Core.Invoke do
   alias StatifierBlocks.Core.{AssignLocation, Config, Emit}
   alias StatifierBlocks.Emission
 
-  # ADR-0011 decision 13's argument, applied to this type's `assign_to` on
-  # `sb-r313`: the `<assign location="...">` this block emits writes the
+  # ADR-0011 decision 13's argument, applied to this type's `assign_to`
+  # here too: the `<assign location="...">` this block emits writes the
   # same datamodel `core.assign` writes through the same element, so the
   # location rule is `Config.datamodel_path?/1` here too, and the wording
   # is `core.subchart`'s sentence with this field's own example.

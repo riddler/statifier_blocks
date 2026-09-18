@@ -8,8 +8,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     An entry renders the tile the card it produces will carry, resolved by the
     same seam and through the same `icon` assign - `Editor` hands this
     component and `Editor.BlockNode` the identical value. The tile was declared
-    here and rendered nowhere for the whole of the graduated editor's life
-    (`sb-jja`), so a host could not put an icon on a palette row at all; a
+    here and rendered nowhere for the whole of the graduated editor's life,
+    so a host could not put an icon on a palette row at all; a
     palette that showed no icons above a canvas that did was the visible half
     of that.
 
@@ -28,7 +28,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         has two kinds of row. `allowed` carries the type names that slot will
         take, computed by `StatifierBlocks.Editor` with the *same* predicate a
         drag uses - `Edit.Targets.droppable_slots_for/3` against a probe block
-        of each candidate type, whose config since sb-1c7g is the entry's
+        of each candidate type, whose config since 2026-09-06 is the entry's
         `default_config`, so a type refused for a READ rather than for its
         kind is filtered here too. `allowed_recipes` carries the recipe names
         whose arrangement lands at the armed position, which is the recipe's
@@ -105,7 +105,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     affordance - though it is that, drag-and-drop being unusable by keyboard
     and hostile on touch.
 
-    ## The entry is also a drag source (sb-4nep)
+    ## The entry is also a drag source
 
     A row carries `draggable="true"` and `data-sb-drag-type`, which is the
     whole of this component's part in palette drag-to-insert. Dragging a type
@@ -343,7 +343,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # The fit numbers count what the ARMED SLOT will take, which is the whole
     # of the verdict and not the structural half of it: `allowed` is
     # `Edit.Targets.droppable_slots_for/3` against the insert probe, and since
-    # sb-1c7g that probe carries the entry's `default_config`, so a type
+    # 2026-09-06 that probe carries the entry's `default_config`, so a type
     # refused for a read it declares on a config field is outside the
     # numerator exactly as one refused for its kind is. The alternative was to
     # split the line into a structural count and a typed one, and it is the
@@ -380,7 +380,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # about what fits ends before the recipes are named: "N of M block types
     # fit here, and 1 recipe" would read as the recipe fitting too, and at the
     # time it was written a listed recipe had not been asked. It has been since
-    # (sb-ym2w): a recipe on screen at an armed slot is one whose arrangement
+    # 2026-09-06: a recipe on screen at an armed slot is one whose arrangement
     # lands there. The wording stays as it is, because "also listed" is still
     # true of such a row and understating what has been checked costs an author
     # nothing, where the old comma overstated it. N and M stand for the two
@@ -485,7 +485,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # A recipe used to stay visible everywhere and be refused at the pick,
     # which read as honest and was not: the refusal wrote nothing and said
     # nothing, so a row that could never land looked exactly like one that
-    # could until it was clicked, and then still did (sb-ym2w). The same
+    # could until it was clicked, and then still did. The same
     # answer given before the click is the one an author can act on.
     #
     # Either set may be `nil`, and `nil` is "nothing is armed" rather than

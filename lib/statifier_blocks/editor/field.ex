@@ -62,9 +62,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     one is a widening of that record and belongs to whoever amends it.
 
     `:expression` renders through the `expression_component` seam. Predicator
-    source is statifier-ui's subject (sui-bob, sui-ADR-0006), and decision 9
+    source is statifier-ui's subject (sui-ADR-0006), and decision 9
     records a richer affordance as a deferral, so this component accepts an
-    override for exactly that seam - and, since sb-m6e0, fills the seam
+    override for exactly that seam - and, since 2026-09-04, fills the seam
     itself when the package the deferral names is on the load path.
 
     ## Which control an `:expression` gets
@@ -142,7 +142,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     rendered, so a host that supplies nothing loses nothing.
 
     Three field types read it, and the *closed* spelling means different
-    things to them (sb-uw3a):
+    things to them:
 
     | Field type | Closed list | Open list |
     |---|---|---|
@@ -186,7 +186,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     It is read ahead of the three key-chosen lists below, because a list
     keyed on this field is the narrower claim.
 
-    ## `event_candidates` (sb-82mu)
+    ## `event_candidates`
 
     The completion events the blocks in a `core.on_event`'s enclosing body
     raise, each `%{label: , value: }`, where the value is the generated
@@ -202,7 +202,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     other core types that declare an `event` key are unaffected. Nothing in
     this module tests for a block type to decide it.
 
-    ## `outcome_candidates` (sb-r4w7)
+    ## `outcome_candidates`
 
     The outcomes a host says the chart a `core.subchart` names actually
     finishes with, as plain names. They are drawn as a `<datalist>` on the
@@ -214,7 +214,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     `chart_outcomes` assign for a selected `core.subchart`, and is empty for
     every other selection. Nothing in this module tests for a block type.
 
-    ## The fixture hint (sb-e30x)
+    ## The fixture hint
 
     `fixture_hint` is `StatifierBlocks.Shell.fixture_hint/3`'s answer for
     this field, and it is drawn as a sibling element after the control: the
@@ -243,7 +243,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     is silence rather than an empty affordance, which is the same thing the
     empty `<datalist>` cases below do.
 
-    ## The `:expression` path suggestions (sb-0vt)
+    ## The `:expression` path suggestions
 
     That plain input gains a `<datalist>` of the declared datamodel paths
     when `path_candidates` is non-empty, on exactly the `invoke_type` terms
@@ -779,7 +779,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     # The same host list on a `:path` or an `:expression`, where it can only
-    # ever SUGGEST (sb-uw3a). Both controls type their value - a path is
+    # ever SUGGEST. Both controls type their value - a path is
     # still a path and an expression still an expression, and ADR-0011
     # decision 9's surfaces are untouched by anything here - so a CLOSED
     # list draws a `<datalist>` on these two types rather than the
@@ -931,9 +931,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # module-and-behaviour indirection for one override would be more
       # machinery than the deferral is worth.
       #
-      # `candidates` is additive to that map (sb-0vt), and
-      # `value_candidates` (sb-m6e0), `path_types` (sb-23e0) and `debounce`
-      # (sb-2bt9) are additive
+      # `candidates` is additive to that map, and
+      # `value_candidates`, `path_types` and `debounce` are additive
       # in exactly the same way. An
       # override written before either existed takes a map and ignores a key
       # it does not read, so nothing that worked stops working; an override
@@ -946,12 +945,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # it renders itself, and `nil` when the caller named none. It was held
       # back while nothing behind the seam read it, on the ground that an
       # unread key is a promise this side cannot keep;
-      # `StatifierUI.Live.ExpressionInput` reads it from 0.10.1 (sui-6fe),
+      # `StatifierUI.Live.ExpressionInput` reads it from 0.10.1,
       # which is what makes it a key rather than a promise. Writing it is
       # still the override's job: this clause renders whatever comes back and
       # has no tag of its own to put the attribute on.
       #
-      # `candidates` is no longer `path_candidates` verbatim (sb-3xub): it is
+      # `candidates` is no longer `path_candidates` verbatim: it is
       # the host's own offers for THIS field ahead of the document's declared
       # paths, merged into one de-duplicated list. The precedence is the
       # datalist branch's above, and for the same reason - a list keyed on
@@ -1152,7 +1151,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
-    # sb-82mu: a `core.on_event` `event` field, offered the completion events
+    # A `core.on_event` `event` field, offered the completion events
     # its enclosing body's blocks raise. Keyed by field key and by a non-empty
     # list, exactly as `invoke_type` above is, and for the same two reasons:
     # the field stays a plain `:string` in `config_schema/1`, and an empty
@@ -1194,7 +1193,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
-    # sb-r4w7: a `core.subchart` `outcomes` field, offered the finals the host
+    # A `core.subchart` `outcomes` field, offered the finals the host
     # says the referenced chart emits. Keyed by field key and by a non-empty
     # list, exactly as `invoke_type` and `event` above are, and for the same
     # reasons: the field stays a plain `:string` in `config_schema/1`, and an
@@ -1690,7 +1689,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       if Enum.any?(candidates, fn {offered, _label} -> offered == value end), do: nil, else: text
     end
 
-    # The one list the `expression_component` seam is handed (sb-3xub): a
+    # The one list the `expression_component` seam is handed: a
     # host's own offers for this field first, then the document's declared
     # paths, de-duplicated. Built once, in one place, so the order is a
     # property of this function rather than of the call site that happens to

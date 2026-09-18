@@ -2,7 +2,7 @@ defmodule StatifierBlocks.Runtime.FixtureRuns do
   @moduledoc """
   Turns `(document, palette, fixtures)` into a list of per-row verdicts, by
   compiling the document once and driving the compiled chart once per
-  fixture row (`sb-4yze`, Phase 1).
+  fixture row.
 
   ## Namespace: `StatifierBlocks.Runtime.*`, not `StatifierBlocks.Fixtures.*`
 

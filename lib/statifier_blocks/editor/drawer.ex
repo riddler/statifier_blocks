@@ -15,7 +15,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     its height back. Declarations joined them under the 2026-09-01 amendment
     (clause 2i), which took ADR-0001 11i's named door: the document's own
     `datamodel` roots are a grid of rows about the envelope, which is 1A's
-    test again. Fixture runs joined under `sb-4yze`: one row per fixture row
+    test again. Fixture runs joined 2026-09-02: one row per fixture row
     in the document, each carrying the outcome slot it expected against the
     one the compiled chart actually took (`StatifierBlocks.Runtime.FixtureRuns`
     does the driving; this module only draws the table). The read-only
@@ -83,7 +83,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     host seam is where that split is written down.
 
     It is called the way HEEx calls `<.tab />` rather than by applying it to a
-    bare map, which is `StatifierBlocks.Editor.Icons`' rule (sb-b8g) and the
+    bare map, which is `StatifierBlocks.Editor.Icons`' rule and the
     same one for the same reason: a host component that derives a value with
     `assign/3`, which is what an ordinary component does, raises on an assigns
     map with no change-tracking key in it.
@@ -134,7 +134,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     The strip is a `role="tablist"` with a roving `tabindex`, so the tabs
     are one stop on the Tab sequence and all but the active one are reached
-    with the arrow keys or not at all - and once `sb-mtak` made the strip scroll at the
+    with the arrow keys or not at all - and once the strip began scrolling at the
     narrow breakpoint with its scrollbar hidden, "not at all" also meant not
     visible. WAI-ARIA's pattern closes that: Left and Right move one tab and
     wrap, Home and End go to the ends.
@@ -749,7 +749,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # `config_key` is the field an author typed the value into, and it is the
     # title because that is the whole of what the span is: not "somewhere in
     # this block" but "this field of it". It rides the click too, as
-    # `phx-value-config-key`, which is `sb-rd29`'s whole contribution to this
+    # `phx-value-config-key`, which is the click-through's whole contribution to this
     # component: a plain HEEx attribute omits itself when its value is `nil`,
     # so a span with no `config_key` posts no such param and the editor's
     # `select` handler falls through to the clause that only selects. Nothing

@@ -43,7 +43,7 @@ defmodule StatifierBlocks.DurationInput do
   that drifts."
 
   That is a deliberate difference from the spike control this graduates
-  (`sb-709`, `spike/js/panes.js`), which refused a strict subset - a
+  (`spike/js/panes.js`), which refused a strict subset - a
   sub-second unit, fractional components and repeated units alike. None
   of those three refusals survives. A fraction that normalises into whole
   components (`1.5h` is an hour and a half), a repeated unit that

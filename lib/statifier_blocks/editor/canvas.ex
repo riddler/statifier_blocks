@@ -84,7 +84,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     attr(:armed, :any,
       default: nil,
-      doc: "The `{parent_id, slot, index}` the palette is armed at, or nil (sb-dfyk)."
+      doc: "The `{parent_id, slot, index}` the palette is armed at, or nil."
     )
 
     attr(:collapsed, :any,

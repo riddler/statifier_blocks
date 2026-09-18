@@ -1,6 +1,6 @@
 defmodule StatifierBlocks.Runtime.DurableSubchart do
   @moduledoc """
-  The durable `statifier_blocks:subchart` handler (sb-2i04, ADR-0008): the
+  The durable `statifier_blocks:subchart` handler (ADR-0008): the
   child runs as its own persisted `statifier_persistence` run, and the
   answer is given at **dispatch time** rather than from a pure
   `Statifier.Invoke.Handler.start/2`.

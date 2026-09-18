@@ -37,7 +37,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     `palette.assignability`, consulted by the one `Assignability` the
     compiler's `validate/3` consults.
 
-    ## The other thing a drag can carry (sb-4nep)
+    ## The other thing a drag can carry
 
     A palette entry is a drag source too, and dragging one onto a gap inserts
     a block of that type there. It is the same two round-trips with the same
@@ -212,7 +212,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     package inventing a second one. The stylesheet tints the two the spike
     proved and leaves every other outcome the neutral treatment.
 
-    ## The Run pane's send control, and who moves the run (sb-j18n)
+    ## The Run pane's send control, and who moves the run
 
     `run_session` is the other half of that seam, and it points the other way.
     `run` is what a host says about a run; `run_session` is a live
@@ -266,7 +266,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     session is supplied and a **live** `run` is seated beside it - a persisted
     run reads as not sendable, because there is no session for it to send to.
 
-    ## Opening at a fit (sb-ehqn)
+    ## Opening at a fit
 
     A document wider than the canvas opens with its right-hand columns off
     the edge, and the only remedy the editor had was the author pressing
@@ -372,7 +372,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     named for one of the package's own tabs, or repeating an id already used,
     is not drawn - `StatifierBlocks.Shell.host_tabs/1` says why.
 
-    ## The findings number a host may show (sb-ukgu)
+    ## The findings number a host may show
 
     A host that draws its own header usually wants to say how many findings
     the open document has, and the obvious way to get that number - counting
@@ -408,7 +408,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     different number than the drawer is a bug in the host; a host showing
     none is fine.
 
-    ## The insert mode, and the pick that lands nowhere (sb-dfyk)
+    ## The insert mode, and the pick that lands nowhere
 
     `palette_position` is a mode, and every visible part of it hangs off that
     one assign: the armed gap on the canvas, the instruction naming where the
@@ -588,7 +588,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `on_collapse` | no | one-argument function called with each declaration the "Save as a step" gesture proposes, in `on_select`'s shape. The gesture edits no document and this package persists nothing: what the host does with the map - which table, which tenant, whether it is saved at all - is the host's. **It is also what draws the gesture**: unset (the default), no card carries the "Save as a step" control, no tray is drawn, and the gesture's four events are answered with the socket unchanged (ADR-0005's Note of 2026-09-08, item 1) |
     | `selected_id` | no | the block the editor is about, written by a host that has a selection surface of its own; honoured only on an update that carries it, and an id the open document does not hold clears the selection instead of naming it. Held as editor state, and cleared when the host opens a different document. Not a command: it moves the selection, it does not edit the document |
     | `icon` | no | function component resolving an icon *name* to markup |
-    | `expression_component` | no | override for `:expression` fields (sui-bob's seam); with it unset, an `:expression` renders statifier-ui's own expression editor when that package is on the host's load path, and the package's plain source input when it is not |
+    | `expression_component` | no | override for `:expression` fields (statifier-ui's seam); with it unset, an `:expression` renders statifier-ui's own expression editor when that package is on the host's load path, and the package's plain source input when it is not |
     | `debounce` | no | what `phx-debounce` the inspector's config controls carry - `nil` (the default) renders no attribute anywhere, which is byte for byte what this component rendered before the assign existed. The form posts `phx-change` on each change event and this component offers an `:update_config` for each one it decodes, so a host persisting on its own `on_change` writes once per keystroke unless it asks for something slower. `StatifierBlocks.Editor.ConfigForm`'s own attr, which a host composing that component reached directly, documents the accepted values and why every control means every control; this is the same attr, reachable from the mount |
     | `value_candidates` | no | the values offered per datamodel path, `%{path => [%{label:, value:} \| binary]}`; **merged over the datamodel's own `one_of` enumerations, per path**, so a path this map names uses this map's list and a path it does not name keeps what the datamodel declares. Read only by an expression editor that draws value pickers; `%{}` (the default) now means *nothing beyond what the datamodel declares* rather than nothing at all |
     | `field_candidates` | no | the values a host offers for one field, keyed `{type_name, field_key}`: `[{value, label}]` for a closed list, which a `:string` field draws as a `<select>`, or `{:open, [{value, label}]}` for an open one, drawn as a `<datalist>`. A `{:path, opts}` and an `:expression` field read it too and draw either spelling as a `<datalist>`, ahead of the declared datamodel paths, because the value stays typed by the control. `%{}` (the default) offers none, and a field it does not name renders exactly as it did. It draws a control and decides nothing: `validate_config/1` is still the only authority on a value, and a stored value a closed list does not offer is drawn rather than rewritten |
@@ -600,7 +600,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `run_session` | no | the live session the Run pane's send control puts events into: a `Statifier.Session.server()`, or `nil` (the default) for none. Held as editor state behind the same guard `run` uses, and cleared when the host opens a different document. The send writes to the session only: re-seating `run` afterwards is the host's, per *The Run pane's send control* above |
     | `theme` | no | `--sb-*` custom properties for the canvas root |
     | `fit` | no | the fit the editor **opens** in: `:manual` (the default), `:width` or `:active`; the first measurement performs it once, and an unknown value is refused into `:manual` |
-    | `fixtures` | no | `%{block_id => [TruthTable.t()]}`, read by both the drawer's truth-table tab and, as of `sb-4yze`, its Fixtures tab (`refresh_fixture_runs/1` drives each row through the compiled chart), and, as of `sb-e30x`, by the inspector's config form for the fixture hint beside an `:expression` control, and, as of `sb-0l36`, by the inspector's own Fixtures tab, which shows the selected block's runs out of the same result; `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
+    | `fixtures` | no | `%{block_id => [TruthTable.t()]}`, read by both the drawer's truth-table tab and, as of 2026-09-02, its Fixtures tab (`refresh_fixture_runs/1` drives each row through the compiled chart), and, as of 2026-09-04, by the inspector's config form for the fixture hint beside an `:expression` control, and, as of 2026-09-04, by the inspector's own Fixtures tab, which shows the selected block's runs out of the same result; `nil` (the default) means *no fixtures source*, and the drawer is still there with a count of 0 |
     | `drawer_tabs` | no | tabs the host contributes to the drawer, each `%{id:, title:, content:}` with an optional `count:`; drawn beside the package's own and rendered by calling `content` |
     | `drawer_height` | no | the drawer's height in rem, remembered **by the host** per viewer (2A); bounded on the way in |
     | `on_drawer_resize` | no | one-argument function called with each new drawer height, which is how the host comes to have one to remember |
@@ -650,7 +650,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     alias StatifierBlocks.Shell
 
     # The one type whose `event` field is offered generated completion-event
-    # names (sb-82mu), and the separator the candidate labels use - the same
+    # names, and the separator the candidate labels use - the same
     # one the summary chips use for `<label> <sep> <outcome>`, so a candidate
     # and the chip it will become read alike.
     @on_event_type "core.on_event"
@@ -662,7 +662,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @const_tag "const"
 
     # The one type whose `outcomes` field is offered the finals a host says
-    # the referenced chart emits (sb-r4w7).
+    # the referenced chart emits.
     @subchart_type "core.subchart"
     @candidate_separator " · "
 
@@ -944,7 +944,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         roots need no option: they are read off `document`.
       * `:chart_outcomes` - what the host says its stored documents finish
         with, `%{}` by default, which says nothing about any chart and so
-        reports no subchart disagreement (sb-r4w7).
+        reports no subchart disagreement.
     """
     @spec findings_count(Document.t(), Palette.t(), keyword()) :: non_neg_integer()
     def findings_count(%Document{} = document, %Palette{} = palette, opts \\ []) do
@@ -1188,7 +1188,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     # -------------------------------------------------------------- events
 
-    # A config-emitted source span (`sb-rd29`) carries its field's key on the
+    # A config-emitted source span carries its field's key on the
     # click: the author did not just ask "which block wrote this byte", they
     # asked "where in that block's form". So this clause does three things the
     # plain one below does not - it puts the inspector on the Config tab,
@@ -1416,7 +1416,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # Tabs since R4, and the pick is remembered as `nil` until it is made:
     # `Shell.drawer_view/1` resolves an unchosen tab to whichever one actually
     # holds something, and a pick that lands here stops it resolving. Fixture
-    # runs are consumed as of `sb-4yze` (`refresh_fixture_runs/1` below); the
+    # runs are consumed as of 2026-09-02 (`refresh_fixture_runs/1` below); the
     # datamodel view is the last reserved entry filled, and like the tabs
     # before it, it needs no second handler here - it is derived in `render/1`
     # from assigns this module already holds. Neither does a host's
@@ -1536,7 +1536,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # own subtree, which is every block). The guard stays because it says why
     # the answer is empty at the place that asks, and it short-circuits an
     # enumeration whose result is known; it is not a workaround for the `MatchError`
-    # `Assignability.valid_targets/4` used to raise here (sb-rzr).
+    # `Assignability.valid_targets/4` used to raise here.
     def handle_event("dragstart", %{"block-id" => id}, socket) do
       {:noreply, assign(socket, :drag, drag_session(socket, id))}
     end
@@ -1556,7 +1556,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:noreply, socket}
     end
 
-    # The insert half of the drag (sb-4nep). Same two round-trips, same one
+    # The insert half of the drag. Same two round-trips, same one
     # enumeration, same markup: what differs is that the thing being carried
     # is a TYPE the document does not hold yet rather than a block it does, so
     # the verdicts are asked of a probe block - `Targets.slot_verdicts/3`
@@ -1788,7 +1788,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     # The same funnel, taking the selection the command MOVES it to. A caller
     # that wrote the selection after the commit instead - Expand did, until
-    # sb-h0nt - paid two rebuilds per gesture: `landed/2`'s, then a second one
+    # 2026-09-07 - paid two rebuilds per gesture: `landed/2`'s, then a second one
     # whose only job was to report the moved selection out. `rebuild/1` is the
     # whole view model plus the fixture runs, the source listing and the run
     # provenance, so the second pass is real work for an answer that is
@@ -1913,7 +1913,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     # Through `Edit.Session` like every other gesture, not around it
-    # (sb-h0nt). The panel used to reach `Edit.History.commit/4` itself,
+    # (2026-09-07). The panel used to reach `Edit.History.commit/4` itself,
     # which made it a second funnel: the gate, the undo stack and the host
     # notification had two implementations, and a decision taken in
     # `Session` - drafts survive a command that is not a config change,
@@ -2094,7 +2094,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         # had - is cleared exactly when that was the composite which has just
         # gone (3S). Handed to `commit/3` rather than written after it, so the
         # gesture rebuilds once and the host is told the new selection once
-        # (sb-h0nt).
+        # (2026-09-07).
         socket
         |> drop_draft(id)
         |> commit(
@@ -2328,7 +2328,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # The block the two insert paths ask `Edit.Targets` about:
     # `Palette.new_block/2`'s block, with the palette entry's `default_config`
     # merged over the config `config_schema/1`'s own `default:` values folded
-    # (sb-1c7g).
+    # (2026-09-06).
     #
     # The schema's defaults are not enough on their own, and the gap is not a
     # corner case. A `{:path, _}` field defaulting to `""` names no path, so
@@ -2467,7 +2467,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     # The one fold this component starts with, rather than the empty set the
     # 2026-08-30 amendment's decision 2 section left it at: a NON-EMPTY drafts
-    # shelf opens folded (`sb-e2zy`, the campaign-024 wrap ruling).
+    # shelf opens folded (a wrap ruling of 2026-08-31).
     #
     # It changes the INITIAL value and nothing else. `collapse-toggle` above
     # is untouched, the set is still per-session editor state that is neither
@@ -2805,7 +2805,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # `drawer_view/1` above is given `assigns.document.datamodel` and not this
     # - because 2A's count is a statement about the document, and a strip that
     # counted a refused draft would report a document that does not exist.
-    # The declared datamodel paths an `:expression` control offers (sb-0vt).
+    # The declared datamodel paths an `:expression` control offers.
     # Read off the ALREADY-NORMALIZED assigns rather than the raw host input:
     # `declared_paths` and `host_roots` are computed once per update above,
     # and `Datamodel.candidates/3` normalizes idempotently, so passing them
@@ -2831,7 +2831,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Datamodel.value_candidates(assigns.datamodel, assigns.value_candidates)
     end
 
-    # The kind half of the same question (sb-23e0), and the reason it takes
+    # The kind half of the same question, and the reason it takes
     # no host override where `offered_values/1` above takes one: a value set
     # is something only a host knows, while a path's KIND is something the
     # document either declares or does not. There is nothing for a host to
@@ -2875,8 +2875,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Datamodel.value_candidates(assigns.datamodel)
     end
 
-    # The completion events a `core.on_event`'s `event` field offers
-    # (sb-82mu): every block in the enclosing body that declares outcomes,
+    # The completion events a `core.on_event`'s `event` field offers:
+    # every block in the enclosing body that declares outcomes,
     # crossed with those outcomes, written the way the compiler writes them.
     # It is derived here rather than in `StatifierBlocks.ViewModel` for the
     # reason `path_candidates/1` above is: it is a question about the
@@ -2910,7 +2910,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp event_candidates(_not_an_on_event), do: []
 
-    # The finals a `core.subchart`'s `outcomes` field offers (sb-r4w7): what
+    # The finals a `core.subchart`'s `outcomes` field offers: what
     # the host said the chart named in `chart` finishes with, and nothing
     # derived. A block type cannot read the document it references - see
     # `StatifierBlocks.Core.Subchart`'s moduledoc - so this is the one
@@ -3424,7 +3424,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    # Two surfaces read the runs as of `sb-0l36`, and either one asking is
+    # Two surfaces read the runs as of 2026-09-04, and either one asking is
     # enough: the drawer's Fixtures tab when the drawer is open on it, and the
     # inspector's Fixtures tab when it has a block to be about. With no
     # selection the inspector's tab has no subject and draws its empty state,
@@ -3652,7 +3652,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # The one composition of a view model in this component, called by
     # `rebuild/1` on every state change and by `findings_count/3` on the
     # host's behalf. It is one function rather than two identical pipelines
-    # because sb-ukgu is precisely the defect that two of them produce: the
+    # because a drifting count is precisely the defect that two of them produce: the
     # host's number and the drawer's number are the same number only while
     # the two pipelines agree, and nothing but sharing them keeps that true.
     #
@@ -3810,7 +3810,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       |> session(%{block_id: id, type: nil})
     end
 
-    # The insert session (sb-4nep). `block_id` is `nil` and stays a key: it is
+    # The insert session. `block_id` is `nil` and stays a key: it is
     # what `BlockNode` compares a card against to grey the card being dragged,
     # and a session missing the key would raise there rather than simply match
     # no card. Nothing is being dragged out of the document, so no card greys,
@@ -4015,7 +4015,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Shell.fit_zoom(box_width(box), box_width(socket.assigns.viewport), socket.assigns.zoom)
     end
 
-    # The `fit` attr's half of the two fits (sb-ehqn). Arming is refused once
+    # The `fit` attr's half of the two fits. Arming is refused once
     # anything has been measured, which is what makes the attr an opening
     # state rather than a control a host re-render keeps pressing; `:manual`
     # arms nothing, so a host that names the default changes nothing at all.

@@ -5,8 +5,8 @@ defmodule StatifierBlocks.SlotValidation do
   (`:undeclared_slot`), and a slot's child count must satisfy the arity
   its type declares for it (`:slot_arity_violated`).
 
-  One implementation, consulted by both the editor and the compiler
-  (`sb-iwz`), the same way `StatifierBlocks.Assignability` is - both are
+  One implementation, consulted by both the editor and the compiler,
+  the same way `StatifierBlocks.Assignability` is - both are
   passed the same palette and the same document, and neither owns a
   private copy of either rule.
 

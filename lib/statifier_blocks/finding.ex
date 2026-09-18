@@ -147,14 +147,14 @@ defmodule StatifierBlocks.Finding do
 
   `{:slot, id, name}` is never produced: `Compiler.Finding` carries no slot
   name, so there is nothing to build one from. This is a known gap:
-  `sb-da9`'s slot-shaped structural findings (`:undeclared_slot`, slot
+  the slot-shaped structural findings (`:undeclared_slot`, slot
   arity) will need either a slot-bearing compiler finding or this seam
   widened (the `:source` override below is the closest existing hook) -
   that is future work, not built here.
 
   ## Source (by rule, never by `code`)
 
-  New codes arrive continuously (`sb-da9` adds `:undeclared_slot` and
+  New codes arrive continuously (`SlotValidation` adds `:undeclared_slot` and
   slot-arity codes; other emitters land in this campaign), so the mapping
   must never switch on `code` - an unknown code has to map correctly by
   construction. In order:
@@ -214,7 +214,7 @@ defmodule StatifierBlocks.Finding do
   ## The `:source` override
 
   `opts[:source]` lets a caller that knows better than the default rule
-  say so explicitly - the seam `sb-da9`'s slot-shaped findings may
+  say so explicitly - the seam the slot-shaped findings may
   eventually need. It is used exactly as given: it is already typed
   `source()` at the call site, so there is nothing left to validate.
   """

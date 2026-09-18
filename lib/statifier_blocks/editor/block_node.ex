@@ -233,10 +233,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     So `.sb-badge` renders on a **collapsed** container whose subtree rollup is
     greater than zero, and nowhere else: never on an expanded face, and never
-    at a count of zero. What shipped before `sb-vamn` was a badge on every
+    at a count of zero. What shipped before 2026-08-30 was a badge on every
     container whenever its rollup was non-zero, which is not what the record
     says and read as an error on every container face as the counts multiplied
-    up the tree; `sb-vamn` removed it and left the class as the seam this
+    up the tree; that badge was removed and the class left as the seam this
     renders into.
 
     The rollup itself is unchanged and is still on every node as
@@ -379,7 +379,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       recursion carries it because nothing else can: `Shell.depth/1` is a
       subtree MAXIMUM for the toolbar, and a node has no way of asking where
       it is from inside its own render. `Slot` stamps it and the stylesheet
-      bands on it (sb-d7g).
+      bands on it.
       """
     )
 
@@ -806,8 +806,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     #
     # Before campaign 016 only `:columns` was arranged, so a branch stacked
     # its arms full-width - every fan edge then ran straight down through the
-    # arm above the one it was going to, which is the picture `sb-ay0`
-    # recorded.
+    # arm above the one it was going to, which is the picture
+    # recorded on 2026-08-29.
     #
     # One class, and `data-arrangement` on the card above carries which of the
     # two arranged answers it was. A `--fan` and a `--lanes` modifier here

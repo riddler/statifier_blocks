@@ -108,7 +108,7 @@ defmodule StatifierBlocks.Composite do
   pins, by overriding each callback in a composite and asking which answer
   comes back; a change to either `defoverridable` line turns it red, and this
   paragraph and `StatifierBlocks.Composite.Data`'s cannot drift from it
-  silently (`sb-rhb8`).
+  silently.
 
   ### The derived `summary/1`
 
@@ -145,7 +145,7 @@ defmodule StatifierBlocks.Composite do
 
   `emit/2` exists because the behaviour requires it and ADR-0007 deliberately
   injects no default for it. It **raises**, because the compiler expands a
-  composite at Resolve and no composite block survives to Emit (`sb-nzc1`).
+  composite at Resolve and no composite block survives to Emit.
 
   ## What a composite reads and writes
 
@@ -220,7 +220,7 @@ defmodule StatifierBlocks.Composite do
   `RQ-SF038-14`): the declaration has an order and an author reading a
   finding needs one field to open, not none.
 
-  `ADR-0004`'s amendment (`sb-nzc1`) re-anchors a finding raised inside an
+  `ADR-0004`'s amendment re-anchors a finding raised inside an
   expansion against the composite block, carrying the key this map names -
   and `config_key: nil` when it names none, which is the honest answer when
   no param fed the block.
@@ -362,7 +362,7 @@ defmodule StatifierBlocks.Composite do
         raise RuntimeError,
               "#{inspect(__MODULE__)}.emit/2 was reached for block #{inspect(id)} of type " <>
                 "#{inspect(type)}. A composite is replaced by its expansion at Resolve " <>
-                "(ADR-0004, sb-nzc1), so no composite block survives to Emit; reaching this " <>
+                "(ADR-0004), so no composite block survives to Emit; reaching this " <>
                 "means the expansion did not run."
       end
 
