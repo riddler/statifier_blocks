@@ -1410,6 +1410,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Enum.at(match, 1)
     end
 
+    # Every SELECTOR that declares the chrome's grid template, not every rule:
+    # a redeclaration written as a selector list is a redeclaration by each of
+    # its selectors, and this stylesheet already writes lists broken across
+    # lines, so a scan anchored to one line would miss the shape the file
+    # itself uses. Comments come out first - the comments here run to
+    # paragraphs and quote declarations, and a brace inside one would end a
+    # rule the parse never entered.
+    defp chrome_template_declarers(css) do
+      ~r/([^{}]+)\{([^{}]*)\}/
+      |> Regex.scan(String.replace(css, ~r|/\*.*?\*/|s, ""))
+      |> Enum.filter(fn [_, _selectors, body] -> body =~ "grid-template-columns:" end)
+      |> Enum.flat_map(fn [_, selectors, _body] -> String.split(selectors, ",") end)
+      |> Enum.map(&String.trim/1)
+      |> Enum.filter(&String.contains?(&1, ".sb-node__chrome"))
+    end
+
     defp declaration!(body, property) do
       match = Regex.run(~r/^\s*#{Regex.escape(property)}:\s*(.*?);/m, body)
       assert match, "the rule declares no `#{property}`"
@@ -1682,9 +1698,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # The rest of the strip is untouched by the swap, which is what makes it
       # a swap rather than a rearrangement: the same members in the same order
       # either side of a selection, with one box standing in for the other.
-      # Sabotage: rendered the placeholder outside the strip - the member set
-      # is still equal but the box left the column that reserves it, and the
-      # assertion above goes red first.
+      # Sabotage (run): added `and @node.block_id != @selected_id` to the
+      # delete control's `:if` - selecting a card takes the `x` away as it
+      # brings Save in, so the swap becomes a rearrangement, and this goes red
+      # on the second `.sb-node__remove` assertion. The test above stays green
+      # throughout: it asks only about Save's own two boxes.
       test "every other strip member is present in both states", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn)
 
@@ -1787,12 +1805,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # grid-template-columns: ... }` - a second declaration appears and this
       # goes red naming the selector.
       test "the chrome's grid template is declared once and no state redeclares it" do
-        css = File.read!(@stylesheet)
-
-        declaring =
-          ~r/^([^\n{}]*\.sb-node__chrome[^\n{}]*)\{[^{}]*grid-template-columns:/ms
-          |> Regex.scan(css)
-          |> Enum.map(fn [_, selector] -> String.trim(selector) end)
+        declaring = @stylesheet |> File.read!() |> chrome_template_declarers()
 
         assert declaring == [".sb-node__chrome"], """
         The chrome's grid template is declared by more than the base rule, so
@@ -1800,6 +1813,37 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         Declaring selectors: #{inspect(declaring)}
         """
+      end
+
+      # The scan above is only worth its assertion if it can SEE a
+      # redeclaration, and the shape it used to miss is the one this
+      # stylesheet's own `.sb-node__offer-keep, .sb-node__offer-confirm` rule
+      # is written in: a selector list broken across lines. The old scan
+      # matched a single-line selector only, so a second declaration written
+      # the way the file already writes selector lists would have gone
+      # uncounted and the test would have passed on a stylesheet that had
+      # exactly the defect it is there to catch.
+      #
+      # A fixture rather than the real file, because the real file has no such
+      # redeclaration - which is the point of the test above and the reason it
+      # cannot prove the scan works.
+      test "the scan counts a redeclaration written as a multi-line selector list" do
+        fixture = """
+        .sb-node__chrome {
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr) auto auto;
+        }
+
+        .sb-palette,
+        .sb-node--selected > .sb-node__chrome {
+          grid-template-columns: auto 1fr;
+        }
+        """
+
+        assert chrome_template_declarers(fixture) == [
+                 ".sb-node__chrome",
+                 ".sb-node--selected > .sb-node__chrome"
+               ]
       end
 
       # And hovering still changes nothing but paint, which is the half of the

@@ -263,9 +263,12 @@ defmodule StatifierBlocks.ViewModel.OutcomeMetadataTest do
                slot(vm, "interrupts").children
     end
 
-    # Sabotage: same mutation as the first test - a slot whose container
-    # declares no outcome key reads no name either, so the name never leaks
-    # into a body card.
+    # Sabotage (run): dropped the `when is_binary(key)` guard from
+    # `finishing_outcome_name/2`'s first clause - a `nil` key stops falling
+    # through to the total clause, the `finish_as` name is read for a slot
+    # whose container declared no outcome key, and this goes red with
+    # `outcome: "went_back"` where no outcome belongs. The three tests above
+    # all pass a declared key and stay green.
     test "a handler in a slot with no declared key still carries no outcome" do
       vm = build(document_with("toy.rail", named_rule("blk_RULE", "abandon", "went_back")))
 
