@@ -11611,3 +11611,199 @@ malformed name falling back, and a named handler in an undeclared slot
 carrying none.
 
 Filed with `sb-hjcd`, campaign RF055.
+
+## Note (2026-09-18): the delete offer is a deliberate exception to the reserved control strip, and its width is not held at rest
+
+Campaign RF055, bead `sb-tw8m`.
+
+A dated Note rather than an amendment: it carries no `Status:` line, it never
+flips, no text above this line is edited by it and no line above it is removed.
+It records a status quo - what the canvas draws today, and why that is intended
+rather than a defect - and it takes nothing away. The Note of 2026-09-08, item
+4 ("The control strip is reserved beside the title", `:10543`) governs every
+resting member of the strip exactly as it did before this section, with the one
+member named below excepted for the reasons given.
+
+**Why this is a Note and not an Amendment.** The test is
+`docs/adr/README.md:42-44`, which says that an amendment "changes what the
+record decides and a note does not", a note being one that records "where
+something already decided renders, or what a sentence already accepted" was
+about. Item 4 decided the reservation for
+controls whose presence is constant and whose *reveal* varies - the four
+`data-reveal="hover-or-selected"` members it enumerates - and the Save control's
+reservation (`sb-ct1l`) extended it to a member whose presence varies with the
+SELECTION, on item 4's own words. Item 4 took no position on a member that
+exists only while an interaction the author started is unanswered, because no
+such member existed when it was written. This section names where that case
+lands and why; it withdraws no reservation, admits no new class of exception,
+and changes no answer item 4 gives. It is the second kind of note the README
+names: what a sentence already accepted was about.
+
+Every code cite below was **read at `20db999`** and is written anchor first,
+line second; a later reader re-locates by the anchor and not by the number.
+
+### 1. The sentence being qualified, and the member that excepts itself from it
+
+Item 4's ruling sentence reads, character for character (`:10553-10555`,
+following its `**The ruling.**` lead-in):
+
+> The control strip is **reserved** beside the title at all times: the space
+> the controls occupy is held whether or not they are revealed, the title wraps
+> beside it, and nothing truncates.
+
+The delete OFFER is the pair of word controls the canvas draws in the delete
+control's place when a palette recipe claims the block the author asked to
+delete as half of an arrangement (the 2026-09-07 amendment, clause `3D`; the
+offer is held as `pending_remove`, `lib/statifier_blocks/editor.ex:1603`, the
+`def handle_event("remove", ...)` head, and `:1611`, the
+`assign(socket, :pending_remove, %{block_id: id, ids: ids})` arm). It is a
+`<span class="sb-node__offer" data-reveal="always">`
+(`lib/statifier_blocks/editor/block_node.ex:517`) holding two buttons -
+`.sb-node__offer-keep`, whose word is `keep` (`:524`), and
+`.sb-node__offer-confirm`, whose visible label is
+`x{offer_count(@pending_remove)}` (`:534`, the label at `:541`). It REPLACES
+the one-character delete control rather than joining it: `.sb-node__remove` is
+conditioned on `not offered?(@node, @pending_remove)` (`:505`), so the `x` is
+withheld for exactly as long as the pair is drawn.
+
+The pair is wider than the control it replaces, and that extra width is not
+held while no offer is open. Opening an offer therefore re-sizes the strip,
+whose column is sized by its own children
+(`assets/css/statifier_blocks.css:1101`, `.sb-node__chrome > .sb-node__strip`),
+and the title's `minmax(0, 1fr)` column gives up the difference (`:1084`,
+`.sb-node__chrome`, `grid-template-columns: auto minmax(0, 1fr) auto auto`).
+That is the same class of reflow the Save control's reservation closed for the
+selection: a rendered stand-in of the control's own box, `.sb-node__strip-reserve`
+(`assets/css/statifier_blocks.css:1502`), drawn on every card that could ever
+carry Save (`lib/statifier_blocks/editor/block_node.ex:472`, the
+`class="sb-node__strip-reserve"` span). The offer is deliberately left without
+one.
+
+### 2. Why the exception is taken
+
+**It replaces a strip member rather than adding one, and it is conspicuous by
+ruling.** The pair stands where the `x` stood and inherits the reservation the
+`x` already had; what is unreserved is only the difference between two word
+controls and one character. And the pair carries `data-reveal="always"`
+(`lib/statifier_blocks/editor/block_node.ex:520`), which is a ruling rather
+than an oversight - the stylesheet's own comment says why an offer nobody can
+see is not an offer (`assets/css/statifier_blocks.css:1331-1345`, the comment
+opening "The delete OFFER"). A control that is always revealed cannot be caught
+by the failure item 4 names, which is a control appearing on top of a title that
+had taken its space.
+
+**It is a transient, user-initiated state, not a resting one.** The offer is on
+the canvas only between the author's delete click and their next click, and
+either button takes it away. Its reflow is therefore seen once, at the moment
+the author asked for it, on the one card they pointed at
+(`lib/statifier_blocks/editor/block_node.ex:649`, `defp offered?/2`'s matching
+clause, which is true only for the card whose id the offer names). The Save
+reflow that item 4's reservation was extended to cover was a different thing:
+it was seen on every selection, on a card the author had not asked to re-draw,
+as a side effect of selecting it.
+
+**Reserving its width at rest costs the title more than the reflow it would
+save.** The measurement and its method are item 3.
+
+### 3. The measurement, and the method it was taken by
+
+The numbers below are **arithmetic from this repository's own stylesheet
+tokens, not a browser reading**. Each token is given with its anchor, read at
+`20db999` in `assets/css/statifier_blocks.css`, and evaluated at a 16px root:
+`--sb-card-width: 14rem` (`:394`) = 224px; `--sb-space: 0.5rem` (`:353`) = 8px;
+`--sb-space-half` (`:354`) = 4px; `--sb-space-2` (`:355`) = 16px; `--sb-space-3`
+(`:356`) = 24px; `--sb-border-width: 1px` (`:285`); `--sb-text-xs: 0.6875rem`
+(`:369`) = 11px. All of these sit in the `.sb-editor` token block (`:254`).
+Every box below is `border-box` (`:182`, the declaration in the `.sb-editor *`
+reset opening at `:178`).
+
+The card measured is a leaf at rest - not selected, not hovered, no badge - on a
+mount that registered `on_collapse`, which is the mount that draws the Save box
+at all (`lib/statifier_blocks/editor/block_node.ex:455`, the
+`<div class="sb-node__strip">` head, and the two `@collapsible` conditions at
+`:457` and `:471`).
+
+- The card is `--sb-card-width` wide (`assets/css/statifier_blocks.css:836`,
+  `.sb-node[data-container="false"]`), with the base node box's 1px border and
+  `--sb-space` padding (`:800`, `.sb-node`). Content row = 224 - 2x1 - 2x8 =
+  **206px**.
+- The chrome is a four-column grid with `column-gap: var(--sb-space)` (`:1084`),
+  so 3 gaps = 24px. The icon column is `--sb-space-3` wide (`:1171`, the
+  `.sb-node__icon` rule, `width: var(--sb-space-3)`) = 24px. The badge column
+  (`:1166`, `.sb-node__chrome > .sb-badge`, `grid-column: 3`) has no child on
+  this card and is 0. Title and strip therefore share 206 - 24 - 24 = **158px**.
+- The strip's members lay out with `gap: var(--sb-space-half)` (`:1101`) = 4px.
+  The Save box is `padding: 0 var(--sb-space)` plus a 1px border either side
+  (`:1502`, `.sb-node__strip-reserve`; the control it stands in for, `:1439`,
+  declares the same), so it is 18px + w("save"). The delete control is
+  `width: var(--sb-space-2)` (`:1301`) = 16px.
+- **Title column at rest today = 158 - (18 + w("save")) - 4 - 16 = 120px -
+  w("save"), about 98px.**
+
+With an offer open on that same card, the `x` is withheld and the pair is drawn.
+Each of the pair's two boxes is `padding: 0 var(--sb-space)` plus a 1px border
+either side (`:1353`), and they sit in an `inline-flex` with
+`gap: var(--sb-space)` (`:1346`), so the pair is 2x18 + 8 = 44px + w("keep") +
+w("x2"). **Title column while an offer is open = 158 - (18 + w("save")) - 4 -
+(44 + w("keep") + w("x2")) = 92px - w("save") - w("keep") - w("x2"), about
+36px.** That collapse is what this Note records as accepted, and it is the
+transient state item 2 describes.
+
+Reserving the pair at rest means drawing a stand-in for it on every card, the
+way Save's is drawn. The strip would then hold the Save box, the `x`, and the
+pair's stand-in, with one more 4px strip gap to seat it: **title column with the
+reservation = 158 - (18 + w("save")) - 4 - 16 - 4 - (44 + w("keep") + w("x2")) =
+72px - w("save") - w("keep") - w("x2"), about 16px.**
+
+So the reservation would cost the resting title 48px that do not depend on any
+font - the pair's own 44px of padding and borders plus the 4px gap that seats
+one more strip member - plus the advance of the words `keep` and `x2`, on every
+card, whether or not any offer is ever opened. What it would buy is that the
+title does not re-wrap between the two states, a change of about 62px seen once
+per delete gesture on one card.
+
+**The only estimated term is the glyph advance** of the three short words
+`save`, `keep` and `x2` at `--sb-text-xs` = 11px in the host's inherited font
+(`--sb-font: inherit`, `:367`: this package sets no family, so the advance
+depends on the host page). Taken at roughly 22px, 23px and 11px for a system
+sans, which is where the "about" figures above come from. Nothing in the ruling
+rests on them: the font-independent statement is that the reservation removes
+48px from a title column that is at most 120px, leaving a title that wraps at
+about one character a line at rest on every card.
+
+**The reservation was built in full and measured under this bead, and it is not
+shipped.** A reservation of one of the two boxes rather than both does not close
+the gap either: the open state would then hold two boxes where the rest state
+held one, and the reflow returns at half the width. The alternatives the
+measurement leaves open - drawing the offer outside the strip's flow, or
+widening the card - are layout decisions above this section, and it takes
+neither.
+
+### 4. The confirm label carries a count, so a wide enough claim draws a wider label
+
+The confirm button's visible label is the literal `x` followed by the number of
+blocks the claim names (`lib/statifier_blocks/editor/block_node.ex:541`, the
+`x{offer_count(@pending_remove)}` interpolation; `offer_count/1` is
+`length(ids)` at `:654`). A claim of ten or more blocks therefore draws a label
+one character wider than any this vocabulary can produce today, and the
+unreserved difference item 1 describes is that much larger again. It is
+unreachable with the core vocabulary: `core_recipes/0` holds exactly one entry,
+`%{"deadline" => Core.DeadlineRecipe}`
+(`lib/statifier_blocks/palette.ex:256`, `def core_recipes`, the map at `:257`), and that recipe's
+`members/2` (`lib/statifier_blocks/core/deadline_recipe.ex:137`) answers through
+`pair/3` (`:166` and `:176`), whose two matching clauses each return a
+two-element list and whose fallback (`:187`) returns none. Reachable the day a
+host registers a wider recipe, and recorded here so that day is not a surprise.
+
+### What this Note does not do
+
+It withdraws nothing from item 4: the reservation stands for every resting
+member of the strip, the Save box's stand-in stands, and no control gains or
+loses a reveal contract. It edits no line above it, removes no line above it,
+adds no assign, clause, control or class, moves no status line - including this
+file's head `Status:` line - changes no code and adds no changelog fragment. It
+takes no layout decision on the card's width, on where the offer is drawn, or on
+what a host recipe of ten members should look like, and it takes no position on
+whether any section above it is ready to flip, which remains the operator's.
+
+Filed with `sb-tw8m`, campaign RF055.
