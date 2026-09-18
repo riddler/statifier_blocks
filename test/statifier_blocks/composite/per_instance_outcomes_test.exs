@@ -346,6 +346,55 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
     def declared_outcomes(config), do: Screens.outcome_names(config["screen"])
   end
 
+  defmodule ImproperScreen do
+    @moduledoc """
+    A callback answering an IMPROPER list. It passes `is_list/1` and is not a
+    list of names, which is the shape a total check has to be written for
+    rather than reasoned about.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "signup.screen_improper",
+      params: [
+        %{key: "screen", type: :string, label: "Screen", required?: true, default: "account"}
+      ],
+      palette_entry: %{label: "Screen (improper)"},
+      version: 1
+
+    alias StatifierBlocks.Composite.PerInstanceOutcomesTest.ScreenSubtree
+
+    @impl StatifierBlocks.Composite
+    def subtree(params), do: ScreenSubtree.build(params)
+
+    @impl StatifierBlocks.Composite
+    def declared_outcomes(_config), do: ["account_submitted" | "timed_out"]
+  end
+
+  defmodule RaisingScreen do
+    @moduledoc """
+    A callback that raises rather than answering - the element document the
+    host meant to read is not there, and the package author reached for an
+    exception. `subtree/1` doing the same is rescued into a finding, and
+    decision 1 gives this route no other option either.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "signup.screen_raising",
+      params: [
+        %{key: "screen", type: :string, label: "Screen", required?: true, default: "account"}
+      ],
+      palette_entry: %{label: "Screen (raising)"},
+      version: 1
+
+    alias StatifierBlocks.Composite.PerInstanceOutcomesTest.ScreenSubtree
+
+    @impl StatifierBlocks.Composite
+    def subtree(params), do: ScreenSubtree.build(params)
+
+    @impl StatifierBlocks.Composite
+    def declared_outcomes(_config), do: raise(RuntimeError, "no element document is loaded")
+  end
+
   # -- the palette and the two documents ----------------------------------
 
   defp palette do
@@ -357,7 +406,9 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
         "signup.screen_quiet" => QuietScreen,
         "signup.screen_rubbish" => RubbishScreen,
         "signup.screen_doubled" => DoubledScreen,
-        "signup.screen_colliding" => CollidingScreen
+        "signup.screen_colliding" => CollidingScreen,
+        "signup.screen_improper" => ImproperScreen,
+        "signup.screen_raising" => RaisingScreen
       })
     )
   end
@@ -885,6 +936,93 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
       assert RubbishScreen.slots(%{"screen" => "confirm"}) == []
 
       assert DoubledScreen.outcomes(%{"screen" => "account"}) == [{"done", "Done"}]
+    end
+
+    # An IMPROPER list passes `is_list/1` and is not a list of names, so the
+    # shape check has to be written as a walk rather than as a guard plus
+    # `Enum.all?/2` - which raises a `FunctionClauseError` on the tail. It is
+    # a `C9d` third-arm answer like any other rubbish, not a second kind of
+    # thing.
+    #
+    # Sabotage: put the guard-plus-`Enum.all?/2` shape check back
+    # (`not (is_list(names) and Enum.all?(names, &(is_binary(&1) and &1 != "")))`)
+    # - red (verified), and red by RAISING `FunctionClauseError` out of
+    # `Compiler.compile/2`, which is the defect this test was written for.
+    test "an improper list is a finding, and the compile does not raise" do
+      assert {:error, [%Finding{} = finding]} =
+               Compiler.compile(
+                 one_block_document("signup.screen_improper", "account"),
+                 palette()
+               )
+
+      assert finding.stage == :resolve
+      assert finding.code == :outcome_declaration_invalid
+      assert finding.fault == :package
+      assert finding.block_id == "blk_SCREEN"
+      assert finding.message =~ "must answer a list of non-empty outcome name strings"
+    end
+
+    # A callback that raises is the sibling of a `subtree/1` that raises, and
+    # the compiler rescues that one into a `:composite_expansion_failed`
+    # finding (`compiler.ex`, `expand/2`). Decision 1 forbids this pipeline to
+    # raise and `C9d` takes no exception to it, so this route rescues too and
+    # says what the exception said.
+    #
+    # Sabotage: dropped the `rescue` from `instance_answer/2` - red
+    # (verified), raising `RuntimeError` out of `Compiler.compile/2`.
+    test "a callback that raises is a finding, and the compile does not raise" do
+      assert {:error, [%Finding{} = finding]} =
+               Compiler.compile(one_block_document("signup.screen_raising", "account"), palette())
+
+      assert finding.stage == :resolve
+      assert finding.code == :outcome_declaration_invalid
+      assert finding.fault == :package
+      assert finding.block_id == "blk_SCREEN"
+      assert finding.message =~ "raised"
+      assert finding.message =~ "no element document is loaded"
+    end
+
+    # The other path, for both of them. The editor's slot list and the view
+    # model's outcome chips have no stage to report a finding to, and the
+    # comment on the read says they must be total; these are what hold it to
+    # that. `Composite.outcomes/2` is the palette-carrying route a view model
+    # actually uses.
+    #
+    # Sabotage: the same two - the guard-plus-`Enum.all?/2` check, and the
+    # dropped `rescue` - red on this test each time (verified), once per
+    # fixture.
+    test "neither rubbish answer raises off the compiler path" do
+      for module <- [ImproperScreen, RaisingScreen] do
+        config = %{"screen" => "account"}
+
+        assert Composite.declared_outcome_names(module, config) == []
+        assert module.slots(config) == []
+        assert module.outcomes(config) == [{"done", "Done"}]
+      end
+
+      assert Composite.outcomes(
+               palette(),
+               screen_block("signup.screen_improper", "blk_SCREEN", "account")
+             ) == [{"done", "Done"}]
+
+      assert Composite.outcomes(
+               palette(),
+               screen_block("signup.screen_raising", "blk_SCREEN", "account")
+             ) == [{"done", "Done"}]
+    end
+
+    # And the refusal is reported once per block, not once per reader: the
+    # read runs several times over one compile and the finding is drawn where
+    # `C2` item 3's is.
+    #
+    # Sabotage: seeded the findings into the member reduction beside the
+    # raisability check rather than in place of it - red (verified), the block
+    # draws the refusal twice.
+    test "a refused declaration draws exactly one finding for its block" do
+      assert {:error, findings} =
+               Compiler.compile(one_block_document("signup.screen_raising", "plan"), palette())
+
+      assert length(findings) == 1
     end
   end
 end

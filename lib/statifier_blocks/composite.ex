@@ -786,22 +786,26 @@ defmodule StatifierBlocks.Composite do
   # spelling at all is named open there and is not decided here.
   def per_instance_declarer?(_data_ref), do: false
 
-  @doc """
-  The `C9d` refusals of `ref`'s per-instance outcome declaration for `config`,
-  as a list of messages, or `[]`.
-
-  `[]` for every composite that is not a per-instance declarer: a type that
-  writes the static `:outcomes` option keeps both refusals at its own compile
-  time, with their existing text, and this function is not what reports them.
-
-  A type whose list is a function of config cannot have that list checked as
-  its module compiles, so the two `ArgumentError`s that stand over a static
-  declaration are re-sited here, unchanged in substance, plus the one a static
-  list cannot produce - a callback answering something that is not a list of
-  names at all. The compiler reports each as one `:resolve`-stage
-  `StatifierBlocks.Compiler.Finding` against that block; decision 1 forbids
-  this pipeline to raise.
-  """
+  # The `C9d` refusals of `ref`'s per-instance outcome declaration for
+  # `config`, as a list of messages, or `[]`.
+  #
+  # `[]` for every composite that is not a per-instance declarer: a type that
+  # writes the static `:outcomes` option keeps both refusals at its own compile
+  # time, with their existing text, and this function is not what reports them.
+  #
+  # A type whose list is a function of config cannot have that list checked as
+  # its module compiles, so the two `ArgumentError`s that stand over a static
+  # declaration are re-sited here, unchanged in substance, plus the two a
+  # static list cannot produce - a callback answering something that is not a
+  # list of names, and a callback that raises. The compiler reports each as one
+  # `:resolve`-stage `StatifierBlocks.Compiler.Finding` against that block;
+  # decision 1 forbids this pipeline to raise.
+  #
+  # `@doc false`, like its two siblings above: `C9` decides a rule and the
+  # threading it forces, and adding a documented public function the section
+  # does not name would be new surface. This is the compiler's seam onto that
+  # rule, not a surface a host calls.
+  @doc false
   @spec declared_outcome_problems(Palette.type_ref(), Block.config()) :: [String.t()]
   def declared_outcome_problems(ref, config) do
     case per_instance_outcomes(ref, config) do
@@ -1137,17 +1141,39 @@ defmodule StatifierBlocks.Composite do
           :static | {:ok, [String.t()]} | {:error, [String.t()]}
   defp per_instance_outcomes(ref, config) do
     if per_instance_declarer?(ref) do
-      ref |> Palette.call(:declared_outcomes, [config], []) |> check_instance_outcomes(ref)
+      ref |> instance_answer(config) |> check_instance_outcomes(ref)
     else
       :static
     end
   end
 
-  @spec check_instance_outcomes(term(), Palette.type_ref()) ::
+  # A callback is package-author code and may do anything, including raise.
+  # The sibling `subtree/1` may too, and the compiler rescues that one into a
+  # `:composite_expansion_failed` finding (`compiler.ex`, `expand/2`); decision
+  # 1 forbids this pipeline to raise and `C9d` takes no exception to it, so
+  # this route rescues in the same shape and for the same reason. `rescue`
+  # alone, not `catch`, which is the width the sibling takes.
+  @spec instance_answer(Palette.type_ref(), Block.config()) ::
+          {:answered, term()} | {:raised, String.t()}
+  defp instance_answer(ref, config) do
+    {:answered, Palette.call(ref, :declared_outcomes, [config], [])}
+  rescue
+    error -> {:raised, Exception.message(error)}
+  end
+
+  @spec check_instance_outcomes({:answered, term()} | {:raised, String.t()}, Palette.type_ref()) ::
           {:ok, [String.t()]} | {:error, [String.t()]}
-  defp check_instance_outcomes(names, ref) do
+  defp check_instance_outcomes({:raised, why}, _ref) do
+    {:error,
+     [
+       "declared_outcomes/1 raised for this block's config, and the compiler does not " <>
+         "raise: #{why}"
+     ]}
+  end
+
+  defp check_instance_outcomes({:answered, names}, ref) do
     cond do
-      not (is_list(names) and Enum.all?(names, &(is_binary(&1) and &1 != ""))) ->
+      not name_list?(names) ->
         {:error,
          [
            "declared_outcomes/1 must answer a list of non-empty outcome name strings for " <>
@@ -1166,6 +1192,17 @@ defmodule StatifierBlocks.Composite do
         collision_problems(ref, names)
     end
   end
+
+  # Written as a walk rather than as `is_list/1` plus `Enum.all?/2`, because an
+  # IMPROPER list passes the guard and then raises a `FunctionClauseError` off
+  # the tail - and the two functions this answer reaches, the editor's
+  # `slots/1` and the view model's `outcomes/1`, have no stage to report a
+  # finding to and must not raise. Total over every term: a non-list falls to
+  # the last clause, and so does an improper tail.
+  @spec name_list?(term()) :: boolean()
+  defp name_list?([]), do: true
+  defp name_list?([name | rest]) when is_binary(name) and name != "", do: name_list?(rest)
+  defp name_list?(_not_a_list_of_names), do: false
 
   @spec collision_problems(Palette.type_ref(), [String.t()]) ::
           {:ok, [String.t()]} | {:error, [String.t()]}
