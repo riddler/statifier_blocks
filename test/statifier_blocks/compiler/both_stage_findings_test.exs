@@ -110,7 +110,7 @@ defmodule StatifierBlocks.Compiler.BothStageFindingsTest do
 
   defp codes(findings), do: Enum.map(findings, &{&1.stage, &1.block_id, &1.code})
 
-  # Sabotage: put `structure_stage/4` back behind `config_stage/2` in
+  # Sabotage: put `structure_stage/6` back behind `config_stage/2` in
   # `compile/3`'s `with` - red, because the refusal then carries the
   # `:config` finding alone and the author never sees the read.
   test "a config finding on one card and an unsatisfied read on another come back together" do

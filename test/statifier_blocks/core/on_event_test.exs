@@ -1295,22 +1295,33 @@ defmodule StatifierBlocks.Core.OnEventTest do
     # comparison against a config that carries no such key at all rather
     # than as prose about it.
     #
-    # Sabotage: had `finish_id/2` route a blank name through
-    # `Context.outcome_id(context, "done")` - the ids happen to match, but
-    # making the blank arm answer `outcome_id(context, "finished")` instead
-    # took all three comparisons red (verified).
+    # Sabotage: had `finish_id/2`'s nil arm answer
+    # `Context.outcome_id(context, "finished")` - red, four tests in this
+    # file, this one among them (verified 2026-09-18). The measurement is
+    # why the assertions below are shaped as they are: the mutation moves
+    # `without`, `absent` and `blank` the SAME way, so `absent == without`
+    # and `blank == without` both still held under it and only the literal
+    # final went red. The three-way equality alone pins nothing; each side
+    # is pinned against the fixed expectation first, and the equality is
+    # then the byte-identity claim `C8` item 5 makes rather than a
+    # restatement of itself.
     test "an unnamed handler compiles byte-identically to a handler without the key" do
       without = compile!(block(%{"event" => "order.cancelled", "outcome" => "abandon"}))
       absent = compile!(block(named(nil)))
       blank = compile!(block(named("")))
 
+      # The bytes 0.30.0 emitted: the final is the `done` one, with no
+      # outcome name in it. Asserted of each of the three, so a regression
+      # in the nil arm reddens whichever side it moves.
+      for {label, scxml} <- [without: without, absent: absent, blank: blank] do
+        assert scxml =~ ~s(<final id="s_blk_OE__o_done">),
+               "#{label} no longer emits the `done` final"
+
+        refute scxml =~ "finish_as", "#{label} leaked the key into the bytes"
+      end
+
       assert absent == without
       assert blank == without
-
-      # And those bytes are the ones 0.30.0 emitted: the final is the `done`
-      # one, with no outcome name in it.
-      assert without =~ ~s(<final id="s_blk_OE__o_done">)
-      refute without =~ "finish_as"
     end
 
     # `C8` item 5: an additive key is not a document schema change, and this

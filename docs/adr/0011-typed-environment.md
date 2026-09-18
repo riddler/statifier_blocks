@@ -3201,3 +3201,42 @@ rewritten, as this file leaves every sentence its later notes correct.
 Filed with `sb-dxck`, campaign SF039, from `sb-3ers`, `sb-8031` and
 `sb-d8k4`'s `ADR-0011` half. This Note changes no code, adds no README
 row, and flips no status line in this file.
+
+## Note (2026-09-18): `structure_stage` is `/6`, extending section 3's one-arity-spelling reading to this file's own cite
+
+A dated Note by addition; it edits nothing above this line.
+
+### 1. The cite, and what it prints now
+
+The Note of 2026-09-08, section 2, writes at `:3077` that
+`structure_stage/4` (`compiler.ex:1113`) "takes `(document, palette, opts,
+skip)` and hands `structure_finding/3` the declarations and the read keys".
+
+Read at `4ddc99c`, the function is **`structure_stage/6`** -
+`defp structure_stage(document, palette, opts, skip, writers, declaring)` at
+`lib/statifier_blocks/compiler.ex:1500`. The two arguments it gained at
+`7493dfc` (2026-09-13) are `writers` and `declaring`; the four the sentence
+names are still its first four, in that order, so the sentence's point - that
+the stage does not hold the expansion index, which is why the writer half of
+the message cannot be resolved there - is untouched.
+
+The two cites beside it in the same paragraph resolve as written at `4ddc99c`:
+`config_and_structure_stages/5` (`:3075`) is still `/5`, at `compiler.ex:1200`
+rather than `:891-906`; `structure_document/3` (`:3076`) is still `/3`, at
+`compiler.ex:1233` and `:1235`.
+
+### 2. Why by addition
+
+Section 3 of the Note of 2026-09-08 already rules the general case for this
+file - `with_writes/4` above a five-argument `@spec`, `slot_start/4` read as
+`slot_start/6` at `d6fb241` - and settles it the same way: the record keeps the
+spelling it was written with, and a later Note records the code's. This Note is
+that record for `structure_stage`, and nothing above this line moves.
+
+### 3. What this Note does not decide
+
+Nothing about the typed environment, the `:type_mismatch` tuple, or where the
+writer half of a finding's message is resolved. It changes no code, adds no
+README row, and flips no status line in this file.
+
+Filed with `sb-k0xe`, campaign RF050.
