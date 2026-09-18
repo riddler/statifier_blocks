@@ -337,6 +337,37 @@ defmodule StatifierBlocks.Core.OnEventTest do
       end
     end
 
+    # The case above carries no control byte, so its `:ok` says only that
+    # the walk did not raise. This one pins the answer for a literal that
+    # is BOTH invalid UTF-8 and carries a C0 control byte: still `:ok`, no
+    # control-character finding, deliberately. The walk reads characters
+    # and this binary has none to read; the offending byte is visible only
+    # to a reader of raw bytes. The layering is what makes that harmless -
+    # a binary outside the canonical JSON value grammar cannot arrive
+    # through a parsed document at all (`Decode.decode/1` runs
+    # `Validation.validate/1`, whose `canonical_json_check/2` refuses it),
+    # so the only caller who can ask this question is one calling this
+    # callback directly, and the answer it gets is about SHAPE while the
+    # encoding refusal stays where it lives.
+    #
+    # sabotage: rewrote `control_in/1`'s binary clause to fall back to
+    # scanning the RAW BYTES for a control when `String.valid?/1` says no
+    # (`:binary.bin_to_list(value) |> Enum.find(&control?/1)`) -> this test
+    # went red on the first value with `{:error, [{"capture", _}]}`, and
+    # every other test in this file stayed green (verified)
+    test "pins as deliberate the `:ok` for a literal that is invalid UTF-8 AND carries a control byte" do
+      for value <- [
+            <<1, 0xFF>>,
+            <<"ok", 1, 0xC3>>,
+            [<<1, 0xFF>>],
+            %{"k" => <<1, 0xFF>>},
+            %{<<1, 0xFF>> => "v"}
+          ] do
+        assert OnEvent.validate_config(capture(%{"order.mark" => ["const", value]})) == :ok,
+               inspect(value)
+      end
+    end
+
     # The message is the only thing an author is shown for either form -
     # `capture` has no field to anchor a per-pair finding on - so it has to
     # name both.

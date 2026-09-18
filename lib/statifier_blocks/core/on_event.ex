@@ -643,13 +643,29 @@ defmodule StatifierBlocks.Core.OnEvent do
 
   # `String.to_charlist/1` raises `UnicodeConversionError` on a binary that
   # is not valid UTF-8, so the clause asks `String.valid?/1` first and
-  # answers `nil` - no control character found - for one that is not. The
-  # compiler never reaches that case: `Validation.canonical_json_check/2`
-  # refuses a non-UTF-8 binary before this walk runs. `validate_config/1`
-  # is public, though, and a host calling it directly with
-  # `["const", <<0xFF>>]` asks a question about SHAPE; it gets the shape
-  # answer rather than a raise, and the encoding refusal stays the one
-  # `canonical_json_check/2` gives.
+  # answers `nil` - no control character found - for one that is not. A
+  # parsed document never reaches that case: `Decode.decode/1` runs
+  # `Validation.validate/1` over every document this package parses, and
+  # its `canonical_json_check/2` refuses a non-UTF-8 binary in `config`
+  # before any compile walks it. `validate_config/1` is public, though,
+  # and a host calling it directly with `["const", <<0xFF>>]` asks a
+  # question about SHAPE; it gets the shape answer rather than a raise,
+  # and the encoding refusal stays the one `canonical_json_check/2`
+  # gives.
+  #
+  # A literal that is BOTH invalid UTF-8 and carries a C0 control byte,
+  # `<<1, 0xFF>>`, therefore draws no control-character finding either.
+  # That is the same deliberate shape answer and not an oversight: this
+  # walk reads CHARACTERS, a binary that is not valid UTF-8 has none to
+  # read, and the byte that would offend is visible only to something
+  # reading raw bytes instead. The layering is what makes it harmless -
+  # such a binary is outside `ADR-0001`'s decision 6 value grammar
+  # altogether, so the only way it arrives is a direct call (this
+  # callback, or a hand-built `t:StatifierBlocks.Document.t/0` handed to
+  # `StatifierBlocks.Compiler.compile/3`), and a direct call gets the
+  # encoding refusal from `canonical_json_check/2`, at the door, rather
+  # than a second copy of it phrased as a control-character finding
+  # here.
   defp control_in(value) when is_binary(value) do
     if String.valid?(value), do: value |> String.to_charlist() |> Enum.find(&control?/1)
   end
