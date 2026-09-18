@@ -1413,10 +1413,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # Every SELECTOR that declares the chrome's grid template, not every rule:
     # a redeclaration written as a selector list is a redeclaration by each of
     # its selectors, and this stylesheet already writes lists broken across
-    # lines, so a scan anchored to one line would miss the shape the file
-    # itself uses. Comments come out first - the comments here run to
-    # paragraphs and quote declarations, and a brace inside one would end a
-    # rule the parse never entered.
+    # lines. A scan anchored to the line carrying the rule's `{` sees only the
+    # LAST selector in such a list, so a chrome selector written on any earlier
+    # line of one goes uncounted. Comments come out first - the comments here
+    # run to paragraphs and quote declarations, and a brace inside one would
+    # end a rule the parse never entered.
     defp chrome_template_declarers(css) do
       ~r/([^{}]+)\{([^{}]*)\}/
       |> Regex.scan(String.replace(css, ~r|/\*.*?\*/|s, ""))
@@ -1816,17 +1817,28 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
 
       # The scan above is only worth its assertion if it can SEE a
-      # redeclaration, and the shape it used to miss is the one this
-      # stylesheet's own `.sb-node__offer-keep, .sb-node__offer-confirm` rule
-      # is written in: a selector list broken across lines. The old scan
-      # matched a single-line selector only, so a second declaration written
-      # the way the file already writes selector lists would have gone
-      # uncounted and the test would have passed on a stylesheet that had
-      # exactly the defect it is there to catch.
+      # redeclaration, and the shape it used to miss is a selector list broken
+      # across lines - the way this stylesheet already writes its own
+      # `.sb-node__offer-keep, .sb-node__offer-confirm` rule.
       #
-      # A fixture rather than the real file, because the real file has no such
-      # redeclaration - which is the point of the test above and the reason it
-      # cannot prove the scan works.
+      # The blind spot is narrower than "a list", and the narrowness is the
+      # whole reason this fixture is written the way it is. The old scan
+      # matched a selector only on the line that carried the rule's `{`, so a
+      # list whose chrome selector sits on that last line was already counted
+      # and a fixture written that way proves nothing. What went uncounted is a
+      # list whose chrome selector is any EARLIER line - which is the first
+      # redeclaration below. The second one is the already-counted ordering,
+      # kept so the fixture says which half of the shape was broken.
+      #
+      # A fixture rather than the real file, because the real file has no
+      # redeclaration at all - which is the point of the test above and the
+      # reason it cannot prove its own scan works.
+      #
+      # Sabotage (run): put `chrome_template_declarers/1` back to the old
+      # one-line regex - the first redeclaration drops out and this goes red
+      # printing a two-element list where three belong, while the test above
+      # stays green because the real stylesheet holds nothing for the
+      # difference to show up in.
       test "the scan counts a redeclaration written as a multi-line selector list" do
         fixture = """
         .sb-node__chrome {
@@ -1834,15 +1846,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           grid-template-columns: auto minmax(0, 1fr) auto auto;
         }
 
-        .sb-palette,
-        .sb-node--selected > .sb-node__chrome {
+        .sb-node--selected > .sb-node__chrome,
+        .sb-palette {
           grid-template-columns: auto 1fr;
+        }
+
+        .sb-palette,
+        .sb-node--folded > .sb-node__chrome {
+          grid-template-columns: 1fr;
         }
         """
 
         assert chrome_template_declarers(fixture) == [
                  ".sb-node__chrome",
-                 ".sb-node--selected > .sb-node__chrome"
+                 ".sb-node--selected > .sb-node__chrome",
+                 ".sb-node--folded > .sb-node__chrome"
                ]
       end
 
