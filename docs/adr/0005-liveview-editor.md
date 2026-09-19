@@ -11926,8 +11926,9 @@ the request that flips it.
   resolve. It now reads "the proposal of 2026-09-18", the Amendment's own
   date.
 
-The correction moves the lines below `:11458` up by one. No record cites a
-line of this file below that point.
+The correction moves the lines below `:11458` up by one. No record earlier
+than this Note cites a line of this file below that point; this Note's own
+cites there use the moved numbers.
 
 ### Sentences in the flipped sections that name their own status
 
