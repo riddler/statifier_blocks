@@ -613,3 +613,18 @@ repository is what consumes all three:
 
 `version` stays at `1` there, on this record's decision 8 reasoning: a
 consumer that ignores keys it does not know misreads nothing.
+
+## Note (2026-09-18): the unpublished identifiers cited above
+
+A dated note, not an amendment: it changes no decision in this record.
+
+The text above this Note cites one ruling by an identifier that names an
+entry in an unpublished list, so it names nothing a public reader can
+follow. It stays as written, and this Note does not repeat it.
+
+The test `no lib/ or docs/adr/ file gains a private ruling or question id`
+in `test/statifier_blocks/block_type_test.exs`, added in the same request as
+this Note, fails when an identifier of the shapes it defines is added to a
+Markdown file in this directory or to an `.ex` file under `lib/`.
+
+Filed with `sb-4wh3`, campaign RF058.

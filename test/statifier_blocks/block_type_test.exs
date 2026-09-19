@@ -399,7 +399,7 @@ defmodule StatifierBlocks.BlockTypeTest do
     end
   end
 
-  describe "hygiene: no statifier_ui reference, no purity violations, no bead/PR ids" do
+  describe "hygiene: no statifier_ui reference, no purity violations, no bead/PR ids, no new private ids" do
     @lib_files ["lib/statifier_blocks/block_type.ex"]
     @lib_and_support_files @lib_files ++ ["test/support/block_type_fixtures.ex"]
 
@@ -497,6 +497,141 @@ defmodule StatifierBlocks.BlockTypeTest do
       assert offenders == [],
              "bead ids and pull-request numbers in shipped lib/ prose:\n" <>
                Enum.join(offenders, "\n")
+    end
+
+    # A private ruling or question id names an entry in a list kept outside
+    # this repository, so a public reader cannot follow it. The ids already
+    # in lib/ and docs/adr/ stay where they are; a new one is refused. The
+    # shapes, each a separate alternative below:
+    #
+    # - a question id: `RQ-` and dash-separated alphanumeric parts (a
+    #   campaign, then a number that a letter may follow);
+    # - a ruling id qualified by a sub-number or a letter: `R`, digits, then
+    #   `-`/`.` and digits, or one lower-case letter;
+    # - a ruling id that is a bare letter: `R-` and one lower-case letter;
+    # - a campaign decision id: `D`, the campaign's digits, `-`, digits;
+    # - a bare `R`/`Q` number, only where a ruling or question word names it
+    #   as one ("ruling R", "epic R", "question Q" before it, or "ruling"
+    #   or "operator ruling" after it).
+    #
+    # A bare `R`/`Q`/`D` number with no such word beside it is NOT matched:
+    # the records number their own sections that way (ADR-0004's `R1` to
+    # `R4`, the `D1` to `D4` of ADR-0004's 2026-08-31 amendment), and `Q3`
+    # is also a quarter. That is the known blind spot of this pattern.
+    @private_id ~r/
+      \bRQ-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*
+      | \bR\d+(?:[-.]\d+|[a-z])\b
+      | \bR-[a-z]\b
+      | \bD\d+-\d+\b
+      | \b(?:[Rr]ulings?|[Ee]pic|[Qq]uestions?)\s+[`*]*\K[RQ]\d+(?:[-.]\d+|[a-z])?\b
+      | \b[RQ]\d+(?:[-.]\d+|[a-z])?(?=[`*]*,?\s+(?:operator\s+)?ruling\b)
+    /x
+
+    # The committed baseline of the ids already present. It records, per
+    # file, a digest of each id and how many times the file carries it -
+    # never the id itself, because a committed list of the ids would be a
+    # new copy of every one of them in a public file. A digest is the first
+    # sixteen hex characters of the id's SHA-256.
+    @private_id_baseline "test/fixtures/private_id_baseline.txt"
+
+    defp repo_path(relative), do: __DIR__ |> Path.join("../../#{relative}") |> Path.expand()
+
+    defp scanned_files do
+      root = repo_path("")
+
+      (Path.wildcard(Path.join(root, "lib/**/*.ex")) ++
+         Path.wildcard(Path.join(root, "docs/adr/*.md")))
+      |> Enum.map(&Path.relative_to(&1, root))
+      |> Enum.sort()
+    end
+
+    defp private_ids(text), do: @private_id |> Regex.scan(text) |> Enum.map(&hd/1)
+
+    defp digest(id),
+      do: :sha256 |> :crypto.hash(id) |> Base.encode16(case: :lower) |> binary_part(0, 16)
+
+    defp private_id_counts(files) do
+      for file <- files,
+          {id, count} <-
+            file |> repo_path() |> File.read!() |> private_ids() |> Enum.frequencies(),
+          into: %{},
+          do: {{file, digest(id)}, {id, count}}
+    end
+
+    defp read_baseline do
+      @private_id_baseline
+      |> repo_path()
+      |> File.read!()
+      |> String.split("\n", trim: true)
+      |> Enum.reject(&String.starts_with?(&1, "#"))
+      |> Map.new(fn line ->
+        [file, digest, count] = String.split(line, "\t")
+        {{file, digest}, String.to_integer(count)}
+      end)
+    end
+
+    # sabotage: list the question-word positive below among the negatives,
+    # or drop the `\K` alternative from @private_id -> red (both verified).
+    test "the private-id pattern matches each id shape and no ordinary text" do
+      # Invented ids in each shape; none of them names a real entry.
+      positives = [
+        {"see RQ-XX999-99 for why", "RQ-XX999-99"},
+        {"see RQ-999-9b for why", "RQ-999-9b"},
+        {"under ruling R99-9, the", "R99-9"},
+        {"under ruling R99.9, the", "R99.9"},
+        {"as R99z has it", "R99z"},
+        {"campaign-999 ruling R-z said", "R-z"},
+        {"campaign-999 ruling `D99-9` said", "D99-9"},
+        {"under operator ruling R98, the", "R98"},
+        {"behind epic `R97`", "R97"},
+        {"open question Q99 asks", "Q99"},
+        {"the R96 ruling of", "R96"},
+        {"(R95, operator ruling 2026-01-01)", "R95"}
+      ]
+
+      for {text, id} <- positives, do: assert(private_ids(text) == [id], text)
+
+      negatives = [
+        "Rule 3 of the walk",
+        "released as v0.32.0",
+        "### R1. What `src` is",
+        "ADR-0004 R1 has it for `core.subchart`",
+        "the amendment's section D4",
+        "Document.rename(document, \"Q3 authorization\")",
+        "RFC 7231 section 6",
+        "a question the compiler asks",
+        "the ruling of 2026-08-29"
+      ]
+
+      for text <- negatives, do: assert(private_ids(text) == [], text)
+    end
+
+    # sabotage: plant an invented id of the question shape in shell.ex's
+    # moduledoc, and separately append one to the foot of ADR-0012 -> red,
+    # naming the file and the id; delete a counted id from shelf.ex -> red
+    # on the second assertion (all three verified).
+    test "no lib/ or docs/adr/ file gains a private ruling or question id" do
+      baseline = read_baseline()
+      current = private_id_counts(scanned_files())
+
+      added =
+        for {{file, _digest} = key, {id, count}} <- current,
+            count > Map.get(baseline, key, 0),
+            do: "#{file}: #{id} (#{count} now, #{Map.get(baseline, key, 0)} before)"
+
+      gone =
+        for {{file, digest} = key, before} <- baseline,
+            Map.get(current, key, {nil, 0}) |> elem(1) < before,
+            do: "#{file}\t#{digest}\t#{before}"
+
+      assert added == [],
+             "new private ruling or question ids - write the substance instead:\n" <>
+               Enum.join(Enum.sort(added), "\n")
+
+      assert gone == [],
+             "ids removed since #{@private_id_baseline} was written - lower or " <>
+               "delete these lines there so the id cannot come back unseen:\n" <>
+               Enum.join(Enum.sort(gone), "\n")
     end
   end
 end

@@ -11849,3 +11849,19 @@ what a host recipe of ten members should look like, and it takes no position on
 whether any section above it is ready to flip, which remains the operator's.
 
 Filed with `sb-tw8m`, campaign RF055.
+
+## Note (2026-09-18): the unpublished identifiers cited above
+
+A dated note, not an amendment: it changes no decision in this record.
+
+The text above this Note cites rulings, or the questions they answered, by
+identifiers that name entries in unpublished lists, so they name nothing a
+public reader can follow. They stay as written, and this Note repeats none
+of them.
+
+The test `no lib/ or docs/adr/ file gains a private ruling or question id`
+in `test/statifier_blocks/block_type_test.exs`, added in the same request as
+this Note, fails when an identifier of the shapes it defines is added to a
+Markdown file in this directory or to an `.ex` file under `lib/`.
+
+Filed with `sb-4wh3`, campaign RF058.

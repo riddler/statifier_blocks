@@ -290,3 +290,19 @@ the count moves again if it is accepted.
 
 Filed with `sb-uewa`, folding the `ADR-0007` half of `sb-35c0` (its `README.md`
 half landed with the 0.21.0 prep); campaign-034 ruling `RQ-034-6`.
+
+## Note (2026-09-18): the unpublished identifiers cited above
+
+A dated note, not an amendment: it changes no decision in this record.
+
+The text above this Note cites rulings, or the questions they answered, by
+identifiers that name entries in unpublished lists, so they name nothing a
+public reader can follow. They stay as written, and this Note repeats none
+of them.
+
+The test `no lib/ or docs/adr/ file gains a private ruling or question id`
+in `test/statifier_blocks/block_type_test.exs`, added in the same request as
+this Note, fails when an identifier of the shapes it defines is added to a
+Markdown file in this directory or to an `.ex` file under `lib/`.
+
+Filed with `sb-4wh3`, campaign RF058.
