@@ -619,13 +619,17 @@ defmodule StatifierBlocks.Compiler do
         # map is keyed by exactly those - `Composite.expand!/2` takes it over
         # the minted members, before the author's pass-through children are
         # spliced in - so a child the author placed has no entry here, and
-        # `anchor/2` finds nothing for it and leaves its finding on it.
+        # `anchor/2` finds nothing for it and leaves its finding on it. A
+        # child whose id is one the expansion mints does have one, and
+        # `minted_id_findings/3` reports it.
         own = Map.new(param_map, fn {id, key} -> {id, {block.id, key}} end)
 
         members
         |> Enum.map(&at_current_version(palette, &1, param_map))
         |> Enum.reduce(
-          {[], outcome_findings(palette, block, module, members, param_map), own},
+          {[],
+           minted_id_findings(block, members, param_map) ++
+             outcome_findings(palette, block, module, members, param_map), own},
           &resolve_member(palette, &1, &2)
         )
         |> then(fn
@@ -879,6 +883,56 @@ defmodule StatifierBlocks.Compiler do
       findings ->
         findings
     end
+  end
+
+  # `ADR-0002`'s Amendment of 2026-09-18, `C10`: a block the author wrote in
+  # one of this composite's pass-through slots - spliced into the expansion,
+  # at any depth below the slot - whose id is one the expansion mints for a
+  # member of its own. Author ids are checked for uniqueness in the Document
+  # stage, over the authored document, and members are minted here, so
+  # nothing before this point compares the two. Such a block passes every
+  # filter keyed by `param_map` as though it were that member - `C2` item 3's
+  # raisability check among them - and where both blocks emit a state, the
+  # Chart stage refuses the two states of one id. This stage holds the
+  # expansion and `param_map` both, so it names the cause; the Chart stage's
+  # duplicate id stays the backstop for every collision this does not reach.
+  #
+  # The test is an id that `param_map` is keyed by and that occurs more than
+  # once in the spliced expansion. A minted id occurs once by construction -
+  # `Composite.expand!/2` refuses a duplicated local id - so a second
+  # occurrence is a block the author wrote. The author's children in any
+  # other slot are not in the expansion and are not asked here: a child the
+  # composite drops keeps the slot finding it already draws, and one in a
+  # declaring composite's derived outcome slot is left to the backstop.
+  #
+  # Reported against the composite block, like `outcome_findings/5`, and not
+  # against the author's block: that block's id is a key of the expansion
+  # index this stage builds, so a finding on it would be re-anchored onto the
+  # composite anyway, carrying the param blamed on the minted member it
+  # collides with. The author's block is named in the reason and the message.
+  #
+  # The findings seed the member reduction beside `outcome_findings/5`'s, as
+  # siblings within one stage.
+  #
+  # `fault: :author`: renaming the block is a document edit, and it fixes it.
+  @spec minted_id_findings(Block.t(), [Block.t()], Composite.param_map()) :: [Finding.t()]
+  defp minted_id_findings(%Block{} = block, members, param_map) do
+    ids = members |> Composite.flatten() |> Enum.map(& &1.id)
+    counts = Enum.frequencies(ids)
+
+    ids
+    |> Enum.uniq()
+    |> Enum.filter(&(Map.has_key?(param_map, &1) and Map.fetch!(counts, &1) > 1))
+    |> Enum.map(fn id ->
+      Finding.new(
+        :resolve,
+        {:minted_id_collision, block.id, id},
+        ~s(the block "#{id}" placed in this composite carries an id its expansion ) <>
+          "mints for one of its own members; give that block another id",
+        block_id: block.id,
+        fault: :author
+      )
+    end)
   end
 
   # `ADR-0002`'s Amendment of 2026-09-18, `C9d`: the two refusals that stand
