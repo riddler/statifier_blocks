@@ -15,7 +15,8 @@ defmodule StatifierBlocks.ViewModel.OutcomeMetadataTest do
   use ExUnit.Case, async: true
 
   alias StatifierBlocks.{Block, BlockType, Document, Palette, ViewModel}
-  alias StatifierBlocks.ViewModel.{Node, Slot}
+  alias StatifierBlocks.Core.OnEvent
+  alias StatifierBlocks.ViewModel.{Field, Node, Slot}
 
   defmodule MalformedRail do
     @moduledoc """
@@ -88,6 +89,14 @@ defmodule StatifierBlocks.ViewModel.OutcomeMetadataTest do
 
   defp slot(%ViewModel{root: %Node{slots: slots}}, name) do
     Enum.find(slots, fn %Slot{name: slot_name} -> slot_name == name end)
+  end
+
+  # The messages routed to one node's `finish_as` field - the findings an
+  # author sees on the same card that draws the node's outcome.
+  defp finish_as_messages(%Node{form: form}) do
+    %Field{findings: findings} = Enum.find(form.fields, &(&1.key == "finish_as"))
+
+    Enum.map(findings, & &1.message)
   end
 
   describe "BlockType.slot_outcome_key/2" do
@@ -273,6 +282,59 @@ defmodule StatifierBlocks.ViewModel.OutcomeMetadataTest do
       vm = build(document_with("toy.rail", named_rule("blk_RULE", "abandon", "went_back")))
 
       assert [%Node{block_id: "blk_RULE", outcome: nil}] = slot(vm, "interrupts").children
+    end
+
+    # `finish_as` is spelled twice, once in `BlockType` for the reader and
+    # once in `OnEvent` for the type's own field; this ties the two.
+    # Sabotage (run): renamed `BlockType`'s `@finish_as_key` - red, the node
+    # reads `abandon` while `outcomes/1` answers `went_back`. Renamed
+    # `OnEvent`'s `@finish_as_key` instead - red, `outcomes/1` answers
+    # `done` while the node reads `went_back`.
+    test "the node carries the name OnEvent.outcomes/1 answers for the same config" do
+      rule = named_rule("blk_RULE", "abandon", "went_back")
+      vm = build(document_with("core.group", rule))
+
+      assert [{name, _label}] = OnEvent.outcomes(rule.config)
+      assert [%Node{block_id: "blk_RULE", outcome: ^name}] = slot(vm, "interrupts").children
+    end
+
+    # The reader is flat by the ruling of 2026-09-18: a name the compiler
+    # refuses is still the node's outcome, and `validate_config/1`'s finding
+    # sits on the same card's `finish_as` field.
+    # Sabotage (run): made `finishing_outcome_name/2` read `done` as no
+    # name - red on the first row, the node reads `abandon`. Dropped each
+    # of `check_finish_as_done/2`, `check_finish_as_resumes/2` and
+    # `check_finish_as_shape/2` from `validate_config/1` in turn - red on
+    # that row's message each time.
+    test "a name the compiler refuses is still the outcome, beside its finding" do
+      for {outcome, name, message} <- [
+            {"abandon", "done",
+             ~s(cannot be "done" - that is what a handler with no name finishes as)},
+            {"resume", "went_back",
+             "only a handler that abandons its group finishes with a name"},
+            {"abandon", "went__back", "must be an outcome name, like went_back"}
+          ] do
+        vm = build(document_with("core.group", named_rule("blk_RULE", outcome, name)))
+
+        assert [%Node{block_id: "blk_RULE", outcome: ^name} = node] =
+                 slot(vm, "interrupts").children
+
+        assert message in finish_as_messages(node), "#{name} beside #{outcome}"
+      end
+    end
+
+    # Sabotage (run): made `finishing_outcome_name/2` read the name with
+    # `Config.non_empty_string?/1`, the predicate `OnEvent` reads it with - red,
+    # the node reads the blanks; the blank-name test above stays green.
+    # Widened `check_finish_as/2`'s blank clause to a name starting with a
+    # space - red, the finding is gone.
+    test "a whitespace-only name falls back to the select value, and is a finding" do
+      vm = build(document_with("core.group", named_rule("blk_RULE", "abandon", "   ")))
+
+      assert [%Node{block_id: "blk_RULE", outcome: "abandon"} = node] =
+               slot(vm, "interrupts").children
+
+      assert "must be an outcome name, like went_back" in finish_as_messages(node)
     end
   end
 end
