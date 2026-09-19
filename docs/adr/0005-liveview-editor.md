@@ -11998,7 +11998,7 @@ same line twice, one row covers both.
 | `:6350` | `palette.ex:69-73`, the `assignability` relation | `@type t`'s `assignability:` field | `palette.ex:133` |
 | `:6398`, `:6423` | `view_model.ex:1026`, the `validate_config/1` call | `config_findings/3`'s `Palette.call(ref, :validate_config, ...)` | `view_model.ex:1946`, head `:1944` |
 | `:6412` | `finding.ex:90` and `:100`, the default severity | `defstruct`'s `severity: :error`; `new/4`'s `Keyword.get(opts, :severity, :error)` | `finding.ex:90`, unmoved; `finding.ex:106` |
-| `:6441` | `view_model.ex:423-424` and `:434`, the orphan split | `build/3`'s `Enum.split_with/2` | `view_model.ex:518`, head `:512` |
+| `:6441` | `view_model.ex:423-424` and `:434`, the orphan split | `build/3`'s `Enum.split_with/2`; the struct field `orphan_findings: orphan` in `build/3` | `view_model.ex:518`, head `:512`; `view_model.ex:528` |
 | `:6450` | `compiler.ex:405-410`, the compiler's `orphan_findings` | `defp orphan_findings(palette, %Block{slots: slots})` | `compiler.ex:1127` |
 | `:6458` | `view_model.ex:841-853`, the sort in `singleton_findings` | no function of that name exists at `bda200f`; the sort is `singleton_specs/2`'s `Enum.sort_by(&elem(&1, 0))` | `view_model.ex:1635`, head `:1630` |
 | `:6484` | `core/send.ex:24-30`, a send completes in the macrostep it arms | the moduledoc heading "The block finishes when the send is **armed**" | `core/send.ex:24-30`, unmoved |
