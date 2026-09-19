@@ -325,10 +325,10 @@ Inherited from statifier-ex unless this project records otherwise:
   the test.
 - Process artifacts - bead ids, plan phase and step numbers, plan filenames,
   workflow jargon - stay out of shipped `lib/` prose, per statifier-ex
-  ADR-0018; `test/statifier_blocks/block_type_test.exs` enforces it over the
-  files it names. That scope is exactly the shipped library - the
-  test globs every `.ex` file under `lib/` and scans it for bead ids and
-  pull-request numbers - so a `docs/adr/` record may name a bead id as
+  ADR-0018; `test/statifier_blocks/block_type_test.exs` enforces it for bead
+  ids and pull-request numbers over exactly the shipped library - that test
+  names no files, it globs every `.ex` file under `lib/` at run time and
+  scans each one - so a `docs/adr/` record may name a bead id as
   provenance, where it identifies a record, a correction or the work that
   landed it; a private ruling or question id is not a bead id and is not
   licensed here. **Dated correction and note blocks are exempt.** A
