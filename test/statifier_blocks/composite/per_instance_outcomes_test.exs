@@ -491,6 +491,7 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
       # about.
       assert call_sites == [
                {"compiler.ex", "case Composite.declared_outcome_names(module, block.config) do"},
+               {"compiler.ex", "|> Composite.declared_outcome_names(block.config)"},
                {"composite.ex", "case declared_outcomes(ref, config) do"},
                {"composite.ex", "case declared_outcomes(ref, config) do"},
                {"composite.ex", "case declared_outcomes(ref, block.config) do"},

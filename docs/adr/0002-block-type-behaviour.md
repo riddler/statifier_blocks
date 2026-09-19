@@ -13807,7 +13807,7 @@ Markdown file in this directory or to an `.ex` file under `lib/`.
 
 Filed with `sb-4wh3`, campaign RF058.
 
-## Amendment (2026-09-18): a block an author places in a pass-through slot with an id the expansion mints is a Resolve finding naming the cause - `C10`
+## Amendment (2026-09-18): a block an author places in a composite's pass-through or outcome slot with an id the expansion mints is a Resolve finding naming the cause - `C10`
 
 **Status: proposed (2026-09-18, campaign RF058, bead `sb-uc5p`, recording the
 operator's ruling of 2026-09-18 on that bead: "YES, ADD THE RESOLVE-STAGE
@@ -13832,10 +13832,12 @@ line second; a later reader re-locates by the anchor and not by the number.
 
 ### 1. The finding
 
-At the Resolve stage, a block that is in a composite's expansion because the
-author placed it in one of that composite's declared pass-through slots - the
-placed block, or any block below it - and whose id equals the id the expansion
-mints for one of the composite's own members, is a finding:
+At the Resolve stage, a finding is made for every block the author placed on
+a composite block, in either of two kinds of slot, whose id equals the id the
+expansion mints for one of the composite's own members. The two kinds are the
+type's declared pass-through slots and, on a declaring composite, the derived
+`on_<name>` slot of each outcome name that block declares. A block below a
+placed block counts as placed.
 
 | Field | Value |
 |---|---|
@@ -13858,15 +13860,20 @@ are minted later, at Resolve, and the minted ids are exactly the keys of the
 expansion's `param_map` (the `param_map = param_map(...)` binding in
 `def expand!/2`, `composite.ex:679`). The one place both are in hand is
 `expand_node/3` (`defp expand_node/3`, `compiler.ex:615`), and that is where
-the finding is made. Validation is not
-changed and consults no palette; the refusal the Note's section 4 declined
-stays declined.
+the finding is made. Validation is not changed and consults no palette; the
+refusal the Note's section 4 declined stays declined.
 
-The test is an id that `param_map` is keyed by and that occurs more than once
-in the spliced expansion. A minted id occurs once by construction, because a
-declaration that repeats a local id anywhere in its subtree is refused before
-anything is minted (`defp check_local_ids!/2`, `composite.ex:1401`). A second
-occurrence is therefore a block the author placed.
+The test differs by kind of slot, because only one kind is spliced:
+
+- **A pass-through slot.** Its children are spliced into the expansion, so
+  the test is an id that `param_map` is keyed by and that occurs more than
+  once in the spliced expansion. A minted id occurs once by construction,
+  because a declaration that repeats a local id anywhere in its subtree is
+  refused before anything is minted (`defp check_local_ids!/2`,
+  `composite.ex:1401`). A second occurrence is therefore a block the author
+  placed.
+- **An `on_<name>` slot.** Its children are not spliced into the expansion,
+  so the test is an id that `param_map` is keyed by at all.
 
 ### 3. Where it is reported, and why there
 
@@ -13888,12 +13895,11 @@ within one stage: both are reported.
 
 ### 4. What it does not reach
 
-- **A block the expansion does not carry.** A child in a slot the composite's
-  type does not declare, and a child in a declaring composite's derived
-  `on_<name>` slot, are not spliced into the expansion and are not asked. A
-  dropped child keeps the slot finding it already draws.
+- **A block in any other slot of the composite.** A child in a slot the
+  composite's type does not declare is not asked, and a dropped child keeps
+  the slot finding it already draws.
 - **A block outside the composite.** An id equal to a minted one written
-  anywhere else in the document is not in that composite's expansion.
+  anywhere else in the document is in none of that composite's slots.
 
 Where such a block reaches the chart, the Chart stage's `:duplicate_id` stays
 the backstop, as the ruling says.
@@ -13901,12 +13907,20 @@ the backstop, as the ruling says.
 ### 5. What changes for a document
 
 A document carrying such a block is refused at Resolve with this finding.
-Where both blocks reach the chart as states - the run the Note's section 3
-(`:13558`) records, repeated at `4e60305` for this request - it was already
-refused, at the Chart stage, with a `:duplicate_id` on the minted state's id;
-and where the placed block's outcomes were all that made a declared name
-raisable, `C2` item 3's finding was hidden. This section makes no claim about
-a document in which one of the two blocks emits no state.
+Before this section, where both blocks reached the chart as states, it was
+refused at the Chart stage instead:
+
+- **A pass-through slot** - the run the Note's section 3 (`:13558`) records,
+  repeated at `4e60305` for this request: a `:duplicate_id` on the minted
+  state's id; and where the placed block's outcomes were all that made a
+  declared name raisable, `C2` item 3's finding was hidden.
+- **An `on_<name>` slot** - run for this request against code that did not
+  yet ask that slot, with a `core.await` placed under the id of the
+  `core.await` member: `:duplicate_id` findings on that id's states, beside
+  other Chart-stage findings.
+
+This section makes no claim about a document in which one of the two blocks
+emits no state.
 
 ### What this section does not do
 

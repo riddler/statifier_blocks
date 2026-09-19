@@ -1,21 +1,24 @@
 defmodule StatifierBlocks.Compiler.MintedIdCollisionTest do
   @moduledoc """
-  A block an author placed in a composite's pass-through slot, carrying the
-  id that composite's expansion mints for one of its own members
-  (`ADR-0002`'s Amendment of 2026-09-18, `C10`).
+  A block an author placed in a composite's pass-through slot or in a
+  declaring composite's derived `on_<name>` slot, carrying the id that
+  composite's expansion mints for one of its own members (`ADR-0002`'s
+  Amendment of 2026-09-18, `C10`).
 
   Author ids are checked for uniqueness in the Document stage, over the
   authored document; members are minted later, at Resolve, so nothing
-  compared the two. The author's block then passed the minted-member filter
-  `C2` item 2's raisable set is taken through, and the document was refused
-  only at the Chart stage, as a duplicate state id - a finding that names the
-  symptom. Resolve now reports the cause, against the composite block, and
-  the Chart stage's duplicate id stays the backstop for every collision this
-  does not reach.
+  compared the two. A spliced block of that id passed the minted-member
+  filter `C2` item 2's raisable set is taken through, and either kind of
+  block made a document refused only at the Chart stage, as duplicate state
+  ids - findings that name the symptom. Resolve now reports the cause,
+  against the composite block, and the Chart stage's duplicate id stays the
+  backstop for every collision this does not reach.
 
   The fixtures are the signup wizard's confirmation step with a pass-through
-  slot, the shape `StatifierBlocks.Composite.DeclaredOutcomesTest` uses. Its
-  subtree mints one member, `<composite id>_body`.
+  slot, the shape `StatifierBlocks.Composite.DeclaredOutcomesTest` uses,
+  whose subtree mints one member, `<composite id>_body`; and a step declaring
+  `received`, whose subtree mints `<composite id>_body` and
+  `<composite id>_wait`.
 
   A pure test. Nothing here names LiveView, so it compiles and runs headless.
   """
@@ -70,6 +73,42 @@ defmodule StatifierBlocks.Compiler.MintedIdCollisionTest do
 
     @impl StatifierBlocks.Composite
     def subtree(_params), do: [Block.new("core.sequence", id: "body", slots: %{"body" => []})]
+  end
+
+  defmodule AwaitingStep do
+    @moduledoc """
+    Declares `received`, which its own `core.await` raises, so it compiles to a
+    state of its own with a derived `on_received` slot. Its subtree mints
+    `<composite id>_body` and `<composite id>_wait`.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "signup.awaiting_step",
+      params: [
+        %{key: "event", type: :string, label: "Confirmed by", required?: true, default: ""}
+      ],
+      outcomes: ["received"],
+      palette_entry: %{label: "Await the confirmation"},
+      version: 1
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(params) do
+      [
+        Block.new("core.sequence",
+          id: "body",
+          slots: %{
+            "body" => [
+              Block.new("core.await",
+                id: "wait",
+                config: %{"event" => params["event"], "timeout" => "10m"}
+              )
+            ]
+          }
+        )
+      ]
+    end
   end
 
   describe "an author's block carrying an id the expansion mints" do
@@ -140,6 +179,32 @@ defmodule StatifierBlocks.Compiler.MintedIdCollisionTest do
     end
   end
 
+  describe "an author's block in a declaring composite's on_<name> slot" do
+    # Sabotage: asked the spliced expansion only and not the derived outcome
+    # slots - red: the document got past Resolve and the Chart stage answered
+    # duplicate state ids, which name the symptom.
+    test "carrying a minted id is the same Resolve finding against the composite" do
+      assert {:error, findings} =
+               Compiler.compile(document(awaiting([await("blk_AWAIT_wait")])), palette())
+
+      assert Enum.all?(findings, &(&1.stage == :resolve))
+
+      assert [%Finding{} = finding] = Enum.filter(findings, &(&1.code == :minted_id_collision))
+
+      assert finding.block_id == "blk_AWAIT"
+      assert finding.reason == {:minted_id_collision, "blk_AWAIT", "blk_AWAIT_wait"}
+      assert finding.fault == :author
+    end
+
+    # The negative half. Sabotage: dropped the `param_map` filter on the
+    # outcome-slot ids, so every child there was reported - red, because this
+    # document compiles.
+    test "carrying any other id compiles untouched" do
+      assert {:ok, _compiled} =
+               Compiler.compile(document(awaiting([await("blk_THEN")])), palette())
+    end
+  end
+
   describe "a document without the collision is untouched" do
     # The negative half. Sabotage: reported a minted id occurring once as well
     # as one occurring twice - red, because this document compiles.
@@ -168,10 +233,10 @@ defmodule StatifierBlocks.Compiler.MintedIdCollisionTest do
     end
   end
 
-  describe "the scope: blocks the expansion does not carry are not asked" do
+  describe "the scope: a block in no pass-through or outcome slot is not asked" do
     # A child the composite drops keeps the finding it drew before. Sabotage:
     # walked every slot of the composite block as the author wrote it rather
-    # than the spliced expansion - red: the dropped child below was reported
+    # than its pass-through and outcome slots - red: the dropped child below was reported
     # as a collision, and its `:undeclared_slot` finding was lost with it.
     test "a colliding child in a slot the type does not declare keeps :undeclared_slot" do
       block = %{
@@ -218,7 +283,8 @@ defmodule StatifierBlocks.Compiler.MintedIdCollisionTest do
     Palette.new(
       Map.merge(Palette.core_types(), %{
         "signup.open_step" => OpenStep,
-        "signup.plain_open_step" => PlainOpenStep
+        "signup.plain_open_step" => PlainOpenStep,
+        "signup.awaiting_step" => AwaitingStep
       })
     )
   end
@@ -228,6 +294,14 @@ defmodule StatifierBlocks.Compiler.MintedIdCollisionTest do
       id: "blk_OPEN",
       config: %{"event" => "signup.confirmed"},
       slots: %{"body" => children}
+    )
+  end
+
+  defp awaiting(on_received) do
+    Block.new("signup.awaiting_step",
+      id: "blk_AWAIT",
+      config: %{"event" => "signup.confirmed"},
+      slots: %{"on_received" => on_received}
     )
   end
 
