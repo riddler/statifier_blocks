@@ -4894,7 +4894,7 @@ Filed with `sb-mzah`, campaign-028's Lane B2, recording what `sb-m6e0` landed.
 
 ## Amendment (2026-09-05): decision 10, a summary chip that is a generated event name draws as a name
 
-**Status: proposed (2026-09-05, campaign 029 Lane G, bead `sb-1hqt`).** A
+**Status: accepted (2026-09-05, campaign 029 Lane G, bead `sb-1hqt`).** A
 decision record merges at proposed under campaign 029's invariant; flipping it
 to accepted is a separate gated request. Additive; decision 10 stands exactly
 as written, **10n and 10o are unchanged in every particular**, and no text
@@ -5106,7 +5106,7 @@ Filed with `sb-1hqt`, campaign-029's Lane G.
 
 ## Amendment (2026-09-05): the host seams, `on_select` and a selection descriptor
 
-**Status: proposed (2026-09-05, campaign 029 Lane G, bead `sb-1hqt`).** A
+**Status: accepted (2026-09-05, campaign 029 Lane G, bead `sb-1hqt`).** A
 decision record merges at proposed under campaign 029's invariant; flipping it
 to accepted is a separate gated request. Additive; decisions 2, 8A and 15
 stand as written and no text above this line is edited by this section. This
@@ -5336,7 +5336,7 @@ Filed with `sb-1hqt`, campaign-029's Lane G.
 
 ## Amendment (2026-09-05): 3A admits a Fixtures tab in the inspector
 
-**Status: proposed (2026-09-05, campaign 029 Lane G, bead `sb-1hqt`).** A
+**Status: accepted (2026-09-05, campaign 029 Lane G, bead `sb-1hqt`).** A
 decision record merges at proposed under campaign 029's invariant; flipping it
 to accepted is a separate gated request. Additive; 1A, 2A and the drawer's own
 Fixtures tab stand exactly as written and no text above this line is edited by
@@ -5471,7 +5471,7 @@ Filed with `sb-1hqt`, campaign-029's Lane G.
 
 ## Amendment (2026-09-05): decision 9, the `:duration` control reads one grammar
 
-**Status: proposed (2026-09-05, campaign 029 Lane A, bead `sb-8acm`).**
+**Status: accepted (2026-09-05, campaign 029 Lane A, bead `sb-8acm`).**
 Additive; no text above this line is edited by this section. It reverses one
 clause of the 2026-08-29 amendment to decision 9 above, and it reverses it
 because the premise that clause rests on turned out to be false.
@@ -5607,7 +5607,7 @@ section neither depends on it nor touches what it recorded.
 
 ## Amendment (2026-09-05): decision 2, a compound command, and a palette entry that names a recipe
 
-**Status: proposed (2026-09-05, campaign 030 Lane S0, bead `sb-8vkc`).** A
+**Status: accepted (2026-09-05, campaign 030 Lane S0, bead `sb-8vkc`).** A
 decision record merges at proposed under campaign 030's invariant; flipping it
 to accepted is a separate gated request. Additive; decision 2's table of edits
 stands exactly as written, decision 3's round-trip law is unchanged, and no
@@ -5833,7 +5833,7 @@ Filed with `sb-8vkc`, campaign-030's Lane S0.
 
 ## Amendment (2026-09-05): decisions 10 and 11, a palette entry may declare how many of it a document holds
 
-**Status: proposed (2026-09-05, campaign 030 Lane S0, bead `sb-8vkc`).** A
+**Status: accepted (2026-09-05, campaign 030 Lane S0, bead `sb-8vkc`).** A
 decision record merges at proposed under campaign 030's invariant; flipping it
 to accepted is a separate gated request. Additive; decision 10's existing keys
 stand exactly as written, decision 11's anchor enum and routing table are
@@ -6290,7 +6290,7 @@ Filed with `sb-a9r8`, campaign-030's fill lane D.
 
 ## Amendment (2026-09-05): decision 11, the host's own whole-document rule, and what a lone deadline half is not
 
-**Status: proposed (2026-09-05, campaign 031 lane H, bead `sb-w2m1`).** A
+**Status: accepted (2026-09-05, campaign 031 lane H, bead `sb-w2m1`).** A
 decision record merges at proposed under campaign 031's invariant; flipping it
 to accepted is a separate gated request. Additive; decision 11's source enum,
 severity enum, anchor enum and routing table are unchanged, clause `10z`'s
@@ -11435,7 +11435,7 @@ Filed with `sb-suao`, campaign RF046.
 
 ## Amendment (2026-09-18): a handler that names the outcome it finishes with draws under that name - `Node.outcome` reads `finish_as` when present, the `outcome` select otherwise
 
-**Status: proposed (2026-09-18, campaign RF055, bead `sb-hjcd`, recording the
+**Status: accepted (2026-09-18, campaign RF055, bead `sb-hjcd`, recording the
 operator's ruling of 2026-09-18, "the `finish_as` name when present, else the
 select value").** A decision record merges at proposed under the campaign
 invariant; flipping it to accepted is a separate gated request. Additive by
@@ -11455,8 +11455,7 @@ precedence over the one the container declared. Both are decisions inside
 this record's own subject matter, so they carry a status line and a flip.
 That `C8` item 7 parked the question, and that nothing an author drew before
 this section draws differently now, are reasons the change is *safe* and
-*additive*; they are not the README's test, and an earlier draft of this
-section wrongly argued itself a Note on them.
+*additive*; they are not the README's test.
 
 `ADR-0002`'s `C8` (`docs/adr/0002-block-type-behaviour.md:11839`, "an
 interrupt handler names the outcome it abandons its group with") let a
@@ -11526,7 +11525,7 @@ answer for every handler that names nothing, which is every handler that
 existed before `C8`, so nothing an author drew before this section draws
 differently now.
 
-The two alternatives the proposal of this morning put beside it are recorded
+The two alternatives the proposal of 2026-09-18 put beside it are recorded
 as refused, with the reason:
 
 - **the select value always, with the name as a second `Node` field** - a new
@@ -11614,7 +11613,7 @@ Filed with `sb-hjcd`, campaign RF055.
 
 ## Amendment (2026-09-18): decision 14's control strip, the delete offer is a deliberate exception to the reservation and its width is not held at rest
 
-**Status: proposed (2026-09-18, campaign RF055, bead `sb-tw8m`, recording the
+**Status: accepted (2026-09-18, campaign RF055, bead `sb-tw8m`, recording the
 campaign's ruling of 2026-09-18 that the delete offer's width is not reserved
 and that this is intended).** A decision record merges at proposed under the
 campaign invariant; flipping it to accepted is a separate gated request.
@@ -11865,3 +11864,106 @@ this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
 Filed with `sb-4wh3`, campaign RF058.
+
+## Note (2026-09-19): nine long-proposed sections are flipped to accepted, and two sentences of the 2026-09-18 `finish_as` Amendment are corrected in its own text
+
+A dated Note rather than an amendment: it carries no `Status:` line and
+decides nothing. The lines this request changes above it are nine status
+lines, each by one word, `proposed` to `accepted`, and two sentences inside
+the Amendment of 2026-09-18 on `finish_as` (`:11436`), which was proposed
+until this request and whose own text they are. Everything else is this Note,
+at the foot of the file.
+
+The operator delegated the flip-or-file judgement over this file's
+long-proposed sections, on 2026-09-18, to the request that carries this Note:
+flip each section the code on `main` implements, and file a bead for each
+section it does not. That is the "separate gated request" the status
+paragraphs name, and it runs through the same `docs/adr/` direction gate.
+Every long-proposed section in this file is implemented, so none stays
+proposed and none is filed.
+
+Every `lib/` cite below was read at `main` `bda200f` and is written anchor
+first, line second. Each flipped section's own cites stay as written and are
+re-located by their anchors; this Note re-counts none of them.
+
+### The nine sections flipped, and where the code implements each
+
+| Section | Status line | Read in the code at `bda200f` |
+|---|---|---|
+| decision 10, a generated event-name chip, `10w` to `10y` (`:4895`) | `:4897` | `StateId.undone_event/1` inverts the name or answers `:error` (`compiler/state_id.ex:255`); `drawn_chips/3` translates ahead of the cap (`block_type.ex:1930`); `summary_titles/3` keeps the raw name for `title` (`block_type.ex:1740`) |
+| the host seams, `on_select` (`:5107`) | `:5109` | `notify_select/2` calls `on_select` with a `%{id:, type:, label:}` descriptor or `nil`, only when the selection moved (`editor.ex:3987`) |
+| `3A` admits a Fixtures tab (`:5337`) | `:5339` | `@inspector_tabs` ends `:fixtures` (`shell.ex:166`) |
+| decision 9, the `:duration` control reads one grammar (`:5472`) | `:5474` | `StatifierBlocks.Core.Duration.parse/1` is `Predicator.Duration.parse/1` and nothing else (`core/duration.ex:98`) |
+| decision 2, a compound command and a recipe palette entry (`:5608`) | `:5610` | `Edit.apply/2`'s `{:compound, commands}` clause (`edit.ex:204`); `Palette.core_recipes/0` (`palette.ex:256`) |
+| decisions 10 and 11, `singleton` (`:5834`) | `:5836` | `singleton_specs/2` (`view_model.ex:1630`) |
+| decision 11, the host's whole-document rule, `11p` to `11u` (`:6291`) | `:6293` | the `validate_document/1` callback (`document_validator.ex:124`); `validator_findings/2` stamps `:lint` at `:warning` (`view_model.ex:1556`) |
+| a handler that names its outcome draws under that name (`:11436`) | `:11438` | `BlockType.finishing_outcome_name/2` (`block_type.ex:1397`), read by `build_child/3` (`view_model.ex:2213`) |
+| decision 14's control strip, the delete offer (`:11614`) | `:11616` | the offer is drawn in place of the delete control only while `offered?/2` holds (`editor/block_node.ex:649`), and no stand-in holds its width at rest |
+
+### The two sentences corrected in the `finish_as` Amendment
+
+Both were named as advisories when that Amendment's request was reviewed,
+and both are corrected here, in the text of a section that was still proposed, in
+the request that flips it.
+
+- Its paragraph "Why this is an Amendment and not a Note" ended with the
+  clause "and an earlier draft of this section wrongly argued itself a Note on
+  them". A reader cannot check a record's drafts, and the clause decided
+  nothing; the paragraph now ends at "they are not the README's test."
+- "the proposal of this morning" named a time only its day of writing could
+  resolve. It now reads "the proposal of 2026-09-18", the Amendment's own
+  date.
+
+The correction moves the lines below `:11458` up by one. No record cites a
+line of this file below that point.
+
+### Sentences in the flipped sections that name their own status
+
+They are met here, not edited.
+
+- The status paragraphs of all nine but the `:duration` section's (`:5474`)
+  say the section merges at proposed and that flipping it is a separate gated
+  request. This is that request.
+- The `10w`, `on_select`, Fixtures-tab, compound-command and `singleton`
+  paragraphs say nothing in them is built yet, the whole-document rule's says
+  nothing is built in its campaign (`:6298`), and the `:duration` section's
+  Consequences say the code follows it (`:5579`). The table above is where
+  each now reads in the code.
+- Both Amendments of 2026-09-18 say they take no position on whether a
+  section is ready to flip, "which remains the operator's" (`:11604-11605`,
+  `:11848`). The operator's delegation of 2026-09-18 is that word for these
+  nine sections.
+- Both Amendments of 2026-09-18 also say this file's head `Status:` line
+  (`:3`) is not extended by a section that merges at proposed (`:11595-11597`,
+  `:11844-11846`). It is not
+  extended by this flip either: no flip since 2026-08-31 has extended it, and
+  this Note is where these nine are recorded.
+
+### Sentences in the flipped sections that later records supersede
+
+Each is superseded by a dated section that names the change, and none
+reverses what the flipped section decides.
+
+- `10w`'s "10n and 10o are unchanged" subsection reads the cap as 24 and
+  keeps refuse-never-truncate. The Note of 2026-09-08 item 2 (`:10418`) moves
+  the cap to 32 and sends the finding to the drawer; `ADR-0002`'s carve-out
+  of that date (`docs/adr/0002-block-type-behaviour.md:9616`) draws an
+  over-cap summary chip clipped; and the Note of 2026-09-12 (`:10948`) puts
+  the declared event name on the `title` of a chip that is both translated
+  and over the cap.
+- The compound-command section's "Deleting a deadline is deleting two
+  blocks, and it is two gestures until some record says otherwise": the
+  Amendment at `:8069` is that record.
+- The `singleton` section's "not decided here" for a host
+  `validate_document/1`: the section at `:6291` decides it, and the Note at
+  `:6727` records its code.
+
+One observation from the `:duration` read, recorded and not a correction:
+three config values in the test "core.wait, core.send, core.raise and
+core.await write nothing and read nothing"
+(`test/statifier_blocks/environment_test.exs:485`) still carry the retired
+spelling. `9d`'s list - refusal messages, on-screen examples, field hints,
+test names and documentation - does not reach a test's config values, and
+that test asserts nothing about their grammar.
+
+Filed with `sb-rov2`, campaign RF058, carrying `sb-a1yq`'s two record items.
