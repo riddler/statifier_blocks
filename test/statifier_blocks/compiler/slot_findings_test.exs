@@ -274,6 +274,31 @@ defmodule StatifierBlocks.Compiler.SlotFindingsTest do
     assert none =~ ~s(the "arm_review" slot holds 0 blocks, and this block type)
   end
 
+  # The whole undeclared-slot sentence, at one child and at two. It used to
+  # end "so they would be dropped", a plural pronoun whatever the count; it
+  # now names the slot's contents, which reads the same at every count, so
+  # only the noun phrase `block_count/1` writes changes between the two.
+  #
+  # Sabotage (run): put the tail back to "so they would be dropped" - red on
+  # the singular assertion, the first it reaches. Made `block_count/1` a
+  # single clause `"#{count} blocks"` - red on the singular assertion. Made
+  # its second clause `"#{count} block"` - red on the plural assertion.
+  test "the undeclared-slot message reads whole at one block and at two" do
+    assert {:error, [%Finding{message: one}]} =
+             Compiler.compile(stray_document(1), CoreFixtures.palette())
+
+    assert one ==
+             ~s(the "stray" slot holds 1 block but this block type declares no such slot, ) <>
+               "so the slot's contents would be dropped"
+
+    assert {:error, [%Finding{message: two}]} =
+             Compiler.compile(stray_document(2), CoreFixtures.palette())
+
+    assert two ==
+             ~s(the "stray" slot holds 2 blocks but this block type declares no such slot, ) <>
+               "so the slot's contents would be dropped"
+  end
+
   # One `myapp.notify` carrying `count` children under a slot its type does
   # not declare.
   defp stray_document(count) do

@@ -304,7 +304,8 @@ defmodule StatifierBlocks.ViewModel.OutcomeMetadataTest do
     # Sabotage (run): made `finishing_outcome_name/2` read `done` as no
     # name - red on the first row, the node reads `abandon`. Dropped each
     # of `check_finish_as_done/2`, `check_finish_as_resumes/2` and
-    # `check_finish_as_shape/2` from `validate_config/1` in turn - red on
+    # `check_finish_as_shape/2` from `check_finish_as/2`'s pipe in turn
+    # (`validate_config/1` reaches them only through it) - red on
     # that row's message each time.
     test "a name the compiler refuses is still the outcome, beside its finding" do
       for {outcome, name, message} <- [

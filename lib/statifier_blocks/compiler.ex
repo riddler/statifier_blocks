@@ -770,8 +770,8 @@ defmodule StatifierBlocks.Compiler do
       :resolve,
       reason,
       ~s(the "#{slot}" slot holds #{block_count(count)} but this block type declares no such ) <>
-        "slot, so they are dropped where this composite is replaced by its expansion; move " <>
-        "them into a slot it declares, or rename the slot",
+        "slot, so the slot's contents are dropped where this composite is replaced by its " <>
+        "expansion; move the contents into a slot this block type declares, or rename the slot",
       block_id: id,
       fault: :author
     )
@@ -1877,7 +1877,7 @@ defmodule StatifierBlocks.Compiler do
       :structure,
       reason,
       ~s(the "#{slot}" slot holds #{block_count(count)} but this block type declares no such ) <>
-        "slot, so they would be dropped",
+        "slot, so the slot's contents would be dropped",
       block_id: id
     )
   end

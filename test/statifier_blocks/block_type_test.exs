@@ -463,9 +463,9 @@ defmodule StatifierBlocks.BlockTypeTest do
     # three-character id spells one of the two with probability 2/46_656,
     # about 1 in 23_000. What bounds the exposure is the tracker's own id
     # uniqueness at filing time rather than this test: an id is minted once,
-    # so each word can ever be spelled by at most one issue per prefix, and
-    # the blind spot is those few ids rather than an open-ended leak. This
-    # test would not report them.]
+    # so each word can ever be spelled by at most one issue and its dotted
+    # children per prefix, and the blind spot is those few ids rather than
+    # an open-ended leak. This test would not report them.]
     @bead_or_pr_id ~r/\bs(?:b|t|ui|p|ob)-(?!(?:type|slot|save|node|form|edge|gap|drag|run)\b)[a-z0-9]{3,4}\b|PR #[0-9]/
 
     # Every `.ex` file under lib/, globbed at run time rather than listed, so
