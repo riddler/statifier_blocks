@@ -13930,3 +13930,56 @@ the public surface. It takes no position on whether any Amendment above is
 ready to flip, which remains the operator's on each one's own request.
 
 Filed with `sb-uc5p`, campaign RF058.
+
+## Note (2026-09-18): a throw from `declared_outcomes/1` or `subtree/1` is outside decision 1's "never raises", and leaves the compile
+
+Campaign RF058, bead `sb-17wn`.
+
+A dated note, not an amendment. `docs/adr/README.md`'s test is that "an
+amendment changes what the record decides and a note does not: a note records
+where something already decided renders, or what a sentence already accepted
+was about". This Note records what one accepted sentence was about. Nothing
+above this line is edited, this Note carries no `Status:` line, it flips
+nothing, it changes no behaviour and it adds no changelog fragment. Every
+`lib/` position below was **read at `a43d930`** and is written anchor first,
+line second; a later reader re-locates by the anchor and not by the number.
+The two tests it names are cited by title.
+
+### 1. What the sentence says, and what it was about
+
+`ADR-0004` decision 1 says "`Compiler.compile/3` returns `{:ok, %Compiled{}}`
+or `{:error, [finding]}`, never raises"
+(`docs/adr/0004-compiler-provenance.md:76-77`). `C9d` rests its re-sited
+refusals on it: "decision 1 forbids this pipeline to raise, `C2` item 3 takes
+no exception to it, and neither does this" (`:13325-13326`).
+
+Both sentences are about a raise: an exception. An Elixir `throw` is not one,
+and neither sentence names it.
+
+### 2. What the code does with each
+
+- **A per-instance declarer's `declared_outcomes/1` that raises** is rescued
+  into the `:outcome_declaration_invalid` finding (`defp instance_answer/2`,
+  `composite.ex:1158`).
+- **A `subtree/1` that raises** is rescued into the
+  `:composite_expansion_failed` finding (`defp expand/2`, `compiler.ex:1051`).
+- **Either callback that throws** is not caught by either function, and the
+  throw leaves the compile. The test
+  `a callback that throws is not caught, and leaves the compile` and the test
+  `a subtree/1 that throws is not caught either`, both in
+  `test/statifier_blocks/composite/per_instance_outcomes_test.exs` and added
+  in the same request as this Note, pin the two.
+
+So the width of decision 1 on these two routes is the width of a `rescue`,
+and the two routes take the same width.
+
+### What this line does not do
+
+It decides nothing: it adds no finding, no catch and no rule. Catching a throw
+on either route would change what decision 1 reaches, and that is a request of
+its own, taken for both routes together. It records nothing about an exit,
+and nothing about any callback but these two. It takes no position on whether
+any Amendment above is ready to flip, which remains the operator's on each
+one's own request.
+
+Filed with `sb-17wn`, campaign RF058.
