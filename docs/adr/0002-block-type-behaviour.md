@@ -13999,9 +13999,11 @@ section's status paragraph names, and it runs through the same `docs/adr/`
 direction gate.
 
 Every `lib/` cite below was read at `main` `bda200f` and is written anchor
-first, line second. Each flipped section's own cites stay labelled with the
-SHA they were read at and are re-located by their anchors; this Note
-re-counts none of them.
+first, line second. The `{:path, opts}`, `G14`, `G15` and `core.branch`
+sections label their cites "at `main`" or not at all, so their cites carry
+no SHA, and some have drifted; they are re-located by their anchors. The
+other six label theirs with the SHA they were read at. This Note re-counts
+none of them.
 
 ### The ten sections flipped, and where the code implements each
 
@@ -14058,26 +14060,85 @@ They are met here, not edited.
 
 ### Sentences in the flipped sections that later records supersede
 
-Each is superseded by a dated section that names the change, and none
-reverses what the flipped section decides.
+Each is superseded or narrowed by a dated section that names the change, and
+none reverses what the flipped section decides. Where the later section is
+itself one of the ten flipped here, it is named by its label.
 
-- The `{:path, opts}` section's "an eighth member" (`:2801`) and "`opts`
+- **The `{:path, opts}` section.** "an eighth member" (`:2801`) and "`opts`
   carries no defined key today" (`:2821`): the Note of 2026-09-06 at `:3456`
   gives `opts` its first two keys, and the `{:type_expr, opts}` Amendment at
   `:4957` makes the set nine.
-- `G15`'s four config fields and `G15a`'s four `<param>` elements: the Note at
-  `:3981` counts six fields, the Note at `:5546` names `collect_type` as the
-  seventh, and `ADR-0009`'s Note of 2026-09-06 on `item_as` and `index_as`
+- **`G15`.** Its four config fields (the row at `:3333`) and `G15a`'s four
+  `<param>` elements: the Note at `:3981` counts six fields, the Note at
+  `:5546` names `collect_type` as the seventh, and `ADR-0009`'s Note of
+  2026-09-06 on `item_as` and `index_as`
   (`docs/adr/0009-fan-out-block-type.md:860`) records the two reaching the
-  emission.
-- `B3`'s carve-out says a clipped chip's `title` carries its full text
-  (`:9673-9674`). For a chip that is both translated and over the cap,
+  emission. `G15b`'s "the shipped surface does not carry" (`:3422`): the Note
+  at `:3981` records two of the four now shipping.
+- **`G15`'s `collect`.** The row declares it `{:path, %{}}` (`:3333`): the
+  Note at `:3734` reads the `writes` key that declaration has since gained.
+  Its refusal of "a `collect` that is present and not a bare lowercase
+  identifier, refused in the same words" (`:3353-3356`): the Note at `:5304`
+  records `ADR-0009`'s dotted-path amendment, under which `collect` is refused
+  only when it is not a datamodel path.
+- **`B3`'s carve-out.** It says a clipped chip's `title` carries its full
+  text (`:9673-9674`). For a chip that is both translated and over the cap,
   `ADR-0005`'s Note of 2026-09-12 (`docs/adr/0005-liveview-editor.md:10948`)
-  puts the declared event name on the `title` instead.
-- `C6`'s "No slot is minted here, and none exists today" (`:11131`): `C7`
-  derives the `on_<name>` slots.
-- `C8` item 7, that the canvas draws a named handler as `abandon`: the Note at
-  `:13452` records that `ADR-0005`'s Amendment of 2026-09-18
+  puts the declared event name on the `title` instead, as the pointer line at
+  `:10714-10716` records.
+- **`C1`.** Its `outcomes:` option as a list, and its rule that an explicit
+  empty list is the same as an absent key (`:10082-10084`): `C9` narrows both
+  by addition, adding a per-instance callback and reading the empty-list rule
+  per instance (`C9b`).
+- **`C2` item 1.** Whether a composite whose declaration drops a name its
+  root still raises deserves a finding "is not decided here"
+  (`:10112-10113`): item 1 of the Note at `:10544` decides it, with no
+  finding.
+- **`C2` item 2.** The raisable set as the union over every minted member
+  (`:10115-10123`): item 4 of the Note at `:10544` narrows it to the members
+  the palette can resolve, as item 4 of the Note at `:11259` records.
+- **`C2` item 4 and `C3`.** The subtree-level reasoning and `C3`'s condition,
+  "a composite that writes no `outcomes` key" (`:10157`): `C9` narrows both
+  by addition (`:13055`).
+- **`C5`'s first bullet.** "nothing about what an outcome is, how it is
+  drawn, or how it compiles" (`:10188-10194`): `C6` decides how it compiles.
+- **`C6`, on the selection half.** "no such slot is derived for a composite
+  today" (`:11034`), "No slot is minted here, and none exists today"
+  (`:11131`), and the does-not-decide bullet that no `on_<name>` slot is
+  derived for a declaring composite and nothing in this package selects on
+  its outcome (`:11209-11220`): `C7` derives the `on_<name>` slots and routes
+  the outcome through them.
+- **`C6` item 3.** Its transition to the composite final (`:11113-11116`):
+  `C7` item 3 narrows it by addition to route through an occupied outcome
+  slot first. Its claim that the only `on_`-prefixed slot minting in `lib/`
+  is `core.subchart`'s (`:11135-11137`), and its list of `outcomes_over/3`'s
+  call sites: items 1 and 2 of the Note at `:12293` narrow both.
+- **`C6` item 5.** That `ADR-0004`'s `T4` is unchanged (`:11156-11164`):
+  item 3 of the Note at `:12293` adds `T4` to the clauses a declaring
+  composite narrows.
+- **`C6`, `C7` item 5 and `C8`, on failure classing.** `C6`'s "still
+  undecided" (`:11199-11201`), `C7`'s "What stays open is the
+  **derivation**" (`:11736-11737`) and `C8`'s bullet leaving a named
+  outcome's failure class open (`:12180`): the Note at `:12200` decides it,
+  by hand only, with no `:failure` slot style on a derived slot.
+- **`C7`'s premise and item 5.** "the two places a composite's slot list is
+  answered" (`:11528-11532`) and item 5's "today" (`:11732-11733`): item 4 of
+  the Note at `:12293` reads both narrowly, the first as the two call sites
+  it quotes and the second as a statement under `C6`.
+- **`C8` item 3 and its two-id-functions bullet.** "every caller threads it
+  through a `with`" (`:11921-11922`, repeated at `:12062-12063`): item 1 of
+  the Note at `:12703` reads it as threading the tagged return, a `case` at
+  one of the four sites. "The abandon raise on the watcher's transition ...
+  is **unchanged**" (`:12067`): item 2 of that Note records that the named
+  arm moves the transition's target too.
+- **`C8` item 7.** That the canvas draws a named handler as `abandon`: the
+  Note at `:13452` records that `ADR-0005`'s Amendment of 2026-09-18
   (`docs/adr/0005-liveview-editor.md:11436`) answers it.
+- **`C9`.** Its `outcome_slots/3` bullet, "Only its guard is type-level"
+  (`:13126-13127`): item 5 of the Note at `:13677` dates it to the SHA the
+  section read. `C9c`'s "called from functions that do hold the block"
+  (`:13284-13286`): item 6 of that Note reads it as a sentence about `lib/`.
+  `C9d`'s "decision 1 forbids this pipeline to raise" (`:13325-13326`): the
+  Note at `:13934` records that a throw is outside it.
 
 Filed with `sb-rov2`, campaign RF058.
