@@ -674,10 +674,16 @@ defmodule StatifierBlocks.Core.OnEvent do
   # `StatifierBlocks.Compiler.compile/3`, the editor's
   # `{:update_config, id, config}` gate in
   # `StatifierBlocks.Edit.check_config/3`, or the per-block config check
-  # behind `StatifierBlocks.ViewModel.build/3` - and a direct call gets
-  # the encoding refusal from `canonical_json_check/2`, at the door,
-  # rather than a second copy of it phrased as a control-character
-  # finding here.
+  # behind `StatifierBlocks.ViewModel.build/3`. Of those three paths only
+  # the compile reaches `canonical_json_check/2`: its Document stage runs
+  # `StatifierBlocks.Document.validate/1` before any config is walked, so
+  # there the encoding refusal comes at the door rather than as a second
+  # copy of it phrased as a control-character finding here. The editor's
+  # gate and the view model's check call nothing in
+  # `StatifierBlocks.Validation` - they ask this callback and the shared
+  # `{:type_expr, opts}` check only - so a non-UTF-8 config passes both
+  # with no finding, and the encoding refusal it gets instead is the one
+  # the next compile or decode of that document gives.
   defp control_in(value) when is_binary(value) do
     if String.valid?(value), do: value |> String.to_charlist() |> Enum.find(&control?/1)
   end

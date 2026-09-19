@@ -346,6 +346,41 @@ defmodule StatifierBlocks.Compiler.UndeclaredSlotNonDeclaringTest do
       assert plural =~ ~s(the "mystery" slot holds 2 blocks but this block type)
     end
 
+    # The whole sentence, at one child and at two. It used to say "they are
+    # dropped" and "move them into a slot it declares" - a plural pronoun
+    # whatever the count, and an `it` that could be the slot or the block
+    # type. It now names the slot's contents and the block type outright,
+    # so only the noun phrase `block_count/1` writes changes with the count.
+    #
+    # Sabotage (run): put the old "so they are dropped ... move them into a
+    # slot it declares" wording back - red on the singular assertion, the
+    # first it reaches. Made the compiler's `block_count/1` a single clause
+    # `"#{count} blocks"` - red on the singular assertion. Made its second
+    # clause `"#{count} block"` - red on the plural assertion.
+    test "the undeclared-slot message reads whole at one block and at two" do
+      assert {:error, [%Finding{message: singular}]} =
+               Compiler.compile(document_with("mystery"), palette())
+
+      assert singular ==
+               ~s(the "mystery" slot holds 1 block but this block type declares no such ) <>
+                 "slot, so the slot's contents are dropped where this composite is replaced " <>
+                 "by its expansion; move the contents into a slot this block type declares, " <>
+                 "or rename the slot"
+
+      two =
+        block()
+        |> Map.put(:slots, %{"mystery" => [dropped_child("blk_W"), dropped_child("blk_X")]})
+        |> document()
+
+      assert {:error, [%Finding{message: plural}]} = Compiler.compile(two, palette())
+
+      assert plural ==
+               ~s(the "mystery" slot holds 2 blocks but this block type declares no such ) <>
+                 "slot, so the slot's contents are dropped where this composite is replaced " <>
+                 "by its expansion; move the contents into a slot this block type declares, " <>
+                 "or rename the slot"
+    end
+
     # The arity message counts through the same helper, and its own two
     # reachable counts are zero and two-or-more: ADR-0002 decision 6's four
     # arities are `:any`, `:at_least_one`, `:exactly_one` and `:zero_or_one`,
