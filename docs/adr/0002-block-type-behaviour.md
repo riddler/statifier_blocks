@@ -13806,3 +13806,113 @@ this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
 Filed with `sb-4wh3`, campaign RF058.
+
+## Amendment (2026-09-18): a block an author places in a pass-through slot with an id the expansion mints is a Resolve finding naming the cause - `C10`
+
+**Status: proposed (2026-09-18, campaign RF058, bead `sb-uc5p`, recording the
+operator's ruling of 2026-09-18 on that bead: "YES, ADD THE RESOLVE-STAGE
+FINDING").** A decision record merges at proposed under the campaign
+invariant, and this one **stays** proposed; its flip is the operator's, on its
+own request. The code that builds it lands in the same request, after this
+section.
+
+Additive: every decision, Amendment and Note above this line stands exactly as
+it stands, and no text above this line is edited by this section. `C2` item 2
+(`:10125`), which decides that the raisable set is the minted members alone, is
+not changed. The Note of 2026-09-18 on the minted-member exclusion (`:13467`)
+records the gap this section closes: an author's block whose id equals a
+minted one passes that exclusion, can hide `C2` item 3's finding, and is
+refused only at the Chart stage, as a duplicate state id. Its section 4 (`:13593`)
+names a Resolve-stage finding on the collision as the cheaper answer and
+leaves the question open; this section takes that answer. The Note's text
+stays as the record of the gap when it was written.
+
+Every `lib/` cite below was **read at `4e60305`** and is written anchor first,
+line second; a later reader re-locates by the anchor and not by the number.
+
+### 1. The finding
+
+At the Resolve stage, a block that is in a composite's expansion because the
+author placed it in one of that composite's declared pass-through slots - the
+placed block, or any block below it - and whose id equals the id the expansion
+mints for one of the composite's own members, is a finding:
+
+| Field | Value |
+|---|---|
+| `code` | `:minted_id_collision` |
+| `reason` | `{:minted_id_collision, composite_id, placed_block_id}` |
+| `stage` | `:resolve` |
+| `block_id` | the composite block's id |
+| `fault` | `:author` |
+| `message` | names the placed block's id and says to give that block another id |
+
+One finding per colliding id. Renaming the placed block is a document edit
+that fixes it, which is `StatifierBlocks.Compiler.Finding`'s rule for
+`:author`.
+
+### 2. Why Resolve, and the test it applies
+
+Author ids are checked for uniqueness over the authored document, in the
+Document stage (`defp validate_unique_ids/1`, `validation.ex:313`). Members
+are minted later, at Resolve, and the minted ids are exactly the keys of the
+expansion's `param_map` (the `param_map = param_map(...)` binding in
+`def expand!/2`, `composite.ex:679`). The one place both are in hand is
+`expand_node/3` (`defp expand_node/3`, `compiler.ex:615`), and that is where
+the finding is made. Validation is not
+changed and consults no palette; the refusal the Note's section 4 declined
+stays declined.
+
+The test is an id that `param_map` is keyed by and that occurs more than once
+in the spliced expansion. A minted id occurs once by construction, because a
+declaration that repeats a local id anywhere in its subtree is refused before
+anything is minted (`defp check_local_ids!/2`, `composite.ex:1401`). A second
+occurrence is therefore a block the author placed.
+
+### 3. Where it is reported, and why there
+
+Against the composite block, not the placed block, with the placed block's id
+in the reason and the message.
+
+`ADR-0004`'s `T3` rules that "A finding on a pass-through child is reported
+against that child" (`docs/adr/0004-compiler-provenance.md:3318`), and the
+rule holds because such a child has no entry in the expansion index. A
+colliding child does have one, the minted member's, so a finding raised on it
+is re-anchored onto the composite (`defp reanchor_finding/2`,
+`compiler.ex:1104`), carrying the param blamed on the member it collides with.
+Reported against the composite, the finding is anchored the way every other
+finding on that composite is, and names no param that is not at fault.
+
+It is the block `C2` item 3's `:outcome_not_raisable` names too
+(`defp outcome_findings/5`, `compiler.ex:864`), and the two are siblings
+within one stage: both are reported.
+
+### 4. What it does not reach
+
+- **A block the expansion does not carry.** A child in a slot the composite's
+  type does not declare, and a child in a declaring composite's derived
+  `on_<name>` slot, are not spliced into the expansion and are not asked. A
+  dropped child keeps the slot finding it already draws.
+- **A block outside the composite.** An id equal to a minted one written
+  anywhere else in the document is not in that composite's expansion.
+
+Where such a block reaches the chart, the Chart stage's `:duplicate_id` stays
+the backstop, as the ruling says.
+
+### 5. What changes for a document
+
+A document carrying such a block is refused at Resolve with this finding.
+Where both blocks reach the chart as states - the run the Note's section 3
+(`:13558`) records, repeated at `4e60305` for this request - it was already
+refused, at the Chart stage, with a `:duplicate_id` on the minted state's id;
+and where the placed block's outcomes were all that made a declared name
+raisable, `C2` item 3's finding was hidden. This section makes no claim about
+a document in which one of the two blocks emits no state.
+
+### What this section does not do
+
+It changes no rule of `C2`, no filter keyed by `param_map`, no Validation
+check and no Chart-stage mapping. It adds one finding code and nothing else to
+the public surface. It takes no position on whether any Amendment above is
+ready to flip, which remains the operator's on each one's own request.
+
+Filed with `sb-uc5p`, campaign RF058.
