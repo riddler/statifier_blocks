@@ -13931,7 +13931,7 @@ ready to flip, which remains the operator's on each one's own request.
 
 Filed with `sb-uc5p`, campaign RF058.
 
-## Note (2026-09-18): a throw from `declared_outcomes/1` or `subtree/1` is outside decision 1's "never raises", and leaves the compile
+## Note (2026-09-18): a throw from `declared_outcomes/1` or `subtree/1` is outside `ADR-0004` decision 1's "never raises", and leaves the compile
 
 Campaign RF058, bead `sb-17wn`.
 
@@ -13970,16 +13970,16 @@ and neither sentence names it.
   `test/statifier_blocks/composite/per_instance_outcomes_test.exs` and added
   in the same request as this Note, pin the two.
 
-So the width of decision 1 on these two routes is the width of a `rescue`,
-and the two routes take the same width.
+So the width of `ADR-0004` decision 1 on these two routes is the width of a
+`rescue`, and the two routes take the same width.
 
 ### What this line does not do
 
 It decides nothing: it adds no finding, no catch and no rule. Catching a throw
-on either route would change what decision 1 reaches, and that is a request of
-its own, taken for both routes together. It records nothing about an exit,
-and nothing about any callback but these two. It takes no position on whether
-any Amendment above is ready to flip, which remains the operator's on each
-one's own request.
+on either route would change what `ADR-0004` decision 1 reaches, and that is a
+request of its own, taken for both routes together. It records nothing about
+an exit, and nothing about any callback but these two. It takes no position on
+whether any Amendment above is ready to flip, which remains the operator's on
+each one's own request.
 
 Filed with `sb-17wn`, campaign RF058.
