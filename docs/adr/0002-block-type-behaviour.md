@@ -13764,12 +13764,19 @@ sentence about `lib/`. It is not a sentence about every caller:
 `unraisable_outcomes/4` was also called directly from
 `test/statifier_blocks/composite/declared_outcomes_test.exs` at `6ea2afe`, at
 `:822`, `:889`, `:922`, `:948` and `:1022`, with no block among the
-arguments. At `eedde40` the function is `unraisable_outcomes/5`
+arguments; `declared_outcome_names/1` had no direct `test/` call there. At
+`eedde40` `unraisable_outcomes/4` is `unraisable_outcomes/5`
 (`composite.ex:983`, `def unraisable_outcomes(%Palette{} = palette, ref,
 config, members, param_map) do`), and its direct `test/` calls pass a config
 map as the third argument: `declared_outcomes_test.exs` `:822`, `:895`,
 `:928`, `:954` and `:1029`, and
 `test/statifier_blocks/composite/per_instance_outcomes_test.exs` `:725`.
+At `eedde40` `declared_outcome_names/1` is `declared_outcome_names/2`
+(`composite.ex:775`, `def
+declared_outcome_names(ref, config), do: declared_outcomes(ref, config)`), and
+it too is called directly from `test/`, with a config and no block among the
+arguments: `per_instance_outcomes_test.exs` `:603`, `:605`, `:608`, `:792`,
+`:795`, `:798`, `:935` and `:998`.
 
 ### What this line does not do
 
