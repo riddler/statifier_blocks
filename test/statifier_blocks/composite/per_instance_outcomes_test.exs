@@ -395,6 +395,45 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
     def declared_outcomes(_config), do: raise(RuntimeError, "no element document is loaded")
   end
 
+  defmodule ThrowingScreen do
+    @moduledoc """
+    A callback that THROWS rather than answering or raising. The route
+    rescues a raise and does not catch a throw, and neither does the
+    sibling `subtree/1` route; the pair of tests on it says so.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "signup.screen_throwing",
+      params: [
+        %{key: "screen", type: :string, label: "Screen", required?: true, default: "account"}
+      ],
+      palette_entry: %{label: "Screen (throwing)"},
+      version: 1
+
+    alias StatifierBlocks.Composite.PerInstanceOutcomesTest.ScreenSubtree
+
+    @impl StatifierBlocks.Composite
+    def subtree(params), do: ScreenSubtree.build(params)
+
+    @impl StatifierBlocks.Composite
+    def declared_outcomes(_config), do: throw(:no_element_document)
+  end
+
+  defmodule ThrowingSubtreeScreen do
+    @moduledoc "The sibling: a `subtree/1` that throws, on a type declaring no outcomes."
+
+    use StatifierBlocks.Composite,
+      name: "signup.screen_throwing_subtree",
+      params: [
+        %{key: "screen", type: :string, label: "Screen", required?: true, default: "account"}
+      ],
+      palette_entry: %{label: "Screen (throwing subtree)"},
+      version: 1
+
+    @impl StatifierBlocks.Composite
+    def subtree(_params), do: throw(:no_element_document)
+  end
+
   # -- the palette and the two documents ----------------------------------
 
   defp palette do
@@ -408,7 +447,9 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
         "signup.screen_doubled" => DoubledScreen,
         "signup.screen_colliding" => CollidingScreen,
         "signup.screen_improper" => ImproperScreen,
-        "signup.screen_raising" => RaisingScreen
+        "signup.screen_raising" => RaisingScreen,
+        "signup.screen_throwing" => ThrowingScreen,
+        "signup.screen_throwing_subtree" => ThrowingSubtreeScreen
       })
     )
   end
@@ -459,44 +500,65 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
     # Sabotage: had `outcomes_over/3` read `declared_outcomes(ref, %{})` in
     # place of the block's own config - red here on the pinned line, and red in
     # four tests across the other three describe blocks besides (verified).
+    #
+    # The `:outcomes` key is read in more than one spelling, and the grep
+    # takes each: a `Map` read naming the key, an access by `[:outcomes]`, a
+    # dot access that is not a function call, and a one-line map pattern
+    # binding the key. A key read is kept even in a function head, where a
+    # pattern is a read; only the route's NAME is dropped from a head.
+    #
+    # Sabotage: added a private reader to `composite.ex` in the dot spelling
+    # (`defp read(declaration), do: declaration.outcomes`), then in the
+    # pattern spelling (`defp read(%{outcomes: names}), do: names`) - red
+    # each time (verified), and green each time against the one-spelling
+    # grep this replaced.
     test "the readers are exactly these, and each one takes the instance's config" do
-      readers =
+      route = ["declared_outcomes(", "declared_outcome_names("]
+
+      key_read =
+        ~r/Map\.(get|fetch!?|take|has_key\?|pop)\([^)]*:outcomes\b|\[:outcomes\]|\.outcomes\b(?![(\/\w])|%\{[^}]*\boutcomes: [a-z_]\w*[^}]*\}/
+
+      head? = fn line ->
+        Enum.any?(["defp ", "def ", "@spec ", "@callback "], &String.starts_with?(line, &1))
+      end
+
+      call_sites =
         "lib/**/*.ex"
         |> Path.wildcard()
         |> Enum.flat_map(fn path ->
           path
           |> File.read!()
           |> String.split("\n")
-          |> Enum.with_index(1)
-          |> Enum.filter(fn {line, _number} ->
-            String.contains?(line, "declared_outcomes(") or
-              String.contains?(line, "declared_outcome_names(") or
-              String.contains?(line, "Map.get(declaration, :outcomes")
+          |> Enum.map(&String.trim/1)
+          |> Enum.reject(&String.starts_with?(&1, "#"))
+          |> Enum.filter(fn line ->
+            (String.contains?(line, route) and not head?.(line)) or
+              Regex.match?(key_read, line)
           end)
-          |> Enum.map(fn {line, number} -> {path, number, String.trim(line)} end)
+          |> Enum.map(&{Path.basename(path), &1})
         end)
 
-      call_sites =
-        readers
-        |> Enum.reject(fn {_path, _number, line} ->
-          String.starts_with?(line, "#") or String.starts_with?(line, "defp ") or
-            String.starts_with?(line, "def ") or String.starts_with?(line, "@spec ") or
-            String.starts_with?(line, "@callback ")
-        end)
-        |> Enum.map(fn {path, _number, line} -> {Path.basename(path), line} end)
-
-      # Every call of the declared-list route carries a config. The one read
-      # that does not is `static_declared_outcomes/1`'s own `Map.get` off the
-      # declaration, which is the route's floor and has no instance to know
-      # about.
+      # Every call of the declared-list route carries a config. The key reads
+      # that do not have no instance to know about: `emit_declaring/2`'s
+      # pattern reads the declaring node `declaring_node/7` built from that
+      # instance's names; `refute_both_outcome_spellings!/1` reads the static
+      # list as the module compiles; `static_declared_outcomes/1`'s `Map.get`
+      # is the route's floor; and `Composite.Data`'s `__composite__/1` takes
+      # the key off a data registration, which `C9e` leaves off the
+      # per-instance route.
       assert call_sites == [
                {"compiler.ex", "case Composite.declared_outcome_names(module, block.config) do"},
                {"compiler.ex", "|> Composite.declared_outcome_names(block.config)"},
+               {"compiler.ex",
+                "defp emit_declaring(%Context{} = context, %{outcomes: outcomes, members: members}) do"},
+               {"composite.ex", "static = Map.get(declaration || %{}, :outcomes, [])"},
                {"composite.ex", "case declared_outcomes(ref, config) do"},
                {"composite.ex", "case declared_outcomes(ref, config) do"},
                {"composite.ex", "case declared_outcomes(ref, block.config) do"},
                {"composite.ex", "Map.get(declaration, :outcomes, [])"},
-               {"composite.ex", ":static -> static_declared_outcomes(ref)"}
+               {"composite.ex", ":static -> static_declared_outcomes(ref)"},
+               {"data.ex",
+                "Map.take(state, [:name, :params, :version, :sentence, :palette_entry, :slots, :outcomes])"}
              ]
     end
 
@@ -650,9 +712,16 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
     #
     # Sabotage: dropped the `refute_both_outcome_spellings!/1` call from
     # `__before_compile__/1` - red (verified): the module compiles and its
-    # static list is silently never read.
+    # static list is silently never read. And replaced the description's
+    # opening clause ("... both writes the :outcomes option and defines ")
+    # with "... is not a valid composite declaration." - still a
+    # `CompileError`, and red on the message pattern alone (verified), which
+    # is the "by name" in the title: the class does not pin it.
     test "a type writing both spellings is refused by name as it compiles" do
-      assert_raise CompileError, fn ->
+      message =
+        ~r/StatifierBlocksTestBothSpellings both writes the :outcomes option and defines declared_outcomes\/1/
+
+      assert_raise CompileError, message, fn ->
         Code.eval_string("""
         defmodule StatifierBlocksTestBothSpellings do
           use StatifierBlocks.Composite,
@@ -1016,14 +1085,53 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
     # read runs several times over one compile and the finding is drawn where
     # `C2` item 3's is.
     #
-    # Sabotage: seeded the findings into the member reduction beside the
-    # raisability check rather than in place of it - red (verified), the block
-    # draws the refusal twice.
+    # Sabotage: seeded `outcome_findings/5`'s result twice into
+    # `expand_node/3`'s member reduction (the call written a second time,
+    # joined with `++`) - red here (verified), the block draws the refusal
+    # twice, and red on every other test that matches a lone Resolve finding.
+    # Joining the declaration findings to the raisability check's instead of
+    # returning them in its place stays GREEN (verified): that check runs
+    # over the `[]` a refused declaration reads as, so it adds nothing.
     test "a refused declaration draws exactly one finding for its block" do
       assert {:error, findings} =
                Compiler.compile(one_block_document("signup.screen_raising", "plan"), palette())
 
       assert length(findings) == 1
+    end
+
+    # What decision 1's "never raises" reaches on this route, and what it
+    # does not: `instance_answer/2` rescues a raise into the finding above
+    # and does not catch a throw, so a throwing callback leaves
+    # `Compiler.compile/2` as a throw. That is the width the sibling
+    # `subtree/1` route takes (the next test), and ADR-0002's Note of
+    # 2026-09-18 on throws records it; a catch on either route is a change
+    # to that Note, not a quiet widening.
+    #
+    # Sabotage: added `catch :throw, thrown -> {:raised, inspect(thrown)}`
+    # to `instance_answer/2` - red (verified): the compile answers a finding
+    # and nothing is thrown.
+    test "a callback that throws is not caught, and leaves the compile" do
+      assert catch_throw(
+               Compiler.compile(
+                 one_block_document("signup.screen_throwing", "account"),
+                 palette()
+               )
+             ) == :no_element_document
+    end
+
+    # The sibling route, at the same width: `expand/2` in the compiler
+    # rescues a raising `subtree/1` into `:composite_expansion_failed` and
+    # does not catch a throw.
+    #
+    # Sabotage: added `catch :throw, thrown ->` returning the
+    # `:composite_expansion_failed` finding to `expand/2` - red (verified).
+    test "a subtree/1 that throws is not caught either" do
+      assert catch_throw(
+               Compiler.compile(
+                 one_block_document("signup.screen_throwing_subtree", "account"),
+                 palette()
+               )
+             ) == :no_element_document
     end
   end
 end

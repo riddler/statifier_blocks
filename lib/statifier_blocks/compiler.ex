@@ -950,9 +950,10 @@ defmodule StatifierBlocks.Compiler do
   # `ADR-0002`'s Amendment of 2026-09-18, `C9d`: the two refusals that stand
   # over a STATIC `:outcomes` list as the using module compiles have nowhere to
   # stand for a list that is a function of config, so for a per-instance
-  # declarer they are re-sited here, unchanged in substance, beside the one a
+  # declarer they are re-sited here, unchanged in substance, beside the two a
   # static list cannot produce - a callback answering something that is not a
-  # list of names. A raise is not available: decision 1 forbids this pipeline
+  # list of names, and a callback that raises for this block's config rather
+  # than answering. A raise is not available: decision 1 forbids this pipeline
   # to raise, and `C2` item 3's own check takes no exception to that.
   #
   # `fault: :package`. A composite's `declared_outcomes/1` is package-author

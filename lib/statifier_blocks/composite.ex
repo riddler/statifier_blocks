@@ -298,6 +298,16 @@ defmodule StatifierBlocks.Composite do
   An answer that is not a list of distinct non-empty strings, and one whose
   derived `on_<name>` slots collide with the type's pass-through slots, are
   `:resolve`-stage findings against that block (`C9d`) rather than raises.
+  So is a callback that raises for a block's config instead of answering. A
+  callback that throws is not caught, as a `subtree/1` that throws is not:
+  the throw leaves `StatifierBlocks.Compiler.compile/3`.
+
+  It must be a pure function of the config it is handed, as every callback
+  must be (`ADR-0002` decision 4). The compiler asks it at more than one site
+  for one block in one compile, the editor and the view model ask it again,
+  and nothing reconciles two different answers: a callback that reads
+  anything besides its argument - the clock, process state, a store - can
+  answer those sites differently.
   """
   @callback declared_outcomes(Block.config()) :: [String.t()]
 
