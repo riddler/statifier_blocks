@@ -2760,7 +2760,7 @@ Filed with `sb-a9r8`, campaign-030's fill lane D.
 
 ## Amendment (2026-09-05): decision 7, the `{:path, opts}` field type
 
-**Status: proposed (2026-09-05).** Drafted for `sb-5v3i` under the operator
+**Status: accepted (2026-09-05).** Drafted for `sb-5v3i` under the operator
 campaign-031 grant, and merging at proposed under that campaign's invariant
 like every other section filed with it; flipping it to accepted is a separate
 gated request. Additive; decision 7, its 2026-08-27 `value_path` amendment,
@@ -2877,7 +2877,7 @@ Filed with `sb-5v3i`, campaign-031's lane H. `sb-2ym4` implements.
 
 ## Amendment (2026-09-05): decision 10, the `core.await` row
 
-**Status: proposed (2026-09-05).** Drafted for `sb-5v3i` under the operator
+**Status: accepted (2026-09-05).** Drafted for `sb-5v3i` under the operator
 campaign-031 grant, and merging at proposed under that campaign's invariant;
 flipping it to accepted is a separate gated request. Additive; decision 10's
 original seven-row table stands, the 2026-08-28 amendment's section D stands,
@@ -3294,7 +3294,7 @@ Filed with `sb-5v3i`, campaign-031's lane H. `sb-0q0z` implements.
 
 ## Amendment (2026-09-05): decision 10, the `core.map` row
 
-**Status: proposed (2026-09-05).** Drafted for `sb-7haw` under the operator
+**Status: accepted (2026-09-05).** Drafted for `sb-7haw` under the operator
 campaign-031 grant, and merging at proposed under that campaign's invariant;
 flipping it to accepted is a separate gated request. Additive: decision 10's
 original seven-row table stands, the 2026-08-28 amendment's section D stands,
@@ -3901,7 +3901,7 @@ campaign-033 ruling `RQ-033-3`.
 
 ## Amendment (2026-09-06): decision 10's `core.branch` row and the environment table row, now that `slots/1` returns `undecided`
 
-**Status: proposed (2026-09-06).** Drafted for `sb-uewa` under the operator
+**Status: accepted (2026-09-06).** Drafted for `sb-uewa` under the operator
 campaign-034 grant, and merging at proposed under that campaign's invariant
 like every other section filed with it; flipping it to accepted is a separate
 gated request. Additive; decision 10's original seven-row table stands, every
@@ -9615,7 +9615,7 @@ file.
 
 ## Amendment (2026-09-08): `B3`'s length arm gains a face carve-out - an over-cap summary chip is drawn clipped with an ellipsis, and the finding that says so is read in the drawer
 
-**Status: proposed (2026-09-08, campaign SF039, bead `sb-tx1b`, recording
+**Status: accepted (2026-09-08, campaign SF039, bead `sb-tx1b`, recording
 campaign-SF039's ruling `RQ-SF039-6`).** A decision record merges at proposed
 under the campaign invariant; flipping it to accepted is a separate gated
 request through the same `docs/adr/` gate, and campaign SF039 names no bead
@@ -9997,7 +9997,7 @@ row and flips no status line in this file.
 
 ## Amendment (2026-09-12): a composite declares its own outcomes - an optional `outcomes` key that replaces the derived list, checked against what the expansion can raise
 
-**Status: proposed (2026-09-12, campaign SF041, bead `sb-ndw1`, recording
+**Status: accepted (2026-09-12, campaign SF041, bead `sb-ndw1`, recording
 campaign-SF041's ruling `RQ-SF041-2`).** A decision record merges at proposed
 under the campaign invariant, and this one **stays** proposed at that
 campaign's wrap: `RQ-SF041-2` ruled the record first and named `sb-5ee4` as the
@@ -11013,7 +11013,7 @@ Filed with `sb-xoll`, campaign SF044.
 
 ## Amendment (2026-09-13): a composite's declared outcomes are raised by the composite itself, which is what makes them reachable by the enclosing body - `C6`
 
-**Status: proposed (2026-09-13, campaign RF046, bead `sb-3vug`, recording
+**Status: accepted (2026-09-13, campaign RF046, bead `sb-3vug`, recording
 `RQ-RF046-2`).** A decision record merges at proposed under the campaign
 invariant, and this one **stays** proposed at that campaign's wrap. **Nothing
 below describes code that exists today.** `RQ-RF046-2` ruled the record first
@@ -11481,7 +11481,7 @@ Filed with `sb-9j5e`, campaign RF046.
 
 ## Amendment (2026-09-13): an enclosing body selects on a declaring composite's outcome through a derived `on_<name>` slot - `C7`
 
-**Status: proposed (2026-09-13, campaign RF046, bead `sb-gu5q`, recording
+**Status: accepted (2026-09-13, campaign RF046, bead `sb-gu5q`, recording
 `RQ-RF046-17`).** A decision record merges at proposed under the campaign
 invariant, and this one **stays** proposed at that campaign's wrap. **Nothing
 below describes code that exists today.** `RQ-RF046-17` ruled this record
@@ -11838,7 +11838,7 @@ Filed with `sb-gu5q`, campaign RF046.
 
 ## Amendment (2026-09-14): an interrupt handler names the outcome it abandons its group with - `C8`
 
-**Status: proposed (2026-09-14, campaign RF047, bead `sb-algi`, recording
+**Status: accepted (2026-09-14, campaign RF047, bead `sb-algi`, recording
 `RQ-RF047-2` and `RQ-RF047-3`).** A decision record merges at proposed under
 the campaign invariant, and this one **stays** proposed at that campaign's
 wrap. **Nothing below describes code that exists today.** `RQ-RF047-2` ruled
@@ -13020,7 +13020,7 @@ Filed with `sb-63wg`, campaign RF050.
 
 ## Amendment (2026-09-18): a composite may declare its outcomes as a function of its own config, and every reader of the declared list reads that instance's - `C9`
 
-**Status: proposed (2026-09-18, campaign RF055, bead `sb-rkna`, recording the
+**Status: accepted (2026-09-18, campaign RF055, bead `sb-rkna`, recording the
 operator's ruling of 2026-09-18, "Yes, per-instance declaration").** A decision
 record merges at proposed under the campaign invariant, and this one **stays**
 proposed at that campaign's wrap. **Nothing below describes code that exists
@@ -13983,3 +13983,101 @@ whether any Amendment above is ready to flip, which remains the operator's on
 each one's own request.
 
 Filed with `sb-17wn`, campaign RF058.
+
+## Note (2026-09-19): ten long-proposed sections are flipped to accepted, and the `outcome_of:` Amendment stays proposed
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only lines this request changes above it are
+ten status lines, each by one word, `proposed` to `accepted`. Everything else
+is this Note, at the foot of the file, so no line another record cites moves.
+
+The operator delegated the flip-or-file judgement over this file's
+long-proposed sections, on 2026-09-18, to the request that carries this Note:
+flip each section the code on `main` implements, and file a bead for each
+section it does not. That is the "separate gated request" each flipped
+section's status paragraph names, and it runs through the same `docs/adr/`
+direction gate.
+
+Every `lib/` cite below was read at `main` `bda200f` and is written anchor
+first, line second. Each flipped section's own cites stay labelled with the
+SHA they were read at and are re-located by their anchors; this Note
+re-counts none of them.
+
+### The ten sections flipped, and where the code implements each
+
+| Section | Status line | Read in the code at `bda200f` |
+|---|---|---|
+| decision 7, the `{:path, opts}` field type (`:2761`) | `:2763` | `@type field_type` carries `{:path, path_opts()}` (`block_type.ex:193`); `datamodel_path?/1` answers the claim for either spelling (`block_type.ex:1222`) |
+| decision 10, the `core.await` row, `G14` (`:2878`) | `:2880` | `StatifierBlocks.Core.Await`: `config_schema/1` (`core/await.ex:97`), `outcomes/1` (`:123`), `io/1` (`:163`) |
+| decision 10, the `core.map` row, `G15` (`:3295`) | `:3297` | `StatifierBlocks.Core.Map`: `invoke_type/0` (`core/map.ex:341`), `outcomes/1` (`:364`), `config_schema/1` (`:426`) |
+| decision 10's `core.branch` row and the environment table row (`:3902`) | `:3904` | `StatifierBlocks.Core.Branch.slots/1` ends `otherwise`, then `undecided` (`core/branch.ex:100`) |
+| `B3`'s face carve-out, `C1` to `C3` (`:9616`) | `:9618` | `drawn_chips/3` clips a `:too_long` chip (`block_type.ex:1930`) through `clip/1` (`:1949`); `face_findings/1` keeps the finding off the card face (`editor/block_node.ex:757`) |
+| declared outcomes, `C1` to `C5` (`:9998`) | `:10000` | `@declaration_options` carries `:outcomes` (`composite.ex:319`); `unraisable_outcomes/5` (`composite.ex:993`) feeds the `:outcome_not_raisable` Resolve finding (`compiler.ex:876`) |
+| `C6` (`:11014`) | `:11016` | `emit_declaring/2` emits the composite's own state and one `<final>` per declared name (`compiler.ex:2334`) |
+| `C7` (`:11482`) | `:11484` | `derived_slots/2` appends one `on_<name>` slot per declared name (`composite.ex:726`) |
+| `C8` (`:11839`) | `:11841` | `StatifierBlocks.Core.OnEvent.outcomes/1` answers a `finish_as` name (`core/on_event.ex:465`); `check_finish_as/2` holds item 4's refusals (`:543`) |
+| `C9` (`:13021`) | `:13023` | `@optional_callbacks declared_outcomes: 1` (`composite.ex:314`); `refute_both_outcome_spellings!/1` (`:467`); `declared_outcome_problems/2` (`:820`) |
+
+### What stays proposed
+
+- **The `outcome_of:` Amendment (`:9181`, status line `:9183`).** The code it
+  describes is not on `main`: nothing under `lib/` names `outcome_of`, and the
+  placeholder vocabulary still has the one arm the private `substitute/2` in
+  `composite/data.ex` reads. Its own status paragraph says it stays proposed
+  until the campaign that builds it. `sb-bv7k` is filed for that build.
+- **The Amendment of 2026-09-18 on a minted id (`:13810`).** It was proposed
+  in the campaign that carries this Note, so it is not long-proposed and is
+  outside this request.
+
+### Sentences in the flipped sections that name their own status
+
+They are met here, not edited.
+
+- Every one of the ten status paragraphs says the section merges or stays at
+  proposed, and every one but `C7`'s, `C8`'s and `C9`'s adds that flipping it
+  is a separate or later gated request. This is that request. `B3`'s
+  carve-out adds that its campaign "names no bead that files one"
+  (`:9618-9623`); this request is the one.
+- The paragraphs of `C1` to `C5`, `C6`, `C7`, `C8` and `C9` each say that
+  nothing below them describes code that exists, and `G14`'s says the row is
+  written ahead of its module (`:2885-2886`). The table above is where each
+  now reads in the code, so those sentences describe the day each section was
+  written.
+- `C5`'s last bullet ends "both are proposed and unbuilt at `b39c023`"
+  (`:10212-10213`), and `C6`'s list of what it does not decide says the
+  `outcome_of:` Amendment and `C6` "Both remain proposed" (`:11205-11206`).
+  After this Note the `outcome_of:` Amendment alone stays proposed and
+  unbuilt.
+- `C9`'s list of what it does not decide says whether `C1` to `C8` are ready
+  to flip "remains the operator's on each one's own request, and this section,
+  like them, merges at proposed" (`:13429-13430`), and several Notes above say
+  the same of the sections before them. The operator's delegation of
+  2026-09-18 is that word for these ten sections.
+- This file's head `Status:` line (`:3`) is not extended. It lists the
+  amendments accepted up to 2026-08-30, and no flip since has extended it.
+
+### Sentences in the flipped sections that later records supersede
+
+Each is superseded by a dated section that names the change, and none
+reverses what the flipped section decides.
+
+- The `{:path, opts}` section's "an eighth member" (`:2801`) and "`opts`
+  carries no defined key today" (`:2821`): the Note of 2026-09-06 at `:3456`
+  gives `opts` its first two keys, and the `{:type_expr, opts}` Amendment at
+  `:4957` makes the set nine.
+- `G15`'s four config fields and `G15a`'s four `<param>` elements: the Note at
+  `:3981` counts six fields, the Note at `:5546` names `collect_type` as the
+  seventh, and `ADR-0009`'s Note of 2026-09-06 on `item_as` and `index_as`
+  (`docs/adr/0009-fan-out-block-type.md:860`) records the two reaching the
+  emission.
+- `B3`'s carve-out says a clipped chip's `title` carries its full text
+  (`:9673-9674`). For a chip that is both translated and over the cap,
+  `ADR-0005`'s Note of 2026-09-12 (`docs/adr/0005-liveview-editor.md:10948`)
+  puts the declared event name on the `title` instead.
+- `C6`'s "No slot is minted here, and none exists today" (`:11131`): `C7`
+  derives the `on_<name>` slots.
+- `C8` item 7, that the canvas draws a named handler as `abandon`: the Note at
+  `:13452` records that `ADR-0005`'s Amendment of 2026-09-18
+  (`docs/adr/0005-liveview-editor.md:11436`) answers it.
+
+Filed with `sb-rov2`, campaign RF058.
