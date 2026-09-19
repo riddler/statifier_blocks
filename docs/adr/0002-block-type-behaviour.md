@@ -13673,3 +13673,113 @@ whether any Amendment above is ready to flip, which remains the operator's on
 each one's own request.
 
 Filed with `sb-f3iq`, campaign RF055.
+
+## Note (2026-09-18): a fifth cite tidy by addition - `C1`'s and `C2` item 4's composite cites re-located, two `C9` cites given their anchors, and two `C9` sentences stated exactly
+
+Campaign RF058, bead `sb-bckf`.
+
+Nothing above this line is edited. Every correction below is a later dated
+line: no rule, decision, clause or heading changes, this Note carries no
+`Status:` line, it flips nothing, it changes no code and it adds no changelog
+fragment. Every `lib/` and `test/` position below is given at the SHA it was
+read at, beside the anchor it was located by; a later reader re-locates by the
+anchor and not by the number.
+
+**Why a note and not an amendment.** `docs/adr/README.md`'s test is that "an
+amendment changes what the record decides and a note does not: a note records
+where something already decided renders, or what a sentence already accepted
+was about". Every item below is about where a cited thing sits, or what a
+sentence already written was about. None of them changes what `C1`, `C2` or
+`C9` decides.
+
+### 1. `C1`'s two composite cites, exact where they were read and moved since
+
+The Amendment of 2026-09-12 (`:9998`) says its `lib/` cites were read at
+`main` `b39c023` (`:10016`). Its cites of `@declaration_options` as
+`composite.ex:255` and of `@type declaration` as `composite.ex:231-238`, at
+`:10060-10063` and again inside `C1` at `:10080-10081`, are exact at
+`b39c023`: the attribute is on `:255` and the type opens on `:231` and closes
+on `:238` there. Both moved afterwards. At `eedde40`:
+
+- `@declaration_options [:name, :params, :sentence, :palette_entry, :version,
+  :slots, :outcomes]` is **`composite.ex:309`**;
+- `@type declaration :: %{` opens on **`composite.ex:247`** and its map closes
+  on `:255`, with `outcomes: [String.t()]` on `:254`.
+
+The sentences that cite them are unchanged. The first site describes the
+declaration as it stood before `C1` (six options, six fields), and that is
+still what it says it describes.
+
+### 2. `C2` item 4's `subtree/1` cite, exact where it was read and moved since
+
+`C2` item 4 (`:10148`) cites `subtree/1` as `composite.ex:250`. At `b39c023`
+that line is `@callback subtree(Block.config()) :: [Block.t()]`, so the cite
+was exact where it was read. At `eedde40` the same `@callback` is
+**`composite.ex:275`**. What item 4 argues from it is unchanged.
+
+### 3. `C9`'s `block_type.ex:33` cite, and the attribute it means
+
+`C9`'s arity paragraph (`:13221-13223`) says optional callbacks "are already
+this package's practice on the other behaviour" and cites `block_type.ex:33`.
+At `6ea2afe`, the SHA `C9` says it read at, and again at `eedde40`, that line
+is moduledoc prose inside `## Required and optional callbacks` that lists the
+optional callbacks. The attribute itself, `@optional_callbacks io: 1,`, opens
+on **`block_type.ex:839`** at both SHAs, and that is the stronger anchor for
+the sentence. The sentence is unchanged.
+
+### 4. `C9`'s bare `composite.ex:1050` cite, given its anchor
+
+`C9`'s precedence paragraph (`:13210-13211`) says a type writing both
+spellings is refused "in the shape `composite.ex:1050` already refuses an
+unrecognized `use` option", with no anchor beside the number. At `6ea2afe`,
+`defp refute_unknown_options!(opts) do` is `composite.ex:1049`, `:1050` is its
+`case` head, and its `raise ArgumentError,` is `:1055`. At `eedde40` the same
+function is **`composite.ex:1284`** (`@spec` `:1283`), its `case` head `:1285`
+and its `raise ArgumentError,` **`:1290`**. The sentence's claim - a refusal by
+name as the using module compiles - is unchanged.
+
+### 5. The `derived_outcomes(ref, config)` call at `:675` is a pipe
+
+The composite's `outcome_slots/3` bullet in `C9`'s "The gap, and what is true
+of the code today" (`:13126-13127`) says that function "calls
+`derived_outcomes(ref, config)` (`:675`)". At `6ea2afe` the text there is a
+pipe: `ref` on `composite.ex:674`, then `|> derived_outcomes(config)` on
+`:675`. It is the same call with `ref` as its first argument, written as a
+pipe; the bullet's quoted call shape is a paraphrase of those two lines, not
+the text at `:675`. `C9f`'s editor bullet (`:13358-13362`) writes the call the
+same way, without a line number, and is read the same way. At `eedde40`
+`outcome_slots/3` is one clause, `defp outcome_slots(_declaration, ref,
+config) do` at **`composite.ex:746`**, and the pipe is `ref` on `:752` and
+`|> derived_outcomes(config)` on **`:753`**, inside a `case` over
+`declared_outcomes(ref, config)` (`:747`); the bullet's "Only its guard is
+type-level" describes `6ea2afe`, where the section says it read.
+
+### 6. `C9c`'s "called from functions that do hold the block" is a sentence about `lib/`
+
+`C9c` (`:13284-13286`) says that `declared_outcome_names/1` and
+`unraisable_outcomes/4` "are called from functions that do hold the block".
+That is true of every `lib/` caller at `6ea2afe`, and the section declares its
+cites to be `lib/` cites (`:13070-13071`), so the sentence is read as a
+sentence about `lib/`. It is not a sentence about every caller:
+`unraisable_outcomes/4` was also called directly from
+`test/statifier_blocks/composite/declared_outcomes_test.exs` at `6ea2afe`, at
+`:822`, `:889`, `:922`, `:948` and `:1022`, with no block among the
+arguments. At `eedde40` the function is `unraisable_outcomes/5`
+(`composite.ex:983`, `def unraisable_outcomes(%Palette{} = palette, ref,
+config, members, param_map) do`), and its direct `test/` calls pass a config
+map as the third argument: `declared_outcomes_test.exs` `:822`, `:895`,
+`:928`, `:954` and `:1029`, and
+`test/statifier_blocks/composite/per_instance_outcomes_test.exs` `:725`.
+
+### What this line does not do
+
+It decides nothing, adds no key, callback, field type, slot or finding, and
+edits no line in this file or in any other record. `C9`'s other `lib/` cites
+are exact at `6ea2afe`, the SHA it says it read at, and the request that
+built `C9` moved `composite.ex` and `compiler.ex` after it; this Note
+re-locates only the cites it names, and a reader re-locates the rest by the
+anchors `C9` writes beside them. It takes no position on whether `C1`, `C2`,
+`C9` or any Amendment above is ready to flip, which remains the operator's on
+each one's own request.
+
+Filed with `sb-bckf`, campaign RF058.
