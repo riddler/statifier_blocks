@@ -14085,14 +14085,14 @@ itself one of the ten flipped here, it is named by its label.
   text (`:9673-9674`). For a chip that is both translated and over the cap,
   `ADR-0005`'s Note of 2026-09-12 (`docs/adr/0005-liveview-editor.md:10948`)
   puts the declared event name on the `title` instead, as the pointer line at
-  `:10714-10716` records.
+  `:10714-10721` records.
 - **`C1`.** Its `outcomes:` option as a list, and its rule that an explicit
   empty list is the same as an absent key (`:10082-10084`): `C9` narrows both
   by addition, adding a per-instance callback and reading the empty-list rule
   per instance (`C9b`).
 - **`C2` item 1.** Whether a composite whose declaration drops a name its
   root still raises deserves a finding "is not decided here"
-  (`:10112-10113`): item 1 of the Note at `:10544` decides it, with no
+  (`:10111-10113`): item 1 of the Note at `:10544` decides it, with no
   finding.
 - **`C2` item 2.** The raisable set as the union over every minted member
   (`:10115-10123`): item 4 of the Note at `:10544` narrows it to the members
@@ -14118,13 +14118,26 @@ itself one of the ten flipped here, it is named by its label.
   composite narrows.
 - **`C6`, `C7` item 5 and `C8`, on failure classing.** `C6`'s "still
   undecided" (`:11199-11201`), `C7`'s "What stays open is the
-  **derivation**" (`:11736-11737`) and `C8`'s bullet leaving a named
+  **derivation**" (`:11737`) and `C8`'s bullet leaving a named
   outcome's failure class open (`:12180`): the Note at `:12200` decides it,
   by hand only, with no `:failure` slot style on a derived slot.
 - **`C7`'s premise and item 5.** "the two places a composite's slot list is
   answered" (`:11528-11532`) and item 5's "today" (`:11732-11733`): item 4 of
   the Note at `:12293` reads both narrowly, the first as the two call sites
   it quotes and the second as a statement under `C6`.
+- **`C6` and `C7`, on closing `k2`'s gap.** `C6`'s "A reader who wants the
+  whole of `k2` closed needs this section and the record that answers the
+  selection half" (`:11035-11036`), `C7`'s "Together the two sections close
+  the gap campaign SF040's capture `k2` measured; neither closes it alone"
+  (`:11501-11502`), and `C7`'s "and Back goes back" (`:11784`): `C8`'s
+  preamble records that the two close the raising and routing halves only,
+  and that nothing lets one interrupt handler name its outcome
+  (`:11853-11856`).
+- **`C8`'s preamble.** "This section is the third half, and the three close
+  the gap together; none closes it alone" (`:11860-11861`): `C9`'s dated line
+  on `C8`'s measurement (`:13387`) records that it holds for the one-screen
+  arrangement it was measured on and does not hold for a composite whose
+  declared names are config-derived (`:13401-13402`).
 - **`C8` item 3 and its two-id-functions bullet.** "every caller threads it
   through a `with`" (`:11921-11922`, repeated at `:12062-12063`): item 1 of
   the Note at `:12703` reads it as threading the tagged return, a `case` at
@@ -14135,7 +14148,7 @@ itself one of the ten flipped here, it is named by its label.
   Note at `:13452` records that `ADR-0005`'s Amendment of 2026-09-18
   (`docs/adr/0005-liveview-editor.md:11436`) answers it.
 - **`C9`.** Its `outcome_slots/3` bullet, "Only its guard is type-level"
-  (`:13126-13127`): item 5 of the Note at `:13677` dates it to the SHA the
+  (`:13126-13128`): item 5 of the Note at `:13677` dates it to the SHA the
   section read. `C9c`'s "called from functions that do hold the block"
   (`:13284-13286`): item 6 of that Note reads it as a sentence about `lib/`.
   `C9d`'s "decision 1 forbids this pipeline to raise" (`:13325-13326`): the
