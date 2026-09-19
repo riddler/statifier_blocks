@@ -11879,12 +11879,24 @@ long-proposed sections, on 2026-09-18, to the request that carries this Note:
 flip each section the code on `main` implements, and file a bead for each
 section it does not. That is the "separate gated request" the status
 paragraphs name, and it runs through the same `docs/adr/` direction gate.
-Every long-proposed section in this file is implemented, so none stays
-proposed and none is filed.
+Every section in this file whose Status line reads proposed is implemented,
+so none of them stays proposed and none is filed. One clause is outside that
+count: `14f`, in the Amendment of 2026-08-28 on decision 14 (`:836`), whose
+Status line reads "accepted in part" and keeps `14f` proposed for the
+candidate tokens not yet declared (`:838`, and the Note of 2026-08-29 at
+`:1576`, whose heading at `:1672` reads "PARTLY LANDED, the rest still
+PROPOSED"). It is a clause of an
+accepted section rather than a section whose Status line reads proposed, so
+this request neither flips it nor files for it.
 
 Every `lib/` cite below was read at `main` `bda200f` and is written anchor
-first, line second. Each flipped section's own cites stay as written and are
-re-located by their anchors; this Note re-counts none of them.
+first, line second. The `finish_as` Amendment and the delete-offer Amendment
+label their own cites with the SHA or the request they read them at, and
+give an anchor beside each. The compound-command, `singleton` and
+whole-document-rule sections cite bare line numbers with no anchor and no
+SHA, and those numbers now point at other code; the section *Cites in
+three flipped sections, re-located* below re-locates each of them. The
+other four sections cite no `lib/` line.
 
 ### The nine sections flipped, and where the code implements each
 
@@ -11947,8 +11959,10 @@ reverses what the flipped section decides.
 - `10w`'s "10n and 10o are unchanged" subsection reads the cap as 24 and
   keeps refuse-never-truncate. The Note of 2026-09-08 item 2 (`:10418`) moves
   the cap to 32 and sends the finding to the drawer; `ADR-0002`'s carve-out
-  of that date (`docs/adr/0002-block-type-behaviour.md:9616`) draws an
-  over-cap summary chip clipped; and the Note of 2026-09-12 (`:10948`) puts
+  of that date (`docs/adr/0002-block-type-behaviour.md:9616`), which was
+  proposed at `bda200f` and which the request flipping `ADR-0002`'s
+  long-proposed sections flips, draws an over-cap summary chip clipped; and
+  the Note of 2026-09-12 (`:10948`) puts
   the declared event name on the `title` of a chip that is both translated
   and over the cap.
 - The compound-command section's "Deleting a deadline is deleting two
@@ -11957,6 +11971,42 @@ reverses what the flipped section decides.
 - The `singleton` section's "not decided here" for a host
   `validate_document/1`: the section at `:6291` decides it, and the Note at
   `:6727` records its code.
+
+### Cites in three flipped sections, re-located
+
+The compound-command section (`:5608`), the `singleton` section (`:5834`) and
+the whole-document-rule section (`:6291`) cite `lib/` by bare line number,
+read on 2026-09-05 with no SHA and no anchor. Each is re-located here by the
+anchor its own sentence names, read at `bda200f`. Where the section cites the
+same line twice, one row covers both.
+
+| Cited at | Cited as | Anchor | At `bda200f` |
+|---|---|---|---|
+| `:5633` | `palette.ex:38-43`, the map from `type_name` to module | `@type t`'s `types:` field | `palette.ex:131` |
+| `:5708` | `palette.ex:143-147`, the collision rule | `from_modules/2`'s doc, "later entries win" | `palette.ex:355` |
+| `:5770` | `core/sequence.ex:14` | the moduledoc sentence "A sequence has no `interrupts` slot" | `core/sequence.ex:14`, unmoved |
+| `:5784` | `palette.ex:87`, `core_types/0` | `def core_types` | `palette.ex:219` |
+| `:5852` | `view_model.ex:15-28`, the per-block derived sources | the moduledoc heading "The derived finding sources, and the compiler adapter" | `view_model.ex:16` |
+| `:5858` | `validation.ex:49-52` | `def validate(%Document{} = document)` | `validation.ex:49-52`, unmoved |
+| `:5858` | `validation.ex:120-127`, datamodel ids unique | `check_datamodel_unique_ids/1` | called at `validation.ex:127`, head `:191` |
+| `:5922`, `:6403` | `finding.ex:63`, the source enum | `@type source` | `finding.ex:63`, unmoved |
+| `:5928`, `:6393` | `finding.ex:39-42`, the anchor enum | `@type anchor` | `finding.ex:39-42`, unmoved |
+| `:5931`, `:6434` | `document.ex:47-55`, `root` typed `Block.t()` | `@type t`'s `root:` field | `document.ex:57` |
+| `:6337` | `palette.ex:56-62`, the struct | `defstruct` | `palette.ex:137` |
+| `:6342` | `palette.ex:80-86`, `new/2`'s options | `new/2`'s `Options:` list | `palette.ex:145-161`, head `:178` |
+| `:6350` | `palette.ex:69-73`, the `assignability` relation | `@type t`'s `assignability:` field | `palette.ex:133` |
+| `:6398`, `:6423` | `view_model.ex:1026`, the `validate_config/1` call | `config_findings/3`'s `Palette.call(ref, :validate_config, ...)` | `view_model.ex:1946`, head `:1944` |
+| `:6412` | `finding.ex:90` and `:100`, the default severity | `defstruct`'s `severity: :error`; `new/4`'s `Keyword.get(opts, :severity, :error)` | `finding.ex:90`, unmoved; `finding.ex:106` |
+| `:6441` | `view_model.ex:423-424` and `:434`, the orphan split | `build/3`'s `Enum.split_with/2` | `view_model.ex:518`, head `:512` |
+| `:6450` | `compiler.ex:405-410`, the compiler's `orphan_findings` | `defp orphan_findings(palette, %Block{slots: slots})` | `compiler.ex:1127` |
+| `:6458` | `view_model.ex:841-853`, the sort in `singleton_findings` | no function of that name exists at `bda200f`; the sort is `singleton_specs/2`'s `Enum.sort_by(&elem(&1, 0))` | `view_model.ex:1635`, head `:1630` |
+| `:6484` | `core/send.ex:24-30`, a send completes in the macrostep it arms | the moduledoc heading "The block finishes when the send is **armed**" | `core/send.ex:24-30`, unmoved |
+| `:6520` | `compiler.ex:741-758` and `:795-809`, the `deadline_lost_on_resume` finding | `deadline_warnings/1` and `deadline_warning/1` | `compiler.ex:2053` and `:2107` |
+| `:6524` | `:756-757`, the two conjuncts | `deadline_lost_on_resume?/1`'s `armed_head?/1 and resumes?/1` | `compiler.ex:2066-2069` |
+
+Every row's claim holds at its new location. `11t`'s `singleton_findings`
+row is the one name that changed: the sort `11t` cites for its ordering
+reason is the same rule, now in `singleton_specs/2`.
 
 One observation from the `:duration` read, recorded and not a correction:
 three config values in the test "core.wait, core.send, core.raise and
