@@ -38,10 +38,63 @@ defmodule StatifierBlocks.Compiled do
       `[]` means the document declares nothing. Whether each name is one the
       chart can take is a host's publish-time question (ADR-0014 decision
       4), asked over `scxml` and this list together.
+
+  And one from ADR-0008's amendment of 2026-09-22, A5:
+
+    * `interface` - what this document offers a parent that invokes it,
+      and what it relies on from each child it invokes: see
+      `t:interface/0`. Recorded on every compile, whatever the chart-use
+      option, and a function of the same inputs the SCXML is. It adds
+      nothing to the SCXML, so nothing to chart identity, and it is not
+      carried onto `StatifierBlocks.CompilationRecord`. The package reads
+      it in one place, `StatifierBlocks.Graph`, whose two checks a host's
+      publish step calls.
   """
 
-  alias StatifierBlocks.{CompilationRecord, Provenance}
+  alias StatifierBlocks.{Block, CompilationRecord, Provenance}
   alias StatifierBlocks.Compiler.Finding
+
+  @typedoc """
+  One block of this document that names another document to run (ADR-0008's
+  amendment of 2026-09-22, A1's parent side).
+
+    * `block_id` - the referencing block, which a finding about this
+      reference is anchored on.
+    * `document_id` - the document the block names in its `chart` field.
+    * `routes_on` - the child outcomes the block routes on: a
+      `core.subchart`'s `outcomes` as
+      `StatifierBlocks.Core.Subchart.child_outcomes/1` reads them, so
+      `["done"]` when the author listed none. A `core.map` routes on none
+      of its child's outcomes, so `[]`.
+    * `reads` - the child done-data keys the block reads: the members a
+      `core.map`'s `collect_type` marks required, when it resolves to
+      members - its inline arm, or a name the compile's `:datamodel`
+      declares. A `core.subchart` reads none, so `[]`.
+  """
+  @type child_reference :: %{
+          block_id: Block.id(),
+          document_id: String.t(),
+          routes_on: [String.t()],
+          reads: [String.t()]
+        }
+
+  @typedoc """
+  The document's side of the parent/child interface (A1, A5).
+
+    * `declared_outcomes` - the outcomes the document's root block
+      declares: the set a `:child_use` compile gives one top-level
+      `<final>` each.
+    * `declared_donedata_keys` - the names the root block type's
+      `donedata_type/1` declares, which a `:child_use` compile emits as
+      `<param>`s.
+    * `references` - one `t:child_reference/0` per block that names another
+      document, in document pre-order.
+  """
+  @type interface :: %{
+          declared_outcomes: [String.t()],
+          declared_donedata_keys: [String.t()],
+          references: [child_reference()]
+        }
 
   @type t :: %__MODULE__{
           scxml: binary(),
@@ -49,9 +102,18 @@ defmodule StatifierBlocks.Compiled do
           record: CompilationRecord.t(),
           invoke_types: [String.t()],
           warnings: [Finding.t()],
-          accepts: [String.t()]
+          accepts: [String.t()],
+          interface: interface()
         }
 
   @enforce_keys [:scxml, :provenance, :record]
-  defstruct [:scxml, :provenance, :record, invoke_types: [], warnings: [], accepts: []]
+  defstruct [
+    :scxml,
+    :provenance,
+    :record,
+    invoke_types: [],
+    warnings: [],
+    accepts: [],
+    interface: %{declared_outcomes: [], declared_donedata_keys: [], references: []}
+  ]
 end

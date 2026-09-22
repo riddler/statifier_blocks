@@ -199,7 +199,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       about a field, a slot or the block itself, which is decision 11's whole
       routing rule made visible.
     * **Source** is the enum value, as a chip: `:config`, `:assignability`,
-      `:resolution`, `:lint`, `:compile`. It answers "who says so", which is
+      `:resolution`, `:lint`, `:compile`, `:graph`. It answers "who says so", which is
       the question an author asks about a finding they disagree with.
     * **Message** is the sentence, and the only cell allowed to wrap.
     """

@@ -59,8 +59,15 @@ defmodule StatifierBlocks.Finding do
       grow a value every time the compiler grows a stage. The anchor still
       decides where the finding renders; the source only says where it
       came from.
+
+  ADR-0008's amendment of 2026-09-22 (A5) grows it by one value:
+
+    * `:graph` - the rule lives on an edge of the host's document graph, a
+      parent and the child it names, rather than in one document.
+      `StatifierBlocks.Graph` is its only producer, always at `:error`,
+      and `from_compiler/2` never produces it: no compile sees a child.
   """
-  @type source :: :config | :assignability | :resolution | :lint | :compile
+  @type source :: :config | :assignability | :resolution | :lint | :compile | :graph
 
   @typedoc """
   Three-valued since the 2026-08-29 amendment to ADR-0005 decision 11.
