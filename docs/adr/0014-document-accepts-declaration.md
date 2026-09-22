@@ -30,8 +30,10 @@ today it can only guess it.** A document's chart listens to whatever its
 transitions name. Some of those names are meant to arrive from outside - a
 patron registration waits for the host to say the visitor's email address
 was verified - and some are the chart talking to itself: a `core.send` to
-self, a clock interrupt's delayed event (ADR-0010), the completion events
-the compiler emits for its own sequencing (ADR-0004 decision 2). From the
+self, a clock interrupt's delayed event (ADR-0010), the `done.state`
+completion events the compiler wires its own sequencing on, which the
+interpreter raises when a state enters its `<final>` (ADR-0004 decision 2).
+From the
 chart alone the two kinds look the same. An author who means "this document
 accepts `email.verified` from outside, and nothing else" has nowhere to say
 it, so a host that binds external sources to documents cannot tell a typo in
@@ -246,9 +248,12 @@ The tree holds a `core.await` on `email.verified` and, on the rail of the
 group around it, a `core.on_event` on `registration.abandoned`. The same
 group carries a clock interrupt in ADR-0010's spelling - a delayed
 `core.send` to self at the head of its body, caught by a second
-`core.on_event` on its rail - that reminds the visitor after a day, and the
-compiler emits its own `done.state` completion transitions between the
-steps (ADR-0004 decision 2).
+`core.on_event` on its rail whose outcome is `abandon` - a deadline: if a
+day passes before either event arrives, the interrupt abandons the group,
+and with it the wait on `email.verified` (ADR-0010). The compiler also
+wires its own
+transitions between the steps on `done.state` completion events (ADR-0004
+decision 2).
 
 - **The compile.** `compile/3` succeeds as it did before; the SCXML and the
   chart identity are what they would be with no `accepts` key at all, and
@@ -256,7 +261,7 @@ steps (ADR-0004 decision 2).
   `["email.verified", "registration.abandoned"]`.
 - **The publish check.** The host calls `Statifier.Chart.check_accepts/2`
   with the machine and the carried list. Both names are matched by a
-  reachable descriptor, so nothing is unreachable. The reminder's event and
+  reachable descriptor, so nothing is unreachable. The deadline's event and
   the completion descriptors are reachable and undeclared: internal, and not
   an error. The publish proceeds.
 - **A declared name the chart cannot take.** The author deletes the
@@ -267,7 +272,7 @@ steps (ADR-0004 decision 2).
   the name.
 - **No declaration.** The same document with `"accepts"` omitted accepts the
   computed set, `email.verified` and `registration.abandoned` among it, and
-  also the reminder's event, because nothing marked it internal. That is the
+  also the deadline's event, because nothing marked it internal. That is the
   looser contract decision 5 describes, and the reason a host may require
   the declaration.
 
@@ -293,6 +298,36 @@ steps (ADR-0004 decision 2).
   the panel row of decision 6 is an authoring surface only. No finding
   anchor for a document-level declaration is added.
 
+## What this record owes the accepted records
+
+Three accepted records read differently once the code that builds this one
+has landed, because each spells out in full a set this record grows. They are
+not edited here. Each change is owed as an `## Amendment` on its owning
+record, carried by a follow-up request through the same `docs/adr/` gate,
+citing this record.
+
+- **ADR-0001, decision 11's 11e and decision 7.** 11e names the envelope-key
+  allowlist in full - `datamodel`, `id`, `metadata`, `revision`, `root`,
+  `schema_version` - and was itself an Amendment on ADR-0001. Decision 2 of
+  this record adds `accepts` to that list. Decision 7's bump criterion is
+  worded as "when this record is amended in a way that changes bytes", and
+  `accepts` is added by a different record; the amendment owed states that
+  the criterion applies to the envelope wherever the key is decided, so the
+  "no bump" of decision 2 above is ADR-0001's reading and not only this
+  record's. The typespec appendix's `%Document{}` is part of the same
+  change.
+- **ADR-0004, decisions 1 and 7.** Decision 1 lists what the compiled
+  artifact carries - the SCXML, the provenance map, the compilation record,
+  the emitted invoke types and the warnings - and decision 7 spells out
+  `%CompilationRecord{}` field by field; the typespec appendix repeats both
+  as `compiled` and `compilation_record`. Decision 3 of this record adds
+  `accepts` to each.
+- **ADR-0005, decision 2 as amended by 2g.** Decision 2 is a closed command
+  set, and 2g grew it from four to five as an amendment, in its words
+  because "decision 2 says its command set is closed at four, and this
+  section makes it five". Decision 6 of this record adds `{:set_accepts, [String.t()]}` as the sixth, beside
+  `{:set_datamodel, _}`, under 2g's and 2h's rules.
+
 ## Consequences
 
 - **A host can tell the events a document exposes from the events it keeps
@@ -304,13 +339,6 @@ steps (ADR-0004 decision 2).
 - **An older reader refuses a document that declares.** A 0.32.0 decoder
   refuses the key by name; a document that declares nothing is readable by
   it as before.
-- **Two closed sets in earlier records grow by addition from this one.**
-  ADR-0001 11e's envelope-key allowlist gains `accepts`, and ADR-0005's
-  command set, five since that record's 2g, gains `{:set_accepts, _}`.
-  `%Compiled{}`, whose fields ADR-0004 decision 1 enumerates, and the record
-  ADR-0004 decision 7 describes gain a field each. None of those records is
-  edited by this one; each still reads as it did, and this record is where
-  the addition is decided.
 - **The publish check depends on the engine's two functions.** Until a
   published engine carries `Statifier.Chart.events/1` and
   `Statifier.Chart.check_accepts/2`, the envelope key, the carry and the
