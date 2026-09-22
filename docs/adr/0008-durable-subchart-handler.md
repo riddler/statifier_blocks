@@ -555,8 +555,14 @@ done-data keys the child declares.**
   `donedata_type/1` declares (ADR-0013 decision 2), which a `:child_use`
   compile emits as `<param>`s on every top-level final (ADR-0013 decision 3).
 - A `core.subchart` parent **routes on** the outcomes its author listed in
-  `outcomes` (`lib/statifier_blocks/core/subchart.ex:606`,
-  `def child_outcomes/1`, read at `aa657cd`). `error` is exempt, and a child
+  `outcomes`, read through `child_outcomes/1`
+  (`lib/statifier_blocks/core/subchart.ex:606`, `def child_outcomes/1`, read
+  at `aa657cd`), so a parent that listed none routes on `done` for this
+  check. That is the reading the check takes because it is what the compile
+  emits: `child_outcomes/1` answers `["done"]` for an empty field, and the
+  parent's conditioned `done` arm is built from that answer, so a child that
+  does not declare `done` leaves that arm dead exactly as a listed name
+  would. `error` is exempt, and a child
   is never required to declare it: `core.subchart` appends `error` to every
   parent's outcomes whether or not the author listed it, and a child reports
   an unhandled failure below its root as `error` without its root declaring
@@ -626,8 +632,10 @@ the runtime backstop for a reference that goes missing after publish.
   declared outcomes and declared done-data keys (A1's child side), and one
   entry per referencing block holding the block id, the referenced document
   id, the outcomes it routes on and the keys it reads (A1's parent side). It
-  is a function of the document and the palette alone, so ADR-0004 decision
-  6's determinism covers it as it covers every other field, and it adds
+  is a function of ADR-0004 decision 6's triple - the document's canonical
+  bytes, the palette and the compiler version. Decision 6 as written
+  guarantees the SCXML and the provenance map over that triple, and this
+  amendment extends the same determinism to `interface`. The field adds
   nothing to the SCXML and therefore nothing to chart identity. It is not
   added to `%CompilationRecord{}`.
 - **Every finding is a `StatifierBlocks.Finding` at `:error` severity with a
@@ -647,10 +655,14 @@ the runtime backstop for a reference that goes missing after publish.
 **How it stands beside the two existing checks.** `outcome_findings/3` is left
 as it is: it remains the editor's advisory at `:warning`, both directions,
 over a map a host may supply without holding compiled children. At publish,
-A2's forward check is the gate for the one direction that misroutes - an
-outcome the parent routes on that the child does not declare. The other
-direction, a child outcome the parent does not route on, is not refused: it
-takes the unconditioned arm by design. A host that builds `chart_outcomes`
+A2 and A3 refuse the **dead-arm** direction: an outcome the parent routes on
+that the child does not declare, whose conditioned arm can never match. That
+is how every drop or rename of a child outcome shows at the parent. The other
+direction, a child outcome the parent has **no** arm for - a child revision
+that adds an outcome, for one - is the one that misroutes: it falls to the
+unconditioned arm of ADR-0004's child-use amendment, C2, and so to the
+parent's first-listed path. It is not refused here; it stays with that arm
+and with `outcome_findings/3`'s `:warning`. A host that builds `chart_outcomes`
 from each child's recorded `interface` gets the same set in both places.
 `agrees?/3` is also left as it is: A2 checks that a read key is **declared**,
 not what type it has. Type agreement stays ADR-0013 decision 4's dormant
@@ -677,7 +689,10 @@ whether it walks it all at once; the host's document store, and what "active"
 means for a parent beyond "currently published and referencing this document
 id"; migration of any kind, automatic or not, of a parent or of a running
 execution; how the editor renders `:graph` findings, and whether it runs the
-check at edit time; a declaration for keys read under a `core.subchart`'s
+check at edit time; the misrouting direction - a child outcome its parent
+has no arm for, such as one a child revision adds - which is left to C2's
+unconditioned arm and the editor's `:warning`; a declaration for keys read
+under a `core.subchart`'s
 `assign_to`; the done-data types A2 does not check; and the parameters a
 parent passes to a child.
 
