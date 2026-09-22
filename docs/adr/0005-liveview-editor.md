@@ -12074,16 +12074,41 @@ field that failed. The only producer this amendment decides is
 field. `ViewModel.build/3` routes it to no node and does not put it in
 `orphan_findings`, which stays the list of findings naming a block id the
 document does not hold; it stays in `findings`, which is the document-level
-panel's source, and so in the count `Shell.findings_count/1` reports. In the
-Findings tab with nothing selected (`lib/statifier_blocks/shell.ex:1013`,
-`def findings_groups/3`), the `:document` findings form one group, placed
-**first**, headed as the document rather than as a block, and carrying
-`block_id: nil`, so there is nothing to select; the heading's words are the
-implementation's. The count badge on a collapsed subtree does not include it,
-since it belongs to no subtree. The two private `finding_block_id/1` clauses
-that read the anchor (`lib/statifier_blocks/view_model.ex:1971` and
-`shell.ex:1040`) gain the arm, since each raises on an anchor it does not
-know.
+panel's source, and so in the count `Shell.findings_count/1` reports. The
+count badge on a collapsed subtree does not include it, since it belongs to no
+subtree. Its rows, on both document-level surfaces:
+
+- **`data-anchor`.** `StatifierBlocks.Editor.Findings.anchor_tag/1`
+  (`lib/statifier_blocks/editor/findings.ex:237`, `def anchor_tag/1`), which
+  stamps `data-anchor` on every row of both surfaces, returns `"document"` for
+  a `:document` finding. That is a new value of a public return, spelled here.
+- **Cells.** In `Findings.row/1` (`findings.ex:206`, `def row/1`) the subject
+  cell reads `Document` and carries no block id, and there is no anchor-tail
+  cell: the subject is the whole anchor, as it is for `{:block, id}`. Severity,
+  source and message render as on every other row.
+- **The drawer's Findings tab** (`findings.ex:80`, `def findings/1`). A
+  `:document` row renders as a span, not as the reveal button: there is no
+  block to select, and no `select` event is pushed. It is stamped
+  `data-orphan="false"`, because it is not in `orphan_findings`.
+- **The inspector's Findings tab with nothing selected**
+  (`lib/statifier_blocks/shell.ex:1013`, `def findings_groups/3`). The
+  `:document` findings form one group, placed **first**, labelled `Document`,
+  with `block_id: nil`, and its rows are spans as the unanchored group's are.
+  That group and the unanchored group both carry `block_id: nil`, so
+  `Shell.findings_group/0` gains one key, `document?: boolean()`, `true` on the
+  `:document` group only and `false` on every other group. The inspector's
+  group section (`lib/statifier_blocks/editor/inspector.ex:567`,
+  `defp document_findings_panel/1`) stamps `data-unanchored="true"` only when
+  `block_id` is `nil` and `document?` is `false`, and stamps
+  `data-document="true"` on the `:document` group, `"false"` on every other.
+  The `Unanchored` group keeps its label, its place last and its stamp.
+
+Every reader that matches the three-member anchor with no fallback gains the
+`:document` arm, because each raises on an anchor it does not know: the two
+private `finding_block_id/1` clauses (`lib/statifier_blocks/view_model.ex:1971`
+and `shell.ex:1040`), and in `findings.ex` the public `anchor_tag/1`, the
+private `anchor_tail/1` (`findings.ex:244`) and the private `block_id/1`
+(`findings.ex:259`), which answers `nil` for `:document`.
 
 **11x. `from_compiler/2` maps the Document stage to `:document`.** A
 `StatifierBlocks.Compiler.Finding` with `stage: :document` and `block_id: nil`
@@ -12129,6 +12154,9 @@ publish entry, it is the whole list, and the host refuses on its `:error`.
 - `from_compiler_all/2`'s refused list is empty for every list the compiler
   produces today.
 - `sb-m89g` has a target: the union member, the adapter clause, the two
-  `finding_block_id/1` arms, the first group in
-  `Shell.findings_groups/3`, and a test that a Document-stage finding adapts,
-  routes to no node and is counted.
+  `finding_block_id/1` arms, the first group and the `document?` key in
+  `Shell.findings_groups/3`, the three `:document` arms and the span row in
+  `lib/statifier_blocks/editor/findings.ex`, the `data-unanchored` and
+  `data-document` stamps in `lib/statifier_blocks/editor/inspector.ex`, and a
+  test that a Document-stage finding adapts, routes to no node, is counted,
+  and renders on both surfaces with nothing to select.

@@ -3858,7 +3858,7 @@ anchor, not by number.
 A host's publish step needs the findings `compile/3` would refuse a document
 for, without emitting a chart, so that the editor, the compile and the publish
 step answer one question with one implementation - the rule `ADR-0003`
-decision 6 already states for assignability. Three facts stand in the way
+decision 6 already states for assignability. Four facts stand in the way
 today.
 
 **The messages are private.** The only producer of worded structure findings
@@ -4001,9 +4001,12 @@ host hands it `compile/3`'s refusal; this amendment does not de-duplicate.
 
 Nothing in `Publish.findings/3` emits, so it cannot see an Emit-stage or
 Chart-stage refusal. The host's publish step calls `Publish.findings/3` and
-then `compile/3`, and refuses on an `:error` from either. By G2, a document
-`Publish.findings/3` passes that `compile/3` then refuses was refused after
-Structure.
+then `compile/3`, and refuses on an `:error` from either. By G2, when the
+host's `compile/3` call carries the same `:datamodel` and no `:entry_type`, a
+document `Publish.findings/3` passes that `compile/3` then refuses was refused
+after Structure. A `compile/3` call carrying `:entry_type` can also refuse at
+Structure, on the checks that option drives, which `Publish.findings/3` does
+not run.
 
 **Worked example: patron registration.** The document `patron_registration`
 holds `blk_CONTACT`, a block of a host composite type whose `address` param
