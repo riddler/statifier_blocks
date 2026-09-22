@@ -12021,7 +12021,7 @@ Filed with `sb-rov2`, campaign RF058, carrying `sb-a1yq`'s two record items.
 
 ## Amendment (2026-09-22): decision 11, a `:document` anchor for the one finding that names no block
 
-**Status: proposed (2026-09-22), drafted for `sb-3zw2`; the implementation is
+**Status: accepted (2026-09-22), drafted for `sb-3zw2`; the implementation is
 `sb-m89g`.** Additive: decision 11 and every amendment to it above stand as
 written, no text above this line is edited, and the header line's status
 history is not extended here. It adds clauses `11v` to `11x`. This is an
@@ -12210,7 +12210,7 @@ Filed with `sb-27yl`.
 
 ## Amendment (2026-09-22): decision 2 gains `{:set_accepts, names}`, decision 11's source list gains `:graph`, and what the accepted-events row shipped with
 
-**Status: proposed (2026-09-22), drafted for `sb-db8s`.** Additive: decisions
+**Status: accepted (2026-09-22), drafted for `sb-db8s`.** Additive: decisions
 2 and 11 and every amendment to them above stand as written, no text above
 this line is edited, and the header line's status history is not extended
 here. It adds clauses `2o` to `2r` and `11y`. This is an amendment rather than
@@ -12373,3 +12373,107 @@ the value to the enum and nothing more.
 - 2p leaves one question on this record by name: whether a recipe's command
   list may hold `{:set_accepts, _}`. It concerns 3C's bound, and a request
   that decides it would amend 3C.
+
+## Note (2026-09-22): the two Amendments of 2026-09-22 on decisions 2 and 11 are flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only lines this request changes above it
+are the two Amendments' status lines, each by one word, `proposed` to
+`accepted`: the Amendment on the `:document` anchor (`:12024`, clauses `11v`
+to `11x`) and the Amendment on `{:set_accepts, names}` and `:graph`
+(`:12213`, clauses `2o` to `2r` and `11y`). Everything else is this Note, at
+the foot of the file, so no line another record cites moves.
+
+The operator granted, on 2026-09-22, the flip of proposed records in this
+repository. This request takes that grant for these two Amendments alone,
+through the same `docs/adr/` direction gate, after checking every claim each
+makes against the code on `main`.
+
+Every `lib/` and `test/` cite below was read at `main` `c362e40` and is
+written anchor first, line second; a later reader re-locates by the anchor
+and not by the number.
+
+### `11v` to `11x`, and where each reads today
+
+| Clause | Read at `c362e40` |
+|---|---|
+| `11v`, the union gains `:document` (`:12058`) | `@type anchor` (`finding.ex:46`) has the four members the clause spells, `:document` last and carrying no id |
+| `11w`, where a `:document` finding goes (`:12073`) | `ViewModel.build/3` (`view_model.ex:519`) rejects `:document` findings before its routed/orphan split and keeps them in `findings`; `Shell.findings_count/1` (`shell.ex:961`) is the length of that list; a collapsed subtree's badge counts the findings routed to its nodes, which a `:document` finding never is; `test/statifier_blocks/view_model/document_anchor_test.exs` pins all three |
+| `11w`, the rows (`:12073`) | `anchor_tag/1` (`editor/findings.ex:252`) answers `"document"`; in `row/1` (`editor/findings.ex:217`) the subject reads `Document` through `defp subject_label/2` and `defp anchor_tail/1` answers `nil`; in the drawer's `findings/1` (`editor/findings.ex:83`) a `:document` row is a `sb-findings__document` span, not the reveal button, stamped `data-orphan="false"` |
+| `11w`, the inspector (`:12073`) | `Shell.findings_groups/3` (`shell.ex:1026`) puts one `Document` group first, `block_id: nil` and `document?: true`, and every other group `document?: false`; `@type findings_group` (`shell.ex:121`) carries `document?: boolean()`; `defp document_findings_panel/1` (`editor/inspector.ex:573`) stamps `data-unanchored` only for `block_id == nil and not document?`, and `data-document` from `document?` |
+| `11w`, the readers that gain an arm (`:12106`) | `defp finding_block_id/1` has a `:document` clause answering `nil` in `view_model.ex:1989` and `shell.ex:1072`; `editor/findings.ex` has `:document` clauses in `anchor_tag/1` (`:255`), `defp anchor_tail/1` (`:264`) and `defp block_id/1` (`:288`, answering `nil`); `defp route_one_finding/4` (`view_model.ex:2324`) has no `:document` clause and is never handed one |
+| `11x`, the adapter (`:12119`) | `defp anchor_from_compiler/1` (`finding.ex:329`) maps `stage: :document, block_id: nil` to `:document`, and its next clause (`finding.ex:332`) still refuses a block-less finding from any other stage as `{:unanchorable, finding}`; `@type from_compiler_error` (`finding.ex:149`) keeps that member; the source is rule 4's `:compile` at `:error`, and `:lint` otherwise by rule 2, as the cross-product test in `test/statifier_blocks/finding_from_compiler_test.exs` asserts for every stage, severity and key |
+| the test the Consequences name (`:12155`) | adapting: `test/statifier_blocks/finding_from_compiler_test.exs`; no node, not an orphan, and in the document's count: `test/statifier_blocks/view_model/document_anchor_test.exs`; counted, and rendered on both surfaces with nothing to select: `test/statifier_blocks/editor/publish_equality_test.exs` (the describe "a Document-stage finding in the editor (11w)") |
+
+### `2o` to `2r` and `11y`, and where each reads today
+
+Every code cite these clauses give, read at `281d1b8`, is at the same line at
+`c362e40`.
+
+| Clause | Read at `c362e40` |
+|---|---|
+| `2o`, the closed set gains `{:set_accepts, _}` (`:12245`) | the `Edit.t()` union (`edit.ex:150`) holds six edits and `{:compound, [t()]}`, seven constructors; the `apply/2` clause (`edit.ex:218`) calls `Validation.accepts/1` (`validation.ex:216`) and answers the inverse `{:set_accepts, document.accepts}`; the `check_config/3` clause (`edit.ex:299`) answers `:ok`; `defp check_compound/1` (`edit.ex:353`) refuses only an empty list, a nested compound and a non-list |
+| `2p`, a recipe writing it is out of reach (`:12268`) | `defp reach/3`'s `{:set_datamodel, _entries}` clause (`recipe.ex:153`) continues, under the comment the clause quotes; its last clause (`recipe.ex:155`) halts on `{:set_accepts, _}`; `Recipe.within_reach?/2` (`recipe.ex:127`) then answers `false`, and `Edit.Targets.recipe_inserts/4` (`edit/targets.ex:451`) answers `{:error, {:recipe_out_of_reach, name}}`; the core deadline recipe (`core/deadline_recipe.ex`, `insert/2`) and a composite's recipe (`Composite.recipe_insert/3`) write only `:insert` commands |
+| `2q`, the two helpers and `event_N` (`:12295`) | `Declarations.add_accepted/1` (`declarations.ex:207`) appends the first `event_N` the list does not hold, counting from 1; `Declarations.put_accepted/3` (`declarations.ex:234`) replaces at an index in range, verbatim, and returns the list unchanged otherwise; `remove/2` (`declarations.ex:95`) and `move/3` (`declarations.ex:119`) are specified over a list of either `DatamodelEntry.t()` or `String.t()` entries and read only indices |
+| `2r`, the tab's count (`:12319`) | `Shell.drawer_view/1` (`shell.ex:1135`) sums `Declarations.count/1` over `:declarations` and `:accepts` (`shell.ex:1157-1158`), and its input type carries an optional `:accepts`; the editor hands it `assigns.document.datamodel` and `assigns.document.accepts` (`editor.ex`, `defp drawer_view/1`), the document's lists and not a draft |
+| `11y`, `:graph` joins the source enum (`:12330`) | `@type source` (`finding.ex:78`) ends in `:graph`; `Graph.check/2` (`graph.ex:96`) and `Graph.consumers_broken/2` (`graph.ex:130`) build every finding through one private constructor (`graph.ex:184`) with source `:graph`, anchor `{:config, block_id, key}` and `Finding.new/4`'s default severity, `:error` |
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- The second Amendment calls `ADR-0014` decision 6 and `ADR-0008`'s
+  Amendment of 2026-09-22, A5, "(proposed)" (`:12221-12224`). That described
+  the day it was written. Both were accepted on `main` at `f4e783d` (their
+  status lines, `docs/adr/0014-document-accepts-declaration.md:3` and
+  `docs/adr/0008-durable-subchart-handler.md:495`). This flip accepts decision
+  2's count, 2n's two counts, 2i's tab count and decision 11's enum as they
+  now read. It decides nothing about `accepts` or the graph check beyond what
+  those records decide, as the Amendment says of itself (`:12357`).
+- The first Amendment's status line names the request that drafted it and the
+  one that implemented it; the implementation is on `main` at `abf3f06`.
+- 2p says whether a recipe may write `{:set_accepts, _}` is not decided. It is
+  still not decided: this flip accepts 2p as a record of shipped behaviour and
+  of an open question, and leaves the question open.
+- This file's head `Status:` line is not extended.
+
+### Sentences that no longer hold as written, and the records that name the change
+
+None reverses what either Amendment decides.
+
+- **`11v` to `11x`'s Context: "`from_compiler/2` refuses such a finding as
+  `{:unanchorable, finding}`" (`:12050`).** It described the code before
+  this date; `11x` itself changes the answer, read above.
+- **`11v` to `11x`'s code cites.** Those read at `6b216a5`, and the two read
+  at `32463bb`, moved when the implementation landed. Each is at:
+  `@type anchor` `finding.ex:46`; `defp document_stage/1` `compiler.ex:628`;
+  `defp anchor_from_compiler/1` `finding.ex:329`; `anchor_tag/1`
+  `editor/findings.ex:252`; `row/1` `editor/findings.ex:217`; `findings/1`
+  `editor/findings.ex:83`; `Shell.findings_groups/3` `shell.ex:1026`;
+  `defp document_findings_panel/1` `editor/inspector.ex:573`; the two
+  `defp finding_block_id/1` at `view_model.ex:1986` and `shell.ex:1069`;
+  `defp anchor_tail/1` `editor/findings.ex:261`; `defp block_id/1`
+  `editor/findings.ex:285`; `defp route_one_finding/4` `view_model.ex:2324`;
+  `@type from_compiler_error` `finding.ex:149`; `ViewModel.build/3`
+  `view_model.ex:519`.
+
+### Sentences stated exactly
+
+Each holds on the reading below, which is what the code does; none of them
+changes what is decided.
+
+- **`11y`, "`Finding.from_compiler/2` never produces it" (`:12345`).** None
+  of `from_compiler/2`'s own rules maps a finding to `:graph`. Its first rule
+  takes a caller's `:source` option as given (`finding.ex`, the moduledoc's
+  "The `:source` override"), so a caller could name `:graph` there; no caller
+  under `lib/` does.
+- **`11x`'s Consequence, "`from_compiler_all/2`'s refused list is empty for
+  every list the compiler produces today" (`:12160`).** It rests on
+  `ADR-0004` decision 10. In `compiler.ex` and under
+  `lib/statifier_blocks/compiler/`, the one finding built without a
+  `block_id` is `defp document_stage/1`'s; the Chart, self-reference and
+  sensitive-path findings take theirs from an emission's owner, and
+  `StatifierBlocks.Compiler.Attribution.stamp/3` gives every emitted element
+  an owner before it is spliced in.
+
+Filed with `sb-910d`.
