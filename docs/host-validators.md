@@ -124,6 +124,23 @@ same list by `StatifierBlocks.ViewModel.build/3`, and `findings_count/3` reads
 it through the same code the tab chip does. So a host header that reports the
 count moves when your rule fires, and it cannot disagree with the drawer.
 
+The publish check is one more place the row shows, because it runs the same
+functions. Your publish step calls `StatifierBlocks.Publish.findings/3` and
+then `StatifierBlocks.Compiler.compile/3`: the first composes the editor's own
+list, `ViewModel.build/3` and so your validators included, so the finding the
+author saw in the drawer is in the answer the publish step reads, with the
+severity you gave it. An `:error` from either call refuses the publish; a
+`:warning` - the default here - is your call, and a reasonable host publishes
+over one and shows it rather than dropping it; an `:info` never refuses. In a
+patron registration document, a rule that flags a `core.assign` writing
+`patron.card_number` as `:warning` leaves the publish to you, the same rule
+returning `:error` refuses it, and the undeclared-path advisory this package
+raises on the same field stays `:info` whatever your rule says. The publish
+step, its registries and its revision store are yours; this package ships the
+functions. The README's
+[At publish](https://github.com/riddler/statifier_blocks/blob/main/README.md#at-publish)
+section is the whole check.
+
 ## It survives the author's next edit
 
 You register the rule once, on the palette. You do not re-register it, and
@@ -147,7 +164,9 @@ the row gone once the block it objected to is deleted.
 
 - **It cannot stop a compile.** A validator finding is advisory; the severity
   the package defaults to is `:warning` for that reason, and even `:error`
-  from a host rule is a rendering, not a refusal. If your rule is really about
+  from a host rule is a rendering, not a refusal, to the compile. (At
+  publish the severity is read: see [Where the finding shows](#where-the-finding-shows).)
+  If your rule is really about
   whether one block's config is well-formed, it belongs in that block type's
   `validate_config/1`, where a refusal is available.
 - **It is not validated back at you.** A return that is not a list, and a
