@@ -12103,12 +12103,18 @@ subtree. Its rows, on both document-level surfaces:
   `data-document="true"` on the `:document` group, `"false"` on every other.
   The `Unanchored` group keeps its label, its place last and its stamp.
 
-Every reader that matches the three-member anchor with no fallback gains the
-`:document` arm, because each raises on an anchor it does not know: the two
-private `finding_block_id/1` clauses (`lib/statifier_blocks/view_model.ex:1971`
-and `shell.ex:1040`), and in `findings.ex` the public `anchor_tag/1`, the
-private `anchor_tail/1` (`findings.ex:244`) and the private `block_id/1`
-(`findings.ex:259`), which answers `nil` for `:document`.
+Every reader a `:document` finding reaches that matches the three-member
+anchor with no fallback gains the `:document` arm, because each raises on an
+anchor it does not know: the two private `finding_block_id/1` clauses
+(`lib/statifier_blocks/view_model.ex:1971` and `shell.ex:1040`), and in
+`findings.ex` the public `anchor_tag/1`, the private `anchor_tail/1`
+(`findings.ex:244`) and the private `block_id/1` (`findings.ex:259`), which
+answers `nil` for `:document`. The view model's private `route_one_finding/4`
+(`view_model.ex:2308`, `defp route_one_finding/4`, read at `32463bb`) also
+matches only the three members, and gains no arm: it is handed one node's own
+findings, and a `:document` finding is never among them, because
+`ViewModel.build/3` keeps it out of both the routed set and `orphan_findings`
+as the first paragraph of this clause says.
 
 **11x. `from_compiler/2` maps the Document stage to `:document`.** A
 `StatifierBlocks.Compiler.Finding` with `stage: :document` and `block_id: nil`
@@ -12157,6 +12163,10 @@ publish entry, it is the whole list, and the host refuses on its `:error`.
   `finding_block_id/1` arms, the first group and the `document?` key in
   `Shell.findings_groups/3`, the three `:document` arms and the span row in
   `lib/statifier_blocks/editor/findings.ex`, the `data-unanchored` and
-  `data-document` stamps in `lib/statifier_blocks/editor/inspector.ex`, and a
+  `data-document` stamps in `lib/statifier_blocks/editor/inspector.ex`,
+  `ViewModel.build/3`'s split of its findings into routed and orphan, which
+  today sends every finding whose `finding_block_id/1` is not a document block
+  id to `orphan_findings` and must keep a `:document` finding out of both
+  (`view_model.ex:512`, `def build/3`, read at `32463bb`), and a
   test that a Document-stage finding adapts, routes to no node, is counted,
   and renders on both surfaces with nothing to select.
