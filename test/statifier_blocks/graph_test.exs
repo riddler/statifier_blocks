@@ -4,10 +4,27 @@ defmodule StatifierBlocks.GraphTest do
   records (A1, A5) and the two pairwise checks a host's publish step calls
   over it (A2, A3, A4).
 
-  The documents are inline and minimal: a patron registration parent that
-  runs an email verification child and issues one library card per member
-  of a household. The resolver is an in-memory map, which is all a host's
-  resolver has to be for the check to be pure.
+  The worked example is stored, so a host can vendor it: four documents
+  under `test/fixtures/graph/`. A patron registration verifies the
+  registering patron's email address through a `core.subchart` that routes
+  on the child's `verified` and `expired` outcomes, then verifies every
+  member of the household through a `core.map` whose `collect_type` marks
+  `verified_address` required. Both name the one child document,
+  `email_verification`, stored three ways: the published revision, a next
+  revision that renames `verified` to `confirmed`, and a next revision that
+  keeps `verified` but no longer reports `verified_address`.
+
+  No `core.*` type declares done-data, so the child's root is a host block
+  type, `library.verify_email`, which reads its outcomes and the keys it
+  reports from its own config: the three revisions differ only in their
+  stored bytes.
+
+  The rules the worked example does not reach - an unresolvable child,
+  `error` exempt, `done` routing, a declaration-named `collect_type`, the
+  resolver asked once, several parents - keep small inline documents,
+  including a second child that issues one library card per household
+  member. The resolver is an in-memory map, which is all a host's resolver
+  has to be for the check to be pure.
   """
 
   use ExUnit.Case, async: true
@@ -17,31 +34,30 @@ defmodule StatifierBlocks.GraphTest do
   alias StatifierBlocks.Core.Emit
 
   defmodule VerifyEmail do
-    @moduledoc "The root of a child that verifies a patron's email address."
+    @moduledoc """
+    The root of the email verification child: its outcomes are the
+    newline-separated `outcomes` config field, and its done-data is one
+    string key per `reports` member.
+    """
 
     use StatifierBlocks.BlockType
 
     @impl true
-    def outcomes(_config), do: [{"verified", "Verified"}, {"expired", "Expired"}]
+    def outcomes(%{"outcomes" => outcomes}) do
+      outcomes
+      |> String.split("\n", trim: true)
+      |> Enum.map(&{&1, String.capitalize(&1)})
+    end
 
     @impl true
-    def donedata_type(_config),
-      do: [%{name: "verified_at", path: "verification.at", type: :string}]
+    def donedata_type(%{"reports" => reports}) do
+      for %{"name" => name} <- reports,
+          do: %{name: name, path: "verification." <> name, type: :string}
+    end
 
     @impl true
-    def emit(%Block{}, context), do: StatifierBlocks.GraphTest.emit_finals(context, outcomes(%{}))
-  end
-
-  defmodule VerifyEmailRenamed do
-    @moduledoc "The next revision of that root: `verified` renamed to `confirmed`."
-
-    use StatifierBlocks.BlockType
-
-    @impl true
-    def outcomes(_config), do: [{"confirmed", "Confirmed"}, {"expired", "Expired"}]
-
-    @impl true
-    def emit(%Block{}, context), do: StatifierBlocks.GraphTest.emit_finals(context, outcomes(%{}))
+    def emit(%Block{config: config}, context),
+      do: StatifierBlocks.GraphTest.emit_finals(context, outcomes(config))
   end
 
   defmodule IssueCard do
@@ -62,19 +78,6 @@ defmodule StatifierBlocks.GraphTest do
       do: StatifierBlocks.GraphTest.emit_finals(context, [{"done", ""}])
   end
 
-  defmodule IssueCardThin do
-    @moduledoc "The next revision of that root, which no longer reports the card number."
-
-    use StatifierBlocks.BlockType
-
-    @impl true
-    def donedata_type(_config), do: [%{name: "branch", path: "card.branch", type: :string}]
-
-    @impl true
-    def emit(%Block{}, context),
-      do: StatifierBlocks.GraphTest.emit_finals(context, [{"done", ""}])
-  end
-
   @doc false
   def emit_finals(context, outcomes) do
     finals =
@@ -89,20 +92,86 @@ defmodule StatifierBlocks.GraphTest do
   defp palette do
     Palette.new(
       Map.merge(Palette.core_types(), %{
-        "library:verify_email" => VerifyEmail,
-        "library:verify_email_renamed" => VerifyEmailRenamed,
-        "library:issue_card" => IssueCard,
-        "library:issue_card_thin" => IssueCardThin
+        "library.verify_email" => VerifyEmail,
+        "library:issue_card" => IssueCard
       })
     )
   end
+
+  @dir Path.join([__DIR__, "..", "fixtures", "graph"])
+
+  @parent "patron_registration-parent.json"
+  @child "email_verification-child.json"
+  @child_next "email_verification-child_next.json"
+  @child_next_no_key "email_verification-child_next_no_key.json"
 
   @card_members [
     %{"name" => "card_number", "type" => "string", "required?" => true},
     %{"name" => "branch", "type" => "string"}
   ]
 
+  describe "the stored documents" do
+    # Each one decodes, validates and re-encodes to its stored bytes, so
+    # the files are canonical and a vendored copy compares byte for byte.
+    #
+    # sabotage: swapped the child fixture's `id` and `metadata` keys - it
+    # still decodes but no longer re-encodes to its bytes, and this goes red
+    # (verified)
+    test "each fixture is a valid, canonically encoded document" do
+      for name <- [@parent, @child, @child_next, @child_next_no_key] do
+        bytes = File.read!(Path.join(@dir, name))
+        assert {:ok, %Document{} = document} = Document.from_json(bytes), name
+        assert Document.validate(document) == :ok, name
+        assert Document.to_json(document) <> "\n" == bytes, name
+      end
+    end
+
+    # The two next revisions are revisions of the published child: the same
+    # document id, a later revision.
+    #
+    # sabotage: set the renaming revision's stored `revision` to 1 - it is
+    # no longer one on from the published child and this goes red (verified)
+    test "the next revisions are the same child document, one revision on" do
+      child = document!(@child)
+
+      for name <- [@child_next, @child_next_no_key] do
+        next = document!(name)
+        assert next.id == child.id, name
+        assert next.revision == child.revision + 1, name
+      end
+    end
+  end
+
   describe "the interface a compile records (A1, A5)" do
+    # sabotage: recorded the `core.map` reference with `reads: []` in
+    # `reference/3` - the parent's interface loses `verified_address` and
+    # this goes red (verified)
+    test "the stored parent records both references, and each child its side" do
+      assert stored_parent().interface == %{
+               declared_outcomes: ["done"],
+               declared_donedata_keys: [],
+               references: [
+                 %{
+                   block_id: "blk_VERIFY",
+                   document_id: "email_verification",
+                   routes_on: ["verified", "expired"],
+                   reads: []
+                 },
+                 %{
+                   block_id: "blk_HOUSEHOLD",
+                   document_id: "email_verification",
+                   routes_on: [],
+                   reads: ["verified_address"]
+                 }
+               ]
+             }
+
+      assert %{declared_outcomes: ["confirmed", "expired"]} = stored_child(@child_next).interface
+
+      assert %{declared_outcomes: ["verified", "expired"], declared_donedata_keys: []} =
+               stored_child(@child_next_no_key).interface
+    end
+
     # sabotage: recorded `outcome_names/2` of the subchart block instead of
     # `child_outcomes/1` - `routes_on` gains the appended `error` and the
     # first assertion goes red (verified)
@@ -168,12 +237,11 @@ defmodule StatifierBlocks.GraphTest do
     # `child_use` - the plain compile records no keys and this goes red
     # (verified)
     test "the child side is the root's outcomes and done-data keys, whatever the chart use" do
-      child =
-        Document.new(Block.new("library:verify_email", id: "blk_ROOT"), id: "email_verification")
+      child = document!(@child)
 
       expected = %{
         declared_outcomes: ["verified", "expired"],
-        declared_donedata_keys: ["verified_at"],
+        declared_donedata_keys: ["verified_address"],
         references: []
       }
 
@@ -194,11 +262,11 @@ defmodule StatifierBlocks.GraphTest do
   end
 
   describe "check/2, the forward direction (A2, A4)" do
-    # sabotage: inverted `pair/3`'s filter to `outcome in child.outcomes` -
-    # every declared outcome the parent routes on is refused and this goes
-    # red (verified)
-    test "a green pair returns no finding" do
-      assert Graph.check(compile!(registration(cards: true)), resolver(published())) == []
+    # sabotage: inverted `pair/3`'s filter to `outcome in
+    # child.declared_outcomes` - both routed outcomes are refused and this
+    # goes red (verified)
+    test "the stored pair returns no finding" do
+      assert Graph.check(stored_parent(), resolver(published())) == []
     end
 
     # sabotage: matched `{:error, :not_published}` to `[]` in `check/2` -
@@ -218,11 +286,10 @@ defmodule StatifierBlocks.GraphTest do
       assert message =~ ~s("email_verification")
     end
 
-    # sabotage: inverted `pair/3`'s filter to `outcome in child.outcomes` -
-    # the declared `expired` is refused in place of `verified` and this
-    # goes red (verified)
+    # sabotage: made `pair/3`'s outcome comprehension iterate nothing - the
+    # renamed outcome passes and this goes red (verified)
     test "a routed outcome the child does not declare is refused" do
-      resolver = resolver(%{published() | "email_verification" => verify_email_renamed()})
+      resolver = resolver(%{published() | "email_verification" => stored_child(@child_next)})
 
       assert [
                %Finding{
@@ -231,8 +298,9 @@ defmodule StatifierBlocks.GraphTest do
                  severity: :error,
                  message: message
                }
-             ] = Graph.check(compile!(registration()), resolver)
+             ] = Graph.check(stored_parent(), resolver)
 
+      assert message =~ ~s("email_verification")
       assert message =~ ~s("verified")
     end
 
@@ -260,22 +328,22 @@ defmodule StatifierBlocks.GraphTest do
       assert message =~ ~s("done")
     end
 
-    # sabotage: made `pair/3`'s key comprehension iterate nothing - the thin
-    # child is judged only on outcomes, which a map routes on none of, and
-    # this goes red (verified)
+    # sabotage: made `pair/3`'s key comprehension iterate nothing - the
+    # dropped key passes and this goes red (verified)
     test "a read done-data key the child does not declare is refused" do
-      resolver = resolver(%{published() | "library_card_issue" => issue_card_thin()})
+      resolver =
+        resolver(%{published() | "email_verification" => stored_child(@child_next_no_key)})
 
       assert [
                %Finding{
-                 anchor: {:config, "blk_CARDS", "collect_type"},
+                 anchor: {:config, "blk_HOUSEHOLD", "collect_type"},
                  source: :graph,
                  severity: :error,
                  message: message
                }
-             ] = Graph.check(compile!(registration(cards: true)), resolver)
+             ] = Graph.check(stored_parent(), resolver)
 
-      assert message =~ ~s("card_number")
+      assert message =~ ~s("verified_address")
     end
 
     # A2: the other direction - a child outcome the parent has no arm for -
@@ -307,8 +375,32 @@ defmodule StatifierBlocks.GraphTest do
   end
 
   describe "consumers_broken/2, the reverse direction (A2, A3)" do
+    # sabotage: inverted `pair/3`'s filter to `outcome in
+    # child.declared_outcomes` - the stored parent is named against its own
+    # published child and this goes red (verified)
+    test "the published child breaks nobody" do
+      assert Graph.consumers_broken(stored_child(@child), [stored_parent()]) == []
+    end
+
     # The amendment's worked example: `verified` renamed to `confirmed`.
     #
+    # sabotage: made `pair/3`'s outcome comprehension iterate nothing - the
+    # stored parent is not named and this goes red (verified)
+    test "the renaming revision names the stored parent" do
+      assert [
+               {"patron_registration",
+                %Finding{
+                  anchor: {:config, "blk_VERIFY", "outcomes"},
+                  source: :graph,
+                  severity: :error,
+                  message: message
+                }}
+             ] = Graph.consumers_broken(stored_child(@child_next), [stored_parent()])
+
+      assert message =~ ~s("patron_registration")
+      assert message =~ ~s("verified")
+    end
+
     # sabotage: dropped the `document_id == child_id` filter in
     # `consumers_broken/2` - the parent naming only the card child is judged
     # against the verification child too, and this goes red (verified)
@@ -322,7 +414,7 @@ defmodule StatifierBlocks.GraphTest do
                {"patron_registration", %Finding{} = first},
                {"patron_renewal", %Finding{} = second}
              ] =
-               Graph.consumers_broken(verify_email_renamed(), [
+               Graph.consumers_broken(stored_child(@child_next), [
                  broken,
                  untouched,
                  renewal,
@@ -341,10 +433,18 @@ defmodule StatifierBlocks.GraphTest do
     # sabotage: made `pair/3`'s key comprehension iterate nothing - a key
     # the next revision drops breaks nobody and this goes red (verified)
     test "a dropped done-data key names the parent that reads it" do
-      parent = compile!(registration(cards: true), id: "patron_registration")
+      assert [
+               {"patron_registration",
+                %Finding{
+                  anchor: {:config, "blk_HOUSEHOLD", "collect_type"},
+                  source: :graph,
+                  severity: :error,
+                  message: message
+                }}
+             ] = Graph.consumers_broken(stored_child(@child_next_no_key), [stored_parent()])
 
-      assert [{"patron_registration", %Finding{anchor: {:config, "blk_CARDS", "collect_type"}}}] =
-               Graph.consumers_broken(issue_card_thin(), [parent])
+      assert message =~ ~s("patron_registration")
+      assert message =~ ~s("verified_address")
     end
 
     # sabotage: dropped the `document_id == child_id` filter in
@@ -352,7 +452,7 @@ defmodule StatifierBlocks.GraphTest do
     # judged against this one and this goes red (verified)
     test "a child revision every parent still agrees with breaks nobody" do
       parent = compile!(registration(cards: true), id: "patron_registration")
-      assert Graph.consumers_broken(verify_email(), [parent]) == []
+      assert Graph.consumers_broken(stored_child(@child), [parent]) == []
       assert Graph.consumers_broken(issue_card(), [parent]) == []
     end
   end
@@ -360,7 +460,7 @@ defmodule StatifierBlocks.GraphTest do
   # -- documents ---------------------------------------------------------
 
   defp published do
-    %{"email_verification" => verify_email(), "library_card_issue" => issue_card()}
+    %{"email_verification" => stored_child(@child), "library_card_issue" => issue_card()}
   end
 
   defp resolver(published) do
@@ -372,16 +472,22 @@ defmodule StatifierBlocks.GraphTest do
     end
   end
 
-  defp verify_email, do: child("library:verify_email", "email_verification")
-  defp verify_email_renamed, do: child("library:verify_email_renamed", "email_verification")
-  defp issue_card, do: child("library:issue_card", "library_card_issue")
-  defp issue_card_thin, do: child("library:issue_card_thin", "library_card_issue")
+  defp stored_parent, do: compile!(document!(@parent))
+  defp stored_child(name), do: compile!(document!(name), child_use: true)
 
-  defp child(type, id) do
-    compile!(Document.new(Block.new(type, id: "blk_ROOT"), id: id), child_use: true)
+  defp document!(name) do
+    {:ok, document} = @dir |> Path.join(name) |> File.read!() |> Document.from_json()
+    document
   end
 
-  # The parent: a sequence that runs the verification child and, when
+  defp issue_card do
+    compile!(
+      Document.new(Block.new("library:issue_card", id: "blk_ROOT"), id: "library_card_issue"),
+      child_use: true
+    )
+  end
+
+  # An inline parent: a sequence that runs the verification child and, when
   # asked, issues a card for every member of the household.
   defp registration(opts \\ []) do
     verify =
