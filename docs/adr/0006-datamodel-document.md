@@ -687,8 +687,12 @@ check, verdict or refusal.
   this document at all" (`:578-580`).** No emitted chart carries the
   document and no engine is asked to honour it: the compiled `<datamodel>`
   takes its roots from `ADR-0001`'s `datamodel` key and the `:declare` option
-  (`document_roots/3`, `compiler.ex:2202`). The compiler does read the
-  document a host supplies as `:datamodel`, three times:
+  (`document_roots/3`, `compiler.ex:2202`). The compiler half held when it
+  was written: at `f4ec41f`, the commit that added this Amendment, the
+  compiler's one read of its `:datamodel` option was the sensitive-path
+  refusal, which does not take this document (below). It no longer holds:
+  the compiler now reads the document a host supplies as `:datamodel` in two
+  places, and two later records name the change:
   - the typed-environment read check reads its declarations
     (`StatifierBlocks.Environment.declarations/1`, `environment.ex:489`, fed by
     `assignability_context/1`, `compiler.ex:1739`), under `ADR-0011`
@@ -697,16 +701,15 @@ check, verdict or refusal.
   - `core.on_event`'s declared-payload refusal reads the same declarations
     (`declared_payload_findings/2`, `compiler.ex:1609`), under `ADR-0002`'s
     Amendment of 2026-09-06 on the event payload
-    (`docs/adr/0002-block-type-behaviour.md:4010`);
-  - the sensitive-path refusal reads it
-    (`StatifierBlocks.Compiler.SensitivePaths.datamodel/1`,
-    `compiler/sensitive_paths.ex:188`), under `ADR-0002`'s decision-7
-    Amendment of 2026-08-29 on `sensitive?`
-    (`docs/adr/0002-block-type-behaviour.md:1187`). That read predates this
-    Amendment, and this record's decision 7 (`:223-227`) anticipated it.
+    (`docs/adr/0002-block-type-behaviour.md:4010`).
 
-  None of the three reads a duration's spelling or an `example`, the
-  subject of the bullet the sentence closes.
+  The sensitive-path refusal reads the same `:datamodel` option, but not
+  this document: `StatifierBlocks.Compiler.SensitivePaths.datamodel/1`
+  (`compiler/sensitive_paths.ex:188`) accepts `nil`, a list or `MapSet` of
+  paths, or a map with `:declared` and `:sensitive`, a pair the host
+  derives, and has no arm for the typed document. Neither of the two reads
+  above, nor the sensitive-path refusal, reads a duration's spelling or an
+  `example`, the subject of the bullet the sentence closes.
 - **"`sb-oiq`'s index" (`:519`).** The index is `StatifierDatamodel.Index`
   since the Note of 2026-09-06 (`:582`) re-homed the document; it stores each
   entry's declared type as written, so the reading holds.
