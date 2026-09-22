@@ -1,6 +1,6 @@
 # ADR-0014: A document declares the external events it accepts - a list of names on the envelope, carried through compile, and judged against the chart by the engine's check at publish
 
-Status: proposed (2026-09-22, drafted for `sb-mgei` under the operator's
+Status: accepted (2026-09-22, drafted for `sb-mgei` under the operator's
 campaign consent). It merges at proposed; flipping it to accepted is a
 separate request through the same `docs/adr/` gate, after the code that
 builds it has landed.
@@ -362,3 +362,128 @@ citing this record.
   this slice: the two would need different bytes, and the only way to get
   them is to encode an empty list, which would move the hash of every
   document that has no reason to declare.
+
+## Note (2026-09-22): decision 3's pass-through sentence covers a list `validate/1` admits
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. It states the reach of one sentence that read
+wider than the record meant on the day it was written, because decision 2 of
+the same record already sent a malformed list to the compile's Document
+stage.
+
+Decision 3 says the carry "is a pass-through: the compile reads nothing from
+`accepts`, judges nothing about it, and produces no finding from it"
+(`:147-149`). That is true of a list `Document.validate/1` admits. A list it
+refuses is refused by the compile before any carry, as decision 2 says
+(`:124-128`): `document_stage/1` in `lib/statifier_blocks/compiler.ex`
+(`:628`, read at `main` `abf3f06`) reports the refusal as its
+`{:invalid_document, reason}` finding, and the test `is part of validate/1,
+so the compiler's document stage reports it` in
+`test/statifier_blocks/accepts_test.exs` pins it. For an admitted list, the
+test `judges nothing: an undeclarable name compiles with no finding` pins
+decision 3's sentence.
+
+## Note (2026-09-22): this record is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the record's own `Status:` line (`:3`), by one word, `proposed` to
+`accepted`; the index row in `README.md` changes its status cell with it.
+Everything else is this Note and the one before it, at the foot of the
+file, so no line another record cites moves.
+
+The operator granted, on 2026-09-22, the flip of proposed records in this
+repository. This request takes that grant for this record, through the same
+`docs/adr/` direction gate, after checking every claim it makes against the
+code on `main`. It is the "separate request through the same `docs/adr/`
+gate" the status paragraph names (`:3-6`), and the code that builds the
+record has landed.
+
+Every `lib/` cite below was read at `main` `abf3f06` and is written anchor
+first, line second; a later reader re-locates by the anchor and not by the
+number. The record's own cites are labelled `aa657cd`, and it is not edited
+for those that have moved; each anchor still names what the record says. The
+tests named below are in `test/statifier_blocks/accepts_test.exs`.
+
+### Each decision, and where it reads today
+
+| Decision | Read at `abf3f06` |
+|---|---|
+| 1, a list of names (`:67-78`) | an entry is a string and nothing else; `Validation.accepts/1` (`validation.ex:216`) refuses a non-string entry, which is the refusal decision 1 leans on. The test `asks nothing of a name past those four` pins that no further shape is read |
+| 2, the key, the bytes, no bump (`:79-131`) | `accepts` is on the `%Document{}` `defstruct` (`document.ex:70`), default `[]`. `encode/1` puts it through `maybe_put_list/3` (`canonical_json.ex:43`; the empty clause at `:124`), so an empty list is omitted. `@envelope_keys` lists it (`decode.ex:51`), and the tag `v0.32.0` reads the same attribute without it. `validate_envelope/1` in `StatifierBlocks.Validation` runs the private `check_accepts/1` after `check_datamodel/1`, and `Document.validate/1` (`document.ex:274`) keeps its return. The tests under `Document.validate/1's four refusals (decision 2)`, `the canonical bytes (decision 2)` and `the decoder (decision 2)` pin the four refusals in their exact arms, the unchanged hash of every document without the key, and the decoder's pass-through; `is part of validate/1, so the compiler's document stage reports it` pins the `{:invalid_document, reason}` finding of `document_stage/1` (`compiler.ex:628`) |
+| 3, the carry (`:133-149`) | `accepts` is on the `%Compiled{}` `defstruct` (`compiled.ex:110`) and the `%CompilationRecord{}` `defstruct` (`compilation_record.ex:83`), each default `[]`, set from `document.accepts` in `chart_stage/5` (`compiler.ex:3253`) and in the record the compile builds (`compiler.ex:3411`). The tests under `the compile carry (decision 3)` pin the carry as written, the unmoved SCXML and chart identity, and that the compile judges nothing |
+| 4, the consistency rule (`:151-177`) | nothing in this package runs the check; the engine's functions are read below |
+| 5, no declaration (`:179-192`) | `[]` is the default on all three structs and the encoding of `[]` and of an absent key is the same bytes (the test `an empty list and an absent key are the same bytes`) |
+| 6, the editor surface (`:194-228`) | `Edit.apply/2`'s `{:set_accepts, names}` clause (`edit.ex:218`) replaces the list, answers `{:set_accepts, previous}` as its inverse, and refuses through `Validation.accepts/1`; `check_config/3` has an `:ok` clause for it (`edit.ex:299`) beside the `{:set_datamodel, _}` one (`:295`). The declarations panel draws the list as its second row (`StatifierBlocks.Editor.Declarations.declarations/1`, `editor/declarations.ex:137`), and `StatifierBlocks.Declarations.refusal/1` (`declarations.ex:279`) has the `accepts` arm. The tests under `{:set_accepts, names} (decision 6)` and `the panel arithmetic (decision 6)` pin the command, its inverse, the shared refusal and the phrasing, and `test/statifier_blocks/editor/accepted_events_test.exs` pins the row's buttons, the gesture that commits nothing and the held draft. The command is the sixth of decision 2's commands; `{:compound, _}` is not counted among them, as `ADR-0005` says: "A compound is not a sixth edit" (`docs/adr/0005-liveview-editor.md:5676`) |
+
+### The engine's two functions
+
+Decisions 4 and 5, and the Context's paragraph at `:42-54`, name two engine
+functions the record cites and does not define. Read on statifier-ex's `main`
+at `4fd4191`: `Statifier.Chart.events/1` (`lib/statifier/chart.ex:223`) and
+`Statifier.Chart.check_accepts/2` (`:277`) are there, specified by that
+repository's ADR-0071, which is accepted. So the Context's "The engine is
+specifying" (`:43`) describes the day it was written. What the record says of
+them holds:
+
+- a declared `email.verified` is matched by a descriptor `email.verified`,
+  `email` or `*` (decision 4, `:159-160`); `check_accepts/2`'s documentation
+  gives the same matching on token boundaries;
+- `check_accepts/2` answers the declared names nothing matches as
+  `unreachable` and the descriptors nothing declares as `undeclared`, and
+  refuses nothing itself, so decision 4's publish error is the host's refusal
+  on `unreachable`;
+- the engine's no-declaration form, which decision 5 has a host pass when it
+  reads `[]` (`:189-192`), is `nil`. The engine reads `[]` as a declaration
+  that the chart accepts nothing, which is why the host's translation matters.
+
+The engine has answered one question this record leaves to it (`:287-288`):
+`check_accepts/2`'s documentation says a `*` in a declared name is an
+ordinary token, never a pattern. This record still decides no name grammar of
+its own.
+
+No published engine carries either function yet. The last engine release
+tag, `v2.6.1`, holds neither commit, and this package's `mix.lock` resolves
+`statifier` `2.5.0`. The Consequences' "Until a published engine carries
+`Statifier.Chart.events/1` and `Statifier.Chart.check_accepts/2`, the
+envelope key, the carry and the editor row stand on their own and decision 4
+has no function to run" (`:343-346`) is therefore the state today.
+
+### Sentences that name their own status
+
+They are met here, not edited.
+
+- The status paragraph says the record "merges at proposed; flipping it to
+  accepted is a separate request through the same `docs/adr/` gate, after
+  the code that builds it has landed" (`:4-6`). This request is that one.
+- "What this record owes the accepted records" (`:302-330`) says the
+  Amendments on `ADR-0001`, `ADR-0004` and `ADR-0005` are owed and not
+  edited here. They are still owed: none of the three records carries an
+  Amendment adding `accepts` or `{:set_accepts, _}` on `main` at `abf3f06`,
+  and this request adds none.
+
+### Sentences that no longer hold as written, and the records that name the change
+
+None reverses what the record decides.
+
+- **"The engine is specifying `Statifier.Chart.events/1` ... and
+  `Statifier.Chart.check_accepts/2`" (`:42-47`).** Both are specified and
+  built, by statifier-ex's ADR-0071, as read above. What the Context says
+  they compute holds.
+
+### A sentence that holds, read beside a later record
+
+- **"No finding anchor for a document-level declaration is added"
+  (`:299-300`).** True of this record, which adds none. `ADR-0005`'s
+  Amendment of 2026-09-22, "a `:document` anchor for the one finding that
+  names no block" (`docs/adr/0005-liveview-editor.md:12022`, clause `11v`),
+  has since added that anchor for a Document-stage compile finding, and says
+  "`ADR-0014` decision 2 sends a malformed `accepts` list through the same
+  stage" (`docs/adr/0005-liveview-editor.md:12046-12047`).
+  `Finding.from_compiler/2` maps that stage to `:document`
+  (`anchor_from_compiler/1`, `finding.ex:329`), so a malformed `accepts` a
+  host hands the editor as a compile refusal is drawn as a `:document`
+  finding. Decision 4's check is not a compile finding, and its edit-time
+  display stays undecided.
+
+Filed with `sb-tysd`, campaign RF069.
