@@ -69,6 +69,7 @@ defmodule StatifierBlocks.ViewModel do
 
   | Anchor | Position in the view model |
   |---|---|
+  | `:document` | `t().findings` only - no node, and not `t().orphan_findings` |
   | any anchor naming a block id not in the document | `t().orphan_findings` |
   | `{:block, id}` | that node's `findings` |
   | `{:slot, id, name}` | that slot's `findings` (a slot name the node does not carry falls back to the node's `findings`) |
@@ -90,6 +91,12 @@ defmodule StatifierBlocks.ViewModel do
   findings, its form's field and unrouted findings, plus every child's own
   `findings_count` - so a collapsed subtree can carry a count badge
   (decision 11's last sentence) without walking back down into it.
+
+  A `:document` finding (ADR-0005's Amendment of 2026-09-22, `11w`) belongs
+  to no subtree, so no node counts it. It is not an orphan either:
+  `orphan_findings` stays the list of findings naming a block id the
+  document does not hold. It stays in `t().findings`, which is the
+  document-level panel's source, and so in the count a host reads.
 
   ## d10's defaults
 
@@ -514,8 +521,12 @@ defmodule StatifierBlocks.ViewModel do
     all_findings = derived_findings(document, palette, labels) ++ findings
     block_ids = document |> Document.blocks() |> MapSet.new(& &1.id)
 
+    # A `:document` finding goes to neither side of the split (`11w`): it
+    # names no block to route to, and it is not an orphan.
     {routed, orphan} =
-      Enum.split_with(all_findings, &MapSet.member?(block_ids, finding_block_id(&1)))
+      all_findings
+      |> Enum.reject(&(&1.anchor == :document))
+      |> Enum.split_with(&MapSet.member?(block_ids, finding_block_id(&1)))
 
     by_block = Enum.group_by(routed, &finding_block_id/1)
 
@@ -1608,7 +1619,11 @@ defmodule StatifierBlocks.ViewModel do
 
   defp spec_finding(_anchor, _message, _source, _severity), do: []
 
-  # The anchor enum decision 11 has and no fourth member (`11s`). An anchor
+  # The anchor enum decision 11 has and no fourth member (`11s`). The
+  # `:document` member the enum gained on 2026-09-22 (`11v`) is not admitted
+  # here: that amendment leaves undecided whether a host's rule may anchor a
+  # finding on the document, so a validator returning it is dropped like any
+  # other shape this does not recognise. An anchor
   # naming an id the document does not hold is NOT checked here: `build/3`
   # already splits those into `orphan_findings`, which is the existing safety
   # net rather than a new refusal.
@@ -1967,10 +1982,11 @@ defmodule StatifierBlocks.ViewModel do
   defp resolution_message({:migration_failed, id, reason}),
     do: "block #{id} failed to migrate its config: #{inspect(reason)}"
 
-  @spec finding_block_id(Finding.t()) :: Block.id()
+  @spec finding_block_id(Finding.t()) :: Block.id() | nil
   defp finding_block_id(%Finding{anchor: {:config, id, _key}}), do: id
   defp finding_block_id(%Finding{anchor: {:slot, id, _name}}), do: id
   defp finding_block_id(%Finding{anchor: {:block, id}}), do: id
+  defp finding_block_id(%Finding{anchor: :document}), do: nil
 
   @typedoc "Threaded through the recursive walk instead of two positional arguments."
   @type ctx ::

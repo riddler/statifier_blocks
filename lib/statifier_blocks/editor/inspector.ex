@@ -564,6 +564,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # document does not hold, so there is nothing to select and a button that
     # did nothing would be worse than no button. They are listed rather than
     # filtered because they are inside the count on the tab beside them.
+    #
+    # The document's own group (ADR-0005's Amendment of 2026-09-22, `11w`)
+    # is first, and its rows are spans for the same reason: a `:document`
+    # finding names no block. It carries `block_id: nil` like the unanchored
+    # group, so `document?` is what keeps `data-unanchored` off it and puts
+    # `data-document` on it.
     defp document_findings_panel(assigns) do
       ~H"""
       <p :if={@groups == []} class="sb-inspector__empty">No findings in this document.</p>
@@ -573,7 +579,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           :for={group <- @groups}
           class="sb-inspector__group"
           data-block-id={group.block_id}
-          data-unanchored={to_string(group.block_id == nil)}
+          data-unanchored={to_string(group.block_id == nil and not group.document?)}
+          data-document={to_string(group.document?)}
         >
           <h3 class="sb-inspector__group-title">{group.label}</h3>
           <ul class="sb-inspector__findings">

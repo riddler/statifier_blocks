@@ -117,6 +117,21 @@ defmodule StatifierBlocks.Compiler do
   `slots/1` did not declare, so an undeclared slot's blocks were absent
   from the emission rather than misplaced in it - a silent drop.
 
+  ## The stages before Emit, on their own
+
+  `structure_findings/3` runs stages 1 to 4 - Document, Resolve, Config and
+  Structure - and stops (ADR-0004's Amendment of 2026-09-22, G1 to G3). It
+  returns `[]` when those four stages find nothing and otherwise exactly the
+  findings `compile/3` refuses with, in the same order: the two functions share
+  one private prefix, so no message builder, skip rule or re-anchoring rule
+  exists twice. A host's publish step calls it to learn why a document would
+  not compile before Emit without emitting a chart.
+
+  The prefix is total. A Document-stage refusal is returned without walking the
+  tree it refused, so a document whose `root` is not a block, or whose `slots`
+  value is not a map of block lists, is refused by both functions rather than
+  raising while its findings are put in document order.
+
   ## Options
 
     * `:known_invoke_types` - decision 8's opt-in lint. A set (or list) of
@@ -496,18 +511,55 @@ defmodule StatifierBlocks.Compiler do
     |> in_document_order(document)
   end
 
-  # Resolve is pulled out of the `with` because it answers a third thing the
-  # stages after it do not: the expansion index, which every finding - its
-  # own included - is re-anchored through before it is reported.
-  @spec stages(Document.t(), Palette.t(), [option()]) ::
-          {:ok, Compiled.t()} | {:error, [Finding.t()]}
-  defp stages(%Document{} = document, %Palette{} = palette, opts) do
+  @doc """
+  The findings stages 1 to 4 refuse `document` for - Document, Resolve,
+  Config and Structure - without emitting anything (ADR-0004's Amendment of
+  2026-09-22, G1 to G3).
+
+  Returns `[]` when those four stages find nothing, and otherwise the
+  findings they found: the same `StatifierBlocks.Compiler.Finding` values
+  `compile/3` refuses with, struct for struct and in the same document
+  order, because both run one private implementation of those stages. When
+  `compile/3` succeeds, or refuses at a stage after Structure, this returns
+  `[]`.
+
+  Total: never a raise on a `%Document{}` and a `%Palette{}`, whatever the
+  document holds. A Document-stage refusal comes back as one finding with
+  `block_id: nil`; every other finding names a block the stored document
+  holds, a finding inside a composite's expansion re-anchored to the
+  composite the author placed.
+
+  `opts` is `compile/3`'s own option list. The stages this runs read
+  `:datamodel` and `:entry_type`; every other option is ignored, so a host
+  passes one keyword list to both calls. Only errors come back: the warnings
+  a compile reports come from stages after Structure.
+  """
+  @spec structure_findings(Document.t(), Palette.t(), [option()]) :: [Finding.t()]
+  def structure_findings(%Document{} = document, %Palette{} = palette, opts \\ [])
+      when is_list(opts) do
+    case prefix(document, palette, opts) do
+      {:ok, _node, _expansion} ->
+        []
+
+      {:error, _findings} = refused ->
+        {:error, findings} = in_document_order(refused, document)
+        findings
+    end
+  end
+
+  # The prefix both public functions run, and the only place stages 1 to 4
+  # are sequenced. `compile/3` continues from the tree and expansion index it
+  # answers; `structure_findings/3` stops. Resolve is not folded into the
+  # `with` because it answers a third thing the stages after it do not: the
+  # expansion index, which every finding - its own included - is re-anchored
+  # through before it is reported.
+  @spec prefix(Document.t(), Palette.t(), [option()]) ::
+          {:ok, Resolved.t(), expansion()} | {:error, [Finding.t()]}
+  defp prefix(%Document{} = document, %Palette{} = palette, opts) do
     with :ok <- document_stage(document) do
       case resolve_stage(document, palette) do
         {:ok, node, expansion} ->
-          document
-          |> after_resolve(palette, node, expansion, opts)
-          |> reanchor(expansion)
+          config_and_structure_prefix(document, palette, node, expansion, opts)
 
         {:error, findings, expansion} ->
           reanchor({:error, findings}, expansion)
@@ -515,12 +567,43 @@ defmodule StatifierBlocks.Compiler do
     end
   end
 
-  @spec after_resolve(Document.t(), Palette.t(), Resolved.t(), expansion(), [option()]) ::
+  # The prefix's last step: the Config and Structure pair, re-anchored
+  # through the expansion index when it refuses, and the tree and index
+  # handed on when it does not.
+  @spec config_and_structure_prefix(
+          Document.t(),
+          Palette.t(),
+          Resolved.t(),
+          expansion(),
+          [option()]
+        ) :: {:ok, Resolved.t(), expansion()} | {:error, [Finding.t()]}
+  defp config_and_structure_prefix(document, palette, node, expansion, opts) do
+    case config_and_structure_stages(document, palette, node, expansion, opts) do
+      :ok -> {:ok, node, expansion}
+      {:error, _findings} = refused -> reanchor(refused, expansion)
+    end
+  end
+
+  @spec stages(Document.t(), Palette.t(), [option()]) ::
           {:ok, Compiled.t()} | {:error, [Finding.t()]}
-  defp after_resolve(document, palette, node, expansion, opts) do
-    with :ok <- config_and_structure_stages(document, palette, node, expansion, opts),
-         {node, shelf_warnings} = elide_shelf(node),
-         :ok <- chart_use_stage(node, opts),
+  defp stages(%Document{} = document, %Palette{} = palette, opts) do
+    case prefix(document, palette, opts) do
+      {:ok, node, expansion} ->
+        document
+        |> after_structure(node, opts)
+        |> reanchor(expansion)
+
+      {:error, _findings} = refused ->
+        refused
+    end
+  end
+
+  @spec after_structure(Document.t(), Resolved.t(), [option()]) ::
+          {:ok, Compiled.t()} | {:error, [Finding.t()]}
+  defp after_structure(document, node, opts) do
+    {node, shelf_warnings} = elide_shelf(node)
+
+    with :ok <- chart_use_stage(node, opts),
          :ok <- donedata_stage(node, opts),
          {:ok, {emission, emit_warnings}} <- emit_stage(node, document, opts),
          :ok <- self_reference_stage(emission, document.id),
@@ -3342,6 +3425,14 @@ defmodule StatifierBlocks.Compiler do
   defp in_document_order({:ok, %Compiled{} = compiled}, document) do
     {:ok, %{compiled | warnings: order(compiled.warnings, document)}}
   end
+
+  # A Document-stage refusal is returned as it is: the tree it refused is the
+  # one `Document.blocks/1` would walk to rank it, and a `root` that is not a
+  # block, or a `slots` value that is not a map of block lists, raises there
+  # (ADR-0004's Amendment of 2026-09-22, G2). The stage reports one finding,
+  # which names no block and so has no rank or path to be given anyway.
+  defp in_document_order({:error, [%Finding{stage: :document}]} = refused, _document),
+    do: refused
 
   defp in_document_order({:error, findings}, document) do
     {:error, order(findings, document)}

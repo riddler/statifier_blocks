@@ -35,11 +35,19 @@ defmodule StatifierBlocks.Finding do
   The whole routing mechanism (ADR-0005 decision 11). A `:config` finding
   renders inline beneath its field, a `:slot` finding on that slot's
   header, a `:block` finding on the block's chrome.
+
+  `:document` (ADR-0005's Amendment of 2026-09-22, `11v`) names the
+  document the findings list is about and carries no id: the list is
+  already about exactly one document, and the id may be the very field that
+  failed. It renders on no card, slot or field - only on the two
+  document-level surfaces - and `from_compiler/2` over a Document-stage
+  compiler finding is its one producer.
   """
   @type anchor ::
           {:config, Block.id(), key :: String.t()}
           | {:slot, Block.id(), Block.slot_name()}
           | {:block, Block.id()}
+          | :document
 
   @typedoc """
   Where this finding's rule lives. See `StatifierBlocks.ViewModel`'s
@@ -118,10 +126,15 @@ defmodule StatifierBlocks.Finding do
   Why `from_compiler/2` refused to adapt a
   `StatifierBlocks.Compiler.Finding`.
 
-  `:unanchorable` - the finding names no block (`block_id` is `nil`). The
-  anchor is the whole routing mechanism (ADR-0005 decision 11), so a
-  finding that names no block cannot be routed. Only the `:document` stage
-  produces these today (`Document.validate/1` failing).
+  `:unanchorable` - the finding names no block (`block_id` is `nil`) and
+  did not come from the Document stage. The anchor is the whole routing
+  mechanism (ADR-0005 decision 11), so a finding that names no block cannot
+  be routed. The Document stage's own block-less finding adapts to
+  `:document` instead (`11x`), and every finding a later stage reports names
+  a block (ADR-0004 decision 10), so the compiler produces none of these
+  today: one would be a compiler defect, and the refusal is the honest
+  answer to it. The member is kept rather than dropped because dropping it
+  would narrow this function's public return.
 
   This union carried a second member for part of this package's history:
   the refusal for a finding whose stage named no source in decision 11's
@@ -150,7 +163,10 @@ defmodule StatifierBlocks.Finding do
 
     * `block_id` and `config_key` both present -> `{:config, block_id, config_key}`
     * `block_id` present, `config_key` `nil` -> `{:block, block_id}`
-    * `block_id` `nil` (any `config_key`) -> refused, `{:unanchorable, finding}`
+    * `block_id` `nil` at the `:document` stage -> `:document` (ADR-0005's
+      Amendment of 2026-09-22, `11x`)
+    * `block_id` `nil` at any other stage (any `config_key`) -> refused,
+      `{:unanchorable, finding}`
 
   `{:slot, id, name}` is never produced: `Compiler.Finding` carries no slot
   name, so there is nothing to build one from. This is a known gap:
@@ -188,9 +204,10 @@ defmodule StatifierBlocks.Finding do
        true for compile errors too.
 
   Because rule 4 no longer refuses, the anchor is the only thing that can:
-  a block-less finding is `{:unanchorable, _}` even when its stage or
-  severity would otherwise have mapped to a source, because there is
-  nowhere to route it regardless of what it is about.
+  a block-less finding from any stage but `:document` is
+  `{:unanchorable, _}` even when its stage or severity would otherwise have
+  mapped to a source, because there is nowhere to route it regardless of
+  what it is about.
 
   ## Severity (pass-through, not a two-clause case)
 
@@ -302,11 +319,16 @@ defmodule StatifierBlocks.Finding do
     {Enum.reverse(ok_rev), Enum.reverse(refused_rev)}
   end
 
-  # `block_id` is the whole routing mechanism (ADR-0005 decision 11): a
-  # finding that names no block cannot be anchored, and `:document` is the
-  # only stage that produces one today (`Document.validate/1` failing).
+  # `block_id` is the whole routing mechanism (ADR-0005 decision 11). The
+  # Document stage's finding names no block because the tree it would name
+  # one in is what failed, and it anchors on the document (`11x`). A
+  # block-less finding from any later stage is a compiler defect against
+  # ADR-0004 decision 10, and is refused.
   @spec anchor_from_compiler(StatifierBlocks.Compiler.Finding.t()) ::
           {:ok, anchor()} | {:error, {:unanchorable, StatifierBlocks.Compiler.Finding.t()}}
+  defp anchor_from_compiler(%StatifierBlocks.Compiler.Finding{stage: :document, block_id: nil}),
+    do: {:ok, :document}
+
   defp anchor_from_compiler(%StatifierBlocks.Compiler.Finding{block_id: nil} = finding),
     do: {:error, {:unanchorable, finding}}
 

@@ -43,6 +43,10 @@ defmodule StatifierBlocks.FindingFromCompilerTest do
     # return `{:ok, {:block, nil}}` instead of refusing - red on the
     # "every block-less input refuses" assertion below, across every
     # stage/severity/config_key combination that has no block id.
+    # Sabotage: dropped the `:document` clause of `anchor_from_compiler/1` -
+    # the Document stage's block-less finding refuses again and the
+    # `:document` arm below goes red at every severity and config key
+    # (verified).
     test "every combination is {:ok,_} or {:error,_}, never raises, and honors every invariant" do
       for stage <- @stages,
           severity <- @severities,
@@ -52,11 +56,20 @@ defmodule StatifierBlocks.FindingFromCompilerTest do
 
         result = Finding.from_compiler(finding)
 
-        case block_id do
-          nil ->
+        case {stage, block_id} do
+          # ADR-0005's Amendment of 2026-09-22, `11x`: the Document stage's
+          # block-less finding anchors on the document, with its source from
+          # the existing rules unchanged.
+          {:document, nil} ->
+            assert {:ok, %Finding{anchor: :document} = adapted} = result
+            assert adapted.severity == finding.severity
+            assert adapted.message == finding.message
+            assert adapted.source == if(severity == :error, do: :compile, else: :lint)
+
+          {_later_stage, nil} ->
             assert {:error, {:unanchorable, ^finding}} = result
 
-          "blk_X" ->
+          {_stage, "blk_X"} ->
             # Since 11h nothing anchored is refused: a stage the mapping
             # cannot place takes `:compile`. The refusal it used to take
             # is gone from `from_compiler_error/0` under 11j (sb-mmyj),
@@ -220,6 +233,9 @@ defmodule StatifierBlocks.FindingFromCompilerTest do
 
       assert Enum.map(ok, & &1.anchor) == [
                {:config, "blk_A", "x"},
+               # The Document stage's block-less finding anchors on the
+               # document since `11x`, where it used to be refused.
+               :document,
                {:block, "blk_B"},
                # blk_C is an :emit-stage :error - unplaceable by stage, so
                # :compile since 11h, where it used to be refused.
@@ -230,15 +246,29 @@ defmodule StatifierBlocks.FindingFromCompilerTest do
                {:config, "blk_D", "y"}
              ]
 
-      assert Enum.map(ok, & &1.source) == [:config, :resolution, :compile, :lint]
+      assert Enum.map(ok, & &1.source) == [:config, :compile, :resolution, :compile, :lint]
 
-      # Only the block-less finding refuses now: the anchor is the one
-      # thing 11h did not make recoverable.
-      assert Enum.map(refused, fn {f, _reason} -> f.stage end) == [:document]
+      # Nothing the compiler produces refuses now: the Document stage's
+      # finding has the `:document` anchor (`11x`).
+      assert refused == []
+    end
 
-      assert Enum.map(refused, fn {_f, reason} -> reason end) == [
-               {:unanchorable, Enum.at(findings, 1)}
-             ]
+    # The refusal member is kept (`11x`): a block-less finding from a stage
+    # after the Document stage is a compiler defect, and it is refused and
+    # returned, never dropped.
+    # Sabotage: made `from_compiler_all/2` discard refusals instead of
+    # collecting them - the refused list comes back empty and the count
+    # invariant goes red (verified).
+    test "a block-less finding from a later stage is still refused, not dropped" do
+      findings = [
+        compiler_finding(:document, :error, nil, nil),
+        compiler_finding(:structure, :error, nil, nil)
+      ]
+
+      {ok, refused} = Finding.from_compiler_all(findings)
+
+      assert Enum.map(ok, & &1.anchor) == [:document]
+      assert refused == [{Enum.at(findings, 1), {:unanchorable, Enum.at(findings, 1)}}]
     end
   end
 
