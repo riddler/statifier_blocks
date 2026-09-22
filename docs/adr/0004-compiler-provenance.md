@@ -3838,3 +3838,221 @@ this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
 Filed with `sb-4wh3`, campaign RF058.
+
+## Amendment (2026-09-22): the stages before Emit are one public function, `structure_findings/3`, and `compile/3` runs it
+
+**Status: proposed (2026-09-22), drafted for `sb-3zw2`; the implementation is
+`sb-m89g`.** Additive: no text above this line is edited, every decision above
+stands as written, and the header line's status history is not extended here.
+This is an amendment rather than a dated Note because it adds a public function
+to decision 1's pipeline and fixes what that function returns, and by this
+directory's README a note decides nothing. Its companion is `ADR-0005`'s
+Amendment of this date, which gives the one finding this function can return
+without a block, the Document stage's, somewhere to render.
+
+Code cites below were read at `6b216a5` and carry their anchors; re-locate by
+anchor, not by number.
+
+### Context
+
+A host's publish step needs the findings `compile/3` would refuse a document
+for, without emitting a chart, so that the editor, the compile and the publish
+step answer one question with one implementation - the rule `ADR-0003`
+decision 6 already states for assignability. Three facts stand in the way
+today.
+
+**The messages are private.** The only producer of worded structure findings
+is the Structure stage, `structure_stage/6`
+(`lib/statifier_blocks/compiler.ex:1648`, `defp structure_stage/6`), which
+words a slot finding through `slot_finding/1` (`compiler.ex:1865`,
+`defp slot_finding/1`) and an assignability finding through
+`structure_finding/4` (`compiler.ex:1777`, `defp structure_finding/4`), the
+second with the datamodel labels and the field key a read was declared on.
+The two public validators the stage calls return bare tuples:
+`SlotValidation.validate/2` (`lib/statifier_blocks/slot_validation.ex:64`,
+`def validate/2`) and `Assignability.validate/3`
+(`lib/statifier_blocks/assignability.ex:937`, `def validate/3`). A caller
+outside the compiler that wants a finding an author can read has to call
+`compile/3` or copy those private sentences.
+
+**The compile checks a different tree.** For a document holding a composite,
+the Structure stage walks the tree the Resolve stage built, with the expansion
+spliced in (`compiler.ex:1383`, `defp structure_document/3`), and every
+finding raised inside an expansion is re-anchored to the outermost composite
+block before it is reported (`compiler.ex:1158`, `defp reanchor/2`; this
+record's Amendment of 2026-09-07, E3). The public validators, called on the
+stored document, check the composite block against its own type's slots and
+never see its members. The two answers disagree on any document holding a
+composite.
+
+**The Document stage's finding names no block.** Stage 1 reports a
+`Document.validate/1` refusal as one finding with `block_id: nil`
+(`compiler.ex:544`, `defp document_stage/1`). The `StatifierBlocks.Compiler.Finding`
+moduledoc says why the stage exists outside decision 10's table: decision 1's
+totality. `ADR-0005`'s anchor union has no member for it, so
+`Finding.from_compiler/2` refuses it as `:unanchorable`.
+
+**That totality has a hole.** Whatever stage refused, `compile/3` sorts its
+findings into document order through `Document.blocks/1`
+(`compiler.ex:3258`, `defp in_document_order/2`), and that walk assumes a
+well-formed tree (`lib/statifier_blocks/document.ex:107`, `def blocks/1`). A
+document whose envelope is malformed but whose tree is intact - a negative
+`revision`, say - gets its Document-stage finding back. A document whose
+`root` is not a block, or whose `slots` value is not a map of block lists,
+makes `compile/3` raise at `6b216a5` instead of returning the finding stage 1
+produced. That is a defect against decision 1, not a decision, and a publish
+entry built on the same stages would inherit it.
+
+### Decision
+
+**G1. `StatifierBlocks.Compiler.structure_findings/3` is public, pure and
+total.**
+
+```elixir
+@spec structure_findings(Document.t(), Palette.t(), [option()]) :: [Finding.t()]
+def structure_findings(document, palette, opts \\ [])
+```
+
+It runs stages 1 to 4 of the pipeline - Document, Resolve, Config and
+Structure - and nothing after them: no Emit, none of the refusals `after_resolve/5`
+runs between Structure and Emit (`compiler.ex:519`, `defp after_resolve/5`),
+no serializer and no call into statifier-ex. It returns `[]` when those four
+stages find nothing, and otherwise the findings they found, as the same
+`StatifierBlocks.Compiler.Finding` values `compile/3` returns, in the same
+document order (`compiler.ex:3258`, `defp in_document_order/2`). It is total
+in decision 1's sense: it never raises on a `%Document{}` and a `%Palette{}`,
+whatever the document holds. It takes `compile/3`'s own option list and reads
+the options stages 3 and 4 read, `:datamodel` and `:entry_type`
+(`compiler.ex:1739`, `defp assignability_context/1`); it ignores the rest, so a
+host passes one keyword list to both calls. It carries only errors: the
+warnings a compile reports come from stages after Structure.
+
+The stop rules are the pipeline's, unchanged. A Document-stage finding stops
+it there; a Resolve refusal stops it there, re-anchored; otherwise it returns
+the union of Config and Structure (this record's Note of 2026-09-06 on the one
+exception to "first failing stage"). The arity is 3, with the third argument
+defaulting to `[]` as `compile/3`'s does.
+
+**G2. It is the compile's own prefix, not a second copy.** `compile/3` and
+`structure_findings/3` share one private implementation of stages 1 to 4:
+`compile/3` runs that prefix and, when it finds nothing, continues from the
+tree and expansion index it built into the stages after Structure;
+`structure_findings/3` runs the same prefix and stops. So for every document,
+palette and option list:
+
+- when `compile/3` returns `{:error, findings}` and those findings come from
+  stages 1 to 4, `structure_findings/3` returns exactly `findings`, struct for
+  struct and in order;
+- otherwise - `compile/3` returns `{:ok, _}`, or refuses at a stage after
+  Structure - `structure_findings/3` returns `[]`.
+
+`sb-m89g` proves both halves over the fixture documents and over a document
+holding a composite. No message builder, skip rule or re-anchoring rule is
+restated outside the compiler. `compile/3`'s byte corpus is unchanged by the
+split, and so is its behaviour on every document it does not raise on today.
+
+The shared prefix is total, so the hole the context names closes for both
+functions at once: a Document-stage refusal is returned without walking the
+tree it refused, and `compile/3` returns `{:error, [finding]}` where it raised.
+`sb-m89g` proves it with a document whose `root` is not a block.
+
+**G3. "Over the spliced document" means what the compile already means.**
+The Structure stage `structure_findings/3` runs is the one `compile/3` runs,
+over the same tree: a composite that declares no outcomes has been replaced by
+its expansion (this record's Amendment of 2026-09-07, E1), a composite that
+declares them keeps its own node with its members beneath it (`ADR-0002`'s
+Amendment of 2026-09-13, `C6`), and pass-through children are spliced in with
+their stored ids (this record's pass-through Amendment of 2026-09-07, T1 and
+T2). Every
+finding on an expansion member is reported against the outermost composite
+block the author placed, carrying the param key the expansion index blames or
+`nil` (E3, `compiler.ex:1185`, `defp anchor/2`), and a finding on a
+pass-through child names that child (T3). No finding this function returns
+names a block id the stored document does not hold. A caller that runs
+`SlotValidation.validate/2` or `Assignability.validate/3` over the stored
+document is asking a different question, and a publish step must not use
+their verdict in place of this one.
+
+**G4. What the publish entry composes.** `StatifierBlocks.Publish.findings/3`
+(`sb-m89g`) takes `(document, palette, context)`, where `context` is the map
+the editor takes: `:datamodel`, `:declare` and `:chart_outcomes`. It:
+
+1. calls `structure_findings/3` with `datamodel:` and `declare:` taken from
+   `context`, so the host hands one value to both halves;
+2. adapts every finding through `Finding.from_compiler/2`;
+3. when a finding came from the Document stage, returns the adapted list and
+   stops - the editor's own composition reads a tree the Document stage has
+   refused;
+4. otherwise returns the editor's composition with the adapted list as its
+   caller-supplied findings: the `findings` of `ViewModel.build/3` when it is
+   handed the adapted list followed by `Datamodel.findings/4`'s advisories and
+   `ViewModel.outcome_findings/3`'s disagreements, which puts the view model's
+   own derived findings first (`lib/statifier_blocks/editor.ex:3666`,
+   `defp view_model/6`).
+
+The equality `sb-m89g` proves is step 4's: for a document the Document stage
+accepts, `Publish.findings/3` equals the editor's findings for the same
+document, palette and context when the editor is handed the adapted
+`structure_findings/3` list as its caller findings - byte for byte, order
+included - and `Editor.findings_count/3` over the same inputs is its length.
+A config refusal can appear twice in that list, once derived by the view model
+and once from the Config stage, exactly as the editor shows it today when a
+host hands it `compile/3`'s refusal; this amendment does not de-duplicate.
+
+Nothing in `Publish.findings/3` emits, so it cannot see an Emit-stage or
+Chart-stage refusal. The host's publish step calls `Publish.findings/3` and
+then `compile/3`, and refuses on an `:error` from either. By G2, a document
+`Publish.findings/3` passes that `compile/3` then refuses was refused after
+Structure.
+
+**Worked example: patron registration.** The document `patron_registration`
+holds `blk_CONTACT`, a block of a host composite type whose `address` param
+fills a field on one of its expansion members, and that field declares a read
+of the datamodel path `patron.email` as a string. The datamodel document
+declares `patron.email` as a list. (An illustration of the rules above, not a
+fixture.)
+
+- `structure_findings/3` returns one `:structure` finding, anchored on
+  `blk_CONTACT` with `config_key: "address"`, carrying the datamodel labels in
+  its message. `compile/3` refuses with the same one finding.
+- `SlotValidation.validate/2` and `Assignability.validate/3` over the stored
+  document see `blk_CONTACT` and none of its members, and return `:ok`.
+- `Publish.findings/3` returns the editor's derived findings for the document,
+  then that finding adapted to `{:config, "blk_CONTACT", "address"}` with
+  source `:assignability`; the host refuses the publish on its `:error`.
+
+A second revision of the same document stored with `revision: -1` fails
+`Document.validate/1`. `structure_findings/3` returns one `:document` finding
+with `block_id: nil`, `Publish.findings/3` returns it adapted to `ADR-0005`'s
+`:document` anchor and nothing else, and the host refuses.
+
+### What this amendment does not decide
+
+- **Severity policy.** The host refuses on `:error`. Whether a `:warning`
+  refuses is the host's call. A read of a datamodel path the host does not
+  declare stays the editor's `:info` advisory (`ADR-0005`'s Amendment of
+  2026-08-29 on undeclared datamodel paths); nothing here raises it.
+- **A publish step or a store in this package.** `Publish.findings/3` is a
+  pure function a host calls; the package gains no publish step, publish
+  store, revision store or process.
+- **The editor at edit time.** Whether the package's editor calls
+  `structure_findings/3` itself, rather than taking compile findings as caller
+  findings from its host, is not decided here.
+- **De-duplication** of a finding both the view model and the Config stage
+  report.
+- **Compile options beyond `:datamodel` and `:declare`.** A host that
+  compiles with `:entry_type` gets the checks that option drives from
+  `compile/3`; `Publish.findings/3`'s context does not carry it.
+- **The order of the host's other publish checks**, including the pairwise
+  interface check of `ADR-0008`'s Amendment of 2026-09-22.
+
+### Consequences
+
+- `sb-m89g` has a target: the public function, the shared prefix inside
+  `compiler.ex`, the four-step composition, and the two equalities (G2's and
+  G4's).
+- A host no longer has to compile to learn why a document would not compile
+  before Emit, and the answer it gets is the compile's own, word for word.
+- Decision 10's "every finding names a block" keeps its one standing
+  exception, the Document stage, which `ADR-0005`'s companion Amendment now
+  routes rather than refuses.
