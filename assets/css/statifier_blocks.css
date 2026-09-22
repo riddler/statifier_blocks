@@ -4147,7 +4147,9 @@ button.sb-inspector__group-row:hover {
 
 .sb-declarations__add,
 .sb-declarations__move,
-.sb-declarations__remove {
+.sb-declarations__remove,
+.sb-accepts__add,
+.sb-accepts__remove {
   font: inherit;
   cursor: pointer;
   color: inherit;
@@ -4164,19 +4166,40 @@ button.sb-inspector__group-row:hover {
   color: var(--sb-fg-subtle);
 }
 
-.sb-declarations__add {
+.sb-declarations__add,
+.sb-accepts__add {
   margin-top: var(--sb-space);
 }
 
 /* A refusal is about the panel and never about a block, so it renders here
  * and never as a finding - decision 11's anchors cannot name a declaration. */
-.sb-declarations__refusal {
+.sb-declarations__refusal,
+.sb-accepts__refusal {
   color: var(--sb-error);
   background: var(--sb-error-bg);
   border-radius: var(--sb-radius);
   padding: var(--sb-space-half) var(--sb-space);
   font-size: var(--sb-text-sm);
   margin: 0 0 var(--sb-space);
+}
+
+/* The accepted-events row below the roots (ADR-0014 decision 6): the roots'
+ * table and controls, one field wide, under a heading of its own. No new
+ * token. */
+.sb-accepts {
+  margin-top: var(--sb-space);
+}
+
+.sb-accepts__heading {
+  font-size: var(--sb-text-sm);
+  font-weight: var(--sb-weight-medium);
+  margin: 0 0 var(--sb-space-half);
+}
+
+.sb-accepts__empty {
+  color: var(--sb-fg-subtle);
+  font-size: var(--sb-text-sm);
+  margin: 0;
 }
 
 /* ----------------------------------------------------------- fixtures */

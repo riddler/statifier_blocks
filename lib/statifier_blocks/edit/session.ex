@@ -388,6 +388,9 @@ defmodule StatifierBlocks.Edit.Session do
   def refusal({:malformed_envelope, {:datamodel, _reason}} = envelope),
     do: Declarations.refusal(envelope)
 
+  def refusal({:malformed_envelope, {:accepts, _reason}} = envelope),
+    do: Declarations.refusal(envelope)
+
   def refusal({:malformed_envelope, _term}), do: "That change was refused."
 
   # A pick out of the palette (clauses 2C and 3C).

@@ -48,7 +48,7 @@ defmodule StatifierBlocks.Decode do
   alias StatifierBlocks.Document.DatamodelEntry
 
   @block_keys ~w(id type type_version config slots)
-  @envelope_keys ~w(id revision root schema_version metadata datamodel)
+  @envelope_keys ~w(id revision root schema_version metadata datamodel accepts)
   @entry_keys ~w(id expr description)
 
   @spec decode(binary()) :: {:ok, Document.t()} | {:error, Validation.error()}
@@ -64,7 +64,13 @@ defmodule StatifierBlocks.Decode do
         root: root,
         schema_version: Map.get(envelope, "schema_version"),
         metadata: Map.get(envelope, "metadata", %{}),
-        datamodel: datamodel
+        datamodel: datamodel,
+        # Passed through as decoded, list or not and entry by entry:
+        # `Validation`'s `accepts` arms (ADR-0014 decision 2) are the one
+        # implementation of what the key may hold. There is nothing for this
+        # module to catch first - an entry is a bare JSON string, so it has no
+        # key of its own to be unexpected, and no `null` a struct would hide.
+        accepts: Map.get(envelope, "accepts", [])
       }
 
       case Validation.validate(document) do

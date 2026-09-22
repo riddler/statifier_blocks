@@ -729,6 +729,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       palette-open palette-close palette-pick
       config-change discard-draft field-list-add field-list-remove
       declaration-add declaration-remove declaration-move declaration-change
+      accepted-add accepted-remove accepted-move accepted-change
     )
 
     # The four events the "Save as a step" gesture is made of, refused on a
@@ -787,6 +788,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          drafts: %{},
          draft_findings: %{},
          declaration_draft: nil,
+         accepted_draft: nil,
          pending_fields: [],
          palette_position: nil,
          palette_allowed: nil,
@@ -1015,6 +1017,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assigns
         |> assign(:drawer, drawer_view(assigns))
         |> assign(:declarations, declaration_entries(assigns))
+        |> assign(:accepted, accepted_names(assigns))
         |> assign(:path_candidates, path_candidates(assigns))
         |> assign(:offered_values, offered_values(assigns))
         |> assign(:declared_path_types, declared_path_types(assigns))
@@ -1025,6 +1028,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:run_events, run_events(assigns))
         |> assign(:run_sendable?, run_sendable?(assigns))
         |> assign(:declaration_refusal, declaration_refusal(assigns))
+        |> assign(:accepted_refusal, accepted_refusal(assigns))
         |> assign(:gesture_refusal, gesture_refusal(assigns))
         |> assign(:marks, run_marks)
         |> assign(:fit_target, fit_target(assigns, run_marks))
@@ -1170,6 +1174,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             host_tabs={Shell.host_tabs(@drawer_tabs)}
             declarations={@declarations}
             declaration_refusal={@declaration_refusal}
+            accepted={@accepted}
+            accepted_refusal={@accepted_refusal}
             fixture_runs={@fixture_runs}
             declared_view={@declared_view}
             declared_values={@declared_values}
@@ -1778,6 +1784,27 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
        set_declarations(socket, &Declarations.change(&1, declaration_index(index), params))}
     end
 
+    # The panel's accepted-events row (ADR-0014 decision 6): the same four
+    # gestures over the document's `accepts` list, each building a candidate
+    # with `StatifierBlocks.Declarations` and handing it to
+    # `{:set_accepts, names}`, the only thing that writes the key.
+    def handle_event("accepted-add", _params, socket) do
+      {:noreply, set_accepted(socket, &Declarations.add_accepted/1)}
+    end
+
+    def handle_event("accepted-remove", %{"index" => index}, socket) do
+      {:noreply, set_accepted(socket, &Declarations.remove(&1, declaration_index(index)))}
+    end
+
+    def handle_event("accepted-move", %{"index" => index, "dir" => dir}, socket) do
+      {:noreply, set_accepted(socket, &Declarations.move(&1, declaration_index(index), dir))}
+    end
+
+    def handle_event("accepted-change", %{"index" => index, "name" => name}, socket) do
+      {:noreply,
+       set_accepted(socket, &Declarations.put_accepted(&1, declaration_index(index), name))}
+    end
+
     # ------------------------------------------------------------ commands
 
     # The one place a command reaches the document. Every gesture funnels
@@ -1944,6 +1971,50 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           |> assign(
             :declaration_draft,
             %{entries: candidate, refusal: Declarations.refusal(session.last_error)}
+          )
+          |> rebuild()
+      end
+    end
+
+    # The accepted-events row's funnel: `set_declarations/2`'s rules for the
+    # second list the panel edits (ADR-0014 decision 6 puts the row under
+    # 2j to 2l). A gesture that lands on what the document holds commits
+    # nothing and clears a held draft; a refusal is held as a draft of the
+    # names the author typed, with the sentence saying why; a landing goes
+    # through `Edit.Session` like every other command.
+    @spec set_accepted(Phoenix.LiveView.Socket.t(), ([String.t()] -> [String.t()])) ::
+            Phoenix.LiveView.Socket.t()
+    defp set_accepted(socket, fun) do
+      %{document: document} = socket.assigns
+      candidate = fun.(accepted_names(socket.assigns))
+
+      if candidate == document.accepts do
+        socket |> assign(:accepted_draft, nil) |> rebuild()
+      else
+        commit_accepted(socket, candidate)
+      end
+    end
+
+    @spec commit_accepted(Phoenix.LiveView.Socket.t(), [String.t()]) ::
+            Phoenix.LiveView.Socket.t()
+    defp commit_accepted(socket, candidate) do
+      case socket |> edit_session() |> Session.commit({:set_accepts, candidate}) do
+        {:ok, session} ->
+          socket
+          |> assign(
+            history: session.history,
+            document: session.document,
+            accepted_draft: nil,
+            last_error: nil
+          )
+          |> notify_change(session.document)
+          |> rebuild()
+
+        {:error, session} ->
+          socket
+          |> assign(
+            :accepted_draft,
+            %{names: candidate, refusal: Declarations.refusal(session.last_error)}
           )
           |> rebuild()
       end
@@ -2421,6 +2492,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             drafts: %{},
             draft_findings: %{},
             declaration_draft: nil,
+            accepted_draft: nil,
             palette_position: nil,
             palette_allowed: nil,
             palette_allowed_recipes: nil,
@@ -2634,6 +2706,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         orphan_findings: assigns.view_model.orphan_findings,
         host_tabs: assigns.drawer_tabs,
         declarations: assigns.document.datamodel,
+        accepts: assigns.document.accepts,
         declared_view: Map.get_lazy(assigns, :declared_view, fn -> declared_view(assigns) end),
         source_view: Map.get(assigns, :source_view),
         selected_id: assigns.selected_id,
@@ -3285,6 +3358,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp declaration_entries(%{declaration_draft: %{entries: entries}}), do: entries
     defp declaration_entries(assigns), do: assigns.document.datamodel
 
+    @spec accepted_names(map()) :: [String.t()]
+    defp accepted_names(%{accepted_draft: %{names: names}}), do: names
+    defp accepted_names(assigns), do: assigns.document.accepts
+
     # The last refused gesture, as the one sentence the canvas column draws
     # (ADR-0005's Note of 2026-09-08, item 6). Every refusal that has nowhere
     # else to go is in `last_error` - `5E`'s four, the history's two ends, a
@@ -3310,6 +3387,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec declaration_refusal(map()) :: String.t() | nil
     defp declaration_refusal(%{declaration_draft: %{refusal: refusal}}), do: refusal
     defp declaration_refusal(_assigns), do: nil
+
+    @spec accepted_refusal(map()) :: String.t() | nil
+    defp accepted_refusal(%{accepted_draft: %{refusal: refusal}}), do: refusal
+    defp accepted_refusal(_assigns), do: nil
 
     # The ids the strip is actually carrying, which is what a `phx-value-tab`
     # payload is answered against. `Shell.host_tabs/1` is applied first for

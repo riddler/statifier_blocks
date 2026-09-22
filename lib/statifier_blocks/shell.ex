@@ -1096,6 +1096,7 @@ defmodule StatifierBlocks.Shell do
           optional(:orphan_findings) => [Finding.t()],
           optional(:host_tabs) => [host_tab()],
           optional(:declarations) => [DatamodelEntry.t()],
+          optional(:accepts) => [String.t()],
           optional(:declared_view) => [Datamodel.declared_row()],
           optional(:source_view) => SourceView.t() | nil,
           optional(:selected_id) => Block.id() | nil,
@@ -1120,7 +1121,11 @@ defmodule StatifierBlocks.Shell do
           %{
             id: :declarations,
             title: drawer_title(:declarations),
-            count: Declarations.count(Map.get(state, :declarations))
+            # Both rows of the panel are declarations the document carries:
+            # its roots and the events it accepts (ADR-0014 decision 6).
+            count:
+              Declarations.count(Map.get(state, :declarations)) +
+                Declarations.count(Map.get(state, :accepts))
           }
 
         :fixtures ->
