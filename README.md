@@ -864,16 +864,21 @@ The step calls them in this order:
    `StatifierBlocks.Graph.check/2` with its resolver from a document id to
    that document's published artifact; republishing a child, it calls
    `StatifierBlocks.Graph.consumers_broken/2` with the published parents it
-   says name that child. Each call judges pairs; walking the graph is the
-   host's (ADR-0008's Amendment of 2026-09-22).
+   says name that child, and it pairs each finding with that parent's
+   document id. Each call judges pairs; walking the graph is the host's
+   (ADR-0008's Amendment of 2026-09-22).
 4. **The `accepts` declaration**, for a document that carries one. The
    engine's `Statifier.Chart.check_accepts/2` judges `compiled.accepts`
    against the chart the host will start (ADR-0014 decision 4). It is the
    engine's function, arriving in the engine's next minor release, and this
-   package runs no check of its own for that rule.
+   package runs no check of its own for that rule. It answers a map, not
+   findings: the declared names no reachable transition can take
+   (`unreachable`) and the reachable descriptors no declared name matches
+   (`undeclared`). A declared name in `unreachable` refuses the publish;
+   `undeclared` is internal, never an error (ADR-0014 decision 4).
 
-Every answer is a finding with one of three severities, and the rule is the
-same whichever call reported it:
+Every answer from steps 1 to 3 is a finding with one of three severities,
+and the rule is the same whichever of those calls reported it:
 
 - **`:error` refuses the publish.**
 - **`:warning` is the host's call.** A reasonable host publishes over one and
