@@ -1,0 +1,1 @@
+{"id":"email_verification","metadata":{"name":"Email verification"},"revision":2,"root":{"config":{"outcomes":"verified\nexpired","reports":[]},"id":"blk_EVROOT","type":"library.verify_email","type_version":1},"schema_version":1}
