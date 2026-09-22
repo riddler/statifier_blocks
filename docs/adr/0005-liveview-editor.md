@@ -12018,3 +12018,117 @@ test names and documentation - does not reach a test's config values, and
 that test asserts nothing about their grammar.
 
 Filed with `sb-rov2`, campaign RF058, carrying `sb-a1yq`'s two record items.
+
+## Amendment (2026-09-22): decision 11, a `:document` anchor for the one finding that names no block
+
+**Status: proposed (2026-09-22), drafted for `sb-3zw2`; the implementation is
+`sb-m89g`.** Additive: decision 11 and every amendment to it above stand as
+written, no text above this line is edited, and the header line's status
+history is not extended here. It adds clauses `11v` to `11x`. This is an
+amendment rather than a dated Note because it grows decision 11's anchor union
+by one member and changes what `Finding.from_compiler/2` answers for one input,
+and by this directory's README a note decides nothing. Its companion is
+`ADR-0004`'s Amendment of this date, which makes the compile's stages before
+Emit one public function a host's publish step calls.
+
+Code cites below were read at `6b216a5` and carry their anchors; re-locate by
+anchor, not by number.
+
+### Context
+
+Decision 11's anchor is the whole routing mechanism, and its union has three
+members, each naming a block (`lib/statifier_blocks/finding.ex:39`,
+`@type anchor`). The compile has one stage whose finding names none: the
+Document stage reports a `Document.validate/1` refusal with `block_id: nil`
+(`lib/statifier_blocks/compiler.ex:544`, `defp document_stage/1`). The
+refusal can be about the envelope, about one block's shape, or about two
+blocks sharing an id, and in every case the tree it would route into is the
+thing that failed validation. `ADR-0014` decision 2 sends a malformed
+`accepts` list through the same stage, so the envelope keys a document gains
+arrive here too.
+
+`from_compiler/2` refuses such a finding as `{:unanchorable, finding}`
+(`finding.ex:303`, `defp anchor_from_compiler/1`). A host that hands the
+editor a compile refusal drops it from what the author sees, and a publish
+entry that returns `[%StatifierBlocks.Finding{}]` has no way to say "this
+document is not a document" at all.
+
+### Decision
+
+**11v. The anchor union gains `:document`.**
+
+```elixir
+@type anchor ::
+        {:config, Block.id(), key :: String.t()}
+        | {:slot, Block.id(), Block.slot_name()}
+        | {:block, Block.id()}
+        | :document
+```
+
+`:document` names the document the findings list is about, and carries no id:
+the list is already about exactly one document, and the id may be the very
+field that failed. The only producer this amendment decides is
+`from_compiler/2` over a Document-stage finding (`11x`).
+
+**11w. How a `:document` finding renders.** It renders on no card, slot or
+field. `ViewModel.build/3` routes it to no node and does not put it in
+`orphan_findings`, which stays the list of findings naming a block id the
+document does not hold; it stays in `findings`, which is the document-level
+panel's source, and so in the count `Shell.findings_count/1` reports. In the
+Findings tab with nothing selected (`lib/statifier_blocks/shell.ex:1013`,
+`def findings_groups/3`), the `:document` findings form one group, placed
+**first**, headed as the document rather than as a block, and carrying
+`block_id: nil`, so there is nothing to select; the heading's words are the
+implementation's. The count badge on a collapsed subtree does not include it,
+since it belongs to no subtree. The two private `finding_block_id/1` clauses
+that read the anchor (`lib/statifier_blocks/view_model.ex:1971` and
+`shell.ex:1040`) gain the arm, since each raises on an anchor it does not
+know.
+
+**11x. `from_compiler/2` maps the Document stage to `:document`.** A
+`StatifierBlocks.Compiler.Finding` with `stage: :document` and `block_id: nil`
+adapts to `{:ok, %Finding{anchor: :document}}`. Its source comes from the
+existing rules unchanged: rule 4 gives `:compile` at `:error`. A finding with
+`block_id: nil` at any **other** stage is still refused as
+`{:unanchorable, finding}`: `ADR-0004` decision 10 says every finding a stage
+after the Document stage reports names a block, so such a finding is a
+compiler defect, and the refusal is the honest answer to it. The refusal
+member of `from_compiler_error/0` (`finding.ex:129`) is kept. `11j`'s rule
+that a value with no producer is worse than absent is not applied to it here:
+dropping it would narrow the public return of `from_compiler/2` and
+`from_compiler_all/2`, a breaking change this amendment does not take.
+
+**Worked example: patron registration.** A revision of `patron_registration`
+is stored with `revision: -1`. `ADR-0004`'s `structure_findings/3` returns one
+`:document` finding with `block_id: nil`. `from_compiler/2` adapts it to
+`%Finding{anchor: :document, source: :compile, severity: :error}`, keeping the
+compiler's message. Handed to the editor, it heads the Findings tab as the
+document's own group and adds one to the drawer's count; returned by a
+publish entry, it is the whole list, and the host refuses on its `:error`.
+
+### What this amendment does not decide
+
+- **Any other producer of `:document`.** Whether a host's
+  `StatifierBlocks.DocumentValidator` (`11p` to `11t`) or the `singleton`
+  rule of clause `10z` may anchor a finding on the document is not decided;
+  `10z`'s findings stay on the root block.
+- **A document id on the anchor.** `ADR-0008`'s Amendment of 2026-09-22 pairs
+  a reverse-direction interface finding with another document's id outside
+  the anchor; that pairing is unchanged, and `:document` never names a
+  document other than the one the list is about.
+- **How the editor draws a document that fails `Document.validate/1`.** The
+  view model reads a tree; this amendment decides where a `:document` finding
+  goes in one, not how a refused tree is drawn.
+- **Severity.** A Document-stage finding is `:error`, as it is today.
+
+### Consequences
+
+- A compile refusal a host hands the editor no longer loses a finding in the
+  adapter, and `ADR-0004`'s `structure_findings/3` returns a list the
+  presentation layer can hold whole.
+- `from_compiler_all/2`'s refused list is empty for every list the compiler
+  produces today.
+- `sb-m89g` has a target: the union member, the adapter clause, the two
+  `finding_block_id/1` arms, the first group in
+  `Shell.findings_groups/3`, and a test that a Document-stage finding adapts,
+  routes to no node and is counted.
