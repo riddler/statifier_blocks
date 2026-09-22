@@ -12207,3 +12207,169 @@ baseline regenerated with this Note also records the four ranges above. The
 two Amendments' text is unchanged, and so is what each decides.
 
 Filed with `sb-27yl`.
+
+## Amendment (2026-09-22): decision 2 gains `{:set_accepts, names}`, decision 11's source list gains `:graph`, and what the accepted-events row shipped with
+
+**Status: proposed (2026-09-22), drafted for `sb-db8s`.** Additive: decisions
+2 and 11 and every amendment to them above stand as written, no text above
+this line is edited, and the header line's status history is not extended
+here. It adds clauses `2o` to `2r` and `11y`. This is an amendment rather than
+a dated Note because it grows decision 2's closed command set and decision
+11's `source` enum, and by this directory's README a note decides nothing.
+
+Both growths were decided elsewhere, and this amendment carries them into the
+sets this record spells out: the command by `ADR-0014` decision 6 (proposed),
+which names this record as owing it in its section "What this record owes the
+accepted records", and the source by `ADR-0008`'s Amendment of 2026-09-22, A5
+(proposed), whose Consequences say this record's source list grows by one
+through it. Clauses `2p` to `2r` record what the code that builds the
+accepted-events row shipped with, where this record's own clauses speak to
+the same surface.
+
+Code cites below were read at `281d1b8` and carry their anchors; re-locate by
+anchor, not by number.
+
+### Context
+
+Decision 2 is a closed command set. 2g grew it from four to five with
+`{:set_datamodel, entries}`, and 2n then added `{:compound, [t()]}` as a
+constructor above the edits rather than beside them, counting "the set of
+edits from the set of `Edit.t()` constructors: after this clause those are
+five and six". `ADR-0014` decision 6 adds a sixth edit for the document's
+`accepts` list, authored as a second row of the declarations panel 2i built.
+
+Decision 11's `source` enum was grown once by amendment (11h, `:compile`) and
+narrowed once (11j, `:arity`). `ADR-0008`'s Amendment gives a finding about an
+edge of the host's document graph a source of its own.
+
+### 2o. Decision 2's closed set, as 2g grew it, gains `{:set_accepts, [String.t()]}`
+
+The command replaces the document's whole `accepts` list, and its inverse is
+`{:set_accepts, previous}`. 2g's argument for one whole-list command, and 2h's
+rule that the command is where the grammar is enforced, apply to it
+unchanged: `Edit.apply/2` refuses any list `ADR-0014` decision 2 refuses, in
+the same `{:malformed_envelope, {:accepts, _}}` arms, by calling
+`StatifierBlocks.Validation.accepts/1` rather than restating the grammar, and
+`check_config/3` answers `:ok` for it because a declaration has no block type
+to ask. In the code: the `Edit.t()` union (`lib/statifier_blocks/edit.ex:150`,
+the `{:set_accepts, [String.t()]}` member), the `apply/2` clause at `:218`,
+the `check_config/3` clause at `:299`, and `Validation.accepts/1`
+(`lib/statifier_blocks/validation.ex:216`).
+
+The counts that read five are read as six. 2g's Consequences bullet "The
+command set is five and the reason it is closed is unchanged" reads six, with
+its reason unchanged. 2n's count reads: the set of edits is six and the set of
+`Edit.t()` constructors is seven, `:compound` sitting above the six and never
+beside them. 2n's rules for a compound are untouched, and a
+`{:set_accepts, _}` may be a compound's leaf as any other edit may: the code
+refuses only an empty or nested compound (`lib/statifier_blocks/edit.ex:353`,
+`defp check_compound/1`).
+
+### 2p. A recipe that writes `{:set_accepts, _}` is refused as out of reach; whether that is right is not decided
+
+This clause records shipped behaviour and decides nothing about it. 3C bounds
+the positions a recipe's commands may target, and says nothing about a
+command that names no position. The code answers that question differently
+for the two declaration commands:
+
+- `{:set_datamodel, _}` is admitted anywhere in a recipe's command list, by
+  a private clause of `StatifierBlocks.Recipe` (`lib/statifier_blocks/recipe.ex:153`,
+  `defp reach/3`, the `{:set_datamodel, _entries}` clause), whose comment
+  gives the reason: "A declaration is not a position, and the document's
+  datamodel is not a slot of anything".
+- `{:set_accepts, _}` falls to that function's last clause (`recipe.ex:155`)
+  and is out of reach, so `Recipe.within_reach?/2` (`recipe.ex:127`) answers
+  `false` for a list holding one, and
+  `StatifierBlocks.Edit.Targets.recipe_inserts/4`
+  (`lib/statifier_blocks/edit/targets.ex:451`) refuses the recipe with
+  `{:error, {:recipe_out_of_reach, name}}`.
+
+No record decided the first answer, and none decides the second. The comment's
+reason reads the same for an `accepts` list as for a `datamodel` list, and
+neither the core `"deadline"` recipe nor the recipe a composite block type
+gets writes either command. Whether a recipe may write `{:set_accepts, _}`
+is left undecided here; until a record decides it, the code's refusal is the
+behaviour, and a recipe that needs to write one is refused rather than
+trusted.
+
+### 2q. The row's two gestures are two public helpers, and a new row is named `event_N`
+
+2i's panel arithmetic lives in `StatifierBlocks.Declarations`, outside the
+editor, as pure list-to-list functions. The accepted-events row adds two
+public functions there, beside `add/1` and `put/4`, because a name is a bare
+string with no fields to address:
+
+- `Declarations.add_accepted/1` (`lib/statifier_blocks/declarations.ex:207`)
+  appends `event_1`, or the first `event_N` the list does not already hold,
+  counting up from 1, so a name freed by a remove is used again.
+- `Declarations.put_accepted/3` (`declarations.ex:234`) writes a name at an
+  index verbatim, blank included, and returns the list unchanged when no name
+  sits at that index.
+
+`remove/2` and `move/3` serve both rows unchanged, because neither looks
+inside an entry.
+
+`add_accepted/1` mints a placeholder for the reason `add/1` mints `root_N`: an
+empty name is refused (`ADR-0014` decision 2), so a blank row would make the
+press produce a refusal instead of a row. The placeholder is an ordinary name.
+The package gives `event_N` no meaning beyond its spelling, and a placeholder
+the author never overwrites is a declared name like any other, in the
+document's bytes once committed.
+
+### 2r. The Declarations tab's count is the roots plus the accepted events
+
+2i says the strip's count "is the number of declarations the **document**
+holds, never the number in a draft". The panel now holds two rows of
+declarations, so the count is the document's datamodel roots plus its
+accepted event names: `StatifierBlocks.Shell.drawer_view/1`
+(`lib/statifier_blocks/shell.ex:1135`) sums `Declarations.count/1` over the
+two lists (`shell.ex:1157-1158`), and its input map gains an optional
+`:accepts` key beside `:declarations` to carry the second. A draft still
+counts for nothing.
+
+### 11y. `:graph` joins decision 11's `source` enum
+
+The enum as 11h and 11j left it, `:config | :assignability | :resolution |
+:lint | :compile`, gains `:graph`, as `ADR-0008`'s A5 decided:
+
+```elixir
+@type source :: :config | :assignability | :resolution | :lint | :compile | :graph
+```
+
+(`lib/statifier_blocks/finding.ex:78`, `@type source`.) `:graph` says the rule
+lives on an edge of the host's document graph, a parent and the child it
+names, rather than in one document. It is not a case of 11h's `:compile`,
+because no compile sees a child: its one producer is
+`StatifierBlocks.Graph`, through `check/2` and `consumers_broken/2`
+(`lib/statifier_blocks/graph.ex:96` and `:130`), always at `:error`, and
+`Finding.from_compiler/2` never produces it. The anchor union is unchanged by
+this clause: a `:graph` finding is anchored `{:config, block_id, key}` on the
+parent's referencing block (A5).
+
+Decision 11's `%Finding{}` sketch and the typespec appendix's copy of the
+union are read with `:graph`, as 11j read both without `:arity`. Where a
+`:graph` finding renders, and whether the editor runs the check at all, stay
+undecided, as A5's "What this does not decide" leaves them; this clause adds
+the value to the enum and nothing more.
+
+### What this amendment does not decide
+
+- **Anything about `accepts` or the graph check beyond what `ADR-0014` and
+  `ADR-0008`'s Amendment decided.**
+- **Whether a recipe may write `{:set_accepts, _}`** (2p), or whether the
+  admission of `{:set_datamodel, _}` is right.
+- **An edit-time display of either publish check**, which both deciding
+  records leave open.
+- **The rest of 2g to 2m and 11h to 11x**, in any particular. 2l's draft
+  treatment and 2j's reorder buttons apply to the accepted-events row as they
+  apply to the roots, as `ADR-0014` decision 6 says.
+
+### Consequences
+
+- Decision 2's count, 2n's two counts, 2i's tab count and decision 11's enum
+  read the same as `Edit.t()`, `Shell.drawer_view/1` and
+  `StatifierBlocks.Finding`'s `source` type already do. No code follows from this amendment: the code landed first,
+  under the two deciding records.
+- 2p leaves one question on this record by name: whether a recipe's command
+  list may hold `{:set_accepts, _}`. It concerns 3C's bound, and a request
+  that decides it would amend 3C.
