@@ -4254,6 +4254,28 @@ record should name the option.
 
 Filed with `sb-db8s`.
 
+## Note (2026-09-22): H1's pass-through clause covers an `accepts` list `Document.validate/1` admits
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. It states the reach of one clause of H1 that
+read wider than meant on the day it was written.
+
+H1 says the artifact's `accepts` is "a pass-through the compile reads nothing
+from, judges nothing about and produces no finding from" (`:4097-4099`). The
+words restate `ADR-0014` decision 3's sentence on the carry
+(`docs/adr/0014-document-accepts-declaration.md:147-149`), and `ADR-0014`'s
+own Note of 2026-09-22 on that sentence
+(`docs/adr/0014-document-accepts-declaration.md:366`) records its reach: it
+is true of a list `Document.validate/1` admits. H1's clause has the same
+reach. A list `Document.validate/1` refuses is refused by the compile before
+any carry: `defp document_stage/1` (`lib/statifier_blocks/compiler.ex:628`,
+read at `main` `f4e783d`) reports the refusal as its
+`{:invalid_document, reason}` finding, under `ADR-0014` decision 2. For an
+admitted list, `defp chart_stage/5` (`compiler.ex:3253`) copies the list onto
+the artifact and reads nothing in it. What H1 decides is unchanged.
+
+Filed with `sb-910d`.
+
 ## Note (2026-09-22): the two Amendments of 2026-09-22 are flipped to accepted
 
 A dated Note rather than an amendment: it carries no `Status:` line, decides
@@ -4261,8 +4283,9 @@ nothing, and edits no clause. The only lines this request changes above it
 are the two Amendments' status lines, each by one word, `proposed` to
 `accepted`: the Amendment on `structure_findings/3` (`:3844`, clauses G1 to
 G4) and the Amendment on `accepts` and `interface` (`:4065`, clauses H1 to
-H3). Everything else is this Note, at the foot of the file, so no line
-another record cites moves.
+H3). Everything else is added at the foot of the file - this Note and the
+dated Note just above it on H1's pass-through clause - so no line another
+record cites moves.
 
 The operator granted, on 2026-09-22, the flip of proposed records in this
 repository. This request takes that grant for these two Amendments alone,
@@ -4278,7 +4301,7 @@ and not by the number.
 | Clause | Read at `c362e40` |
 |---|---|
 | G1, one public, pure, total function (`:3908`) | `def structure_findings/3` (`compiler.ex:538`) runs `defp prefix/3` (`compiler.ex:558`) and answers `[]` on `{:ok, _, _}`, or the refusal ordered by `defp in_document_order/2` (`compiler.ex:3425`); nothing it runs reaches `defp after_structure/3` (`compiler.ex:603`), where the Emit, chart-use, done-data, self-reference, sensitive-path and Chart stages run; stages 3 and 4 read `:entry_type` and `:datamodel` through `defp assignability_context/1` (`compiler.ex:1823`) |
-| G1, only errors (`:3927`) | the compile's warnings are built in functions `after_structure/3` reaches: `defp drafts_warning/1` through `defp elide_shelf/1`, `defp marker_warning/1`, `defp deadline_warning/1`, `defp shadowed_finding/2` in the Emit stage, and `defp candidate_finding/3` and `Chart.validate/3`'s warnings in `defp chart_stage/5` (`compiler.ex:3241`) |
+| G1, only errors (`:3927`) | the compile's warnings are built in functions `after_structure/3` reaches: `defp drafts_warning/1` through `defp elide_shelf/1`, `defp marker_warning/1`, `defp deadline_warning/1`, `defp shadowed_finding/2` in the Emit stage, and, in `defp chart_stage/5` (`compiler.ex:3241`), `defp candidate_finding/3`, `Chart.validate/3`'s warnings, and the invoke-type lint, which `defp lint/2` (`compiler.ex:3340`) takes from `StatifierBlocks.Compiler.InvokeTypes.lint/2` (`compiler/invoke_types.ex:77`) |
 | G2, the compile's own prefix (`:3936`) | `compile/3` (`compiler.ex:508`) runs `defp stages/3`, which runs the same `prefix/3` and continues into `after_structure/3` only from the tree and expansion index `prefix/3` answers; both equalities are pinned in `test/statifier_blocks/compiler/structure_findings_test.exs` (the describes "G2: the stored fixtures", "G3: a composite, over the spliced document" and "G1: stages 1 to 4 and nothing after them"); the request that built G1 and G2 (`abf3f06`) changed no file under `test/fixtures/corpus`, and the byte-corpus test (`test/statifier_blocks/compiler/byte_corpus_test.exs`) passes on this tree |
 | G2, the hole closed (`:3953`) | `in_document_order/2`'s Document-stage clause (`compiler.ex:3434`) returns the refusal without calling `Document.blocks/1`; the same test file's "totality" describe refuses a `root` that is not a block, and a `slots` value that is not a map of block lists, through both functions |
 | G3, over the spliced document (`:3959`) | the Structure stage is handed `defp structure_document/3` (`compiler.ex:1465`), the resolved tree whenever the expansion index is not empty; a refusal is re-anchored by `defp reanchor/2` (`compiler.ex:1242`) through `defp anchor/2` (`compiler.ex:1269`) |
@@ -4339,8 +4362,8 @@ None reverses what either Amendment decides.
 
 ### Sentences stated exactly
 
-Each holds on the reading below, which is what the code does; none of them
-changes what is decided.
+Each is read below, or its reach is stated by the dated Note it cites; none
+of them changes what is decided.
 
 - **G4, "`context` is the map the editor takes" (`:3977-3978`).** The editor
   takes `:datamodel`, `:declare` and `:chart_outcomes` as a LiveComponent's
@@ -4348,12 +4371,8 @@ changes what is decided.
   options; `Publish.findings/3`'s `context` is a map of the same three keys
   (`publish.ex`, `@type context`), each optional with the editor's default.
 - **H1, "a pass-through the compile reads nothing from, judges nothing about
-  and produces no finding from" (`:4097-4099`).** The words restate `ADR-0014`
-  decision 3's sentence on the carry
-  (`docs/adr/0014-document-accepts-declaration.md:147-149`), and they hold of
-  it: `chart_stage/5` copies the list and reads nothing in it. A malformed
-  `accepts` is still refused by the compile, earlier, at the Document stage,
-  because `Document.validate/1` refuses it under `ADR-0014` decision 2 and
-  `defp document_stage/1` (`compiler.ex:628`) reports any such refusal.
+  and produces no finding from" (`:4097-4099`).** Its reach is stated by the
+  Note of 2026-09-22 above on H1's pass-through clause (`:4257`): it
+  covers an `accepts` list `Document.validate/1` admits.
 
 Filed with `sb-910d`.
