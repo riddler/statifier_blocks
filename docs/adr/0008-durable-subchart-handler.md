@@ -487,3 +487,210 @@ this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
 Filed with `sb-4wh3`, campaign RF058.
+
+---
+
+## Amendment (2026-09-22): what a parent and its child agree on at publish, and who checks it
+
+**Status: proposed (2026-09-22), drafted for `sb-mwpx`; the implementation is
+`sb-vkyz`.** Additive: no text above this line is edited, every decision above
+stands as written, and the header line's status history is not extended here.
+This is an amendment rather than a dated Note because it decides five things
+the record did not - what the parent/child interface is, where its check
+lives, what a child republish may not do, what an unresolvable reference is at
+publish, and what the check reads - and by this directory's README a note
+decides nothing.
+
+### Context
+
+Decision 2 fixes how the handler resolves a child at **start**, and decision 5
+fixes what a start may refuse for. Neither says what a published parent and a
+published child have to agree on, and nothing checks it before an execution
+starts. Two facts make that gap worth closing.
+
+**A compile of one document cannot see the child.** `core.subchart` names its
+child by document id in `chart` and declares, in `outcomes`, the outcomes the
+author expects that child to finish with; the compile routes on them and
+cannot read the child (the `StatifierBlocks.Core.Subchart` moduledoc, "Which
+outcomes, and where the author says so"). Decision 6 already says a
+cross-document cycle is the resolver's to report for the same reason. The
+document graph is the host's: it holds every published document and knows
+which parent names which child.
+
+**The runtime does not refuse a disagreement; it misroutes it.** The parent's
+`done.invoke` transitions are one conditioned arm per declared outcome and an
+unconditioned arm last, and that last arm targets the first outcome the author
+listed (`lib/statifier_blocks/core/subchart.ex:519`, `defp default_target/1`,
+read at `aa657cd`). A child that finishes with an outcome the parent does not
+route on therefore takes the parent's first-listed path, and no refusal in
+decision 5 fires. What decision 5 does refuse at start is a reference that
+does not resolve at all: `unknown_document`, its first reason.
+
+Two checks across documents already exist, and this amendment says how it
+stands beside each:
+
+- `StatifierBlocks.ViewModel.outcome_findings/3`
+  (`lib/statifier_blocks/view_model.ex:1863`, `def outcome_findings/3`, read
+  at `aa657cd`) compares a `core.subchart`'s declared `outcomes` with a map of
+  child finals the host supplies, in both directions, at `:warning`, and
+  treats a child the map says nothing about as agreement.
+- `StatifierBlocks.BlockType.agrees?/3`
+  (`lib/statifier_blocks/block_type.ex:1023`, `def agrees?/3`, read at
+  `aa657cd`) is ADR-0013 decision 4's dormant check of a `core.map`'s
+  `collect_type` against the child's declared done-data **types**.
+
+`%StatifierBlocks.Compiled{}` carries neither side of the interface today: its
+fields are `scxml`, `provenance`, `record`, `invoke_types` and `warnings`
+(`lib/statifier_blocks/compiled.ex:46`, `defstruct`, read at `aa657cd`).
+
+### Decision
+
+**A1. The interface a parent relies on is the child's declared outcomes and the
+done-data keys the child declares.**
+
+- A child's **declared outcomes** are the outcomes its root block declares:
+  the set a `:child_use` compile gives one top-level `<final>` each
+  (ADR-0004's 2026-08-29 child-use amendment, C1).
+- A child's **declared done-data keys** are the names its root block's
+  `donedata_type/1` declares (ADR-0013 decision 2), which a `:child_use`
+  compile emits as `<param>`s on every top-level final (ADR-0013 decision 3).
+- A `core.subchart` parent **routes on** the outcomes its author listed in
+  `outcomes` (`lib/statifier_blocks/core/subchart.ex:606`,
+  `def child_outcomes/1`, read at `aa657cd`). `error` is exempt, and a child
+  is never required to declare it: `core.subchart` appends `error` to every
+  parent's outcomes whether or not the author listed it, and a child reports
+  an unhandled failure below its root as `error` without its root declaring
+  it (`lib/statifier_blocks/compiler.ex:390`, `@propagated_outcome`, read at
+  `aa657cd`).
+- A `core.subchart` parent **reads no declared done-data key**. It routes on
+  the compiler-minted `outcome` param and, when `assign_to` is set, writes the
+  whole of `_event.data` to that path (`lib/statifier_blocks/core/subchart.ex:693`,
+  the `<assign>` in `defp assign/1`, read at `aa657cd`). What a later block
+  reads under that path is not declared anywhere today, and this amendment
+  does not decide a declaration for it.
+- A `core.map` parent **reads** the members its `collect_type` marks required,
+  when `collect_type` resolves to a shape with members - the inline arm, or a
+  name the parent's own declarations define. A `collect_type` that resolves to
+  nothing with members contributes no keys: unknown is not disagreement. A
+  `core.map` routes on its own two outcomes and on none of the child's
+  (ADR-0009 decision 4).
+
+References are recognized by block type module, not by type name, as
+`outcome_findings/3` does, so a host palette that maps another name onto
+either module is covered. No new block config key is decided here.
+
+**A2. The package ships a pairwise check; the host walks its graph.**
+
+The check is a pure function of **one parent and one child**, both as
+`%Compiled{}` artifacts. The package holds no document store and gains no
+publish step, and the check performs no IO. It comes in two directions, both
+of them the host's to call:
+
+- **Forward, when a parent is published.** For each reference in the parent,
+  the host's resolver answers the child's currently published artifact, and
+  the pair is judged: every outcome the parent routes on is a declared outcome
+  of the child, and every key the parent reads is a declared done-data key of
+  the child.
+- **Reverse, when a child is republished.** The next child artifact is judged
+  against each parent the host says currently references that child's
+  document id, with the same two rules.
+
+The publish-time resolver is a host function from a document id to
+`{:ok, %Compiled{}}` or `{:error, :not_published}`. It is not decision 2's
+`resolve_chart/2`, and decision 2's contract is unchanged by it.
+
+**A3. A child republish that breaks an active parent is refused, naming the
+parents.** A child revision that no longer declares an outcome some published
+parent routes on, or a done-data key some published parent reads, is refused
+at publish, and the refusal names every such parent document and the
+referencing block in each. The way through is **expand, then contract**:
+publish a child revision that declares both the old name and the new one,
+republish each parent to route on or read the new name, then publish the child
+revision that drops the old one. Executions already started are not the
+concern of this check: a started child runs the chart resolved for it at its
+start, which the start instruction carries in `invoke.content` (decision 3),
+so a republish changes what the next start resolves and nothing already
+running.
+
+**A4. An unresolvable reference is a publish finding on the referencing
+block.** When the resolver answers `{:error, :not_published}` for a parent's
+reference, the parent's publish carries a finding anchored on that block's
+`chart` field. At publish that answer is knowledge, not absence: the host
+holds the graph and has said the child is not there. `unknown_document` stays
+the runtime backstop for a reference that goes missing after publish.
+
+**A5. What the check reads, and the finding it produces.**
+
+- **The compile records the interface on `%Compiled{}`**, as one new field,
+  `interface`, on every compile, whatever the chart-use option: the document's
+  declared outcomes and declared done-data keys (A1's child side), and one
+  entry per referencing block holding the block id, the referenced document
+  id, the outcomes it routes on and the keys it reads (A1's parent side). It
+  is a function of the document and the palette alone, so ADR-0004 decision
+  6's determinism covers it as it covers every other field, and it adds
+  nothing to the SCXML and therefore nothing to chart identity. It is not
+  added to `%CompilationRecord{}`.
+- **Every finding is a `StatifierBlocks.Finding` at `:error` severity with a
+  new source, `:graph`**: the rule lives on an edge of the host's document
+  graph, not in one document. This grows the source list of ADR-0005
+  decision 11 (`lib/statifier_blocks/finding.ex:63`, `@type source`, read at
+  `aa657cd`) by one value; the anchor union is unchanged.
+- **Anchors.** An unresolvable reference is anchored `{:config, block_id,
+  "chart"}`, an outcome the child does not declare `{:config, block_id,
+  "outcomes"}`, and a key the child does not declare `{:config, block_id,
+  "collect_type"}` - each on the referencing block, under the field its author
+  would change.
+- **Naming the parent.** The anchor has no document arm, and this amendment
+  does not add one. In the reverse direction each finding is returned paired
+  with the parent's document id, and its message names that document.
+
+**How it stands beside the two existing checks.** `outcome_findings/3` is left
+as it is: it remains the editor's advisory at `:warning`, both directions,
+over a map a host may supply without holding compiled children. At publish,
+A2's forward check is the gate for the one direction that misroutes - an
+outcome the parent routes on that the child does not declare. The other
+direction, a child outcome the parent does not route on, is not refused: it
+takes the unconditioned arm by design. A host that builds `chart_outcomes`
+from each child's recorded `interface` gets the same set in both places.
+`agrees?/3` is also left as it is: A2 checks that a read key is **declared**,
+not what type it has. Type agreement stays ADR-0013 decision 4's dormant
+advisory and is not raised to a refusal here, which also keeps that record's
+record-against-record case out of the refusal.
+
+**Worked example: patron registration.** The parent document
+`patron_registration` has a `core.subchart` block `blk_VERIFY` whose `chart`
+is `email_verification` and whose `outcomes` lists `verified` and `expired`.
+The published `email_verification` revision's root declares the same two, so
+the forward check returns nothing. A new `email_verification` revision renames
+`verified` to `confirmed`. The reverse check against `patron_registration`
+returns one `:error` finding, source `:graph`, anchored
+`{:config, "blk_VERIFY", "outcomes"}`, paired with `patron_registration`, and
+the host refuses the child's publish. Unchecked, the next start of that child
+would finish `confirmed`, match no conditioned arm, and take the parent's
+first-listed path, `verified`, with no refusal. Expand-then-contract gets
+there: a child revision declaring `verified`, `confirmed` and `expired`, then
+`patron_registration` republished to route on `confirmed`, then the child
+revision without `verified`.
+
+**What this does not decide.** The order the host walks its graph in, and
+whether it walks it all at once; the host's document store, and what "active"
+means for a parent beyond "currently published and referencing this document
+id"; migration of any kind, automatic or not, of a parent or of a running
+execution; how the editor renders `:graph` findings, and whether it runs the
+check at edit time; a declaration for keys read under a `core.subchart`'s
+`assign_to`; the done-data types A2 does not check; and the parameters a
+parent passes to a child.
+
+### Consequences
+
+- `sb-vkyz` has a target: the `interface` field on `%Compiled{}`, the two
+  directions of A2 over it, the `:graph` source, and the anchors in A5.
+- A host's publish step gains two calls and refuses on their `:error`
+  findings. Nothing in this package calls them, and the runtime refusals of
+  decision 5 are unchanged.
+- ADR-0004 decision 1's artifact grows by one field and ADR-0005 decision
+  11's source list by one value, both through this amendment. Neither record
+  is edited.
+- A renamed outcome becomes a three-publish change instead of a one-publish
+  change. That cost is deliberate: the one-publish change is the silent
+  misroute described in the context above.
