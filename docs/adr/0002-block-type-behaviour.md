@@ -13809,7 +13809,7 @@ Filed with `sb-4wh3`, campaign RF058.
 
 ## Amendment (2026-09-18): a block an author places in a composite's pass-through or outcome slot with an id the expansion mints is a Resolve finding naming the cause - `C10`
 
-**Status: proposed (2026-09-18, campaign RF058, bead `sb-uc5p`, recording the
+**Status: accepted (2026-09-18, campaign RF058, bead `sb-uc5p`, recording the
 operator's ruling of 2026-09-18 on that bead: "YES, ADD THE RESOLVE-STAGE
 FINDING").** A decision record merges at proposed under the campaign
 invariant, and this one **stays** proposed; its flip is the operator's, on its
@@ -14155,3 +14155,64 @@ itself one of the ten flipped here, it is named by its label.
   Note at `:13934` records that a throw is outside it.
 
 Filed with `sb-rov2`, campaign RF058.
+
+## Note (2026-09-22): the `C10` Amendment of 2026-09-18 is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+`C10`'s status line (`:13812`), by one word, `proposed` to `accepted`.
+Everything else is this Note, at the foot of the file, so no line another
+record cites moves.
+
+The operator granted, on 2026-09-22, the flip of proposed records in this
+repository. This request takes that grant for `C10` alone, through the same
+`docs/adr/` direction gate, after checking every claim `C10` makes against the
+code on `main`.
+
+Every `lib/` cite below was read at `main` `78bf210` and is written anchor
+first, line second; a later reader re-locates by the anchor and not by the
+number. `C10`'s own cites are labelled with the SHA they were read at,
+`4e60305`. Four have moved since and each anchor still names the thing `C10`
+says: the `param_map = param_map(...)` binding in `expand!/2` now reads at
+`composite.ex:689`, `check_local_ids!/2` at `composite.ex:1411`,
+`reanchor_finding/2` at `compiler.ex:1171` and `outcome_findings/5` at
+`compiler.ex:868`. `C10` is not edited for them.
+
+### Each section, and where it reads today
+
+| Section | Read at `78bf210` |
+|---|---|
+| 1, the finding (`:13833`) | `minted_id_findings/4` (`compiler.ex:923`) makes one `Finding.new(:resolve, {:minted_id_collision, block.id, id}, ...)` per distinct colliding id, with `block_id:` the composite's id and `fault: :author`; its message names the placed block's id and says to give that block another id. `StatifierBlocks.Compiler.Finding`'s `:resolve` row lists the code (`compiler/finding.ex:16`) and its fault rule counts it among the `:author` findings (`compiler/finding.ex:50`) |
+| 2, why Resolve, and the two tests (`:13855`) | `expand_node/3` (`compiler.ex:615`) seeds its member reduction with `minted_id_findings/4` beside `outcome_findings/5` (`:631`). A pass-through id counts when `param_map` is keyed by it and it occurs more than once in the flattened members; an id under a declared outcome's `on_<name>` slot counts when `param_map` is keyed by it at all. `validate_unique_ids/1` (`validation.ex:313`) is unchanged since `4e60305` and `validation.ex` names no palette |
+| 3, reported against the composite (`:13878`) | the `block_id:` above; the comment above `minted_id_findings/4` gives `C10`'s reason, that a finding on the placed block would be re-anchored onto the composite by `reanchor_finding/2` |
+| 4, what it does not reach (`:13896`) | only the pass-through members and the declared outcome slots are asked; the tests `a colliding child in a slot the type does not declare keeps :undeclared_slot` and `a minted id written outside the composite is refused at the Chart stage` pin the two exclusions |
+| 5, what changes for a document (`:13907`) | the test `is a Resolve finding against the composite block, naming the author's block` asserts every finding is at `:resolve` and none is `:duplicate_id`; `carrying a minted id is the same Resolve finding against the composite` covers the `on_<name>` slot |
+
+The tests named above are in
+`test/statifier_blocks/compiler/minted_id_collision_test.exs`.
+
+### Sentences that name their own status
+
+They are met here, not edited.
+
+- `C10`'s status paragraph says it "**stays** proposed; its flip is the
+  operator's, on its own request" (`:13815-13816`). The operator's grant of
+  2026-09-22 is that word, and this is that request. The same paragraph's
+  "The code that builds it lands in the same request, after this section"
+  (`:13816-13817`) describes the day it was written; the table above is where
+  that code reads now.
+- `C10`'s closing list says it "takes no position on whether any Amendment
+  above is ready to flip" (`:13929-13930`). This Note takes none either for
+  any section but `C10`.
+- The Note of 2026-09-19 above lists `C10` under "What stays proposed", as
+  "outside this request" (`:14030-14032`). It describes that request; `C10` is
+  flipped by this one.
+- This file's head `Status:` line (`:3`) is not extended.
+
+### Sentences that no longer hold as written
+
+None found. No dated record or Note after `C10` changes what it decides, and
+the only later sections that name it are the Note of 2026-09-19, met above,
+and this Note.
+
+Filed with `sb-b4yk`, campaign RF069.
