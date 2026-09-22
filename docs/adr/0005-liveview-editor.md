@@ -12170,3 +12170,40 @@ publish entry, it is the whole list, and the host refuses on its `:error`.
   (`view_model.ex:512`, `def build/3`, read at `32463bb`), and a
   test that a Document-stage finding adapts, routes to no node, is counted,
   and renders on both surfaces with nothing to select.
+
+## Note (2026-09-22): the two citations of the README's Note/Amendment paragraph, re-located one line down after the ADR-0014 index row
+
+A dated Note rather than an amendment: it carries no `Status:` line and
+decides nothing. It re-locates two citations into `docs/adr/README.md` that
+drifted when that file gained the index row for `ADR-0014`, which sits above
+the paragraph they cite. Both are the test named in a "Why this is an
+Amendment and not a Note" paragraph of an Amendment of 2026-09-18 above, and
+both cite the README paragraph that opens "A `## Note` on a record carries no
+Status line". Line numbers in this file and in the README were read at
+`0ac7a57`; re-locate by anchor, not by number.
+
+The `finish_as` Amendment's paragraph (`:11447`, under the heading "Amendment
+(2026-09-18): a handler that names the outcome it finishes with draws under
+that name") cites `:40-43`. The same four lines of that paragraph are now
+`docs/adr/README.md:41-44`, from "A `## Note` on a record carries no Status
+line" to "where something already decided renders, or what a sentence already
+accepted". One observation, recorded and not a correction: the quotation that
+paragraph gives ends on the words "was about.", which sat on the line after
+the range when it was written and sit on `docs/adr/README.md:45` now, so the
+quotation in full is `docs/adr/README.md:42-45`.
+
+The control-strip Amendment's paragraph (`:11626`, under the heading
+"Amendment (2026-09-18): decision 14's control strip, the delete offer is a
+deliberate exception to the reservation and its width is not held at rest")
+cites `:42-44`. The three lines it quotes from, "changes what the record
+decides and a note does not" through "what a sentence already accepted was
+about", are now `docs/adr/README.md:43-45`.
+
+The cite baseline regenerated in the request that added the index row records
+the text now at the two old ranges, so the gate stays green over both
+paragraphs as written: the check proves a range unmoved since the last
+regeneration, not that it still holds what the citing paragraph quotes. The
+baseline regenerated with this Note also records the three ranges above. The
+two Amendments' text is unchanged, and so is what each decides.
+
+Filed with `sb-27yl`.
