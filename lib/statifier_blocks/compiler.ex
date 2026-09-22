@@ -315,7 +315,8 @@ defmodule StatifierBlocks.Compiler do
     SlotValidation
   }
 
-  alias StatifierBlocks.Core.{Config, Emit, OnEvent, ResumableGroup, Send}
+  alias StatifierBlocks.Core.{Config, Emit, OnEvent, ResumableGroup, Send, Subchart}
+  alias StatifierBlocks.Core.Map, as: FanOut
 
   alias StatifierBlocks.Compiler.{
     Attribution,
@@ -3166,10 +3167,91 @@ defmodule StatifierBlocks.Compiler do
          record: record(document, node, scxml),
          invoke_types: InvokeTypes.types(emitted),
          warnings: emit_warnings ++ warnings ++ lint(emitted, opts) ++ candidate_lint(node, opts),
-         accepts: document.accepts
+         accepts: document.accepts,
+         interface: interface(node, opts)
        }}
     end
   end
+
+  # -- The parent/child interface ---------------------------------------------
+
+  # ADR-0008's amendment of 2026-09-22, A1 and A5: what this document offers
+  # a parent and what it relies on from each child it names. Read off the
+  # resolved tree the Chart stage serialized - the shelf already elided, a
+  # composite already expanded - so a reference is recorded exactly when
+  # the compile emitted the `<invoke>` it stands for. It reads the tree and
+  # the `:datamodel` option and nothing else, so it is as deterministic as
+  # the bytes beside it, and it writes nothing into them.
+  @spec interface(Resolved.t(), keyword()) :: Compiled.interface()
+  defp interface(%Resolved{block: block, module: module} = node, opts) do
+    declarations = opts |> assignability_context() |> Environment.declarations()
+
+    %{
+      declared_outcomes: BlockType.outcome_names(module, block.config),
+      declared_donedata_keys:
+        module |> BlockType.donedata_type(block.config) |> Enum.map(& &1.name),
+      references: references(node, declarations)
+    }
+  end
+
+  # Document pre-order: a block before its children, slots in the order the
+  # resolved node holds them. Recognized by module rather than by type name
+  # (A1), so a host palette mapping another name onto either module is
+  # covered.
+  @spec references(Resolved.t(), StatifierDatamodel.Declarations.t()) :: [
+          Compiled.child_reference()
+        ]
+  defp references(%Resolved{block: block, module: ref, slots: slots}, declarations) do
+    own = reference(module_of(ref), block, declarations)
+
+    children =
+      Enum.flat_map(slots, fn {_slot, nodes} ->
+        Enum.flat_map(nodes, &references(&1, declarations))
+      end)
+
+    own ++ children
+  end
+
+  @spec reference(module(), Block.t(), StatifierDatamodel.Declarations.t()) :: [
+          Compiled.child_reference()
+        ]
+  defp reference(Subchart, %Block{id: id, config: %{"chart" => chart} = config}, _declarations)
+       when is_binary(chart) do
+    [%{block_id: id, document_id: chart, routes_on: Subchart.child_outcomes(config), reads: []}]
+  end
+
+  defp reference(FanOut, %Block{id: id, config: %{"chart" => chart} = config}, declarations)
+       when is_binary(chart) do
+    [
+      %{
+        block_id: id,
+        document_id: chart,
+        routes_on: [],
+        reads: required_members(Map.get(config, "collect_type"), declarations)
+      }
+    ]
+  end
+
+  defp reference(_module, _block, _declarations), do: []
+
+  # A1: the members a `collect_type` marks required, when it resolves to
+  # members - the inline arm, or a name the parent's declarations define.
+  # Anything else contributes no keys: unknown is not disagreement.
+  @spec required_members(term(), StatifierDatamodel.Declarations.t()) :: [String.t()]
+  defp required_members(members, _declarations) when is_list(members) do
+    case Environment.inline_shape(members) do
+      {:shape, shape} -> for %{name: name, required?: true} <- shape, do: name
+    end
+  end
+
+  defp required_members(name, declarations) when is_binary(name) do
+    case StatifierDatamodel.Declarations.fetch(declarations, String.trim(name)) do
+      {:ok, %{fields: fields}} -> for %{name: field, required?: true} <- fields, do: field
+      :error -> []
+    end
+  end
+
+  defp required_members(_absent, _declarations), do: []
 
   @spec lint([InvokeTypes.emitted()], keyword()) :: [Finding.t()]
   defp lint(emitted, opts) do
