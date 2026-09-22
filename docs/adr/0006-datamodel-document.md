@@ -452,7 +452,7 @@ written.
 
 ## Amendment (2026-09-05): decision 4, a `duration` value is an expression-language duration string
 
-**Status: proposed (2026-09-05, drafted under campaign 029 lane A).** Accepting
+**Status: accepted (2026-09-05, drafted under campaign 029 lane A).** Accepting
 it is a separate change on its own gate. Additive: decision 4 stands as
 accepted, and no text above this line is edited by this section. It also
 discharges this record's first open question, below.
@@ -628,3 +628,87 @@ this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
 Filed with `sb-4wh3`, campaign RF058.
+
+## Note (2026-09-22): the Amendment of 2026-09-05 to decision 4 is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the Amendment's status line (`:455`), by one word, `proposed` to `accepted`.
+Everything else is this Note, at the foot of the file, so no line another
+record cites moves.
+
+The operator granted, on 2026-09-22, the flip of proposed records in this
+repository. This request takes that grant for this Amendment alone, through
+the same `docs/adr/` direction gate, after checking every claim the Amendment
+makes against the code on `main`. It is the "separate change on its own
+gate" the Amendment's status paragraph names (`:455-456`).
+
+Every `lib/` cite below was read at `main` `78bf210` and is written anchor
+first, line second; a later reader re-locates by the anchor and not by the
+number. `statifier_datamodel` is read at the version `mix.lock` resolves,
+`0.4.0`, and cited by module.
+
+### Each clause, and where it reads today
+
+| Clause | Read at `78bf210` |
+|---|---|
+| `4a`, a `duration` value is an expression-language duration string (`:489`) | `StatifierDatamodel.Index`'s type documentation says a `duration` value and the `example` beside it are a duration string the expression language reads, the same string an author types into a `:duration` field; that field is compiled by `StatifierBlocks.Core.Duration.parse/1` (`core/duration.ex:98`) |
+| `4b`, the expression library owns the grammar (`:495`) | `parse/1` hands the stored string to `Predicator.Duration.parse/1` and adds no rule of its own (`core/duration.ex:98`); `core.send` (`core/send.ex:338`), `core.wait` (`core/wait.ex:250`) and the editor's duration control (`duration_input.ex:154`) all read through it |
+| `4c`, a spelling inside one type, not a widening (`:501`) | `duration` is still carried as a string in `StatifierDatamodel.Index`'s closed set, and no float type exists; the count is read below |
+| `4d`, an `example` for a `duration` follows `4a` (`:507`) | nothing under `lib/` reads an entry's `example`; `StatifierDatamodel.Index` stores it as written and its documentation says the module parses none of it |
+| `4e`, the projection is unchanged (`:516`) | `StatifierBlocks.Datamodel.declared_paths/1` hands a document to `StatifierDatamodel.Document.declared_paths/1` (`datamodel.ex:273`), which answers paths and nothing else |
+| the open question discharged (`:522`) | record text: the family carries the `example` spelling and the rendering package's wire form as two things on purpose; no code in this package encodes a wire value |
+
+### Sentences that name their own status
+
+They are met here, not edited.
+
+- The status paragraph says "Accepting it is a separate change on its own
+  gate" (`:455-456`). This request is that change.
+- `ADR-0001`'s Note that reads "has landed" as "has merged, at proposed"
+  (`docs/adr/0001-block-document-schema.md:1013`) and `ADR-0005`'s Note that
+  does the same (`docs/adr/0005-liveview-editor.md:6254`) each cite the status
+  line as **proposed**. They describe the day each was written; the cite
+  baseline's recorded text for both is regenerated in this request.
+- This file's head `Status:` line (`:3`) is not extended.
+
+### Sentences that no longer hold as written, and the records that name the change
+
+None reverses what the Amendment decides: a `duration` is still one
+string, in the expression library's grammar, and the Amendment still adds no
+check, verdict or refusal.
+
+- **`4c`'s "the eight types" (`:501-503`), and "one of eight things"
+  (`:462`).** The Note of 2026-09-06 at `:582` records `date` joining the
+  scalar set from `sd-ADR-0001`, making it nine; `ADR-0011`'s supersession
+  list (`docs/adr/0011-typed-environment.md:123`) names the same widening.
+  `4c`'s substance, that this section adds no type, holds.
+- **"The record still reaches no engine ... and the compiler does not read
+  this document at all" (`:578-580`).** No emitted chart carries the
+  document and no engine is asked to honour it: the compiled `<datamodel>`
+  takes its roots from `ADR-0001`'s `datamodel` key and the `:declare` option
+  (`document_roots/3`, `compiler.ex:2202`). The compiler does read the
+  document a host supplies as `:datamodel`, three times:
+  - the typed-environment read check reads its declarations
+    (`StatifierBlocks.Environment.declarations/1`, `environment.ex:489`, fed by
+    `assignability_context/1`, `compiler.ex:1739`), under `ADR-0011`
+    decisions 2 and 3 (accepted 2026-09-06), which this record's own Note of
+    2026-09-06 (`:582`) names as the consumer of the re-homed document;
+  - `core.on_event`'s declared-payload refusal reads the same declarations
+    (`declared_payload_findings/2`, `compiler.ex:1609`), under `ADR-0002`'s
+    Amendment of 2026-09-06 on the event payload
+    (`docs/adr/0002-block-type-behaviour.md:4010`);
+  - the sensitive-path refusal reads it
+    (`StatifierBlocks.Compiler.SensitivePaths.datamodel/1`,
+    `compiler/sensitive_paths.ex:188`), under `ADR-0002`'s decision-7
+    Amendment of 2026-08-29 on `sensitive?`
+    (`docs/adr/0002-block-type-behaviour.md:1187`). That read predates this
+    Amendment, and this record's decision 7 (`:223-227`) anticipated it.
+
+  None of the three reads a duration's spelling or an `example`, the
+  subject of the bullet the sentence closes.
+- **"`sb-oiq`'s index" (`:519`).** The index is `StatifierDatamodel.Index`
+  since the Note of 2026-09-06 (`:582`) re-homed the document; it stores each
+  entry's declared type as written, so the reading holds.
+
+Filed with `sb-b4yk`, campaign RF069.
