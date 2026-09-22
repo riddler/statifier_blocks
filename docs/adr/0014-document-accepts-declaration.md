@@ -161,8 +161,9 @@ refuses the publish; a reachable event nobody declared is internal.**
 - **Reachable but undeclared is internal.** A descriptor the chart can take
   that no declared name matches is the document's own business: it is not
   bindable from outside, and no external sender may name it. It is not an
-  error. The compiler's own completion events and a clock interrupt's
-  delayed event land here, which is where they belong.
+  error. The `done.state` descriptors the compiler wires its sequencing
+  on, and a clock interrupt's delayed event, land here, which is where they
+  belong.
 - **Who judges it.** `Statifier.Chart.check_accepts/2`, the engine's pure
   function, over the machine compiled from `%Compiled{}`'s SCXML and the
   carried list. This package adds no check of its own for this rule and
