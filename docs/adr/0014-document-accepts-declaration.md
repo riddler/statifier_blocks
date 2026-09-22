@@ -458,9 +458,9 @@ They are met here, not edited.
   the code that builds it has landed" (`:4-6`). This request is that one.
 - "What this record owes the accepted records" (`:302-330`) says the
   Amendments on `ADR-0001`, `ADR-0004` and `ADR-0005` are owed and not
-  edited here. They are still owed: none of the three records carries an
-  Amendment adding `accepts` or `{:set_accepts, _}` on `main` at `abf3f06`,
-  and this request adds none.
+  edited here. They were owed when this record was written; the Amendments
+  of 2026-09-22 on `ADR-0001`, `ADR-0004` and `ADR-0005` (merged at
+  `c362e40`) now record them, and this request adds none.
 
 ### Sentences that no longer hold as written, and the records that name the change
 
