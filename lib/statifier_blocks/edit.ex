@@ -31,7 +31,7 @@ defmodule StatifierBlocks.Edit do
      re-inserting at `i` in the shortened list is the identity, and that
      is true whether or not `P == Q and s == t`.
 
-  ## The five inverses
+  ## The six inverses
 
   | Command | Inverse |
   |---|---|
@@ -40,6 +40,7 @@ defmodule StatifierBlocks.Edit do
   | `{:move, id, target}` | `{:move, id, original_target}` |
   | `{:update_config, id, config}` | `{:update_config, id, previous_config}` |
   | `{:set_datamodel, entries}` | `{:set_datamodel, previous_entries}` |
+  | `{:set_accepts, names}` | `{:set_accepts, previous_names}` |
 
   ## The fifth command (ADR-0005's 2026-09-01 amendment, 2g-2h)
 
@@ -57,7 +58,7 @@ defmodule StatifierBlocks.Edit do
   that was there before, and the round-trip law of decision 3 holds by
   construction because the command is its own kind of inverse.
 
-  This is the one command whose *content* is checked here rather than in
+  This is the first command whose *content* is checked here rather than in
   `check_config/3`. `check_config/3` is decision 9's block-type gate and it
   asks a palette; a declaration has no block type and no palette to ask.
   What a declaration has is a grammar - ADR-0001 11b's `{id, expr,
@@ -67,6 +68,18 @@ defmodule StatifierBlocks.Edit do
   of it, so a list this command accepts is a list `Document.validate/1`
   accepts, and `to_json/1` can never raise on a document this command
   produced.
+
+  ## The sixth command (ADR-0014 decision 6)
+
+  `{:set_accepts, names}` replaces the document's whole `accepts` list - the
+  names of the external events the document accepts - on the fifth
+  command's terms and for its reasons: whole-list replacement, the previous
+  list as the inverse, and the grammar checked here rather than in
+  `check_config/3`. The one implementation of that grammar is
+  `StatifierBlocks.Validation.accepts/1`, so a list this command accepts is a
+  list `Document.validate/1` accepts. It is a command rather than editor
+  state because the list is in the document and in its hash: a declared name
+  an author deletes is document content, and undo has to bring it back.
 
   ## The deliberate widening
 
@@ -102,10 +115,10 @@ defmodule StatifierBlocks.Edit do
   and no document at all, so there is no partially applied document for a
   caller to mistake for a result.
 
-  **A compound is not a sixth edit.** Its leaves are drawn from the five and
+  **A compound is not a seventh edit.** Its leaves are drawn from the six and
   nothing else - a list that is empty, or that holds a `:compound` of its
   own, is refused rather than flattened - so every edit a document can
-  undergo is still one of the five. What the constructor buys is that
+  undergo is still one of the six. What the constructor buys is that
   `Edit.History` pushes one inverse per commit, which makes a compound
   **one undo entry**: one gesture in, one gesture out, and no state between
   the halves that an author can stop in.
@@ -134,12 +147,13 @@ defmodule StatifierBlocks.Edit do
           | {:move, Block.id(), target()}
           | {:update_config, Block.id(), Block.config()}
           | {:set_datamodel, [DatamodelEntry.t()]}
+          | {:set_accepts, [String.t()]}
           | {:compound, [t()]}
 
   @doc """
   Applies one command, returning the new document and the command that
   undoes it. Total: refuses rather than raises. See the moduledoc's four
-  structural rules and five inverses.
+  structural rules and six inverses.
   """
   @spec apply(Document.t(), t()) ::
           {:ok, Document.t(), t()}
@@ -198,6 +212,12 @@ defmodule StatifierBlocks.Edit do
   def apply(%Document{} = document, {:set_datamodel, entries}) do
     with :ok <- Validation.datamodel(entries) do
       {:ok, %{document | datamodel: entries}, {:set_datamodel, document.datamodel}}
+    end
+  end
+
+  def apply(%Document{} = document, {:set_accepts, names}) do
+    with :ok <- Validation.accepts(names) do
+      {:ok, %{document | accepts: names}, {:set_accepts, document.accepts}}
     end
   end
 
@@ -273,6 +293,10 @@ defmodule StatifierBlocks.Edit do
   # `apply/2`, which is where the moduledoc's fifth-command section says it
   # belongs and why.
   def check_config(%Palette{}, %Document{}, {:set_datamodel, _entries}), do: :ok
+
+  # The same for an accepted-event list (ADR-0014 decision 6): no block type,
+  # no palette to ask, and the grammar is `apply/2`'s.
+  def check_config(%Palette{}, %Document{}, {:set_accepts, _names}), do: :ok
 
   def check_config(%Palette{} = palette, %Document{} = document, {:update_config, id, config}) do
     with {:ok, block} <- find_block(document, id),

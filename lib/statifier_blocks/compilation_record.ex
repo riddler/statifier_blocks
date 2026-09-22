@@ -48,6 +48,15 @@ defmodule StatifierBlocks.CompilationRecord do
   A host that changes an `emit/2` without bumping `current_version/0` has
   moved a compile input without moving the record; that is a palette-hygiene
   obligation on the host, stated here so it is not discovered later.
+
+  ## `accepts` rides here as well as on the artifact
+
+  The document's `accepts` list, exactly as written (ADR-0014 decision 3),
+  so a host that keeps only this record can read what the document declares
+  it accepts without re-reading the document. It is not identity: the list is
+  in the document's bytes and so in `document_hash`, and it never reaches the
+  SCXML, so `chart_identity` does not move when an author edits it. `[]`
+  means the document declares nothing.
   """
 
   alias Statifier.Machine.Identity
@@ -59,7 +68,8 @@ defmodule StatifierBlocks.CompilationRecord do
           document_hash: binary(),
           palette_hash: binary(),
           compiler_version: String.t(),
-          chart_identity: Identity.t()
+          chart_identity: Identity.t(),
+          accepts: [String.t()]
         }
 
   @enforce_keys [
@@ -76,6 +86,7 @@ defmodule StatifierBlocks.CompilationRecord do
     :document_hash,
     :palette_hash,
     :compiler_version,
-    :chart_identity
+    :chart_identity,
+    accepts: []
   ]
 end

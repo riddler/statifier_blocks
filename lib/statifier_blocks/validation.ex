@@ -36,7 +36,8 @@ defmodule StatifierBlocks.Validation do
   @doc """
   Checks `document` against ADR-0001's structural rules, in order:
 
-  1. The envelope (`schema_version`, `id`, `revision`, `metadata`, `root`).
+  1. The envelope (`schema_version`, `id`, `revision`, `metadata`,
+     `datamodel`, `accepts`, `root`).
   2. Every block, pre-order (`id`, `type`, `type_version`, `config`,
      `slots`), slots visited in UTF-8-sorted name order - the same order
      `Document.blocks/1` uses for a well-formed tree.
@@ -61,7 +62,8 @@ defmodule StatifierBlocks.Validation do
          :ok <- check_document_id(document.id),
          :ok <- check_revision(document.revision),
          :ok <- check_metadata(document.metadata),
-         :ok <- check_datamodel(document.datamodel) do
+         :ok <- check_datamodel(document.datamodel),
+         :ok <- check_accepts(document.accepts) do
       check_root(document.root)
     end
   end
@@ -195,6 +197,71 @@ defmodule StatifierBlocks.Validation do
         {:halt, {:error, {:malformed_envelope, {:datamodel, {:duplicate_id, id}}}}}
       else
         {:cont, MapSet.put(seen, id)}
+      end
+    end)
+    |> case do
+      {:error, _reason} = error -> error
+      %MapSet{} -> :ok
+    end
+  end
+
+  # --- accepts (ADR-0014 decision 2) ----------------------------------------
+
+  # Public for the reason `datamodel/1` is: `{:set_accepts, names}` is the
+  # key's second writer (ADR-0014 decision 6), and its refusal has to be the
+  # one a stored document would get. `StatifierBlocks.Edit` calls this rather
+  # than restating the grammar, so the panel cannot admit a list
+  # `from_json/1` would refuse.
+  @spec accepts(term()) :: :ok | {:error, error()}
+  def accepts(names), do: check_accepts(names)
+
+  # Four refusals, each for the first entry at fault. Every entry's own shape
+  # is checked before any name is compared against another, the order
+  # `check_datamodel/1` uses, so a malformed entry is reported as malformed
+  # rather than as a duplicate. Nothing past these four is asked of a name:
+  # the record leaves the event-name grammar and patterns undecided, and a
+  # name no transition can take is the host's publish check to find.
+  @spec check_accepts(term()) :: :ok | {:error, error()}
+  defp check_accepts(names) when is_list(names) do
+    with :ok <- check_accepts_entries(names, 0) do
+      check_accepts_unique(names)
+    end
+  end
+
+  defp check_accepts(_other), do: {:error, {:malformed_envelope, {:accepts, :not_a_list}}}
+
+  @spec check_accepts_entries([term()], non_neg_integer()) :: :ok | {:error, error()}
+  defp check_accepts_entries([], _index), do: :ok
+
+  defp check_accepts_entries([name | rest], index) do
+    case check_accepts_entry(name, index) do
+      :ok -> check_accepts_entries(rest, index + 1)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  # A binary that is not valid UTF-8 is not a JSON string, so it takes the
+  # `:not_a_string` arm: the canonical encoder could not write it as one.
+  @spec check_accepts_entry(term(), non_neg_integer()) :: :ok | {:error, error()}
+  defp check_accepts_entry("", index),
+    do: {:error, {:malformed_envelope, {:accepts, {:entry, index, :empty}}}}
+
+  defp check_accepts_entry(name, index) do
+    if is_binary(name) and String.valid?(name) do
+      :ok
+    else
+      {:error, {:malformed_envelope, {:accepts, {:entry, index, :not_a_string}}}}
+    end
+  end
+
+  @spec check_accepts_unique([String.t()]) :: :ok | {:error, error()}
+  defp check_accepts_unique(names) do
+    names
+    |> Enum.reduce_while(MapSet.new(), fn name, seen ->
+      if MapSet.member?(seen, name) do
+        {:halt, {:error, {:malformed_envelope, {:accepts, {:duplicate_name, name}}}}}
+      else
+        {:cont, MapSet.put(seen, name)}
       end
     end)
     |> case do

@@ -213,6 +213,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "the sentence for a refused declaration edit, or `nil`"
     )
 
+    attr(:accepted, :list,
+      default: [],
+      doc: "the event names the accepted-events row draws - the document's, or an author's draft"
+    )
+
+    attr(:accepted_refusal, :string,
+      default: nil,
+      doc: "the sentence for a refused accepted-event edit, or `nil`"
+    )
+
     attr(:fixture_runs, :any,
       default: nil,
       doc: "`StatifierBlocks.Runtime.FixtureRuns.t()` for the Fixtures tab, or `nil`"
@@ -411,6 +421,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 <Declarations.declarations
                   entries={@declarations}
                   refusal={@declaration_refusal}
+                  accepted={@accepted}
+                  accepted_refusal={@accepted_refusal}
                   read_only={@read_only}
                   target={@target}
                 />

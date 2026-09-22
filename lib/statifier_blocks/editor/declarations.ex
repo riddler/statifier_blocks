@@ -69,6 +69,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     entry, so a refusal here is not a finding and never enters the findings
     pipeline. `StatifierBlocks.Declarations.refusal/1` is the one place a
     refusal becomes a sentence.
+
+    ## The accepted events
+
+    Below the roots sits a second row: the document's `accepts` list, the
+    names of the external events the document declares it accepts (ADR-0014
+    decision 6). It is authored under the same rules as the roots - reorder
+    by buttons, a gesture that lands on what the document holds commits
+    nothing, a refused edit is held as a draft with its sentence drawn above
+    it - and written through its own command, `{:set_accepts, names}`. A name
+    is one field, so a row is one input. The row is an authoring surface
+    only: whether each name is one the chart can take is a host's publish
+    check, and nothing here draws its answer.
     """
 
     use Phoenix.Component
@@ -102,9 +114,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     )
 
+    attr(:accepted, :list,
+      default: [],
+      doc: """
+      The accepted event names to draw: the document's `accepts`, or the draft
+      list an author is mid-edit on - chosen by the editor, as `entries` is.
+      """
+    )
+
+    attr(:accepted_refusal, :string,
+      default: nil,
+      doc: "the sentence for a refused accepted-event change, or `nil`"
+    )
+
     attr(:target, :any, required: true)
 
-    @doc "The declarations table: one row per declared root, plus the Add control."
+    @doc """
+    The declarations table: one row per declared root, plus the Add control,
+    then the accepted-events table: one row per accepted event name, plus its
+    own Add control.
+    """
     def declarations(assigns) do
       ~H"""
       <div class="sb-declarations" data-count={length(@entries)}>
@@ -150,6 +179,136 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           Add a declaration
         </button>
       </div>
+
+      <div class="sb-accepts" data-count={length(@accepted)}>
+        <h3 class="sb-accepts__heading">Accepted events</h3>
+
+        <p :if={@accepted_refusal} class="sb-accepts__refusal" role="status">
+          {@accepted_refusal}
+        </p>
+
+        <p :if={@accepted == []} class="sb-accepts__empty">
+          This document declares no accepted events. With none declared, every event its
+          chart can take is one it accepts.
+        </p>
+
+        <div :if={@accepted != []} class="sb-declarations__scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Event name</th>
+                <th :if={not @read_only} scope="col">
+                  <span class="sb-declarations__actions-head">Order</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <.accepted_row
+                :for={{name, index} <- Enum.with_index(@accepted)}
+                name={name}
+                index={index}
+                last={index == length(@accepted) - 1}
+                read_only={@read_only}
+                target={@target}
+              />
+            </tbody>
+          </table>
+        </div>
+
+        <button
+          :if={not @read_only}
+          type="button"
+          class="sb-accepts__add"
+          phx-click="accepted-add"
+          phx-target={@target}
+        >
+          Add an accepted event
+        </button>
+      </div>
+      """
+    end
+
+    attr(:name, :string, required: true)
+    attr(:index, :integer, required: true)
+    attr(:last, :boolean, required: true)
+    attr(:read_only, :boolean, default: false)
+    attr(:target, :any, required: true)
+
+    # One accepted event: the declarations row's shape with one field. The
+    # read-only clause draws the name as a value, for the reason the roots'
+    # read-only row gives.
+    defp accepted_row(%{read_only: true} = assigns) do
+      ~H"""
+      <tr class="sb-accepts__row" data-index={@index} data-name={@name} data-read-only="true">
+        <td class="sb-declarations__value">{@name}</td>
+      </tr>
+      """
+    end
+
+    defp accepted_row(assigns) do
+      ~H"""
+      <tr class="sb-accepts__row" data-index={@index} data-name={@name}>
+        <td class="sb-declarations__fields">
+          <form
+            id={"sb-accepted-#{@index}"}
+            class="sb-declarations__form"
+            phx-change="accepted-change"
+            phx-submit="accepted-change"
+            phx-target={@target}
+          >
+            <input type="hidden" name="index" value={@index} />
+
+            <label class="sb-declarations__field">
+              <span class="sb-declarations__label">Event name</span>
+              <input
+                type="text"
+                name="name"
+                value={@name}
+                autocomplete="off"
+                spellcheck="false"
+                aria-label={"Name of accepted event #{@index + 1}"}
+              />
+            </label>
+          </form>
+        </td>
+
+        <td class="sb-declarations__actions">
+          <button
+            type="button"
+            class="sb-declarations__move"
+            phx-click="accepted-move"
+            phx-value-index={@index}
+            phx-value-dir="up"
+            phx-target={@target}
+            disabled={@index == 0}
+            aria-label={"Move accepted event #{@index + 1} earlier"}
+          >
+            Up
+          </button>
+          <button
+            type="button"
+            class="sb-declarations__move"
+            phx-click="accepted-move"
+            phx-value-index={@index}
+            phx-value-dir="down"
+            phx-target={@target}
+            disabled={@last}
+            aria-label={"Move accepted event #{@index + 1} later"}
+          >
+            Down
+          </button>
+          <button
+            type="button"
+            class="sb-accepts__remove"
+            phx-click="accepted-remove"
+            phx-value-index={@index}
+            phx-target={@target}
+            aria-label={"Remove accepted event #{@index + 1}"}
+          >
+            Remove
+          </button>
+        </td>
+      </tr>
       """
     end
 

@@ -36,6 +36,19 @@ defmodule StatifierBlocks.Declarations do
   same reason it gives there: the value is completed at gesture time and
   the recorded command carries a finished list, so replaying a command log
   yields the same document every time.
+
+  ## The accepted events
+
+  The panel's second row is the document's `accepts` list (ADR-0014
+  decision 6): the names of the external events the document accepts,
+  written through `{:set_accepts, names}` on the terms the roots are
+  written through `{:set_datamodel, entries}`. `remove/2` and `move/3` serve
+  both lists unchanged, because neither looks inside an entry.
+  `add_accepted/1` and `put_accepted/3` are the two gestures that do, and
+  they exist beside `add/1` and `put/4` rather than inside them because a
+  name is a bare string with no fields to address. `add_accepted/1` mints
+  for `add/1`'s reason: an empty name is refused, so a blank row would be a
+  press that produces a refusal.
   """
 
   alias StatifierBlocks.Document.DatamodelEntry
@@ -44,6 +57,7 @@ defmodule StatifierBlocks.Declarations do
   @type field :: :id | :expr | :description
 
   @minted_prefix "root_"
+  @minted_event_prefix "event_"
 
   @doc """
   Appends a freshly named entry: `root_1`, or the first `root_N` no entry
@@ -77,7 +91,7 @@ defmodule StatifierBlocks.Declarations do
       iex> StatifierBlocks.Declarations.remove(entries, 4) == entries
       true
   """
-  @spec remove([DatamodelEntry.t()], term()) :: [DatamodelEntry.t()]
+  @spec remove([entry], term()) :: [entry] when entry: DatamodelEntry.t() | String.t()
   def remove(entries, index) when is_list(entries) do
     if in_range?(entries, index), do: List.delete_at(entries, index), else: entries
   end
@@ -101,7 +115,7 @@ defmodule StatifierBlocks.Declarations do
       iex> StatifierBlocks.Declarations.move([a, b], 0, :up) |> Enum.map(& &1.id)
       ["a", "b"]
   """
-  @spec move([DatamodelEntry.t()], term(), term()) :: [DatamodelEntry.t()]
+  @spec move([entry], term(), term()) :: [entry] when entry: DatamodelEntry.t() | String.t()
   def move(entries, index, direction) when is_list(entries) do
     with true <- in_range?(entries, index),
          {:ok, other} <- neighbour(index, direction),
@@ -176,6 +190,52 @@ defmodule StatifierBlocks.Declarations do
   end
 
   @doc """
+  Appends a freshly named accepted event: `event_1`, or the first `event_N`
+  the list does not already hold.
+
+  The name is a placeholder the author is expected to overwrite with the
+  event their host sends, and it is one `{:set_accepts, names}` accepts, so
+  the press lands as a row rather than as a refusal.
+
+      iex> StatifierBlocks.Declarations.add_accepted([])
+      ["event_1"]
+
+      iex> StatifierBlocks.Declarations.add_accepted(["event_1", "email.verified"])
+      ["event_1", "email.verified", "event_2"]
+  """
+  @spec add_accepted([String.t()]) :: [String.t()]
+  def add_accepted(names) when is_list(names) do
+    taken = MapSet.new(names)
+
+    minted =
+      1
+      |> Stream.iterate(&(&1 + 1))
+      |> Stream.map(&(@minted_event_prefix <> Integer.to_string(&1)))
+      |> Enum.find(&(not MapSet.member?(taken, &1)))
+
+    names ++ [minted]
+  end
+
+  @doc """
+  Writes the accepted event name at `index`, or returns `names` unchanged
+  when no name sits there.
+
+  The value is written through verbatim, blank included, as `put/4` writes
+  an `id`: a name is required, so there is nothing for a blank to mean, and
+  the refusal `{:set_accepts, names}` answers with is the panel's message to
+  the author.
+
+      iex> StatifierBlocks.Declarations.put_accepted(["event_1"], 0, "email.verified")
+      ["email.verified"]
+      iex> StatifierBlocks.Declarations.put_accepted(["event_1"], 3, "email.verified")
+      ["event_1"]
+  """
+  @spec put_accepted([String.t()], term(), term()) :: [String.t() | term()]
+  def put_accepted(names, index, value) when is_list(names) do
+    if in_range?(names, index), do: List.replace_at(names, index, value), else: names
+  end
+
+  @doc """
   How many declarations the document carries - the drawer strip's count for
   the Declarations tab.
 
@@ -189,8 +249,8 @@ defmodule StatifierBlocks.Declarations do
   def count(_other), do: 0
 
   @doc """
-  A refusal from `{:set_datamodel, entries}`, as one sentence for the
-  panel.
+  A refusal from `{:set_datamodel, entries}` or `{:set_accepts, names}`, as
+  one sentence for the panel.
 
   ADR-0005 decision 11's anchors name a block, a slot or a config key, and
   none of them can name a declaration entry, so a refusal here is not a
@@ -207,11 +267,17 @@ defmodule StatifierBlocks.Declarations do
       ...> )
       ~s(Two declarations are named "signup". Every id must be unique.)
 
+      iex> StatifierBlocks.Declarations.refusal(
+      ...>   {:malformed_envelope, {:accepts, {:entry, 0, :empty}}}
+      ...> )
+      "Accepted event 1 needs a name, such as email.verified."
+
       iex> StatifierBlocks.Declarations.refusal(:something_else)
       "That change was refused."
   """
   @spec refusal(term()) :: String.t()
   def refusal({:malformed_envelope, {:datamodel, reason}}), do: datamodel_refusal(reason)
+  def refusal({:malformed_envelope, {:accepts, reason}}), do: accepts_refusal(reason)
   def refusal(_other), do: "That change was refused."
 
   @spec datamodel_refusal(term()) :: String.t()
@@ -230,6 +296,21 @@ defmodule StatifierBlocks.Declarations do
     do: "Declaration #{index + 1}'s description must be text, or left empty."
 
   defp datamodel_refusal(_other), do: "That change was refused."
+
+  # ADR-0014 decision 2's four arms. `:not_a_list` has no sentence of its
+  # own: the panel only ever builds a list, so it reaches here from nowhere an
+  # author stands, and takes the generic one.
+  @spec accepts_refusal(term()) :: String.t()
+  defp accepts_refusal({:duplicate_name, name}),
+    do: ~s(The document already accepts "#{name}". Every accepted event is named once.)
+
+  defp accepts_refusal({:entry, index, :empty}),
+    do: "Accepted event #{index + 1} needs a name, such as email.verified."
+
+  defp accepts_refusal({:entry, index, :not_a_string}),
+    do: "Accepted event #{index + 1} must be named in text."
+
+  defp accepts_refusal(_other), do: "That change was refused."
 
   # `root_1` upward, skipping every name already taken. The scan is over the
   # ids the list holds rather than over its length, so removing `root_1` and
@@ -262,13 +343,14 @@ defmodule StatifierBlocks.Declarations do
   defp neighbour(index, "down"), do: neighbour(index, :down)
   defp neighbour(_index, _other), do: :error
 
-  @spec in_range?([DatamodelEntry.t()], term()) :: boolean()
+  @spec in_range?([DatamodelEntry.t() | String.t()], term()) :: boolean()
   defp in_range?(entries, index) when is_integer(index),
     do: index >= 0 and index < length(entries)
 
   defp in_range?(_entries, _index), do: false
 
-  @spec swap([DatamodelEntry.t()], non_neg_integer(), non_neg_integer()) :: [DatamodelEntry.t()]
+  @spec swap([entry], non_neg_integer(), non_neg_integer()) :: [entry]
+        when entry: DatamodelEntry.t() | String.t()
   defp swap(entries, a, b) do
     at_a = Enum.at(entries, a)
     at_b = Enum.at(entries, b)

@@ -29,6 +29,15 @@ defmodule StatifierBlocks.Compiled do
     * `warnings` - findings that did not fail the compile: upstream's own
       warnings (st-ADR-0033) mapped through provenance, and decision 8's
       optional invoke-type lint when the caller asked for it.
+
+  One field beside them, from ADR-0014 decision 3:
+
+    * `accepts` - the document's own `accepts` list, exactly as written: the
+      names of the external events the document declares it accepts. A
+      pass-through the compile reads nothing from and judges nothing about;
+      `[]` means the document declares nothing. Whether each name is one the
+      chart can take is a host's publish-time question (ADR-0014 decision
+      4), asked over `scxml` and this list together.
   """
 
   alias StatifierBlocks.{CompilationRecord, Provenance}
@@ -39,9 +48,10 @@ defmodule StatifierBlocks.Compiled do
           provenance: Provenance.t(),
           record: CompilationRecord.t(),
           invoke_types: [String.t()],
-          warnings: [Finding.t()]
+          warnings: [Finding.t()],
+          accepts: [String.t()]
         }
 
   @enforce_keys [:scxml, :provenance, :record]
-  defstruct [:scxml, :provenance, :record, invoke_types: [], warnings: []]
+  defstruct [:scxml, :provenance, :record, invoke_types: [], warnings: [], accepts: []]
 end

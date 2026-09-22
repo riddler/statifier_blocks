@@ -40,6 +40,7 @@ defmodule StatifierBlocks.CanonicalJson do
 
     pairs = maybe_put(pairs, "metadata", document.metadata)
     pairs = maybe_put_list(pairs, "datamodel", document.datamodel)
+    pairs = maybe_put_list(pairs, "accepts", document.accepts)
 
     object(pairs)
   end
@@ -114,6 +115,11 @@ defmodule StatifierBlocks.CanonicalJson do
   # `maybe_put/3` rather than a widening of it, so a document's ordinary
   # map fields (`config`, `metadata`, `slots`) keep their existing guard
   # untouched.
+  #
+  # `accepts` (ADR-0014 decision 2) takes the same rule for the same reason:
+  # an empty list and an absent key are one declaration, so they are one
+  # spelling in the bytes, and no document written before the key existed
+  # changes a byte or a hash.
   @spec maybe_put_list([{String.t(), term()}], String.t(), list()) :: [{String.t(), term()}]
   defp maybe_put_list(pairs, _key, []), do: pairs
   defp maybe_put_list(pairs, key, value) when is_list(value), do: [{key, value} | pairs]

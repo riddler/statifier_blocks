@@ -31,6 +31,16 @@ defmodule StatifierBlocks.DocumentFixtures do
   Neither entry carries an `expr`: both roots are per-run values that a
   host seeds or a step assigns, and inventing an initial for them here
   would be a value the example does not have.
+
+  A third document, `patron_registration/0`, is ADR-0014's worked example:
+  a visitor becoming a library patron, whose chart waits on two events the
+  host sends in. It is the one fixture that declares `accepts`, and it
+  reaches `core.send` and `core.await`, which the two above do not. It
+  declares no `datamodel` roots, because no guard in it reads one.
+
+  | Fixture | Domain | Core types it reaches |
+  |---|---|---|
+  | `patron_registration/0` | patron registration (library) | `core.sequence`, `core.group`, `core.send`, `core.await`, `core.on_event` |
   """
 
   alias StatifierBlocks.{Block, Document}
@@ -38,6 +48,7 @@ defmodule StatifierBlocks.DocumentFixtures do
 
   @fixture_path Path.join([__DIR__, "..", "fixtures", "documents", "worked_example.json"])
   @wizard_path Path.join([__DIR__, "..", "fixtures", "documents", "signup_wizard.json"])
+  @patron_path Path.join([__DIR__, "..", "fixtures", "documents", "patron_registration.json"])
 
   @doc "The ADR-0001 worked example, built with `Block.new/2`/`Document.new/2`."
   @spec worked_example() :: Document.t()
@@ -236,6 +247,72 @@ defmodule StatifierBlocks.DocumentFixtures do
   @spec signup_wizard_json() :: binary()
   def signup_wizard_json do
     @wizard_path
+    |> File.read!()
+    |> String.trim_trailing()
+  end
+
+  @doc """
+  ADR-0014's worked example: a patron registration document that declares
+  the two events it accepts from outside.
+
+  The group's body starts a one-day deadline - a delayed `core.send` to
+  self - and then waits for the host to report the email address verified.
+  Its interrupts rail holds the handler for the host reporting the visitor
+  gone, and the handler that catches the deadline; both abandon the group.
+  `accepts` names the two events the host sends in and leaves the deadline's
+  own event out, because the chart sends that one to itself.
+  """
+  @spec patron_registration() :: Document.t()
+  def patron_registration do
+    deadline =
+      Block.new("core.send",
+        id: "blk_PDLN",
+        # Reverse-sorted vs. the canonical `delay, event` output.
+        config: %{"event" => "registration.deadline", "delay" => "24h"}
+      )
+
+    verified =
+      Block.new("core.await",
+        id: "blk_PVER",
+        config: %{"event" => "email.verified"}
+      )
+
+    abandoned =
+      Block.new("core.on_event",
+        id: "blk_PABN",
+        config: %{"outcome" => "abandon", "event" => "registration.abandoned"}
+      )
+
+    expired =
+      Block.new("core.on_event",
+        id: "blk_PEXP",
+        config: %{"outcome" => "abandon", "event" => "registration.deadline"}
+      )
+
+    group =
+      Block.new("core.group",
+        id: "blk_PGRP",
+        # Reverse-sorted vs. the canonical `body, interrupts` output.
+        slots: %{
+          "interrupts" => [abandoned, expired],
+          "body" => [deadline, verified]
+        }
+      )
+
+    root = Block.new("core.sequence", id: "blk_PROOT", slots: %{"body" => [group]})
+
+    Document.new(root,
+      id: "bdoc_01JPATRONREG",
+      revision: 4,
+      metadata: %{"name" => "Patron registration"},
+      accepts: ["email.verified", "registration.abandoned"]
+    )
+  end
+
+  @doc "The patron registration document's canonical bytes, read from the fixture file."
+  @spec patron_registration_json() :: binary()
+  def patron_registration_json do
+    @patron_path
     |> File.read!()
     |> String.trim_trailing()
   end

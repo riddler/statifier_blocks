@@ -3165,7 +3165,8 @@ defmodule StatifierBlocks.Compiler do
          provenance: provenance,
          record: record(document, node, scxml),
          invoke_types: InvokeTypes.types(emitted),
-         warnings: emit_warnings ++ warnings ++ lint(emitted, opts) ++ candidate_lint(node, opts)
+         warnings: emit_warnings ++ warnings ++ lint(emitted, opts) ++ candidate_lint(node, opts),
+         accepts: document.accepts
        }}
     end
   end
@@ -3241,7 +3242,8 @@ defmodule StatifierBlocks.Compiler do
       document_hash: Document.content_hash(document),
       palette_hash: palette_hash(node),
       compiler_version: @compiler_version,
-      chart_identity: Identity.of_source(scxml, chart_name: document.id, chart_version: nil)
+      chart_identity: Identity.of_source(scxml, chart_name: document.id, chart_version: nil),
+      accepts: document.accepts
     }
   end
 

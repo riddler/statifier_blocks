@@ -37,6 +37,13 @@ defmodule StatifierBlocks.Document do
   It follows, never leads, the compile call's `:declare` option - see
   `StatifierBlocks.Compiler`'s moduledoc for the precedence rule.
 
+  Beside it sits `accepts`: the names of the external events the document
+  accepts, in the author's order (ADR-0014). Here it is a declaration and
+  nothing more. An empty list and an absent key are the same declaration,
+  the compile carries the list onto the artifact without reading it, and
+  whether each name is one the chart can take is judged by a host's publish
+  step, not by this package.
+
   `committed_config/2` and `effective_config/3` are the two config readers
   a surface asks the document, public because the reference embedder's Plan
   view - the first consumer of both - had written them out privately in
@@ -56,10 +63,19 @@ defmodule StatifierBlocks.Document do
           revision: non_neg_integer(),
           root: Block.t(),
           metadata: %{optional(String.t()) => Block.json()},
-          datamodel: [DatamodelEntry.t()]
+          datamodel: [DatamodelEntry.t()],
+          accepts: [String.t()]
         }
 
-  defstruct [:id, :root, schema_version: 1, revision: 0, metadata: %{}, datamodel: []]
+  defstruct [
+    :id,
+    :root,
+    schema_version: 1,
+    revision: 0,
+    metadata: %{},
+    datamodel: [],
+    accepts: []
+  ]
 
   @typedoc "Derived, never stored. Identifies a position, not a block."
   @type path :: [{Block.id(), Block.slot_name(), non_neg_integer()}]
@@ -81,7 +97,8 @@ defmodule StatifierBlocks.Document do
   Options: `:id` (default a freshly minted `StatifierBlocks.Id.document/0`),
   `:revision` (default `0`), `:metadata` (default `%{}`), `:datamodel`
   (default `[]`, a list of `StatifierBlocks.Document.DatamodelEntry`
-  structs - ADR-0001 decision 11). `:schema_version` is not an option -
+  structs - ADR-0001 decision 11), `:accepts` (default `[]`, a list of
+  event names - ADR-0014 decision 2). `:schema_version` is not an option -
   decision 7 fixes it at `1` for this ADR's envelope.
   """
   @spec new(Block.t(), keyword()) :: t()
@@ -91,7 +108,8 @@ defmodule StatifierBlocks.Document do
       root: root,
       revision: Keyword.get(opts, :revision, 0),
       metadata: Keyword.get(opts, :metadata, %{}),
-      datamodel: Keyword.get(opts, :datamodel, [])
+      datamodel: Keyword.get(opts, :datamodel, []),
+      accepts: Keyword.get(opts, :accepts, [])
     }
   end
 
@@ -246,7 +264,8 @@ defmodule StatifierBlocks.Document do
   @doc """
   Checks `document` against ADR-0001's structural rules: schema version,
   envelope shape (including the `datamodel` key's own entry shape and id
-  uniqueness - decision 11), per-block shape (id, type, type_version,
+  uniqueness - decision 11 - and the `accepts` list's four refusals -
+  ADR-0014 decision 2), per-block shape (id, type, type_version,
   config, slots), and document-wide id uniqueness. Never consults a
   block-type registry - `config` is opaque here and `type` is never
   resolved against anything.
@@ -256,8 +275,10 @@ defmodule StatifierBlocks.Document do
 
   @doc """
   Canonical JSON per ADR-0001 decision 8. Deterministic: sorted object keys,
-  no insignificant whitespace, empty `slots`/`config`/`metadata`/`datamodel`
-  omitted, no floats.
+  no insignificant whitespace, empty `slots`/`config`/`metadata`/`datamodel`/
+  `accepts` omitted, no floats. An empty `accepts` is omitted for the reason
+  an empty `datamodel` is: every document written before the key existed
+  keeps its bytes, and so its `content_hash/1` (ADR-0014 decision 2).
 
   Runs `validate/1` first and raises `ArgumentError` carrying the validation
   reason when it fails, so an invalid document can never produce bytes that
@@ -292,8 +313,8 @@ defmodule StatifierBlocks.Document do
   id-level arm instead. Nothing is rescued to a default and nothing raises.
 
   An envelope key outside the known set (`id`, `revision`, `root`,
-  `schema_version`, `metadata`, `datamodel` - decision 11 added the last)
-  is refused rather than silently dropped, the same discipline the
+  `schema_version`, `metadata`, `datamodel`, `accepts` - decision 11 added
+  `datamodel` and ADR-0014 decision 2 added `accepts`) is refused rather than silently dropped, the same discipline the
   block-level decode already applies to an unrecognized block key.
   """
   @spec from_json(binary()) :: {:ok, t()} | {:error, validation_error()}
