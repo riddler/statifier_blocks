@@ -3894,8 +3894,8 @@ totality. `ADR-0005`'s anchor union has no member for it, so
 
 **That totality has a hole.** Whatever stage refused, `compile/3` sorts its
 findings into document order through `Document.blocks/1`
-(`compiler.ex:3258`, `defp in_document_order/2`), and that walk assumes a
-well-formed tree (`lib/statifier_blocks/document.ex:107`, `def blocks/1`). A
+(`compiler.ex:3260`, `defp in_document_order/2`, re-located at `32463bb`), and that walk assumes a
+well-formed tree (`lib/statifier_blocks/document.ex:125`, `def blocks/1`, re-located at `32463bb`). A
 document whose envelope is malformed but whose tree is intact - a negative
 `revision`, say - gets its Document-stage finding back. A document whose
 `root` is not a block, or whose `slots` value is not a map of block lists,
@@ -3919,7 +3919,7 @@ runs between Structure and Emit (`compiler.ex:519`, `defp after_resolve/5`),
 no serializer and no call into statifier-ex. It returns `[]` when those four
 stages find nothing, and otherwise the findings they found, as the same
 `StatifierBlocks.Compiler.Finding` values `compile/3` returns, in the same
-document order (`compiler.ex:3258`, `defp in_document_order/2`). It is total
+document order (`compiler.ex:3260`, `defp in_document_order/2`, re-located at `32463bb`). It is total
 in decision 1's sense: it never raises on a `%Document{}` and a `%Palette{}`,
 whatever the document holds. It takes `compile/3`'s own option list and reads
 the options stages 3 and 4 read, `:datamodel` and `:entry_type`
@@ -3987,7 +3987,7 @@ the editor takes: `:datamodel`, `:declare` and `:chart_outcomes`. It:
    caller-supplied findings: the `findings` of `ViewModel.build/3` when it is
    handed the adapted list followed by `Datamodel.findings/4`'s advisories and
    `ViewModel.outcome_findings/3`'s disagreements, which puts the view model's
-   own derived findings first (`lib/statifier_blocks/editor.ex:3666`,
+   own derived findings first (`lib/statifier_blocks/editor.ex:3747`, re-located at `32463bb`,
    `defp view_model/6`).
 
 The equality `sb-m89g` proves is step 4's: for a document the Document stage
