@@ -3841,7 +3841,7 @@ Filed with `sb-4wh3`, campaign RF058.
 
 ## Amendment (2026-09-22): the stages before Emit are one public function, `structure_findings/3`, and `compile/3` runs it
 
-**Status: proposed (2026-09-22), drafted for `sb-3zw2`; the implementation is
+**Status: accepted (2026-09-22), drafted for `sb-3zw2`; the implementation is
 `sb-m89g`.** Additive: no text above this line is edited, every decision above
 stands as written, and the header line's status history is not extended here.
 This is an amendment rather than a dated Note because it adds a public function
@@ -4062,7 +4062,7 @@ with `block_id: nil`, `Publish.findings/3` returns it adapted to `ADR-0005`'s
 
 ## Amendment (2026-09-22): decision 1's artifact gains `accepts` and `interface`, and decision 7's record gains `accepts`
 
-**Status: proposed (2026-09-22), drafted for `sb-db8s`.** Additive: no text
+**Status: accepted (2026-09-22), drafted for `sb-db8s`.** Additive: no text
 above this line is edited, every decision above stands as written, and the
 header line's status history is not extended here. It adds clauses `H1` to
 `H3`. This is an amendment rather than a dated Note because it changes what
@@ -4253,3 +4253,107 @@ Note does not decide whether a host must pass `:datamodel`, or whether the
 record should name the option.
 
 Filed with `sb-db8s`.
+
+## Note (2026-09-22): the two Amendments of 2026-09-22 are flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only lines this request changes above it
+are the two Amendments' status lines, each by one word, `proposed` to
+`accepted`: the Amendment on `structure_findings/3` (`:3844`, clauses G1 to
+G4) and the Amendment on `accepts` and `interface` (`:4065`, clauses H1 to
+H3). Everything else is this Note, at the foot of the file, so no line
+another record cites moves.
+
+The operator granted, on 2026-09-22, the flip of proposed records in this
+repository. This request takes that grant for these two Amendments alone,
+through the same `docs/adr/` direction gate, after checking every claim each
+makes against the code on `main`.
+
+Every `lib/` and `test/` cite below was read at `main` `c362e40` and is
+written anchor first, line second; a later reader re-locates by the anchor
+and not by the number.
+
+### G1 to G4, and where each reads today
+
+| Clause | Read at `c362e40` |
+|---|---|
+| G1, one public, pure, total function (`:3908`) | `def structure_findings/3` (`compiler.ex:538`) runs `defp prefix/3` (`compiler.ex:558`) and answers `[]` on `{:ok, _, _}`, or the refusal ordered by `defp in_document_order/2` (`compiler.ex:3425`); nothing it runs reaches `defp after_structure/3` (`compiler.ex:603`), where the Emit, chart-use, done-data, self-reference, sensitive-path and Chart stages run; stages 3 and 4 read `:entry_type` and `:datamodel` through `defp assignability_context/1` (`compiler.ex:1823`) |
+| G1, only errors (`:3927`) | the compile's warnings are built in functions `after_structure/3` reaches: `defp drafts_warning/1` through `defp elide_shelf/1`, `defp marker_warning/1`, `defp deadline_warning/1`, `defp shadowed_finding/2` in the Emit stage, and `defp candidate_finding/3` and `Chart.validate/3`'s warnings in `defp chart_stage/5` (`compiler.ex:3241`) |
+| G2, the compile's own prefix (`:3936`) | `compile/3` (`compiler.ex:508`) runs `defp stages/3`, which runs the same `prefix/3` and continues into `after_structure/3` only from the tree and expansion index `prefix/3` answers; both equalities are pinned in `test/statifier_blocks/compiler/structure_findings_test.exs` (the describes "G2: the stored fixtures", "G3: a composite, over the spliced document" and "G1: stages 1 to 4 and nothing after them"); the request that built G1 and G2 (`abf3f06`) changed no file under `test/fixtures/corpus`, and the byte-corpus test (`test/statifier_blocks/compiler/byte_corpus_test.exs`) passes on this tree |
+| G2, the hole closed (`:3953`) | `in_document_order/2`'s Document-stage clause (`compiler.ex:3434`) returns the refusal without calling `Document.blocks/1`; the same test file's "totality" describe refuses a `root` that is not a block, and a `slots` value that is not a map of block lists, through both functions |
+| G3, over the spliced document (`:3959`) | the Structure stage is handed `defp structure_document/3` (`compiler.ex:1465`), the resolved tree whenever the expansion index is not empty; a refusal is re-anchored by `defp reanchor/2` (`compiler.ex:1242`) through `defp anchor/2` (`compiler.ex:1269`) |
+| G4, the publish entry (`:3976`) | `StatifierBlocks.Publish.findings/3` (`publish.ex:94`): step 1 is `defp compile_opts/1`, which passes `:datamodel` and `:declare` only when the context holds them; step 2 is `Finding.from_compiler_all/2`; step 3 returns the adapted list when any finding's stage is `:document`; step 4 is `defp editor_findings/4`, which builds the view model over the adapted list, then `Datamodel.findings/4`, then `ViewModel.outcome_findings/3`, the order the editor's `defp view_model/6` uses (`editor.ex:3747`); the equality and the count are pinned in `test/statifier_blocks/editor/publish_equality_test.exs` (the describe "the editor's list, finding for finding"), and the doubled config refusal in `test/statifier_blocks/publish_test.exs` |
+
+### H1 to H3, and where each reads today
+
+Every code cite H1 to H3 give, read at `281d1b8`, is at the same line at
+`c362e40`.
+
+| Clause | Read at `c362e40` |
+|---|---|
+| H1, the artifact carries `accepts` and `interface` (`:4092`) | `defp chart_stage/5` sets `accepts: document.accepts` and `interface: interface(node, opts)` (`compiler.ex:3253-3254`) on every compile that reaches it, whatever the chart-use option; the SCXML is serialized from the emission before either is read (`compiler.ex:3242`), so neither reaches the chart; the `defstruct` (`compiled.ex:110`) carries both, `accepts` defaulting to `[]` |
+| H2, the record gains `accepts` (`:4117`) | the `defstruct` (`compilation_record.ex:83`) holds the six enforced fields and `accepts: []`; `defp record/3` (`compiler.ex:3403`) fills `accepts: document.accepts`; the record has no `interface` field |
+| H3, the typespec appendix (`:4143`) | `CompilationRecord`'s `@type t` (`compilation_record.ex:65`) carries `accepts: [String.t()]`; `Compiled`'s `@type t` (`compiled.ex:99`) carries `accepts: [String.t()]` and `interface: interface()`; `@type interface` (`compiled.ex:93`) and `@type child_reference` (`compiled.ex:74`) hold exactly the fields the clause spells |
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- The H Amendment calls `ADR-0014` decision 3 and `ADR-0008`'s Amendment of
+  2026-09-22, A5, "(proposed)" (`:4074-4075`). That described the day it was
+  written. Both were accepted on `main` at `f4e783d` (their status lines,
+  `docs/adr/0014-document-accepts-declaration.md:3` and
+  `docs/adr/0008-durable-subchart-handler.md:495`). This flip accepts the
+  lists this record spells out as they now read. It decides nothing about
+  either field beyond what those records decide, as the Amendment says of
+  itself (`:4072-4073`).
+- The G Amendment's status line names the request that drafted it and the
+  one that implemented it; the implementation is on `main` at `abf3f06`.
+- This file's head `Status:` line is not extended.
+
+### Sentences that no longer hold as written, and the records that name the change
+
+None reverses what either Amendment decides.
+
+- **G's Context on the adapter: "`Finding.from_compiler/2` refuses it as
+  `:unanchorable`" (`:3893`).** It described the code before this date.
+  `ADR-0005`'s companion Amendment of 2026-09-22, `11x`
+  (`docs/adr/0005-liveview-editor.md:12119`), maps a Document-stage finding
+  to `:document`, and the code does (`defp anchor_from_compiler/1`,
+  `finding.ex:329`).
+- **G's Context on totality: "makes `compile/3` raise at `6b216a5`"
+  (`:3902`).** It described the code before this date, as it says; G2 closes
+  the hole, read above.
+- **G's code cites, read at `6b216a5`.** The Note of 2026-09-22 above
+  (`:4194`) re-locates G1's three: `after_resolve/5` no longer exists and
+  `after_structure/3` is read in its place. The Context's and G3's cites
+  moved by the same split, and each is at: `defp structure_stage/6`
+  `compiler.ex:1732`, `defp slot_finding/1` `compiler.ex:1949`,
+  `defp structure_finding/4` `compiler.ex:1861`, `defp structure_document/3`
+  `compiler.ex:1465`, `defp reanchor/2` `compiler.ex:1242`,
+  `defp document_stage/1` `compiler.ex:628`, `defp anchor/2`
+  `compiler.ex:1269`. `SlotValidation.validate/2`
+  (`slot_validation.ex:64`), `Assignability.validate/3`
+  (`assignability.ex:937`), `Document.blocks/1` (`document.ex:125`) and
+  `defp view_model/6` (`editor.ex:3747`) did not move.
+
+### Sentences stated exactly
+
+Each holds on the reading below, which is what the code does; none of them
+changes what is decided.
+
+- **G4, "`context` is the map the editor takes" (`:3977-3978`).** The editor
+  takes `:datamodel`, `:declare` and `:chart_outcomes` as a LiveComponent's
+  assigns, and `Editor.findings_count/3` (`editor.ex:952`) as keyword
+  options; `Publish.findings/3`'s `context` is a map of the same three keys
+  (`publish.ex`, `@type context`), each optional with the editor's default.
+- **H1, "a pass-through the compile reads nothing from, judges nothing about
+  and produces no finding from" (`:4097-4099`).** The words restate `ADR-0014`
+  decision 3's sentence on the carry
+  (`docs/adr/0014-document-accepts-declaration.md:147-149`), and they hold of
+  it: `chart_stage/5` copies the list and reads nothing in it. A malformed
+  `accepts` is still refused by the compile, earlier, at the Document stage,
+  because `Document.validate/1` refuses it under `ADR-0014` decision 2 and
+  `defp document_stage/1` (`compiler.ex:628`) reports any such refusal.
+
+Filed with `sb-910d`.

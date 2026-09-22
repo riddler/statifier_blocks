@@ -1033,7 +1033,7 @@ Filed with `sb-4wh3`, campaign RF058.
 
 ## Amendment (2026-09-22): the envelope gains `accepts`, decided by `ADR-0014` - 11e's allowlist, decision 7's bump sentence, and the typespec appendix
 
-**Status: proposed (2026-09-22), drafted for `sb-db8s`.** Additive: no text
+**Status: accepted (2026-09-22), drafted for `sb-db8s`.** Additive: no text
 above this line is edited, every decision above stands as written, and the
 header line's status history is not extended here. It adds clauses `11j` to
 `11l`, which continue this record's own decision 11 labels under the label
@@ -1140,3 +1140,48 @@ about it changes. The code's type and struct hold both fields
   from this amendment: the code landed first, under `ADR-0014`.
 - A reader of this record alone learns that the envelope has seven keys and
   why the seventh took no bump, without reading `ADR-0014` first.
+
+## Note (2026-09-22): the Amendment of 2026-09-22 on the `accepts` envelope key is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+that Amendment's status line (`:1036`), by one word, `proposed` to
+`accepted`. Everything else is this Note, at the foot of the file, so no line
+another record cites moves.
+
+The operator granted, on 2026-09-22, the flip of proposed records in this
+repository. This request takes that grant for this Amendment alone, through
+the same `docs/adr/` direction gate, after checking every claim the Amendment
+makes against the code on `main`.
+
+Every `lib/` cite below was read at `main` `c362e40` and is written anchor
+first, line second; a later reader re-locates by the anchor and not by the
+number. Every code cite the Amendment gives, read at `281d1b8`, is at the
+same line at `c362e40`.
+
+### Each clause, and where it reads today
+
+| Clause | Read at `c362e40` |
+|---|---|
+| `11j`, the allowlist is seven keys (`:1068`) | `@envelope_keys` (`decode.ex:51`) holds `id`, `revision`, `root`, `schema_version`, `metadata`, `datamodel` and `accepts`, and nothing else; `defp ensure_known_envelope_keys/1` (`decode.ex:113`) refuses any other envelope key with `{:malformed_envelope, {:unexpected_key, key}}` |
+| `11k`, `accepts` takes no bump (`:1082`) | `encode/1` hands `accepts` to `defp maybe_put_list/3` (`canonical_json.ex:43`), whose empty-list clause (`canonical_json.ex:124`) leaves the key out, the clause `datamodel` goes through on the line above; `Document.content_hash/1` (`document.ex:302`) hashes `to_json/1`'s canonical bytes, so a document with no `accepts` encodes and hashes as it did before the key existed; the `defstruct` (`document.ex:70`) still defaults `schema_version` to `1` |
+| `11l`, the appendix's `%Document{}` with its two list fields (`:1099`) | `@type t` (`document.ex:60`) carries `datamodel: [DatamodelEntry.t()]` and `accepts: [String.t()]`, with `DatamodelEntry` aliased to `StatifierBlocks.Document.DatamodelEntry`; the `defstruct` (`document.ex:70`) defaults both to `[]`, with the other fields and defaults the clause spells |
+| the three passages owed (`:1045-1049`) | `ADR-0014`'s section "What this record owes the accepted records" (`docs/adr/0014-document-accepts-declaration.md:302`) names 11e, decision 7 and the typespec appendix, the three this Amendment carries the key into |
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- The Amendment calls `ADR-0014` decision 2 "(proposed)" (`:1045`). That
+  described the day it was written. `ADR-0014` was accepted on `main` at
+  `f4e783d` (its status line, `docs/adr/0014-document-accepts-declaration.md:3`).
+  This flip accepts the three passages as this record now reads them. It
+  decides nothing about `accepts` that `ADR-0014` does not, as the Amendment
+  says of itself (`:1045-1046`).
+- This file's head `Status:` line is not extended.
+
+### Sentences that no longer hold as written
+
+None. Each clause holds at `c362e40` as written.
+
+Filed with `sb-910d`.
