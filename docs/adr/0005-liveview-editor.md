@@ -12374,6 +12374,30 @@ the value to the enum and nothing more.
   list may hold `{:set_accepts, _}`. It concerns 3C's bound, and a request
   that decides it would amend 3C.
 
+## Note (2026-09-22): 11y's "`Finding.from_compiler/2` never produces it" holds of the by-rule mapping, not of the `:source` override
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. It states the reach of one sentence of `11y`
+that read wider than true on the day it was written, and still does.
+
+`11y` says of `:graph` that "`Finding.from_compiler/2` never produces it"
+(`:12345`). That holds of the adapter's by-rule mapping: none of its rules
+maps a finding to `:graph`. It does not hold of the adapter as a whole. Its
+first rule takes `opts[:source]` as given (the moduledoc's "The `:source`
+override", and `defp source_from_compiler/2`'s `Keyword.fetch(opts, :source)`
+clause, `lib/statifier_blocks/finding.ex:342`, read at `main` `f4e783d`), so
+`from_compiler/2` returns a `:graph` finding when a caller names `:graph`
+there. No code under `lib/` passes a `:source` option to `from_compiler/2` or
+`from_compiler_all/2`: `StatifierBlocks.Publish.findings/3` calls
+`from_compiler_all/2` with no options (`lib/statifier_blocks/publish.ex:101`),
+and the two moduledocs that show a caller passing one
+(`StatifierBlocks.Compiler.SensitivePaths` and
+`StatifierBlocks.Compiler.SelfReference`) show `source: :lint`. So today the
+one producer of a `:graph` finding is `StatifierBlocks.Graph`, as `11y` says.
+What `11y` decides, the value in the enum, is unchanged.
+
+Filed with `sb-910d`.
+
 ## Note (2026-09-22): the two Amendments of 2026-09-22 on decisions 2 and 11 are flipped to accepted
 
 A dated Note rather than an amendment: it carries no `Status:` line, decides
@@ -12381,8 +12405,9 @@ nothing, and edits no clause. The only lines this request changes above it
 are the two Amendments' status lines, each by one word, `proposed` to
 `accepted`: the Amendment on the `:document` anchor (`:12024`, clauses `11v`
 to `11x`) and the Amendment on `{:set_accepts, names}` and `:graph`
-(`:12213`, clauses `2o` to `2r` and `11y`). Everything else is this Note, at
-the foot of the file, so no line another record cites moves.
+(`:12213`, clauses `2o` to `2r` and `11y`). Everything else is added at the
+foot of the file - this Note and the dated Note just above it on `11y`'s
+sentence about `from_compiler/2` - so no line another record cites moves.
 
 The operator granted, on 2026-09-22, the flip of proposed records in this
 repository. This request takes that grant for these two Amendments alone,
@@ -12400,7 +12425,7 @@ and not by the number.
 | `11v`, the union gains `:document` (`:12058`) | `@type anchor` (`finding.ex:46`) has the four members the clause spells, `:document` last and carrying no id |
 | `11w`, where a `:document` finding goes (`:12073`) | `ViewModel.build/3` (`view_model.ex:519`) rejects `:document` findings before its routed/orphan split and keeps them in `findings`; `Shell.findings_count/1` (`shell.ex:961`) is the length of that list; a collapsed subtree's badge counts the findings routed to its nodes, which a `:document` finding never is; `test/statifier_blocks/view_model/document_anchor_test.exs` pins all three |
 | `11w`, the rows (`:12073`) | `anchor_tag/1` (`editor/findings.ex:252`) answers `"document"`; in `row/1` (`editor/findings.ex:217`) the subject reads `Document` through `defp subject_label/2` and `defp anchor_tail/1` answers `nil`; in the drawer's `findings/1` (`editor/findings.ex:83`) a `:document` row is a `sb-findings__document` span, not the reveal button, stamped `data-orphan="false"` |
-| `11w`, the inspector (`:12073`) | `Shell.findings_groups/3` (`shell.ex:1026`) puts one `Document` group first, `block_id: nil` and `document?: true`, and every other group `document?: false`; `@type findings_group` (`shell.ex:121`) carries `document?: boolean()`; `defp document_findings_panel/1` (`editor/inspector.ex:573`) stamps `data-unanchored` only for `block_id == nil and not document?`, and `data-document` from `document?` |
+| `11w`, the inspector (`:12073`) | `Shell.findings_groups/3` (`shell.ex:1026`) puts one `Document` group first, `block_id: nil` and `document?: true`, and every other group `document?: false`; `@type findings_group` (`shell.ex:121`) carries `document?: boolean()`; `defp document_findings_panel/1` (`editor/inspector.ex:573`) stamps `data-unanchored` on every group, `"true"` only when `block_id == nil and not document?`, and `data-document` on every group from `document?` |
 | `11w`, the readers that gain an arm (`:12106`) | `defp finding_block_id/1` has a `:document` clause answering `nil` in `view_model.ex:1989` and `shell.ex:1072`; `editor/findings.ex` has `:document` clauses in `anchor_tag/1` (`:255`), `defp anchor_tail/1` (`:264`) and `defp block_id/1` (`:288`, answering `nil`); `defp route_one_finding/4` (`view_model.ex:2324`) has no `:document` clause and is never handed one |
 | `11x`, the adapter (`:12119`) | `defp anchor_from_compiler/1` (`finding.ex:329`) maps `stage: :document, block_id: nil` to `:document`, and its next clause (`finding.ex:332`) still refuses a block-less finding from any other stage as `{:unanchorable, finding}`; `@type from_compiler_error` (`finding.ex:149`) keeps that member; the source is rule 4's `:compile` at `:error`, and `:lint` otherwise by rule 2, as the cross-product test in `test/statifier_blocks/finding_from_compiler_test.exs` asserts for every stage, severity and key |
 | the test the Consequences name (`:12155`) | adapting: `test/statifier_blocks/finding_from_compiler_test.exs`; no node, not an orphan, and in the document's count: `test/statifier_blocks/view_model/document_anchor_test.exs`; counted, and rendered on both surfaces with nothing to select: `test/statifier_blocks/editor/publish_equality_test.exs` (the describe "a Document-stage finding in the editor (11w)") |
@@ -12459,21 +12484,23 @@ None reverses what either Amendment decides.
 
 ### Sentences stated exactly
 
-Each holds on the reading below, which is what the code does; none of them
-changes what is decided.
+Each is read below, or its reach is stated by the dated Note it cites; none
+of them changes what is decided.
 
-- **`11y`, "`Finding.from_compiler/2` never produces it" (`:12345`).** None
-  of `from_compiler/2`'s own rules maps a finding to `:graph`. Its first rule
-  takes a caller's `:source` option as given (`finding.ex`, the moduledoc's
-  "The `:source` override"), so a caller could name `:graph` there; no caller
-  under `lib/` does.
+- **`11y`, "`Finding.from_compiler/2` never produces it" (`:12345`).** Its
+  reach is stated by the Note of 2026-09-22 above on that sentence
+  (`:12377`): it holds of the adapter's by-rule mapping, and the
+  `:source` override returns `:graph` when a caller names it.
 - **`11x`'s Consequence, "`from_compiler_all/2`'s refused list is empty for
   every list the compiler produces today" (`:12160`).** It rests on
   `ADR-0004` decision 10. In `compiler.ex` and under
   `lib/statifier_blocks/compiler/`, the one finding built without a
-  `block_id` is `defp document_stage/1`'s; the Chart, self-reference and
-  sensitive-path findings take theirs from an emission's owner, and
+  `block_id` is `defp document_stage/1`'s; the self-reference and sensitive-path
+  findings take theirs from an emission's owner, and
   `StatifierBlocks.Compiler.Attribution.stamp/3` gives every emitted element
-  an owner before it is spliced in.
+  an owner before it is spliced in. A Chart-stage finding takes its
+  `block_id` from `Provenance.owner_at/2` over the provenance map, and an
+  offset the map does not cover falls back to the root block's owner
+  (`defp owner/3`, `compiler/chart.ex:241`), so it too names a block.
 
 Filed with `sb-910d`.
