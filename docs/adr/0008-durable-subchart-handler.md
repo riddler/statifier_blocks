@@ -492,7 +492,7 @@ Filed with `sb-4wh3`, campaign RF058.
 
 ## Amendment (2026-09-22): what a parent and its child agree on at publish, and who checks it
 
-**Status: proposed (2026-09-22), drafted for `sb-mwpx`; the implementation is
+**Status: accepted (2026-09-22), drafted for `sb-mwpx`; the implementation is
 `sb-vkyz`.** Additive: no text above this line is edited, every decision above
 stands as written, and the header line's status history is not extended here.
 This is an amendment rather than a dated Note because it decides five things
@@ -709,3 +709,147 @@ parent passes to a child.
 - A renamed outcome becomes a three-publish change instead of a one-publish
   change. That cost is deliberate: the one-publish change is the silent
   misroute described in the context above.
+
+## Note (2026-09-22): `interface` reads the compile's `:datamodel` option beside decision 6's triple, and A2's check is judged pair by pair
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. It states two facts that sentences of the
+Amendment of 2026-09-22 above read past. Each sentence read past its fact on
+the day it was written: A1 already had a `core.map` read the members of "a
+name the parent's own declarations define" (`:577-580`), and A2's own
+forward bullet already had the host's resolver answer each child (`:595-599`).
+
+### What `interface` reads
+
+A5 says the `interface` field "is a function of ADR-0004 decision 6's
+triple - the document's canonical bytes, the palette and the compiler
+version" (`:635-637`). One member of it is not. A `core.map` whose `collect_type` is a
+declared type name, rather than the inline arm, contributes the required
+fields that name has in the typed datamodel document the compile's
+`:datamodel` option supplies, and no keys when that option is absent or does
+not declare the name. The "parent's own declarations" of A1 are that
+document: nothing in the parent's stored bytes defines a type name. The
+option is not in the triple, so one document, one palette and one compiler
+version record different `reads` for such a reference with and without
+`:datamodel`.
+
+Every anchor below was read at `main` `abf3f06`; a later reader re-locates by
+the anchor and not by the number.
+
+- The private `interface/2` in `lib/statifier_blocks/compiler.ex` (`:3269`)
+  reads its declarations off the options through `assignability_context/1`
+  (`:1823`) and `StatifierBlocks.Environment.declarations/1`, and hands them
+  to the private `required_members/2`, whose name arm fetches the trimmed
+  name from them (`:3330`). The comment above `interface/2` says it reads the
+  resolved tree and the `:datamodel` option and nothing else.
+- The test `a collect_type naming a declaration reads its required fields,
+  and unknown reads none` in `test/statifier_blocks/graph_test.exs` compiles
+  one document twice, with and without `:datamodel`, and asserts `reads` of
+  `["card_number", "branch"]` and `[]`.
+
+The child side of `interface` and every `core.subchart` reference read the
+resolved tree alone, so for a document holding no `core.map` with a named
+`collect_type` the recorded `interface` is a function of the triple as A5
+says. A5's other claims about the field hold: it adds nothing to the SCXML
+and is not on `%CompilationRecord{}`.
+
+### The shape of A2's check
+
+A2 says the check "is a pure function of **one parent and one child**, both
+as `%Compiled{}` artifacts", and that it "performs no IO" (`:590-592`). The
+rule is judged one pair at a time, over the two artifacts' `interface`
+fields, and the package ships it as two public functions, one per direction,
+that each walk several pairs:
+
+- `StatifierBlocks.Graph.check/2` (`lib/statifier_blocks/graph.ex:96`) takes
+  one parent artifact and the host's resolver, and judges the parent against
+  each child the resolver answers for a document id the parent names. The
+  resolver is the host's function and the one call `check/2` makes that may
+  touch IO; the module's own code performs none.
+- `StatifierBlocks.Graph.consumers_broken/2` (`graph.ex:130`) takes one next
+  child artifact and a list of parent artifacts, and judges the child against
+  each parent's references to its document id. It takes no resolver.
+
+Both hand each pair to the private `pair/3` (`graph.ex:157`), which reads
+one reference and one child `interface` and nothing else.
+
+## Note (2026-09-22): the Amendment of 2026-09-22 is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the Amendment's status line (`:495`), by one word, `proposed` to `accepted`.
+Everything else is this Note and the one before it, at the foot of the file,
+so no line another record cites moves.
+
+The operator granted, on 2026-09-22, the flip of proposed records in this
+repository. This request takes that grant for the Amendment alone, through the
+same `docs/adr/` direction gate, after checking every claim the Amendment
+makes against the code on `main`. The record's own header `Status:` line
+(`:3`) is not extended.
+
+Every `lib/` cite below was read at `main` `abf3f06` and is written anchor
+first, line second. The Amendment's own cites are labelled `aa657cd`; those
+that have moved still name what the Amendment says, and it is not edited for
+them: `outcome_findings/3` now reads at `view_model.ex:1878`, the
+`%Compiled{}` `defstruct` at `compiled.ex:110`, `@propagated_outcome` at
+`compiler.ex:406` and `@type source` at `finding.ex:78`. `default_target/1`
+(`subchart.ex:519`), `child_outcomes/1` (`subchart.ex:606`), the `<assign>`
+in `assign/1` (`subchart.ex:693`) and `agrees?/3` (`block_type.ex:1023`) have
+not moved.
+
+### Each section, and where it reads today
+
+| Section | Read at `abf3f06` |
+|---|---|
+| A1, the child side (`:551-556`) | `%Compiled{}`'s `interface` holds `declared_outcomes` from `BlockType.outcome_names/2` over the root block and `declared_donedata_keys` from its `donedata_type/1` (`interface/2`, `compiler.ex:3269`). The test `the child side is the root's outcomes and done-data keys, whatever the chart use` compiles one child with and without `child_use: true` and asserts the same interface |
+| A1, the parent side (`:557-582`) | the private `reference/3` (`compiler.ex:3301`) records a `Subchart` reference with `routes_on` from `Subchart.child_outcomes/1` and `reads: []`, and a `FanOut` reference with `routes_on: []` and `reads` from `required_members/2`, which answers the required members of the inline arm or of a declared name and `[]` for anything else. It matches on the block type module, not the type name; no test pins that reading, because the tests' palette maps no other name onto either module. `StatifierBlocks.Graph`'s `@exempt_outcome` is `"error"`, and the private `pair/3` skips it. The tests `a subchart routes on its author's outcomes and reads nothing`, `a subchart with no outcomes listed routes on done`, `a map reads the members its inline collect_type marks required` and `error is exempt: a child need not declare it` pin each reading. What a named `collect_type` resolves against is the Note above |
+| A2, a pairwise check in two directions (`:588-606`) | the two functions and the pair they judge are the Note above. Both read only `interface`, and the module holds no store and starts no process. `@type resolver` (`graph.ex:73`) answers `{:ok, %Compiled{}}` or `{:error, :not_published}`, and its documentation says it is not the start-time `resolve_chart/2`. The tests `the stored pair returns no finding`, `a parent naming two distinct children judges each against its own` and `the resolver is asked once per distinct document id` pin the forward direction |
+| A3, a breaking republish names the parents (`:608-619`) | `consumers_broken/2` returns one `{parent_document_id, finding}` pair per failed rule, and each message names the parent document; the anchor names the referencing block. The tests `the renaming revision names the stored parent` and `names every parent the next child revision breaks, and none other` pin it |
+| A4, an unresolvable reference (`:621-626`) | `check/2` turns `{:error, :not_published}` into a finding anchored `{:config, block_id, "chart"}` (the private `unpublished/1`); the test `an unresolvable child is a finding on the referencing block's chart field` pins it |
+| A5, what the check reads and produces (`:628-653`) | `interface` is on `%Compiled{}` (`compiled.ex:110`) and not on `%CompilationRecord{}`; the Chart stage sets it on every compile (`chart_stage/5`, `compiler.ex:3241`), after serializing, so it adds nothing to the SCXML. Every finding is built by `Finding.new/4` with source `:graph` and its default severity `:error` (the private `finding/3`, `graph.ex:183`); `:graph` is a member of `@type source` (`finding.ex:78`). The three anchors are the ones A5 names |
+| How it stands beside the two existing checks (`:655-670`) | `outcome_findings/3` and `agrees?/3` are unchanged by it; the test `a child declaring an outcome the parent does not route on is not refused` pins the direction left to the `:warning` |
+| Consequences (`:699-711`) | no module under `lib/` other than `StatifierBlocks.Graph` calls `check/2` or `consumers_broken/2`; `Publish.findings/3` does not |
+
+The tests named above are in `test/statifier_blocks/graph_test.exs`.
+
+### Sentences that name their own status
+
+They are met here, not edited.
+
+- The status line says "the implementation is `sb-vkyz`" (`:495-496`), and
+  the Consequences say "`sb-vkyz` has a target" (`:701`). That implementation
+  has landed; the table above is where it reads.
+- The Context's "`%StatifierBlocks.Compiled{}` carries neither side of the
+  interface today: its fields are `scxml`, `provenance`, `record`,
+  `invoke_types` and `warnings`" (`:542-544`) describes the day it was
+  written. `%Compiled{}` now carries `interface`, as A5 decided, and
+  `accepts`, by `ADR-0014` decision 3.
+
+### Sentences that no longer hold as written, and the records that name the change
+
+- **"The anchor has no document arm" (`:651`).** It held when written, and
+  the rest of that sentence and "the anchor union is unchanged" (`:645`)
+  still hold: this Amendment adds no anchor. The union has since gained
+  `:document`, by `ADR-0005`'s Amendment of 2026-09-22, "a `:document`
+  anchor for the one finding that names no block", clause `11v`
+  (`docs/adr/0005-liveview-editor.md:12022`); `@type anchor` reads it at
+  `finding.ex:46`. Of the pairing decided here that Amendment says "that
+  pairing is unchanged, and `:document` never names a document other than
+  the one the list is about" (`docs/adr/0005-liveview-editor.md:12148-12149`),
+  so the pairing with the parent's document id stands.
+- **A5's triple sentence (`:635-637`) and A2's "one parent and one child"
+  (`:590-592`).** Each read past a fact when written; the first Note above
+  states both.
+
+### Not decided by the Amendment
+
+- **A reference inside a composite's expansion.** `interface/2` reads the
+  resolved tree after expansion, so a `core.subchart` or `core.map` placed by
+  a composite's expansion is recorded under its expansion member's block id,
+  and a `:graph` finding on it anchors on a block id the author's stored
+  document does not hold. A5 says each anchor is "on the referencing block,
+  under the field its author would change" (`:649-650`) and does not say
+  which block that is for an expansion member; re-anchoring such a finding
+  onto the composite block is not decided here.
+
+Filed with `sb-tysd`, campaign RF069.
