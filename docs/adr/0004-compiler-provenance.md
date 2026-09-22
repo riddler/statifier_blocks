@@ -4059,3 +4059,197 @@ with `block_id: nil`, `Publish.findings/3` returns it adapted to `ADR-0005`'s
 - Decision 10's "every finding names a block" keeps its one standing
   exception, the Document stage, which `ADR-0005`'s companion Amendment now
   routes rather than refuses.
+
+## Amendment (2026-09-22): decision 1's artifact gains `accepts` and `interface`, and decision 7's record gains `accepts`
+
+**Status: proposed (2026-09-22), drafted for `sb-db8s`.** Additive: no text
+above this line is edited, every decision above stands as written, and the
+header line's status history is not extended here. It adds clauses `H1` to
+`H3`. This is an amendment rather than a dated Note because it changes what
+decision 1 says the artifact carries and what decision 7 says the record
+holds, and by this directory's README a note decides nothing.
+
+Both additions were decided elsewhere, and this amendment decides nothing
+about either beyond carrying it into the lists this record spells out:
+`accepts` by `ADR-0014` decision 3 (proposed), and `interface` by `ADR-0008`'s
+Amendment of 2026-09-22, A5 (proposed). Each names this record as owing the
+change - `ADR-0014` in its section "What this record owes the accepted
+records", `ADR-0008`'s Amendment in its Consequences - and the code that
+builds both is on `main`.
+
+Code cites below were read at `281d1b8` and carry their anchors; re-locate by
+anchor, not by number.
+
+### Context
+
+Decision 1 lists what the compiled artifact carries: the generated SCXML, the
+provenance map, the compilation record, the emitted invoke types and any
+warnings. Decision 7 spells `%CompilationRecord{}` out field by field, and the
+typespec appendix repeats both as `compilation_record` and `compiled`.
+`%StatifierBlocks.Compiled{}` now has two fields none of those lists name,
+and `%StatifierBlocks.CompilationRecord{}` has one.
+
+### H1. Decision 1's artifact carries `accepts` and `interface` as well
+
+The artifact carries the generated SCXML, the provenance map, the compilation
+record, the emitted invoke types, any warnings, and two further fields:
+
+- **`accepts`**, the document's own `accepts` list exactly as written
+  (`ADR-0014` decision 3): a pass-through the compile reads nothing from,
+  judges nothing about and produces no finding from, `[]` when the document
+  declares nothing;
+- **`interface`**, what the document offers a parent that invokes it and what
+  it relies on from each child it names (`ADR-0008`'s Amendment, A1 and A5):
+  its declared outcomes, its declared done-data keys, and one entry per
+  referencing block. It is recorded on every successful compile, whatever the
+  chart-use option.
+
+Neither field is emitted into the SCXML, so neither moves chart identity under
+decision 7. Both are set where the artifact is built
+(`lib/statifier_blocks/compiler.ex:3253-3254`, in `defp chart_stage/5`), on
+the struct at `lib/statifier_blocks/compiled.ex:110` (the `defstruct`). What
+determines `interface` is A5's to say; the Note of this date below records one
+compile option the code reads for it.
+
+Decision 1's second paragraph holds for both: neither is written back into
+the document.
+
+### H2. Decision 7's `%CompilationRecord{}` gains `accepts`
+
+```
+%CompilationRecord{
+  document_id:      Document.id(),
+  revision:         non_neg_integer(),
+  document_hash:    binary(),     # ADR-0001 decision 8
+  palette_hash:     binary(),     # decision 6's second input
+  compiler_version: String.t(),   # decision 6's third input
+  chart_identity:   Identity.t(), # st-ADR-0052, computed upstream
+  accepts:          [String.t()]  # ADR-0014 decision 3
+}
+```
+
+The list is the document's, exactly as written, so a host that keeps only the
+record reads what the document declares it accepts without re-reading the
+document (`ADR-0014` decision 3). It is not identity and adds nothing to the
+join decision 7 records: it is in the document's bytes and so in
+`document_hash`, and it never reaches the SCXML, so `chart_identity` does not
+move when an author edits it. The struct and the function that fills it are
+`lib/statifier_blocks/compilation_record.ex:83` (the `defstruct`) and
+`lib/statifier_blocks/compiler.ex:3403` (`defp record/3`).
+
+`interface` is not on the record: `ADR-0008`'s A5 keeps it on the artifact
+only.
+
+### H3. The typespec appendix reads with the same fields
+
+The appendix's `compilation_record` type gains `accepts: [String.t()]`, and
+its `compiled` type gains `accepts` and `interface`, with `interface` spelled
+as `StatifierBlocks.Compiled` types it (`lib/statifier_blocks/compiled.ex`,
+`@type interface` and `@type child_reference`):
+
+```elixir
+@type compiled :: %{
+        scxml: binary(),
+        provenance: Provenance.t(),
+        record: compilation_record(),
+        invoke_types: [String.t()],
+        warnings: [finding()],
+        accepts: [String.t()],
+        interface: interface()
+      }
+
+@type interface :: %{
+        declared_outcomes: [String.t()],
+        declared_donedata_keys: [String.t()],
+        references: [child_reference()]
+      }
+
+@type child_reference :: %{
+        block_id: Block.id(),
+        document_id: String.t(),
+        routes_on: [String.t()],
+        reads: [String.t()]
+      }
+```
+
+What each `interface` field holds is A1's and A5's, and this clause restates
+none of it.
+
+### What this amendment does not decide
+
+- **Anything about `accepts` or `interface` beyond what `ADR-0014` and
+  `ADR-0008`'s Amendment decided**: the publish-time checks that read them,
+  and the host that runs those checks, are theirs.
+- **Decision 6.** Its triple and what it guarantees are unchanged here; A5's
+  extension of that determinism to `interface` is A5's.
+- **Decisions 8 and 10**, and every finding shape: neither field produces a
+  finding at compile time.
+
+### Consequences
+
+- Decision 1's list, decision 7's struct and the appendix read the same as
+  `%Compiled{}` and `%CompilationRecord{}` already do. No code follows from
+  this amendment: the code landed first, under the two deciding records.
+
+## Note (2026-09-22): the three code cites in the 2026-09-22 Amendment's G1, re-located after the stages before Emit were split
+
+A dated Note rather than an amendment: it carries no `Status:` line and
+decides nothing. G1 of this record's Amendment of 2026-09-22 ("the stages
+before Emit are one public function, `structure_findings/3`, and `compile/3`
+runs it") cites three private functions of `lib/statifier_blocks/compiler.ex`.
+The request that built G1 and G2 split the compile's stages into a shared
+prefix, which moved all three; one of them no longer exists. Each is
+re-located below by its anchor, read at `281d1b8`. G1's text is unchanged,
+and so is what it decides.
+
+- **`after_resolve/5`**, cited at `compiler.ex:519` and read at `6b216a5`, for
+  "none of the refusals `after_resolve/5` runs between Structure and Emit".
+  There is no `after_resolve/5` at `281d1b8`. Stages 1 to 4 are sequenced by
+  `defp prefix/3` (`compiler.ex:558`), whose Config-and-Structure step is
+  `defp config_and_structure_prefix/5` (`compiler.ex:580`); what runs after
+  Structure, the refusals between Structure and Emit among it, is
+  `defp after_structure/3` (`compiler.ex:603`). G1's sentence reads the same
+  with `after_structure/3` in place of `after_resolve/5`: `structure_findings/3`
+  runs `prefix/3` and none of `after_structure/3`.
+- **`in_document_order/2`**, cited at `compiler.ex:3260` (re-located at
+  `32463bb`), is at `compiler.ex:3425`, the first of its three clauses.
+- **`assignability_context/1`**, cited at `compiler.ex:1739`, is at
+  `compiler.ex:1823`.
+
+Filed with `sb-db8s`.
+
+## Note (2026-09-22): `interface` also varies with the `:datamodel` compile option
+
+A dated Note rather than an amendment: it carries no `Status:` line and
+decides nothing. It records what the code built for `ADR-0008`'s Amendment of
+2026-09-22 reads, beside a sentence of that Amendment's A5 it does not edit,
+and names the edge that follows. Code cites were read at `281d1b8`; re-locate
+by anchor, not by number.
+
+A5 says `interface` "is a function of ADR-0004 decision 6's triple - the
+document's canonical bytes, the palette and the compiler version". The code
+reads one more input. A `core.map` reference's `reads` are the members its
+`collect_type` marks required, and A1 lets that come from "the inline arm, or
+a name the parent's own declarations define". The name arm is resolved
+against the compile's `:datamodel` option: `defp interface/2`
+(`lib/statifier_blocks/compiler.ex:3269`) builds the declarations from that
+option, and `defp required_members/2` (`compiler.ex:3330`, the clause for a
+binary name) looks the name up in them. No other option reaches `interface`:
+the inline arm, the declared outcomes, the declared done-data keys and every
+`core.subchart` reference are read from the resolved tree alone. So for a
+fixed triple, `interface` is fixed except for the `reads` of a `core.map`
+whose `collect_type` is a name, which vary with `:datamodel`.
+
+The edge: a host that compiles such a parent without `:datamodel`, or with a
+datamodel that does not define the name, gets `reads: []` for that reference,
+because a name that resolves to nothing contributes no keys (A1: "unknown is
+not disagreement"). `StatifierBlocks.Graph.check/2` and
+`StatifierBlocks.Graph.consumers_broken/2` then have no key to judge for that
+reference, and the key check passes it without a finding. The key check is as
+complete as the `:datamodel` the parent was compiled with.
+
+A5's text is unchanged, and so is what `ADR-0008`'s Amendment decides; this
+Note does not decide whether a host must pass `:datamodel`, or whether the
+record should name the option.
+
+Filed with `sb-db8s`.

@@ -1030,3 +1030,113 @@ this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
 Filed with `sb-4wh3`, campaign RF058.
+
+## Amendment (2026-09-22): the envelope gains `accepts`, decided by `ADR-0014` - 11e's allowlist, decision 7's bump sentence, and the typespec appendix
+
+**Status: proposed (2026-09-22), drafted for `sb-db8s`.** Additive: no text
+above this line is edited, every decision above stands as written, and the
+header line's status history is not extended here. It adds clauses `11j` to
+`11l`, which continue this record's own decision 11 labels under the label
+note that opens the 2026-08-31 amendment: a bare label in this record means
+this record's clause, so this `11j` is not `ADR-0005`'s. This is an amendment
+rather than a dated Note because it changes what three passages of this record
+say the envelope is, and by this directory's README a note decides nothing.
+
+The key itself was decided by `ADR-0014` decision 2 (proposed), and this
+amendment decides nothing about `accepts` that `ADR-0014` does not. It carries
+the change into the three passages that record's section "What this record
+owes the accepted records" names here, now that the code that builds the key
+is on `main`.
+
+Code cites below were read at `281d1b8` and carry their anchors; re-locate by
+anchor, not by number.
+
+### Context
+
+`ADR-0014` decision 2 gives the envelope an optional top-level key,
+`accepts`: a list of event names in the author's order, `[]` by default,
+omitted from the canonical bytes when empty, with `schema_version` staying at
+1. Three passages of this record spell out in full a set that decision grows,
+and none of them was edited by it:
+
+- 11e names the envelope-key allowlist in full, six keys;
+- decision 7's bump criterion is worded as "when this record is amended in a
+  way that changes bytes", and `accepts` is added by a different record;
+- the typespec appendix's `StatifierBlocks.Document` type lists the envelope
+  field by field.
+
+### 11j. 11e's envelope-key allowlist gains `accepts`
+
+The allowlist 11e names is read as seven keys: `accepts`, `datamodel`, `id`,
+`metadata`, `revision`, `root`, `schema_version`. The decoder's list holds
+exactly those seven (`lib/statifier_blocks/decode.ex:51`, `@envelope_keys`).
+Everything else 11e says stands: an envelope key outside the list is
+`{:malformed_envelope, {:unexpected_key, key}}`, so a reader built before
+`accepts` existed refuses a document carrying it, by name, rather than
+dropping the declaration on its next encode. That refusal is what `ADR-0014`
+decision 2 relies on for its own "no bump".
+
+What an `accepts` value may hold, and the four refusals `Document.validate/1`
+gives a malformed one, are `ADR-0014` decision 2's and are not restated here.
+
+### 11k. Decision 7's bump criterion is about the envelope's bytes, whichever record decides the key
+
+Decision 7 says `schema_version` "bumps only when this record is amended in a
+way that changes bytes". Read the criterion as a rule about the envelope,
+wherever an envelope key is decided: adding a key bumps `schema_version` when
+it moves the canonical bytes of a document encoded before the key existed,
+and does not bump it otherwise. The record that adds the key applies the
+criterion; the envelope, its allowlist and this criterion stay this record's.
+
+`accepts` moves no existing document's bytes. An absent or empty list is left
+out of the canonical encoding by the rule `datamodel` uses
+(`lib/statifier_blocks/canonical_json.ex:124-125`, `defp maybe_put_list/3`,
+called for `accepts` in `encode/1` at `:43`), so a document encoded before the
+key encodes to the same bytes after it, and hashes the same under
+`content_hash/1`. `ADR-0014`'s "no bump" is therefore this record's reading
+too, reached by the same sentence 11e applied to `datamodel`.
+
+### 11l. The typespec appendix's `%Document{}` is read with its two list fields
+
+The appendix's `StatifierBlocks.Document` type and `defstruct` are read with
+two further fields, each defaulting to `[]`:
+
+```elixir
+@type t :: %__MODULE__{
+        schema_version: pos_integer(),
+        id: id(),
+        revision: non_neg_integer(),
+        root: Block.t(),
+        metadata: %{optional(String.t()) => Block.json()},
+        datamodel: [StatifierBlocks.Document.DatamodelEntry.t()],
+        accepts: [String.t()]
+      }
+
+defstruct [:id, :root, schema_version: 1, revision: 0, metadata: %{}, datamodel: [], accepts: []]
+```
+
+`accepts` is `ADR-0014` decision 2's. `datamodel` is this record's own 11a,
+which states the in-memory field in prose and did not carry it into the
+appendix; it is named here only so that the appendix reads whole, and nothing
+about it changes. The code's type and struct hold both fields
+(`lib/statifier_blocks/document.ex:60`, `@type t`, and `:70`, the
+`defstruct`).
+
+### What this amendment does not decide
+
+- **Anything about `accepts` beyond what `ADR-0014` decided** - its entry
+  grammar, its refusals, how the compile carries it, the editor row, and the
+  publish-time check are that record's.
+- **Decisions 1 to 10 and 11a to 11i**, in any particular. The block shape
+  gains nothing, and decision 8's encoding rules and round-trip law cover the
+  key without change.
+- **Whether a future envelope key bumps `schema_version`.** 11k says how the
+  criterion reads; applying it to a key is the deciding record's.
+
+### Consequences
+
+- 11e's list, decision 7's sentence and the appendix read the same as the
+  decoder, the canonical encoder and the struct already do. No code follows
+  from this amendment: the code landed first, under `ADR-0014`.
+- A reader of this record alone learns that the envelope has seven keys and
+  why the seventh took no bump, without reading `ADR-0014` first.
