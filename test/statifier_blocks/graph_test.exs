@@ -269,6 +269,16 @@ defmodule StatifierBlocks.GraphTest do
       assert Graph.check(stored_parent(), resolver(published())) == []
     end
 
+    # Each reference is judged against the child its own document id
+    # resolves to, not against whichever child the parent resolved first.
+    #
+    # sabotage: replaced `Map.fetch!(children, reference.document_id)` in
+    # `check/2` with `children |> Map.values() |> hd()` - one child judges
+    # both references and this goes red (verified)
+    test "a parent naming two distinct children judges each against its own" do
+      assert Graph.check(compile!(registration(cards: true)), resolver(published())) == []
+    end
+
     # sabotage: matched `{:error, :not_published}` to `[]` in `check/2` -
     # the unresolvable child passes silently and this goes red (verified)
     test "an unresolvable child is a finding on the referencing block's chart field" do
