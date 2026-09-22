@@ -112,13 +112,17 @@ defmodule StatifierBlocks.Shell do
   @typedoc """
   One block's findings, as the inspector's unselected Findings tab lists them.
 
-  `block_id` is `nil` for the one group that is not about a block - the
-  unanchored findings, whose anchors name ids the document does not hold.
+  `block_id` is `nil` for the two groups that are not about a block - the
+  document's own findings (the `:document` anchor), and the unanchored
+  findings, whose anchors name ids the document does not hold. `document?`
+  tells those two apart: it is `true` on the document's group only
+  (ADR-0005's Amendment of 2026-09-22, `11w`).
   """
   @type findings_group :: %{
           block_id: Block.id() | nil,
           label: String.t(),
-          findings: [Finding.t()]
+          findings: [Finding.t()],
+          document?: boolean()
         }
 
   @typedoc """
@@ -224,6 +228,9 @@ defmodule StatifierBlocks.Shell do
   # The heading over the findings whose anchor names no block in the document.
   # A word rather than a block id, because there is no block to name.
   @unanchored_label "Unanchored"
+
+  # The heading over the findings anchored on the document itself (`11w`).
+  @document_label "Document"
 
   # Most to least urgent. It is the order `Finding.severity/0` declares and the
   # order an author triages in, and `severity_counts/1` is its only reader.
@@ -1003,6 +1010,12 @@ defmodule StatifierBlocks.Shell do
   reads the chip as wrong. It carries `block_id: nil`, which is what tells a
   caller there is nothing to select.
 
+  The findings anchored on the document itself (`:document`, ADR-0005's
+  Amendment of 2026-09-22, `11w`) form one group, placed **first** and
+  labelled `Document`. It too carries `block_id: nil`, so every group carries
+  `document?`, `true` on that group only - the key that tells a caller which
+  of the two block-less groups it holds.
+
   `root` is only ever read for a label; a `nil` root labels every group with
   its block id, which is `label_for/2`'s own fallback for an id the tree does
   not hold.
@@ -1012,7 +1025,8 @@ defmodule StatifierBlocks.Shell do
         ]
   def findings_groups(root, findings, orphans) when is_list(findings) do
     orphan_set = MapSet.new(orphans || [])
-    {unanchored, anchored} = Enum.split_with(findings, &MapSet.member?(orphan_set, &1))
+    {document, rest} = Enum.split_with(findings, &(&1.anchor == :document))
+    {unanchored, anchored} = Enum.split_with(rest, &MapSet.member?(orphan_set, &1))
 
     by_block = Enum.group_by(anchored, &finding_block_id/1)
 
@@ -1020,26 +1034,42 @@ defmodule StatifierBlocks.Shell do
     |> Enum.map(&finding_block_id/1)
     |> Enum.uniq()
     |> Enum.map(
-      &%{block_id: &1, label: group_label(root, &1), findings: Map.fetch!(by_block, &1)}
+      &%{
+        block_id: &1,
+        label: group_label(root, &1),
+        findings: Map.fetch!(by_block, &1),
+        document?: false
+      }
     )
+    |> prepend_document(document)
     |> append_unanchored(unanchored)
   end
+
+  @spec prepend_document([findings_group()], [Finding.t()]) :: [findings_group()]
+  defp prepend_document(groups, []), do: groups
+
+  defp prepend_document(groups, document),
+    do: [%{block_id: nil, label: @document_label, findings: document, document?: true} | groups]
 
   @spec append_unanchored([findings_group()], [Finding.t()]) :: [findings_group()]
   defp append_unanchored(groups, []), do: groups
 
   defp append_unanchored(groups, unanchored),
-    do: groups ++ [%{block_id: nil, label: @unanchored_label, findings: unanchored}]
+    do:
+      groups ++
+        [%{block_id: nil, label: @unanchored_label, findings: unanchored, document?: false}]
 
   @spec group_label(ViewModel.Node.t() | nil, Block.id()) :: String.t()
   defp group_label(%ViewModel.Node{} = root, id), do: label_for(root, id)
   defp group_label(nil, id), do: id
 
-  # The anchor's block id, whichever of the three shapes decision 11 gives it.
-  @spec finding_block_id(Finding.t()) :: Block.id()
+  # The anchor's block id, whichever of the three block-naming shapes decision
+  # 11 gives it, and `nil` for the `:document` anchor, which names none.
+  @spec finding_block_id(Finding.t()) :: Block.id() | nil
   defp finding_block_id(%Finding{anchor: {:config, id, _key}}), do: id
   defp finding_block_id(%Finding{anchor: {:slot, id, _name}}), do: id
   defp finding_block_id(%Finding{anchor: {:block, id}}), do: id
+  defp finding_block_id(%Finding{anchor: :document}), do: nil
 
   @doc """
   What the drawer shows, from its own open flag, its tab, the fixtures source,

@@ -66,6 +66,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     alias StatifierBlocks.{Finding, Shell, ViewModel}
 
+    # The subject a `:document` finding's row reads (`11w`).
+    @document_subject "Document"
+
     attr(:findings, :list, required: true)
 
     attr(:orphans, :any,
@@ -92,7 +95,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             data-orphan={to_string(MapSet.member?(@orphans, finding))}
           >
             <button
-              :if={not MapSet.member?(@orphans, finding)}
+              :if={not MapSet.member?(@orphans, finding) and not document?(finding)}
               type="button"
               class="sb-findings__reveal sb-findings__cells"
               phx-click="select"
@@ -104,6 +107,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             <span
               :if={MapSet.member?(@orphans, finding)}
               class="sb-findings__orphan sb-findings__cells"
+            >
+              <.row finding={finding} root={@root} subject />
+            </span>
+            <span
+              :if={document?(finding)}
+              class="sb-findings__document sb-findings__cells"
             >
               <.row finding={finding} root={@root} subject />
             </span>
@@ -191,11 +200,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       saying what the line above already said. An orphan's subject is its id
       and nothing else: `Shell.label_for/2` falls back to the id for a block
       the tree does not hold, and a row reading "blk_gone blk_gone" says the
-      same thing twice.
+      same thing twice. A `:document` finding's subject reads `Document` and
+      carries no block id, because it names none (ADR-0005's Amendment of
+      2026-09-22, `11w`).
     * **Anchor tail** is the part of the anchor the subject does not already
       carry - `config.duration` for a `{:config, id, key}`, `slot:body` for a
-      `{:slot, id, name}`, and **nothing at all** for a `{:block, id}`, whose
-      anchor is the subject. It is what tells an author whether a finding is
+      `{:slot, id, name}`, and **nothing at all** for a `{:block, id}` or a
+      `:document`, whose anchor is the subject. It is what tells an author whether a finding is
       about a field, a slot or the block itself, which is decision 11's whole
       routing rule made visible.
     * **Source** is the enum value, as a chip: `:config`, `:assignability`,
@@ -216,7 +227,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       <span class="sb-findings__severity">{@finding.severity}</span>
       <span :if={@subject} class="sb-findings__subject">
         <span :if={@label} class="sb-findings__label">{@label}</span>
-        <span class="sb-findings__id">{@block_id}</span>
+        <span :if={@block_id} class="sb-findings__id">{@block_id}</span>
       </span>
       <span :if={@tail} class="sb-findings__anchor">{@tail}</span>
       <span class="sb-findings__source">{@finding.source}</span>
@@ -232,20 +243,35 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     is what a test, a host's stylesheet or a debugging author uses to name one
     row exactly. The `row/1` tail above is the reader-facing half of the same
     tuple; this is the machine-facing whole of it.
+
+    A `:document` finding's tag is `document`, with no id: the anchor names
+    the document the list is about and carries none (ADR-0005's Amendment of
+    2026-09-22, `11w`).
     """
     @spec anchor_tag(Finding.t()) :: String.t()
     def anchor_tag(%Finding{anchor: {:config, id, key}}), do: "config:#{id}:#{key}"
     def anchor_tag(%Finding{anchor: {:slot, id, name}}), do: "slot:#{id}:#{name}"
     def anchor_tag(%Finding{anchor: {:block, id}}), do: "block:#{id}"
+    def anchor_tag(%Finding{anchor: :document}), do: "document"
 
     # Nothing to add for a `{:block, id}`: its anchor is the subject, and a
     # tail reading `block:blk_x` beside a subject reading `blk_x` is noise.
+    # The same holds for `:document`, whose subject is the whole anchor.
     @spec anchor_tail(Finding.t()) :: String.t() | nil
     defp anchor_tail(%Finding{anchor: {:config, _id, key}}), do: "config.#{key}"
     defp anchor_tail(%Finding{anchor: {:slot, _id, name}}), do: "slot:#{name}"
     defp anchor_tail(%Finding{anchor: {:block, _id}}), do: nil
+    defp anchor_tail(%Finding{anchor: :document}), do: nil
 
-    @spec subject_label(map(), StatifierBlocks.Block.id()) :: String.t() | nil
+    # A `:document` finding is drawn as a span on both document-level
+    # surfaces: there is no block to select, so no `select` is pushed.
+    @spec document?(Finding.t()) :: boolean()
+    defp document?(%Finding{anchor: anchor}), do: anchor == :document
+
+    @spec subject_label(map(), StatifierBlocks.Block.id() | nil) :: String.t() | nil
+    defp subject_label(%{subject: true, finding: %Finding{anchor: :document}}, nil),
+      do: @document_subject
+
     defp subject_label(%{subject: true, root: %ViewModel.Node{} = root}, id) do
       case Shell.label_for(root, id) do
         ^id -> nil
@@ -255,9 +281,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp subject_label(_assigns, _id), do: nil
 
-    @spec block_id(Finding.t()) :: StatifierBlocks.Block.id()
+    @spec block_id(Finding.t()) :: StatifierBlocks.Block.id() | nil
     defp block_id(%Finding{anchor: {:config, id, _key}}), do: id
     defp block_id(%Finding{anchor: {:slot, id, _name}}), do: id
     defp block_id(%Finding{anchor: {:block, id}}), do: id
+    defp block_id(%Finding{anchor: :document}), do: nil
   end
 end
