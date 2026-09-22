@@ -12203,7 +12203,7 @@ The cite baseline regenerated in the request that added the index row records
 the text now at the two old ranges, so the gate stays green over both
 paragraphs as written: the check proves a range unmoved since the last
 regeneration, not that it still holds what the citing paragraph quotes. The
-baseline regenerated with this Note also records the three ranges above. The
+baseline regenerated with this Note also records the four ranges above. The
 two Amendments' text is unchanged, and so is what each decides.
 
 Filed with `sb-27yl`.
