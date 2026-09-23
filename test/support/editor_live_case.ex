@@ -68,6 +68,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          on_select?: session["on_select"] != false,
          on_collapse?: session["on_collapse"] != false,
          profile: session["profile"],
+         # `:error` for a test that named no `:publish_status`, `{:ok, value}`
+         # for one that did - `nil` included - so `publish_attr/1` can tell a
+         # host passing nothing from a host passing `nil`.
+         publish_status: Map.get(session, "publish_status", :error),
          test_pid: session["test_pid"]
        )}
     end
@@ -98,7 +102,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         on_select={if @on_select?, do: selection_notifier(@test_pid)}
         on_collapse={if @on_collapse?, do: collapse_notifier(@test_pid)}
         on_drawer_resize={height_notifier(@test_pid)}
-        {profile_attr(@profile)}
+        {profile_attr(@profile) ++ publish_attr(@publish_status)}
       >
         <:header :if={@header}>
           <p class="host-header">{@header}</p>
@@ -113,6 +117,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp profile_attr(nil), do: []
     defp profile_attr(profile), do: [profile: profile]
 
+    # The `publish_status` attr on `profile_attr/1`'s terms: absent unless the
+    # test named one, so the host that names none is the host every other
+    # test mounts, and `publish_status: nil` is a host naming `nil`.
+    defp publish_attr(:error), do: []
+    defp publish_attr({:ok, status}), do: [publish_status: status]
+
     # A host swapping the open document, which is 8A's half of the split: which
     # document is open is the host's decision, and 2A says the drawer closes
     # when it changes.
@@ -125,6 +135,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # the re-render that assign causes.
     def handle_info({:feed, line}, socket),
       do: {:noreply, assign(socket, :feed, socket.assigns.feed ++ [line])}
+
+    # A host re-filling the publish line after the author changed something,
+    # which is when a real host would re-count and re-diff.
+    def handle_info({:publish_status, status}, socket),
+      do: {:noreply, assign(socket, :publish_status, {:ok, status})}
 
     def handle_info({:host_tabs, tabs}, socket),
       do: {:noreply, assign(socket, :host_tabs, tabs)}
@@ -254,6 +269,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     the `content` function for each. `:profile` is ADR-0005's 2026-09-07
     profile map, and its default - `nil` - mounts with the attr **absent**,
     which is the unprofiled editor rather than a host naming the default. The
+    `:publish_status` is passed only when the test names it, `nil` included,
+    for `:profile`'s reason. The
     `:datamodel` default is `nil` - no datamodel supplied - which is what the
     editor's own default is and what ADR-0005 amendment 11f makes meaningful.
     `:declare` defaults to `[]`, the compile call's roots the editor reads
@@ -300,6 +317,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "on_select" => Keyword.get(opts, :on_select, true),
         "on_collapse" => Keyword.get(opts, :on_collapse, true),
         "profile" => Keyword.get(opts, :profile),
+        "publish_status" => Keyword.fetch(opts, :publish_status),
         "test_pid" => test_pid
       }
     end
