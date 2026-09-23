@@ -853,3 +853,127 @@ They are met here, not edited.
   onto the composite block is not decided here.
 
 Filed with `sb-tysd`, campaign RF069.
+
+## Amendment (2026-09-22): a `core.map` `collect_type` name that cannot be resolved without `:datamodel` is reported unchecked
+
+**Status: proposed (2026-09-22), drafted for `sb-kndj`, which also carries the
+implementation.** Additive: no text above this line is edited, the Amendment
+of 2026-09-22 above (A1 to A5) and the Notes after it stand as written except
+where the section "What this changes above" says otherwise, and the header
+line's status history is not extended here. This is an amendment rather than
+a dated Note because it decides three things the record did not - that a
+host need not pass `:datamodel`, what `interface` records when a key check
+cannot be made, and the severity of the report - and by this directory's
+README a note decides nothing.
+
+### Context
+
+A1 lets a `core.map` read the members its `collect_type` marks required when
+the name is one "the parent's own declarations define", and says that a
+`collect_type` that resolves to nothing with members "contributes no keys:
+unknown is not disagreement" (`:578-580`). Two dated Notes of 2026-09-22
+record what those declarations are: `ADR-0004`'s Note "`interface` also
+varies with the `:datamodel` compile option"
+(`docs/adr/0004-compiler-provenance.md:4221`), and this record's Note on what
+`interface` reads (`:722`). Both say that a parent compiled without
+`:datamodel` records `reads: []` for a `core.map` whose `collect_type` is a
+name. `ADR-0004`'s Note adds that `StatifierBlocks.Graph.check/2` and
+`StatifierBlocks.Graph.consumers_broken/2` then pass the key check for that
+reference without a finding, and it leaves open whether a host must pass
+`:datamodel` (`docs/adr/0004-compiler-provenance.md:4252`).
+
+Every code cite below was read at `1d0d873`; re-locate by the anchor, not by
+the number. The declarations of a compile given no `:datamodel` are empty
+(`StatifierBlocks.Environment.declarations/1`,
+`lib/statifier_blocks/environment.ex:489`), and the name clause of the private
+`required_members/2` answers `[]` for a name they do not hold
+(`lib/statifier_blocks/compiler.ex:3330`). A host that omits the option
+therefore gets a key check that looks complete and is not.
+
+### Decision
+
+**U1. A host is not required to pass `:datamodel`.** No compile is refused
+for its absence, and neither check refuses a parent or a child because of it:
+an option the host chose not to pass is not an author's error.
+
+**U2. `interface` marks a named `collect_type` it could not resolve.** Every
+entry of `references` gains one field, `unresolved`. For a `core.map`
+reference it is the trimmed `collect_type` name when that name is not blank
+and the compile was given no `:datamodel` (the option absent or `nil`). It is
+`nil` in every other case: the inline arm, an absent or blank `collect_type`,
+a name read against a supplied `:datamodel`, and every `core.subchart`
+reference. When `unresolved` is set, `reads` is `[]`, as A1 already has it.
+The field is a function of the same inputs as the rest of `interface`, the
+`:datamodel` option included, and like the rest it adds nothing to the SCXML.
+
+**U3. Both directions report the unchecked read at `:warning`.** Where A2
+judges a reference whose `unresolved` is set against a child - forward, when
+the resolver answers that child; reverse, for each of a parent's references
+to the next child's document id - the pair yields one
+`StatifierBlocks.Finding` with source `:graph` and severity `:warning`,
+anchored `{:config, block_id, "collect_type"}` on the referencing block. Its
+message names the type name and says the done-data keys read there are
+unchecked because the name is not resolvable without `:datamodel`. In the
+reverse direction it is paired with the parent's document id and its message
+names that parent, as A5 has it for every finding. It is never an `:error`,
+so a host that refuses on `:error` findings, as the Consequences above have it
+(`:703`), does not refuse on it. The outcome check for the same reference is
+unchanged, and a reference whose child the resolver answers
+`{:error, :not_published}` yields A4's `:error` alone.
+
+With `:datamodel` supplied nothing changes: a name the datamodel declares
+reads its required members, the key check judges them as A1 and A2 say, and
+no `:warning` is produced.
+
+### What this changes above
+
+- A1's "unknown is not disagreement" (`:580`) stands: an unresolved name
+  contributes no keys and no `:error`. What changes is that one kind of
+  unknown, a name with no `:datamodel` to resolve it against, is reported
+  instead of passing without a finding.
+- A5's "Every finding is a `StatifierBlocks.Finding` at `:error` severity"
+  (`:641`) holds for every finding but U3's, which is a `:warning`. A5's
+  anchor for a key finding is the one U3 uses.
+- `ADR-0005`'s clause `11y` says `StatifierBlocks.Graph` produces `:graph`
+  findings "always at `:error`" (`docs/adr/0005-liveview-editor.md:12344`).
+  After U3 it also produces a `:warning`. `ADR-0005`'s clause `11i` already
+  made severity and source independent
+  (`docs/adr/0005-liveview-editor.md:2573`), so the enum `11y` adds to is
+  unchanged; `ADR-0005` is not edited, and this amendment is where the change
+  is recorded.
+- `ADR-0004`'s Note and this record's Note on what `interface` reads stay
+  true of `reads`: U2 adds a field beside it and changes neither.
+
+### Worked example: patron registration
+
+The parent `patron_registration` has a `core.map` block `blk_CARDS` that runs
+the child `library_card_issue` once per household member, with
+`collect_type` the name `library.card_receipt`; the host's datamodel declares
+that name with the required fields `card_number` and `branch`, and the
+published `library_card_issue` declares both as done-data keys. Compiled with
+that datamodel, the reference reads `card_number` and `branch`, `unresolved`
+is `nil`, and both directions return nothing. Compiled without `:datamodel`,
+the reference reads nothing and `unresolved` is `"library.card_receipt"`:
+`check/2` against the same child returns one `:warning` anchored
+`{:config, "blk_CARDS", "collect_type"}`, and `consumers_broken/2` returns it
+paired with `"patron_registration"`. Before this amendment both returned
+nothing.
+
+### What this does not decide
+
+- **A name that a supplied `:datamodel` does not declare.** `unresolved`
+  stays `nil` for it, `reads` is `[]`, and the key check passes it without a
+  finding, as before.
+- How the editor renders a `:graph` `:warning`, as A5 leaves every `:graph`
+  rendering undecided.
+- Anything about done-data types, which stay `ADR-0013` decision 4's dormant
+  advisory.
+
+### Consequences
+
+- Each `references` entry of `%Compiled{}`'s `interface` carries
+  `unresolved`, and `StatifierBlocks.Graph`'s two functions may return a
+  `:warning` beside their `:error` findings.
+- A host that passes `:datamodel` sees no change. A host that does not sees
+  one `:warning` per such reference in each judged pair, and clears it by
+  passing the option or by writing the `collect_type` inline.
