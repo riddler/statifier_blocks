@@ -125,8 +125,9 @@ it through the same code the tab chip does. So a host header that reports the
 count moves when your rule fires, and it cannot disagree with the drawer.
 
 The publish check is one more place the row shows, because it runs the same
-functions. Your publish step calls `StatifierBlocks.Publish.findings/3` and
-then `StatifierBlocks.Compiler.compile/3`: the first composes the editor's own
+functions. Your publish step calls `StatifierBlocks.Publish.findings/3` over
+the revision it is about to publish - the document as saved - and then
+`StatifierBlocks.Compiler.compile/3`: the first composes the editor's own
 list, `ViewModel.build/3` and so your validators included, so the finding the
 author saw in the drawer is in the answer the publish step reads, with the
 severity you gave it. An `:error` from either call refuses the publish; a
@@ -135,9 +136,17 @@ over one and shows it rather than dropping it; an `:info` never refuses. In a
 patron registration document, a rule that flags a `core.assign` writing
 `patron.card_number` as `:warning` leaves the publish to you, the same rule
 returning `:error` refuses it, and the undeclared-path advisory this package
-raises on the same field stays `:info` whatever your rule says. The publish
-step, its registries and its revision store are yours; this package ships the
-functions. The README's
+raises on the same field stays `:info` whatever your rule says.
+
+A validator finding is about that revision, never about a chart. The chart
+is what `compile/3` emits once nothing refuses, identified by its
+`chart_identity`, and the `StatifierBlocks.CompilationRecord` on
+`compiled.record` is the bridge between the two: it joins the revision's
+document id, `revision` and `document_hash` to the chart it compiled to.
+Publishing the revision makes that chart; it touches no execution, and an
+execution already running stays on the chart it started on. The publish
+step, its registries and its revision store are yours; this package ships
+the functions. The README's
 [At publish](https://github.com/riddler/statifier_blocks/blob/main/README.md#at-publish)
 section is the whole check.
 
@@ -176,9 +185,11 @@ the row gone once the block it objected to is deleted.
 - **It does not rescue your bugs.** A raise inside `validate_document/1` is
   not caught. That is deliberate: it is your bug, and the moment it is visible
   is the moment to see it.
-- **It sees the document, not the run.** The callback is handed the document
-  as authored. Anything about a compiled chart, a fixture run or the datamodel
-  is yours to compute outside and carry in.
+- **It sees the document, not the chart or an execution.** The callback is
+  handed the document as authored - the one open in the editor, saved or
+  not, or the revision your publish step is checking. Anything about a
+  compiled chart, an execution on one, a fixture or the datamodel is yours
+  to compute outside and carry in.
 
 ## Related
 
