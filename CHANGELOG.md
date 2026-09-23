@@ -10,6 +10,113 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.33.0] 2026-09-22
+
+0.33.0 is a minor, because it adds to the public surface and changes no
+existing signature. A document can declare the external events it accepts,
+as a new `accepts` key on its envelope. Two new public modules serve a host's
+publish step: `StatifierBlocks.Publish.findings/3` returns every finding the
+host judges a document by before it compiles, and `StatifierBlocks.Graph`
+judges a parent's compiled artifact against the children it names, and a
+child's next revision against the parents that name it. Upgrading a host
+that stores documents: `accepts` defaults to `[]`, a stored document decodes
+unchanged and keeps its `content_hash/1`, and nothing needs migrating; a
+document saved with a non-empty `accepts` list cannot be read by 0.32.0 or
+earlier. Beside that, this release carries a minted-id collision finding
+at the Resolve stage, a Document-stage refusal where the compile raised,
+and clearer wording on the `:undeclared_slot` finding.
+
+### Added
+
+- A document can declare the external events it accepts, as an `accepts` list
+  of event names on the envelope beside `datamodel`. `Document.validate/1`
+  refuses a value that is not a list, an entry that is not a string, an empty
+  name and a repeated name, each as a `{:malformed_envelope, {:accepts, _}}`
+  reason. An empty or absent list encodes to the same bytes as before, so no
+  existing document's `content_hash/1` changes; a reader from an earlier
+  release refuses a document that declares one.
+- `Compiler.compile/3` carries the document's `accepts` list, exactly as
+  written, onto `%Compiled{}` and `%CompilationRecord{}` as a new `accepts`
+  field. The compile reads nothing from it and the SCXML and chart identity do
+  not change with it; whether each name is one the chart can take is for a
+  host's publish step to check.
+- The edit command `{:set_accepts, names}` replaces a document's whole
+  `accepts` list, with the previous list as its inverse, and the editor's
+  Declarations tab gains an accepted-events row where an author adds, renames,
+  reorders and removes them.
+- `StatifierBlocks.Declarations.add_accepted/1` appends a freshly named
+  accepted event, `event_1` or the first `event_N` the list does not already
+  hold, and `Declarations.put_accepted/3` writes the name at an index, or
+  returns the list unchanged when no name sits there. `Declarations.refusal/1`
+  phrases a refused `{:set_accepts, names}` as one sentence for the panel.
+- `StatifierBlocks.Editor.Findings.anchor_tag/1` tags a finding anchored on
+  the document `document`, with no id.
+- `StatifierBlocks.Graph.check/2` and `StatifierBlocks.Graph.consumers_broken/2` return a `:warning` finding on a `core.map` block's `collect_type` field when that field names a type and the parent was compiled without `:datamodel`, saying the done-data keys read there are unchecked; each `interface` reference records the name in an `unresolved` field. Pass `:datamodel` to the compile, or write the `collect_type` inline, to have the keys checked.
+- `Compiler.structure_findings/3` returns the findings the compile's Document,
+  Resolve, Config and Structure stages refuse a document for, without emitting
+  anything: exactly the list `Compiler.compile/3` refuses with when it refuses
+  at one of those stages, and `[]` otherwise. It takes `compile/3`'s own
+  options and never raises.
+- `StatifierBlocks.Publish.findings/3` returns every finding a host's publish
+  step judges a document by before it compiles, in the order the editor shows
+  them: the structure findings above, then the editor's own findings for the
+  same document and the same `:datamodel`, `:declare` and `:chart_outcomes`. A
+  document the Document stage refuses comes back as that one finding. The
+  host refuses the publish on an `:error`; an undeclared datamodel path stays
+  an `:info` advisory.
+- `StatifierBlocks.Finding` gains the anchor `:document` for a finding about
+  the document rather than a block. `Finding.from_compiler/2` adapts the
+  compile's Document-stage finding to it instead of refusing it as
+  `:unanchorable`, and the editor lists it first on both findings surfaces,
+  under `Document`, with nothing to select. `Shell.findings_groups/3`'s groups
+  gain a `document?` key, and the inspector stamps `data-document` on each
+  group.
+- `Compiler.compile/3` records the document's parent/child interface on
+  `%Compiled{}` as a new `interface` field: the outcomes and done-data keys its
+  root block declares, and for each `core.subchart` or `core.map` block the
+  document it names, the child outcomes it routes on and the child done-data
+  keys it reads. The SCXML and chart identity do not change with it, and
+  `%CompilationRecord{}` does not carry it.
+- `StatifierBlocks.Graph.check/2` judges a parent's compiled artifact against
+  each child it names, through a resolver the host supplies, and
+  `StatifierBlocks.Graph.consumers_broken/2` judges a child's next revision
+  against the parents that name it, for a host's publish step to refuse on. A
+  child that is not published, an outcome the parent routes on that the child
+  does not declare, and a done-data key the parent reads that the child does
+  not declare are each an `:error` finding on the parent's referencing block.
+  The reverse direction pairs each finding with the parent's document id.
+- `StatifierBlocks.Finding` gains the source `:graph` for those findings.
+
+### Changed
+
+- `StatifierBlocks.Shell.drawer_view/1` takes the document's accepted events
+  under an optional `accepts` key, and the Declarations tab's count adds them
+  to the datamodel roots it counted before.
+- A recipe's `insert/2` may return `{:set_accepts, names}` beside the blocks
+  it inserts, as it already could `{:set_datamodel, entries}`:
+  `Recipe.within_reach?/2` answers `true` for a list holding it, and
+  `Edit.Targets.recipe_inserts/4` no longer refuses such a recipe as
+  `{:recipe_out_of_reach, name}`. Every command that names a position is
+  still held to the armed position and the block that encloses it.
+- A block placed in a composite's pass-through slot, or in a declaring
+  composite's `on_<name>` slot, whose id equals one the composite's expansion
+  mints for its own members now draws a `:minted_id_collision` finding at the
+  Resolve stage, against the composite block and naming the placed block;
+  before, such a document was refused at the Chart stage with `:duplicate_id`
+  findings when both blocks emitted a state, and a block in a pass-through
+  slot could hide an `:outcome_not_raisable` finding. Give that block another
+  id.
+
+### Fixed
+
+- `Compiler.compile/3` returns its Document-stage refusal for a document whose
+  `root` is not a block, or whose `slots` value is not a map of block lists,
+  where it raised.
+- The `:undeclared_slot` finding message no longer calls a single stray block
+  "they": at both the Structure and the Resolve stage it now says the slot's
+  contents are dropped, and the Resolve message says to move them into a slot
+  "this block type declares" instead of an ambiguous "it declares".
+
 ## [0.32.0] 2026-09-18
 
 0.32.0 is a minor, because a public function's arity changes. A composite
@@ -3359,6 +3466,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.33.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.33.0
 [0.32.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.32.0
 [0.31.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.31.0
 [0.30.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.30.0
