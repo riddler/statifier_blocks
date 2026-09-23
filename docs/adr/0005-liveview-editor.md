@@ -12523,9 +12523,9 @@ the one-clause change `1F` describes; the lines they name on `main` at
 
 `3C` bounds the positions a recipe's commands may target: the armed position
 and any slot of the block that encloses it, and "nothing else" (`:5752`). It
-was written when every command a recipe could return named a position or a
-block. Two commands now name neither: `{:set_datamodel, entries}`, which
-`2g` added (`:4153`), and `{:set_accepts, names}`, which `ADR-0014` decision 6,
+says nothing about a command that names no position (`2p`, `:12268`). Two
+commands name neither: `{:set_datamodel, entries}`, which `2g` added before
+`3C` was written (`:4153`), and `{:set_accepts, names}`, which `ADR-0014` decision 6,
 "The editor surface is a row of the declarations panel, written through its
 own command" (`docs/adr/0014-document-accepts-declaration.md:194-195`), added
 and `2o` carried into decision 2's closed set (`:12245`).
