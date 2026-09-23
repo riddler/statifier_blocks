@@ -72,8 +72,11 @@ defmodule StatifierBlocks.Finding do
 
     * `:graph` - the rule lives on an edge of the host's document graph, a
       parent and the child it names, rather than in one document.
-      `StatifierBlocks.Graph` is its only producer, always at `:error`,
-      and `from_compiler/2` never produces it: no compile sees a child.
+      `StatifierBlocks.Graph` is its only producer, at `:error` but for
+      one `:warning` - a done-data read left unchecked because a type name
+      had no `:datamodel` to resolve against (ADR-0008's second amendment
+      of 2026-09-22, U3) - and `from_compiler/2` never produces it: no
+      compile sees a child.
   """
   @type source :: :config | :assignability | :resolution | :lint | :compile | :graph
 
