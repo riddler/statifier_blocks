@@ -39,7 +39,11 @@ defmodule StatifierBlocks.Graph do
        required; a `core.subchart` reads none. Anchored on the block's
        `collect_type` field. Only presence is checked: whether a declared
        key has the type the parent expects stays
-       `StatifierBlocks.BlockType.agrees?/3`'s dormant advisory.
+       `StatifierBlocks.BlockType.agrees?/3`'s dormant advisory. A
+       `collect_type` that is a type name the parent was compiled with no
+       `:datamodel` to resolve has no keys to check: the reference records
+       the name as `unresolved`, and the pair reports the read as unchecked
+       rather than passing it (ADR-0008's second amendment of 2026-09-22).
 
   The other direction of the outcome rule - a child outcome the parent has
   **no** arm for, such as one a child revision adds - is not refused here.
@@ -49,11 +53,19 @@ defmodule StatifierBlocks.Graph do
 
   ## The findings
 
-  Every finding is a `StatifierBlocks.Finding` with source `:graph` and
-  severity `:error`, anchored `{:config, block_id, key}` on the parent's
-  referencing block, under the field its author would change. The anchor
-  has no document arm, so `consumers_broken/2` returns each finding paired
-  with the parent's document id, and its message names that document.
+  Every finding is a `StatifierBlocks.Finding` with source `:graph`,
+  anchored `{:config, block_id, key}` on the parent's referencing block,
+  under the field its author would change. The anchor has no document arm,
+  so `consumers_broken/2` returns each finding paired with the parent's
+  document id, and its message names that document.
+
+  Every finding is severity `:error` but one: a done-data read left
+  unchecked because the parent's `collect_type` names a type and the parent
+  was compiled without `:datamodel` is a `:warning` on the block's
+  `collect_type` field. The host chose not to pass that option, which is
+  not the author's error, so a publish step refusing on `:error` findings
+  does not refuse on it; passing `:datamodel`, or writing the
+  `collect_type` inline, lets the keys be checked.
   """
 
   alias StatifierBlocks.{Compiled, Finding}
@@ -77,16 +89,20 @@ defmodule StatifierBlocks.Graph do
   every child it names, each resolved through `resolver`.
 
   Returns `[]` when every child resolves, declares every outcome the parent
-  routes on and every done-data key the parent reads. Otherwise one
-  `:error` finding, source `:graph`, per failed rule, in the parent's
-  document order:
+  routes on and every done-data key the parent reads, and no read is left
+  unchecked. Otherwise one finding, source `:graph`, per failed rule, in the
+  parent's document order - each an `:error` but the last kind below:
 
     * a child the resolver answers `{:error, :not_published}` for -
       anchored `{:config, block_id, "chart"}`;
     * an outcome the parent routes on that the child does not declare,
       `error` exempt - anchored `{:config, block_id, "outcomes"}`;
     * a done-data key the parent reads that the child does not declare -
-      anchored `{:config, block_id, "collect_type"}`.
+      anchored `{:config, block_id, "collect_type"}`;
+    * a `:warning`, when the child resolves and the reference's
+      `collect_type` names a type the parent was compiled with no
+      `:datamodel` to resolve, so its keys are unchecked - anchored
+      `{:config, block_id, "collect_type"}`.
 
   `block_id` is always the parent's referencing block. A resolver answering
   anything else breaks its contract, and the call raises rather than
@@ -118,13 +134,16 @@ defmodule StatifierBlocks.Graph do
   parent's references to that id are judged, so a parent that names other
   documents only contributes nothing. Returns `[]` when every such parent
   still finds every outcome it routes on and every done-data key it reads
-  declared by `child_next`; otherwise one `{parent_document_id, finding}`
-  pair per failed rule, parents in the order given and each parent's
-  findings in its document order. Each finding is source `:graph`,
-  severity `:error`, anchored on the parent's referencing block -
+  declared by `child_next`, and no read is left unchecked; otherwise one
+  `{parent_document_id, finding}` pair per failed rule, parents in the
+  order given and each parent's findings in its document order. Each
+  finding is source `:graph`, anchored on the parent's referencing block -
   `{:config, block_id, "outcomes"}` for an outcome, `{:config, block_id,
   "collect_type"}` for a done-data key - and its message names the parent
-  document. The resolver plays no part: both sides are in hand.
+  document. Each is severity `:error`, except a `:warning` on
+  `"collect_type"` for a reference whose `collect_type` names a type the
+  parent was compiled with no `:datamodel` to resolve, so its keys are
+  unchecked. The resolver plays no part: both sides are in hand.
   """
   @spec consumers_broken(Compiled.t(), [Compiled.t()]) :: [{String.t(), Finding.t()}]
   def consumers_broken(%Compiled{} = child_next, parents) when is_list(parents) do
@@ -148,12 +167,11 @@ defmodule StatifierBlocks.Graph do
     end
   end
 
-  # The two rules A1 names, over one reference and the child's interface.
-  @spec pair(
-          Compiled.child_reference(),
-          Compiled.interface(),
-          (Compiled.child_reference(), :outcome | :key, String.t() -> String.t())
-        ) :: [Finding.t()]
+  # The two rules A1 names, over one reference and the child's interface,
+  # and U3 of ADR-0008's second amendment of 2026-09-22: a read whose keys
+  # could not be resolved is reported as unchecked, at `:warning`, in place
+  # of the key rule.
+  @spec pair(Compiled.child_reference(), Compiled.interface(), message()) :: [Finding.t()]
   defp pair(reference, child, message) do
     outcomes =
       for outcome <- reference.routes_on,
@@ -163,8 +181,18 @@ defmodule StatifierBlocks.Graph do
       end
 
     keys =
-      for key <- reference.reads, key not in child.declared_donedata_keys do
-        finding(reference, "collect_type", message.(reference, :key, key))
+      case reference do
+        %{unresolved: name} when is_binary(name) ->
+          [
+            finding(reference, "collect_type", message.(reference, :unchecked, name),
+              severity: :warning
+            )
+          ]
+
+        %{reads: reads} ->
+          for key <- reads, key not in child.declared_donedata_keys do
+            finding(reference, "collect_type", message.(reference, :key, key))
+          end
       end
 
     outcomes ++ keys
@@ -179,20 +207,28 @@ defmodule StatifierBlocks.Graph do
     )
   end
 
-  @spec finding(Compiled.child_reference(), String.t(), String.t()) :: Finding.t()
-  defp finding(reference, key, message) do
-    Finding.new({:config, reference.block_id, key}, :graph, message)
+  @spec finding(Compiled.child_reference(), String.t(), String.t(), keyword()) :: Finding.t()
+  defp finding(reference, key, message, opts \\ []) do
+    Finding.new({:config, reference.block_id, key}, :graph, message, opts)
   end
 
-  @spec forward_message(Compiled.child_reference(), :outcome | :key, String.t()) :: String.t()
+  @typep message ::
+           (Compiled.child_reference(), :outcome | :key | :unchecked, String.t() -> String.t())
+
+  @spec forward_message(Compiled.child_reference(), :outcome | :key | :unchecked, String.t()) ::
+          String.t()
   defp forward_message(reference, :outcome, outcome),
     do: ~s("#{reference.document_id}" does not declare the outcome "#{outcome}" routed on here)
 
   defp forward_message(reference, :key, key),
     do: ~s("#{reference.document_id}" does not declare the done-data key "#{key}" read here)
 
-  @spec reverse_message(String.t()) ::
-          (Compiled.child_reference(), :outcome | :key, String.t() -> String.t())
+  defp forward_message(reference, :unchecked, name),
+    do:
+      ~s(the done-data keys read here from "#{reference.document_id}" are unchecked: ) <>
+        ~s("#{name}" names a type that is not resolvable without :datamodel)
+
+  @spec reverse_message(String.t()) :: message()
   defp reverse_message(parent_id) do
     fn
       reference, :outcome, outcome ->
@@ -202,6 +238,10 @@ defmodule StatifierBlocks.Graph do
       reference, :key, key ->
         ~s("#{parent_id}" reads the done-data key "#{key}", which the next revision ) <>
           ~s(of "#{reference.document_id}" does not declare)
+
+      reference, :unchecked, name ->
+        ~s(the done-data keys "#{parent_id}" reads from "#{reference.document_id}" are ) <>
+          ~s(unchecked: "#{name}" names a type that is not resolvable without :datamodel)
     end
   end
 end

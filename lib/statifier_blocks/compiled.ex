@@ -70,12 +70,19 @@ defmodule StatifierBlocks.Compiled do
       `core.map`'s `collect_type` marks required, when it resolves to
       members - its inline arm, or a name the compile's `:datamodel`
       declares. A `core.subchart` reads none, so `[]`.
+    * `unresolved` - the `collect_type` name, trimmed, of a `core.map` whose
+      `collect_type` is a name the compile was given no `:datamodel` to
+      resolve: the keys it reads are then unchecked, not absent, and `reads`
+      is `[]`. `nil` for the inline arm, an absent or blank `collect_type`, a
+      name read against a supplied `:datamodel` and every `core.subchart`
+      (ADR-0008's second amendment of 2026-09-22, U2).
   """
   @type child_reference :: %{
           block_id: Block.id(),
           document_id: String.t(),
           routes_on: [String.t()],
-          reads: [String.t()]
+          reads: [String.t()],
+          unresolved: String.t() | nil
         }
 
   @typedoc """

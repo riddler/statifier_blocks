@@ -105,6 +105,34 @@ defmodule StatifierBlocks.GraphTest do
   @child_next "email_verification-child_next.json"
   @child_next_no_key "email_verification-child_next_no_key.json"
 
+  # The host's datamodel, declaring the receipt a card issue answers with -
+  # and a second one whose receipt also requires a key no child declares.
+  @card_receipt_datamodel %{
+    "types" => [
+      %{
+        "name" => "library.card_receipt",
+        "kind" => "shape",
+        "fields" => [
+          %{"name" => "card_number", "type" => "string", "required?" => true},
+          %{"name" => "branch", "type" => "string", "required?" => true}
+        ]
+      }
+    ]
+  }
+
+  @card_expiry_datamodel %{
+    "types" => [
+      %{
+        "name" => "library.card_receipt",
+        "kind" => "shape",
+        "fields" => [
+          %{"name" => "card_number", "type" => "string", "required?" => true},
+          %{"name" => "expires_on", "type" => "string", "required?" => true}
+        ]
+      }
+    ]
+  }
+
   @card_members [
     %{"name" => "card_number", "type" => "string", "required?" => true},
     %{"name" => "branch", "type" => "string"}
@@ -155,13 +183,15 @@ defmodule StatifierBlocks.GraphTest do
                    block_id: "blk_VERIFY",
                    document_id: "email_verification",
                    routes_on: ["verified", "expired"],
-                   reads: []
+                   reads: [],
+                   unresolved: nil
                  },
                  %{
                    block_id: "blk_HOUSEHOLD",
                    document_id: "email_verification",
                    routes_on: [],
-                   reads: ["verified_address"]
+                   reads: ["verified_address"],
+                   unresolved: nil
                  }
                ]
              }
@@ -182,7 +212,8 @@ defmodule StatifierBlocks.GraphTest do
                block_id: "blk_VERIFY",
                document_id: "email_verification",
                routes_on: ["verified", "expired"],
-               reads: []
+               reads: [],
+               unresolved: nil
              }
     end
 
@@ -204,7 +235,8 @@ defmodule StatifierBlocks.GraphTest do
                block_id: "blk_CARDS",
                document_id: "library_card_issue",
                routes_on: [],
-               reads: ["card_number"]
+               reads: ["card_number"],
+               unresolved: nil
              }
     end
 
@@ -212,25 +244,44 @@ defmodule StatifierBlocks.GraphTest do
     # declared name contributes no keys and the first assertion goes red
     # (verified)
     test "a collect_type naming a declaration reads its required fields, and unknown reads none" do
-      datamodel = %{
-        "types" => [
-          %{
-            "name" => "library.card_receipt",
-            "kind" => "shape",
-            "fields" => [
-              %{"name" => "card_number", "type" => "string", "required?" => true},
-              %{"name" => "branch", "type" => "string", "required?" => true}
-            ]
-          }
-        ]
-      }
-
       named = registration(cards: "library.card_receipt")
 
       assert %{references: [_verify, %{reads: ["card_number", "branch"]}]} =
-               compile!(named, datamodel: datamodel).interface
+               compile!(named, datamodel: @card_receipt_datamodel).interface
 
       assert %{references: [_verify, %{reads: []}]} = compile!(named).interface
+    end
+
+    # A name with no `:datamodel` to resolve it is marked, so its keys read
+    # as unchecked rather than absent; a supplied datamodel clears the mark,
+    # and a `nil` datamodel is no datamodel.
+    #
+    # sabotage: made `unresolved/2` answer `nil` for every name - the name
+    # compiled without `:datamodel` is not marked and this goes red (verified)
+    test "a collect_type name compiled without :datamodel is marked unresolved, and with it is not" do
+      named = registration(cards: " library.card_receipt ")
+
+      assert %{references: [%{unresolved: nil}, %{reads: [], unresolved: "library.card_receipt"}]} =
+               compile!(named).interface
+
+      assert %{references: [_verify, %{unresolved: "library.card_receipt"}]} =
+               compile!(named, datamodel: nil).interface
+
+      assert %{references: [_verify, %{reads: ["card_number", "branch"], unresolved: nil}]} =
+               compile!(named, datamodel: @card_receipt_datamodel).interface
+    end
+
+    # Only a name is marked: the inline arm and a blank name have nothing
+    # left to resolve, whatever the options.
+    #
+    # sabotage: dropped the blank arm of `unresolved/2` - a blank
+    # `collect_type` is marked as the name "" and this goes red (verified)
+    test "the inline arm and a blank collect_type are never marked unresolved" do
+      assert %{references: [_verify, %{unresolved: nil}]} =
+               compile!(registration(cards: true)).interface
+
+      assert %{references: [_verify, %{unresolved: nil}]} =
+               compile!(registration(cards: "  ")).interface
     end
 
     # sabotage: read the child side from `donedata_type/1` only under
@@ -367,6 +418,74 @@ defmodule StatifierBlocks.GraphTest do
       assert Graph.check(parent, resolver(published())) == []
     end
 
+    # ADR-0008's second amendment of 2026-09-22, U3: with no `:datamodel`
+    # the keys a named `collect_type` reads are unknown, and the pair says
+    # so at `:warning` rather than passing it.
+    #
+    # sabotage: made `pair/3`'s unresolved arm answer `[]` - the unchecked
+    # read passes silently and this goes red (verified)
+    test "a read left unchecked without :datamodel is a warning on the collect_type field" do
+      parent = compile!(registration(cards: "library.card_receipt"))
+
+      assert [
+               %Finding{
+                 anchor: {:config, "blk_CARDS", "collect_type"},
+                 source: :graph,
+                 severity: :warning,
+                 message: message
+               }
+             ] = Graph.check(parent, resolver(published()))
+
+      assert message =~ ~s("library_card_issue")
+      assert message =~ ~s("library.card_receipt")
+      assert message =~ "unchecked"
+      assert message =~ ":datamodel"
+    end
+
+    # With the datamodel the keys are judged exactly as an inline shape's
+    # are: all present passes, one missing is the key rule's `:error`, and
+    # no `:warning` rides along either way.
+    #
+    # sabotage: made `interface/2` read every compile as having no
+    # `:datamodel` - the declared keys are reported unchecked instead of
+    # judged and this goes red (verified)
+    test "with :datamodel a named collect_type's keys are checked as before" do
+      named = registration(cards: "library.card_receipt")
+
+      assert Graph.check(
+               compile!(named, datamodel: @card_receipt_datamodel),
+               resolver(published())
+             ) ==
+               []
+
+      assert [
+               %Finding{
+                 anchor: {:config, "blk_CARDS", "collect_type"},
+                 severity: :error,
+                 message: message
+               }
+             ] =
+               Graph.check(
+                 compile!(named, datamodel: @card_expiry_datamodel),
+                 resolver(published())
+               )
+
+      assert message =~ ~s("expires_on")
+    end
+
+    # An unpublished child is A4's `:error` alone: there is no pair to judge.
+    #
+    # sabotage: judged a reference whose child is unpublished against an
+    # empty interface too, in `check/2` - a `:warning` joins the `:error`
+    # and this goes red (verified)
+    test "an unpublished child of an unresolved reference is the chart error alone" do
+      parent = compile!(registration(cards: "library.card_receipt"))
+      resolver = resolver(Map.delete(published(), "library_card_issue"))
+
+      assert [%Finding{anchor: {:config, "blk_CARDS", "chart"}, severity: :error}] =
+               Graph.check(parent, resolver)
+    end
+
     # sabotage: resolved per reference rather than per distinct document id
     # - the resolver is asked twice for the one child and this goes red
     # (verified)
@@ -464,6 +583,33 @@ defmodule StatifierBlocks.GraphTest do
       parent = compile!(registration(cards: true), id: "patron_registration")
       assert Graph.consumers_broken(stored_child(@child), [parent]) == []
       assert Graph.consumers_broken(issue_card(), [parent]) == []
+    end
+
+    # ADR-0008's second amendment of 2026-09-22, U3, in the reverse
+    # direction: the warning is paired with the parent and names it.
+    #
+    # sabotage: made `pair/3`'s unresolved arm answer `[]` - the parent's
+    # unchecked read passes silently and this goes red (verified)
+    test "a read left unchecked without :datamodel is a warning paired with the parent" do
+      named = registration(cards: "library.card_receipt")
+      parent = compile!(named, id: "patron_registration")
+
+      assert [
+               {"patron_registration",
+                %Finding{
+                  anchor: {:config, "blk_CARDS", "collect_type"},
+                  source: :graph,
+                  severity: :warning,
+                  message: message
+                }}
+             ] = Graph.consumers_broken(issue_card(), [parent])
+
+      assert message =~ ~s("patron_registration")
+      assert message =~ ~s("library.card_receipt")
+      assert message =~ "unchecked"
+
+      checked = compile!(named, id: "patron_registration", datamodel: @card_receipt_datamodel)
+      assert Graph.consumers_broken(issue_card(), [checked]) == []
     end
   end
 

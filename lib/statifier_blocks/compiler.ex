@@ -3265,9 +3265,20 @@ defmodule StatifierBlocks.Compiler do
   # the compile emitted the `<invoke>` it stands for. It reads the tree and
   # the `:datamodel` option and nothing else, so it is as deterministic as
   # the bytes beside it, and it writes nothing into them.
+  #
+  # With no `:datamodel` there are no declarations to resolve a type name
+  # against, and that is told apart from a datamodel that declares nothing:
+  # ADR-0008's second amendment of 2026-09-22 (U2) marks a name left
+  # unresolved for that reason alone.
+  @typep declarations :: StatifierDatamodel.Declarations.t() | :no_datamodel
+
   @spec interface(Resolved.t(), keyword()) :: Compiled.interface()
   defp interface(%Resolved{block: block, module: module} = node, opts) do
-    declarations = opts |> assignability_context() |> Environment.declarations()
+    declarations =
+      case Keyword.get(opts, :datamodel) do
+        nil -> :no_datamodel
+        _datamodel -> opts |> assignability_context() |> Environment.declarations()
+      end
 
     %{
       declared_outcomes: BlockType.outcome_names(module, block.config),
@@ -3281,9 +3292,7 @@ defmodule StatifierBlocks.Compiler do
   # resolved node holds them. Recognized by module rather than by type name
   # (A1), so a host palette mapping another name onto either module is
   # covered.
-  @spec references(Resolved.t(), StatifierDatamodel.Declarations.t()) :: [
-          Compiled.child_reference()
-        ]
+  @spec references(Resolved.t(), declarations()) :: [Compiled.child_reference()]
   defp references(%Resolved{block: block, module: ref, slots: slots}, declarations) do
     own = reference(module_of(ref), block, declarations)
 
@@ -3295,22 +3304,31 @@ defmodule StatifierBlocks.Compiler do
     own ++ children
   end
 
-  @spec reference(module(), Block.t(), StatifierDatamodel.Declarations.t()) :: [
-          Compiled.child_reference()
-        ]
+  @spec reference(module(), Block.t(), declarations()) :: [Compiled.child_reference()]
   defp reference(Subchart, %Block{id: id, config: %{"chart" => chart} = config}, _declarations)
-       when is_binary(chart) do
-    [%{block_id: id, document_id: chart, routes_on: Subchart.child_outcomes(config), reads: []}]
-  end
-
-  defp reference(FanOut, %Block{id: id, config: %{"chart" => chart} = config}, declarations)
        when is_binary(chart) do
     [
       %{
         block_id: id,
         document_id: chart,
+        routes_on: Subchart.child_outcomes(config),
+        reads: [],
+        unresolved: nil
+      }
+    ]
+  end
+
+  defp reference(FanOut, %Block{id: id, config: %{"chart" => chart} = config}, declarations)
+       when is_binary(chart) do
+    collect_type = Map.get(config, "collect_type")
+
+    [
+      %{
+        block_id: id,
+        document_id: chart,
         routes_on: [],
-        reads: required_members(Map.get(config, "collect_type"), declarations)
+        reads: required_members(collect_type, declarations),
+        unresolved: unresolved(collect_type, declarations)
       }
     ]
   end
@@ -3320,12 +3338,14 @@ defmodule StatifierBlocks.Compiler do
   # A1: the members a `collect_type` marks required, when it resolves to
   # members - the inline arm, or a name the parent's declarations define.
   # Anything else contributes no keys: unknown is not disagreement.
-  @spec required_members(term(), StatifierDatamodel.Declarations.t()) :: [String.t()]
+  @spec required_members(term(), declarations()) :: [String.t()]
   defp required_members(members, _declarations) when is_list(members) do
     case Environment.inline_shape(members) do
       {:shape, shape} -> for %{name: name, required?: true} <- shape, do: name
     end
   end
+
+  defp required_members(_name, :no_datamodel), do: []
 
   defp required_members(name, declarations) when is_binary(name) do
     case StatifierDatamodel.Declarations.fetch(declarations, String.trim(name)) do
@@ -3335,6 +3355,21 @@ defmodule StatifierBlocks.Compiler do
   end
 
   defp required_members(_absent, _declarations), do: []
+
+  # ADR-0008's second amendment of 2026-09-22, U2: the name a
+  # `collect_type` gives when the compile had no `:datamodel` to resolve it
+  # against, so the keys it would read are unchecked rather than absent. A
+  # blank name is an absent `collect_type`, and a name read against a
+  # supplied datamodel is not marked, whatever the lookup found.
+  @spec unresolved(term(), declarations()) :: String.t() | nil
+  defp unresolved(name, :no_datamodel) when is_binary(name) do
+    case String.trim(name) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp unresolved(_collect_type, _declarations), do: nil
 
   @spec lint([InvokeTypes.emitted()], keyword()) :: [Finding.t()]
   defp lint(emitted, opts) do
