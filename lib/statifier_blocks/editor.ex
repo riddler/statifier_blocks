@@ -328,6 +328,36 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     optimistic concurrency on save, and it does not merge, rebase or resolve
     anything.
 
+    ## The publish line
+
+    A host about to publish a new revision of a document usually knows two
+    things an author should see before pressing its button: how many live
+    executions are pinned to the chart the previous revision compiled to, and
+    which of the four classes statifier-ex's `Statifier.Chart.diff/3` puts
+    the change in (`st-ADR-0072` decision 1: `:identical`, `:compatible`,
+    `:mapped` or `:breaking`). `publish_status` is where the host says them:
+    `%{live: n, class: class}`, drawn as one line such as *3 live executions
+    on the previous revision; this change is compatible*, with `n` a
+    non-negative integer and `class` one of those four atoms.
+
+    Both values are the host's, computed by the host. This package makes no
+    query for the count, holds no revision store, diffs no charts and
+    migrates nothing: publishing a revision re-pins no execution, and the
+    line only reports what the host passed.
+
+    The line is the package's markup, but it is not a header, so it is drawn
+    beside the `:header` slot rather than inside it: always as the root's
+    child that immediately follows where the header element is. With the
+    slot filled that is directly after the host's header; with the slot
+    empty there is no header element and the line is the root's first child,
+    in the same place. It carries `role="status"`, the class as
+    `data-publish-class` and the count as `data-live`, so a host styling it
+    per class needs no text match. `nil` (the default) draws nothing - the
+    editor's markup is byte for byte what it was before the assign existed -
+    and so does any other value: a count that is not a non-negative integer
+    or a class outside the four is refused into no line, the way an unknown
+    `fit` is refused into `:manual`.
+
     ## The drawer tabs a host contributes
 
     8A's split gives the drawer to the package, and 1A's test - tabular, and
@@ -605,6 +635,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `drawer_height` | no | the drawer's height in rem, remembered **by the host** per viewer (2A); bounded on the way in |
     | `on_drawer_resize` | no | one-argument function called with each new drawer height, which is how the host comes to have one to remember |
     | `class` | no | appended to the root element's own classes |
+    | `publish_status` | no | `nil` (the default) or `%{live: n, class: class}`: the count of live executions on the previous revision and the `Statifier.Chart.diff/3` class of the change, both computed by the host, drawn as one line beside the `:header` slot. The package makes no query for either. See *The publish line* above |
     | `history_limit` | no | bound on the undo stack; `:infinity` by default |
     | `profile` | no | which surfaces this mount draws, and whether it edits: `%{drawer_tabs:, inspector_tabs:, palette_groups:, toolbar:, read_only?:, run?:}`, every key optional and every list `:all` by default. An id a list names that the package cannot resolve is dropped. See *Profiles, and a read-only mount* above and `docs/profiles.md` |
     """
@@ -769,6 +800,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          field_candidates: %{},
          theme: %{},
          class: nil,
+         publish_status: nil,
          history_limit: :infinity,
          profile: @default_profile,
          history: History.new(),
@@ -1041,6 +1073,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           Shell.insert_target(assigns.view_model.root, assigns.palette_position)
         )
         |> assign(:save_as_step_rows, save_as_step_rows(assigns))
+        |> assign(:publish_line, publish_line(assigns.publish_status))
 
       ~H"""
       <div
@@ -1058,6 +1091,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <header :if={@header != []} class="sb-editor__header">
           {render_slot(@header)}
         </header>
+
+        <p
+          :if={@publish_line}
+          class="sb-editor__publish-status"
+          role="status"
+          data-publish-class={@publish_line.class}
+          data-live={@publish_line.live}
+        >
+          {@publish_line.text}
+        </p>
 
         <div
           class="sb-editor__layout"
@@ -2754,6 +2797,27 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp normalize_profile(_other), do: @default_profile
+
+    # The publish line's text, class and count, or `nil` for no line. Only the
+    # documented shape draws one: the four classes `Statifier.Chart.diff/3`
+    # returns and a non-negative count. Anything else is refused into `nil`
+    # rather than drawn, so a host that passes a class this package does not
+    # know gets no line instead of a sentence naming it. See the moduledoc's
+    # *publish line*.
+    @publish_classes [:identical, :compatible, :mapped, :breaking]
+
+    @spec publish_line(term()) ::
+            %{text: String.t(), class: atom(), live: non_neg_integer()} | nil
+    defp publish_line(%{live: live, class: class})
+         when is_integer(live) and live >= 0 and class in @publish_classes do
+      %{text: "#{live_executions(live)}; this change is #{class}", class: class, live: live}
+    end
+
+    defp publish_line(_other), do: nil
+
+    defp live_executions(0), do: "No live executions on the previous revision"
+    defp live_executions(1), do: "1 live execution on the previous revision"
+    defp live_executions(count), do: "#{count} live executions on the previous revision"
 
     @spec profile_list(map(), atom()) :: list() | :all
     defp profile_list(profile, key) do

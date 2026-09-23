@@ -2950,6 +2950,16 @@
   margin-bottom: var(--sb-space-2);
 }
 
+/* The publish line: one line the host fills with `publish_status`, drawn
+ * beside the header slot rather than inside it. A host that styles it per
+ * class selects on `data-publish-class`; the package draws it plainly.
+ */
+.sb-editor__publish-status {
+  margin: 0 0 var(--sb-space-2);
+  font-size: var(--sb-text-sm);
+  color: var(--sb-fg-muted);
+}
+
 /* The grid 1A describes, and the element 7A's container query answers for.
  *
  * `flex` and `grid-template-rows` are the bounded-height mode's half of the
