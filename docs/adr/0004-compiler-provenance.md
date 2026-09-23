@@ -4376,3 +4376,251 @@ of them changes what is decided.
   covers an `accepts` list `Document.validate/1` admits.
 
 Filed with `sb-910d`.
+
+## Amendment (2026-09-23): two revisions of one document map state for state through their block ids, a state with no counterpart is reported and never mapped, and two documents are refused
+
+**Status: proposed (2026-09-23), drafted for `sb-dm82`; the implementation is
+`sb-1gbj`.** Additive: no text above this line is edited, every decision above
+stands as written, and the header line's status history is not extended here.
+It adds clauses `M1` to `M6`. This is an amendment rather than a dated Note
+because it gives the compiled artifact a use no decision above names - reading
+two artifacts of one document against each other - and fixes what that reading
+answers, and by this directory's README a note decides nothing.
+
+Code cites below were read at `928b22d` and carry their anchors; re-locate by
+anchor, not by number.
+
+### Context
+
+Four nouns, one job each. A **document** is the host's stable name for a thing
+it authors. A **revision** is one saved edit of it. A **chart** is the SCXML a
+revision compiles to, identified by its hash (decision 7). An **execution** is
+pinned to one chart hash, and only an explicit migration re-pins it.
+
+Two records in other repositories decide the parts of a migration that are not
+this package's, and each leaves one part to it.
+
+- `sp-ADR-0013` (statifier_persistence, `docs/adr/0013-the-migration-plan.md`,
+  proposed) decides the migration plan: one plan per pair of chart hashes,
+  whose `states`, `history` and `invocations` fields say how each part of the
+  engine's position export crosses from one chart to the other (its decision
+  1), with an `[from_state_id, from_ordinal, to_state_id, to_ordinal]` list as
+  the one encoding of an invocation key. Its decision 8 names this package as
+  the one that generates those three fields for two revisions of one document,
+  as plain maps, with no dependency on statifier_persistence.
+- `st-ADR-0072` (statifier-ex, proposed) decides the chart diff:
+  `Statifier.Chart.diff/3` takes a caller-supplied `mapping:` of from state id
+  to to state id, because the engine has no identity a state keeps across an
+  edit (its decision 2).
+
+This package has that identity. Decision 3 derives every generated state id
+from a block id and, for an auxiliary state, a role; a block id is stable across
+revisions and never reused (ADR-0001 decision 3); and decision 7's record
+carries the document id beside the revision. Nothing in this package reads two
+artifacts against each other today.
+
+**The case this amendment is written against.** An execution waits at a long
+wait state while its document is edited: the wait state is renamed, and the
+step before it gains an outcome. In the library world, a hold's execution waits
+for its patron to collect a copy, with its pickup timer pending, while the
+document is edited so that "Awaiting pickup" becomes "Ready for pickup" and the
+step that routes the copy to the pickup branch gains a `transferred` outcome.
+The execution must land in the renamed wait with its timer's deadline
+unchanged, or be refused whole. The worked example below compiles that edit.
+
+**One word needs a boundary first.** "Unmapped" already has a meaning in this
+record. Decision 5's totality is what makes decision 9's finding mapping "a
+total function rather than one with an `:unmapped` arm", and
+`Provenance.owner_at/2` answers `{:error, {:unmapped_offset, offset}}` for an
+offset no span owns (`lib/statifier_blocks/provenance.ex:97`,
+`def owner_at/2`). Both are about a byte offset inside one chart. The
+`unmapped` list of M3 is a different concept: a state of one revision's chart
+with no counterpart in another revision's chart. Neither changes the other.
+
+### M1. For two revisions of one document, the mapping is computed from block ids
+
+Given two compiled artifacts of the same document, the "from" and the "to", a
+state of the from chart **corresponds** to a state of the to chart when both
+carry the same state id and each side's provenance map (`by_state_id`,
+decision 5) names the same block id and the same role for it. By decision 3
+that is having been generated from the same block under the same role:
+`state_id/1` and `state_id/2` are pure functions of the two, and
+`unstate_id/1` inverts them without the provenance map
+(`lib/statifier_blocks/compiler/state_id.ex:125`, `def unstate_id/1`).
+
+The owner comparison on both sides is not redundant. A block id this package
+mints contains no `__`, but a stored document may carry any non-empty string
+as a block id (`defp check_block_id/2`,
+`lib/statifier_blocks/validation.ex:293`), and an id containing `__` gives a
+generated state id the two readings `StateId.undone_event/1`'s `@doc`
+describes for a generated event name, under "Why this is total rather than
+best-effort" (`state_id.ex:223`): `s_a__b` is block `a__b`'s own state and
+block `a`'s state under role `b`. Equal ids whose owners differ do not
+correspond.
+
+The states are the from chart's `<state>`, `<parallel>`, `<final>` and
+`<history>` elements. `by_state_id` is not that set: the serializer records
+every owned element whose `id` attribute `unstate_id/1` reads
+(`defp record_state/2`, `lib/statifier_blocks/compiler/serializer.ex:152`),
+and a delayed `<send>`'s id is minted the same way - `core.wait` emits its
+timer as `<send id="s_<block id>__send">`
+(`lib/statifier_blocks/core/wait.ex:232`, inside `def emit/2`; the Note of
+2026-08-29 on `core.wait`'s timer), and that id is a `by_state_id` key. So the mapping takes which ids are states from the
+chart, and each state's owner from the map.
+
+The mapping reads the two artifacts and nothing else: not the documents, not
+the palette, not a running execution. For equal inputs it gives an equal
+answer.
+
+### M2. A block present in both revisions maps state for state, roles included
+
+Every state of the from chart that has a corresponding state (M1) maps to it:
+the block's own state to its own state, and each auxiliary state - an outcome
+final (2b), a history pseudo-state, any role a block type mints - to the state
+of the same role. Because corresponding states carry equal ids, every entry is
+an identity entry, and each one is still written out: the mapping is total over
+the from chart's states, so each of them is either mapped here or listed under
+M3, and a reader sees every one accounted for without re-reading the chart.
+
+Written-out identity entries change nothing either record above decides. Under
+`sp-ADR-0013` decision 1 a state the plan does not name maps to the state of
+the same id, so an identity entry and an omitted one move an execution the
+same way; that record's decision 1 shows this edit's `states` empty for a
+blocks-compiled chart, which is the same plan in its smallest form.
+`st-ADR-0072` decision 2 reads no entry whose key is still a state of the to
+chart and reports each such entry as `:mapping_unused`, which changes no
+class.
+
+An `<invoke>` of a mapped state maps to the `<invoke>` at the same ordinal of
+the state it maps to, when that state has one; the ordinal is `sp-ADR-0013`'s,
+the within-state document-order ordinal of an `<invoke>`. A block id names a
+state and not an `<invoke>` inside it, so the ordinal is all this package can
+map by. An `<invoke>` whose ordinal the to state does not have gets no entry.
+
+A mapping judges nothing about the pair it maps. A block whose type, config or
+children changed between the revisions still maps its states by id. Whether a
+mapped pair is still the same kind of state under the same parent is the
+engine's diff to report (`st-ADR-0072` decision 1, `:state_changed`), and
+whether one execution's own position is untouched by the edit is the engine's
+position predicate (`st-ADR-0072` decision 4), which compares each active
+state's transitions, `<onexit>` and `<invoke>` elements.
+
+### M3. A state with no counterpart is reported as unmapped, and never mapped to a guess
+
+A state of the from chart with no corresponding state in the to chart is
+listed under `unmapped` and appears in no other field. That covers every state
+of a deleted block - its own state and every auxiliary state it minted - and
+an auxiliary state a surviving block no longer mints, such as the final of an
+outcome it no longer declares. Such a state is never mapped to its parent, a
+sibling, a neighbour or a new state. A deleted block's id is retired for good
+within its document (ADR-0001 decision 3), so nothing on the to side stands
+for it.
+
+Each entry names the from state and the block that owned it, read from the
+from side's provenance map, as a map with string keys:
+`%{"state_id" => state_id, "block_id" => block_id, "role" => role}`, where
+`role` is `nil` for a block's own state. The list is ordered by state id.
+
+`unmapped` is a report and not a plan field: `sp-ADR-0013`'s plan has none.
+What a host does with the list is its own call - refuse the migration, or name
+the states in the plan's `drop` list, which is that record's explicit act and
+never this package's (M5).
+
+A state of the to chart with no counterpart - a new block's state, a new role
+- has no entry anywhere. The mapping is keyed by the from side.
+
+### M4. Two different documents are refused
+
+The mapping is between two revisions of one document. When the two artifacts'
+records (decision 7) carry different `document_id`s, the answer is
+`{:error, :different_documents}` and nothing else: no fields, no partial
+mapping. Block ids are unique within a document (ADR-0001 decision 3), so an
+equal block id in two documents says nothing about either. The revisions are
+not compared: any two artifacts of one document map, in either order,
+including two compiles of the same revision.
+
+### M5. The output is plain data in the persistence plan's field names, and this package gains no dependency
+
+On success the answer is `{:ok, mapping}`, where `mapping` is a map with string
+keys and plain data only - strings, integers, lists and maps - so it encodes
+as JSON as it stands:
+
+- `"states"`: a map from a from state id to its to state id, for every mapped
+  state that is not a history pseudo-state;
+- `"history"`: the same, for every mapped history pseudo-state, kept apart
+  because `sp-ADR-0013` decision 3 refuses a source id named in both;
+- `"invocations"`: a list of `[from_state_id, from_ordinal, to_state_id,
+  to_ordinal]` lists, `sp-ADR-0013` decision 1's one encoding of an invocation
+  key, ordered by from state id and then ordinal;
+- `"unmapped"`: M3's list.
+
+The first three names are `sp-ADR-0013`'s field names, so a host copies them
+into its plan unchanged. The answer carries no `from`, `to`, `drop`, `timers`
+or `datamodel`: those are the plan author's, and the two chart hashes a plan
+names are already on the two records (`chart_identity`, decision 7). The field
+names are reproduced here, not imported: `mix.exs` gains no dependency.
+
+### M6. What this amendment does not decide
+
+- **Datamodel changes.** A revision that adds, renames or removes a `<data>`
+  root is not translated into `sp-ADR-0013`'s `datamodel` operations; the plan
+  author writes them.
+- **Timers.** Whether a state could own a timer, pin sources and
+  `keep_mapped` are `sp-ADR-0013` decision 6's, and a pin source over its own
+  timer jobs is statifier_oban's (`sp-ADR-0013` decision 8). The mapping reads no timer.
+- **Applying anything.** This package moves no execution. The mapping is data
+  a host asks for; saving, compiling or publishing a document never produces
+  one, and nothing migrates an execution because a chart was published.
+  Applying a plan is `sp-ADR-0013`'s, whole or not at all.
+- **Whether the to chart suits an execution.** That is `st-ADR-0072`'s diff and
+  position predicate; the mapping calls neither.
+- **The function's name and module**, which are the implementing request's.
+
+### Worked example: the library hold's edit, in block terms
+
+The hold's document `bdoc_HOLD` holds a routing step `blk_ROUTE` and after it
+a wait block `blk_PICKUP` labelled "Awaiting pickup", which arms the pickup
+timer as a delayed `<send>` whose id it mints under the reserved send role
+(S1, and the Note of 2026-08-29 on `core.wait`'s timer). The execution is
+waiting inside `s_blk_PICKUP`.
+
+The edit relabels `blk_PICKUP` "Ready for pickup" and gives `blk_ROUTE` a
+declared `transferred` outcome, wired to a new block `blk_TRANSFER`.
+
+- The relabel changes the wait block's label and not its id, and the label
+  names no role. Decision 3 derives a state id from the block id and a role
+  alone, so every state id `blk_PICKUP` compiles to is unchanged, and each
+  maps to itself under M2. So does every
+  other state of the from chart. `unmapped` is `[]`.
+- `blk_ROUTE`'s new outcome compiles to a new final
+  `s_blk_ROUTE__o_transferred` inside its state (2b), and `blk_TRANSFER` to
+  `s_blk_TRANSFER`. Neither has a from counterpart, so neither appears (M3).
+  In block terms the headline edit is an identity mapping plus one new role
+  state, and the states of the block wired after it - the reading
+  `st-ADR-0072`'s worked example reaches from the engine's side, where the
+  blocks-compiled pair diffs Compatible.
+- The timer's send id, `s_blk_PICKUP__send`, is derived from `blk_PICKUP`'s
+  id in the same way (M1), so it does not change either. Its deadline stays with the host's timer
+  queue; the mapping maps the state the execution waits in and says nothing
+  about the timer (M6), and `sp-ADR-0013` decision 6 needs no pin source for a
+  plan that maps every state that could own one.
+
+Had the edit deleted `blk_PICKUP` instead, `unmapped` would list
+`s_blk_PICKUP` and every auxiliary state it minted, each with
+`"block_id" => "blk_PICKUP"`, and none would be mapped to `blk_ROUTE`'s state
+or to anything else. An execution waiting there is then the host's to refuse,
+or to drop in its plan under `sp-ADR-0013`'s rules.
+
+Asked to map an artifact of `bdoc_HOLD` against an artifact of the patron
+registration document, the answer is `{:error, :different_documents}`.
+
+### Consequences
+
+- One public, pure function over two `%StatifierBlocks.Compiled{}` artifacts
+  implements M1 to M5, and its `@doc` cites them by clause. It builds on no
+  Phoenix LiveView module.
+- `mix.exs` gains no dependency.
+- A host that migrates a blocks-compiled execution reads `unmapped` first: an
+  empty list means every state of the old chart has a counterpart, and a
+  non-empty one names the blocks a plan has to drop or the migration has to
+  refuse.
