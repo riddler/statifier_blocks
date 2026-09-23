@@ -12504,3 +12504,108 @@ of them changes what is decided.
   (`defp owner/3`, `compiler/chart.ex:241`), so it too names a block.
 
 Filed with `sb-910d`.
+
+## Amendment (2026-09-22): clause 3C, a recipe may write the document's `accepts` list as it may write the datamodel roots
+
+**Status: proposed (2026-09-22, drafted for `sb-opa4`).** Additive: `3C`
+(`:5745`), `2p` (`:12268`) and every clause above this line stand as written,
+no text above this line is edited, and the header line's status history is not
+extended here. It adds one clause, `1F`, which amends `3C` and decides the
+question `2p` leaves open. It is an amendment rather than a dated Note because
+it changes what `3C` admits, and by this directory's README a note decides
+nothing.
+
+`lib/` and `test/` cites below were read at this request's head, which carries
+the one-clause change `1F` describes; the lines they name on `main` at
+`83f1a25` are given beside them. Re-locate by anchor, not by number.
+
+### Context
+
+`3C` bounds the positions a recipe's commands may target: the armed position
+and any slot of the block that encloses it, and "nothing else" (`:5752`). It
+was written when every command a recipe could return named a position or a
+block. Two commands now name neither: `{:set_datamodel, entries}`, which
+`2g` added (`:4153`), and `{:set_accepts, names}`, which `ADR-0014` decision 6,
+"The editor surface is a row of the declarations panel, written through its
+own command" (`docs/adr/0014-document-accepts-declaration.md:194-195`), added
+and `2o` carried into decision 2's closed set (`:12245`).
+
+`2p` records how the code answered for the two: the first admitted anywhere in
+a recipe's list, the second refused as out of reach, and it decides neither
+(`:12268`). Its Consequences name the open question and say a request that
+decides it would amend `3C` (`:12373-12375`). This is that request.
+
+### 1F. A command that names no position is within `3C`'s bound; a recipe may write `{:set_accepts, _}` as it may write `{:set_datamodel, _}`
+
+`3C` bounds the commands that name a position or a block. A command that names
+neither has no reach to exceed, and a recipe's list may hold it anywhere. Of
+decision 2's commands as `2o` counts them, two are of that kind:
+`{:set_datamodel, entries}` and `{:set_accepts, names}`. Both are admitted.
+
+`{:compound, _}` is not one of them: "A compound is not a sixth edit"
+(`:5676`), and its leaves may name positions. A recipe's list holding one is
+refused as out of reach today, by `defp reach/3`'s last clause, and `1F`
+leaves that as it is - the caller wraps the list in the one compound.
+
+The reason is the one the code already gives for the first, and it reads the
+same for the second: "A declaration is not a position, and the document's
+datamodel is not a slot of anything" (`lib/statifier_blocks/recipe.ex:155`,
+the comment on `defp reach/3`'s `{:set_datamodel, _entries}` clause; `:150` at
+`83f1a25`). `2g` made the same point when it opened the command set: "an entry
+is not a block, the list is not a slot, and there is no `target()` for an
+index to be read against" (`:4156-4158`).
+
+An `accepts` list is a declaration on the document in exactly that sense.
+`ADR-0014` decision 6 says of its command: "It is a command rather than editor
+state by 2g's own test"
+(`docs/adr/0014-document-accepts-declaration.md:207-208`).
+
+`3C`'s reason for its bound is that "A recipe that could write two levels up
+would move blocks into a region the author is not looking at" (`:5764-5765`).
+It says nothing about either list, because neither is a region.
+
+What stays bounded: every command that names a position or a block is held to
+`3C` exactly as before, wherever a declaration sits in the list. A
+declaration admits itself and nothing beside it.
+
+In the code, at this request's head:
+
+- `defp reach/3` gains a `{:set_accepts, _names}` clause that continues
+  (`lib/statifier_blocks/recipe.ex:162`), beside the `{:set_datamodel,
+  _entries}` clause (`recipe.ex:158`; `:153` at `83f1a25`), and before the
+  last clause that halts on any other command (`recipe.ex:164`; `:155` at
+  `83f1a25`).
+- `Recipe.within_reach?/2` (`recipe.ex:132`; `:127` at `83f1a25`) answers
+  `true` for a list holding either declaration, and its doc says so.
+- `Edit.Targets.recipe_inserts/4` (`lib/statifier_blocks/edit/targets.ex:451`,
+  unchanged) no longer answers `{:error, {:recipe_out_of_reach, name}}` for a
+  recipe whose only reason was a `{:set_accepts, _}`.
+- `test/statifier_blocks/edit/recipe_declarations_test.exs` pins both
+  admissions at `within_reach?/2` and through `recipe_inserts/4`, that a
+  compound holding `{:set_accepts, _}` applies, and that a declaration beside
+  an out-of-reach insert does not carry the insert past the bound.
+
+### What this amendment does not decide
+
+- **Anything about `accepts` beyond what `ADR-0014` decided.** A recipe that
+  writes the list replaces the whole of it, on `2o`'s terms and with its
+  inverse; what a recipe should put there is the recipe's.
+- **Whether the core `"deadline"` recipe or a composite's recipe writes
+  either declaration.** Neither does today, and nothing here asks them to.
+- **Any other command that names no position.** A later command of that kind
+  is admitted or not by the record that adds it.
+- **An edit-time display of the publish check**, which `ADR-0014` leaves open.
+
+### Consequences
+
+- `2p`'s open question is closed: a recipe may write `{:set_accepts, _}`.
+  `2p` stands as the record of the behaviour before this amendment, and its
+  "until a record decides it, the code's refusal is the behaviour"
+  (`:12291-12292`) is met by this one.
+- The same Amendment's "What this amendment does not decide" also left
+  open "whether the admission of `{:set_datamodel, _}` is right"
+  (`:12359-12360`). `1F` decides that too: it is.
+- A host that calls `recipe_inserts/4` for a recipe writing
+  `{:set_accepts, _}` now gets `{:ok, commands}` where it got
+  `{:error, {:recipe_out_of_reach, name}}`, and the change is noted in the
+  changelog.

@@ -106,6 +106,11 @@ defmodule StatifierBlocks.Recipe do
   names that block, and that every command naming a block names one this
   compound itself inserted.
 
+  A command that names neither - `{:set_datamodel, entries}` or
+  `{:set_accepts, names}`, a declaration on the document rather than a
+  position in it - has no reach to exceed, and is within the bound wherever
+  it sits in the list.
+
       iex> StatifierBlocks.Recipe.within_reach?({"blk_g", "body", 0}, [])
       true
 
@@ -151,6 +156,10 @@ defmodule StatifierBlocks.Recipe do
   # slot of anything - so there is no reach for this command to exceed, and
   # nothing for a recipe to reach past by writing one.
   defp reach({:set_datamodel, _entries}, minted, _enclosing_id), do: {:cont, minted}
+
+  # The document's accepts list is the same kind of thing: a declaration on
+  # the document, not a slot of anything, so a recipe may write it too.
+  defp reach({:set_accepts, _names}, minted, _enclosing_id), do: {:cont, minted}
 
   defp reach(_other, _minted, _enclosing_id), do: {:halt, :out_of_reach}
 end
