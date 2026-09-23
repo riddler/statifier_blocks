@@ -856,7 +856,7 @@ Filed with `sb-tysd`, campaign RF069.
 
 ## Amendment (2026-09-22): a `core.map` `collect_type` name that cannot be resolved without `:datamodel` is reported unchecked
 
-**Status: proposed (2026-09-22), drafted for `sb-kndj`, which also carries the
+**Status: accepted (2026-09-22), drafted for `sb-kndj`, which also carries the
 implementation.** Additive: no text above this line is edited, the Amendment
 of 2026-09-22 above (A1 to A5) and the Notes after it stand as written except
 where the section "What this changes above" says otherwise, and the header
@@ -977,3 +977,92 @@ nothing.
 - A host that passes `:datamodel` sees no change. A host that does not sees
   one `:warning` per such reference in each judged pair, and clears it by
   passing the option or by writing the `collect_type` inline.
+
+## Note (2026-09-22): the rendering non-decision the second Amendment credits to A5 is the first Amendment's, in its "What this does not decide"
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. It states where one sentence of the Amendment
+on an unresolvable `collect_type` name points, which was inexact on the day
+it was written.
+
+That Amendment leaves "How the editor renders a `:graph` `:warning`"
+undecided, "as A5 leaves every `:graph` rendering undecided" (`:967-968`).
+A5 (`:628-653`) decides what the check reads and the finding it produces,
+and says nothing about rendering. The sentence that leaves "how the editor
+renders `:graph` findings" undecided is the first Amendment's paragraph
+"What this does not decide" (`:687-697`), which follows A5, "How it stands
+beside the two existing checks" and that Amendment's worked example. The
+non-decision carried over holds as written; only the clause it is credited
+to is inexact.
+
+Filed with `sb-qiox`.
+
+## Note (2026-09-22): the Amendment on an unresolvable `collect_type` name is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the status line of the Amendment on an unresolvable `collect_type` name
+(`:859`), by one word, `proposed` to `accepted`. Everything else is added at
+the foot of the file - this Note and the dated Note just above it - so no
+line another record cites moves.
+
+The operator granted, on 2026-09-22, the flip of proposed records in this
+repository. This request takes that grant for this Amendment alone, through
+the same `docs/adr/` direction gate, after checking every claim it makes
+against the code on `main`. The record's own header `Status:` line (`:3`) is
+not extended.
+
+Every `lib/` and `test/` cite below was read at `main` `4508edd` and is
+written anchor first, line second; a later reader re-locates by the anchor
+and not by the number. The tests named below are in
+`test/statifier_blocks/graph_test.exs`.
+
+### Each section, and where it reads today
+
+| Section | Read at `4508edd` |
+|---|---|
+| U1, no host must pass `:datamodel` (`:895-897`) | `StatifierBlocks.Compiler.compile/3` (`compiler.ex:508`) takes `:datamodel` among its options and no clause refuses a compile for its absence: the tests' `defp compile!/2` fails a test unless the compile answers `{:ok, %Compiled{}}`, and it compiles every parent above without `:datamodel`. Neither `Graph` function answers an `:error` for the absence; U3's finding is a `:warning` |
+| U2, `unresolved` on every reference (`:899-907`) | `@type child_reference` (`compiled.ex:80`) carries `unresolved`, typed `String.t()` or `nil`, and its doc states U2's cases. The private `interface/2` (`compiler.ex:3276`) takes the declarations as `:no_datamodel` when `Keyword.get(opts, :datamodel)` is `nil`. The private `reference/3`'s `Subchart` clause (`compiler.ex:3308`) sets `unresolved: nil`; its `FanOut` clause (`compiler.ex:3321`) sets it from the private `unresolved/2`, which answers the trimmed name for a non-blank binary under `:no_datamodel` (`compiler.ex:3365`) and `nil` otherwise (`compiler.ex:3372`). The private `required_members/2` reads the inline arm first (`compiler.ex:3342`) and answers `[]` for a name under `:no_datamodel` (`compiler.ex:3348`). The tests "a collect_type name compiled without :datamodel is marked unresolved, and with it is not" and "the inline arm and a blank collect_type are never marked unresolved" pin it |
+| U3, a `:warning` in both directions (`:909-922`) | `check/2` (`graph.ex:112`) and `consumers_broken/2` (`graph.ex:149`) judge each pair through the private `pair/3` (`graph.ex:175`). For a reference whose `unresolved` is a binary (`graph.ex:185`) it builds one finding through the private `finding/4` (`graph.ex:211`) with `severity: :warning`, source `:graph` and anchor `{:config, block_id, "collect_type"}`, in place of the key rule; the outcome rule beside it is unchanged. The forward message (`graph.ex:226`) and the reverse one (`graph.ex:242`) each name the type name and say the keys read are unchecked because it "names a type that is not resolvable without :datamodel"; the reverse one names the parent, and `consumers_broken/2` pairs each finding with the parent's document id. In `check/2` a child answered `{:error, :not_published}` yields the private `unpublished/1`'s finding alone (`graph.ex:123`). The tests "a read left unchecked without :datamodel is a warning on the collect_type field", "a read left unchecked without :datamodel is a warning paired with the parent" and "an unpublished child of an unresolved reference is the chart error alone" pin it |
+| with `:datamodel` nothing changes (`:924-926`) | the test "with :datamodel a named collect_type's keys are checked as before" asserts no finding when every key the datamodel marks required is one the child declares, and one `:error` and no `:warning` when the datamodel requires one the child does not; the last assertion of "a read left unchecked without :datamodel is a warning paired with the parent" asserts no finding in the reverse direction |
+| What this changes above (`:930-945`) | `StatifierBlocks.Graph`'s moduledoc, under "The findings", says every finding is an `:error` but the one `:warning`; the `:graph` entry of `StatifierBlocks.Finding`'s `@type source` documentation reads "at `:error` but for one `:warning`" (`finding.ex:75`) |
+| the worked example (`:949-960`) | the tests above build it: a parent from `defp registration/1` with `cards: "library.card_receipt"`, the `core.map` block `blk_CARDS`, the child `library_card_issue`, the parent id `patron_registration`, and `@card_receipt_datamodel` declaring `card_number` and `branch` required. Each result the example states is an assertion of those tests |
+| Consequences (`:974-979`) | as U2 and U3 above; `changelog.d/sb-kndj.md`, under "Changed", not yet promoted, records the change for a host |
+
+Every record cite the Amendment makes reads at `4508edd` as the Amendment
+quotes it: of this file `:578-580`, `:580`, `:641`, `:703` and `:722`; of
+`docs/adr/0004-compiler-provenance.md` `:4221` and `:4252`; and of
+`docs/adr/0005-liveview-editor.md` `:2573` and `:12344`.
+
+### Sentences that name their own status
+
+They are met here, not edited.
+
+- The status line says the drafting request "also carries the
+  implementation" (`:859-860`). That implementation is on `main`; the table
+  above is where it reads.
+
+### Sentences that no longer hold as written, and the records that name the change
+
+None reverses what the Amendment decides.
+
+- **The Context's code cites, read at `1d0d873` (`:885-890`).** The private
+  `required_members/2`'s name clause moved with the implementation from
+  `compiler.ex:3330` to `compiler.ex:3350`; `Environment.declarations/1`
+  (`environment.ex:489`) has not moved.
+- **The Context's "A host that omits the option therefore gets a key check
+  that looks complete and is not" (`:890-891`).** It described the code
+  before this date; U3 itself changes the answer, read above.
+- **`ADR-0005`'s clause `11y`, "always at `:error`"
+  (`docs/adr/0005-liveview-editor.md:12344`).** That record is not edited.
+  The third bullet of "What this changes above" (`:937-943`) is where the
+  `:warning` a `:graph` finding may now carry is recorded, and this flip
+  accepts it there.
+
+### Sentences stated exactly
+
+- **"as A5 leaves every `:graph` rendering undecided" (`:967-968`).** The
+  dated Note just above says which paragraph leaves it undecided
+  (`:687-697`).
+
+Filed with `sb-qiox`.

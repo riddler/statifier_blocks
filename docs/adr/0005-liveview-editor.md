@@ -12507,7 +12507,7 @@ Filed with `sb-910d`.
 
 ## Amendment (2026-09-22): clause 3C, a recipe may write the document's `accepts` list as it may write the datamodel roots
 
-**Status: proposed (2026-09-22, drafted for `sb-opa4`).** Additive: `3C`
+**Status: accepted (2026-09-22, drafted for `sb-opa4`).** Additive: `3C`
 (`:5745`), `2p` (`:12268`) and every clause above this line stand as written,
 no text above this line is edited, and the header line's status history is not
 extended here. It adds one clause, `1F`, which amends `3C` and decides the
@@ -12609,3 +12609,69 @@ In the code, at this request's head:
   `{:set_accepts, _}` now gets `{:ok, commands}` where it got
   `{:error, {:recipe_out_of_reach, name}}`, and the change is noted in the
   changelog.
+
+## Note (2026-09-22): the Amendment on clause 3C is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the status line of the Amendment on clause `3C` (`:12510`), by one word,
+`proposed` to `accepted`. Everything else is this Note, at the foot of the
+file, so no line another record cites moves.
+
+The operator granted, on 2026-09-22, the flip of proposed records in this
+repository. This request takes that grant for this Amendment alone, through
+the same `docs/adr/` direction gate, after checking every claim it makes
+against the code on `main`.
+
+Every `lib/` and `test/` cite below was read at `main` `4508edd` and is
+written anchor first, line second; a later reader re-locates by the anchor
+and not by the number. No commit since the Amendment landed touches
+`lib/statifier_blocks/recipe.ex` or `lib/statifier_blocks/edit/targets.ex`,
+so each code cite the Amendment labels "this request's head" reads at the
+same line at `4508edd`.
+
+### `1F`, and where it reads today
+
+| Claim | Read at `4508edd` |
+|---|---|
+| a command that names no position is within the bound wherever it sits (`:12540-12543`) | `defp reach/3` has a `{:set_datamodel, _entries}` clause (`recipe.ex:158`) and a `{:set_accepts, _names}` clause (`recipe.ex:162`), each answering `{:cont, minted}` with the set of ids the compound inserted unchanged; `Recipe.within_reach?/2` (`recipe.ex:132`) folds the whole list through `reach/3`, so a declaration at any place in it continues the fold |
+| the two such commands among decision 2's, as `2o` counts them (`:12541-12543`) | the `Edit.t()` union (`edit.ex:144`) holds `:insert`, `:remove`, `:move`, `:update_config`, `:set_datamodel`, `:set_accepts` and `:compound`; of the six edits, the first four name a position or a block and the last two name neither |
+| `{:compound, _}` in a recipe's list is still refused (`:12545-12548`) | no clause of `reach/3` matches it, so the last clause (`recipe.ex:164`) halts with `:out_of_reach` |
+| the reason, quoted from the code (`:12550-12553`) | the comment above the `{:set_datamodel, _entries}` clause begins at `recipe.ex:155` with the words the Amendment quotes; the `{:set_accepts, _names}` clause carries a comment giving the same reason |
+| what stays bounded (`:12567-12569`) | the `:insert` clause (`recipe.ex:138`), the `:move` and `:update_config` clause (`recipe.ex:146`) and the `:remove` clause (`recipe.ex:151`) are unchanged by `1F`; a declaration adds no id to the set those clauses read, so it admits nothing beside it |
+| `within_reach?/2` and its doc (`:12578-12579`) | its doc's paragraph beginning "A command that names neither" names both commands and says either is within the bound wherever it sits in the list |
+| `recipe_inserts/4` (`:12580-12582`) | `Edit.Targets.recipe_inserts/4` (`edit/targets.ex:451`) answers `{:error, {:recipe_out_of_reach, name}}` only when `within_reach?/2` answers `false` |
+| the test (`:12583-12586`) | `test/statifier_blocks/edit/recipe_declarations_test.exs`: the describe "Recipe.within_reach?/2" holds "a list holding {:set_accepts, _} is within reach", "a list holding {:set_datamodel, _} is still within reach" and "a declaration does not carry an out-of-reach insert past the bound"; the describe "Edit.Targets.recipe_inserts/4" holds "a recipe writing {:set_accepts, _} is admitted and its compound applies", "a recipe writing {:set_datamodel, _} is still admitted" and "a recipe declaring and reaching is still refused" |
+| neither the core `"deadline"` recipe nor a composite's recipe writes a declaration (`:12593-12594`) | neither `lib/statifier_blocks/core/deadline_recipe.ex` nor `lib/statifier_blocks/composite.ex` names `:set_datamodel` or `:set_accepts` |
+| the changelog (`:12608-12611`) | `changelog.d/sb-opa4.md`, under "Changed", not yet promoted |
+
+Every record cite the Amendment makes - of this file `:4153`, `:4156-4158`,
+`:5676`, `:5745`, `:5752`, `:5764-5765`, `:12245`, `:12268`, `:12291-12292`,
+`:12359-12360` and `:12373-12375`, and of
+`docs/adr/0014-document-accepts-declaration.md` `:194-195` and `:207-208` -
+reads at `4508edd` as the Amendment quotes it.
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- The status line names the request that drafted the Amendment. That request
+  also carried the code, and both are on `main`.
+- `ADR-0014` decision 6, which `1F` quotes twice, is accepted (its status
+  line, `docs/adr/0014-document-accepts-declaration.md:3`).
+- This file's head `Status:` line is not extended.
+
+### Sentences that no longer hold as written, and the record that names the change
+
+None reverses what the Amendment decides; each is superseded by `1F` itself.
+
+- **`2p`'s second bullet (`:12280-12285`)** says a recipe writing
+  `{:set_accepts, _}` is refused as out of reach. It described the code
+  before `1F`. `1F`'s Consequences say `2p` stands as the record of that
+  behaviour (`:12601-12604`), and `2p` is not edited.
+- **The flip Note of 2026-09-22 above** says of `2p` that whether a recipe
+  may write `{:set_accepts, _}` "is still not decided" and that the flip
+  "leaves the question open" (`:12460-12462`). It held on the day it was
+  written. `1F` decides the question, and this flip accepts that decision.
+
+Filed with `sb-qiox`.
