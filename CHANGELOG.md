@@ -10,6 +10,37 @@ fragment in [`changelog.d/`](changelog.d/README.md); the fragments are assembled
 into a version section at release. See that README for the format and for when a
 change warrants an entry at all.
 
+## [0.34.0] 2026-09-23
+
+0.34.0 is a minor, because it adds to the public surface and changes no
+existing signature. A host can now generate the migration plan between two
+compiled revisions of one document: `StatifierBlocks.Migration.plan/2` maps
+the old revision's states onto the new one's through their block ids and
+answers the mapping as plain data, reporting every state it could not map.
+The editor can show the host's publish line: a new `publish_status` assign
+carries the count of live executions on the previous revision and the class
+of the change, drawn beside the header. Upgrading a host: nothing needs
+migrating, the package gains no dependency, and an editor mounted without
+`publish_status` renders exactly what it rendered in 0.33.0.
+
+### Added
+
+- `StatifierBlocks.Migration.plan/2` maps the states of one compiled revision
+  of a document onto another's through their block ids, roles included, and
+  answers plain string-keyed data in the migration plan's `states`, `history`
+  and `invocations` fields. Every old state with no counterpart - each state of
+  a deleted block, and each final of an outcome a block no longer declares -
+  is listed under `unmapped` and mapped nowhere. Two artifacts of different
+  documents are refused with `{:error, :different_documents}`. It moves no
+  execution and reads no timer.
+- `StatifierBlocks.Editor` takes a `publish_status` assign, `nil` or
+  `%{live: n, class: class}` with `class` one of the four classes
+  `Statifier.Chart.diff/3` returns, and draws it as one line beside the
+  `:header` slot, such as "3 live executions on the previous revision; this
+  change is compatible". The host computes both values and the editor makes
+  no query; `nil`, the default, renders exactly what the editor rendered
+  before.
+
 ## [0.33.0] 2026-09-22
 
 0.33.0 is a minor, because it adds to the public surface and changes no
@@ -3466,6 +3497,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.34.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.34.0
 [0.33.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.33.0
 [0.32.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.32.0
 [0.31.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.31.0
