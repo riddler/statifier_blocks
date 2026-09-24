@@ -12857,7 +12857,7 @@ Filed with `sb-2g62`.
 
 ## Amendment (2026-09-24): decision 5 asked of a whole document - `StatifierBlocks.Plan.expressible?/2`
 
-**Status: proposed (2026-09-24), drafted and implemented in one request for
+**Status: accepted (2026-09-24), drafted and implemented in one request for
 `sb-u6es`.** Additive: decision 5 and every clause above this line stand as
 written, no text above this line is edited, and the header line's status
 history is not extended here. It adds one clause, `5F`, which widens decision
@@ -12976,7 +12976,7 @@ document.
 
 ## Amendment (2026-09-24): `5F`'s function is `expressible/3`, and `expressible?/3` is its boolean twin
 
-**Status: proposed (2026-09-24), drafted and implemented in one request for
+**Status: accepted (2026-09-24), drafted and implemented in one request for
 `sb-3owm`.** Additive: the Amendment of 2026-09-24 and its Correction above
 stand as printed, no line above this one is edited, and the header line's
 status history is not extended here. It is an amendment rather than a dated
@@ -13026,3 +13026,81 @@ document. It changes the name a host calls and adds the boolean it can call
 beside it, which is why it is an amendment: both are public functions.
 
 Filed with `sb-3owm`; the arity and cite points are `sb-39qs`'s.
+
+## Note (2026-09-24): the Amendment on `5F` with its Correction, and the Amendment renaming its function, are flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only lines this request changes above it are
+two status lines, each by one word, `proposed` to `accepted`: the Amendment of
+2026-09-24 on `5F` (`:12860`) and the Amendment of 2026-09-24 that renames its
+function (`:12979`). The Correction of 2026-09-24 (`:12941`) has no status line
+of its own; `5F` is accepted as that Correction and the later Amendment read
+it. This Note is added at the foot of the file, so no line another record
+cites moves.
+
+The operator's word of 2026-09-24 is to flip this repository's proposed
+records. The code both Amendments record is in 0.35.0, merged and tagged
+(`v0.35.0`, `422f55b`), whose `CHANGELOG.md` section names
+`StatifierBlocks.Plan.expressible/3` and `expressible?/3`. That version is
+not yet published on Hex: these records are accepted on the operator's word
+before the Hex publish, which this repository's rule on records otherwise
+waits for. Every claim below was checked against the code at `422f55b`.
+
+Every `lib/` and `test/` cite below was read at `422f55b` and is written
+anchor first, line second; a later reader re-locates by the anchor and not by
+the number. The Amendments cite `lib/` outside `plan.ex` at `a17e0dd`; no
+request between `a17e0dd` and `422f55b` touched
+`lib/statifier_blocks/assignability.ex`, `lib/statifier_blocks/edit/targets.ex`,
+`lib/statifier_blocks/editor.ex` or `lib/statifier_blocks/document.ex`, so
+those cites read at the tag as they are printed.
+
+### `5F`, as corrected and renamed, and where each bullet reads
+
+| Bullet | At `422f55b` |
+|---|---|
+| The function (`:12886`) | `def expressible` (`plan.ex:106`) takes `document`, `palette` and `ctx \\ %{}` and answers `:ok` or `{:no, reasons}`; `Edit.Targets.admits_at?/5` defaults its `ctx` to `%{}` the same way (`def admits_at?`, `edit/targets.ex:300`) |
+| Rules 1 and 3 (`:12890`) | `defp placement_reasons/3` (`plan.ex:173`) answers `{:slot_not_declared, id, {parent_id, slot}}` for an undeclared slot and hands a declared one to `defp room_reasons/4` (`plan.ex:194`), which answers `{:no_room, id, {parent_id, slot, index}}` past the first child of an `:exactly_one` or `:zero_or_one` slot |
+| Rule 2, as the Correction reads it (`:12941`) | `defp admission_findings/3` (`plan.ex:151`) reads `Assignability.validate/3` (`def validate`, `assignability.ex:937`, whose doc explains the `check/5` difference at `:915`) and keeps only `:kind_not_admitted` findings (`plan.ex:158`), each as `{:not_admitted, id, finding}` |
+| An unresolved block (`:12904`) | `defp resolution_reasons/2` (`plan.ex:164`) answers `{:unresolved, id, error}` with `Palette.resolve/2`'s error |
+| An unfillable slot (`:12908`) | `defp unfillable_reasons/4` (`plan.ex:203`) answers `{:unfillable_slot, id, slot}` for an empty `:exactly_one` or `:at_least_one` slot where `Edit.Targets.accepted_types_at/5` (`def accepted_types_at`, `edit/targets.ex:337`) admits no type |
+| Order (`:12917`) | `def expressible` concatenates, per block of `Document.blocks/1` (pre-order, `document.ex:125`), resolution, placement, admission and unfillable reasons, the order of the moduledoc's table |
+| The tests (`:12920`) | `test/statifier_blocks/plan_test.exs`, describe "the corpus": `patron_registration.json` through `Palette.core/0`, and `expressible/handler_in_body.json` and `expressible/empty_required_slot.json`; the Correction's test "a read the environment contradicts is not a reason, since the editor offers that drop" asserts `droppable_slots_for` offers the slot and `expressible/3` answers `:ok` |
+| The boolean twin (`:13003`) | `def expressible?` (`plan.ex:141`) answers `expressible(document, palette, ctx) == :ok`; the describe "the boolean" in `plan_test.exs` |
+
+The Context's and the Correction's cites into this file hold: decision 5
+(`:212`) and its four rules (`:221-230`), the 2026-09-08 Note's item 5
+(`:10567`), the over-approximation paragraph (`:236`) with the quoted
+"offer a gap that later yields a `:type_mismatch` finding", and "The editor
+never blocks an edit for a validation reason" (`:246`). ADR-0003 decision 7
+reads at `docs/adr/0003-assignability.md:236`. The editor's `"drop"` handler
+(`def handle_event("drop", ...)`, `editor.ex:1598`) commits the `:move` at
+the chosen gap with no admission check of its own. "What this amendment does
+not decide" holds: no module under `lib/` other than `plan.ex` calls
+`expressible` or `expressible?`.
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- Both status lines say "proposed (2026-09-24)"; each is flipped by one word
+  above.
+- `5F`'s Consequences bullet says "The change is in the next release's
+  changelog" (`:12936-12937`). That release is 0.35.0, read above.
+- This file's head `Status:` line is not extended.
+
+### Sentences that no longer hold as written, and the records that name the change
+
+- **The name and arity.** `expressible?/2` in the Amendment's heading
+  (`:12858`) and `5F`'s heading (`:12884`), and `expressible?` as the
+  tagged-answer function in "The function" bullet (`:12886-12887`) and the
+  Correction's closing sentence (`:12974`): the Amendment of 2026-09-24 at
+  `:12977` renames it `expressible/3` and gives the arity as `/3`.
+- **Rule 2 as `validate/3`'s every finding** (`:12896`): the Correction at
+  `:12941` narrows it to kind admission.
+- **"one public function"** in `5F`'s Consequences (`:12936`): the Amendment
+  at `:12977` reads it as two.
+- **The Correction's cite `edit/targets.ex:36`** (`:12960`): the Amendment at
+  `:12977` re-measures it as `edit/targets.ex:35-36`, which is where the
+  quoted phrase reads at `422f55b`.
+
+Filed with `sb-pyg0`.
