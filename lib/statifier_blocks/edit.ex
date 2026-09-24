@@ -64,10 +64,10 @@ defmodule StatifierBlocks.Edit do
   What a declaration has is a grammar - ADR-0001 11b's `{id, expr,
   description}` and 11c's structural id uniqueness - and that is the same
   kind of question rules 1 to 4 answer for the tree, so it is answered
-  here. `StatifierBlocks.Validation.datamodel/1` is the one implementation
-  of it, so a list this command accepts is a list `Document.validate/1`
-  accepts, and `to_json/1` can never raise on a document this command
-  produced.
+  here. The internal datamodel check `StatifierBlocks.Document.validate/1`
+  runs is the one implementation of it, so a list this command accepts is a
+  list `Document.validate/1` accepts, and `to_json/1` can never raise on a
+  document this command produced.
 
   ## The sixth command (ADR-0014 decision 6)
 
@@ -76,10 +76,11 @@ defmodule StatifierBlocks.Edit do
   command's terms and for its reasons: whole-list replacement, the previous
   list as the inverse, and the grammar checked here rather than in
   `check_config/3`. The one implementation of that grammar is
-  `StatifierBlocks.Validation.accepts/1`, so a list this command accepts is a
-  list `Document.validate/1` accepts. It is a command rather than editor
-  state because the list is in the document and in its hash: a declared name
-  an author deletes is document content, and undo has to bring it back.
+  the internal `accepts` check `StatifierBlocks.Document.validate/1` runs, so
+  a list this command accepts is a list `Document.validate/1` accepts. It
+  is a command rather than editor state because the list is in the document
+  and in its hash: a declared name an author deletes is document content,
+  and undo has to bring it back.
 
   ## The deliberate widening
 

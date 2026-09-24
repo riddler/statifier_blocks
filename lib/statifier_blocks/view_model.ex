@@ -1102,7 +1102,7 @@ defmodule StatifierBlocks.ViewModel do
   surface can draw no button that cannot work. An id no block carries is
   `nil` for the same reason.
 
-  The tuple is `StatifierBlocks.Edit.target/0`: what this answers is
+  The tuple is `t:StatifierBlocks.Edit.target/0`: what this answers is
   directly what a command takes.
 
       iex> alias StatifierBlocks.{Block, Document, Palette, ViewModel}
@@ -1321,7 +1321,7 @@ defmodule StatifierBlocks.ViewModel do
   `sentence`s in the package, and the three are deliberately distinct: this
   one takes a node and answers what to draw,
   `StatifierBlocks.BlockType.sentence/2` asks a block type for its own line,
-  and `StatifierBlocks.SentenceChain.sentence/5` is where a built node's
+  and the internal sentence chain is where a built node's
   `sentence` field came from in the first place.
 
       iex> alias StatifierBlocks.{Block, Document, Palette, ViewModel}

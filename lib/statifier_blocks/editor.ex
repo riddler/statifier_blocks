@@ -333,11 +333,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     A host about to publish a new revision of a document usually knows two
     things an author should see before pressing its button: how many live
     executions are pinned to the chart the previous revision compiled to, and
-    which of the four classes statifier-ex's `Statifier.Chart.diff/3` puts
-    the change in (`st-ADR-0072` decision 1: `:identical`, `:compatible`,
-    `:mapped` or `:breaking`). `publish_status` is where the host says them:
-    `%{live: n, class: class}`, drawn as one line such as *3 live executions
-    on the previous revision; this change is compatible*, with `n` a
+    which of the four classes statifier-ex's
+    `Statifier.Chart.diff(from, to, opts)` puts the change in (`st-ADR-0072`
+    decision 1: `:identical`, `:compatible`, `:mapped` or `:breaking`).
+    `publish_status` is where the host says them: `%{live: n, class: class}`,
+    drawn as one line such as *3 live executions on the previous revision;
+    this change is compatible*, with `n` a
     non-negative integer and `class` one of those four atoms.
 
     Both values are the host's, computed by the host. This package makes no
@@ -635,7 +636,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `drawer_height` | no | the drawer's height in rem, remembered **by the host** per viewer (2A); bounded on the way in |
     | `on_drawer_resize` | no | one-argument function called with each new drawer height, which is how the host comes to have one to remember |
     | `class` | no | appended to the root element's own classes |
-    | `publish_status` | no | `nil` (the default) or `%{live: n, class: class}`: the count of live executions on the previous revision and the `Statifier.Chart.diff/3` class of the change, both computed by the host, drawn as one line beside the `:header` slot. The package makes no query for either. See *The publish line* above |
+    | `publish_status` | no | `nil` (the default) or `%{live: n, class: class}`: the count of live executions on the previous revision and the `Statifier.Chart.diff(from, to, opts)` class of the change, both computed by the host, drawn as one line beside the `:header` slot. The package makes no query for either. See *The publish line* above |
     | `history_limit` | no | bound on the undo stack; `:infinity` by default |
     | `profile` | no | which surfaces this mount draws, and whether it edits: `%{drawer_tabs:, inspector_tabs:, palette_groups:, toolbar:, read_only?:, run?:}`, every key optional and every list `:all` by default. An id a list names that the package cannot resolve is dropped. See *Profiles, and a read-only mount* above and `docs/profiles.md` |
     """

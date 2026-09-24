@@ -405,8 +405,8 @@ defmodule StatifierBlocks.Environment do
 
   One codepath for one rule (ADR-0011's Amendment of 2026-09-07, section 4):
   the walk applies a block's writes with this function, and so does the
-  editor's drop-check preview through
-  `StatifierBlocks.Assignability.downstream_findings/6`. For any block
+  editor's drop-check preview through the downstream check inside
+  `StatifierBlocks.Assignability.check/5`. For any block
   `block`, environment `env` and declarations `declarations`, the entries the
   preview holds after `block` and the entries the walk holds after `block`
   are the same map.

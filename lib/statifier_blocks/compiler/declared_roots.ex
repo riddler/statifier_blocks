@@ -115,7 +115,7 @@ defmodule StatifierBlocks.Compiler.DeclaredRoots do
   The document itself carries a second declaration surface: a top-level
   `datamodel` key of `StatifierBlocks.Document.DatamodelEntry` structs,
   each already checked against ADR-0001's structural rules by
-  `StatifierBlocks.Validation` before a document ever reaches the
+  `StatifierBlocks.Document.validate/1` before a document ever reaches the
   compiler. `document_declarations/1` turns them into the same
   `declare/2` emissions `declarations/1` builds from the compile call's
   `:declare` option, and `StatifierBlocks.Compiler` prepends them to the
@@ -235,8 +235,8 @@ defmodule StatifierBlocks.Compiler.DeclaredRoots do
   identifier for an id and either `nil` or a non-empty expression for
   `expr`. That is why this returns a plain list rather than a tagged
   tuple: the shape is a schema rule, checked exactly once by
-  `StatifierBlocks.Validation`, and re-checking it here would be a second
-  place for that rule to drift from the one the document was actually
+  `StatifierBlocks.Document.validate/1`, and re-checking it here would be a
+  second place for that rule to drift from the one the document was actually
   validated against.
 
   `description` is dropped - it is prose for a human reading the

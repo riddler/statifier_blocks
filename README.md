@@ -927,9 +927,9 @@ The step calls them in this order:
    document id. Each call judges pairs; walking the graph is the host's
    (ADR-0008's Amendment of 2026-09-22).
 4. **The `accepts` declaration**, for a revision that carries one. The
-   engine's `Statifier.Chart.check_accepts/2` judges `compiled.accepts`
-   against the chart that revision compiled to, the one the host will
-   start executions on (ADR-0014 decision 4). It is the
+   engine's `Statifier.Chart.check_accepts(machine, declared)` judges
+   `compiled.accepts` against the chart that revision compiled to, the one
+   the host will start executions on (ADR-0014 decision 4). It is the
    engine's function, arriving in the engine's next minor release, and this
    package runs no check of its own for that rule. It answers a map, not
    findings: the declared names no reachable transition can take

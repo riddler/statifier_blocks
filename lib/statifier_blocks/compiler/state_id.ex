@@ -222,8 +222,8 @@ defmodule StatifierBlocks.Compiler.StateId do
 
   ## Why this is total rather than best-effort
 
-  `StatifierBlocks.Validation` admits any non-empty UTF-8 string as a block
-  id, so the opacity this module's moduledoc argues from is a property of
+  `StatifierBlocks.Document.validate/1` admits any non-empty UTF-8 string as
+  a block id, so the opacity this module's moduledoc argues from is a property of
   every id this package *mints* and not of every id it *admits*. A document
   arriving through `from_json/1` may carry a block id containing `"__"`, or
   a `"."`, and either gives a generated event name a second reading:
