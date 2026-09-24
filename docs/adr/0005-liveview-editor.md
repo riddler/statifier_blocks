@@ -12937,3 +12937,39 @@ and a required slot no type in the palette is admitted into.
   existing signature changes. The change is in the next release's changelog.
 
 Filed with `sb-u6es`.
+
+## Correction of 2026-09-24 (`sb-u6es`): `5F`'s rule 2 is kind admission only
+
+The Amendment of 2026-09-24 above stands as printed; this correction is
+**added at the foot** and rewrites nothing above it. It corrects one bullet of
+`5F`, "Rule 2 is `Assignability.validate/3`, not `check/5`" (`:12896`), which
+made every finding `validate/3` reports a refusal, the read findings included.
+
+**The rule.** In `5F`, rule 2 is **kind admission** at the block's own
+position, and nothing else. Its findings are still read from
+`Assignability.validate/3`, but only a `:kind_not_admitted` finding becomes
+`{:not_admitted, id, finding}` (`defp admission_findings/3` in `plan.ex`). A
+`:type_mismatch` is not a reason.
+
+**Why.** Decision 5's over-approximation paragraph (`:236`) highlights a slot
+when any of its gaps admits the block, and it says that highlighting can
+"offer a gap that later yields a `:type_mismatch` finding". Its next paragraph
+(`:246`) says "The editor never blocks an edit for a validation reason, with
+the single exception of the four rules above", and a read mismatch is a
+validation finding. `Edit.Targets`'s moduledoc says the same
+(`edit/targets.ex:36` at `a17e0dd`: "seams are validation, not admission"),
+and the editor's `"drop"` handler (`def handle_event("drop", ...)`,
+`editor.ex:1598` at `a17e0dd`) commits the move at the gap the author chose
+with no re-check. A document in which a read mismatches is therefore one an
+author can build in the editor. Reporting it as a refusal made `5F` answer
+`{:no, _}` for such a document, against its own contract. `5F` itself already
+relies on the never-blocks line for an empty required slot the palette can
+fill (`:12915`); rule 2 now reads the same line the same way.
+
+What stays as `5F` prints it: rules 1 and 3, `:unresolved`,
+`:unfillable_slot` (still asked through `Edit.Targets.accepted_types_at/5`),
+the order of reasons, and the optional `ctx`. The test
+"a read the environment contradicts is not a reason, since the editor offers
+that drop" in `test/statifier_blocks/plan_test.exs` shows `droppable_slots_for`
+offering the slot and `expressible?` answering `:ok` for the resulting
+document.
