@@ -12973,3 +12973,50 @@ the order of reasons, and the optional `ctx`. The test
 that drop" in `test/statifier_blocks/plan_test.exs` shows `droppable_slots_for`
 offering the slot and `expressible?` answering `:ok` for the resulting
 document.
+
+## Note (2026-09-24): `5F`'s function is `expressible/3`, and `expressible?/3` is its boolean twin
+
+A dated Note rather than a second correction: the Amendment of 2026-09-24
+and its Correction above stand as printed, and no line above this one is
+edited. It records a rename made before any release carried `5F`, the
+boolean function added beside it, and two wording points in the text above.
+`5F`'s rules, reasons, order and optional `ctx` are unchanged. `lib/` cites
+into `plan.ex`, which this request changes, are by anchor alone; the one
+other `lib/` cite was read at `a17e0dd` and holds unchanged at `1d5253e`.
+
+**The rename.** The function `5F` names answers `:ok` or `{:no, reasons}`,
+and both are truthy, so under the trailing-`?` convention Elixir keeps for
+booleans (and this package keeps, as in `Edit.Targets.admits_at?/5`) a
+caller writing `if Plan.expressible?(document, palette)` would pass every
+document. That function is now `StatifierBlocks.Plan.expressible/3`
+(`def expressible` in `plan.ex`), answering exactly what `5F` and the
+Correction say it answers. Wherever the text above names
+`expressible?` as the tagged-answer function - the Amendment's heading
+(`:12858`), `5F`'s heading (`:12884`), "The function" bullet
+(`:12886-12887`), and the Correction's closing sentence (`:12974`) - read
+`expressible`.
+
+**The boolean twin.** `StatifierBlocks.Plan.expressible?/3`
+(`def expressible?` in `plan.ex`) takes the same `document`, `palette` and
+optional `ctx`, and answers `true` exactly when `expressible/3` answers
+`:ok`, `false` otherwise. It drops the reasons; a host that shows an author
+why asks `expressible/3`. The tests are the describe "the boolean" in
+`test/statifier_blocks/plan_test.exs`. With it, the Consequences bullet
+(`:12936`) reads two public functions where it says one.
+
+**Arity.** Both functions take an optional third argument, so each is
+defined at `/3` with a default and callable with two or three arguments.
+The Amendment's heading (`:12858`) and `5F`'s heading (`:12884`) say `/2`;
+read `/3`.
+
+**A cite.** The Correction quotes "seams are validation, not admission"
+from `Edit.Targets`'s moduledoc and cites `edit/targets.ex:36` at
+`a17e0dd` (`:12960`). The phrase begins on `:35` and ends on `:36`, so the
+cite is `edit/targets.ex:35-36`, under the moduledoc's numbered point
+opening "The index-dependent half is a seam check".
+
+Nothing in this Note changes what `5F` or its Correction decides about a
+document; it changes the name a host calls and adds the boolean it can call
+beside it.
+
+Filed with `sb-3owm`; the arity and cite points are `sb-39qs`'s.

@@ -1393,13 +1393,16 @@ yourself.
 
 A document that did not come out of the editor - a stored master, one built
 in code - can be checked against the palette you are about to mount before
-an author opens it: `StatifierBlocks.Plan.expressible?(document, palette)`
+an author opens it: `StatifierBlocks.Plan.expressible(document, palette)`
 answers `:ok` when every block's type resolves through the palette and every
 block sits in a slot the editor would let an author drop it into - declared,
 with room, and admitting its kinds - and every empty required slot is one the
 palette can fill; otherwise `{:no, reasons}`, each reason naming the rule and
 the block. A read the environment contradicts is not a reason: the editor
 flags it as a finding rather than refusing the drop.
+`StatifierBlocks.Plan.expressible?(document, palette)` asks the same question
+and answers `true` or `false`, for a host that only needs the yes or no. Both
+take the assignability context as an optional third argument.
 
 ### Not yet
 

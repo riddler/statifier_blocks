@@ -3,13 +3,15 @@ defmodule StatifierBlocks.Plan do
   Whole-document questions a host asks before it hands a document to the
   editor.
 
-  `expressible?/3` asks whether every block in a document sits at a place
+  `expressible/3` asks whether every block in a document sits at a place
   the editor, mounted with a given palette, would itself have let an author
   put it, and whether every slot the document still has to fill is one that
   palette can fill. A host installing a document it did not author through
   the editor - a stored master, a document built in code, one migrated from
   an older palette - asks it once, and learns whether an author can go on
   editing that document with the palette they will be handed.
+  `expressible?/3` asks the same question and answers a boolean, for a
+  host that only needs the yes or no.
 
   ## The same predicate the editor uses, asked at each block's own position
 
@@ -37,7 +39,7 @@ defmodule StatifierBlocks.Plan do
 
   ## Reasons
 
-  `expressible?/3` answers `:ok`, or `{:no, reasons}` with one reason per
+  `expressible/3` answers `:ok`, or `{:no, reasons}` with one reason per
   thing the editor would refuse, in `StatifierBlocks.Document.blocks/1`
   pre-order and, within one block, in the order the table lists them. Every
   reason names the block an author has to look at second and the rule first:
@@ -94,14 +96,14 @@ defmodule StatifierBlocks.Plan do
       iex> alias StatifierBlocks.{Block, Document, Palette, Plan}
       iex> wait = Block.new("core.wait", id: "blk_WAIT", config: %{"duration" => "48h"})
       iex> root = Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [wait]})
-      iex> Plan.expressible?(Document.new(root, id: "doc_1"), Palette.core())
+      iex> Plan.expressible(Document.new(root, id: "doc_1"), Palette.core())
       :ok
-      iex> Plan.expressible?(Document.new(root, id: "doc_1"), Palette.new(%{"core.sequence" => StatifierBlocks.Core.Sequence}))
+      iex> Plan.expressible(Document.new(root, id: "doc_1"), Palette.new(%{"core.sequence" => StatifierBlocks.Core.Sequence}))
       {:no, [{:unresolved, "blk_WAIT", {:unknown_block_type, "core.wait"}}]}
   """
-  @spec expressible?(Document.t(), Palette.t(), Assignability.context()) ::
+  @spec expressible(Document.t(), Palette.t(), Assignability.context()) ::
           :ok | {:no, [reason()]}
-  def expressible?(%Document{} = document, %Palette{} = palette, ctx \\ %{}) do
+  def expressible(%Document{} = document, %Palette{} = palette, ctx \\ %{}) do
     admission = admission_findings(palette, document, ctx)
 
     reasons =
@@ -116,6 +118,28 @@ defmodule StatifierBlocks.Plan do
       [] -> :ok
       reasons -> {:no, reasons}
     end
+  end
+
+  @doc """
+  `true` exactly when `expressible/3` answers `:ok` for the same
+  `document`, `palette` and `ctx`; `false` when it answers `{:no, reasons}`.
+
+  The reasons are dropped. A host that shows an author why a document
+  cannot be edited with a palette asks `expressible/3` instead.
+
+  ## Examples
+
+      iex> alias StatifierBlocks.{Block, Document, Palette, Plan}
+      iex> wait = Block.new("core.wait", id: "blk_WAIT", config: %{"duration" => "48h"})
+      iex> root = Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [wait]})
+      iex> Plan.expressible?(Document.new(root, id: "doc_1"), Palette.core())
+      true
+      iex> Plan.expressible?(Document.new(root, id: "doc_1"), Palette.new(%{"core.sequence" => StatifierBlocks.Core.Sequence}))
+      false
+  """
+  @spec expressible?(Document.t(), Palette.t(), Assignability.context()) :: boolean()
+  def expressible?(%Document{} = document, %Palette{} = palette, ctx \\ %{}) do
+    expressible(document, palette, ctx) == :ok
   end
 
   # Rule 2 for every block at its own position - kind admission, and only
