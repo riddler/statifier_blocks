@@ -61,6 +61,11 @@ Two dependencies are **optional** and neither is added for you:
 `statifier_ui`, which an `:expression` field uses for its expression editor
 when it resolves. See [Embedding the editor](#embedding-the-editor).
 
+A document written against 0.27 still compiles. To have a composite in it say
+how it finished - declared `outcomes`, a handler's `finish_as` and the
+`on_<name>` slots an author fills - see
+[`docs/guides/migrating-documents-0.27-to-0.34.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/guides/migrating-documents-0.27-to-0.34.md).
+
 ## A worked example
 
 A card-processing flow: place a hold, and settle it when the account has the
