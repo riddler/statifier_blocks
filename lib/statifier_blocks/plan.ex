@@ -21,16 +21,19 @@ defmodule StatifierBlocks.Plan do
   document, at its own `{parent_id, slot, index}`. The fourth cannot fail
   for a block already in a tree.
 
-  Rule 2 is answered by `StatifierBlocks.Assignability.validate/3`, not by
-  `Assignability.check/5` called with the block as its own candidate:
-  `check/5`'s downstream and vacated reads are defined relative to a
-  position a block is being moved to or from, and `validate/3`'s own doc
-  says why asking them of a block that already occupies the position checks
-  the document as though the block were somewhere it is not (ADR-0003
-  decision 7: validation is the authority, with the same rules `check/5`
-  applies). `validate/3` runs the two halves of `check/5` that are about the
-  block itself - kind admission at its slot, and its own reads against the
-  environment at its position - for every block, once.
+  Rule 2 is **kind admission** only: whether the block's kinds are ones its
+  slot accepts (ADR-0003 decision 3). Its findings are read from
+  `StatifierBlocks.Assignability.validate/3`, which checks every block at
+  its own position once, and only its `:kind_not_admitted` findings are
+  reasons here.
+
+  A `:type_mismatch` - a read the environment at the block's position
+  contradicts - is not a reason. It is a validation finding, and the editor
+  does not refuse a drop for one: a slot is offered to a drag when any of its
+  gaps accepts the block, a drop at another gap is committed and flagged,
+  and the editor never blocks an edit for a validation reason (ADR-0005
+  decision 5). A document holding such a read is one an author could have
+  built in the editor, and can go on editing there.
 
   ## Reasons
 
@@ -44,7 +47,7 @@ defmodule StatifierBlocks.Plan do
   | `{:unresolved, block_id, error}` | the block's type does not resolve through the palette; `error` is `StatifierBlocks.Palette.resolve/2`'s |
   | `{:slot_not_declared, block_id, {parent_id, slot}}` | the block sits in a slot its parent's type does not declare (rule 1) |
   | `{:no_room, block_id, {parent_id, slot, index}}` | the block sits past the first child of an `:exactly_one` or `:zero_or_one` slot (rule 3) |
-  | `{:not_admitted, block_id, finding}` | assignability refuses the block where it is (rule 2); `finding` is `StatifierBlocks.Assignability.finding/0`'s |
+  | `{:not_admitted, block_id, finding}` | the block's slot does not admit its kinds (rule 2); `finding` is the `:kind_not_admitted` member of `StatifierBlocks.Assignability.finding/0` |
   | `{:unfillable_slot, block_id, slot}` | the block's `:exactly_one` or `:at_least_one` slot is empty, and no block type in the palette is admitted there |
 
   A block whose parent does not resolve is not checked against rules 1 and
@@ -115,8 +118,10 @@ defmodule StatifierBlocks.Plan do
     end
   end
 
-  # Rule 2 for every block at its own position, grouped by the block each
-  # finding names. Both finding shapes carry that block's id second.
+  # Rule 2 for every block at its own position - kind admission, and only
+  # that: a `:type_mismatch` is a validation finding the editor flags rather
+  # than refuses, so it is left out. Grouped by the block each finding names,
+  # which a `:kind_not_admitted` carries second.
   @spec admission_findings(Palette.t(), Document.t(), Assignability.context()) ::
           %{optional(Block.id()) => [reason()]}
   defp admission_findings(palette, document, ctx) do
@@ -125,7 +130,9 @@ defmodule StatifierBlocks.Plan do
         %{}
 
       {:error, findings} ->
-        Enum.group_by(findings, &elem(&1, 1), &{:not_admitted, elem(&1, 1), &1})
+        findings
+        |> Enum.filter(&(elem(&1, 0) == :kind_not_admitted))
+        |> Enum.group_by(&elem(&1, 1), &{:not_admitted, elem(&1, 1), &1})
     end
   end
 

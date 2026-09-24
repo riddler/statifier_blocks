@@ -2,6 +2,7 @@ defmodule StatifierBlocks.PlanTest do
   use ExUnit.Case, async: true
 
   alias StatifierBlocks.{Block, Document, Palette, Plan}
+  alias StatifierBlocks.Edit.Targets
 
   doctest StatifierBlocks.Plan
 
@@ -139,8 +140,8 @@ defmodule StatifierBlocks.PlanTest do
       assert Plan.expressible?(decode!("patron_registration.json"), Palette.core()) == :ok
     end
 
-    # Mutation: drop the `Assignability.validate/3` findings from the reason
-    # list - red, the document reads as expressible.
+    # Mutation: drop the `Assignability.validate/3` kind findings from the
+    # reason list - red, the document reads as expressible.
     test "a handler dropped into a group's body is refused, naming the handler and the rule" do
       document = decode!("expressible/handler_in_body.json")
 
@@ -163,11 +164,8 @@ defmodule StatifierBlocks.PlanTest do
   end
 
   describe "rule 2 at the block's own position" do
-    # Mutation: answer rule 2 with `Assignability.check/5` at each block's own
-    # `{parent, slot, index}` instead of `validate/3` - red: the lend's read is
-    # checked against its own write, and the return's against the environment
-    # without the lend, and both come back as mismatches the document does not
-    # have.
+    # Mutation: make `expressible?/3` answer `{:no, []}` instead of `:ok` for
+    # an empty reason list - red.
     test "a typed chain whose every read is satisfied is expressible" do
       document =
         document([
@@ -179,17 +177,31 @@ defmodule StatifierBlocks.PlanTest do
       assert Plan.expressible?(document, library_palette()) == :ok
     end
 
-    # Mutation: drop the `Assignability.validate/3` findings from the reason
-    # list - red.
-    test "a read the environment contradicts is refused at the reading block" do
+    # Mutation: drop the `:kind_not_admitted` filter in
+    # `admission_findings/3` - red: the return's mismatched read comes back as
+    # `{:not_admitted, "blk_RET", {:type_mismatch, ...}}`, a refusal the
+    # editor does not make.
+    test "a read the environment contradicts is not a reason, since the editor offers that drop" do
+      {:ok, probe} = Targets.probe(library_palette(), "library.return")
+      before = document([Block.new("library.request", id: "blk_REQ")])
+
+      assert {"blk_ROOT", "body"} in Targets.droppable_slots_for(
+               before,
+               library_palette(),
+               probe,
+               %{}
+             )
+
       document =
         document([
           Block.new("library.request", id: "blk_REQ"),
           Block.new("library.return", id: "blk_RET")
         ])
 
-      assert {:no, [{:not_admitted, "blk_RET", {:type_mismatch, "blk_RET", "blk_REQ", _, _, _}}]} =
-               Plan.expressible?(document, library_palette())
+      assert {:error, [{:type_mismatch, "blk_RET", "blk_REQ", _, _, _}]} =
+               StatifierBlocks.Assignability.validate(library_palette(), document, %{})
+
+      assert Plan.expressible?(document, library_palette()) == :ok
     end
   end
 
@@ -254,16 +266,19 @@ defmodule StatifierBlocks.PlanTest do
 
   describe "the context" do
     # Mutation: call `Assignability.validate/3` with `%{}` instead of `ctx` -
-    # red: the skipped block's mismatch comes back.
+    # red: the skipped handler's kind finding comes back.
     test "is the one the assignability check is asked with" do
-      document =
-        document([
-          Block.new("library.request", id: "blk_REQ"),
-          Block.new("library.return", id: "blk_RET")
-        ])
+      handler =
+        Block.new("core.on_event",
+          id: "blk_LOST",
+          config: %{"event" => "loan.lost", "outcome" => "lost"}
+        )
 
-      assert Plan.expressible?(document, library_palette(), %{
-               skip_blocks: MapSet.new(["blk_RET"])
+      assert {:no, [{:not_admitted, "blk_LOST", {:kind_not_admitted, _, _, _, _, _}}]} =
+               Plan.expressible?(document([handler]), Palette.core())
+
+      assert Plan.expressible?(document([handler]), Palette.core(), %{
+               skip_blocks: MapSet.new(["blk_LOST"])
              }) == :ok
     end
   end
