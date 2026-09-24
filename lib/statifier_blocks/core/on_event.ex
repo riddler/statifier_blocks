@@ -332,10 +332,10 @@ defmodule StatifierBlocks.Core.OnEvent do
   with no fields already does.
 
   The destination side of a pair is untouched by all of this:
-  `StatifierBlocks.Environment.capture_writes/1` still writes `:unknown`
-  there. This types the source side at compile, and typing the
-  destination from the payload is a widening of ADR-0011 that no ruling
-  has asked for.
+  the capture-pair writes `StatifierBlocks.Environment.write_signatures/3`
+  reports still carry `:unknown` there. This types the source side at
+  compile, and typing the destination from the payload is a widening of
+  ADR-0011 that no ruling has asked for.
 
   `config_schema/1` declares **no field** for `capture`. ADR-0002
   decision 7's field-type set has no member that describes a map, the

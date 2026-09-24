@@ -71,8 +71,8 @@ defmodule StatifierBlocks.InvokeStep do
   subtree the block runs, and both outcome finals are emitted
   unconditionally rather than only when a slot is occupied.
 
-  The two share the `invoke_type` grammar (through
-  `StatifierBlocks.Core.Config`), the two event names, and the rule that
+  The two share the `invoke_type` grammar (through the internal config
+  helpers the `core.*` types share), the two event names, and the rule that
   `assign_to` is written on the success transition rather than in a
   `<finalize>` - the answer is only an answer when the call succeeded, and
   `<finalize>` runs for every event the invocation delivers.
@@ -260,7 +260,7 @@ defmodule StatifierBlocks.InvokeStep do
   `use` site or defines its own `failure_outcomes/1`, in the same place it
   would override `outcomes/1`.
 
-  This narrows one sentence of `StatifierBlocks.BlockType.failure_outcomes/1`'s
+  This narrows one sentence of `c:StatifierBlocks.BlockType.failure_outcomes/1`'s
   own Note: a type built on this module now exports the callback by
   inheritance, so it is classed even though it was written before the
   callback existed. The amendment counts that as a cost and takes it.

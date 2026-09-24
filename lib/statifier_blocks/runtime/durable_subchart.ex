@@ -3,7 +3,7 @@ defmodule StatifierBlocks.Runtime.DurableSubchart do
   The durable `statifier_blocks:subchart` handler (ADR-0008): the
   child runs as its own persisted `statifier_persistence` run, and the
   answer is given at **dispatch time** rather than from a pure
-  `Statifier.Invoke.Handler.start/2`.
+  `c:Statifier.Invoke.Handler.start/2`.
 
   `StatifierBlocks.Runtime.Subchart` is untouched and stays the in-memory
   canonical handler. This is the second module beside it (ADR-0008

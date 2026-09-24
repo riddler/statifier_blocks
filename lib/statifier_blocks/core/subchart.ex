@@ -142,7 +142,7 @@ defmodule StatifierBlocks.Core.Subchart do
   **The field accepts a datamodel path** (ADR-0011 decision 13): any
   non-empty string with no whitespace in it, which is exactly what
   `core.assign` accepts for the path it writes, read out of one
-  `StatifierBlocks.Core.Config.datamodel_path?/1`. `validate_config/1` and
+  internal datamodel-path predicate. `validate_config/1` and
   `emit/2` are widened together, because the emission has to answer for a
   config the validation would have rejected.
 

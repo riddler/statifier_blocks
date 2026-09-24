@@ -95,8 +95,8 @@ defmodule StatifierBlocks.Core.Map do
   none reads differently.
 
   It is a **type**, never a path and never an expression: it does not
-  carry `datamodel_path?`, it is not read through
-  `StatifierBlocks.Core.AssignLocation`, and it is offered no path
+  carry `datamodel_path?`, it is not read through the
+  internal assign-location check, and it is offered no path
   candidates. It has no findings of **this module's** either: what the
   shared check `StatifierBlocks.BlockType.type_expr_findings/2` refuses is
   bytes that are no arm at all, and it refuses them for every
@@ -156,11 +156,11 @@ defmodule StatifierBlocks.Core.Map do
   it to. The other three fields this package writes an
   `<assign location="...">` from - `core.invoke`'s and
   `StatifierBlocks.InvokeStep`'s `assign_to`, and `core.subchart`'s -
-  read the same `StatifierBlocks.Core.Config.datamodel_path?/1` since
+  read the same internal datamodel-path predicate since
   ADR-0011 decision 13 and its widening of 2026-09-06, so all four now agree: the same
   `<assign>` element writes the same datamodel, so there is one location
   rule to have. The shape of all four refusals is shared in
-  `StatifierBlocks.Core.AssignLocation`, and now the rule is shared too. A
+  one internal assign-location module, and now the rule is shared too. A
   bare lowercase identifier is still a valid `collect` - every one of them
   is already a datamodel path - so the widening refuses nothing the field
   accepted before.

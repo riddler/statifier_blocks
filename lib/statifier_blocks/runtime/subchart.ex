@@ -92,8 +92,8 @@ defmodule StatifierBlocks.Runtime.Subchart do
   as one `{:raise, :platform, ...}` instruction carrying the reason and a
   JSON-shaped `detail` map - never an `{:error, _}` from `start/2`, which
   the engine turns into a data-less `error.execution`
-  (`Statifier.Session.Effects.plan_invoke/3`) and would lose the reason
-  entirely.
+  (in the internal invoke planning of `Statifier.Session.Effects`) and would
+  lose the reason entirely.
 
   The raised event is `"error.communication.invoke." <> invoke.invoke_id`.
   `core.subchart` emits its `<invoke>` with `id=<block id>` (C3), so this
@@ -101,8 +101,9 @@ defmodule StatifierBlocks.Runtime.Subchart do
   `error.communication.invoke` transition - emitted only when `on_error`
   is occupied - catches it by SCXML's descriptor prefix rule. `attempts`
   is deliberately omitted from `detail`'s shape: a refusal made no
-  attempt, and the engine's own default (`Statifier.Session.build_failure_event/3`)
-  already reads an absent one as `:undefined`.
+  attempt, and the engine's own failure event
+  (`Statifier.Invoke.Answer.failed/4`) already reads an absent one as
+  `:undefined`.
 
   ## Why `perform/2` is absent
 
