@@ -11,6 +11,34 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.35.0] 2026-09-24
+
+0.35.0 is a minor, because it adds to the public surface and changes no
+existing signature. A host can now check a whole document against the
+palette it is about to mount before an author opens it:
+`StatifierBlocks.Plan.expressible/3` answers `:ok`, or `{:no, reasons}`
+with one reason per refusal, each naming the rule and the block, and
+`StatifierBlocks.Plan.expressible?/3` answers the same question as a
+boolean. The release also carries a host upgrade page for moving from 0.31
+to 0.34 one minor at a time, and a guide for moving a document off the 0.27
+vocabulary onto declared outcomes. Upgrading a host: nothing needs
+migrating, the package gains no dependency, and a host that calls neither
+new function sees no change from 0.34.0.
+
+### Added
+
+- `StatifierBlocks.Plan.expressible/3` checks a whole document against a
+  palette before it reaches the editor: `:ok` when every block's type resolves,
+  every block sits in a slot the editor would let an author drop it into
+  (declared, with room, admitting its kinds), and every empty required slot is
+  one the palette can fill; otherwise `{:no, reasons}` with one reason per
+  refusal naming the rule and the block. A read type mismatch is not a reason,
+  since the editor flags it rather than refusing the drop. An optional third
+  argument is the assignability context, defaulting to `%{}` as
+  `Edit.Targets.admits_at?/5` defaults it. `StatifierBlocks.Plan.expressible?/3`
+  asks the same question with the same arguments and answers a boolean, `true`
+  exactly when `expressible/3` answers `:ok`.
+
 ## [0.34.0] 2026-09-23
 
 0.34.0 is a minor, because it adds to the public surface and changes no
@@ -3498,6 +3526,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.35.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.35.0
 [0.34.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.34.0
 [0.33.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.33.0
 [0.32.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.32.0
