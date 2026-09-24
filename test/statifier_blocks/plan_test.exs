@@ -134,10 +134,10 @@ defmodule StatifierBlocks.PlanTest do
   end
 
   describe "the corpus" do
-    # Mutation: make `expressible?/3` answer `{:no, []}` instead of `:ok`
+    # Mutation: make `expressible/3` answer `{:no, []}` instead of `:ok`
     # for an empty reason list - red.
     test "patron registration is expressible through the core palette" do
-      assert Plan.expressible?(decode!("patron_registration.json"), Palette.core()) == :ok
+      assert Plan.expressible(decode!("patron_registration.json"), Palette.core()) == :ok
     end
 
     # Mutation: drop the `Assignability.validate/3` kind findings from the
@@ -150,7 +150,7 @@ defmodule StatifierBlocks.PlanTest do
                 {:not_admitted, "blk_PABN",
                  {:kind_not_admitted, "blk_PABN", "blk_PGRP", "body", [:interrupt_handler],
                   [:step]}}
-              ]} = Plan.expressible?(document, Palette.core())
+              ]} = Plan.expressible(document, Palette.core())
     end
 
     # Mutation: drop `unfillable_reasons/4` from the reason list - red, the
@@ -158,13 +158,13 @@ defmodule StatifierBlocks.PlanTest do
     test "a required slot the palette cannot fill names the block and the slot" do
       document = decode!("expressible/empty_required_slot.json")
 
-      assert Plan.expressible?(document, library_palette()) ==
+      assert Plan.expressible(document, library_palette()) ==
                {:no, [{:unfillable_slot, "blk_RNOT", "reminders"}]}
     end
   end
 
   describe "rule 2 at the block's own position" do
-    # Mutation: make `expressible?/3` answer `{:no, []}` instead of `:ok` for
+    # Mutation: make `expressible/3` answer `{:no, []}` instead of `:ok` for
     # an empty reason list - red.
     test "a typed chain whose every read is satisfied is expressible" do
       document =
@@ -174,7 +174,7 @@ defmodule StatifierBlocks.PlanTest do
           Block.new("library.return", id: "blk_RET")
         ])
 
-      assert Plan.expressible?(document, library_palette()) == :ok
+      assert Plan.expressible(document, library_palette()) == :ok
     end
 
     # Mutation: drop the `:kind_not_admitted` filter in
@@ -201,7 +201,7 @@ defmodule StatifierBlocks.PlanTest do
       assert {:error, [{:type_mismatch, "blk_RET", "blk_REQ", _, _, _}]} =
                StatifierBlocks.Assignability.validate(library_palette(), document, %{})
 
-      assert Plan.expressible?(document, library_palette()) == :ok
+      assert Plan.expressible(document, library_palette()) == :ok
     end
   end
 
@@ -210,7 +210,7 @@ defmodule StatifierBlocks.PlanTest do
     test "a block whose type the palette does not carry is unresolved" do
       document = document([Block.new("library.lend", id: "blk_LEND")])
 
-      assert Plan.expressible?(document, Palette.core()) ==
+      assert Plan.expressible(document, Palette.core()) ==
                {:no, [{:unresolved, "blk_LEND", {:unknown_block_type, "library.lend"}}]}
     end
 
@@ -219,7 +219,7 @@ defmodule StatifierBlocks.PlanTest do
       stray = Block.new("core.raise", id: "blk_RSE", config: %{"event" => "loan.lost"})
       root = Block.new("core.sequence", id: "blk_ROOT", slots: %{"stray" => [stray]})
 
-      assert Plan.expressible?(Document.new(root, id: "doc_1"), Palette.core()) ==
+      assert Plan.expressible(Document.new(root, id: "doc_1"), Palette.core()) ==
                {:no, [{:slot_not_declared, "blk_RSE", {"blk_ROOT", "stray"}}]}
     end
 
@@ -235,7 +235,7 @@ defmodule StatifierBlocks.PlanTest do
           slots: %{"on_error" => [first, second]}
         )
 
-      assert Plan.expressible?(document([invoke]), Palette.core()) ==
+      assert Plan.expressible(document([invoke]), Palette.core()) ==
                {:no, [{:no_room, "blk_R2", {"blk_INV", "on_error", 1}}]}
     end
   end
@@ -250,7 +250,7 @@ defmodule StatifierBlocks.PlanTest do
           config: %{"arms" => [%{"slot" => "arm_overdue", "cond" => "overdue"}]}
         )
 
-      assert Plan.expressible?(document([branch]), Palette.core()) == :ok
+      assert Plan.expressible(document([branch]), Palette.core()) == :ok
     end
 
     # Mutation: drop the `== []` filter from `unfillable_reasons/4`'s
@@ -260,7 +260,7 @@ defmodule StatifierBlocks.PlanTest do
       lost = Block.new("core.raise", id: "blk_RSE", config: %{"event" => "loan.lost"})
       hold = Block.new("library.hold", id: "blk_HOLD", slots: %{"pickup" => [lost]})
 
-      assert Plan.expressible?(document([hold]), library_palette()) == :ok
+      assert Plan.expressible(document([hold]), library_palette()) == :ok
     end
   end
 
@@ -275,11 +275,48 @@ defmodule StatifierBlocks.PlanTest do
         )
 
       assert {:no, [{:not_admitted, "blk_LOST", {:kind_not_admitted, _, _, _, _, _}}]} =
-               Plan.expressible?(document([handler]), Palette.core())
+               Plan.expressible(document([handler]), Palette.core())
 
-      assert Plan.expressible?(document([handler]), Palette.core(), %{
+      assert Plan.expressible(document([handler]), Palette.core(), %{
                skip_blocks: MapSet.new(["blk_LOST"])
              }) == :ok
+    end
+  end
+
+  describe "the boolean" do
+    # Mutation: make `expressible?/3` return `expressible/3`'s answer as is,
+    # without the `== :ok` - red: `:ok` is truthy but not `true`.
+    test "is true for a document the tagged answer calls expressible" do
+      document = decode!("patron_registration.json")
+
+      assert Plan.expressible(document, Palette.core()) == :ok
+      assert Plan.expressible?(document, Palette.core()) == true
+    end
+
+    # Mutation: make `expressible?/3` answer `true` for every document - red.
+    # Returning the tagged answer as is is red too: `{:no, reasons}` is
+    # truthy, which is the reading this function exists to rule out.
+    test "is false for a document the tagged answer refuses" do
+      document = decode!("expressible/handler_in_body.json")
+
+      assert {:no, [_ | _]} = Plan.expressible(document, Palette.core())
+      assert Plan.expressible?(document, Palette.core()) == false
+    end
+
+    # Mutation: call `expressible/3` with `%{}` instead of `ctx` inside
+    # `expressible?/3` - red: the skipped handler is refused again.
+    test "is asked with the same context as the tagged answer" do
+      handler =
+        Block.new("core.on_event",
+          id: "blk_LOST",
+          config: %{"event" => "loan.lost", "outcome" => "lost"}
+        )
+
+      ctx = %{skip_blocks: MapSet.new(["blk_LOST"])}
+
+      assert Plan.expressible?(document([handler]), Palette.core()) == false
+      assert Plan.expressible(document([handler]), Palette.core(), ctx) == :ok
+      assert Plan.expressible?(document([handler]), Palette.core(), ctx) == true
     end
   end
 end
