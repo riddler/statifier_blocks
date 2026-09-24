@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "bdoc_PATRONMIGRATE",
+  "revision": 1,
+  "metadata": {"name": "Patron registration, as written for 0.27"},
+  "root": {
+    "id": "blk_ROOT",
+    "type": "core.sequence",
+    "type_version": 1,
+    "slots": {
+      "body": [
+        {
+          "id": "blk_VERIFY",
+          "type": "library.verify_email",
+          "type_version": 1,
+          "config": {"event": "email.verified"}
+        },
+        {
+          "id": "blk_INTERESTS",
+          "type": "core.assign",
+          "type_version": 1,
+          "config": {"path": "registration.screen", "value": "\"interests\""}
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "type_name": "library.verify_email",
+  "version": 1,
+  "params": [
+    {"key": "event", "type": "string", "label": "Verified by", "default": ""}
+  ],
+  "palette_entry": {"label": "Verify the email address"},
+  "subtree": [
+    {
+      "type": "core.group",
+      "id_suffix": "body",
+      "slots": {
+        "body": [
+          {
+            "type": "core.await",
+            "id_suffix": "wait",
+            "config": {"event": {"$param": "event"}, "timeout": "24h"}
+          }
+        ],
+        "interrupts": [
+          {
+            "type": "core.on_event",
+            "id_suffix": "back",
+            "config": {"event": "registration.back_pressed", "outcome": "abandon"}
+          }
+        ]
+      }
+    }
+  ]
+}
