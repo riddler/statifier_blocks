@@ -12675,3 +12675,113 @@ None reverses what the Amendment decides; each is superseded by `1F` itself.
   written. `1F` decides the question, and this flip accepts that decision.
 
 Filed with `sb-qiox`.
+
+## Amendment (2026-09-23): decision 8A, the publish line - one package-drawn status line beside the `:header` slot, filled through a `publish_status` assign
+
+**Status: proposed (2026-09-23), drafted for `sb-fpon`; the implementation is
+`sb-9txh`, on `main` and shipped in 0.34.0.** Additive: 8A, 8B, decision 15
+and every clause above this line stand as written, no text above this line is
+edited, and the header line's status history is not extended here. It adds
+one clause, `1G`, which amends 8A. It is an amendment rather than a dated
+Note because it changes what 8A decides: 8A gives the whole outer header,
+compile and publish included, to the host, and says the header seam costs the
+package no API surface; `1G` puts one line of the package's own markup at the
+header's edge and adds one public assign to fill it.
+
+The code it records landed before the record did, and the editor's moduledoc
+has been its only account. This amendment records that code as it stands and
+decides nothing the code does not already do.
+
+`lib/`, `test/` and `assets/` cites below were read at `main` `f856ab4` and
+are written anchor first, line second; re-locate by anchor, not by number.
+
+### Context
+
+8A's table gives the host "the outer header: document identity, the document
+switcher, the theme control, compile and publish" (`:2037`), and its reason
+for a slot is that "a slot costs the package no API surface at all"
+(`:2048-2049`). 8B named the slot: "It is called `:header`" (`:3513`).
+Decision 15 keeps "what publishing means" outside this package (`:629-631`).
+
+A host about to publish a new revision usually knows two things an author
+should see before pressing its button: how many live executions are pinned to
+the chart the previous revision compiled to, and which class
+statifier-ex's `Statifier.Chart.diff/3` puts the change in. That record,
+`st-ADR-0072` decision 1 (proposed), names four classes: `:identical`,
+`:compatible`, `:mapped` and `:breaking`. A host could draw that sentence in
+its own slot markup under 8A as written; since `sb-9txh` the package draws it,
+from values the host hands it.
+
+### 1G. The editor draws one publish line beside the `:header` slot, from a `publish_status` assign the host fills; a value outside its shape draws nothing
+
+- **The assign and its shape.** `StatifierBlocks.Editor` takes an optional
+  `publish_status` assign: `nil`, the default, or `%{live: n, class: class}`,
+  with `n` a non-negative integer and `class` one of `st-ADR-0072` decision
+  1's four classes. The default is set in `def mount/1`
+  (`lib/statifier_blocks/editor.ex:804`), the assigns table row names it
+  (`editor.ex:639`), and the moduledoc's section "The publish line"
+  (`editor.ex:331`) states it.
+- **Both values are the host's.** The package makes no query for the count,
+  holds no revision store, diffs no charts and re-pins no execution; the line
+  reports what the host passed (the moduledoc's "The publish line",
+  `editor.ex:344-347`). What publishing means stays the host's, as decision
+  15 says.
+- **The text.** One sentence, the count spelled for zero, one and many, then
+  the class: "3 live executions on the previous revision; this change is
+  compatible" (`defp publish_line/1`, `editor.ex:2812`, and
+  `defp live_executions/1`, `editor.ex:2819-2821`).
+- **The placement.** The line is the package's markup and not a header, so it
+  is drawn beside the `:header` slot, never inside it: as the root's child
+  immediately after where the header element is. With the slot filled that is
+  directly after the host's `<header>`; with the slot empty there is no header
+  element, and the line is the root's first child (`def render/1`: the
+  `<header :if={@header != []}>` at `editor.ex:1092`, the line's `<p>` at
+  `editor.ex:1096`, both direct children of the root element opened at
+  `editor.ex:1080`).
+- **An out-of-shape value draws nothing.** `nil` draws no line, and the
+  editor's markup is then byte for byte what it was before the assign existed.
+  Any other value - a count that is not a non-negative integer, a class
+  outside the four, a map missing either key - is refused into no line rather
+  than drawn, so a host that passes a class this package does not know gets no
+  sentence naming it (`defp publish_line/1`'s fallback clause,
+  `editor.ex:2817`, beside `@publish_classes`, `editor.ex:2808`; the value is
+  normalized once per render in `def render/1`, `editor.ex:1077`).
+- **The two data attributes.** The line carries `role="status"`, the class as
+  `data-publish-class` and the count as `data-live` (`def render/1`,
+  `editor.ex:1099-1101`), so a host styling it per class needs no text match.
+  Its class is `sb-editor__publish-status`, and the stylesheet gives it one
+  rule on existing tokens (`assets/css/statifier_blocks.css:2957`).
+
+What `1G` leaves of 8A: the header itself, the document switcher, the theme
+control and the compile and publish controls are still the host's markup in
+the `:header` slot, and a press of the host's publish button is still the
+host's event. The package gains one assign and one line, and no event.
+
+The tests are `test/statifier_blocks/editor/publish_status_test.exs`: the
+describe "nil" (byte for byte against a mount passing nothing, for every
+fixture), "each class", "the count", "where the line is drawn" (the tests
+"with the header slot filled, directly after the host's header" and "with
+the header slot empty, as the root's first child"), "a value outside the
+documented shape" ("is refused into no line") and "a host re-filling the
+line".
+
+### What this amendment does not decide
+
+- **Anything about the four classes** beyond naming them. What each means is
+  `st-ADR-0072`'s, and a fifth class there is refused into no line here until
+  a record adds it to this one.
+- **A publish control, a publish event, or an edit-time display of the
+  publish check.** None is the package's; the last stays open as `ADR-0014`
+  leaves it.
+- **Where a host gets the count or the class.** That is the host's, with no
+  seam in this package.
+
+### Consequences
+
+- 8A's "a slot costs the package no API surface at all" (`:2048-2049`) still
+  holds of the slot. The header region now has one package-drawn neighbour,
+  and its API surface is the one assign `1G` names.
+- A host mounting the editor without `publish_status` renders what it
+  rendered before the assign existed; the change is in the 0.34.0 changelog.
+
+Filed with `sb-fpon`.
