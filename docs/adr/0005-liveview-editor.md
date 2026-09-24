@@ -12974,15 +12974,19 @@ that drop" in `test/statifier_blocks/plan_test.exs` shows `droppable_slots_for`
 offering the slot and `expressible?` answering `:ok` for the resulting
 document.
 
-## Note (2026-09-24): `5F`'s function is `expressible/3`, and `expressible?/3` is its boolean twin
+## Amendment (2026-09-24): `5F`'s function is `expressible/3`, and `expressible?/3` is its boolean twin
 
-A dated Note rather than a second correction: the Amendment of 2026-09-24
-and its Correction above stand as printed, and no line above this one is
-edited. It records a rename made before any release carried `5F`, the
-boolean function added beside it, and two wording points in the text above.
-`5F`'s rules, reasons, order and optional `ctx` are unchanged. `lib/` cites
-into `plan.ex`, which this request changes, are by anchor alone; the one
-other `lib/` cite was read at `a17e0dd` and holds unchanged at `1d5253e`.
+**Status: proposed (2026-09-24), drafted and implemented in one request for
+`sb-3owm`.** Additive: the Amendment of 2026-09-24 and its Correction above
+stand as printed, no line above this one is edited, and the header line's
+status history is not extended here. It is an amendment rather than a dated
+Note because it renames the public function `5F` decides and adds a second
+public function beside it, and `5F`'s own Status paragraph (`:12860-12866`)
+names a public function as what makes a block an amendment. It also records
+two wording points in the text above. `5F`'s rules, reasons, order and
+optional `ctx` are unchanged. `lib/` cites into `plan.ex`, which this
+request changes, are by anchor alone; the one other `lib/` cite was read at
+`a17e0dd` and holds unchanged at `1d5253e`.
 
 **The rename.** The function `5F` names answers `:ok` or `{:no, reasons}`,
 and both are truthy, so under the trailing-`?` convention Elixir keeps for
@@ -13002,7 +13006,9 @@ optional `ctx`, and answers `true` exactly when `expressible/3` answers
 `:ok`, `false` otherwise. It drops the reasons; a host that shows an author
 why asks `expressible/3`. The tests are the describe "the boolean" in
 `test/statifier_blocks/plan_test.exs`. With it, the Consequences bullet
-(`:12936`) reads two public functions where it says one.
+(`:12936`) reads two public functions where it says one, and each is the
+kind of addition `5F`'s Status paragraph (`:12860-12866`) calls amendment
+material.
 
 **Arity.** Both functions take an optional third argument, so each is
 defined at `/3` with a default and callable with two or three arguments.
@@ -13015,8 +13021,8 @@ from `Edit.Targets`'s moduledoc and cites `edit/targets.ex:36` at
 cite is `edit/targets.ex:35-36`, under the moduledoc's numbered point
 opening "The index-dependent half is a seam check".
 
-Nothing in this Note changes what `5F` or its Correction decides about a
-document; it changes the name a host calls and adds the boolean it can call
-beside it.
+This amendment changes nothing `5F` or its Correction decides about a
+document. It changes the name a host calls and adds the boolean it can call
+beside it, which is why it is an amendment: both are public functions.
 
 Filed with `sb-3owm`; the arity and cite points are `sb-39qs`'s.
