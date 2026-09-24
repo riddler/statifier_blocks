@@ -1,0 +1,1 @@
+{"id":"bdoc_01JRENEW","metadata":{"name":"Loan renewal notice, no reminder yet"},"revision":0,"root":{"id":"blk_RROOT","slots":{"body":[{"id":"blk_RNOT","type":"library.renewal_notice","type_version":1}]},"type":"core.sequence","type_version":1},"schema_version":1}

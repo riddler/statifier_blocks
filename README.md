@@ -1391,6 +1391,13 @@ answer. Pass the anchored ones as the `findings` assign, or straight into
 `StatifierBlocks.ViewModel.build/3` if you are driving the view model
 yourself.
 
+A document that did not come out of the editor - a stored master, one built
+in code - can be checked against the palette you are about to mount before
+an author opens it: `StatifierBlocks.Plan.expressible?(document, palette)`
+answers `:ok` when every block sits where the editor would have let an author
+put it and every empty required slot is one the palette can fill, and
+`{:no, reasons}` otherwise, each reason naming the rule and the block.
+
 ### Not yet
 
 Honest about the edges, so you do not go looking for these:

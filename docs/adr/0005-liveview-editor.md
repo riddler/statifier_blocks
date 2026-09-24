@@ -12854,3 +12854,86 @@ None. The moduledoc's re-wrap after the tag changed no sentence the
 Amendment quotes or paraphrases.
 
 Filed with `sb-2g62`.
+
+## Amendment (2026-09-24): decision 5 asked of a whole document - `StatifierBlocks.Plan.expressible?/2`
+
+**Status: proposed (2026-09-24), drafted and implemented in one request for
+`sb-u6es`.** Additive: decision 5 and every clause above this line stand as
+written, no text above this line is edited, and the header line's status
+history is not extended here. It adds one clause, `5F`, which widens decision
+5. It is an amendment rather than a dated Note because it adds a public module
+and a public function that decide something no clause above decides: what the
+editor would say about a document it did not build.
+
+`lib/` cites below were read at `main` `a17e0dd` unless they name
+`lib/statifier_blocks/plan.ex`, which this request adds; those are cited by
+anchor alone.
+
+### Context
+
+Decision 5 (`:212`) answers "may this block go here" for a block being
+dragged, through four rules (`:221-230`), and `Edit.Targets.admits_at?/5`
+(the 2026-09-08 Note's item 5, `:10567`; `def admits_at?`,
+`edit/targets.ex:300` at `a17e0dd`) answers it for one type at one slot's
+append gap. Neither answers it for a document that already exists. A host
+that installs a document the editor did not produce - a stored master, one
+built in code, one written against an older palette - has no way to ask
+whether an author handed that document and a given palette can go on editing
+it, short of mounting the editor and looking.
+
+### 5F. `StatifierBlocks.Plan.expressible?/2` asks decision 5's rules of every block at its own position, and asks whether every empty required slot can be filled
+
+- **The function.** `expressible?(document, palette, ctx \\ %{})`, answering
+  `:ok` or `{:no, reasons}` (`def expressible?` in `plan.ex`). `ctx` is the
+  `Assignability.context()` the assignability check is asked with, defaulted
+  the way `admits_at?/5` defaults it.
+- **Rules 1 and 3 at the block's own position.** A block in a slot its
+  parent's type does not declare is `{:slot_not_declared, id, {parent_id,
+  slot}}`; a block past the first child of an `:exactly_one` or
+  `:zero_or_one` slot is `{:no_room, id, {parent_id, slot, index}}`
+  (`defp placement_reasons/3` and `defp room_reasons/4` in `plan.ex`). Rule 4
+  cannot fail for a block already in a tree.
+- **Rule 2 is `Assignability.validate/3`, not `check/5`.** `validate/3`
+  (`def validate`, `assignability.ex:937` at `a17e0dd`) runs kind admission
+  and a block's own reads at its own position, for every block, and its own
+  doc (`assignability.ex:915` at `a17e0dd`) says why `check/5` called with a
+  block already at its target checks the document as though the block were
+  somewhere it is not. ADR-0003 decision 7 (`0003-assignability.md:236`)
+  makes validation the authority with the same rules. Each finding becomes
+  `{:not_admitted, id, finding}` (`defp admission_findings/3` in `plan.ex`).
+- **A block the palette cannot resolve** is `{:unresolved, id, error}`, with
+  `Palette.resolve/2`'s error (`defp resolution_reasons/2` in `plan.ex`). The
+  assignability check degrades permissively on such a block, so without this
+  reason a document holding a type the palette does not carry would pass.
+- **An empty required slot no palette type can fill** - an `:exactly_one` or
+  `:at_least_one` slot with no child, where
+  `Edit.Targets.accepted_types_at/5` (`def accepted_types_at`,
+  `edit/targets.ex:337` at `a17e0dd`) admits no type - is
+  `{:unfillable_slot, id, slot}`, naming the block that declares the slot
+  (`defp unfillable_reasons/4` in `plan.ex`). An empty required slot the
+  palette can fill is not a reason: decision 5's "the editor never blocks an
+  edit for a validation reason" (`:246`) lets an author empty one, and fill it
+  again.
+- **Order.** Reasons follow `Document.blocks/1` pre-order, and within one
+  block the order the moduledoc's table lists them.
+
+The tests are `test/statifier_blocks/plan_test.exs`, with the corpus cases
+under the describe "the corpus": `test/fixtures/documents/patron_registration.json`
+expressible through `Palette.core/0`, and the two documents under
+`test/fixtures/documents/expressible/`, a handler dropped into a group's body
+and a required slot no type in the palette is admitted into.
+
+### What this amendment does not decide
+
+- **Recipes and profiles.** `5F` asks a palette's block types, not its
+  recipes, and sees the palette it is handed rather than a mount's `profile`.
+- **Whether the editor calls it.** Nothing in the editor asks `5F` today; it
+  is a host's call before a mount.
+- **A repair.** `5F` reports; nothing is moved, removed or inserted.
+
+### Consequences
+
+- `StatifierBlocks.Plan` is a new public module with one public function; no
+  existing signature changes. The change is in the next release's changelog.
+
+Filed with `sb-u6es`.
