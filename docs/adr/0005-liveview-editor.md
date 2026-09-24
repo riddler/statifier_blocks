@@ -12678,7 +12678,7 @@ Filed with `sb-qiox`.
 
 ## Amendment (2026-09-23): decision 8A, the publish line - one package-drawn status line beside the `:header` slot, filled through a `publish_status` assign
 
-**Status: proposed (2026-09-23), drafted for `sb-fpon`; the implementation is
+**Status: accepted (2026-09-23), drafted for `sb-fpon`; the implementation is
 `sb-9txh`, on `main` and shipped in 0.34.0.** Additive: 8A, 8B, decision 15
 and every clause above this line stand as written, no text above this line is
 edited, and the header line's status history is not extended here. It adds
@@ -12785,3 +12785,72 @@ line".
   rendered before the assign existed; the change is in the 0.34.0 changelog.
 
 Filed with `sb-fpon`.
+
+## Note (2026-09-23): the Amendment on decision 8A, the publish line, is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+that Amendment's status line (`:12681`, clause `1G`), by one word, `proposed`
+to `accepted`. This Note is added at the foot of the file, so no line another
+record cites moves.
+
+The operator granted, on 2026-09-23, the flip to accepted of proposed records
+whose code has shipped. The code `1G` records is in the published 0.34.0 (tag
+`v0.34.0`, `c0ad673`), and the 0.34.0 section of `CHANGELOG.md` names the
+`publish_status` assign. The Amendment itself landed after the tag, at
+`2004d80`, and records that code as it stood. This request takes the grant
+for this Amendment alone, through the same `docs/adr/` direction gate, after
+checking every claim it makes against the code at `v0.34.0` and at `main`
+`2004d80`.
+
+The Amendment's `lib/`, `test/` and `assets/` cites were read at `f856ab4`,
+after the tag. Between `c0ad673` and `2004d80` one request touched
+`lib/statifier_blocks/editor.ex`: `c2bc38b` re-wrapped the moduledoc's
+publish-line paragraph to name the engine function as
+`Statifier.Chart.diff(from, to, opts)` where the tag names
+`Statifier.Chart.diff/3`, and the table row's wording the same way. The
+paragraph gained one line, so every `editor.ex` cite from `:336` on sits one
+line earlier at the tag. No code changed; `assets/css/statifier_blocks.css`
+and `test/statifier_blocks/editor/publish_status_test.exs` did not change.
+Cites below are written anchor first, then the line at `c0ad673`, then at
+`2004d80`; a later reader re-locates by the anchor and not by the number.
+
+### 1G, and where each bullet reads
+
+| Bullet | At `c0ad673` / `2004d80` |
+|---|---|
+| The assign and its shape (`:12717`) | the default `publish_status: nil` inside `def mount/1` (`editor.ex:803` / `:804`); the assigns table row (`:638` / `:639`); the moduledoc's "The publish line" (`:331` / `:331`), which names `%{live: n, class: class}` and the four classes at both SHAs |
+| Both values are the host's (`:12724`) | the moduledoc's "Both values are the host's" paragraph (`:343-346` / `:344-347`); `editor.ex` holds no query, revision store or diff call for either value |
+| The text (`:12729`) | `defp publish_line/1` (`:2811` / `:2812`) builds "`<count phrase>`; this change is `<class>`", and `defp live_executions/1` (`:2818-2820` / `:2819-2821`) spells zero, one and many; the describe "the count" |
+| The placement (`:12733`) | in `def render/1`, the root `<div` (`:1079` / `:1080`), the `<header :if={@header != []}>` (`:1091` / `:1092`) and the line's `<p` (`:1095` / `:1096`), both direct children of the root, the `<p` immediately after the header; the describe "where the line is drawn" |
+| An out-of-shape value draws nothing (`:12741`) | `publish_line/1`'s fallback clause (`:2816` / `:2817`) answers `nil` for anything the first clause's guard, over `@publish_classes` (`:2807` / `:2808`), does not admit; the value is normalized once per render (`:1076` / `:1077`); the describes "nil" and "a value outside the documented shape" |
+| The two data attributes (`:12749`) | `role="status"`, `data-publish-class` and `data-live` on the `<p` (`:1098-1100` / `:1099-1101`); `.sb-editor__publish-status` (`assets/css/statifier_blocks.css:2957` at both) sets margin, font size and colour from `--sb-space-2`, `--sb-text-sm` and `--sb-fg-muted`, all defined in the same file |
+| What `1G` leaves of 8A (`:12755`) | no `handle_event/3` clause in `editor.ex` names a publish event; the assign and the line are the only additions |
+| The tests (`:12760`) | the six describes named are in `publish_status_test.exs` at both SHAs, with the two placement tests and "is refused into no line" by those names |
+
+The Context's cites into this file hold: 8A's host row (`:2037`), "a slot
+costs the package no API surface at all" (`:2048-2049`), 8B's "It is called
+`:header`" (`:3513`) and decision 15's host concerns (`:629-631`). The
+edit-time display of the publish check is still undecided in `ADR-0014`
+("An edit-time display of the check", in its "What this record does not
+decide"), as "What this amendment does not decide" (`:12773`) says.
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- The Amendment calls `st-ADR-0072` decision 1 "(proposed)" (`:12710`). On
+  statifier-ex `main` at `e7d37bf` it still is. This flip accepts `1G` as
+  this package's: the four atoms `@publish_classes` admits are the ones that
+  record's decision 1 names, and what each means stays that record's, as the
+  Amendment says of itself.
+- The Amendment's status line says the implementation is "on `main` and
+  shipped in 0.34.0" (`:12681-12682`); read above.
+- This file's head `Status:` line is not extended.
+
+### Sentences that no longer hold as written
+
+None. The moduledoc's re-wrap after the tag changed no sentence the
+Amendment quotes or paraphrases.
+
+Filed with `sb-2g62`.

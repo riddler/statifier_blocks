@@ -4379,7 +4379,7 @@ Filed with `sb-910d`.
 
 ## Amendment (2026-09-23): two revisions of one document map state for state through their block ids, a state with no counterpart is reported and never mapped, and two documents are refused
 
-**Status: proposed (2026-09-23), drafted for `sb-dm82`; the implementation is
+**Status: accepted (2026-09-23), drafted for `sb-dm82`; the implementation is
 `sb-1gbj`.** Additive: no text above this line is edited, every decision above
 stands as written, and the header line's status history is not extended here.
 It adds clauses `M1` to `M6`. This is an amendment rather than a dated Note
@@ -4624,3 +4624,72 @@ registration document, the answer is `{:error, :different_documents}`.
   empty list means every state of the old chart has a counterpart, and a
   non-empty one names the blocks a plan has to drop or the migration has to
   refuse.
+
+## Note (2026-09-23): the Amendment of 2026-09-23 on the revision mapping is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+that Amendment's status line (`:4382`, clauses M1 to M6), by one word,
+`proposed` to `accepted`. This Note is added at the foot of the file, so no
+line another record cites moves.
+
+The operator granted, on 2026-09-23, the flip to accepted of proposed records
+whose code has shipped. The Amendment's code, `StatifierBlocks.Migration`, is
+in the published 0.34.0 (tag `v0.34.0`, `c0ad673`, which carries
+`0d8a502`, the request that added it). This request takes that grant for
+this Amendment alone, through the same `docs/adr/` direction gate, after
+checking every claim it makes against the code at `v0.34.0` and at `main`
+`2004d80`. Between the two, `lib/statifier_blocks/migration.ex`,
+`test/statifier_blocks/migration_test.exs`, `provenance.ex`,
+`validation.ex`, `compiler/serializer.ex`, `core/wait.ex` and
+`compilation_record.ex` did not change; `compiler/state_id.ex` changed only
+in the `@doc` paragraph the Amendment cites under "Why this is total rather
+than best-effort", where the module that admits any non-empty string is now
+named as `StatifierBlocks.Document.validate/1`, and no line moved.
+
+Every code cite the Amendment gives, read at `928b22d`, is at the same line
+at `c0ad673` and at `2004d80`. Cites below are written anchor first, line
+second; a later reader re-locates by the anchor and not by the number.
+
+### M1 to M6, and where each reads
+
+| Clause | Read at `c0ad673` and `2004d80` |
+|---|---|
+| M1, correspondence by id and owner (`:4440`) | `def plan/2` (`migration.ex:101`) splits the from chart's states by `defp counterpart?/4`, which asks `Provenance.owner_of_state/2` (`provenance.ex:111`) on both sides and compares block id and role only (`defp same_owner?/2`); equal ids whose owners differ are pinned by "an equal state id whose two owners differ does not correspond" in `test/statifier_blocks/migration_test.exs` |
+| M1, which elements are states (`:4461`) | `@states ~w(state parallel final history)`, read from the SCXML by `defp chart_states/1`; the serializer keys `by_state_id` by every owned `id` `StateId.unstate_id/1` reads (`defp record_state/2`, `compiler/serializer.ex:152`), and `core.wait` mints its timer's id under the role `Cancels.armed_role/0` answers, `"send"` (`def emit/2`, `core/wait.ex:232`); the test "the pickup timer's send id is not a state and is mapped nowhere" |
+| M1, the two artifacts and nothing else (`:4471`) | `plan/2` reads each artifact's `scxml`, `provenance` and `record.document_id`, and takes no other argument |
+| M2, state for state, identity entries written out (`:4475`) | `defp identity_map/1` writes every mapped state as an entry; the describe "the library hold's edit (M1, M2)" |
+| M2, an `<invoke>` by ordinal (`:4494`) | `defp invocations/2` emits `[id, ordinal, id, ordinal]` for ordinals below the smaller of the two states' `<invoke>` counts; the test "an invocation maps to the same ordinal only where the to state has one" |
+| M3, unmapped, never guessed (`:4508`) | the from states `counterpart?/4` rejects go only to `"unmapped"`, each as `%{"state_id", "block_id", "role"}` from the from side's map (`defp unmapped_entry/2`) and sorted by state id (`defp sort_by_id/1`); `role` is the provenance owner's, `nil` for a block's own state (`@type owner`, `provenance.ex:62`); the describe "a state with no counterpart (M3)" |
+| M4, two documents refused (`:4532`) | `plan/2`'s first clause answers `{:error, :different_documents}` when the two records' `document_id`s differ (`migration.ex:97`); the describe "two documents (M4)", including "two artifacts of one document map whatever their revisions" |
+| M5, plain data in the plan's field names (`:4542`) | the answer's four string keys `"states"`, `"history"`, `"invocations"` and `"unmapped"`; the test "is plain data with string keys that survives a JSON round trip"; `mix.exs`'s `deps/0` names no statifier_persistence dependency |
+| M6, what is not decided (`:4563`) | `plan/2` reads no timer, datamodel or execution, and no compile or publish path calls it |
+| Consequences (`:4617`) | one public function, `plan/2`, whose `@doc` cites M1 to M5 by clause; the module aliases no Phoenix module |
+
+The worked example (`:4579`) is the describe "the library hold's edit (M1, M2)" at
+both SHAs.
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- The Amendment calls `sp-ADR-0013` "proposed" (`:4403-4404`). That described the
+  day it was written. On statifier_persistence `main` at `3e25271` that
+  record's status line reads accepted, and its decisions 1, 3 and 8 still
+  read as the Amendment quotes them: the `states`, `history` and
+  `invocations` fields and the one invocation-key encoding, no source id
+  twice across `states`, `drop` and `history`, and this package as the one
+  that generates the three fields with no dependency on that package.
+- The Amendment calls `st-ADR-0072` "proposed" (`:4411`). On statifier-ex
+  `main` at `e7d37bf` it still is. This flip accepts M1 to M6 as this
+  package's and decides nothing about that record; the mapping calls neither
+  of the functions it names (M6).
+- The Amendment's status line names the request that drafted it and the one
+  that implemented it; the implementation is in 0.34.0, read above.
+- This file's head `Status:` line is not extended.
+
+### Sentences that no longer hold as written
+
+None.
+
+Filed with `sb-2g62`.
