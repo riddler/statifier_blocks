@@ -61,6 +61,11 @@ Two dependencies are **optional** and neither is added for you:
 `statifier_ui`, which an `:expression` field uses for its expression editor
 when it resolves. See [Embedding the editor](#embedding-the-editor).
 
+Moving a host up from 0.31, one minor at a time:
+[`docs/upgrading.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/upgrading.md)
+says what the host changes at each release, and names the calls a publish
+step makes.
+
 A document written against 0.27 still compiles. To have a composite in it say
 how it finished - declared `outcomes`, a handler's `finish_as` and the
 `on_<name>` slots an author fills - see
@@ -606,10 +611,16 @@ expansion - for a host that already ships the arrangement as a recipe.
 Three things are worth knowing before you reach for one:
 
 - **The compiler expands it, at the Resolve stage.** A document holding a
-  composite compiles to bytes identical to the same document with that
-  composite expanded in place, so nothing about the chart depends on which
-  of the two the author stored. `emit/2` raises if it is ever reached,
-  because no composite block survives to Emit.
+  composite that declares no `outcomes` compiles to bytes identical to the
+  same document with that composite expanded in place, so nothing about the
+  chart depends on which of the two the author stored. A composite that
+  declares `outcomes` is the exception: since 0.30.0 it compiles to a state
+  of its own enclosing its expansion, with one `<final>` per declared
+  outcome and an `on_<name>` slot for each, and the compiler writes that
+  state from the expansion itself. Either way `emit/2` raises if it is ever
+  reached, because the compiler never calls a composite's own `emit/2`.
+  [`docs/guides/migrating-documents-0.27-to-0.34.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/guides/migrating-documents-0.27-to-0.34.md)
+  shows a document moving onto declared outcomes.
 - **A finding inside an expansion is reported against the composite.** It
   carries the key of the param that produced the expanded block, or no key
   at all where no single param is responsible - never an anchor on a block
