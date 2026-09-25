@@ -90,7 +90,7 @@ correct and this plan confirms it rather than assuming it. The
 stop-and-report condition on an out-of-scope conflict does not fire.
 
 The amendment's premise also holds: sui-13q landed, and
-`/Users/johnnyt/Dev/github/statifier/statifier-ui/docs/fixture-bundles.md`
+`statifier-ui/docs/fixture-bundles.md`
 exists on statifier-ui's default branch (commit `2317ea7`, "Adds
 per-fragment fixture bundles and loader").
 
@@ -963,7 +963,7 @@ mutation note directly above it.
 - The d9 amendment, **not yet accepted**: PR #13, branch
   `sb-wm8-amend-adr0002-fixtures`, sections 9a/9b/9c of the same file
 - The convention the amendment adopts:
-  `/Users/johnnyt/Dev/github/statifier/statifier-ui/docs/fixture-bundles.md`
+  `statifier-ui/docs/fixture-bundles.md`
   (statifier-ui commit `2317ea7`)
 - Foundation: `docs/adr/0001-block-document-schema.md` and its implementation
   on this branch's base, `lib/statifier_blocks/block.ex:13-38`
