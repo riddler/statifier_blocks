@@ -11,7 +11,7 @@
  *
  * ## Everything here REPLAYS. Nothing here computes.
  *
- * The campaign's D4 ruling, verbatim: "chart/block runs are MOCKED (scripted
+ * The operator's ruling of 2026-08-28, verbatim: "chart/block runs are MOCKED (scripted
  * step sequences in fixture JSON - enough to prove the runner UI: step list,
  * active-block highlight via the tree, pass/fail chips). Condition fixtures get
  * a truth-table UI over precomputed expected values; a small real JS predicate
@@ -270,7 +270,7 @@ export function invokeView(invoke) {
  * is there. `item` is display-only source text under the same string rule the
  * deltas hold to, and nothing reads it back. The runner does not iterate, does
  * not know how long the list is, and does not check `index` against it - which
- * is D4's honest-replayer rule applied to the field most likely to look like
+ * is that ruling's honest-replayer rule applied to the field most likely to look like
  * machinery, exactly as `invokeView` above applies it to `outcome`.
  *
  * Three normalizations, the first two `invokeView`'s and the third this
@@ -522,7 +522,7 @@ export function tableCountFor(fixtures, blockId) {
 }
 
 /**
- * The drawer's COLLAPSED STRIP, derived (sb-3l1, ruling 5A / the 2A strip).
+ * The drawer's COLLAPSED STRIP, derived (sb-3l1, ruled by the operator 2026-08-29 / the 2A strip).
  *
  *     { present, expanded, count, label }
  *

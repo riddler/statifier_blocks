@@ -495,7 +495,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # Decision 12's read-only case reaches here as `form: nil`, and it is the
     # ConfigForm's own message rather than a second one written here: the tab
     # says why there is nothing to edit, and points at the Block section
-    # above, which is where D4 moved the bytes themselves.
+    # above, which is where the operator's ruling of 2026-08-29 moved the
+    # bytes themselves.
     defp config_panel(assigns) do
       ~H"""
       <ConfigForm.config_form

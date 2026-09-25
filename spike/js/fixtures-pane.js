@@ -10,7 +10,7 @@
  *
  * ## What this pane is allowed to claim
  *
- * The campaign's D4 ruling makes every number here fixture data. A run is a
+ * The operator's replay-only ruling (2026-08-28) makes every number here fixture data. A run is a
  * script someone wrote, a check's pass or fail is a value in the file, and a
  * truth table's cells are typed in. Nothing is interpreted and nothing is
  * evaluated. That is stated ON SCREEN rather than only in a comment, because a

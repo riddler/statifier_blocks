@@ -1,8 +1,8 @@
 defmodule StatifierBlocks.AssignabilityFixtures do
   @moduledoc """
   Test-only support for ADR-0003's worked example, re-expressed in the
-  family's canonical credit-card example domain (the umbrella's
-  `docs/terminology-firewall.md`, "Example domains"). `CoreFixtures`
+  family's canonical credit-card example domain (the family's examples
+  stay in a small set of neutral, public domains). `CoreFixtures`
   carries the `myapp.*` types the ADR-0001 worked example names, plus
   `sb-da9`'s stand-in walk; this module carries ADR-0003's own worked
   example instead - `myapp.authorize` / `myapp.settle` /

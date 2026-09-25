@@ -506,7 +506,7 @@ async function loadDocument(name) {
  * The picker's options come from `fixture-documents.js` rather than from the
  * markup, because they are now read twice: here, where a choice is fetched and
  * opened, and in `proposed-core.js`, where `core.subchart`'s chart reference
- * offers the same list (D11). Two hand-kept copies is how a reference ends up
+ * offers the same list. Two hand-kept copies is how a reference ends up
  * naming a document the shell has no file for.
  *
  * Appended after the markup's empty option, so "None" stays first.

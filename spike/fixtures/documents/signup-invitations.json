@@ -17,7 +17,8 @@
     "core.foreach (blk_si_each_invitee, added by sb-9nn), and core.invoke /",
     "core.raise, which the failure subtree reuses. The",
     "subchart's on_error slot is core.invoke's, unchanged - the same slot, the",
-    "same failure rail vocabulary (sb-68b), the same D13 ruling that an outcome",
+    "same failure rail vocabulary (sb-68b), the same ruling (the operator's,",
+    "2026-08-28) that an outcome",
     "path is a slot and never a port.",
     "The raise in the failure subtree is caught by the rail of the group the",
     "subchart sits in, exactly as in signup-wizard.json: the two are not joined",
@@ -88,7 +89,7 @@
                         "id, which is the only chart identity a spike with no compiler",
                         "has; a compiler would emit the identity statifier-ex ADR-0052/",
                         "0057 defines instead. The picker that wrote this value offers",
-                        "only the spike's own fixture documents (D11)."
+                        "only the spike's own fixture documents."
                       ],
                       "type": "core.subchart",
                       "id": "blk_si_invitee_signup",

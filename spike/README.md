@@ -344,7 +344,7 @@ accepted for the spike at kickoff: store the author's own string verbatim and
 compile to ISO-8601 at emit time (`Predicator.Duration` on the Elixir side).
 That is why `core.wait`, `core.send` and `core.timeout` now validate both
 spellings. The shipped `:duration` field type is ADR-0002 d7's and **no ADR
-text changes here**; if D4 is not adopted, the alternative that needs no ADR
+text changes here**; if that pre-decision is not adopted, the alternative that needs no ADR
 at all is to compile at commit time and store the ISO string, which is a
 change to one branch of this control and nothing else.
 
@@ -884,8 +884,8 @@ to the author who has to say what happens next.
 The child is **named, not embedded**. A body slot holding the child's blocks
 inline would be a second copy of a document that already exists with its own
 id, its own revision and its own runs, and a document is a tree whose chart is
-a build product of it. So the type declares no body slot at all, and D11
-settles the spike's half of the reference: the picker offers only the spike's
+a build product of it. So the type declares no body slot at all, and an operator
+ruling of 2026-08-28 settles the spike's half of the reference: the picker offers only the spike's
 own fixture documents, derived from `js/fixture-documents.js` rather than
 typed into the descriptor, so a reference cannot name a chart the shell could
 not open. What it stores is the child document's id - which is the only chart
@@ -896,7 +896,7 @@ identity statifier-ex ADR-0052/0057 defines.
 `run_si_invited` / `run_si_invite_abandoned` replay the two outcomes. The
 child's own steps are **not** replayed: the spike opens one document at a
 time, and a run that walked the child's blocks under the parent's name would
-be claiming machinery the D4 ruling refuses.
+be claiming machinery the spike's replay-only ruling (2026-08-28) refuses.
 
 Two open questions the type raises and does not answer. A child chart has more
 than two outcomes in general - it can finish in any of its final states, and
@@ -925,7 +925,7 @@ character rather than by interpretation. `dev/selftest.html` does exactly that.
 Two things are deliberately absent. Expressions: `capture_attempts + 1` is the
 obvious next `value` and three things would have to be decided first - which
 language, how it is stored, and what the spike would then have to refuse to do,
-since D4 means an expression-valued assign would replay exactly as a literal
+since replay-only means an expression-valued assign would replay exactly as a literal
 one and the screen would look identical while claiming more. And the
 declaration check: nothing asks whether `path` is declared in
 `fixtures/datamodel.json`, because that finding wants to be a **warning** and

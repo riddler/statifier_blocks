@@ -34,8 +34,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     inspector the block is the group heading.
 
     Above the list, `severity_pills/1` renders `Shell.severity_counts/1` as a
-    row of pills. The grouping is unchanged and still by block (D2): the
-    pills say how much, the list says where.
+    row of pills. The grouping is unchanged and still by block (ruled by
+    the operator, 2026-08-30): the pills say how much, the list says where.
 
     Two cases are easy to render wrong and are handled explicitly.
 
@@ -140,7 +140,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     It is not a filter. Nothing here is clickable, the list beneath is
     unchanged, and the grouping stays by block (`Shell.findings_groups/3`):
     the pills say how much, the groups say where. The spike grouped by
-    severity instead, and the operator's ruling did not adopt that - a
+    severity instead, and an operator ruling did not adopt that - a
     severity is a property of a finding, and the thing an author acts on is
     the block.
 
@@ -176,7 +176,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     )
 
     @doc """
-    One finding, in the anatomy every surface shows a finding in (D4).
+    One finding, in the anatomy every surface shows a finding in (ruled by
+    the operator, 2026-08-30).
 
     Severity, subject, anchor tail, source, message. There were three
     renderings of a finding before this one - this list's row, the
@@ -189,8 +190,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     * **Severity** is a word as well as the row's colour, for the reason
       `Shell.cell_word/1` records about truth-table cells: a reader who
       cannot tell two hues apart gets the same list as everyone else. It is
-      the enum's own word - `error`, `warning`, `info` (ruling D3) - and not
-      a synonym, so the word on screen is the value a host would match on.
+      the enum's own word - `error`, `warning`, `info` (ruled by the
+      operator, 2026-08-30) - and not a synonym, so the word on screen is
+      the value a host would match on.
       The colour stays on the row's own element (`.sb-finding` and its
       severity modifier), so a host restyling one severity restyles it in one
       place.
