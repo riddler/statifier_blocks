@@ -49,7 +49,7 @@ defmodule StatifierBlocks.Plan do
   | `{:unresolved, block_id, error}` | the block's type does not resolve through the palette; `error` is `StatifierBlocks.Palette.resolve/2`'s |
   | `{:slot_not_declared, block_id, {parent_id, slot}}` | the block sits in a slot its parent's type does not declare (rule 1) |
   | `{:no_room, block_id, {parent_id, slot, index}}` | the block sits past the first child of an `:exactly_one` or `:zero_or_one` slot (rule 3) |
-  | `{:not_admitted, block_id, finding}` | the block's slot does not admit its kinds (rule 2); `finding` is the `:kind_not_admitted` member of `StatifierBlocks.Assignability.finding/0` |
+  | `{:not_admitted, block_id, finding}` | the block's slot does not admit its kinds (rule 2); `finding` is the `:kind_not_admitted` member of `t:StatifierBlocks.Assignability.finding/0` |
   | `{:unfillable_slot, block_id, slot}` | the block's `:exactly_one` or `:at_least_one` slot is empty, and no block type in the palette is admitted there |
 
   A block whose parent does not resolve is not checked against rules 1 and
@@ -84,7 +84,7 @@ defmodule StatifierBlocks.Plan do
   `palette`, admits it, and every required slot that is still empty is one
   some block type in `palette` could fill; otherwise `{:no, reasons}`.
 
-  `ctx` is the `StatifierBlocks.Assignability.context/0` the assignability
+  `ctx` is the `t:StatifierBlocks.Assignability.context/0` the assignability
   check is asked with, defaulting to `%{}` the way
   `StatifierBlocks.Edit.Targets.admits_at?/5` defaults it. A host that
   mounts the editor with a datamodel document passes the same context here
