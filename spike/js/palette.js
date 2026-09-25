@@ -13,7 +13,7 @@
  *
  *   - `emit/2`. The spike compiles nothing; SCXML emission is ADR-0004's and
  *     has no visual surface here.
- *   - `fixtures/0`. The fixture-runner pane is mocked (campaign D4), and the
+ *   - `fixtures/0`. The fixture-runner pane is mocked (ruled by the operator, 2026-08-28), and the
  *     bundle spelling is statifier-ui's contract, not this file's to guess.
  *   - `migrate_config/2` on the core types, none of which declares one -
  *     every core type is at `current_version` 1. The mechanism itself IS

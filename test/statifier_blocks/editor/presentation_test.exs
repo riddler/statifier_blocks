@@ -1891,7 +1891,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    describe "nesting depth banding (sb-d7g, ruling D5)" do
+    describe "nesting depth banding (sb-d7g, ruled by the operator, 2026-08-29)" do
       # The number is ROOT-RELATIVE and it is the recursion's own counter. The
       # trap this pins is `Shell.depth/1`, which is right there, is called
       # "depth", and is a subtree MAXIMUM for the toolbar: reached for here it

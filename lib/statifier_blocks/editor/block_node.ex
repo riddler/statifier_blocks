@@ -74,14 +74,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     ## The unresolvable card's face
 
     Decision 12's card is the one exception to "the face is four lines", and
-    since ruling D4 it is a *smaller* exception than it was: a type name and
-    **one** short reason, and nothing else. Its findings and its raw config
-    are the inspector's - the Block section holds the bytes, the Findings tab
-    holds every finding - which is what keeps the card the same width as the
-    siblings it sits beside.
+    since the operator's ruling of 2026-08-29 it is a *smaller* exception
+    than it was: a type name and **one** short reason, and nothing else.
+    Its findings and its raw config are the inspector's - the Block section
+    holds the bytes, the Findings tab holds every finding - which is what
+    keeps the card the same width as the siblings it sits beside.
 
-    Before D4 this face carried both, and the pair is what made the card
-    misread. The findings are sentences, the config is a canonical JSON
+    Before that ruling this face carried both, and the pair is what made the
+    card misread. The findings are sentences, the config is a canonical JSON
     object, and a lane is as wide as the widest thing in it: one unresolvable
     block pushed its whole column out and buried the shape of the document
     under the detail of its one broken part. Detail an author reads once, on
@@ -102,8 +102,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         card.
       * a phrase chosen from a closed set is bounded by construction. No
         host-authored string reaches this line, so no host can widen the
-        card by writing a longer finding - which is the failure D4 is
-        undoing.
+        card by writing a longer finding - which is the failure that ruling
+        is undoing.
 
     The chrome stays dashed and the badge still counts, so the card says it
     is broken and how much is wrong with it; what it no longer does is say
@@ -723,11 +723,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    # D4's split, stated once. A resolvable card still reads its findings on
-    # the face - a broken `duration` on a `core.wait` is one line and belongs
-    # where the author is looking. An unresolvable card reads the reason line
-    # above instead, and every one of its findings is in the inspector's
-    # Findings tab, counted by the badge the chrome already draws.
+    # The 2026-08-29 ruling's split, stated once. A resolvable card still
+    # reads its findings on the face - a broken `duration` on a `core.wait`
+    # is one line and belongs where the author is looking. An unresolvable
+    # card reads the reason line above instead, and every one of its findings
+    # is in the inspector's Findings tab, counted by the badge the chrome
+    # already draws.
     #
     # The second clause is ADR-0005's Note of 2026-09-08, item 2: a
     # presentation diagnostic - a summary chip the cap refused or clipped -

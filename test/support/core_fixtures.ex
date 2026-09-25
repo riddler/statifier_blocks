@@ -6,8 +6,8 @@ defmodule StatifierBlocks.CoreFixtures do
 
     * the `myapp.*` block types the family's two worked examples name - the
       ADR-0001 credit-card authorization flow and the signup wizard with
-      A/B testing (the umbrella's `docs/terminology-firewall.md`, "Example
-      domains") - so each example can be checked against **real** core
+      A/B testing (the family's examples stay in a small set of neutral,
+      public domains) - so each example can be checked against **real** core
       types with only its host types stubbed;
     * `check/2`, a palette-aware walk of a document reporting resolution,
       config, arity, undeclared-slot and kind findings. The shipped version

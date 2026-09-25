@@ -4,8 +4,8 @@ defmodule StatifierBlocks.DocumentFixtures do
   ways so the encoder and the decoder can be checked against the same
   canonical bytes independently.
 
-  The two domains are the family's canonical pair (the umbrella's
-  `docs/terminology-firewall.md`, "Example domains"), and between them they
+  The two domains are the family's canonical pair (the family's examples stay
+  in a small set of neutral, public domains), and between them they
   exercise the whole `core.*` vocabulary:
 
   | Fixture | Domain | Core types it reaches |

@@ -47,7 +47,7 @@
               appended by shell.js from `js/fixture-documents.js`, which is
               also where core.subchart's chart picker gets its options: two
               hand-kept copies of the same list is how a chart reference ends
-              up naming a document the shell cannot open (D11).
+              up naming a document the shell cannot open.
             -->
             <select class="sb-select" id="sb-document">
               <option value="">None</option>
@@ -363,10 +363,11 @@
                        `fixtures/runs.json` by `fixtures-pane.js`. The truth
                        tables were a third sub-view here until sb-054 moved
                        them to the drawer below the editor. Everything both
-                       surfaces show is MOCKED per the campaign's D4 ruling: a
-                       run is a scripted step sequence and a truth table's
-                       cells are precomputed. Nothing here interprets a chart
-                       or evaluates a predicate, and both say so on screen. -->
+                       surfaces show is MOCKED (ruled by the operator,
+                       2026-08-28): a run is a scripted step sequence and a
+                       truth table's cells are precomputed. Nothing here
+                       interprets a chart or evaluates a predicate, and both
+                       say so on screen. -->
                   <div id="sb-fixtures-panel" class="sb-fixtures"></div>
                 </div>
               </div>
@@ -403,11 +404,11 @@
           hidden
         >
           <!--
-            The collapsed strip (sb-3l1, ruling 5A). Always in the markup, and
-            the only thing on screen while the drawer is collapsed: it is the
-            cold-start affordance, so a strip that appeared only once the
-            drawer had been opened some other way would close the very gap it
-            exists to close in the wrong direction.
+            The collapsed strip (sb-3l1, ruled by the operator, 2026-08-29).
+            Always in the markup, and the only thing on screen while the
+            drawer is collapsed: it is the cold-start affordance, so a strip
+            that appeared only once the drawer had been opened some other way
+            would close the very gap it exists to close in the wrong direction.
 
             A plain `<button>` rather than a `<summary>`: `<details>` owns its
             own open state, and the drawer's is already owned by

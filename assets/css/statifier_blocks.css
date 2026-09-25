@@ -482,9 +482,9 @@
   --sb-canvas-grid: radial-gradient(var(--sb-border) var(--sb-border-width), transparent 0) 0 0 /
     var(--sb-space-3) var(--sb-space-3);
 
-  /* The nesting bands (sb-d7g, ruling D5). Two grounds that alternate by the
-   * depth of the slot they paint, so a reader can see how deep a subtree sits
-   * without counting rules or edges.
+  /* The nesting bands (sb-d7g, ruled by the operator, 2026-08-29). Two
+   * grounds that alternate by the depth of the slot they paint, so a reader
+   * can see how deep a subtree sits without counting rules or edges.
    *
    * Both default to a surface the theme already carries rather than to a
    * literal, and that is the decision: a host that restates the four surfaces
@@ -1787,8 +1787,9 @@
   padding-left: var(--sb-space);
 }
 
-/* Depth banding (sb-d7g, ruling D5). Each nesting level is a full-width band
- * and adjacent levels alternate, which is the spike's reading and the one the
+/* Depth banding (sb-d7g, ruled by the operator, 2026-08-29). Each nesting
+ * level is a full-width band and adjacent levels alternate, which is the
+ * spike's reading and the one the
  * shipped editor lost when `sb-8yb` took the container boxes off: every depth
  * then sat on the same dotted ground and the tree's shape was carried by the
  * left edges alone.
