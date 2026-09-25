@@ -67,7 +67,7 @@ defmodule StatifierBlocks.Shell do
   @type inspector_tab :: :config | :findings | :condition | :fixtures
 
   @typedoc """
-  Which of the drawer's own tabs is showing (1A, and the R4 ruling of
+  Which of the drawer's own tabs is showing (1A, and the operator's ruling of
   2026-08-29 that put document findings here).
 
   The package's tabs are atoms and a host's are strings, which is what keeps
@@ -173,7 +173,7 @@ defmodule StatifierBlocks.Shell do
 
   # Tab order, and it is also the order the strip resolves an unchosen tab in
   # (see `drawer_view/1`). Truth tables first because they are what 2A shipped
-  # the drawer for; findings second because R4 moved them here; declarations
+  # the drawer for; findings second because the 2026-08-29 ruling moved them here; declarations
   # third because they are the newest and the resolution order is arrival
   # order, so a document with tables in it opens where it always did. Fixtures
   # goes last for the same reason: it is the newest tab of all, and putting it
@@ -1073,9 +1073,9 @@ defmodule StatifierBlocks.Shell do
 
   @doc """
   What the drawer shows, from its own open flag, its tab, the fixtures source,
-  the document's findings and the selection (2A, and R4).
+  the document's findings and the selection (2A, and the ruling of 2026-08-29).
 
-  Two tabs since R4 (operator, 2026-08-29): truth tables, and the
+  Two tabs since the operator's ruling of 2026-08-29: truth tables, and the
   document-level findings that used to render as a block under the canvas.
   Both are tabular and about the whole document, which is 1A's admission test.
   The tab decides the `title` and the `count` the strip carries, so a

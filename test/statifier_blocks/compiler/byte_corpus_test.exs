@@ -92,7 +92,7 @@ defmodule StatifierBlocks.Compiler.ByteCorpusTest do
            "#{directory} holds a file no corpus entry compiles, or is missing one it does"
   end
 
-  # `sb-hykt` (SF041): the donedata key the failure seam mints moved to
+  # `sb-hykt`: the donedata key the failure seam mints moved to
   # `statifier_persistence:execution_status` (`statifier_persistence`
   # ADR-0011 decision 4), and the four goldens of the two documents that
   # DO mint a failure-classed final were re-baselined in that same

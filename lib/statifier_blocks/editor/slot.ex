@@ -76,7 +76,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     restored - the mark still carries no event, no `phx-` attribute and no tab
     stop, which is item 7b's other half.
 
-    ## The gap IS the insertion marker (R3, operator ruling 2026-08-29)
+    ## The gap IS the insertion marker (operator ruling 2026-08-29)
 
     The ruling asks for "a marker on the edge between siblings, subtle at
     rest, highlighted on hover and during drag; empty slots keep a
@@ -130,7 +130,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     fires whether or not you get there, a failure path is the continuation
     this step takes when it goes badly - so a shared placement with no
     distinction read as a second set of interrupt rules, which is what
-    campaign 013's screens recorded.
+    the editor spike's screens recorded.
 
     ## The exit edge
 

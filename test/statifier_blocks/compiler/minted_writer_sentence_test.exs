@@ -1,6 +1,6 @@
 defmodule StatifierBlocks.Compiler.MintedWriterSentenceTest do
   @moduledoc """
-  ADR-0011's Note of 2026-09-08 (`RQ-SF038-24`, option 1), which `sb-bjt7`
+  ADR-0011's Note of 2026-09-08 (option 1), which `sb-bjt7`
   builds: a `:type_mismatch` whose disagreeing WRITER is a minted expansion
   member keeps the minted id in the tuple, and renders as the sentence of the
   composite block the author placed.

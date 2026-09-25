@@ -21,7 +21,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     `StatifierBlocks.Editor.CollapseTest`, which is where a container can be
     folded shut.
 
-    The document-level list is a drawer tab since operator ruling R4
+    The document-level list is a drawer tab since an operator ruling
     (2026-08-29) and no longer a block under the canvas, so every assertion
     about it opens the drawer first. That is not test ceremony: an author
     reaches the list the same way.
@@ -88,7 +88,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    describe "the Findings drawer tab (R4)" do
+    describe "the Findings drawer tab" do
       # Sabotage: `Findings.findings/1` rendering `@view.tables` instead of
       # `@view.findings` - the count collapses to zero and the anchors below go
       # missing.
@@ -112,7 +112,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       # Sabotage: `Editor.render/1` keeping the `<Findings.findings>` call in
       # `.sb-editor__main` - the list renders a second time with no scope on
-      # it, which is the position R4 retires.
+      # it, which is the position the ruling retires.
       test "and nothing lists them under the canvas", %{conn: conn} do
         {:ok, view, html} = mount_editor(conn, findings: findings())
 

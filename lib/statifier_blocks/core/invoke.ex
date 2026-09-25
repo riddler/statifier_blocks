@@ -17,7 +17,7 @@ defmodule StatifierBlocks.Core.Invoke do
   an author says what happens then is by putting blocks in the `on_error`
   slot. It is not a second outlet with an author-drawn edge: every edge in
   a document is a parent/slot/child relationship, which is the invariant
-  the editor's rendered connectors rest on (D13, and ADR-0002's amendment
+  the editor's rendered connectors rest on (ADR-0002's amendment
   section A2). The slot is a rail beside the step, declared with
   `zero_or_one` arity and the `:failure` slot style ADR-0005 decision 10's
   2026-08-29 amendment (10g) names for exactly this slot: an in-band

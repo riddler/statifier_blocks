@@ -71,7 +71,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     The presentation diagnostics do not draw here at all - see
     `face_findings/1`.
 
-    ## The unresolvable card's face (campaign-017 ruling D4)
+    ## The unresolvable card's face
 
     Decision 12's card is the one exception to "the face is four lines", and
     since ruling D4 it is a *smaller* exception than it was: a type name and
@@ -129,7 +129,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     box is paint, the stylesheet owns paint, and a host restyling the editor
     reads the same two hooks the package's own stylesheet does.
 
-    ## The delete affordance (operator ruling R2, campaign 016)
+    ## The delete affordance (operator ruling, 2026-08-29)
 
     "`x` on hover, `-` + `x` on the selected card, nothing at rest." A
     delete control on every one of forty cards at rest is noise competing
@@ -144,7 +144,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     so the contract is one string rather than a computed style nothing can
     check.
 
-    The `-` half of R2 now ships too, on container chrome only, as
+    The `-` half of that ruling now ships too, on container chrome only, as
     `.sb-node__fold`. It is not a fifth command: ADR-0005's command set is
     still `:insert`, `:move`, `:remove`, `:update_config`, and which
     containers are folded shut is editor state the shell holds beside the
@@ -164,8 +164,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     Its findings and its config read-only as canonical JSON (there is no
     `config_schema/1` to drive a form and inventing one would be guessing)
-    are still rendered, and still nowhere else in the editor - campaign-017
-    ruling D4 moved them from this card to the inspector's Block and Findings
+    are still rendered, and still nowhere else in the editor - an operator
+    ruling moved them from this card to the inspector's Block and Findings
     sections, for the reason the card-face section above gives. Decision 12's
     "nothing is lost" is unchanged by that; what changed is which surface
     shows it.
@@ -804,7 +804,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # per arm and a parallel reaches `:lanes` by declaring `layout: :columns`;
     # both put their columns side by side, and neither is named here.
     #
-    # Before campaign 016 only `:columns` was arranged, so a branch stacked
+    # At first only `:columns` was arranged, so a branch stacked
     # its arms full-width - every fan edge then ran straight down through the
     # arm above the one it was going to, which is the picture
     # recorded on 2026-08-29.

@@ -8,7 +8,7 @@ defmodule StatifierBlocks.Connectors do
   Clause 7b.2 then says where the drawing happens: **the connector geometry
   itself is computed on the server, as pure functions from measured
   rectangles to path data.** That is this module. It is the graduation of the
-  geometry half of the campaign-012/013 spike's `spike/js/layout.js`, which
+  geometry half of the editor spike's `spike/js/layout.js`, which
   kept the same split for the same reason and which
   `spike/dev/selftest.html` could only assert inside Chrome.
 
@@ -35,7 +35,7 @@ defmodule StatifierBlocks.Connectors do
      raised to the tail's own `y` rather than routed upward, because every
      arrowhead is oriented along its path and an ascending one points back
      at the block the flow just left. `flow_path/3` carried that clamp
-     alone until campaign-022 ruling R8d; the other three drew the arrow the
+     alone until an operator ruling; the other three drew the arrow the
      document does not contain.
 
   ## The 7d choices this module records
@@ -134,7 +134,7 @@ defmodule StatifierBlocks.Connectors do
   The last two are the only anchors that may be absent while the block they
   name is on the page: a stacked container renders no pill and a type that
   phrased no join renders no marker. Both fall back to the card and the
-  outlet, which is where every fan left and arrived before campaign 016.
+  outlet, which is where every fan left and arrived before the fan markers.
   """
 
   alias StatifierBlocks.ViewModel

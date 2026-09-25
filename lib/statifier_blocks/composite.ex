@@ -78,14 +78,14 @@ defmodule StatifierBlocks.Composite do
   |---|---|---|
   | `config_schema/1` | `params`, in declaration order | no |
   | `validate_config/1` | **not derived**: `ADR-0007`'s injected `:ok` stands, and the refusals `params` declare are run by the compile over `config_schema/1` (see below) | **yes** |
-  | `slots/1` | the declared pass-through slots, in declaration order (`RQ-SF038-5`) | no |
+  | `slots/1` | the declared pass-through slots, in declaration order | no |
   | `io/1` | see below | no |
   | `current_version/0` | the version the declaration states | no |
   | `outcomes/1` | the declaration's `outcomes` names, or - absent - the expansion root's, over its expanded config | no |
   | `sentence/1` | the declaration's template rendered over the config | **yes** |
-  | `summary/1` | one chip per visible param (`RQ-SF038-14`) | **yes** |
+  | `summary/1` | one chip per visible param | **yes** |
   | `palette_entry/0` | the map the declaration states | **yes** |
-  | `emit/2` | generated, and raises if reached (`RQ-SF037-6`) | no |
+  | `emit/2` | generated, and raises if reached | no |
 
   Five callbacks are overridable, and they reach that state by two different
   routes. The macro's own `defoverridable` re-marks the three it **redefines**
@@ -152,7 +152,7 @@ defmodule StatifierBlocks.Composite do
   A composite's reads and writes, as the environment walk consumes them, are
   the **union of its expanded members'**, each taken over that member's
   expanded config, at the composite's **one** position in the document
-  (`RQ-SF037-15`, ruled 2026-09-07: shape (A)). That union is computed by
+  (ruled by the operator, 2026-09-07: shape (A)). That union is computed by
   `StatifierBlocks.Environment.read_signatures/3` and `write_signatures/3` -
   the same two functions, run over `expand!/2`'s subtree - and not by `io/1`,
   which is single-valued in `consumes` and `produces` and carries no per-path
@@ -164,7 +164,7 @@ defmodule StatifierBlocks.Composite do
     * `kinds` - the members' `kinds` concatenated in expansion order, de-duplicated
     * `slot_accepts` - one entry per **declared pass-through slot**, at the
       mapped inner slot's own accepted kinds; `%{}` for a composite that
-      declares none, which is every composite written before `RQ-SF038-5`
+      declares none, which is every composite written before pass-through slots
     * `consumes` - the expansion root's, or absent when the root declares none
     * `produces` - the expansion root's, or absent when the root declares none
 
@@ -216,8 +216,8 @@ defmodule StatifierBlocks.Composite do
   for a block no param is responsible for.
 
   A member carrying more than one param's value is blamed on the **first**
-  param in declaration order (`ADR-0002`'s Note of 2026-09-07, item 5, ruling
-  `RQ-SF038-14`): the declaration has an order and an author reading a
+  param in declaration order (`ADR-0002`'s Note of 2026-09-07, item 5): the
+  declaration has an order and an author reading a
   finding needs one field to open, not none.
 
   `ADR-0004`'s amendment re-anchors a finding raised inside an
@@ -337,7 +337,7 @@ defmodule StatifierBlocks.Composite do
     * `:slots` - the **pass-through slots** this composite exposes, a list of
       `t:pass_through_decl/0` maps carrying `:name` and `:to`, with optional
       `:label` (defaulting to `:name`) and `:arity` (defaulting to `:any`).
-      Defaults to `[]`, which is every composite written before `RQ-SF038-5`.
+      Defaults to `[]`, which is every composite written before pass-through slots.
     * `:outcomes` - the **outcome names** this composite declares, a list of
       strings in the order it declares them (`ADR-0002`'s Amendment of
       2026-09-12, `C1`). Present and non-empty, the list **replaces** the
@@ -1518,7 +1518,7 @@ defmodule StatifierBlocks.Composite do
 
   # A block is blamed on a param whose value it carries. Where it carries more
   # than one, the FIRST in declaration order takes the blame (`ADR-0002`'s
-  # Note of 2026-09-07, item 5, ruling `RQ-SF038-14`): an author following a
+  # Note of 2026-09-07, item 5): an author following a
   # re-anchored finding needs one field to open, and the declaration has an
   # order to pick it by. A member carrying no distinguishing param value is
   # still `nil` - no param fed it, and there is nothing to name.

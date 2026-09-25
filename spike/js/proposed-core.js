@@ -345,7 +345,7 @@ function assignToFindings(config) {
  *
  * ## The on_error SLOT, and why it is not a port
  *
- * RULED 2026-08-28 (operator; umbrella `docs/decisions.md` D13): an outcome
+ * RULED 2026-08-28 (operator): an outcome
  * path is a SLOT, never a port. This is decided, not recommended. The tree
  * invariant the whole editor rests on - connectors are RENDERED, never
  * authored - survives only if every edge in a document is a parent/slot/child
@@ -481,8 +481,8 @@ const coreInvoke = {
  * is two blocks naming the same string in two places, and the enclosing
  * group's rail is where the catch lives.
  *
- * That is the same D13 answer `core.invoke`'s `on_error` gets (operator,
- * 2026-08-28; umbrella `docs/decisions.md`), arrived at from the other side.
+ * That is the same answer `core.invoke`'s `on_error` gets (operator,
+ * 2026-08-28), arrived at from the other side.
  * There an outcome path is a SLOT rather than a port; here a send is a NAME
  * rather than a port. Both refusals protect the one invariant the editor
  * rests on: every edge in a document is a parent/slot/child relationship, so
@@ -588,7 +588,7 @@ const coreRaise = {
  *
  * ## The on_error slot is `core.invoke`'s, deliberately unchanged
  *
- * Same declaration, same arity, same `failure` slot style (sb-68b), same D13
+ * Same declaration, same arity, same `failure` slot style (sb-68b), same
  * reason: an outcome path is a SLOT, never a port. A child chart that fails is
  * the same shape of event as a host call that fails - the step went badly and
  * the author wants somewhere to say what happens next - and giving it a second
@@ -754,7 +754,7 @@ const coreSubchart = {
  * the duration is up. "Interrupt this group after fifteen minutes, whatever it
  * is doing" is a different shape and no shipped `core.*` type expressed it, so
  * the demo documents grew `myapp.timeout_rule` to say it. That crutch is
- * retired (2026-08-28, umbrella D12) and this descriptor is what replaced it -
+ * retired (2026-08-28) and this descriptor is what replaced it -
  * which is the whole argument for the type: the core form covers what the host
  * form was standing in for, key for key.
  *
@@ -808,7 +808,7 @@ const coreSubchart = {
  * original deadline running across the resume. ADR-0010 decision 3 records
  * the first as intended; the second is answered by the record's 2026-09-02
  * note as an ADVISORY finding rather than a new arming convention (operator
- * ruling RQ-026-6, bead sb-dj1p); the third is nobody's.
+ * ruling, bead sb-dj1p); the third is nobody's.
  *
  * This descriptor is kept, not deleted, because it is now the evidence for a
  * refused proposal and because `dev/selftest.html` and
@@ -1164,9 +1164,9 @@ const coreAssign = {
  *   - a cancel names the SEND it cancels, so it needs an identity for a send.
  *     `sendid` in SCXML is a compile-time artifact; a block document's handle
  *     would have to be the sending block's id, which makes the cancel a
- *     cross-subtree REFERENCE to another block - the exact shape D13 refused
+ *     cross-subtree REFERENCE to another block - the exact shape the 2026-08-28 ruling refused
  *     for `core.invoke`'s failure path and `core.raise`'s catch (operator,
- *     2026-08-28, umbrella `docs/decisions.md`). Every edge in a document is a
+ *     2026-08-28). Every edge in a document is a
  *     parent/slot/child relationship, and a cancel pointing at a send would be
  *     the first hand-drawn one;
  *   - the alternative that keeps the tree invariant is scope-shaped rather

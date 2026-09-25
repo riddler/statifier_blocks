@@ -44,7 +44,7 @@ defmodule StatifierBlocks.Core.Drafts do
   at most one, are a depth constraint and a cardinality constraint. Neither
   is an intersection of a parent's `slot_accepts` with a child's `kinds`,
   so neither is expressible here; both are Structure-stage findings owned
-  by `StatifierBlocks.Shelf` (G12, campaign-024 ruling R-b).
+  by `StatifierBlocks.Shelf` (G12, as the operator ruled it).
 
   ## Against `core.placeholder`
 

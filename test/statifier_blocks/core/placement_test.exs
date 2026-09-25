@@ -45,7 +45,7 @@ defmodule StatifierBlocks.Core.PlacementTest do
   What the kind cannot say - that the root's `body` admits a shelf anyway,
   and that a document carries at most one - is not a placement question and
   is not here. Both are Structure-stage findings owned by
-  `StatifierBlocks.Shelf` (G12, campaign-024 ruling R-b), tested in
+  `StatifierBlocks.Shelf` (G12, as the operator ruled it), tested in
   `test/statifier_blocks/shelf_test.exs`.
   """
 

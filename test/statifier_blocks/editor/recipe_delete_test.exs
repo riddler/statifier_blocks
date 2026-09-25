@@ -29,7 +29,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @moduledoc """
     A well-behaved recipe that recognises a different arrangement in the same
     group and, registered as `"clock_pairwise"`, sorts before `"deadline"`. It
-    is how the first-by-name tiebreak (`3D`, ruling `RQ-SF037-11`) is observed
+    is how the first-by-name tiebreak (`3D`) is observed
     from outside.
     """
 
@@ -300,7 +300,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute "blk_handler" in ids(removed)
       end
 
-      # `3D`'s tiebreak, ruling `RQ-SF037-11`: more than one claim is a
+      # `3D`'s tiebreak: more than one claim is a
       # deterministic pick by recipe name, not a refusal. `"clock_pairwise"` sorts
       # before `"deadline"`, so its claim is the one offered.
       #

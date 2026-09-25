@@ -41,7 +41,7 @@ defmodule StatifierBlocks.Runtime.Subchart.Resolution do
   alias StatifierBlocks.{Compiled, Compiler, Document}
   alias StatifierBlocks.Compiler.Finding
 
-  @typedoc "The reason a start refused, always one of the closed campaign-023 R-b set."
+  @typedoc "The reason a start refused, always one of the closed refusal set."
   @type reason :: String.t()
 
   @typedoc "A resolved child chart's SCXML, or a refusal carrying its reason and JSON-shaped detail."

@@ -62,7 +62,7 @@ defmodule StatifierBlocks.Compiler do
   fails, and the errors a caller gets back come from that one stage. Config
   and Structure are the one pair that does not: when Config finds something,
   Structure still runs, and the refusal carries the **union** of what both
-  found (RQ-SF035-2, and the dated Notes of 2026-09-06 on ADR-0004
+  found (the dated Notes of 2026-09-06 on ADR-0004
   decision 10 and on ADR-0011 decision 1).
 
   The reason is that they are not in a consequence relation the way the
@@ -101,8 +101,8 @@ defmodule StatifierBlocks.Compiler do
 
   Decision 10's table names three things in this stage: slot **arity**,
   `:undeclared_slot`, and assignability. ADR-0004's amendment of
-  2026-08-31, section D3, adds two more to the same row under campaign-024
-  ruling R-b - `:drafts_block_misplaced` and `:duplicate_drafts_block`,
+  2026-08-31, section D3, adds two more to the same row by the operator's
+  ruling - `:drafts_block_misplaced` and `:duplicate_drafts_block`,
   the two placement facts a block type's `io/1` cannot carry, owned by
   `StatifierBlocks.Shelf`. All of them run here, and their
   findings are reported together rather than either short-circuiting the
@@ -223,8 +223,8 @@ defmodule StatifierBlocks.Compiler do
       transition per unhandled pair reaches it from the root block's own
       state, and its `<donedata>` holds only the reserved
       `<param name="statifier_persistence:execution_status" expr="'failed'"/>` -
-      the key `statifier_persistence`'s ADR-0011 decision 4 (proposed,
-      SF041) fixes, which a durable stepper reads to decide that the
+      the key `statifier_persistence`'s ADR-0011 decision 4 (proposed)
+      fixes, which a durable stepper reads to decide that the
       execution failed.
       So a root document whose nested step fails still reaches `:done`,
       and says that it failed when it gets there. A document with no
@@ -1069,7 +1069,7 @@ defmodule StatifierBlocks.Compiler do
     end)
   end
 
-  # `ADR-0002`'s Note of 2026-09-07, item 2 (`RQ-SF037-17`): an expansion is
+  # `ADR-0002`'s Note of 2026-09-07, item 2: an expansion is
   # at each member's **current** version, as the palette resolves it at
   # expansion time.
   #
@@ -1308,8 +1308,8 @@ defmodule StatifierBlocks.Compiler do
     reserved_outcome_findings(node) ++ config_findings(node, declarations)
   end
 
-  # The one outcome name a **root** block may not declare (RQ-SF035-16;
-  # the question was left open on ADR-0002's failure amendment,
+  # The one outcome name a **root** block may not declare (the
+  # question was left open on ADR-0002's failure amendment,
   # section 4 step 3, and the Note of 2026-09-06 closes it there).
   #
   # Section 4 step 3 mints the one shared final an unhandled failure below
@@ -1702,7 +1702,7 @@ defmodule StatifierBlocks.Compiler do
   # Slot arity, `:undeclared_slot`, assignability, and the shelf's two
   # placement facts - decision 10's full table for this stage, plus the two
   # codes ADR-0004's amendment of 2026-08-31, section D3, adds to its
-  # Structure row under campaign-024 ruling R-b. Every source is collected
+  # Structure row by the operator's ruling. Every source is collected
   # and concatenated rather than any of them short-circuiting the others:
   # decision 10 says every finding within a stage is reported, because those
   # findings are siblings rather than consequences, and none of these three
@@ -2086,7 +2086,7 @@ defmodule StatifierBlocks.Compiler do
   defp note_phrase(note) when is_binary(note) and note != "", do: ~s(: "#{note}")
   defp note_phrase(_note), do: ""
 
-  # ADR-0010's Note of 2026-09-02, the operator's RQ-026-6 ruling, option
+  # ADR-0010's Note of 2026-09-02, the operator's ruling, option
   # (c): the one advisory this record asks for, and the whole of what the
   # ruling changes. The compiled bytes are untouched - decision 1's "first
   # block of the group's `body` slot" convention stands for both group
@@ -2803,13 +2803,13 @@ defmodule StatifierBlocks.Compiler do
   #     nothing is listening across a boundary and what the option buys is
   #     the session reaching `:done` at all.
   #
-  # One exception, added 2026-09-06 with the campaign-033 failure seam and
+  # One exception, added 2026-09-06 with the failure seam and
   # noted on both records: a final for a **failure-classed** outcome - one
   # `BlockType.failure_outcomes/2` names - carries a reserved `<donedata>`
   # `<param>` under **both** options. The key is
   # `statifier_persistence:execution_status` and its value is `'failed'`,
   # spelled here exactly as `statifier_persistence`'s ADR-0011 decision 4
-  # (proposed, SF041) fixes it, and a durable stepper reads it to decide
+  # (proposed) fixes it, and a durable stepper reads it to decide
   # that the execution failed. Under `:terminate` it is the only `<param>`
   # the final carries, because the root shape still says nothing about
   # which outcome was reached; under `:child_use` it rides beside the
@@ -2962,7 +2962,7 @@ defmodule StatifierBlocks.Compiler do
   end
 
   # The failure seam's reserved key, spelled as `statifier_persistence`'s
-  # ADR-0011 decision 4 (proposed, SF041) fixes it: one key, one closed
+  # ADR-0011 decision 4 (proposed) fixes it: one key, one closed
   # value. The key it replaces is never minted again, only reserved.
   @spec execution_status_param() :: Emission.t()
   defp execution_status_param do

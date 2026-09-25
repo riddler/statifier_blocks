@@ -85,7 +85,7 @@ defmodule StatifierBlocks.Runtime.Subchart do
        rescues them"), pinned downstream by `Statifier.Testing.HandlerCase`
        check 5.
 
-  ## The closed refusal set (campaign-023 ruling R-b)
+  ## The closed refusal set
 
   Exactly three reasons, never a fourth: `"unknown_document"`,
   `"child_compile_findings"`, `"cycle_refused"`. Every refusal is planned
@@ -159,7 +159,7 @@ defmodule StatifierBlocks.Runtime.Subchart do
               {:ok, Document.t()} | {:ok, Compiled.t()} | {:cycle, [String.t()]} | :error
   @callback palette() :: Palette.t()
 
-  @typedoc "The reason a start refused, always one of the closed R-b set."
+  @typedoc "The reason a start refused, always one of the closed refusal set."
   @type reason :: Resolution.reason()
 
   defmacro __using__(_opts) do

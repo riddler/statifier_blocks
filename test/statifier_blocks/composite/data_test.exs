@@ -249,7 +249,7 @@ defmodule StatifierBlocks.Composite.DataTest do
     end
 
     # Sabotage: exported `slots/1` beside `slots/2` - red. A composite in
-    # this campaign exposes no slot of its own (RQ-SF037-3), and the seam
+    # this campaign exposes no slot of its own, and the seam
     # reaches the callback at one higher arity, never at the declared one.
     test "the callbacks live at one higher arity, and only there" do
       assert Palette.declares?(ref(), :slots, 1)
@@ -282,7 +282,7 @@ defmodule StatifierBlocks.Composite.DataTest do
 
     # Sabotage: returned `{:ok, _}` from `emit/3` - red. No composite block
     # survives to Emit, so reaching it means the expansion did not run.
-    test "emit/2 raises if reached (RQ-SF037-6)" do
+    test "emit/2 raises if reached" do
       assert_raise RuntimeError, ~r/Resolve/, fn ->
         Palette.call(ref(), :emit, [block(), nil], :never)
       end

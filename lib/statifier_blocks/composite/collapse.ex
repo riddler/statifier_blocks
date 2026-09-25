@@ -41,7 +41,7 @@ defmodule StatifierBlocks.Composite.Collapse do
   `marks: %{block_id => [field key]}`, and `propose/3` - the record's entry
   point, and the whole of what a caller with no gesture behind it needs -
   is the unmarked reading. Neither of the three arguments is a name, which
-  is the property `RQ-SF038-1` fixes the arity for.
+  is the property the operator's ruling fixes the arity for.
 
   Each param's field declaration is the **source field's**: its `"type"`,
   `"label"` and whichever of `"required?"`, `"value_path"`,

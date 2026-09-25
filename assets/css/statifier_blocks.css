@@ -23,7 +23,7 @@
  *
  * ## What graduated from the spike (sb-8dc)
  *
- * The campaign-012/013 editor spike (`spike/`, never shipped) took a dark
+ * The editor spike (`spike/`, never shipped) took a dark
  * theme to parity and made a third host-brand theme carry the whole surface as
  * a pure token override. What it found about this file - the d14 amendment's
  * evidence - graduated here:
@@ -611,7 +611,7 @@
   position: relative;
 
   /* The stage is as wide as the tree it holds, not as wide as the panel
-   * (campaign-022 ruling R8c). `width: auto` on a block box is the
+   * (an operator ruling). `width: auto` on a block box is the
    * CONTAINING BLOCK's width, and the tree has a floor of its own - nesting
    * paddings, the interrupt channel, a card that will not shrink past its
    * token width - so a panel narrower than that floor left the stage box
@@ -1047,7 +1047,7 @@
   background: var(--sb-error-bg);
 }
 
-/* ---- card face (parity item 1.4, and R2's delete affordance)
+/* ---- card face (parity item 1.4, and the ruled delete affordance)
  *
  * Three text lines beside one tile, and every element in it is a DIRECT child
  * of the chrome: a grid places them without a wrapper element per column, and
@@ -1241,8 +1241,8 @@
   color: var(--sb-fg-subtle);
   font-size: var(--sb-text-xs);
 
-  /* Clipped at the chip's own edge, never broken mid-token (campaign-022
-   * ruling R8b). A chip holds an event name or a count - `signup.reminder_due`
+  /* Clipped at the chip's own edge, never broken mid-token (an operator
+   * ruling). A chip holds an event name or a count - `signup.reminder_due`
    * - and `overflow-wrap: anywhere` broke that across two lines as
    * `signup.reminder_du` / `e`, which reads as two identifiers rather than
    * as one that ran out of room. The card's width is a token and a lane
@@ -1284,7 +1284,7 @@
   white-space: nowrap;
 }
 
-/* R2 (operator ruling, 2026-08-29): "`x` on hover, `-` + `x` on the selected
+/* The delete-affordance ruling (operator, 2026-08-29): "`x` on hover, `-` + `x` on the selected
  * card, nothing at rest." Both halves ship: the `-` is the collapse control
  * `.sb-node__fold` below, on container chrome only, and the `x` is this rule.
  *
@@ -1333,8 +1333,8 @@
  * next click removes more than one block and the control says how many
  * before it is clicked: `x2` where the `x` was, with a Keep beside it.
  *
- * `data-reveal="always"`, which is not a hole in R2's "nothing at rest".
- * R2 governs the control that deletes ONE block, and the pair here is on
+ * `data-reveal="always"`, which is not a hole in that ruling's "nothing at rest".
+ * The ruling governs the control that deletes ONE block, and the pair here is on
  * the canvas only while the author's own delete gesture is unanswered - it
  * appears because they clicked, and the next click of either button takes
  * it away. An offer nobody can see is not an offer.
@@ -1373,7 +1373,7 @@
   color: var(--sb-error);
 }
 
-/* R2's other half, and the only control on the card that is not about the
+/* The delete-affordance ruling's other half, and the only control on the card that is not about the
  * document: the fold. It sits left of the `x` on a container's chrome, in the
  * same square the `x` uses, so a card carries at most two affordances and they
  * line up.
@@ -1392,7 +1392,7 @@
  * it, and hover is not a gesture a keyboard has. */
 /* Expand (ADR-0005's 2026-09-07 amendment, clause 1E): the control that
  * replaces a composite with the blocks it stands for. It sits on the same
- * chrome as the delete control and obeys the same R2 reveal contract - a
+ * chrome as the delete control and obeys the same delete-affordance reveal contract - a
  * gesture that rewrites the card is not one to leave sitting at rest - and
  * it sits beside the `x` in the reserved strip, which is what keeps the two
  * from overlapping now that neither is placed by an offset. A composite has
@@ -1706,7 +1706,7 @@
 }
 
 /* The fan pill: `ONE OF` above a set of alternatives, `ALL OF` above a set of
- * concurrent lanes (10b, campaign 016).
+ * concurrent lanes (10b).
  *
  * It is the only place the exclusive/concurrent distinction is stated. Side
  * by side columns look identical either way - the arrangement says the block
@@ -1930,7 +1930,7 @@
 
 /* The exit edge (10h's last row, per the 2026-08-29 `sb-67s` ruling) is DRAWN
  * now, and the stub tick that stood in for it is RETIRED (`sb-rx1`, ruled on
- * `sb-otg`, campaign 016).
+ * `sb-otg`).
  *
  * `sb-rx1` shipped `.sb-slot[data-exit-edge]::after` as a short horizontal
  * mark hanging off the bottom-left of a rail, a placeholder for an edge
@@ -1980,7 +1980,7 @@
   background: var(--sb-drop-ok-bg);
 }
 
-/* R3's insertion marker (operator ruling 2026-08-29): "a marker on the edge
+/* The insertion marker (operator ruling 2026-08-29): "a marker on the edge
  * between siblings, subtle at rest, highlighted on hover and during drag;
  * empty slots keep a placeholder".
  *
@@ -2032,7 +2032,7 @@
  * control in the editor speaks. The surface is what makes the marker mask the
  * flow edge it sits on instead of letting the line run through the "+", and
  * the border is what makes a resting gap read as a control rather than as
- * punctuation - R3's "the gap IS the insertion marker" asks for a marker an
+ * punctuation - the ruling's "the gap IS the insertion marker" asks for a marker an
  * author can see, not one they have to hover to find.
  *
  * What stays here is only what is this button's own: gap scale, half the
@@ -2147,7 +2147,7 @@
 
 /* ---- slot labels --------------------------------------------------------
  *
- * Parity item 1.7 (`sb-5p2`, campaign 016). Everything below is about what a
+ * Parity item 1.7 (`sb-5p2`). Everything below is about what a
  * slot's HEADER says, and it is banded off from the arrangement rules above
  * on purpose: those decide where a slot sits, these decide what it reads as,
  * and the two were edited by different hands in the same campaign.
@@ -2364,8 +2364,8 @@
 /* --------------------------------------------------- the form-control box
  *
  * The config form's fields and the palette's search box, in one rule,
- * graduated from the spike's `.sb-input` and `.sb-select` (campaign-021
- * ruling R4). Before it the two disagreed: the search box was built out of
+ * graduated from the spike's `.sb-input` and `.sb-select` (an operator
+ * ruling). Before it the two disagreed: the search box was built out of
  * the pane's own tokens and the config form's fields were left native, on
  * the reasoning that a host's browser should paint them the way it paints
  * that host's other forms. That reasoning does not survive the two sitting
@@ -3747,7 +3747,7 @@ button.sb-inspector__group-row:hover {
   display: none;
 }
 
-/* Two tabs since R4, so which one is selected has to be legible rather than
+/* Two tabs since the findings-tab ruling, so which one is selected has to be legible rather than
  * merely encoded. Weight alone said it when there was one tab and nothing to
  * compare it against; the unselected tab standing down to the muted
  * foreground is what makes the pair read as a choice, and it is the same
@@ -3829,7 +3829,7 @@ button.sb-inspector__group-row:hover {
   margin-left: var(--sb-space-half);
 }
 
-/* The Findings tab (operator ruling R4, 2026-08-29). The list used to sit
+/* The Findings tab (operator ruling, 2026-08-29). The list used to sit
  * under the canvas as a heading and a column of tinted pills; in the drawer it
  * is a table of rows, and the row is what these rules build.
  *
@@ -3849,7 +3849,7 @@ button.sb-inspector__group-row:hover {
 /* The row's cells, on every surface that renders `Findings.row/1`: the
  * drawer's reveal button and orphan span, the inspector's group rows and its
  * selected-block rows. One rule, because one component renders all four
- * (campaign-019 D4) and a second rule is how they drifted apart the first
+ * (an operator ruling) and a second rule is how they drifted apart the first
  * time.
  *
  * Flex rather than the grid this was: the anchor tail is absent for a
@@ -3897,7 +3897,7 @@ button.sb-inspector__group-row:hover {
   white-space: nowrap;
 }
 
-/* The pill row above a findings list (campaign-019 D2/D3): how many at each
+/* The pill row above a findings list (an operator ruling): how many at each
  * severity, in the enum's own words, most urgent first. It is a summary and
  * not a filter - nothing here is clickable and the list below is unfiltered -
  * so it is a list of readings rather than a row of controls. A severity with

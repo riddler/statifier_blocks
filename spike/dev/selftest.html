@@ -964,7 +964,7 @@
        * lib/ - these are checks on a descriptor written to find out what a
        * `core.*` type would have to declare. See js/proposed-core.js.
        */
-      suite("proposed core: core.invoke declares an on_error SLOT (D13)", () => {
+      suite("proposed core: core.invoke declares an on_error SLOT", () => {
         const invoke = proposedCoreTypes["core.invoke"];
 
         check("it is not in the shipped core vocabulary", !("core.invoke" in coreTypes));
@@ -5164,7 +5164,7 @@
           "Proposed core"
         );
       /*
-       * The retirement itself (D12, 2026-08-28).
+       * The retirement itself (2026-08-28).
        *
        * `demo-types.js` is not imported by this page - `spikeRegistry()` is
        * `palette.js`'s own maps - so this suite checks the property that
@@ -5173,7 +5173,7 @@
        * vocabulary is a registry edit and nothing more. The re-authored
        * document is checked against the core descriptors directly.
        */
-      suite("the retired crutches leave nothing behind (sb-0o4, D12)", () => {
+      suite("the retired crutches leave nothing behind (sb-0o4)", () => {
         const proposing = proposingRegistry();
 
         // The three re-typed blocks, rebuilt here from the fixture's stored
@@ -5999,7 +5999,7 @@
 
         // `<cancel>` is sketched at the descriptor and NOT built: a cancel
         // naming the send it cancels is a cross-subtree reference, which is
-        // the shape D13 refused.
+        // the shape the 2026-08-28 ruling refused.
         check("no core.cancel is proposed", !("core.cancel" in proposedCoreTypes));
         check("...and none is shipped either", !("core.cancel" in coreTypes));
       });
@@ -8017,7 +8017,7 @@
        *     document, and a cleared field renders exactly as a never-set one.
        *
        * What the document STORES is the author's own string, compiled to ISO
-       * at emit time: campaign 014's pre-decision D4, recorded on sb-709 and
+       * at emit time: a pre-decision, recorded on sb-709 and
        * in the spike README as a PROPOSAL. The shipped `:duration` field type
        * is ADR-0002 decision 7's and no ADR text moves here.
        *
@@ -8570,7 +8570,7 @@
 
       /* ==================================================== sb-3l1 =========
        *
-       * The pure halves of the campaign-015 polish pass: which config a form's
+       * The pure halves of the `sb-3l1` polish pass: which config a form's
        * findings are computed from (ruling 6A), and the drawer's collapsed
        * strip (ruling 5A). The other four items in the bead are CSS and DOM
        * order, which this page cannot see and which the browser screenshots

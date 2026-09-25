@@ -1,8 +1,8 @@
 defmodule StatifierBlocks.ShelfTest do
   @moduledoc """
   The two placement facts `io/1` cannot carry (ADR-0002's amendment of
-  2026-08-31, section G12; ADR-0004's, section D3; campaign-024 ruling
-  R-b), checked at the module that owns them and again through
+  2026-08-31, section G12; ADR-0004's, section D3; an operator
+  ruling), checked at the module that owns them and again through
   `Compiler.compile/3`, which is where they reach an author.
   """
 

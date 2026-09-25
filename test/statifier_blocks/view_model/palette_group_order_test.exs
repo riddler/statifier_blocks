@@ -1,6 +1,6 @@
 defmodule StatifierBlocks.ViewModel.PaletteGroupOrderTest do
   @moduledoc """
-  The host seam a regrouped palette needs (`sb-cvtx`, RQ-SF038-18):
+  The host seam a regrouped palette needs (`sb-cvtx`):
   `order_palette_groups/2` spends the reading order a host already wrote
   down in its profile's `palette_groups` list, instead of leaving every
   palette in the alphabetical order `build/3` produces.

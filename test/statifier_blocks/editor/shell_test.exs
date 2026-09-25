@@ -377,7 +377,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert has_element?(view, ~s(.sb-inspector[data-tab="findings"]))
         assert has_element?(view, ".sb-inspector__empty")
 
-        # The document's own list is in the drawer since R4, and never under
+        # The document's own list is in the drawer since the findings-tab ruling, and never under
         # the canvas: two lists in one column, one of them unlabelled as to
         # scope, is the conflation 3A ends.
         refute has_element?(view, ".sb-editor__main .sb-findings")
@@ -411,7 +411,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert view |> element(".sb-drawer__strip") |> render() =~ "Truth tables"
       end
 
-      # R4 put a second tab in the drawer, so the strip has to say WHICH tab it
+      # The findings-tab ruling put a second tab in the drawer, so the strip has to say WHICH tab it
       # is counting. Resolution, and not a fixed default: a strip reading
       # "Truth tables 0" on a document with findings in it hides the only thing
       # the drawer is holding, which is the state 2A built the strip to avoid.
@@ -451,7 +451,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
 
       # Sabotage: `handle_event("drawer-tab", ...)` left as the no-op it was
-      # before R4 - the click changes nothing and the panel stays on tables.
+      # before that ruling - the click changes nothing and the panel stays on tables.
       test "picking a tab switches the panel and the aria wiring", %{conn: conn} do
         {:ok, view, _html} = mount_editor(conn, document: unremarkable_document())
 

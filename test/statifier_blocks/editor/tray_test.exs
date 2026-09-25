@@ -120,7 +120,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # The same rule read from the other end, and the reason it is worth its
       # own assertion (`sb-e2zy`): every refute above names a point an edge
       # STARTS from, and an edge entering the shelf does not start there - it
-      # ends there, at the anchor card's inlet. The campaign-024 wrap ruling
+      # ends there, at the anchor card's inlet. An operator ruling
       # is that this card takes no inbound arrow at any zoom, because an
       # arrow into it is what makes the shelf read as a trailing step.
       #

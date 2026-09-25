@@ -681,7 +681,7 @@ defmodule StatifierBlocks.BlockType do
 
   @doc """
   The subset of `outcomes/1`'s names that mean **this block finished
-  badly** (the campaign-033 failure seam, 2026-09-06).
+  badly** (the failure seam, 2026-09-06).
 
   A type that does not export it classes none of its outcomes as a
   failure, which is where every accepted `core.*` type except `core.map`
@@ -802,7 +802,7 @@ defmodule StatifierBlocks.BlockType do
 
   @doc """
   This block as one line of prose, given this config (ADR-0002's
-  2026-09-07 amendment, on ruling `RQ-SF036-4`).
+  2026-09-07 amendment, as the operator ruled it).
 
   Optional. A type that does not export it says nothing beyond its own
   label, which is the line every block type had before the callback
@@ -1913,7 +1913,7 @@ defmodule StatifierBlocks.BlockType do
   # the drawn chip and its `title` are the same chip by construction.
   #
   # `:too_long` is the ONE arm that no longer drops (ADR-0002's `C1`
-  # amendment, and `RQ-SF039-6`): an over-cap chip is DRAWN, clipped to
+  # amendment, as the operator ruled it): an over-cap chip is DRAWN, clipped to
   # the cap with `@chip_ellipsis` in its last position, and the full text
   # goes on the `title`. The other three arms are unchanged - a blank, a
   # multiline and a non-string chip have no prefix worth drawing, so B3's

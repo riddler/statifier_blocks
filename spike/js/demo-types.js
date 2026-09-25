@@ -121,8 +121,8 @@ function step({
 /* ------------------------------- RETIRED 2026-08-28: the interrupt rules
  *
  * `myapp.guarded_on_event` and `myapp.timeout_rule` used to live here, and
- * they are gone (sb-0o4; operator ruling D12 in the umbrella's
- * `docs/decisions.md`, 2026-08-28). Both were CRUTCHES, and the note they
+ * they are gone (sb-0o4; ruled by the operator,
+ * 2026-08-28). Both were CRUTCHES, and the note they
  * carried said so: they existed because the core vocabulary could not express
  * a guarded interrupt rule or a timeout rule, and the demo documents needed
  * both to have something to draw an exit edge FOR.

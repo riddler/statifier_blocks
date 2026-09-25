@@ -2,7 +2,7 @@ defmodule StatifierBlocks.ViewModel.SlotConditionTest do
   @moduledoc """
   `ViewModel.Slot.condition`: the source text of the condition a slot is
   subject to, derived from the container's own `:expression` field keyed by
-  that slot's name (`sb-5p2`, campaign 016).
+  that slot's name (`sb-5p2`).
 
   The load-bearing assertion is the same negative the rest of this directory
   carries. A canvas that wants to show what picks between a branch's arms

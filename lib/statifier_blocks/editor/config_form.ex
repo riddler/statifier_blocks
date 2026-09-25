@@ -465,8 +465,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         partially rendered form does not blank out the fields it did not show.
 
     A fourth, added 2026-09-07 with the `hidden?` / `readonly?` flags
-    (ADR-0002 decision 7's amendment, section F6, and campaign-SF036 ruling
-    `RQ-SF036-15`): **a flagged field ignores any posted value for its key.**
+    (ADR-0002 decision 7's amendment, section F6, as the operator
+    ruled it): **a flagged field ignores any posted value for its key.**
     The decode is keyed off the schema and a hidden field is in the schema,
     so a crafted payload posting under a hidden field's key would otherwise
     be decoded through a control no form ever drew. For a `hidden?: true` or
@@ -618,7 +618,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp read_only(field), do: %{field | readonly?: true}
 
     # A field the form withheld reads nothing out of the params, whatever the
-    # params carry (F6 as ruled by `RQ-SF036-15`). `:error` is the same term
+    # params carry (F6 as the operator ruled it). `:error` is the same term
     # `Map.fetch/2` returns for a key that was never posted, so the reduce
     # above has one unposted branch rather than two.
     @spec posted_value(ViewModel.Field.t(), map()) :: {:ok, term()} | :error

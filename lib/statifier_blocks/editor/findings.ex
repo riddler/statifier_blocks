@@ -12,7 +12,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     ## Why it is a drawer tab
 
-    It shipped as a text block under the canvas, and operator ruling R4
+    It shipped as a text block under the canvas, and an operator ruling
     (2026-08-29) retired that position: a list of findings is a grid of rows
     about the whole document, which is exactly 1A's admission test for the
     drawer, and the canvas is for the document rather than for a report about
@@ -24,7 +24,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     A row is severity, subject, anchor tail, source and message, in that
     order, and `row/1` is where that anatomy is defined - for this list and
     for both of the inspector's findings panels, which called to render a
-    finding and got the bare message until campaign-019 ruling D4. The
+    finding and got the bare message until an operator ruling. The
     severity is what an author scans down, the subject is the block they will
     click, the tail and the chip say which part of that block and who is
     complaining, and the message is the sentence they read once they have
@@ -140,7 +140,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     It is not a filter. Nothing here is clickable, the list beneath is
     unchanged, and the grouping stays by block (`Shell.findings_groups/3`):
     the pills say how much, the groups say where. The spike grouped by
-    severity instead, and campaign-019 ruling D2 did not adopt that - a
+    severity instead, and the operator's ruling did not adopt that - a
     severity is a property of a finding, and the thing an author acts on is
     the block.
 

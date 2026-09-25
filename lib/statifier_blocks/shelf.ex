@@ -4,7 +4,7 @@ defmodule StatifierBlocks.Shelf do
   surface asks about the shelf and the gap marker.
 
   ADR-0002's amendment of 2026-08-31, section G12, states the two facts and
-  campaign-024 ruling R-b puts their enforcement in the compiler's
+  an operator ruling puts their enforcement in the compiler's
   Structure stage; ADR-0004's amendment of the same date, section D3, names
   the two codes. This module owns both, and owns nothing else: kind
   admission, slot arity and the data-flow walk are unchanged and are still

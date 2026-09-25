@@ -193,7 +193,7 @@ defmodule StatifierBlocks.Compiler.SlotFindingsTest do
   # SlotValidation's `slots/1` stability precondition - it counts a block's
   # children against the slot set the block's own config declares - used to
   # be bought by sequencing: Config ran first and stopped the pipeline, so
-  # only accepted config ever reached this stage. RQ-SF035-2 retired that
+  # only accepted config ever reached this stage. An operator ruling retired that
   # sequencing (Config and Structure now report together, see the compiler
   # moduledoc), so the precondition is bought by the skip set instead: a
   # block Config refused is passed over by every source in this stage,

@@ -128,7 +128,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert length(Regex.scan(~r{data-empty="true"}, html)) == 3
       end
 
-      # Campaign-017 ruling D4: the stored config sits under the three rows,
+      # By an operator ruling, the stored config sits under the three rows,
       # and only for the block that has one. A resolvable block's values are
       # in the form below; a pane that showed the JSON as well would be
       # saying the same thing twice, in the notation an author does not edit
@@ -264,7 +264,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    # sb-1g4q / campaign-019 D4. Both of this pane's findings panels rendered
+    # sb-1g4q. Both of this pane's findings panels rendered
     # the bare message, so the same finding said less here than in the drawer
     # and an author had to go and look it up somewhere else. They render
     # `Findings.row/1` now - the one renderer, minus the subject column, whose

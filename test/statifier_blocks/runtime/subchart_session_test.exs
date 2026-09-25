@@ -99,7 +99,7 @@ defmodule StatifierBlocks.Runtime.SubchartSessionTest do
     end
 
     # `core.subchart`'s other half, as ADR-0002's amendment of 2026-09-06
-    # section 2 (the operator's ruling `RQ-034-13`) now leaves it: with
+    # section 2 (the operator's ruling) now leaves it: with
     # `on_error` empty the block still emits the
     # `error.communication.invoke` transition and the `error` final, so
     # the refusal has somewhere to route and the block ends on `error`
@@ -172,7 +172,7 @@ defmodule StatifierBlocks.Runtime.SubchartSessionTest do
     end
   end
 
-  describe "the reason vocabulary is exactly three (campaign-023 ruling R-b)" do
+  describe "the reason vocabulary is exactly three" do
     # Sabotage: added a fourth entry (`"timeout"`) to the literal list on
     # the right-hand side of the comparison -> the two lists no longer
     # match by length even though every reason the module actually

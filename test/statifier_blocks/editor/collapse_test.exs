@@ -253,7 +253,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # condition read off the node: folded, with a subtree rollup above zero.
       # This is the DOM half of that contract - `presentation_test` measures
       # the reservation, and neither is worth anything without the other
-      # (sb-l9bx, campaign 027).
+      # (sb-l9bx).
       # Sabotage: dropping `data-findings-count` from the node, or stamping it
       # only when the card is expanded - the selector matches nothing, the
       # badge slides back under the `+`, and this goes red.

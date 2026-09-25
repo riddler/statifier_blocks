@@ -40,8 +40,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       mount_editor(conn, Keyword.put(opts, :document, document()))
     end
 
-    # The document-level list is the drawer's Findings tab since operator
-    # ruling R4 (2026-08-29), so reaching it is two clicks rather than a look
+    # The document-level list is the drawer's Findings tab since an operator
+    # ruling (2026-08-29), so reaching it is two clicks rather than a look
     # at the mounted markup.
     defp open_findings(view) do
       view |> element(".sb-drawer__strip") |> render_click()

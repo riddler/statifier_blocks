@@ -1,6 +1,6 @@
 defmodule StatifierBlocks.ViewModel.AccentAndRailTest do
   @moduledoc """
-  The presentation derivations the campaign-012/013 spike proved and this
+  The presentation derivations the editor spike proved and this
   package graduated: the per-block-type accent token (ADR-0005 decision 14's
   `accent_token`, consumption side), the rail partition, the boundary box
   derived from it (amendment 10c as amended by 10h), the exit edge each rail

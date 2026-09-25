@@ -6,7 +6,7 @@
 if Code.ensure_loaded?(Phoenix.LiveView) do
   defmodule StatifierBlocks.Editor.GraduationTest do
     @moduledoc """
-    What the campaign-012/013 spike proved about the DOM, rendered by the
+    What the editor spike proved about the DOM, rendered by the
     shipped components (`sb-8dc`).
 
     The derivations behind all of it are asserted with LiveView absent, in

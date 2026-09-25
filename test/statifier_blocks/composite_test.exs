@@ -34,7 +34,7 @@ defmodule StatifierBlocks.CompositeTest do
     @moduledoc """
     The amendment's worked example: call out, and record the failure if the
     call comes back on the error path. Two params, one slot the author cannot
-    reach (RQ-SF037-3).
+    reach.
     """
 
     use StatifierBlocks.Composite,
@@ -261,8 +261,8 @@ defmodule StatifierBlocks.CompositeTest do
   defmodule TwoInOne do
     @moduledoc """
     One member carrying both params, and one member carrying neither. The
-    first is blamed on `"path"`, the first param in declaration order
-    (`RQ-SF038-14`); the second answers `nil`, because no param fed it.
+    first is blamed on `"path"`, the first param in declaration order;
+    the second answers `nil`, because no param fed it.
     """
 
     use StatifierBlocks.Composite,
@@ -392,9 +392,9 @@ defmodule StatifierBlocks.CompositeTest do
     end
 
     # Sabotage: derived `slots/1` from the expansion root's slots - red.
-    # RQ-SF037-3: a composite in this campaign exposes no slot of its own, so
+    # A composite in this campaign exposes no slot of its own, so
     # an author cannot put their own block on the error path.
-    test "slots/1 is [] (RQ-SF037-3)" do
+    test "slots/1 is []" do
       assert GuardedStep.slots(%{}) == []
     end
 
@@ -458,7 +458,7 @@ defmodule StatifierBlocks.CompositeTest do
     # Sabotage: generated an `emit/2` returning `{:ok, ...}` - red. That is
     # exactly the failure ADR-0007 refuses to inject a default to avoid: a
     # type that compiled to nothing looking complete instead of failing.
-    test "emit/2 is generated and raises if reached (RQ-SF037-6)" do
+    test "emit/2 is generated and raises if reached" do
       assert_raise RuntimeError, ~r/Resolve/, fn ->
         GuardedStep.emit(guarded_step("blk_GS"), nil)
       end
@@ -557,7 +557,7 @@ defmodule StatifierBlocks.CompositeTest do
       assert Enum.all?(ids(members), &String.starts_with?(&1, "blk_GS_"))
     end
 
-    # `ADR-0002`'s Note of 2026-09-07, item 5 rules `RQ-SF038-14`: the module
+    # `ADR-0002`'s Note of 2026-09-07, item 5 rules it: the module
     # side blames the FIRST param in declaration order when more than one
     # matches, rather than refusing to blame at all.
     #
@@ -683,7 +683,7 @@ defmodule StatifierBlocks.CompositeTest do
     end
   end
 
-  # ADR-0002's Note of 2026-09-08, item 3 (RQ-SF039-10): one expansion, two
+  # ADR-0002's Note of 2026-09-08, item 3: one expansion, two
   # spellings. Each of the four broken-declaration shapes the record lists is
   # asserted BOTH ways here - `{:error, _}` through `expand/2` and a raise
   # through `expand!/2` - because the pair is the ruling, and a shape that
@@ -806,7 +806,7 @@ defmodule StatifierBlocks.CompositeTest do
     end
   end
 
-  describe "the environment walk at a composite's one position (RQ-SF037-15)" do
+  describe "the environment walk at a composite's one position" do
     # Sabotage: answered the composite's own `config_schema/1` - red, because
     # the params declare no path and the walk then says the composite writes
     # nothing while its expansion writes `cards.authorization.failure`.

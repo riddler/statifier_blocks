@@ -65,7 +65,7 @@ const DURATION = /^P(?!$)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?!$)(\d+H)?(\d+M)?(\d+S)
 
 /* sb-709: the OTHER duration spelling a document may hold - predicator-ex's own
  * duration literal, `3d8h`, which the duration control makes the primary way to
- * type one. Campaign 014's D4 stores what the author typed and compiles to ISO
+ * type one. A pre-decision stores what the author typed and compiles to ISO
  * at emit time (a PROPOSAL, recorded on sb-709 and in the spike README; no ADR
  * text changes here), so both spellings are values a `:duration` field can hold
  * and a validator that took only one of them would refuse what the form writes.
@@ -547,7 +547,7 @@ const coreWait = {
  * `core.on_event` could previously only ask "did this event arrive"; a rule
  * that also asks "and is the money still unmoved" had to be a host type, and
  * the demo documents grew `myapp.guarded_on_event` to say it. That crutch is
- * retired (2026-08-28, umbrella D12) and this key is what replaced it.
+ * retired (2026-08-28) and this key is what replaced it.
  *
  * The field is `expression`, which is the SAME declared type a branch arm's
  * condition uses - so it gets the same one-line mono control in the config
