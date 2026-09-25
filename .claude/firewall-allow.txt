@@ -1,0 +1,31 @@
+# Exact strings the maintainers' planning-reference scan may pass. Each is
+# this repository's own: a section an ADR numbers for itself, an invented
+# id in the fixture list of the test that refuses private ids in lib/ and
+# docs/adr/, or an ISO-8601 duration. One exact string per line; an entry
+# allows a match only where the entry's text covers it on the same line.
+
+# ADR-0004 numbers its own sections with a bare letter and digit.
+(ADR-0004's amendment, R1)
+(ADR-0004's `R1` to
+`R4`, the `D1` to `D4` of ADR-0004's 2026-08-31 amendment), and `Q3`
+
+# test/statifier_blocks/block_type_test.exs: invented ids the private-id
+# pattern must match, and the repo's own spellings it must not.
+{"see RQ-XX999-99 for why", "RQ-XX999-99"},
+{"see RQ-999-9b for why", "RQ-999-9b"},
+{"under ruling R99-9, the", "R99-9"},
+{"under ruling R99.9, the", "R99.9"},
+{"as R99z has it", "R99z"},
+{"campaign-999 ruling `D99-9` said", "D99-9"},
+{"under operator ruling R98, the", "R98"},
+{"behind epic `R97`", "R97"},
+{"open question Q99 asks", "Q99"},
+{"the R96 ruling of", "R96"},
+{"(R95, operator ruling 2026-01-01)", "R95"}
+"### R1. What `src` is",
+"ADR-0004 R1 has it for `core.subchart`",
+"Document.rename(document, \"Q3 authorization\")",
+
+# test/statifier_blocks/core/duration_migration_test.exs: an ISO-8601
+# duration, not a reference.
+"PT1.5S",

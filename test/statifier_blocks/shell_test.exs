@@ -487,7 +487,7 @@ defmodule StatifierBlocks.ShellTest do
   # a rendered drawer to compare against; what belongs here is that the tab a
   # host is being pointed at counts what `findings_count/1` counts and not a
   # list of its own.
-  describe "the findings number (R4, sb-ukgu)" do
+  describe "the findings number (sb-ukgu)" do
     # Sabotage: `findings_count/1` returning `length(findings) + 1` - the tab
     # follows it, which is the coupling this asserts, so the literal 2 goes
     # red; inlining a count of its own at the tab's call site instead makes
@@ -508,7 +508,7 @@ defmodule StatifierBlocks.ShellTest do
     end
   end
 
-  # sb-1g4q / campaign-019 D2: the pill row above both document-level findings
+  # sb-1g4q: the pill row above both document-level findings
   # lists. The markup is the components' tests; what belongs here is that the
   # pills are the same list the count counts, cut a second way.
   describe "the findings number, cut by severity (D2)" do

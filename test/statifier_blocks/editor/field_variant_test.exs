@@ -4,8 +4,8 @@
 if Code.ensure_loaded?(Phoenix.LiveView) do
   defmodule StatifierBlocks.Editor.FieldVariantTest do
     @moduledoc """
-    `variant: :inline` on `Editor.Field.field/1` (campaign-SF038 ruling
-    `RQ-SF038-18`, bead `sb-2qm3`).
+    `variant: :inline` on `Editor.Field.field/1` (an operator
+    ruling, bead `sb-2qm3`).
 
     The attribute is a component attribute and not a layout mode: a host that
     wants two selects reading as words inside a sentence of its own writing

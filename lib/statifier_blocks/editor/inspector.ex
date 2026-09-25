@@ -20,7 +20,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       * The Findings tab is **not** the document-level findings panel decision
         13 names. That panel still exists, still lists every finding in the
         document, and still lives beside the canvas. This tab is the selected
-        block's own findings, which is the distinction the campaign-014 polish
+        block's own findings, which is the distinction an earlier polish
         pass drew.
 
     ## The Findings tab with nothing selected
@@ -42,7 +42,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     This is the tab's empty state and not a fourth surface. The moment
     anything is selected the tab is that block's findings again, unchanged,
     and the document-level list an author *navigates* is still the drawer's
-    (R4). What the inspector adds is an answer where there was a dead end:
+    (the operator's ruling of 2026-08-29). What the inspector adds is an answer where there was a dead end:
     the count is not recomputed here, the list is not filtered here, and
     selecting a row hands the author back to the pane's real subject.
 
@@ -152,7 +152,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     Under the three rows, and only for a block whose type did not resolve,
     the Block section holds that block's **stored config as canonical JSON**
-    (campaign-017 ruling D4). It used to sit on the card, where it made the
+    (an operator ruling). It used to sit on the card, where it made the
     one broken block the widest thing in its lane; it is the same bytes in
     the same order, moved to the surface an author reaches by asking about
     that block in particular. It is read-only here for the reason the Config

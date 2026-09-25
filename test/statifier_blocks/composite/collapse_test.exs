@@ -111,7 +111,7 @@ defmodule StatifierBlocks.Composite.CollapseTest do
 
     # Sabotage: made `propose/3` commit the compound `replacement/4` builds
     # - red. The gesture edits no document and the package persists nothing
-    # (16E, epic ruling R5), which is a property of the PROPOSER before it is
+    # (16E), which is a property of the PROPOSER before it is
     # a property of the editor that calls it.
     test "the document it was given is the document it leaves" do
       document = document(guarded_step_arrangement())
@@ -372,7 +372,7 @@ defmodule StatifierBlocks.Composite.CollapseTest do
     # Sabotage: reached for a `statifier_datamodel` arm to carry the value -
     # red, and wrong besides: the value a `{:type_expr, opts}` field holds is
     # already JSON, so the spelling carries `opts` and nothing crosses a
-    # package boundary (RQ-SF038-2, sd OUT).
+    # package boundary (the datamodel package stays out).
     test "type_expr spells its arms and allow_empty? and needs no datamodel arm" do
       {:ok, row} =
         propose(
@@ -417,7 +417,7 @@ defmodule StatifierBlocks.Composite.CollapseTest do
   describe "20E: the Guarded section worked example" do
     # Sabotage: refused the selection the way 13E did - red. 13E's premise
     # was that a composite had no slots to expose an opening through, and
-    # SF038 removes that premise.
+    # Pass-through slots remove that premise.
     test "an unfilled slot is admitted and proposed as a pass-through slot" do
       {:ok, row} =
         propose(document(guarded_section_arrangement()), ["blk_7"],

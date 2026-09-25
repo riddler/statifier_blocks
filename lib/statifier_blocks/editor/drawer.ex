@@ -9,7 +9,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     goes in the drawer; content about one block does not, whatever its shape.
 
     Six tabs ship. Truth tables were first. The document-level findings list
-    joined them under operator ruling R4 (2026-08-29), which retired the text
+    joined them under an operator ruling (2026-08-29), which retired the text
     block that used to sit under the canvas: a list of findings is a grid of
     rows about the whole document, so 1A's test admits it and the canvas gets
     its height back. Declarations joined them under the 2026-09-01 amendment

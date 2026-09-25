@@ -9,7 +9,7 @@ defmodule StatifierBlocks.ThemeAudit do
   checkable. Everything here takes a stylesheet as a **string** and returns
   values - nothing reads a file, nothing paints, nothing needs a browser.
 
-  It is a port of the pure half of the campaign-012 spike's
+  It is a port of the pure half of the editor spike's
   `spike/js/theme.js`, which `spike/dev/theme-audit.html` ran against the
   spike's three themes. The spike could only ever run it in Chrome by hand.
   Here it runs in the gate, which is the whole point of the port.

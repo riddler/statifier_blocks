@@ -312,7 +312,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert html =~ "StatifierBlocksMeasure"
       end
 
-      # sb-ako9 (RQ-SF038-8). `palette-open` was already on
+      # sb-ako9. `palette-open` was already on
       # `@read_only_refused`, so the click was inert - but the comment beside
       # that list says a read-only mount draws no control that could have sent
       # one of these, and forty-one "+" buttons were exactly such controls.
@@ -368,7 +368,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute has_element?(view, ~s(.sb-gap__placeholder[phx-click]))
       end
 
-      # sb-z6vv (the operator's ruling of 2026-09-12, RQ-SF041-5): the mark
+      # sb-z6vv (the operator's ruling of 2026-09-12): the mark
       # above had no accessible name, so a reader heard the slot header and
       # nothing about the arm being empty. The name is the arm's own label
       # plus "is empty", carried by a `role="img"` span - which is why the
@@ -523,7 +523,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute editor(view) =~ "sb-editor__refusal"
       end
 
-      # sb-7n1h (RQ-SF041-5, ruled 2026-09-12). The drawing side of item 7a:
+      # sb-7n1h (ruled by the operator, 2026-09-12). The drawing side of item 7a:
       # a read-only mount refuses `expand` and `remove`, so it draws neither
       # control. Withholding is the precedent clause 1 set for the palette
       # column and item 7c for the gap "+" - never draw a gesture the mount

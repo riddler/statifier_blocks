@@ -337,7 +337,7 @@ defmodule StatifierBlocks.Compiler.CompositeExpansionTest do
   end
 
   describe "a member is expanded at its type's current version" do
-    # `ADR-0002`'s Note of 2026-09-07, item 2 (`RQ-SF037-17`): an expansion is
+    # `ADR-0002`'s Note of 2026-09-07, item 2: an expansion is
     # at each member's CURRENT version, as the palette resolves it at
     # expansion time. `core.send` is at version 2 and `Block.new/2` defaults
     # `:type_version` to 1, so before the compiler stamped the expansion this

@@ -793,7 +793,7 @@ defmodule StatifierBlocks.ThemeAuditTest do
 
     # The stage's own box, which is a different claim from the panel's: the
     # panel is the scroller and this is the thing it scrolls over.
-    # campaign-022 ruling R8c - `width: auto` gave the stage the PANEL's width
+    # An operator ruling - `width: auto` gave the stage the PANEL's width
     # while the tree has a floor of its own, so a narrow panel left an 782px
     # box around a 1208px tree and everything read off the box, the
     # measurement hook's `offsetWidth` included, was short with it.

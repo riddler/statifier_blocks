@@ -870,7 +870,7 @@ export function predicatorComponents(text) {
  *
  * ISO-8601 orders its components and predicator does not, so `8h3d` and `3d8h`
  * compile to the same `P3DT8H`. That is a projection, not the stored value:
- * campaign 014's D4 stores the author's own string verbatim and compiles at
+ * a pre-decision stores the author's own string verbatim and compiles at
  * emit time (a PROPOSAL, recorded on sb-709 and in the README - the shipped
  * `:duration` field type is ADR-0002 decision 7's and no ADR text changes
  * here), so the ISO form only ever appears as the readout beside the field.

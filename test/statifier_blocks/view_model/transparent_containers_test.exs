@@ -1,6 +1,6 @@
 defmodule StatifierBlocks.ViewModel.TransparentContainersTest do
   @moduledoc """
-  The host seam a flattened outline needs (`sb-6xkf`, RQ-SF038-7):
+  The host seam a flattened outline needs (`sb-6xkf`):
   `transparent?/2`, `effective_parent/3` and `end_of_list_target/3`, with
   `core_containers/0` as the documented default rather than a built-in
   policy.

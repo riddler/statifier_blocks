@@ -1,6 +1,6 @@
 defmodule StatifierBlocks.Compiler.ResumableDeadlineTest do
   @moduledoc """
-  ADR-0010's Note of 2026-09-02 (the operator's `RQ-026-6` ruling, option
+  ADR-0010's Note of 2026-09-02 (the operator's ruling, option
   (c)): a delayed `core.send` at the head of a `core.resumable_group`'s
   `body`, with a `resume` handler on that group's `interrupts` rail, is an
   **advisory** and not a refusal.

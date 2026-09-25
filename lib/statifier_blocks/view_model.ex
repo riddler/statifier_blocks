@@ -891,7 +891,7 @@ defmodule StatifierBlocks.ViewModel do
 
   @doc """
   How a container arranges its body slots: `:lanes`, `:fan` or `:stack`
-  (ADR-0005 amendment 10b, and the campaign-012 spike's `arrangementOf`).
+  (ADR-0005 amendment 10b, and the editor spike's `arrangementOf`).
 
   One derivation, read by three consumers that would otherwise each grow
   their own: the class `BlockNode` puts on the slot box, the words the
@@ -1037,7 +1037,7 @@ defmodule StatifierBlocks.ViewModel do
 
   @doc """
   The words on the pill drawn on the edge below an arranged container, or
-  `nil` when nothing is arranged (ADR-0005 amendment 10b, campaign 016).
+  `nil` when nothing is arranged (ADR-0005 amendment 10b).
 
   The distinction the pill states is the one the arrangement already makes
   and nothing else in the picture does: a fan's columns are alternatives and

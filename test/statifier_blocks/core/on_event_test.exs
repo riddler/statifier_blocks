@@ -817,7 +817,7 @@ defmodule StatifierBlocks.Core.OnEventTest do
   end
 
   describe "a literal capture source (ADR-0002's Note of 2026-09-12, N1)" do
-    # The measurement that asked for the arm (campaign SF040's capture k2),
+    # The measurement that asked for the arm (the signup spike's capture k2),
     # asserted the way it was found missing: two handlers on one screen,
     # each recording which of them fired, with nothing in either payload.
     # The host contributes no data at all here, which is the point - before
@@ -849,7 +849,7 @@ defmodule StatifierBlocks.Core.OnEventTest do
 
     # The positive round trip that closes the interim `core/on_event.ex`
     # declared when it narrowed a string literal to printable ASCII
-    # (RQ-SF041-17, 2026-09-12), and the reason `mix.exs` requires predicator
+    # (ruled by the operator, 2026-09-12), and the reason `mix.exs` requires predicator
     # `~> 9.4.1` rather than `~> 9.0`. ADR-0002's Note of 2026-09-13 records
     # that the narrowing is gone and that `N1`'s every-JSON-type reading of
     # the arm is what the code now does.
@@ -1017,7 +1017,7 @@ defmodule StatifierBlocks.Core.OnEventTest do
   end
 
   describe "an absent capture source (ADR-0002's Note of 2026-09-12, N2)" do
-    # The measurement that asked for the clause (campaign SF040's capture
+    # The measurement that asked for the clause (the signup spike's capture
     # `k3`, the signup Journey loop), asserted the way it was found: one
     # handler, two pairs, and a payload that carries one source and not the
     # other. `Map.has_key?/2` rather than a comparison with `:undefined` is

@@ -22,8 +22,8 @@ defmodule StatifierBlocks.Core.Map do
   determinism intact - the same document compiles to the same bytes over
   three items and over three thousand.
 
-  It follows that this type validates **nothing** about N (campaign-031
-  ruling `D31-9`, recorded as ADR-0009's 2026-09-05 Tier A note). A bound
+  It follows that this type validates **nothing** about N (an operator
+  ruling, recorded as ADR-0009's 2026-09-05 Tier A note). A bound
   on the batch, if measurement forces one, is a configuration key of the
   fan-out runtime with a runtime refusal on the ordinary error route -
   never a compile finding here, because the value a bound would apply to
@@ -365,7 +365,7 @@ defmodule StatifierBlocks.Core.Map do
 
   @doc """
   `error` is failure-classed: a batch that ended on the error route is a
-  batch that finished badly (the campaign-033 failure seam, 2026-09-06).
+  batch that finished badly (the failure seam, 2026-09-06).
 
   ADR-0009 decision 4's outcome set is untouched by this - there are still
   exactly two outcomes, `done` and `error`, and the class is a second axis

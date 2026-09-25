@@ -10,7 +10,7 @@ defmodule StatifierBlocks.Core.MapTest do
   not this package's:
 
     * anything about N. The compiler never sees the list, so there is no
-      count to bound and no bound to check (campaign-031 ruling `D31-9`,
+      count to bound and no bound to check (an operator ruling,
       ADR-0009's 2026-09-05 Tier A note). A test here that pinned a cap
       would pin a claim the type does not make.
     * what the empty fan-out answers. `sb-kha0` owns that question, and a
@@ -523,7 +523,7 @@ defmodule StatifierBlocks.Core.MapTest do
       refute scxml =~ "<datamodel"
     end
 
-    # RQ-031-4: the fan-out scheduler reads the aggregation policy off this
+    # The fan-out scheduler reads the aggregation policy off this
     # param, so the word has to reach it verbatim.
     #
     # sabotage: normalised the value ("first-error", say) - the runtime
@@ -599,7 +599,7 @@ defmodule StatifierBlocks.Core.MapTest do
     end
 
     # ADR-0002's amendment of 2026-09-06, section 2, extended to this type
-    # by the operator's ruling `RQ-034-13`: the failure final is emitted
+    # by the operator's ruling: the failure final is emitted
     # whether or not `on_error` is occupied, and with it empty the failure
     # transition targets that final directly. This replaces the assertion
     # that neither was emitted.

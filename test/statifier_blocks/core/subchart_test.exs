@@ -342,7 +342,7 @@ defmodule StatifierBlocks.Core.SubchartTest do
     end
 
     # ADR-0002's amendment of 2026-09-06, section 2, extended to this type
-    # by the operator's ruling `RQ-034-13`: the `error` final is emitted
+    # by the operator's ruling: the `error` final is emitted
     # whatever the referenced chart's own declared outcomes say and
     # whatever the slot holds, and with the slot empty the failure
     # transition targets it directly. This replaces the assertion that

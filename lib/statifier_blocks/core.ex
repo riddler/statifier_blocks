@@ -83,7 +83,7 @@ defmodule StatifierBlocks.Core do
   and that a document carries at most one - are a depth constraint and a
   cardinality constraint, and `StatifierBlocks.Shelf` carries those two and
   only those two, as Structure-stage findings (ADR-0002's amendment of
-  2026-08-31, section G12, campaign-024 ruling R-b).
+  2026-08-31, section G12, as the operator ruled it).
 
   ## What they compile to
 

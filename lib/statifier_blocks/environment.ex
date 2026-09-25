@@ -447,12 +447,12 @@ defmodule StatifierBlocks.Environment do
     end)
   end
 
-  # RQ-SF037-15, ruled 2026-09-07 (shape A): a composite's read and write
+  # Ruled by the operator, 2026-09-07 (shape A): a composite's read and write
   # signatures are computed at its ONE position, by running these same two
   # functions over `Composite.expand!/2`'s subtree with the expanded config.
   #
   # No descent, and no second walk: `descend/6` steps into a slot, a composite
-  # in this campaign exposes none (RQ-SF037-3), and the expansion is not in the
+  # in this campaign exposes none, and the expansion is not in the
   # document (ADR-0011's Note of 2026-09-07, section 1). What is walked here is
   # the expansion the compiler will produce at Resolve, at the position the
   # composite occupies - so the block after it reads what the members left,

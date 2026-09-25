@@ -520,7 +520,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     gesture is byte-identical to the document before it. What the host
     receives is a map, and which table it goes in, which tenant it belongs
     to, and whether it is saved at all are the host's - ADR-0005's 2026-09-07
-    amendment, clauses `15E` to `20E`, and epic ruling `R5` behind them.
+    amendment, clauses `15E` to `20E`, and the operator's ruling behind them.
 
     A refusal is delivered too, or it is not delivered at all: `propose/3`
     answering `{:error, reason}` is a refused gesture in the sense Expand's
@@ -702,7 +702,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     A toolbar item a profile may list.
 
     Wider than `Editor.Toolbar`'s own word for a chip - two of the four are
-    groups of buttons - and named for the shape ruling `RQ-SF036-1` spells.
+    groups of buttons - and named for the shape the operator's ruling spells.
     `:metrics` is the two right-aligned read chips and nothing else; the
     `Canvas` heading and the `nested tree` chip are not addressable, because a
     profile that could remove them could leave the middle pane unnamed.
@@ -1463,7 +1463,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     def handle_event("drawer-close", _params, socket),
       do: {:noreply, assign(socket, drawer_open: false, drawer_tab_focus: nil)}
 
-    # Tabs since R4, and the pick is remembered as `nil` until it is made:
+    # Tabs since the operator's ruling of 2026-08-29, and the pick is remembered as `nil` until it is made:
     # `Shell.drawer_view/1` resolves an unchosen tab to whichever one actually
     # holds something, and a pick that lands here stops it resolving. Fixture
     # runs are consumed as of 2026-09-02 (`refresh_fixture_runs/1` below); the

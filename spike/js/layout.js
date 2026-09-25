@@ -440,7 +440,7 @@ function safeSlots(descriptor, config) {
  * beside the body like an interrupt rail, but it is an in-band continuation of
  * the step that failed, not a rule watching a region. Rendered in one
  * vocabulary, "fires out of band" and "runs when the call fails" were the same
- * picture (evidence: campaign-012 journal, sb-pt1-onerror-vs-interrupts-*).
+ * picture (evidence: sb-pt1-onerror-vs-interrupts-*).
  *
  * `failure` is that third value. It stays presentation metadata a type
  * declares, exactly as d10 asks - no renderer, no stylesheet and nothing here

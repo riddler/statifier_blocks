@@ -339,7 +339,7 @@ reading of a repeated unit is not this spike's call. Refusing a subset is the
 safe direction; accepting a string predicator would reject is the failure the
 repo's cross-repo rule is about.
 
-**What the document stores is a PROPOSAL.** Campaign 014's pre-decision D4,
+**What the document stores is a PROPOSAL.** A pre-decision,
 accepted for the spike at kickoff: store the author's own string verbatim and
 compile to ISO-8601 at emit time (`Predicator.Duration` on the Elixir side).
 That is why `core.wait`, `core.send` and `core.timeout` now validate both
@@ -751,7 +751,7 @@ with an optional subtree for the failure case:
   renderer needs nothing new to draw it.
 
 That last point is the load-bearing one. An outcome path is a slot and never a
-port (ruled 2026-08-28; the umbrella's `docs/decisions.md` D13). The whole
+port (ruled by the operator, 2026-08-28). The whole
 editor rests on connectors being rendered rather than authored, which holds
 only while every edge in a document is a parent/slot/child relationship; a
 port-shaped failure edge would have been the one edge an author draws by hand.
@@ -822,7 +822,7 @@ time.
 The load-bearing part is what that raise is NOT: there is no edge from the
 raise to the handler it wakes. The two blocks name the same string in two
 places, and the innermost enclosing group is what hears it. That is the same
-answer `core.invoke`'s `on_error` gets (D13) reached from the other side -
+answer `core.invoke`'s `on_error` gets reached from the other side -
 there an outcome path is a slot rather than a port, here a send is a name
 rather than a port - and both protect the same invariant: every edge in a
 document is a parent/slot/child relationship, so connectors are rendered and
@@ -848,7 +848,7 @@ accent like every other core step.
 group after fifteen minutes, whatever it is doing" is a different shape from
 `core.wait`, which is a step inside a body that the chart sits at, and no
 shipped `core.*` type expressed it - so the demo documents grew a
-`myapp.timeout_rule` crutch to say it. That crutch is retired (D12) and this
+`myapp.timeout_rule` crutch to say it. That crutch is retired (2026-08-28) and this
 descriptor is what replaced it, key for key.
 
 `after` is a `duration`, spelled `after` rather than `duration` because a
@@ -964,7 +964,7 @@ may name is not this repo's decision - session identity is statifier-ex's
 the vocabulary already spells `core.invoke` - and a config key that validates
 nothing is a proposal made by accident. No `core.cancel`: a cancel names the
 send it cancels, which makes it a cross-subtree reference to another block,
-the exact shape D13 refused. The alternative that keeps the tree invariant is
+the exact shape the 2026-08-28 ruling refused. The alternative that keeps the tree invariant is
 scope-shaped rather than reference-shaped - a delayed send is cancelled when
 the region that armed it is left - and that is a compiler rule rather than a
 block type, which is a strong hint the vocabulary may need no cancel at all.
@@ -1217,7 +1217,7 @@ and `dev/theme-audit.html` still answer for the spike exactly as they did.
 
 ## What the third polish pass ruled (sb-3l1)
 
-Campaign 014's polish pass filed five readability findings against the spike
+An earlier polish pass filed five readability findings against the spike
 and fixed none of them; the operator ruled on all five plus one new item, and
 this is where those rulings landed. The rulings are the spec, and each is
 quoted where its code lives.

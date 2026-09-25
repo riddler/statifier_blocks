@@ -1,6 +1,6 @@
 defmodule StatifierBlocks.Compiler.ReservedRootOutcomeTest do
   @moduledoc """
-  `sb-k0dy`, RQ-SF035-16: `failed` is reserved as an outcome name on a
+  `sb-k0dy`: `failed` is reserved as an outcome name on a
   **root** block, and a document that declares it there is refused at
   compile with a `:config` finding.
 

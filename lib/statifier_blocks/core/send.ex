@@ -41,7 +41,7 @@ defmodule StatifierBlocks.Core.Send do
 
   **No cancel block, and there will not be one.** A cancel that names the
   send it cancels is a cross-subtree reference between blocks, which is
-  the exact shape the umbrella's D13 refuses - outcome paths are slots,
+  the exact shape the operator's ruling of 2026-08-28 refuses - outcome paths are slots,
   never ports, and connectors are rendered, never authored - as ADR-0001's
   tree invariant and ADR-0005's amendment 10a state at record level. The
   alternative that keeps the tree invariant is scope-shaped rather than

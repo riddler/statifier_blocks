@@ -16,7 +16,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     same reason: the drawer and palette folds own those in this shell.
 
     The load-bearing claim is a negative one. The gesture edits no document
-    and this package persists nothing (`16E`, epic ruling `R5`), so what
+    and this package persists nothing (`16E`), so what
     every test here watches is the pair of seams together: `on_collapse`
     fired, and `on_change` silent.
     """

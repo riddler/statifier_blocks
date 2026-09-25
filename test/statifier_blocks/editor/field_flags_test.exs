@@ -8,7 +8,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
   defmodule StatifierBlocks.Editor.FieldFlagsTest do
     @moduledoc """
     `hidden?` and `readonly?` at the form (ADR-0002 decision 7, amended
-    2026-09-07, sections F1 and F6, with campaign-SF036 ruling `RQ-SF036-15`).
+    2026-09-07, sections F1 and F6, as the operator ruled them).
 
     The document is the amendment's own worked example in the signup domain:
     a step name the host owns and a variant seed the host assigns, beside one
@@ -265,7 +265,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
 
       # Sabotage: gave `posted_value/2` only the `hidden?` clause - red, since
-      # `RQ-SF036-15` names both flags and a readonly field posts nothing
+      # The ruling names both flags and a readonly field posts nothing
       # either.
       test "ignores a value posted under a readonly field's key" do
         fields = [field("step_name", "Collect email", readonly?: true)]

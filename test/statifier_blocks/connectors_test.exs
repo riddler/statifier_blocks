@@ -93,7 +93,7 @@ defmodule StatifierBlocks.ConnectorsTest do
                "M 10 60 V 60 Q 10 60 10 60 H 50 Q 50 60 50 60 V 60"
     end
 
-    # The other three paths carry the same clamp (campaign-022 ruling R8d).
+    # The other three paths carry the same clamp (an operator ruling).
     # A fan reaches the case first: one short lane beside a tall one puts a
     # slot's inlet ABOVE the bar that feeds it, and an unclamped arm drew the
     # arrowhead back into the hub.
@@ -288,7 +288,7 @@ defmodule StatifierBlocks.ConnectorsTest do
       assert Enum.count(edges, &(&1.kind == :join)) == 2
     end
 
-    # `sb-d4cr`, found by campaign-025 `sb-e2zy`: `slot_exit/2` read
+    # `sb-d4cr`, found by `sb-e2zy`: `slot_exit/2` read
     # `slot.children`, so an arm ending in a shelf rejoined FROM the shelf's
     # outlet - flow leaving the one card 10u says nothing enters and nothing
     # leaves.
@@ -425,7 +425,7 @@ defmodule StatifierBlocks.ConnectorsTest do
     end
   end
 
-  describe "the hubs a fan turns on (10b, campaign 016)" do
+  describe "the hubs a fan turns on (10b)" do
     # The fallback, and the behaviour every fan had before the markers were
     # anchored: with no pill measured the fan still leaves the card.
     # Sabotage: making `marker_or/3` return the marker unconditionally - a

@@ -507,7 +507,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    describe "the tier-2 layout: cards, columns and the pill (10b, campaign 016)" do
+    describe "the tier-2 layout: cards, columns and the pill (10b)" do
       # Sabotage: `BlockNode.layout_class/1` reading `entry.layout` again
       # instead of `ViewModel.arrangement/1` - a branch's arms stack full-width
       # once more, and every fan edge runs straight down through the arm above
@@ -593,7 +593,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert has_element?(view, ~s([data-block-id="blk_left"][data-container="false"]))
       end
 
-      # R3's placeholder half (operator ruling 2026-08-29): an empty arm is a
+      # The insertion-marker ruling's placeholder half (operator, 2026-08-29): an empty arm is a
       # real arm and has to look like somewhere to drop.
       # Sabotage: stamping `data-empty` off the slot's arity rather than its
       # children - a filled `:any` slot claims to be empty and keeps the
@@ -613,7 +613,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                )
       end
 
-      # R3 keeps the affordance it restyles: the marker IS the gap, so the
+      # The ruling keeps the affordance it restyles: the marker IS the gap, so the
       # server events and the keyboard path are the ones that already shipped.
       # Sabotage: moving the insertion marker onto the connector overlay - the
       # overlay is `aria-hidden` with `pointer-events: none` and is absent
@@ -629,7 +629,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    describe "the card face (parity item 1.4, campaign 016)" do
+    describe "the card face (parity item 1.4)" do
       # Sabotage: rendering `@node.entry.label` again instead of
       # `ViewModel.title/1` - a block the author named reads as its type, and
       # the name they typed is visible nowhere on the canvas.
@@ -799,7 +799,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                )
       end
 
-      # R2 (operator ruling 2026-08-29): nothing at rest, revealed on hover or
+      # The delete-affordance ruling (operator, 2026-08-29): nothing at rest, revealed on hover or
       # selection - so the control has to be in the DOM the whole time and
       # hidden by style alone. Asserted as the attribute the stylesheet
       # selects rather than as a computed style, which LiveViewTest cannot
@@ -857,7 +857,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # because the pair is on the canvas only while the author's own delete
       # gesture is unanswered, and an offer nobody can see is not an offer.
       # Asserted here, beside the rest rule it is the exception to, so the two
-      # halves of R2 cannot drift apart without one of these going red.
+      # halves of that ruling cannot drift apart without one of these going red.
       #
       # Sabotage: dropping `data-reveal` from the offer `<span>` - the pair
       # falls out of the `[data-reveal="always"]` rule below, has no rule of
@@ -1035,7 +1035,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    describe "slot labels, lane rules and the interrupt region (1.7, campaign 016)" do
+    describe "slot labels, lane rules and the interrupt region (1.7)" do
       @stylesheet "assets/css/statifier_blocks.css"
 
       # The spike's arm header is two lines: the arm's name in small caps, and
@@ -1306,7 +1306,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # Sabotage: `background: var(--sb-block-accent-tint)` on the chip - a
       # third accent-bearing element inside the card, which is the tint that
       # note ratified the deletion of.
-      # campaign-022 ruling R8b: `overflow-wrap: anywhere` broke an event name
+      # An operator ruling: `overflow-wrap: anywhere` broke an event name
       # across two lines - `signup.reminder_du` / `e` - which reads as two
       # identifiers. The chip clips at its own edge instead, the trade
       # `.sb-node__invoke` already makes on the line below it.
@@ -2015,7 +2015,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    describe "the form-control box (campaign-021 ruling R4)" do
+    describe "the form-control box" do
       @stylesheet "assets/css/statifier_blocks.css"
 
       # The ruling's whole point is that there is ONE rule and not two copies
@@ -2084,7 +2084,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute css =~ ~r/^\.sb-field__input,\n\.sb-palette__search \{$/m
       end
 
-      # The two states R4 adds that the spike never had. `disabled` is phrased
+      # The two states the form-control ruling adds that the spike never had. `disabled` is phrased
       # exactly as the button vocabulary phrases it - a host that themes one
       # disabled state has themed both - and the placeholder takes the family's
       # subtle step rather than the browser's grey.
@@ -2102,7 +2102,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
 
       # The subtree has exactly one focus treatment, declared in the reset, and
-      # R4's focus ring is that rule landing on a box instead of on native
+      # The form-control ruling's focus ring is that rule landing on a box instead of on native
       # chrome - not a second rule. This is the refutation that keeps it one.
       # Sabotage: adding `.sb-field__input:focus-visible { outline-color: ... }`
       # beside the box - the ring looks better on the inspector alone, the
@@ -2121,7 +2121,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # `width: 100%` moved to the shared rule, so a second one here would be a
       # copy that outlives the rule it copies.
       # Sabotage: leaving `width: 100%` behind in the search box's own rule -
-      # nothing renders differently, and the duplication R4 removed is back.
+      # nothing renders differently, and the duplication the ruling removed is back.
       test "the search box keeps only what is its own" do
         own =
           ~r/\*\/\n\.sb-palette__search \{\n(.*?)\n\}$/ms
@@ -2134,7 +2134,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    describe "the gap marker's stylesheet (campaign-021 ruling R6)" do
+    describe "the gap marker's stylesheet" do
       @stylesheet "assets/css/statifier_blocks.css"
 
       # The gap's masking claim, made true. The connector overlay is an
@@ -2208,7 +2208,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    describe "the container's own width (campaign-021 ruling R7)" do
+    describe "the container's own width" do
       @stylesheet "assets/css/statifier_blocks.css"
 
       # A geometry rule before it is a look. Left to stretch, a container is

@@ -1,6 +1,6 @@
 defmodule StatifierBlocks.Compiler.FailureOutcomeTest do
   @moduledoc """
-  The campaign-033 failure seam, block half (`sb-napt`, mirrored with
+  The failure seam, block half (`sb-napt`, mirrored with
   `sp-n8g`): a block type may class one of the outcomes it already
   declares as **failure**, and the compiler emits a reserved `<donedata>`
   `<param>` on that outcome's top-level `<final>` under `:child_use` and

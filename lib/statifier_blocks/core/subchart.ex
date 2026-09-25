@@ -88,7 +88,7 @@ defmodule StatifierBlocks.Core.Subchart do
 
   ## Every outcome gets a slot, `on_error` included
 
-  An outcome path is a **slot**, never a port (D13, ADR-0002's amendment
+  An outcome path is a **slot**, never a port (ADR-0002's amendment
   A2): every edge in a document is a parent/slot/child relationship, which
   is the invariant the editor's rendered connectors rest on. So each
   declared outcome gets one `zero_or_one` slot, `on_<outcome>`, holding
@@ -575,7 +575,7 @@ defmodule StatifierBlocks.Core.Subchart do
 
   @doc """
   `error` is failure-classed: a child that reported `error` is a child
-  that finished badly (the campaign-033 failure seam, 2026-09-06).
+  that finished badly (the failure seam, 2026-09-06).
 
   It is the one outcome this type appends itself, and the moduledoc
   already calls it "the failure outcome"; nothing else the author listed

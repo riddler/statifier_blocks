@@ -38,7 +38,7 @@ defmodule StatifierBlocks.AssetsTest do
       """
     end
 
-    # The defect this guards is the one campaign 016 found in every host seen:
+    # The defect this guards is the one found in every host seen:
     # registering the drag hook alone leaves the connector layer with no
     # measurements, so the editor renders as stacked rows with no flow lines
     # and nothing anywhere reports an error. A default export carrying both is
@@ -394,7 +394,7 @@ defmodule StatifierBlocks.AssetsTest do
     # other test in the suite is happy with that: the markup is right, the
     # filter works, and only a human looking at the pane would say so.
     #
-    # Since campaign-021 ruling R4 the box is not the search box's alone: the
+    # Since the form-control ruling the box is not the search box's alone: the
     # config form's fields were the same defect one pane over, and the two are
     # now one rule. What this test asks is unchanged - does this control
     # declare a box - and it is `declarations_of/1`, not the assertion, that
@@ -443,7 +443,7 @@ defmodule StatifierBlocks.AssetsTest do
     # likely to drift back out: its old rule carried `border: none`, which
     # reads as harmless and silently cancels the family on the one control
     # that most needs to look like one - forty-one of them ride the flow edges
-    # of a document, and a canvas of borderless glyphs is what R3's "the gap
+    # of a document, and a canvas of borderless glyphs is what the insertion-marker ruling's "the gap
     # IS the insertion marker" is not.
     # Sabotage: putting `border: none` (or the old `background: var(--sb-bg)`)
     # back on `.sb-gap__add` - the resting "+" goes back to a bare glyph while
@@ -662,8 +662,8 @@ defmodule StatifierBlocks.AssetsTest do
   # not by string equality with the whole list, because whether a control's
   # box is written on its own or shared with the control beside it is a
   # question about duplication, not about what the control declares. Equality
-  # answered "nothing" for a rule that declares everything (campaign-021
-  # ruling R4 shared `.sb-palette__search`'s box with `.sb-field__input`), and
+  # answered "nothing" for a rule that declares everything (an operator
+  # ruling shared `.sb-palette__search`'s box with `.sb-field__input`), and
   # a guard that reports a themed control as unthemed is worse than no guard.
   defp declarations_of(selector) do
     @stylesheet
