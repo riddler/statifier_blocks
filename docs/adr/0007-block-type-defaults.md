@@ -1,7 +1,7 @@
 # ADR-0007: A block type declares its defaults with `use`, and the leaf invoke step is one declaration
 
 Status: accepted (2026-08-31, unqualified direction-agent verdict under the
-operator campaign-023 gate grant, PR 196)
+operator's campaign gate grant, PR 196)
 
 ## Context
 
@@ -40,7 +40,7 @@ typed out in the module that exports it. Decision 5 owns the surface; decision
 ordinary functions produces a module indistinguishable from a hand-written one,
 which is why this record is additive rather than a reopening.
 
-**Why this is its own record.** It is what campaign-023 ruling R-a settled:
+**Why this is its own record.** It is what an operator ruling settled:
 this ships a new record that cross-references ADR-0002 rather than an
 amendment to it. The substantive reason matches the procedural one.
 ADR-0002 decides what a block type *is*; this decides a convenience layer
@@ -225,7 +225,7 @@ This record deliberately ships exactly the one shape there is evidence for.
 
 ## Note (2026-08-31): `StatifierBlocks.Runtime.*` is where a canonical runtime helper lives
 
-Recorded for `sb-4ptg` under campaign-024 ruling R-d. Decision 3 above keeps
+Recorded for `sb-4ptg` under an operator ruling. Decision 3 above keeps
 the two-registry seam: a block type **names** an invoke type and a separately
 registered handler **runs** it, so everything this record decides sits on the
 authoring side of that line. `StatifierBlocks.Runtime.Subchart` (PR 197,
@@ -289,7 +289,7 @@ under `sb-57yc`. What it is belongs to that record; this Note names only that
 the count moves again if it is accepted.
 
 Filed with `sb-uewa`, folding the `ADR-0007` half of `sb-35c0` (its `README.md`
-half landed with the 0.21.0 prep); campaign-034 ruling `RQ-034-6`.
+half landed with the 0.21.0 prep); on an operator ruling.
 
 ## Note (2026-09-18): the unpublished identifiers cited above
 
@@ -305,4 +305,4 @@ in `test/statifier_blocks/block_type_test.exs`, added in the same request as
 this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
-Filed with `sb-4wh3`, campaign RF058.
+Filed with `sb-4wh3`.

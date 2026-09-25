@@ -1,6 +1,6 @@
 # ADR-0009: Durable fan-out is a new block type, `core.map`, compiling to one invocation whose handler starts N children
 
-Status: accepted (2026-09-01, campaign-026; unqualified direction-agent
+Status: accepted (2026-09-01; unqualified direction-agent
 verdict on the second review, after one cure)
 
 ## Context
@@ -28,18 +28,18 @@ ADR-0008 states the handler half of all of that, and `sp-ADR-0008` states the
 linkage and stepping half.
 
 **The question of whether `core.foreach` could carry it is closed.** `sb-7em`
-carried the open half of that question since campaign-015. The operator's
-campaign-026 ruling `R26-2` answers it: `core.foreach` stays synchronous and
+carried the open half of that question since an earlier campaign. The operator's
+ruling answers it: `core.foreach` stays synchronous and
 SCXML-faithful, and durable fan-out is a **new block type**. This record is
 where that answer is written down, and `sb-7em` is answered on its face by it.
 The substantive reason is in decision 1.
 
-**The aggregation and accumulation vocabulary is ruled, not open.** Campaign
-026's `R26-3` fixes the aggregation vocabulary at `all` and `first_error` with
-`quorum` reserved and unbuilt; `R26-4` fixes accumulation at one author-named
-datamodel location, list-ordered by item index, with errors in place; `R26-5`
+**The aggregation and accumulation vocabulary is ruled, not open.** An operator
+ruling fixes the aggregation vocabulary at `all` and `first_error` with
+`quorum` reserved and unbuilt; the operator's ruling fixes accumulation at one author-named
+datamodel location, list-ordered by item index, with errors in place; the operator's ruling
 widens the linkage to an ordered set (`sp-ADR-0008`'s amendment, bead `sp-3n2`);
-`R26-6` puts the concurrency bound in the runtime with a block-level hint the
+the operator's ruling puts the concurrency bound in the runtime with a block-level hint the
 runtime clamps (`sob-djz`'s record). This record states the halves of those that
 are this package's - what the author writes and what the compiler emits - and
 cites the other two repositories for the halves that are theirs, per the
@@ -50,8 +50,8 @@ expresses fan-out, what it declares, what it compiles to, what the author writes
 to choose an aggregation policy and to name where the answers land, and what
 discipline the accumulated payload is under when N is large.
 
-**What this record does not do is build any of it.** Campaign 026's ruling
-`R26-1` defers the implementation to a later campaign. There are no `lib/`
+**What this record does not do is build any of it.** An operator ruling
+defers the implementation to a later campaign. There are no `lib/`
 changes here and no row is added to ADR-0002 decision 10's vocabulary table -
 that table records fifteen types (G11, which supersedes G8's count) and
 `StatifierBlocks.Palette.core_types/0` now registers the same fifteen
@@ -109,7 +109,7 @@ answered; its declaration half was never fan-out's to answer.
 
 ### 2. The type is named `core.map`
 
-The working name is adopted as the name. `R26-2` left the naming to this record;
+The working name is adopted as the name. The operator's ruling left the naming to this record;
 this is the decision.
 
 `map` says what the block means to the author's data: one item in, one answer
@@ -228,7 +228,7 @@ wants to branch on the answers reads the accumulated list with a `core.branch`
 after the block, which is the same shape any other datamodel-driven decision
 has.
 
-*[Note added 2026-09-05, with `sb-7haw` under campaign-031, after `sb-kqno`
+*[Note added 2026-09-05, with `sb-7haw`, after `sb-kqno`
 landed `StatifierBlocks.Core.Map` (PR 281, `a852429`). The shipped
 `config_schema/1` is **four fields**, not the eight this table declares, and
 two of the four are spelled differently. This Note records the shipped
@@ -250,8 +250,8 @@ opts}` field type ADR-0002's 2026-09-05 amendment on decision 7 added, which
 did not exist when this table was written; `collect` says what the block does
 with the answers rather than borrowing a name whose grammar it now only
 partly shares, and it keeps the same finding text so an author meets one
-complaint and not two. And `on` is the operator's campaign-031 amendment
-`RQ-031-4`, option (b): the scheduler that fans out **reads the policy off
+complaint and not two. And `on` is the operator's ruling,
+option (b): the scheduler that fans out **reads the policy off
 the `on` param verbatim**, so the authored word and the param name are the
 one word the runtime keys on, with no translation step between the record's
 vocabulary and the wire. Decision 6's permitted set is untouched by either
@@ -267,7 +267,7 @@ still live, and each has somewhere it would be decided:
   position under. Nothing in the shipped emission carries them, so a child
   chart today reads whatever the fan-out handler passes it, which is the
   handler's contract rather than this one's.
-- `max_concurrency` is decision 9's hint. Campaign 031's ruling `D31-9` puts
+- `max_concurrency` is decision 9's hint. An operator ruling puts
   the bound itself in the fan-out runtime as a configuration key, refused at
   runtime on the ordinary error route, and says a block-level hint is clamped
   rather than honoured below the queue limit - so a field here would be a
@@ -281,7 +281,7 @@ A later bead decides each, on this record, against the runtime as it then
 stands. Until one does, the table above declares them and the module does not,
 and a reader who finds that gap is looking at this Note and not at drift.
 
-Filed with `sb-7haw`, campaign-031, from `sb-kqno`'s two recorded residues.]*
+Filed with `sb-7haw`, from `sb-kqno`'s two recorded residues.]*
 
 ### 5. Answers accumulate in one author-named location, ordered by item index
 
@@ -385,7 +385,7 @@ decision 6), as `core.parallel`'s `complete` is.
 
 ### 7. The payload discipline for large N
 
-This is the section `R26-4` asks for, and it exists because the accumulated
+This is the section the operator's ruling asks for, and it exists because the accumulated
 list has a cost profile a single `assign_to` does not.
 
 **The cost is per-step, not per-run.** The list lives in the parent's
@@ -491,7 +491,7 @@ because the `<invoke>` carries `id=<block id>`. Same mechanism, one more string.
 
 ### 9. Concurrency is the runtime's, with a hint the runtime clamps
 
-Per `R26-6`. `max_concurrency` on the block is a **hint**. The runtime owns the
+Per the operator's ruling. `max_concurrency` on the block is a **hint**. The runtime owns the
 actual bound, the runtime clamps the hint to it, and the host wins every
 disagreement. A hint above the runtime's bound is clamped down silently rather
 than refused; a hint below it is honoured; an absent hint means the runtime's
@@ -519,7 +519,7 @@ batching may reorder execution freely without reordering results.
 
 ### 10. Linkage: the ordered set is `sp-ADR-0008`'s amendment
 
-Per `R26-5`, and cited rather than restated. `sp-ADR-0008`'s amendment (bead
+Per the operator's ruling, and cited rather than restated. `sp-ADR-0008`'s amendment (bead
 `sp-3n2`) widens an invocation's linkage to an ordered set of child run ids with
 per-child status, adds the item index to child run metadata, and reads the
 single-child case as the N=1 degenerate one. Storage and stepping are
@@ -611,7 +611,7 @@ and stepped, the third says how their starts are batched and bounded. That
 split follows the umbrella's contract-ownership rule and it follows the
 precedent ADR-0008 and `sp-ADR-0008` already set for single-child.
 
-**Nothing here is implemented.** Campaign 026's `R26-1` defers the
+**Nothing here is implemented.** An operator ruling defers the
 implementation, and this record carries no `lib/` change, no test, and no
 palette registration. What it produces is a design that a later campaign can
 build from without another rulings walk, and a set of decisions that are
@@ -626,7 +626,7 @@ A dated note rather than an amendment. Decision 7 is unchanged in every clause:
 the five-step discipline stands in the order it gives, clause 4 still puts a
 cap at the runtime rather than in the document, and "no compression, no
 truncation, no spill" still holds. What this records is the direction taken by
-the 2026-09-05 scale walk (campaign-031 ruling `D31-9`) for the range decision
+the 2026-09-05 scale walk (an operator ruling) for the range decision
 7 does not reach - what an author does when N is large enough that a chart run
 per item is the wrong unit of work.
 
@@ -677,7 +677,7 @@ the same reason clause 4 gives for setting no numeric limit in this record, and
 the scale walk does not change it - it only says where the number that clause 4
 declined to write now lives.
 
-Filed with `sb-uxko`, campaign-031 ruling `D31-9`.
+Filed with `sb-uxko`, on an operator ruling.
 
 ---
 
@@ -685,7 +685,7 @@ Filed with `sb-uxko`, campaign-031 ruling `D31-9`.
 
 A dated note rather than an amendment. Decision 7's five clauses are unchanged
 and stand in the order given. This adds one sentence to the discipline, from
-the same 2026-09-05 scale walk (campaign-031 ruling `D31-9`).
+the same 2026-09-05 scale walk (an operator ruling).
 
 **`items` are descriptors - ids, ranges, chunk handles - never row payloads.**
 
@@ -707,7 +707,7 @@ record's existing fields rather than in a new one: a chunk handle is a
 descriptor, so "`core.map` over chunk descriptors" needs nothing from decision
 4's declaration surface that a descriptor list does not already satisfy.
 
-Filed with `sb-uxko`, campaign-031 ruling `D31-9`.
+Filed with `sb-uxko`, on an operator ruling.
 
 ---
 
@@ -732,8 +732,8 @@ vocabulary for what it is iterating over, and a walk that cannot name the item
 cannot check a read inside a body at all. That record does not change what the
 handler passes a child; it names what the walk knows.
 
-**`max_concurrency` stays deferred**, on this record's own argument: campaign
-031's ruling on the fan-out runtime put the bound in the runtime as a
+**`max_concurrency` stays deferred**, on this record's own argument: the
+scale walk's ruling on the fan-out runtime put the bound in the runtime as a
 configuration key and clamps a block-level hint below the queue limit, so a
 field here would be a hint to a runtime that already has the number.
 
@@ -774,8 +774,8 @@ this decision says it succeeds. The two layers disagreed, and an accepted record
 disagreeing with shipped code is a defect in one of them rather than a matter of
 taste.
 
-**The answer, taken by the operator on 2026-09-06 as campaign-033 ruling
-`RQ-033-4`: this decision wins.** `items` resolving to `[]` is a successful
+**The answer, taken by the operator on 2026-09-06 as an operator
+ruling: this decision wins.** `items` resolving to `[]` is a successful
 fan-out over nothing, exactly as the paragraph above has it - zero children
 start, the accumulated list is written as `[]`, and the block takes `done`
 immediately. There is no refusal reason for an empty list, and the refusal set
@@ -792,19 +792,19 @@ invocation carries the `items` datamodel path once rather than the list
 exists only at runtime where the handler evaluates the path.
 
 **One thing this Note does not decide.** Decision 4 fixes this block's outcome
-set at two, `done` and `error`, not config-derived, and the campaign-033 bead
+set at two, `done` and `error`, not config-derived, and the bead
 `sb-napt` proposes a failure-classed outcome that would reach that decision.
 Whether it does, and what it would change here, is that bead's record to write
 and not this one's.
 
-Answers `sb-kha0`. Filed with `sb-xwhj`, campaign-033 ruling `RQ-033-4`; the
+Answers `sb-kha0`. Filed with `sb-xwhj`, on an operator ruling; the
 runtime half is `sob-as0`.
 
 ## Note (2026-09-06): decision 4's outcome set stays two, and `error` becomes failure-classed
 
 A dated Note rather than an amendment, and the answer to the question the Note
 above this one left open in as many words: "Decision 4 fixes this block's
-outcome set at two ... and the campaign-033 bead `sb-napt` proposes a
+outcome set at two ... and the bead `sb-napt` proposes a
 failure-classed outcome that would reach that decision. Whether it does, and
 what it would change here, is that bead's record to write." This is that
 record's entry, and the answer is that decision 4 is unchanged in every clause.
@@ -848,14 +848,14 @@ with a failed child takes `done` or `error`; the class only says what taking
 **Decision 8 is untouched**, including the empty-list paragraph and the Note
 above that reaffirmed it. An empty fan-out still succeeds over nothing and
 takes `done` immediately, so it never reaches the failure-classed outcome -
-the two campaign-033 rulings agree rather than collide.
+the two rulings agree rather than collide.
 
 **Decision 7 is untouched.** No payload grows: the reserved param is one fixed
 attribute on one final of the parent document, not a per-item cost, and
 it multiplies by nothing.
 
 Filed with `sb-napt`, mirrored with `sp-n8g` in `statifier_persistence`;
-campaign-033 ruling `RQ-033-3`.
+on an operator ruling.
 
 ## Note (2026-09-06): decision 4's `item_as` and `index_as` reach the shipped emission, so one sentence of the 2026-09-05 deferral is historical
 
@@ -886,7 +886,7 @@ records the six-field count.
 as the Note above leaves them, on the reasons it gives each. Deferring is still
 not dropping.
 
-Filed with `sb-uewa`, folding `sb-z4vz`; campaign-034 ruling `RQ-034-6`.
+Filed with `sb-uewa`, folding `sb-z4vz`; on an operator ruling.
 
 ## Note (2026-09-06): what `collect` holds for a child that ends in a failure-classed final, and where a nested `core.map` failure goes
 
@@ -896,7 +896,7 @@ item-index order, decision 6's two policies still decide which outcome the
 block reaches, and decision 8's empty fan-out still succeeds over nothing. The
 Note of this date filed with `sb-napt` said all four, and this one repeats none
 of the reasoning.
-What is recorded here is the answer to the question campaign 033 left deferred -
+What is recorded here is the answer to the question the campaign left deferred -
 what the shipped fan-out writes into `collect` for a child whose own run ended
 badly - and one sentence about where a nested `core.map`'s `error` now goes,
 from ADR-0002's amendment of this date.
@@ -960,14 +960,14 @@ block's own compilation inside a parent chart is untouched. What changed is
 only what the enclosing **document** does when nobody caught the block's
 `error`.
 
-Filed with `sb-ii2k`, campaign-034 rulings `RQ-034-1` and `RQ-034-13`; the code
+Filed with `sb-ii2k`, on the operator's rulings; the code
 is `sb-hxs5`, and ADR-0002's amendment of this date is where the propagation
 rule is stated.
 
 ## Amendment (2026-09-06): decision 4, `collect` admits a dotted datamodel path through the shared location helper
 
-**Status: accepted (2026-09-06, campaign 034, bead `sb-pxkf`).** A decision
-record merges at proposed under campaign 034's invariant; flipping it to
+**Status: accepted (2026-09-06, bead `sb-pxkf`).** A decision
+record merges at proposed under the campaign's invariant; flipping it to
 accepted is a separate gated request. Additive: decision 4 stands as accepted,
 and no text above this line is edited by this section.
 
@@ -1054,8 +1054,8 @@ what a child chart may declare its `donedata` carries, decision 5's element
 union, and decision 7's cost rule are each named elsewhere and are not decided
 here.
 
-Filed with `sb-pxkf`, campaign-034 ruling `RQ-034-5`, split from `sb-jvz3` by
-ruling `RQ-034-15`; it folds `sb-h6qt`'s half of the question. The code is
+Filed with `sb-pxkf`, on an operator ruling, split from `sb-jvz3` by
+the operator's ruling; it folds `sb-h6qt`'s half of the question. The code is
 `sb-cjou`.
 
 ### Note (2026-09-06): what the flip checked against `main` at `802043e`
@@ -1129,7 +1129,7 @@ once this field's message names a datamodel path as theirs do. The clause's
 reason - an author meets one complaint and not two - is why the text moves with
 the rule rather than staying put.
 
-Filed with `sb-pxkf`, campaign-034 ruling `RQ-034-5`.
+Filed with `sb-pxkf`, on an operator ruling.
 
 ## Note (2026-09-06): the deferred-question half of this record's Note on `ADR-0011` decision 13 is answered
 
@@ -1155,12 +1155,12 @@ because that is where the sentence said it belonged - `collect`'s grammar is
 this record's decision to make - and it is answered in the direction decision
 13 argued for, on this record's own reading of its decision 5.
 
-Filed with `sb-pxkf`, campaign-034 ruling `RQ-034-5`.
+Filed with `sb-pxkf`, on an operator ruling.
 
 ## Amendment (2026-09-06): decision 4 gains `collect_type`, decision 5's element is the envelope this record already fixed, and decision 7's multiplicand is nameable
 
-**Status: accepted (2026-09-06, campaign SF035, bead `sb-jvz3`, recording
-campaign-034's ruling `RQ-034-2` and campaign-033's `RQ-033-19` B).** A
+**Status: accepted (2026-09-06, bead `sb-jvz3`, recording
+two operator rulings).** A
 decision record merges at proposed under the campaign invariant; flipping it to
 accepted is a separate gated request through the same `docs/adr/` gate, and
 `sb-upv0` carries it. Additive: decisions 4, 5 and 7 stand as accepted, and no
@@ -1319,7 +1319,7 @@ The open question this record's Note of 2026-09-06 at `:714` left on decisions
 as folded with that record.
 
 Filed with `sb-jvz3`, against `ADR-0013` as merged (PR 319, `b90d40e`);
-campaign-SF035. `sb-nqfd` builds it.
+`sb-nqfd` builds it.
 
 ## Note (2026-09-06): what the flip of the `collect_type` amendment checked, and the one sentence it makes historical
 
@@ -1386,7 +1386,7 @@ spelling carries it.
   still the sixth entry, and `config_schema/1` is `:426-482` with seven
   entries today - the sixth of them being the entry this amendment adds.
 
-Filed with `sb-upv0`, campaign SF035's Lane A.
+Filed with `sb-upv0`, the campaign's Lane A.
 
 ## Note (2026-09-18): the unpublished identifiers cited above
 
@@ -1402,4 +1402,4 @@ in `test/statifier_blocks/block_type_test.exs`, added in the same request as
 this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
-Filed with `sb-4wh3`, campaign RF058.
+Filed with `sb-4wh3`.

@@ -24,7 +24,7 @@ want turns out to need a structural declaration - a `padding`, a
 `grid-template-columns`, a rule against an `sb-` class - that is a **hole in
 the token surface**, not a licence to write the rule. File it; the fix belongs
 in the stylesheet, and every token in the surface today was found exactly that
-way by the campaign-012 spike's third theme.
+way by the spike's third theme.
 
 ## Where to put it
 

@@ -526,7 +526,7 @@ here". The first, verbatim:
 > schema change with a hash consequence, and it is ADR-0001's to make.
 
 This amendment takes that follow-up and makes that change, under
-campaign-022 ruling R3 and the ruling recorded on `sb-7moq` (2026-08-31):
+an operator ruling and the ruling recorded on `sb-7moq` (2026-08-31):
 "Documents should absolutely gain a rich declaration surface."
 
 The forcing case is that note's own gap, seen from the author's side. Against
@@ -980,7 +980,7 @@ decision 11 - is untouched here; what a declared entry of duration type means
 is ADR-0006's subject, and `sb-b05e` recorded it there, on a request of its
 own that has landed.
 
-Filed with `sb-8acm`, campaign-029's Lane A.
+Filed with `sb-8acm`, the campaign's Lane A.
 
 ## Note (2026-09-05): the Note above, two corrections to what it cites
 
@@ -989,7 +989,7 @@ decision moves, the worked example's bytes are not edited, and no text above
 this line is changed by this section. Both corrections were raised in review
 against the request that added the Note above and routed to a follow-up
 rather than cured in place, so the merged artifact stayed the artifact its
-review read. Recorded under campaign 030's fill lane D.
+review read. Recorded under the campaign's fill lane D.
 
 **The list of places the older spelling appears is short by one.** The Note
 above tells a reader to read the spelling inside decision 6's bullet as the
@@ -1014,7 +1014,7 @@ amendment of 2026-09-05 to its decision 4, whose status line reads
 a separate change on its own gate. Read "has landed" as "has merged, at
 proposed" - the reading every 2026-09-05 section in this family gets.
 
-Filed with `sb-a9r8`, campaign-030's fill lane D.
+Filed with `sb-a9r8`, the campaign's fill lane D.
 
 ## Note (2026-09-18): the unpublished identifiers cited above
 
@@ -1029,7 +1029,7 @@ in `test/statifier_blocks/block_type_test.exs`, added in the same request as
 this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
-Filed with `sb-4wh3`, campaign RF058.
+Filed with `sb-4wh3`.
 
 ## Amendment (2026-09-22): the envelope gains `accepts`, decided by `ADR-0014` - 11e's allowlist, decision 7's bump sentence, and the typespec appendix
 

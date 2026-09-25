@@ -44,7 +44,7 @@ final carrying the reserved run-status param. Bead: `sb-hxs5`.
   `/4` (`:1364`) read **the root block's** outcomes and classes only;
   nothing walks below the root.
 - `test/statifier_blocks/compiler/failure_outcome_test.exs` is the
-  campaign-033 half. Its `compile_map!/2` occupies `on_error` "on
+  later campaign's half. Its `compile_map!/2` occupies `on_error` "on
   purpose", with a closing comment saying the failure final is emitted
   only when the slot holds something - a sentence section 2 supersedes.
 

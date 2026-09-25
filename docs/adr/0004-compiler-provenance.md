@@ -1,6 +1,6 @@
 # ADR-0004: One block, one state - a deterministic compile carrying a provenance map
 
-Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings); decision 2 amended - outcome-tagged finals (accepted 2026-08-29, operator ruling); child-use compile and core.subchart routing amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 93); delayed-send cancel emission amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95); core.foreach sequential loop amendment F1-F6 (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 94); outcome_event/2 tagged-return ratification under 2e (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 111); core.parallel complete-first amendment P1-P3 (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 112); root-termination note, the terminate option (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 123); host-declared-roots note, the declare option (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 124); send-id minting and the config_value_span finding field amendment (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 130); core.wait timer note - the timer rides the reserved send role (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 132); core.subchart src identity and self-reference refusal amendment R1-R4 (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 133)
+Status: accepted (2026-08-26); illustrations and option list amended (2026-08-27, operator rulings); decision 2 amended - outcome-tagged finals (accepted 2026-08-29, operator ruling); child-use compile and core.subchart routing amendment (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 93); delayed-send cancel emission amendment (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 95); core.foreach sequential loop amendment F1-F6 (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 94); outcome_event/2 tagged-return ratification under 2e (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 111); core.parallel complete-first amendment P1-P3 (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 112); root-termination note, the terminate option (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 123); host-declared-roots note, the declare option (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 124); send-id minting and the config_value_span finding field amendment (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 130); core.wait timer note - the timer rides the reserved send role (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 132); core.subchart src identity and self-reference refusal amendment R1-R4 (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 133)
 
 ## Context
 
@@ -892,7 +892,7 @@ edited.
 
 ### What forces the amendment
 
-The operator's 2026-08-28 ruling (umbrella `docs/decisions.md` D13) settled the
+The operator's 2026-08-28 ruling (the maintainers' decision log) settled the
 authoring model above this record: **outcome paths are slots, never ports; a
 block has one inlet and one outlet; and each outcome compiles to a distinct
 completion event.** Ports - several typed outputs with author-drawn edges - were
@@ -1230,7 +1230,7 @@ exists in the vocabulary.
 
 ## Amendment (2026-08-29): a document compiled for use as a child, and `core.subchart` routing
 
-**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 93).** This section records the
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator's campaign grant, PR 93).** This section records the
 operator's 2026-08-29 ruling on the mirror pair `sb-81e` / `st-aj2k` and
 nothing else. It is additive: it amends no accepted text above, and every
 decision in the record, the 2026-08-28 amendment included, stands as written.
@@ -1374,7 +1374,7 @@ The parent's `core.subchart` block, compiled:
 
 ## Amendment (2026-08-29): a delayed send's cancel, emitted in the arming state's `<onexit>`
 
-**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 95).** This section is additive: nothing above it
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator's campaign grant, PR 95).** This section is additive: nothing above it
 is edited, and every decision in the record stands as written. It records the
 emission half of the operator's 2026-08-29 delayed-send lifetime ruling
 (`sb-b4f`, mirrored to statifier-ex as `st-q3ud`); the declaration half - that
@@ -1439,7 +1439,7 @@ that makes it scope-shaped and keeps D13 intact.
 
 ## Amendment (2026-08-29): the sequential `core.foreach` compile
 
-**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 94).** Drafted 2026-08-29 from the operator ruling on the loop
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator's campaign grant, PR 94).** Drafted 2026-08-29 from the operator ruling on the loop
 shape (sb-i61 / st-z4f3, "as recommended"). It records how a sequential
 `core.foreach` block compiles under this record's existing decisions and names
 one new compile finding; it amends no accepted decision above, and no accepted
@@ -1554,7 +1554,7 @@ names would be a change to decision 9.
 
 ## Amendment (2026-08-29): `core.parallel` `complete: first` - per-lane transitions, losing lanes exit and cancel
 
-**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 112).** This section is additive: nothing above it
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator's campaign grant, PR 112).** This section is additive: nothing above it
 is edited, and every decision in the record stands as written. It drafts the
 operator's 2026-08-29 ruling on how a racing `core.parallel` compiles
 (`sb-olu`, mirrored to statifier-ex as `st-rau9`, "as recommended"). Upstream
@@ -1823,7 +1823,7 @@ determinism, provenance and F6 refusal are shared, and this note is what F6's
 
 ## Amendment (2026-08-29): the send id is minted through the context, and decision 10's finding shape gains `config_value_span`
 
-**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015b grant, PR 130).** This section is additive: nothing above it
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator's campaign grant, PR 130).** This section is additive: nothing above it
 is edited, no accepted decision changes, and the header line's status history
 is the conductor's to extend. It records two things the code already does and
 this record does not yet say: how a delayed send's `id` is minted, which the
@@ -1964,7 +1964,7 @@ and nothing else in the record is edited by (`sb-cqg`).
 
 ## Amendment (2026-08-29): `core.subchart`'s `src` is a document id, and a document may not run itself
 
-**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015b grant, PR 133).** This section is additive: nothing above it
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator's campaign grant, PR 133).** This section is additive: nothing above it
 is edited, no accepted decision changes, and the header line's status history
 is the conductor's to extend. It records the operator's ruling on a question
 the `core.subchart` amendment of this date left open - what the emitted `src`
@@ -2124,7 +2124,7 @@ depends on that happening.
 ## Note (2026-08-30): the editor's `invoke_types` assign, a suggestion list over decision 8's data
 
 A dated note rather than an amendment, recorded for `sb-ht79` under
-campaign-021 ruling R5. It records a seam the editor now carries and changes
+an operator ruling. It records a seam the editor now carries and changes
 nothing this record decides. The record's Status is untouched, no compiled
 byte moves, and the compiler is not edited.
 
@@ -2200,7 +2200,7 @@ a field it already published" gains a second reader, not a second producer.
 ## Note (2026-08-31): the document-level key is taken, and the Emit stage's first warning
 
 A dated note rather than an amendment, recorded for `sb-ao6l` under
-campaign-022 ruling R3. It records where two things this record already
+an operator ruling. It records where two things this record already
 anticipated now render, and one small fact the accepted text did not
 contemplate; no decision above changes and no text above is edited.
 
@@ -2245,11 +2245,11 @@ non-block surfaces, two roles, one namespace; a consumer that switched on
 
 ## Amendment (2026-08-31): `core.drafts` emits nothing, `core.placeholder` emits a step, and four findings
 
-**Status: accepted (2026-09-01), drafted for `sb-5h6q` under the operator campaign-024 grant; accepted on the gate's unqualified direction-agent verdict.** Additive; decisions 1
+**Status: accepted (2026-09-01), drafted for `sb-5h6q` under the operator's campaign grant; accepted on the gate's unqualified direction-agent verdict.** Additive; decisions 1
 through 11 stand as accepted and no text above this line is edited by this
 section. It is the compiler half of ADR-0002's amendment of this date, which
 adds `core.drafts` and `core.placeholder` to decision 10's vocabulary
-(campaign-024 rulings R-a and R-b); the two records were drafted together and
+(the operator's rulings); the two records were drafted together and
 neither is readable without the other.
 
 ### What forces the amendment
@@ -2306,7 +2306,7 @@ section - a shelf takes no role because it takes no bytes.
 ### D3. Two Structure-stage errors: `:drafts_block_misplaced` and `:duplicate_drafts_block`
 
 ADR-0002's amendment of this date, section G12, states the two placement facts
-`io/1` cannot carry, and campaign-024 ruling R-b puts their enforcement in
+`io/1` cannot carry, and an operator ruling puts their enforcement in
 this stage. Decision 10's table is not edited; these two codes are written
 here and read as additions to its Structure row, which is the convention this
 record's earlier amendments use for a row a ruling adds:
@@ -2466,7 +2466,7 @@ The 2026-08-29 root-termination Note says of a `terminate: true` compile that
 `child_use: true` "remains the only thing that emits `<donedata>`". Both were
 true of every outcome a block type could declare when they were written,
 because no outcome could say anything about itself. `sb-napt` gives one the
-means to, under the operator's campaign-033 ruling `RQ-033-3` of 2026-09-06.
+means to, under the operator's ruling of 2026-09-06.
 
 **The narrowing, in one sentence.** A top-level `<final>` for an outcome that
 `StatifierBlocks.BlockType.failure_outcomes/2` classes as a failure carries a
@@ -2517,7 +2517,7 @@ describes for any wired-but-unemitted outcome, met here for the first time by
 an outcome that matters to a stepper.
 
 Filed with `sb-napt`, mirrored with `sp-n8g` in `statifier_persistence`;
-campaign-033 ruling `RQ-033-3`.
+on an operator ruling.
 
 ## Note (2026-09-06): the root shape gains one shared `<final>` for an unhandled failure below the root
 
@@ -2585,12 +2585,12 @@ directly. The paragraph's sentence held when it was written and is superseded
 for the empty-slot case from this date; nothing else in it moves.
 
 Filed with `sb-hxs5`, against ADR-0002's amendment of 2026-09-06;
-campaign-034 rulings `RQ-034-1` and `RQ-034-13`.
+on the operator's rulings.
 
 ## Amendment (2026-09-06): C1's `child_use` final may carry declared summary params after the outcome param
 
-**Status: accepted (2026-09-06, campaign SF035, bead `sb-jvz3`, recording
-campaign-034's ruling `RQ-034-2`).** A decision record merges at proposed under
+**Status: accepted (2026-09-06, bead `sb-jvz3`, recording
+an operator ruling).** A decision record merges at proposed under
 the campaign invariant; flipping it to accepted is a separate gated request
 through the same `docs/adr/` gate, and `sb-upv0` carries it. Additive: C1
 stands as accepted, and no text above this line is edited by this section.
@@ -2675,12 +2675,12 @@ because there is no boundary for them to cross - which is that Note's own
 reason, unchanged.
 
 Filed with `sb-jvz3`, against `ADR-0013` as merged (PR 319, `b90d40e`);
-campaign-SF035, from campaign-034's ruling `RQ-034-2`. `sb-nqfd` builds the
+from an operator ruling. `sb-nqfd` builds the
 emission.
 
 ## Note (2026-09-06): decision 10's "first failing stage" takes exactly one exception - Config and Structure report together
 
-`RQ-SF035-2`, taken by the operator with the campaign-SF035 walk and
+The operator's ruling, taken by the operator with the walk and
 implemented by `sb-c9b6`, amends one sentence of decision 10. The sentence is
 "The pipeline stops at the first stage producing errors and reports every
 error from that stage", and the rule it states now holds everywhere except
@@ -2788,7 +2788,7 @@ which is the intended result and the reason decision 5's per-block anchor
 matters. Document order over blocks is also unchanged - the union is sorted
 by the same pre-order rank, so a card's own findings stay together.
 
-Filed with `sb-c9b6`, campaign-SF035. Code:
+Filed with `sb-c9b6`. Code:
 `lib/statifier_blocks/compiler.ex` (`compile/3`'s `with`,
 `config_and_structure_stages/4`, `structure_stage/4`); goldens in
 `test/statifier_blocks/compiler/both_stage_findings_test.exs`. Folds
@@ -2843,12 +2843,12 @@ param's Note is at `:2457` and the shared-final Note at `:2522`; `ADR-0013`
 `:915-917` and `:921-925` still carry the failed arm. Nothing above the
 amendment was edited by it or by this flip.
 
-Filed with `sb-upv0`, campaign SF035's Lane A.
+Filed with `sb-upv0`, the campaign's Lane A.
 
 ## Amendment (2026-09-07): a composite expands at the Resolve stage, and a finding inside an expansion is attributed one level up to the param that produced it
 
-**Status: accepted (2026-09-07, campaign SF037, bead `sb-nzc1`, recording
-campaign-SF037's rulings `RQ-SF037-5` and `RQ-SF037-6`).** A decision record
+**Status: accepted (2026-09-07, bead `sb-nzc1`, recording
+the campaign's param-attribution and no-emit rulings).** A decision record
 merges at proposed under the campaign invariant; flipping it to accepted is a
 separate gated request through the same `docs/adr/` gate, and `sb-v3ny` carries
 it. Additive: decisions 3, 5, 6, 8, 9 and 10 stand as accepted, and no text
@@ -3087,8 +3087,8 @@ puts a marker on an expanded block: an expansion is recognised structurally,
 and a document holding a composite is an `ADR-0001` document at
 `schema_version` 1.
 
-Filed with `sb-nzc1`, campaign SF037, recording campaign-SF037's rulings
-`RQ-SF037-5` and `RQ-SF037-6`. `sb-qxyh` implements it, and `sb-v3ny` carries
+Filed with `sb-nzc1`, recording the campaign's rulings
+the param-attribution ruling and the no-emit ruling. `sb-qxyh` implements it, and `sb-v3ny` carries
 the flip.
 
 ## Note (2026-09-07): the composite-expansion amendment is flipped to accepted, with three corrections by addition and one open question named
@@ -3194,7 +3194,7 @@ records the choice and its reason. Nothing this record decides turns on it -
 Structure asks about arity and assignability, not values - and the narrowing is
 recorded here rather than left to be rediscovered.
 
-### 6. `RQ-SF037-17` is named open, and this record does not decide it
+### 6. The member-version question is named open, and this record does not decide it
 
 `Composite.expand/2` does not stamp a member's `type_version`. `mint/3`
 (`composite.ex:535-543`) rewrites `id` and `slots` and nothing else, so a member
@@ -3207,17 +3207,17 @@ migration path on every compile, purely because the subtree author passed no
 recipe (`composite.ex:454-460`). `sb-qxyh` declined to stamp at Resolve to keep
 the byte identity `:3007-3009` requires. Today the question is latent: every
 shipped type answers `current_version/0` with 1. Where `expand/2` should get a
-member's current version is `RQ-SF037-17`, queued 2026-09-07 for the SF038
+member's current version is the member-version question, queued 2026-09-07 for the next
 walk. This Note names it and decides nothing.
 
-Filed with `sb-v3ny`, campaign SF037. This Note changes no code and adds no
+Filed with `sb-v3ny`. This Note changes no code and adds no
 README row; it flips the `Status:` line at `:2850` and nothing else in this
 file.
 
 ## Amendment (2026-09-07): a pass-through slot's children are spliced into the expansion with their ids unchanged, and a finding on one of them is that child's own
 
-**Status: accepted (2026-09-07, campaign SF038, bead `sb-1700`, recording
-campaign-SF038's ruling `RQ-SF038-5`).** A decision record merges at proposed
+**Status: accepted (2026-09-07, bead `sb-1700`, recording
+the pass-through-slot ruling).** A decision record merges at proposed
 under the campaign invariant; flipping it to accepted is a separate gated
 request through the same `docs/adr/` gate, and `sb-vjvq` carries it once
 `sb-q183` has landed. Additive: decisions 3, 5, 6, 8, 9 and 10 stand as
@@ -3226,7 +3226,7 @@ above this line is edited by this section.
 
 An amendment rather than a Note, because the Amendment at `:2848` says twice
 that a composite has no slot of its own - `:3085-3086`, "Nothing here gives a
-composite a slot of its own" - and `RQ-SF038-5` gives it one. A **pass-through
+composite a slot of its own" - and the pass-through-slot ruling gives it one. A **pass-through
 slot** is a slot the author fills on the composite's own card, whose children
 the expansion carries into a named slot of a named member. `ADR-0002`'s
 amendment filed with `sb-nlo5` owns the declaration - the `slots:` option, the
@@ -3329,7 +3329,7 @@ re-anchors because a finding naming an expanded member "names a block the
 author cannot see, cannot select and cannot edit" (`:2934-2937`, `:2977-2978`).
 A pass-through child fails every clause of that test: the author placed it, it
 is drawn on the composite's card, in the interior that `ADR-0005`'s `7E`
-(`:8601`) and its campaign-SF038 amendment give the declared slot, they can
+(`:8601`) and its amendment give the declared slot, they can
 select it, and they can edit its fields. Re-anchoring it onto the composite
 would take a finding the author can act on directly and point it at a form
 that has no field for it - the exact harm E3's third bullet ("It is never
@@ -3476,8 +3476,8 @@ composite block's own `slots`, which is where `ADR-0001` decision 2
 (`:63`) and decision 5 (`:110`) already put every block's children, and nothing
 about the expansion is stored.
 
-Filed with `sb-1700`, campaign SF038, recording campaign-SF038's ruling
-`RQ-SF038-5`. `sb-q183` implements it, and `sb-vjvq` carries the flip.
+Filed with `sb-1700`, recording the campaign's
+pass-through-slot ruling. `sb-q183` implements it, and `sb-vjvq` carries the flip.
 
 ## Note (2026-09-07): the pass-through splice amendment is flipped to accepted, and its cites re-counted
 
@@ -3533,12 +3533,12 @@ The functions it describes, for a later reader, are at `composite.ex:441`
 (`expand/2`), `:880` (`splice/3`), `:893` (`put_children/4`), `:910` (`mint/3`)
 and `:468` (the `param_map/2` call `T3` rests on).
 
-Filed with `sb-vjvq`, campaign SF038.
+Filed with `sb-vjvq`.
 
 ## Note (2026-09-12): `emit/2`'s return type does not widen; a non-SCXML target is a separate optional callback, named and not built
 
-RQ-SF041-2, ruled by the operator on 2026-09-12, answers the record question
-the SF040 element-editor spike raised against **decision 4** at `:169`. This
+A ruling by the operator on 2026-09-12 answers the record question
+the element-editor spike raised against **decision 4** at `:169`. This
 section records the ruling. It changes no decision, edits no line above it,
 and nothing in `lib/` changes with it.
 
@@ -3546,13 +3546,13 @@ Read at `main` `d9f4896`.
 
 ### 1. The question, and where it came from
 
-`docs/spikes/SF040-element-editor.md` **section 4, "Ask R"** (`:427`) states
+`docs/spikes/element-editor-spike.md` **section 4, "Ask R"** (`:427`) states
 the question: *should a block type be able to emit for a non-SCXML target, and
 if so by what shape?* It offers two candidates - widen `emit/2`'s return, or
 add a separate optional callback - and prefers the second. Section 3's
 recommendation (`:365`) is the half that rules on the editor and defers the
 seam: its part (b) says the in-compiler emit "turns on a record decision" and
-should not be taken until SF041 rules it.
+should not be taken until the next walk rules it.
 
 The spike is correct that the narrowing is this record's. Read at `d9f4896`:
 
@@ -3588,14 +3588,14 @@ The spike is correct that the narrowing is this record's. Read at `d9f4896`:
    total and returns typed errors") already puts a resolution failure, as an
    ordinary typed arm rather than a raise. That refusal point is carried from
    the spike's candidate 2 as the operator adopted it
-   (`docs/spikes/SF040-element-editor.md:467-468`, "a type that declares
+   (`docs/spikes/element-editor-spike.md:467-468`, "a type that declares
    neither is refused at resolve rather than at emit"); it is recorded here as
    part of the adopted shape, not decided here, and a later request building
    the callback may find it wants a different point and say so. Being a
    callback on the block-type behaviour, it is **`ADR-0002`'s to declare**, and
    it is declared there when it is built, not here and not now.
    (The spike's candidate 2 spells the same shape `emit_json/2`, "or an
-   emitter-keyed callback", at `docs/spikes/SF040-element-editor.md:465`. The
+   emitter-keyed callback", at `docs/spikes/element-editor-spike.md:465`. The
    ruled name is `emit_node/2`, and the difference is the name only: one node,
    not one subtree, is the part the name is carrying.)
 3. **The emit seam stays as it is.** No function on the SCXML path changes
@@ -3607,7 +3607,7 @@ The spike is correct that the narrowing is this record's. Read at `d9f4896`:
    that wants a non-SCXML artifact walks `Document.blocks/1` plus
    `committed_config/2` itself. That is the route the spike measured, at "under
    about 120 lines with zero package change and zero record cost"
-   (`docs/spikes/SF040-element-editor.md:390`), and it is the answer for anyone
+   (`docs/spikes/element-editor-spike.md:390`), and it is the answer for anyone
    asking today.
 
 ### 3. What is NOT built
@@ -3629,16 +3629,16 @@ Cites into this file: `:169` (decision 4), `:194`, `:230` (decision 5's owner
 tuple). Cites into `ADR-0002`: `:86` (decision 3), `:123`, `:385`, `:481`. Code
 cites, all read at `main` `d9f4896` and re-verified by anchor:
 `block_type.ex:501`, `:505-506`; `compiler.ex:1658`, `:1798`, `:2503`. Spike
-cites, read at `d9f4896`: `docs/spikes/SF040-element-editor.md:365`, `:390`,
+cites, read at `d9f4896`: `docs/spikes/element-editor-spike.md:365`, `:390`,
 `:427`, `:465`, `:467-468`. This section appends at the end of the file, so no
 line above it moved.
 
-Filed with `sb-xbn9`, campaign SF041.
+Filed with `sb-xbn9`.
 
 ## Note (2026-09-12): the reserved failure-seam key is renamed to `statifier_persistence:execution_status`, and the name it replaces stays reserved
 
 Premise surface: `statifier_persistence`'s `ADR-0011: execution is the durable
-noun` (**proposed**, campaign SF041, on `statifier_persistence` `main` at
+noun` (**proposed**, on `statifier_persistence` `main` at
 `84ba7cf`), decision 4. That record owns the key - this one owns where the
 compiler mints it - and decision 4 renames it. This Note records the rename
 against every place this file names the old spelling; no line above it moves.
@@ -3725,18 +3725,18 @@ anchor had on `main` before this request moved it:
 
 This section appends at the end of the file, so no line above it moved.
 
-Filed with `sb-hykt`, campaign SF041.
+Filed with `sb-hykt`.
 
 ## Note (2026-09-13): a cite tidy by addition - the spike's candidate 2 spans two lines, and the second error arm stays with the request that builds `emit_node/2`
 
-Campaign SF044, bead `sb-l2jn`, folding `sb-aqde`. A dated Note: it edits no
+Bead `sb-l2jn`, folding `sb-aqde`. A dated Note: it edits no
 line above it, decides nothing, carries no `Status:` line and flips nothing.
 Both cites below were read at `b02909f`, anchor first.
 
-### 1. `docs/spikes/SF040-element-editor.md:465` is `:465-466`
+### 1. `docs/spikes/element-editor-spike.md:465` is `:465-466`
 
 Item 2 of the Note of 2026-09-12 (`:3538`) closes with a parenthesis
-(`:3597-3600`) citing `docs/spikes/SF040-element-editor.md:465` for the spike's
+(`:3597-3600`) citing `docs/spikes/element-editor-spike.md:465` for the spike's
 own spelling of the shape, "`emit_json/2`, or an emitter-keyed callback". The
 phrase spans two lines: `:465` is the numbered item and the opening of the
 parenthesis, ending on "or an emitter-keyed", and `:466` opens with
@@ -3752,7 +3752,7 @@ between the two names is still the name only.
 `sb-aqde` also asked whether decision 3's enumerated failure -
 `{:error, {:unknown_block_type, type_name}}`, a type absent from the palette -
 should grow a second arm for a **resolvable** module that declares neither emit
-callback. Campaign SF044's walk **declined to record it now**: at `b02909f`
+callback. The campaign's walk **declined to record it now**: at `b02909f`
 there is no `emit_node/2` anywhere in `lib/` (zero hits), so there is nothing
 yet for a second arm to be an arm of, and a record line written ahead of the
 callback would be a decision about code no request has shaped.
@@ -3762,7 +3762,7 @@ the Note of 2026-09-12 already puts the callback's own declaration: being a
 callback on the block-type behaviour it is `ADR-0002`'s to declare, "when it is
 built, not here and not now" (`:3595-3596`). The second error arm goes with it.
 
-Filed with `sb-l2jn`, campaign SF044.
+Filed with `sb-l2jn`.
 
 ## Note (2026-09-18): the Structure stage's arity is `structure_stage/6`, and the two spellings this file prints are read as history
 
@@ -3821,7 +3821,7 @@ flips no status line in this file. The nine stale `structure_stage/4` comment
 mentions under `test/` - in nine comments across six files - were corrected in
 place in the same request, comments being neither a record nor a cite.
 
-Filed with `sb-k0xe`, campaign RF050.
+Filed with `sb-k0xe`.
 
 ## Note (2026-09-18): the unpublished identifiers cited above
 
@@ -3837,7 +3837,7 @@ in `test/statifier_blocks/block_type_test.exs`, added in the same request as
 this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
-Filed with `sb-4wh3`, campaign RF058.
+Filed with `sb-4wh3`.
 
 ## Amendment (2026-09-22): the stages before Emit are one public function, `structure_findings/3`, and `compile/3` runs it
 

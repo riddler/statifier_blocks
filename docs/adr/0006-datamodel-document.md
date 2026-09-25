@@ -1,6 +1,6 @@
 # ADR-0006: The datamodel document is a typed, three-scope declaration, and the declared-path set is its projection
 
-Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 gate grant, PR 101).
+Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator's campaign gate grant, PR 101).
 Every consumer named below is written against the declared-path *set*, which
 already exists as an accepted contract (ADR-0005, 11f).
 
@@ -428,7 +428,7 @@ is blocked either way, and the document compiles as it did before.
 ## Note (2026-08-31): a second thing in this repository is now spelled `datamodel`
 
 A dated note rather than an amendment, recorded for `sb-ao6l` under
-campaign-022 ruling R3: nothing in this record changes, and the note exists
+an operator ruling: nothing in this record changes, and the note exists
 only because this record's cross-check section took on the job of keeping
 the family's datamodel vocabulary countable.
 
@@ -452,7 +452,7 @@ written.
 
 ## Amendment (2026-09-05): decision 4, a `duration` value is an expression-language duration string
 
-**Status: accepted (2026-09-05, drafted under campaign 029 lane A).** Accepting
+**Status: accepted (2026-09-05, drafted under the campaign's lane A).** Accepting
 it is a separate change on its own gate. Additive: decision 4 stands as
 accepted, and no text above this line is edited by this section. It also
 discharges this record's first open question, below.
@@ -627,7 +627,7 @@ in `test/statifier_blocks/block_type_test.exs`, added in the same request as
 this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
-Filed with `sb-4wh3`, campaign RF058.
+Filed with `sb-4wh3`.
 
 ## Note (2026-09-22): the Amendment of 2026-09-05 to decision 4 is flipped to accepted
 
@@ -714,4 +714,4 @@ check, verdict or refusal.
   since the Note of 2026-09-06 (`:582`) re-homed the document; it stores each
   entry's declared type as written, so the reading holds.
 
-Filed with `sb-b4yk`, campaign RF069.
+Filed with `sb-b4yk`.

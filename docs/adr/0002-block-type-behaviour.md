@@ -1,6 +1,6 @@
 # ADR-0002: A block type is a behaviour module resolved through a caller-supplied palette
 
-Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings); outcomes/metadata/label amendment (accepted 2026-08-29, operator ruling); decision 7 amended - optional `datamodel_path?` key (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 90); decision 10 amended - the core.assign row, section G (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 98); decision 7 amended - optional `sensitive?` key and the secrets rule (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 99); core.send send id and no core.cancel amendment (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 95); decision 10 amended - the core.send row, section G2, and the decision 7 :duration cross-reference (2026-08-29, accepted under the operator campaign-015 direction-agent gate grant, PR 110); decision 10 amended - the core.subchart and core.foreach rows, core.parallel's `complete` key and the thirteen count, G5-G8 (2026-08-29, accepted under the operator campaign-015b direction-agent gate grant, PR 129); the optional `summary/1` callback and the card's second line, section H (2026-08-30, accepted under the operator campaign-017 direction-agent gate grant, PR 150)
+Status: accepted (2026-08-26); decision 9 amended (2026-08-26); decisions 7, 8 and 10 and the typespec appendix amended (2026-08-27, operator rulings); outcomes/metadata/label amendment (accepted 2026-08-29, operator ruling); decision 7 amended - optional `datamodel_path?` key (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 90); decision 10 amended - the core.assign row, section G (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 98); decision 7 amended - optional `sensitive?` key and the secrets rule (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 99); core.send send id and no core.cancel amendment (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 95); decision 10 amended - the core.send row, section G2, and the decision 7 :duration cross-reference (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 110); decision 10 amended - the core.subchart and core.foreach rows, core.parallel's `complete` key and the thirteen count, G5-G8 (2026-08-29, accepted under the operator's campaign direction-agent gate grant, PR 129); the optional `summary/1` callback and the card's second line, section H (2026-08-30, accepted under the operator's campaign direction-agent gate grant, PR 150)
 
 ## Context
 
@@ -714,8 +714,8 @@ four are one seam seen from four sides: what a block type declares about
 itself.
 
 It is drafted from two sources and invents as little as it can get away with.
-The operator's 2026-08-28 ruling (umbrella `docs/decisions.md` D13) settles the
-authoring model; the campaign-012 editor spike (`spike/`) supplies working
+The operator's 2026-08-28 ruling (recorded in the maintainers' decision log) settles the
+authoring model; the editor spike (`spike/`) supplies working
 forms for everything D13 left to a record. Where the spike already does
 something, this section records what it does rather than proposing a better
 name for it.
@@ -1003,7 +1003,7 @@ works.
 
 ## Amendment (2026-08-29): decision 7, an optional `datamodel_path?` key
 
-**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 90).** Additive;
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator's campaign grant, PR 90).** Additive;
 decision 7 and its 2026-08-27 `value_path` amendment both stand exactly as
 written, and no text above this line is edited by this section.
 
@@ -1031,7 +1031,7 @@ What that sentence deliberately is not:
   more claim about itself; adding a `:path` type would give the editor a second
   control to render for what is textually identical input.
 
-  *[Note added 2026-09-05, with `sb-5v3i` under campaign-031 ruling D31-4.
+  *[Note added 2026-09-05, with `sb-5v3i` under an operator ruling.
   This bullet is reversed, and only this bullet: decision 7's set gains
   `{:path, opts}` by the amendment of this date at the end of this record.
   The sentence above is true of the input's bytes and not of what an author
@@ -1087,10 +1087,10 @@ datamodel and anchors any advisory on the `path` key.
 
 ## Amendment (2026-08-29): the `core.assign` row on decision 10
 
-**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 98).** The 2026-08-28
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator's campaign grant, PR 98).** The 2026-08-28
 amendment's section D promoted `core.invoke` and `core.raise` and stopped
-there, so `core.assign` - built in the campaign-013 spike, shipped in
-campaign 014, and registered in `StatifierBlocks.Palette.core_types/0` - has
+there, so `core.assign` - built in the spike, shipped in
+a later campaign, and registered in `StatifierBlocks.Palette.core_types/0` - has
 been running with no row in decision 10's vocabulary table and a
 `PROVISIONAL` admonition in its moduledoc saying so. The operator's ruling of
 this date is that the type is in the shipped vocabulary and is owed the row.
@@ -1186,7 +1186,7 @@ answering what a host can do to itself with it.
 
 ## Amendment (2026-08-29): decision 7, an optional `sensitive?` key, and the secrets rule behind it
 
-**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 99).** Additive; decision 7, its 2026-08-27
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator's campaign grant, PR 99).** Additive; decision 7, its 2026-08-27
 `value_path` amendment and the accepted 2026-08-29 `datamodel_path?`
 amendment above all stand exactly as written, and no text above this line is
 edited by this section. It sits beside the `datamodel_path?` section because
@@ -1385,7 +1385,7 @@ does not silently settle it.
 
 ## Amendment (2026-08-29): `core.send`'s descriptor carries a send id, and there is no `core.cancel`
 
-**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 95).** This section is additive: nothing above it
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator's campaign grant, PR 95).** This section is additive: nothing above it
 is edited, and every earlier accepted decision stands as written. It records
 the operator's 2026-08-29 delayed-send lifetime ruling - filed here as
 `sb-b4f` and mirrored to statifier-ex as `st-q3ud` - on the side this record
@@ -1445,7 +1445,7 @@ thing D13 exists to refuse.
 
 ## Amendment (2026-08-29): the `core.send` row on decision 10
 
-**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015 grant, PR 110).** Section G of this date gave `core.assign` its row and
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator's campaign grant, PR 110).** Section G of this date gave `core.assign` its row and
 named the one type still owed one: `core.send`, shipped in the same campaign,
 registered in `StatifierBlocks.Palette.core_types/0`, and running under a
 `PROVISIONAL` admonition in its moduledoc saying decision 10's vocabulary
@@ -1465,7 +1465,7 @@ section records them in the table rather than revisiting them.
 | `core.send` | `[]` | `event`: `:string`; `delay`: `:duration`, optional | default (`done`) | a leaf that sends one event, now or after a delay, emitting a `<send>` inside its `<onentry>`; the block finishes when the send is armed, and cancellation is scope-shaped rather than a block, per the send-id amendment of this date |
 
 The row is read off the shipped `StatifierBlocks.Core.Send`, not off the
-campaign-013 spike proposal that preceded it. In full, so a reader need not
+spike proposal that preceded it. In full, so a reader need not
 open the module: `slots/1` returns `[]` for every config; `config_schema/1`
 returns exactly two field declarations, `event` (label "Send this event",
 `:string`, `required?: true`, default `""`) and `delay` (label "After",
@@ -1519,7 +1519,7 @@ the send-id amendment rules on and a separate bead brings into line.
 
 ## Amendment (2026-08-29): the `core.subchart` and `core.foreach` rows, and `core.parallel`'s `complete` key
 
-**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator campaign-015b grant, PR 129).** Section G3 of this date closed the `core.send` gap and
+**Status: accepted (2026-08-29, unqualified direction-agent verdict under the operator's campaign grant, PR 129).** Section G3 of this date closed the `core.send` gap and
 named the one type still owed a row: `core.subchart`, which shipped later the
 same day with its routing recorded in ADR-0004's amendment of that date and no
 decision-10 row of its own. `core.foreach` shipped after G3 was written and is
@@ -1750,7 +1750,7 @@ than the ones there.
 
 ## Amendment (2026-08-30): an optional `summary/1`, and what a core card's second line says
 
-**Status: accepted (2026-08-30, unqualified direction-agent verdict under the operator campaign-017 grant, PR 150).** Additive; decision 5's
+**Status: accepted (2026-08-30, unqualified direction-agent verdict under the operator's campaign grant, PR 150).** Additive; decision 5's
 callback table gains a row, decision 7 is untouched, and no text above this
 line is edited by this section. Section C of the 2026-08-28 amendment stands
 exactly as written: this section does not move who owns a label, it says what
@@ -1974,7 +1974,7 @@ placed by.
 ## Note (2026-08-31): `core.on_event` takes an optional `cond`
 
 A dated note rather than an amendment, recorded for `sb-d65` under
-campaign-022 ruling R6. It records one optional field on a type this record
+an operator ruling. It records one optional field on a type this record
 already ships, and the reason that field belongs on the interrupt handler
 rather than on a `core.branch` after it. The record's Status is untouched, no
 document authored without the key compiles differently, and the vocabulary
@@ -2068,7 +2068,7 @@ its conditions and a handler does not.
 
 ## Amendment (2026-08-31): decision 10, the `core.drafts` and `core.placeholder` rows
 
-**Status: accepted (2026-09-01), drafted for `sb-5h6q` under the operator campaign-024 grant; accepted on the gate's unqualified direction-agent verdict.** Additive; decision 10's original
+**Status: accepted (2026-09-01), drafted for `sb-5h6q` under the operator's campaign grant; accepted on the gate's unqualified direction-agent verdict.** Additive; decision 10's original
 seven-row table stands, the 2026-08-28 amendment's section D stands, sections
 G through G8 stand, and no text above this line is edited by this section.
 
@@ -2090,7 +2090,7 @@ deliberately missing here.
 Neither is a document-schema change. ADR-0001 decision 1's single root stands,
 no second root is introduced, no envelope key is added, and `schema_version`
 stays at `1`. These are two block types and nothing else, and
-campaign-024 ruling R-a is what puts the second in the same record as the
+an operator ruling is what puts the second in the same record as the
 first: they are one authoring story and one review. What the two mean to the
 compiler is ADR-0004's amendment of this date; how they render is ADR-0005's;
 where they may sit is section G12 below together with ADR-0003's amendment of
@@ -2239,7 +2239,7 @@ here the record is ahead of the palette rather than behind it. A reader who
 finds a fifteen-row table and a thirteen-entry palette is looking at that gap
 and not at drift.
 
-*[Note added 2026-09-05, with `sb-5v3i` under campaign-031 ruling D31-2. Both
+*[Note added 2026-09-05, with `sb-5v3i` under an operator ruling. Both
 counts moved after this section was written, and neither move is edited into
 it. The palette caught up first: `StatifierBlocks.Palette.core_types/0`
 registers **fifteen** today, not thirteen, because `sb-uag7` landed the two
@@ -2258,7 +2258,7 @@ fifteen rows it saw - it names the next row after those - rather than a
 reservation of the sixteenth position against this one, and `core.map` still
 has no row in this table.]*
 
-*[Note added 2026-09-05, with `sb-7haw` under campaign-031, after `sb-kqno`
+*[Note added 2026-09-05, with `sb-7haw`, after `sb-kqno`
 landed `core.map` (PR 281, `a852429`). The table and the palette both read
 **seventeen** now, and they agree. The amendment of this date below adds
 `core.map`'s row as G15, which takes the table from the sixteen the Note
@@ -2308,7 +2308,7 @@ to ADR-0001 decision 3's document-unique ids, and like that rule it is checked
 by walking the document rather than by asking a block type anything.
 
 Both are enforced as **Structure-stage findings** (ADR-0004 decision 10),
-which is campaign-024 ruling R-b. The stage is right on its own terms: the
+which is an operator ruling. The stage is right on its own terms: the
 Structure stage is where arity, undeclared slots and assignability already
 live, it runs after Config so a document with a malformed form does not first
 hear about its shelf, and it runs before Emit so nothing has been generated
@@ -2321,7 +2321,7 @@ that is already valid. A later record that lets a shelf sit inside a group, or
 that admits a second one, widens the admitted set and leaves every existing
 document compiling to the bytes it compiles to today. That is why this record
 takes the narrow position now rather than guessing at the general one:
-campaign-024 ruling R-b, and the reason behind it.
+an operator ruling, and the reason behind it.
 
 ### G13. What these two rows do not change
 
@@ -2346,7 +2346,7 @@ campaign-024 ruling R-b, and the reason behind it.
 ## Note (2026-09-01): reading G9b, and the duplicated G-labels
 
 A dated precision note rather than an amendment, recorded for `sb-9ln1` under
-the campaign-024 wrap walk (ruling 4). It decides nothing. No section above is
+the wrap walk (ruling 4). It decides nothing. No section above is
 edited, no label is renumbered, no row is added or removed, no Status changes,
 and every rule this record states means after this note exactly what it meant
 before it. What is written down is three places a reader trips over, corrected
@@ -2389,7 +2389,7 @@ only the two cases it alone can decide". ADR-0004's D3 states
 `:drafts_block_misplaced` unconditionally - *a `core.drafts` block appears
 somewhere other than as a direct child of the root block's `body` slot* - with
 no carve-out for a placement assignability has already refused. The two
-sentences read as though they disagree. They do not, and the campaign-024 wrap
+sentences read as though they disagree. They do not, and the wrap
 ruling that filed this note settles which way to read them: **the D3
 double-naming stands.**
 
@@ -2448,7 +2448,7 @@ through **G.G5**, and a `###` section by its bare label, **G2** through
 ## Note (2026-09-02): `core.wait` arms a delayed send too, so the send-id amendment's section C is stale in one clause
 
 A dated precision note rather than an amendment, recorded for `sb-4m2` under
-the campaign-015b queue-walk ruling (item 10), which filed it after the PR 132
+the operator's queue-walk ruling (item 10), which filed it after the PR 132
 direction-agent review surfaced the sentence as pre-existing staleness. It
 decides nothing. No section above is edited, no row is added or removed, no
 Status changes, and every rule this record states means after this note exactly
@@ -2611,7 +2611,7 @@ The code follows the records rather than preceding them: the recogniser, the
 refusal wording and the fixture migration land on `sb-4r1p`. Nothing above this
 line is edited.
 
-Filed with `sb-8acm`, campaign-029's Lane A.
+Filed with `sb-8acm`, the campaign's Lane A.
 
 ## Note (2026-09-05): decision 8, `core.wait` and `core.send` become its first users
 
@@ -2620,7 +2620,7 @@ moves. Decision 8's rules on `type_version` migration are unchanged in every
 particular, no row is added to decision 10's vocabulary table, no
 `config_schema/1` changes, no callback is added to or removed from the
 behaviour, and no Status changes. No section above this line is edited.
-Recorded ahead of the code, bead `sb-8vkc`, campaign 030 Lane S0; it merges at
+Recorded ahead of the code, bead `sb-8vkc`, the campaign's Lane S0; it merges at
 proposed under the campaign invariant like every other section filed with it,
 and flipping it to accepted is a separate gated request. `sb-me4u` implements.
 
@@ -2681,7 +2681,7 @@ ADR-0010 decision 1's refusal of a `core.timeout` is why it stays true.
 - It does not decide persistence. Whether a migrated document is written back
   is the host's, on the host's own `revision` axis, exactly as decision 8 says.
 
-Filed with `sb-8vkc`, campaign-030's Lane S0.
+Filed with `sb-8vkc`, the campaign's Lane S0.
 
 ## Note (2026-09-05): the two Notes above, five corrections to how they read
 
@@ -2693,7 +2693,7 @@ added to or removed from the behaviour, and no Status changes. No text above
 this line is edited by this section. Every correction below was raised in
 review against the request that added the Note it concerns and routed to a
 follow-up rather than cured in place, so each merged artifact stayed the
-artifact its review read. Recorded under campaign 030's fill lane D.
+artifact its review read. Recorded under the campaign's fill lane D.
 
 **1. Where a proposed rule is written in the flat indicative, read it as
 proposed.** The last bullet of the 2026-09-05 Note on decision 7 and G2a
@@ -2756,12 +2756,12 @@ is the single shipped type that `use`s the behaviour
 exports the callback and refuses. The paragraph above that bullet, in the
 same Note, has this exactly right; only the shorthand is loose.
 
-Filed with `sb-a9r8`, campaign-030's fill lane D.
+Filed with `sb-a9r8`, the campaign's fill lane D.
 
 ## Amendment (2026-09-05): decision 7, the `{:path, opts}` field type
 
 **Status: accepted (2026-09-05).** Drafted for `sb-5v3i` under the operator
-campaign-031 grant, and merging at proposed under that campaign's invariant
+the campaign grant, and merging at proposed under that campaign's invariant
 like every other section filed with it; flipping it to accepted is a separate
 gated request. Additive; decision 7, its 2026-08-27 `value_path` amendment,
 its 2026-08-29 `datamodel_path?` amendment and its 2026-08-29 `sensitive?`
@@ -2873,12 +2873,12 @@ and not a contradiction.
   the reading rather than in the bytes. A reader who finds seven values in
   either place and eight here is looking at that convention, not at drift.
 
-Filed with `sb-5v3i`, campaign-031's lane H. `sb-2ym4` implements.
+Filed with `sb-5v3i`, the campaign's lane H. `sb-2ym4` implements.
 
 ## Amendment (2026-09-05): decision 10, the `core.await` row
 
 **Status: accepted (2026-09-05).** Drafted for `sb-5v3i` under the operator
-campaign-031 grant, and merging at proposed under that campaign's invariant;
+the campaign grant, and merging at proposed under that campaign's invariant;
 flipping it to accepted is a separate gated request. Additive; decision 10's
 original seven-row table stands, the 2026-08-28 amendment's section D stands,
 sections G through G13 stand, and no text above this line is edited by this
@@ -2958,7 +2958,7 @@ because a group was abandoned - leaves no timer behind. An await with no
 `timeout` arms nothing, and there is nothing to cancel. Nothing in
 `Compiler.Cancels` changes for this row.
 
-*[Note added 2026-09-06, with `sb-6uzm` under campaign-032: G14a's first
+*[Note added 2026-09-06, with `sb-6uzm` under the campaign: G14a's first
 sentence pre-dates the answer the Note beneath G14d records, and now reads
 looser than what ships. "One `<final>` per outcome" was written while G14d
 still held the outcome list open, and the count it states is the count for an
@@ -3052,9 +3052,9 @@ the ruling did not.
 `sb-m0t1` decides it against the compiler and records the answer as a dated
 Note here. Neither answer changes any other claim in this section.
 
-Filed with `sb-5v3i`, campaign-031's lane H. `sb-m0t1` implements.
+Filed with `sb-5v3i`, the campaign's lane H. `sb-m0t1` implements.
 
-*[Note added 2026-09-05, with `sb-m0t1` under campaign-031 ruling D31-2, and
+*[Note added 2026-09-05, with `sb-m0t1` under an operator ruling, and
 the answer G14d above leaves to it: **`outcomes/1` returns both outcomes for
 every config**, including one with no `timeout`. The first of G14d's two
 options, and the compiler is what picks it.
@@ -3118,7 +3118,7 @@ claim in this section.]*
 ## Note (2026-09-05): `core.on_event` takes an optional `capture`
 
 A dated Note rather than an amendment, recorded for `sb-5v3i` under
-campaign-031 ruling D31-3 and in the same form the 2026-08-31 Note above used
+an operator ruling and in the same form the 2026-08-31 Note above used
 for `cond`: one optional field on a type this record already ships, and the
 reason it belongs on the interrupt transition rather than on a `core.assign`
 after it. The record's Status is untouched, no document authored without the
@@ -3290,12 +3290,12 @@ against. Correcting the run-time branch does not wake it.
   `schema_version` stays at `1`. An optional key inside a block's `config`
   object is a block-type contract, which is this record's.
 
-Filed with `sb-5v3i`, campaign-031's lane H. `sb-0q0z` implements.
+Filed with `sb-5v3i`, the campaign's lane H. `sb-0q0z` implements.
 
 ## Amendment (2026-09-05): decision 10, the `core.map` row
 
 **Status: accepted (2026-09-05).** Drafted for `sb-7haw` under the operator
-campaign-031 grant, and merging at proposed under that campaign's invariant;
+the campaign grant, and merging at proposed under that campaign's invariant;
 flipping it to accepted is a separate gated request. Additive: decision 10's
 original seven-row table stands, the 2026-08-28 amendment's section D stands,
 sections G through G14 stand, and no text above this line is edited by this
@@ -3426,8 +3426,8 @@ four, is a dated Note beneath ADR-0009 decision 4 added on this date by this
 same bead. Nothing in this section decides anything about those four: they are
 that Note's to hold open.
 
-**G15c. This row validates nothing about N, and that is a decision.** Campaign
-031's ruling `D31-9` puts the bound on a fan-out batch in the *runtime* that
+**G15c. This row validates nothing about N, and that is a decision.** The operator's
+scale-walk ruling puts the bound on a fan-out batch in the *runtime* that
 starts the children: a configuration key with a runtime refusal on the
 ordinary `error.communication.invoke` route, carrying N and the cap in its
 detail. It is never a compile finding here, and the reason is not division of
@@ -3450,7 +3450,7 @@ And the document schema is untouched - ADR-0001 owns the stored bytes and
 `schema_version` stays at `1`, because a new block type is a new value of an
 existing field.
 
-Filed with `sb-7haw`, campaign-031. `sb-kqno` (PR 281, `a852429`) is the
+Filed with `sb-7haw`. `sb-kqno` (PR 281, `a852429`) is the
 implementation this row is read off.
 
 ## Note (2026-09-06): decision 7, `{:path, opts}` gets its first two keys, and a `field_candidates` feed
@@ -3567,7 +3567,7 @@ by test; `sb-xk1h` is where a `core.*` row would first gain an `expects`.
 ## Note (2026-09-06): the two `core.subchart` cites under G14 have drifted, and what they read today
 
 A dated Note rather than an amendment, recorded for `sb-50lu` under
-campaign-033. Nothing above this line is edited and no decision moves: this
+the campaign. Nothing above this line is edited and no decision moves: this
 is a cite errata for the two `lib/statifier_blocks/core/subchart.ex` line
 ranges the Notes under G14 use as evidence. The claims those ranges support
 are unchanged and still hold; only the numbers naming them went stale, and
@@ -3621,7 +3621,7 @@ range that no longer lands should read the name and not the number.
 ## Note (2026-09-06): the seventeen rows of the decision 10 Note's rationale sit in ten tables, seven of them in decision 10's
 
 A dated Note rather than an amendment, recorded for `sb-ae12` under
-campaign-033. Nothing above this line is edited and no decision moves: this is
+the campaign. Nothing above this line is edited and no decision moves: this is
 a cite errata for one clause in the Note added earlier this date under
 "decision 10, the read and the write signature of each core row". The form is
 the one the Note added beside G14 on this date uses for a fact that moved after
@@ -3836,7 +3836,7 @@ in particular it does not touch amendment A: `outcomes/1` still returns
 `{name, label}` pairs in declaration order, the default is still the single
 outcome `done`, and A2's refusal to marry an outcome to a slot stands word for
 word. What this Note records is a **new optional callback beside** that one,
-built by `sb-napt` under the operator's campaign-033 ruling `RQ-033-3` of
+built by `sb-napt` under the operator's ruling of
 2026-09-06, and what it does and does not reach.
 
 **The callback.** `StatifierBlocks.BlockType` declares
@@ -3887,7 +3887,7 @@ outcome the type itself appends or fixes for "the work did not succeed".
 Nothing an author lists is classed: `core.subchart` takes the rest of its
 outcomes from a chart this package cannot read, so what a `declined` or an
 `expired` means there is the author's word and not a class this package may
-assign. The operator's `RQ-033-3` is the boundary the code draws - a failure
+assign. The operator's ruling is the boundary the code draws - a failure
 is a final an author routed to on purpose, and an unhandled `error.*` is not
 a failure by itself.
 
@@ -3897,12 +3897,12 @@ amendments wrote them, because `outcomes(config)` is the column they carry and
 neither type's outcome list changed.
 
 Filed with `sb-napt`, mirrored with `sp-n8g` in `statifier_persistence`;
-campaign-033 ruling `RQ-033-3`.
+on an operator ruling.
 
 ## Amendment (2026-09-06): decision 10's `core.branch` row and the environment table row, now that `slots/1` returns `undecided`
 
 **Status: accepted (2026-09-06).** Drafted for `sb-uewa` under the operator
-campaign-034 grant, and merging at proposed under that campaign's invariant
+the campaign grant, and merging at proposed under that campaign's invariant
 like every other section filed with it; flipping it to accepted is a separate
 gated request. Additive; decision 10's original seven-row table stands, every
 amendment and Note above this line stands, and no text above this line is
@@ -3975,7 +3975,7 @@ record family is a reading aid rather than a claim, which is why an errata
 paragraph is the right shape for it: the Note above keeps its words, and the
 number is corrected here.
 
-Filed with `sb-uewa`; campaign-034 ruling `RQ-034-6`. Sections A, B and C
+Filed with `sb-uewa`; on an operator ruling. Sections A, B and C
 discharge the debt `ADR-0012` reserved.
 
 ## Note (2026-09-06): G15 and G15b, read against `core.map`'s six shipped fields
@@ -4005,12 +4005,12 @@ shipped surface does not carry", and two of the four now ship.**
 Note of 2026-09-06 gives each; the `assign_to`/`collect` and `aggregate`/`on`
 spelling reconciliation that is the rest of G15b is untouched by this.
 
-Filed with `sb-uewa`, folding `sb-z4vz`; campaign-034 ruling `RQ-034-6`.
+Filed with `sb-uewa`, folding `sb-z4vz`; on an operator ruling.
 
 ## Amendment (2026-09-06): `core.on_event` declares its event payload, and a `capture` that reads past it is refused at compile
 
 **Status: accepted (2026-09-06).** Drafted for `sb-i0cc` under the operator
-campaign-034 grant, and merging at proposed under that campaign's invariant
+the campaign grant, and merging at proposed under that campaign's invariant
 like every other section filed with it; flipping it to accepted is a separate
 gated request. Additive, by this record's convention: **no line above this one
 is edited**. Decision 7's field-type set is not widened, decision 10's table is
@@ -4029,7 +4029,7 @@ not extended by this flip: that line lists the amendments accepted up to
 of 2026-08-31 at `:2069` is accepted and is absent from it too - so extending
 it here would start a convention rather than follow one.]
 
-Records campaign-034 ruling `RQ-034-7`, taken with the operator on 2026-09-06.
+Records the source-path ruling, taken with the operator on 2026-09-06.
 
 ### Context
 
@@ -4175,7 +4175,7 @@ to it.
 
 This is the dormant branch of `:3190-3191` waking. Its bullet reads *"a
 declared payload that lacks a named source path"*, which admits two readings;
-`RQ-034-7` fixes which, and it is this one: **the pair's source path names a
+the source-path ruling fixes which, and it is this one: **the pair's source path names a
 member the declared payload does not carry.** The other reading - a declared
 member no `capture` reads - is not a finding, then or now: a payload may
 legitimately carry more than one handler wants.
@@ -4213,7 +4213,7 @@ legitimately carry more than one handler wants.
 
 ### Note (2026-09-06): the correction the `error.execution` bullet of the Note of 2026-09-05 takes (`:3255`)
 
-This is the dated correction `RQ-034-7` calls for, and it is placed here rather
+This is the dated correction the source-path ruling calls for, and it is placed here rather
 than under the bullet it corrects. Amendment by addition is this record family's
 convention, and here it is also the only safe shape: an insert at `:3259` would
 shift every line below it, and sections already on `main` cite five distinct
@@ -4266,7 +4266,7 @@ and is read as the dated entry it is.
 - **The document schema.** `ADR-0001` owns the stored bytes and
   `schema_version` stays at `1`.
 
-Filed with `sb-i0cc`; campaign-034 ruling `RQ-034-7`. `sb-0na2` builds P5's
+Filed with `sb-i0cc`; the source-path ruling. `sb-0na2` builds P5's
 check; `sb-kkd7` is the request that flips this section.
 
 ### Note (2026-09-06): what the flip checked, and the three cites `sb-0na2` moved
@@ -4324,8 +4324,8 @@ reads as written.
 
 ## Amendment (2026-09-06): `core.invoke` declares and classes `error`, a failure-classed final is unconditional, and an unhandled failure below the root reaches the root
 
-**Status: accepted (2026-09-06), on the operator's campaign-034 rulings
-`RQ-034-1` and `RQ-034-13`.** Drafted for `sb-ii2k`; it merges at proposed and
+**Status: accepted (2026-09-06), on the operator's rulings
+the operator's rulings.** Drafted for `sb-ii2k`; it merges at proposed and
 flips to accepted in a separate change once `sb-hxs5` has the code on main.
 
 [Note 2026-09-06, `sb-ju4d`: the paragraph above is this section as it was
@@ -4344,7 +4344,7 @@ declares and what the compiler emits, rather than only recording a callback
 that already existed. It is written by addition and edits nothing above this
 line: amendment A's `{name, label}` pairs, A2's refusal to marry an outcome to
 a slot, and the Note of this date that added the optional `failure_outcomes/1`
-all keep every word. Taken by the operator as campaign-034 ruling `RQ-034-1`,
+all keep every word. Taken by the operator as a ruling,
 filed with `sb-ii2k`; the code is `sb-hxs5`.
 
 **The defect it answers.** `sb-napt` gave a block type the ability to say that
@@ -4390,7 +4390,7 @@ have had both for longer.
 
 ### 2. A failure-classed outcome's final is emitted whether or not its slot is occupied - in `core.invoke`, `core.map` and `core.subchart` alike
 
-Taken by the operator as campaign-034 ruling `RQ-034-13`, which extends this
+Taken by the operator as a ruling, which extends this
 section from `core.invoke` alone to all three shipped types that class an
 outcome. The rule is one rule because the reason is one reason, and a rule
 that held for one of the three would leave sections 4 and 5 true of that one
@@ -4647,7 +4647,7 @@ column has read `done` and `error` since the amendment of 2026-08-28 that wrote
 it. What changes from this date is not the row but the code beneath it, which
 now exports the `outcomes/1` the row has always described.
 
-Filed with `sb-ii2k`, campaign-034 rulings `RQ-034-1` and `RQ-034-13`. The code
+Filed with `sb-ii2k`, on the operator's rulings. The code
 is `sb-hxs5`; this section merges at proposed and the record's own acceptance
 is the operator's, through `sb-ju4d`. The reference embedder's host-side
 translation comes out with `se-cqr`, against `statifier_persistence`'s ADR-0008
@@ -4863,8 +4863,8 @@ the five it names, `emit/2` is still listed for the reason it gives, and no row
 of its table gains or loses a word. What this Note records is a **new optional
 callback beside** those, declared by `ADR-0013`
 (`docs/adr/0013-typed-fan-out-child-summary.md`, decision 2, proposed
-2026-09-06 under the operator's campaign-SF035 grant, recording campaign-034's
-ruling `RQ-034-2`), and what it does and does not reach.
+2026-09-06 under the operator's grant, recording the
+operator's ruling), and what it does and does not reach.
 
 The form is the Note of this date at `:3832`, which recorded `failure_outcomes/1`
 the same way and for the same reason: a new optional callback is additive to
@@ -4951,13 +4951,13 @@ not by a status line) and the Note at `:4656` states it in as many words at
 `:4739-4740`. `sb-upv0` flips the sections that carry one; there is nothing to
 flip here.
 
-Filed with `sb-jvz3`, against `ADR-0013` as merged; campaign-SF035, from
-campaign-034's ruling `RQ-034-2`. `sb-nqfd` builds the callback.
+Filed with `sb-jvz3`, against `ADR-0013` as merged, from
+an operator ruling. `sb-nqfd` builds the callback.
 
 ## Amendment (2026-09-06): decision 7, the `{:type_expr, opts}` field type
 
 **Status: accepted (2026-09-06).** Drafted for `sb-zvar` under the operator's
-campaign-SF035 grant, recording that campaign's ruling `RQ-SF035-1`, and
+campaign grant, recording that campaign's ruling, and
 merging at proposed under that campaign's invariant like every other section
 filed with it; flipping it to accepted is a separate gated request, and
 `sb-wzoa` carries it. Additive: decision 7 and every amendment and Note it has
@@ -5002,8 +5002,8 @@ inhabitant is `sb-myt1`'s, and the migration is `sb-268w`'s. What all four were
 waiting on - a way to *say* a shape without naming it - has landed.
 
 **A shape can be said without being named.** `sd-ADR-0001`'s inline-shape
-amendment is accepted in `statifier_datamodel` on this campaign's ruling
-`RQ-SF035-1`, and its code is on that repository's `main`. A type expression
+amendment is accepted in `statifier_datamodel` on this campaign's ruling,
+and its code is on that repository's `main`. A type expression
 there may now be `{:shape, members}`, `members` an ordered list of maps each
 carrying exactly `name`, `type` and `required?`; member order is authoring
 order and identity is member-set-wise; an inline shape is **built by a
@@ -5157,7 +5157,7 @@ on the block and carrying the field's `key` as its `config_key`. That is the
 existing anchor and the existing key: `{:config, block_id, key}` routes beneath
 the field by decision 11's rule in `ADR-0005`, and `config_key` is the key on
 the `Finding` struct already, which `sb-8mki`'s declaration refusal sets and
-which campaign-SF035's ruling `RQ-SF035-5` settled as the place a field-scoped
+which an operator ruling settled as the place a field-scoped
 finding names its field rather than growing the anchor tuple. No new finding
 code, no new
 severity, no new option. `ADR-0005`'s Note of 2026-09-06 draws such a value raw
@@ -5224,7 +5224,7 @@ deferral rather than a debt: the arm each of them declined was additive to a
 value neither of them changed.
 
 **9. The `default:` rule for a `{:path, opts}` field, stated in the record.**
-Campaign-SF035's ruling `RQ-SF035-6` rides here because it is decision 7's
+An operator ruling rides here because it is decision 7's
 rule and had no home in the record. A field declaration has always had to carry
 `default:` - it is a required key of `field_decl/0` - and a `{:path, opts}`
 field declared without it is **refused at declaration**, in the compile's
@@ -5297,8 +5297,8 @@ that count the set at eight - `P3` at `:4108-4133`, the Note at `:4934-4941`,
 accurate as of the day they were written and are read forward under the
 convention above.
 
-Filed with `sb-zvar`, campaign-SF035's Lane A, on ruling `RQ-SF035-1` and
-carrying ruling `RQ-SF035-6`. `sb-268w` migrates the two fields; `sb-1jcr`
+Filed with `sb-zvar`, the campaign's Lane A, on the operator's ruling and
+carrying the operator's ruling. `sb-268w` migrates the two fields; `sb-1jcr`
 builds the type; `sb-wzoa` flips this section.
 
 ## Note (2026-09-06): G15's `collect` row and the two sentences beside it, read against `ADR-0009`'s dotted-path amendment
@@ -5380,7 +5380,7 @@ four-field census, its `on` default read through `core.parallel`'s G7a shape,
 and its "refuses nothing else, and in particular nothing about N" clause are all
 unaffected, because only the rule behind one field's refusal moved.
 
-Filed with `sb-ctfg`, campaign SF035's Lane A, from `sb-cjou`'s discovery.
+Filed with `sb-ctfg`, the campaign's Lane A, from `sb-cjou`'s discovery.
 
 ## Note (2026-09-06): the open sentence in section 4 step 3 - a root outcome named `failed` is refused at compile
 
@@ -5407,8 +5407,8 @@ stage, with a finding against the root block that names the reserved name and
 says to rename the outcome. The finding carries the config field the outcome
 name came out of where one field answers for it - `core.subchart`'s `outcomes`,
 for the type most likely to reach this - and the block anchor where none does,
-which is a type whose outcome list is a constant. Ruled `RQ-SF035-16` in
-campaign SF035's walk, with the operator present.
+which is a type whose outcome list is a constant. Ruled in
+the walk, with the operator present.
 
 **Why a refusal rather than a fallback role.** A fallback would have to rename
 one of the two finals, and both names are load-bearing in a way a generated
@@ -5459,7 +5459,7 @@ the amendment rather than against today's output.
 The bracketed Note inside step 3 stays where it is: it is the dated record of
 the question, and this Note is the dated record of the answer.
 
-Filed with `sb-k0dy`, campaign SF035's Lane A, from `sb-hxs5`'s open question.
+Filed with `sb-k0dy`, the campaign's Lane A, from `sb-hxs5`'s open question.
 
 ## Note (2026-09-06): the payload amendment's second arm is spelled - `payload` is a `{:type_expr, opts}` field and admits an inline shape
 
@@ -5541,7 +5541,7 @@ key still reaches no compiled SCXML at all, which `P1` states and
 `StatifierBlocks.Core.TypeExprMigrationTest` asserts byte for byte beside the
 corpus `StatifierBlocks.Compiler.ByteCorpusTest` pins.
 
-Filed with `sb-268w`, campaign SF035's Lane A.
+Filed with `sb-268w`, the campaign's Lane A.
 
 ## Note (2026-09-07): what the flip of decision 7's `{:type_expr, opts}` amendment checked, and its forward sentences met
 
@@ -5639,12 +5639,12 @@ third place the union is written out - *The contract as typespecs* above - still
 lists the original seven, which that section also says, and it is not edited
 here.
 
-Filed with `sb-wzoa`, campaign SF035's Lane A.
+Filed with `sb-wzoa`, the campaign's Lane A.
 
 ## Amendment (2026-09-07): decision 7, optional `hidden?` and `readonly?` keys, and the missing-`default:` refusal widened to every field type
 
-**Status: accepted (2026-09-07).** Drafted for `sb-s0jt` under the operator's campaign-SF036
-grant, recording that campaign's ruling `RQ-SF036-3` and the two record
+**Status: accepted (2026-09-07).** Drafted for `sb-s0jt` under the operator's campaign
+grant, recording that campaign's ruling and the two record
 questions carried on `sb-btx0`, and merging at proposed under that campaign's
 invariant like every other section filed with it; flipping it to accepted is a
 separate gated request, and `sb-xnxw` carries it. Additive: decision 7 and
@@ -5755,7 +5755,7 @@ its field type.** Not the `{:path, opts}` arm alone: `:string`, `:integer`,
 
 The finding is a `:config` finding, per *block* rather than per type, with the
 same shape and the same routing the `{:path, opts}` refusal already produces
-(`sb-8mki`, campaign SF035): `config_schema/1` takes the block's config, so two
+(`sb-8mki`): `config_schema/1` takes the block's config, so two
 blocks of one type can differ, and anchoring on each block sends a reader to a
 card they can see.
 
@@ -5858,8 +5858,8 @@ reading `params`. That is a decode change, and it is the only one: it defends a
 key the form withheld, and it does not touch the three documented properties.
 
 This paragraph states a rule beyond the ruling the rest of this section records,
-and it is ruled in its own right: campaign-SF036 ruling `RQ-SF036-15`,
-2026-09-07, adds to `RQ-SF036-3` that a `hidden?: true` or `readonly?: true`
+and it is ruled in its own right: an operator ruling,
+2026-09-07, adds to the operator's ruling that a `hidden?: true` or `readonly?: true`
 field ignores any posted value for its key and that the decoder takes the
 unposted branch for a flagged field unconditionally.
 
@@ -5947,8 +5947,8 @@ rather than trusted.
 
 ## Amendment (2026-09-07): decision 5, an optional `sentence/1`, and the one refusal set a sentence sits outside
 
-**Status: accepted (2026-09-07, campaign SF036, bead `sb-hlut`, on ruling
-`RQ-SF036-4`).** A decision record merges at proposed under campaign SF036's
+**Status: accepted (2026-09-07, bead `sb-hlut`, on the
+operator's ruling).** A decision record merges at proposed under the campaign's
 invariant; flipping this section's status line to accepted is a separate gated
 request (`sb-xnxw`, after `sb-w37s` lands the callback). Additive: decision 5's
 table at `:109-121`, its closing paragraph at `:130-138`, amendment B3 at
@@ -6148,7 +6148,7 @@ two only to show that a sentence is a line and a chip is not.
   `sentence/1` is optional and degrades to the label, which is what every
   optional callback in that table's closing paragraph does.
 - **Nothing about the card.** What a block's card draws is `ADR-0005`'s;
-  `RQ-SF036-4` rules that an author's `title` still wins there, and this
+  the operator's ruling rules that an author's `title` still wins there, and this
   section neither states nor weakens that.
 - **No cap of its own.** A sentence has no maximum length here. If one is ever
   wanted it is `ADR-0005` decision 10's to carry, by `10n`'s own argument
@@ -6167,7 +6167,7 @@ two only to show that a sentence is a line and a chip is not.
 types' sentences, from this section as merged. `sb-xnxw` flips **this
 section's status line** to accepted after `sb-w37s` lands.
 
-Filed with `sb-hlut`, campaign SF036, on ruling `RQ-SF036-4`.
+Filed with `sb-hlut`, on the operator's ruling.
 
 ## Note (2026-09-07): the field-flags and `sentence/1` amendments are flipped to accepted, with five claims corrected and their code cites re-counted
 
@@ -6221,7 +6221,7 @@ this one, which is the same refusal by the other door. F5 stands untouched:
 (`editor/config_form.ex:463-465`) answers `:error` unconditionally for a
 `hidden?: true` or a `readonly?: true` field, ahead of the `Map.fetch/2`
 clause, and `decode/3`'s reduce turns that into `field.value` (`:374`) - the
-fourth documented property, written at `:324-332` and citing `RQ-SF036-15` by
+fourth documented property, written at `:324-332` and citing the operator's ruling by
 name; the three properties at `:309-322` are unedited. F7: `ViewModel.Field`
 carries `hidden?` and `readonly?` in its `@type t` (`view_model.ex:209-210`),
 defaulting to `false` in the `defstruct` (`:223-224`) and absent from
@@ -6354,14 +6354,14 @@ load-bearing ones read, at `8abc655`:
 cross-record line citations this campaign moved are recorded as a reviewed
 diff rather than found by the next record to be edited.
 
-Filed with `sb-xnxw`, campaign SF036, folding the residue of `sb-p144`
+Filed with `sb-xnxw`, folding the residue of `sb-p144`
 (corrections 1-3) and `sb-xtcp` (corrections 4-5).
 
 ## Amendment (2026-09-07): decision 5, `use StatifierBlocks.Composite` - a block type derived from params and a pure subtree
 
-**Status: accepted (2026-09-07, campaign SF037, bead `sb-2gdx`, on epic `R3`'s
-settled direction and rulings `RQ-SF037-3`, `RQ-SF037-6` and `RQ-SF037-8`).** A
-decision record merges at proposed under campaign SF037's invariant; flipping
+**Status: accepted (2026-09-07, bead `sb-2gdx`, on the epic's
+settled direction and the no-slot, no-emit and closed-vocabulary rulings).** A
+decision record merges at proposed under the campaign's invariant; flipping
 this section's status line to accepted is a separate gated request (`sb-v3ny`,
 after `sb-xio9` lands the macro). Additive: decision 5's table (`:109-121`) and
 its closing paragraph (`:130-138`), decision 7 (`:180-186`), the field-flags
@@ -6470,13 +6470,13 @@ Two properties follow, and they are the acceptance tests for this clause:
 |---|---|---|---|
 | `config_schema/1` | `params`, in declaration order | the declaration | no |
 | `validate_config/1` | the refusals `params` declare, over the composite's config | the declaration | **yes** |
-| `slots/1` | `[]` | `RQ-SF037-3` | no |
+| `slots/1` | `[]` | the no-slot ruling | no |
 | `io/1` | see below | the expansion | no |
 | `current_version/0` | the version the declaration states | the declaration | no |
 | `outcomes/1` | the **expansion root's** `outcomes/1`, over its expanded config | the expansion | no |
 | `sentence/1` | the declaration's sentence template rendered over the config; the palette label when the declaration states no template | the declaration | **yes** |
 | `palette_entry/0` | the map the declaration states | the declaration | **yes** |
-| `emit/2` | generated, and never reached | `RQ-SF037-6` | no |
+| `emit/2` | generated, and never reached | the no-emit ruling | no |
 
 **Overridable by a declaration: `sentence/1`, `palette_entry/0` and
 `validate_config/1`. Those three and no others.** They are the three whose
@@ -6497,7 +6497,7 @@ callback does.
 
 Two rows need their own paragraph.
 
-**`slots/1` is `[]`, and that is `RQ-SF037-3`.** A composite in this campaign
+**`slots/1` is `[]`, and that is the no-slot ruling.** A composite in this campaign
 exposes no slot of its own: an author fills its params, not its children. A
 pass-through slot - a composite that lets an author drop blocks into a named
 hole in its own subtree - is a later record's, and this one does not open the
@@ -6520,7 +6520,7 @@ beside this one.
 deliberately injects no default for it (`docs/adr/0007-block-type-defaults.md`,
 "`emit/2` is deliberately not among them"). The macro therefore generates one,
 and it raises if it is ever called, because the compiler expands the composite
-at **Resolve** and no composite block survives to **Emit** (`RQ-SF037-6`;
+at **Resolve** and no composite block survives to **Emit** (the no-emit ruling;
 `sb-nzc1`). A generated `emit/2` that quietly emitted an empty state would be
 exactly the failure `ADR-0007` refuses to inject a default to avoid: a type
 that compiled to nothing looking complete instead of failing.
@@ -6561,7 +6561,7 @@ section does not pretend it is.
 | `io/0` key | The composite's derived answer | Why |
 |---|---|---|
 | `kinds` | the members' `kinds` concatenated in expansion order, de-duplicated | it is a list, so it holds a union without changing shape |
-| `slot_accepts` | `%{}` | the composite declares no slots (`RQ-SF037-3`), so there is no slot name to accept into, and the root's own entry is dropped with the slot it names |
+| `slot_accepts` | `%{}` | the composite declares no slots (the no-slot ruling), so there is no slot name to accept into, and the root's own entry is dropped with the slot it names |
 | `consumes` | the **expansion root's**, or absent when the root declares none | single-valued; a union of two members' `consumes` has no shape to go in |
 | `produces` | the **expansion root's**, or absent when the root declares none | as above |
 
@@ -6575,12 +6575,12 @@ hold an `:info` rather than an `:error`. A composite that says less than it
 could is quiet; it is never wrong.
 
 **No new arm of the type-expression vocabulary is opened here.**
-`RQ-SF037-8` stands: if a union the mechanism computes cannot be expressed in
+The closed-vocabulary ruling stands: if a union the mechanism computes cannot be expressed in
 the arms `sd-ADR-0001` already has, that is a `statifier_datamodel` record
 question and the implementing request stops rather than widening the
 vocabulary from this package.
 
-**Open question: `RQ-SF037-15`, queued 2026-09-07 for the operator.** *By what
+**Open question: the union-mechanism question, queued 2026-09-07 for the operator.** *By what
 mechanism does a composite expose its expansion's path reads and writes to a
 walk that never descends into the expansion?* Three shapes are on the table and
 this section picks none of them: (A) an `Environment` arm that computes read
@@ -6627,7 +6627,7 @@ root** - together with `param_map`, which maps each expanded block's id to the
 **param key** that produced it, or to `nil` for a block no single param is
 responsible for.
 
-**`param_map` is what makes `RQ-SF037-5` implementable.** A finding raised
+**`param_map` is what makes the param-attribution ruling implementable.** A finding raised
 inside an expansion is reported against the composite block, with the
 `config_key` the map names - and with `config_key: nil` when the map says no
 param is to blame. An author never sees a finding against a block id they
@@ -6699,7 +6699,7 @@ deterministic in `blk_GS`, contain no `__`, and are document-unique because
 | Callback | Answer | Where it comes from |
 |---|---|---|
 | `config_schema/1` | the two params above | the declaration |
-| `slots/1` | `[]` | `RQ-SF037-3` - the author cannot put a block on the error path |
+| `slots/1` | `[]` | the no-slot ruling - the author cannot put a block on the error path |
 | `outcomes/1` | `[{"done", "Done"}, {"error", "Error"}]` | the expansion root's (`core/invoke.ex:114`) |
 | `io/1` | `%{kinds: [:step], produces: :unknown}` | `kinds` is `[:step]` merged with `[:step]` (`core/invoke.ex:199-200`, `core/assign.ex:121`); `produces` is the root's `:unknown`; `slot_accepts` is `%{}`, so the root's `%{"on_error" => [:step]}` is dropped with the slot it names |
 | `current_version/0` | the declaration's | the declaration |
@@ -6712,29 +6712,29 @@ write of `:unknown` at that path (`block_type.ex:220-221`). So the expansion
 writes `:unknown` at `cards.authorization.failure`, and a block after `blk_GS`
 reading that path must be answered `:info` rather than `:error`. That write is
 exactly the union this section decides the composite exposes, and exactly the
-thing `RQ-SF037-15` has to pick a mechanism for. It is named here rather than
+thing the union-mechanism question has to pick a mechanism for. It is named here rather than
 left in the abstract because it is the smallest composite that has the problem.
 
 ### What this section does not decide
 
-- **The mechanism for the reads-and-writes union**: `RQ-SF037-15`, above.
-- **A pass-through slot**: `slots/1` is `[]` here by `RQ-SF037-3`, and a
+- **The mechanism for the reads-and-writes union**: the union-mechanism question, above.
+- **A pass-through slot**: `slots/1` is `[]` here by the no-slot ruling, and a
   composite that exposes a slot of its own is a later record's.
 - **Whether an expanded block carries a marker in the document**: it does not
-  (`RQ-SF037-2`), and `ADR-0001` decision 2 is why. That belongs to `ADR-0004`'s
+  (the operator's ruling), and `ADR-0001` decision 2 is why. That belongs to `ADR-0004`'s
   amendment `sb-nzc1` and to `ADR-0005`'s, not here.
 - **A stateful composite, or a palette entry that is `{module, state}`**: that
-  is `RQ-SF037-1` and a separate amendment to this record (`sb-5b7j`).
+  is the operator's ruling and a separate amendment to this record (`sb-5b7j`).
 - **The `Collapse` operation**: a later record's, and no code in this campaign.
 
-Filed with `sb-2gdx`, campaign SF037, folding `sb-3ejc`.
+Filed with `sb-2gdx`, folding `sb-3ejc`.
 
 ## Amendment (2026-09-07): decisions 1-4, a palette entry may be `{module, state}`, resolved through one call seam, and `Composite.Data` is the stateful composite
 
-**Status: accepted (2026-09-07, campaign SF037, bead `sb-5b7j`, on ruling
-`RQ-SF037-1`).** A decision record merges at proposed under campaign SF037's
+**Status: accepted (2026-09-07, bead `sb-5b7j`, on the
+operator's ruling).** A decision record merges at proposed under the campaign's
 invariant. This section's status line flips to accepted by `sb-v3ny` **only if
-`sb-5xqr` lands in SF037**; if that request does not land, this section stays
+`sb-5xqr` lands in the campaign**; if that request does not land, this section stays
 at proposed and `sb-v3ny` records that fact as a dated note instead of flipping
 it. Additive: decisions 1 (`:58-63`), 2 (`:65-70`), 3 (`:86-88`), 4 (`:97-107`)
 and 5 (`:109`), the composite amendment immediately above this line, and every
@@ -7027,12 +7027,12 @@ data-driven half of the amendment above: `use StatifierBlocks.Composite`
 derives a block type from a declaration written in Elixir at compile time;
 `Composite.Data` derives the same block type from the same declaration written
 as **data** at run time. Everything the amendment above decides about a
-composite holds here unchanged - `slots/1` is `[]` (`RQ-SF037-3`),
+composite holds here unchanged - `slots/1` is `[]` (the no-slot ruling),
 `config_schema/1` is `params`, `emit/2` raises, the expansion root is the
 subtree's head, ids are minted deterministically from the composite block's id,
 and `Composite.expand/2` is the one expansion function. A data composite is
 expanded by the *same* `Composite.expand/2` over the *same* subtree, which is
-why it answers the environment walk the same way: `RQ-SF037-15` was ruled on
+why it answers the environment walk the same way: the union-mechanism question was ruled on
 2026-09-07 - the walk computes a composite's read and write
 signatures at its one position through `Environment.read_signatures/3` and
 `write_signatures/3` fed with `expand/2`'s subtree and the expanded config, no
@@ -7083,7 +7083,7 @@ state through `Composite.Data.declaration/1`, which answers `{:ok, state}` or
 placement is forced by decision 4 and by decision 3 together: a callback must
 be pure and total, and `fetch/2` must not raise, so the last moment a malformed
 declaration can be refused is before it is in the palette. `declaration/1` is
-not new surface in `RQ-SF035-17`'s sense - it is the function this section's own
+not new surface in the new-surface ruling's sense - it is the function this section's own
 decision forces, and without it there is no moment at which a declaration can
 be refused at all.
 
@@ -7149,7 +7149,7 @@ above defines `expand/2`'s `param_map` as expanded-block-id to param key or
 `nil`. For `Composite.Data`: a node is attributed to param key *K* when the
 placeholders in **its own `"config"`**, not its slots' children, name exactly
 one distinct param, and to `nil` when they name none or more than one. That is
-what makes `RQ-SF037-5`'s attribution mechanical for a declaration nobody
+what makes the param-attribution ruling's attribution mechanical for a declaration nobody
 wrote by hand.
 
 ### Per-instance module generation is rejected
@@ -7237,7 +7237,7 @@ after `{:ok, state} = Composite.Data.declaration(row)`.
 | The call site | What it writes today | What it writes through the seam | Answer |
 |---|---|---|---|
 | `ViewModel.build_resolved_node/4` (`:1701`) | `module.config_schema(config)` | `Palette.call(ref, :config_schema, [config], [])` | the two params |
-| `ViewModel.build_resolved_node/4` (`:1691`) | `module.slots(config)` | `Palette.call(ref, :slots, [config], [])` | `[]` (`RQ-SF037-3`) |
+| `ViewModel.build_resolved_node/4` (`:1691`) | `module.slots(config)` | `Palette.call(ref, :slots, [config], [])` | `[]` (the no-slot ruling) |
 | `BlockType.call_sentence/2` (`:1839`) | `module.sentence(config)` | `Palette.call(ref, :sentence, [config], nil)` | "Call myapp:authorize, recording failure at cards.authorization.failure" |
 | `Compiler.entries/1` (`:2278`) | `module.current_version()` | `Palette.call(ref, :current_version, [], 1)` | `1`, the declaration's |
 | `Compiler.emit/2` (`:1432`) | `module.emit(block, context)` | `Palette.call(ref, :emit, [block, context], :never)` | never reached - `blk_AD` does not survive Resolve |
@@ -7279,7 +7279,7 @@ listed below.
 - **A shape for a host's own `state`.** `Composite.Data`'s is fixed here;
   `Palette` treats every other one as opaque, and a host's stateful type says
   what its own is.
-- **Whether `Composite.Data` ships in SF037.** `sb-5xqr` is the request that
+- **Whether `Composite.Data` ships in the campaign.** `sb-5xqr` is the request that
   builds it, and it is that campaign's cut line. If it does not land, this
   section stays at proposed.
 - **How a host persists a declaration.** The shape above is JSON-shaped so that
@@ -7288,8 +7288,8 @@ listed below.
   data composite is an ordinary `schema_version` 1 document naming a type by
   string.
 - **A pass-through slot, a marker on an expanded block, or the `Collapse`
-  operation**: unchanged from the amendment above - `RQ-SF037-3`,
-  `RQ-SF037-2`, and `ADR-0005`'s amendment respectively.
+  operation**: unchanged from the amendment above - the no-slot ruling,
+  the operator's ruling, and `ADR-0005`'s amendment respectively.
 - **How a data composite declares a migration.** The paragraph above shows why
   it matters: a declaration is the only thing that can supply one, and this
   section fixes no key for it. Until that is decided, a host bumping
@@ -7300,7 +7300,7 @@ listed below.
 - **Any change to the fourteen `@callback`s**: none is added, removed or
   re-arity'd by this section.
 
-Filed with `sb-5b7j`, campaign SF037. The implementing request is `sb-5xqr`.
+Filed with `sb-5b7j`. The implementing request is `sb-5xqr`.
 
 ## Note (2026-09-07): the `use StatifierBlocks.Composite` amendment is flipped to accepted, with five corrections by addition, three questions named, and the data-composite amendment left at proposed
 
@@ -7329,10 +7329,10 @@ flip is what makes them false. They stay exactly as written:
 asks to be re-read rather than trusted. It was, and the re-reading is sections
 1 to 6.
 
-### 1. `RQ-SF037-15` is ruled in shape (A), and built as a branch rather than a walker arm
+### 1. The union-mechanism question is ruled in shape (A), and built as a branch rather than a walker arm
 
 The open-question paragraph at `:6583-6597` is superseded here. The operator
-ruled `RQ-SF037-15` on 2026-09-07 in shape **(A)**, the shape the paragraph
+ruled the union-mechanism question on 2026-09-07 in shape **(A)**, the shape the paragraph
 lists at `:6586-6588` and `ADR-0011`'s Note lists at `:2465-2468`: a composite's
 read and write signatures are computed at its one position by running the same
 `read_signatures/3` and `write_signatures/3` over `Composite.expand/2`'s subtree
@@ -7350,9 +7350,9 @@ there, and both branches call one private helper,
 through the same signature function it was handed. No public function was added,
 no arm of the type-expression vocabulary was opened, and the module declares no
 `@callback` at all. `:6577-6581`'s "**No new arm of the type-expression
-vocabulary is opened here.** `RQ-SF037-8` stands" is exact as written.
+vocabulary is opened here.** The closed-vocabulary ruling stands" is exact as written.
 
-`:6714-6715`, "exactly the thing `RQ-SF037-15` has to pick a mechanism for", is
+`:6714-6715`, "exactly the thing the union-mechanism question has to pick a mechanism for", is
 stale in the same way and is met by this section.
 
 ### 2. Correction 1: `sensitive?` is not a param flag
@@ -7368,7 +7368,7 @@ and it is what falsifies the list: the type's nine keys are `key`, `type`,
 `sensitive?` is a key on a **datamodel** declaration, `Datamodel.declared_row/0`
 at `datamodel.ex:226`. `block_type.ex:400-402` says so - "neither implies
 `sensitive?`, which is a key on a **datamodel** declaration rather than on a
-field declaration" - and this file already said so at `:6276-6280`, in the SF036
+field declaration" - and this file already said so at `:6276-6280`, in the campaign
 correction that left F8 standing. The sentence at `:6417-6420` is read with
 `sensitive?` struck from its list; every other flag in it is a `field_decl/0`
 key and means for a param exactly what the sentence says. Nothing else in the
@@ -7478,7 +7478,7 @@ environment walk is unaffected because it has a palette. Rows `:6474` and
 `:6476` and the worked-example table at `:6703-6704` state the derivations
 unconditionally, and are read with this limitation. **Whether a composite's
 derived `io/1` and `outcomes/1` should see the host palette is a question this
-Note names and does not decide**; it is for the SF038 walk.
+Note names and does not decide**; it is for the walk.
 
 **The param map handed to `subtree/1` is the declaration's defaults with the
 stored config merged over them** (`params_of/2`, `composite.ex:492-497`). The
@@ -7499,13 +7499,13 @@ param key or `nil` per expanded block (`composite.ex:173`, built at `:562-583`),
 and it is built over `flatten/1`, so nested members are in it too - which the
 section does not say and which nothing in it contradicts.
 
-`RQ-SF037-17` - where `expand/2` should get a member's `current_version` - is
+The member-version question - where `expand/2` should get a member's `current_version` - is
 named open here and decided nowhere. `mint/3` rewrites a member's `id` and
 `slots` and does not stamp `type_version`, so a member carries `Block.new/2`'s
 default of 1 (`block.ex:54`) and a member type at version 2 would take the
 migration path on every compile. `sb-qxyh` declined to stamp at Resolve to keep
 the byte identity `ADR-0004`'s amendment of this date requires. The question is
-queued for the SF038 walk.
+queued for the walk.
 
 A third question this Note names and does not decide: **nothing derives
 `summary/1` for a composite**, and `:6491-6496` is right that it stays optional
@@ -7521,10 +7521,10 @@ something. Named for the walk.
 ### 8. The data-composite amendment stays at proposed
 
 The Amendment at `:6732`, `sb-5b7j`'s, says at `:6735-6739` that its status line
-flips "**only if `sb-5xqr` lands in SF037**", and that if it does not, "this
+flips "**only if `sb-5xqr` lands in the campaign**", and that if it does not, "this
 section stays at proposed and `sb-v3ny` records that fact as a dated note
-instead of flipping it". `sb-5xqr` did not land in campaign SF037: it was below
-the cut line `RQ-SF037-14` draws, `Palette.call/4` is not defined in
+instead of flipping it". `sb-5xqr` did not land in the campaign: it was below
+the cut line the operator's ruling draws, `Palette.call/4` is not defined in
 `palette.ex`, and no `StatifierBlocks.Composite.Data` module exists on `main` at
 `0c39a3c`. **The Status line at `:6734` therefore stays at `proposed`**, exactly
 as that section instructs, and this is the dated note it asks for. It flips when
@@ -7591,7 +7591,7 @@ moved with the file: `:6103` cites `block_type.ex:107-145` for the `use` macro,
 today `:109-171`, and `:6111` cites `:138-143` for `defoverridable`, today
 `:163-169`; both were already re-counted at `:6349`.
 
-Filed with `sb-v3ny`, campaign SF037, folding the `ADR-0002` half of `sb-cr7e`
+Filed with `sb-v3ny`, folding the `ADR-0002` half of `sb-cr7e`
 and items 1, 2 and 4 of `sb-ot1x`. This Note changes no code and adds no README
 row; it flips the `Status:` line at `:6362` and nothing else in this file, and
 it leaves the Status line at `:6734` at `proposed`.
@@ -7612,16 +7612,16 @@ Three sentences were true only of the day they were written, and the landing is
 what makes them false. They stay exactly as written:
 
 - `:6736-6739`, "This section's status line flips to accepted by `sb-v3ny`
-  **only if `sb-5xqr` lands in SF037**; if that request does not land, this
+  **only if `sb-5xqr` lands in the campaign**; if that request does not land, this
   section stays at proposed and `sb-v3ny` records that fact as a dated note
-  instead of flipping it." `sb-5xqr` did land in SF037, and later than
+  instead of flipping it." `sb-5xqr` did land in the campaign, and later than
   `sb-v3ny` merged, so the flip is a separate gated request rather than
   `sb-v3ny`'s work. It is `sb-acf5`, and this is it.
-- `:7282-7284`, "**Whether `Composite.Data` ships in SF037.** `sb-5xqr` is the
+- `:7282-7284`, "**Whether `Composite.Data` ships in the campaign.** `sb-5xqr` is the
   request that builds it, and it is that campaign's cut line. If it does not
   land, this section stays at proposed." It landed.
-- `sb-v3ny`'s section 8 at `:7521-7531`, "`sb-5xqr` did not land in campaign
-  SF037 ... **The Status line at `:6734` therefore stays at `proposed`**." That
+- `sb-v3ny`'s section 8 at `:7521-7531`, "`sb-5xqr` did not land in the
+  campaign ... **The Status line at `:6734` therefore stays at `proposed`**." That
   was exact when written, against `main` at `0c39a3c`. It is superseded by
   addition on the terms it set for itself in its own last sentence: "It flips
   when `sb-5xqr` lands, by its own terms and through the same gate."
@@ -7891,14 +7891,14 @@ unchanged.
 
 ### 9. Three questions this Note names and does not decide
 
-- **`RQ-SF037-16`, a data composite's migration key.** `:7293-7299` names it
+- **The migration-key question, a data composite's migration key.** `:7293-7299` names it
   open, and `sb-5xqr` built the refusal that paragraph describes rather than
   papering over it: `migrate_config/3` (`composite/data.ex:371`) answers
   `{:error, {:no_migration_from, from}}` unconditionally, so a host that bumps
   `"version"` on a declaration with stored blocks is choosing a refusal,
   exactly as `:7270-7275` says. The declaration carries no migration key, and
   `Composite.Data`'s moduledoc says so. Queued.
-- **`RQ-SF037-17`, a member's `current_version` in an expansion.** `sb-v3ny`
+- **The member-version question, a member's `current_version` in an expansion.** `sb-v3ny`
   named it at `:7502-7509` and this request does not touch it: a data composite
   expands through the same `Composite.expand/2`, and its members carry
   `Block.new/2`'s default of 1 for the same reason. Queued.
@@ -7907,25 +7907,25 @@ unchanged.
   `decode_param/1` rather than spelled. Whether a data declaration should be
   able to reach them, and in what shape, is not decided here.
 
-Filed with `sb-acf5`, campaign SF037. This Note changes no code and adds no
+Filed with `sb-acf5`. This Note changes no code and adds no
 README row; it flips the `Status:` line at `:6734` and nothing else in this
 file.
 
-## Note (2026-09-07): seven readings the SF038 walk takes on this record - the migration question ruled and pointed at its own amendment, a member's version in an expansion, io/outcomes through a palette, a derived `summary/1`, what `param_map` blames, a declared `failure_outcomes`, and one question named open
+## Note (2026-09-07): seven readings the walk takes on this record - the migration question ruled and pointed at its own amendment, a member's version in an expansion, io/outcomes through a palette, a derived `summary/1`, what `param_map` blames, a declared `failure_outcomes`, and one question named open
 
-The SF038 walk read the questions this file's Notes leave standing and took the
+The walk read the questions this file's Notes leave standing and took the
 six rulings the items below record. This Note is a reading of `main` at
 `503ed48`. It edits no text above this line, carries no `Status:` line and
 flips nothing: five of its seven items record what the code already does or
 what a named request will do to it, one points at a decision that lands as its
 own amendment, and one names a question and leaves it open. The walk's rulings
-are labelled `RQ-SF038-<n>` below, which is the form this file already uses for
-the SF037 walk's at `:7894` and `:7901`.
+are named by their subject below, which is the form this file already uses for
+the walk's at `:7894` and `:7901`.
 
-### 1. `RQ-SF037-16` is ruled, and the ruling lands as an amendment rather than here
+### 1. The migration-key question is ruled, and the ruling lands as an amendment rather than here
 
 `:7894-7900` names a data composite's migration key open, and `:7901-7904`
-records that `sb-v3ny` left `RQ-SF037-17` beside it. The walk ruled it: a
+records that `sb-v3ny` left the member-version question beside it. The walk ruled it: a
 declaration may carry a declarative `"migrations"` list. That is a decision
 about the declaration's shape, so it does not land in a Note - it lands as its
 own dated `## Amendment` on this file (`sb-ekkt`), after the pass-through
@@ -7944,7 +7944,7 @@ above. `migrate_config/3` (`composite/data.ex:371`) still answers
 `## The hygiene obligation a bump is for` (`composite/data.ex:171-181`) is
 untouched by this Note.
 
-### 2. `RQ-SF037-17`: an expansion is at each member's current version
+### 2. The member-version question: an expansion is at each member's current version
 
 The walk ruled it: an expansion is at each member's **current** version, as the
 palette resolves it at expansion time; a template carries no version key; and
@@ -7977,10 +7977,10 @@ are measured against.
 `Collapse` is not built (`sb-uzly` is the request), so the version-stripping
 clause is a requirement on it rather than a description of code.
 
-### 3. `RQ-SF038-13`: the derived callbacks stay core-only, and readers with a palette go through a palette
+### 3. The operator's ruling: the derived callbacks stay core-only, and readers with a palette go through a palette
 
 Section 6 of the Note at `:7464-7481` names this question and leaves it for
-the SF038 walk (`:7479-7481`): whether a composite's derived `io/1` and
+the walk (`:7479-7481`): whether a composite's derived `io/1` and
 `outcomes/1` should see the host palette. Ruled: **the callbacks stay
 core-only, and say so.**
 `member_module/1` resolves a member's type name through
@@ -8029,7 +8029,7 @@ because the section describes neither.
   is not one of `nil`, `""`, `[]`, `%{}` or `false` (`composite.ex:596-599`).
 
 And the collision, which both readings above reach for. **Ruled
-(`RQ-SF038-14`): the module side takes the first param in *declaration
+(the declaration-order ruling): the module side takes the first param in *declaration
 order*.** The declaration has an order to take: `:params` is a
 `[t:StatifierBlocks.BlockType.field_decl/0]` (`composite.ex:204`), which is why
 `config_schema/1` answers "`params`, in declaration order" (`composite.ex:79`,
@@ -8083,7 +8083,7 @@ argument, and whether the register belongs to the profile at all are one
 profile-shaped question for a later record. **Nothing here decides it**, and no
 request is filed for it.
 
-Filed with `sb-uigm`, campaign SF038. This Note changes no code, adds no README
+Filed with `sb-uigm`. This Note changes no code, adds no README
 row and carries no `Status:` line, because it takes no decision this file has
 not already taken or pointed at. Items 3 and 4 are implemented by `sb-9w7w`,
 item 6 by `sb-a0xw`, and item 1's decision lands as `sb-ekkt`'s amendment with
@@ -8092,8 +8092,8 @@ names the change it is measured against.
 
 ## Amendment (2026-09-07): a composite may declare a pass-through slot - `slots:` on the `use`, a `"slots"` key on a data declaration - and the card draws an interior for it
 
-**Status: accepted (2026-09-07, campaign SF038, bead `sb-nlo5`, recording
-campaign-SF038's ruling `RQ-SF038-5` and the card half of `RQ-SF038-14`).** A
+**Status: accepted (2026-09-07, bead `sb-nlo5`, recording
+the pass-through-slot ruling and the card half of the declaration-order ruling).** A
 decision record merges at proposed under the campaign invariant; flipping it to
 accepted is a separate gated request through the same `docs/adr/` gate, and
 `sb-vjvq` carries it once `sb-q183` has landed. Additive: decisions 1-8 stand
@@ -8102,8 +8102,8 @@ date at `:6732` stand as accepted, and no text above this line is edited by
 this section.
 
 An amendment rather than a Note, because this file says four times that a
-composite has no slot of its own and `RQ-SF038-5` gives it one. `:6500`
-("`slots/1` is `[]`, and that is `RQ-SF037-3`"), the worked example's table row
+composite has no slot of its own and the pass-through-slot ruling gives it one. `:6500`
+("`slots/1` is `[]`, and that is the no-slot ruling"), the worked example's table row
 at `:6702`, `:6721` ("a composite that exposes a slot of its own is a later
 record's") and `:7030` are the four; `:7656`'s claim-table row records the same
 thing for the data kind. This is the later record `:6721` was written for.
@@ -8185,7 +8185,7 @@ depth: the node-level one is reached only through `"subtree"`.
 `slots/1` answers **the declared slots, in declaration order**, one
 `slot_decl/0` per entry, and `[]` when nothing is declared - which is the whole
 of today's behaviour and why this is an amendment by addition rather than a
-replacement. `RQ-SF037-3`'s answer at `:6500` is the `slots: []` case, and it
+replacement. The no-slot ruling's answer at `:6500` is the `slots: []` case, and it
 stays the answer for every composite written before this section and every one
 that declares nothing after it.
 
@@ -8277,8 +8277,8 @@ on the expanded tree, exactly as an unresolvable member type already is.
 draws as an ordinary leaf card.**" That sentence is amended **by addition**, and
 the addition is: *a composite draws as a leaf card unless its declaration names
 a slot, and then it draws one interior per declared slot, in declaration order,
-under the declared label.* 8E (`:8612`) scopes itself to campaign SF037 in its
-own words - "**A composite's `slots/1` is empty, in campaign SF037**" - and
+under the declared label.* 8E (`:8612`) scopes itself to the campaign in its
+own words - "**A composite's `slots/1` is empty, in the campaign**" - and
 names pass-through slots "a later campaign's question"; this is that campaign
 and that answer.
 
@@ -8292,11 +8292,11 @@ into any slot, and what they may drop is `slot_accepts` (P3), which is the
 mapped inner slot's own answer.
 
 The addition is recorded here rather than in `ADR-0005` because the
-declaration is this record's and campaign SF038's sections on `ADR-0005` belong
+declaration is this record's and the campaign's sections on `ADR-0005` belong
 to other requests; 7E and 8E are named, quoted and amended by cross-cite, and
 no text in that file is edited by this section.
 
-`RQ-SF038-14`'s card half is this clause. **No layout mode is added to the
+The declaration-order ruling's card half is this clause. **No layout mode is added to the
 package editor by it**, and none is implied: a declared slot is a component's
 own declaration, drawn by the drawing code that already exists.
 
@@ -8307,7 +8307,7 @@ expansion. It writes **the same tree `expand/2` answers**, pass-through
 children included, in the mapped inner slot, with their ids unchanged - so the
 gesture moves the author's blocks and rewrites none of them.
 
-The property that buys is the one campaign SF038 is measured on: the compiled
+The property that buys is the one the campaign is measured on: the compiled
 chart of a document holding a composite with a filled pass-through slot is
 byte-identical to the chart of the same document after `Expand`, because
 `Expand` writes what Resolve would have built and `ADR-0004`'s T4
@@ -8434,7 +8434,7 @@ rejected` (`:7155`) is untouched.
   `ADR-0011`'s amendment of this date, sections 1-3.
 - **A `"migrations"` list on a data declaration**: `sb-ekkt`'s amendment on
   this file, which the Note at `:7925` points at.
-- **How `Collapse` proposes a pass-through slot.** `RQ-SF038-5` relaxes
+- **How `Collapse` proposes a pass-through slot.** The pass-through-slot ruling relaxes
   `ADR-0005`'s 13E so that a selection whose subtree holds an unfilled slot is
   admissible and proposed as a pass-through slot rather than refused, and the
   children are not lifted. The gesture is `ADR-0005`'s and `sb-uzly`'s; this
@@ -8446,13 +8446,13 @@ rejected` (`:7155`) is untouched.
   Every slot a composite declares maps to a member, and a composite still
   carries no interior of its own.
 
-Filed with `sb-nlo5`, campaign SF038. Implemented by `sb-q183`; flipped to
+Filed with `sb-nlo5`. Implemented by `sb-q183`; flipped to
 accepted by `sb-vjvq` once it has landed.
 
 ## Amendment (2026-09-07): a data composite's declaration may carry a `"migrations"` list - `rename`, `drop` and `default` steps, walked once from the stored version to the current one
 
-**Status: accepted (2026-09-07, campaign SF038, bead `sb-ekkt`, recording
-campaign-SF038's ruling `RQ-SF038-3`, which was `RQ-SF037-16`).** A decision
+**Status: accepted (2026-09-07, bead `sb-ekkt`, recording
+an operator ruling, which was the migration-key question).** A decision
 record merges at proposed under the campaign invariant; flipping it to accepted
 is a separate gated request through the same `docs/adr/` gate, and `sb-vjvq`
 carries it once `sb-mulk` has landed. Additive: decisions 1-8 stand as
@@ -8761,14 +8761,14 @@ and `resolve/2` would report `{:error, {:migration_failed, block.id,
   re-arityed; `migrate_config/2` keeps the signature at `:507-508` and its
   optional-callback row at `:46`.
 
-Filed with `sb-ekkt`, campaign SF038. Implemented by `sb-mulk`; flipped to
+Filed with `sb-ekkt`. Implemented by `sb-mulk`; flipped to
 accepted by `sb-vjvq` once it has landed.
 
 ## Note (2026-09-07): a composite's derived recipe carries its type's palette entry, so the duplicate-order refusal exempts exactly that pair
 
-This Note records campaign SF038's ruling `RQ-SF038-26`, taken by the
+This Note records an operator ruling, taken by the
 operator on 2026-09-07 (bead `sb-4zyk`) - the form this file already uses
-for the SF038 walk's rulings at `:7921-7923`. It is a reading of `main` at
+for the walk's rulings at `:7921-7923`. It is a reading of `main` at
 `b65a1d5`. It carries no `Status:` line and flips nothing, it edits no text
 above this line, and it adds no callback, option or declaration key: the
 registration it exempts is already legal by this file's own rule, and the
@@ -8882,8 +8882,8 @@ code is `sb-ba15`'s, and the shape above is that request's as it landed.
 - **Any change to the fourteen `@callback`s, or to `Composite`'s
   declaration keys.** None is added, removed or re-arityed.
 
-Filed with `sb-4zyk`, campaign SF038, recording the operator's ruling
-`RQ-SF038-26` of 2026-09-07. Implemented by `sb-ba15`, landed at `8b6105a`.
+Filed with `sb-4zyk`, recording the operator's ruling
+of 2026-09-07. Implemented by `sb-ba15`, landed at `8b6105a`.
 
 ## Note (2026-09-07): the pass-through and migrations amendments are flipped to accepted, their cites re-counted, and three of their own witnesses superseded by the code they asked for
 
@@ -8921,7 +8921,7 @@ Read at `main` `d6fb241`.
   its own - `:6500`, `:6702`, `:6721` and `:7030`, with `:7656`'s claim-table
   row for the data kind - all stand, unedited, and are read with `P3`: `[]`
   remains `slots/1`'s answer for every composite that declares no slot, which
-  is every composite written before `RQ-SF038-5`.
+  is every composite written before the pass-through-slot ruling.
 
 ### 2. What the code answers, per clause, at `d6fb241`
 
@@ -8991,28 +8991,28 @@ The code cites have moved. Read at `d6fb241`:
 | `palette.ex:652-657` (never a ladder), `:693` (the call), `:648-651` (`:block_type_too_new`), `:659-664` (in-memory only) | `:747-752`, `:788`, `:743-746`, `:755-760` |
 | `assignability.ex:661-667`, `:654` | see the `ADR-0011` foot Note of this date |
 
-Filed with `sb-vjvq`, campaign SF038.
+Filed with `sb-vjvq`.
 
 ## Note (2026-09-08): admission resolves a composite's member kinds through the palette, `expand/2` answers a tuple beside a raising `expand!/2`, a strict `assignable?/4`, an unknown `use` option refused, and where the interrupt pair is scoped
 
 A dated Note rather than an amendment, and it edits nothing above this line.
-It records campaign SF039's rulings `RQ-SF039-9`, `RQ-SF039-10`, `RQ-SF039-14`
-and `RQ-SF039-16`, taken by the operator on 2026-09-08, as six items, each
+It records four of the operator's rulings,
+taken by the operator on 2026-09-08, as six items, each
 naming the bead that builds it. Every one of them names an arity, a return or
 a refusal on a function this record already places, so none of them moves a
 decision above: this Note carries no `Status:` line and flips nothing, no
 `@callback` in decision 5's table is added, removed or re-arity'd, and
-`schema_version` stays at `1`. The `RQ-SF039-<n>` label is the form this file
-already uses for the SF037 and SF038 walks' rulings.
+`schema_version` stays at `1`. Naming each ruling by its subject is the form this file
+already uses for the two earlier walks' rulings.
 
 Every `lib/` cite below is written beside the anchor it was found by - a
 heading, a function head, a `@doc` line - and was **re-counted at `main`
-`6d54afe`** by `sb-dxck`, once campaign SF039's code beads had landed and
+`6d54afe`** by `sb-dxck`, once the campaign's code beads had landed and
 moved the lines this Note first read at `f9b62c5`. A cite is re-located by
 that anchor and not by its number, which is why re-counting is the whole of
 what changed.
 
-### 1. Admission resolves a composite's member kinds through the palette (`RQ-SF039-14`)
+### 1. Admission resolves a composite's member kinds through the palette (ruled 2026-09-08)
 
 `StatifierBlocks.Assignability.kinds/3` and `slot_accepts/4` take the palette
 as their **first** argument and resolve a composite's members through it,
@@ -9029,7 +9029,7 @@ reader with a palette is not`, `:158-180`). `produces/4` (`:535-536`) does not
 have that problem, because it goes through `io_of/3` (`:553-554`), whose
 composite arm is `Composite.io(palette, resolved)` (`:556`) - `Composite.io/2`
 (`:636-637`) and `outcomes/2` (`:649-650`) being the palette-holding readers
-this record's Note of 2026-09-07 on the SF038 walk's seven readings (`:7914`),
+this record's Note of 2026-09-07 on the walk's seven readings (`:7914`),
 item 3, named. Admission is a reader holding
 a palette and has been reading with none.
 
@@ -9067,7 +9067,7 @@ minted; the existing one takes the palette.
 
 Built by `sb-x903`.
 
-### 2. Per-target admission is `ADR-0005`'s, recorded there (`RQ-SF039-15`)
+### 2. Per-target admission is `ADR-0005`'s, recorded there (ruled 2026-09-08)
 
 The editor's per-target admission form - one probe and one check at a gap,
 rather than a sweep - is `StatifierBlocks.Edit.Targets`'s and therefore
@@ -9078,7 +9078,7 @@ about its arities, its defaults or its candidate list is stated here; this item
 exists so a reader of item 1 knows where the target side lives and does not
 look for it in this record.
 
-### 3. `Composite.expand/2` answers a tuple; `expand!/2` keeps the raise (`RQ-SF039-10`)
+### 3. `Composite.expand/2` answers a tuple; `expand!/2` keeps the raise (ruled 2026-09-08)
 
 `Composite.expand/2` (`composite.ex:441-443`) answers
 `{:ok, {blocks, param_map}} | {:error, reason}`.
@@ -9103,16 +9103,16 @@ the changelog of the release it lands in.
 Two rulings this file already carries are untouched by the new return, and are
 named here only so that a reader of `expand/2` finds all three together: an
 expansion's members are built at each member type's `current_version/0`
-(`RQ-SF037-17`, this file's Note of 2026-09-07 on the SF038 walk's seven
+(the member-version question, this file's Note of 2026-09-07 on the walk's seven
 readings, `:7914`, item 2), and `param_map` blames
 the **first** param in declaration order when more than one distinguishing
-value matches (`RQ-SF038-14`, item 5 of that same Note). Both are ruled and
+value matches (the declaration-order ruling, item 5 of that same Note). Both are ruled and
 unbuilt; `sb-ij7y` and `sb-gua3` carry them, and the change here neither
 implements nor disturbs either.
 
 Built by `sb-671e`.
 
-### 4. `assignable?/4` gains a strict form (`RQ-SF039-16`)
+### 4. `assignable?/4` gains a strict form (ruled 2026-09-08)
 
 `Assignability.assignable?/4` (`assignability.ex:324-326`) gains a
 `strict: true` form under which either side resolving to `:unknown` answers
@@ -9160,7 +9160,7 @@ recognized set together; the two are the same list.
 
 Built by `sb-xudv`.
 
-### 6. The interrupt pair's spelling does not change; its scoping is `ADR-0010`'s (`RQ-SF039-9`)
+### 6. The interrupt pair's spelling does not change; its scoping is `ADR-0010`'s (ruled 2026-09-08)
 
 The reserved-prefix paragraph of decision 10 stands, unedited.
 `statifier_blocks.interrupt.abandon` and `statifier_blocks.interrupt.resume`
@@ -9176,15 +9176,15 @@ type declares, and decision 11 above already hands the compiler and its
 provenance map the SCXML subtree representation and state-id generation. No sentence of decision 10, and no row of its
 table, is edited for it.
 
-Filed with `sb-0lmk`, campaign SF039.
+Filed with `sb-0lmk`.
 
 ## Amendment (2026-09-08): a subtree may name a member's outcome - `outcome_of:` on a config value, resolved at expansion and lifted back by Collapse
 
-**Status: proposed (2026-09-08, campaign SF039, bead `sb-gmqx`, recording
-campaign-SF039's ruling `RQ-SF039-4`).** A decision record merges at proposed
+**Status: proposed (2026-09-08, bead `sb-gmqx`, recording
+an operator ruling).** A decision record merges at proposed
 under the campaign invariant, and this one **stays** proposed at that
-campaign's wrap: `RQ-SF039-4` ruled the record first and the code a later
-campaign's, so no bead in campaign SF039 builds any of it and **nothing below
+campaign's wrap: the operator ruled the record first and the code a later
+campaign's, so no bead in the campaign builds any of it and **nothing below
 describes code that exists**. Flipping it to accepted is a separate gated
 request through the same `docs/adr/` gate, filed by the campaign that builds
 it. **No bead carries the code yet**, and that is the one way this section
@@ -9450,8 +9450,8 @@ inside the member.
 
 ### What this section does not decide
 
-- **The code.** `RQ-SF039-4` ruled the record first and the code a later
-  campaign's. No bead in campaign SF039 builds any clause above, and the
+- **The code.** The operator ruled the record first and the code a later
+  campaign's. No bead in the campaign builds any clause above, and the
   implementing bead is filed when the campaign that builds it is walked. This
   section is what that campaign builds from.
 - **Whether an outcome the member's type does not declare is refused, and
@@ -9478,12 +9478,12 @@ inside the member.
   not drawn on any form this file describes; the composite's own card draws its
   params.
 
-Filed with `sb-gmqx`, campaign SF039.
+Filed with `sb-gmqx`.
 
 ## Note (2026-09-08): the cite-tidy pass - the Note of this date re-counted at `6d54afe`, four census rows re-counted rather than rewritten, the migrations example's duration read in the accepted grammar, and `ADR-0004`'s T1 bullet named by its position
 
 A dated Note rather than an amendment, and it edits no decision, no clause
-and no heading. It is the cite-tidy pass campaign SF039 runs once, last on
+and no heading. It is the cite-tidy pass the campaign runs once, last on
 this repository's lane, after every record the campaign adds is on `main`,
 so that no number it re-counts moves again in the same week. It records
 what changed and why, so that a reader who followed one of these numbers
@@ -9609,20 +9609,20 @@ and is read the same way, in that record's Note of this date.
   it.
 - It does not regenerate `docs/adr/.cite-baseline.json`; `sb-u4wf` does.
 
-Filed with `sb-dxck`, campaign SF039, from `sb-8031`, `sb-d8k4`, `sb-sbb0`
+Filed with `sb-dxck`, from `sb-8031`, `sb-d8k4`, `sb-sbb0`
 and `sb-tv0y`. This Note changes no code and flips no status line in this
 file.
 
 ## Amendment (2026-09-08): `B3`'s length arm gains a face carve-out - an over-cap summary chip is drawn clipped with an ellipsis, and the finding that says so is read in the drawer
 
-**Status: accepted (2026-09-08, campaign SF039, bead `sb-tx1b`, recording
-campaign-SF039's ruling `RQ-SF039-6`).** A decision record merges at proposed
+**Status: accepted (2026-09-08, bead `sb-tx1b`, recording
+an operator ruling).** A decision record merges at proposed
 under the campaign invariant; flipping it to accepted is a separate gated
-request through the same `docs/adr/` gate, and campaign SF039 names no bead
+request through the same `docs/adr/` gate, and the campaign names no bead
 that files one. Unusually for a section at proposed, **the code this section
 describes is already on `main`**: `sb-hwlr` built it and it merged at
 `040b4ee`, which is why every clause below is written in the present tense and
-every one of them is cited. The order is deliberate - `RQ-SF039-6` was ruled
+every one of them is cited. The order is deliberate - the operator's ruling was ruled
 before either record was written, `ADR-0005` took the half it owns first, and
 this section takes the half that is this record's. Additive: every decision
 above stands exactly as it stands, every Amendment and Note above this line
@@ -9659,7 +9659,7 @@ the reason: "a clipped string reads as a rendering bug a host files against the
 editor, where a missing chip reads as the declaration it is".
 
 That reasoning holds for a badge and it does not hold for a chip, and the
-difference is what `RQ-SF039-6` was ruled on. A badge is one chip in the card's
+difference is what the operator's ruling was ruled on. A badge is one chip in the card's
 header: dropping it leaves a header that looks like the header of a type that
 declared no badge, which is a real card. A summary chip is one member of a row
 the author wrote, and `H3`'s own promise is that "a lane name longer than the
@@ -9821,11 +9821,11 @@ still absent: `C2`.
   host-facing badge would be better clipped too is a question with a different
   answer on the header, and no bead asks it.
 
-Filed with `sb-tx1b`, campaign SF039.
+Filed with `sb-tx1b`.
 
 ## Note (2026-09-08): the Note of 2026-09-07's items 2 and 5 are built - a member is stamped at its type's current version on the compiler path, and `param_map` blames the first declared param
 
-This file's Note of 2026-09-07 on the SF038 walk's seven readings (`:7914`)
+This file's Note of 2026-09-07 on the walk's seven readings (`:7914`)
 closed by saying its items 2 and 5 "record rulings no request carries yet".
 Both requests have since landed. This Note is a reading of `main` at
 `570669f`. It edits no text above this line, carries no `Status:` line, flips
@@ -9941,7 +9941,7 @@ compiler's caller is stamped today. Said plainly, at `570669f`:
 Item 2's **third** clause is not among them: it is met, and `:7977-7978` is
 stale. That sentence reads "`Collapse` is not built (`sb-uzly` is the
 request), so the version-stripping clause is a requirement on it rather than
-a description of code". `Collapse` landed in campaign SF038 - `sb-uzly`, PR
+a description of code". `Collapse` landed in the campaign - `sb-uzly`, PR
 412, `7fa35a2`, an ancestor of `570669f` - and the clause is a description of
 code today: `template/3`
 (`lib/statifier_blocks/composite/collapse.ex:627-636`, at `570669f`) builds
@@ -9992,15 +9992,15 @@ Each stands where it is. This is how to read it.
   `E4` divergence. Those are `sb-y1d7` and `sb-04p8`, and each is measured
   against item 2 as it stands.
 
-Filed with `sb-dzqm`, campaign SF039. This Note changes no code, adds no README
+Filed with `sb-dzqm`. This Note changes no code, adds no README
 row and flips no status line in this file.
 
 ## Amendment (2026-09-12): a composite declares its own outcomes - an optional `outcomes` key that replaces the derived list, checked against what the expansion can raise
 
-**Status: accepted (2026-09-12, campaign SF041, bead `sb-ndw1`, recording
-campaign-SF041's ruling `RQ-SF041-2`).** A decision record merges at proposed
+**Status: accepted (2026-09-12, bead `sb-ndw1`, recording
+an operator ruling).** A decision record merges at proposed
 under the campaign invariant, and this one **stays** proposed at that
-campaign's wrap: `RQ-SF041-2` ruled the record first and named `sb-5ee4` as the
+campaign's wrap: the operator ruled the record first and named `sb-5ee4` as the
 bead that builds it, in the same campaign but as a separate request. **Nothing
 below describes code that exists today.** Flipping this section to accepted is
 a separate gated request through the same `docs/adr/` gate, filed by the
@@ -10062,7 +10062,7 @@ key for it: `@declaration_options [:name, :params, :sentence, :palette_entry, :v
 (`composite.ex:791-802`), and the declaration type
 (`@type declaration`, `composite.ex:231-238`) carries exactly those six fields.
 
-**The measurement that asks for it.** Campaign SF040's capture `k2` (the signup
+**The measurement that asks for it.** The signup spikes' capture `k2` (the signup
 screen composite in `statifier_examples`, against `statifier_blocks` 0.27.0 as
 pinned there) found the consequence in a running document: every use-form
 composite there raises `done` and only `done`, so a `went_back` outcome the
@@ -10202,7 +10202,7 @@ forms equally, which is the point of writing it as a declaration key.
   (`block_type.ex:712`, this file's Note of 2026-09-06 at `:3832`) is a second,
   independent question about the same names. This section decides which names a
   composite declares; which of them are failure-classed is not decided here and
-  no bead in campaign SF041 decides it.
+  no bead in the campaign decides it.
 - **Not a flip, and not a widening of any existing return.** No callback is
   added to `t:StatifierBlocks.BlockType`'s list, no function's return shape
   changes, and `outcomes/1` still answers `[outcome_decl()]`.
@@ -10224,8 +10224,8 @@ gives ADRs none), adds no README row, and flips no status line in this file.
 
 ## Note (2026-09-12): `core.on_event` capture semantics - a `{"const", value}` source arm, and a pair whose source is absent leaves its destination unwritten
 
-A dated Note rather than an amendment, recorded for `sb-p3fn` under campaign
-SF041's ruling `RQ-SF041-2` (operator, 2026-09-12), in the same form the Note
+A dated Note rather than an amendment, recorded for `sb-p3fn` under the
+operator's ruling of 2026-09-12, in the same form the Note
 of 2026-09-05 used when it first gave `core.on_event` its `capture` key
 (`:3118`). It takes two decisions about that one key. No section above this
 line is edited, no heading is moved, no decision is reopened, no status line in
@@ -10279,7 +10279,7 @@ capture is "payload lacks `reason` -> writes the explicit unbound marker;
 raises nothing" (`:3223`). The marker is `:undefined`. The destination is
 written either way; only the value differs.
 
-The measurement that puts a number on the consequence is campaign SF040's
+The measurement that puts a number on the consequence is the campaign's
 capture `k3`, the signup Journey loop in `statifier_examples` against
 `statifier_blocks` 0.27.0 as pinned there: `test/statifier_examples/signup/journey_test.exs:281-285`
 at `ccf391e` asserts `moved.answers["seats"] == :undefined` after a reader
@@ -10330,7 +10330,7 @@ compiles to the bytes it compiled to before, which is the same test `cond` and
   before the raise"). A literal does not need the payload, but it needs the
   *moment* - it records that **this** handler fired - and a `core.assign` after
   the raise is on the wrong side of an abandon.
-- **The measurement that asks for it.** Campaign SF040's capture `k2` found
+- **The measurement that asks for it.** The signup spikes' capture `k2` found
   that a multi-button screen cannot record which button was pressed: every pair
   reads the payload, so two buttons that should write different values must
   rely on the host putting different values in the payload, a contract neither
@@ -10339,7 +10339,7 @@ compiles to the bytes it compiled to before, which is the same test `cond` and
 
 **The element-document side is the element package's, not this record's.** How
 an element format spells the value a pressed control records - and whether it
-does - is `riddler_spec`'s question, under Riddler's ruling `R12.3` (the word
+does - is `riddler_spec`'s question, under a Riddler ruling (the word
 is `outcome`, never `action`). This Note decides the block document's `capture`
 and nothing about an element document; the two owners meet at the payload, and
 `N1` is what lets the block document stop depending on that meeting.
@@ -10354,7 +10354,7 @@ nothing wrote it before, and carrying its previous value if something did.
 - **By default, and with no per-pair opt-in in this wave.** There is no key,
   no option and no second spelling by which an author asks for the old
   behaviour on one pair. Whether a per-pair declaration ("write the marker
-  here") is ever wanted is left open and is nobody's bead in campaign SF041.
+  here") is ever wanted is left open and is nobody's bead in the campaign.
 - **"Not answered" and "answered with nothing" are different values.** That is
   the whole of what this decides. A downstream reader tests a captured
   destination the way it tests any other datamodel path - is it there - instead
@@ -10438,7 +10438,7 @@ flips no status line in this file.
 ## Note (2026-09-12): the editor's Expand reads `expand/2`'s tuple while the raising callers are Resolve and the environment walk, and the `outcome_of:` amendment's three undecided questions are named open with a recommendation each
 
 A dated Note rather than an amendment, and it edits nothing above this line.
-It carries two items from campaign SF041's ruling `RQ-SF041-5` (operator,
+It carries two items from an operator ruling (
 2026-09-12, which seated them as one bundle): a correction **by addition** to
 this file's Note of 2026-09-08 (`:8996`) item 3 (`:9081`), and the questions
 the Amendment of 2026-09-08 (`:9181`) left undecided, listed as **open** with
@@ -10457,7 +10457,7 @@ re-located by that anchor and not by its number.
 Item 3 of this file's Note of 2026-09-08 says of `expand!/2` that "it is what
 the compiler's Resolve and the editor's Expand call" (`:9088-9089`). The
 compiler half of that sentence holds. The editor half does not, and has not
-since the code that item ruled was built: `RQ-SF039-10`'s own clause gave the
+since the code that item ruled was built: that ruling's own clause gave the
 editor the tuple spelling precisely so a broken declaration would not take an
 author's LiveView down, and that is what landed.
 
@@ -10506,8 +10506,8 @@ answer before `outcome_of:` is built, and they are listed here so a reader of
 this record finds them together rather than inside a section's closing bullets.
 
 Each carries **a recommendation and not a decision**. The recommendations are
-campaign SF041's walk's, quoted here for the operator's ruling at that
-campaign's wrap (`RQ-SF041-5`); until that ruling each question is open, and
+the walk's, quoted here for the operator's ruling at that
+campaign's wrap; until that ruling each question is open, and
 this Note takes none of them.
 
 - **An outcome name the member's type does not declare** (`:9457-9464`). `O5`
@@ -10539,11 +10539,11 @@ how the editor draws an `outcome_of:` value - are not repeated here: the first
 is the amendment's own status and the second is a drawing question this record
 does not own.
 
-Filed with `sb-ykpe`, campaign SF041. `sb-33es` is answered by item 1.
+Filed with `sb-ykpe`. `sb-33es` is answered by item 1.
 
 ## Note (2026-09-13): the four outcome questions the declared-`outcomes` build left open are decided - no finding for a dropped name, the name is its own fallback label, the duplicate refusal is adopted, and an unresolvable member contributes nothing
 
-Campaign SF044, bead `sb-k7nf`, recording the operator's ruling `RQ-SF044-8`.
+Bead `sb-k7nf`, recording the no-compile-finding ruling.
 This is a Note: it carries no status of its own and nothing here flips.
 
 The Amendment of 2026-09-12 (`:9998`) was built by `sb-5ee4`, and building it
@@ -10694,7 +10694,7 @@ Three things this rule does **not** say, because each is a different decision:
   byte-identical guarantee `C3` makes (`:10159-10160`) is untouched by this item.
 
 **The enumeration is a test, not a list in this record.** The code half is
-bead `sb-o1gz`, filed by campaign SF044's walk and depending on this Note. It
+bead `sb-o1gz`, filed by the campaign's walk and depending on this Note. It
 carries the change and the test that exercises it: a composite declaring an
 outcome whose only would-be raiser is a member the palette cannot resolve, and
 which therefore draws `C2` item 3's Resolve finding rather than compiling. A
@@ -10709,7 +10709,7 @@ them. It adds no key to a declaration, changes no spelling of a finding, and
 takes no position on whether the Amendment of 2026-09-12 is ready to flip -
 that remains the operator's, on its own request.
 
-Filed with `sb-k7nf`, campaign SF044. `sb-o1gz` carries item 4's code.
+Filed with `sb-k7nf`. `sb-o1gz` carries item 4's code.
 
 [Note 2026-09-13, `sb-o2p2`: `C1`'s "full text on the chip's `title`" clause
 above is narrowed for one case by `ADR-0005`'s Note of 2026-09-12
@@ -10722,7 +10722,7 @@ narrowing.]
 
 ## Note (2026-09-13): a cite tidy by addition - the item 3 quote's range, the capture Note's `core/on_event.ex` and `statifier_examples` anchors, the two supersession anchors `N3` left at heading level, and five re-anchorings on this file's other Note of today
 
-Campaign SF044, bead `sb-l2jn`, folding `sb-3lxm`, `sb-vag4` and `sb-aqde`, and
+Bead `sb-l2jn`, folding `sb-3lxm`, `sb-vag4` and `sb-aqde`, and
 taking item 1 of `sb-uoo5`. It also answers the five cite advisories the
 direction review of `sb-k7nf` left on this file's Note of 2026-09-13 (`:10544`).
 
@@ -10846,7 +10846,7 @@ decisions stand exactly as written.
   drops a name its root still raises deserves a finding of its own is not
   decided here" - begins on `:10111` and ends on `:10114`.
 - **Item 1's rule, in the ruling's own words** (`:10579`). The rule is spelled
-  "no stage reports it"; `RQ-SF044-8` spells it **no compile finding**. The two
+  "no stage reports it"; the no-compile-finding ruling spells it **no compile finding**. The two
   say the same thing - no stage of the compiler reports a dropped name, at any
   severity - and the ruling's wording is the one to quote.
 
@@ -10859,7 +10859,7 @@ flip, which remains the operator's. Where a record sentence and the code
 disagree above, the code is what a reader will find; each such place is dated
 here rather than rewritten there.
 
-Filed with `sb-l2jn`, campaign SF044.
+Filed with `sb-l2jn`.
 
 ## Note (2026-09-13): the printable-ASCII narrowing of a `{"const", value}` string was never this record's, and it has ended - `N1` reads as written again, and the predicator floor is `~> 9.4.1`
 
@@ -11009,14 +11009,14 @@ question of whether a control character in a `capture` literal is well-formed
 once it reaches an XML attribute is a compiler-emission question this Note does
 not reach.
 
-Filed with `sb-xoll`, campaign SF044.
+Filed with `sb-xoll`.
 
 ## Amendment (2026-09-13): a composite's declared outcomes are raised by the composite itself, which is what makes them reachable by the enclosing body - `C6`
 
-**Status: accepted (2026-09-13, campaign RF046, bead `sb-3vug`, recording
-`RQ-RF046-2`).** A decision record merges at proposed under the campaign
+**Status: accepted (2026-09-13, bead `sb-3vug`, recording
+the operator's ruling).** A decision record merges at proposed under the campaign
 invariant, and this one **stays** proposed at that campaign's wrap. **Nothing
-below describes code that exists today.** `RQ-RF046-2` ruled the record first
+below describes code that exists today.** The operator ruled the record first
 and named `sb-t74x` as the request that builds it, in the same campaign but
 separately - the way the Amendment of 2026-09-12 (`:9998`) names its own
 carrier; flipping this section to accepted is a later gated request
@@ -11070,12 +11070,12 @@ nothing more:
 - The declared names do appear in the compiled chart, but only on the member
   that raises them, on that member's own state id.
 
-**The measurement.** Campaign SF040's capture `k2` found the consequence in a
+**The measurement.** The signup spikes' capture `k2` found the consequence in a
 running document, and this file already records it under the Amendment of
 2026-09-12: "every use-form composite there raises `done` and only `done`, so a
 `went_back` outcome the subtree does raise reaches no outcome slot in the
 enclosing body, and pressing Back moves the path forward instead of back"
-(`:10067-10070`). Riddler's ruling `R12.3` names the same shape from the other
+(`:10067-10070`). A Riddler ruling names the same shape from the other
 side: a Back button records `went_back` as an outcome the enclosing body can
 route. A composite is the unit a host puts in front of an author, and it is the
 one block type that cannot say how it finished. `C6` decides that it can.
@@ -11165,7 +11165,7 @@ of the stage", because it is now a state. Emission moves bytes for every
 declaring composite, so `@compiler_version` (`compiler.ex:409`, `@compiler_version "0.29.0"`) bumps when
 the code half lands, under `ADR-0004`'s own obligation: "any change to emission
 that moves bytes bumps it - a release-discipline obligation this record creates
-on itself" (`docs/adr/0004-compiler-provenance.md:259-261`). In campaign RF046
+on itself" (`docs/adr/0004-compiler-provenance.md:259-261`). In that campaign
 the bump is the `0.30.0` release prep's, not this record's and not the code
 half's.
 
@@ -11254,12 +11254,12 @@ composite's own `done.outcome.s_blk_CS.*`. The code half rewrites the
 assertions there; this section names the test and does not dictate its lines.
 None of that happens here: this request touches `docs/adr/` and nothing else.
 
-Filed with `sb-3vug`, campaign RF046.
+Filed with `sb-3vug`.
 
 ## Note (2026-09-13): a second cite tidy by addition - six advisories the first tidy already answered, the two cites it left unlabelled, `sb-o2p2`'s pointer line re-attributed to the amendment's preamble, `C2` item 2 pointed at the raisable-set narrowing, and `emit/2`'s return type is `ADR-0004`'s
 
-Campaign RF046, bead `sb-suao`, folding `sb-yr8c` and `sb-mqmv`, and taking the
-operator's ruling `RQ-RF046-3`.
+Bead `sb-suao`, folding `sb-yr8c` and `sb-mqmv`, and taking the
+operator's ruling.
 
 Nothing above this line is edited. Every correction below is a later dated line:
 no rule, decision, clause or heading changes, this Note carries no `Status:`
@@ -11308,7 +11308,7 @@ re-answered; each is named with where it was answered and re-verified at
   decided here" begins on `:10111` and ends on `:10114`.
 - **Item 1's rule is quoted in the ruling's own words.** Answered in the same
   item's fifth bullet (`:10848-10852`): the Note spells the rule "no stage
-  reports it", `RQ-SF044-8` spells it **no compile finding**, the two say the
+  reports it", the no-compile-finding ruling spells it **no compile finding**, the two say the
   same thing, and the ruling's wording is the one to quote.
 
 ### 2. The two cites the first tidy left unlabelled: `composite.ex:813` and `block_type.ex:851`
@@ -11373,7 +11373,7 @@ not flip it or edit item 2. It is here so that a reader of item 2 - including a
 reader of it after it flips - finds the narrowing without having to know that a
 later Note exists.
 
-### 5. `emit/2`'s return type is `ADR-0004`'s, and `ADR-0004` has already ruled it (`RQ-RF046-3`)
+### 5. `emit/2`'s return type is `ADR-0004`'s, and `ADR-0004` has already ruled it (the operator's ruling)
 
 Two places in this file gloss `emit/2` and neither is its specification. The
 callback-row note (`:123-125`) says "Only the first four rows are this record's
@@ -11420,7 +11420,7 @@ each one's own request. Where a record sentence and the code disagree above, the
 code is what a reader will find; each such place is dated here rather than
 rewritten there.
 
-Filed with `sb-suao`, campaign RF046.
+Filed with `sb-suao`.
 
 ## Note (2026-09-13): a raw C0 control character in a `{"const", value}` capture literal is refused at compile, on XML 1.0 grounds
 
@@ -11477,14 +11477,14 @@ no status line, and flips nothing. The changelog fragment this request carries
 is the code half's, for the compile refusal a user could notice, not this
 line's.
 
-Filed with `sb-9j5e`, campaign RF046.
+Filed with `sb-9j5e`.
 
 ## Amendment (2026-09-13): an enclosing body selects on a declaring composite's outcome through a derived `on_<name>` slot - `C7`
 
-**Status: accepted (2026-09-13, campaign RF046, bead `sb-gu5q`, recording
-`RQ-RF046-17`).** A decision record merges at proposed under the campaign
+**Status: accepted (2026-09-13, bead `sb-gu5q`, recording
+the enclosing-body ruling).** A decision record merges at proposed under the campaign
 invariant, and this one **stays** proposed at that campaign's wrap. **Nothing
-below describes code that exists today.** `RQ-RF046-17` ruled this record
+below describes code that exists today.** The enclosing-body ruling ruled this record
 first and named `sb-t74x` - already `C6`'s carrier - as the request that
 builds the mint half and this half together, after this section is on `main`.
 If that request finds this section wrong, it holds and reports rather than
@@ -11498,7 +11498,7 @@ selects on a composite's outcome" (`:11209-11210`), naming the shape it
 expects: "most likely an `on_<name>` slot on the declaring composite, of the
 kind `core.subchart` derives at `core/subchart.ex:227`" (`:11209-11220`).
 This section is the answer to that bullet, and it takes the shape the bullet
-named. Together the two sections close the gap campaign SF040's capture `k2`
+named. Together the two sections close the gap the signup spikes' capture `k2`
 measured; neither closes it alone.
 
 Additive: every decision, Amendment and Note above this line stands exactly as
@@ -11533,7 +11533,7 @@ What is true of the package at `c1c1894`, and which this section changes:
 - The only slot **derived from a config-listed outcome name** is
   `core.subchart`'s, from that block's own config (`core/subchart.ex:192`,
   `@slot_prefix "on_"`, used at `:224-228`, `def slots(config)`), which is
-  the precedent `RQ-RF046-17` names. `on_`-prefixed slots that a block type
+  the precedent the enclosing-body ruling names. `on_`-prefixed slots that a block type
   declares outright, fed by no config, are older and are untouched by this
   section: `core.invoke`'s (`core/invoke.ex:96`,
   `def slots(_config), do: [{"on_error", :zero_or_one, "If it fails"}]`) and
@@ -11632,7 +11632,7 @@ and the compiler's `List.keyfind/3` read (`compiler.ex:2411-2416`) assume.
 
 **3. An occupied slot's child runs inside the composite's own state, before
 that outcome's final.** The route this section decides is `core.subchart`'s,
-which is what `RQ-RF046-17` named:
+which is what the enclosing-body ruling named:
 
 - With the slot **empty**, the declared member outcome reaches the matching
   composite final directly and the enclosing body continues on the composite's
@@ -11675,12 +11675,12 @@ state is still in the configuration when its final child is entered - and it
 is still the wrong place to route. Two reasons. The composite final for
 `<name>` is where that outcome **ends**, so a route that ran a continuation
 and then returned to that final would raise the outcome's event again, and
-again after that. And the precedent `RQ-RF046-17` names routes before the
+again after that. And the precedent the enclosing-body ruling names routes before the
 final rather than after it (`core/subchart.ex:474-483`), which is what makes
 an occupied slot and an empty one reach the same final and makes the
 composite's completion mean the same thing either way.
 
-**How this section reads the ruling.** `RQ-RF046-17` says "the enclosing body
+**How this section reads the ruling.** The enclosing-body ruling says "the enclosing body
 routes `done.outcome.<composite state>.<name>` through it". This section
 reads that as naming the **route**, not its emitter: under it the composite
 routes the declared member outcome through the slot itself, and its own
@@ -11753,7 +11753,7 @@ An occupied outcome slot moves emitted bytes, so `@compiler_version`
 (`compiler.ex:409`, `@compiler_version "0.29.0"`) bumps under `ADR-0004`'s
 obligation on itself, "any change to emission that moves bytes bumps it - a
 release-discipline obligation this record creates on itself"
-(`docs/adr/0004-compiler-provenance.md:260-261`). In campaign RF046 that bump
+(`docs/adr/0004-compiler-provenance.md:260-261`). In that campaign, that bump
 is the `0.30.0` release prep's, as it is for `C6`: not this record's, and not
 the building request's.
 
@@ -11773,11 +11773,11 @@ else.
 
 ### The measurement this closes
 
-`C6` names it (`:11049`): campaign SF040's capture `k2` found that "every
+`C6` names it (`:11049`): the signup spikes' capture `k2` found that "every
 use-form composite there raises `done` and only `done`, so a `went_back`
 outcome the subtree does raise reaches no outcome slot in the enclosing body,
 and pressing Back moves the path forward instead of back" (`:10069-10072`),
-and Riddler's ruling `R12.3` names the same shape from the other side. With
+and a Riddler ruling names the same shape from the other side. With
 `C6` the outcome is raised on the composite's own state; with this section
 there is a slot for it and the package routes it. The examples app's screen
 composite declares `went_back`, an author drops the blocks that go back into
@@ -11834,15 +11834,15 @@ does not dictate its lines.
 - It does not reach the examples app's own composite declaration, which is
   that repository's request, nor the `outcome_of:` amendment (`:9181`).
 
-Filed with `sb-gu5q`, campaign RF046.
+Filed with `sb-gu5q`.
 
 ## Amendment (2026-09-14): an interrupt handler names the outcome it abandons its group with - `C8`
 
-**Status: accepted (2026-09-14, campaign RF047, bead `sb-algi`, recording
-`RQ-RF047-2` and `RQ-RF047-3`).** A decision record merges at proposed under
+**Status: accepted (2026-09-14, bead `sb-algi`, recording
+the operator's rulings).** A decision record merges at proposed under
 the campaign invariant, and this one **stays** proposed at that campaign's
-wrap. **Nothing below describes code that exists today.** `RQ-RF047-2` ruled
-the surface and `RQ-RF047-3` ruled this record first; `sb-r6ln` is the request
+wrap. **Nothing below describes code that exists today.** The operator ruled
+the surface and the operator ruled this record first; `sb-r6ln` is the request
 that builds it, dispatched only after this section is on `main`. If that
 request finds this section wrong, it holds and reports rather than amending it
 here.
@@ -11851,7 +11851,7 @@ here.
 composite raises `done.outcome.<composite state id>.<name>`, and `C7`
 (`:11482`) decides that the enclosing body selects on that name through a
 derived `on_<name>` slot. Together they close the raising and routing halves of
-the gap campaign SF040's capture `k2` measured. They do not close the half a
+the gap the signup spikes' capture `k2` measured. They do not close the half a
 screen composite needs: **nothing lets one interrupt handler say which of the
 composite's outcomes its arrival is.** A screen expands to a `core.group` whose
 `interrupts` slot holds one `core.on_event` per button; every such handler
@@ -11943,7 +11943,7 @@ re-located by that anchor and not by its number. Cites into this file and into
 
 ### The measurement this closes
 
-Run twice - at the RF047 walk on 2026-09-13 and again by this campaign's `W0`
+Run twice - at the walk on 2026-09-13 and again by this campaign's `W0`
 probe on 2026-09-14 - in a throwaway `statifier_examples` worktree at `35bb23e`
 against `statifier_blocks` `0.30.0` and `predicator` `9.4.1`, both times with
 the same result.
@@ -11982,8 +11982,8 @@ still `<final id="<handler>__o_done">` raising `.done`, because `emit/2` mints
 `Context.done_id/1` (`core/on_event.ex:918`) and knows no other name. That one
 byte is what item 3 below decides.
 
-The measurement that asks for this is the Riddler ruling `R12.3`: a Back button
-records `went_back` as an outcome the enclosing body can route. `R10d` - Back
+The measurement that asks for this is a Riddler ruling: a Back button
+records `went_back` as an outcome the enclosing body can route. A second Riddler ruling - Back
 navigation and re-asks overwrite - is not contradicted by anything here;
 nothing in this section builds `context`, a resolve verdict, or validation.
 
@@ -12000,7 +12000,7 @@ Its meaning is: *the outcome this handler completes with when it abandons its
 group.* Absent or blank, the handler finishes as it always has.
 
 **The spelling is `finish_as` and not the `outcome_name` the ruling
-recommended.** `RQ-RF047-2` left the record free to respell, and it should:
+recommended.** The operator's ruling left the record free to respell, and it should:
 `outcome_name` is already a **public function** in this package with a
 neighbouring meaning - `BlockType.outcome_name/2` (`block_type.ex:1350`, `def
 outcome_name(config, key) when is_map(config) and is_binary(key) do`, `@spec`
@@ -12195,7 +12195,7 @@ files, and the enumeration is the tests' to carry:
   repository's request, and the `outcome_of:` amendment (`:9181`), which this
   section does not reach.
 
-Filed with `sb-algi`, campaign RF047.
+Filed with `sb-algi`.
 
 ## Note (2026-09-14): a declaring composite's outcomes are failure-classed by hand only, and a derived `on_<name>` slot takes no `:failure` slot style
 
@@ -12288,11 +12288,11 @@ This line edits no line above it, adds no status line, and flips nothing. It
 carries no changelog fragment: it changes no public API and no observable
 behaviour.
 
-Filed with `sb-pj0o`, campaign RF047.
+Filed with `sb-pj0o`.
 
 ## Note (2026-09-14): a third cite tidy by addition - `C6`'s `on_`-minting sentence narrowed, the `C7` advisories answered by anchor, `ADR-0004`'s `E4`/`T4` narrowed to a non-declaring composite, and eleven re-anchorings across this file and `ADR-0005`
 
-Campaign RF047, bead `sb-pk04`, folding `sb-2wa7`, `sb-58gr` and `sb-s0v5`.
+Bead `sb-pk04`, folding `sb-2wa7`, `sb-58gr` and `sb-s0v5`.
 
 Nothing above this line is edited. Every correction below is a later dated
 line: no rule, decision, clause or heading changes, this Note carries no
@@ -12640,11 +12640,11 @@ flip, which remains the operator's on each one's own request. Where a record
 sentence and the code disagree above, the code is what a reader will find; each
 such place is dated here rather than rewritten there.
 
-Filed with `sb-pk04`, campaign RF047.
+Filed with `sb-pk04`.
 
 ## Note (2026-09-14): the control-character Note's "at all" clause carries the tab/LF/CR qualifier
 
-Campaign RF047, bead `sb-oa0y`.
+Bead `sb-oa0y`.
 
 Nothing above this line is edited. This is a later dated line: no rule,
 decision, clause or heading changes, it carries no `Status:` line, it flips
@@ -12698,11 +12698,11 @@ refused through the compiler by `Validation.canonical_json_check/2`'s binary
 clause (`validation.ex:351`, `defp canonical_json_check(value, _path) when
 is_binary(value) do`, read at `2a0aa2a`), which runs before this walk.
 
-Filed with `sb-oa0y`, campaign RF047.
+Filed with `sb-oa0y`.
 
 ## Note (2026-09-18): a fourth cite tidy by addition - `C8`'s `with`-threading sentence narrowed, the named arm moves the watcher transition's target too, and two cite ranges re-measured
 
-Campaign RF050, bead `sb-kmho`.
+Bead `sb-kmho`.
 
 Nothing above this line is edited. Every correction below is a later dated
 line: no rule, decision, clause or heading changes, this Note carries no
@@ -12797,11 +12797,11 @@ operator's on each one's own request. A fourth correction in the same set
 concerns a line range quoted in a request body rather than in this file, and
 takes no line here.
 
-Filed with `sb-kmho`, campaign RF050.
+Filed with `sb-kmho`.
 
 ## Note (2026-09-18): six one-line corrections to the third cite tidy, by addition
 
-Campaign RF050, bead `sb-s972`.
+Bead `sb-s972`.
 
 Nothing above this line is edited. Every correction below is a later dated
 line: no rule, decision, clause or heading changes, this Note carries no
@@ -12886,11 +12886,11 @@ edits no line in this file or in any other record. Every correction above is
 a measurement, and where a record and the code disagree the code is what a
 reader will find.
 
-Filed with `sb-s972`, campaign RF050.
+Filed with `sb-s972`.
 
 ## Note (2026-09-18): the tab/LF/CR line's XML ground names §2.11's CR-to-LF step beside §3.3.3
 
-Campaign RF050, bead `sb-lnj2`.
+Bead `sb-lnj2`.
 
 Nothing above this line is edited. This is a later dated line: no rule,
 decision, clause or heading changes, it carries no `Status:` line, it flips
@@ -12928,11 +12928,11 @@ edits no line in this file or in any other record. It takes no position on
 whether any Amendment above is ready to flip, which remains the operator's on
 each one's own request.
 
-Filed with `sb-lnj2`, campaign RF050.
+Filed with `sb-lnj2`.
 
 ## Note (2026-09-18): `C8`'s reach is the minted members, and an author-placed handler in a pass-through slot is out of scope
 
-Campaign RF050, bead `sb-63wg`.
+Bead `sb-63wg`.
 
 Nothing above this line is edited. This is a later dated line: no rule,
 decision, clause or heading changes, it carries no `Status:` line, it flips
@@ -13016,11 +13016,11 @@ narrows or answers it. It takes no position on whether `C8` or any Amendment
 above is ready to flip, which remains the operator's on each one's own
 request.
 
-Filed with `sb-63wg`, campaign RF050.
+Filed with `sb-63wg`.
 
 ## Amendment (2026-09-18): a composite may declare its outcomes as a function of its own config, and every reader of the declared list reads that instance's - `C9`
 
-**Status: accepted (2026-09-18, campaign RF055, bead `sb-rkna`, recording the
+**Status: accepted (2026-09-18, bead `sb-rkna`, recording the
 operator's ruling of 2026-09-18, "Yes, per-instance declaration").** A decision
 record merges at proposed under the campaign invariant, and this one **stays**
 proposed at that campaign's wrap. **Nothing below describes code that exists
@@ -13447,7 +13447,7 @@ to prove four things:
    composite declaring per instance, compiles with **zero** findings, pinned by
    a test, and the ten findings quoted above are gone.
 
-Filed with `sb-rkna`, campaign RF055.
+Filed with `sb-rkna`.
 
 ## Note (2026-09-18): `C8` item 7's open question is answered in `ADR-0005`, by addition
 
@@ -13462,11 +13462,11 @@ this line follows it rather than anticipating it. Item 7's own text stands as
 the record of the gap at the time it was written; nothing in this file is
 changed by this line, which is why it is a Note and not an amendment.
 
-Filed with `sb-hjcd`, campaign RF055.
+Filed with `sb-hjcd`.
 
 ## Note (2026-09-18): the minted-member exclusion rests on the author not writing an id the expansion will mint, and such an id is refused at the Chart stage rather than by that exclusion
 
-Campaign RF055, bead `sb-v731`.
+Bead `sb-v731`.
 
 Nothing above this line is edited. This is a later dated line: no rule,
 decision, clause or heading changes, it carries no `Status:` line, it flips
@@ -13624,11 +13624,11 @@ is; that question is open and is the operator's on its own request. It takes
 no position on whether any Amendment above is ready to flip, which remains the
 operator's on each one's own request.
 
-Filed with `sb-v731`, campaign RF055.
+Filed with `sb-v731`.
 
 ## Note (2026-09-18): two cite ranges in the fourth cite tidy and in the XML-ground line are re-measured against their own quotes
 
-Campaign RF055, bead `sb-f3iq`.
+Bead `sb-f3iq`.
 
 Nothing above this line is edited. Every correction below is a later dated
 line: no rule, decision, clause or heading changes, this Note carries no
@@ -13672,11 +13672,11 @@ edits no line in this file or in any other record. It takes no position on
 whether any Amendment above is ready to flip, which remains the operator's on
 each one's own request.
 
-Filed with `sb-f3iq`, campaign RF055.
+Filed with `sb-f3iq`.
 
 ## Note (2026-09-18): a fifth cite tidy by addition - `C1`'s and `C2` item 4's composite cites re-located, two `C9` cites given their anchors, and two `C9` sentences stated exactly
 
-Campaign RF058, bead `sb-bckf`.
+Bead `sb-bckf`.
 
 Nothing above this line is edited. Every correction below is a later dated
 line: no rule, decision, clause or heading changes, this Note carries no
@@ -13789,7 +13789,7 @@ anchors `C9` writes beside them. It takes no position on whether `C1`, `C2`,
 `C9` or any Amendment above is ready to flip, which remains the operator's on
 each one's own request.
 
-Filed with `sb-bckf`, campaign RF058.
+Filed with `sb-bckf`.
 
 ## Note (2026-09-18): the unpublished identifiers cited above
 
@@ -13805,11 +13805,11 @@ in `test/statifier_blocks/block_type_test.exs`, added in the same request as
 this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
-Filed with `sb-4wh3`, campaign RF058.
+Filed with `sb-4wh3`.
 
 ## Amendment (2026-09-18): a block an author places in a composite's pass-through or outcome slot with an id the expansion mints is a Resolve finding naming the cause - `C10`
 
-**Status: accepted (2026-09-18, campaign RF058, bead `sb-uc5p`, recording the
+**Status: accepted (2026-09-18, bead `sb-uc5p`, recording the
 operator's ruling of 2026-09-18 on that bead: "YES, ADD THE RESOLVE-STAGE
 FINDING").** A decision record merges at proposed under the campaign
 invariant, and this one **stays** proposed; its flip is the operator's, on its
@@ -13929,11 +13929,11 @@ check and no Chart-stage mapping. It adds one finding code and nothing else to
 the public surface. It takes no position on whether any Amendment above is
 ready to flip, which remains the operator's on each one's own request.
 
-Filed with `sb-uc5p`, campaign RF058.
+Filed with `sb-uc5p`.
 
 ## Note (2026-09-18): a throw from `declared_outcomes/1` or `subtree/1` is outside `ADR-0004` decision 1's "never raises", and leaves the compile
 
-Campaign RF058, bead `sb-17wn`.
+Bead `sb-17wn`.
 
 A dated note, not an amendment. `docs/adr/README.md`'s test is that "an
 amendment changes what the record decides and a note does not: a note records
@@ -13982,7 +13982,7 @@ an exit, and nothing about any callback but these two. It takes no position on
 whether any Amendment above is ready to flip, which remains the operator's on
 each one's own request.
 
-Filed with `sb-17wn`, campaign RF058.
+Filed with `sb-17wn`.
 
 ## Note (2026-09-19): ten long-proposed sections are flipped to accepted, and the `outcome_of:` Amendment stays proposed
 
@@ -14128,7 +14128,7 @@ itself one of the ten flipped here, it is named by its label.
 - **`C6` and `C7`, on closing `k2`'s gap.** `C6`'s "A reader who wants the
   whole of `k2` closed needs this section and the record that answers the
   selection half" (`:11035-11036`), `C7`'s "Together the two sections close
-  the gap campaign SF040's capture `k2` measured; neither closes it alone"
+  the gap the signup spikes' capture `k2` measured; neither closes it alone"
   (`:11501-11502`), and `C7`'s "and Back goes back" (`:11784`): `C8`'s
   preamble records that the two close the raising and routing halves only,
   and that nothing lets one interrupt handler name its outcome
@@ -14154,7 +14154,7 @@ itself one of the ten flipped here, it is named by its label.
   `C9d`'s "decision 1 forbids this pipeline to raise" (`:13325-13326`): the
   Note at `:13934` records that a throw is outside it.
 
-Filed with `sb-rov2`, campaign RF058.
+Filed with `sb-rov2`.
 
 ## Note (2026-09-22): the `C10` Amendment of 2026-09-18 is flipped to accepted
 
@@ -14215,4 +14215,4 @@ None found. No dated record or Note after `C10` changes what it decides, and
 the only later sections that name it are the Note of 2026-09-19, met above,
 and this Note.
 
-Filed with `sb-b4yk`, campaign RF069.
+Filed with `sb-b4yk`.

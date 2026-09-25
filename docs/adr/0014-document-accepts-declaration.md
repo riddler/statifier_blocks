@@ -486,4 +486,4 @@ None reverses what the record decides.
   finding. Decision 4's check is not a compile finding, and its edit-time
   display stays undecided.
 
-Filed with `sb-tysd`, campaign RF069.
+Filed with `sb-tysd`.

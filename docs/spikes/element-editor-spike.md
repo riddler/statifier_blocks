@@ -1,13 +1,13 @@
-# SF040: an element editor over this editor - findings
+# An element editor over this editor - findings
 
 **A findings document, not a proposal.** It weighs two answers to Riddler's
-Q15 - *is Riddler's element editor this editor with an element palette and
+element-editor question - *is Riddler's element editor this editor with an element palette and
 its own emit?* - against two throwaway spikes run 2026-09-12. Nothing here
 amends a record and nothing here is a decision; the asks it names are filed
 separately and listed in section 4.
 
-Written in the vocabulary settled by the operator on 2026-09-12 (campaign
-SF040 consent amendment A2, recorded as a Riddler `docs/decisions.md` R10d
+Written in the vocabulary settled by the operator on 2026-09-12 (a
+consent amendment for these spikes, recorded as a Riddler ruling
 amendment): **a question owns its `answer_options`; a visitor's Journey owns
 `responses`, and the datamodel root a screen writes is
 `responses.<element_key>`; the host-supplied root is `context`.** Quoted code,
@@ -22,12 +22,12 @@ never pushed, and are never to be deleted.
 
 | Input | Where |
 |---|---|
-| q1 (`sb-q8sw`) branch | `spike/sf040-element-emit` at `a1aab91`, on `fa61fd7`, in `statifier_blocks-worktrees/sb-q8sw-element-emit` |
+| q1 (`sb-q8sw`) branch | a local spike branch at `a1aab91`, on `fa61fd7`, in `statifier_blocks-worktrees/sb-q8sw-element-emit` |
 | q1 spike notes | `statifier_blocks-worktrees/sb-q8sw-element-emit/SPIKE-NOTES.md` |
-| q1 capture and artifact | `.claude/fleet/pending/SF040-spikes/sb-q8sw-element-editor.png`, `sb-q8sw-emitted.json` |
+| q1 capture and artifact | the maintainers' private notes: `sb-q8sw-element-editor.png`, `sb-q8sw-emitted.json` |
 | q1 capture harness (not committed) | same directory, `sb-q8sw-render.exs`, `sb-q8sw-page.rb` |
-| q2 (`se-aud`) branch | `spike/sf040-element-editor` in `statifier_examples`, local, cut from `f81e92a` |
-| q2 authoring notes | `.claude/fleet/pending/SF040-spikes/se-aud-authoring-notes.md` |
+| q2 (`se-aud`) branch | a local spike branch in `statifier_examples`, local, cut from `f81e92a` |
+| q2 authoring notes | the maintainers' private notes: `se-aud-authoring-notes.md` |
 | q2 captures | same directory, `se-aud-editor-element-tree.png`, `se-aud-inspector-text-question.png`, `se-aud-palette-browser.png` |
 | q2 artifact and diff | same directory, `se-aud-emitted.json`, `se-aud-fixture-diff.txt` |
 | This package | `statifier_blocks` at `fa61fd7`; every line cite below was read there |
@@ -42,7 +42,7 @@ stated.
 
 ### What it cost
 
-`git diff origin/main --stat` on `spike/sf040-element-emit` is 15 files,
+`git diff origin/main --stat` on the q1 spike branch is 15 files,
 1,220 insertions, 14 deletions. `SPIKE-NOTES.md` (274) is not code, which
 leaves 946 lines, and they fall into three piles that should not be added
 together:
@@ -56,7 +56,7 @@ together:
 
 **The seam is 299 lines: 183 of new pass plus 116 added across four existing
 files, against 14 removed.** The 647 lines of vocabulary and tests are the
-cost of *a* vocabulary and are paid under either answer to Q15; a second JSON
+cost of *a* vocabulary and are paid under either answer to the question; a second JSON
 vocabulary pays them again and pays none of the 299.
 
 The fork is one `case` in one function. `compile/3` takes
@@ -221,7 +221,7 @@ field early. ADR-0005 decision 10's presentation metadata already carries
 `layout: :columns`, so the mechanism exists and a page vocabulary would
 declare it on a container type; untested here.
 
-**No canvas mode is proposed by this document.** `docs/decisions.md` D16 is
+**No canvas mode is proposed by this document.** An operator ruling is
 explicit that components promote and layouts do not - "a second way to lay a
 document out is a host's page, not a mode inside the package editor" - and
 nothing above asks to reopen it.
@@ -316,7 +316,7 @@ q1's JSON path still ran them.
 | Palette, canvas, findings pane, inspector | free | host rebuilds or forgoes |
 | Per-emitter tax | 2 clauses (`sb-ahsn`) | none |
 
-## 3. Recommendation for Riddler Q15
+## 3. Recommendation for Riddler's element-editor question
 
 ### The deciding numbers
 
@@ -376,7 +376,7 @@ layout tree, `ConfigForm` and `Field` draw every element's form with no
 package change, and the findings pane is the shipped pane. The profile
 mechanism carried two thirds of the asked-for hiding with no code. Nothing in
 either spike suggests a page editor built from scratch would be better, and
-q2's gesture count is better than most page builders manage. This part of Q15
+q2's gesture count is better than most page builders manage. This part of the question
 answers yes with no qualification beyond the defects in section 1 - and the
 one that would be felt first, `ViewModel.title_override/2`'s `"label"` lookup
 (`sb-u1d2`), is a small fix with a large effect: over a prose vocabulary it
@@ -386,7 +386,7 @@ blanks half the canvas.
 decision.** The seam is small and clean - one `case`, 299 lines, every dropped
 stage individually justified - but `BlockType.emit/2`'s return type is a
 record question (section 4, ask R), and every other item on the list is small
-if it lands and moot if it does not. Until SF041 rules it, a host walk of
+if it lands and moot if it does not. Until the next walk rules it, a host walk of
 `Document.blocks/1` plus `committed_config/2` produces the same JSON in under
 about 120 lines with zero package change and zero record cost. That is the
 D16-shaped fallback applied to the **emit** half only, and the two halves are
@@ -397,10 +397,10 @@ taken later without redoing (a).
 larger than either seam.** Six missing concepts, a naming decision that should
 be settled before either spelling ships (`outcome` vs `action`), and a
 required `style` the target document cannot hold. 25 of 64 fields with
-Findings at 0 is not an editor defect and no answer to Q15 shrinks it: the
+Findings at 0 is not an editor defect and no answer to the question shrinks it: the
 same 25 fields are missing from a host-native view, because they are missing
 from the types. Whoever owns the page vocabulary should decide these first;
-until they do, neither answer to Q15 produces a document the k1 fixture's
+until they do, neither answer to the question produces a document the k1 fixture's
 consumers can run.
 
 One consequence worth stating: a page profile should **keep Source rather than
@@ -410,24 +410,24 @@ is authoring blind (`sb-12q2`).
 
 ## 4. Upstream asks under either answer
 
-Filed already by the conductor, at P4, labelled `campaign-SF040` and
-`sf041-candidate`. Cited here by id; this document files nothing.
+Filed already by the conductor, at P4, labelled for these spikes and
+for the next walk. Cited here by id; this document files nothing.
 
 | Id | Ask | Live under |
 |---|---|---|
 | `sb-ahsn` | A `warnings` accessor across compile artifacts, so `reanchor/2` and `in_document_order/2` stop matching `%Compiled{}` | the seam only (it is the per-emitter tax) |
 | `sb-u1d2` | `ViewModel.title_override/2` takes the card-title key from the block type rather than the literal `"label"` | **both** - it is an editor defect, and q2 raises its priority rather than adding to it |
-| `sb-ij80` | A `run?` profile key that **unseats** the run rather than hiding the pane (a record decides first) | **both**, and independent of Q15: any host mounting for an audience that must not see a run needs it today |
+| `sb-ij80` | A `run?` profile key that **unseats** the run rather than hiding the pane (a record decides first) | **both**, and independent of the question: any host mounting for an audience that must not see a run needs it today |
 | `sb-l1ih` | A totality check in the emit pass for a compiled child that was never placed (confirm against ADR-0004 first - it may be deliberate silence) | **both** - the SCXML pass has the same gap in the other direction |
 | `sb-9hpg` | Two blocks claiming the same key raise no finding | **both**, wherever answer keys are a concept |
 | `sb-2w79` | Findings are one per block, not one per failing required field, and a blank required string reads as a type error | **both** |
 | `sb-12q2` | A JSON emitter target has no Source surface; `SourceView` is a chart listing | the seam only |
 | `sb-czla` | A reads-before-writes check over the typed environment walk | **both** (arrived from t1, listed here because a page of questions is where it bites) |
 
-### Ask R: `BlockType.emit/2`'s return type is a record question, for the SF041 walk
+### Ask R: `BlockType.emit/2`'s return type is a record question, for the next walk
 
-**This document amends no record** (campaign SF040 consent clause 9). It
-states the question as precisely as the spike allows, for the SF041 walk to
+**This document amends no record** (the spikes' consent). It
+states the question as precisely as the spike allows, for the next walk to
 rule.
 
 What the code says today, read at `fa61fd7`:
@@ -482,7 +482,7 @@ recorded here so they are not lost. Neither is this package's to fix.
   `../../deps/statifier_blocks/assets/css/statifier_blocks.css`, and a Mix
   path dep is never materialised under `deps/`, so `mix assets.build` fails to
   resolve it. q2 worked around it with a symlink. A real gap in a supported
-  arm, independent of anything in SF040.
+  arm, independent of anything in these spikes.
 - **`statifier_examples`' gate cannot be green while that arm is in use**, by
   construction: `test/statifier_examples/mix_deps_test.exs` guards the Hex arm
   with `refute System.get_env("STATIFIER_BLOCKS_PATH")`. That is the right
@@ -500,10 +500,10 @@ written, including both corrections this document makes to its own inputs
 subtree" gloss belonging to ADR-0002 rather than ADR-0004 decision 4).
 Six qualifications, none blocking.
 
-1. The sentence attributed to `docs/decisions.md` D16 - "a second way to
+1. The sentence attributed to an operator ruling - "a second way to
    lay a document out is a host's page, not a mode inside the package
    editor" - is not in D16. D16's own words are "nothing promotes as a
-   layout mode" (and the epic's R4, "never as a layout mode"). The quoted
+   layout mode" (and the epic's layout-mode ruling, "never as a layout mode"). The quoted
    sentence is `PlanLive`'s moduledoc paraphrasing D16. The claim is
    right; the quotation marks belong to statifier_examples, not to the
    umbrella record.
@@ -525,7 +525,7 @@ Six qualifications, none blocking.
 
 5. Every input this document cites resolves only on one machine - two
    never-pushed local branches and six artifacts under the private
-   umbrella's `.claude/fleet/pending/` - and D16 is a private record cited
+   maintainers' notes - and an operator ruling is a private record cited
    unqualified. No terminology-firewall hit; a reference-hygiene question
    for the operator, given that this file lands in a public repo.
 
@@ -534,12 +534,12 @@ Six qualifications, none blocking.
    Section 2 says "estimated"; section 3(b) hedges with "about". Read with
    qualification 2, it is the least-evidenced number in the argument.
 
-Recorded rather than cured: campaign SF040 consent clause 6 merges a spike
+Recorded rather than cured: the spikes' consent merges a spike
 findings doc on a QUALIFIED verdict with its qualifications written here.
 Qualifications 1 and 2 were independently re-verified against `fa61fd7`
 before being recorded and both hold: the quoted sentence is at
 `statifier_examples/lib/statifier_examples_web/live/plan_live.ex:6-8` and
-appears nowhere in `docs/decisions.md`, and `Document.walk/1`
+appears nowhere in the operator's rulings, and `Document.walk/1`
 (`document.ex:109-118`) sorts the slot map by name and `flat_map`s the
 children together, so the list it returns carries neither nesting nor slot
 name. A reader taking recommendation (b) should read qualification 2 with

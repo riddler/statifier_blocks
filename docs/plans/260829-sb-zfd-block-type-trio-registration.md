@@ -17,7 +17,7 @@ three through a total normalizer whose discipline is refuse-never-truncate
 10, so this bead adds metadata keys and their normalizers, not callbacks.
 
 The second half is the registration surface a host uses to contribute its
-own types: campaign 014 pre-decision D7, an explicit list handed in at
+own types: an operator ruling, an explicit list handed in at
 mount, no global registry and no config-time discovery. Bead: sb-zfd.
 
 ## Current State Analysis
