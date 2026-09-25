@@ -136,7 +136,7 @@ the headless job.
   entries, no control is drawn.
 - **No payload editing.** Entries send their fixture's `payload_text`
   unmodified.
-- **No write to statifier-ui, and no new wire type.** RQ-033-10's split holds:
+- **No write to statifier-ui, and no new wire type.** The operator's split of the seam holds:
   statifier-ui answers where a run is; this package answers which block that
   is.
 - **The editor does not subscribe to the run.** After a send, `@run` is

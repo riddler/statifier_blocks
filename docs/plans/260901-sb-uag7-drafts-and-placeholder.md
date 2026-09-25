@@ -360,5 +360,5 @@ Left for human eyes, deferred and never confirmed by an agent:
 - ADR-0003 amendment (2026-08-31), A1-A3 - `docs/adr/0003-assignability.md:723`
 - ADR-0004 amendment (2026-08-31), D1-D6 - `docs/adr/0004-compiler-provenance.md:2246`
 - ADR-0005 amendment (2026-08-31), 10s-10v, 11n - `docs/adr/0005-liveview-editor.md:3841`
-- campaign-024 rulings R-a (the marker joins the shelf's record) and R-b (the
+- an operator ruling (the marker joins the shelf's record) and a second (the
   placement facts are Structure-stage findings)

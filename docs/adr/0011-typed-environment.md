@@ -1,7 +1,7 @@
 # ADR-0011: Nothing flows between adjacent blocks - a pre-order walk carries an environment from datamodel path to type, and a block declares what it reads and writes there
 
 Status: accepted (2026-09-06, drafted for `sb-kcdw` under the operator's
-campaign-032 grant). It merges at proposed under that campaign's invariant,
+campaign grant). It merges at proposed under that campaign's invariant,
 like every other section filed with it; flipping it to accepted is a separate
 request through the same `docs/adr/` gate, and `sb-ok9s` carries it.
 
@@ -1009,8 +1009,8 @@ this one's.
 
 ## Amendment (2026-09-06): decision 12's `{:list, :unknown}` becomes a reference into the parent's declaration
 
-**Status: accepted (2026-09-06, campaign SF035, bead `sb-jvz3`, recording
-campaign-034's ruling `RQ-034-2`).** A decision record merges at proposed under
+**Status: accepted (2026-09-06, bead `sb-jvz3`, recording
+an operator ruling).** A decision record merges at proposed under
 the campaign invariant; flipping it to accepted is a separate gated request
 through the same `docs/adr/` gate, and `sb-upv0` carries it. Additive: decision
 12 stands as accepted, and no text above this line is edited by this section.
@@ -1030,11 +1030,11 @@ case
 `Status:` line, additive, nothing above it edited.
 
 An amendment **narrowly**, and the scope is worth stating before the decision.
-Two other sections of this record move in campaign SF035 and neither moves
+Two other sections of this record move in the campaign and neither moves
 here: `sb-myt1` amends **decision 1** for the inline-shape inhabitant of
-`type_expr()` (campaign-SF035 ruling `RQ-SF035-1`, the arm `sd-ADR-0001`'s
+`type_expr()` (an operator ruling, the arm `sd-ADR-0001`'s
 amendment spells) and for seeding declared path types from the datamodel index
-where the document wrote nothing (campaign-SF035 ruling `RQ-SF035-15`), and
+where the document wrote nothing (an operator ruling), and
 `sb-c9b6` files its own Note. This
 section writes only what `ADR-0013` needs of decision 12 and states its
 dependence on `sb-myt1`'s work rather than doing any of it.
@@ -1115,12 +1115,12 @@ expression surface is the one that exists - reads a list of a shape instead,
 which is more information and not different information.
 
 Filed with `sb-jvz3`, against `ADR-0013` as merged (PR 319, `b90d40e`);
-campaign-SF035, from campaign-034's ruling `RQ-034-2`. `sb-nqfd` builds it,
+from an operator ruling. `sb-nqfd` builds it,
 behind `sb-myt1`.
 
 ## Note (2026-09-06): decision 1's walk now runs on a partially-configured document, and a block whose config was refused contributes nothing to it
 
-`RQ-SF035-2`, taken by the operator with the campaign-SF035 walk, changes
+The operator's ruling, taken by the operator with the walk, changes
 when the compiler asks for this walk. Until now the Structure stage ran only
 after the Config stage had passed, so every block the walk met carried a
 config `validate_config/1` had accepted. From `sb-c9b6` the two stages report
@@ -1177,7 +1177,7 @@ expected one is `sd-ADR-0001` decision 8's and this Note does not go near it;
 only the question of what the environment holds at a path is narrowed, and
 only for a block the compiler has already refused.
 
-Filed with `sb-c9b6`, campaign-SF035, from the walk's ruling `RQ-SF035-2`
+Filed with `sb-c9b6`, from the walk's ruling
 (which also folds `sb-lvh1`). `sb-myt1`'s amendment to decision 1 - the
 inline-shape arm of `type_expr()` - is a separate and later change to this
 same decision and does not interact with this one: one narrows what the walk
@@ -1185,8 +1185,8 @@ carries for a refused block, the other widens what a type may spell.
 
 ## Amendment (2026-09-06): decision 1's type expression admits an inline shape, and the environment seeds the declared path types the document has not written
 
-**Status: accepted (2026-09-06, campaign SF035, bead `sb-myt1`, recording the
-walk's rulings `RQ-SF035-1` and `RQ-SF035-15`).** A decision record merges at
+**Status: accepted (2026-09-06, bead `sb-myt1`, recording the
+walk's rulings).** A decision record merges at
 proposed under the campaign invariant; flipping it to accepted is a separate
 gated request through the same `docs/adr/` gate, and `sb-wzoa` carries it.
 Additive: no text above this line is edited by this section, and both parts
@@ -1215,7 +1215,7 @@ Decision 1's type vocabulary gains **one inhabitant**, the inline, unnamed
 shape that `sd-ADR-0001`'s amendment of this date defines - its section
 "Amendment (2026-09-06): a type expression admits an inline, unnamed shape
 beside a declared name" in `statifier_datamodel`, accepted on the operator's
-same-walk ruling `RQ-SF035-1`, its code on that package's `main` in `3116a72`.
+same-walk ruling, its code on that package's `main` in `3116a72`.
 That amendment's arms (a) through (e) are the arm's whole definition: the
 spelling `{:shape, [member()]}` with a member's three keys, member-set-wise
 identity rather than term equality, construction by a consumer with no
@@ -1348,14 +1348,14 @@ that is every caller that has no document to read, the compiler and the editor
 both supplying one when they have it (`lib/statifier_blocks/compiler.ex:682`
 and `lib/statifier_blocks/editor.ex:1922-1923`).
 
-**`RQ-SF035-15` is where this was decided**, taken by the operator with the
-campaign-SF035 walk on `sb-g6me`'s question, which `sb-y4i7` raised and
+**the operator's ruling is where this was decided**, taken by the operator with the
+walk on `sb-g6me`'s question, which `sb-y4i7` raised and
 declined to answer on the grounds that seeding declared path types is a record
 question and not a bead's. It was right; this is the record answering it.
 `sb-g6me` closes as folded with this section.
 
-Filed with `sb-myt1`, campaign SF035, from the walk's rulings `RQ-SF035-1` and
-`RQ-SF035-15`, against `sd-ADR-0001`'s inline-shape amendment as merged in
+Filed with `sb-myt1`, from two of the walk's
+rulings, against `sd-ADR-0001`'s inline-shape amendment as merged in
 `statifier_datamodel` and against this record as `sb-jvz3` and `sb-c9b6` left
 it. `sb-1jcr` builds both parts; `sb-wzoa` flips this section.
 
@@ -1412,7 +1412,7 @@ sentences at `:522-525` and `:527-529`, the deferred entry this closes at
 and `:950`, and the Note at `:889-896`. `ADR-0009` `:891`, `:921-925` and
 `:927-929` still carry the envelope this decision now references.
 
-Filed with `sb-upv0`, campaign SF035's Lane A.
+Filed with `sb-upv0`, the campaign's Lane A.
 
 ## Note (2026-09-07): `sb-myt1`'s amendment is **not** flipped - one sentence of part 2 does not hold against the code - and four cites are corrected
 
@@ -1572,12 +1572,12 @@ formatting-only exemption, and amendments here are additive.
 - **It edits no clause and moves no line.** Every correction above is a reading,
   recorded here.
 
-Filed with `sb-wzoa`, campaign SF035's Lane A.
+Filed with `sb-wzoa`, the campaign's Lane A.
 
 ## Note (2026-09-07): seeding is root-forward, the seed reads `Index.entries/1` and each entry's declared type, and a bare `object` is nominal
 
-`RQ-SF035-24` asked two questions of this record and was ruled by the operator
-on 2026-09-07 as `RQ-SF036-0a` and `RQ-SF036-0b`. This Note records the ruling.
+A question from the earlier walk asked two questions of this record and was ruled by the operator
+on 2026-09-07 as two rulings. This Note records the ruling.
 It sits at the foot so that no line a sibling record cites moves, it edits no
 clause, it removes no line, and it carries no `Status:` line of its own. The
 one sentence it supersedes is named below and left standing where it is.
@@ -1707,7 +1707,7 @@ fixture is what `se-yag` changes.
 - **It changes no walk behaviour.** The only code in the request that carries
   it is the corrected comment above `declared_seed/1`.
 
-Filed with `sb-m9eq`, campaign SF036's Lane X. `sb-wzoa` flips the Amendment
+Filed with `sb-m9eq`, the campaign's Lane X. `sb-wzoa` flips the Amendment
 this releases; `se-yag` edits the card-processing fixture; `sd-y3l` lands the
 matching Note on `sd-ADR-0001` decision 8.
 
@@ -1742,7 +1742,7 @@ section said one thing in that sentence and another in its own table, and
 picking between them was a decision, not a re-cite, so the flip did not
 proceed.
 
-The operator took that decision on 2026-09-07 as `RQ-SF036-0b`, and the second
+The operator took that decision on 2026-09-07 as a ruling, and the second
 Note of that date above (`:1577`) records it: **the code is right and the
 sentence is superseded**, the seed reads `entries/1` and the declared type, the
 superseded sentence is left standing where it is, and the two halves of this
@@ -1757,7 +1757,7 @@ reads the Note of 2026-09-07 with it. The section's decision table
 (`lib/statifier_blocks/environment.ex:263-273`) are what the accepted decision
 says, and they agreed with the code before this flip and agree with it now.
 
-`RQ-SF036-0a` was ruled on the same date and changed nothing here: seeding is
+The other was ruled on the same date and changed nothing here: seeding is
 root-forward, which is what the first two rows of the table already said.
 
 ### 2. What else the flip verified against `main`
@@ -1834,19 +1834,19 @@ Every other row of that census still reads where it says it reads.
 ### What this Note does not do
 
 - **It settles nothing new.** The projection question was settled by the second
-  Note of 2026-09-07 above (`:1577`) under `RQ-SF036-0b`; this Note flips
+  Note of 2026-09-07 above (`:1577`) under the operator's ruling; this Note flips
   a status word on the strength of that settlement and decides nothing itself.
 - **It edits no clause and removes no line but the status word.** The
   superseded sentence at `:1283-1288` stands, and both Notes above stand.
 - **It changes no code.** The request that carries it touches this file only.
 
-Filed with `sb-wzoa`, campaign SF036's Lane X. `sb-vjjl` is the next request on
+Filed with `sb-wzoa`, the campaign's Lane X. `sb-vjjl` is the next request on
 this record.
 
 ## Amendment (2026-09-07): decision 2's record-typed write also yields one entry per member, recursively through shapes
 
-**Status: accepted (2026-09-07, campaign SF036, bead `sb-vjjl`, recording the
-campaign-SF035 walk ruling `RQ-SF035-23`, taken by the operator as "R3").** A
+**Status: accepted (2026-09-07, bead `sb-vjjl`, recording the
+walk's ruling).** A
 decision record merges at proposed under the campaign invariant; flipping it to
 accepted is a separate gated request through the same `docs/adr/` gate, and the
 code half of `sb-vjjl` may carry that flip once the environment builds what this
@@ -1874,11 +1874,11 @@ embedder reached for was a second, declaration-only path field naming the nested
 path directly. It works, it duplicates a path the author already wrote, and it
 covers only the one member the embedder knew to name.
 
-The shape the SF035 walk scheduled for this - a `{:from_field, key}` inhabitant
+The shape the walk scheduled for this - a `{:from_field, key}` inhabitant
 of `writes:` - was found self-contradictory before it was built and is
 **withdrawn**: the tuple occupies the `writes:` slot, leaving the declaring
 field no type to supply, and the path it names is the root itself, which a plain
-`{:path, %{writes: T}}` on that field already writes today. `RQ-SF035-23` is
+`{:path, %{writes: T}}` on that field already writes today. The operator's ruling is
 where that was decided, and it decided against a grammar change: **this section
 adds no inhabitant to `writes:` and changes no write signature spelling.** The
 answer comes from the type system instead.
@@ -2124,8 +2124,8 @@ member is not checked at all, which is section 2's list row.
   2's table - and until then every consumer behaves exactly as it does today,
   which is the same sequencing the Amendment at `:1186` states for `sb-1jcr`.
 
-Filed with `sb-vjjl`, campaign SF036's Lane X, from the campaign-SF035 walk
-ruling `RQ-SF035-23`, against this record as `sb-m9eq` and `sb-wzoa` left it and
+Filed with `sb-vjjl`, the campaign's Lane X, from the walk
+ruling, against this record as `sb-m9eq` and `sb-wzoa` left it and
 against `sd-ADR-0001`'s two amendments of 2026-09-06 as merged in
 `statifier_datamodel`. The code half of `sb-vjjl` builds it and may carry its
 flip.
@@ -2156,7 +2156,7 @@ Section 5 (`:1994-1998`) says, in its title and its first sentence:
 > not on any synthesised key.
 
 **That sentence does not hold, and the operator ruled that the code is right
-and the sentence is superseded** (campaign-SF036 ruling `RQ-SF036-17`,
+and the sentence is superseded** (an operator ruling,
 2026-09-07). What the code does instead:
 
 `StatifierBlocks.Compiler.structure_finding/3`
@@ -2215,7 +2215,7 @@ finding is anchored on comes from the other end entirely: `read_keys/2`
 key, looked up when the finding is built. So the sentence is superseded on the
 same ruling and for the same reason as section 5's first: threading the root
 field's key to a derived entry is exactly the widening of `annotated/0` that
-`RQ-SF036-17` declined.
+the operator's ruling declined.
 
 What survives of that paragraph is its argument about **why** an author needs
 the root's writer at all, and it is not disturbed, only relocated: an author
@@ -2292,7 +2292,7 @@ precedence rule is the record's reading rather than a taken ruling.** It is
 derived - the first case from decision 2's independence of fields plus the
 observation that a derived entry is the weaker source, the second from decision
 1's last-write-wins applied to the whole write at a position - and a reader
-should not take it for the operator's word. `RQ-SF035-23` ruled that the
+should not take it for the operator's word. The operator ruled that the
 expansion happens and that `{:from_field, key}` is withdrawn; it did not rule
 on which of two entries at one path survives.
 
@@ -2378,7 +2378,7 @@ only.
   sentence, the worked shape's repeat of the first, the two "coverage check"
   phrases and the internal pointer at `:1986-1987` all stand where they are,
   superseded or corrected by the parts above.
-- **It changes no code.** `RQ-SF036-17` ruled the correction is a Note and not
+- **It changes no code.** The operator ruled the correction is a Note and not
   a code change, and the request that carries this Note touches this file only.
 - **It settles the amendment's last bullet rather than falsifying it.** "It
   changes no code and flips no status" (`:2121-2125`) is a statement of
@@ -2388,8 +2388,8 @@ only.
   Amendment's status.
 - **It adds no README row.** An amendment adds none, and neither does a Note.
 
-Filed with `sb-9paa`, campaign SF036's Lane X, recording the operator's ruling
-`RQ-SF036-17` of 2026-09-07 and folding three items the pass-2 review of
+Filed with `sb-9paa`, the campaign's Lane X, recording the operator's ruling
+of 2026-09-07 and folding three items the pass-2 review of
 `sb-vjjl`'s record half raised against this file. `sb-vjjl` is the request this one
 follows on this record.
 
@@ -2416,8 +2416,8 @@ The walk **descends nothing**. Descent in this walk is descent into a slot:
 `descend/6` (`lib/statifier_blocks/environment.ex:249-251`) takes the next
 `{parent_id, slot, index}` step of the target `at/3` was asked about (`:203`),
 looks the child up in `block.slots`, and `into_slot/7` is what merges a
-container's slots per decision 4. A composite in campaign SF037 exposes no
-slot of its own (`RQ-SF037-3`), so there is no slot to step into and nothing
+container's slots per decision 4. A composite in the campaign exposes no
+slot of its own (the no-slot ruling), so there is no slot to step into and nothing
 in `block.slots` to reach; the expansion is not a slot, is not in the
 document, and this walk never sees it. There is no second walk, no nested
 environment, and no extra position: a document holding one composite has one
@@ -2454,11 +2454,11 @@ first and the `io/1` sugar last. Two members' path declarations therefore do
 not fit in one `io/0` map, and a composite whose own `config_schema/1` is its
 params declares no path at all.
 
-### 3. The mechanism is open, and is named rather than decided: `RQ-SF037-15`
+### 3. The mechanism is open, and is named rather than decided: the union-mechanism question
 
 So this Note records **what** the walk must see at a composite's position -
 the union above - and names as **open** the question of **how** the composite
-answers for it. That question is `RQ-SF037-15`, queued 2026-09-07 for the
+answers for it. That question is the union-mechanism question, queued 2026-09-07 for the
 operator. A Note may name an open question; it decides nothing, and this one
 decides nothing. The three shapes on the table when it was queued:
 
@@ -2490,14 +2490,14 @@ position that does not exist.
 A finding from such a check is attributed **one level up**: to the composite
 block the author placed and can see, never to an expanded block the author
 cannot see, and to the param that produced the offending value where one did
-(`RQ-SF037-5`; where no param can be blamed, the finding is reported against
+(the param-attribution ruling; where no param can be blamed, the finding is reported against
 the composite with `config_key: nil`). Decision 5's anchoring is unchanged by
 that - it says which field a refusal lands on, and for a composite that field
 is a param of the block that is in the document.
 
 ### 5. Pass-through slots: named, not decided
 
-A composite exposing no slot is a decision of this campaign (`RQ-SF037-3`) and
+A composite exposing no slot is a decision of this campaign (the no-slot ruling) and
 not a property of composites. When a later record gives a composite
 **pass-through slots**, three things in this Note come back into question, and
 none of them is decided here:
@@ -2555,15 +2555,15 @@ decision.
 otherwise unchanged. The citation is left standing where it is and corrected
 here, which is this record's practice for a cite the code moved.
 
-Filed with `sb-uwld`, campaign SF037, folding `sb-kjai`. `sb-xio9`
+Filed with `sb-uwld`, folding `sb-kjai`. `sb-xio9`
 ("`use StatifierBlocks.Composite`: the declaration, `Composite.expand/2`, and
 the derived block type + recipe") is the bead that implements what section 2
 describes, under whichever of section 3's shapes is ruled. This Note changes
 no code, adds no README row, and flips no status.
 
-## Note (2026-09-07): `RQ-SF037-15` is ruled in section 3's shape (A), and the walk is built that way
+## Note (2026-09-07): the union-mechanism question is ruled in section 3's shape (A), and the walk is built that way
 
-Section 3 (`:2457`) named `RQ-SF037-15` open and put three shapes on the
+Section 3 (`:2457`) named the union-mechanism question open and put three shapes on the
 table, deciding nothing. The operator ruled it on 2026-09-07 in shape **(A)**
 (`:2465-2468`): a composite's read and write signatures are computed at its one
 position by running the same `read_signatures/3` and `write_signatures/3` over
@@ -2594,14 +2594,14 @@ a sentence that opens at `:1479` ("So part 2 stays at") and closes at `:1481`
 citation is left standing where it is and corrected here, which is this
 record's practice at `:2552-2556` for a cite that has gone narrow.
 
-Filed with `sb-v3ny`, campaign SF037, folding the `ADR-0011` item of `sb-cr7e`.
+Filed with `sb-v3ny`, folding the `ADR-0011` item of `sb-cr7e`.
 This Note changes no code, adds no README row, and flips no status line in this
 file.
 
 ## Amendment (2026-09-07): the walk descends a pass-through slot's children, at the mapped inner position, and `with_writes/4` moves to `Environment`
 
-**Status: accepted (2026-09-07, campaign SF038, bead `sb-p01u`, recording the
-campaign-SF038 walk rulings `RQ-SF038-5` and `RQ-SF038-16`).** A decision record
+**Status: accepted (2026-09-07, bead `sb-p01u`, recording the
+walk's pass-through-slot and drop-check rulings).** A decision record
 merges at proposed under the campaign invariant; flipping it to accepted is a
 separate gated request through the same `docs/adr/` gate, and `sb-vjvq` carries
 that flip once `sb-q183` has built section 2 and `sb-1eam` section 4. Additive:
@@ -2609,9 +2609,9 @@ no text above this line is edited by this section.
 
 An amendment rather than a Note, by the test the Amendment at `:1186` applies to
 itself. The Note of 2026-09-07 at `:2396` says in as many words that "The walk
-**descends nothing**" (`:2415`), and gives the reason: "A composite in campaign
-SF037 exposes no slot of its own (`RQ-SF037-3`), so there is no slot to step
-into and nothing in `block.slots` to reach". `RQ-SF038-5` gives a composite a
+**descends nothing**" (`:2415`), and gives the reason: "A composite in the
+campaign exposes no slot of its own (the no-slot ruling), so there is no slot to step
+into and nothing in `block.slots` to reach". The pass-through-slot ruling gives a composite a
 slot of its own, so there is now something in `block.slots` to reach and that
 sentence moves. A moved sentence is an amendment. What the Note's section 2
 decided - what the walk consumes *at* the composite's one position - is
@@ -2626,7 +2626,7 @@ the later record section 5 was written for.
 
 ### Context
 
-`RQ-SF038-5` admits a **pass-through slot** on a composite, for module and data
+The pass-through-slot ruling admits a **pass-through slot** on a composite, for module and data
 composites alike: the declaration names a slot of the composite and the inner
 `{local_id, inner_slot}` it maps to, `slots/1` answers the declared slots
 instead of the `[]` that `lib/statifier_blocks/composite.ex:231` answers today,
@@ -2649,7 +2649,7 @@ inside a section rather than after it. Left undecided, `slot_start/4` (`:701`)
 would hand a pass-through slot the environment as it reaches the container,
 which is decision 1's rule for an ordinary container and the wrong answer here.
 
-`RQ-SF038-16` is the second half, and it is the drop-check's. The editor's
+The drop-check ruling is the second half, and it is the drop-check's. The editor's
 placement preview applies a candidate's writes with
 `Assignability.with_writes/4` (`lib/statifier_blocks/assignability.ex:661-667`,
 called from `downstream_findings/6` at `:654`), whose body is
@@ -2719,13 +2719,13 @@ Per variant, so that the claim is not read wider than it is:
 
 | The composite | `slots/1` | What the walk descends | The environment the child is read against |
 |---|---|---|---|
-| No declared slot (every composite before `RQ-SF038-5`) | `[]` | nothing | - |
+| No declared slot (every composite before the pass-through-slot ruling) | `[]` | nothing | - |
 | Declared pass-through slot, children present | the declared slot | those children | the mapped inner position, per this section |
 | Declared pass-through slot, no children | the declared slot | nothing - `arms/5` rejects an empty slot (`:658-670`) | - |
 | A slot key on the block the declaration does not declare | the declared slot | nothing | - |
 | Declared pass-through slot mapped into an inner composite's pass-through slot | the declared slot | those children | the inner composite's mapped position, this section applied again |
 
-A **data** composite is not a separate row. `RQ-SF038-5` admits the pass-through
+A **data** composite is not a separate row. The pass-through-slot ruling admits the pass-through
 slot for module and data composites in one shape, the declaration is read to the
 same `{name, {local_id, inner_slot}}` mapping either way, and this walk asks the
 resolved module the same two questions in both cases.
@@ -2885,7 +2885,7 @@ the same expansion, and the preview says `:error` before the author lets go.
   amendment's, not this record's.
 - **How a finding renders the writer half when the writer is an expansion
   member** (section 3): named open, for the operator.
-- **`Collapse`**: `RQ-SF038-1`'s, and no rule of this walk changes for it.
+- **`Collapse`**: an earlier ruling's, and no rule of this walk changes for it.
 - **What `{:passthrough, slot}` carries through a pass-through slot.** It is
   already an inhabitant of `t:StatifierBlocks.Assignability.produces/0`
   (`lib/statifier_blocks/assignability.ex:85`), the Note of 2026-09-07 named it
@@ -2894,7 +2894,7 @@ the same expansion, and the preview says `:error` before the author lets go.
 - **Any `type_expr()` arm**: the four inhabitants the Note of 2026-09-07 counts
   at `:2477` stand.
 
-Filed with `sb-p01u`, campaign SF038, recording `RQ-SF038-5` and `RQ-SF038-16`.
+Filed with `sb-p01u`, recording the pass-through-slot ruling and the drop-check ruling.
 This section adds no README row, flips no status line, and removes no line of
 this file. `sb-q183` builds section 2, `sb-1eam` section 4, and `sb-vjvq`
 carries the flip.
@@ -2983,12 +2983,12 @@ The code cites have moved. Read at `d6fb241`:
 | `core/group.ex:37-41`, `core/assign.ex:66-73` | `:37-41` unmoved; assign's `path` declaration at `:65-73` |
 | new: the mapping resolver | `composite.ex:486-494` (`Composite.pass_through/2`) |
 
-Filed with `sb-vjvq`, campaign SF038.
+Filed with `sb-vjvq`.
 
 ## Note (2026-09-08): a `:type_mismatch` whose disagreeing writer is a minted expansion member keeps the minted id in the tuple, and renders as the owning composite's sentence
 
 A dated Note rather than an amendment, and it edits nothing above this line. It
-records `RQ-SF038-24`, ruled by the operator on 2026-09-07 in option **1**, and
+records the operator's ruling, ruled by the operator on 2026-09-07 in option **1**, and
 it answers the one question the Amendment of 2026-09-07's section 3 (`:2733`)
 put on the table and left there: "What such a finding *renders* as - the minted
 id, the composite that owns it, or the composite's sentence - is not decided
@@ -3132,7 +3132,7 @@ an id the author typed.
 - Nothing about a **kind** refusal: `{:kind_not_admitted, ...}` names a slot and
   a parent, carries no writer, and is unaffected.
 
-Filed with `sb-htds`, campaign SF039, recording `RQ-SF038-24`. `sb-bjt7` builds
+Filed with `sb-htds`, recording the operator's ruling. `sb-bjt7` builds
 it. This Note changes no code, adds no README row, and flips no status line in
 this file.
 
@@ -3140,7 +3140,7 @@ this file.
 
 A dated Note rather than an amendment: no decision, no clause and no
 heading of this record changes, and nothing here is proposed. It is the
-cite-tidy pass campaign SF039 runs once, last on this repository's lane,
+cite-tidy pass the campaign runs once, last on this repository's lane,
 after every record the campaign adds is on `main`. Every `lib/` line below
 was read at `main` `6d54afe`, beside the anchor it is matched by, which is
 the practice `docs/adr/README.md` now states once for every record here.
@@ -3198,7 +3198,7 @@ and `then`, which mint to exactly the `blk_GX_*` names the rest of the
 section then uses. The example above is left standing rather than
 rewritten, as this file leaves every sentence its later notes correct.
 
-Filed with `sb-dxck`, campaign SF039, from `sb-3ers`, `sb-8031` and
+Filed with `sb-dxck`, from `sb-3ers`, `sb-8031` and
 `sb-d8k4`'s `ADR-0011` half. This Note changes no code, adds no README
 row, and flips no status line in this file.
 
@@ -3243,7 +3243,7 @@ Nothing about the typed environment, the `:type_mismatch` tuple, or where the
 writer half of a finding's message is resolved. It changes no code, adds no
 README row, and flips no status line in this file.
 
-Filed with `sb-k0xe`, campaign RF050.
+Filed with `sb-k0xe`.
 
 ## Note (2026-09-18): the unpublished identifiers cited above
 
@@ -3259,4 +3259,4 @@ in `test/statifier_blocks/block_type_test.exs`, added in the same request as
 this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
-Filed with `sb-4wh3`, campaign RF058.
+Filed with `sb-4wh3`.

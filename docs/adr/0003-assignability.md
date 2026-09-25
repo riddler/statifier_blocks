@@ -1,6 +1,6 @@
 # ADR-0003: Assignability is opaque-string identity plus a host-supplied widening relation
 
-Status: accepted (2026-08-26); decision 8 amended (2026-08-29, operator acceptance after the campaign-014 direction-agent gate on PR 88)
+Status: accepted (2026-08-26); decision 8 amended (2026-08-29, operator acceptance after the direction-agent gate on PR 88)
 
 ## Context
 
@@ -545,7 +545,7 @@ compiler would reject.
 
 ## Amendment (2026-08-29): decision 8, a reason vocabulary for what a seam decided
 
-**Status: accepted (2026-08-29, operator ruling: the campaign-014 direction-agent verdict on PR 88 was QUALIFIED on one claim in 8e, the text was corrected per that verdict and merged, and the operator accepted the section on 2026-08-29).** Drafted 2026-08-29 as a proposed amendment. Additive; decisions 1-9 stand as accepted
+**Status: accepted (2026-08-29, operator ruling: the direction-agent verdict on PR 88 was QUALIFIED on one claim in 8e, the text was corrected per that verdict and merged, and the operator accepted the section on 2026-08-29).** Drafted 2026-08-29 as a proposed amendment. Additive; decisions 1-9 stand as accepted
 and no text above this line is changed by it. Nothing here alters a verdict,
 a typespec above, or either finding tuple.
 
@@ -722,11 +722,11 @@ position-level answer in every case.
 
 ## Amendment (2026-08-31): the `:draft_shelf` kind, and a slot the data-flow walk does not enter
 
-**Status: accepted (2026-09-01), drafted for `sb-5h6q` under the operator campaign-024 grant; accepted on the gate's unqualified direction-agent verdict.** Additive; decisions 1
+**Status: accepted (2026-09-01), drafted for `sb-5h6q` under the operator's campaign grant; accepted on the gate's unqualified direction-agent verdict.** Additive; decisions 1
 through 9 stand as accepted and no text above this line is edited by this
 section. It is the assignability half of ADR-0002's amendment of this date,
 which adds `core.drafts` and `core.placeholder` to that record's decision 10
-under campaign-024 rulings R-a and R-b.
+under the operator's rulings.
 
 ### What forces the amendment
 
@@ -780,7 +780,7 @@ block's `body` admits a `:draft_shelf` anyway, and that it admits at most one,
 are a depth constraint and a cardinality constraint. Neither is an
 intersection of a parent's `slot_accepts` with a child's `kinds`, so neither
 is expressible here, and ADR-0002's amendment of this date puts both in the
-Structure stage as findings under campaign-024 ruling R-b. Decision 3's claim
+Structure stage as findings under an operator ruling. Decision 3's claim
 to subsume ADR-0002's placement special case is unaffected: it subsumed a
 parent-type constraint, which these are not.
 
@@ -917,4 +917,4 @@ in `test/statifier_blocks/block_type_test.exs`, added in the same request as
 this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
-Filed with `sb-4wh3`, campaign RF058.
+Filed with `sb-4wh3`.

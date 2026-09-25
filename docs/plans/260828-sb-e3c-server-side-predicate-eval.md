@@ -7,7 +7,7 @@ evaluation, done **server side through predicator**, so a fixture row can be
 *checked* rather than asserted. Bead: `sb-e3c`.
 
 The bead's title says "Real JS predicate evaluator". That title predates the
-ruling. Campaign-014 pre-decision **D11** settles the contract question the
+ruling. An operator ruling settles the contract question the
 bead's body raises: evaluation is server side, through predicator, reached
 from the LiveView editor path. A JS evaluator would be a second
 implementation of the predicator grammar, and this plan writes **no
@@ -793,7 +793,7 @@ gate cannot read a comment.
 ## References
 
 - Bead: `sb-e3c`
-- Ruling: campaign-014 pre-decision **D11** - predicate evaluation is server
+- Ruling: an operator ruling - predicate evaluation is server
   side, through predicator, via the LiveView editor; never a JS mirror of the
   grammar.
 - `docs/adr/0002-block-type-behaviour.md:250` - decision 9/9a-9c, fixture

@@ -1,7 +1,7 @@
 # ADR-0012: A condition that could not be decided is a third slot on `core.branch`, and an unwired one falls to `otherwise`
 
 Status: accepted (2026-09-06, drafted for `sb-qrcn` under the operator's
-campaign-033 grant, recording the ruling of 2026-09-06). It merges at proposed
+campaign grant, recording the ruling of 2026-09-06). It merges at proposed
 under that campaign's invariant, like every other record filed with it;
 flipping it to accepted is a separate request through the same `docs/adr/`
 gate, after `sb-2hoh` has built it.
@@ -275,7 +275,7 @@ naming it would over-report by one instead.
 
 [Note 2026-09-06, `sb-5fa7`: the `summary/1` clause of this decision - the
 `"1 arm + otherwise + undecided"` card for a branch that wires the slot - is
-**withdrawn** by the operator's ruling of 2026-09-06 under the campaign-033
+**withdrawn** by the operator's ruling of 2026-09-06 under the campaign
 grant. The callback cannot answer it: `@callback summary(Block.config())` is
 handed the config alone (`lib/statifier_blocks/block_type.ex:609`), and
 whether a slot holds children is a fact about the block rather than about its

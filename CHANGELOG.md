@@ -2779,7 +2779,7 @@ buttons carry a new `sb-button` class, and two band tokens
   card; its icon tile is unchanged.
 - The document-level findings list is the drawer's **Findings** tab, beside
   Truth tables, and no longer a block of text under the canvas (operator
-  ruling R4, 2026-08-29, under ADR-0005 ruling 1A: a list of findings is a
+  ruling, 2026-08-29, under ADR-0005 ruling 1A: a list of findings is a
   grid of rows about the whole document). Each row carries the finding's
   severity, the block it is about - label and id - and the message, and
   clicking one selects and reveals that block. The inspector's Findings tab
@@ -2884,7 +2884,7 @@ buttons carry a new `sb-button` class, and two band tokens
 
 ## [0.3.0] 2026-08-29
 
-Charts get more shapes to compile into. Campaign 015 adds four emitters to the
+Charts get more shapes to compile into. This release adds four emitters to the
 `core.*` vocabulary - `core.subchart`, which runs another chart and routes on
 the outcome the child reported; `core.foreach`, a container whose body runs
 once per item of a datamodel list; scope-correct cancellation for a delayed
@@ -3112,7 +3112,7 @@ Dependency floor: unchanged - `statifier ~> 2.2` and `predicator ~> 9.0`.
 
 ## [0.2.0] 2026-08-29
 
-The editor ships. Campaign 014 graduated the authoring spike into the
+The editor ships. This release graduated the authoring spike into the
 package: `StatifierBlocks.Editor` renders from `assets/` with a documented
 `--sb-*` theming surface, a drag marks the slots that accept a block and can
 say why a slot refused, and a host registers its own block types through

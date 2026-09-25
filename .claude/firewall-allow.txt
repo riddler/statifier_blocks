@@ -29,3 +29,23 @@
 # test/statifier_blocks/core/duration_migration_test.exs: an ISO-8601
 # duration, not a reference.
 "PT1.5S",
+
+# ADR-0004's 2026-08-29 core.subchart amendment numbers its own four
+# sections with a letter and digit; these lines, in that record and in the
+# records that cite it, name those sections.
+self-reference refusal amendment R1-R4
+### R1. What `src` is
+### R2. What `src` is not
+### R3. The refusal
+### R4. Cross-document cycles
+annotation quoted in R1
+criterion in R3 generalizes
+amendment, section R2
+change about R2 is its status
+(ADR-0004's amendment, R3)
+so is R1's rule
+ADR-0004 R1 has it
+ADR-0004 R2)
+
+# ADR-0004's worked example renames a document to an example title.
+Document.rename(document, "Q3 authorization")

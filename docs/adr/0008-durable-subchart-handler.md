@@ -1,6 +1,6 @@
 # ADR-0008: The durable subchart handler answers at dispatch time, not from a pure `start/2`, and its refusal set gains exactly one reason
 
-Status: accepted (2026-09-01, campaign-025; unqualified direction-agent
+Status: accepted (2026-09-01; unqualified direction-agent
 verdict)
 
 ## Context
@@ -52,7 +52,7 @@ contract-ownership rule - handler shape here, storage and stepping there.
 
 **What this record therefore has to answer**, and nothing wider: what shape the
 durable handler has, given that a pure `start/2` will not carry it; and what a
-durable start may refuse for, given that campaign-023 ruling R-b closed the
+durable start may refuse for, given that an operator ruling closed the
 in-memory set at three reasons.
 
 ## Decision
@@ -183,7 +183,7 @@ nothing to it and should offer no callback that looks like it does.
 
 ### 5. The refusal set is four reasons, closed
 
-The campaign-023 closed set is reused verbatim -
+The closed set is reused verbatim -
 `"unknown_document"`, `"child_compile_findings"`, `"cycle_refused"` - and the
 ruling notes on `sb-2i04` permit at most one durable-only addition. This record
 takes that one and spells it **`"child_run_creation_failed"`**, in the same
@@ -316,7 +316,7 @@ is `sb-2i04`, mirrored with `sp-nt8`, and the two halves close together.
 ## Note (2026-09-01): decision 5, the four-reason table is satisfied jointly
 
 A dated note rather than an amendment. Decision 5 is unchanged in every
-clause: the refusal set is the campaign-023 three plus exactly one
+clause: the refusal set is the original three plus exactly one
 durable-only reason, `child_run_creation_failed`, and it is closed at four.
 What this records is *which package raises which of the four*, which the
 table above deliberately did not say and which the implementation
@@ -373,7 +373,7 @@ three - it has no child run to fail to create. The record's closing bullet
 above was written before the implementation landed; the design it describes
 is what landed, and the mirrored pair stays open for the operator to close.
 
-Filed with `sb-8fsb`, campaign-026.
+Filed with `sb-8fsb`.
 
 ---
 
@@ -417,7 +417,7 @@ done".
 No decision clause is edited and no status changes: this record's status
 line stands as it was.
 
-Filed with `sb-143s`, campaign-029.
+Filed with `sb-143s`.
 
 ---
 
@@ -470,7 +470,7 @@ replacement for it, and the handler this record specifies,
 different handler with a different invoke type (ADR-0009 decision 3), and
 this record's refusal set stays four and closed.
 
-Filed with `sb-uxko`, campaign-031 ruling `D31-9` (the 2026-09-05 scale walk).
+Filed with `sb-uxko`, on an operator ruling (the 2026-09-05 scale walk).
 
 ## Note (2026-09-18): the unpublished identifiers cited above
 
@@ -486,7 +486,7 @@ in `test/statifier_blocks/block_type_test.exs`, added in the same request as
 this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
-Filed with `sb-4wh3`, campaign RF058.
+Filed with `sb-4wh3`.
 
 ---
 
@@ -852,7 +852,7 @@ They are met here, not edited.
   which block that is for an expansion member; re-anchoring such a finding
   onto the composite block is not decided here.
 
-Filed with `sb-tysd`, campaign RF069.
+Filed with `sb-tysd`.
 
 ## Amendment (2026-09-22): a `core.map` `collect_type` name that cannot be resolved without `:datamodel` is reported unchecked
 

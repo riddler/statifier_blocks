@@ -27,7 +27,7 @@ the drawer ("content that is a grid of rows about the whole document goes to
 the drawer") reads onto the event log unless the record says why it does not.
 It does not, because a run is not the document.
 
-**2. statifier-ui is composed as shipped.** RQ-033-10 splits the seam by
+**2. statifier-ui is composed as shipped.** The operator's ruling splits the seam by
 ownership: statifier-ui answers where a run is, this package answers which
 block that is. No statifier-ui write, no new wire type, no new event name in
 statifier-ui's namespace - its `scrub_event` and `select_event` attrs exist

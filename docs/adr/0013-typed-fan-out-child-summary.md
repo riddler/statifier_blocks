@@ -1,10 +1,10 @@
 # ADR-0013: A fan-out child's summary is typed by the parent's declaration, with an optional child-side one and a dormant agreement check
 
 Status: accepted (2026-09-06, drafted for `sb-57yc` under the operator's
-campaign-034 grant and finished under campaign-SF035's, recording
-campaign-033's ruling `RQ-033-19` B, campaign-034's rulings `RQ-034-2`,
-`RQ-034-14` and `RQ-034-15` b, and campaign-SF035's `RQ-SF035-1`, all of
-2026-09-06). The labelled form is ADR-0009's, at
+campaign grant and finished under the next one's, recording
+five operator rulings,
+all of
+2026-09-06). The form is ADR-0009's, at
 `docs/adr/0009-fan-out-block-type.md:710`, rather than ADR-0012's bare
 "recording the ruling of <date>": this record carries five rulings from three
 campaigns and one date does not tell them apart. It merges at proposed under
@@ -12,10 +12,10 @@ the campaign invariant, like every other record filed with it; flipping it
 to accepted is a separate request through the same `docs/adr/` gate, after
 `sb-nqfd` has built it.
 
-Decisions 3 and 5 below are the campaign-SF035 rewrite. ADR-0009's Note of
+Decisions 3 and 5 below are the rewrite. ADR-0009's Note of
 2026-09-06 (`docs/adr/0009-fan-out-block-type.md:891-965`) merged while this
 record's first draft was under review and fixed what one collected element is:
-an envelope, not the child's answer. `RQ-034-15` b ruled that this record is
+an envelope, not the child's answer. The operator ruled that this record is
 rewritten against that Note rather than held, and the two decisions below say
 so where an earlier draft said otherwise.
 
@@ -67,7 +67,7 @@ there is no donedata on that arm at all.
 **The bytes that are not there are C1's.** ADR-0004's amendment C1
 (`docs/adr/0004-compiler-provenance.md:1262-1287`) has a document compiled for
 use as a child emit one top-level `<final>` per root-block outcome, carrying
-the outcome name as done data and, since the campaign-033 failure seam, the
+the outcome name as done data and, since the failure seam, the
 reserved `statifier_persistence:run_status` param on a failure-classed one
 (the key is `@run_status_key` at `lib/statifier_blocks/compiler.ex:263-264`,
 minted by `run_status_param/0` at `:1443-1444` and appended at `:1423-1425`).
@@ -145,7 +145,7 @@ whose closing sentence is "**No ninth field type is added by it**"
 `statifier_datamodel`'s vocabulary, and it takes the shape the first one took
 rather than inventing a second.
 
-The inline arm for **this field** is deferred **by name**, to campaign-SF035's
+The inline arm for **this field** is deferred **by name**, to the next campaign's
 typed-shapes theme, as four things that are only worth deciding together: a
 `{:type_expr, opts}` member of ADR-0002 decision 7's field-type set, an
 inline-shape inhabitant of `StatifierBlocks.Environment`'s `type_expr()`,
@@ -161,7 +161,7 @@ The environment entry that decision fixes is a structure, and
 `type_expr()` cannot spell a structure today. That inhabitant is
 `statifier_datamodel`'s to define and this package's to consume - the
 inline-shape amendment to `sd-ADR-0001` (`statifier_datamodel`, proposed,
-campaign-SF035 ruling `RQ-SF035-1`), which `sb-myt1` cites into ADR-0011's
+an operator ruling), which `sb-myt1` cites into ADR-0011's
 decision 1 without respelling it. This record does the same: it says which
 members the envelope has and which are required, and it spells none of the
 grammar.
@@ -339,7 +339,7 @@ Four states, and each is decided rather than incidental:
 | no | yes | the child's declaration produces the params of decision 3, and `collect` stays `{:list, :unknown}` at the parent. The bytes are richer; the parent's typing is not |
 | yes | yes | **the parent's wins for typing**, and the pair is checked as above wherever both documents are in hand |
 
-The parent's winning is campaign-034's second-order ruling `RQ-034-2`, and it
+The parent's winning is an operator ruling, and it
 follows from decision 1's reason: the parent's compile has the parent's document and
 never the child's, so a typing that depended on the child's declaration would
 be a typing that is available in the editor and absent in the compiler. A type
@@ -788,8 +788,8 @@ the Note records where one of them stops rather than changing what it says.
 Decision 1 fixes `collect_type`'s `config_schema/1` field type as the existing
 `:string`, carrying a declared **name**, and ADR-0002 decision 7's set stays
 closed at eight (`lib/statifier_blocks/block_type.ex:149-157`). That is
-campaign-034's ruling `RQ-034-14` a and it stands unchanged through the
-campaign-SF035 rewrite of decisions 3 and 5: the envelope of decision 5 is a
+an operator ruling and it stands unchanged through the
+later rewrite of decisions 3 and 5: the envelope of decision 5 is a
 fact about the environment's type expressions, not about what an author types
 into a config field, and the two move independently.
 
@@ -850,7 +850,7 @@ family, as `ADR-0002`'s Note of this date states in as many words
 (`docs/adr/0002-block-type-behaviour.md:4851-4854`). The record's head status
 is untouched and stays `proposed`; `sb-upv0` flips it.
 
-Filed with `sb-jvz3`, as folded residue from `sb-57yc`; campaign-SF035.
+Filed with `sb-jvz3`, as folded residue from `sb-57yc`.
 
 ## Note (2026-09-06): decision 1's `collect_type` is a `{:type_expr, opts}` field now, and admits the inline arm
 
@@ -927,7 +927,7 @@ before any of this.
 The record's head status is untouched and stays `proposed`; the flip is its
 own gated request.
 
-Filed with `sb-268w`, campaign SF035's Lane A.
+Filed with `sb-268w`, the campaign's Lane A.
 
 ## Note (2026-09-06): the flip, and where this record's cites read today
 
@@ -1099,7 +1099,7 @@ the declared-params argument decision 3 asks for, which is an arity the
 decision implies and does not state. The name and the clause structure are
 otherwise what `:584-585` describes.
 
-Filed with `sb-upv0`, campaign SF035's Lane A.
+Filed with `sb-upv0`, the campaign's Lane A.
 
 ## Correction of 2026-09-13 (`sb-51lv`)
 
@@ -1108,7 +1108,7 @@ lines above stand exactly as printed - the 2026-09-07 ruling keeps a merged
 record's line numbers and its text, which is what keeps them honest - so this
 correction is **added at the foot** and rewrites nothing above it.
 
-**The rule.** Campaign SF041 renamed the reserved done-data key and the
+**The rule.** The campaign renamed the reserved done-data key and the
 private function that mints it, to the spelling `statifier_persistence`'s
 ADR-0011 decision 4 fixes. Wherever this record writes `@run_status_key`, read
 `@execution_status_key`; wherever it writes `run_status_param/0`, read
@@ -1151,4 +1151,4 @@ in `test/statifier_blocks/block_type_test.exs`, added in the same request as
 this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
-Filed with `sb-4wh3`, campaign RF058.
+Filed with `sb-4wh3`.

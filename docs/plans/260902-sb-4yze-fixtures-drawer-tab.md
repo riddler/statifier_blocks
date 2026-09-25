@@ -202,8 +202,8 @@ Three phases, in this order.
    Ordering it last is deliberate: it is written from what shipped rather than
    from a shape guessed ahead of the code, which is what precedent `cea57f1`
    did, and it can name the module, the verdict vocabulary and the count
-   exactly. All three commits go in one pull request, which is what ruling
-   R27-9 asks for.
+   exactly. All three commits go in one pull request, which is what the
+   operator's ruling asks for.
 
 ### The count on the strip is rows, not failures
 
@@ -685,7 +685,7 @@ Sabotage notes on every one of them.
 #### Manual Verification:
 - [ ] Browser check on a **private** port - never 8645, 8643, 8642 or 4002,
       which the campaign freeze holds - with captures written to
-      `/Users/johnnyt/Dev/github/statifier/.claude/fleet/journal/027-screens/`.
+      the maintainers' private campaign journal.
       **Deferred: no human is available in this session.**
 
 **Machine-checked (unattended, 2026-09-02): NOT TAKEN - still deferred.** The
@@ -698,7 +698,7 @@ re-pointed off the frozen 8645 to **8650**, and a throwaway harness added to
 `blk_cp_risk_branch` (pass / fail / unbound-binding). The host compiled and
 served `/editor` with HTTP 200 on 8650. The browser step was then abandoned
 because the fleet's `chrome` resource lock is held by another agent
-(`campaign=027 bead=W0 pid=27793 at=2026-09-02T13:03Z`), and contending for
+(held since 2026-09-02T13:03Z), and contending for
 a held lock is not permitted. The server was stopped and 8650 released;
 8645/8643/8642/4002 were never touched. The harness is left on disk so the
 capture is a two-command job once `chrome` frees:
@@ -761,7 +761,7 @@ Status line, proposed and not accepted:
 
 ```markdown
 **Status: proposed (2026-09-02), drafted with the implementation it records,
-implementing bead `sb-4yze`, campaign-027's Lane E.** Additive; decisions 1, 7,
+implementing bead `sb-4yze`, the campaign's Lane E.** Additive; decisions 1, 7,
 14 and 15 stand as written and no text above this line is edited by this
 section.
 ```
@@ -867,8 +867,8 @@ judgement and stays deferred for the direction agent.
 
 **Implementation Note**: Docs-only. Ordered last so it records what shipped
 rather than a shape guessed ahead of the code - the same order precedent
-`cea57f1` used. All three phases land in one pull request, which is what ruling
-R27-9 asks for.
+`cea57f1` used. All three phases land in one pull request, which is what the
+operator's ruling asks for.
 
 ---
 
@@ -909,7 +909,7 @@ empty `otherwise` arm.
    replaces the run list and does not read as an error the fixtures caused.
 6. Detach the fixtures source; confirm the empty-state copy.
 7. Capture 2, 3, 4 and 5 into
-   `/Users/johnnyt/Dev/github/statifier/.claude/fleet/journal/027-screens/`.
+   the maintainers' private campaign journal.
 
 All seven are **deferred**: no human is available in this session, and the
 capture step is the bead's own acceptance item.
@@ -963,7 +963,7 @@ None blocks implementation.
 
 ## References
 
-- Bead: `sb-4yze` (campaign 027, W0, Lane E; ruling R27-9)
+- Bead: `sb-4yze` (Lane E; on an operator ruling)
 - ADR being amended: `docs/adr/0005-liveview-editor.md` (decision 1 the headless
   guard, decision 7 the hook limit, decision 14 the `sb-` prefix, decision 15
   the deferred per-entry fixtures pane at `:608-632`)
@@ -1010,7 +1010,7 @@ Verification block gates advancement and the manual items are deferred.
 
 - [ ] Browser check on a **private** port - never 8645, 8643, 8642 or 4002,
       which the campaign freeze holds - with captures written to
-      `/Users/johnnyt/Dev/github/statifier/.claude/fleet/journal/027-screens/`.
+      the maintainers' private campaign journal.
       **Deferred: no human is available in this session.**
 - [ ] The fixtures table stays readable at the drawer's minimum height (6 rem)
       without the horizontal scroll the drawer exists to avoid.
@@ -1033,7 +1033,7 @@ phase gate. Manual items deferred under `--loop`.
 
 **Implementation Note**: Docs-only. Ordered last so it records what shipped
 rather than a shape guessed ahead of the code - the same order precedent
-`cea57f1` used. All three phases land in one pull request, which is what ruling
-R27-9 asks for.
+`cea57f1` used. All three phases land in one pull request, which is what the
+operator's ruling asks for.
 
 ---

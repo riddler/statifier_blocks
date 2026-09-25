@@ -1,7 +1,7 @@
 # ADR-0010: A clock interrupt is a delayed `core.send` at the head of a group's body caught by a `core.on_event` on its rail, and there is no `core.timeout`
 
-Status: accepted (2026-09-02, campaign-026; direction-agent verdict on the
-second review, after one cure, with the `RQ-026-6` ruling recorded in the
+Status: accepted (2026-09-02; direction-agent verdict on the
+second review, after one cure, with the resumable-group deadline ruling recorded in the
 note below)
 
 ## Context
@@ -362,7 +362,7 @@ consistent with this record and needs no amendment to it.
   exercises it.
 ---
 
-## Note (2026-09-02): `RQ-026-6` answers the resumable-group deadline, and it is an advisory
+## Note (2026-09-02): the operator's ruling answers the resumable-group deadline, and it is an advisory
 
 A dated note rather than an amendment: it does not change what this record
 decides, it records the operator's answer to the one question the record
@@ -391,7 +391,7 @@ exactly as described, and no block type gains a key. The sharp edge is surfaced
 where an author will see it rather than designed away, which keeps the SCXML the
 pair emits the SCXML the vocabulary already emitted.
 
-`sb-dj1p` carries the work, filed 2026-09-02 as a campaign-027 candidate and
+`sb-dj1p` carries the work, filed 2026-09-02 as a next-campaign candidate and
 not scheduled here. Its acceptance criteria are that the finding fires on
 exactly that shape and is sabotage-tested, that it stays silent for `core.group`
 and for rails without a resume handler, and that this note names it - which it
@@ -406,7 +406,7 @@ answer to it.
 
 ## Note (2026-09-02): the deadline spelling's duration is `core.send`'s `delay`, and the cross-type spelling question stays deferred
 
-The same shape as the `RQ-026-6` note above - a dated note, not an amendment.
+The same shape as the resumable-group deadline note above - a dated note, not an amendment.
 It does not change what this record decides; it says which of the deferred
 list's questions the record already answered in passing, and why the rest of
 that entry stays open.
@@ -441,7 +441,7 @@ that proposes the type is where the question belongs.
 
 No bead owns that remaining half. Filing one is outside this rider's scope, so
 the deferred-list entry above is left in place and is the standing owner of the
-question, the way the `RQ-026-6` note left its own entry standing.
+question, the way the resumable-group deadline note left its own entry standing.
 
 ---
 
@@ -514,7 +514,7 @@ way ADR-0005's clause 9 says its own earlier prose is superseded.
   about which *key* a new type names, not which grammar a value is written in,
   and no such type is proposed. The deferred-list entry above stays its
   standing owner, exactly as that note left it.
-- It does not reach the **`RQ-026-6` note** above it. That note answers what a
+- It does not reach the **resumable-group deadline note** above it. That note answers what a
   deadline means on a `core.resumable_group` after a resume, and it says
   nothing about how a duration is spelled; `sb-dj1p` still owns its advisory.
 - It does not restate the grammar. Which strings parse, how a fraction
@@ -522,7 +522,7 @@ way ADR-0005's clause 9 says its own earlier prose is superseded.
   units mean are `Predicator.Duration`'s to define, exactly as ADR-0005 clause
   9e leaves them.
 
-Filed with `sb-pctm`, campaign-030's fill lane D.
+Filed with `sb-pctm`, the campaign's fill lane D.
 
 ---
 
@@ -533,24 +533,24 @@ decision moves, no text above this line is changed by this section, and the
 correction is one of tense rather than of substance. It was raised in review
 against the request that added the Note above and routed to a follow-up
 rather than cured in place, so the merged artifact stayed the artifact its
-review read. Recorded under campaign 031's fill lane D.
+review read. Recorded under the campaign's fill lane D.
 
 **Read "`sb-dj1p` still owns its advisory" as provenance, not as open work.**
 The Note above closes its third bullet by saying that it does not reach the
-`RQ-026-6` note, because that note "says nothing about how a duration is
+resumable-group deadline note, because that note "says nothing about how a duration is
 spelled; `sb-dj1p` still owns its advisory". The ownership is real and the
-sentence is right about it: the advisory the `RQ-026-6` note ruled is
+sentence is right about it: the advisory the resumable-group deadline note ruled is
 `sb-dj1p`'s, and that bead is where it was decided and built. What "still"
 can be misread as is a bead that is still open. It is not. `sb-dj1p` closed
-on 2026-09-02, merged as PR 219 in campaign 027, and the advisory it carries
+on 2026-09-02, merged as PR 219 in the next campaign, and the advisory it carries
 has shipped: the `:emit`-stage finding `{:deadline_lost_on_resume, group_id}`
 raised from `lib/statifier_blocks/compiler.ex`, listed among the reasons
 `Compiler.Finding` documents. Read the sentence as "the advisory is
 `sb-dj1p`'s, landed in PR 219".
 
-**The same reading applies one Note further up.** The `RQ-026-6` note of
+**The same reading applies one Note further up.** The resumable-group deadline note of
 2026-09-02 says "`sb-dj1p` carries the work, filed 2026-09-02 as a
-campaign-027 candidate and not scheduled here". That sentence was true on the
+next-campaign candidate and not scheduled here". That sentence was true on the
 day it was written and is now a record of what was true then: the bead was
 scheduled, in the campaign that sentence names it a candidate for, and it
 landed. Nothing in either note's argument depends on the bead being open, and
@@ -558,14 +558,14 @@ neither sentence's bytes are edited - a record's history is not edited, and
 this section supersedes from below, in the form the Note above states for its
 own supersession.
 
-Filed with `sb-bkek`, campaign-031's fill lane D.
+Filed with `sb-bkek`, the campaign's fill lane D.
 
 ---
 
 ## Amendment (2026-09-08): decision 8, the rail scopes the interrupt pair per group
 
-**Status: accepted (2026-09-08, campaign SF039, bead `sb-e18p`, recording
-campaign-SF039's rulings `RQ-SF039-3` and `RQ-SF039-9`).** A decision record
+**Status: accepted (2026-09-08, bead `sb-e18p`, recording
+the operator's rulings).** A decision record
 merges at proposed under the campaign invariant; flipping it to accepted is a
 separate gated request through the same `docs/adr/` gate, and `sb-5d9l` carries
 it once `sb-p8lh` has landed. Additive: decisions 1 through 7 stand as
@@ -722,8 +722,8 @@ outer group's rail matches, and the inner handler raises
 inner group's rail matches. Each group resumes its own body, and the nesting
 the record claimed worked for free now does.
 
-Filed with `sb-e18p`, campaign SF039, recording campaign-SF039's rulings
-`RQ-SF039-3` and `RQ-SF039-9`. `sb-p8lh` implements it, and `sb-5d9l` carries
+Filed with `sb-e18p`, recording two of the campaign's
+rulings. `sb-p8lh` implements it, and `sb-5d9l` carries
 the flip.
 
 ## Note (2026-09-08): decision 8 is flipped to accepted, and the salt's second seat recorded
@@ -869,7 +869,7 @@ paragraph, and this file's `:189`, decision 3 behaviour 2. Both files have
 taken only appends since, so no line above either cite moved. `mix adr.cites`
 is green over this request.
 
-Filed with `sb-5d9l`, campaign SF039.
+Filed with `sb-5d9l`.
 
 ## Note (2026-09-18): the unpublished identifiers cited above
 
@@ -885,4 +885,4 @@ in `test/statifier_blocks/block_type_test.exs`, added in the same request as
 this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
-Filed with `sb-4wh3`, campaign RF058.
+Filed with `sb-4wh3`.

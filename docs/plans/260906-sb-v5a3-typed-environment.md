@@ -124,7 +124,7 @@ wrapper).
   decision 6's `consumes`/`produces` desugaring against the subject path,
   decision 4's merge, decision 11's fan-out binding.
 - `:unknown` is the atom; the string `"unknown"` normalizes onto it
-  (RQ-032-5's named reinterpretation); `{:list, T}` maps onto the document's
+  (the operator's named reinterpretation); `{:list, T}` maps onto the document's
   own `list`.
 
 ### Success criteria
