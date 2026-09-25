@@ -152,7 +152,7 @@ returns 0; `git diff origin/main --stat -- assets/js/` empty.
   is document-level and tabular, which is 1A's admission test - and the
   amendment must say so explicitly so the deferral is narrowed rather than
   contradicted. The sui-13q convention doc is the read-only sibling
-  `/Users/johnnyt/Dev/github/statifier/statifier-ui/docs/fixture-bundles.md`.
+  `statifier-ui/docs/fixture-bundles.md`.
 - **The headless guard.** ADR-0005 decision 1 wraps every LiveView module in
   `Code.ensure_loaded?(Phoenix.LiveView)` and a CI job proves the package
   compiles with LiveView absent. `Shell`'s moduledoc (`shell.ex:1-30`) states
@@ -691,7 +691,7 @@ Sabotage notes on every one of them.
 **Machine-checked (unattended, 2026-09-02): NOT TAKEN - still deferred.** The
 capture was attempted and abandoned deliberately, not skipped. A scratch
 `statifier_examples` worktree was stood up at
-`/Users/johnnyt/Dev/github/statifier/statifier_examples-worktrees/sb-4yze-capture`
+`statifier_examples-worktrees/sb-4yze-capture`
 with `STATIFIER_BLOCKS_PATH` pointed at this worktree, its `config/dev.exs`
 re-pointed off the frozen 8645 to **8650**, and a throwaway harness added to
 `editor_live.ex` supplying three truth-table rows against
@@ -971,7 +971,7 @@ None blocks implementation.
   fixture-bundle convention is statifier-ui's), `docs/adr/0004-compiler.md`
   (the compile artifact and the provenance map)
 - Sibling convention, read-only:
-  `/Users/johnnyt/Dev/github/statifier/statifier-ui/docs/fixture-bundles.md`
+  `statifier-ui/docs/fixture-bundles.md`
   (sui-13q)
 - Upstream contract: `deps/statifier/lib/statifier/testing/case.ex:1-30`
   (ADR-0053's four-function surface),

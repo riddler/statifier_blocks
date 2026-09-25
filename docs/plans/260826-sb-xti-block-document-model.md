@@ -40,7 +40,7 @@ Key constraints discovered:
 - **No new dependency is needed or wanted.** statifier-ex's ADR-0008 was
   amended to drop the `uxid` dependency and mint UXID-format ids inline; the
   family-standard minting is
-  `/Users/johnnyt/Dev/github/statifier/statifier-ex/lib/statifier/machine_state.ex:571-585`
+  `statifier-ex/lib/statifier/machine_state.ex:571-585`
   (`generate_session_id/0` and `crockford32/1`): a 48-bit big-endian
   millisecond timestamp followed by 80 bits of `:crypto.strong_rand_bytes/1`,
   rendered with `Base.hex_encode32(case: :lower, padding: false)` and
@@ -50,7 +50,7 @@ Key constraints discovered:
   translation table and the two functions are re-stated here rather than
   reached into.
 - **Family content-hash form**:
-  `/Users/johnnyt/Dev/github/statifier/statifier-ex/lib/statifier/machine/identity.ex:53`
+  `statifier-ex/lib/statifier/machine/identity.ex:53`
   formats a SHA-256 content hash as `"sha256:" <> Base.encode16(digest, case:
   :lower)`. See Open Question 2.
 - **Repo conventions that bind every phase** (`CLAUDE.md`): errors are events
@@ -763,10 +763,10 @@ mutation note directly above it.
   `docs/adr/0003-assignability.md`, `docs/adr/0004-compiler-provenance.md`,
   `docs/adr/0005-liveview-editor.md`
 - Family id minting (st-ADR-0008, amended to drop the `uxid` dependency):
-  `/Users/johnnyt/Dev/github/statifier/statifier-ex/lib/statifier/machine_state.ex:571-585`
+  `statifier-ex/lib/statifier/machine_state.ex:571-585`
   and the Crockford table at `:375-381`
 - Family content hash and total typed decode of untrusted bytes (st-ADR-0052):
-  `/Users/johnnyt/Dev/github/statifier/statifier-ex/lib/statifier/machine/identity.ex:53`
+  `statifier-ex/lib/statifier/machine/identity.ex:53`
   and `:96-108`
 - Conventions and gate rules: `CLAUDE.md`, `.quality.exs`, `coveralls.json`,
   `changelog.d/README.md`

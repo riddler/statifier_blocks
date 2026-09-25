@@ -16,8 +16,8 @@ still the older one; where that happens it is marked.
 
 ## Inputs
 
-All paths relative to the private umbrella working set
-(`~/Dev/github/statifier`). Both spike branches are local to `Mac.lan`, were
+All paths relative to the directory the family's repositories are cloned
+into. Both spike branches are local to a maintainer's machine, were
 never pushed, and are never to be deleted.
 
 | Input | Where |
