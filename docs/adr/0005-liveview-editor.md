@@ -6148,8 +6148,8 @@ request.
 
 ### 1. The amendment's own status line, completed
 
-That amendment's status line reads "**Status: proposed (2026-09-05, the
-campaign's Lane A, bead `sb-8acm`).**" (`:5476`). Every 2026-09-05 section around it
+That amendment's status line reads "**Status: proposed (2026-09-05,
+[planning reference removed] Lane A, bead `sb-8acm`).**" (`:5476`). Every 2026-09-05 section around it
 carries a second sentence it omits - that a decision record merges at proposed
 under the campaign invariant, and that flipping it to accepted is a separate
 gated request. The three nearest are the campaign's lane G sections above
@@ -6942,7 +6942,7 @@ is edited, and both clauses read exactly as they did.
 ### The Status line writes `lane` where this record writes `Lane`
 
 The amendment's Status line (`:6293`) opens **"Status: proposed (2026-09-05,
-the campaign's lane H, bead `sb-w2m1`)"**, and its closing attribution (`:6601`)
+[planning reference removed] lane H, bead `sb-w2m1`)"**, and its closing attribution (`:6601`)
 reads "Filed with `sb-w2m1`, the campaign's lane H." Everywhere else this
 record names a lane by its letter it capitalises the word: `Lane G` (`:4897`,
 `:5109`, `:5222`, `:5339`, and the attributions at `:5105`, `:5214`, `:5335`,
@@ -7215,9 +7215,9 @@ All five cites resolve, and to what the sentence claims of them:
 
 | Cite | What is there |
 |---|---|
-| `:5610` | "Status: proposed (2026-09-05, the campaign's Lane S0, bead `sb-8vkc`)." |
+| `:5610` | "Status: proposed (2026-09-05, [planning reference removed] Lane S0, bead `sb-8vkc`)." |
 | `:5832` | "Filed with `sb-8vkc`, the campaign's Lane S0." |
-| `:5836` | "Status: proposed (2026-09-05, the campaign's Lane S0, bead `sb-8vkc`)." |
+| `:5836` | "Status: proposed (2026-09-05, [planning reference removed] Lane S0, bead `sb-8vkc`)." |
 | `:5982` | "Filed with `sb-8vkc`, the campaign's Lane S0." |
 | `:6132` | "Filed with `sb-8vkc`, the campaign's Lane S0." |
 
