@@ -1378,8 +1378,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
 
       # And the row wraps rather than widening the card, which is the other
-      # half of "contained": the column is `minmax(0, 1fr)`, so a long
-      # sentence has somewhere to go that is not sideways.
+      # half of "contained": the column's maximum is `1fr`, so a long
+      # sentence has somewhere to go that is not sideways. (Its minimum is the
+      # title's, ADR-0005's Amendment of 2026-09-25 on item 4, which is a
+      # length the card always has room for.)
       # Sabotage: `overflow-wrap: normal` - a finding carrying one long
       # identifier pushes the chrome past the card width again.
       test "a long message wraps inside the column rather than widening it" do
@@ -1389,7 +1391,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         chrome = rule_body!(css, ~r/^\.sb-node__chrome\s*\{(.*?)\n\}/ms)
 
         assert body =~ ~r/overflow-wrap:\s*break-word/
-        assert chrome =~ ~r/grid-template-columns:\s*auto minmax\(0, 1fr\) auto/
+        assert chrome =~ ~r/grid-template-columns:\s*auto minmax\([^;]*, 1fr\) auto/
       end
 
       # The item's own sentence: the cap is a legibility number and not a
@@ -1425,6 +1427,31 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       |> Enum.flat_map(fn [_, selectors, _body] -> String.split(selectors, ",") end)
       |> Enum.map(&String.trim/1)
       |> Enum.filter(&String.contains?(&1, ".sb-node__chrome"))
+    end
+
+    # The one rule whose selector list gives the strip its members back, as
+    # {selectors, body}. Comments come out first for the reason
+    # `chrome_template_declarers/1` gives.
+    defp reclaim_rule!(css) do
+      match =
+        ~r/([^{}]+)\{([^{}]*)\}/
+        |> Regex.scan(String.replace(css, ~r|/\*.*?\*/|s, ""))
+        |> Enum.map(fn [_, selectors, body] ->
+          {selectors |> String.split(",") |> Enum.map(&String.trim/1), body}
+        end)
+        |> Enum.filter(fn {selectors, _body} ->
+          ".sb-node__chrome:hover > .sb-node__strip" in selectors
+        end)
+
+      assert [rule] = match, "expected exactly one reclaim rule, found #{length(match)}"
+      rule
+    end
+
+    defp declared_properties(body) do
+      ~r/^\s*([a-z-]+):/m
+      |> Regex.scan(body)
+      |> Enum.map(fn [_, property] -> property end)
+      |> Enum.sort()
     end
 
     defp declaration!(body, property) do
@@ -1608,7 +1635,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert label =~ ~r/grid-column:\s*2/
         assert strip =~ ~r/grid-column:\s*4/
 
-        assert chrome =~ ~r/grid-template-columns:\s*auto minmax\(0, 1fr\) auto auto/,
+        assert chrome =~ ~r/grid-template-columns:\s*auto minmax\([^;]*, 1fr\) auto auto/,
                "the chrome declares no fourth column for the strip to sit in"
       end
 
@@ -1651,6 +1678,119 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert body =~ ~r/overflow-wrap:\s*anywhere/
         refute body =~ ~r/text-overflow:\s*ellipsis/
         refute body =~ ~r/white-space:\s*nowrap/
+      end
+    end
+
+    describe "the title keeps a minimum and the strip yields to it at rest (ADR-0005's Amendment of 2026-09-25 on item 4)" do
+      @stylesheet "assets/css/statifier_blocks.css"
+
+      # Every state a strip member is revealed in, as the reveal rules spell
+      # them, and the always-revealed members besides. The strip gives its
+      # members back in exactly these.
+      @reclaim_selectors [
+        ".sb-node__chrome:hover > .sb-node__strip",
+        ".sb-node--selected > .sb-node__chrome > .sb-node__strip",
+        ".sb-node__chrome > .sb-node__strip:focus-within",
+        ~S{.sb-node__chrome > .sb-node__strip:has(> [data-reveal="always"])}
+      ]
+
+      # The minimum, and what it is written against. Reserved in full, a
+      # strip holding Save, Expand and the `x` left "Authorize with a
+      # deadline" about 45px on a 14rem card and the title broke mid-word.
+      # 6.5 times the title's own type size clears the longest word among the
+      # example documents' titles ("reconciliation", about 6.34 of it), and
+      # a host that scales `--sb-text-md` scales the minimum with it.
+      # Sabotage (run): put the title's track back to `minmax(0, 1fr)` - the
+      # column has no minimum and this goes red on the template.
+      test "the title's column has a minimum of 6.5 times the title's type size" do
+        css = File.read!(@stylesheet)
+
+        chrome = rule_body!(css, ~r/^\.sb-node__chrome\s*\{(.*?)\n\}/ms)
+        label = rule_body!(css, ~r/^\.sb-node__label\s*\{(.*?)\n\}/ms)
+
+        assert declaration!(chrome, "grid-template-columns") ==
+                 "auto minmax(calc(var(--sb-text-md) * 6.5), 1fr) auto auto"
+
+        assert declaration!(label, "font-size") == "var(--sb-text-md)",
+               "the minimum is written against a type size the title does not use"
+      end
+
+      # The yield. At rest the strip lays its members out on one line and
+      # clips what the minimum leaves no room for, so the title keeps its
+      # minimum and a clipped member - hidden at rest - cannot take a pointer
+      # outside the card.
+      # Sabotage (run): dropped `overflow: hidden` - the strip's clipped
+      # members spill past the card at rest and this goes red.
+      test "at rest the strip keeps one line and clips what the title's minimum leaves no room for" do
+        css = File.read!(@stylesheet)
+
+        strip = rule_body!(css, ~r/^\.sb-node__chrome > \.sb-node__strip\s*\{(.*?)\n\}/ms)
+
+        assert declaration!(strip, "flex-wrap") == "nowrap"
+        assert declaration!(strip, "overflow") == "hidden"
+      end
+
+      # The reclaim. On hover, on the selected card, under keyboard focus and
+      # whenever a member is revealed at all times, the strip gives every
+      # member back by wrapping inside its column. It declares nothing else:
+      # no width and no template, so the title's column is the same width at
+      # rest and revealed.
+      # Sabotage (run): removed the selected-card selector from the list - a
+      # selected card keeps its strip clipped and this goes red naming it.
+      test "on hover, selection, focus and an always-revealed member the strip reclaims every member" do
+        css = File.read!(@stylesheet)
+
+        {selectors, body} = reclaim_rule!(css)
+
+        for selector <- @reclaim_selectors do
+          assert selector in selectors,
+                 "the strip does not reclaim its members under `#{selector}`"
+        end
+
+        assert declared_properties(body) == ["flex-wrap", "overflow"]
+        assert declaration!(body, "flex-wrap") == "wrap"
+        assert declaration!(body, "overflow") == "visible"
+      end
+
+      # A reveal rule for a strip control is only safe while the strip
+      # reclaims in the same state; otherwise the control is revealed inside a
+      # box that clips it. Every reveal rule's state must be one the reclaim
+      # rule names.
+      # Sabotage (run): removed the selected-card selector from the reclaim
+      # rule's list - a selected card reveals its controls inside a clipped
+      # strip and this goes red naming the first control, beside the test
+      # above.
+      test "every state that reveals a strip control is a state the strip reclaims in" do
+        css = File.read!(@stylesheet)
+        {selectors, _body} = reclaim_rule!(css)
+
+        states = %{
+          ".sb-node__chrome:hover" => ".sb-node__chrome:hover > .sb-node__strip",
+          ".sb-node--selected > .sb-node__chrome" =>
+            ".sb-node--selected > .sb-node__chrome > .sb-node__strip"
+        }
+
+        for control <- ~w(.sb-node__remove .sb-node__expand .sb-node__save-step .sb-node__fold),
+            {state, reclaim} <- states do
+          assert css =~ "#{state} #{control}",
+                 "`#{control}` is no longer revealed under `#{state}`"
+
+          assert reclaim in selectors,
+                 "`#{control}` is revealed under `#{state}` but the strip stays clipped there"
+        end
+      end
+
+      # The delete offer's pair can be wider than what the title's minimum
+      # leaves the strip, so its two buttons stack rather than push the strip
+      # past the card's edge.
+      # Sabotage (run): dropped `flex-wrap: wrap` - the pair stays side by side
+      # and this goes red.
+      test "the delete offer's two buttons may stack" do
+        css = File.read!(@stylesheet)
+
+        offer = rule_body!(css, ~r/^\.sb-node__offer\[data-reveal="always"\]\s*\{(.*?)\n\}/ms)
+
+        assert declaration!(offer, "flex-wrap") == "wrap"
       end
     end
 

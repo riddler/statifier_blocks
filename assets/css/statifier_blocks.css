@@ -1080,11 +1080,24 @@
  * when the state arrived. "Save as a step" is the one such member, and
  * `.sb-node__strip-reserve` below is how it reserves its box on the cards
  * that are not selected.
+ *
+ * The title column has a MINIMUM, and at rest the strip yields to it
+ * (ADR-0005's Amendment of 2026-09-25 on item 4). Reserved in full, a strip
+ * holding Save, Expand and the `x` left "Authorize with a deadline" about
+ * 45px on a 14rem card, and `overflow-wrap: anywhere` broke it mid-word at
+ * rest as well as selected. The minimum is 6.5 times `--sb-text-md`: the
+ * longest word among the example documents' titles is "reconciliation",
+ * about 6.34 of the title's own size in a system sans at medium weight, and
+ * the half-step above it is the margin. Written against the type token
+ * rather than as a length of its own, so a host that scales its type scales
+ * the minimum with it. The strip keeps the rest of the row: it is sized by
+ * its members up to what the minimum leaves, and the rule after the strip's
+ * own says what happens to the members that do not fit.
  */
 .sb-node__chrome {
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(calc(var(--sb-text-md) * 6.5), 1fr) auto auto;
   align-items: center;
   column-gap: var(--sb-space);
 }
@@ -1103,8 +1116,33 @@
   grid-row: 1;
   align-self: start;
   display: inline-flex;
+  flex-wrap: nowrap;
   align-items: flex-start;
   gap: var(--sb-space-half);
+  overflow: hidden;
+}
+
+/* The strip reclaims its members (ADR-0005's Amendment of 2026-09-25 on
+ * item 4). At rest the rule above lays the strip out on one line and clips
+ * what the title's minimum leaves no room for: every member it can clip is
+ * hidden at rest anyway, and a clipped box cannot take a pointer outside the
+ * card. That is the yield. Here the strip gets all of them back: on hover, on
+ * the selected card, while a strip control has keyboard focus (the
+ * keyboard's hover), and whenever the strip holds a member that is revealed
+ * at all times - the delete offer, or a folded container's `+` - because a
+ * control on show must never be the one clipped.
+ *
+ * It reclaims them by WRAPPING inside the column rather than by widening it.
+ * The column's width comes from the grid template, which no state
+ * redeclares, and from the members' own boxes, which are the same in every
+ * state; so the title keeps the width it had at rest, and what a reveal can
+ * change is the strip's height, by the rows its wrapped members take. */
+.sb-node__chrome:hover > .sb-node__strip,
+.sb-node--selected > .sb-node__chrome > .sb-node__strip,
+.sb-node__chrome > .sb-node__strip:focus-within,
+.sb-node__chrome > .sb-node__strip:has(> [data-reveal="always"]) {
+  flex-wrap: wrap;
+  overflow: visible;
 }
 
 /* The tile spans whatever the text column grew to. `span 3` rather than
@@ -1342,9 +1380,14 @@
  * One group rather than two loose buttons, so the two controls lay themselves
  * out beside each other and neither has to know how wide the other became
  * when the count reached two digits. It is the strip's child in the `x`'s
- * place, so the reservation it inherits is the one the `x` had. */
+ * place, so the reservation it inherits is the one the `x` had.
+ *
+ * `flex-wrap: wrap` because the title's minimum (the chrome's grid template
+ * above) can leave the strip narrower than the pair side by side: the two
+ * buttons stack rather than push the strip past the card's edge. */
 .sb-node__offer[data-reveal="always"] {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--sb-space);
   opacity: 1;
