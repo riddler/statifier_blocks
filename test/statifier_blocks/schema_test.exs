@@ -9,6 +9,8 @@ defmodule StatifierBlocks.SchemaTest do
 
   @fixtures_dir "test/fixtures/documents"
 
+  # statifier_examples_fed826c/: copies of statifier_examples@fed826c, the reference host is the source of truth.
+
   # Composite data declarations (keys type_name, version, params,
   # palette_entry, subtree), not block documents: the migration guide's
   # test reads them as declarations, and the schema is not about them.
