@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "bdoc_01JLIBRARYLOAN",
+  "revision": 1,
+  "metadata": {"name": "Library loan"},
+  "accepts": ["fines.paid", "loan.renewed", "loan.returned", "loan.reported_lost"],
+  "datamodel": [{"id": "patron", "description": "The borrowing patron."}],
+  "root": {
+    "id": "blk_LROOT", "type": "core.sequence", "type_version": 1,
+    "slots": {"body": [
+      {"id": "blk_LCHK", "type": "core.branch", "type_version": 1,
+       "config": {"arms": [{"slot": "arm_owes", "cond": "patron.fines_owed > 0"}]},
+       "slots": {
+         "arm_owes": [
+           {"id": "blk_LFIN", "type": "core.send", "type_version": 1,
+            "config": {"event": "loan.fines_notice"}},
+           {"id": "blk_LPAY", "type": "core.await", "type_version": 1,
+            "config": {"event": "fines.paid"}}
+         ],
+         "otherwise": [],
+         "undecided": []
+       }},
+      {"id": "blk_LOUT", "type": "core.send", "type_version": 1,
+       "config": {"event": "loan.checked_out"}},
+      {"id": "blk_LLEN", "type": "core.resumable_group", "type_version": 1,
+       "config": {"history": "shallow"},
+       "slots": {
+         "body": [
+           {"id": "blk_LRET", "type": "core.await", "type_version": 1,
+            "config": {"event": "loan.returned", "timeout": "21d"}}
+         ],
+         "interrupts": [
+           {"id": "blk_LREN", "type": "core.on_event", "type_version": 1,
+            "config": {"event": "loan.renewed", "outcome": "resume"}},
+           {"id": "blk_LLOS", "type": "core.on_event", "type_version": 1,
+            "config": {"event": "loan.reported_lost", "outcome": "abandon"}}
+         ]
+       }},
+      {"id": "blk_LEND", "type": "core.send", "type_version": 1,
+       "config": {"event": "loan.closed"}}
+    ]}
+  }
+}
