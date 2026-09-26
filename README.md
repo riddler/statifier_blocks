@@ -1415,6 +1415,11 @@ Honest about the edges, so you do not go looking for these:
   settled is shipped, but only against the set of paths a host declares.
   Nothing here parses or validates a path beyond its shape, and a host that
   supplies no datamodel gets no advisory at all.
+- **A chart view.** Nothing here draws a compiled chart's transitions as a
+  flow between blocks. What such a view's edges would mean - the block-level
+  flow graph lifted from the compiled transitions, which is not
+  `StatifierBlocks.Graph` - is defined in
+  [`docs/block-level-flow-graph.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/block-level-flow-graph.md).
 
 ### Theming
 
