@@ -13104,3 +13104,160 @@ They are met here, not edited.
   quoted phrase reads at `422f55b`.
 
 Filed with `sb-pyg0`.
+
+## Amendment (2026-09-25): item 4's control strip yields its width to a minimum title column at rest, and reclaims its members on hover and selection
+
+**Status: proposed (2026-09-25, bead `sb-ooms`, ruled by the operator,
+2026-09-25).** A decision record merges at proposed and is flipped to
+accepted by a separate request once the code below has shipped in a
+published version of this package. Additive: the Note of 2026-09-08,
+item 4 (`:10543`, "The control strip is reserved beside the title"), the
+Amendment of 2026-09-18 on the delete offer (`:11614`), and every clause
+above this line stand as printed. **No text above this line is edited by
+this section**, no line above it is removed, and the head `Status:` line at
+`:3` is not extended.
+
+**Why this is an Amendment and not a Note.** `docs/adr/README.md:43` gives
+the test: an amendment "changes what the record decides and a note does not".
+Item 4 rules that the strip is reserved "at all times" (`:10553-10555`), and
+the Amendment of 2026-09-18 keeps "Every resting member of the strip ...
+item 4's reservation in full, the Save stand-in included" (`:11646-11647`).
+This section lets the strip give part of that width to the title at rest,
+which narrows both answers.
+
+Cites of the rules in `assets/css/statifier_blocks.css` that this request
+changes are by anchor alone. Every other code cite, the stylesheet's token
+lines included (they sit above every change), was read at `0a29d88` and is
+written anchor first, line second.
+
+### 1. What the reservation cost
+
+On a 14rem card (`--sb-card-width`, `assets/css/statifier_blocks.css:394`)
+the title and the strip share one row of the chrome's grid, whose title track
+was `minmax(0, 1fr)`: it had no minimum, so the strip, sized by its members,
+took what it needed and the title took the rest. The composite card
+"Authorize with a deadline" in the examples app carries three strip members
+at rest - the Save stand-in (`lib/statifier_blocks/editor/block_node.ex:472`,
+the `class="sb-node__strip-reserve"` span), "Replace with its steps" and the
+`x`. Read in a browser with `getComputedStyle` on its `.sb-node__chrome`, at
+`0a29d88`, the grid template resolved to `24px 45.3906px 0px 112.609px`
+at rest: the reservation held, and left the title 45px.
+The title's rule breaks anywhere (`overflow-wrap: anywhere`, in the
+`.sb-node__label` rule), so the title drew on five lines, and two of its
+words, "Authorize" and "deadline", broke across lines.
+
+### 2. The ruling
+
+Ruled by the operator, 2026-09-25: a minimum title column, enough for the
+longest word of the fixture titles at the current type size, with the
+control strip yielding its reserved width at rest and reclaiming it on hover
+and selection; the card width and the control set unchanged; "nothing
+truncates" still holds.
+
+### 3. The minimum, and how it was derived
+
+The title column's minimum is **6.5 times `--sb-text-md`**, the size the
+title draws at (`font-size: var(--sb-text-md)` in the `.sb-node__label`
+rule; `--sb-text-md: 0.875rem`, `:371`). It is written into the
+`.sb-node__chrome` rule's template as
+`auto minmax(calc(var(--sb-text-md) * 6.5), 1fr) auto auto`, a length of the
+type token rather than a token of its own, so a host that scales its type
+scales the minimum with it and the theming surface gains no name.
+
+The fixture titles are the card titles of the documents the examples app
+(statifier_examples) ships in its editor's document list:
+`card_processing`, `card_processing_sketch`, `card_processing_composite`,
+`signup_wizard`, `signup_invitations`, `signup_onboarding`,
+`signup_bulk_invites`, `signup_bulk_invites_strict`, `signup_invite_chunk`,
+`signup_guarded_step`, `signup_guarded_section` and `signup_path`. Their
+longest word is "reconciliation", in "Park it for reconciliation". Measured
+with a canvas `measureText` in the title's own computed font - weight 500 at
+14px, in the examples app's system sans stack - it is 88.8px, about 6.34
+times the type size. The half-step above it is the margin. The measurement
+is font-dependent: this package sets no family (`--sb-font: inherit`,
+`:367`), and a host whose face is wider needs a larger factor for the same
+words.
+
+### 4. The yield and the reclaim
+
+**At rest the strip yields.** The strip's rule
+(`.sb-node__chrome > .sb-node__strip`) now lays its members out on one line
+(`flex-wrap: nowrap`) and clips them (`overflow: hidden`). Its grid track is
+still sized by its members, up to what the title's minimum leaves; the
+members past that edge are clipped. Every member the strip can clip at rest
+is hidden at rest (a revealed one reclaims, below), and a clipped box cannot
+take a pointer outside the card.
+
+**On hover and selection the strip reclaims its members.** One rule,
+headed `.sb-node__chrome:hover > .sb-node__strip`, gives them back under
+four selectors: the hovered card, the selected card
+(`.sb-node--selected > .sb-node__chrome > .sb-node__strip`), a strip holding
+keyboard focus (`:focus-within`, the keyboard's hover: a strip control at
+rest stays focusable by opacity, and focus reveals it), and a strip holding
+a member revealed at all times (`:has(> [data-reveal="always"])`: the delete
+offer, `block_node.ex:520`, and a folded container's fold control, `:494`).
+It declares `flex-wrap: wrap` and `overflow: visible` and nothing else.
+
+**It reclaims them by wrapping inside its column, not by widening it.** A
+strip wide enough to seat every member on one line would leave the title
+less than its minimum, and the acceptance for this change is that the
+selected card breaks no word either. So the strip keeps the column the
+minimum leaves it and wraps its members onto further lines. The delete
+offer's pair (`.sb-node__offer[data-reveal="always"]`) gains
+`flex-wrap: wrap` for the same reason: its two buttons can be wider than
+that column, and they stack rather than push the strip past the card's edge.
+
+### 5. What this reintroduces, and how far
+
+The column widths do not move between states. The template is declared once,
+on `.sb-node__chrome`, and no state redeclares it; the members' boxes are the
+same in every state; so the tracks resolve the same way at rest and revealed.
+Read in the browser on "Authorize with a deadline" with this change, the
+template is `24px 91px 0px 67px` at rest, hovered and selected, and the title
+draws on three lines with no word broken.
+
+What a reveal can change is the strip's **height**. On that card the strip
+is 16px tall at rest and 36px on hover or selection, where the `x` wraps to a
+second line. That grows the card only when the strip's lines stand taller
+than the card's text column, which they do not on that card: its height was
+the same in both states. A card with a one-line title and no second line
+would grow on hover by the rows its strip wraps to. With a delete offer open
+the pair stacks; in a browser reading with the pair drawn in the `x`'s place
+on the same card, the strip was 80px tall and stayed inside the card.
+
+This also retires, for this layout, the collapse the Amendment of 2026-09-18
+measured (its item 3): the title column no longer gives up width when an
+offer opens, because no state widens the strip past what the minimum leaves.
+
+### 6. What stands
+
+- **Nothing truncates.** The title still wraps rather than clipping, and
+  keeps `overflow-wrap: anywhere` in the `.sb-node__label` rule, so a word
+  longer than the minimum (a host's, or a wider face) breaks rather than
+  widening the card. Across every card of the twelve documents above, read in
+  the browser at rest, no title word breaks across lines and no strip leaves
+  its card. What the strip clips at rest is hidden controls, never the title.
+- **No control outside the flow.** Every member is still the strip's child
+  in the grid's fourth column; none is absolutely placed.
+- **The reservation below the minimum.** A strip that fits in what the
+  minimum leaves is reserved in full, as item 4 and the Amendment of
+  2026-09-18 say, the Save stand-in included: the stand-in is still drawn on
+  every card that could carry Save (`block_node.ex:470-476`), so selecting a
+  card still swaps one box for another of the same width.
+- **The card width and the control set** are unchanged: `--sb-card-width`
+  stays 14rem, and no control is added, removed or re-worded.
+
+### What this amendment does not decide
+
+It takes no position on the chip cap, the card's width, a compact density,
+or where the delete offer is drawn. It edits no line above it and moves no
+status line.
+
+### Consequences
+
+The change is in the next release's changelog (`changelog.d/sb-ooms.md`).
+The tests are the describe "the title keeps a minimum and the strip yields to
+it at rest" in `test/statifier_blocks/editor/presentation_test.exs`, beside
+the reservation's own.
+
+Filed with `sb-ooms`.
