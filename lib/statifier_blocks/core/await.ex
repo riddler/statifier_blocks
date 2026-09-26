@@ -199,6 +199,36 @@ defmodule StatifierBlocks.Core.Await do
     |> Enum.reject(&is_nil/1)
   end
 
+  @doc """
+  This block as one line of prose (ADR-0002's 2026-09-07 amendment).
+
+  The event it holds for, then the deadline when one is stored, in the
+  words the config form labels the deadline with. Each half is held to
+  the same test `summary/1` holds it to, so a half that is absent or not
+  well formed is left out of a line that reads as settled rather than
+  repeated from the field: an await with no usable event says it waits for
+  "an event", and one with no usable deadline says nothing about giving
+  up, because no timer is armed.
+
+      iex> StatifierBlocks.Core.Await.sentence(%{"event" => "copy.returned", "timeout" => "14d"})
+      "Wait for copy.returned, giving up after 14d"
+
+      iex> StatifierBlocks.Core.Await.sentence(%{"event" => "email.verified"})
+      "Wait for email.verified"
+
+      iex> StatifierBlocks.Core.Await.sentence(%{})
+      "Wait for an event"
+  """
+  @impl true
+  def sentence(config) do
+    event = event_chip(Map.get(config, "event")) || "an event"
+    timeout = Map.get(config, "timeout")
+
+    if Duration.duration?(timeout),
+      do: "Wait for #{event}, giving up after #{timeout}",
+      else: "Wait for " <> event
+  end
+
   defp event_chip(event) do
     if Config.event_name?(event), do: event, else: nil
   end

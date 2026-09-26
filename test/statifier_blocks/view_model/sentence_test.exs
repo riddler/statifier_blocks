@@ -24,6 +24,18 @@ defmodule StatifierBlocks.ViewModel.SentenceTest do
   doctest StatifierBlocks.Core.Send, only: [sentence: 1]
   doctest StatifierBlocks.Core.Assign, only: [sentence: 1]
   doctest StatifierBlocks.Core.OnEvent, only: [sentence: 1]
+  doctest StatifierBlocks.Core.Sequence, only: [sentence: 1]
+  doctest StatifierBlocks.Core.Group, only: [sentence: 1]
+  doctest StatifierBlocks.Core.Await, only: [sentence: 1]
+
+  # The core types that declare a `sentence/1` of their own. The generated
+  # configs below are run through each, so a type added here is held to the
+  # callback's contract without a test of its own.
+  @speaking_core [
+    StatifierBlocks.Core.Sequence,
+    StatifierBlocks.Core.Group,
+    StatifierBlocks.Core.Await
+  ]
 
   defmodule Speaking do
     @moduledoc "A host type with words of its own, and a name an author may override."
@@ -242,6 +254,99 @@ defmodule StatifierBlocks.ViewModel.SentenceTest do
       view_model = ViewModel.build(document, Palette.core(), [])
 
       assert ViewModel.sentence(view_model.root) == "When card.authz_timed_out, abandon"
+    end
+
+    # sabotage: answer the palette label ("Group") from `Core.Group`'s
+    # `sentence/1` -> the group node's line is the old one -> red
+    # (verified). The shape is a loan desk's: a sequence holding a group
+    # holding an await with a deadline.
+    test "is core.sequence's, core.group's and core.await's own line in a document" do
+      await =
+        Block.new("core.await",
+          id: "awt",
+          config: %{"event" => "copy.returned", "timeout" => "14d"}
+        )
+
+      group = Block.new("core.group", id: "grp", slots: %{"body" => [await]})
+      root = Block.new("core.sequence", id: "seq", slots: %{"body" => [group]})
+      view_model = ViewModel.build(Document.new(root, id: "doc"), Palette.core(), [])
+
+      [group_node] = view_model.root.slots |> Enum.flat_map(& &1.children)
+      [await_node] = group_node.slots |> Enum.flat_map(& &1.children)
+
+      assert ViewModel.sentence(view_model.root) == "Run its steps in order"
+      assert ViewModel.sentence(group_node) == "Run interruptible steps"
+      assert ViewModel.sentence(await_node) == "Wait for copy.returned, giving up after 14d"
+    end
+  end
+
+  describe "the core types' sentence/1 over generated configs" do
+    # sabotage: interpolate the stored `timeout` unchecked in
+    # `Core.Await.sentence/1` -> a generated "14d\n" or a non-binary
+    # reaches the line (a newline, or a raise on interpolation) -> red
+    test "is total, never raises and answers one non-blank line for any config" do
+      for index <- 0..499, module <- @speaking_core do
+        config = generated_config(index)
+
+        line =
+          try do
+            module.sentence(config)
+          rescue
+            error ->
+              flunk(
+                "#{inspect(module)}.sentence/1 raised #{inspect(error)} on config #{index}: " <>
+                  inspect(config)
+              )
+          end
+
+        assert is_binary(line), "config #{index}: #{inspect(config)}"
+        assert String.trim(line) != "", "config #{index}: #{inspect(config)}"
+        refute line =~ ~r/[\n\r\t]/, "config #{index}: #{inspect(config)}"
+        assert BlockType.sentence(module, config) == line
+      end
+    end
+  end
+
+  @config_keys ["event", "timeout", "label", "duration", "outcome", "lanes", ""]
+  @config_values [
+    "copy.returned",
+    "email.verified",
+    "guardian.consented",
+    "14d",
+    "1h30m",
+    "30s",
+    "14d\n",
+    " 14d",
+    "1h 30m",
+    "copy.returned\n",
+    "copy returned",
+    "line1\nline2",
+    "col1\ttab",
+    "",
+    "   ",
+    <<0xFF, 0xFE>>,
+    "café ☃ 日本語",
+    nil,
+    true,
+    0,
+    -1,
+    14,
+    1.5,
+    :copy_returned,
+    [],
+    ["copy.returned"],
+    %{},
+    %{"event" => "copy.returned"},
+    {:tuple, "14d"}
+  ]
+
+  # Deterministic from `index` alone, so a failure names the one config
+  # that produced it and is regenerable from that integer.
+  defp generated_config(index) do
+    :rand.seed(:exsss, {index, index * 3 + 1, index * 7 + 2})
+
+    for _ <- 1..:rand.uniform(4), into: %{} do
+      {Enum.random(@config_keys), Enum.random(@config_values)}
     end
   end
 

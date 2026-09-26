@@ -80,6 +80,23 @@ defmodule StatifierBlocks.Core.Group do
     }
 
   @doc """
+  This block as one line of prose (ADR-0002's 2026-09-07 amendment).
+
+  A group has no config, so the line is the same for every block of this
+  type. It says what separates a group from a sequence - its steps can be
+  interrupted - rather than counting the rules in `interrupts`, which are
+  blocks with lines of their own (`StatifierBlocks.Core.OnEvent`'s
+  "When ..., abandon") and are read there. It is kept short because it is
+  also the name other lines use for the group, as in "When ..., abandon
+  abandons Run interruptible steps" (`StatifierBlocks.Describe`).
+
+      iex> StatifierBlocks.Core.Group.sentence(%{})
+      "Run interruptible steps"
+  """
+  @impl true
+  def sentence(_config), do: "Run interruptible steps"
+
+  @doc """
   A compound state whose `body` runs in order, guarded by whatever sits in
   `interrupts` (`StatifierBlocks.Core.Emit`). With no interrupt handlers it
   is exactly a sequence; with them, the body and the handlers run as

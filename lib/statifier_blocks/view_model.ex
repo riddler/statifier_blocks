@@ -1006,7 +1006,7 @@ defmodule StatifierBlocks.ViewModel do
       iex> root |> Document.new() |> ViewModel.build(Palette.core(), []) |> ViewModel.outline()
       ...> |> Enum.map(fn {node, depth, kind} -> {node.block_id, depth, kind, node.sentence} end)
       [
-        {"root", 0, :step, "Sequence"},
+        {"root", 0, :step, "Run its steps in order"},
         {"wait", 1, :step, "Wait 30s"},
         {"send", 1, :step, "Send order.paid"}
       ]

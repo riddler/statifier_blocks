@@ -17,12 +17,12 @@ defmodule StatifierBlocks.Describe do
       ...>   )
       iex> root |> Document.new() |> Describe.outline(Palette.core(), []) |> Describe.render([])
       [
-        "Sequence",
+        "Run its steps in order",
         "Wait 30s",
         "Send order.paid",
-        "Sequence starts with Wait 30s",
+        "Run its steps in order starts with Wait 30s",
         "After Wait 30s (done), Send order.paid",
-        "Send order.paid (done) ends Sequence"
+        "Send order.paid (done) ends Run its steps in order"
       ]
 
   ## Pure, and no model anywhere
