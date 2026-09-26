@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "urn:statifier-blocks:block-document:1",
   "title": "Block document",
-  "description": "A statifier_blocks block document, schema_version 1. The root admits exactly the documents StatifierBlocks.Document.from_json/1 accepts, as that package decodes them, with one exception: draft-07 counts a number with a zero fractional part, such as 1.0, as an integer, and the package refuses it as a float. The typed core.* definitions under definitions/core are NOT applied by the root: validation is registry-free, so a block of an unknown host type validates. The schema cannot say that block ids are unique across the document, that datamodel entry ids are unique, or anything about key order, whitespace or canonical bytes.",
+  "description": "A statifier_blocks block document, schema_version 1. The root never refuses a document StatifierBlocks.Document.from_json/1 accepts. It admits two kinds that the package refuses: a document repeating a block id or a datamodel entry id, and a whole number spelled with a fraction or an exponent (1.0, 1e2) wherever an integer is read (schema_version, revision, type_version, config, metadata), which draft-07 counts as an integer and the package decodes as a float. The typed core.* definitions under definitions/core are NOT applied by the root: validation is registry-free, so a block of an unknown host type validates. The schema cannot say that block ids are unique across the document, that datamodel entry ids are unique, or anything about key order, whitespace or canonical bytes.",
   "type": "object",
   "additionalProperties": false,
   "required": [

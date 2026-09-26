@@ -10,11 +10,12 @@ defmodule StatifierBlocks.Schema do
 
   ## What the root admits
 
-  The root admits exactly the documents `StatifierBlocks.Document.from_json/1`
-  accepts, as this package decodes them: the envelope, the generic block
-  shape every type satisfies, the `datamodel` and `accepts` keys, and the
+  The root describes every check `StatifierBlocks.Document.from_json/1`
+  makes that JSON Schema can express: the envelope, the generic block shape
+  every type satisfies, the `datamodel` and `accepts` keys, and the
   canonical value grammar (integers, never floats, in `config` and
-  `metadata`).
+  `metadata`). It never refuses a document `from_json/1` accepts. Where it
+  admits more, the section below says so.
 
   The typed `config` and `slots` descriptions for the `core.*` types sit
   under `definitions/core`, keyed by type name, and the root does **not**
@@ -35,13 +36,21 @@ defmodule StatifierBlocks.Schema do
     * whether a type's config is valid, which the type's
       `validate_config/1` owns.
 
-  ## The 1.0 edge
+  ## Where the root admits more than the package
 
-  Draft-07 counts a number with a zero fractional part as an integer, so a
-  validator admits a literal `1.0` in `config` or `metadata` wherever it
-  admits `1`. This package decodes `1.0` as a float and refuses it. That is
-  the one place the root admits a document the package refuses; it never
-  refuses one the package accepts.
+  The root admits two kinds of document that `from_json/1` refuses:
+
+    * a document that repeats a block id or a datamodel entry id, since
+      uniqueness is one of the things above the schema cannot say;
+    * a whole number spelled with a fraction or an exponent, such as `1.0`
+      or `1e2`, wherever an integer is read: `schema_version`, `revision`,
+      `type_version`, and inside `config` or `metadata`. Draft-07 counts a
+      number with a zero fractional part as an integer, while this package
+      decodes such a spelling as a float and refuses it. The canonical
+      encoder never writes one.
+
+  In the other direction there is no exception: the root refuses no
+  document the package accepts.
   """
 
   @source Path.expand("../../priv/schemas/block-document.schema.json", __DIR__)
