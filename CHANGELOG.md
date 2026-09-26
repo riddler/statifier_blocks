@@ -11,6 +11,33 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.36.0] 2026-09-26
+
+0.36.0 is a minor, because it adds to the public surface and changes no
+existing signature. A host gains two things. The block document's JSON
+Schema (draft-07) now ships in the package, and `StatifierBlocks.Schema`
+reads it, so a host can check a document with its own validator before it
+reaches the package. `StatifierBlocks.Describe` describes a document in
+words: a deterministic outline of its nodes and flow-graph edges, and one
+sentence per node and per edge, which a host rewords through a phrasing
+behaviour. The release also gives `core.sequence`, `core.group` and
+`core.await` card lines of their own in place of their labels. Upgrading a
+host: nothing needs migrating, the package gains no runtime dependency,
+and a host that calls neither new module sees no change from 0.35.1 other
+than those three card lines.
+
+### Added
+
+- `StatifierBlocks.Describe` describes a block document in words: `outline/3` answers one node per block and the flow-graph edges between them, read from the document's structure without compiling it, and `render/2` writes one deterministic English line per node and per edge, which a host rewords through the `StatifierBlocks.Describe.Phrasing` behaviour.
+
+- The block document's JSON Schema (draft-07) ships in the package at `priv/schemas/block-document.schema.json`, with `StatifierBlocks.Schema.path/0` and `json/0` to read it: its root never refuses a document `StatifierBlocks.Document.from_json/1` accepts, and typed `config` and `slots` definitions for the `core.*` types sit under its `definitions/core`, which the root does not apply.
+
+### Changed
+
+- `core.sequence` declares `sentence/1`: its card line, and its name in `StatifierBlocks.Describe`'s lines, is "Run its steps in order" where it was the label "Sequence".
+- `core.group` declares `sentence/1`: its card line, and its name in `StatifierBlocks.Describe`'s lines, is "Run interruptible steps" where it was the label "Group".
+- `core.await` declares `sentence/1`: its card line, and its name in `StatifierBlocks.Describe`'s lines, is "Wait for <event>", followed by ", giving up after <timeout>" when a deadline is set, where it was the label "Wait for event".
+
 ## [0.35.1] 2026-09-25
 
 0.35.1 is a patch, because it changes no public function, option or
@@ -3542,6 +3569,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.36.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.36.0
 [0.35.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.35.1
 [0.35.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.35.0
 [0.34.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.34.0
