@@ -393,3 +393,26 @@ Every cite was read at `01af1f5`.
 | `StatifierBlocks.Core.OnEvent`, "The `outcome` values", `finish_as`, "Candidates for `event`" | `lib/statifier_blocks/core/on_event.ex` | `01af1f5` |
 | `StatifierBlocks.Core.ResumableGroup.emit/2` | `lib/statifier_blocks/core/resumable_group.ex` | `01af1f5` |
 | The patron registration fixture | `test/fixtures/documents/patron_registration.json` | `01af1f5` |
+
+## Note (2026-09-26): where the graph is computed
+
+This is a dated note on the sentence in the introduction that nothing in
+this package computes the graph, not a change to anything the note
+defines. ADR-0016, at proposed, decides that `StatifierBlocks.Describe`
+computes it: `StatifierBlocks.Describe.outline/3` answers one node per
+block and the sequence, branch, interrupt and exit edges of this note
+(plus an entry edge from a container's entry to its first child), for
+`core.sequence`, `core.group`, `core.resumable_group` and `core.branch`,
+and `StatifierBlocks.Describe.render/2` writes them as one line each.
+
+It reads the document's structure and never compiles, so it does not lift
+edges from a compiled chart the way this note does by hand, and the
+sentence that a flow-graph emitter would be a proposal of its own still
+stands. Its edges carry the outcomes a block's type declares rather than
+the finals the compiler emits. In the two worked examples above those
+differ only at an await with no timeout, `blk_PVER` and `blk_LPAY`, where
+the lifted listings say `received` and the describe says `received,
+timed_out` (ADR-0016, decision 1).
+
+Until the module ships in a published version, the introduction's
+sentence stays true of main. Every other claim here is unchanged.
