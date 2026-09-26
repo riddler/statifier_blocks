@@ -1,0 +1,890 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:statifier-blocks:block-document:1",
+  "title": "Block document",
+  "description": "A statifier_blocks block document, schema_version 1. The root admits exactly the documents StatifierBlocks.Document.from_json/1 accepts, as that package decodes them, with one exception: draft-07 counts a number with a zero fractional part, such as 1.0, as an integer, and the package refuses it as a float. The typed core.* definitions under definitions/core are NOT applied by the root: validation is registry-free, so a block of an unknown host type validates. The schema cannot say that block ids are unique across the document, that datamodel entry ids are unique, or anything about key order, whitespace or canonical bytes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "revision",
+    "root"
+  ],
+  "properties": {
+    "schema_version": {
+      "description": "The document format's version. Only 1 exists.",
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "description": "The document's id, opaque and non-empty.",
+      "$ref": "#/definitions/non_empty_string"
+    },
+    "revision": {
+      "description": "The document's revision counter.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "metadata": {
+      "description": "Host-owned data carried with the document. Absent means an empty object.",
+      "$ref": "#/definitions/json_object"
+    },
+    "datamodel": {
+      "description": "The datamodel entries the document declares. Absent means none. Entry ids must be unique, which this schema cannot say.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/datamodel_entry"
+      }
+    },
+    "accepts": {
+      "description": "The external event names the document accepts. Absent means none.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "root": {
+      "description": "The root block.",
+      "$ref": "#/definitions/block"
+    }
+  },
+  "definitions": {
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "json_value": {
+      "description": "The canonical JSON value grammar: null, booleans, integers, strings, arrays and objects of the same. No floats.",
+      "type": [
+        "null",
+        "boolean",
+        "integer",
+        "string",
+        "array",
+        "object"
+      ],
+      "items": {
+        "$ref": "#/definitions/json_value"
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/json_value"
+      }
+    },
+    "json_object": {
+      "description": "A JSON object whose values follow the canonical value grammar.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/json_value"
+      }
+    },
+    "block": {
+      "description": "The generic shape every block type satisfies, a host type included. What a type's config and slots mean is the type's own to say.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "type_version"
+      ],
+      "properties": {
+        "id": {
+          "description": "The block's id, opaque, non-empty and unique within the document (the uniqueness is not expressible here).",
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "type": {
+          "description": "The block type's name, resolved against a palette only when compiled, never when validated.",
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "type_version": {
+          "description": "The version of the block type's config shape.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "config": {
+          "description": "The type's configuration. Absent means an empty object.",
+          "$ref": "#/definitions/json_object"
+        },
+        "slots": {
+          "description": "Named child block lists. Absent means none.",
+          "type": "object",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "$ref": "#/definitions/block_list"
+          }
+        }
+      }
+    },
+    "block_list": {
+      "description": "An ordered list of blocks filling one slot.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/block"
+      }
+    },
+    "datamodel_entry": {
+      "description": "One datamodel entry. An absent field is spelled by omission; an explicit null is refused.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "description": "A bare lowercase identifier. The not clause refuses a newline, which some regular-expression engines let a trailing $ match before.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "not": {
+            "pattern": "\n"
+          }
+        },
+        "expr": {
+          "description": "The entry's initial value, as an expression.",
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "description": {
+          "description": "A description of the entry for the people authoring against it.",
+          "$ref": "#/definitions/non_empty_string"
+        }
+      }
+    },
+    "core": {
+      "core.assign": {
+        "description": "A core.assign block: writes a value into the datamodel. Applied together with #/definitions/block; the root does not apply it.",
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "type": {
+            "const": "core.assign"
+          },
+          "config": {
+            "type": "object",
+            "required": [
+              "path",
+              "value"
+            ],
+            "properties": {
+              "path": {
+                "description": "The datamodel path written to: non-empty, no ASCII whitespace.",
+                "type": "string",
+                "pattern": "^[^ \t\n\u000b\f\r]+$"
+              },
+              "value": {
+                "description": "The literal written, as source text: false, 42350, \"manual_review\".",
+                "$ref": "#/definitions/non_empty_string"
+              }
+            }
+          }
+        }
+      },
+      "core.await": {
+        "description": "A core.await block: waits for an event, with an optional timeout. Applied together with #/definitions/block; the root does not apply it.",
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "type": {
+            "const": "core.await"
+          },
+          "config": {
+            "type": "object",
+            "required": [
+              "event"
+            ],
+            "properties": {
+              "event": {
+                "description": "The event name waited for.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_.\\-]*$"
+              },
+              "timeout": {
+                "description": "A predicator duration, or an empty string; absent means no timeout. Null is refused.",
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "core.branch": {
+        "description": "A core.branch block: runs the first arm whose condition holds. Applied together with #/definitions/block; the root does not apply it.",
+        "properties": {
+          "type": {
+            "const": "core.branch"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "arms": {
+                "description": "The arms in order, each naming its slot and its condition. Absent means none. Two arms sharing a slot are refused by the type's own validation.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "slot",
+                    "cond"
+                  ],
+                  "properties": {
+                    "slot": {
+                      "description": "The arm's slot name.",
+                      "type": "string",
+                      "pattern": "^arm_[a-z][a-z0-9_]*$"
+                    },
+                    "cond": {
+                      "description": "The arm's condition, as an expression.",
+                      "$ref": "#/definitions/non_empty_string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "slots": {
+            "type": "object",
+            "properties": {
+              "otherwise": {
+                "description": "Otherwise: any number of blocks, run when no arm holds.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              },
+              "undecided": {
+                "description": "Cannot be decided: any number of blocks, run when an arm's condition cannot be evaluated.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              }
+            },
+            "patternProperties": {
+              "^arm_[a-z][a-z0-9_]*$": {
+                "description": "One arm's blocks, labelled by its condition: at least one block.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": {
+              "$ref": "#/definitions/block_list"
+            }
+          }
+        }
+      },
+      "core.drafts": {
+        "description": "A core.drafts block: the shelf of fragments an author has built but not placed; nothing in it compiles. Applied together with #/definitions/block; the root does not apply it.",
+        "properties": {
+          "type": {
+            "const": "core.drafts"
+          },
+          "config": {
+            "type": "object"
+          },
+          "slots": {
+            "type": "object",
+            "properties": {
+              "body": {
+                "description": "Drafts: any number of blocks.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": {
+              "$ref": "#/definitions/block_list"
+            }
+          }
+        }
+      },
+      "core.foreach": {
+        "description": "A core.foreach block: runs its body once per item of a datamodel list. Applied together with #/definitions/block; the root does not apply it.",
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "type": {
+            "const": "core.foreach"
+          },
+          "config": {
+            "type": "object",
+            "required": [
+              "items",
+              "item_as"
+            ],
+            "properties": {
+              "items": {
+                "description": "The datamodel path of the list: non-empty, no ASCII whitespace.",
+                "type": "string",
+                "pattern": "^[^ \t\n\u000b\f\r]+$"
+              },
+              "item_as": {
+                "description": "The name each item is bound to: a bare lowercase identifier.",
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "index_as": {
+                "description": "The name the position is bound to: a bare lowercase identifier, or null or an empty string for none. It may not equal item_as, which the type's own validation refuses.",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^([a-z][a-z0-9_]*)?$"
+              }
+            }
+          },
+          "slots": {
+            "type": "object",
+            "properties": {
+              "body": {
+                "description": "For each item: any number of blocks.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": {
+              "$ref": "#/definitions/block_list"
+            }
+          }
+        }
+      },
+      "core.group": {
+        "description": "A core.group block: a body its interrupt rules can leave. Applied together with #/definitions/block; the root does not apply it.",
+        "properties": {
+          "type": {
+            "const": "core.group"
+          },
+          "config": {
+            "type": "object"
+          },
+          "slots": {
+            "type": "object",
+            "properties": {
+              "body": {
+                "description": "Steps: any number of blocks.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              },
+              "interrupts": {
+                "description": "Interrupt rules: any number of blocks.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": {
+              "$ref": "#/definitions/block_list"
+            }
+          }
+        }
+      },
+      "core.invoke": {
+        "description": "A core.invoke block: calls a host-provided invocation. Applied together with #/definitions/block; the root does not apply it.",
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "type": {
+            "const": "core.invoke"
+          },
+          "config": {
+            "type": "object",
+            "required": [
+              "invoke_type"
+            ],
+            "properties": {
+              "invoke_type": {
+                "description": "The invocation, as namespace:name.",
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$"
+              },
+              "assign_to": {
+                "description": "The datamodel path the result is written to, or null or an empty string for none.",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[^ \t\n\u000b\f\r]*$"
+              },
+              "params": {
+                "description": "The parameters, one name=path per line, or null or an empty string for none. The line grammar is the type's own validation.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "slots": {
+            "type": "object",
+            "properties": {
+              "on_error": {
+                "description": "If it fails: zero or one block.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": {
+              "$ref": "#/definitions/block_list"
+            }
+          }
+        }
+      },
+      "core.map": {
+        "description": "A core.map block: runs another chart for every item of a datamodel list. Applied together with #/definitions/block; the root does not apply it.",
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "type": {
+            "const": "core.map"
+          },
+          "config": {
+            "type": "object",
+            "required": [
+              "items",
+              "chart"
+            ],
+            "properties": {
+              "items": {
+                "description": "The datamodel path of the list: non-empty, no space and no single quote.",
+                "type": "string",
+                "pattern": "^[^ ']+$"
+              },
+              "chart": {
+                "description": "The document run for each item: non-empty, no space and no single quote.",
+                "type": "string",
+                "pattern": "^[^ ']+$"
+              },
+              "item_as": {
+                "description": "The name each item is bound to: a bare lowercase identifier. Absent means item.",
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "index_as": {
+                "description": "The name the position is bound to: a bare lowercase identifier, or null or an empty string for none. It may not equal item_as, which the type's own validation refuses.",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^([a-z][a-z0-9_]*)?$"
+              },
+              "collect": {
+                "description": "The datamodel path the collected answers are written to, or null or an empty string for none.",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[^ \t\n\u000b\f\r]*$"
+              },
+              "collect_type": {
+                "description": "What one collected answer is, as a declared type name or an inline shape. Not checked by the type's own validation, so left unconstrained here."
+              },
+              "on": {
+                "description": "The aggregation policy. Absent means all.",
+                "enum": [
+                  "all",
+                  "first_error"
+                ]
+              }
+            }
+          },
+          "slots": {
+            "type": "object",
+            "properties": {
+              "on_done": {
+                "description": "When the batch is done: zero or one block.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              },
+              "on_error": {
+                "description": "If the batch fails: zero or one block.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": {
+              "$ref": "#/definitions/block_list"
+            }
+          }
+        }
+      },
+      "core.on_event": {
+        "description": "A core.on_event block: an interrupt rule that abandons or resumes its group when an event arrives. Applied together with #/definitions/block; the root does not apply it.",
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "type": {
+            "const": "core.on_event"
+          },
+          "config": {
+            "type": "object",
+            "required": [
+              "event",
+              "outcome"
+            ],
+            "properties": {
+              "event": {
+                "description": "The event name the rule fires on.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_.\\-]*$"
+              },
+              "cond": {
+                "description": "An optional guard, as an expression; null or an empty string for none.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "outcome": {
+                "description": "What the rule does to its group.",
+                "enum": [
+                  "abandon",
+                  "resume"
+                ]
+              },
+              "finish_as": {
+                "description": "The outcome name an abandoning rule finishes with, or null or an empty string for none. Its shape is the type's own validation.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "capture": {
+                "description": "Datamodel writes taken from the event's payload, or null for none. Its pairs are the type's own validation.",
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "payload": {
+                "description": "The event payload's declared type, as a type name or an inline shape. Left unconstrained here."
+              }
+            }
+          }
+        }
+      },
+      "core.parallel": {
+        "description": "A core.parallel block: runs its lanes at once. Applied together with #/definitions/block; the root does not apply it.",
+        "properties": {
+          "type": {
+            "const": "core.parallel"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "lanes": {
+                "description": "The lane names in order, each a bare lowercase identifier. Absent means none.",
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "uniqueItems": true
+              },
+              "complete": {
+                "description": "When the block is done. Absent means all.",
+                "enum": [
+                  "all",
+                  "first"
+                ]
+              }
+            }
+          },
+          "slots": {
+            "type": "object",
+            "patternProperties": {
+              "^lane_[a-z][a-z0-9_]*$": {
+                "description": "One lane's blocks, labelled by its name: any number of blocks.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": {
+              "$ref": "#/definitions/block_list"
+            }
+          }
+        }
+      },
+      "core.placeholder": {
+        "description": "A core.placeholder block: marks a step deliberately left unwritten. Applied together with #/definitions/block; the root does not apply it.",
+        "properties": {
+          "type": {
+            "const": "core.placeholder"
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "note": {
+                "description": "A note for the author. Absent means an empty string.",
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "core.raise": {
+        "description": "A core.raise block: raises an internal event. Applied together with #/definitions/block; the root does not apply it.",
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "type": {
+            "const": "core.raise"
+          },
+          "config": {
+            "type": "object",
+            "required": [
+              "event"
+            ],
+            "properties": {
+              "event": {
+                "description": "The event name raised.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_.\\-]*$"
+              }
+            }
+          }
+        }
+      },
+      "core.resumable_group": {
+        "description": "A core.resumable_group block: a group that remembers where it was when it resumes. Applied together with #/definitions/block; the root does not apply it.",
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "type": {
+            "const": "core.resumable_group"
+          },
+          "config": {
+            "type": "object",
+            "required": [
+              "history"
+            ],
+            "properties": {
+              "history": {
+                "description": "How much of the position is remembered.",
+                "enum": [
+                  "shallow",
+                  "deep"
+                ]
+              }
+            }
+          },
+          "slots": {
+            "type": "object",
+            "properties": {
+              "body": {
+                "description": "Steps: any number of blocks.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              },
+              "interrupts": {
+                "description": "Interrupt rules: any number of blocks.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": {
+              "$ref": "#/definitions/block_list"
+            }
+          }
+        }
+      },
+      "core.send": {
+        "description": "A core.send block: sends an event, with an optional delay. Applied together with #/definitions/block; the root does not apply it.",
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "type": {
+            "const": "core.send"
+          },
+          "config": {
+            "type": "object",
+            "required": [
+              "event"
+            ],
+            "properties": {
+              "event": {
+                "description": "The event name sent.",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_.\\-]*$"
+              },
+              "delay": {
+                "description": "A predicator duration, or an empty string; absent means no delay. Null is refused.",
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "core.sequence": {
+        "description": "A core.sequence block: runs its steps one after another. Applied together with #/definitions/block; the root does not apply it.",
+        "properties": {
+          "type": {
+            "const": "core.sequence"
+          },
+          "config": {
+            "type": "object"
+          },
+          "slots": {
+            "type": "object",
+            "properties": {
+              "body": {
+                "description": "Steps: any number of blocks.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": {
+              "$ref": "#/definitions/block_list"
+            }
+          }
+        }
+      },
+      "core.subchart": {
+        "description": "A core.subchart block: runs another document as a child chart. Applied together with #/definitions/block; the root does not apply it.",
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "type": {
+            "const": "core.subchart"
+          },
+          "config": {
+            "type": "object",
+            "required": [
+              "chart"
+            ],
+            "properties": {
+              "chart": {
+                "description": "The document run: non-empty, no space.",
+                "type": "string",
+                "pattern": "^[^ ]+$"
+              },
+              "outcomes": {
+                "description": "The child's outcome names, one per line, or null or an empty string for none. The line grammar is the type's own validation.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "assign_to": {
+                "description": "The datamodel path the child's answer is written to, or null or an empty string for none.",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[^ \t\n\u000b\f\r]*$"
+              },
+              "params": {
+                "description": "The parameters, one name=path per line, or null or an empty string for none. The line grammar is the type's own validation.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "slots": {
+            "type": "object",
+            "properties": {
+              "on_done": {
+                "description": "If it finishes done: zero or one block.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              },
+              "on_error": {
+                "description": "If it fails: zero or one block.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              }
+            },
+            "patternProperties": {
+              "^on_[a-z][a-z0-9_]*$": {
+                "description": "If it finishes with one declared outcome: zero or one block.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/block_list"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": {
+              "$ref": "#/definitions/block_list"
+            }
+          }
+        }
+      },
+      "core.wait": {
+        "description": "A core.wait block: waits for a duration. Applied together with #/definitions/block; the root does not apply it.",
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "type": {
+            "const": "core.wait"
+          },
+          "config": {
+            "type": "object",
+            "required": [
+              "duration"
+            ],
+            "properties": {
+              "duration": {
+                "description": "A predicator duration.",
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
