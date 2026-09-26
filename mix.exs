@@ -76,7 +76,7 @@ defmodule StatifierBlocks.MixProject do
       # each module to the first group whose pattern matches.
       groups_for_modules: [
         "Document model": [
-          ~r/^StatifierBlocks\.(Document|Block|Id|CanonicalJson|Decode|Validation|SlotValidation)($|\.)/
+          ~r/^StatifierBlocks\.(Document|Block|Id|CanonicalJson|Decode|Validation|SlotValidation|Schema)($|\.)/
         ],
         "Block types and assignability": [
           ~r/^StatifierBlocks\.(BlockType|Palette|Assignability)($|\.)/
@@ -113,8 +113,11 @@ defmodule StatifierBlocks.MixProject do
       # repo's own gate tooling. A mix task in the tarball would install itself
       # into every project that depends on this package, which is not something
       # a dependency should do to its host.
+      # `priv/schemas` because the block-document JSON Schema ships as a public
+      # file a host validates against, and it is named narrowly rather than as
+      # `priv` so a later addition under priv/ has to say that it ships.
       files:
-        ~w(lib/statifier_blocks lib/statifier_blocks.ex assets mix.exs README.md LICENSE CHANGELOG.md),
+        ~w(lib/statifier_blocks lib/statifier_blocks.ex priv/schemas assets mix.exs README.md LICENSE CHANGELOG.md),
       links: %{
         "GitHub" => @source_url,
         "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
@@ -194,6 +197,9 @@ defmodule StatifierBlocks.MixProject do
         {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
         {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
         {:excoveralls, "~> 0.18", only: :test},
+        # A test-only validator for the shipped block-document schema; never a
+        # runtime dependency, since the package ships no validator of its own.
+        {:ex_json_schema, "~> 0.11", only: :test, runtime: false},
         {:ex_doc, "~> 0.40", only: :dev, runtime: false}
       ]
   end
