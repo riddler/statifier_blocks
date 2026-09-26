@@ -11,6 +11,22 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.35.1] 2026-09-25
+
+0.35.1 is a patch, because it changes no public function, option or
+callback and adds nothing to the public surface. It fixes how a card lays
+out its title: a long title on a card that carries several controls no
+longer breaks mid-word. Upgrading a host: nothing needs migrating, the
+package gains no dependency, and the fix is in the shipped stylesheet
+only.
+
+### Fixed
+
+- A card's title no longer breaks mid-word when the card carries several
+  controls: the title column keeps a minimum of 6.5 times `--sb-text-md`, the
+  hidden controls yield their width to it at rest, and on hover or selection
+  they wrap inside the space left rather than squeezing the title.
+
 ## [0.35.0] 2026-09-24
 
 0.35.0 is a minor, because it adds to the public surface and changes no
@@ -3526,6 +3542,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.35.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.35.1
 [0.35.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.35.0
 [0.34.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.34.0
 [0.33.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.33.0
