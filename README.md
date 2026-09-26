@@ -1023,6 +1023,145 @@ new patron's email to be verified, and add a `core.assign` that writes
   `:error` on `{:config, block_id, "event"}`: in the drawer as the author
   clears the field, and in `Publish.findings/3`'s list, so the host refuses.
 
+## Validating and describing a document
+
+Two read-only views of a saved document, neither of which compiles it: a
+JSON Schema that a host in any language can check a stored document against,
+and a description of the document in words.
+
+### Validating a document against the schema from any language
+
+The package ships the block document's JSON Schema (draft-07) at
+`priv/schemas/block-document.schema.json`. `StatifierBlocks.Schema.path/0`
+names the installed file, so a build step can copy it into a service written
+in another language, and `StatifierBlocks.Schema.json/0` hands over its
+content. This package ships no validator and runs none; a host checks a
+document with a draft-07 validator in its own language.
+
+```elixir
+alias StatifierBlocks.Schema
+
+same_file = File.read!(Schema.path()) == Schema.json()
+#=> true
+
+draft = Schema.json() |> JSON.decode!() |> Map.fetch!("$schema")
+#=> "http://json-schema.org/draft-07/schema#"
+```
+
+Any draft-07 validator reads the file. Here it is ex_json_schema, the one this
+package's own tests use (a test-only dependency, never a dependency of this
+package at runtime), checking a library-loan document that a service stored as
+JSON:
+
+```elixir
+schema = Schema.path() |> File.read!() |> JSON.decode!() |> ExJsonSchema.Schema.resolve()
+
+stored = ~s({
+  "schema_version": 1,
+  "id": "bdoc_library_loan",
+  "revision": 3,
+  "root": {
+    "id": "checkout",
+    "type": "core.send",
+    "type_version": 1,
+    "config": {"event": "loan.checked_out"}
+  }
+})
+
+checked = ExJsonSchema.Validator.validate(schema, JSON.decode!(stored))
+#=> :ok
+
+missing_root = stored |> JSON.decode!() |> Map.delete("root")
+refused = match?({:error, [_ | _]}, ExJsonSchema.Validator.validate(schema, missing_root))
+#=> true
+```
+
+The schema never refuses a document `StatifierBlocks.Document.from_json/1`
+accepts, but it admits some that `from_json/1` refuses: a document that
+repeats a block id or a datamodel entry id, and a whole number spelled with a
+fraction or an exponent (`1.0`, `1e2`) where an integer is read. A document
+that passes the schema is worth handing to `from_json/1`; only `from_json/1`
+says it is one. The typed `config` and `slots` descriptions of the `core.*`
+types sit under `definitions/core` and the root does not apply them, so a
+block of a host type validates. `StatifierBlocks.Schema`'s docs list every
+difference, and [ADR-0015](https://github.com/riddler/statifier_blocks/blob/main/docs/adr/0015-block-document-json-schema.md)
+is the record.
+
+### Describing a document
+
+`StatifierBlocks.Describe.outline/3` reads a document under a palette into
+one node per block and the edges by which control passes between them, found
+from the document's structure; `StatifierBlocks.Describe.render/2` writes one
+line of English per node and then one per edge. Neither compiles the
+document, reads a clock, starts a process, reaches a network or asks a
+language model, and equal input answers byte-identical lines.
+
+```elixir
+alias StatifierBlocks.{Block, Describe, Document, Palette}
+
+loan =
+  Block.new("core.sequence",
+    id: "loan",
+    slots: %{
+      "body" => [
+        Block.new("core.send", id: "checkout", config: %{"event" => "loan.checked_out"}),
+        Block.new("core.await",
+          id: "returned",
+          config: %{"event" => "loan.returned", "timeout" => "21d"}
+        )
+      ]
+    }
+  )
+
+outline = loan |> Document.new(id: "bdoc_library_loan") |> Describe.outline(Palette.core(), [])
+
+lines = Describe.render(outline, [])
+#=> ["Run its steps in order", "Send loan.checked_out", "Wait for loan.returned, giving up after 21d", "Run its steps in order starts with Send loan.checked_out", "After Send loan.checked_out (done), Wait for loan.returned, giving up after 21d", "Wait for loan.returned, giving up after 21d (received, timed_out) ends Run its steps in order"]
+
+edge_kinds = Enum.map(outline.edges, & &1.kind)
+#=> [:entry, :sequence, :exit]
+```
+
+The outline is data as well as lines: each `StatifierBlocks.Describe.Node`
+carries the block's id, parent, depth, sentence and declared outcomes, and
+each `StatifierBlocks.Describe.Edge` its kind and endpoints. Edges are found
+inside `core.sequence`, `core.group`, `core.resumable_group` and `core.branch`;
+every other type is described by containment and its node's fan label alone.
+
+### Overriding the phrasing
+
+A host rewords the lines through a module implementing
+`StatifierBlocks.Describe.Phrasing`, passed as `phrasing:`. Each line is
+offered to the callback for its node's or edge's `kind`, with the structured
+node or edge and the default line; the callback answers its own line or
+`:default`. Every callback is optional, and a blank answer, one carrying a
+newline, carriage return or tab, or a callback that raises keeps the default
+line.
+
+```elixir
+defmodule MyApp.LoanPhrasing do
+  @behaviour StatifierBlocks.Describe.Phrasing
+
+  alias StatifierBlocks.Describe.Edge
+
+  @impl true
+  def sequence(%Edge{from: {:block, "checkout"}}, _default), do: "Once the book is out, wait for its return"
+  def sequence(%Edge{}, _default), do: :default
+end
+
+reworded = Describe.render(outline, phrasing: MyApp.LoanPhrasing)
+#=> ["Run its steps in order", "Send loan.checked_out", "Wait for loan.returned, giving up after 21d", "Run its steps in order starts with Send loan.checked_out", "Once the book is out, wait for its return", "Wait for loan.returned, giving up after 21d (received, timed_out) ends Run its steps in order"]
+```
+
+The seam rewords lines; it does not add, drop or reorder them. For the lines
+to stay byte-identical for equal input, a callback has to be a pure function
+of its arguments.
+
+[`docs/describing-a-document.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/describing-a-document.md)
+is the how-to: reading the outline's structure, the edges each container
+type draws, and rewording nodes and edges. [ADR-0016](https://github.com/riddler/statifier_blocks/blob/main/docs/adr/0016-document-describes-itself.md)
+is the record.
+
 ## Embedding the editor
 
 The editor ships in this package, and a host that never renders anything must
