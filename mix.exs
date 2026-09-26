@@ -65,6 +65,7 @@ defmodule StatifierBlocks.MixProject do
       main: "readme",
       extras: [
         "README.md",
+        "docs/describing-a-document.md",
         "CHANGELOG.md"
       ],
       # Without this the first hexdocs is one flat list of ~50 modules, which
@@ -86,6 +87,9 @@ defmodule StatifierBlocks.MixProject do
         ],
         Compiler: [
           ~r/^StatifierBlocks\.(Compiler|Compiled|CompilationRecord|Emission|Provenance)($|\.)/
+        ],
+        "Describing a document": [
+          ~r/^StatifierBlocks\.Describe($|\.)/
         ],
         "Edit algebra and view model": [
           ~r/^StatifierBlocks\.(Edit|Finding|ViewModel)($|\.)/
