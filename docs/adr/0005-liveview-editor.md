@@ -13107,7 +13107,7 @@ Filed with `sb-pyg0`.
 
 ## Amendment (2026-09-25): item 4's control strip yields its width to a minimum title column at rest, and reclaims its members on hover and selection
 
-**Status: proposed (2026-09-25, bead `sb-ooms`, ruled by the operator,
+**Status: accepted (2026-09-25, bead `sb-ooms`, ruled by the operator,
 2026-09-25).** A decision record merges at proposed and is flipped to
 accepted by a separate request once the code below has shipped in a
 published version of this package. Additive: the Note of 2026-09-08,
@@ -13261,3 +13261,67 @@ it at rest" in `test/statifier_blocks/editor/presentation_test.exs`, beside
 the reservation's own.
 
 Filed with `sb-ooms`.
+
+## Note (2026-09-26): the Amendment of 2026-09-25 on item 4's control strip is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the Amendment's status line (`:13110`), by one word, `proposed` to
+`accepted`. This Note is added at the foot of the file, so no line another
+record cites moves.
+
+The operator's word of 2026-09-26 is to flip the records whose code has been
+published. The code the Amendment records is in 0.35.1, tagged `v0.35.1` at
+`f6f6567` and published on Hex on 2026-09-26 (13:10:03Z), whose
+`CHANGELOG.md` section, under Fixed, names the title column's minimum of 6.5
+times `--sb-text-md`, the yield at rest and the wrap on hover or selection.
+Every claim below was checked against the code at `f6f6567`.
+
+Every `lib/` and `test/` cite below was read at `f6f6567` and is written
+anchor first, line second. The Amendment reads its code at `0a29d88`; the one
+request between `0a29d88` and `f6f6567` that touched a code file it cites is
+the one that carries it (`3232359`), and it did not touch
+`lib/statifier_blocks/editor/block_node.ex`, so those cites read at the tag
+as they are printed. The stylesheet's token lines it cites by number sit
+above every change and hold: `--sb-font: inherit` (`:367`),
+`--sb-text-md: 0.875rem` (`:371`), `--sb-card-width: 14rem` (`:394`).
+
+### Where each claim reads
+
+| Claim | At `f6f6567` |
+|---|---|
+| The minimum, item 3 | the `.sb-node__chrome` rule declares `grid-template-columns: auto minmax(calc(var(--sb-text-md) * 6.5), 1fr) auto auto` (`statifier_blocks.css:1100`); no other rule redeclares that template on a card; the `.sb-node__label` rule draws at `font-size: var(--sb-text-md)` (`:1244`) |
+| The yield, item 4 | the `.sb-node__chrome > .sb-node__strip` rule declares `flex-wrap: nowrap` and `overflow: hidden` (`:1114-1123`) |
+| The reclaim, item 4 | one rule headed `.sb-node__chrome:hover > .sb-node__strip` lists the selected card, `:focus-within` and `:has(> [data-reveal="always"])` beside it and declares `flex-wrap: wrap` and `overflow: visible` and nothing else (`:1140-1146`) |
+| The always-revealed members | the delete offer's `data-reveal="always"` (`block_node.ex:520`) and the fold control's `data-reveal={if @collapsed?, do: "always", ...}` (`block_node.ex:494`) |
+| The offer's pair stacks | the `.sb-node__offer[data-reveal="always"]` rule declares `flex-wrap: wrap` (`statifier_blocks.css:1388-1394`) |
+| Nothing truncates | the `.sb-node__label` rule keeps `overflow-wrap: anywhere` (`:1248`) |
+| No control outside the flow | the strip sits at `grid-column: 4` (`:1115`); none of the six `position: absolute` rules in the stylesheet selects a strip member |
+| The Save stand-in on every card that could carry Save | the `class="sb-node__strip-reserve"` span (`block_node.ex:470-476`, the class at `:472`) |
+| The card width and the control set | `--sb-card-width` stays 14rem; `3232359` changes no template in `block_node.ex` |
+| The tests | `test/statifier_blocks/editor/presentation_test.exs`, describe "the title keeps a minimum and the strip yields to it at rest (ADR-0005's Amendment of 2026-09-25 on item 4)" (`:1684`), beside describe "the reserved control strip (the Note of 2026-09-08, item 4)" (`:1576`) |
+
+The title "Park it for reconciliation" reads in the examples app's
+`priv/fixtures/card_processing.json`, and
+"Authorize with a deadline" is the label in its
+`lib/statifier_examples/card_auth/authorize_with_deadline.ex`. The browser
+measurements of items 1, 3 and 5 are readings taken at the time they name;
+this Note does not re-take them.
+
+The Amendment's cites into this file hold: item 4
+(`:10543`), its "at all times" (`:10553-10555`), the Amendment of 2026-09-18
+(`:11614`) and its "Every resting member" (`:11646-11647`).
+
+Its test, that an amendment "changes what the record decides", reads at
+`docs/adr/README.md:43`.
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- The status line says "proposed (2026-09-25 ..."; it is flipped by one word
+  above.
+- The Consequences say "The change is in the next release's changelog
+  (`changelog.d/sb-ooms.md`)". That release is 0.35.1, and the fragment is
+  its `CHANGELOG.md` section, read above.
+- This file's head `Status:` line is not extended.
