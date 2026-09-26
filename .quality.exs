@@ -44,11 +44,12 @@
   # before a publish as well as before a commit. Docs runs `mix docs` and fails
   # on any ExDoc warning. Doc links fails on the link mistakes ExDoc accepts
   # silently: a README relative link to a file not in the package files, a
-  # relative link in a published file to a file that is not an extra, two
-  # extras sharing a basename, and a relative link ExDoc quietly rewrites to a
-  # different extra. Each breaks a link on HexDocs or hex.pm while the build
-  # stays clean. Like the ADR cites stage below, neither is in the loop
-  # profile's `stages:` allow-list, so both are pre-commit concerns.
+  # relative link in a Markdown extra to a file that is not itself an extra
+  # (moduledoc links are the Docs stage's), two extras sharing a basename, and
+  # a relative link ExDoc quietly rewrites to a different extra. Each breaks a
+  # link on HexDocs or hex.pm while the build stays clean. Like the ADR cites
+  # stage below, neither is in the loop profile's `stages:` allow-list, so both
+  # are pre-commit concerns.
   docs: [enabled: :auto],
   doc_links: [enabled: :auto],
   profiles: [
