@@ -16,6 +16,7 @@
 | [0012](0012-undecided-branch-arm.md) | A condition that could not be decided is a third slot on `core.branch`, and an unwired one falls to `otherwise` | accepted |
 | [0013](0013-typed-fan-out-child-summary.md) | A fan-out child's summary is typed by the parent's declaration, with an optional child-side one and a dormant agreement check | accepted |
 | [0014](0014-document-accepts-declaration.md) | A document declares the external events it accepts - a list of names on the envelope, carried through compile, and judged against the chart by the engine's check at publish | accepted |
+| [0016](0016-document-describes-itself.md) | A document describes itself deterministically - block sentences joined by flow-graph edges read from structure, a host phrasing seam, and no model anywhere | proposed |
 
 New ADRs: next number, same three-section format (Context, Decision,
 Consequences). Pick the number against a freshly fetched remote.
