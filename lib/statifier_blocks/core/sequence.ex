@@ -62,6 +62,20 @@ defmodule StatifierBlocks.Core.Sequence do
     }
 
   @doc """
+  This block as one line of prose (ADR-0002's 2026-09-07 amendment).
+
+  A sequence has no config, so the line is the same for every block of
+  this type: what it does with its steps, in the words
+  `StatifierBlocks.Core.Parallel` uses for its lanes, so the two read as
+  the pair they are in a list.
+
+      iex> StatifierBlocks.Core.Sequence.sentence(%{})
+      "Run its steps in order"
+  """
+  @impl true
+  def sentence(_config), do: "Run its steps in order"
+
+  @doc """
   A compound state running `body` in order and finishing at its own
   `<final>` - `StatifierBlocks.Core.Emit`'s plain ordered shape, with
   nothing added. A sequence with an empty `body` enters its `<final>`

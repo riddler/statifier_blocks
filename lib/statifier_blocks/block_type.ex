@@ -1635,8 +1635,8 @@ defmodule StatifierBlocks.BlockType do
       iex> StatifierBlocks.BlockType.sentence(StatifierBlocks.Core.Send, %{"event" => "order.paid"})
       "Send order.paid"
 
-      iex> StatifierBlocks.BlockType.sentence(StatifierBlocks.Core.Sequence, %{})
-      "Sequence"
+      iex> StatifierBlocks.BlockType.sentence(StatifierBlocks.Core.ResumableGroup, %{})
+      "Resumable group"
 
       iex> StatifierBlocks.BlockType.sentence(NoSuchModule, %{})
       nil

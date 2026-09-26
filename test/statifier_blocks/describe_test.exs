@@ -110,27 +110,27 @@ defmodule StatifierBlocks.DescribeTest do
     # ` at <history> history` suffix -> the resume line loses it, red.
     test "the library loan renders the default lines" do
       assert Describe.render(outline(decode!(@library_loan)), []) == [
-               "Sequence",
+               "Run its steps in order",
                ~s(Decide: When "owes", otherwise \(one of\)),
                "Send loan.fines_notice",
-               "Wait for event",
+               "Wait for fines.paid",
                "Send loan.checked_out",
                "Resumable group",
-               "Wait for event",
+               "Wait for loan.returned, giving up after 21d",
                "When loan.renewed, resume",
                "When loan.reported_lost, abandon",
                "Send loan.closed",
-               ~s(Sequence starts with Decide: When "owes", otherwise),
+               ~s(Run its steps in order starts with Decide: When "owes", otherwise),
                ~s[After Decide: When "owes", otherwise (done), Send loan.checked_out],
                "After Send loan.checked_out (done), Resumable group",
                "After Resumable group (done), Send loan.closed",
-               "Send loan.closed (done) ends Sequence",
+               "Send loan.closed (done) ends Run its steps in order",
                ~s(Decide: When "owes", otherwise: when patron.fines_owed > 0, Send loan.fines_notice),
-               "After Send loan.fines_notice (done), Wait for event",
-               ~s[Wait for event (received, timed_out) ends Decide: When "owes", otherwise],
+               "After Send loan.fines_notice (done), Wait for fines.paid",
+               ~s[Wait for fines.paid (received, timed_out) ends Decide: When "owes", otherwise],
                ~s(Decide: When "owes", otherwise: otherwise, the end of Decide: When "owes", otherwise),
-               "Resumable group starts with Wait for event",
-               "Wait for event (received, timed_out) ends Resumable group",
+               "Resumable group starts with Wait for loan.returned, giving up after 21d",
+               "Wait for loan.returned, giving up after 21d (received, timed_out) ends Resumable group",
                "On loan.renewed, When loan.renewed, resume resumes Resumable group at shallow history",
                "On loan.reported_lost, When loan.reported_lost, abandon abandons Resumable group"
              ]
@@ -297,8 +297,8 @@ defmodule StatifierBlocks.DescribeTest do
              ]
 
       assert Describe.render(described, []) |> Enum.drop(2) == [
-               "Group starts with the end of Group",
-               "On again, When again, resume resumes Group"
+               "Run interruptible steps starts with the end of Run interruptible steps",
+               "On again, When again, resume resumes Run interruptible steps"
              ]
     end
 
@@ -358,7 +358,7 @@ defmodule StatifierBlocks.DescribeTest do
       assert edge(:interrupt, "g", {:block, "h1"}, {:exit, "g"}) in described.edges
       refute Enum.any?(described.edges, &(&1.from == {:block, "h2"}))
 
-      assert "On its event, When an event, abandon abandons Group" in Describe.render(
+      assert "On its event, When an event, abandon abandons Run interruptible steps" in Describe.render(
                described,
                []
              )
@@ -408,12 +408,12 @@ defmodule StatifierBlocks.DescribeTest do
     end
 
     @defaults [
-      "Sequence",
+      "Run its steps in order",
       "Wait 30s",
       "Send order.paid",
-      "Sequence starts with Wait 30s",
+      "Run its steps in order starts with Wait 30s",
       "After Wait 30s (done), Send order.paid",
-      "Send order.paid (done) ends Sequence"
+      "Send order.paid (done) ends Run its steps in order"
     ]
 
     defp described do
@@ -434,12 +434,12 @@ defmodule StatifierBlocks.DescribeTest do
     # the multiline answers replace their lines, red.
     test "a host overrides one node and one edge; blank, newline, non-string and raise fall back" do
       assert Describe.render(described(), phrasing: Host) == [
-               "Sequence",
+               "Run its steps in order",
                "Wait 30s",
                "Tell the shop the order is paid",
                "It begins with a pause.",
                "After Wait 30s (done), Send order.paid",
-               "Send order.paid (done) ends Sequence"
+               "Send order.paid (done) ends Run its steps in order"
              ]
     end
 
