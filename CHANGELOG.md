@@ -11,6 +11,18 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.36.1] 2026-09-27
+
+0.36.1 is a patch, because it changes no public function, option or
+callback and adds nothing to the public surface. It fixes
+`StatifierBlocks.Describe`: the outline now draws the interrupt edge for an
+abandon handler that names `finish_as`, which 0.36.0 left out. Upgrading a
+host: nothing needs migrating, and the package gains no dependency.
+
+### Fixed
+
+- `StatifierBlocks.Describe.outline/3` draws the interrupt edge to the group's end for an abandon handler that names `finish_as`, keying the edge on the handler's `outcome` select rather than on the name it finishes with.
+
 ## [0.36.0] 2026-09-26
 
 0.36.0 is a minor, because it adds to the public surface and changes no
@@ -3569,6 +3581,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.36.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.36.1
 [0.36.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.36.0
 [0.35.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.35.1
 [0.35.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.35.0
