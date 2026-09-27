@@ -108,7 +108,7 @@ defmodule StatifierBlocks.Describe do
   # A1), which is all a placeholder can be said to declare.
   @placeholder_outcomes ["done"]
 
-  @typep resolution :: {:ok, Palette.type_ref(), Block.t()} | :unresolvable
+  @typep resolution :: {:ok, Palette.type_ref(), Block.t()} | {:unresolvable, Block.t()}
   @typep lookup :: %{optional(Block.id()) => {Block.id() | nil, resolution()}}
 
   @doc """
@@ -191,7 +191,7 @@ defmodule StatifierBlocks.Describe do
   defp resolve(palette, block) do
     case Palette.resolve(palette, block) do
       {:ok, ref, migrated} -> {:ok, ref, migrated}
-      {:error, _reason} -> :unresolvable
+      {:error, _reason} -> {:unresolvable, block}
     end
   end
 
@@ -199,7 +199,7 @@ defmodule StatifierBlocks.Describe do
   defp outcomes({:ok, ref, block}),
     do: ref |> BlockType.outcomes(block.config) |> BlockType.outcome_names()
 
-  defp outcomes(:unresolvable), do: @placeholder_outcomes
+  defp outcomes(_unresolvable), do: @placeholder_outcomes
 
   # -- edges -----------------------------------------------------------------
 
@@ -320,34 +320,34 @@ defmodule StatifierBlocks.Describe do
   defp interrupt_edges(%ViewModel.Node{block_id: id, slots: slots}, history, lookup) do
     slots
     |> Enum.filter(&(&1.name == "interrupts"))
-    |> Enum.flat_map(&ViewModel.flow_children/1)
-    |> Enum.flat_map(&interrupt_edge(&1, id, history, event(&1, lookup)))
+    |> Enum.flat_map(fn slot ->
+      slot
+      |> ViewModel.flow_children()
+      |> Enum.flat_map(fn handler ->
+        select = select(handler, slot.outcome_key, lookup)
+        interrupt_edge(select, handler.block_id, id, {history, event(handler, lookup)})
+      end)
+    end)
   end
 
-  @spec interrupt_edge(ViewModel.Node.t(), Block.id(), :shallow | :deep | nil, String.t() | nil) ::
-          [Edge.t()]
-  defp interrupt_edge(
-         %ViewModel.Node{outcome: "abandon", block_id: handler},
-         group,
-         _history,
-         event
-       ),
-       do: [
-         %Edge{
-           kind: :interrupt,
-           container: group,
-           from: {:block, handler},
-           to: {:exit, group},
-           event: event
-         }
-       ]
+  @spec interrupt_edge(
+          String.t() | nil,
+          Block.id(),
+          Block.id(),
+          {:shallow | :deep | nil, String.t() | nil}
+        ) :: [Edge.t()]
+  defp interrupt_edge("abandon", handler, group, {_history, event}),
+    do: [
+      %Edge{
+        kind: :interrupt,
+        container: group,
+        from: {:block, handler},
+        to: {:exit, group},
+        event: event
+      }
+    ]
 
-  defp interrupt_edge(
-         %ViewModel.Node{outcome: "resume", block_id: handler},
-         group,
-         history,
-         event
-       ) do
+  defp interrupt_edge("resume", handler, group, {history, event}) do
     [
       %Edge{
         kind: :interrupt,
@@ -360,7 +360,21 @@ defmodule StatifierBlocks.Describe do
     ]
   end
 
-  defp interrupt_edge(%ViewModel.Node{}, _group, _history, _event), do: []
+  defp interrupt_edge(_other, _handler, _group, _context), do: []
+
+  # What the arrival does to the group: the handler's `outcome` select, read
+  # at the slot's declared outcome key from the handler's resolved config
+  # (the document's own config for a block the palette cannot resolve).
+  # Never the view model node's `outcome`, which answers the name a handler
+  # finishes with (`finish_as`) ahead of the select when one is set.
+  @spec select(ViewModel.Node.t(), String.t() | nil, lookup()) :: String.t() | nil
+  defp select(%ViewModel.Node{block_id: id}, key, lookup) do
+    case Map.get(lookup, id) do
+      {_parent, {:ok, _ref, %Block{config: config}}} -> BlockType.outcome_name(config, key)
+      {_parent, {:unresolvable, %Block{config: config}}} -> BlockType.outcome_name(config, key)
+      nil -> nil
+    end
+  end
 
   # The event a handler listens for, as its resolved config holds it.
   @spec event(ViewModel.Node.t(), lookup()) :: String.t() | nil

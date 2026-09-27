@@ -267,3 +267,43 @@ made outside this package.
 - Because output is byte-identical for equal input, a rendered description
   can be stored beside a document revision and compared across revisions
   as text.
+
+## Note (2026-09-27): decision 1, what the describe reads besides the view model
+
+A dated note, not an amendment: it changes no decision in this record.
+
+Decision 1 says the describe "is built over the view model and nothing
+else". The view model's nodes carry no block config, and three things
+decision 1 asks of the describe are config: a node's declared outcomes, a
+handler's `event` and `outcome` select, and a resumable group's `history`.
+So `outline/3` also reads each block of the document it was given, resolved
+through the same palette it was given, for that block's config:
+
+- `StatifierBlocks.Describe.outline/3` resolves every block of the
+  document's tree once, beside the view model it builds
+  (`describe.ex:121`, `def outline`, read at `a53155f`).
+- The resolution is `Palette.resolve/2` (`describe.ex:191`, `defp resolve`,
+  read at `a53155f`), the same lookup the view model makes for each node
+  (`view_model.ex:1996`, `defp build_node`, read at `a53155f`).
+- A node's `outcomes` are `BlockType.outcomes/2` of that resolved config
+  (`describe.ex:199`, `defp outcomes`, read at `a53155f`).
+- A resumable group's edge `history` is read from its resolved config
+  (`describe.ex:226`, `defp container_edges(ResumableGroup, ...)`, read at
+  `a53155f`).
+
+The describe still compiles nothing and reads nothing outside its
+arguments: the document and the palette are the only inputs, as decisions 1
+and 4 require.
+
+The interrupt edge is keyed on the handler's `outcome` config, as decision
+1 says. Before the request that adds this Note, the describe read the
+outcome from the view model node, which answers the name an abandoning
+handler finishes with (`finish_as`) ahead of the select, so a handler with
+`outcome: "abandon"` and a `finish_as` drew no edge. It now reads the
+select at the slot's declared outcome key from the handler's resolved config
+(`defp select/3` in `lib/statifier_blocks/describe.ex`, added in the same
+request as this Note; a handler the palette cannot resolve is read from the
+document's own config, as before), and decision 1's interrupt sentence holds
+as written.
+A `finish_as` beside `outcome: "resume"` is refused by `core.on_event`'s
+config validation, so no resume handler names one.
