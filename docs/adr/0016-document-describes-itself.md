@@ -1,6 +1,6 @@
 # ADR-0016: A document describes itself deterministically - block sentences joined by flow-graph edges read from structure, a host phrasing seam, and no model anywhere
 
-Status: proposed (2026-09-26, recording the operator's ruling of
+Status: accepted (2026-09-26, recording the operator's ruling of
 2026-09-26 on how the edges are found and how a host rewords them). It
 merges at proposed; flipping it to accepted is a separate request through
 the same `docs/adr/` gate, after the code that builds it has shipped in a
@@ -307,3 +307,57 @@ document's own config, as before), and decision 1's interrupt sentence holds
 as written.
 A `finish_as` beside `outcome: "resume"` is refused by `core.on_event`'s
 config validation, so no resume handler names one.
+
+## Note (2026-09-27): this record is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the record's own `Status:` line (`:3`), by one word, `proposed` to
+`accepted`; the index row in `README.md` changes its status cell with it.
+Everything else is this Note, at the foot of the file, so no line another
+record cites moves.
+
+The code this record decides first shipped in `statifier_blocks` 0.36.0
+(tag `v0.36.0`, `d98dffb`). The interrupt-edge correction that the Note of
+2026-09-27 above describes shipped in 0.36.1 (tag `v0.36.1`, `647e44f`),
+and 0.36.1 is the published version that carries the code as this record
+describes it. Every claim below was read at `647e44f`, which is both the
+`v0.36.1` tag and `main` when this request was written. The record's own
+cites are labelled `2033622`; each anchor still names the line the record
+says, and none has moved. The tests named below are in
+`test/statifier_blocks/describe_test.exs`.
+
+### Each decision, and where it reads today
+
+| Decision | Read at `647e44f` |
+|---|---|
+| 1, `outline/3` | `StatifierBlocks.Describe.outline/3` (`describe.ex:121`, `def outline`) answers a `%StatifierBlocks.Describe{}` with the document's `id` and `revision`, its nodes and its edges, and reads no key of `opts`. It calls `ViewModel.build/3` with an empty findings list and walks `ViewModel.outline/1` once. The sentence "It is built over the view model and nothing else" is superseded by the Note of 2026-09-27 above, which says what else it reads: each block of the document, resolved through the same palette, for its config. Nothing in the module calls `StatifierBlocks.Compiler`; the test `the compiled modules import nothing that reaches one` pins that |
+| 1, a node | `StatifierBlocks.Describe.Node` (`describe/node.ex`, `defstruct`) carries the nine fields of the table, filled in `defp node/4` (`describe.ex:164`) |
+| 1, the four types | `defp container_edges/4` (`describe.ex:220`) draws edges for `core.sequence`, `core.group`, `core.resumable_group` and `core.branch` only, and `defp edges/3` (`describe.ex:208`) draws none inside a block the palette did not resolve. An abandon handler ends at the group's exit and a resume handler at its body, keyed on the handler's `outcome` select (`defp select/3`, `describe.ex:371`), which holds for a handler that names `finish_as` (the test `an abandon handler that names finish_as draws its interrupt edge to the exit`). A resume into a `core.resumable_group` carries its `history`, and a resume into a `core.group` carries `nil` (the test `a plain group's resume re-enters its body from the first step; an empty body`). An abandon edge carries no history, which is what the library loan's lifted listing says of `blk_LLOS` |
+| 1, a branch | one `:branch` edge per arm and for `otherwise`, and for `undecided` only when it holds a block (`defp branch_edges/2`, `describe.ex:251`; `defp unwired_undecided?/1`, `describe.ex:275`), each arm followed by its own sequence and exit edges (the test `a branch: an empty guarded arm, a wired otherwise, a wired and an unwired undecided`) |
+| 1, outcomes and the other types | a `:sequence` or `:exit` edge carries the source's declared outcome names (`defp chain/3`, `describe.ex:288`); every other type draws no edge inside itself (`container_edges/4`'s last clause, `describe.ex:234`). `core.await` declares `received` and `timed_out` for every config (`core/await.ex:123`, `def outcomes`), and the tests `patron registration produces the note's edges` and `the library loan produces the note's edges` assert both worked examples edge for edge, with the one declared-outcome difference the record names |
+| 2, `render/2` | `StatifierBlocks.Describe.render/2` (`describe.ex:151`, `def render`) answers the node lines then the edge lines, in the default words of the table (`defp edge_line/2`, `describe.ex:407`), with a newline, carriage return or tab in an author's text written as one space (`defp flat/1`, `describe.ex:455`). The test `the library loan renders the default lines` pins every line of one worked example |
+| 3, the phrasing seam | `StatifierBlocks.Describe.Phrasing` (`describe/phrasing.ex`, `@optional_callbacks`) declares the nine optional callbacks. `defp phrase/4` (`describe.ex:462`) chooses the callback by kind and falls back to the default line on a refused answer or a raise, throw or exit (`defp ask/4`, `describe.ex:469`; `defp usable/1`, `describe.ex:481`). The tests under `the phrasing seam` pin each arm |
+| 4, no model anywhere | the tests under `determinism` and under `no network, clock, process, random source or model` pin byte-identical output and the absence of each of those calls from the four compiled modules and their sources |
+| 5, what it is not | no layout, no renderer and no chart read ship with the module; `StatifierBlocks.Connectors.edges/2` (`connectors.ex:409`, `def edges`) and `StatifierBlocks.Graph` are unchanged and separate |
+
+One reading is named here rather than left to be found. Decision 2's
+`:entry` row writes its target as `<S(to)>`, and an entry edge into an
+empty body ends at the container's exit rather than at a block. The line
+reads that endpoint the way decision 2's `<target>` sentence reads an exit,
+"the end of" the container's sentence, as the test `a plain group's resume
+re-enters its body from the first step; an empty body` pins.
+
+### Sentences that name their own status
+
+They are met here, not edited.
+
+- The status paragraph says the record "merges at proposed; flipping it to
+  accepted is a separate request through the same `docs/adr/` gate, after
+  the code that builds it has shipped in a published version" (`:4-7`).
+  This request is that one, and 0.36.1 is that version.
+- Consequences says the flow-graph note's sentence "nothing in this package
+  computes the graph" stops being true of main once the module ships, and
+  that a dated Note at the foot of the note says where the computation is.
+  `docs/block-level-flow-graph.md` carries that Note (`## Note (2026-09-26):
+  where the graph is computed`), and the module has shipped.
