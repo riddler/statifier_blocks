@@ -2,6 +2,7 @@ defmodule StatifierBlocks.DescribeTest do
   use ExUnit.Case, async: true
 
   alias StatifierBlocks.{Block, Describe, Document, DocumentGenerator, Palette}
+  alias StatifierBlocks.Core.OnEvent
   alias StatifierBlocks.Describe.{Edge, Node}
 
   doctest StatifierBlocks.Describe
@@ -362,6 +363,73 @@ defmodule StatifierBlocks.DescribeTest do
                described,
                []
              )
+    end
+
+    # A handler that names what it finishes with still abandons its group:
+    # the edge is keyed on the `outcome` select, not on the finishing name
+    # the view model carries for the card.
+    #
+    # Sabotage: in `Describe.interrupt_edges/3`, key the edge on the view
+    # model node's `outcome` instead of `select/3` -> the handler answers
+    # `cancelled`, draws no edge, red.
+    test "an abandon handler that names finish_as draws its interrupt edge to the exit" do
+      root =
+        Block.new("core.group",
+          id: "g",
+          slots: %{
+            "body" => [Block.new("core.send", id: "s", config: %{"event" => "e"})],
+            "interrupts" => [
+              Block.new("core.on_event",
+                id: "h",
+                config: %{
+                  "event" => "user.cancel",
+                  "outcome" => "abandon",
+                  "finish_as" => "cancelled"
+                }
+              )
+            ]
+          }
+        )
+
+      [handler] = root.slots["interrupts"]
+      assert OnEvent.validate_config(handler.config) == :ok
+
+      # `finish_as` is refused beside `outcome: "resume"`, so no resume
+      # handler names one.
+      assert {:error, _findings} =
+               OnEvent.validate_config(Map.put(handler.config, "outcome", "resume"))
+
+      described = outline(Document.new(root))
+
+      assert Enum.filter(described.edges, &(&1.kind == :interrupt)) == [
+               edge(:interrupt, "g", {:block, "h"}, {:exit, "g"}, event: "user.cancel")
+             ]
+
+      assert Describe.render(described, []) |> List.last() =~
+               ~r/^On user\.cancel, .* abandons Run interruptible steps$/
+    end
+
+    # A handler the palette cannot resolve is read from the document's own
+    # config, so its `outcome` select still draws the edge it drew when the
+    # view model's node answered it.
+    #
+    # Sabotage: in `Describe.select/3`, answer `nil` for an unresolvable
+    # block -> the handler draws no edge, red.
+    test "an unresolvable handler's outcome select still draws its interrupt edge" do
+      root =
+        Block.new("core.group",
+          id: "g",
+          slots: %{
+            "body" => [],
+            "interrupts" => [
+              Block.new("host.unknown", id: "h", config: %{"outcome" => "abandon"})
+            ]
+          }
+        )
+
+      assert Enum.filter(outline(Document.new(root)).edges, &(&1.kind == :interrupt)) == [
+               edge(:interrupt, "g", {:block, "h"}, {:exit, "g"})
+             ]
     end
   end
 
