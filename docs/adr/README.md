@@ -18,7 +18,7 @@
 | [0014](0014-document-accepts-declaration.md) | A document declares the external events it accepts - a list of names on the envelope, carried through compile, and judged against the chart by the engine's check at publish | accepted |
 | [0015](0015-block-document-json-schema.md) | The block document ships a JSON Schema whose root admits exactly what the package admits, and a palette can generate its own | proposed |
 | [0016](0016-document-describes-itself.md) | A document describes itself deterministically - block sentences joined by flow-graph edges read from structure, a host phrasing seam, and no model anywhere | accepted |
-| [0017](0017-block-types-explain-themselves.md) | Block types explain themselves - an optional `explain/0` paragraph, a delayed send that says when, and a `:timer` edge in the describe | proposed |
+| [0017](0017-block-types-explain-themselves.md) | Block types explain themselves - an optional `explain/0` paragraph, a delayed send that says when, and a `:timer` edge in the describe | accepted |
 
 New ADRs: next number, same three-section format (Context, Decision,
 Consequences). Pick the number against a freshly fetched remote.
