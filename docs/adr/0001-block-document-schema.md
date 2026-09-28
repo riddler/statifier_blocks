@@ -1185,3 +1185,177 @@ They are met here, not edited.
 None. Each clause holds at `c362e40` as written.
 
 Filed with `sb-910d`.
+
+## Amendment (2026-09-28): decision 2, a block carries an optional author-written note
+
+**Status: proposed (2026-09-28, ruled by the operator, 2026-09-28: a note key on the block).**
+Drafted for `sb-l45c`. Additive: no text above this line is edited, every
+decision above stands as written except where a clause below says how one
+reads, and the header line's status history is not extended here. It adds
+clauses `2a` to `2g`; a bare label in this record means this record's clause.
+This is an amendment rather than a dated Note because it changes what
+decision 2 says a block is, and by this directory's README a note decides
+nothing.
+
+This record alone decides the field. The code that builds it follows in its
+own request, and the editor's field for writing a note is a later record.
+
+Code cites below were read at `ff04855` and carry their anchors; re-locate by
+anchor, not by number. They name what the code does before the field exists,
+which is what the clauses change.
+
+### Context
+
+Decision 2 says a block is `{type, id, config, slots}` and nothing else, and
+gives its reason: every field it refuses (layout, selection, collapse state,
+validation results, generated SCXML, the provenance map) is "a function of the
+document plus a block-type registry", so storing it stores a value that can be
+wrong. An author's own note on a block, a sentence saying why the block is
+there, is none of those: no registry and no function of the document can
+produce it. It is authored content, and decision 2's own test, "the document
+is the minimum that must round-trip", puts it in the document.
+
+A renderer that draws a document shows each block's text in a description
+region beside the drawing (`ADR-0017` decision 4, its third tier, the
+block type's explanation). The text there is the package's and the block
+type's; an author has had nowhere to write their own.
+
+### 2a. A block is `{type, id, config, slots, note}`
+
+Decision 2 is read with a fifth field:
+
+- `note` is an author-written string about this block. It is optional, and
+  the empty string is the absent note.
+
+The four fields decision 2 names keep their meaning, and its refusal of every
+derived field stands: the note is admitted because it is not derived. The
+`type_version` decision 4 carries on each block is unchanged by this clause.
+
+### 2b. The note is a string, and an empty one is left out of the canonical bytes
+
+A note is a JSON string. Decision 8's omission list is read with one more
+line:
+
+- an empty `note` omitted.
+
+The absent key and the empty string are one note: an absent key decodes to
+the empty string, and the empty string encodes to no key. That is what keeps
+decision 8's round-trip law, `decode(encode(d)) == d`, true of a block whose
+note is empty, in the shape the law already takes for an empty `config`. A
+non-empty note is written under the key `note`, in the key order decision 8
+already gives (object keys sorted by their UTF-8 bytes, so between `id` and
+`slots`). A value that is not a string is refused at decode, as a typed
+refusal under decision 9; which refusal arm names it is the code's.
+
+Today the canonical encoder writes a block's `id`, `type` and
+`type_version`, then `config` and `slots` when they are not empty
+(`lib/statifier_blocks/canonical_json.ex:56`, `defp value/1`'s `%Block{}`
+clause), and nothing else.
+
+### 2c. `schema_version` stays at 1
+
+By the criterion 11k reads decision 7 as, a key bumps `schema_version` when
+it moves the canonical bytes of a document encoded before the key existed.
+No such document carries a note, so none has a `note` key after this
+amendment and every one encodes to the same bytes. There is no bump, as there
+was none for `datamodel` (11e) or `accepts` (11k).
+
+"No bump" is safe for the reason 11e gave: an old reader refuses a block key
+it does not know rather than dropping it. The decoder's block-key allowlist
+today holds `id`, `type`, `type_version`, `config` and `slots`
+(`lib/statifier_blocks/decode.ex:50`, `@block_keys`), and a block carrying
+any other key is refused with `{:malformed_block, id, {:unexpected_key, key}}`
+(`decode.ex:128`, `defp decode_block/1`). A reader built before the note
+therefore refuses a document carrying one, by name, rather than losing the
+note on its next encode.
+
+### 2d. Decode and the shipped schema admit the note together
+
+Decoding admits `note` on a block, and the shipped JSON Schema's block
+definition describes it as an optional string. Both change in the one
+request, which is what keeps `ADR-0015` decision 3 true, that the schema's
+root admits exactly what `Decode` plus `Validation` admit. The block
+definition today lists `id`, `type`, `type_version`, `config` and `slots`
+under `"additionalProperties": false`
+(`priv/schemas/block-document.schema.json:83`, `definitions.block`). This
+amendment makes no change to `ADR-0015`: its decision 3 already requires the
+two to move together.
+
+The in-memory block is read with the field too. The typespec appendix's
+`StatifierBlocks.Block` type and `defstruct` gain it, defaulting to the empty
+string:
+
+```elixir
+@type t :: %__MODULE__{
+        id: id(),
+        type: type_name(),
+        type_version: pos_integer(),
+        config: config(),
+        slots: %{optional(slot_name()) => [t()]},
+        note: String.t()
+      }
+
+defstruct [:id, :type, type_version: 1, config: %{}, slots: %{}, note: ""]
+```
+
+The code's type and struct today hold the other five fields
+(`lib/statifier_blocks/block.ex:32`, `@type t`, and `:40`, the `defstruct`).
+
+### 2e. The note travels with its block
+
+The note is a field of the block, so it goes wherever the block goes. A move
+keeps it: `Edit.apply/2`'s `:move` clause detaches the block and inserts the
+same block at its target (`lib/statifier_blocks/edit.ex:190`). Any copy of a
+block keeps it for the same reason, a copy being the block with its fields.
+The package has no copy command today; one that is added later carries the
+note by this clause, and decision 1's rule that a copy mints new ids is about
+ids, not about the note.
+
+### 2f. The compiler and the provenance map never read the note
+
+The note is for people. The compiler emits nothing from it, and the
+provenance map (`ADR-0004`) records nothing about it, so two documents that
+differ only in a note compile to byte-identical SCXML with the same
+provenance.
+
+The note is in the canonical bytes, so it is in the document hash:
+`Document.content_hash/1` hashes `to_json/1`'s canonical bytes
+(`lib/statifier_blocks/document.ex:302`), and a note changes the document's
+content hash and not the compiled chart. That is the relation 11d gave for a
+`datamodel` entry's `description`, and the one the compiler's moduledoc
+states for `metadata`: "Equal output does not imply equal input"
+(`lib/statifier_blocks/compiler.ex:297`, the paragraph that opens "The
+guarantee is **not** reversible"). A note is a third instance of that
+clause, not a weakening of it.
+
+### 2g. What shows the note
+
+A renderer's description region shows a block's note above the built-in text,
+the block type's explanation that `ADR-0017` decision 4 puts there. A block
+with no note shows the region as it did. Where a renderer draws the region is
+the renderer's; that the note leads is this clause's.
+
+### What this amendment does not decide
+
+- **The editor's field for writing a note.** That is a later record; until it
+  lands, a note reaches a document through the document's own bytes or a
+  host's code.
+- **Whether the describe, the outline or the card line says anything about a
+  note.** They read as they did; a record that wants the note there says so.
+- **A length limit, markup, or any structure inside a note.** A note is a
+  string, and this amendment reads nothing inside it.
+- **Decisions 1 and 3 to 11, and 11a to 11l**, beyond the readings `2b` to
+  `2f` give decision 8's omission list, decision 7's bump through 11k, and the
+  typespec appendix.
+
+### Consequences
+
+- An author can say why a block is there, in the document, where it
+  round-trips, diffs and reviews with everything else it saves.
+- A document with no note encodes, hashes and compiles as it did before the
+  field existed; a host that writes no note sees one change, that `Decode`
+  admits a block key it refused before.
+- A host that stores the content hash sees it move when an author edits a
+  note, with no change to the chart the document compiles to.
+- A reader of this record alone learns that a block has five fields and why
+  the fifth took no bump.

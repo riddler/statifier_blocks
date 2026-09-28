@@ -3,6 +3,7 @@
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-block-document-schema.md) | The block document is a tree of typed blocks with named slots | accepted |
+| [0001 Amendment 2026-09-28](0001-block-document-schema.md#amendment-2026-09-28-decision-2-a-block-carries-an-optional-author-written-note) | Decision 2: a block carries an optional author-written note, a string left out of the canonical bytes when empty and never read by the compiler | proposed |
 | [0002](0002-block-type-behaviour.md) | A block type is a behaviour module resolved through a caller-supplied palette | accepted |
 | [0002 Amendment 2026-09-28](0002-block-type-behaviour.md#amendment-2026-09-28-decision-7-declared-field-types-are-binding-for-every-block-type) | Decision 7: a block type's declared field types are binding for every block type, checked before `validate_config/1` through the one field-type mapping | accepted |
 | [0003](0003-assignability.md) | Assignability is opaque-string identity plus a host-supplied widening relation | accepted |
