@@ -328,9 +328,13 @@ defmodule StatifierBlocks.Edit do
         {:error, findings} -> findings
       end
 
-    BlockType.type_expr_findings(ref, config) ++
-      BlockType.field_type_findings(ref, config) ++
-      own
+    shared =
+      BlockType.type_expr_findings(ref, config) ++ BlockType.field_type_findings(ref, config)
+
+    # A type answering anything but a list is passed on as it answered, never
+    # appended to: `ViewModel.overlay_findings/2` is where that shape is
+    # refused with the type named, and an improper list would lose it.
+    if is_list(own), do: shared ++ own, else: own
   end
 
   @spec check_leaf(Palette.t(), t(), {:ok, Document.t()}) ::

@@ -404,9 +404,7 @@ defmodule StatifierBlocks.ViewModelTest do
 
       session = %Session{palette: palette, document: document, history: History.new()}
 
-      # `null`, which the declared field type leaves to `validate_config/1`,
-      # so the map that callback answers reaches the view model on its own.
-      {:error, refused} = Session.change_config(session, "blk_MAP", %{"label" => nil})
+      {:error, refused} = Session.change_config(session, "blk_MAP", %{"label" => 42})
 
       node =
         document
@@ -431,6 +429,34 @@ defmodule StatifierBlocks.ViewModelTest do
       assert message.message =~ "validate_config/1"
       assert message.message =~ ~s(block "blk_MAP")
       assert message.message =~ "{key, message} string pairs"
+    end
+
+    # A stored value its declared type refuses, beside the map answer: the
+    # build still places both findings under the field rather than raising.
+    # Sabotage: `ViewModel.config_findings/3` mapping `shared ++ own` again ->
+    # the build raises on the improper list and the flunk goes red.
+    test "a map-answering type holding a value its declared type refuses still builds" do
+      palette = Palette.new(Map.put(Palette.core_types(), "myapp.map_answering", MapAnswering))
+      block = Block.new("myapp.map_answering", id: "blk_MAP", config: %{"label" => 42})
+
+      document =
+        Document.new(Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [block]}),
+          id: "bdoc_map"
+        )
+
+      view_model =
+        try do
+          ViewModel.build(document, palette, [])
+        rescue
+          raised -> flunk("the build raised #{inspect(raised.__struct__)}")
+        end
+
+      [label] = find_node(view_model, "blk_MAP").form.fields
+
+      assert Enum.map(label.findings, & &1.message) == [
+               "the label field is declared a string, and holds an integer",
+               "must be a string"
+             ]
     end
 
     # Sabotage: dropping `finding_pair?/1` from the check - a list whose
