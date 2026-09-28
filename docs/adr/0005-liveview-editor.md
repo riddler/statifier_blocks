@@ -13325,3 +13325,92 @@ They are met here, not edited.
   (`changelog.d/sb-ooms.md`)". That release is 0.35.1, and the fragment is
   its `CHANGELOG.md` section, read above.
 - This file's head `Status:` line is not extended.
+
+## Note (2026-09-27): three prose corrections to the Amendment of 2026-09-25 on item 4's control strip - the condition its "widths do not move" needs, its count beside its list, and the retired collapse in its Why paragraph
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing the Amendment of 2026-09-25 (`:13108`) did not already decide, and
+edits no line above it. It is added at the foot of the file, so no line
+another record cites moves. Each item names the sentence it corrects, which
+stands as printed and is read with the correction beside it.
+
+Every stylesheet cite below was read at `99b5383` in
+`assets/css/statifier_blocks.css` and is written anchor first, line second.
+
+### 1. Section 5's "The column widths do not move between states" holds under a condition
+
+The sentence (`:13212`) reasons from the template being declared once and the
+members' boxes being the same in every state. Both premises hold at
+`99b5383`: the template is declared only in the `.sb-node__chrome` rule
+(`grid-template-columns: auto minmax(calc(var(--sb-text-md) * 6.5), 1fr) auto auto`,
+`:1100`), and the reveal is `opacity`, which changes no box (the comment above
+that rule). But the strip's `overflow` differs between the states, and that
+changes how the strip's `auto` track is sized:
+
+- **At rest** the `.sb-node__chrome > .sb-node__strip` rule (`:1114`) declares
+  `overflow: hidden`, which makes the strip a scroll container, and a grid
+  item that is a scroll container has an automatic minimum width of 0 (CSS
+  Grid Layout, "Automatic Minimum Size of Grid Items").
+- **Revealed** the rule headed `.sb-node__chrome:hover > .sb-node__strip`
+  (`:1140-1146`) declares `overflow: visible`, so the strip's automatic minimum
+  is its min-content width. With `flex-wrap: wrap` from the same rule, that is
+  the width of its widest member; the delete offer's pair wraps too
+  (`.sb-node__offer[data-reveal="always"]`, `flex-wrap: wrap`, `:1388-1394`),
+  so it counts as the wider of its two buttons.
+
+The strip's max-content width is the same in both states (every member on one
+line), and the track grows toward it only as far as the title's minimum
+leaves. So the sentence holds **while the widest single strip member fits in
+the width the title's minimum leaves the strip**: then both states resolve
+the strip's track to the same width. A member wider than that would size the
+revealed track past it, and the widths would move; the title's track keeps its
+minimum, so the row would overflow the chrome rather than narrow the title.
+That last sentence is what the grid's sizing rules give, not a browser
+reading.
+
+On the card section 5 read, the condition is met with room to spare. That
+card is a leaf with no badge, at a 16px root: the content row is 206px (the
+2026-09-18 Amendment's item 3, `:11744`, from `--sb-card-width: 14rem`,
+`:394`, less the `.sb-node` rule's 1px border and `--sb-space` padding, `:804`
+and `:806`); less the 24px icon column (`width: var(--sb-space-3)`,
+`:1215`, in the `.sb-node__icon` rule opening at `:1209`), the chrome's three
+8px column gaps (`column-gap: var(--sb-space)`, `:1102`), the empty badge
+column and the title's 91px minimum (6.5 times 14px), it leaves 67px, which
+is the strip track section 5 read (`24px 91px 0px 67px`). Every member
+of `<div class="sb-node__strip">` in `lib/statifier_blocks/editor/block_node.ex`
+(`:455`) draws one short word: `save` (the control or its stand-in), `steps`,
+`+` or `-`, `x`, and the offer's `keep` and `x` with a count. This Note takes
+no new browser reading, and it does not say which other cards meet the
+condition.
+
+### 2. Section 6's count sits beside its list here
+
+Section 6's first bullet says "every card of the twelve documents above"
+(`:13237`); the list it counts is section 3's (`:13167-13172`), two sections
+up. The twelve documents are: `card_processing`, `card_processing_sketch`,
+`card_processing_composite`, `signup_wizard`, `signup_invitations`,
+`signup_onboarding`, `signup_bulk_invites`, `signup_bulk_invites_strict`,
+`signup_invite_chunk`, `signup_guarded_step`, `signup_guarded_section` and
+`signup_path`.
+
+### 3. The Why paragraph's list gains the collapse section 5 retires
+
+The Amendment's "Why this is an Amendment and not a Note" paragraph
+(`:13120`) names item 4's "at all times" (`:10553-10555`) and the 2026-09-18
+Amendment's "Every resting member of the strip ... item 4's reservation in
+full" (`:11646-11647`) as the answers it narrows. Its section 5 narrows a
+third, in its last paragraph (`:13228-13230`): it retires, for this layout,
+the collapse the 2026-09-18 Amendment measured in its item 3, whose sentence
+"That collapse is what this section decides to accept" (`:11773`) is an
+answer that record gave. The title column no longer gives up width when an
+offer opens, because the offer's pair wraps inside the strip's column
+rather than widening it, under the condition item 1 above states. That
+retirement belongs in the Why paragraph's list beside the other two, and it
+is read there from this Note.
+
+### What this Note does not do
+
+It edits no line above it, moves no status line, takes no browser reading,
+and changes no code, test or changelog fragment.
+
+Filed with `sb-f7y4`.
