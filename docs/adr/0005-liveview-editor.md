@@ -13565,3 +13565,118 @@ exactly as decision 7 records it.
 - **A host's side is unchanged.** Decision 7's delivery - a `file:`
   dependency and an import in `app.js` - is still the whole of what a host
   does to get the package's JavaScript.
+
+## Amendment (2026-09-28): item 4's control strip wraps its members at rest, so a card is the same height at rest and on hover
+
+**Status: proposed (2026-09-28, bead `sb-sk59`, ruled by the operator,
+2026-09-28).** A decision record merges at proposed and is flipped to
+accepted by a separate request once the code below has shipped in a
+published version of this package. Additive: the Amendment of 2026-09-25 on
+item 4's control strip (`:13108`), the Note of 2026-09-27 that corrects its
+prose (`:13329`), and every clause above this line stand as printed except
+where this section says which of their sentences it narrows. **No text above
+this line is edited by this section**, no line above it is removed, and the
+head `Status:` line at `:3` is not extended.
+
+**Why this is an Amendment and not a Note.** `docs/adr/README.md`, its
+paragraph on Notes and Amendments, gives the test: an amendment "changes what
+the record decides and a note does not". The Amendment of 2026-09-25 decides
+that at rest the strip "now lays its members out on one line (`flex-wrap:
+nowrap`)" (`:13184-13185`), and that the reclaim rule "declares `flex-wrap: wrap`
+and `overflow: visible` and nothing else" (`:13199`). This section changes
+both answers.
+
+Cites of the rules in `assets/css/statifier_blocks.css` that this request
+changes are by anchor alone. The code cites into
+`lib/statifier_blocks/editor/block_node.ex` were read at `06a4053` and are
+written anchor first, line second.
+
+### 1. What the Amendment of 2026-09-25 left
+
+Its section 5 records the consequence: "What a reveal can change is the
+strip's **height**" (`:13219`), and "A card with a one-line title and no
+second line would grow on hover by the rows its strip wraps to" (`:13223-13224`).
+The strip kept one row at rest and wrapped only when revealed, so on a card
+whose text column stands shorter than the strip's wrapped rows, the card
+grew on hover, on selection and under keyboard focus, and shrank back when
+the state left. No example card was seen doing it; the card that shows it is
+the smallest one the section names: one line of title, no second line, and a
+strip that wraps to more than one row.
+
+### 2. The ruling
+
+Ruled by the operator, 2026-09-28: the strip reserves its wrapped height at
+rest.
+
+### 3. The decision
+
+**At rest the strip wraps.** The strip's rule
+(`.sb-node__chrome > .sb-node__strip`) declares `flex-wrap: wrap` in place
+of `flex-wrap: nowrap`, and keeps `overflow: hidden`. Its members take the
+rows they wrap to in every state, whether or not any of them is shown, so the
+rows are held at rest the way item 4's column holds the width. Every member
+the strip can clip at rest is still hidden at rest, and a clipped box still
+cannot take a pointer outside the card.
+
+**The reclaim rule gives up the clip and nothing else.** The rule headed
+`.sb-node__chrome:hover > .sb-node__strip`, with its four selectors
+unchanged, declares `overflow: visible` alone. It no longer declares a wrap
+of its own, because the rest rule already wraps.
+
+**The height follows the width's condition.** The Note of 2026-09-27,
+item 1, states the condition under which the strip's track is the same width
+at rest and revealed: the widest single strip member fits in the width the
+title's minimum leaves the strip. Under that condition the strip lays out
+the same members, in boxes that are the same in every state, in the same
+width with the same wrap, so it takes the same rows, and a reveal changes
+neither the strip's width nor its height. The card's height follows: its
+first row is the taller of the title and the strip, and neither moves. A member
+wider than that width still widens the revealed track, as that Note says,
+and then the rows can differ too.
+
+### 4. What this narrows
+
+- The Amendment of 2026-09-25, section 4's "now lays its members out on one
+  line (`flex-wrap: nowrap`)" (`:13184-13185`) and "It declares `flex-wrap: wrap`
+  and `overflow: visible` and nothing else" (`:13199`) are read with section
+  3 above beside them. Its "It reclaims them by wrapping inside its column,
+  not by widening it" (`:13201`) holds with the wrap now taken at rest.
+- Its section 5's "What a reveal can change is the strip's **height**"
+  (`:13219`) and its sentence on the one-line card (`:13223-13224`) no
+  longer hold under the width's condition.
+- The Note of 2026-09-27, item 1's "With `flex-wrap: wrap` from the same
+  rule" (`:13356`) reads with the wrap coming from the rest rule.
+
+### 5. What stands
+
+- **The yield.** The title's column keeps its minimum
+  (`auto minmax(calc(var(--sb-text-md) * 6.5), 1fr) auto auto` in the
+  `.sb-node__chrome` rule), and the strip still clips at rest.
+- **The reservation.** Every card still draws the strip
+  (`<div class="sb-node__strip">`, `block_node.ex:455`), and the Save
+  stand-in is still drawn on every card that could carry Save
+  (`class="sb-node__strip-reserve"`, `block_node.ex:472`), so selecting a
+  card still swaps one box for another of the same size.
+- **The card width and the control set** are unchanged: no control is
+  added, removed or re-worded.
+
+### What this amendment does not decide
+
+It takes no browser reading and claims no pixel height: the suite has no
+browser, so the height is pinned on the rules the strip resolves. It edits no
+line above it and moves no status line.
+
+### Consequences
+
+- A card whose strip wraps to more rows than its text takes is taller at
+  rest than it was, by those rows, and no longer grows on hover. A card whose
+  text stands taller than its strip's rows is unchanged.
+- The change is in the next release's changelog (`changelog.d/sb-sk59.md`).
+- The tests are in the describe "the title keeps a minimum and the strip
+  yields to it at rest" in `test/statifier_blocks/editor/presentation_test.exs`:
+  "at rest the strip wraps its members and clips what the title's minimum
+  leaves no room for", "on hover, selection, focus and an always-revealed
+  member the strip reclaims every member", and "a card whose text is shorter
+  than its wrapped strip is the same height at rest and on hover".
+
+Filed with `sb-sk59`.

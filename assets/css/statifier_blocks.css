@@ -1110,45 +1110,51 @@
  * to spell as the difference between two `right` calculations. The controls
  * are in DOM order left to right - Save, Expand or the fold, then the `x` -
  * which is the order they were drawn in before and is now also the order a
- * keyboard reaches them in. */
+ * keyboard reaches them in.
+ *
+ * `flex-wrap: wrap` here, at rest, and not only in the reclaim rule below
+ * (ADR-0005's Amendment of 2026-09-28 on item 4's strip): the strip lays its
+ * members out in the rows they wrap to whether or not any of them is shown,
+ * so the rows are reserved at rest the way the column reserves the width. A
+ * strip that kept one line at rest and wrapped only when revealed grew a
+ * card whose text was shorter than its wrapped strip on hover. */
 .sb-node__chrome > .sb-node__strip {
   grid-column: 4;
   grid-row: 1;
   align-self: start;
   display: inline-flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--sb-space-half);
   overflow: hidden;
 }
 
 /* The strip reclaims its members (ADR-0005's Amendment of 2026-09-25 on
- * item 4). At rest the rule above lays the strip out on one line and clips
- * what the title's minimum leaves no room for: every member it can clip is
- * hidden at rest anyway, and a clipped box cannot take a pointer outside the
- * card. That is the yield. Here the strip gets all of them back: on hover, on
- * the selected card, while a strip control has keyboard focus (the
- * keyboard's hover), and whenever the strip holds a member that is revealed
- * at all times - the delete offer, or a folded container's `+` - because a
+ * item 4). At rest the rule above clips what the title's minimum leaves no
+ * room for: every member it can clip is hidden at rest anyway, and a
+ * clipped box cannot take a pointer outside the card. That is the yield.
+ * Here the strip gets all of them back: on hover, on the selected card,
+ * while a strip control has keyboard focus (the keyboard's hover), and
+ * whenever the strip holds a member that is revealed at all times - the delete offer, or a folded container's `+` - because a
  * control on show must never be the one clipped.
  *
- * It reclaims them by WRAPPING inside the column rather than by widening it.
- * The column's width comes from the grid template, which no state
+ * It reclaims them by giving up the clip, inside the column rather than by
+ * widening it, and in the rows the rule above already wraps them to. The
+ * column's width comes from the grid template, which no state
  * redeclares, and from the members' own boxes, which are the same in every
  * state. That holds the width under one condition (ADR-0005's Note of
  * 2026-09-27, item 1): the `overflow` is not the same in every state. At rest
  * `overflow: hidden` lets the strip's track shrink to nothing; here
  * `overflow: visible` floors it at the widest single member. So the title
  * keeps the width it had at rest WHILE THE WIDEST SINGLE STRIP MEMBER FITS in
- * the width the title's minimum leaves the strip, and then what a reveal can
- * change is the strip's height, by the rows its wrapped members take. A
- * member wider than that would widen the revealed track and the widths would
- * move. */
+ * the width the title's minimum leaves the strip, and then the strip wraps to
+ * the same rows at rest and revealed, so a reveal changes neither its width
+ * nor its height. A member wider than that would widen the revealed track and
+ * the widths would move. */
 .sb-node__chrome:hover > .sb-node__strip,
 .sb-node--selected > .sb-node__chrome > .sb-node__strip,
 .sb-node__chrome > .sb-node__strip:focus-within,
 .sb-node__chrome > .sb-node__strip:has(> [data-reveal="always"]) {
-  flex-wrap: wrap;
   overflow: visible;
 }
 
