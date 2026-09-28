@@ -46,10 +46,13 @@ defmodule StatifierBlocks.Core.Config do
   # something a host's datamodel legitimately declares would be a second,
   # quieter proposal riding along with the rule it spells.
   #
-  # Any whitespace, not just the space/tab/newline trio: a carriage return,
-  # a vertical tab, or a non-breaking space is whitespace too, and a check
-  # that only named three characters would let the rest through a rule
-  # whose stated shape is "no whitespace".
+  # All six ASCII whitespace characters, not just the space/tab/newline
+  # trio: a carriage return, a vertical tab or a form feed is whitespace
+  # too, and a check that only named three characters would let the rest
+  # through a rule whose stated shape is "no whitespace". ASCII only: the
+  # regex carries no `u` flag, so a non-breaking space (U+00A0) or any
+  # other Unicode space is NOT whitespace here and passes. The shipped
+  # block-document schema's datamodel-path pattern refuses the same six.
   @spec datamodel_path?(term()) :: boolean()
   def datamodel_path?(value),
     do: non_empty_string?(value) and not Regex.match?(@whitespace, value)
