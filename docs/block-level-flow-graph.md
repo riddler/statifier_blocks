@@ -416,3 +416,17 @@ timed_out` (ADR-0016, decision 1).
 
 Until the module ships in a published version, the introduction's
 sentence stays true of main. Every other claim here is unchanged.
+
+## Note (2026-09-27): the describe's timer edge
+
+This is a dated note on the sentence in "Edges: what the compiler emits
+between blocks" that the coupling of two blocks by an event name alone is
+not an edge, not a change to it. That sentence stays true of the compiled
+chart and of the graph this note lifts. `StatifierBlocks.Describe`, which
+reads the document's structure rather than lifting a chart, draws one
+describe-level exception (ADR-0016's amendment of 2026-09-27 and ADR-0017
+decision 3, both at proposed): a `:timer` edge from a delayed `core.send`
+to every `core.on_event` and `core.await` that names its event, labelled
+with the delay. It is not a transition. In the patron registration worked
+example it joins `blk_PDLN` to `blk_PEXP`; the library loan has no delayed
+send and gains none.

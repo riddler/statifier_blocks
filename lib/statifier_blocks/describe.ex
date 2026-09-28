@@ -78,20 +78,52 @@ defmodule StatifierBlocks.Describe do
   Every other type - `core.parallel`, `core.foreach`, `core.map`,
   `core.subchart`, `core.invoke`, a composite, a host type - is described
   by containment and its node's `fan_label` alone, and draws no edge among
-  its children; a block of one still takes part in its parent's edges. An
-  event name shared by a send and a handler is not an edge.
+  its children; a block of one still takes part in its parent's edges.
+
+  ## The timer edge, the one edge an event name draws
+
+  An event name shared by a send and a handler is not an edge, with one
+  named exception (ADR-0016's amendment of 2026-09-27, ADR-0017 decision
+  3): a delayed `core.send`, one whose `delay` is a duration
+  `StatifierBlocks.Core.Duration.duration?/1` accepts, draws one `:timer`
+  edge to every `core.on_event` and `core.await` anywhere in the document
+  whose `event` is the send's `event`, the same string. The edge runs from
+  the send to the rule or await, its container is the send's parent, and
+  it carries the event and the delay as the send's config holds it. Only
+  blocks the palette resolved take part, and a block inside a drafts shelf
+  takes part in none. An undelayed send draws none. It is read from config,
+  never compiled, and it is not a transition: it says that the send arms an
+  event the other block waits for.
+
+  Timer edges follow every other edge, in the outline's order of their
+  sends and, for one send, of their targets. A document with no delayed
+  send describes exactly as it would without them.
 
   ## Lines
 
   `render/2` answers one line per node, then one per edge, in the
-  outline's orders; ADR-0016 decision 2 gives each default line's words.
+  outline's orders; ADR-0016 decision 2 gives each default line's words,
+  and a timer edge's line is `In <delay>, <event> reaches <target>`, the
+  delay written in the words `core.send`'s own sentence uses (`24h` reads
+  as `24 hours`).
   Every line is non-blank English with no newline, carriage return or tab,
   and uncapped: a newline, carriage return or tab inside an author's text
   is written as one space. A block's id never appears in a default line.
   """
 
-  alias StatifierBlocks.{Block, BlockType, Document, Palette, ViewModel}
-  alias StatifierBlocks.Core.{Branch, Group, ResumableGroup, Sequence}
+  alias StatifierBlocks.{Block, BlockType, Document, Palette, Shelf, ViewModel}
+
+  alias StatifierBlocks.Core.{
+    Await,
+    Branch,
+    Duration,
+    Group,
+    OnEvent,
+    ResumableGroup,
+    Send,
+    Sequence
+  }
+
   alias StatifierBlocks.Describe.{Edge, Node}
 
   @type t :: %__MODULE__{
@@ -130,7 +162,8 @@ defmodule StatifierBlocks.Describe do
     outcomes = Map.new(nodes, fn %Node{id: id, outcomes: names} -> {id, names} end)
 
     edges =
-      Enum.flat_map(entries, fn {vm_node, _depth, _kind} -> edges(vm_node, lookup, outcomes) end)
+      Enum.flat_map(entries, fn {vm_node, _depth, _kind} -> edges(vm_node, lookup, outcomes) end) ++
+        timer_edges(entries, lookup)
 
     %__MODULE__{id: document.id, revision: document.revision, nodes: nodes, edges: edges}
   end
@@ -379,12 +412,86 @@ defmodule StatifierBlocks.Describe do
   # The event a handler listens for, as its resolved config holds it.
   @spec event(ViewModel.Node.t(), lookup()) :: String.t() | nil
   defp event(%ViewModel.Node{block_id: id}, lookup) do
-    with {_parent, {:ok, _ref, %Block{config: %{"event" => event}}}} when is_binary(event) <-
-           Map.get(lookup, id),
-         false <- String.trim(event) == "" do
-      event
+    case Map.get(lookup, id) do
+      {_parent, {:ok, _ref, %Block{config: config}}} -> config_event(config)
+      _unresolvable -> nil
+    end
+  end
+
+  # A config's `event`, when it is a non-blank string.
+  @spec config_event(map()) :: String.t() | nil
+  defp config_event(%{"event" => event}) when is_binary(event) do
+    if String.trim(event) == "", do: nil, else: event
+  end
+
+  defp config_event(_config), do: nil
+
+  # One `:timer` edge per delayed send and rule or await naming its event,
+  # in the outline's order of the sends and then of the targets. Read over
+  # the whole document rather than inside a container: only blocks the
+  # palette resolved take part, and nothing inside a drafts shelf. A block
+  # with no usable event is filtered out where its `event` is bound: a
+  # comprehension's `event = nil` is a false filter.
+  @spec timer_edges([{ViewModel.Node.t(), non_neg_integer(), ViewModel.kind()}], lookup()) ::
+          [Edge.t()]
+  defp timer_edges(entries, lookup) do
+    blocks =
+      Enum.flat_map(entries, fn {vm_node, _depth, _kind} -> timer_party(vm_node, lookup) end)
+
+    targets =
+      for {id, _parent, module, config} when module in [OnEvent, Await] <- blocks,
+          event = config_event(config),
+          do: {id, event}
+
+    for {id, parent, Send, config} when is_binary(parent) <- blocks,
+        delayed?(Map.get(config, "delay")),
+        event = config_event(config),
+        {target, ^event} <- targets,
+        do: timer_edge({id, parent, config}, target, event)
+  end
+
+  # A block that may take part in a timer edge: resolved, and not shelved.
+  @spec timer_party(ViewModel.Node.t(), lookup()) ::
+          [{Block.id(), Block.id() | nil, module(), map()}]
+  defp timer_party(%ViewModel.Node{block_id: id}, lookup) do
+    with {parent, {:ok, ref, %Block{config: config}}} <- Map.get(lookup, id),
+         false <- shelved?(id, lookup) do
+      [{id, parent, module(ref), config}]
     else
-      _no_event -> nil
+      _unresolvable_or_shelved -> []
+    end
+  end
+
+  @spec timer_edge({Block.id(), Block.id(), map()}, Block.id(), String.t()) :: Edge.t()
+  defp timer_edge({send, parent, config}, target, event) do
+    %Edge{
+      kind: :timer,
+      container: parent,
+      from: {:block, send},
+      to: {:block, target},
+      event: event,
+      delay: Map.get(config, "delay")
+    }
+  end
+
+  # ADR-0017 decision 2's test: a delay counts when it is a duration.
+  @spec delayed?(term()) :: boolean()
+  defp delayed?(delay), do: Duration.duration?(delay)
+
+  # Whether the block, or any block above it, is a drafts shelf.
+  @spec shelved?(Block.id() | nil, lookup()) :: boolean()
+  defp shelved?(nil, _lookup), do: false
+
+  defp shelved?(id, lookup) do
+    case Map.get(lookup, id) do
+      {parent, {:ok, _ref, %Block{type: type}}} ->
+        Shelf.shelf_type?(type) or shelved?(parent, lookup)
+
+      {parent, {:unresolvable, %Block{type: type}}} ->
+        Shelf.shelf_type?(type) or shelved?(parent, lookup)
+
+      nil ->
+        false
     end
   end
 
@@ -422,6 +529,13 @@ defmodule StatifierBlocks.Describe do
     at = if edge.history, do: " at #{edge.history} history", else: ""
 
     "#{on}, #{target(s, edge.from)} #{does} #{sentence(s, edge.container)}#{at}"
+  end
+
+  defp edge_line(%Edge{kind: :timer} = edge, s) do
+    delay = Send.delay_words(edge.delay) || "its delay"
+    event = if edge.event, do: flat(edge.event), else: "its event"
+
+    "In #{delay}, #{event} reaches #{target(s, edge.to)}"
   end
 
   @spec arm(Edge.condition()) :: String.t()

@@ -13,7 +13,7 @@ defmodule StatifierBlocks.Describe.Phrasing do
   | Callback | Asked for |
   |---|---|
   | `step/2`, `arm/2`, `rail/2`, `tray/2` | a node of that `kind` |
-  | `entry/2`, `sequence/2`, `branch/2`, `interrupt/2`, `exit/2` | an edge of that `kind` |
+  | `entry/2`, `sequence/2`, `branch/2`, `interrupt/2`, `exit/2`, `timer/2` | an edge of that `kind` |
 
   Every callback is optional; an undeclared one keeps the default line.
 
@@ -69,6 +69,9 @@ defmodule StatifierBlocks.Describe.Phrasing do
   @doc "The line for an `:exit` edge."
   @callback exit(edge :: Edge.t(), default :: String.t()) :: answer()
 
+  @doc "The line for a `:timer` edge."
+  @callback timer(edge :: Edge.t(), default :: String.t()) :: answer()
+
   @optional_callbacks step: 2,
                       arm: 2,
                       rail: 2,
@@ -77,5 +80,6 @@ defmodule StatifierBlocks.Describe.Phrasing do
                       sequence: 2,
                       branch: 2,
                       interrupt: 2,
-                      exit: 2
+                      exit: 2,
+                      timer: 2
 end

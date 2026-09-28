@@ -16,6 +16,7 @@ defmodule StatifierBlocks.Describe.Edge do
   | `:exit` | the last child of a slot | `{:exit, container}` | `outcomes` |
   | `:branch` | `{:entry, branch}` | an arm's first child, or `{:exit, branch}` for an empty arm | `condition` |
   | `:interrupt` | a handler | `{:exit, group}` to abandon, `{:body, group}` to resume | `event`, `history` |
+  | `:timer` | a delayed `core.send` | `{:block, id}`, a `core.on_event` or `core.await` naming the sent event | `event`, `delay` |
 
   `outcomes` is every outcome name the source block's type declares, on
   the one edge. `condition` is the arm's condition as its config holds it
@@ -23,11 +24,18 @@ defmodule StatifierBlocks.Describe.Edge do
   `:shallow` or `:deep` for a resume into a `core.resumable_group`, and
   `nil` otherwise: a resume into a `core.group` restarts its body from the
   first step.
+
+  A `:timer` edge is the one edge that joins two blocks by an event name
+  (ADR-0016's amendment of 2026-09-27, ADR-0017 decision 3): it is not a
+  transition, it says that the send arms an event the other block waits
+  for. Its `container` is the send's parent, `event` is the sent event, and
+  `delay` is the send's delay as its config holds it, the edge's label.
+  `delay` is `nil` on every other kind of edge.
   """
 
   alias StatifierBlocks.Block
 
-  @type kind :: :entry | :sequence | :exit | :branch | :interrupt
+  @type kind :: :entry | :sequence | :exit | :branch | :interrupt | :timer
 
   @type endpoint ::
           {:block, Block.id()} | {:entry, Block.id()} | {:exit, Block.id()} | {:body, Block.id()}
@@ -42,7 +50,8 @@ defmodule StatifierBlocks.Describe.Edge do
           outcomes: [String.t()],
           condition: condition(),
           event: String.t() | nil,
-          history: :shallow | :deep | nil
+          history: :shallow | :deep | nil,
+          delay: String.t() | nil
         }
 
   @enforce_keys [:kind, :container, :from, :to]
@@ -54,6 +63,7 @@ defmodule StatifierBlocks.Describe.Edge do
     outcomes: [],
     condition: nil,
     event: nil,
-    history: nil
+    history: nil,
+    delay: nil
   ]
 end

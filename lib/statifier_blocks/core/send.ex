@@ -241,9 +241,12 @@ defmodule StatifierBlocks.Core.Send do
 
   # `nil` is "no delay to name": absent, empty, or a value the duration
   # grammar does not read. A valid duration never holds whitespace, so
-  # what comes back is always one line.
+  # what comes back is always one line. Not part of the public API: it is
+  # public only so `StatifierBlocks.Describe` writes a timer edge's delay
+  # in the words this sentence uses.
+  @doc false
   @spec delay_words(term()) :: String.t() | nil
-  defp delay_words(delay) do
+  def delay_words(delay) do
     cond do
       not Duration.duration?(delay) -> nil
       Regex.match?(@short_form, delay) -> in_words(delay)

@@ -36,10 +36,14 @@ defmodule StatifierBlocks.DescribeTest do
     # The note's lifted listing, edge for edge, with the one difference
     # ADR-0016 decision 1 names: an await's edge carries the outcomes its
     # type declares, `received` and `timed_out`, where the compiled listing
-    # says `received` for an await with no timeout.
+    # says `received` for an await with no timeout. Beyond the listing, and
+    # after every edge it shows, the timer edge from the deadline send to
+    # the rule its event arms (ADR-0017 decision 3).
     #
     # Sabotage: in `Describe.interrupt_edge/4`'s abandon clause, target
     # `{:body, group}` -> both abandon edges end at the body, red.
+    # Sabotage: in `Describe.timer_edge/3`, set `container` to the send
+    # itself -> the timer edge's container is `blk_PDLN`, red.
     test "patron registration produces the note's edges" do
       document = decode!(Path.join(@documents, "patron_registration.json"))
 
@@ -60,8 +64,21 @@ defmodule StatifierBlocks.DescribeTest do
                ),
                edge(:interrupt, "blk_PGRP", {:block, "blk_PEXP"}, {:exit, "blk_PGRP"},
                  event: "registration.deadline"
+               ),
+               edge(:timer, "blk_PGRP", {:block, "blk_PDLN"}, {:block, "blk_PEXP"},
+                 event: "registration.deadline",
+                 delay: "24h"
                )
              ]
+    end
+
+    # Sabotage: in `Describe.edge_line/2`'s timer clause, write the stored
+    # delay instead of its words -> the line reads `In 24h, ...`, red.
+    test "patron registration renders the timer edge's line last" do
+      document = decode!(Path.join(@documents, "patron_registration.json"))
+
+      assert document |> outline() |> Describe.render([]) |> List.last() ==
+               "In 24 hours, registration.deadline reaches When registration.deadline, abandon"
     end
 
     # Sabotage: in `Describe.branch_edges/2`, drop the `pick` from each
@@ -430,6 +447,216 @@ defmodule StatifierBlocks.DescribeTest do
       assert Enum.filter(outline(Document.new(root)).edges, &(&1.kind == :interrupt)) == [
                edge(:interrupt, "g", {:block, "h"}, {:exit, "g"})
              ]
+    end
+  end
+
+  describe "the timer edge" do
+    defp delayed(id, event, delay),
+      do: Block.new("core.send", id: id, config: %{"event" => event, "delay" => delay})
+
+    defp await(id, event), do: Block.new("core.await", id: id, config: %{"event" => event})
+
+    defp rule(id, event),
+      do: Block.new("core.on_event", id: id, config: %{"event" => event, "outcome" => "abandon"})
+
+    # Two delayed sends of one event, each reaching the await and the rule
+    # that name it; an undelayed send of the same event and an await of
+    # another event take part in none.
+    defp timers do
+      Block.new("core.sequence",
+        id: "root",
+        slots: %{
+          "body" => [
+            delayed("first", "loan.due", "1h30m"),
+            await("waits", "loan.due"),
+            Block.new("core.group",
+              id: "g",
+              slots: %{
+                "body" => [
+                  Block.new("core.send", id: "now", config: %{"event" => "loan.due"}),
+                  delayed("second", "loan.due", "2d"),
+                  await("other", "loan.returned")
+                ],
+                "interrupts" => [rule("rule", "loan.due")]
+              }
+            )
+          ]
+        }
+      )
+      |> Document.new()
+      |> outline()
+    end
+
+    # Sabotage: in `Describe.timer_edges/2`, drop the delay test -> the
+    # undelayed send `now` draws two timer edges, red.
+    test "a delayed send reaches every rule and await naming its event, in outline order" do
+      timer_edges = Enum.filter(timers().edges, &(&1.kind == :timer))
+
+      assert timer_edges == [
+               edge(:timer, "root", {:block, "first"}, {:block, "waits"},
+                 event: "loan.due",
+                 delay: "1h30m"
+               ),
+               edge(:timer, "root", {:block, "first"}, {:block, "rule"},
+                 event: "loan.due",
+                 delay: "1h30m"
+               ),
+               edge(:timer, "g", {:block, "second"}, {:block, "waits"},
+                 event: "loan.due",
+                 delay: "2d"
+               ),
+               edge(:timer, "g", {:block, "second"}, {:block, "rule"},
+                 event: "loan.due",
+                 delay: "2d"
+               )
+             ]
+    end
+
+    # Sabotage: in `Describe.outline/3`, put the timer edges ahead of the
+    # container edges -> the first edge is a timer edge, red.
+    test "timer edges follow every other edge, and render byte-identically" do
+      described = timers()
+      {others, timer_edges} = Enum.split_while(described.edges, &(&1.kind != :timer))
+
+      assert length(timer_edges) == 4
+      assert Enum.all?(timer_edges, &(&1.kind == :timer))
+      refute Enum.any?(others, &(&1.kind == :timer))
+      assert Enum.all?(others, &(&1.delay == nil))
+
+      first = Describe.render(described, [])
+      second = Describe.render(timers(), [])
+      assert :erlang.term_to_binary(first) == :erlang.term_to_binary(second)
+
+      assert Enum.take(first, -4) == [
+               "In 1 hour 30 minutes, loan.due reaches Wait for loan.due",
+               "In 1 hour 30 minutes, loan.due reaches When loan.due, abandon",
+               "In 2 days, loan.due reaches Wait for loan.due",
+               "In 2 days, loan.due reaches When loan.due, abandon"
+             ]
+    end
+
+    # Sabotage: in `Describe.delayed?/1`, accept any binary delay -> the
+    # `soon` send draws a timer edge, red.
+    test "a document with no delayed send answers no timer edge" do
+      refute Enum.any?(outline(decode!(@library_loan)).edges, &(&1.kind == :timer))
+
+      root =
+        Block.new("core.sequence",
+          id: "root",
+          slots: %{
+            "body" => [
+              delayed("empty", "loan.due", ""),
+              delayed("unreadable", "loan.due", "soon"),
+              Block.new("core.send", id: "absent", config: %{"event" => "loan.due"}),
+              await("waits", "loan.due")
+            ]
+          }
+        )
+
+      refute Enum.any?(outline(Document.new(root)).edges, &(&1.kind == :timer))
+    end
+
+    # A send with a delay but no usable event names nothing, so it does not
+    # reach a rule or await that names nothing either: a blank event is no
+    # event, on either end.
+    #
+    # Sabotage: in `Describe.timer_edges/2`, bind both ends' `event` with
+    # `Map.get(config, "event")` instead of `config_event/1` -> the blank
+    # send reaches the blank await, red.
+    test "a delayed send with no event reaches nothing" do
+      root =
+        Block.new("core.sequence",
+          id: "root",
+          slots: %{
+            "body" => [
+              Block.new("core.send", id: "blank", config: %{"event" => " ", "delay" => "1d"}),
+              Block.new("core.send", id: "absent", config: %{"delay" => "1d"}),
+              Block.new("core.await", id: "blank_wait", config: %{"event" => " "}),
+              Block.new("core.await", id: "absent_wait", config: %{})
+            ]
+          }
+        )
+
+      refute Enum.any?(outline(Document.new(root)).edges, &(&1.kind == :timer))
+    end
+
+    # Sabotage: in `Describe.timer_party/2`, drop the shelf test -> the
+    # shelved send and the shelved await draw timer edges, red.
+    test "a block inside a drafts shelf takes part in no timer edge" do
+      root =
+        Block.new("core.sequence",
+          id: "root",
+          slots: %{
+            "body" => [
+              delayed("live", "loan.due", "7d"),
+              await("waits", "loan.due"),
+              Block.new("core.drafts",
+                id: "shelf",
+                slots: %{
+                  "body" => [
+                    delayed("shelved_send", "loan.due", "1d"),
+                    Block.new("core.sequence",
+                      id: "shelved_seq",
+                      slots: %{"body" => [await("shelved_await", "loan.due")]}
+                    )
+                  ]
+                }
+              )
+            ]
+          }
+        )
+
+      assert Enum.filter(outline(Document.new(root)).edges, &(&1.kind == :timer)) == [
+               edge(:timer, "root", {:block, "live"}, {:block, "waits"},
+                 event: "loan.due",
+                 delay: "7d"
+               )
+             ]
+    end
+
+    # Sabotage: in `Describe.timer_party/2`, let an unresolvable block take
+    # part as an await -> the unresolvable block `odd`, whose own
+    # config names the event, draws a timer edge, red.
+    test "only blocks the palette resolved take part" do
+      root =
+        Block.new("core.sequence",
+          id: "root",
+          slots: %{
+            "body" => [
+              delayed("live", "loan.due", "7d"),
+              Block.new("core.await",
+                id: "odd",
+                type_version: 99,
+                config: %{"event" => "loan.due"}
+              )
+            ]
+          }
+        )
+
+      refute Enum.any?(outline(Document.new(root)).edges, &(&1.kind == :timer))
+    end
+  end
+
+  describe "the phrasing seam for a timer edge" do
+    defmodule TimerHost do
+      @behaviour StatifierBlocks.Describe.Phrasing
+
+      @impl true
+      def timer(%Edge{delay: delay, event: event}, _default),
+        do: "#{event} is armed #{delay} ahead"
+    end
+
+    # Sabotage: in `Describe.render/2`, phrase edges with `:interrupt` for
+    # every kind -> `timer/2` is never asked, the default line stays, red.
+    test "timer/2 rewords the timer edge's line, and only that line" do
+      described =
+        outline(decode!(Path.join(@documents, "patron_registration.json")))
+
+      defaults = Describe.render(described, [])
+      reworded = Describe.render(described, phrasing: TimerHost)
+
+      assert List.last(reworded) == "registration.deadline is armed 24h ahead"
+      assert Enum.drop(reworded, -1) == Enum.drop(defaults, -1)
     end
   end
 

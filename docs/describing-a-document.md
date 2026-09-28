@@ -119,6 +119,17 @@ Every other type is described by containment and its node's fan label alone.
 A `:sequence` or `:exit` edge carries every outcome its source's type
 declares, on the one edge.
 
+One more kind is read across the whole document rather than inside a
+container. A `core.send` with a delay draws a `:timer` edge to every
+`core.on_event` and `core.await` whose `event` is the one it sends: the edge
+runs from the send to the rule or await, its container is the send's parent,
+its `event` is the sent event and its `delay` the send's delay as stored. It
+is not a transition; it says the send arms an event the other block waits
+for. A send with no delay, and any block inside a drafts shelf, draws none.
+Timer edges come after every other edge, and the default line reads
+`In 24 hours, registration.deadline reaches ...`, the delay in the send's own
+words. The loan above has no delayed send, so its outline has none.
+
 To answer "what ends the loan early", read the interrupt edges:
 
 ```elixir
@@ -159,7 +170,7 @@ interrupt_lines = Enum.filter(lines, &String.starts_with?(&1, "On "))
 Implement `StatifierBlocks.Describe.Phrasing` and pass the module as
 `phrasing:`. Each line is offered to the callback named for its node's `kind`
 (`step/2`, `arm/2`, `rail/2`, `tray/2`) or its edge's `kind` (`entry/2`,
-`sequence/2`, `branch/2`, `interrupt/2`, `exit/2`), with the structured node or
+`sequence/2`, `branch/2`, `interrupt/2`, `exit/2`, `timer/2`), with the structured node or
 edge and the default line. Every callback is optional.
 
 ```elixir
