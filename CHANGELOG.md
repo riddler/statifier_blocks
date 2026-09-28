@@ -11,6 +11,31 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.38.0] 2026-09-28
+
+Upgrading a host: a block type's declared field types now bind, so a host
+config its declared field types refuse is now refused before
+`validate_config/1` runs, at compile, at the edit gate and in the view
+model. After taking this version and before deploying it, run
+`StatifierBlocks.Palette.preflight/1` over your palette, and
+`StatifierBlocks.Palette.preflight/2` over the documents you store, and
+correct each declaration or stored block it lists; an empty list means you
+are ready. That is the one change to an existing answer, under Changed.
+0.38.0 is a minor, because it adds to the public surface and changes no
+existing signature: `StatifierBlocks.Schema.for_palette/1` answers a
+draft-07 schema for one palette, and `preflight/1` and `preflight/2` are
+new. The package gains no dependency.
+
+### Added
+
+- `StatifierBlocks.Schema.for_palette/1` answers a draft-07 schema for a palette: the shipped root with every block also judged by its own type's definition, a `core.*` type's from `definitions/core` and a host type's generated from its declared `config_schema/1` and `slots/1`, each declared field typed from its declared field type.
+
+- `StatifierBlocks.Palette.preflight/1` lists every host type in a palette whose own defaults, or the block `Palette.new_block/2` builds from them, disagree with their declared field types, each finding naming the type, the field's key, its declared type and the value; `preflight/2` also lists every block of the given documents whose config its type's declared field types refuse, by block id. A type whose callbacks raise is a finding, never a raise.
+
+### Changed
+
+- A block type's declared field types now bind: a config value whose declared field type in `config_schema/1` does not admit it (an integer in a `:string` field, a value outside a `{:select, choices}`) is refused before `validate_config/1` runs, at compile, at the edit gate and under the field in the view model, with a finding naming the field's key and its declared type; `validate_config/1` still runs and its findings follow. An absent key and a `null` are still the type's own to judge. After taking this version and before deploying it, run the palette pre-flight (`StatifierBlocks.Palette.preflight/1`, or `preflight/2` with your stored documents) over your host types and correct each declaration or stored block it lists, since a host type whose documents disagree with its declared field types will see new `:config` findings.
+
 ## [0.37.0] 2026-09-28
 
 0.37.0 is a minor, because it adds to the public surface and changes no
@@ -3606,6 +3631,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.38.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.38.0
 [0.37.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.37.0
 [0.36.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.36.1
 [0.36.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.36.0
