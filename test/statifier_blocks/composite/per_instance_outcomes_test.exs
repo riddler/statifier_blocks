@@ -503,9 +503,14 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
     #
     # The `:outcomes` key is read in more than one spelling, and the grep
     # takes each: a `Map` read naming the key, an access by `[:outcomes]`, a
-    # dot access that is not a function call, and a one-line map pattern
-    # binding the key. A key read is kept even in a function head, where a
-    # pattern is a read; only the route's NAME is dropped from a head.
+    # dot access that is not a function call, and a one-line map or struct
+    # pattern binding the key. A key read is kept even in a function head,
+    # where a pattern is a read; only the route's NAME is dropped from a head.
+    #
+    # The describe's own `Node` and `Edge` structs carry an `outcomes` field
+    # of their own, read by pattern in `describe.ex`; those reads are of a
+    # described node or edge, never of a composite declaration, so the grep
+    # sets them aside and the test pins exactly which lines it set aside.
     #
     # Sabotage: added a private reader to `composite.ex` in the dot spelling
     # (`defp read(declaration), do: declaration.outcomes`), then in the
@@ -516,13 +521,22 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
       route = ["declared_outcomes(", "declared_outcome_names("]
 
       key_read =
-        ~r/Map\.(get|fetch!?|take|has_key\?|pop)\([^)]*:outcomes\b|\[:outcomes\]|\.outcomes\b(?![(\/\w])|%\{[^}]*\boutcomes: [a-z_]\w*[^}]*\}/
+        ~r/Map\.(get|fetch!?|take|has_key\?|pop)\([^)]*:outcomes\b|\[:outcomes\]|\.outcomes\b(?![(\/\w])|%(?:__MODULE__|[A-Z]\w*(?:\.[A-Z]\w*)*)?\{[^}]*\boutcomes: [a-z_]\w*[^}]*\}/
+
+      describe_struct_read = ~r/%(?:Node|Edge)\{[^}]*\boutcomes: [a-z_]\w*[^}]*\}/
+      describe_path = "lib/statifier_blocks/describe.ex"
 
       head? = fn line ->
         Enum.any?(["defp ", "def ", "@spec ", "@callback "], &String.starts_with?(line, &1))
       end
 
-      call_sites =
+      # A describe line's own struct reads are erased before the key grep
+      # runs, so a composite read on the same line is still caught.
+      key_line = fn path, line ->
+        if path == describe_path, do: Regex.replace(describe_struct_read, line, ""), else: line
+      end
+
+      lines =
         "lib/**/*.ex"
         |> Path.wildcard()
         |> Enum.flat_map(fn path ->
@@ -531,12 +545,30 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
           |> String.split("\n")
           |> Enum.map(&String.trim/1)
           |> Enum.reject(&String.starts_with?(&1, "#"))
-          |> Enum.filter(fn line ->
-            (String.contains?(line, route) and not head?.(line)) or
-              Regex.match?(key_read, line)
-          end)
-          |> Enum.map(&{Path.basename(path), &1})
+          |> Enum.map(&{path, &1})
         end)
+
+      call_sites =
+        lines
+        |> Enum.filter(fn {path, line} ->
+          (String.contains?(line, route) and not head?.(line)) or
+            Regex.match?(key_read, key_line.(path, line))
+        end)
+        |> Enum.map(fn {path, line} -> {Path.basename(path), line} end)
+
+      set_aside =
+        lines
+        |> Enum.filter(fn {path, line} ->
+          Regex.match?(key_read, line) and not Regex.match?(key_read, key_line.(path, line))
+        end)
+        |> Enum.map(fn {path, line} -> {Path.basename(path), line} end)
+
+      # Sabotage: added `def r(%Edge{outcomes: n}), do: n` to `describe.ex` - red here (verified).
+      assert set_aside == [
+               {"describe.ex",
+                "outcomes = Map.new(nodes, fn %Node{id: id, outcomes: names} -> {id, names} end)"},
+               {"describe.ex", "defp carried(%Edge{outcomes: outcomes}),"}
+             ]
 
       # Every call of the declared-list route carries a config. The key reads
       # that do not have no instance to know about: `emit_declaring/2`'s
@@ -546,6 +578,9 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
       # is the route's floor; and `Composite.Data`'s `__composite__/1` takes
       # the key off a data registration, which `C9e` leaves off the
       # per-instance route.
+      # Sabotage: added `def r(%StatifierBlocks.Describe.Node{outcomes: names}), do: names` to
+      # `composite.ex`, then `def r(%Edge{outcomes: n}, %{outcomes: d})` to `describe.ex` - red
+      # here each time (verified); the first is green against the map-only grep this widened.
       assert call_sites == [
                {"compiler.ex", "case Composite.declared_outcome_names(module, block.config) do"},
                {"compiler.ex", "|> Composite.declared_outcome_names(block.config)"},
