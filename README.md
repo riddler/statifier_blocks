@@ -1560,6 +1560,15 @@ clipped, an accent that is not an anchored `--sb-*` name never reaches a style
 attribute, and a `join_label` that raises degrades to the editor's own word.
 Assignability answers with reason-carrying refusals (sb-ue7, in flight).
 
+Two things on the canvas are the design rather than a defect. A summary chip
+is capped at 32 characters: one longer than that is drawn clipped, with an
+ellipsis in its last position, and the chip's `title` carries its full text,
+because a card has a fixed width and does not grow a line for one value. And
+the canvas pane scrolls rather than squeezing the document: at 100 percent
+zoom a document wider than the canvas scrolls horizontally inside the editor.
+The toolbar's zoom steps and `Fit width` bring it into view, and the `fit`
+assign (`:width` or `:active`) opens a document that way.
+
 Routing a compile pass into the drawer's Findings tab is two calls:
 
 ```elixir
