@@ -1127,6 +1127,9 @@ carries the block's id, parent, depth, sentence and declared outcomes, and
 each `StatifierBlocks.Describe.Edge` its kind and endpoints. Edges are found
 inside `core.sequence`, `core.group`, `core.resumable_group` and `core.branch`;
 every other type is described by containment and its node's fan label alone.
+One more kind, `:timer`, is read across the whole document: a delayed
+`core.send` reaches each `core.on_event` and `core.await` that names its
+event, labelled with the delay.
 
 ### Overriding the phrasing
 
