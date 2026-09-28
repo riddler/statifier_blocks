@@ -96,6 +96,11 @@ defmodule StatifierBlocks.Core.Raise do
       order: 8
     }
 
+  @impl true
+  def explain,
+    do:
+      "A raise puts one named event on this execution's own queue straight away, for an interrupt rule on an enclosing group to catch, and the step finishes at once. The raised event is handled before any event arriving from outside."
+
   @doc """
   A compound state whose entry raises `event` and immediately goes final.
 

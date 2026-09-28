@@ -79,6 +79,11 @@ defmodule StatifierBlocks.Core.Group do
       slot_outcome_key: %{"interrupts" => "outcome"}
     }
 
+  @impl true
+  def explain,
+    do:
+      "A group holds a run of steps together with the interrupt rules on its rail. While any step inside it is running, a rule whose event arrives interrupts the group, and the rule either abandons the group, leaving it for good, or resumes it, starting the group again from its first step. For example, a patron registration can be abandoned when its deadline passes before the email address is verified."
+
   @doc """
   This block as one line of prose (ADR-0002's 2026-09-07 amendment).
 

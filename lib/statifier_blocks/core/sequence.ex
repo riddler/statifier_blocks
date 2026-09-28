@@ -61,6 +61,11 @@ defmodule StatifierBlocks.Core.Sequence do
       layout: :stack
     }
 
+  @impl true
+  def explain,
+    do:
+      "A sequence runs its steps one after another, in the order they are listed: each step starts when the one before it has finished, and the sequence is done when its last step is. The outermost block of a document is usually a sequence."
+
   @doc """
   This block as one line of prose (ADR-0002's 2026-09-07 amendment).
 

@@ -173,6 +173,11 @@ defmodule StatifierBlocks.Core.Await do
       order: 15
     }
 
+  @impl true
+  def explain,
+    do:
+      "A Wait for event step holds the flow until a named event arrives, and then finishes as received. With a time limit set, it gives up when the limit passes first and finishes as timed out instead, so the two can be followed by different steps. For example, a patron registration can wait up to a day for the email address to be verified."
+
   @doc """
   The event name, then the deadline when one is stored (ADR-0002
   amendment H6).

@@ -905,6 +905,11 @@ defmodule StatifierBlocks.Core.OnEvent do
       order: 6
     }
 
+  @impl true
+  def explain,
+    do:
+      "An interrupt rule sits on a group's rail and watches for one event while any step in the group is running. When the event arrives, and its condition holds if it has one, the rule interrupts the group: abandon leaves the group for good, and resume handles the event and re-enters the group. It can first copy values from the event into the datamodel. For example, a patron registration is abandoned when registration.deadline arrives."
+
   @doc """
   The outcome's word, then the event name, as a chip list (ADR-0002
   amendment H6).

@@ -37,7 +37,7 @@ defmodule StatifierBlocks.Composite.Data do
   `StatifierBlocks.Palette.call/4`. That is why this module does **not**
   `@behaviour StatifierBlocks.BlockType`: it implements the behaviour's
   callbacks at **one higher arity**, with the state first, and the seam is
-  what does the arithmetic. The behaviour itself is untouched - fourteen
+  what does the arithmetic. The behaviour itself is untouched - fifteen
   callbacks at the arities it declares.
 
   ## Everything the composite amendment decides holds here unchanged

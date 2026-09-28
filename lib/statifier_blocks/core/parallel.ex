@@ -208,6 +208,11 @@ defmodule StatifierBlocks.Core.Parallel do
       join_label: &__MODULE__.join_label/1
     }
 
+  @impl true
+  def explain,
+    do:
+      "A parallel runs its lanes at the same time, with no order between them. By default it is done when every lane is done; it can instead finish as soon as the first lane does, stopping the others. For example, a parcel delivery can notify the sender and the recipient in two lanes at once."
+
   @doc """
   The lane names, as a chip list (ADR-0002 amendment H6).
 

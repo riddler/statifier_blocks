@@ -13,7 +13,7 @@ defmodule StatifierBlocks.Core.Placeholder do
 
   ## Declarations
 
-  Every callback but three is the default `use StatifierBlocks.BlockType`
+  Every callback but four is the default `use StatifierBlocks.BlockType`
   injects (ADR-0007 decision 1), and that is the point rather than an
   economy. `io/1` in particular takes ADR-0003 decision 5's permissive
   default in full - `kinds: [:step]`, `consumes: :unknown`,
@@ -90,6 +90,11 @@ defmodule StatifierBlocks.Core.Placeholder do
       keywords: ["gap", "todo", "missing", "stub", "marker"],
       order: 13
     }
+
+  @impl true
+  def explain,
+    do:
+      "A placeholder marks a step the author has deliberately left unwritten. It does nothing when the flow reaches it, so a preview walks straight through, and every compile warns about it until it is replaced; its note says what belongs there."
 
   @doc """
   The smallest thing a step can be: one compound state carrying a single
